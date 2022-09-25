@@ -1,20 +1,21 @@
 //! A space with miscellaneous demonstrations/tests of functionality.
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
+use std::sync::Arc;
+
+use all_is_cubes::drawing::embedded_graphics::text::{Alignment, TextStyleBuilder};
 use all_is_cubes::transaction::Transaction;
-use all_is_cubes::vui::{install_widgets, LayoutGrant};
+use all_is_cubes::vui::{install_widgets, widgets, Align, Gravity, LayoutGrant, WidgetTree};
 use futures_core::future::BoxFuture;
 use instant::Instant;
 use noise::Seedable as _;
 
 use all_is_cubes::cgmath::{EuclideanSpace as _, One as _, Vector3};
 use all_is_cubes::drawing::embedded_graphics::{
-    geometry::Point,
-    mono_font::{iso_8859_1::FONT_9X18_BOLD, MonoTextStyle},
-    text::{Baseline, Text},
+    mono_font::iso_8859_1::FONT_9X18_BOLD, text::Baseline,
 };
 
-use all_is_cubes::block::{Resolution::*, AIR};
+use all_is_cubes::block::{Block, BlockAttributes, BlockCollision, Resolution::*, AIR};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
@@ -26,14 +27,14 @@ use all_is_cubes::math::{
     GridVector, Rgb,
 };
 use all_is_cubes::raycast::Raycaster;
-use all_is_cubes::space::{LightPhysics, Space, SpacePhysics};
+use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::vui::LayoutTree;
 
 use crate::{
-    clouds::clouds, draw_text_in_blocks, logo::logo_text, noise::NoiseFnExt, space_to_space_copy,
-    wavy_landscape, DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
+    clouds::clouds, logo::logo_text, noise::NoiseFnExt, space_to_space_copy, wavy_landscape,
+    DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
 };
 
 pub(crate) async fn demo_city(
@@ -284,7 +285,6 @@ pub(crate) async fn demo_city(
         let plot_transform = planner
             .find_plot(enclosure_footprint)
             .expect("Out of city space!");
-        let (plot_rotation, _) = plot_transform.decompose().unwrap();
         let plot = exhibit_footprint.transform(plot_transform).unwrap();
 
         // Mark the exhibit bounds
@@ -301,33 +301,75 @@ pub(crate) async fn demo_city(
 
         // TODO: Add "entrances" so it's clear what the "front" of the exhibit is supposed to be.
 
-        // Draw exhibit name
-        let name_transform = GridMatrix::from_translation([
-            exhibit_footprint.lower_bounds().x - 1,
-            0,
-            exhibit_footprint.upper_bounds().z + 1,
-        ]);
-        let truncated_name_bounds = draw_text_in_blocks(
-            universe,
-            &mut space,
-            R32,
-            exhibit_footprint.size().x + 3,
-            plot_transform * name_transform,
-            &Text::with_baseline(
-                exhibit.name,
-                Point::new(0, 0),
-                MonoTextStyle::new(&FONT_9X18_BOLD, palette::ALMOST_BLACK),
-                Baseline::Bottom,
-            ),
-        )?; // TODO: on failure, place an error marker and continue
-        space.fill_uniform(
-            truncated_name_bounds
-                .transform(
-                    plot_transform * name_transform * GridMatrix::from_translation([0, 0, -1]),
+        // Draw exhibit info
+        {
+            let info_resolution = R32;
+            let exhibit_info_space = draw_exhibit_info(exhibit)?; // TODO: on failure, place an error marker and continue ... or at least produce a GenError for context
+
+            // Enforce maximum width (TODO: this should be done inside draw_exhibit_info instead)
+            let bounds_for_info_voxels = GridAab::from_lower_size(
+                exhibit_info_space.bounds().lower_bounds(),
+                GridVector {
+                    x: exhibit_info_space
+                        .bounds()
+                        .size()
+                        .x
+                        .min(enclosure_footprint.size().x * i32::from(info_resolution)),
+                    ..exhibit_info_space.bounds().size()
+                },
+            );
+
+            let info_voxels_widget: WidgetTree = Arc::new(LayoutTree::Stack {
+                direction: Face6::PZ,
+                children: vec![
+                    LayoutTree::leaf(widgets::FrameWidget::with_block(
+                        demo_blocks[Signboard].clone(),
+                    )),
+                    LayoutTree::leaf(Arc::new(widgets::Voxels::new(
+                        bounds_for_info_voxels,
+                        universe.insert_anonymous(exhibit_info_space),
+                        info_resolution,
+                        BlockAttributes {
+                            display_name: "Exhibit Name".into(),
+                            // TODO: Change this to Recur after fixing collision performance
+                            collision: BlockCollision::None,
+                            ..Default::default()
+                        },
+                    ))),
+                ],
+            });
+
+            // Install the signboard-and-text widgets in a space.
+            let info_sign_space = info_voxels_widget
+                .to_space(
+                    SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
+                    Gravity::new(Align::Center, Align::Center, Align::Low),
                 )
-                .unwrap(),
-            demo_blocks[Signboard].clone().rotate(plot_rotation),
-        )?;
+                .unwrap();
+
+            let sign_position_in_plot_coordinates = {
+                GridVector {
+                    // extending right from left edge
+                    x: enclosure_footprint.lower_bounds().x,
+                    // at ground level
+                    y: 0,
+                    // minus 1 to put the Signboard blockss on the enclosure blocks
+                    z: enclosure_footprint.upper_bounds().z - 1,
+                }
+            };
+            let sign_transform =
+                plot_transform * GridMatrix::from_translation(sign_position_in_plot_coordinates);
+
+            // Copy the signboard into the main space.
+            // (TODO: We do this indirection because the widget system does not currently
+            // support arbitrary rotation of widget trees, but that is wanted.)
+            space_to_space_copy(
+                &info_sign_space,
+                info_sign_space.bounds(),
+                &mut space,
+                sign_transform,
+            )?;
+        }
 
         // Place exhibit content
         space_to_space_copy(
@@ -366,6 +408,28 @@ pub(crate) struct Exhibit {
     pub name: &'static str,
     pub factory:
         for<'a> fn(&'a Exhibit, &'a mut Universe) -> BoxFuture<'a, Result<Space, InGenError>>,
+}
+
+/// Generate a Space containing text voxels to put on the signboard for an exhibit.
+///
+/// The space's bounds extend upward from [0, 0, 0].
+fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
+    let info_widgets: WidgetTree = LayoutTree::leaf(Arc::new(widgets::LargeText {
+        text: exhibit.name.into(),
+        font: || &FONT_9X18_BOLD,
+        brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
+        text_style: TextStyleBuilder::new()
+            .alignment(Alignment::Center)
+            .baseline(Baseline::Middle)
+            .build(),
+    }));
+
+    // TODO: give it a maximum size, instead of what we currently do which is truncating later
+    let space = info_widgets.to_space(
+        SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
+        Gravity::new(Align::Low, Align::Low, Align::Low),
+    )?;
+    Ok(space)
 }
 
 /// Tracks available land while the city is being generated.
