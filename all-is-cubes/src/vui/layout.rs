@@ -73,6 +73,11 @@ impl LayoutGrant {
     /// unchanged.
     #[must_use]
     pub fn shrink_to(self, sizes: GridVector) -> Self {
+        assert!(
+            sizes.x >= 0 && sizes.y >= 0 && sizes.z >= 0,
+            "sizes to shrink to must be positive, not {sizes:?}"
+        );
+
         // Ensure we don't enlarge the size of self by clamping the proposed size
         let sizes = sizes.zip(self.bounds.size(), GridCoordinate::min);
 
