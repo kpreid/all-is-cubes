@@ -27,15 +27,8 @@
 
 use std::collections::HashSet;
 
-use all_is_cubes::block::{Block, BlockAttributes, BlockCollision, Resolution, AIR};
+use all_is_cubes::block::{Block, Resolution, AIR};
 use all_is_cubes::cgmath::{ElementWise, InnerSpace, Point3, Transform as _, Vector3};
-use all_is_cubes::drawing::embedded_graphics::{
-    mono_font::MonoTextStyle,
-    prelude::{Dimensions as _, Point, Transform as _},
-    text::Text,
-};
-use all_is_cubes::drawing::{draw_to_blocks, VoxelColor};
-use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
     cube_to_midpoint, point_to_enclosing_cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray,
     GridCoordinate, GridMatrix, GridPoint, GridVector,
@@ -43,7 +36,6 @@ use all_is_cubes::math::{
 use all_is_cubes::space::{SetCubeError, Space, SpaceTransaction};
 
 mod animation;
-use all_is_cubes::universe::Universe;
 pub(crate) use animation::*;
 mod atrium;
 mod blocks;
@@ -65,49 +57,6 @@ mod noise;
 
 // Reexport the content parts that are implemented in the core crate.
 pub use all_is_cubes::content::*;
-
-/// Draw text into a [`Space`] within 1 block character height.
-///
-/// TODO: Document exact text alignment and other such concerns
-fn draw_text_in_blocks<'a, C: Clone + VoxelColor<'a>>(
-    universe: &mut Universe,
-    space: &mut Space,
-    resolution: Resolution,
-    max_length_in_blocks: GridCoordinate,
-    transform: GridMatrix,
-    text: &Text<'a, MonoTextStyle<'a, C>>,
-) -> Result<GridAab, InGenError> {
-    let resolution_g: GridCoordinate = resolution.into();
-    let character_height = text.character_style.font.character_size.height as GridCoordinate;
-    let text_width_in_voxels = text.bounding_box().size.width as GridCoordinate;
-    let text_width_in_blocks: GridCoordinate =
-        (text_width_in_voxels + resolution_g - 1) / resolution_g;
-
-    let name_blocks = draw_to_blocks(
-        universe,
-        resolution,
-        0,
-        0..1,
-        BlockAttributes {
-            display_name: format!("Text {:?}", text.text).into(),
-            collision: BlockCollision::Recur,
-            ..BlockAttributes::default()
-        },
-        &text.translate(Point::new(
-            ((text_width_in_blocks * resolution_g) - text_width_in_voxels) / 2,
-            (character_height - resolution_g) / 2,
-        )),
-    )?;
-    let truncated_block_box = name_blocks
-        .bounds()
-        .intersection(GridAab::from_lower_size(
-            [0, 0, 0],
-            [max_length_in_blocks, 1, 1],
-        ))
-        .unwrap();
-    space_to_space_copy(&name_blocks, truncated_block_box, space, transform)?;
-    Ok(truncated_block_box)
-}
 
 /// Create a function to define texture in a block, based on a set of points
 /// to form a _tiled_ 3D Voronoi diagram.
