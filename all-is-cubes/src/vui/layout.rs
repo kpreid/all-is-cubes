@@ -48,7 +48,7 @@ pub struct LayoutRequest {
 /// Region a widget has been given by the layout algorithm, based on its
 /// [`LayoutRequest`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[non_exhaustive]
+#[allow(clippy::exhaustive_structs)] // TODO: constructor or something
 pub struct LayoutGrant {
     /// The widget may have exclusive access to this volume.
     pub bounds: GridAab,
