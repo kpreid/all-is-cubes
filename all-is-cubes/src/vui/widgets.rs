@@ -75,7 +75,8 @@ impl FrameWidget {
     }
 
     /// experimental
-    pub(crate) fn with_block(block: Block) -> Arc<Self> {
+    #[doc(hidden)]
+    pub fn with_block(block: Block) -> Arc<Self> {
         Arc::new(Self {
             background: VoxelBrush::single(block.clone()),
             frame: VoxelBrush::single(block),
