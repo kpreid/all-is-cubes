@@ -355,7 +355,9 @@ pub async fn install_demo_blocks(
                 // Haven't thought of a good way to abstract/combine it yet.
                 let resolution = R16;
                 let resolution_g = GridCoordinate::from(resolution);
-                let top_edge = 10;
+
+                let bottom_edge = 3;
+                let top_edge = 12;
 
                 let mut space = Space::for_block(resolution).build();
 
@@ -364,7 +366,7 @@ pub async fn install_demo_blocks(
                     let mut plane =
                         space.draw_target(GridMatrix::from_translation([0, 0, resolution_g - 1]));
                     Rectangle::with_corners(
-                        Point::new(0, resolution_g / 4),
+                        Point::new(0, bottom_edge),
                         Point::new(resolution_g - 1, top_edge),
                     )
                     .draw_styled(&PrimitiveStyle::with_fill(&sign_board), &mut plane)?;

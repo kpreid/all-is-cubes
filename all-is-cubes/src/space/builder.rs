@@ -235,26 +235,30 @@ mod tests {
     #[test]
     fn bounds_if_not_set_when_not_set() {
         let bounds = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
-        assert_eq!(SpaceBuilder::new()
-            .bounds_if_not_set(|| bounds)
-            .build()
-            .bounds(), 
-            bounds);
+        assert_eq!(
+            SpaceBuilder::new()
+                .bounds_if_not_set(|| bounds)
+                .build()
+                .bounds(),
+            bounds
+        );
     }
 
     #[test]
     fn bounds_if_not_set_when_already_set() {
         let first_bounds = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
         let ignored_bounds = GridAab::from_lower_size([100, 2, 3], [1, 1, 1]);
-        assert_eq!(Space::builder(first_bounds)
-            .bounds_if_not_set(|| ignored_bounds)
-            .build()
-            .bounds(), 
-            first_bounds);
+        assert_eq!(
+            Space::builder(first_bounds)
+                .bounds_if_not_set(|| ignored_bounds)
+                .build()
+                .bounds(),
+            first_bounds
+        );
     }
 
     // TODO: test and implement initial fill that has a tick_action that needs to be
     // activated properly
-    
+
     // TODO: test all builder features
 }

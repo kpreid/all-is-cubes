@@ -11,9 +11,7 @@ use instant::Instant;
 use noise::Seedable as _;
 
 use all_is_cubes::cgmath::{EuclideanSpace as _, One as _, Vector3};
-use all_is_cubes::drawing::embedded_graphics::{
-    mono_font::iso_8859_1::FONT_9X18_BOLD, text::Baseline,
-};
+use all_is_cubes::drawing::embedded_graphics::{mono_font::iso_8859_1 as font, text::Baseline};
 
 use all_is_cubes::block::{Block, BlockAttributes, BlockCollision, Resolution::*, AIR};
 use all_is_cubes::character::Spawn;
@@ -303,7 +301,7 @@ pub(crate) async fn demo_city(
 
         // Draw exhibit info
         {
-            let info_resolution = R32;
+            let info_resolution = R64;
             let exhibit_info_space = draw_exhibit_info(exhibit)?; // TODO: on failure, place an error marker and continue ... or at least produce a GenError for context
 
             // Enforce maximum width (TODO: this should be done inside draw_exhibit_info instead)
@@ -406,6 +404,7 @@ pub(crate) async fn demo_city(
 #[allow(clippy::type_complexity)]
 pub(crate) struct Exhibit {
     pub name: &'static str,
+    pub subtitle: &'static str,
     pub factory:
         for<'a> fn(&'a Exhibit, &'a mut Universe) -> BoxFuture<'a, Result<Space, InGenError>>,
 }
@@ -414,15 +413,39 @@ pub(crate) struct Exhibit {
 ///
 /// The space's bounds extend upward from [0, 0, 0].
 fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
-    let info_widgets: WidgetTree = LayoutTree::leaf(Arc::new(widgets::LargeText {
-        text: exhibit.name.into(),
-        font: || &FONT_9X18_BOLD,
-        brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
-        text_style: TextStyleBuilder::new()
-            .alignment(Alignment::Center)
-            .baseline(Baseline::Middle)
-            .build(),
-    }));
+    let info_widgets: WidgetTree = Arc::new(LayoutTree::Stack {
+        direction: Face6::NY,
+        children: vec![
+            LayoutTree::leaf(Arc::new(widgets::LargeText {
+                text: exhibit.name.into(),
+                font: || &font::FONT_9X18_BOLD,
+                brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
+                text_style: TextStyleBuilder::new()
+                    .alignment(Alignment::Center)
+                    .baseline(Baseline::Middle)
+                    .build(),
+            })),
+            LayoutTree::leaf(Arc::new(widgets::LargeText {
+                text: {
+                    let t = exhibit.subtitle;
+                    // TODO: rectangle_to_aab() fails when the empty string is drawn;
+                    // when that's fixed, remove this condition
+                    if t.is_empty() {
+                        " "
+                    } else {
+                        t
+                    }
+                }
+                .into(),
+                font: || &font::FONT_5X8,
+                brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
+                text_style: TextStyleBuilder::new()
+                    .alignment(Alignment::Center)
+                    .baseline(Baseline::Middle)
+                    .build(),
+            })),
+        ],
+    });
 
     // TODO: give it a maximum size, instead of what we currently do which is truncating later
     let space = info_widgets.to_space(

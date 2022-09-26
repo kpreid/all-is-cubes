@@ -75,7 +75,12 @@ macro_rules! exhibit {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "Transparency")]
+#[exhibit(
+    name: "Transparency",
+    subtitle:
+        "Test depth sorting and blending.\n\
+        Lighting of volumes still needs work.",
+)]
 async fn TRANSPARENCY_LARGE(_: &Exhibit, _universe: &mut Universe) {
     let mut space = Space::empty(GridAab::from_lower_size([-3, 0, -3], [7, 5, 7]));
 
@@ -105,7 +110,12 @@ async fn TRANSPARENCY_LARGE(_: &Exhibit, _universe: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "Voxel Transparency WIP")]
+#[exhibit(
+    name: "Voxel Transparency WIP",
+    subtitle:
+        "Transparency in complex blocks is not correctly implemented.\n\
+        We also need something for surface properties.",
+)]
 async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
     let footprint = GridAab::from_lower_size([0, 0, 0], [7, 4, 7]);
     let pool = GridAab::from_lower_size([1, 0, 1], [5, 2, 5]);
@@ -186,7 +196,10 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "Knot")]
+#[exhibit(
+    name: "Knot",
+    subtitle: "Complex voxel shape",
+)]
 async fn KNOT(this: &Exhibit, universe: &mut Universe) {
     let footprint = GridAab::from_lower_size([-2, -2, -1], [5, 5, 3]);
     let resolution = R32;
@@ -258,7 +271,10 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "Text")]
+#[exhibit(
+    name: "Text",
+    subtitle: "",
+)]
 async fn TEXT(_: &Exhibit, universe: &mut Universe) {
     let space = draw_to_blocks(
         universe,
@@ -280,7 +296,10 @@ async fn TEXT(_: &Exhibit, universe: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "Animation")]
+#[exhibit(
+    name: "Animation",
+    subtitle: "Blocks whose definition is animated",
+)]
 async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
 
@@ -345,7 +364,10 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "Collision")]
+#[exhibit(
+    name: "Collision",
+    subtitle: "Test cases for character/world collision",
+)]
 async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
     let half_block = make_slab(universe, 2, R4);
 
@@ -384,7 +406,12 @@ async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "Resolutions")]
+#[exhibit(
+    name: "Resolutions",
+    subtitle:
+        "Voxel blocks can be subdivided into\n\
+        powers of 2 from 2 to 256.",
+)]
 async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
     let footprint = GridAab::from_lower_size([0, 0, 0], [5, 3, 3]);
     let mut space = Space::empty(footprint);
@@ -440,7 +467,10 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "Rotations")]
+#[exhibit(
+    name: "Rotations",
+    subtitle: "Rotated blocks and GridRotation::from_to()",
+)]
 async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
     let mut space = Space::empty(GridAab::from_lower_size([-2, 0, -2], [5, 5, 5]));
@@ -489,7 +519,10 @@ async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "Moved Blocks")]
+#[exhibit(
+    name: "Modifier::Move",
+    subtitle: "Stationary but not animated cases.",
+)]
 async fn MOVED_BLOCKS(_: &Exhibit, universe: &mut Universe) {
     let mut space = Space::empty(GridAab::from_lower_upper([0, 0, -3], [16, 2, 3]));
 
@@ -514,7 +547,10 @@ async fn MOVED_BLOCKS(_: &Exhibit, universe: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "Colors")]
+#[exhibit(
+    name: "Colors",
+    subtitle: "RGB cube of 5 linear color steps",
+)]
 async fn COLORS(_: &Exhibit, universe: &mut Universe) {
     let gradient_resolution = 5;
     let mut space = Space::empty(GridAab::from_lower_size(
@@ -582,7 +618,10 @@ async fn COLORS(_: &Exhibit, universe: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "Colored Lights")]
+#[exhibit(
+    name: "Colored Lights",
+    subtitle: "RGBCMY lights in an enclosed room",
+)]
 async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
     let room_width = 11;
     let room_length = 16;
@@ -749,7 +788,10 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "Visible chunk chart")]
+#[exhibit(
+    name: "ChunkChart",
+    subtitle: "Volume of world chunks in view at a distance of 4.99",
+)]
 async fn CHUNK_CHART(_: &Exhibit, _: &mut Universe) {
     use all_is_cubes::chunking::ChunkChart;
 
@@ -759,7 +801,10 @@ async fn CHUNK_CHART(_: &Exhibit, _: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "make_some_blocks")]
+#[exhibit(
+    name: "make_some_blocks()",
+    subtitle: "",
+)]
 async fn MAKE_SOME_BLOCKS(_: &Exhibit, universe: &mut Universe) {
     const ROWS: GridCoordinate = 5;
     fn make_both_blocks<const N: usize>(universe: &mut Universe) -> (Vec<Block>, Vec<Block>) {
@@ -786,7 +831,10 @@ async fn MAKE_SOME_BLOCKS(_: &Exhibit, universe: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "Swimming Pool")]
+#[exhibit(
+    name: "Swimming Pool",
+    subtitle: "Transparent blocks that can be passed through",
+)]
 async fn SWIMMING_POOL(_: &Exhibit, _: &mut Universe) {
     let width = 6;
     let depth = 6;
@@ -804,7 +852,10 @@ async fn SWIMMING_POOL(_: &Exhibit, _: &mut Universe) {
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
-#[exhibit(name: "space_from_image")]
+#[exhibit(
+    name: "space_from_image()",
+    subtitle: "Using rotations XYZ, XyZ, XZY, xYZ",
+)]
 async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
     // TODO: it would be nice if this exhibit visualized the generated bounding box somehow
 
