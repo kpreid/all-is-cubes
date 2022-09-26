@@ -136,6 +136,7 @@ pub struct Voxels {
     space: URef<Space>,
     region: GridAab,
     scale: Resolution,
+    block_attributes: BlockAttributes,
 }
 
 impl Voxels {
@@ -144,13 +145,19 @@ impl Voxels {
     /// When the `region`'s dimensions are not multiples of `scale`, their alignment within the
     /// block grid will be determined by the layout gravity. Note that areas of `space` outside of
     /// `region` may be displayed in that case.
-    pub const fn new(region: GridAab, space: URef<Space>, scale: Resolution) -> Self {
+    pub const fn new(
+        region: GridAab,
+        space: URef<Space>,
+        scale: Resolution,
+        block_attributes: BlockAttributes,
+    ) -> Self {
         // Design note: We could take `region` from `space` but that'd require locking it,
         // and the caller is very likely to already have that information.
         Self {
             region,
             space,
             scale,
+            block_attributes,
         }
     }
 }
@@ -190,7 +197,6 @@ impl Widget for Voxels {
         // gravity_offset_in_voxels is now the offset within the low-corner block at
         // which the low-corner voxels should start.
 
-        let attributes = BlockAttributes::default(); // TODO customizability
         let block_to_voxels_transform = {
             // Apply gravity and the translation that was requested
             GridMatrix::from_translation(
@@ -206,7 +212,7 @@ impl Widget for Voxels {
             txn.set_overwrite(
                 cube,
                 Block::from_primitive(Primitive::Recur {
-                    attributes: attributes.clone(),
+                    attributes: self.block_attributes.clone(),
                     offset: block_to_voxels_transform.transform_cube(cube),
                     resolution: self.scale,
                     space: self.space.clone(),
@@ -432,7 +438,11 @@ mod tests {
         (txn.bounds().unwrap(), space)
     }
 
-    fn test_voxels_widget(voxel_space_bounds: GridAab, grant: LayoutGrant) -> (GridAab, Space) {
+    fn test_voxels_widget(
+        voxel_space_bounds: GridAab,
+        grant: LayoutGrant,
+        attributes: BlockAttributes,
+    ) -> (GridAab, Space) {
         let mut universe = Universe::new();
         instantiate_widget(
             grant,
@@ -440,6 +450,7 @@ mod tests {
                 voxel_space_bounds,
                 universe.insert_anonymous(Space::builder(voxel_space_bounds).build()),
                 R8,
+                attributes,
             ),
         )
     }
@@ -452,6 +463,7 @@ mod tests {
         let _output = test_voxels_widget(
             v_space_bounds,
             LayoutGrant::new(GridAab::single_cube(output_origin)),
+            BlockAttributes::default(),
         );
         // TODO assertions about resulting blocks
     }
@@ -468,7 +480,8 @@ mod tests {
             bounds: GridAab::from_lower_size(output_origin, [3, 3, 3]),
             gravity: Vector3::new(Align::Low, Align::Center, Align::High),
         };
-        let (output_bounds, output) = test_voxels_widget(v_space_bounds, grant);
+        let (output_bounds, output) =
+            test_voxels_widget(v_space_bounds, grant, BlockAttributes::default());
         assert_eq!(
             output_bounds,
             GridAab::from_lower_size([100, 101, 101], [1, 1, 2])

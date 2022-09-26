@@ -138,6 +138,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
         logo_text_space.bounds(),
         universe.insert_anonymous(logo_text_space),
         Resolution::R4,
+        BlockAttributes::default(),
     );
 
     let mut vertical_widgets: Vec<vui::WidgetTree> = Vec::with_capacity(10);
