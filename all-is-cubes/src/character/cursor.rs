@@ -14,7 +14,7 @@ use crate::math::{
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
 use crate::universe::URef;
-use crate::util::{ConciseDebug, CustomFormat as _, MapExtend};
+use crate::util::MapExtend;
 
 /// Find the first selectable block the ray strikes and express the result in a [`Cursor`]
 /// value, or [`None`] if nothing was struck within the distance limit.
@@ -88,10 +88,7 @@ impl fmt::Display for Cursor {
         write!(
             f,
             "Block at {:?}\n{:#?}\nLighting within {:?}, behind {:?}",
-            self.place,
-            self.evaluated.custom_format(ConciseDebug),
-            self.lighting_ahead,
-            self.lighting_behind,
+            self.place, self.evaluated, self.lighting_ahead, self.lighting_behind,
         )
     }
 }

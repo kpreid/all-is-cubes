@@ -7,7 +7,6 @@ use cgmath::{Vector4, Zero as _};
 use crate::block::{BlockAttributes, BlockCollision, Resolution, Resolution::R1};
 use crate::math::{GridAab, GridArray, OpacityCategory, Rgba};
 use crate::universe::RefError;
-use crate::util::{ConciseDebug, CustomFormat};
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
@@ -15,7 +14,7 @@ use super::{Block, Primitive, URef, AIR, AIR_EVALUATED};
 
 /// A snapshotted form of [`Block`] which contains all information needed for rendering
 /// and physics, and does not require dereferencing [`URef`]s or unbounded computation.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub struct EvaluatedBlock {
@@ -63,17 +62,28 @@ pub struct EvaluatedBlock {
     pub(crate) voxel_opacity_mask: Option<GridArray<OpacityCategory>>,
 }
 
-// TODO: Wait, this isn't really what ConciseDebug is for... shouldn't this be a regular impl Debug?
-impl CustomFormat<ConciseDebug> for EvaluatedBlock {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
+impl fmt::Debug for EvaluatedBlock {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            attributes,
+            color,
+            voxels,
+            resolution,
+            opaque,
+            visible,
+            voxel_opacity_mask,
+        } = self;
         fmt.debug_struct("EvaluatedBlock")
-            .field("attributes", &self.attributes)
-            .field("color", &self.color)
-            .field("opaque", &self.opaque)
-            .field("visible", &self.visible)
-            .field("resolution", &self.resolution)
-            .field("voxels", &"...")
-            .field("voxel_opacity_mask", &"...")
+            .field("attributes", attributes)
+            .field("color", color)
+            .field("opaque", opaque)
+            .field("visible", visible)
+            .field("resolution", resolution)
+            .field("voxels", &voxels.as_ref().map(GridArray::bounds))
+            .field(
+                "voxel_opacity_mask",
+                &voxel_opacity_mask.as_ref().map(GridArray::bounds),
+            )
             .finish()
     }
 }
