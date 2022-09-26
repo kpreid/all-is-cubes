@@ -53,6 +53,8 @@ use crate::universe::Universe;
 /// TODO: This function still has some bugs to work out
 ///
 /// TODO: This function needs a better name
+///
+/// TODO: Handling zero-area rectangles is not implemented
 pub fn rectangle_to_aab(
     rectangle: Rectangle,
     transform: GridMatrix,
@@ -535,6 +537,27 @@ mod tests {
                 GridAab::from_lower_size([0, 0, 0], [2, 1, 2])
             ),
             GridAab::from_lower_upper([10, 10, 0], [21, 20, 2])
+        );
+    }
+
+    #[test]
+    #[ignore = "TODO: make this succeed"]
+    fn rectangle_to_aab_empty_rects_no_transform() {
+        assert_eq!(
+            rectangle_to_aab(
+                Rectangle::new(Point::new(3, 4), Size::new(0, 10)),
+                GridMatrix::one(),
+                GridAab::single_cube(GridPoint::origin())
+            ),
+            GridAab::from_lower_size([3, 4, 0], [0, 10, 1])
+        );
+        assert_eq!(
+            rectangle_to_aab(
+                Rectangle::new(Point::new(3, 4), Size::new(10, 0)),
+                GridMatrix::one(),
+                GridAab::single_cube(GridPoint::origin())
+            ),
+            GridAab::from_lower_size([3, 4, 0], [0, 10, 1])
         );
     }
 
