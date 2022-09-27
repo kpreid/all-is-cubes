@@ -1,6 +1,7 @@
 //! Tests for [`Block`] as a whole.
 //! The following modules also have their own tests:
 //!
+//! * [`super::attributes`]
 //! * [`super::builder`]
 //! * [`super::modifier`]
 
@@ -12,8 +13,8 @@ use cgmath::EuclideanSpace as _;
 use pretty_assertions::assert_eq;
 
 use crate::block::{
-    AnimationHint, Block, BlockAttributes, BlockCollision, BlockDef, BlockDefTransaction,
-    EvalBlockError, Evoxel, Modifier, Primitive, Resolution, Resolution::*, AIR, AIR_EVALUATED,
+    Block, BlockAttributes, BlockCollision, BlockDef, BlockDefTransaction, EvalBlockError, Evoxel,
+    Modifier, Primitive, Resolution, Resolution::*, AIR, AIR_EVALUATED,
 };
 use crate::content::make_some_blocks;
 use crate::listen::{NullListener, Sink};
@@ -401,68 +402,6 @@ fn listen_recur() {
         .execute(&SpaceTransaction::set_cube([1, 0, 0], None, Some(block_1)))
         .unwrap();
     assert_eq!(sink.drain(), vec![]);
-}
-
-#[test]
-fn attributes_default_equivalent() {
-    assert_eq!(
-        BlockAttributes::default(),
-        <BlockAttributes as Default>::default()
-    );
-}
-
-#[test]
-fn attributes_debug() {
-    let default = BlockAttributes::default;
-    fn debug(a: BlockAttributes) -> String {
-        format!("{:?}", a)
-    }
-    assert_eq!(&*debug(BlockAttributes::default()), "BlockAttributes {}",);
-    assert_eq!(
-        &*debug(BlockAttributes {
-            display_name: "x".into(),
-            ..default()
-        }),
-        "BlockAttributes { display_name: \"x\" }",
-    );
-    assert_eq!(
-        &*debug(BlockAttributes {
-            selectable: false,
-            ..default()
-        }),
-        "BlockAttributes { selectable: false }",
-    );
-    assert_eq!(
-        &*debug(BlockAttributes {
-            collision: BlockCollision::None,
-            ..default()
-        }),
-        "BlockAttributes { collision: None }",
-    );
-    assert_eq!(
-        &*debug(BlockAttributes {
-            light_emission: Rgb::new(1.0, 2.0, 3.0),
-            ..default()
-        }),
-        "BlockAttributes { light_emission: Rgb(1.0, 2.0, 3.0) }",
-    );
-    assert_eq!(
-        &*debug(BlockAttributes {
-            animation_hint: AnimationHint::TEMPORARY,
-            ..default()
-        }),
-        "BlockAttributes { animation_hint: AnimationHint { redefinition: None, replacement: Shape } }",
-    );
-
-    // Test a case of multiple attributes
-    assert_eq!(
-        &*debug(BlockAttributes {
-            display_name: "y".into(),
-            selectable: false,
-            ..default()
-        }),
-        "BlockAttributes { display_name: \"y\", selectable: false }",
-    );
 }
 
 #[test]

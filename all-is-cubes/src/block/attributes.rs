@@ -294,3 +294,73 @@ impl AnimationChange {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// [`BlockAttributes`] has an inherent `default()` function, which should be
+    /// equivalent to the [`Default`] trait function.
+    #[test]
+    fn default_equivalent() {
+        assert_eq!(
+            BlockAttributes::default(),
+            <BlockAttributes as Default>::default()
+        );
+    }
+
+    #[test]
+    fn debug() {
+        let default = BlockAttributes::default;
+        fn debug(a: BlockAttributes) -> String {
+            format!("{:?}", a)
+        }
+        assert_eq!(&*debug(BlockAttributes::default()), "BlockAttributes {}",);
+        assert_eq!(
+            &*debug(BlockAttributes {
+                display_name: "x".into(),
+                ..default()
+            }),
+            "BlockAttributes { display_name: \"x\" }",
+        );
+        assert_eq!(
+            &*debug(BlockAttributes {
+                selectable: false,
+                ..default()
+            }),
+            "BlockAttributes { selectable: false }",
+        );
+        assert_eq!(
+            &*debug(BlockAttributes {
+                collision: BlockCollision::None,
+                ..default()
+            }),
+            "BlockAttributes { collision: None }",
+        );
+        assert_eq!(
+            &*debug(BlockAttributes {
+                light_emission: Rgb::new(1.0, 2.0, 3.0),
+                ..default()
+            }),
+            "BlockAttributes { light_emission: Rgb(1.0, 2.0, 3.0) }",
+        );
+        assert_eq!(
+            &*debug(BlockAttributes {
+                animation_hint: AnimationHint::TEMPORARY,
+                ..default()
+            }),
+            "BlockAttributes { animation_hint: \
+            AnimationHint { redefinition: None, replacement: Shape } }",
+        );
+
+        // Test a case of multiple attributes
+        assert_eq!(
+            &*debug(BlockAttributes {
+                display_name: "y".into(),
+                selectable: false,
+                ..default()
+            }),
+            "BlockAttributes { display_name: \"y\", selectable: false }",
+        );
+    }
+}
