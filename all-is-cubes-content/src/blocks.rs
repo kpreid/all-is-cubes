@@ -21,7 +21,7 @@ use all_is_cubes::math::{
     cube_to_midpoint, Face6, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridPoint,
     GridRotation, GridVector, NotNan, Rgb, Rgba,
 };
-use all_is_cubes::space::Space;
+use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{rgb_const, rgba_const};
@@ -359,7 +359,12 @@ pub async fn install_demo_blocks(
                 let bottom_edge = 3;
                 let top_edge = 12;
 
-                let mut space = Space::for_block(resolution).build();
+                let mut space = Space::builder(GridAab::from_lower_upper(
+                    [0, 0, 9],
+                    [resolution_g, resolution_g, resolution_g],
+                ))
+                .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+                .build();
 
                 // Sign board
                 {
@@ -401,7 +406,9 @@ pub async fn install_demo_blocks(
 
             Clock => {
                 let resolution = R16;
-                let mut space = Space::for_block(resolution).build();
+                let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [16, 16, 1]))
+                    .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+                    .build();
                 space.add_behavior(crate::animation::Clock::new());
                 Block::builder()
                     .display_name("Clock")
