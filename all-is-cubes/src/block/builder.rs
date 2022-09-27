@@ -305,6 +305,14 @@ mod tests {
     }
 
     #[test]
+    fn default_equivalent() {
+        assert_eq!(
+            BlockBuilder::<NeedsPrimitive>::new(),
+            <BlockBuilder<NeedsPrimitive> as Default>::default()
+        );
+    }
+
+    #[test]
     fn every_field_nondefault() {
         let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
         let light_emission = Rgb::new(0.1, 3.0, 0.1);
@@ -397,13 +405,5 @@ mod tests {
         );
 
         // TODO: assert the voxels are correct
-    }
-
-    #[test]
-    fn default_equivalent() {
-        assert_eq!(
-            BlockBuilder::<NeedsPrimitive>::default(),
-            <BlockBuilder<NeedsPrimitive> as Default>::default()
-        );
     }
 }
