@@ -286,3 +286,124 @@ impl BuildPrimitiveIndependent for BlockBuilderVoxels {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::block::{Resolution::*, AIR};
+    use crate::math::{Face6, GridAab};
+    use crate::space::SpacePhysics;
+
+    use super::*;
+
+    #[test]
+    fn defaults() {
+        let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
+        assert_eq!(
+            Block::builder().color(color).build(),
+            Block::from_primitive(Primitive::Atom(BlockAttributes::default(), color)),
+        );
+    }
+
+    #[test]
+    fn every_field_nondefault() {
+        let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
+        let light_emission = Rgb::new(0.1, 3.0, 0.1);
+        let rotation_rule = RotationPlacementRule::Attach { by: Face6::NZ };
+        let tick_action = Some(VoxelBrush::single(AIR));
+        assert_eq!(
+            Block::builder()
+                .color(color)
+                .display_name("hello world")
+                .collision(BlockCollision::Recur)
+                .rotation_rule(rotation_rule)
+                .selectable(false)
+                .light_emission(light_emission)
+                .tick_action(tick_action.clone())
+                .animation_hint(AnimationHint::TEMPORARY)
+                .build(),
+            Block::from_primitive(Primitive::Atom(
+                BlockAttributes {
+                    display_name: "hello world".into(),
+                    collision: BlockCollision::Recur,
+                    rotation_rule,
+                    selectable: false,
+                    light_emission,
+                    tick_action,
+                    animation_hint: AnimationHint::TEMPORARY,
+                },
+                color
+            )),
+        );
+    }
+
+    #[test]
+    fn voxels_from_space() {
+        let mut universe = Universe::new();
+        let space_ref = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+
+        assert_eq!(
+            Block::builder()
+                .display_name("hello world")
+                .voxels_ref(R2, space_ref.clone())
+                .build(),
+            Block::from_primitive(Primitive::Recur {
+                attributes: BlockAttributes {
+                    display_name: "hello world".into(),
+                    ..BlockAttributes::default()
+                },
+                offset: GridPoint::origin(),
+                resolution: R2, // not same as space size
+                space: space_ref
+            }),
+        );
+    }
+
+    #[test]
+    fn voxels_from_fn() {
+        let mut universe = Universe::new();
+
+        let resolution = R8;
+        let block = Block::builder()
+            .display_name("hello world")
+            .voxels_fn(&mut universe, resolution, |_cube| &AIR)
+            .unwrap()
+            .build();
+
+        // Extract the implicitly constructed space reference
+        let space_ref = if let Primitive::Recur { space, .. } = block.primitive() {
+            space.clone()
+        } else {
+            panic!("expected Recur, found {:?}", block);
+        };
+
+        assert_eq!(
+            block,
+            Block::from_primitive(Primitive::Recur {
+                attributes: BlockAttributes {
+                    display_name: "hello world".into(),
+                    ..BlockAttributes::default()
+                },
+                offset: GridPoint::origin(),
+                resolution,
+                space: space_ref.clone()
+            }),
+        );
+
+        // Check the space's characteristics
+        assert_eq!(space_ref.borrow().bounds(), GridAab::for_block(resolution));
+        assert_eq!(
+            space_ref.borrow().physics(),
+            &SpacePhysics::DEFAULT_FOR_BLOCK
+        );
+
+        // TODO: assert the voxels are correct
+    }
+
+    #[test]
+    fn default_equivalent() {
+        assert_eq!(
+            BlockBuilder::<NeedsPrimitive>::default(),
+            <BlockBuilder<NeedsPrimitive> as Default>::default()
+        );
+    }
+}
