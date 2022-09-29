@@ -61,22 +61,27 @@ impl PageInst {
     }
 }
 
-// TODO: Disentangle general UI from the concept of "HUD" — i.e. the input accepted should be
-// not a `HudInputs` should become less specific, since this isn't actually part of the HUD.
-pub(super) fn new_paused_widget_tree(hud_inputs: &HudInputs) -> WidgetTree {
+fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
     Arc::new(LayoutTree::Stack {
         direction: Face6::PZ,
         children: vec![
             // TODO: have a better way to communicate our choice of "baseline" alignment
             Arc::new(LayoutTree::Spacer(LayoutRequest {
                 // magic number 2 allows us to fill the edges of the viewport, ish
-                // TODO: HudLayout should give us the option of "overscan"
+                // TODO: VUI camera positioning should give us the option of "overscan",
+                // where all edges of the space spill off the window.
                 minimum: GridVector::new(0, 0, HudLayout::DEPTH_BEHIND_VIEW_PLANE + 2),
             })),
             LayoutTree::leaf(
                 FrameWidget::with_block(Block::from(Rgba::new(0., 0., 0., 0.7))) as Arc<dyn Widget>,
             ),
-            LayoutTree::leaf(pause_toggle_button(hud_inputs)),
+            foreground,
         ],
     })
+}
+
+// TODO: Disentangle general UI from the concept of "HUD" — i.e. the input accepted should be
+// not a `HudInputs` should become less specific, since this isn't actually part of the HUD.
+pub(super) fn new_paused_widget_tree(hud_inputs: &HudInputs) -> WidgetTree {
+    page_modal_backdrop(LayoutTree::leaf(pause_toggle_button(hud_inputs)))
 }
