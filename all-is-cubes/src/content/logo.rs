@@ -1,7 +1,8 @@
 use std::{borrow::Cow, sync::Arc};
 
-use all_is_cubes::{
+use crate::{
     block::Block,
+    content::palette,
     drawing::{
         embedded_graphics::{
             mono_font::iso_8859_1::FONT_9X15_BOLD,
@@ -11,8 +12,6 @@ use all_is_cubes::{
     },
     vui::{widgets::LargeText, Widget},
 };
-
-use crate::palette;
 
 /// All is Cubes logo text as a widget, at "1:1" scale (1 block per font pixel).
 pub fn logo_text() -> Arc<dyn Widget> {
@@ -41,7 +40,7 @@ pub fn logo_text() -> Arc<dyn Widget> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::math::GridVector;
+    use crate::math::GridVector;
 
     #[test]
     fn logo_extent_as_expected() {

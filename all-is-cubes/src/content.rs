@@ -27,6 +27,8 @@ use crate::universe::Universe;
 #[doc(hidden)]
 pub mod load_image;
 
+pub mod logo;
+
 pub mod palette;
 
 #[doc(hidden)]

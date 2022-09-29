@@ -51,7 +51,6 @@ pub(crate) use exhibits::*;
 mod fractal;
 mod landscape;
 pub use landscape::*;
-mod logo;
 mod menu;
 mod noise;
 
