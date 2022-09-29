@@ -20,6 +20,7 @@ use crate::time::Tick;
 use crate::transaction::Transaction;
 use crate::universe::{URef, Universe, UniverseStepInfo};
 use crate::util::YieldProgress;
+use crate::vui::pages::PageInst;
 use crate::vui::widgets::TooltipState;
 
 #[doc(hidden)] // public for use by test-renderers only
@@ -32,6 +33,8 @@ pub use icons::*;
 mod layout;
 #[doc(hidden)] // going to be used by all-is-cubes-content, but not yet stable
 pub use layout::*;
+mod options;
+mod pages;
 mod widget_trait;
 #[doc(hidden)]
 pub use widget_trait::*;
@@ -111,7 +114,7 @@ impl Vui {
             tooltip_state.clone(),
         );
 
-        let paused_widget_tree = new_paused_widget_tree(&hud_inputs);
+        let paused_widget_tree = pages::new_paused_widget_tree(&hud_inputs);
 
         let mut new_self = Self {
             universe,

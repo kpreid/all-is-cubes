@@ -14,70 +14,17 @@ use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::BlockProvider;
 use crate::listen::ListenableSource;
-use crate::math::{
-    Face6, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridRotation, GridVector, Rgba,
-};
+use crate::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridRotation, Rgba};
 use crate::space::{Space, SpacePhysics};
 use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
+use crate::vui::options::{graphics_options_widgets, pause_toggle_button};
 use crate::vui::widgets::{
-    Crosshair, FrameWidget, ToggleButtonVisualState, ToggleButtonWidget, Toolbar, TooltipState,
-    TooltipWidget,
+    Crosshair, FrameWidget, ToggleButtonWidget, Toolbar, TooltipState, TooltipWidget,
 };
-use crate::vui::{
-    install_widgets, CueNotifier, Icons, LayoutGrant, LayoutRequest, LayoutTree, UiBlocks, Widget,
-    WidgetTree,
-};
+use crate::vui::{CueNotifier, Icons, LayoutTree, UiBlocks, Widget, WidgetTree};
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
-
-/// Pair of a widget tree and a space to instantiate it in, which can be recreated with a different size.
-/// TODO: Give this a better name and location.
-#[derive(Clone, Debug)]
-pub(crate) struct PageInst {
-    tree: WidgetTree,
-    space: Option<URef<Space>>,
-}
-
-impl PageInst {
-    pub fn new(tree: WidgetTree) -> Self {
-        Self { tree, space: None }
-    }
-
-    pub fn get_or_create_space(
-        &mut self,
-        layout: &HudLayout,
-        universe: &mut Universe,
-    ) -> URef<Space> {
-        if let Some(space) = self.space.as_ref() {
-            if space.borrow().bounds() == layout.bounds() {
-                return space.clone();
-            }
-        }
-
-        // Size didn't match, so recreate the space.
-        // TODO: Resize in-place instead.
-        let space = universe.insert_anonymous(layout.new_space());
-        // TODO: error handling for layout
-        space
-            .execute(
-                &install_widgets(LayoutGrant::new(layout.bounds()), &self.tree)
-                    .expect("layout/widget error"),
-            )
-            .expect("transaction error");
-
-        // Initialize lighting
-        space
-            .try_modify(|space| {
-                space.fast_evaluate_light();
-                space.evaluate_light(10, |_| {});
-            })
-            .unwrap();
-
-        self.space = Some(space.clone());
-        space
-    }
-}
 
 /// Knows where and how to place graphics within the HUD space, but does not store
 /// the space or any related state itself; depends only on the screen size and other
@@ -230,94 +177,6 @@ pub(super) fn new_hud_widget_tree(
         control_bar: control_bar_positioning,
     });
     hud_widget_tree
-}
-
-#[allow(clippy::redundant_clone)]
-fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree> {
-    vec![
-        LayoutTree::leaf(graphics_toggle_button(
-            hud_inputs,
-            UiBlocks::DebugInfoTextButton,
-            |g| g.debug_info_text,
-            |g, v| g.debug_info_text = v,
-        )),
-        LayoutTree::leaf(graphics_toggle_button(
-            hud_inputs,
-            UiBlocks::DebugChunkBoxesButton,
-            |g| g.debug_chunk_boxes,
-            |g, v| g.debug_chunk_boxes = v,
-        )),
-        LayoutTree::leaf(graphics_toggle_button(
-            hud_inputs,
-            UiBlocks::DebugCollisionBoxesButton,
-            |g| g.debug_collision_boxes,
-            |g, v| g.debug_collision_boxes = v,
-        )),
-        LayoutTree::leaf(graphics_toggle_button(
-            hud_inputs,
-            UiBlocks::DebugLightRaysButton,
-            |g| g.debug_light_rays_at_cursor,
-            |g, v| g.debug_light_rays_at_cursor = v,
-        )),
-    ]
-}
-
-/// Generate a button that toggles a boolean graphics option.
-fn graphics_toggle_button(
-    hud_inputs: &HudInputs,
-    icon_ctor: fn(ToggleButtonVisualState) -> UiBlocks,
-    getter: fn(&GraphicsOptions) -> bool,
-    setter: fn(&mut GraphicsOptions, bool),
-) -> Arc<dyn Widget> {
-    ToggleButtonWidget::new(
-        hud_inputs.graphics_options.clone(),
-        getter,
-        |state| hud_inputs.hud_blocks.blocks[icon_ctor(state)].clone(),
-        {
-            let cc = hud_inputs.control_channel.clone();
-            move || {
-                let _ignore_errors = cc.send(ControlMessage::ModifyGraphicsOptions(Box::new(
-                    move |mut g| {
-                        let mg = Arc::make_mut(&mut g);
-                        setter(mg, !getter(mg));
-                        g
-                    },
-                )));
-            }
-        },
-    )
-}
-
-fn pause_toggle_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
-    ToggleButtonWidget::new(
-        hud_inputs.paused.clone(),
-        |&value| value,
-        |state| hud_inputs.hud_blocks.blocks[UiBlocks::PauseButton(state)].clone(),
-        {
-            let cc = hud_inputs.control_channel.clone();
-            move || {
-                let _ignore_errors = cc.send(ControlMessage::TogglePause);
-            }
-        },
-    )
-}
-
-pub(super) fn new_paused_widget_tree(hud_inputs: &HudInputs) -> WidgetTree {
-    Arc::new(LayoutTree::Stack {
-        direction: Face6::PZ,
-        children: vec![
-            // TODO: have a better way to communicate our choice of "baseline" alignment
-            Arc::new(LayoutTree::Spacer(LayoutRequest {
-                // magic number 2 allows us to fill the edges of the viewport, ish
-                // TODO: HudLayout should give us the option of "overscan"
-                minimum: GridVector::new(0, 0, HudLayout::DEPTH_BEHIND_VIEW_PLANE + 2),
-            })),
-            LayoutTree::leaf(
-                FrameWidget::with_block(Block::from(Rgba::new(0., 0., 0., 0.7))) as Arc<dyn Widget>,
-            ),
-            LayoutTree::leaf(pause_toggle_button(hud_inputs)),
-        ],
-    })
 }
 
 // TODO: Unclear if HudBlocks should exist; maybe it should be reworked into a BlockProvider for widget graphics instead.
