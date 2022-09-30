@@ -416,6 +416,8 @@ pub struct InputTargets<'a> {
 pub enum Key {
     /// Letters should be lowercase.
     Character(char),
+    /// Escape key (or controller ‘start’ or mobile ‘back’).
+    Escape,
     /// Left arrow key.
     Left,
     /// Right arrow key.

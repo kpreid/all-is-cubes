@@ -77,7 +77,7 @@ pub fn map_key(key: glfw::Key) -> Option<all_is_cubes::apps::Key> {
         G::GraveAccent => A::Character('`'),
         G::World1 => return None,
         G::World2 => return None,
-        G::Escape => return None,       // TODO add this?
+        G::Escape => A::Escape,
         G::Enter => A::Character('\r'), // TODO is this the mapping we want?
         G::Tab => A::Character('\t'),
         G::Backspace => A::Character('\u{8}'), // TODO is this the mapping we want?

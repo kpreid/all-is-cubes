@@ -538,6 +538,7 @@ fn map_keyboard_event(event: &KeyboardEvent) -> Option<Key> {
         return None;
     }
     Some(match event.key_code() as u8 as char {
+        '\x1B' => Key::Escape,
         '\x25' => Key::Left,
         '\x26' => Key::Up,
         '\x27' => Key::Right,

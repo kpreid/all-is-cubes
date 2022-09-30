@@ -75,7 +75,7 @@ pub fn map_key(key: winit::event::VirtualKeyCode) -> Option<all_is_cubes::apps::
         V::X => A::Character('x'),
         V::Y => A::Character('y'),
         V::Z => A::Character('z'),
-        V::Escape => return None,
+        V::Escape => A::Escape,
         V::F1 => return None,
         V::F2 => return None,
         V::F3 => return None,

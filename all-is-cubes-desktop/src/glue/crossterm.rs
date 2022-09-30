@@ -9,6 +9,7 @@ pub fn event_to_key(event: &Event) -> Option<Key> {
     match event {
         Event::Key(key_event) => match (key_event.modifiers, key_event.code) {
             (KeyModifiers::NONE, KeyCode::Char(c)) => Some(Key::Character(c.to_ascii_lowercase())),
+            (_, KeyCode::Esc) => Some(Key::Escape),
             (_, KeyCode::Up) => Some(Key::Up),
             (_, KeyCode::Down) => Some(Key::Down),
             (_, KeyCode::Left) => Some(Key::Left),
