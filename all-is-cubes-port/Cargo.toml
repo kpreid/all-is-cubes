@@ -8,7 +8,7 @@ description = "Data import/export for the all-is-cubes engine."
 # TODO: add homepage = "..." when we have one
 repository = "https://github.com/kpreid/all-is-cubes"
 license = "MIT OR Apache-2.0"
-categories = ["games"]
+categories = ["games", "rendering::data-formats"]
 
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
