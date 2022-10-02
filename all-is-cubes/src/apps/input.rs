@@ -255,14 +255,16 @@ impl InputProcessor {
 
     /// Applies the accumulated input from previous events.
     /// `targets` specifies the objects it should be applied to.
-    pub fn apply_input(&mut self, targets: InputTargets<'_>, tick: Tick) {
+    pub(crate) fn apply_input(&mut self, targets: InputTargets<'_>, tick: Tick) {
         let InputTargets {
-            // TODO: universe input is not yet used but it will be, as we start having inputs that trigger transactions
-            universe: _,
+            universe,
             character: character_opt,
             paused: paused_opt,
             graphics_options,
         } = targets;
+
+        // TODO: universe input is not yet used but it will be, as we start having inputs that trigger transactions
+        let _ = universe;
 
         let dt = tick.delta_t.as_secs_f64();
         let key_turning_step = 80.0 * dt;
@@ -403,7 +405,7 @@ impl InputProcessor {
 /// TODO: Specify a warning reporting scheme.
 #[derive(Debug, Default)]
 #[non_exhaustive]
-pub struct InputTargets<'a> {
+pub(crate) struct InputTargets<'a> {
     pub universe: Option<&'a mut Universe>,
     pub character: Option<&'a URef<Character>>,
     pub paused: Option<&'a ListenableCell<bool>>,
