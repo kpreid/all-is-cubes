@@ -30,8 +30,8 @@ pub struct Session {
     /// to advance time in the clock.
     pub frame_clock: FrameClock,
 
-    /// Handles (some) user input. The caller must provide input events/state;
-    /// [`Session`] will handle calling [`InputProcessor::apply_input`].
+    /// Handles (some) user input. The caller must provide input events/state to this.
+    /// [`Session`] will handle applying it to the game state.
     pub input_processor: InputProcessor,
 
     graphics_options: ListenableCell<GraphicsOptions>,

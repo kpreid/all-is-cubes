@@ -17,10 +17,16 @@ use crate::universe::{URef, Universe};
 ///
 /// 1. The platform-specific code should call [`InputProcessor::key_down`] and such to
 ///    to provide input information.
-/// 2. The game loop should call [`InputProcessor::apply_input`] to apply the effects
-///    of input on the relevant [`Character`].
-/// 3. The game loop should call [`InputProcessor::step`] to apply the effects of time
-///    on the input processor.
+/// 2. The game loop should call `InputProcessor::apply_input` to apply the effects
+///    of input on the relevant [`Character`]. (This is currently only possible via
+///    [`Session`].)
+/// 3. The game loop should call `InputProcessor::step` to apply the effects of time
+///    on the input processor. (This is currently only possible via [`Session`].)
+///
+/// TODO: Refactor APIs till this can be explained more cleanly without reference to
+/// private items.
+///
+/// [`Session`]: super::Session
 #[derive(Debug)]
 pub struct InputProcessor {
     /// All [`Key`]s currently pressed.
@@ -236,7 +242,7 @@ impl InputProcessor {
     ///
     /// This method should be called *after* [`apply_input`](Self::apply_input), when
     /// applicable.
-    pub fn step(&mut self, tick: Tick) {
+    pub(crate) fn step(&mut self, tick: Tick) {
         let mut to_drop = Vec::new();
         for (key, duration) in self.momentary_timeout.iter_mut() {
             if let Some(reduced) = duration.checked_sub(tick.delta_t) {
