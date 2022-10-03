@@ -45,6 +45,13 @@ pub struct LayoutRequest {
     pub minimum: GridVector,
 }
 
+impl LayoutRequest {
+    /// A request for no space at all.
+    pub const EMPTY: Self = Self {
+        minimum: GridVector::new(0, 0, 0),
+    };
+}
+
 /// Region a widget has been given by the layout algorithm, based on its
 /// [`LayoutRequest`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -185,6 +192,10 @@ pub struct Positioned<W> {
 }
 
 impl<W> LayoutTree<W> {
+    pub fn empty() -> Arc<Self> {
+        Arc::new(Self::Spacer(LayoutRequest::EMPTY))
+    }
+
     pub fn leaf(widget_value: W) -> Arc<Self> {
         Arc::new(Self::Leaf(widget_value))
     }
