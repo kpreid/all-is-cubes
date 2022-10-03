@@ -6,7 +6,7 @@ use std::f64::consts::PI;
 
 use all_is_cubes::block::{
     space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Modifier,
-    Resolution::*, RotationPlacementRule, AIR,
+    Resolution::*, RotationPlacementRule, Zoom, AIR,
 };
 use all_is_cubes::cgmath::{
     Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Rad, Rotation as _, Rotation2,
@@ -58,6 +58,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     SWIMMING_POOL,
     COLORS,
     TEXT,
+    ZOOM,
 ];
 
 macro_rules! exhibit {
@@ -513,6 +514,42 @@ async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
             center + face.normal_vector() * 2,
             GridRotation::from_to(Face6::NZ, face.opposite(), Face6::PY).unwrap(),
         )?;
+    }
+
+    Ok(space)
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "Modifier::Zoom",
+    subtitle: "",
+)]
+async fn ZOOM(_: &Exhibit, universe: &mut Universe) {
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+
+    let specimen = &demo_blocks[DemoBlocks::LamppostBase];
+
+    let scale = R8;
+    let mut space = Space::builder(GridAab::for_block(scale)).build();
+
+    // TODO: This algorithm should be generically available for creating Zoom instances,
+    // rather than only an exhibit.
+    for cube in space.bounds().interior_iter() {
+        space
+            .set(cube, {
+                let mut zoom_block = specimen.clone();
+                zoom_block
+                    .modifiers_mut()
+                    .push(Zoom::new(scale, cube.cast().unwrap()).into());
+                zoom_block
+            })
+            .unwrap();
+        if !space.get_evaluated(cube).visible {
+            // Cancel placing useless invisible zoomed blocks.
+            // Note: This is not an equivalent optimization (if the original block has
+            // BlockCollision::Hard or animation).
+            space.set(cube, AIR).unwrap();
+        }
     }
 
     Ok(space)
