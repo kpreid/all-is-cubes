@@ -113,11 +113,11 @@ impl Vui {
             app_control_channel,
             graphics_options,
             paused,
+            page_state: state.as_source(),
             mouselook_mode: input_processor.mouselook_mode(),
         };
         let hud_widget_tree = new_hud_widget_tree(
             character_source.clone(),
-            state.as_source(),
             &hud_inputs,
             &hud_layout,
             &mut universe,

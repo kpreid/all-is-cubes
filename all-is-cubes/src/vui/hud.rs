@@ -112,6 +112,7 @@ pub(crate) struct HudInputs {
     pub app_control_channel: mpsc::SyncSender<ControlMessage>,
     pub graphics_options: ListenableSource<GraphicsOptions>,
     pub paused: ListenableSource<bool>,
+    pub page_state: ListenableSource<VuiPageState>,
     pub mouselook_mode: ListenableSource<bool>,
 }
 
@@ -119,14 +120,41 @@ pub(crate) struct HudInputs {
 pub(super) fn new_hud_widget_tree(
     // TODO: terrible mess of tightly coupled parameters
     character_source: ListenableSource<Option<URef<Character>>>,
-    page_state_source: ListenableSource<VuiPageState>,
     hud_inputs: &HudInputs,
     hud_layout: &HudLayout,
     // TODO: stop mutating the universe in widget construction
     universe: &mut Universe,
     tooltip_state: Arc<Mutex<TooltipState>>,
 ) -> WidgetTree {
-    // Miscellaneous control widgets drawn in the corner
+    let toolbar: Arc<dyn Widget> = Toolbar::new(
+        character_source,
+        Arc::clone(&hud_inputs.hud_blocks),
+        hud_layout.toolbar_positions,
+        universe,
+        hud_inputs.cue_channel.clone(),
+    );
+    let tooltip: Arc<dyn Widget> = TooltipWidget::new(
+        Arc::clone(&tooltip_state),
+        hud_inputs.hud_blocks.clone(),
+        universe,
+    );
+    let hud_widget_tree: WidgetTree = Arc::new(LayoutTree::Hud {
+        crosshair: LayoutTree::leaf(Crosshair::new(
+            hud_inputs.hud_blocks.blocks[UiBlocks::Crosshair].clone(),
+            hud_inputs.mouselook_mode.clone(),
+        )),
+        toolbar: Arc::new(LayoutTree::Stack {
+            direction: Face6::PY,
+            children: vec![LayoutTree::leaf(toolbar), LayoutTree::leaf(tooltip)],
+        }),
+        control_bar: control_bar(hud_inputs),
+    });
+    hud_widget_tree
+}
+
+/// Miscellaneous controls (pause, debug, etc., not gameplay controls) intended to be
+/// positioned in the top right corner.
+pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
     let control_bar_widgets: WidgetTree = Arc::new(LayoutTree::Stack {
         direction: Face6::NX,
         children: vec![
@@ -135,7 +163,7 @@ pub(super) fn new_hud_widget_tree(
                 children: graphics_options_widgets(hud_inputs),
             }),
             LayoutTree::leaf(ToggleButtonWidget::new(
-                page_state_source,
+                hud_inputs.page_state.clone(),
                 |page_state| matches!(page_state, VuiPageState::AboutText),
                 |state| hud_inputs.hud_blocks.blocks[UiBlocks::AboutButton(state)].clone(),
                 {
@@ -159,7 +187,7 @@ pub(super) fn new_hud_widget_tree(
             )),
         ],
     });
-    let control_bar_positioning: WidgetTree = if false {
+    if false {
         // reveal the bounds by adding a FrameWidget
         Arc::new(LayoutTree::Stack {
             direction: Face6::PZ,
@@ -167,31 +195,7 @@ pub(super) fn new_hud_widget_tree(
         })
     } else {
         control_bar_widgets
-    };
-    let toolbar: Arc<dyn Widget> = Toolbar::new(
-        character_source,
-        Arc::clone(&hud_inputs.hud_blocks),
-        hud_layout.toolbar_positions,
-        universe,
-        hud_inputs.cue_channel.clone(),
-    );
-    let tooltip: Arc<dyn Widget> = TooltipWidget::new(
-        Arc::clone(&tooltip_state),
-        hud_inputs.hud_blocks.clone(),
-        universe,
-    );
-    let hud_widget_tree: WidgetTree = Arc::new(LayoutTree::Hud {
-        crosshair: LayoutTree::leaf(Crosshair::new(
-            hud_inputs.hud_blocks.blocks[UiBlocks::Crosshair].clone(),
-            hud_inputs.mouselook_mode.clone(),
-        )),
-        toolbar: Arc::new(LayoutTree::Stack {
-            direction: Face6::PY,
-            children: vec![LayoutTree::leaf(toolbar), LayoutTree::leaf(tooltip)],
-        }),
-        control_bar: control_bar_positioning,
-    });
-    hud_widget_tree
+    }
 }
 
 // TODO: Unclear if HudBlocks should exist; maybe it should be reworked into a BlockProvider for widget graphics instead.
