@@ -5,9 +5,7 @@ use std::fmt;
 use exhaust::Exhaust;
 use noise::Seedable;
 
-use all_is_cubes::block::{
-    space_to_blocks, Block, BlockAttributes, BlockCollision, Resolution, RotationPlacementRule, AIR,
-};
+use all_is_cubes::block::{Block, BlockCollision, Resolution, RotationPlacementRule, Zoom, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Transform, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
@@ -336,8 +334,8 @@ enum AtriumBlocks {
     GroundFloor,
     UpperFloor,
     SolidBricks,
-    GroundArch(UpTo5, UpTo5),
-    UpperArch(UpTo5, UpTo5),
+    GroundArch,
+    UpperArch,
     GroundColumn,
     SquareColumn,
     SmallColumn,
@@ -357,8 +355,8 @@ impl fmt::Display for AtriumBlocks {
             AtriumBlocks::GroundFloor => write!(f, "ground-floor"),
             AtriumBlocks::UpperFloor => write!(f, "upper-floor"),
             AtriumBlocks::SolidBricks => write!(f, "solid-bricks"),
-            AtriumBlocks::GroundArch(x, y) => write!(f, "ground-arch/{x}-{y}"),
-            AtriumBlocks::UpperArch(x, y) => write!(f, "upper-arch/{x}-{y}"),
+            AtriumBlocks::GroundArch => write!(f, "ground-arch"),
+            AtriumBlocks::UpperArch => write!(f, "upper-arch"),
             AtriumBlocks::GroundColumn => write!(f, "ground-column"),
             AtriumBlocks::SquareColumn => write!(f, "square-column"),
             AtriumBlocks::SmallColumn => write!(f, "small-column"),
@@ -428,11 +426,6 @@ async fn install_atrium_blocks(
         }
     };
 
-    let ground_floor_arch_blocks =
-        generate_arch(universe, &stone_range, &brick_pattern, resolution, 7, 3)?;
-    let upper_floor_arch_blocks =
-        generate_arch(universe, &stone_range, &brick_pattern, resolution, 3, 2)?;
-
     // TODO: duplicated procgen code — figure out a good toolkit of math helpers
     let one_diagonal = GridVector::new(1, 1, 1);
     let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);
@@ -464,11 +457,11 @@ async fn install_atrium_blocks(
                 .display_name("Atrium Wall Bricks")
                 .voxels_fn(universe, resolution, brick_pattern)?
                 .build(),
-            AtriumBlocks::GroundArch(x, y) => {
-                ground_floor_arch_blocks[[0, y.to_int(), x.to_int()]].clone()
+            AtriumBlocks::GroundArch => {
+                generate_arch(universe, &stone_range, &brick_pattern, resolution, 7, 3)?
             }
-            AtriumBlocks::UpperArch(x, y) => {
-                upper_floor_arch_blocks[[0, y.to_int(), x.to_int()]].clone()
+            AtriumBlocks::UpperArch => {
+                generate_arch(universe, &stone_range, &brick_pattern, resolution, 3, 2)?
             }
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
@@ -572,6 +565,8 @@ async fn install_atrium_blocks(
     Ok(BlockProvider::<AtriumBlocks>::using(universe)?)
 }
 
+const MULTIBLOCK_SCALE: Resolution = Resolution::R8;
+
 fn generate_arch<'b>(
     universe: &mut Universe,
     stone_range: &[Block], // TODO: clarify
@@ -579,7 +574,7 @@ fn generate_arch<'b>(
     resolution: Resolution,
     width_blocks: GridCoordinate,
     height_blocks: GridCoordinate,
-) -> Result<Space, SetCubeError> {
+) -> Result<Block, SetCubeError> {
     let resolution_g: GridCoordinate = resolution.into();
     let space = {
         let arch_opening_width = resolution_g * width_blocks;
@@ -635,68 +630,22 @@ fn generate_arch<'b>(
         })?;
         universe.insert_anonymous(space)
     };
-    space_to_blocks(
-        resolution,
-        BlockAttributes {
-            display_name: "Atrium Upper Floor Arch".into(),
-            collision: BlockCollision::Recur,
-            ..BlockAttributes::default()
-        },
-        space,
-    )
+    Ok(Block::builder()
+        .display_name("Atrium Upper Floor Arch")
+        .collision(BlockCollision::Recur)
+        // TODO: multiplication operation on Resolution
+        .voxels_ref((resolution * MULTIBLOCK_SCALE).unwrap(), space)
+        .build())
 }
 
 fn lookup_multiblock_2d(
     blocks: &BlockProvider<AtriumBlocks>,
-    ctor: fn(UpTo5, UpTo5) -> AtriumBlocks,
-    xy: [GridCoordinate; 2],
+    ctor: AtriumBlocks,
+    [x, y]: [GridCoordinate; 2],
 ) -> Block {
-    match xy.map(UpTo5::new) {
-        [Some(x), Some(y)] => blocks[ctor(x, y)].clone(),
-        _ => Block::builder()
-            .color(rgba_const!(1.0, 0.01, 0.8, 1.0))
-            .display_name(format!("Out of bounds {:?}", xy))
-            .build(),
-    }
-}
-
-/// Kludge to allow for representing multi-block structures in [`AtriumBlocks`].
-/// This represents an integer in {0, 1, 2, 3, 4}, which is the biggest dimension
-/// we have.
-///
-/// TODO: Replace this with built-in support for multi-block structures.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, exhaust::Exhaust)]
-enum UpTo5 {
-    U0,
-    U1,
-    U2,
-    U3,
-    U4,
-}
-impl UpTo5 {
-    /// Basically a `TryFrom` without an error type
-    fn new(input: GridCoordinate) -> Option<Self> {
-        Some(match input {
-            0 => UpTo5::U0,
-            1 => UpTo5::U1,
-            2 => UpTo5::U2,
-            3 => UpTo5::U3,
-            4 => UpTo5::U4,
-            _ => return None,
-        })
-    }
-    fn to_int(self) -> GridCoordinate {
-        match self {
-            UpTo5::U0 => 0,
-            UpTo5::U1 => 1,
-            UpTo5::U2 => 2,
-            UpTo5::U3 => 3,
-            UpTo5::U4 => 4,
-        }
-    }
-}
-impl fmt::Display for UpTo5 {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_int())
-    }
+    let mut block = blocks[ctor].clone();
+    block
+        .modifiers_mut()
+        .push(Zoom::new(MULTIBLOCK_SCALE, GridPoint::new(0, y, x)).into());
+    block
 }
