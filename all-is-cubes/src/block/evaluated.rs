@@ -156,6 +156,17 @@ impl EvaluatedBlock {
     pub(crate) fn visible_or_animated(&self) -> bool {
         self.visible || self.attributes.animation_hint.might_become_visible()
     }
+
+    #[doc(hidden)]
+    #[track_caller]
+    pub fn consistency_check(&self) {
+        let regenerated = if let Some(voxels) = &self.voxels {
+            EvaluatedBlock::from_voxels(self.attributes.clone(), self.resolution, voxels.clone())
+        } else {
+            EvaluatedBlock::from_color(self.attributes.clone(), self.color)
+        };
+        assert_eq!(self, &regenerated);
+    }
 }
 
 /// Errors resulting from [`Block::evaluate`].

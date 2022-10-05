@@ -25,6 +25,7 @@ use crate::math::*;
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[repr(u8)]
 pub enum GridRotation {
     // TODO: shuffle or explicitly number these to choose a meaningful numbering

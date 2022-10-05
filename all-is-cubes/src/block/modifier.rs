@@ -12,6 +12,7 @@ use crate::universe::{RefVisitor, VisitRefs};
 /// Modifiers can be applied to a [`Block`] to change the result of
 /// [`evaluate()`](Block::evaluate)ing it.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Modifier {
     /// Suppresses all behaviors of the [`Block`] that might affect the space around it,

@@ -2,13 +2,34 @@
 use libfuzzer_sys::fuzz_target;
 extern crate all_is_cubes;
 
-use all_is_cubes::block::{Block, BlockAttributes};
+use all_is_cubes::block::{Block, BlockAttributes, EvaluatedBlock, Modifier, Resolution};
 use all_is_cubes::math::Rgba;
+use all_is_cubes::space::Space;
+use all_is_cubes::universe::Universe;
 
-fuzz_target!(|input: (BlockAttributes, Rgba)| {
-    let (attributes, color) = input;
-    // TODO: need to exercise the voxels option
-    let block = Block::builder().attributes(attributes).color(color).build();
+fuzz_target!(|input: (
+    BlockAttributes,
+    Rgba,
+    Vec<Modifier>,
+    Option<(Resolution, Space)>
+)| {
+    let (attributes, color, modifiers, voxels) = input;
 
-    let _ = block.evaluate();
+    let mut universe = Universe::new();
+
+    let builder = Block::builder().attributes(attributes);
+    let mut block = if let Some((resolution, space)) = voxels {
+        builder
+            .voxels_ref(resolution, universe.insert_anonymous(space))
+            .build()
+    } else {
+        builder.color(color).build()
+    };
+    block.modifiers_mut().extend(modifiers);
+
+    // Currently, no evaluation possible from this fuzz input should ever fail.
+    // (That might change in the future.)
+    let evaluated = block.evaluate().unwrap();
+
+    evaluated.consistency_check();
 });
