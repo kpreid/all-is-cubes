@@ -1,3 +1,5 @@
+use std::ops;
+
 #[cfg(doc)]
 use crate::block::{EvaluatedBlock, Primitive};
 
@@ -162,6 +164,24 @@ impl From<Resolution> for f64 {
     }
 }
 
+impl ops::Mul<Resolution> for Resolution {
+    type Output = Option<Resolution>;
+
+    fn mul(self, rhs: Resolution) -> Self::Output {
+        // not the most efficient way to implement this, but straightforward
+        Self::try_from(u32::from(self) * u32::from(rhs)).ok()
+    }
+}
+
+impl ops::Div<Resolution> for Resolution {
+    type Output = Option<Resolution>;
+
+    fn div(self, rhs: Resolution) -> Self::Output {
+        // not the most efficient way to implement this, but straightforward
+        Self::try_from(u32::from(self) / u32::from(rhs)).ok()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,5 +203,20 @@ mod tests {
         assert_eq!(RS.map(u16::from), [1, 2, 4, 8, 16, 32, 64, 128, 256]);
         assert_eq!(RS.map(u32::from), [1, 2, 4, 8, 16, 32, 64, 128, 256]);
         assert_eq!(RS.map(usize::from), [1, 2, 4, 8, 16, 32, 64, 128, 256]);
+    }
+
+    #[test]
+    fn mul() {
+        assert_eq!(R4 * R2, Some(R8));
+        assert_eq!(R256 * R2, None);
+        assert_eq!(R2 * R256, None);
+    }
+
+    #[test]
+    fn div() {
+        assert_eq!(R8 / R2, Some(R4));
+        assert_eq!(R256 / R256, Some(R1));
+        assert_eq!(R1 / R2, None);
+        assert_eq!(R128 / R256, None);
     }
 }
