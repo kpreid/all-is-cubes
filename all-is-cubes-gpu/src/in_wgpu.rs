@@ -219,6 +219,7 @@ impl EverythingRenderer {
             width: viewport.framebuffer_size.x.max(1),
             height: viewport.framebuffer_size.y.max(1),
             present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode: wgpu::CompositeAlphaMode::Auto,
         };
 
         // Downlevel GL backend may not support rendering to float textures, so we need
