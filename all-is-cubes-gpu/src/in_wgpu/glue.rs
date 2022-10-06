@@ -1,7 +1,6 @@
 //! Miscellaneous conversion functions and trait impls for [`wgpu`].
 
 use std::borrow::Cow;
-use std::collections::VecDeque;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -160,18 +159,14 @@ impl<'sh, 'mu> BeltWritingParts<'sh, 'mu> {
 
 /// A [`wgpu::Buffer`] wrapper that allows loading differently-sized data with automatic
 /// reallocation as needed. Also supports not yet having allocated a buffer.
-///
-/// The current implementation does "triple buffering": each write operation writes to the
-/// least recently used of three buffers.
 #[derive(Debug, Default)]
 pub(crate) struct ResizingBuffer {
-    /// The front is the buffer most recently written to.
-    buffers: VecDeque<wgpu::Buffer>,
+    buffer: Option<wgpu::Buffer>,
 }
 
 impl ResizingBuffer {
     pub(crate) fn get(&self) -> Option<&wgpu::Buffer> {
-        self.buffers.get(0)
+        self.buffer.as_ref()
     }
 
     /// Write new data, reallocating if needed.
@@ -183,22 +178,16 @@ impl ResizingBuffer {
         mut bwp: BeltWritingParts<'_, '_>,
         descriptor: &wgpu::util::BufferInitDescriptor<'_>,
     ) {
-        if self.buffers.len() < 3 {
-            // Create buffers lazily until we have 3.
-            self.buffers
-                .push_front(bwp.device.create_buffer_init(descriptor));
-        } else {
-            let new_size: u64 = descriptor.contents.len().try_into().unwrap();
-            let mut b = self.buffers.pop_back().unwrap();
-            if b.size() >= new_size {
-                if let Some(new_size) = wgpu::BufferSize::new(new_size) {
-                    bwp.write_buffer(&b, 0, new_size)
-                        .copy_from_slice(descriptor.contents);
-                }
+        let new_size: u64 = descriptor.contents.len().try_into().unwrap();
+        if let Some(buffer) = self.buffer.as_ref().filter(|b| b.size() >= new_size) {
+            if let Some(new_size) = wgpu::BufferSize::new(new_size) {
+                bwp.write_buffer(buffer, 0, new_size)
+                    .copy_from_slice(descriptor.contents);
             } else {
-                b = bwp.device.create_buffer_init(descriptor);
+                // zero bytes to write
             }
-            self.buffers.push_front(b);
+        } else {
+            self.buffer = Some(bwp.device.create_buffer_init(descriptor));
         }
     }
 }
