@@ -166,19 +166,12 @@ impl<'sh, 'mu> BeltWritingParts<'sh, 'mu> {
 #[derive(Debug, Default)]
 pub(crate) struct ResizingBuffer {
     /// The front is the buffer most recently written to.
-    buffers: VecDeque<SizedBuffer>,
-}
-
-/// wgpu does not expose the size of an existing buffer
-#[derive(Debug)]
-struct SizedBuffer {
-    buffer: wgpu::Buffer,
-    capacity: u64,
+    buffers: VecDeque<wgpu::Buffer>,
 }
 
 impl ResizingBuffer {
     pub(crate) fn get(&self) -> Option<&wgpu::Buffer> {
-        self.buffers.get(0).map(|sb| &sb.buffer)
+        self.buffers.get(0)
     }
 
     /// Write new data, reallocating if needed.
@@ -190,26 +183,20 @@ impl ResizingBuffer {
         mut bwp: BeltWritingParts<'_, '_>,
         descriptor: &wgpu::util::BufferInitDescriptor<'_>,
     ) {
-        let new_size: u64 = descriptor.contents.len().try_into().unwrap();
-
         if self.buffers.len() < 3 {
             // Create buffers lazily until we have 3.
-            self.buffers.push_front(SizedBuffer {
-                capacity: new_size,
-                buffer: bwp.device.create_buffer_init(descriptor),
-            });
+            self.buffers
+                .push_front(bwp.device.create_buffer_init(descriptor));
         } else {
+            let new_size: u64 = descriptor.contents.len().try_into().unwrap();
             let mut b = self.buffers.pop_back().unwrap();
-            if b.capacity >= new_size {
+            if b.size() >= new_size {
                 if let Some(new_size) = wgpu::BufferSize::new(new_size) {
-                    bwp.write_buffer(&b.buffer, 0, new_size)
+                    bwp.write_buffer(&b, 0, new_size)
                         .copy_from_slice(descriptor.contents);
                 }
             } else {
-                b = SizedBuffer {
-                    capacity: new_size,
-                    buffer: bwp.device.create_buffer_init(descriptor),
-                };
+                b = bwp.device.create_buffer_init(descriptor);
             }
             self.buffers.push_front(b);
         }
