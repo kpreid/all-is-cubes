@@ -2,7 +2,7 @@
 use libfuzzer_sys::fuzz_target;
 extern crate all_is_cubes;
 
-use all_is_cubes::block::{Block, BlockAttributes, EvaluatedBlock, Modifier, Resolution};
+use all_is_cubes::block::{Block, BlockAttributes, Modifier, Resolution};
 use all_is_cubes::math::Rgba;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
