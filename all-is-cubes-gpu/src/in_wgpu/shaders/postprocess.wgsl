@@ -55,12 +55,9 @@ fn tone_map(linear_rgb: vec3<f32>) -> vec3<f32> {
     }
 }
 
-@fragment
-fn postprocess_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    // scale clip coordinates to 0.1 coordinates and flip Y
-    let texcoord: vec2<f32> = in.tc.xy * vec2<f32>(0.5, -0.5) + 0.5;
-
-    // Fetch scene pixel, if present
+// Fetch scene pixel, if scene texture is present.
+// (It may be absent because there might have been nothing to draw in previous stages.)
+fn scene_pixel(texcoord: vec2<f32>) -> vec4<f32> {
     var scene_color: vec4<f32>;
     if (camera.scene_texture_valid != 0) {
         scene_color = textureSampleLevel(
@@ -75,13 +72,15 @@ fn postprocess_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         // Note: this color is equal to all_is_cubes::palette::NO_WORLD_TO_SHOW.
         scene_color = vec4<f32>(0.5, 0.5, 0.5, 1.0);
     }
+    return scene_color;
+}
 
-    // apply tone mapping, respecting premultiplied alpha
-    let tone_mapped_scene = vec4<f32>(tone_map(scene_color.rgb * scene_color.a) / scene_color.a, scene_color.a);
-
+// Given a point in the viewport using 0-1 coordinates, find the opacity the info text's
+// shadow should have.
+fn text_shadow_alpha(texcoord: vec2<f32>) -> f32 {
     let derivatives = vec2<f32>(dpdx(texcoord.x), dpdy(texcoord.y));
 
-    var shadowing: f32 = 0.0;
+    var accumulator: f32 = 0.0;
     let radius: i32 = 2;
     let diameter = radius * 2 + 1;
     // Note: This roundabout method of computing the neighborhood coordinates using
@@ -101,11 +100,22 @@ fn postprocess_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
             0.0
         ).a;
         let weight: f32 = 0.2 / max(1.0, length(offset));
-        shadowing = shadowing + offset_alpha * weight;
+        accumulator = accumulator + offset_alpha * weight;
     }
-    shadowing = clamp(shadowing, 0.0, 0.5);
-    shadowing = pow(shadowing, 0.48);  // TODO: kludge for gamma, or sensible visual tweak?
+    return pow(clamp(accumulator, 0.0, 0.5), 0.48);
+}
 
+@fragment
+fn postprocess_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
+    // scale clip coordinates to 0-1 coordinates and flip Y
+    let texcoord: vec2<f32> = in.tc.xy * vec2<f32>(0.5, -0.5) + 0.5;
+
+    let scene_color = scene_pixel(texcoord);
+
+    // apply tone mapping, respecting premultiplied alpha
+    let tone_mapped_scene = vec4<f32>(tone_map(scene_color.rgb * scene_color.a) / scene_color.a, scene_color.a);
+
+    let shadowing = text_shadow_alpha(texcoord);
     let foreground_texel = textureSampleLevel(text_texture, text_sampler, texcoord, 0.0);
 
     // Final compositing:
