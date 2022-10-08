@@ -60,8 +60,8 @@ OPTIONS:
             Mutually exclusive with specifying an input file.
             
             [default: demo-city]
-            [possible values: menu, blank, fail, demo-city, dungeon, islands, atrium, cornell-box,
-            menger-sponge, lighting-bench]
+            [possible values: [..]
+...
 
     -v, --verbose
             Additional logging to stderr
