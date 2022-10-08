@@ -3830,6 +3830,7 @@ dependencies = [
  "anyhow",
  "cargo_metadata",
  "clap",
+ "once_cell",
  "toml_edit",
  "xshell",
 ]

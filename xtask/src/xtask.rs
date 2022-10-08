@@ -10,12 +10,20 @@
 // We might or might not want to reduce this to "compute all the primitive combinations, then find the minimal set of cargo commands to produce this effect".
 // That might be overkill or it might be straightforward.
 
+// TODO: Make this independent of the current directory so that it will never do surprising
+// things to the current directory.
+
+use std::ffi::OsStr;
 use std::io::Write as _;
+use std::path::Component;
 use std::path::Path;
+use std::path::PathBuf;
 use std::time::Duration;
 
+use anyhow::Context as _;
 use anyhow::Error as ActionError;
 use cargo_metadata::PackageId;
+use once_cell::sync::Lazy;
 use xshell::{cmd, pushd, Cmd, Pushd};
 
 #[derive(Debug, clap::Parser)]
@@ -26,6 +34,13 @@ struct XtaskArgs {
 
 #[derive(Debug, clap::Subcommand)]
 enum XtaskCommand {
+    /// Create items that are either necessary for builds to succeed, or trivial.
+    /// Currently this means:
+    ///
+    /// * wasm build output
+    /// * `all-is-cubes.desktop` file
+    Init,
+
     /// Run all tests (and some builds without tests) with default features.
     Test,
 
@@ -68,6 +83,10 @@ fn main() -> Result<(), ActionError> {
     let XtaskArgs { command } = <XtaskArgs as clap::Parser>::parse();
 
     match command {
+        XtaskCommand::Init => {
+            write_development_files()?;
+            update_server_static()?; // includes installing wasm tools
+        }
         XtaskCommand::Test => {
             do_for_all_packages(TestOrCheck::Test, Features::Default)?;
         }
@@ -277,6 +296,54 @@ fn do_for_all_packages(op: TestOrCheck, features: Features) -> Result<(), Action
     Ok(())
 }
 
+/// Create files which may be useful for development in the workspace but which cannot
+/// simply have constant contents.
+fn write_development_files() -> Result<(), ActionError> {
+    // .desktop file, used by Linux desktop application launchers to describe how to run
+    // our executable. It needs to have an absolute path to the file.
+    // The file is also required to be encoded in UTF-8, so non-UTF-8 paths cannot be
+    // supported.
+    if let Some(dir) = PROJECT_DIR.to_str() {
+        let desktop_path = format!("{dir}/all-is-cubes-desktop/all-is-cubes.desktop");
+        std::fs::write(
+            &desktop_path,
+            format!(
+                "\
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=All is Cubes (dev)
+Path={dir}
+Exec=cargo run --bin all-is-cubes
+Terminal=false
+Categories=Game;
+PrefersNonDefaultGPU=true
+SingleMainWindow=true
+"
+            )
+            .as_bytes(),
+        )
+        .with_context(|| format!("failed to write {desktop_path}"))?;
+
+        // Desktops may decline to use the file unless it has the execute bit set.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let mut permissions = std::fs::metadata(&desktop_path)
+                .context("read metadata for desktop file")?
+                .permissions();
+            // Set execute bit
+            permissions.set_mode(permissions.mode() | 0o111);
+            std::fs::set_permissions(&desktop_path, permissions)
+                .context("write metadata for desktop file")?;
+        }
+    } else {
+        eprintln!("Skipping creation of .desktop file because path is not UTF-8");
+    }
+
+    Ok(())
+}
+
 /// cd into each workspace and do something.
 ///
 /// do_for_all_packages doesn't use this because it has more specialized handling
@@ -325,6 +392,26 @@ enum Features {
     /// Test each package with all features enabled and with all features disabled.
     AllAndNothing,
 }
+
+/// Path to the main All is Cubes project/repository directory.
+///
+/// (In the typical case, this will be equal to the current directory.)
+static PROJECT_DIR: Lazy<PathBuf> = Lazy::new(|| {
+    let mut path = PathBuf::from(
+        std::env::var_os("CARGO_MANIFEST_DIR")
+            .expect("CARGO_MANIFEST_DIR environment variable not set"),
+    );
+    // Sanity check
+    assert!(path.is_absolute());
+    // Since we are the xtask binary, we'll be given the path to the xtask package.
+    assert_eq!(
+        path.components().last(),
+        Some(Component::Normal(OsStr::new("xtask")))
+    );
+    // Pop the xtask directory to become the path to the main project directory.
+    path.pop();
+    path
+});
 
 /// Start a [`Cmd`] with the cargo command we should use.
 fn cargo() -> Cmd {
