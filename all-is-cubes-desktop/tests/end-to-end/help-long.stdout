@@ -2,69 +2,69 @@ All is Cubes [DESKTOPVERSION]
 Kevin Reid <kpreid@switchb.org>
 Recursive voxel game.
 
-USAGE:
+Usage:
     all-is-cubes[EXE] [OPTIONS] [FILE]
 
-ARGS:
-    <FILE>
-            Existing save/document file to load. If not specified, a template will be used instead.
-            
-            Currently supported formats:
-            
-            * MagicaVoxel .vox (partial support)
+Arguments:
+  [FILE]
+          Existing save/document file to load. If not specified, a template will be used instead.
+          
+          Currently supported formats:
+          
+          * MagicaVoxel .vox (partial support)
 
-OPTIONS:
-        --display-size <W×H>
-            Window size or image size, if applicable to the selected --graphics mode
-            
-            [default: auto]
+Options:
+      --display-size <W×H>
+          Window size or image size, if applicable to the selected --graphics mode
+          
+          [default: auto]
 
-        --duration <SECONDS>
-            Length of time to simulate.
-            
-            * In 'record' mode, sets duration of video (or still image if absent).
-            * In 'headless' mode, sets a time to exit rather than running infinitely.
-            * In all other modes, does nothing.
+      --duration <SECONDS>
+          Length of time to simulate.
+          
+          * In 'record' mode, sets duration of video (or still image if absent).
+          * In 'headless' mode, sets a time to exit rather than running infinitely.
+          * In all other modes, does nothing.
 
-    -g, --graphics <mode>
-            Graphics/UI mode; one of the following keywords:
-            
-            * window    — Open a window (uses GPU rendering)
-            * window-gl — Open a window (uses GPU with OpenGL backend)
-            * window-rt — EXPERIMENTAL: Open a window (uses CPU raytracing)
-            * terminal  — Colored text in this terminal (uses raytracing)
-            * headless  — Non-interactive; don't draw anything but only simulates
-            * record    — Non-interactive; save an image or video (uses raytracing)
-            * print     — Non-interactive; print one frame like 'terminal' mode then exit
-            
-            [default: window]
+  -g, --graphics <mode>
+          Graphics/UI mode; one of the following keywords:
+          
+          * window    — Open a window (uses GPU rendering)
+          * window-gl — Open a window (uses GPU with OpenGL backend)
+          * window-rt — EXPERIMENTAL: Open a window (uses CPU raytracing)
+          * terminal  — Colored text in this terminal (uses raytracing)
+          * headless  — Non-interactive; don't draw anything but only simulates
+          * record    — Non-interactive; save an image or video (uses raytracing)
+          * print     — Non-interactive; print one frame like 'terminal' mode then exit
+          
+          [default: window]
 
-    -h, --help
-            Print help information
+  -h, --help
+          Print help information (use `-h` for a summary)
 
-        --no-config-files
-            Ignore all configuration files, using only defaults and command-line options
+      --no-config-files
+          Ignore all configuration files, using only defaults and command-line options
 
-    -o, --output <FILE>
-            Output file name for 'record' mode.
-            
-            The file name must have an extension specifying the type; currently only PNG is
-            supported ('.png' or '.apng').
+  -o, --output <FILE>
+          Output file name for 'record' mode.
+          
+          The file name must have an extension specifying the type; currently only PNG is supported
+          ('.png' or '.apng').
 
-        --precompute-light
-            Fully calculate light before starting the game
+      --precompute-light
+          Fully calculate light before starting the game
 
-    -t, --template <TEMPLATE>
-            Which world template to use.
-            
-            Mutually exclusive with specifying an input file.
-            
-            [default: demo-city]
-            [possible values: [..]
+  -t, --template <TEMPLATE>
+          Which world template to use.
+          
+          Mutually exclusive with specifying an input file.
+          
+          [default: demo-city]
+          [possible values: [..]
 ...
 
-    -v, --verbose
-            Additional logging to stderr
+  -v, --verbose
+          Additional logging to stderr
 
-    -V, --version
-            Print version information
+  -V, --version
+          Print version information

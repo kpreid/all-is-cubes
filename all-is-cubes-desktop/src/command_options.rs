@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
 
-use clap::{builder::TypedValueParser, ArgEnum, Parser};
+use clap::builder::{PossibleValue, PossibleValuesParser};
+use clap::{builder::TypedValueParser, error::ErrorKind, Parser, ValueEnum};
 use once_cell::sync::Lazy;
 use strum::IntoEnumIterator;
 
@@ -16,9 +17,20 @@ use crate::record::{RecordAnimationOptions, RecordFormat, RecordOptions};
 use crate::TITLE;
 
 #[derive(Clone, Debug, Parser)]
-#[clap(name = TITLE, author, about, version)]
+#[command(
+    name = TITLE, author, about, version,
+    next_display_order = None, // causes alphabetical sorting -- TODO: revisit
+    help_template = "\
+{name} {version}
+{author}
+{about-with-newline}
+{usage-heading}
+    {usage}
+
+{all-args}{after-help}",
+)]
 pub(crate) struct AicDesktopArgs {
-    #[clap(
+    #[arg(
         long = "graphics",
         short = 'g',
         default_value = "window",
@@ -30,33 +42,33 @@ pub(crate) struct AicDesktopArgs {
     pub(crate) graphics: GraphicsType,
 
     /// Window size or image size, if applicable to the selected --graphics mode.
-    #[clap(long = "display-size", value_name = "W×H", default_value = "auto")]
+    #[arg(long = "display-size", value_name = "W×H", default_value = "auto")]
     pub(crate) display_size: DisplaySizeArg,
 
     /// Which world template to use.
     ///
     /// Mutually exclusive with specifying an input file.
-    #[clap(
+    #[arg(
         long = "template",
         short = 't',
         default_value = "demo-city",
-        value_parser = clap::builder::PossibleValuesParser::new(
+        value_parser = PossibleValuesParser::new(
             UniverseTemplate::iter().map(|t| {
-                clap::PossibleValue::new(t.clone().into()).hide(!t.include_in_lists())
+                PossibleValue::new(<&str>::from(t.clone())).hide(!t.include_in_lists())
             }),
         ).map(|string| UniverseTemplate::from_str(&string).unwrap()),
     )]
     pub(crate) template: UniverseTemplate,
 
     /// Fully calculate light before starting the game.
-    #[clap(long = "precompute-light")]
+    #[arg(long = "precompute-light")]
     pub(crate) precompute_light: bool,
 
     /// Output file name for 'record' mode.
     ///
     /// The file name must have an extension specifying the type; currently only PNG is supported
     /// ('.png' or '.apng').
-    #[clap(
+    #[arg(
         long = "output",
         short = 'o',
         required_if_eq("graphics", "record"),
@@ -71,15 +83,15 @@ pub(crate) struct AicDesktopArgs {
     /// * In 'record' mode, sets duration of video (or still image if absent).
     /// * In 'headless' mode, sets a time to exit rather than running infinitely.
     /// * In all other modes, does nothing.
-    #[clap(long = "duration", value_name = "SECONDS", verbatim_doc_comment)]
+    #[arg(long = "duration", value_name = "SECONDS", verbatim_doc_comment)]
     pub(crate) duration: Option<f64>,
 
     /// Additional logging to stderr.
-    #[clap(long = "verbose", short = 'v')]
+    #[arg(long = "verbose", short = 'v')]
     pub(crate) verbose: bool,
 
     /// Ignore all configuration files, using only defaults and command-line options.
-    #[clap(long = "no-config-files")]
+    #[arg(long = "no-config-files")]
     pub(crate) no_config_files: bool,
 
     /// Existing save/document file to load. If not specified, a template will be used
@@ -88,7 +100,7 @@ pub(crate) struct AicDesktopArgs {
     /// Currently supported formats:
     ///
     /// * MagicaVoxel .vox (partial support)
-    #[clap(conflicts_with = "template", value_name = "FILE")]
+    #[arg(conflicts_with = "template", value_name = "FILE")]
     pub(crate) input_file: Option<PathBuf>,
 }
 
@@ -98,7 +110,7 @@ impl AicDesktopArgs {
     /// Returns an error if options were inconsistent with each other.
     ///
     /// Panics if `output_path` is not set or validated (this should have been checked at parse time).
-    pub fn record_options(&self) -> clap::Result<RecordOptions> {
+    pub fn record_options(&self) -> clap::error::Result<RecordOptions> {
         let output_path = self
             .output_file
             .clone()
@@ -137,8 +149,7 @@ static GRAPHICS_HELP_LONG: Lazy<String> = Lazy::new(|| {
 
     let max_width = pv_iter
         .clone()
-        .map(|pv| pv.get_name())
-        .map(str::len)
+        .map(|pv| pv.get_name().len())
         .max()
         .unwrap_or(0);
 
@@ -156,25 +167,25 @@ static GRAPHICS_HELP_LONG: Lazy<String> = Lazy::new(|| {
 });
 
 #[derive(
-    Clone, Copy, Debug, Eq, PartialEq, clap::ArgEnum, strum::EnumString, strum::IntoStaticStr,
+    Clone, Copy, Debug, Eq, PartialEq, clap::ValueEnum, strum::EnumString, strum::IntoStaticStr,
 )]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub enum GraphicsType {
     // These variants are sorted for the benefit of the help text presentation.
-    #[clap(help = "Open a window (uses GPU rendering)")]
+    #[value(help = "Open a window (uses GPU rendering)")]
     Window,
-    #[clap(help = "Open a window (uses GPU with OpenGL backend)")]
+    #[value(help = "Open a window (uses GPU with OpenGL backend)")]
     WindowGl,
-    #[clap(help = "EXPERIMENTAL: Open a window (uses CPU raytracing)")]
+    #[value(help = "EXPERIMENTAL: Open a window (uses CPU raytracing)")]
     WindowRt,
-    #[clap(help = "Colored text in this terminal (uses raytracing)")]
+    #[value(help = "Colored text in this terminal (uses raytracing)")]
     Terminal,
-    #[clap(help = "Non-interactive; don't draw anything but only simulates")]
+    #[value(help = "Non-interactive; don't draw anything but only simulates")]
     Headless,
-    #[clap(help = "Non-interactive; save an image or video (uses raytracing)")]
+    #[value(help = "Non-interactive; save an image or video (uses raytracing)")]
     Record,
-    #[clap(help = "Non-interactive; print one frame like 'terminal' mode then exit")]
+    #[value(help = "Non-interactive; print one frame like 'terminal' mode then exit")]
     Print,
 }
 
@@ -229,8 +240,8 @@ impl clap::builder::TypedValueParser for OutputFileValueParser {
 
     fn parse_ref(
         &self,
-        cmd: &clap::Command<'_>,
-        arg: Option<&clap::Arg<'_>>,
+        cmd: &clap::Command,
+        arg: Option<&clap::Arg>,
         value: &std::ffi::OsStr,
     ) -> Result<Self::Value, clap::Error> {
         let value = clap::builder::PathBufValueParser::new().parse_ref(cmd, arg, value)?;
@@ -238,7 +249,7 @@ impl clap::builder::TypedValueParser for OutputFileValueParser {
         // The clap API doesn't currently let us build that error or indirectly ask for it.
         match determine_record_format(&value) {
             Ok(_) => Ok(value),
-            Err(msg) => Err(clap::Error::raw(clap::ErrorKind::ValueValidation, msg)),
+            Err(msg) => Err(clap::Error::raw(ErrorKind::ValueValidation, msg)),
         }
     }
 }
@@ -271,7 +282,7 @@ mod tests {
 
     use super::*;
 
-    fn parse(args: &[&str]) -> clap::Result<AicDesktopArgs> {
+    fn parse(args: &[&str]) -> clap::error::Result<AicDesktopArgs> {
         AicDesktopArgs::try_parse_from(std::iter::once("all-is-cubes").chain(args.iter().cloned()))
     }
 
@@ -323,7 +334,7 @@ mod tests {
     #[test]
     fn record_options_missing_file() {
         let e = parse(&["-g", "record"]).unwrap_err();
-        assert_eq!(e.kind(), clap::ErrorKind::MissingRequiredArgument);
+        assert_eq!(e.kind(), ErrorKind::MissingRequiredArgument);
         assert_eq!(
             error_context(&e, clap::error::ContextKind::InvalidArg),
             Some(&ContextValue::Strings(vec![String::from(
@@ -335,7 +346,7 @@ mod tests {
     #[test]
     fn record_options_missing_extension() {
         let e = parse(&["-g", "record", "-o", "foo"]).unwrap_err();
-        assert_eq!(e.kind(), clap::ErrorKind::ValueValidation);
+        assert_eq!(e.kind(), ErrorKind::ValueValidation);
         // TODO: this info should exist but is not currently possible
         // assert_eq!(
         //     error_context(&e, clap::error::ContextKind::InvalidArg),
@@ -350,14 +361,14 @@ mod tests {
     #[test]
     fn record_options_invalid_duration() {
         let e = parse(&["-g", "record", "-o", "o.png", "--duration", "X"]).unwrap_err();
-        assert_eq!(e.kind(), clap::ErrorKind::ValueValidation);
+        assert_eq!(e.kind(), ErrorKind::ValueValidation);
         assert_eq!(
             error_context(&e, clap::error::ContextKind::InvalidArg),
             Some(&ContextValue::String(String::from("--duration <SECONDS>")))
         );
     }
 
-    fn parse_universe_test(args: &[&str]) -> clap::Result<UniverseSource> {
+    fn parse_universe_test(args: &[&str]) -> clap::error::Result<UniverseSource> {
         let AicDesktopArgs {
             template,
             input_file,
@@ -397,7 +408,7 @@ mod tests {
             parse_universe_test(&["--template", "demo-city", "foo"])
                 .unwrap_err()
                 .kind(),
-            clap::ErrorKind::ArgumentConflict
+            ErrorKind::ArgumentConflict
         );
     }
 
@@ -407,7 +418,7 @@ mod tests {
             parse_universe_test(&["--template", "foo"])
                 .unwrap_err()
                 .kind(),
-            clap::ErrorKind::InvalidValue
+            ErrorKind::InvalidValue
         );
     }
 
