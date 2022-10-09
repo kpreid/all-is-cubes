@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
 
-use clap::{ArgEnum, Parser};
+use clap::{builder::TypedValueParser, ArgEnum, Parser};
 use once_cell::sync::Lazy;
 use strum::IntoEnumIterator;
 
@@ -41,7 +41,11 @@ pub(crate) struct AicDesktopArgs {
         long = "template",
         short = 't',
         default_value = "demo-city",
-        possible_values = UniverseTemplate::iter().map(<&'static str>::from).collect::<Vec<&'static str>>(),
+        value_parser = clap::builder::PossibleValuesParser::new(
+            UniverseTemplate::iter().map(|t| {
+                clap::PossibleValue::new(t.clone().into()).hide(!t.include_in_lists())
+            }),
+        ).map(|string| UniverseTemplate::from_str(&string).unwrap()),
     )]
     pub(crate) template: UniverseTemplate,
 
