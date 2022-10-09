@@ -11,7 +11,7 @@ use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::camera::{HeadlessRenderer, RenderError, Viewport};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
-use all_is_cubes_gpu::in_wgpu::EverythingRenderer;
+use all_is_cubes_gpu::in_wgpu::{init, EverythingRenderer};
 use all_is_cubes_gpu::{FrameBudget, GraphicsResourceError};
 use test_renderers::{RendererFactory, RendererId};
 
@@ -19,37 +19,8 @@ use test_renderers::{RendererFactory, RendererId};
 pub async fn main() -> test_renderers::HarnessResult {
     test_renderers::initialize_logging();
 
-    // Get a wgpu::Instance
-    let requested_backends =
-        wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
-    let instance = wgpu::Instance::new(requested_backends);
-
-    // Report adapters that we *could* pick
-    eprintln!("Available adapters (backend filter = {requested_backends:?}):");
-    for adapter in instance.enumerate_adapters(wgpu::Backends::all()) {
-        eprintln!("  {:?}", adapter.get_info());
-    }
-
-    // Pick an adapter.
-    // TODO: Replace this with
-    //   wgpu::util::initialize_adapter_from_env_or_default(&instance, wgpu::Backends::all(), None)
-    // (which defaults to low-power) or even better, test on *all* available adapters?
-    let mut adapter: Option<wgpu::Adapter> =
-        wgpu::util::initialize_adapter_from_env(&instance, wgpu::Backends::all());
-    if adapter.is_none() {
-        eprintln!("No adapter specified via WGPU_ADAPTER_NAME; picking automatically.");
-        adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::util::power_preference_from_env()
-                    .unwrap_or(wgpu::PowerPreference::HighPerformance),
-                compatible_surface: None,
-                force_fallback_adapter: false,
-            })
-            .await;
-    }
-
+    let (_instance, adapter) = init::create_instance_and_adapter_for_test().await;
     if let Some(adapter) = adapter {
-        eprintln!("Using: {:?}", adapter.get_info());
         WGPU_ADAPTER.set(Arc::new(adapter)).unwrap();
     } else {
         eprintln!("Skipping rendering tests due to lack of wgpu::Adapter.");

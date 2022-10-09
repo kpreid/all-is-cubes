@@ -39,6 +39,8 @@ mod camera;
 mod frame_texture;
 use frame_texture::DrawableTexture;
 mod glue;
+#[doc(hidden)]
+pub mod init;
 mod pipelines;
 mod space;
 use space::SpaceRenderer;
