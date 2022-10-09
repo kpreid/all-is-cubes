@@ -254,6 +254,15 @@ mod tests {
         AicDesktopArgs::try_parse_from(std::iter::once("all-is-cubes").chain(args.iter().cloned()))
     }
 
+    fn error_context(
+        error: &clap::Error,
+        wanted_kind: clap::error::ContextKind,
+    ) -> Option<&clap::error::ContextValue> {
+        error
+            .context()
+            .find_map(|(k, v)| if k == wanted_kind { Some(v) } else { None })
+    }
+
     #[test]
     fn record_options_image() {
         assert_eq!(
@@ -295,12 +304,20 @@ mod tests {
         let e = parse(&["-g", "record"]).unwrap_err();
         assert_eq!(e.kind(), clap::ErrorKind::MissingRequiredArgument);
         assert_eq!(
-            e.context()
-                .find(|&(k, _)| k == clap::error::ContextKind::InvalidArg),
-            Some((
-                clap::error::ContextKind::InvalidArg,
-                &ContextValue::Strings(vec![String::from("--output <FILE>")])
-            ))
+            error_context(&e, clap::error::ContextKind::InvalidArg),
+            Some(&ContextValue::Strings(vec![String::from(
+                "--output <FILE>"
+            )]))
+        );
+    }
+
+    #[test]
+    fn record_options_missing_extension() {
+        let e = parse(&["-g", "record", "-o", "foo"]).unwrap_err();
+        assert_eq!(e.kind(), clap::ErrorKind::ValueValidation);
+        assert_eq!(
+            error_context(&e, clap::error::ContextKind::InvalidArg),
+            Some(&ContextValue::String(String::from("--output <FILE>")))
         );
     }
 
@@ -309,12 +326,8 @@ mod tests {
         let e = parse(&["-g", "record", "-o", "o.png", "--duration", "X"]).unwrap_err();
         assert_eq!(e.kind(), clap::ErrorKind::ValueValidation);
         assert_eq!(
-            e.context()
-                .find(|&(k, _)| k == clap::error::ContextKind::InvalidArg),
-            Some((
-                clap::error::ContextKind::InvalidArg,
-                &ContextValue::String(String::from("--duration <SECONDS>"))
-            ))
+            error_context(&e, clap::error::ContextKind::InvalidArg),
+            Some(&ContextValue::String(String::from("--duration <SECONDS>")))
         );
     }
 
