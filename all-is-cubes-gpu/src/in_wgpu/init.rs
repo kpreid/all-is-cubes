@@ -1,6 +1,6 @@
-//! Opinionated functions for initializing wgpu.
+//! Opinionated functions for initializing and using wgpu in headless conditions.
 //!
-//! These are appropriate for the all-is-cubes project itself but may not be appropriate
+//! These are appropriate for the all-is-cubes project's tests, but may not be appropriate
 //! for downstream users of the libraries.
 
 /// Create a [`wgpu::Instance`] and [`wgpu::Adapter`] controlled by environment variables,
@@ -43,4 +43,72 @@ pub async fn create_instance_and_adapter_for_test() -> (wgpu::Instance, Option<w
     }
 
     (instance, adapter)
+}
+
+/// Fetch the contents of a texture whose format is [`wgpu::TextureFormat::Rgba8UnormSrgb`].
+///
+/// TODO: Despite being nominally async, this function blocks on retrieving the texture.
+/// It should be fixed not to.
+#[doc(hidden)]
+pub async fn get_pixels_from_gpu(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    fb_texture: &wgpu::Texture,
+    viewport: all_is_cubes::camera::Viewport,
+) -> image::RgbaImage {
+    let size = viewport.framebuffer_size;
+    if size.x == 0 || size.y == 0 {
+        return image::RgbaImage::new(size.x, size.y);
+    }
+
+    let temp_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("test output image copy buffer"),
+        size: u64::from(size.x) * u64::from(size.y) * 4,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+
+    {
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        encoder.copy_texture_to_buffer(
+            wgpu::ImageCopyTexture {
+                texture: fb_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::ImageCopyBuffer {
+                buffer: &temp_buffer,
+                layout: wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: std::num::NonZeroU32::new(size.x * 4),
+                    rows_per_image: None,
+                },
+            },
+            wgpu::Extent3d {
+                width: size.x,
+                height: size.y,
+                depth_or_array_layers: 1,
+            },
+        );
+        queue.submit(Some(encoder.finish()));
+    }
+
+    let bytes = {
+        let (sender, receiver) = futures_channel::oneshot::channel();
+        temp_buffer
+            .slice(..)
+            .map_async(wgpu::MapMode::Read, |result| {
+                let _ = sender.send(result);
+            });
+        device.poll(wgpu::Maintain::Wait); // TODO: poll in the background instead of blocking
+        receiver
+            .await
+            .expect("communication failed")
+            .expect("buffer reading failed");
+        temp_buffer.slice(..).get_mapped_range().to_vec()
+    };
+
+    image::RgbaImage::from_raw(size.x, size.y, bytes)
+        .expect("image copy buffer was incorrectly sized")
 }

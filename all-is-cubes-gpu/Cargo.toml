@@ -25,9 +25,12 @@ wgpu = ["dep:wgpu"]
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }
 bytemuck = { version = "1.12.1", default-features = false, features = ["derive"] }
+futures-channel = { version = "0.3.24", default-features = false, features = ["alloc"] }
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3.21", default-features = false, features = ["alloc"] }
 futures-task = { version = "0.3.17", default-features = false }
+# Using `image` for headless renderer output.
+image = { version = "0.24.2", default-features = false }
 instant = "0.1.9"
 log = { version = "0.4.14", default-features = false }
 luminance = { version = "0.47.0", optional = true, default-features = false }
