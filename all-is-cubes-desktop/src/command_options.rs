@@ -247,6 +247,7 @@ impl clap::builder::TypedValueParser for OutputFileValueParser {
         let value = clap::builder::PathBufValueParser::new().parse_ref(cmd, arg, value)?;
         // TODO: This error return is missing the context data.
         // The clap API doesn't currently let us build that error or indirectly ask for it.
+        // <https://github.com/clap-rs/clap/issues/4362>
         match determine_record_format(&value) {
             Ok(_) => Ok(value),
             Err(msg) => Err(clap::Error::raw(ErrorKind::ValueValidation, msg)),
@@ -348,6 +349,8 @@ mod tests {
         let e = parse(&["-g", "record", "-o", "foo"]).unwrap_err();
         assert_eq!(e.kind(), ErrorKind::ValueValidation);
         // TODO: this info should exist but is not currently possible
+        // <https://github.com/clap-rs/clap/issues/4362>
+        //
         // assert_eq!(
         //     error_context(&e, clap::error::ContextKind::InvalidArg),
         //     Some(&ContextValue::String(String::from("--output <FILE>")))
