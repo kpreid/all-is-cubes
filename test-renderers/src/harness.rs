@@ -121,7 +121,7 @@ impl RenderTestContext {
 /// so that `cargo test -- --whatever` in the workspace succeeds, but it
 /// does not have all of the options yet.
 #[derive(Debug, clap::Parser)]
-#[clap(author, about, version)]
+#[command(author, about, version)]
 pub struct HarnessArgs {
     filters: Vec<String>,
 }

@@ -74,7 +74,7 @@ enum XtaskCommand {
     /// Publish all of the crates in this workspace that are intended to be published.
     PublishAll {
         /// Actually publish crates rather than dry run.
-        #[clap(long = "for-real")]
+        #[arg(long = "for-real")]
         for_real: bool,
     },
 }
