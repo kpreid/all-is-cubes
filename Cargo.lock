@@ -142,6 +142,7 @@ dependencies = [
  "rayon",
  "resource",
  "thiserror",
+ "tokio",
  "wgpu",
 ]
 

@@ -47,3 +47,7 @@ wgpu = { version = "0.14.0", optional = true, features = ["webgl"] }
 # If we don't set this feature, it will try to access files at run time and fail
 # since web wasm has no std::fs.
 resource = { version = "0.5.0", features = ["force-static"] }
+
+[dev-dependencies]
+# Using tokio for async test-running.
+tokio = { version = "1.18.0", features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
