@@ -53,9 +53,7 @@ pub(crate) struct SpaceRenderer {
     light_texture: SpaceLightTexture,
 
     /// Buffer containing the [`ShaderSpaceCamera`] configured for this Space.
-    camera_buffer: wgpu::Buffer,
-    /// Bind group for camera_buffer.
-    pub(crate) camera_bind_group: wgpu::BindGroup,
+    camera_buffer: SpaceCameraBuffer,
 
     /// Bind group containing our block texture and light texture.
     space_bind_group: wgpu::BindGroup,
@@ -97,21 +95,7 @@ impl SpaceRenderer {
             &light_texture,
         );
 
-        let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some(&format!("{space_label} camera_buffer")),
-            size: std::mem::size_of::<ShaderSpaceCamera>().try_into().unwrap(),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
-        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &pipelines.camera_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: camera_buffer.as_entire_binding(),
-            }],
-            label: Some(&format!("{space_label} camera_bind_group")),
-        });
+        let camera_buffer = SpaceCameraBuffer::new(&space_label, device, pipelines);
 
         let todo = Arc::new(Mutex::new(SpaceRendererTodo::default()));
         space_borrowed.listen(TodoListener(Arc::downgrade(&todo)));
@@ -125,7 +109,6 @@ impl SpaceRenderer {
             light_texture,
             space_bind_group,
             camera_buffer,
-            camera_bind_group,
             csm: ChunkedSpaceMesh::new(space),
         })
     }
@@ -154,7 +137,6 @@ impl SpaceRenderer {
             block_texture,
             light_texture,
             camera_buffer: _,
-            camera_bind_group: _,
             space_bind_group,
             csm,
         } = self;
@@ -288,7 +270,7 @@ impl SpaceRenderer {
         let view_chunk = csm.view_chunk();
 
         queue.write_buffer(
-            &self.camera_buffer,
+            &self.camera_buffer.buffer,
             0,
             bytemuck::bytes_of(&ShaderSpaceCamera::new(
                 camera,
@@ -316,7 +298,7 @@ impl SpaceRenderer {
                 stencil_ops: None,
             }),
         });
-        render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+        render_pass.set_bind_group(0, &self.camera_buffer.bind_group, &[]);
         render_pass.set_bind_group(1, &self.space_bind_group, &[]);
 
         // Opaque geometry first, in front-to-back order
@@ -387,7 +369,7 @@ impl SpaceRenderer {
 
     /// Returns the camera, to allow additional drawing in the same coordinate system.
     pub(crate) fn camera_bind_group(&self) -> &wgpu::BindGroup {
-        &self.camera_bind_group
+        &self.camera_buffer.bind_group
     }
 
     /// Generate debug lines for the current state of the renderer, assuming
@@ -430,6 +412,36 @@ impl SpaceRenderer {
                 }
             }
         }
+    }
+}
+
+/// GPU resources for the camera uniform that [`BLOCKS_AND_LINES_SHADER`] expects,
+/// matching [`Pipelines::camera_bind_group_layout`].
+#[derive(Debug)]
+pub(in crate::in_wgpu) struct SpaceCameraBuffer {
+    /// Buffer containing a [`ShaderSpaceCamera`].
+    buffer: wgpu::Buffer,
+    /// Bind group binding the buffer.
+    bind_group: wgpu::BindGroup,
+}
+
+impl SpaceCameraBuffer {
+    fn new(space_label: &str, device: &wgpu::Device, pipelines: &Pipelines) -> Self {
+        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(&format!("{space_label} camera_buffer")),
+            size: std::mem::size_of::<ShaderSpaceCamera>().try_into().unwrap(),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &pipelines.camera_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+            label: Some(&format!("{space_label} camera_bind_group")),
+        });
+        Self { buffer, bind_group }
     }
 }
 
