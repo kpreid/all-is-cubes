@@ -3358,9 +3358,9 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "trycmd"
-version = "0.13.7"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5377b33cbe8bb69d97da63e2a2266065a642a47cc9bb3d783c28279d0029fea"
+checksum = "1859507c6593597db93d95d228b324da1f04f39014eb26ea492925c31c36a81f"
 dependencies = [
  "glob",
  "humantime",
