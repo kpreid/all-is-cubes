@@ -45,25 +45,59 @@ pub async fn create_instance_and_adapter_for_test() -> (wgpu::Instance, Option<w
     (instance, adapter)
 }
 
-/// Fetch the contents of a texture whose format is [`wgpu::TextureFormat::Rgba8UnormSrgb`].
+/// Copy the contents of a texture into an [`ImageBuffer`], assuming that its byte layout
+/// is the same as that of `P`.
+///
+/// Panics if the provided pixel type or viewport size are incorrect.
 ///
 /// TODO: Despite being nominally async, this function blocks on retrieving the texture.
 /// It should be fixed not to.
 #[doc(hidden)]
-pub async fn get_pixels_from_gpu(
+pub async fn get_image_from_gpu<P>(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    fb_texture: &wgpu::Texture,
-    viewport: all_is_cubes::camera::Viewport,
-) -> image::RgbaImage {
-    let size = viewport.framebuffer_size;
-    if size.x == 0 || size.y == 0 {
-        return image::RgbaImage::new(size.x, size.y);
+    texture: &wgpu::Texture,
+    size: all_is_cubes::cgmath::Vector2<u32>,
+) -> image::ImageBuffer<P, Vec<P::Subpixel>>
+where
+    P: image::Pixel,
+    P::Subpixel: bytemuck::AnyBitPattern,
+{
+    let pixels_vec: Vec<P::Subpixel> =
+        get_texels_from_gpu(device, queue, texture, size, P::CHANNEL_COUNT.into()).await;
+    image::ImageBuffer::from_raw(size.x, size.y, pixels_vec)
+        .expect("image copy buffer was incorrectly sized")
+}
+
+/// Fetch the contents of a 2D texture, assuming that its byte layout is the same as that
+/// of `[C; components]` and returning a vector of length
+/// `dimensions.x * dimensions.y * components`.
+///
+/// Panics if the provided sizes are incorrect.
+///
+/// TODO: Despite being nominally async, this function blocks on retrieving the texture.
+/// It should be fixed not to.
+#[doc(hidden)]
+pub async fn get_texels_from_gpu<C>(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    texture: &wgpu::Texture,
+    dimensions: all_is_cubes::cgmath::Vector2<u32>,
+    components: usize,
+) -> Vec<C>
+where
+    C: bytemuck::AnyBitPattern,
+{
+    if dimensions.x == 0 || dimensions.y == 0 {
+        return Vec::new();
     }
 
+    let size_of_texel = components * std::mem::size_of::<C>();
     let temp_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("test output image copy buffer"),
-        size: u64::from(size.x) * u64::from(size.y) * 4,
+        label: Some("GPU-to-CPU image copy buffer"),
+        size: u64::from(dimensions.x)
+            * u64::from(dimensions.y)
+            * u64::try_from(size_of_texel).unwrap(),
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
         mapped_at_creation: false,
     });
@@ -72,7 +106,7 @@ pub async fn get_pixels_from_gpu(
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         encoder.copy_texture_to_buffer(
             wgpu::ImageCopyTexture {
-                texture: fb_texture,
+                texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
@@ -81,20 +115,22 @@ pub async fn get_pixels_from_gpu(
                 buffer: &temp_buffer,
                 layout: wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: std::num::NonZeroU32::new(size.x * 4),
+                    bytes_per_row: std::num::NonZeroU32::new(
+                        dimensions.x * u32::try_from(size_of_texel).unwrap(),
+                    ),
                     rows_per_image: None,
                 },
             },
             wgpu::Extent3d {
-                width: size.x,
-                height: size.y,
+                width: dimensions.x,
+                height: dimensions.y,
                 depth_or_array_layers: 1,
             },
         );
         queue.submit(Some(encoder.finish()));
     }
 
-    let bytes = {
+    let texels_vec: Vec<C> = {
         let (sender, receiver) = futures_channel::oneshot::channel();
         temp_buffer
             .slice(..)
@@ -106,9 +142,9 @@ pub async fn get_pixels_from_gpu(
             .await
             .expect("communication failed")
             .expect("buffer reading failed");
-        temp_buffer.slice(..).get_mapped_range().to_vec()
+        let slice: &[u8] = &temp_buffer.slice(..).get_mapped_range();
+        bytemuck::cast_slice::<u8, C>(slice).to_vec()
     };
 
-    image::RgbaImage::from_raw(size.x, size.y, bytes)
-        .expect("image copy buffer was incorrectly sized")
+    texels_vec
 }

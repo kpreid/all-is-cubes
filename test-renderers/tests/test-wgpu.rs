@@ -140,11 +140,11 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
                 &self.color_texture,
                 info_text,
             );
-            let image = init::get_pixels_from_gpu(
+            let image = init::get_image_from_gpu(
                 &self.factory.device,
                 &self.factory.queue,
                 &self.color_texture,
-                viewport,
+                viewport.framebuffer_size,
             )
             .await;
             Ok((image, self.flaws))
