@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
 
-use clap::builder::{PossibleValue, PossibleValuesParser};
-use clap::{builder::TypedValueParser, error::ErrorKind, Parser, ValueEnum};
+use clap::builder::{PathBufValueParser, PossibleValue, PossibleValuesParser};
+use clap::{builder::TypedValueParser, Parser, ValueEnum};
 use once_cell::sync::Lazy;
 use strum::IntoEnumIterator;
 
@@ -73,7 +73,10 @@ pub(crate) struct AicDesktopArgs {
         short = 'o',
         required_if_eq("graphics", "record"),
         value_name = "FILE",
-        value_parser = OutputFileValueParser,
+        value_parser = PathBufValueParser::new().try_map(|value| {
+            let _format = determine_record_format(&value)?;
+            Ok::<PathBuf, &str>(value)
+        }),
     )]
     pub(crate) output_file: Option<PathBuf>,
 
@@ -231,30 +234,6 @@ pub fn determine_record_format(output_path: &Path) -> Result<RecordFormat, &'sta
     Err("file name must have an extension specifying the type; one of 'png', 'apng', or 'gltf'")
 }
 
-/// Value parser for output file paths.
-#[derive(Copy, Clone)]
-struct OutputFileValueParser;
-
-impl clap::builder::TypedValueParser for OutputFileValueParser {
-    type Value = PathBuf;
-
-    fn parse_ref(
-        &self,
-        cmd: &clap::Command,
-        arg: Option<&clap::Arg>,
-        value: &std::ffi::OsStr,
-    ) -> Result<Self::Value, clap::Error> {
-        let value = clap::builder::PathBufValueParser::new().parse_ref(cmd, arg, value)?;
-        // TODO: This error return is missing the context data.
-        // The clap API doesn't currently let us build that error or indirectly ask for it.
-        // <https://github.com/clap-rs/clap/issues/4362>
-        match determine_record_format(&value) {
-            Ok(_) => Ok(value),
-            Err(msg) => Err(clap::Error::raw(ErrorKind::ValueValidation, msg)),
-        }
-    }
-}
-
 /// Source of the universe to create/load
 ///
 /// TODO: we will eventually want to support new/open while running and this will
@@ -279,7 +258,7 @@ pub(crate) fn parse_universe_source(
 
 #[cfg(test)]
 mod tests {
-    use clap::error::ContextValue;
+    use clap::error::{ContextValue, ErrorKind};
 
     use super::*;
 
@@ -348,16 +327,14 @@ mod tests {
     fn record_options_missing_extension() {
         let e = parse(&["-g", "record", "-o", "foo"]).unwrap_err();
         assert_eq!(e.kind(), ErrorKind::ValueValidation);
-        // TODO: this info should exist but is not currently possible
-        // <https://github.com/clap-rs/clap/issues/4362>
-        //
-        // assert_eq!(
-        //     error_context(&e, clap::error::ContextKind::InvalidArg),
-        //     Some(&ContextValue::String(String::from("--output <FILE>")))
-        // );
         assert_eq!(
-            e.to_string(),
-            "error: file name must have an extension specifying the type; one of 'png', 'apng', or 'gltf'"
+            error_context(&e, clap::error::ContextKind::InvalidArg),
+            Some(&ContextValue::String(String::from("--output <FILE>")))
+        );
+        assert!(
+            e.to_string()
+                .contains("file name must have an extension specifying the type; one of"),
+            "{e}\n{e:?}"
         );
     }
 
