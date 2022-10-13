@@ -6,6 +6,7 @@ use std::{fmt, hash};
 
 use crate::block::{self, Block, Modifier, Primitive, RotationPlacementRule, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
+use crate::fluff;
 use crate::inv::{InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
 use crate::math::{Face6, GridPoint, GridRotation};
@@ -395,6 +396,16 @@ pub enum ToolError {
     /// TODO: Improve this along with [`Transaction`] error types.
     #[error("unexpected error: {0}")]
     Internal(String),
+}
+
+impl ToolError {
+    /// Return [`Fluff`] to accompany this error.
+    ///
+    /// TODO: This should have spatial information (located at the cursor target or the
+    /// character's "hand" or other).
+    pub fn fluff(&self) -> impl Iterator<Item = fluff::Fluff> {
+        std::iter::once(fluff::Fluff::Beep)
+    }
 }
 
 /// A wrapper around a value which cannot be printed or serialized,

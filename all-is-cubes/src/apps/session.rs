@@ -10,8 +10,11 @@ use futures_task::noop_waker_ref;
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets, StandardCameras};
 use crate::camera::{GraphicsOptions, Viewport};
 use crate::character::{Character, Cursor};
+use crate::fluff;
 use crate::inv::ToolError;
-use crate::listen::{ListenableCell, ListenableCellWithLocal, ListenableSource};
+use crate::listen::{
+    ListenableCell, ListenableCellWithLocal, ListenableSource, Listener, Notifier,
+};
 use crate::space::Space;
 use crate::transaction::Transaction;
 use crate::universe::{URef, Universe, UniverseStepInfo};
@@ -43,6 +46,8 @@ pub struct Session {
     /// to replace `self.game_universe`. See [`Self::set_universe_async`].
     game_universe_in_progress: Option<BoxFuture<'static, Result<Universe, ()>>>,
 
+    fluff_notifier: Notifier<fluff::Fluff>, // TODO: should include spatial information
+
     paused: ListenableCell<bool>,
 
     ui: Option<Vui>,
@@ -73,6 +78,7 @@ impl fmt::Debug for Session {
             game_universe,
             game_character,
             game_universe_in_progress,
+            fluff_notifier,
             paused,
             ui,
             control_channel: _,
@@ -92,6 +98,7 @@ impl fmt::Debug for Session {
                 "game_universe_in_progress",
                 &game_universe_in_progress.as_ref().map(|_| "..."),
             )
+            .field("fluff_notifier", fluff_notifier)
             .field("paused", &paused)
             .field("ui", &ui)
             .field("cursor_result", &cursor_result)
@@ -163,6 +170,12 @@ impl Session {
 
     pub fn graphics_options_mut(&self) -> &ListenableCell<GraphicsOptions> {
         &self.graphics_options
+    }
+
+    /// Listen for [`Fluff`] events from this session. Fluff constitutes short-duration
+    /// sound or particle effects.
+    pub fn listen_fluff(&self, listener: impl Listener<fluff::Fluff> + Send + Sync + 'static) {
+        self.fluff_notifier.listen(listener)
     }
 
     /// Steps the universe if the `FrameClock` says it's time to do so.
@@ -304,13 +317,25 @@ impl Session {
     ///
     /// TODO: Clicks should be passed through `InputProcessor` instead of being an entirely separate path.
     pub fn click(&mut self, button: usize) {
+        // TODO: This function has no tests.
+
         let result = self.click_impl(button);
+
+        // Now, do all the _reporting_ of the tool's success or failure.
+        // (The architectural reason this isn't inside of the use_tool() itself is so that
+        // it is possible to use a tool more silently. That may or may not be a good idea.)
 
         if let Err(error @ ToolError::Internal(_)) = &result {
             // Log the message because the UI text field currently doesn't
             // fit long errors at all.
             // TODO: include source() chain
-            log::error!("Error applying tool: {error}")
+            log::error!("Error applying tool: {error}");
+        }
+
+        if let Err(error) = &result {
+            for fluff in error.fluff() {
+                self.fluff_notifier.notify(fluff);
+            }
         }
 
         if let Some(ui) = &self.ui {
@@ -441,6 +466,7 @@ impl SessionBuilder {
             game_character,
             game_universe,
             game_universe_in_progress: None,
+            fluff_notifier: Notifier::new(),
             paused,
             control_channel: control_recv,
             control_channel_sender: control_send,

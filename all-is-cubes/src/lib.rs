@@ -195,6 +195,7 @@ pub mod chunking;
 #[doc(hidden)] // Exported only for use by all_is_cubes_content
 pub mod content;
 pub mod drawing;
+pub mod fluff;
 #[doc(hidden)] // Exported only for use by all_is_cubes_gpu
 pub mod intalloc;
 pub mod inv;
