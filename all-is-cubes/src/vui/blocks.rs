@@ -15,7 +15,7 @@ use crate::universe::Universe;
 #[cfg(doc)]
 use crate::inv::Tool;
 use crate::util::YieldProgress;
-use crate::vui::widgets::{ButtonBase, ToggleButtonVisualState};
+use crate::vui::widgets::{ActionButtonVisualState, ButtonBase, ToggleButtonVisualState};
 
 /// Blocks that are used within the VUI, only.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
@@ -29,6 +29,9 @@ pub enum UiBlocks {
     ///
     /// Each array element is the relationship of this toolbar item to that button index.
     ToolbarPointer([ToolbarButtonState; TOOL_SELECTIONS]),
+
+    /// Action button for navigating “back” in the user interface (closing dialogs, etc).
+    BackButton(ActionButtonVisualState),
 
     // TODO: Should we do a `Button(ButtonLabel, ToggleButtonVisualState)` variant instead?
     AboutButton(ToggleButtonVisualState),
@@ -53,6 +56,7 @@ impl fmt::Display for UiBlocks {
             UiBlocks::ToolbarPointer([b0, b1, b2]) => {
                 write!(f, "toolbar-pointer/{b0}-{b1}-{b2}")
             }
+            UiBlocks::BackButton(state) => write!(f, "back-button/{}", state),
             UiBlocks::AboutButton(state) => write!(f, "about-button/{}", state),
             UiBlocks::PauseButton(state) => write!(f, "pause-button/{}", state),
             UiBlocks::MouselookButton(state) => write!(f, "mouselook-button/{}", state),
@@ -106,6 +110,12 @@ impl UiBlocks {
                         )?),
                     )
                     .build(),
+
+                UiBlocks::BackButton(state) => {
+                    let mut button_builder = state.button_builder()?;
+                    button_builder.draw_icon(include_image!("icons/button-back.png"))?;
+                    button_builder.build(universe, "Back")
+                }
 
                 UiBlocks::AboutButton(state) => {
                     let mut button_builder = state.button_builder()?;

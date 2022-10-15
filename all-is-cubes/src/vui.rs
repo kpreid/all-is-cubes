@@ -235,6 +235,9 @@ impl Vui {
         loop {
             match self.control_channel.try_recv() {
                 Ok(msg) => match msg {
+                    VuiMessage::Back => {
+                        self.back();
+                    }
                     VuiMessage::About => {
                         // TODO: States should be stackable somehow, and this should not totally overwrite the previous state.
                         self.set_state(VuiPageState::AboutText);
@@ -358,6 +361,12 @@ pub(crate) enum VuiPageState {
 /// Message indicating a UI action that affects the UI itself
 #[derive(Clone, Debug)]
 pub(crate) enum VuiMessage {
+    /// Perform the VUI-internal “back” action. This is not necessarily the same as an
+    /// external button press.
+    ///
+    /// TODO: This is a kludge being used for 'close the current page state' but ideally
+    /// it would specify *what* it's closing in case of message race conditions etc.
+    Back,
     /// Open [`VuiPageState::AboutText`].
     About,
 }

@@ -36,3 +36,21 @@ impl WidgetController for OneshotController {
 
     // TODO: Arrange somehow for this controller to be deleted since it doesn't need to be step()ped
 }
+
+/// A one-cube action button which performs the VUI 'back' action.
+pub(crate) fn back_button(hud_inputs: &HudInputs) -> WidgetTree {
+    // TODO: define a narrower set of inputs than HudInputs
+    // TODO: should not be using the toggle button widget
+    // TODO: this function should maybe live in a 'UI mid-level components' module?
+    LayoutTree::leaf(ToggleButton::new(
+        ListenableSource::constant(()),
+        |()| false,
+        |state| hud_inputs.hud_blocks.blocks[UiBlocks::BackButton(state)].clone(),
+        {
+            let cc = hud_inputs.vui_control_channel.clone();
+            move || {
+                let _ignore_errors = cc.send(VuiMessage::Back);
+            }
+        },
+    ))
+}
