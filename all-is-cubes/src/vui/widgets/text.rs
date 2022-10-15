@@ -18,7 +18,6 @@ use crate::vui::{widgets, LayoutGrant, LayoutRequest, Layoutable, Widget, Widget
 ///
 /// TODO: Give this a more precise name, and a nice constructor...
 #[derive(Clone, Debug)]
-#[doc(hidden)]
 #[allow(clippy::exhaustive_structs)] // TODO: find a better strategy
 pub struct LargeText {
     pub text: Cow<'static, str>,

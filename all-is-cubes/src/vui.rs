@@ -32,12 +32,10 @@ use hud::*;
 mod icons;
 pub use icons::*;
 mod layout;
-#[doc(hidden)] // going to be used by all-is-cubes-content, but not yet stable
 pub use layout::*;
 mod options;
 mod pages;
 mod widget_trait;
-#[doc(hidden)]
 pub use widget_trait::*;
 pub mod widgets;
 

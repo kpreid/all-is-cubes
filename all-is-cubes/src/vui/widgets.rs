@@ -35,7 +35,6 @@ pub(crate) use tooltip::*;
 /// Generic widget controller that only does something on `initialize()`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
-#[doc(hidden)] // TODO: widget API still in development and this is particularly dubious
 pub struct OneshotController(pub Option<WidgetTransaction>);
 
 impl OneshotController {
@@ -223,7 +222,7 @@ impl Widget for Voxels {
 /// A single-block button that displays a boolean state derived from a
 /// [`ListenableSource`].
 #[derive(Clone)]
-pub(crate) struct ToggleButton<D> {
+pub struct ToggleButton<D> {
     states: [Block; 2],
     data_source: ListenableSource<D>,
     projection: Arc<dyn Fn(&D) -> bool + Send + Sync>,
@@ -245,7 +244,7 @@ impl<D: Clone + Sync + Debug> Debug for ToggleButton<D> {
 }
 
 impl<D> ToggleButton<D> {
-    pub(crate) fn new(
+    pub fn new(
         data_source: ListenableSource<D>,
         projection: impl Fn(&D) -> bool + Send + Sync + 'static,
         mut blocks: impl FnMut(ToggleButtonVisualState) -> Block,
@@ -285,7 +284,7 @@ impl<D: Clone + Debug + Send + Sync + 'static> Widget for ToggleButton<D> {
     }
 }
 
-/// Possible visual states of a `ToggleButton`.
+/// Possible visual states of a [`ToggleButton`].
 ///
 /// The [`fmt::Display`] implementation of this type produces a string form suitable for
 /// naming blocks depicting this state; the [`Exhaust`] implementation allows iterating
@@ -310,14 +309,14 @@ impl fmt::Display for ToggleButtonVisualState {
 
 /// [`WidgetController`] for [`ToggleButton`].
 #[derive(Debug)]
-pub(crate) struct ToggleButtonController<D: Clone + Send + Sync> {
+struct ToggleButtonController<D: Clone + Send + Sync> {
     definition: Arc<ToggleButton<D>>,
     position: GridPoint,
     todo: DirtyFlag,
 }
 
 impl<D: Clone + Debug + Send + Sync + 'static> ToggleButtonController<D> {
-    pub(crate) fn new(position: GridPoint, definition: Arc<ToggleButton<D>>) -> Self {
+    fn new(position: GridPoint, definition: Arc<ToggleButton<D>>) -> Self {
         Self {
             todo: DirtyFlag::listening(true, |l| definition.data_source.listen(l)),
             position,
