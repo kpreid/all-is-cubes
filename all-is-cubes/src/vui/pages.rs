@@ -102,6 +102,7 @@ pub(super) fn new_paused_widget_tree(hud_inputs: &HudInputs) -> WidgetTree {
 /// by configuration of the [`Session`].
 pub(super) fn new_about_widget_tree(
     universe: &mut Universe,
+    hud_inputs: &HudInputs,
 ) -> Result<WidgetTree, InstallVuiError> {
     // TODO: refactor this into something reusable since it will be a key element of any
     // UI with labeled things.
@@ -159,10 +160,13 @@ pub(super) fn new_about_widget_tree(
 
     "#}) + env!("CARGO_PKG_VERSION");
 
+    let back_button = widgets::back_button(hud_inputs);
+
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
             LayoutTree::leaf(shrink(R8, LayoutTree::leaf(logo_text()))?),
+            back_button,
             LayoutTree::leaf(shrink(R32, heading("Controls"))?),
             LayoutTree::leaf(shrink(R32, paragraph(controls_text))?),
             LayoutTree::leaf(shrink(R32, heading("About"))?),

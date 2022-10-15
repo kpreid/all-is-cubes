@@ -123,7 +123,7 @@ impl Vui {
         );
 
         let paused_widget_tree = pages::new_paused_widget_tree(&hud_inputs);
-        let about_widget_tree = pages::new_about_widget_tree(&mut universe).unwrap();
+        let about_widget_tree = pages::new_about_widget_tree(&mut universe, &hud_inputs).unwrap();
 
         let mut new_self = Self {
             universe,

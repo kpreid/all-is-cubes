@@ -1,6 +1,6 @@
 //! Specific UI widgets.
 
-use crate::vui::{InstallVuiError, WidgetController, WidgetTransaction};
+use crate::vui::{self, InstallVuiError, WidgetController, WidgetTransaction};
 
 mod crosshair;
 pub(crate) use crosshair::*;
@@ -38,18 +38,15 @@ impl WidgetController for OneshotController {
 }
 
 /// A one-cube action button which performs the VUI 'back' action.
-pub(crate) fn back_button(hud_inputs: &HudInputs) -> WidgetTree {
+pub(crate) fn back_button(hud_inputs: &vui::HudInputs) -> vui::WidgetTree {
     // TODO: define a narrower set of inputs than HudInputs
-    // TODO: should not be using the toggle button widget
     // TODO: this function should maybe live in a 'UI mid-level components' module?
-    LayoutTree::leaf(ToggleButton::new(
-        ListenableSource::constant(()),
-        |()| false,
-        |state| hud_inputs.hud_blocks.blocks[UiBlocks::BackButton(state)].clone(),
+    vui::LayoutTree::leaf(ActionButton::new(
+        |state| hud_inputs.hud_blocks.blocks[vui::UiBlocks::BackButton(state)].clone(),
         {
             let cc = hud_inputs.vui_control_channel.clone();
             move || {
-                let _ignore_errors = cc.send(VuiMessage::Back);
+                let _ignore_errors = cc.send(vui::VuiMessage::Back);
             }
         },
     ))
