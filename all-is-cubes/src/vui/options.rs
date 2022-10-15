@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::apps::ControlMessage;
 use crate::camera::GraphicsOptions;
 use crate::vui::hud::HudInputs;
-use crate::vui::widgets::{ToggleButtonVisualState, ToggleButtonWidget};
+use crate::vui::widgets::{self, ToggleButtonVisualState};
 use crate::vui::{LayoutTree, UiBlocks, Widget, WidgetTree};
 
 #[allow(clippy::redundant_clone)]
@@ -43,7 +43,7 @@ fn graphics_toggle_button(
     getter: fn(&GraphicsOptions) -> bool,
     setter: fn(&mut GraphicsOptions, bool),
 ) -> Arc<dyn Widget> {
-    ToggleButtonWidget::new(
+    widgets::ToggleButton::new(
         hud_inputs.graphics_options.clone(),
         getter,
         |state| hud_inputs.hud_blocks.blocks[icon_ctor(state)].clone(),
@@ -63,7 +63,7 @@ fn graphics_toggle_button(
 }
 
 pub(crate) fn pause_toggle_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
-    ToggleButtonWidget::new(
+    widgets::ToggleButton::new(
         hud_inputs.paused.clone(),
         |&value| value,
         |state| hud_inputs.hud_blocks.blocks[UiBlocks::PauseButton(state)].clone(),

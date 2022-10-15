@@ -1,6 +1,4 @@
 //! Specific UI widgets.
-//!
-//! TODO: Decide whether they should all have `Widget` in the name or not.
 
 use std::error::Error;
 use std::fmt::{self, Debug};
@@ -60,13 +58,12 @@ impl WidgetController for OneshotController {
 ///
 /// TODO: Define what it does in 3D.
 #[derive(Debug)]
-#[doc(hidden)] // TODO: widget API still in development
-pub struct FrameWidget {
+pub struct Frame {
     background: VoxelBrush<'static>,
     frame: VoxelBrush<'static>,
 }
 
-impl FrameWidget {
+impl Frame {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
             background: VoxelBrush::single(Block::from(palette::MENU_BACK)),
@@ -84,8 +81,8 @@ impl FrameWidget {
     }
 }
 
-// FrameWidget can be any size with at least 1 depth.
-impl Layoutable for FrameWidget {
+// Frame can be any size with at least 1 depth.
+impl Layoutable for Frame {
     fn requirements(&self) -> LayoutRequest {
         // TODO: account for size of the chosen VoxelBrushes (currently not possible to change)
         LayoutRequest {
@@ -94,7 +91,7 @@ impl Layoutable for FrameWidget {
     }
 }
 
-impl Widget for FrameWidget {
+impl Widget for Frame {
     fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController> {
         let bounds = position.bounds;
         let mut txn = SpaceTransaction::default();
@@ -226,16 +223,16 @@ impl Widget for Voxels {
 /// A single-block button that displays a boolean state derived from a
 /// [`ListenableSource`].
 #[derive(Clone)]
-pub(crate) struct ToggleButtonWidget<D> {
+pub(crate) struct ToggleButton<D> {
     states: [Block; 2],
     data_source: ListenableSource<D>,
     projection: Arc<dyn Fn(&D) -> bool + Send + Sync>,
     action: EphemeralOpaque<dyn Fn() + Send + Sync>,
 }
 
-impl<D: Clone + Sync + Debug> Debug for ToggleButtonWidget<D> {
+impl<D: Clone + Sync + Debug> Debug for ToggleButton<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ToggleButtonWidget")
+        f.debug_struct("ToggleButton")
             .field("states", &self.states)
             .field("data_source", &self.data_source)
             .field(
@@ -247,7 +244,7 @@ impl<D: Clone + Sync + Debug> Debug for ToggleButtonWidget<D> {
     }
 }
 
-impl<D> ToggleButtonWidget<D> {
+impl<D> ToggleButton<D> {
     pub(crate) fn new(
         data_source: ListenableSource<D>,
         projection: impl Fn(&D) -> bool + Send + Sync + 'static,
@@ -266,7 +263,7 @@ impl<D> ToggleButtonWidget<D> {
     }
 }
 
-impl<D> Layoutable for ToggleButtonWidget<D> {
+impl<D> Layoutable for ToggleButton<D> {
     fn requirements(&self) -> LayoutRequest {
         LayoutRequest {
             minimum: GridVector::new(1, 1, 1),
@@ -276,7 +273,7 @@ impl<D> Layoutable for ToggleButtonWidget<D> {
 
 // TODO: Mess of generic bounds due to the combination of Widget and ListenableSource
 // requirements -- should we make a trait alias for these?
-impl<D: Clone + Debug + Send + Sync + 'static> Widget for ToggleButtonWidget<D> {
+impl<D: Clone + Debug + Send + Sync + 'static> Widget for ToggleButton<D> {
     fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController> {
         Box::new(ToggleButtonController::new(
             position
@@ -288,7 +285,7 @@ impl<D: Clone + Debug + Send + Sync + 'static> Widget for ToggleButtonWidget<D> 
     }
 }
 
-/// Possible visual states of a `ToggleButtonWidget`.
+/// Possible visual states of a `ToggleButton`.
 ///
 /// The [`fmt::Display`] implementation of this type produces a string form suitable for
 /// naming blocks depicting this state; the [`Exhaust`] implementation allows iterating
@@ -311,16 +308,16 @@ impl fmt::Display for ToggleButtonVisualState {
     }
 }
 
-/// [`WidgetController`] for [`ToggleButtonWidget`].
+/// [`WidgetController`] for [`ToggleButton`].
 #[derive(Debug)]
 pub(crate) struct ToggleButtonController<D: Clone + Send + Sync> {
-    definition: Arc<ToggleButtonWidget<D>>,
+    definition: Arc<ToggleButton<D>>,
     position: GridPoint,
     todo: DirtyFlag,
 }
 
 impl<D: Clone + Debug + Send + Sync + 'static> ToggleButtonController<D> {
-    pub(crate) fn new(position: GridPoint, definition: Arc<ToggleButtonWidget<D>>) -> Self {
+    pub(crate) fn new(position: GridPoint, definition: Arc<ToggleButton<D>>) -> Self {
         Self {
             todo: DirtyFlag::listening(true, |l| definition.data_source.listen(l)),
             position,

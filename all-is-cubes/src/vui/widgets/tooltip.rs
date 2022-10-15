@@ -176,7 +176,7 @@ impl TooltipContents {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct TooltipWidget {
+pub(crate) struct Tooltip {
     width_in_hud: GridCoordinate,
     hud_blocks: Arc<HudBlocks>,
     /// Tracks what we should be displaying and serves as dirty flag.
@@ -185,7 +185,7 @@ pub(crate) struct TooltipWidget {
     text_space: URef<Space>,
 }
 
-impl TooltipWidget {
+impl Tooltip {
     const RESOLUTION: Resolution = Resolution::R16;
 
     pub(crate) fn new(
@@ -213,7 +213,7 @@ impl TooltipWidget {
     }
 }
 
-impl Layoutable for TooltipWidget {
+impl Layoutable for Tooltip {
     fn requirements(&self) -> LayoutRequest {
         LayoutRequest {
             minimum: GridVector::new(self.width_in_hud, 1, 1),
@@ -221,7 +221,7 @@ impl Layoutable for TooltipWidget {
     }
 }
 
-impl Widget for TooltipWidget {
+impl Widget for Tooltip {
     fn controller(self: Arc<Self>, grant: &crate::vui::LayoutGrant) -> Box<dyn WidgetController> {
         Box::new(TooltipController {
             definition: self,
@@ -232,14 +232,14 @@ impl Widget for TooltipWidget {
 
 #[derive(Debug)]
 struct TooltipController {
-    definition: Arc<TooltipWidget>,
+    definition: Arc<Tooltip>,
     position: GridAab,
 }
 
 impl WidgetController for TooltipController {
     fn initialize(&mut self) -> Result<WidgetTransaction, crate::vui::InstallVuiError> {
         let toolbar_text_blocks = space_to_blocks(
-            TooltipWidget::RESOLUTION,
+            Tooltip::RESOLUTION,
             BlockAttributes {
                 // TODO: We need an animation_hint that describes the thing that the text does:
                 // toggling visible/invisible and not wanting to get lighting artifacts that might

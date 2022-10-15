@@ -19,9 +19,7 @@ use crate::space::{Space, SpacePhysics};
 use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
 use crate::vui::options::{graphics_options_widgets, pause_toggle_button};
-use crate::vui::widgets::{
-    Crosshair, FrameWidget, ToggleButtonWidget, Toolbar, TooltipState, TooltipWidget,
-};
+use crate::vui::widgets::{self, Crosshair, TooltipState};
 use crate::vui::{
     CueNotifier, Icons, LayoutTree, UiBlocks, VuiMessage, VuiPageState, Widget, WidgetTree,
 };
@@ -126,14 +124,14 @@ pub(super) fn new_hud_widget_tree(
     universe: &mut Universe,
     tooltip_state: Arc<Mutex<TooltipState>>,
 ) -> WidgetTree {
-    let toolbar: Arc<dyn Widget> = Toolbar::new(
+    let toolbar: Arc<dyn Widget> = widgets::Toolbar::new(
         character_source,
         Arc::clone(&hud_inputs.hud_blocks),
         hud_layout.toolbar_positions,
         universe,
         hud_inputs.cue_channel.clone(),
     );
-    let tooltip: Arc<dyn Widget> = TooltipWidget::new(
+    let tooltip: Arc<dyn Widget> = widgets::Tooltip::new(
         Arc::clone(&tooltip_state),
         hud_inputs.hud_blocks.clone(),
         universe,
@@ -162,7 +160,7 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
                 direction: Face6::NX,
                 children: graphics_options_widgets(hud_inputs),
             }),
-            LayoutTree::leaf(ToggleButtonWidget::new(
+            LayoutTree::leaf(widgets::ToggleButton::new(
                 hud_inputs.page_state.clone(),
                 |page_state| matches!(page_state, VuiPageState::AboutText),
                 |state| hud_inputs.hud_blocks.blocks[UiBlocks::AboutButton(state)].clone(),
@@ -174,7 +172,7 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
                 },
             )),
             LayoutTree::leaf(pause_toggle_button(hud_inputs)),
-            LayoutTree::leaf(ToggleButtonWidget::new(
+            LayoutTree::leaf(widgets::ToggleButton::new(
                 hud_inputs.mouselook_mode.clone(),
                 |&value| value,
                 |state| hud_inputs.hud_blocks.blocks[UiBlocks::MouselookButton(state)].clone(),
@@ -188,10 +186,10 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
         ],
     });
     if false {
-        // reveal the bounds by adding a FrameWidget
+        // reveal the bounds by adding a widgets::Frame
         Arc::new(LayoutTree::Stack {
             direction: Face6::PZ,
-            children: vec![LayoutTree::leaf(FrameWidget::new()), control_bar_widgets],
+            children: vec![LayoutTree::leaf(widgets::Frame::new()), control_bar_widgets],
         })
     } else {
         control_bar_widgets

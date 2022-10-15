@@ -320,9 +320,7 @@ pub(crate) async fn demo_city(
             let info_voxels_widget: WidgetTree = Arc::new(LayoutTree::Stack {
                 direction: Face6::PZ,
                 children: vec![
-                    LayoutTree::leaf(widgets::FrameWidget::with_block(
-                        demo_blocks[Signboard].clone(),
-                    )),
+                    LayoutTree::leaf(widgets::Frame::with_block(demo_blocks[Signboard].clone())),
                     LayoutTree::leaf(Arc::new(widgets::Voxels::new(
                         bounds_for_info_voxels,
                         universe.insert_anonymous(exhibit_info_space),

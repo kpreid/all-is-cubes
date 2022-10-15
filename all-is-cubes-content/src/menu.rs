@@ -26,7 +26,7 @@ use all_is_cubes::{
     universe::Universe,
     vui::{
         self, install_widgets,
-        widgets::{self, FrameWidget},
+        widgets::{self, Frame},
         Align, LayoutGrant, LayoutRequest, LayoutTree, Layoutable, WidgetController,
     },
 };
@@ -34,7 +34,7 @@ use all_is_cubes::{
 use crate::{logo::logo_text, UniverseTemplate};
 
 #[derive(Debug)]
-struct TemplateButtonWidget {
+struct TemplateButton {
     // template: UniverseTemplate,
     background_block: Block,
     /// TODO: Instead of pregenerated text we should be able to synthesize it as-needed,
@@ -42,7 +42,7 @@ struct TemplateButtonWidget {
     text_blocks: Space,
 }
 
-impl TemplateButtonWidget {
+impl TemplateButton {
     fn new(universe: &mut Universe, template: UniverseTemplate) -> Result<Self, InGenError> {
         let background_block = Block::builder()
             .display_name(template.to_string())
@@ -72,14 +72,14 @@ impl TemplateButtonWidget {
     }
 }
 
-impl vui::Layoutable for TemplateButtonWidget {
+impl vui::Layoutable for TemplateButton {
     fn requirements(&self) -> vui::LayoutRequest {
         LayoutRequest {
             minimum: GridVector::new(10, 1, 2),
         }
     }
 }
-impl vui::Widget for TemplateButtonWidget {
+impl vui::Widget for TemplateButton {
     fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn WidgetController> {
         Box::new(TemplateButtonController {
             definition: self,
@@ -90,7 +90,7 @@ impl vui::Widget for TemplateButtonWidget {
 
 #[derive(Debug)]
 struct TemplateButtonController {
-    definition: Arc<TemplateButtonWidget>,
+    definition: Arc<TemplateButton>,
     position: LayoutGrant,
 }
 impl vui::WidgetController for TemplateButtonController {
@@ -147,14 +147,14 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
         vertical_widgets.push(LayoutTree::spacer(LayoutRequest {
             minimum: GridVector::new(1, 1, 1),
         }));
-        vertical_widgets.push(LayoutTree::leaf(Arc::new(TemplateButtonWidget::new(
+        vertical_widgets.push(LayoutTree::leaf(Arc::new(TemplateButton::new(
             universe, template,
         )?)));
     }
     let tree: vui::WidgetTree = Arc::new(LayoutTree::Stack {
         direction: Face6::PZ,
         children: vec![
-            LayoutTree::leaf(FrameWidget::new()),
+            LayoutTree::leaf(Frame::new()),
             Arc::new(LayoutTree::Stack {
                 direction: Face6::NY,
                 children: vertical_widgets,

@@ -15,7 +15,7 @@ use crate::space::{Space, SpaceBuilder, SpacePhysics};
 use crate::universe::{URef, Universe};
 use crate::vui::hud::{HudInputs, HudLayout};
 use crate::vui::options::pause_toggle_button;
-use crate::vui::widgets::{self, FrameWidget};
+use crate::vui::widgets::{self, Frame};
 use crate::vui::{
     install_widgets, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest, LayoutTree,
     Widget, WidgetTree,
@@ -85,7 +85,7 @@ fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
                 minimum: GridVector::new(0, 0, HudLayout::DEPTH_BEHIND_VIEW_PLANE + 2),
             })),
             LayoutTree::leaf(
-                FrameWidget::with_block(Block::from(Rgba::new(0., 0., 0., 0.7))) as Arc<dyn Widget>,
+                Frame::with_block(Block::from(Rgba::new(0., 0., 0., 0.7))) as Arc<dyn Widget>
             ),
             foreground,
         ],
