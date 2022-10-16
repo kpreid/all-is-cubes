@@ -47,7 +47,9 @@ mod demo;
 pub use demo::*;
 mod dungeon;
 mod exhibits;
-pub(crate) use exhibits::*;
+#[doc(hidden)]
+pub use exhibits::ui_blocks_exhibit;
+pub(crate) use exhibits::*; // for use in tests
 mod fractal;
 mod landscape;
 pub use landscape::*;

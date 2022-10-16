@@ -9,8 +9,8 @@ use all_is_cubes::block::{
     Resolution::*, RotationPlacementRule, Zoom, AIR,
 };
 use all_is_cubes::cgmath::{
-    Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Rad, Rotation as _, Rotation2,
-    Vector2, Vector3,
+    Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Point3, Rad, Rotation as _,
+    Rotation2, Vector2, Vector3,
 };
 use all_is_cubes::content::load_image::{default_srgb, space_from_image};
 use all_is_cubes::drawing::VoxelBrush;
@@ -42,6 +42,9 @@ use crate::{
     DemoBlocks, Exhibit, Fire,
 };
 
+/// All exhibits which will show up in [`crate::UniverseTemplate::DemoCity`].
+///
+/// Ordered by distance from the center.
 pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     KNOT,
     TRANSPARENCY_LARGE,
@@ -52,6 +55,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     MAKE_SOME_BLOCKS,
     MOVED_BLOCKS,
     ROTATIONS,
+    UI_BLOCKS,
     CHUNK_CHART,
     COLOR_LIGHTS,
     IMAGES,
@@ -930,6 +934,69 @@ async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
     place([3, 0, 0], GridRotation::RxYZ)?;
 
     Ok(outer_space)
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "UI Blocks",
+    subtitle:
+        "Blocks from the UI system (inactive)",
+)]
+async fn UI_BLOCKS(_: &Exhibit, universe: &mut Universe) {
+    ui_blocks_exhibit(universe).await
+}
+
+/// Display all the [`Icons`] and [`UiBlocks`].
+/// Separate function for the UI blocks exhibit which we can use in render tests as well.
+#[doc(hidden)]
+pub async fn ui_blocks_exhibit(universe: &mut Universe) -> Result<Space, InGenError> {
+    use all_is_cubes::vui::blocks::ToolbarButtonState;
+    use all_is_cubes::vui::blocks::UiBlocks;
+
+    let icons = BlockProvider::<all_is_cubes::vui::Icons>::using(universe)?;
+    let icons = icons.iter().map(|(_, block)| block.clone());
+
+    let ui_blocks = BlockProvider::<UiBlocks>::using(universe)?;
+    let ui_blocks = ui_blocks
+        .iter()
+        .filter(|&(key, _)| match key {
+            // Filter out large number of pointer blocks
+            UiBlocks::ToolbarPointer([
+                ToolbarButtonState::Unmapped,
+                ToolbarButtonState::Mapped,
+                ToolbarButtonState::Pressed
+            ]) => true,
+            UiBlocks::ToolbarPointer(_) => false,
+            _ => true,
+        })
+        .map(|(_, block)| block.clone());
+
+    let all_blocks: Vec<Block> = icons.chain(ui_blocks).collect();
+
+    // Compute layout
+    let count = all_blocks.len() as GridCoordinate;
+    let row_length = 4;
+    let bounds = GridAab::from_lower_upper(
+        [0, 0, 0],
+        [row_length, ((count + row_length - 1) / row_length), 2],
+    );
+
+    // Fill space with blocks
+    let mut space = Space::builder(bounds)
+        .spawn_position(Point3::new(
+            FreeCoordinate::from(bounds.size().x) / 2.,
+            FreeCoordinate::from(bounds.size().y) / 2.,
+            FreeCoordinate::from(bounds.size().y) * 1.5,
+        ))
+        .build();
+    for (index, block) in all_blocks.into_iter().enumerate() {
+        let index = index as GridCoordinate;
+        space
+            .set([index % row_length, index / row_length, 0], block)
+            .unwrap();
+    }
+
+    Ok(space)
 }
 
 /// Place a series of blocks on top of each other, starting at the specified point.

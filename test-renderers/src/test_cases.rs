@@ -16,15 +16,12 @@ use all_is_cubes::camera::{
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector2, Vector3};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use all_is_cubes::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, NotNan, Rgb};
+use all_is_cubes::math::{Face6, GridAab, NotNan, Rgb};
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::transaction::Transaction;
 use all_is_cubes::universe::{RefError, URef, Universe, UniverseIndex, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::vui::{
-    blocks::{ToolbarButtonState, UiBlocks},
-    Icons,
-};
+use all_is_cubes::vui::{blocks::UiBlocks, Icons};
 use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::palette;
 
@@ -319,55 +316,20 @@ async fn follow_options_change(mut context: RenderTestContext) {
 /// exercises the renderers with various block shapes.
 async fn icons(mut context: RenderTestContext) {
     let universe = &mut Universe::new();
-    let icons = Icons::new(universe, YieldProgress::noop())
+    Icons::new(universe, YieldProgress::noop())
         .await
         .install(universe)
         .unwrap();
-    let icons = icons.iter().map(|(_, block)| block.clone());
-
-    let ui_blocks = UiBlocks::new(universe, YieldProgress::noop())
+    UiBlocks::new(universe, YieldProgress::noop())
         .await
         .install(universe)
         .unwrap();
-    let ui_blocks = ui_blocks
-        .iter()
-        .filter(|&(key, _)| match key {
-            // Filter out large number of pointer blocks
-            UiBlocks::ToolbarPointer([
-                ToolbarButtonState::Unmapped,
-                ToolbarButtonState::Mapped,
-                ToolbarButtonState::Pressed
-            ]) => true,
-            UiBlocks::ToolbarPointer(_) => false,
-            _ => true,
-        })
-        .map(|(_, block)| block.clone());
 
-    let all_blocks: Vec<Block> = icons.chain(ui_blocks).collect();
+    let mut space = all_is_cubes_content::ui_blocks_exhibit(universe)
+        .await
+        .unwrap();
 
-    // Compute layout
-    let count = all_blocks.len() as GridCoordinate;
-    let row_length = 4;
-    let bounds = GridAab::from_lower_upper(
-        [0, 0, 0],
-        [row_length, ((count + row_length - 1) / row_length), 2],
-    );
-    let aspect_ratio = f64::from(bounds.size().y) / f64::from(bounds.size().x);
-
-    // Fill space with blocks
-    let mut space = Space::builder(bounds)
-        .spawn_position(Point3::new(
-            FreeCoordinate::from(bounds.size().x) / 2.,
-            FreeCoordinate::from(bounds.size().y) / 2.,
-            FreeCoordinate::from(bounds.size().y) * 1.5,
-        ))
-        .build();
-    for (index, block) in all_blocks.into_iter().enumerate() {
-        let index = index as GridCoordinate;
-        space
-            .set([index % row_length, index / row_length, 0], block)
-            .unwrap();
-    }
+    let aspect_ratio = f64::from(space.bounds().size().y) / f64::from(space.bounds().size().x);
 
     space.evaluate_light(1, |_| {});
     finish_universe_from_space(universe, space);

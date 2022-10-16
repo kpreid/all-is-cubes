@@ -46,6 +46,21 @@ pub(crate) async fn demo_city(
     use DemoBlocks::*;
     use LandscapeBlocks::*;
 
+    // Also install blocks some exhibits want.
+    // We do this once so that if multiple exhibits end up wanting them there are no conflicts.
+    // TODO: We want a "module loading" system that allows expressing dependencies.
+    // TODO: Give YieldProgress a nicer interface for this
+    let [ui_blocks_progress, p] = p.split(0.05);
+    all_is_cubes::vui::blocks::UiBlocks::new(universe, ui_blocks_progress)
+        .await
+        .install(universe)
+        .unwrap();
+    let [icons_blocks_progress, p] = p.split(0.05);
+    all_is_cubes::vui::Icons::new(universe, icons_blocks_progress)
+        .await
+        .install(universe)
+        .unwrap();
+
     // Layout parameters
     // TODO: move to CityPlanner
     let road_radius = CityPlanner::ROAD_RADIUS;
