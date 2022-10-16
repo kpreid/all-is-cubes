@@ -27,17 +27,104 @@ use crate::listen::{DirtyFlag, ListenableSource};
 use crate::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
 use crate::space::{Space, SpacePhysics, SpaceTransaction};
 use crate::time::Tick;
+use crate::transaction::Merge;
 use crate::universe::Universe;
 use crate::vui::{self, Layoutable};
 
+type Action = EphemeralOpaque<dyn Fn() + Send + Sync>;
+
+const REQUIREMENT: vui::LayoutRequest = vui::LayoutRequest {
+    minimum: GridVector::new(1, 1, 1),
+};
+
+/// A single-block button that reacts to activations (clicks) but does not change
+/// otherwise.
+#[derive(Clone, Debug)]
+pub struct ActionButton {
+    // TODO: this will eventually want hover + pressed state blocks
+    block: Block,
+    action: Action,
+}
+
+impl ActionButton {
+    pub fn new(
+        mut blocks: impl FnMut(ActionButtonVisualState) -> Block,
+        action: impl Fn() + Send + Sync + 'static,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            block: blocks(ActionButtonVisualState { _dummy: () }),
+            action: EphemeralOpaque::from(Arc::new(action) as Arc<dyn Fn() + Send + Sync>),
+        })
+    }
+}
+
+impl Layoutable for ActionButton {
+    fn requirements(&self) -> vui::LayoutRequest {
+        REQUIREMENT
+    }
+}
+
+impl vui::Widget for ActionButton {
+    fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
+        Box::new(ActionButtonController {
+            position: position
+                .shrink_to(self.requirements().minimum)
+                .bounds
+                .lower_bounds(),
+            definition: self,
+        })
+    }
+}
+
+/// Possible visual states of a [`ActionButton`].
+///
+/// The [`fmt::Display`] implementation of this type produces a string form suitable for
+/// naming blocks depicting this state; the [`Exhaust`] implementation allows iterating
+/// over all possible states.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[non_exhaustive]
+pub struct ActionButtonVisualState {
+    // TODO: Add hover, pressed, disabled
+    _dummy: (),
+}
+
+/// Represents this value as a string suitable for naming blocks depicting this state.
+impl fmt::Display for ActionButtonVisualState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "idle")
+    }
+}
+
+/// [`WidgetController`] for [`ActionButton`].
+#[derive(Debug)]
+struct ActionButtonController {
+    definition: Arc<ActionButton>,
+    position: GridPoint,
+}
+
+impl vui::WidgetController for ActionButtonController {
+    fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
+        let icon =
+            SpaceTransaction::set_cube(self.position, None, Some(self.definition.block.clone()));
+        let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(Arc::new(
+            vui::ActivatableRegion {
+                region: GridAab::single_cube(self.position),
+                effect: self.definition.action.clone(),
+            },
+        )));
+        icon.merge(activatable)
+            .map_err(|error| vui::InstallVuiError::Conflict { error })
+    }
+}
+
 /// A single-block button that displays a boolean state derived from a
-/// [`ListenableSource`].
+/// [`ListenableSource`] and can be clicked.
 #[derive(Clone)]
 pub struct ToggleButton<D> {
     states: [Block; 2],
     data_source: ListenableSource<D>,
     projection: Arc<dyn Fn(&D) -> bool + Send + Sync>,
-    action: EphemeralOpaque<dyn Fn() + Send + Sync>,
+    action: Action,
 }
 
 impl<D: Clone + Sync + fmt::Debug> fmt::Debug for ToggleButton<D> {
@@ -75,9 +162,7 @@ impl<D> ToggleButton<D> {
 
 impl<D> vui::Layoutable for ToggleButton<D> {
     fn requirements(&self) -> vui::LayoutRequest {
-        vui::LayoutRequest {
-            minimum: GridVector::new(1, 1, 1),
-        }
+        REQUIREMENT
     }
 }
 
@@ -85,13 +170,14 @@ impl<D> vui::Layoutable for ToggleButton<D> {
 // requirements -- should we make a trait alias for these?
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton<D> {
     fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
-        Box::new(ToggleButtonController::new(
-            position
+        Box::new(ToggleButtonController {
+            todo: DirtyFlag::listening(true, |l| self.data_source.listen(l)),
+            position: position
                 .shrink_to(self.requirements().minimum)
                 .bounds
                 .lower_bounds(),
-            self,
-        ))
+            definition: self,
+        })
     }
 }
 
@@ -126,16 +212,6 @@ struct ToggleButtonController<D: Clone + Send + Sync> {
     todo: DirtyFlag,
 }
 
-impl<D: Clone + fmt::Debug + Send + Sync + 'static> ToggleButtonController<D> {
-    fn new(position: GridPoint, definition: Arc<ToggleButton<D>>) -> Self {
-        Self {
-            todo: DirtyFlag::listening(true, |l| definition.data_source.listen(l)),
-            position,
-            definition,
-        }
-    }
-}
-
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
     for ToggleButtonController<D>
 {
@@ -165,7 +241,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
 /// Allows drawing a button [`Block`] (a shape in one of several states with a label on it)
 /// given a [`ButtonBase`] defining the style and state.
 ///
-/// These blocks may then be used with button widgets like [`ToggleButton`].
+/// These blocks may then be used with button widgets like [`ActionButton`] and [`ToggleButton`].
 #[derive(Debug)]
 pub struct ButtonBlockBuilder {
     space: Space,
@@ -250,7 +326,8 @@ impl ButtonBlockBuilder {
 /// controls).
 ///
 /// These shapes can then be turned into specific [`Block`]s using
-/// [`ButtonBase::button_builder()`], and used in button widgets like [`ToggleButton`].
+/// [`ButtonBase::button_builder()`], and used in button widgets like [`ActionButton`]
+/// and [`ToggleButton`].
 pub trait ButtonBase {
     /// Returns a new [`ButtonBlockBuilder`] which can be used to draw a button label and
     /// construct a [`Block`].
