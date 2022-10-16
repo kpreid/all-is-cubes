@@ -7,7 +7,7 @@ use embedded_graphics::image::Image as EgImage;
 use embedded_graphics::mono_font::{MonoFont, MonoTextStyle};
 use embedded_graphics::prelude::{Dimensions, PixelColor, Point, Size};
 use embedded_graphics::primitives::{
-    Primitive, PrimitiveStyleBuilder, Rectangle, RoundedRectangle, StrokeAlignment,
+    Circle, Primitive, PrimitiveStyleBuilder, Rectangle, RoundedRectangle, StrokeAlignment,
 };
 use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
 use embedded_graphics::Drawable;
@@ -251,7 +251,7 @@ pub struct ButtonBlockBuilder {
 }
 
 impl ButtonBlockBuilder {
-    pub const RESOLUTION: Resolution = R32;
+    pub const RESOLUTION: Resolution = theme::RESOLUTION;
     pub const RESOLUTION_G: GridCoordinate = Self::RESOLUTION.to_grid();
 
     /// Construct a new [`ButtonBlockBuilder`] ready to draw into;
@@ -318,6 +318,27 @@ impl ButtonBlockBuilder {
         .draw(&mut self.label_draw_target())?;
         Ok(())
     }
+
+    fn create_space(max_z: GridCoordinate) -> Space {
+        Space::builder(GridAab::from_lower_size(
+            [0, 0, 0],
+            [Self::RESOLUTION_G, Self::RESOLUTION_G, max_z],
+        ))
+        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+        .build()
+    }
+}
+
+/// Common constants for button shapes.
+/// TODO: public?
+mod theme {
+    use super::*;
+    pub const RESOLUTION: Resolution = R32;
+    pub const RESOLUTION_G: GridCoordinate = RESOLUTION.to_grid();
+    pub const UNPRESSED_Z: GridCoordinate = 12;
+    pub fn rim_lightening(color: Rgba) -> Rgba {
+        color.map_rgb(|rgb| rgb * 1.1)
+    }
 }
 
 /// A shape for a button; defining the elements which communicate the type of the button
@@ -334,31 +355,89 @@ pub trait ButtonBase {
     fn button_builder(&self) -> Result<ButtonBlockBuilder, InGenError>;
 }
 
+impl ButtonBase for ActionButtonVisualState {
+    /// Returns a new [`ButtonBlockBuilder`] which can be used to construct [`Block`]s
+    /// suitable for [`ActionButton`]s. The label drawn onto this button should fit
+    /// within a 24 × 24 circle.
+    fn button_builder(&self) -> Result<ButtonBlockBuilder, InGenError> {
+        let label_z = theme::UNPRESSED_Z;
+        let back_block = palette::BUTTON_BACK; // TODO: different color theme?
+        let frame_brush = VoxelBrush::single(Block::from(palette::BUTTON_FRAME));
+        let back_brush = VoxelBrush::with_thickness(back_block, 0..label_z);
+        let cap_rim_brush = VoxelBrush::new([(
+            [0, 0, label_z - 1],
+            Block::from(theme::rim_lightening(palette::BUTTON_BACK)),
+        )]);
+
+        let outer_inset = 2; // TODO duplicate number
+        let circle = |inset: i32| {
+            let inset = outer_inset + inset;
+            Circle::new(
+                Point::new(inset, inset),
+                (theme::RESOLUTION_G - inset * 2) as u32,
+            )
+        };
+
+        let mut space = ButtonBlockBuilder::create_space(label_z + 1);
+        let draw_target = &mut space.draw_target(
+            GridMatrix::from_translation([0, theme::RESOLUTION_G - 1, 0]) * GridMatrix::FLIP_Y,
+        );
+
+        circle(0)
+            .into_styled(
+                PrimitiveStyleBuilder::new()
+                    .fill_color(&back_brush)
+                    .stroke_color(&frame_brush)
+                    .stroke_width(2)
+                    .stroke_alignment(StrokeAlignment::Inside)
+                    .build(),
+            )
+            .draw(draw_target)?;
+        circle(2)
+            .into_styled(
+                PrimitiveStyleBuilder::new()
+                    .stroke_color(&cap_rim_brush)
+                    .stroke_width(1)
+                    .stroke_alignment(StrokeAlignment::Inside)
+                    .build(),
+            )
+            .draw(draw_target)?;
+
+        Ok(ButtonBlockBuilder {
+            space,
+            active: false,
+            label_z,
+            label_color: palette::BUTTON_LABEL,
+        })
+    }
+}
+
 impl ButtonBase for ToggleButtonVisualState {
     /// Returns a new [`ButtonBlockBuilder`] which can be used to construct [`Block`]s
     /// suitable for [`ToggleButton`]s. The label drawn onto this button should fit
     /// within a 24 × 24 square.
     fn button_builder(&self) -> Result<ButtonBlockBuilder, InGenError> {
-        let label_z = 12;
+        let label_z = theme::UNPRESSED_Z;
         let active = self.value;
         let back_block = Block::from(if active {
             palette::BUTTON_ACTIVATED_BACK
         } else {
             palette::BUTTON_BACK
         });
-        let cap_rim_block = Block::from(palette::BUTTON_BACK.map_rgb(|rgb| rgb * 1.1));
-
         let frame_brush = VoxelBrush::single(Block::from(palette::BUTTON_FRAME));
         let back_brush = VoxelBrush::with_thickness(back_block, 0..label_z);
-        let cap_rim_brush = VoxelBrush::new([([0, 0, label_z - 1], &cap_rim_block)]);
+        let cap_rim_brush = VoxelBrush::new([(
+            [0, 0, label_z - 1],
+            Block::from(theme::rim_lightening(palette::BUTTON_BACK)),
+        )]);
 
         let outer_inset = 2;
         let outer_rectangle = Rectangle::with_corners(
             Point::new(outer_inset, outer_inset),
             Point::new(
                 // - 1 because e-g rectangles are specified in terms of their outermost pixels
-                ButtonBlockBuilder::RESOLUTION_G - outer_inset - 1,
-                ButtonBlockBuilder::RESOLUTION_G - outer_inset - 1,
+                theme::RESOLUTION_G - outer_inset - 1,
+                theme::RESOLUTION_G - outer_inset - 1,
             ),
         );
         let rr = |inset: i32| {
@@ -368,20 +447,9 @@ impl ButtonBase for ToggleButtonVisualState {
             )
         };
 
-        let mut space = Space::builder(GridAab::from_lower_size(
-            [0, 0, 0],
-            // this will need to be changed if we want to support thick labels
-            [
-                ButtonBlockBuilder::RESOLUTION_G,
-                ButtonBlockBuilder::RESOLUTION_G,
-                label_z + 1,
-            ],
-        ))
-        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build();
+        let mut space = ButtonBlockBuilder::create_space(label_z + 1);
         let draw_target = &mut space.draw_target(
-            GridMatrix::from_translation([0, ButtonBlockBuilder::RESOLUTION_G - 1, 0])
-                * GridMatrix::FLIP_Y,
+            GridMatrix::from_translation([0, theme::RESOLUTION_G - 1, 0]) * GridMatrix::FLIP_Y,
         );
 
         // unwrap()s because if this drawing fails, tests will catch that — no parameters
