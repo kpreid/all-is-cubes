@@ -6,18 +6,18 @@ use exhaust::Exhaust;
 use noise::Seedable;
 
 use all_is_cubes::block::{Block, BlockCollision, Resolution, RotationPlacementRule, Zoom, AIR};
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Transform, Vector3};
+use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace, Point3, Transform, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
     Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix,
-    GridPoint, GridRotation, GridVector, Rgb,
+    GridPoint, GridRotation, GridVector, Rgb, Rgba,
 };
-use all_is_cubes::rgba_const;
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
+use all_is_cubes::{rgb_const, rgba_const};
 
 use crate::noise::array_of_noise;
 use crate::{four_walls, scale_color, Fire};
@@ -38,6 +38,7 @@ pub(crate) async fn atrium(
     let balcony_radius = 4;
     let large_arch_count = Vector3::new(1, 0, 5); // x, dummy y, z
     let floor_count = 4;
+    let sun_height = 10;
 
     let origin = GridAab::from_lower_size([0, 0, 0], [1, 1, 1]);
     let atrium_footprint = origin.expand(FaceMap::symmetric([
@@ -54,7 +55,7 @@ pub(crate) async fn atrium(
     let top_floor_pos = GridVector::new(0, (ceiling_height + WALL) * 2, 0);
 
     let space_bounds = outer_walls_footprint
-        .expand(FaceMap::default().with(Face7::PY, ceiling_height * floor_count));
+        .expand(FaceMap::default().with(Face7::PY, ceiling_height * floor_count + sun_height));
 
     let floor_with_cutout = |mut p: GridPoint| {
         p.y = 0;
@@ -77,12 +78,28 @@ pub(crate) async fn atrium(
             spawn.set_inventory(free_editing_starter_inventory(true));
             spawn
         })
-        .sky_color(Rgb::new(1.0, 1.0, 0.9843) * 4.0)
+        .sky_color(rgb_const!(0.242, 0.617, 0.956) * 1.0)
+        .light_physics(all_is_cubes::space::LightPhysics::Rays {
+            maximum_distance: space_bounds.size().map(f64::from).magnitude() as u16,
+        })
         .build();
+
+    // "Directional" sky light source
+    space.fill_uniform(
+        space_bounds
+            .abut(Face6::PY, -1)
+            .unwrap()
+            .abut(Face6::PX, -6)
+            .unwrap()
+            .abut(Face6::PZ, -30) // TODO: we can shrink this once we manage to have denser ray distribution
+            .unwrap(),
+        &blocks[AtriumBlocks::Sun],
+    )?;
 
     // Outer walls
     four_walls(
-        space_bounds,
+        outer_walls_footprint
+            .expand(FaceMap::default().with(Face7::PY, ceiling_height * floor_count)),
         |_origin, direction, _length, wall_excluding_corners| -> Result<(), InGenError> {
             space.fill_uniform(
                 wall_excluding_corners,
@@ -331,6 +348,7 @@ fn fill_space_transformed(
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
 #[non_exhaustive]
 enum AtriumBlocks {
+    Sun,
     GroundFloor,
     UpperFloor,
     SolidBricks,
@@ -352,6 +370,7 @@ impl fmt::Display for AtriumBlocks {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO: We need a better pattern than writing these out manually
         match self {
+            AtriumBlocks::Sun => write!(f, "sun"),
             AtriumBlocks::GroundFloor => write!(f, "ground-floor"),
             AtriumBlocks::UpperFloor => write!(f, "upper-floor"),
             AtriumBlocks::SolidBricks => write!(f, "solid-bricks"),
@@ -432,6 +451,12 @@ async fn install_atrium_blocks(
 
     BlockProvider::<AtriumBlocks>::new(progress, |key| {
         Ok(match key {
+            AtriumBlocks::Sun => Block::builder()
+                .display_name("Sun")
+                .color(Rgba::WHITE)
+                .light_emission(Rgb::new(1.0, 1.0, 0.9843) * 40.0)
+                .build(),
+
             AtriumBlocks::GroundFloor => Block::builder()
                 .display_name("Atrium Ground Floor")
                 .voxels_fn(universe, resolution, |p| {
