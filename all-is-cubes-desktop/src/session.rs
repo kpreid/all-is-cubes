@@ -20,12 +20,17 @@ pub(crate) struct DesktopSession<Ren, Win> {
     pub(crate) renderer: Ren,
     /// Whatever handle or other state is needed to maintain the window or interact with the event loop.
     pub(crate) window: Win,
+
     /// The current viewport size linked to the renderer.
     pub(crate) viewport_cell: ListenableCell<Viewport>,
     pub(crate) clock_source: ClockSource,
 
-    // If present, writes frames to disk.
+    /// If present, writes frames to disk.
     pub(crate) recorder: Option<crate::record::Recorder>,
+
+    /// If present, connection to system audio output.
+    /// If absent, sound is not produced
+    pub(crate) audio: Option<crate::audio::AudioOut>,
 }
 
 impl<Ren, Win> DesktopSession<Ren, Win> {
@@ -42,6 +47,7 @@ impl<Ren, Win> DesktopSession<Ren, Win> {
             viewport_cell,
             clock_source: ClockSource::Instant,
             recorder: None,
+            audio: None,
         }
     }
 

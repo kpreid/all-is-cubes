@@ -58,6 +58,7 @@ mod config_files;
 mod glue;
 mod record;
 use record::record_main;
+mod audio;
 mod session;
 mod terminal;
 
@@ -272,14 +273,17 @@ fn main() -> Result<(), anyhow::Error> {
 fn inner_main<Ren, Win>(
     params: InnerMainParams,
     looper: impl FnOnce(DesktopSession<Ren, Win>) -> Result<(), anyhow::Error>,
-    dsession: DesktopSession<Ren, Win>,
+    mut dsession: DesktopSession<Ren, Win>,
 ) -> Result<(), anyhow::Error> {
+    dsession.audio = Some(audio::init_sound(&dsession.session)?);
+
     log::debug!(
         "Initialized desktop-session ({:.3} s); entering event loop",
         Instant::now()
             .duration_since(params.before_loop_time)
             .as_secs_f64()
     );
+
     looper(dsession)
 }
 
