@@ -87,44 +87,16 @@ impl fmt::Debug for Session {
 }
 
 impl Session {
-    /// Construct a new [`Session`] with an empty [`Universe`].
-    ///
-    /// This is an async function for the sake of cancellation and optional cooperative
-    /// multitasking, while constructing the initial state. It may safely be blocked on
-    /// from a synchronous context.
-    #[allow(clippy::new_without_default)]
-    pub async fn new(viewport_for_ui: ListenableSource<Viewport>) -> Self {
-        let game_universe = Universe::new();
-        let game_character = ListenableCellWithLocal::new(None);
-        let input_processor = InputProcessor::new();
-        let graphics_options = ListenableCell::new(GraphicsOptions::default());
-        let paused = ListenableCell::new(false);
-        let (control_send, control_recv) = mpsc::sync_channel(100);
-
-        Self {
-            ui: Vui::new(
-                &input_processor,
-                game_character.as_source(),
-                paused.as_source(),
-                graphics_options.as_source(),
-                control_send.clone(),
-                viewport_for_ui,
-            )
-            .await,
-
-            frame_clock: FrameClock::new(),
-            input_processor,
-            graphics_options,
-            game_character,
-            game_universe,
-            game_universe_in_progress: None,
-            paused,
-            control_channel: control_recv,
-            control_channel_sender: control_send,
-            cursor_result: None,
-            last_step_info: UniverseStepInfo::default(),
-            tick_counter_for_logging: 0,
+    /// Returns a [`SessionBuilder`] with which to construct a new [`Session`].
+    pub fn builder() -> SessionBuilder {
+        SessionBuilder {
+            viewport_for_ui: None,
         }
+    }
+
+    /// Deprecated -- use builder
+    pub async fn new(viewport_for_ui: ListenableSource<Viewport>) -> Self {
+        Self::builder().ui(viewport_for_ui).build().await
     }
 
     /// Returns a source for the [`Character`] that should be shown to the user.
@@ -365,6 +337,67 @@ impl Session {
     #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
     pub fn draw_fps_counter(&self) -> &FpsCounter {
         self.frame_clock.draw_fps_counter()
+    }
+}
+
+/// Builder for providing the configuration of a new [`Session`].
+#[derive(Debug, Clone)]
+#[must_use]
+pub struct SessionBuilder {
+    viewport_for_ui: Option<ListenableSource<Viewport>>,
+}
+
+impl SessionBuilder {
+    /// Create the [`Session`] with configuration from this builder.
+    ///
+    /// This is an async function for the sake of cancellation and optional cooperative
+    /// multitasking, while constructing the initial state. It may safely be blocked on
+    /// from a synchronous context.
+    pub async fn build(self) -> Session {
+        let game_universe = Universe::new();
+        let game_character = ListenableCellWithLocal::new(None);
+        let input_processor = InputProcessor::new();
+        let graphics_options = ListenableCell::new(GraphicsOptions::default());
+        let paused = ListenableCell::new(false);
+        let (control_send, control_recv) = mpsc::sync_channel(100);
+
+        Session {
+            ui: Vui::new(
+                &input_processor,
+                game_character.as_source(),
+                paused.as_source(),
+                graphics_options.as_source(),
+                control_send.clone(),
+                self.viewport_for_ui
+                    .expect("lack of viewport not yet supported"),
+            )
+            .await,
+
+            frame_clock: FrameClock::new(),
+            input_processor,
+            graphics_options,
+            game_character,
+            game_universe,
+            game_universe_in_progress: None,
+            paused,
+            control_channel: control_recv,
+            control_channel_sender: control_send,
+            cursor_result: None,
+            last_step_info: UniverseStepInfo::default(),
+            tick_counter_for_logging: 0,
+        }
+    }
+
+    /// Enable graphical user interface.
+    ///
+    /// Requires knowing the expected viewport so that UI can be laid out to fit the aspect
+    /// ratio.
+    ///
+    /// If this is not called, then the session will simulate a world but not present any
+    /// controls for it other than those provided directly by the [`InputProcessor`].
+    pub fn ui(mut self, viewport: ListenableSource<Viewport>) -> Self {
+        self.viewport_for_ui = Some(viewport);
+        self
     }
 }
 
