@@ -45,7 +45,7 @@ pub struct Session {
 
     paused: ListenableCell<bool>,
 
-    ui: Vui,
+    ui: Option<Vui>,
 
     /// Messages for controlling the state that aren't via [`InputProcessor`].
     ///
@@ -143,7 +143,10 @@ impl Session {
     }
 
     pub fn ui_space(&self) -> ListenableSource<Option<URef<Space>>> {
-        self.ui.current_space()
+        match &self.ui {
+            Some(ui) => ui.current_space(),
+            None => ListenableSource::constant(None), // TODO: cache this to allocate less
+        }
     }
 
     pub fn graphics_options(&self) -> ListenableSource<GraphicsOptions> {
@@ -163,7 +166,10 @@ impl Session {
             match self.control_channel.try_recv() {
                 Ok(msg) => match msg {
                     ControlMessage::Back => {
-                        self.ui.back();
+                        // TODO: error reporting … ? hm.
+                        if let Some(ui) = &mut self.ui {
+                            ui.back();
+                        }
                     }
                     ControlMessage::TogglePause => {
                         self.paused.set(!*self.paused.get());
@@ -234,7 +240,9 @@ impl Session {
 
                 let mut info = self.game_universe.step(game_tick);
 
-                info += self.ui.step(base_tick);
+                if let Some(ui) = &mut self.ui {
+                    info += ui.step(base_tick);
+                }
 
                 if LOG_FIRST_FRAMES && self.tick_counter_for_logging <= 10 {
                     self.tick_counter_for_logging = self.tick_counter_for_logging.saturating_add(1);
@@ -281,7 +289,9 @@ impl Session {
             log::error!("Error applying tool: {error}")
         }
 
-        self.ui.show_click_result(button, result);
+        if let Some(ui) = &self.ui {
+            ui.show_click_result(button, result);
+        }
     }
 
     /// Implementation of click interpretation logic, called by [`Self::click`].
@@ -290,7 +300,11 @@ impl Session {
         let cursor_space = self.cursor_result.as_ref().map(|c| &c.space);
         // TODO: A better condition for this would be "is one of the spaces in the UI universe"
         if cursor_space == Option::as_ref(&self.ui_space().get()) {
-            self.ui.click(button, self.cursor_result.clone())
+            // TODO: refactor away unwrap
+            self.ui
+                .as_mut()
+                .unwrap()
+                .click(button, self.cursor_result.clone())
         } else {
             // Otherwise, it's a click inside the game world (even if the cursor hit nothing at all).
             // Character::click will validate against being a click in the wrong space.
@@ -362,17 +376,20 @@ impl SessionBuilder {
         let (control_send, control_recv) = mpsc::sync_channel(100);
 
         Session {
-            ui: Vui::new(
-                &input_processor,
-                game_character.as_source(),
-                paused.as_source(),
-                graphics_options.as_source(),
-                control_send.clone(),
-                self.viewport_for_ui
-                    .expect("lack of viewport not yet supported"),
-            )
-            .await,
-
+            ui: match self.viewport_for_ui {
+                Some(viewport) => Some(
+                    Vui::new(
+                        &input_processor,
+                        game_character.as_source(),
+                        paused.as_source(),
+                        graphics_options.as_source(),
+                        control_send.clone(),
+                        viewport,
+                    )
+                    .await,
+                ),
+                None => None,
+            },
             frame_clock: FrameClock::new(),
             input_processor,
             graphics_options,
