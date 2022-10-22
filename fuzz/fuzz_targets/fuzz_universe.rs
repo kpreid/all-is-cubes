@@ -20,7 +20,12 @@ struct FuzzUniverseTemplate {
 }
 
 fuzz_target!(|input: FuzzUniverseTemplate| {
-    let mut session = block_on(Session::new(ListenableSource::constant(input.viewport)));
+    // TODO: Should we be enabling UI or not?
+    let mut session = block_on(
+        Session::builder()
+            .ui(ListenableSource::constant(input.viewport))
+            .build(),
+    );
 
     // TODO: add some of all kinds of universe objects
     let space = session.universe_mut().insert_anonymous(input.space);

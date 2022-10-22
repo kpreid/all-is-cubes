@@ -94,11 +94,6 @@ impl Session {
         }
     }
 
-    /// Deprecated -- use builder
-    pub async fn new(viewport_for_ui: ListenableSource<Viewport>) -> Self {
-        Self::builder().ui(viewport_for_ui).build().await
-    }
-
     /// Returns a source for the [`Character`] that should be shown to the user.
     pub fn character(&self) -> ListenableSource<Option<URef<Character>>> {
         self.game_character.as_source()
@@ -487,9 +482,7 @@ mod tests {
     fn set_universe_async() {
         let old_marker = Name::from("old");
         let new_marker = Name::from("new");
-        let mut session = block_on(Session::new(ListenableSource::constant(
-            Viewport::ARBITRARY,
-        )));
+        let mut session = block_on(Session::builder().build());
         session
             .universe_mut()
             .insert(old_marker.clone(), Space::empty_positive(1, 1, 1))

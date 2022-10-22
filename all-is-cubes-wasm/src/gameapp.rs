@@ -107,7 +107,10 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     // The main cost of this is constructing the `Vui` instance.
     // TODO: pipe in YieldProgress
     let viewport_cell = ListenableCell::new(gui_helpers.canvas_helper().viewport());
-    let session = Session::new(viewport_cell.as_source()).await;
+    let session = Session::builder()
+        .ui(viewport_cell.as_source())
+        .build()
+        .await;
     session.graphics_options_mut().set(graphics_options);
 
     static_dom
