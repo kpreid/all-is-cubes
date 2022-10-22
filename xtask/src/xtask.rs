@@ -14,11 +14,14 @@
 // things to the current directory.
 
 use std::ffi::OsStr;
+use std::fmt;
 use std::io::Write as _;
+use std::mem;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
+use std::time::Instant;
 
 use anyhow::Context as _;
 use anyhow::Error as ActionError;
@@ -82,21 +85,27 @@ enum XtaskCommand {
 fn main() -> Result<(), ActionError> {
     let XtaskArgs { command } = <XtaskArgs as clap::Parser>::parse();
 
+    let mut time_log: Vec<Timing> = Vec::new();
+
     match command {
         XtaskCommand::Init => {
             write_development_files()?;
-            update_server_static()?; // includes installing wasm tools
+            update_server_static(&mut time_log)?; // includes installing wasm tools
         }
         XtaskCommand::Test => {
-            do_for_all_packages(TestOrCheck::Test, Features::Default)?;
+            do_for_all_packages(TestOrCheck::Test, Features::Default, &mut time_log)?;
         }
         XtaskCommand::TestMore => {
-            exhaustive_test()?;
+            exhaustive_test(&mut time_log)?;
         }
         XtaskCommand::Lint => {
-            do_for_all_packages(TestOrCheck::Lint, Features::Default)?;
+            do_for_all_packages(TestOrCheck::Lint, Features::Default, &mut time_log)?;
+
             // Build docs to verify that there are no broken doc links.
-            cargo().arg("doc").run()?;
+            {
+                let _t = CaptureTime::new(&mut time_log, "doc");
+                cargo().arg("doc").run()?;
+            }
         }
         XtaskCommand::Fmt => {
             do_for_all_workspaces(|| {
@@ -178,7 +187,7 @@ fn main() -> Result<(), ActionError> {
             );
         }
         XtaskCommand::PublishAll { for_real } => {
-            exhaustive_test()?;
+            exhaustive_test(&mut time_log)?;
 
             let maybe_dry = if for_real { vec![] } else { vec!["--dry-run"] };
             for package in ALL_NONTEST_PACKAGES {
@@ -199,6 +208,11 @@ fn main() -> Result<(), ActionError> {
             }
         }
     }
+
+    for t in time_log {
+        eprintln!("{t}");
+    }
+
     Ok(())
 }
 
@@ -220,19 +234,19 @@ const TARGET_WASM: &str = "--target=wasm32-unknown-unknown";
 
 // Test all combinations of situations (that we've bothered to program test
 // setup for).
-fn exhaustive_test() -> Result<(), ActionError> {
+fn exhaustive_test(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
     // building server with `--feature embed` requires static files
-    update_server_static()?;
+    update_server_static(time_log)?;
 
-    do_for_all_packages(TestOrCheck::Test, Features::AllAndNothing)?;
+    do_for_all_packages(TestOrCheck::Test, Features::AllAndNothing, time_log)?;
     Ok(())
 }
 
 /// Build the WASM and other 'client' files that the web server might need.
 /// Needed for build whenever `all-is-cubes-server` is being tested/run with
 /// the `embed` feature; needed for run regardless.
-fn update_server_static() -> Result<(), ActionError> {
-    ensure_wasm_tools_installed()?;
+fn update_server_static(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
+    ensure_wasm_tools_installed(time_log)?;
     {
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
         cmd!("npm run-script build").run()?;
@@ -242,16 +256,22 @@ fn update_server_static() -> Result<(), ActionError> {
 }
 
 /// Run check or tests for all targets.
-fn do_for_all_packages(op: TestOrCheck, features: Features) -> Result<(), ActionError> {
-    // Install npm-based tools for all-is-cubes-wasm build.
-    ensure_wasm_tools_installed()?;
+fn do_for_all_packages(
+    op: TestOrCheck,
+    features: Features,
+    time_log: &mut Vec<Timing>,
+) -> Result<(), ActionError> {
+    {
+        // Install npm-based tools for all-is-cubes-wasm build.
+        ensure_wasm_tools_installed(time_log)?;
+    }
 
     // Ensure all-is-cubes-server build that might be looking for the files will succeed.
     // Note that this is only an “exists” check not a “up-to-date” check, on the assumption
     // that running server tests will not depend on the specific file contents.
     // TODO: That's a fragile assumption.
     if !Path::new("all-is-cubes-wasm/dist/").exists() {
-        update_server_static()?;
+        update_server_static(time_log)?;
     }
 
     // Test everything we can with default features and target.
@@ -259,15 +279,20 @@ fn do_for_all_packages(op: TestOrCheck, features: Features) -> Result<(), Action
     if op != TestOrCheck::Lint {
         match features {
             Features::Default => {
+                let _t = CaptureTime::new(time_log, format!("{op:?}"));
                 op.cargo_cmd().run()?;
             }
 
             Features::AllAndNothing => {
-                op.cargo_cmd().arg("--all-features").run()?;
+                {
+                    let _t = CaptureTime::new(time_log, format!("{op:?} --all-features"));
+                    op.cargo_cmd().arg("--all-features").run()?;
+                }
 
                 // To test with limited features, we need to run commands separately for each
                 // package, as otherwise they will enable dependencies' features.
                 for package_name in ALL_NONTEST_PACKAGES {
+                    let _t = CaptureTime::new(time_log, format!("{op:?} --package {package_name}"));
                     op.cargo_cmd()
                         .args(["--package", package_name, "--no-default-features"])
                         .run()?;
@@ -280,15 +305,20 @@ fn do_for_all_packages(op: TestOrCheck, features: Features) -> Result<(), Action
     // (Supposedly, running `npm test` should run tests inside JS, but that seems
     // to do nothing for me, so we're limited to confirming it compiles.)
     {
+        let _t = CaptureTime::new(time_log, format!("{op:?} all-is-cubes-wasm"));
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
         cargo().arg(CHECK_SUBCMD).arg(TARGET_WASM).run()?;
     }
 
     // Build everything else in the workspace, so non-test targets are checked for compile errors.
-    cargo().arg(CHECK_SUBCMD).arg("--all-targets").run()?;
+    {
+        let _t = CaptureTime::new(time_log, "check --all-targets");
+        cargo().arg(CHECK_SUBCMD).arg("--all-targets").run()?;
+    }
 
     // Build fuzz targets that are not in the workspace
     {
+        let _t = CaptureTime::new(time_log, "check fuzz");
         let _pushd: Pushd = pushd("fuzz")?;
         cargo().arg(CHECK_SUBCMD).run()?;
     }
@@ -361,8 +391,9 @@ where
     Ok(())
 }
 
-fn ensure_wasm_tools_installed() -> Result<(), ActionError> {
+fn ensure_wasm_tools_installed(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
     if !Path::new("all-is-cubes-wasm/node_modules/.bin/webpack").exists() {
+        let _t = CaptureTime::new(time_log, "npm install");
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
         cmd!("npm install").run()?;
     }
@@ -416,4 +447,43 @@ static PROJECT_DIR: Lazy<PathBuf> = Lazy::new(|| {
 /// Start a [`Cmd`] with the cargo command we should use.
 fn cargo() -> Cmd {
     Cmd::new(std::env::var("CARGO").expect("CARGO environment variable not set"))
+}
+
+/// Describe how long a sub-task took.
+struct Timing {
+    label: String,
+    time: Duration,
+}
+
+impl fmt::Display for Timing {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { label, time } = self;
+        write!(f, "{time:5.1?} s  {label}", time = time.as_secs_f64())
+    }
+}
+
+/// Measure the time from creation to drop.
+struct CaptureTime<'a> {
+    label: String,
+    start: Instant,
+    output: &'a mut Vec<Timing>,
+}
+
+impl<'a> CaptureTime<'a> {
+    fn new(time_log: &'a mut Vec<Timing>, label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            start: Instant::now(),
+            output: time_log,
+        }
+    }
+}
+
+impl Drop for CaptureTime<'_> {
+    fn drop(&mut self) {
+        self.output.push(Timing {
+            label: mem::take(&mut self.label),
+            time: Instant::now().duration_since(self.start),
+        });
+    }
 }
