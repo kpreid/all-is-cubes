@@ -879,7 +879,11 @@ fn choose_surface_format(surface: &wgpu::Surface, adapter: &wgpu::Adapter) -> wg
             let d = format.describe();
             Rank {
                 is_srgb: d.srgb,
-                is_float: matches!(format, Rgba16Float | Rgba32Float | Rgb9e5Ufloat),
+                // Float output is somehow broken on wasm, so don't prefer it.
+                // <https://github.com/kpreid/all-is-cubes/issues/310>
+                // TODO: repro and report to wgpu, supposing that it is a wgpu bug
+                is_float: matches!(format, Rgba16Float | Rgba32Float | Rgb9e5Ufloat)
+                    && !cfg!(target_family = "wasm"),
                 negated_original_order: -(index as isize),
             }
         })
