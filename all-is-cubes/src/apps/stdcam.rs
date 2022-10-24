@@ -244,7 +244,7 @@ impl StandardCameras {
                 }
             }
         } else {
-            if *self.world_space.get() != None {
+            if self.world_space.get().is_some() {
                 self.world_space.set(None);
             }
         }
