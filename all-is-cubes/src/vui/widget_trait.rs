@@ -43,8 +43,8 @@ pub trait WidgetController: Debug + Send + Sync + 'static {
         Ok(WidgetTransaction::default())
     }
 
-    /// TODO: Be more specific than Box<dyn Error>
-    /// TODO: Stop using &mut self in favor of a transaction, like Behavior
+    /// TODO: Be more specific than `Box<dyn Error>`
+    /// TODO: Stop using `&mut self` in favor of a transaction, like `Behavior`
     /// TODO: If this is not overridden, arrange to automatically drop the controller for efficiency
     fn step(&mut self, _tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         Ok(WidgetTransaction::default())
