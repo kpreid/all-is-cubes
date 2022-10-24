@@ -58,7 +58,7 @@ impl Pipelines {
         let shader = create_wgsl_module_from_reloadable(
             device,
             "blocks-and-lines",
-            &*BLOCKS_AND_LINES_SHADER,
+            &BLOCKS_AND_LINES_SHADER,
         );
 
         let space_texture_bind_group_layout =

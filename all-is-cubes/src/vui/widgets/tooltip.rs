@@ -168,7 +168,7 @@ enum TooltipContents {
 impl TooltipContents {
     fn text(&self) -> &Arc<str> {
         match self {
-            TooltipContents::JustStartedExisting | TooltipContents::Blanked => &*EMPTY_ARC_STR,
+            TooltipContents::JustStartedExisting | TooltipContents::Blanked => &EMPTY_ARC_STR,
             TooltipContents::Message(m) => m,
             TooltipContents::InventoryItem { text, .. } => text,
         }

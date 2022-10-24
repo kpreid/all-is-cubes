@@ -280,7 +280,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                 indices: [u32; 6],
                 midpoint: Point3<S>,
             }
-            let quads: &[[u32; 6]] = bytemuck::cast_slice(&*transparent_indices);
+            let quads = bytemuck::cast_slice::<u32, [u32; 6]>(&transparent_indices);
             let mut sortable_quads: Vec<QuadWithMid<V::Coordinate>> = quads
                 .iter()
                 .map(|&indices| QuadWithMid {

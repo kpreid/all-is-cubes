@@ -262,7 +262,7 @@ impl Vui {
 
         // Decide what state we should be in.
         {
-            let current_state: &VuiPageState = &*self.state.get();
+            let current_state: &VuiPageState = &self.state.get();
             let paused = *self.hud_inputs.paused.get();
             if paused && matches!(current_state, VuiPageState::Hud) {
                 // TODO: also do this for lost focus

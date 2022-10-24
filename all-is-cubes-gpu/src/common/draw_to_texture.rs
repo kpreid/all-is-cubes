@@ -33,7 +33,7 @@ impl EgFramebuffer {
     }
 
     pub fn data(&self) -> &[[u8; 4]] {
-        &*self.data
+        &self.data
     }
 
     pub fn dirty_rect(&self) -> Rectangle {

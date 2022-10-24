@@ -108,7 +108,7 @@ impl StandardCameras {
         let graphics_options_dirty = DirtyFlag::listening(false, |l| graphics_options.listen(l));
         let viewport_dirty = DirtyFlag::listening(false, |l| viewport_source.listen(l));
 
-        let initial_options: &GraphicsOptions = &*graphics_options.get();
+        let initial_options: &GraphicsOptions = &graphics_options.get();
         let initial_viewport: Viewport = *viewport_source.get();
 
         let mut this = Self {
@@ -208,7 +208,7 @@ impl StandardCameras {
                 // TODO: try_borrow()
                 // TODO: ...or just skip the whole idea
                 self.cameras.ui.set_view_transform(Vui::view_transform(
-                    &*space_ref.borrow(),
+                    &space_ref.borrow(),
                     self.cameras.ui.fov_y(),
                 ));
             }

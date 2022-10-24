@@ -143,7 +143,7 @@ impl<T: Sync> ListenableCellWithLocal<T> {
 
     #[allow(clippy::should_implement_trait)] // TODO: consider renaming
     pub fn borrow(&self) -> &T {
-        &*self.value
+        &self.value
     }
 
     /// Returns a [`ListenableSource`] which provides read-only access to the value

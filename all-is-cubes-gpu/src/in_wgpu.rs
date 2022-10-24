@@ -384,7 +384,7 @@ impl EverythingRenderer {
         let postprocess_shader = create_wgsl_module_from_reloadable(
             device,
             "EverythingRenderer::postprocess_shader",
-            &*POSTPROCESS_SHADER,
+            &POSTPROCESS_SHADER,
         );
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -513,7 +513,7 @@ impl EverythingRenderer {
             });
 
         let mut bwp = BeltWritingParts {
-            device: &*self.device,
+            device: &self.device,
             belt: &mut self.staging_belt,
             encoder: &mut encoder,
         };
@@ -589,7 +589,7 @@ impl EverythingRenderer {
                 bwp.reborrow(),
                 &wgpu::util::BufferInitDescriptor {
                     label: Some("EverythingRenderer::lines_buffer"),
-                    contents: bytemuck::cast_slice(&*v),
+                    contents: bytemuck::cast_slice::<WgpuLinesVertex, u8>(&v),
                     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 },
             );
