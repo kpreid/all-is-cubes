@@ -99,7 +99,7 @@ impl TooltipState {
                         .icon(&hud_blocks.icons)
                         .evaluate()
                         .ok()
-                        .map(|ev_block| ev_block.attributes.display_name.to_owned().into())
+                        .map(|ev_block| ev_block.attributes.display_name.into_owned().into())
                         .unwrap_or_else(|| EMPTY_ARC_STR.clone());
                     let new_contents = TooltipContents::InventoryItem {
                         source_slot: selected_slot,
