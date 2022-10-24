@@ -40,7 +40,7 @@ impl Spawn {
         Spawn {
             bounds: bounds.abut(Face6::PZ, 40).unwrap_or(bounds),
             eye_position: None,
-            look_direction: Vector3::new(notnan!(0.), notnan!(0.), notnan!(-1.)),
+            look_direction: Vector3::new(NotNan::from(0), NotNan::from(0), NotNan::from(-1)),
             inventory: vec![],
         }
     }
@@ -70,9 +70,9 @@ impl Spawn {
         // TODO: accept None for clearing
         // TODO: If we're going to suppress NaN, then it makes sense to suppress infinities too; come up with a general theory of how we want all-is-cubes to handle unreasonable positions.
         self.eye_position = Some(Point3 {
-            x: NotNan::new(position.x).unwrap_or(notnan!(0.)),
-            y: NotNan::new(position.y).unwrap_or(notnan!(0.)),
-            z: NotNan::new(position.z).unwrap_or(notnan!(0.)),
+            x: notnan_or_zero(position.x),
+            y: notnan_or_zero(position.y),
+            z: notnan_or_zero(position.z),
         });
     }
 
@@ -86,9 +86,9 @@ impl Spawn {
     pub fn set_look_direction(&mut self, direction: impl Into<Vector3<FreeCoordinate>>) {
         let direction = direction.into();
         self.look_direction = Vector3 {
-            x: NotNan::new(direction.x).unwrap_or(notnan!(0.)),
-            y: NotNan::new(direction.y).unwrap_or(notnan!(0.)),
-            z: NotNan::new(direction.z).unwrap_or(notnan!(0.)),
+            x: notnan_or_zero(direction.x),
+            y: notnan_or_zero(direction.y),
+            z: notnan_or_zero(direction.z),
         };
     }
 
@@ -96,6 +96,10 @@ impl Spawn {
     pub fn set_inventory(&mut self, inventory: Vec<Slot>) {
         self.inventory = inventory;
     }
+}
+
+fn notnan_or_zero(value: FreeCoordinate) -> NotNan<FreeCoordinate> {
+    NotNan::new(value).unwrap_or_else(|_| NotNan::from(0))
 }
 
 impl VisitRefs for Spawn {

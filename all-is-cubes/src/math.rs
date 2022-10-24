@@ -24,8 +24,12 @@ pub use matrix::*;
 mod rotation;
 pub use rotation::*;
 
-/// Allows writing a [`NotNan`] value as a constant expression  (which is not currently
+/// Allows writing a [`NotNan`] value as a constant expression (which is not currently
 /// a feature provided by the [`ordered_float`] crate itself).
+///
+/// Note that if the expression does not need to be constant, this macro may not be
+/// needed; infallible construction can be written using `NotNan::from(an_integer)`,
+/// `NotNan::zero()`, and `NotNan::one()`.
 ///
 /// ```
 /// use all_is_cubes::{notnan, math::NotNan};

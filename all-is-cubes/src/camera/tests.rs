@@ -18,7 +18,7 @@ fn set_options_updates_matrices() {
     let matrix = camera.projection();
     camera.set_options({
         let mut g = camera.options().clone();
-        g.fov_y = notnan!(30.0);
+        g.fov_y = NotNan::from(30);
         g
     });
     assert_ne!(matrix, camera.projection());
@@ -41,8 +41,8 @@ fn camera_view_position() {
 fn view_frustum() {
     let camera = Camera::new(
         GraphicsOptions {
-            view_distance: NotNan::new(10.0_f64.powi(2)).unwrap(),
-            fov_y: notnan!(90.0),
+            view_distance: NotNan::from(10i32.pow(2)),
+            fov_y: NotNan::from(90),
             ..GraphicsOptions::default()
         },
         Viewport::with_scale(1.0, Vector2::new(10, 5)),

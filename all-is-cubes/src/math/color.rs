@@ -537,7 +537,7 @@ fn component_to_srgb8(c: NotNan<f32>) -> u8 {
 fn component_from_linear8_arithmetic(c: u8) -> NotNan<f32> {
     // TODO: make this const when Rust `const_fn_floating_point_arithmetic` is stable,
     // and we can do away with the lookup tables.
-    NotNan::from(c) / notnan!(255.0)
+    NotNan::from(c) / NotNan::from(255u8)
 }
 
 #[inline]

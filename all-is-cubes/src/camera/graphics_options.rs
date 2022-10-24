@@ -1,3 +1,4 @@
+use cgmath::One;
 use ordered_float::NotNan;
 
 use crate::math::{FreeCoordinate, Rgb, Rgba};
@@ -163,14 +164,14 @@ impl ExposureOption {
     pub(crate) fn initial(&self) -> NotNan<f32> {
         match *self {
             ExposureOption::Fixed(value) => value,
-            ExposureOption::Automatic => notnan!(1.0),
+            ExposureOption::Automatic => NotNan::one(),
         }
     }
 }
 
 impl Default for ExposureOption {
     fn default() -> Self {
-        ExposureOption::Fixed(notnan!(1.0))
+        ExposureOption::Fixed(NotNan::one())
     }
 }
 

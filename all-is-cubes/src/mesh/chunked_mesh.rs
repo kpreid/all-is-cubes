@@ -976,7 +976,7 @@ mod tests {
     fn graphics_options_change() {
         // TODO: This test is fragile because it doesn't think about multiple chunks.
         let mut options = GraphicsOptions {
-            view_distance: notnan!(1.0),
+            view_distance: NotNan::from(1),
             transparency: TransparencyOption::Volumetric,
             ..Default::default()
         };

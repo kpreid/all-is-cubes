@@ -217,7 +217,7 @@ async fn error_character_gone(context: RenderTestContext) {
 
 async fn fog(mut context: RenderTestContext, fog: FogOption) {
     let mut options = GraphicsOptions::default();
-    options.view_distance = notnan!(50.0);
+    options.view_distance = NotNan::from(50);
     options.fog = fog;
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
@@ -281,9 +281,9 @@ async fn follow_options_change(mut context: RenderTestContext) {
 
     // Two sets of graphics options with various differences
     let mut options_1 = GraphicsOptions::default();
-    options_1.fov_y = notnan!(90.0);
+    options_1.fov_y = NotNan::from(90);
     let mut options_2 = GraphicsOptions::default();
-    options_2.fov_y = notnan!(70.0);
+    options_2.fov_y = NotNan::from(70);
     options_2.exposure = ExposureOption::Fixed(notnan!(1.5));
     options_2.transparency = TransparencyOption::Threshold(notnan!(0.1));
 
@@ -336,7 +336,7 @@ async fn icons(mut context: RenderTestContext) {
 
     let mut options = GraphicsOptions::default();
     options.lighting_display = LightingOption::Flat;
-    options.fov_y = notnan!(45.0);
+    options.fov_y = NotNan::from(45);
     context
         .render_comparison_test(
             20, // Fairly sloppy because this test is looking for "Does this icon look right"
@@ -429,7 +429,7 @@ async fn layers_ui_only(mut context: RenderTestContext) {
 
 async fn light(mut context: RenderTestContext, option: LightingOption) {
     let mut options = GraphicsOptions::default();
-    options.fov_y = notnan!(45.0);
+    options.fov_y = NotNan::from(45);
     options.lighting_display = option;
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
@@ -482,7 +482,7 @@ async fn sky_and_info_text(mut context: RenderTestContext) {
 
 async fn tone_mapping(mut context: RenderTestContext, (tmo, exposure): (ToneMappingOperator, f32)) {
     let mut options = GraphicsOptions::default();
-    options.fov_y = notnan!(45.0);
+    options.fov_y = NotNan::from(45);
     options.tone_mapping = tmo;
     options.exposure = ExposureOption::Fixed(NotNan::new(exposure).unwrap());
     let scene =
