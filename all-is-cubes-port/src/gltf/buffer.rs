@@ -76,7 +76,7 @@ impl GltfDataDestination {
     {
         // Refuse characters which could change the interpretation of the path.
         assert!(
-            !file_suffix.contains(&['/', '\0', '%']),
+            !file_suffix.contains(['/', '\0', '%']),
             "Invalid character in buffer file name {file_suffix:?}"
         );
 

@@ -483,10 +483,10 @@ async fn install_atrium_blocks(
                 .voxels_fn(universe, resolution, brick_pattern)?
                 .build(),
             AtriumBlocks::GroundArch => {
-                generate_arch(universe, &stone_range, &brick_pattern, resolution, 7, 3)?
+                generate_arch(universe, &stone_range, brick_pattern, resolution, 7, 3)?
             }
             AtriumBlocks::UpperArch => {
-                generate_arch(universe, &stone_range, &brick_pattern, resolution, 3, 2)?
+                generate_arch(universe, &stone_range, brick_pattern, resolution, 3, 2)?
             }
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
