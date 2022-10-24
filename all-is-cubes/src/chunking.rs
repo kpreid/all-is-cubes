@@ -73,7 +73,7 @@ pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(
     )
 }
 
-/// A distance between two chunks. Output of [`chunk_distance_squared_for_view`].
+/// A distance between two chunks, taking into consideration their entire volume.
 ///
 /// Implements [`Ord`] to be comparable as a distance value, with the following properties:
 ///
