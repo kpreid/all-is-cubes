@@ -40,7 +40,7 @@ impl From<BlockVertex<TexPoint>> for GltfVertex {
                 let mut color_attribute: Vector4<f32> = color.into();
                 // Clamp out-of-range alpha values so they fit into the
                 // VertexColorOrTexture protocol (not less than zero).
-                color_attribute.w = color_attribute.w.min(1.).max(0.);
+                color_attribute.w = color_attribute.w.clamp(0., 1.);
                 Self {
                     position,
                     color_or_texture: Lef32::from_vec4(color_attribute),

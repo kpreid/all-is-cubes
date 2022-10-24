@@ -63,7 +63,7 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
                 let mut color_attribute: [f32; 4] = color.into();
                 // Clamp out-of-range alpha values so they fit into the
                 // VertexColorOrTexture protocol (not less than zero).
-                color_attribute[3] = color_attribute[3].min(1.).max(0.);
+                color_attribute[3] = color_attribute[3].clamp(0., 1.);
                 Self {
                     position: position.into(),
                     cube,

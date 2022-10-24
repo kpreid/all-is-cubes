@@ -294,7 +294,7 @@ impl InputProcessor {
                             + self.mouselook_buffer.y,
                     );
                     character.body.yaw = (character.body.yaw + turning.x).rem_euclid(360.0);
-                    character.body.pitch = (character.body.pitch + turning.y).min(90.0).max(-90.0);
+                    character.body.pitch = (character.body.pitch + turning.y).clamp(-90.0, 90.0);
 
                     if self.keys_held.contains(&Key::Character(' ')) {
                         character.jump_if_able();

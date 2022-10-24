@@ -76,11 +76,10 @@ impl GraphicsOptions {
     /// Constrain fields to valid/practical values.
     #[must_use]
     pub fn repair(mut self) -> Self {
-        self.fov_y = self.fov_y.max(NotNan::from(1)).min(NotNan::from(189));
+        self.fov_y = self.fov_y.clamp(NotNan::from(1), NotNan::from(189));
         self.view_distance = self
             .view_distance
-            .max(NotNan::from(1))
-            .min(NotNan::from(10000));
+            .clamp(NotNan::from(1), NotNan::from(10000));
         self
     }
 }
