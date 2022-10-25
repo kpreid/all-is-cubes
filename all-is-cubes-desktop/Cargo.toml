@@ -50,4 +50,4 @@ unicode-width = { version = "0.1.9", default-features = false }
 winit = { version = "0.27.2", default-features = false, features = ["x11"] }
 
 [dev-dependencies]
-trycmd = "0.13.1"
+trycmd = "0.14.1"
