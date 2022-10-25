@@ -16,7 +16,7 @@ use all_is_cubes::math::{cube_to_midpoint, GridAab, GridArray, GridPoint};
 /// want for patterns in a [`Block`].
 pub(crate) fn array_of_noise<O>(
     resolution: Resolution,
-    noise_fn: &impl NoiseFn<[f64; 3]>,
+    noise_fn: &impl NoiseFn<f64, 3>,
     mut postprocess: impl FnMut(f64) -> O,
 ) -> GridArray<O> {
     GridArray::from_fn(GridAab::for_block(resolution), |cube| {
@@ -25,7 +25,7 @@ pub(crate) fn array_of_noise<O>(
 }
 
 /// Extension trait for [`noise::NoiseFn`] which makes it usable with our [`GridPoint`]s.
-pub trait NoiseFnExt: NoiseFn<[f64; 3]> {
+pub(crate) trait NoiseFnExt: NoiseFn<f64, 3> {
     /// Sample the noise at the center of the given cube. That is, convert the integer
     /// vector to `f64`, add 0.5 to all coordinates, and call [`NoiseFn::get`].
     ///
@@ -39,7 +39,7 @@ pub trait NoiseFnExt: NoiseFn<[f64; 3]> {
 }
 impl<T> NoiseFnExt for T
 where
-    T: NoiseFn<[f64; 3]> + Sized,
+    T: NoiseFn<f64, 3> + Sized,
 {
     fn at_cube(&self, cube: GridPoint) -> f64
     where

@@ -2042,10 +2042,11 @@ dependencies = [
 
 [[package]]
 name = "noise"
-version = "0.7.0"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82051dd6745d5184c6efb7bc8be14892a7f6d4f3ad6dbf754d1c7d7d5fe24b43"
+checksum = "9ba869e17168793186c10ca82c7079a4ffdeac4f1a7d9e755b9491c028180e40"
 dependencies = [
+ "num-traits",
  "rand 0.7.3",
  "rand_xorshift",
 ]

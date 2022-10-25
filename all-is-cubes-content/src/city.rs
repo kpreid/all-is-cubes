@@ -8,7 +8,6 @@ use all_is_cubes::transaction::Transaction;
 use all_is_cubes::vui::{install_widgets, widgets, Align, Gravity, LayoutGrant, WidgetTree};
 use futures_core::future::BoxFuture;
 use instant::Instant;
-use noise::Seedable as _;
 
 use all_is_cubes::cgmath::{EuclideanSpace as _, One as _, Vector3};
 use all_is_cubes::drawing::embedded_graphics::{mono_font::iso_8859_1 as font, text::Baseline};
@@ -129,7 +128,7 @@ pub(crate) async fn demo_city(
 
     // Stray grass
     {
-        let grass_noise_v = noise::OpenSimplex::new().set_seed(0x21b5cc6b);
+        let grass_noise_v = noise::OpenSimplex::new(0x21b5cc6b);
         let grass_noise = noise::ScaleBias::new(&grass_noise_v)
             .set_bias(0.0)
             .set_scale(4.0);

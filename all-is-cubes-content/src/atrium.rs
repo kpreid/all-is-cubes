@@ -3,7 +3,6 @@
 use std::fmt;
 
 use exhaust::Exhaust;
-use noise::Seedable;
 
 use all_is_cubes::block::{Block, BlockCollision, Resolution, RotationPlacementRule, Zoom, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace, Point3, Transform, Vector3};
@@ -405,7 +404,7 @@ async fn install_atrium_blocks(
         .collect();
 
     let stone_base_array = {
-        let stone_noise_v = noise::OpenSimplex::new().set_seed(0x2e240365);
+        let stone_noise_v = noise::OpenSimplex::new(0x2e240365);
         let stone_noise_sc =
             noise::ScalePoint::new(&stone_noise_v).set_scale(4.0 / f64::from(resolution_g));
 

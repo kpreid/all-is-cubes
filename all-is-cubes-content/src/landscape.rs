@@ -1,7 +1,6 @@
 use std::fmt;
 
 use exhaust::Exhaust;
-use noise::Seedable as _;
 use rand::{Rng as _, SeedableRng as _};
 
 use all_is_cubes::block::{Block, BlockCollision, Resolution, AIR};
@@ -106,17 +105,17 @@ pub async fn install_landscape_blocks(
     let rng = &mut rand_xoshiro::Xoshiro256Plus::seed_from_u64(123890483921741);
 
     let blade_color_noise = {
-        let blade_color_noise_v = noise::Value::new().set_seed(0x2e240365);
+        let blade_color_noise_v = noise::Value::new(0x2e240365);
         move |p| blade_color_noise_v.at_grid(p) * 0.12 + 1.0
     };
     let overhang_noise = {
-        let overhang_noise_v = noise::Value::new();
+        let overhang_noise_v = noise::Value::new(0);
         array_of_noise(resolution, &overhang_noise_v, |value| {
             value * 2.5 + f64::from(resolution) * 0.75
         })
     };
     let blade_noise = {
-        let blade_noise_v = noise::OpenSimplex::new().set_seed(0x7af8c181);
+        let blade_noise_v = noise::OpenSimplex::new(0x7af8c181);
         let blade_noise_stretch = noise::ScalePoint::new(blade_noise_v).set_y_scale(0.1);
         array_of_noise(
             resolution.double().unwrap(),
@@ -270,7 +269,7 @@ pub fn wavy_landscape(
     let slope_scaled = max_slope / 0.904087;
     let middle_y = (region.lower_bounds().y + region.upper_bounds().y) / 2;
 
-    let placement_noise_v = noise::OpenSimplex::new().set_seed(0x21b5cc6b);
+    let placement_noise_v = noise::OpenSimplex::new(0x21b5cc6b);
     let placement_noise = noise::ScaleBias::new(&placement_noise_v)
         .set_bias(0.0)
         .set_scale(4.0);
