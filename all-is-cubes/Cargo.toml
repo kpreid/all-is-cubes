@@ -41,7 +41,7 @@ arbitrary = ["dep:arbitrary"]
 threads = ["dep:rayon"]
 
 [dependencies]
-arbitrary = { version = "1.1.6", optional = true, features = ["derive"] }
+arbitrary = { version = "1.2.0", optional = true, features = ["derive"] }
 bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
 bytemuck = { version = "1.12.1", default-features = false }
 cgmath = "0.18.0"
