@@ -13,13 +13,13 @@ use crate::noise::NoiseFnExt;
 ///
 /// TODO: Use named block definitions or not?
 pub fn clouds(region: GridAab, space: &mut Space, density: f32) -> Result<(), SetCubeError> {
-    let large_noise = noise::Perlin::default();
-    let large_noise = noise::ScalePoint::new(&large_noise).set_scale(0.02);
-    let large_noise = noise::ScaleBias::new(&large_noise).set_scale(10.0);
-    let small_noise = noise::Perlin::default();
-    let small_noise = noise::ScalePoint::new(&small_noise).set_scale(0.15);
-    let small_noise = noise::ScaleBias::new(&small_noise).set_scale(4.0);
-    let combined_noise = noise::Add::new(&large_noise, &small_noise);
+    let large_noise =
+        noise::ScaleBias::new(noise::ScalePoint::new(noise::Perlin::default()).set_scale(0.02))
+            .set_scale(10.0);
+    let small_noise =
+        noise::ScaleBias::new(noise::ScalePoint::new(noise::Perlin::default()).set_scale(0.15))
+            .set_scale(4.0);
+    let combined_noise = noise::Add::new(large_noise, small_noise);
 
     fn cloud_block(alpha: f32) -> Block {
         Block::builder()

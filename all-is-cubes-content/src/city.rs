@@ -128,8 +128,7 @@ pub(crate) async fn demo_city(
 
     // Stray grass
     {
-        let grass_noise_v = noise::OpenSimplex::new(0x21b5cc6b);
-        let grass_noise = noise::ScaleBias::new(&grass_noise_v)
+        let grass_noise = noise::ScaleBias::new(noise::OpenSimplex::new(0x21b5cc6b))
             .set_bias(0.0)
             .set_scale(4.0);
         let grass_threshold = 1.2;

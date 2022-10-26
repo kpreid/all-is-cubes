@@ -9,11 +9,8 @@ use all_is_cubes::math::{cube_to_midpoint, GridAab, GridArray, GridPoint};
 /// As a convenience, it also accepts a postprocessing function that is allowed to return
 /// any type.
 ///
-/// The [`noise`] library currently uses `&dyn NoiseFn` ubiquitously in all combiners and
-/// modifiers, which does not implement [`Send`] and so cannot be used inside futures that
-/// need to be [`Send`]. As a stopgap before a release that fixes this (or switching to a
-/// different noise library), we use this utility function to pre-compute all the noise we
-/// want for patterns in a [`Block`].
+/// TODO: The previous rationale, which made this function an improvement on passing
+/// around `NoiseFn`s, is obsolete. Review how many of its uses are actually valuable.
 pub(crate) fn array_of_noise<O>(
     resolution: Resolution,
     noise_fn: &impl NoiseFn<f64, 3>,

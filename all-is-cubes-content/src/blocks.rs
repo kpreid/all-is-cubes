@@ -89,7 +89,7 @@ pub async fn install_demo_blocks(
     let road_color: Block = Rgba::new(0.157, 0.130, 0.154, 1.0).into();
     let curb_color: Block = Rgba::new(0.788, 0.765, 0.741, 1.0).into();
     let road_noise_v = noise::Value::new(0x52b19f6a);
-    let road_noise = |cube| road_noise_v.at_grid(cube) * 0.12 + 1.0;
+    let road_noise = move |cube| road_noise_v.at_grid(cube) * 0.12 + 1.0;
 
     let curb_fn = |cube: GridPoint| {
         let width = resolution_g / 3;

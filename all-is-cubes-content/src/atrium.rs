@@ -403,16 +403,13 @@ async fn install_atrium_blocks(
         .map(|x| scale_color(stone_base.clone(), 1.0 + x as f64 * 0.08, 0.02))
         .collect();
 
-    let stone_base_array = {
-        let stone_noise_v = noise::OpenSimplex::new(0x2e240365);
-        let stone_noise_sc =
-            noise::ScalePoint::new(&stone_noise_v).set_scale(4.0 / f64::from(resolution_g));
-
-        // increased resolution to support brick offset patterning
-        array_of_noise(resolution, &stone_noise_sc, |value| {
-            &stone_range[(value * 8.0 + 2.5).round().clamp(0.0, 4.0) as usize]
-        })
-    };
+    // increased resolution to support brick offset patterning
+    let stone_base_array = array_of_noise(
+        resolution,
+        &noise::ScalePoint::new(noise::OpenSimplex::new(0x2e240365))
+            .set_scale(4.0 / f64::from(resolution_g)),
+        |value| &stone_range[(value * 8.0 + 2.5).round().clamp(0.0, 4.0) as usize],
+    );
 
     let brick_pattern = |mut p: GridPoint| {
         if (p.x.rem_euclid(resolution_g) > resolution_g / 2)
