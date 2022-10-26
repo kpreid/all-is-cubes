@@ -266,8 +266,24 @@ impl Session {
             .and_then(|ndc_pos| cameras.project_cursor(ndc_pos));
     }
 
+    /// Returns the [`Cursor`] computed by the last call to [`Session::update_cursor()`].
     pub fn cursor_result(&self) -> Option<&Cursor> {
         self.cursor_result.as_ref()
+    }
+
+    /// Returns the suggested mouse-pointer/cursor appearance for the current [`Cursor`]
+    /// as computed by the last call to [`Session::update_cursor()`].
+    ///
+    /// Note that this does not report any information about whether the pointer should be
+    /// *hidden*. (TODO: Should we change that?)
+    pub fn cursor_icon(&self) -> &CursorIcon {
+        match self.cursor_result {
+            // TODO: add more distinctions.
+            // * Non-clickable UI should get normal arrow cursor.
+            // * Maybe a lack-of-world should be indicated with a disabled cursor.
+            None => &CursorIcon::Crosshair,
+            Some(_) => &CursorIcon::PointingHand,
+        }
     }
 
     /// Handle a mouse-click event, at the position specified by the last
@@ -468,6 +484,20 @@ impl<T: CustomFormat<StatusText>> fmt::Display for InfoText<'_, T> {
         }?;
         Ok(())
     }
+}
+
+/// Suggested mouse pointer appearance for a given [`Cursor`] state.
+///
+/// Obtain this from [`Session::cursor_icon()`].
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum CursorIcon {
+    /// The platform's default appearance; often an arrowhead.
+    Normal,
+    /// A crosshair “┼”, suggesting aiming/positioning/selecting.
+    Crosshair,
+    /// A hand with finger extended as if to press a button.
+    PointingHand,
 }
 
 #[cfg(test)]

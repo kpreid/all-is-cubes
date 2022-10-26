@@ -18,8 +18,8 @@ use all_is_cubes_gpu::wgpu;
 
 use crate::choose_graphical_window_size;
 use crate::glue::winit::{
-    logical_size_from_vec, map_key, map_mouse_button, monitor_size_for_window,
-    physical_size_to_viewport, sync_cursor_grab,
+    cursor_icon_to_winit, logical_size_from_vec, map_key, map_mouse_button,
+    monitor_size_for_window, physical_size_to_viewport, sync_cursor_grab,
 };
 use crate::session::{ClockSource, DesktopSession};
 
@@ -251,6 +251,8 @@ fn handle_winit_event<Ren: RendererToWinit>(
                         Some(Point2::from(position) / dsession.window.window().scale_factor()),
                         false,
                     );
+                    // TODO: Is it worth improving responsiveness by immediately executing
+                    // an update_cursor()?
                 }
                 WindowEvent::CursorEntered { .. } => {
                     // CursorEntered doesn't tell us position, so ignore
@@ -337,6 +339,10 @@ fn handle_winit_event<Ren: RendererToWinit>(
         Event::RedrawRequested(id) if id == dsession.window.window().id() => {
             dsession.renderer.update_world_camera();
             dsession.session.update_cursor(dsession.renderer.cameras());
+            dsession
+                .window
+                .window()
+                .set_cursor_icon(cursor_icon_to_winit(dsession.session.cursor_icon()));
 
             dsession
                 .renderer

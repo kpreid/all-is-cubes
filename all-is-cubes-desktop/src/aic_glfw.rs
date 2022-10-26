@@ -16,7 +16,9 @@ use all_is_cubes::listen::ListenableCell;
 use all_is_cubes_gpu::in_luminance::SurfaceRenderer;
 
 use crate::choose_graphical_window_size;
-use crate::glue::glfw::{get_workarea_size, map_key, map_mouse_button, window_size_as_viewport};
+use crate::glue::glfw::{
+    cursor_icon_to_glfw, get_workarea_size, map_key, map_mouse_button, window_size_as_viewport,
+};
 use crate::session::{ClockSource, DesktopSession};
 
 type Renderer = SurfaceRenderer<GL33Context>;
@@ -75,6 +77,12 @@ pub(crate) fn glfw_main_loop(mut dsession: GlfwSession) -> Result<(), anyhow::Er
                 CursorMode::Normal
             },
         );
+        dsession
+            .renderer
+            .surface
+            .window
+            .set_cursor(Some(cursor_icon_to_glfw(dsession.session.cursor_icon())));
+
         dsession.session.input_processor.has_pointer_lock(
             dsession.renderer.surface.window.get_cursor_mode() == CursorMode::Disabled,
         );

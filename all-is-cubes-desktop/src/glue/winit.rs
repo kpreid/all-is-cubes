@@ -223,3 +223,13 @@ pub fn sync_cursor_grab(window: &winit::window::Window, input_processor: &mut In
         }
     }
 }
+
+pub fn cursor_icon_to_winit(icon: &all_is_cubes::apps::CursorIcon) -> winit::window::CursorIcon {
+    use all_is_cubes::apps::CursorIcon as A;
+    use winit::window::CursorIcon as W;
+    match icon {
+        A::Crosshair => W::Crosshair,
+        A::PointingHand => W::Hand,
+        /* A::Normal | */ _ => W::Default,
+    }
+}

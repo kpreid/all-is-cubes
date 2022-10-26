@@ -13,7 +13,7 @@ use web_sys::{
     HtmlProgressElement, KeyboardEvent, MouseEvent, Text, WebGlContextAttributes,
 };
 
-use all_is_cubes::apps::{Key, Session, StandardCameras};
+use all_is_cubes::apps::{CursorIcon, Key, Session, StandardCameras};
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::ListenableCell;
@@ -419,6 +419,19 @@ impl WebGameRoot {
                     self.session.update_cursor(renderer.cameras());
                 }
             }
+            let _: Result<_, _> = self
+                .gui_helpers
+                .canvas_helper()
+                .canvas()
+                .style()
+                .set_property(
+                    "cursor",
+                    match self.session.cursor_icon() {
+                        CursorIcon::Crosshair => "crosshair",
+                        CursorIcon::PointingHand => "pointer",
+                        /* CursorIcon::Normal | */ _ => "default",
+                    },
+                );
 
             // Do graphics
             let render_info = match &mut self.renderer {

@@ -51,6 +51,7 @@ version = "0.3.22"
 features = [
   "console",
   "AddEventListenerOptions",
+  "CssStyleDeclaration", # HTMLElement.style for dynamic styling
   "Document",
   "DomTokenList", # classList
   "Element",

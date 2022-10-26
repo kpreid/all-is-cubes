@@ -150,6 +150,16 @@ pub fn map_key(key: glfw::Key) -> Option<all_is_cubes::apps::Key> {
     })
 }
 
+pub fn cursor_icon_to_glfw(icon: &all_is_cubes::apps::CursorIcon) -> glfw::Cursor {
+    use all_is_cubes::apps::CursorIcon as A;
+    use glfw::StandardCursor as G;
+    glfw::Cursor::standard(match icon {
+        A::Crosshair => G::Crosshair,
+        A::PointingHand => G::Hand,
+        /* A::Normal | */ _ => G::Arrow,
+    })
+}
+
 pub fn get_workarea_size(monitor: &glfw::Monitor) -> Vector2<u32> {
     let (_, _, width, height) = monitor.get_workarea();
     Vector2::new(width as u32, height as u32)
