@@ -12,6 +12,7 @@ Options:
       --display-size <W×H>   Window size or image size, if applicable to the selected --graphics
                              mode [default: auto]
       --duration <SECONDS>   Length of time to simulate.
+      --fullscreen           Make the window fullscreen
   -g, --graphics <mode>      Graphics/UI mode [default: window]
   -h, --help                 Print help information (use `--help` for more detail)
       --no-config-files      Ignore all configuration files, using only defaults and command-line

@@ -1,6 +1,5 @@
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
-use glfw::Glfw;
 
 pub fn window_size_as_viewport(window: &glfw::Window) -> Viewport {
     Viewport {
@@ -151,11 +150,7 @@ pub fn map_key(key: glfw::Key) -> Option<all_is_cubes::apps::Key> {
     })
 }
 
-pub fn get_primary_workarea_size(glfw: &mut Glfw) -> Option<Vector2<u32>> {
-    glfw.with_primary_monitor(|_glfw, opt_primary_monitor| {
-        opt_primary_monitor.map(|m| {
-            let (_, _, width, height) = m.get_workarea();
-            Vector2::new(width as u32, height as u32)
-        })
-    })
+pub fn get_workarea_size(monitor: &glfw::Monitor) -> Vector2<u32> {
+    let (_, _, width, height) = monitor.get_workarea();
+    Vector2::new(width as u32, height as u32)
 }

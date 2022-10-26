@@ -6,19 +6,17 @@ use std::ops::ControlFlow;
 use std::sync::mpsc;
 use std::time::Instant;
 
-use all_is_cubes::camera::Viewport;
 use glfw::{Action, Context as _, CursorMode, SwapInterval, WindowEvent, WindowMode};
 use luminance_glfw::{GL33Context, GlfwSurface, GlfwSurfaceError};
 
 use all_is_cubes::apps::{Session, StandardCameras};
+use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes_gpu::in_luminance::SurfaceRenderer;
 
 use crate::choose_graphical_window_size;
-use crate::glue::glfw::{
-    get_primary_workarea_size, map_key, map_mouse_button, window_size_as_viewport,
-};
+use crate::glue::glfw::{get_workarea_size, map_key, map_mouse_button, window_size_as_viewport};
 use crate::session::{ClockSource, DesktopSession};
 
 type Renderer = SurfaceRenderer<GL33Context>;
@@ -100,22 +98,43 @@ pub(crate) fn create_glfw_desktop_session(
     session: Session,
     window_title: &str,
     requested_size: Option<Vector2<u32>>,
+    fullscreen: bool,
     viewport_cell: ListenableCell<Viewport>,
 ) -> Result<GlfwSession, anyhow::Error> {
     let start_time = Instant::now();
     let GlfwSurface {
         context, events_rx, ..
     } = GlfwSurface::new(|glfw| {
-        let size: Vector2<u32> = requested_size
-            .unwrap_or_else(|| choose_graphical_window_size(get_primary_workarea_size(glfw)));
+        glfw.with_primary_monitor(|glfw, opt_primary_monitor| {
+            // TODO: this is a bit of a mess. Requirements it is satisfying:
+            // - Must tolerate glfw not giving us the primary monitor, in which case
+            //   we currently never do fullscreen.
+            // - For fullscreen, we must pass the current size of the monitor *back* to
+            //   glfw or it will change resolution for us.
+            let (default_size, mode): (Vector2<u32>, glfw::WindowMode<'_>) =
+                match opt_primary_monitor {
+                    Some(monitor) if fullscreen => {
+                        let video_mode = monitor.get_video_mode().unwrap();
+                        (
+                            Vector2::new(video_mode.width, video_mode.height),
+                            WindowMode::FullScreen(monitor),
+                        )
+                    }
+                    _ => (
+                        choose_graphical_window_size(opt_primary_monitor.map(get_workarea_size)),
+                        WindowMode::Windowed,
+                    ),
+                };
+            let size: Vector2<u32> = requested_size.unwrap_or(default_size);
 
-        let (mut window, events_rx) = glfw
-            .create_window(size.x, size.y, window_title, WindowMode::Windowed)
-            .ok_or(GlfwSurfaceError::UserError(CannotCreateWindow))?;
-        window.make_current();
-        window.set_all_polling(true);
-        glfw.set_swap_interval(SwapInterval::Sync(1));
-        Ok((window, events_rx))
+            let (mut window, events_rx) = glfw
+                .create_window(size.x, size.y, window_title, mode)
+                .ok_or(GlfwSurfaceError::UserError(CannotCreateWindow))?;
+            window.make_current();
+            window.set_all_polling(true);
+            glfw.set_swap_interval(SwapInterval::Sync(1));
+            Ok((window, events_rx))
+        })
     })?;
 
     viewport_cell.set(window_size_as_viewport(&context.window));

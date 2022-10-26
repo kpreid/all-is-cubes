@@ -61,6 +61,7 @@ pub(crate) fn create_window(
     event_loop: &EventLoop<()>,
     window_title: &str,
     requested_size: Option<Vector2<u32>>,
+    fullscreen: bool,
 ) -> Result<Window, winit::error::OsError> {
     // Pick a window size.
     let inner_size = if let Some(size) = requested_size {
@@ -79,7 +80,7 @@ pub(crate) fn create_window(
     WindowBuilder::new()
         .with_inner_size(inner_size)
         .with_title(window_title)
-        //.with_visible(false)
+        .with_fullscreen(fullscreen.then_some(winit::window::Fullscreen::Borderless(None)))
         .build(event_loop)
 }
 

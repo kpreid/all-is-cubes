@@ -69,6 +69,7 @@ fn main() -> Result<(), anyhow::Error> {
     let AicDesktopArgs {
         graphics: graphics_type,
         display_size: DisplaySizeArg(display_size),
+        fullscreen,
         template,
         precompute_light,
         input_file,
@@ -152,6 +153,7 @@ fn main() -> Result<(), anyhow::Error> {
                 session,
                 &title_and_version(),
                 display_size,
+                fullscreen,
                 viewport_cell,
             )?;
             glfw_main_loop(dsession)
@@ -160,7 +162,12 @@ fn main() -> Result<(), anyhow::Error> {
             let event_loop = winit::event_loop::EventLoop::new();
             let dsession = block_on(create_winit_wgpu_desktop_session(
                 session,
-                aic_winit::create_window(&event_loop, &title_and_version(), display_size)?,
+                aic_winit::create_window(
+                    &event_loop,
+                    &title_and_version(),
+                    display_size,
+                    fullscreen,
+                )?,
                 viewport_cell,
             ))?;
             winit_main_loop(event_loop, dsession)
@@ -169,7 +176,12 @@ fn main() -> Result<(), anyhow::Error> {
             let event_loop = winit::event_loop::EventLoop::new();
             let dsession = create_winit_rt_desktop_session(
                 session,
-                aic_winit::create_window(&event_loop, &title_and_version(), display_size)?,
+                aic_winit::create_window(
+                    &event_loop,
+                    &title_and_version(),
+                    display_size,
+                    fullscreen,
+                )?,
                 viewport_cell,
             )?;
             winit_main_loop(event_loop, dsession)

@@ -45,6 +45,12 @@ pub(crate) struct AicDesktopArgs {
     #[arg(long = "display-size", value_name = "W×H", default_value = "auto")]
     pub(crate) display_size: DisplaySizeArg,
 
+    /// Make the window fullscreen.
+    ///
+    /// Causes --display-size to be ignored unless fullscreen is not possible.
+    #[arg(long)]
+    pub(crate) fullscreen: bool,
+
     /// Which world template to use.
     ///
     /// Mutually exclusive with specifying an input file.

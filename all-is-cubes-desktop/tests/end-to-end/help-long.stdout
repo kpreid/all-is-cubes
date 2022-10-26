@@ -26,6 +26,11 @@ Options:
           * In 'headless' mode, sets a time to exit rather than running infinitely.
           * In all other modes, does nothing.
 
+      --fullscreen
+          Make the window fullscreen.
+          
+          Causes --display-size to be ignored unless fullscreen is not possible.
+
   -g, --graphics <mode>
           Graphics/UI mode; one of the following keywords:
           
