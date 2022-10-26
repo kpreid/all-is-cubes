@@ -2,10 +2,6 @@ html, body {
   background: gray; /* ordinarily invisible, but makes initial loading better */
 }
 
-.viewport {
-  cursor: crosshair;
-}
-
 .overlay-bounds {
   position: relative;  /* define a new positioning root */
   overflow: hidden;
