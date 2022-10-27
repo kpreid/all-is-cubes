@@ -292,7 +292,7 @@ fn sync_viewport(dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>
     );
 }
 
-/// Output of ColorCharacterBuf
+/// Output of [`ColorCharacterBuf`]
 type TextAndColor = (String, Option<Rgba>);
 
 /// Implements `PixelBuf` for colored text output.

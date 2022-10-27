@@ -39,7 +39,8 @@ enum RecorderInner {
 }
 
 impl Recorder {
-    /// TODO: This is only implementing part of the RecordOptions (not the frame timing); refactor.
+    /// TODO: This is only implementing part of the [`RecordOptions`] (not the frame timing);
+    /// refactor.
     fn new(
         options: RecordOptions,
         cameras: StandardCameras,

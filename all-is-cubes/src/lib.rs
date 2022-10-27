@@ -141,31 +141,33 @@
     doc = "[`arbitrary::Arbitrary`]: https://docs.rs/arbitrary/1.0.2/arbitrary/trait.Arbitrary.html"
 )]
 #![cfg_attr(not(feature = "threads"), doc = "[`rayon`]: https://docs.rs/rayon/")]
-#![allow(clippy::collapsible_if)]
+// Basic lint settings, which should be identical across all all-is-cubes project crates.
+// This list is sorted.
 #![allow(clippy::collapsible_else_if)]
+#![allow(clippy::collapsible_if)]
 #![allow(clippy::needless_update)]
-#![allow(clippy::single_match)] // I like using match on Result/Option with comments
+#![allow(clippy::single_match)]
 #![deny(rust_2018_idioms)]
 #![deny(unsafe_op_in_unsafe_fn)]
-#![warn(explicit_outlives_requirements)]
-#![warn(missing_debug_implementations)]
-// TODO: warn(missing_docs), eventually
-#![warn(noop_method_call)]
-// Not warning on trivial_casts because its alternative is not always nice
-#![warn(trivial_numeric_casts)]
-// #![warn(unused_crate_dependencies)]  // noisy for dev-dependencies; enable sometimes for review
-#![warn(unused_extern_crates)]
-#![warn(unused_lifetimes)]
 #![warn(clippy::cast_lossless)]
 #![warn(clippy::doc_markdown)]
 #![warn(clippy::exhaustive_enums)]
 #![warn(clippy::exhaustive_structs)]
 #![warn(clippy::return_self_not_must_use)]
 #![warn(clippy::wrong_self_convention)]
+#![warn(explicit_outlives_requirements)]
+#![warn(missing_debug_implementations)]
+#![warn(noop_method_call)]
+#![warn(trivial_numeric_casts)]
+#![warn(unused_extern_crates)]
+#![warn(unused_lifetimes)]
+// Lenience for tests.
 #![cfg_attr(test,
-    allow(clippy::float_cmp), // Tests work with predictable floats
-    allow(clippy::redundant_clone), // Tests prefer regularity over efficiency
+    allow(clippy::float_cmp), // deterministic tests
+    allow(clippy::redundant_clone), // prefer regularity over efficiency
 )]
+// TODO: warn(missing_docs), eventually
+// #![warn(unused_crate_dependencies)]  // noisy for dev-dependencies; enable sometimes for review
 
 #[macro_use]
 pub mod math;

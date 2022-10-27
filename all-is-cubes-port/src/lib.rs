@@ -7,26 +7,33 @@
 //!
 //! [glTF 2.0]: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
 
-#![allow(clippy::collapsible_if)]
+// Basic lint settings, which should be identical across all all-is-cubes project crates.
+// This list is sorted.
 #![allow(clippy::collapsible_else_if)]
+#![allow(clippy::collapsible_if)]
 #![allow(clippy::needless_update)]
 #![allow(clippy::single_match)]
 #![deny(rust_2018_idioms)]
 #![deny(unsafe_op_in_unsafe_fn)]
-#![warn(explicit_outlives_requirements)]
-#![warn(missing_debug_implementations)]
-// TODO: warn(missing_docs), eventually
-#![warn(noop_method_call)]
-#![warn(trivial_numeric_casts)]
-#![warn(unused_crate_dependencies)]
-#![warn(unused_extern_crates)]
-#![warn(unused_lifetimes)]
 #![warn(clippy::cast_lossless)]
 #![warn(clippy::doc_markdown)]
 #![warn(clippy::exhaustive_enums)]
 #![warn(clippy::exhaustive_structs)]
 #![warn(clippy::return_self_not_must_use)]
 #![warn(clippy::wrong_self_convention)]
+#![warn(explicit_outlives_requirements)]
+#![warn(missing_debug_implementations)]
+#![warn(noop_method_call)]
+#![warn(trivial_numeric_casts)]
+#![warn(unused_extern_crates)]
+#![warn(unused_lifetimes)]
+// Lenience for tests.
+#![cfg_attr(test,
+    allow(clippy::float_cmp), // deterministic tests
+    allow(clippy::redundant_clone), // prefer regularity over efficiency
+)]
+// TODO: warn(missing_docs), eventually
+// #![warn(unused_crate_dependencies)]  // noisy for dev-dependencies; enable sometimes for review
 
 use anyhow::Context;
 use std::path::Path;
