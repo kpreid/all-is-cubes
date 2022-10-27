@@ -187,8 +187,8 @@ pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
             let i = step.cube_ahead()[axis] * direction; // always positive
             let mut color = Vector4::new(0.0, 0.0, 0.0, 1.0);
             let mut light = Vector3::new(0.0, 0.0, 0.0);
-            let mut display_name: Cow<'static, str> = (i % 10).to_string().into();
-            if i % 2 == 0 {
+            let mut display_name: Cow<'static, str> = i.rem_euclid(10).to_string().into();
+            if i.rem_euclid(2) == 0 {
                 color[axis] = if direction > 0 { 1.0 } else { 0.9 };
             } else {
                 if direction > 0 {

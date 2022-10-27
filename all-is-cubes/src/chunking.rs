@@ -474,7 +474,7 @@ mod tests {
             const CS: GridCoordinate = 32;
             let grid_distance = ChunkPos::<CS>(origin_point + Vector3::from(pos))
                 .min_distance_squared_from(ChunkPos(origin_point));
-            assert_eq!(grid_distance % CS.pow(2), 0);
+            assert_eq!(grid_distance.rem_euclid(CS.pow(2)), 0);
             grid_distance / CS.pow(2)
         }
         // Origin and all adjacent chunks are zero distance apart

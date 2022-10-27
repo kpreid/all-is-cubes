@@ -155,7 +155,7 @@ impl Icons {
 
                 Icons::PushPull => {
                     let dots = [Block::from(Rgba::BLACK), AIR];
-                    let dots = move |y: GridCoordinate| dots[(y % 2) as usize].clone();
+                    let dots = move |y: GridCoordinate| dots[y.rem_euclid(2) as usize].clone();
                     Block::builder()
                         .display_name("Push/Pull")
                         .voxels_ref(

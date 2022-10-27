@@ -12,6 +12,7 @@
 #![warn(clippy::doc_markdown)]
 #![warn(clippy::exhaustive_enums)]
 #![warn(clippy::exhaustive_structs)]
+#![warn(clippy::modulo_arithmetic)]
 #![warn(clippy::return_self_not_must_use)]
 #![warn(clippy::undocumented_unsafe_blocks)]
 #![warn(clippy::unnecessary_self_imports)]

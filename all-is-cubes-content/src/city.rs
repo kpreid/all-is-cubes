@@ -179,7 +179,7 @@ pub(crate) async fn demo_city(
             }
 
             // Lampposts
-            if (i - lamp_position_radius) % lamp_spacing == 0 {
+            if (i - lamp_position_radius).rem_euclid(lamp_spacing) == 0 {
                 for p in &[-lamp_position_radius, lamp_position_radius] {
                     lamp_brush.paint(
                         &mut space,
@@ -200,7 +200,7 @@ pub(crate) async fn demo_city(
             }
 
             // Underground lighting
-            if (i - lamp_position_radius) % 7 == 0 {
+            if (i - lamp_position_radius).rem_euclid(7) == 0 {
                 // Underground lamps
                 for (side, &p) in [-road_radius, road_radius].iter().enumerate() {
                     space.set(

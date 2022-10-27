@@ -718,8 +718,11 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
             );
             for (i, swatch_block) in colors_as_blocks.iter().enumerate() {
                 let i = i as GridCoordinate;
-                Rectangle::new(Point::new((i % 3) * 3, (i / 3) * 3), Size::new(2, 2))
-                    .draw_styled(&PrimitiveStyle::with_fill(swatch_block), &mut plane)?;
+                Rectangle::new(
+                    Point::new(i.rem_euclid(3) * 3, i.div_euclid(3) * 3),
+                    Size::new(2, 2),
+                )
+                .draw_styled(&PrimitiveStyle::with_fill(swatch_block), &mut plane)?;
             }
         }
 
@@ -992,7 +995,14 @@ pub async fn ui_blocks_exhibit(universe: &mut Universe) -> Result<Space, InGenEr
     for (index, block) in all_blocks.into_iter().enumerate() {
         let index = index as GridCoordinate;
         space
-            .set([index % row_length, index / row_length, 0], block)
+            .set(
+                [
+                    index.rem_euclid(row_length),
+                    index.div_euclid(row_length),
+                    0,
+                ],
+                block,
+            )
             .unwrap();
     }
 

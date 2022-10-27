@@ -488,7 +488,7 @@ fn handling_allocation_failure() {
     let mut u = Universe::new();
     let complex_block = Block::builder()
         .voxels_fn(&mut u, resolution, |cube| {
-            if (cube.x + cube.y + cube.z) % 2 == 0 {
+            if (cube.x + cube.y + cube.z).rem_euclid(2) == 0 {
                 Rgba::WHITE.into()
             } else {
                 AIR

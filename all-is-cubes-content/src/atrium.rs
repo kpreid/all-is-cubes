@@ -416,9 +416,11 @@ async fn install_atrium_blocks(
             ^ (p.y.rem_euclid(resolution_g) > resolution_g / 2)
         {
             // Create brick half-overlap offset
-            p.z = (p.z + resolution_g / 2) % resolution_g;
+            p.z = (p.z + resolution_g / 2).rem_euclid(resolution_g);
         }
-        let bricking = (p.x % 8).min(p.y % 8).min(p.z % 16);
+        let bricking = (p.x.rem_euclid(8))
+            .min(p.y.rem_euclid(8))
+            .min(p.z.rem_euclid(16));
         if bricking == 0 {
             &grout_base
         } else {
