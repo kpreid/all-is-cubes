@@ -174,10 +174,8 @@ impl PackedLight {
     }
 
     fn scalar_out_nn(value: PackedLightScalar) -> NotNan<f32> {
-        unsafe {
-            // Safety: a test verifies that `scalar_out` can never return NaN.
-            NotNan::new_unchecked(Self::scalar_out(value))
-        }
+        // Safety: a test verifies that `scalar_out` can never return NaN.
+        unsafe { NotNan::new_unchecked(Self::scalar_out(value)) }
     }
 }
 

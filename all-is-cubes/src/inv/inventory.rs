@@ -146,8 +146,11 @@ pub enum Slot {
 }
 
 impl Slot {
-    // TODO: when Option::unwrap is stably const, remove unsafe
-    const COUNT_ONE: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
+    const COUNT_ONE: NonZeroU16 = {
+        // Safety: is a constant
+        // TODO: when Option::unwrap is stably const, remove unsafe
+        unsafe { NonZeroU16::new_unchecked(1) }
+    };
 
     pub fn stack(count: u16, tool: Tool) -> Self {
         match NonZeroU16::new(count) {
