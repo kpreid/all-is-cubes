@@ -20,6 +20,7 @@
 #![warn(clippy::exhaustive_enums)]
 #![warn(clippy::exhaustive_structs)]
 #![warn(clippy::return_self_not_must_use)]
+#![warn(clippy::unnecessary_self_imports)]
 #![warn(clippy::wrong_self_convention)]
 #![warn(explicit_outlives_requirements)]
 #![warn(missing_debug_implementations)]
