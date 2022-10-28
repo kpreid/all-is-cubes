@@ -306,6 +306,9 @@ impl Transactional for Universe {
 }
 
 impl UniverseTransaction {
+    /// Convert from a transaction on a single member to [`UniverseTransaction`].
+    ///
+    /// The public interface to this is the other methods and [`Transaction::bind()`].
     fn from_member_txn(name: Name, transaction: MemberTxn) -> Self {
         UniverseTransaction {
             universe_id: transaction.universe_id(),
@@ -326,16 +329,16 @@ impl UniverseTransaction {
 
     /// Delete this member from the universe.
     ///
-    /// All existing references will become [`RefError::Gone`], even if the same name is
-    /// later added.
+    /// All existing references will become [`RefError::Gone`], even if a new member by
+    /// the same name is later added.
     ///
-    /// This transaction will fail if the member does not exist, or if it is anonymous
-    /// (only named entries can be deleted). In the future, there may be a policy such that
-    /// in-use items cannot be deleted.
+    /// This transaction will fail if the member is already gone, is anonymous
+    /// (only named entries can be deleted), or belongs to another universe.
+    /// In the future, there may be a policy such that in-use items cannot be deleted.
     ///
     /// [`RefError::Gone`]: crate::universe::RefError::Gone
-    pub fn delete(name: Name) -> Self {
-        Self::from_member_txn(name, MemberTxn::Delete)
+    pub fn delete<R: super::URefErased>(member_ref: R) -> Self {
+        Self::from_member_txn(member_ref.name().clone(), MemberTxn::Delete)
     }
 
     /// If this transaction contains any operations that are on a specific member of a

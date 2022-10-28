@@ -137,7 +137,7 @@ fn delete_success() {
         .unwrap();
     let _ = ref_1.try_borrow().unwrap();
 
-    UniverseTransaction::delete(name.clone())
+    UniverseTransaction::delete(ref_1.clone())
         .execute(&mut u)
         .unwrap();
     assert_eq!(
@@ -164,20 +164,38 @@ fn delete_success() {
 #[test]
 fn delete_anonymous_fails() {
     let mut u = Universe::new();
-    let name = u.insert_anonymous(BlockDef::new(AIR)).name().clone();
-    UniverseTransaction::delete(name)
+    let anon = u.insert_anonymous(BlockDef::new(AIR));
+    UniverseTransaction::delete(anon)
         .execute(&mut u)
         .unwrap_err();
 }
 
 #[test]
-fn delete_nonexistent_fails() {
+fn delete_twice_fails() {
     let mut u = Universe::new();
     let name: Name = "test_thing".into();
+    let [block] = make_some_blocks();
+    let uref = u.insert(name.clone(), BlockDef::new(block)).unwrap();
 
-    UniverseTransaction::delete(name)
-        .execute(&mut u)
-        .unwrap_err();
+    let txn = UniverseTransaction::delete(uref);
+
+    // Deletion should succeed...
+    txn.execute(&mut u).unwrap();
+    // ...but not trying to delete the same thing again.
+    txn.execute(&mut u).unwrap_err();
+}
+
+#[test]
+fn delete_wrong_universe_fails() {
+    let mut u1 = Universe::new();
+    let mut u2 = Universe::new();
+    let name: Name = "test_thing".into();
+    let [block] = make_some_blocks();
+    let uref = u1.insert(name.clone(), BlockDef::new(block)).unwrap();
+
+    let txn = UniverseTransaction::delete(uref);
+
+    txn.execute(&mut u2).unwrap_err();
 }
 
 #[test]

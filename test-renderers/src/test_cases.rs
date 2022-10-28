@@ -193,7 +193,8 @@ async fn error_character_gone(context: RenderTestContext) {
     renderer.update(None).await.unwrap();
     let _image = renderer.draw("").await.unwrap();
 
-    UniverseTransaction::delete("character".into())
+    let character_ref: URef<Character> = universe.get(&"character".into()).unwrap();
+    UniverseTransaction::delete(character_ref)
         .execute(&mut universe)
         .unwrap();
     drop(universe); // shouldn't make a difference but hey
