@@ -7,6 +7,7 @@ use once_cell::sync::Lazy;
 
 use all_is_cubes::listen::DirtyFlag;
 
+use crate::in_wgpu::frame_texture::FramebufferTextures;
 use crate::in_wgpu::glue::create_wgsl_module_from_reloadable;
 use crate::in_wgpu::vertex::WgpuBlockVertex;
 use crate::in_wgpu::vertex::WgpuLinesVertex;
@@ -147,7 +148,7 @@ impl Pipelines {
                 }),
                 primitive: block_primitive_state,
                 depth_stencil: Some(wgpu::DepthStencilState {
-                    format: super::DEPTH_FORMAT,
+                    format: FramebufferTextures::DEPTH_FORMAT,
                     depth_write_enabled: true,
                     depth_compare: wgpu::CompareFunction::Less,
                     stencil: wgpu::StencilState::default(),
@@ -194,7 +195,7 @@ impl Pipelines {
                 }),
                 primitive: block_primitive_state,
                 depth_stencil: Some(wgpu::DepthStencilState {
-                    format: super::DEPTH_FORMAT,
+                    format: FramebufferTextures::DEPTH_FORMAT,
                     // Transparent geometry is written sorted back-to-front, so writing the
                     // depth buffer is not useful, but we do *compare* depth so that existing
                     // opaque geometry obscures all transparent geometry behind it.
@@ -237,7 +238,7 @@ impl Pipelines {
                     ..<_>::default()
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
-                    format: super::DEPTH_FORMAT,
+                    format: FramebufferTextures::DEPTH_FORMAT,
                     depth_write_enabled: true,
                     depth_compare: wgpu::CompareFunction::Less,
                     stencil: wgpu::StencilState::default(),

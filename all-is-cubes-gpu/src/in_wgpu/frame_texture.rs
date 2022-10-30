@@ -131,3 +131,72 @@ impl OriginDimensions for DrawableTexture {
         }
     }
 }
+
+/// Resources for storing intermediate states of the frame being drawn, that depend on the
+/// current viewport (surface) size and must be entirely recreated if it changes.
+///
+/// The details of this structure are likely to change in parallel with
+/// [`super::EverythingRenderer`].
+#[derive(Debug)]
+pub(crate) struct FramebufferTextures {
+    /// Texture into which geometry is drawn before postprocessing.
+    ///
+    /// Is a floating-point texture allowing HDR rendering, if the backend supports that.
+    /// "Linear" in that the values stored in it are not sRGB-encoded as read and written,
+    /// though they are if that's all we can support.
+    pub(crate) linear_scene_texture_view: wgpu::TextureView,
+    pub(crate) linear_scene_texture_format: wgpu::TextureFormat,
+
+    /// Depth texture to pair with `linear_scene_texture`.
+    pub(crate) depth_texture_view: wgpu::TextureView,
+}
+
+impl FramebufferTextures {
+    /// Depth bufffer format that [`FramebufferTextures`] will always use.
+    pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
+    /// Texture usages that the `linear_scene_texture_format` must support.
+    pub(crate) const LINEAR_SCENE_TEXTURE_USAGES: wgpu::TextureUsages =
+        wgpu::TextureUsages::RENDER_ATTACHMENT.union(wgpu::TextureUsages::TEXTURE_BINDING);
+
+    /// `config` must be valid (in particular, not zero sized).
+    pub(crate) fn new(
+        device: &wgpu::Device,
+        config: &wgpu::SurfaceConfiguration,
+        linear_scene_texture_format: wgpu::TextureFormat,
+    ) -> Self {
+        let linear_scene_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("linear_scene_texture"),
+            size: wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: linear_scene_texture_format,
+            usage: Self::LINEAR_SCENE_TEXTURE_USAGES,
+        });
+        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("depth_texture"),
+            size: wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: Self::DEPTH_FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        });
+
+        Self {
+            linear_scene_texture_format,
+            linear_scene_texture_view: linear_scene_texture
+                .create_view(&wgpu::TextureViewDescriptor::default()),
+            depth_texture_view: depth_texture.create_view(&Default::default()),
+        }
+    }
+}
