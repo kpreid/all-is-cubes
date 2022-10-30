@@ -139,6 +139,9 @@ impl OriginDimensions for DrawableTexture {
 /// [`super::EverythingRenderer`].
 #[derive(Debug)]
 pub(crate) struct FramebufferTextures {
+    /// Framebuffer/viewport size, remembered for comparison purposes.
+    size: wgpu::Extent3d,
+
     /// Texture into which geometry is drawn before postprocessing.
     ///
     /// Is a floating-point texture allowing HDR rendering, if the backend supports that.
@@ -165,13 +168,14 @@ impl FramebufferTextures {
         config: &wgpu::SurfaceConfiguration,
         linear_scene_texture_format: wgpu::TextureFormat,
     ) -> Self {
+        let size = wgpu::Extent3d {
+            width: config.width,
+            height: config.height,
+            depth_or_array_layers: 1,
+        };
         let linear_scene_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("linear_scene_texture"),
-            size: wgpu::Extent3d {
-                width: config.width,
-                height: config.height,
-                depth_or_array_layers: 1,
-            },
+            size,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -180,11 +184,7 @@ impl FramebufferTextures {
         });
         let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("depth_texture"),
-            size: wgpu::Extent3d {
-                width: config.width,
-                height: config.height,
-                depth_or_array_layers: 1,
-            },
+            size,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -193,10 +193,25 @@ impl FramebufferTextures {
         });
 
         Self {
+            size,
             linear_scene_texture_format,
             linear_scene_texture_view: linear_scene_texture
                 .create_view(&wgpu::TextureViewDescriptor::default()),
             depth_texture_view: depth_texture.create_view(&Default::default()),
+        }
+    }
+
+    /// Update `self` to be as if it had been recreated with [`Self::new()`]
+    /// if any input is different in a way that requires it.
+    pub(crate) fn resize(&mut self, device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) {
+        let new_size = wgpu::Extent3d {
+            width: config.width,
+            height: config.height,
+            depth_or_array_layers: 1,
+        };
+
+        if new_size != self.size {
+            *self = Self::new(device, config, self.linear_scene_texture_format);
         }
     }
 }

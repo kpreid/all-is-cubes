@@ -430,11 +430,7 @@ impl EverythingRenderer {
                 self.config.width = size.x;
                 self.config.height = size.y;
 
-                self.fb = FramebufferTextures::new(
-                    &self.device,
-                    &self.config,
-                    self.fb.linear_scene_texture_format,
-                );
+                self.fb.resize(&self.device, &self.config);
 
                 self.info_text_texture.resize(
                     &self.device,
