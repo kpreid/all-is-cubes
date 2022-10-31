@@ -8,22 +8,25 @@ use futures::FutureExt;
 use image::RgbaImage;
 
 use all_is_cubes::apps::StandardCameras;
-use all_is_cubes::block::{Block, Resolution::R1};
+use all_is_cubes::block::{
+    Block,
+    Resolution::{R1, R2},
+};
 use all_is_cubes::camera::{
-    ExposureOption, FogOption, GraphicsOptions, LightingOption, RenderError, ToneMappingOperator,
-    TransparencyOption, Viewport,
+    AntialiasingOption, ExposureOption, FogOption, GraphicsOptions, LightingOption, RenderError,
+    ToneMappingOperator, TransparencyOption, Viewport,
 };
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector2, Vector3};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use all_is_cubes::math::{Face6, GridAab, NotNan, Rgb};
+use all_is_cubes::math::{Face6, GridAab, GridPoint, GridRotation, NotNan, Rgb};
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::transaction::Transaction;
 use all_is_cubes::universe::{RefError, URef, Universe, UniverseIndex, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::vui::{blocks::UiBlocks, Icons};
 use all_is_cubes::{notnan, rgb_const, rgba_const};
-use all_is_cubes_content::palette;
+use all_is_cubes_content::{make_some_voxel_blocks, palette};
 
 use crate::{
     finish_universe_from_space, Overlays, RenderTestContext, TestCaseCollector, UniverseFuture,
@@ -38,6 +41,14 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         });
     }
 
+    c.insert_variants(
+        "antialias",
+        u(antialias_test_universe()),
+        antialias,
+        // Note: if we wanted full coverage of response to graphics options we would
+        // also test the "if cheap" logic .
+        [AntialiasingOption::None, AntialiasingOption::Always],
+    );
     c.insert("color_srgb_ramp", None, color_srgb_ramp);
     c.insert("cursor_basic", None, cursor_basic);
     c.insert("error_character_gone", None, error_character_gone);
@@ -93,6 +104,16 @@ fn u(f: impl Future<Output = Arc<Universe>> + Send + Sync + 'static) -> Option<U
 
 // --- Test cases ---------------------------------------------------------------------------------
 // Listed in alphabetical order.
+
+async fn antialias(mut context: RenderTestContext, antialias_option: AntialiasingOption) {
+    let mut options = GraphicsOptions::default();
+    options.antialiasing = antialias_option;
+    let scene =
+        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
+    context
+        .render_comparison_test(15, scene, Overlays::NONE)
+        .await;
+}
 
 /// Generate colors which should be every sRGB component value.
 /// This should detect failures of output color mapping.
@@ -620,6 +641,69 @@ fn ui_space(universe: &mut Universe) -> URef<Space> {
         .set([0, 0, 0], Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
         .unwrap();
     universe.insert("ui_space".into(), ui_space).unwrap()
+}
+
+/// Construct a space suitable for testing antialiasing.
+/// (This shares some similarities with the [`fog_test_universe`].)
+async fn antialias_test_universe() -> Arc<Universe> {
+    let mut universe = Universe::new();
+
+    let neutral = Block::from(rgba_const!(1., 1., 1., 1.));
+    let large_block = Block::from(rgba_const!(1., 0., 0., 1.));
+    let voxel_part = Block::from(rgba_const!(0.5, 0., 1., 1.));
+    let voxel_block_1 = Block::builder()
+        .voxels_fn(&mut universe, R2, |p| {
+            if (p.x + p.y + p.z).rem_euclid(2) == 0 {
+                &voxel_part
+            } else {
+                &neutral
+            }
+        })
+        .unwrap()
+        .build();
+    let [voxel_block_2] = make_some_voxel_blocks(&mut universe);
+    let voxel_block_2 = voxel_block_2.rotate(GridRotation::RZyX);
+
+    let solid_block_pattern = |p: GridPoint| -> Option<&Block> {
+        Some(if (p.x + p.y + p.z).rem_euclid(2) == 0 {
+            &large_block
+        } else {
+            &neutral
+        })
+    };
+    let voxel_block_pattern = |p: GridPoint| -> Option<&Block> {
+        let mod3 = p.to_vec().map(|c| c.rem_euclid(3));
+        Some(if mod3.x == 0 && mod3.z == 2 {
+            &voxel_block_2
+        } else {
+            &voxel_block_1
+        })
+    };
+
+    let bounds = GridAab::from_lower_size([-5, -2, -60], [10, 10, 60]);
+    let mut space = Space::builder(bounds)
+        // No light needed or desirable because we want to focus on geometry edges
+        .light_physics(LightPhysics::None)
+        .spawn({
+            let mut spawn = Spawn::default_for_new_space(bounds);
+            spawn.set_eye_position(Point3::new(0., 0., 0.));
+            spawn.set_look_direction(Vector3::new(0.4, -0.2, -1.0));
+            spawn
+        })
+        .build();
+
+    // Bottom floor
+    space
+        .fill(bounds.abut(Face6::NY, -1).unwrap(), voxel_block_pattern)
+        .unwrap();
+
+    // Right wall
+    space
+        .fill(bounds.abut(Face6::PX, -1).unwrap(), solid_block_pattern)
+        .unwrap();
+
+    finish_universe_from_space(&mut universe, space);
+    Arc::new(universe)
 }
 
 /// Construct a space suitable for testing long-distance rendering (fog).
