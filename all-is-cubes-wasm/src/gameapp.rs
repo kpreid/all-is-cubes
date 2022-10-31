@@ -125,9 +125,8 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
                 web_sys::window().unwrap(), // TODO messy
                 document,
                 gui_helpers.canvas_helper().canvas(),
-                // This is set for parity with the all-is-cubes-desktop defaults.
-                // TODO: Probably `GraphicsOptions` should get an antialias/MSAA field.
-                WebGlContextAttributes::new().antialias(false),
+                WebGlContextAttributes::new()
+                    .antialias(cameras.graphics_options().antialiasing.is_msaa()),
             )
             .map_err(|e| Error::new(&format!("did not initialize WebGL: {}", e)))?;
 
