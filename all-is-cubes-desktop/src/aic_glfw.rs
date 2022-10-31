@@ -135,6 +135,14 @@ pub(crate) fn create_glfw_desktop_session(
                 };
             let size: Vector2<u32> = requested_size.unwrap_or(default_size);
 
+            glfw.window_hint(glfw::WindowHint::Samples(Some(
+                if session.graphics_options().get().antialiasing.is_msaa() {
+                    4
+                } else {
+                    1
+                },
+            )));
+
             let (mut window, events_rx) = glfw
                 .create_window(size.x, size.y, window_title, mode)
                 .ok_or(GlfwSurfaceError::UserError(CannotCreateWindow))?;
