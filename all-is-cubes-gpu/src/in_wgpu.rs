@@ -303,11 +303,7 @@ impl EverythingRenderer {
                 label: Some("EverythingRenderer::postprocess_bind_group_layout"),
             });
 
-        let pipelines = Pipelines::new(
-            &device,
-            linear_scene_texture_format,
-            cameras.graphics_options_source(),
-        );
+        let pipelines = Pipelines::new(&device, &fb, cameras.graphics_options_source());
 
         let mut new_self = EverythingRenderer {
             staging_belt: wgpu::util::StagingBelt::new(
@@ -461,6 +457,7 @@ impl EverythingRenderer {
             }
 
             // Might need updates based on size or options, so ask it to check unconditionally.
+            // Note: this must happen before `self.pipelines` is updated!
             if self.fb.rebuild_if_changed(
                 &self.device,
                 &self.config,
@@ -470,7 +467,7 @@ impl EverythingRenderer {
             }
         }
 
-        // Recompile shaders if needed.
+        // Recompile shaders and pipeline if needed.
         if self.postprocess_shader_dirty.get_and_clear() {
             self.postprocess_render_pipeline = Self::create_postprocess_pipeline(
                 &self.device,
@@ -478,8 +475,8 @@ impl EverythingRenderer {
                 self.config.format,
             );
         }
-        self.pipelines
-            .rebuild_if_changed(&self.device, self.fb.linear_scene_texture_format);
+        // Note: this must happen after `self.fb` is updated!
+        self.pipelines.rebuild_if_changed(&self.device, &self.fb);
 
         // Identify spaces to be rendered
         let ws = self.cameras.world_space().snapshot(); // TODO: ugly

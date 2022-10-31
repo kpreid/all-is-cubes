@@ -50,9 +50,13 @@ static BLOCKS_AND_LINES_SHADER: Lazy<Reloadable> =
     Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/blocks-and-lines.wgsl"));
 
 impl Pipelines {
+    /// * `device` is used to create pipelines.
+    /// * `fb` is used to determine what texture formats these pipelines must be compatible
+    ///   with.
+    /// * `graphics_options` is used to determine transparency behavior.
     pub fn new(
         device: &wgpu::Device,
-        linear_scene_texture_format: wgpu::TextureFormat,
+        fb: &FramebufferTextures,
         graphics_options: ListenableSource<GraphicsOptions>,
     ) -> Self {
         // TODO: This is a hazard we should remove. `Pipelines` needs to be consistent with
@@ -134,7 +138,7 @@ impl Pipelines {
         };
 
         let multisample = wgpu::MultisampleState {
-            count: FramebufferTextures::sample_count_from_options(&current_graphics_options),
+            count: fb.sample_count,
             mask: !0,
             alpha_to_coverage_enabled: false,
         };
@@ -152,7 +156,7 @@ impl Pipelines {
                     module: &shader,
                     entry_point: "block_fragment_opaque",
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: linear_scene_texture_format,
+                        format: fb.linear_scene_texture_format,
                         blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -188,7 +192,7 @@ impl Pipelines {
                         ref t => panic!("unimplemented transparency option {t:?}"),
                     },
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: linear_scene_texture_format,
+                        format: fb.linear_scene_texture_format,
                         // Note that this blending configuration is for premultiplied alpha.
                         // The fragment shader is responsible for producing premultiplied alpha outputs.
                         blend: Some(wgpu::BlendState {
@@ -239,7 +243,7 @@ impl Pipelines {
                     module: &shader,
                     entry_point: "lines_fragment",
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: linear_scene_texture_format,
+                        format: fb.linear_scene_texture_format,
                         blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -274,17 +278,13 @@ impl Pipelines {
         }
     }
 
-    pub(crate) fn rebuild_if_changed(
-        &mut self,
-        device: &wgpu::Device,
-        linear_scene_texture_format: wgpu::TextureFormat,
-    ) {
+    pub(crate) fn rebuild_if_changed(&mut self, device: &wgpu::Device, fb: &FramebufferTextures) {
         if self.dirty.get_and_clear() {
             // TODO: Maybe we should split shader compilation and other changes, and keep the
             // non-dependent parts.
             *self = Self::new(
                 device,
-                linear_scene_texture_format,
+                fb,
                 mem::replace(
                     &mut self.graphics_options,
                     ListenableSource::constant(Default::default()),
