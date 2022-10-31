@@ -3,7 +3,6 @@
 //! TODO: This code is experimental and not feature-complete.
 
 use std::mem;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use instant::Instant;
@@ -19,6 +18,7 @@ use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
 
+use crate::in_wgpu::frame_texture::FramebufferTextureFeatures;
 use crate::{
     gather_debug_lines,
     in_wgpu::{
@@ -182,21 +182,6 @@ pub struct EverythingRenderer {
     info_text_sampler: wgpu::Sampler,
 }
 
-fn texture_format_can_be_used_as_scene_texture(
-    adapter: &wgpu::Adapter,
-    format: wgpu::TextureFormat,
-) -> bool {
-    let tff = adapter.get_texture_format_features(format);
-    // TODO: If multisampling is unavailable we should still be willing to use this format
-    // if the user prefers HDR to multisampling.
-    tff.allowed_usages
-        .contains(FramebufferTextures::LINEAR_SCENE_TEXTURE_USAGES)
-        && tff.flags.contains(
-            wgpu::TextureFormatFeatureFlags::MULTISAMPLE
-                | wgpu::TextureFormatFeatureFlags::MULTISAMPLE_RESOLVE,
-        )
-}
-
 impl EverythingRenderer {
     /// A device descriptor suitable for the expectations of [`EverythingRenderer`].
     pub fn device_descriptor() -> wgpu::DeviceDescriptor<'static> {
@@ -227,33 +212,11 @@ impl EverythingRenderer {
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
         };
 
-        // Downlevel GL backend may not support rendering to float textures, so we need
-        // to check explicitly.
-        let preferred_color_format = wgpu::TextureFormat::Rgba16Float;
-        let linear_scene_texture_format = if texture_format_can_be_used_as_scene_texture(
-            adapter,
-            preferred_color_format,
-        ) {
-            preferred_color_format
-        } else {
-            // Fall back to sRGB, which loses HDR support.
-            // TODO: Also disable tone mapping since it'll make things worse.
-            // TODO: expose this "not working as intended" via RenderInfo and eventually the UI
-            // (except when user settings are such that it doesn't matter).
-            static HDR_WARNING_SENT: AtomicBool = AtomicBool::new(false);
-            if !HDR_WARNING_SENT.swap(true, Ordering::Relaxed) {
-                log::warn!(
-                    "{preferred_color_format:?} texture support unavailable; HDR rendering disabled."
-                );
-            }
-            wgpu::TextureFormat::Rgba8UnormSrgb
-        };
-
         let fb = FramebufferTextures::new(
+            FramebufferTextureFeatures::new(adapter),
             &device,
             &config,
             cameras.graphics_options(),
-            linear_scene_texture_format,
         );
 
         let postprocess_bind_group_layout =

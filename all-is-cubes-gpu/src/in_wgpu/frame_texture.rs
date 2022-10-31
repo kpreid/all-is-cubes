@@ -1,4 +1,5 @@
 use std::fmt;
+use std::sync::atomic::AtomicBool;
 
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::cgmath::Vector2;
@@ -140,6 +141,10 @@ impl OriginDimensions for DrawableTexture {
 /// [`super::EverythingRenderer`]. TODO: Find a better code organization.
 #[derive(Debug)]
 pub(crate) struct FramebufferTextures {
+    /// Info about the adapter's capabilities; used to determine which texture format to
+    /// use.
+    features: FramebufferTextureFeatures,
+
     /// Framebuffer/viewport size, remembered for comparison purposes.
     size: wgpu::Extent3d,
 
@@ -181,10 +186,10 @@ impl FramebufferTextures {
 
     /// `config` must be valid (in particular, not zero sized).
     pub(crate) fn new(
+        features: FramebufferTextureFeatures,
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
         options: &GraphicsOptions,
-        linear_scene_texture_format: wgpu::TextureFormat,
     ) -> Self {
         // When modifying this function, make sure to also update `rebuild_if_changed`
         // if it starts consulting any further graphics options.
@@ -195,6 +200,25 @@ impl FramebufferTextures {
             depth_or_array_layers: 1,
         };
         let sample_count = Self::sample_count_from_options(options);
+
+        // Choose scene texture format.
+        //
+        // If possible, we want a float-valued format to allow HDR rendering
+        // (but not necessarily HDR *output*; it may be merely tone mapped).
+        // WebGPU specifies Rgba16Float support, but wgpu downlevel backends may not
+        // support it.
+        //
+        // However, if the graphics options specify antialiasing, and the float format
+        // doesn't support multisample, then we will choose antialiasing over HDR.
+        // TODO: Instead, we should probably prefer HDR (or offer a user choice),
+        // but that will require making the sample count dependent on this conditional too.
+        let linear_scene_texture_format = if features.float_can_render
+            && (features.float_can_multisample || !options.antialiasing.is_msaa())
+        {
+            wgpu::TextureFormat::Rgba16Float
+        } else {
+            wgpu::TextureFormat::Rgba8UnormSrgb
+        };
 
         let linear_scene_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("linear_scene_texture"),
@@ -216,6 +240,7 @@ impl FramebufferTextures {
         });
 
         Self {
+            features,
             size,
             linear_scene_resolved: if sample_count > 1 {
                 Some(
@@ -296,10 +321,48 @@ impl FramebufferTextures {
         let new_sample_count = Self::sample_count_from_options(options);
 
         if new_size != self.size || new_sample_count != self.sample_count {
-            *self = Self::new(device, config, options, self.linear_scene_texture_format);
+            *self = Self::new(self.features, device, config, options);
             true
         } else {
             false
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FramebufferTextureFeatures {
+    /// True if [`wgpu::TextureFormat::Rgba16Float`] can be used for rendering.
+    float_can_render: bool,
+    /// True if [`wgpu::TextureFormat::Rgba16Float`] supports multisampling.
+    float_can_multisample: bool,
+}
+
+impl FramebufferTextureFeatures {
+    pub fn new(adapter: &wgpu::Adapter) -> Self {
+        let float_format = wgpu::TextureFormat::Rgba16Float;
+        let tff = adapter.get_texture_format_features(float_format);
+        let float_can_render = tff
+            .allowed_usages
+            .contains(FramebufferTextures::LINEAR_SCENE_TEXTURE_USAGES);
+
+        if !float_can_render {
+            // Fall back to sRGB, which loses HDR support.
+            // TODO: Also disable tone mapping since it'll make things worse.
+            // TODO: expose this "not working as intended" via RenderInfo and eventually the UI
+            // (except when user settings are such that it doesn't matter).
+            static HDR_WARNING_SENT: AtomicBool = AtomicBool::new(false);
+            if !HDR_WARNING_SENT.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                log::warn!("{float_format:?} texture support unavailable; HDR rendering disabled.");
+            }
+        }
+
+        Self {
+            float_can_render,
+            float_can_multisample: float_can_render
+                && tff.flags.contains(
+                    wgpu::TextureFormatFeatureFlags::MULTISAMPLE
+                        | wgpu::TextureFormatFeatureFlags::MULTISAMPLE_RESOLVE,
+                ),
         }
     }
 }
