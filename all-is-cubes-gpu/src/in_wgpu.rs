@@ -252,8 +252,8 @@ impl EverythingRenderer {
         let fb = FramebufferTextures::new(
             &device,
             &config,
+            cameras.graphics_options(),
             linear_scene_texture_format,
-            FramebufferTextures::sample_count_from_options(cameras.graphics_options()),
         );
 
         let postprocess_bind_group_layout =

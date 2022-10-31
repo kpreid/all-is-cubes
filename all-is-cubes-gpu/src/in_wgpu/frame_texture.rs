@@ -183,14 +183,19 @@ impl FramebufferTextures {
     pub(crate) fn new(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
+        options: &GraphicsOptions,
         linear_scene_texture_format: wgpu::TextureFormat,
-        sample_count: u32,
     ) -> Self {
+        // When modifying this function, make sure to also update `rebuild_if_changed`
+        // if it starts consulting any further graphics options.
+
         let size = wgpu::Extent3d {
             width: config.width,
             height: config.height,
             depth_or_array_layers: 1,
         };
+        let sample_count = Self::sample_count_from_options(options);
+
         let linear_scene_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("linear_scene_texture"),
             size,
@@ -291,12 +296,7 @@ impl FramebufferTextures {
         let new_sample_count = Self::sample_count_from_options(options);
 
         if new_size != self.size || new_sample_count != self.sample_count {
-            *self = Self::new(
-                device,
-                config,
-                self.linear_scene_texture_format,
-                new_sample_count,
-            );
+            *self = Self::new(device, config, options, self.linear_scene_texture_format);
             true
         } else {
             false
