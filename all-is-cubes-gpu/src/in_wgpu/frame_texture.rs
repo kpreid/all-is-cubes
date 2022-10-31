@@ -149,6 +149,11 @@ pub(crate) struct FramebufferTextures {
     /// "Linear" in that the values stored in it are not sRGB-encoded as read and written,
     /// though they are if that's all we can support.
     pub(crate) linear_scene_texture_view: wgpu::TextureView,
+
+    /// Texture format of the `linear_scene_texture_view` and `linear_scene_resolved`.
+    ///
+    /// This is a floating-point format in order to support HDR rendering, *if* the
+    /// adapter supports the necessary features (blending and multisample).
     pub(crate) linear_scene_texture_format: wgpu::TextureFormat,
 
     /// If multisampling is enabled, provides the “resolve target” companion to
@@ -161,6 +166,8 @@ pub(crate) struct FramebufferTextures {
     /// Depth texture to pair with `linear_scene_texture`.
     pub(crate) depth_texture_view: wgpu::TextureView,
 
+    /// Sample count of `linear_scene_texture_view`.
+    /// Currently always 1 or 4.
     pub(crate) sample_count: u32,
 }
 
