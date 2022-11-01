@@ -4,7 +4,9 @@ use std::fmt;
 
 use exhaust::Exhaust;
 
-use all_is_cubes::block::{Block, BlockCollision, Resolution, RotationPlacementRule, Zoom, AIR};
+use all_is_cubes::block::{
+    self, Block, BlockCollision, Resolution, RotationPlacementRule, Zoom, AIR,
+};
 use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace, Point3, Transform, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
@@ -260,9 +262,6 @@ fn map_text_block(
             &blocks[AtriumBlocks::Molding]
                 .clone()
                 .rotate(GridRotation::CLOCKWISE),
-            &blocks[AtriumBlocks::MoldingCorner]
-                .clone()
-                .rotate(GridRotation::CLOCKWISE),
         ),
         // TODO: These are supposed to be planters
         b'P' => blocks[AtriumBlocks::Firepot].clone(),
@@ -278,19 +277,31 @@ fn map_text_block(
 /// Given a block in "straight" and "corner" forms, replace empty air with the straight
 /// form and replace a rotated straight form with the corner form.
 /// TODO: explain the corner connectivity/rotation assumption
-fn possibly_corner_block(existing_block: Block, new_block: &Block, new_corner: &Block) -> Block {
+fn possibly_corner_block(existing_block: Block, new_block: &Block) -> Block {
     let adjacent_ccw = new_block.clone().rotate(GridRotation::COUNTERCLOCKWISE);
     let adjacent_cw = new_block.clone().rotate(GridRotation::CLOCKWISE);
-    if existing_block == AIR {
-        new_block.clone()
+    let placement_rot = if existing_block == AIR {
+        return new_block.clone();
     } else if existing_block == adjacent_cw {
-        new_corner.clone()
+        GridRotation::IDENTITY
     } else if existing_block == adjacent_ccw {
-        new_corner.clone().rotate(GridRotation::COUNTERCLOCKWISE)
+        GridRotation::COUNTERCLOCKWISE
     } else {
         // Don't overwrite
-        existing_block
-    }
+        return existing_block;
+    };
+
+    // Construct composite block.
+    // TODO: give this better syntax.
+    let mut composite = new_block.clone();
+    composite.modifiers_mut().push(
+        block::Composite::new(
+            new_block.clone().rotate(GridRotation::CLOCKWISE),
+            block::CompositeOperator::Over,
+        )
+        .into(),
+    );
+    composite.rotate(placement_rot)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -357,7 +368,6 @@ enum AtriumBlocks {
     SquareColumn,
     SmallColumn,
     Molding,
-    MoldingCorner,
     Firepot,
 }
 impl BlockModule for AtriumBlocks {
@@ -379,7 +389,6 @@ impl fmt::Display for AtriumBlocks {
             AtriumBlocks::SquareColumn => write!(f, "square-column"),
             AtriumBlocks::SmallColumn => write!(f, "small-column"),
             AtriumBlocks::Molding => write!(f, "molding"),
-            AtriumBlocks::MoldingCorner => write!(f, "molding-corner"),
             AtriumBlocks::Firepot => write!(f, "firepot"),
         }
     }
@@ -530,18 +539,6 @@ async fn install_atrium_blocks(
                 .collision(BlockCollision::Recur)
                 // TODO: rotation rule
                 .voxels_fn(universe, resolution, molding_fn)?
-                .build(),
-            AtriumBlocks::MoldingCorner => Block::builder()
-                .display_name("Atrium Top Edge Molding Corner")
-                .collision(BlockCollision::Recur)
-                .voxels_fn(universe, resolution, |mut p| {
-                    if p.x > p.z {
-                        p = GridRotation::COUNTERCLOCKWISE
-                            .to_positive_octant_matrix(resolution.into())
-                            .transform_cube(p);
-                    }
-                    molding_fn(p)
-                })?
                 .build(),
             AtriumBlocks::Firepot => Block::builder()
                 .display_name("Firepot")
