@@ -631,7 +631,7 @@ mod tests {
             );
 
             actual_transaction.execute(&mut tester.universe).unwrap();
-            print_space(&*tester.space(), (-1., 1., 1.));
+            print_space(&tester.space(), (-1., 1., 1.));
             assert_eq!(&tester.space()[(1, 0, 0)], &AIR);
         }
     }
@@ -767,7 +767,7 @@ mod tests {
                 ))
                 .unwrap();
             assert_eq!(tester.equip_and_use_tool(tool), Err(ToolError::Obstacle));
-            print_space(&*tester.space(), (-1., 1., 1.));
+            print_space(&tester.space(), (-1., 1., 1.));
             assert_eq!(&tester.space()[(1, 0, 0)], &existing);
             assert_eq!(&tester.space()[(0, 0, 0)], &obstacle);
         }

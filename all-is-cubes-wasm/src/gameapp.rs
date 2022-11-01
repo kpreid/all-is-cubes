@@ -373,7 +373,7 @@ impl WebGameRoot {
     {
         if let Some(strong_self_ref) = weak_self_ref.upgrade() {
             match strong_self_ref.try_borrow_mut() {
-                Ok(mut this) => body(&mut *this),
+                Ok(mut this) => body(&mut this),
                 Err(BorrowMutError { .. }) => {
                     // We probably left the cell borrowed in a previous panic.
                     // Log, but don't panic again because it will only create log spam.
