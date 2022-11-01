@@ -7,7 +7,7 @@ use image::RgbaImage;
 use tokio::sync::OnceCell;
 
 use all_is_cubes::apps::StandardCameras;
-use all_is_cubes::camera::{HeadlessRenderer, RenderError, Viewport};
+use all_is_cubes::camera::{Flaws, HeadlessRenderer, RenderError, Viewport};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use all_is_cubes_gpu::in_wgpu::{init, EverythingRenderer};
@@ -117,7 +117,10 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
         })
     }
 
-    fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<RgbaImage, RenderError>> {
+    fn draw<'a>(
+        &'a mut self,
+        info_text: &'a str,
+    ) -> BoxFuture<'a, Result<(RgbaImage, Flaws), RenderError>> {
         let viewport = self.viewport_source.snapshot();
         if self.viewport_dirty.get_and_clear() {
             self.color_texture = create_color_texture(&self.factory.device, viewport);
@@ -140,7 +143,7 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
                 viewport,
             )
             .await;
-            Ok(image)
+            Ok((image, Flaws::default()))
         })
     }
 }

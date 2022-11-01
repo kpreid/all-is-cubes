@@ -12,7 +12,7 @@ use futures::{FutureExt, StreamExt as _};
 use image::RgbaImage;
 use itertools::Itertools;
 
-use all_is_cubes::camera::HeadlessRenderer;
+use all_is_cubes::camera::{Flaws, HeadlessRenderer};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::{CustomFormat as _, StatusText};
 
@@ -85,18 +85,18 @@ impl RenderTestContext {
             .update(overlays.cursor)
             .await
             .expect("renderer update() failed");
-        let image = renderer
+        let (image, flaws) = renderer
             .draw(overlays.info_text.unwrap_or(""))
             .await
             .expect("renderer draw() failed");
 
-        self.compare_image(allowed_difference, image)
+        self.compare_image(allowed_difference, image, flaws)
     }
 
     /// Perform an image comparison and log the result, without also calling the renderer
     /// ourselves.
     #[track_caller]
-    pub fn compare_image(&mut self, allowed_difference: u8, image: RgbaImage) {
+    pub fn compare_image(&mut self, allowed_difference: u8, image: RgbaImage, flaws: Flaws) {
         let combo = ImageId {
             test_id: self.id(),
             renderer: self.renderer_factory.id(),
@@ -105,6 +105,9 @@ impl RenderTestContext {
                 self.image_serial
             },
         };
+
+        // TODO: use flaws to decide which reference image to compare against
+        let _ = flaws;
 
         let outcome = crate::compare_rendered_image(combo, allowed_difference, image);
 

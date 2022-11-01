@@ -6,6 +6,7 @@ use embedded_graphics::Drawable;
 use futures_core::future::BoxFuture;
 use image::RgbaImage;
 
+use crate::camera::Flaws;
 use crate::character::Cursor;
 use crate::universe::RefError;
 
@@ -40,7 +41,10 @@ pub trait HeadlessRenderer {
     /// TODO: provide for returning performance info?
     ///
     /// [`Universe`]: crate::universe::Universe
-    fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<RgbaImage, RenderError>>;
+    fn draw<'a>(
+        &'a mut self,
+        info_text: &'a str,
+    ) -> BoxFuture<'a, Result<(RgbaImage, Flaws), RenderError>>;
 }
 
 /// An error indicating that a [`HeadlessRenderer`] failed to operate.

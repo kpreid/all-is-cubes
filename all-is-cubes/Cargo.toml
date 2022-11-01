@@ -42,6 +42,7 @@ threads = ["dep:rayon"]
 
 [dependencies]
 arbitrary = { version = "1.1.6", optional = true, features = ["derive"] }
+bitflags = "1.3.2"
 bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
 bytemuck = { version = "1.12.1", default-features = false }
 cgmath = "0.18.0"

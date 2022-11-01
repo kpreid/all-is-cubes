@@ -12,6 +12,8 @@ use crate::chunking::OctantMask;
 use crate::math::{Aab, FreeCoordinate, GridAab, Rgba};
 use crate::raycast::Ray;
 
+mod flaws;
+pub use flaws::*;
 mod graphics_options;
 pub use graphics_options::*;
 mod renderer;

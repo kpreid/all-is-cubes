@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use image::RgbaImage;
 
 use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::block::{
@@ -277,7 +276,7 @@ async fn follow_character_change(context: RenderTestContext) {
     // Switch characters and draw the second -- the resulting sky color should be from it
     character_cell.set(Some(c2));
     renderer.update(None).await.unwrap();
-    let image: RgbaImage = renderer.draw("").await.unwrap();
+    let (image, _flaws) = renderer.draw("").await.unwrap();
 
     assert_eq!(
         image.get_pixel(0, 0),
@@ -470,8 +469,8 @@ async fn no_update(mut context: RenderTestContext) {
     finish_universe_from_space(&mut universe, space);
 
     let mut renderer = context.renderer(&universe);
-    let image = renderer.draw("").await.unwrap();
-    context.compare_image(5, image);
+    let (image, flaws) = renderer.draw("").await.unwrap();
+    context.compare_image(5, image, flaws);
 
     // Now run a normal update and see what happens.
     context
@@ -564,7 +563,7 @@ async fn zero_viewport(mut context: RenderTestContext) {
 
     // Initially zero viewport
     renderer.update(None).await.unwrap();
-    let image: RgbaImage = renderer
+    let (image, _) = renderer
         .draw(overlays.info_text.as_ref().unwrap())
         .await
         .unwrap();
@@ -579,7 +578,7 @@ async fn zero_viewport(mut context: RenderTestContext) {
     // Now try *resizing to* zero and back
     viewport_cell.set(zero);
     renderer.update(None).await.unwrap();
-    let image: RgbaImage = renderer
+    let (image, _) = renderer
         .draw(overlays.info_text.as_ref().unwrap())
         .await
         .unwrap();

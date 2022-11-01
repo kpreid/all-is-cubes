@@ -5,7 +5,10 @@ use futures_core::future::BoxFuture;
 use image::RgbaImage;
 
 use crate::apps::{Layers, StandardCameras};
-use crate::camera::{Camera, GraphicsOptions, HeadlessRenderer, RenderError, Viewport};
+use crate::camera::{
+    AntialiasingOption, Camera, Flaws, FogOption, GraphicsOptions, HeadlessRenderer, RenderError,
+    Viewport,
+};
 use crate::character::Cursor;
 use crate::content::palette;
 use crate::listen::ListenableSource;
@@ -21,11 +24,18 @@ use crate::universe::URef;
 /// following the scene and camera information in a [`StandardCameras`].
 pub struct RtRenderer<D: RtBlockData = ()> {
     rts: Layers<Option<UpdatingSpaceRaytracer<D>>>,
+
     cameras: StandardCameras,
+
     /// Adjusts the `cameras` viewport to control how many pixels are actually traced.
     /// The output images will alway
     size_policy: Box<dyn Fn(Viewport) -> Viewport + Send + Sync>,
+
     custom_options: ListenableSource<D::Options>,
+
+    /// Whether there was a [`Cursor`] to be drawn.
+    /// Raytracing doesn't yet support cursors but we need to report that.
+    had_cursor: bool,
 }
 
 impl<D: RtBlockData> RtRenderer<D>
@@ -47,6 +57,7 @@ where
             cameras,
             size_policy,
             custom_options,
+            had_cursor: false,
         }
     }
 
@@ -59,8 +70,9 @@ where
     /// This method is equivalent to [`HeadlessRenderer::update()`] except for
     /// fitting the raytracer's needs and capabilities (works with all types;
     /// not `async`).
-    pub fn update(&mut self, _cursor: Option<&Cursor>) -> Result<(), RenderError> {
+    pub fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), RenderError> {
         // TODO: raytracer needs to implement drawing the cursor
+        self.had_cursor = cursor.is_some();
         self.cameras.update();
 
         fn sync_space<D: RtBlockData>(
@@ -233,10 +245,29 @@ impl HeadlessRenderer for RtRenderer<()> {
         Box::pin(async move { self.update(cursor) })
     }
 
-    fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<RgbaImage, RenderError>> {
+    fn draw<'a>(
+        &'a mut self,
+        info_text: &'a str,
+    ) -> BoxFuture<'a, Result<(RgbaImage, Flaws), RenderError>> {
         Box::pin(async {
             let (image, _rt_info) = self.draw_rgba(|_| info_text.to_string());
-            Ok(image)
+
+            let options = self.cameras.graphics_options();
+            let mut flaws = Flaws::empty();
+            if !matches!(
+                options.antialiasing,
+                AntialiasingOption::IfCheap | AntialiasingOption::None
+            ) {
+                flaws |= Flaws::NO_ANTIALIASING;
+            }
+            if self.had_cursor {
+                flaws |= Flaws::NO_CURSOR;
+            }
+            if !matches!(options.fog, FogOption::None) {
+                flaws |= Flaws::NO_FOG;
+            }
+
+            Ok((image, flaws))
         })
     }
 }

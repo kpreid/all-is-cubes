@@ -26,7 +26,7 @@ use luminance_glfw::{GL33Context, GlfwSurface, GlfwSurfaceError};
 use send_wrapper::SendWrapper;
 
 use all_is_cubes::apps::StandardCameras;
-use all_is_cubes::camera::{HeadlessRenderer, RenderError};
+use all_is_cubes::camera::{AntialiasingOption, Flaws, HeadlessRenderer, RenderError};
 use all_is_cubes::character::Cursor;
 use all_is_cubes_gpu::in_luminance::EverythingRenderer;
 use all_is_cubes_gpu::{FrameBudget, GraphicsResourceError};
@@ -185,12 +185,15 @@ impl HeadlessRenderer for LumHeadlessRenderer {
         })
     }
 
-    fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<RgbaImage, RenderError>> {
+    fn draw<'a>(
+        &'a mut self,
+        info_text: &'a str,
+    ) -> BoxFuture<'a, Result<(RgbaImage, Flaws), RenderError>> {
         // TODO: We're supposed to do the preparation work in update() instead of render(),
         // but the luminance renderer doesn't currently support that split.
         // This doesn't matter for our test-case usage.
 
-        let mut inner = move || -> Result<RgbaImage, RenderError> {
+        let mut inner = move || -> Result<_, RenderError> {
             let UnsendRend {
                 framebuffer,
                 renderer,
@@ -236,7 +239,17 @@ impl HeadlessRenderer for LumHeadlessRenderer {
             )
             .expect("texels did not match expected image size");
             image::imageops::flip_vertical_in_place(&mut image);
-            Ok(image)
+
+            let mut flaws = Flaws::default();
+            let options = renderer.cameras().graphics_options();
+            if !matches!(options.antialiasing, AntialiasingOption::None) {
+                // Technically antialiasing may happen, but only if the context was
+                // configured at start with it, which we don't actually control.
+                // De facto, the right answer is no we don't fully support it.
+                flaws |= Flaws::NO_ANTIALIASING;
+            }
+
+            Ok((image, flaws))
         };
 
         // can't defer any of the work because the future wouldn't be Send
