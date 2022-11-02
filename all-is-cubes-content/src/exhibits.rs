@@ -5,8 +5,8 @@ use std::convert::TryFrom;
 use std::f64::consts::PI;
 
 use all_is_cubes::block::{
-    space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Modifier,
-    Resolution::*, RotationPlacementRule, Zoom, AIR,
+    space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Composite,
+    CompositeOperator, Modifier, Resolution::*, RotationPlacementRule, Zoom, AIR,
 };
 use all_is_cubes::cgmath::{
     Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Point3, Rad, Rotation as _,
@@ -53,6 +53,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     RESOLUTIONS,
     ANIMATION,
     MAKE_SOME_BLOCKS,
+    COMPOSITE,
     MOVED_BLOCKS,
     ROTATIONS,
     UI_BLOCKS,
@@ -556,6 +557,82 @@ async fn ZOOM(_: &Exhibit, universe: &mut Universe) {
         }
     }
 
+    Ok(space)
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "Modifier::Composite",
+    subtitle: "",
+)]
+async fn COMPOSITE(_: &Exhibit, universe: &mut Universe) {
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+
+    let sources = [
+        &demo_blocks[DemoBlocks::Lamp],
+        &demo_blocks[DemoBlocks::Arrow],
+        &demo_blocks[DemoBlocks::Signboard],
+    ];
+    let destinations = [
+        &demo_blocks[DemoBlocks::ExhibitBackground],
+        &demo_blocks[DemoBlocks::GlassBlock],
+        &demo_blocks[DemoBlocks::LamppostBase],
+    ];
+
+    let mut space = Space::empty(GridAab::from_lower_upper(
+        [0, 0, 0],
+        [
+            destinations.len() as GridCoordinate * 2,
+            3,
+            sources.len() as GridCoordinate * 2,
+        ],
+    ));
+    let pedestal = &demo_blocks[DemoBlocks::Pedestal];
+
+    for (di, destination) in destinations.into_iter().enumerate() {
+        for (si, source) in sources.into_iter().enumerate() {
+            let mut composite = destination.clone();
+            composite.modifiers_mut().push(
+                Composite::new(
+                    source.clone().rotate(GridRotation::CLOCKWISE),
+                    CompositeOperator::Over,
+                )
+                .into(),
+            );
+
+            // TODO: stop using draw_to_blocks for these in favor of widgets?
+            // or at least extract this to a function since 3 exhibits have them
+            let label_str = format!(
+                "{s}\nover\n{d}",
+                s = source.evaluate().unwrap().attributes.display_name,
+                d = destination.evaluate().unwrap().attributes.display_name
+            );
+            let label = draw_to_blocks(
+                universe,
+                R64,
+                0,
+                0..1,
+                BlockAttributes {
+                    display_name: label_str.clone().into(),
+                    collision: BlockCollision::None,
+                    ..BlockAttributes::default()
+                },
+                &Text::with_baseline(
+                    &label_str,
+                    Point::new(0, -(1 + 10 * 3)), // 3 lines above the bottom
+                    MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
+                    Baseline::Top,
+                ),
+            )?[GridPoint::origin()]
+            .clone();
+
+            stack(
+                &mut space,
+                GridPoint::new(di as GridCoordinate * 2, 0, si as GridCoordinate * 2),
+                [pedestal, &composite, &label],
+            )?;
+        }
+    }
     Ok(space)
 }
 
