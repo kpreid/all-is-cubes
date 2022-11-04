@@ -115,6 +115,7 @@ mod tmpl {
         actual_file_name: String,
         diff_file_name: String,
         show_expected_for_comparison: bool,
+        flawedness: String,
     }
 
     impl From<&ComparisonRecord> for TmplComparison {
@@ -126,7 +127,12 @@ mod tmpl {
                 show_expected_for_comparison: match input.outcome {
                     ComparisonOutcome::Different { .. } => true,
                     ComparisonOutcome::Equal => false,
+                    ComparisonOutcome::Flawed(_) => false,
                     ComparisonOutcome::NoExpected => true,
+                },
+                flawedness: match &input.outcome {
+                    ComparisonOutcome::Flawed(flaws) => format!("Flaws: {flaws}"),
+                    _ => String::new(),
                 },
             }
         }

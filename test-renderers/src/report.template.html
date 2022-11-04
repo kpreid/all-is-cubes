@@ -37,7 +37,10 @@
               {{- endif -}}
               <figure>
                 <img src="./{comp_record.actual_file_name}" title="Actual">
-                <figcaption>{{ if comp_record.show_expected_for_comparison }}Actual{{ endif }}</figcaption>
+                <figcaption>
+                  {{ if comp_record.show_expected_for_comparison }}Actual{{ endif }}
+                  {comp_record.flawedness}
+                </figcaption>
               </figure>
             </div>
           {{ endfor }}

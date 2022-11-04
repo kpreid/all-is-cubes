@@ -17,8 +17,8 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::{CustomFormat as _, StatusText};
 
 use crate::{
-    results_json_path, write_report_file, ComparisonRecord, ImageId, Overlays, RendererFactory,
-    RendererId, Scene, TestCaseOutput, TestId,
+    results_json_path, write_report_file, ComparisonOutcome, ComparisonRecord, ImageId, Overlays,
+    RendererFactory, RendererId, Scene, TestCaseOutput, TestId,
 };
 
 /// The Universe parameter is an optional way to receive a pre-configured universe
@@ -106,10 +106,13 @@ impl RenderTestContext {
             },
         };
 
-        // TODO: use flaws to decide which reference image to compare against
-        let _ = flaws;
+        let mut outcome = crate::compare_rendered_image(combo, allowed_difference, image);
 
-        let outcome = crate::compare_rendered_image(combo, allowed_difference, image);
+        if matches!(outcome.outcome, ComparisonOutcome::Different { .. })
+            && flaws != Flaws::default()
+        {
+            outcome.outcome = ComparisonOutcome::Flawed(format!("{flaws:?}"));
+        }
 
         self.comparison_log.lock().unwrap().push(outcome.clone());
 

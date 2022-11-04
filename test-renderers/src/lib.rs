@@ -63,11 +63,17 @@ pub struct ComparisonRecord {
     outcome: ComparisonOutcome,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ComparisonOutcome {
+    /// Images had no differences above the threshold.
     Equal,
+    /// Images were different by more than the threshold.
     Different { amount: u8 },
+    /// There was no expected image to compare against.
     NoExpected,
+    /// The images were different, but the renderer signaled a known flaw.
+    /// The string is a list of flaws, of unspecified syntax.
+    Flawed(String),
 }
 
 impl ComparisonRecord {
@@ -98,7 +104,7 @@ impl ComparisonRecord {
 
     fn panic_if_unsuccessful(&self) {
         match self.outcome {
-            ComparisonOutcome::Equal => {}
+            ComparisonOutcome::Equal | ComparisonOutcome::Flawed(_) => {}
             ComparisonOutcome::Different { amount } => {
                 // TODO: show filenames
                 panic!("Image mismatch! ({amount})");
