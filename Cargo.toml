@@ -30,7 +30,8 @@ opt-level = 2
 # precisely where the program is *likely to encounter bigger numbers than in testing*.)
 overflow-checks = true
 # Faster builds at the cost of pathname-sensitive debug info.
-split-debuginfo = "unpacked"
+# TODO: Disabled for <https://github.com/rust-lang/rust/issues/103976> in CI
+# split-debuginfo = "unpacked"
 
 [profile.release]
 # TODO: review recommended options for wasm releases
