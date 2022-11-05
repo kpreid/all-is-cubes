@@ -137,11 +137,7 @@ impl Pipelines {
             conservative: false,
         };
 
-        let multisample = wgpu::MultisampleState {
-            count: fb.sample_count,
-            mask: !0,
-            alpha_to_coverage_enabled: false,
-        };
+        let multisample = fb.linear_scene_multisample_state();
 
         let opaque_render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -156,7 +152,7 @@ impl Pipelines {
                     module: &shader,
                     entry_point: "block_fragment_opaque",
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: fb.linear_scene_texture_format,
+                        format: fb.linear_scene_texture_format(),
                         blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -192,7 +188,7 @@ impl Pipelines {
                         ref t => panic!("unimplemented transparency option {t:?}"),
                     },
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: fb.linear_scene_texture_format,
+                        format: fb.linear_scene_texture_format(),
                         // Note that this blending configuration is for premultiplied alpha.
                         // The fragment shader is responsible for producing premultiplied alpha outputs.
                         blend: Some(wgpu::BlendState {
@@ -243,7 +239,7 @@ impl Pipelines {
                     module: &shader,
                     entry_point: "lines_fragment",
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: fb.linear_scene_texture_format,
+                        format: fb.linear_scene_texture_format(),
                         blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     })],

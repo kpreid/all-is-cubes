@@ -9,7 +9,7 @@ use instant::Instant;
 use once_cell::sync::Lazy;
 
 use all_is_cubes::apps::{Layers, StandardCameras};
-use all_is_cubes::camera::info_text_drawable;
+use all_is_cubes::camera::{info_text_drawable, Flaws};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
@@ -18,7 +18,7 @@ use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
 
-use crate::in_wgpu::frame_texture::FramebufferTextureFeatures;
+use crate::in_wgpu::frame_texture::FbtFeatures;
 use crate::{
     gather_debug_lines,
     in_wgpu::{
@@ -133,6 +133,7 @@ impl SurfaceRenderer {
         let info = RenderInfo {
             update: update_info,
             draw: draw_info,
+            flaws: self.everything.flaws(),
         };
         self.everything.add_info_text_and_postprocess(
             &self.queue,
@@ -213,7 +214,7 @@ impl EverythingRenderer {
         };
 
         let fb = FramebufferTextures::new(
-            FramebufferTextureFeatures::new(adapter),
+            FbtFeatures::new(adapter),
             &device,
             &config,
             cameras.graphics_options(),
@@ -384,6 +385,11 @@ impl EverythingRenderer {
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
         })
+    }
+
+    /// Rendering flaws, current as of the last call to [`Self::update()`].
+    pub fn flaws(&self) -> Flaws {
+        self.fb.flaws()
     }
 
     /// Read current scene content, compute meshes, and send updated resources

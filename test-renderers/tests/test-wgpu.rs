@@ -143,7 +143,7 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
                 viewport,
             )
             .await;
-            Ok((image, Flaws::default()))
+            Ok((image, self.everything.flaws()))
         })
     }
 }

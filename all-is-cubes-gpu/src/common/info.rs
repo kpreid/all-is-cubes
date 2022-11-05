@@ -3,6 +3,7 @@ use std::fmt;
 use instant::Duration;
 
 use all_is_cubes::apps::Layers;
+use all_is_cubes::camera::Flaws;
 use all_is_cubes::mesh::chunked_mesh::CsmUpdateInfo;
 use all_is_cubes::util::{CustomFormat, StatusText};
 
@@ -14,6 +15,7 @@ use all_is_cubes::util::{CustomFormat, StatusText};
 pub struct RenderInfo {
     pub(crate) update: UpdateInfo,
     pub(crate) draw: DrawInfo,
+    pub flaws: Flaws,
 }
 
 /// Info about the “update” operation, where fresh scene information is gathered,
@@ -66,6 +68,7 @@ impl CustomFormat<StatusText> for RenderInfo {
                     space_info: ref draw_spaces,
                     submit_time,
                 },
+            flaws,
         } = self;
 
         let total_time = update_time
@@ -113,6 +116,8 @@ impl CustomFormat<StatusText> for RenderInfo {
             update_spaces.ui.custom_format(StatusText),
             draw_spaces.ui.custom_format(StatusText)
         )?;
+
+        write!(fmt, "\nRender flaws: {flaws:?}")?;
         Ok(())
     }
 }

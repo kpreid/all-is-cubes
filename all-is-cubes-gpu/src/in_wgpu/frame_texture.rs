@@ -1,7 +1,7 @@
 use std::fmt;
 use std::sync::atomic::AtomicBool;
 
-use all_is_cubes::camera::GraphicsOptions;
+use all_is_cubes::camera::{Flaws, GraphicsOptions};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
 
@@ -141,12 +141,8 @@ impl OriginDimensions for DrawableTexture {
 /// [`super::EverythingRenderer`]. TODO: Find a better code organization.
 #[derive(Debug)]
 pub(crate) struct FramebufferTextures {
-    /// Info about the adapter's capabilities; used to determine which texture format to
-    /// use.
-    features: FramebufferTextureFeatures,
-
-    /// Framebuffer/viewport size, remembered for comparison purposes.
-    size: wgpu::Extent3d,
+    /// Pure-data (no GPU resources) record of what format we chose.
+    config: FbtConfig,
 
     /// Texture into which geometry is drawn before postprocessing.
     ///
@@ -154,12 +150,6 @@ pub(crate) struct FramebufferTextures {
     /// "Linear" in that the values stored in it are not sRGB-encoded as read and written,
     /// though they are if that's all we can support.
     pub(crate) linear_scene_texture_view: wgpu::TextureView,
-
-    /// Texture format of the `linear_scene_texture_view` and `linear_scene_resolved`.
-    ///
-    /// This is a floating-point format in order to support HDR rendering, *if* the
-    /// adapter supports the necessary features (blending and multisample).
-    pub(crate) linear_scene_texture_format: wgpu::TextureFormat,
 
     /// If multisampling is enabled, provides the “resolve target” companion to
     /// `linear_scene_texture_view`. This texture has a sample_count of 1, is
@@ -170,10 +160,6 @@ pub(crate) struct FramebufferTextures {
 
     /// Depth texture to pair with `linear_scene_texture`.
     pub(crate) depth_texture_view: wgpu::TextureView,
-
-    /// Sample count of `linear_scene_texture_view`.
-    /// Currently always 1 or 4.
-    pub(crate) sample_count: u32,
 }
 
 impl FramebufferTextures {
@@ -186,76 +172,46 @@ impl FramebufferTextures {
 
     /// `config` must be valid (in particular, not zero sized).
     pub(crate) fn new(
-        features: FramebufferTextureFeatures,
+        features: FbtFeatures,
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
         options: &GraphicsOptions,
     ) -> Self {
-        // When modifying this function, make sure to also update `rebuild_if_changed`
-        // if it starts consulting any further graphics options.
+        Self::new_from_config(device, FbtConfig::new(config, features, options))
+    }
 
-        let size = wgpu::Extent3d {
-            width: config.width,
-            height: config.height,
-            depth_or_array_layers: 1,
-        };
-        let sample_count = Self::sample_count_from_options(options);
-
-        // Choose scene texture format.
-        //
-        // If possible, we want a float-valued format to allow HDR rendering
-        // (but not necessarily HDR *output*; it may be merely tone mapped).
-        // WebGPU specifies Rgba16Float support, but wgpu downlevel backends may not
-        // support it.
-        //
-        // However, if the graphics options specify antialiasing, and the float format
-        // doesn't support multisample, then we will choose antialiasing over HDR.
-        // TODO: Instead, we should probably prefer HDR (or offer a user choice),
-        // but that will require making the sample count dependent on this conditional too.
-        let linear_scene_texture_format = if features.float_can_render
-            && (features.float_can_multisample || !options.antialiasing.is_msaa())
-        {
-            wgpu::TextureFormat::Rgba16Float
-        } else {
-            wgpu::TextureFormat::Rgba8UnormSrgb
-        };
-
+    fn new_from_config(device: &wgpu::Device, config: FbtConfig) -> Self {
         let linear_scene_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("linear_scene_texture"),
-            size,
+            size: config.size,
             mip_level_count: 1,
-            sample_count,
+            sample_count: config.sample_count,
             dimension: wgpu::TextureDimension::D2,
-            format: linear_scene_texture_format,
+            format: config.linear_scene_texture_format,
             usage: Self::LINEAR_SCENE_TEXTURE_USAGES,
         });
         let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("depth_texture"),
-            size,
+            size: config.size,
             mip_level_count: 1,
-            sample_count,
+            sample_count: config.sample_count,
             dimension: wgpu::TextureDimension::D2,
             format: Self::DEPTH_FORMAT,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         });
 
         Self {
-            features,
-            size,
-            linear_scene_resolved: if sample_count > 1 {
+            config,
+            linear_scene_resolved: if config.sample_count > 1 {
                 Some(
                     device
                         .create_texture(&wgpu::TextureDescriptor {
                             label: Some("linear_scene_texture_resolve_target"),
-                            size: wgpu::Extent3d {
-                                width: config.width,
-                                height: config.height,
-                                depth_or_array_layers: 1,
-                            },
+                            size: config.size,
                             mip_level_count: 1,
                             sample_count: 1,
                             dimension: wgpu::TextureDimension::D2,
-                            format: linear_scene_texture_format,
+                            format: config.linear_scene_texture_format,
                             usage: Self::LINEAR_SCENE_TEXTURE_USAGES,
                         })
                         .create_view(&wgpu::TextureViewDescriptor::default()),
@@ -263,19 +219,9 @@ impl FramebufferTextures {
             } else {
                 None
             },
-            linear_scene_texture_format,
             linear_scene_texture_view: linear_scene_texture
                 .create_view(&wgpu::TextureViewDescriptor::default()),
             depth_texture_view: depth_texture.create_view(&Default::default()),
-            sample_count,
-        }
-    }
-
-    pub(crate) fn sample_count_from_options(options: &GraphicsOptions) -> u32 {
-        if options.antialiasing.is_msaa() {
-            4
-        } else {
-            1
         }
     }
 
@@ -303,6 +249,18 @@ impl FramebufferTextures {
         }
     }
 
+    pub(crate) fn linear_scene_multisample_state(&self) -> wgpu::MultisampleState {
+        wgpu::MultisampleState {
+            count: self.config.sample_count,
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        }
+    }
+
+    pub(crate) fn linear_scene_texture_format(&self) -> wgpu::TextureFormat {
+        self.config.linear_scene_texture_format
+    }
+
     /// Update `self` to be as if it had been recreated with [`Self::new()`]
     /// if any input is different in a way that requires it.
     ///
@@ -310,38 +268,132 @@ impl FramebufferTextures {
     pub(crate) fn rebuild_if_changed(
         &mut self,
         device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
+        surface_config: &wgpu::SurfaceConfiguration,
         options: &GraphicsOptions,
     ) -> bool {
-        let new_size = wgpu::Extent3d {
-            width: config.width,
-            height: config.height,
-            depth_or_array_layers: 1,
-        };
-        let new_sample_count = Self::sample_count_from_options(options);
-
-        if new_size != self.size || new_sample_count != self.sample_count {
-            *self = Self::new(self.features, device, config, options);
+        let new_config = FbtConfig::new(surface_config, self.config.features, options);
+        if new_config != self.config {
+            *self = Self::new_from_config(device, new_config);
             true
         } else {
             false
         }
     }
+
+    pub(crate) fn flaws(&self) -> Flaws {
+        self.config.flaws
+    }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct FramebufferTextureFeatures {
+/// A decision about what texture format [`FramebufferTextures`] should employ,
+/// separated from the format itself.
+///
+/// This struct's `==` can be used to decide whether re-creation is needed.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct FbtConfig {
+    /// Features remembered for future use.
+    features: FbtFeatures,
+
+    /// Size of all textures.
+    size: wgpu::Extent3d,
+
+    /// Texture format of the `linear_scene_texture_view` and `linear_scene_resolved`.
+    ///
+    /// This is a floating-point format in order to support HDR rendering, *if* the
+    /// adapter supports the necessary features (blending and multisample).
+    pub(crate) linear_scene_texture_format: wgpu::TextureFormat,
+
+    /// Sample count of `linear_scene_texture_view`.
+    /// Currently always 1 or 4.
+    pub(crate) sample_count: u32,
+
+    /// Rendering flaws resulting from necessary compromises.
+    flaws: Flaws,
+}
+
+impl FbtConfig {
+    fn new(
+        surface_config: &wgpu::SurfaceConfiguration,
+        features: FbtFeatures,
+        options: &GraphicsOptions,
+    ) -> Self {
+        let size = wgpu::Extent3d {
+            width: surface_config.width,
+            height: surface_config.height,
+            depth_or_array_layers: 1,
+        };
+
+        let wants_antialiasing = options.antialiasing.is_msaa();
+        let sample_count_if_ok = if wants_antialiasing { 4 } else { 1 };
+        // TODO: define a "wants_hdr" once we have sorted out how graphics options work for that
+
+        // If possible, we want a float-valued format to allow HDR rendering
+        // (but not necessarily HDR *output*; it may be merely tone mapped to SDR).
+        // WebGPU specifies Rgba16Float support, but wgpu downlevel backends may not
+        // support it.
+        //
+        // Furthermore, backends may or may not support multisampling together with Rgba16Float.
+        if features.float_can_render {
+            // We can definitely use Rgba16Float. But can we multisample?
+            if false {
+                // All features present -- choose HDR format and whatever sample_count
+                // is wanted.
+                Self {
+                    features,
+                    size,
+                    linear_scene_texture_format: wgpu::TextureFormat::Rgba16Float,
+                    sample_count: sample_count_if_ok,
+                    flaws: Flaws::empty(),
+                }
+            } else {
+                // Cannot multisample with HDR -- if it was requested, report flaw.
+                Self {
+                    features,
+                    size,
+                    linear_scene_texture_format: wgpu::TextureFormat::Rgba16Float,
+                    sample_count: 1,
+                    flaws: if sample_count_if_ok != 1 {
+                        Flaws::NO_ANTIALIASING
+                    } else {
+                        Flaws::empty()
+                    },
+                }
+            }
+        } else {
+            // Rendering to Rgba16Float is unavailable.
+            // TODO: report no HDR in Flaws.
+            Self {
+                features,
+                size,
+                linear_scene_texture_format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                sample_count: sample_count_if_ok,
+                flaws: Flaws::empty(),
+            }
+        }
+    }
+}
+
+/// Information about an adapter/device's capabilities, obtained from [`wgpu::Adapter`]
+/// and used by [`FramebufferTextures`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct FbtFeatures {
     /// True if [`wgpu::TextureFormat::Rgba16Float`] can be used for rendering.
     float_can_render: bool,
-    /// True if [`wgpu::TextureFormat::Rgba16Float`] supports multisampling.
+    /// True if [`wgpu::TextureFormat::Rgba16Float`] supports multisampling
+    /// and `float_can_render` is also true.
     float_can_multisample: bool,
+    /// True if [`wgpu::TextureFormat::Rgba8UnormSrgb`] supports multisampling.
+    rgba8_can_multisample: bool,
 }
 
-impl FramebufferTextureFeatures {
+impl FbtFeatures {
     pub fn new(adapter: &wgpu::Adapter) -> Self {
         let float_format = wgpu::TextureFormat::Rgba16Float;
-        let tff = adapter.get_texture_format_features(float_format);
-        let float_can_render = tff
+        let multisample_flags = wgpu::TextureFormatFeatureFlags::MULTISAMPLE
+            | wgpu::TextureFormatFeatureFlags::MULTISAMPLE_RESOLVE;
+
+        let float_tff = adapter.get_texture_format_features(float_format);
+        let float_can_render = float_tff
             .allowed_usages
             .contains(FramebufferTextures::LINEAR_SCENE_TEXTURE_USAGES);
 
@@ -358,11 +410,13 @@ impl FramebufferTextureFeatures {
 
         Self {
             float_can_render,
-            float_can_multisample: float_can_render
-                && tff.flags.contains(
-                    wgpu::TextureFormatFeatureFlags::MULTISAMPLE
-                        | wgpu::TextureFormatFeatureFlags::MULTISAMPLE_RESOLVE,
-                ),
+            float_can_multisample: float_can_render && float_tff.flags.contains(multisample_flags),
+            // Kludge: multisampling does not succeed with this software renderer.
+            rgba8_can_multisample: adapter
+                .get_texture_format_features(wgpu::TextureFormat::Rgba8UnormSrgb)
+                .flags
+                .contains(multisample_flags)
+                && adapter.get_info().name != "llvmpipe (LLVM 12.0.0, 256 bits)",
         }
     }
 }

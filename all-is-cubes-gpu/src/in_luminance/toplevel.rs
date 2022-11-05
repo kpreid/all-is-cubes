@@ -14,7 +14,7 @@ use luminance::texture::{Dim2, MagFilter, MinFilter};
 use once_cell::sync::Lazy;
 
 use all_is_cubes::apps::{Layers, StandardCameras};
-use all_is_cubes::camera::{info_text_drawable, Camera, Viewport};
+use all_is_cubes::camera::{info_text_drawable, AntialiasingOption, Camera, Flaws, Viewport};
 use all_is_cubes::cgmath::{Matrix4, SquareMatrix};
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Rgb888, prelude::Drawable};
@@ -399,6 +399,17 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
                     ui: ui_draw_info,
                 },
                 submit_time: None,
+            },
+            flaws: {
+                let mut flaws = Flaws::empty();
+                let options = self.cameras().graphics_options();
+                if !matches!(options.antialiasing, AntialiasingOption::None) {
+                    // Technically antialiasing may happen, but only if the context was
+                    // configured at start with it, which we don't actually control.
+                    // De facto, the right answer is no we don't fully support it.
+                    flaws |= Flaws::NO_ANTIALIASING;
+                }
+                flaws
             },
         })
     }
