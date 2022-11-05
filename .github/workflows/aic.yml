@@ -70,7 +70,7 @@ jobs:
       if: ${{ matrix.depversions == 'latest' }}
       run: cargo update
 
-    - uses: Swatinem/rust-cache@v1
+    - uses: Swatinem/rust-cache@v2.0.2
 
     - name: Install wasm-pack
       # Use workspace target directory for cargo install's build,
@@ -164,16 +164,12 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    # Cache the target/ dir (for xtask).
-    - uses: Swatinem/rust-cache@v1
+    # Cache both the main workspace (for xtask builds) and the fuzzing workspace
+    - uses: Swatinem/rust-cache@v2.0.2
       with:
-        key: main
-    # Cache the fuzz/target/ dir where the actual fuzz targets are built.
-    - uses: Swatinem/rust-cache@v1
-      with:
-        # additional key to distinguish ./fuzz/target from ./target
-        key: fuzz
-        target-dir: ./fuzz/target
+        workspaces: |
+          .
+          fuzz
 
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
