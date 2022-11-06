@@ -104,9 +104,7 @@ impl fmt::Debug for Session {
 impl Session {
     /// Returns a [`SessionBuilder`] with which to construct a new [`Session`].
     pub fn builder() -> SessionBuilder {
-        SessionBuilder {
-            viewport_for_ui: None,
-        }
+        SessionBuilder::default()
     }
 
     /// Returns a source for the [`Character`] that should be shown to the user.
@@ -381,10 +379,24 @@ impl Session {
 }
 
 /// Builder for providing the configuration of a new [`Session`].
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 #[must_use]
+#[allow(missing_debug_implementations)]
 pub struct SessionBuilder {
     viewport_for_ui: Option<ListenableSource<Viewport>>,
+
+    fullscreen_state: ListenableSource<FullscreenState>,
+    set_fullscreen: FullscreenSetter,
+}
+
+impl Default for SessionBuilder {
+    fn default() -> Self {
+        Self {
+            viewport_for_ui: None,
+            fullscreen_state: ListenableSource::constant(None),
+            set_fullscreen: None,
+        }
+    }
 }
 
 impl SessionBuilder {
@@ -394,6 +406,11 @@ impl SessionBuilder {
     /// multitasking, while constructing the initial state. It may safely be blocked on
     /// from a synchronous context.
     pub async fn build(self) -> Session {
+        let Self {
+            viewport_for_ui,
+            fullscreen_state,
+            set_fullscreen,
+        } = self;
         let game_universe = Universe::new();
         let game_character = ListenableCellWithLocal::new(None);
         let input_processor = InputProcessor::new();
@@ -402,7 +419,7 @@ impl SessionBuilder {
         let (control_send, control_recv) = mpsc::sync_channel(100);
 
         Session {
-            ui: match self.viewport_for_ui {
+            ui: match viewport_for_ui {
                 Some(viewport) => Some(
                     Vui::new(
                         &input_processor,
@@ -411,6 +428,8 @@ impl SessionBuilder {
                         graphics_options.as_source(),
                         control_send.clone(),
                         viewport,
+                        fullscreen_state,
+                        set_fullscreen,
                     )
                     .await,
                 ),
@@ -442,7 +461,26 @@ impl SessionBuilder {
         self.viewport_for_ui = Some(viewport);
         self
     }
+
+    /// Enable awareness of whether the session is being displayed full-screen.
+    ///
+    /// * `state` should report the current state (`true` = is full screen).
+    ///   A `None` value means the state is unknown.
+    /// * `setter` is a function which attempts to change the fullscreen state.
+    pub fn fullscreen(
+        mut self,
+        state: ListenableSource<Option<bool>>,
+        setter: Option<Arc<dyn Fn(bool) + Send + Sync>>,
+    ) -> Self {
+        self.fullscreen_state = state;
+        self.set_fullscreen = setter;
+        self
+    }
 }
+
+// TODO: these should be in one struct or something.
+pub(crate) type FullscreenState = Option<bool>;
+pub(crate) type FullscreenSetter = Option<Arc<dyn Fn(bool) + Send + Sync>>;
 
 /// A message sent to the [`Session`], such as from a user interface element.
 #[non_exhaustive]

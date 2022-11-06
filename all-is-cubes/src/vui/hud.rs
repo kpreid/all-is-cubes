@@ -1,3 +1,4 @@
+use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
 
 use cgmath::Vector2;
@@ -6,7 +7,7 @@ use embedded_graphics::prelude::{Primitive as _, Transform as _};
 use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder};
 use embedded_graphics::Drawable as _;
 
-use crate::apps::ControlMessage;
+use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR};
 use crate::camera::{GraphicsOptions, Viewport};
 use crate::character::Character;
@@ -102,7 +103,6 @@ impl HudLayout {
 /// Ad-hoc bundle of elements needed to construct HUD UI widgets.
 ///
 /// TODO: Still looking for the right general abstraction here...
-#[derive(Debug)]
 pub(crate) struct HudInputs {
     pub hud_blocks: Arc<HudBlocks>,
     pub cue_channel: CueNotifier,
@@ -112,6 +112,14 @@ pub(crate) struct HudInputs {
     pub paused: ListenableSource<bool>,
     pub page_state: ListenableSource<VuiPageState>,
     pub mouselook_mode: ListenableSource<bool>,
+    pub fullscreen_mode: ListenableSource<FullscreenState>,
+    pub set_fullscreen: FullscreenSetter,
+}
+
+impl fmt::Debug for HudInputs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HudInputs").finish_non_exhaustive()
+    }
 }
 
 #[allow(clippy::too_many_arguments, clippy::redundant_clone)]

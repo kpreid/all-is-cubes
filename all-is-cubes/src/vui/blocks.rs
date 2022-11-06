@@ -37,6 +37,7 @@ pub enum UiBlocks {
     AboutButton(ToggleButtonVisualState),
     PauseButton(ToggleButtonVisualState),
     MouselookButton(ToggleButtonVisualState),
+    FullscreenButton(ToggleButtonVisualState),
     DebugInfoTextButton(ToggleButtonVisualState),
     DebugChunkBoxesButton(ToggleButtonVisualState),
     DebugCollisionBoxesButton(ToggleButtonVisualState),
@@ -60,6 +61,7 @@ impl fmt::Display for UiBlocks {
             UiBlocks::AboutButton(state) => write!(f, "about-button/{}", state),
             UiBlocks::PauseButton(state) => write!(f, "pause-button/{}", state),
             UiBlocks::MouselookButton(state) => write!(f, "mouselook-button/{}", state),
+            UiBlocks::FullscreenButton(state) => write!(f, "fullscreen-button/{}", state),
             UiBlocks::DebugInfoTextButton(state) => write!(f, "debug-info-text-button/{}", state),
             UiBlocks::DebugChunkBoxesButton(state) => {
                 write!(f, "debug-chunk-boxes-button/{}", state)
@@ -132,6 +134,12 @@ impl UiBlocks {
                 UiBlocks::MouselookButton(state) => {
                     let mut button_builder = state.button_builder()?;
                     button_builder.draw_icon(include_image!("icons/button-mouselook.png"))?;
+                    button_builder.build(universe, "Mouselook")
+                }
+
+                UiBlocks::FullscreenButton(state) => {
+                    let mut button_builder = state.button_builder()?;
+                    button_builder.draw_icon(include_image!("icons/button-fullscreen.png"))?;
                     button_builder.build(universe, "Mouselook")
                 }
 

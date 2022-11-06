@@ -9,7 +9,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
 use ordered_float::NotNan;
 
-use crate::apps::{ControlMessage, InputProcessor};
+use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState, InputProcessor};
 use crate::block::Resolution::R16;
 use crate::camera::{FogOption, GraphicsOptions, ViewTransform, Viewport};
 use crate::character::{Character, Cursor};
@@ -83,13 +83,16 @@ impl Vui {
     ///
     /// This is an async function for the sake of cancellation and optional cooperative
     /// multitasking. It may safely be blocked on from a synchronous context.
-    pub async fn new(
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn new(
         input_processor: &InputProcessor,
         character_source: ListenableSource<Option<URef<Character>>>,
         paused: ListenableSource<bool>,
         graphics_options: ListenableSource<GraphicsOptions>,
         app_control_channel: mpsc::SyncSender<ControlMessage>,
         viewport_source: ListenableSource<Viewport>,
+        fullscreen_source: ListenableSource<FullscreenState>,
+        set_fullscreen: FullscreenSetter,
     ) -> Self {
         let mut universe = Universe::new();
         // TODO: take YieldProgress as a parameter
@@ -113,6 +116,8 @@ impl Vui {
             paused,
             page_state: state.as_source(),
             mouselook_mode: input_processor.mouselook_mode(),
+            fullscreen_mode: fullscreen_source,
+            set_fullscreen,
         };
         let hud_widget_tree = new_hud_widget_tree(
             character_source.clone(),
@@ -402,6 +407,8 @@ mod tests {
             ListenableSource::constant(GraphicsOptions::default()),
             cctx,
             ListenableSource::constant(Viewport::ARBITRARY),
+            ListenableSource::constant(None),
+            None,
         ));
         (vui, ccrx)
     }

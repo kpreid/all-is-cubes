@@ -8,7 +8,21 @@ use crate::vui::{LayoutTree, UiBlocks, Widget, WidgetTree};
 
 #[allow(clippy::redundant_clone)]
 pub(crate) fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree> {
-    vec![
+    let mut w: Vec<WidgetTree> = Vec::with_capacity(5);
+    if let Some(setter) = hud_inputs.set_fullscreen.clone() {
+        w.push(LayoutTree::leaf(widgets::ToggleButton::new(
+            hud_inputs.fullscreen_mode.clone(),
+            |opt_value| opt_value.unwrap_or(false),
+            |state| hud_inputs.hud_blocks.blocks[UiBlocks::FullscreenButton(state)].clone(),
+            {
+                let cell = hud_inputs.fullscreen_mode.clone();
+                move || {
+                    setter(!cell.get().unwrap_or(false));
+                }
+            },
+        )));
+    }
+    w.extend([
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,
             UiBlocks::DebugInfoTextButton,
@@ -33,7 +47,8 @@ pub(crate) fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree
             |g| g.debug_light_rays_at_cursor,
             |g, v| g.debug_light_rays_at_cursor = v,
         )),
-    ]
+    ]);
+    w
 }
 
 /// Generate a button that toggles a boolean graphics option.
