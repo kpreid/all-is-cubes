@@ -451,6 +451,44 @@ impl Composite {
             reverse: false,
         }
     }
+
+    /// Compose `self` and `destination`, except that:
+    ///
+    /// * If `destination` is [`AIR`], then the `self.source` block will be returned.
+    /// * If `destination` has a rotation modifier, it will be rearranged to be last.
+    ///   (In this way, there won't be any unequal-but-equivalent blocks generated due
+    ///   to rotation.)
+    ///
+    /// This operation is of limited use and is designed for world-generation purposes, not
+    /// player action (since it has no restrictions on what it can compose). Its particular
+    /// use is to build corner joint blocks.
+    ///
+    /// TODO: Generalize this so it has a filter on which things should be composed,
+    /// replaced, or left unchanged (failure).
+    ///
+    /// TODO: Figure out a way to express "sorting order" rules for swapping self and
+    /// destination, because for corner joints we don't care which is on top but we want
+    /// there to be only one kind of corner block, not two depending on operation order.
+    pub fn compose_or_replace(mut self, mut destination: Block) -> Block {
+        // If the destination had a rotation, extract it.
+        let dest_rot = if let Some(&Modifier::Rotate(dest_rot)) = destination.modifiers().last() {
+            destination.modifiers_mut().pop();
+            dest_rot
+        } else {
+            GridRotation::IDENTITY
+        };
+
+        if destination == AIR {
+            // If the destination is AIR, discard it.
+            // Note: Since we removed rotation, this is currently equivalent to
+            // Block::unspecialize(), but it might not be in the future. We could use
+            // a better solution
+            self.source
+        } else {
+            self.source = self.source.rotate(dest_rot.inverse());
+            Modifier::from(self).attach(destination).rotate(dest_rot)
+        }
+    }
 }
 
 impl From<Composite> for Modifier {

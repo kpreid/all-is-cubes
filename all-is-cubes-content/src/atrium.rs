@@ -257,12 +257,13 @@ fn map_text_block(
                     },
             )
         }
-        b'T' => possibly_corner_block(
-            existing_block,
-            &blocks[AtriumBlocks::Molding]
+        b'T' => block::Composite::new(
+            blocks[AtriumBlocks::Molding]
                 .clone()
                 .rotate(GridRotation::CLOCKWISE),
-        ),
+            block::CompositeOperator::Over,
+        )
+        .compose_or_replace(existing_block),
         // TODO: These are supposed to be planters
         b'P' => blocks[AtriumBlocks::Firepot].clone(),
         // Not-yet-implemented decoration placeholder blocks
@@ -272,36 +273,6 @@ fn map_text_block(
             std::str::from_utf8(&[ascii])
         ),
     }
-}
-
-/// Given a block in "straight" and "corner" forms, replace empty air with the straight
-/// form and replace a rotated straight form with the corner form.
-/// TODO: explain the corner connectivity/rotation assumption
-fn possibly_corner_block(existing_block: Block, new_block: &Block) -> Block {
-    let adjacent_ccw = new_block.clone().rotate(GridRotation::COUNTERCLOCKWISE);
-    let adjacent_cw = new_block.clone().rotate(GridRotation::CLOCKWISE);
-    let placement_rot = if existing_block == AIR {
-        return new_block.clone();
-    } else if existing_block == adjacent_cw {
-        GridRotation::IDENTITY
-    } else if existing_block == adjacent_ccw {
-        GridRotation::COUNTERCLOCKWISE
-    } else {
-        // Don't overwrite
-        return existing_block;
-    };
-
-    // Construct composite block.
-    // TODO: give this better syntax.
-    let mut composite = new_block.clone();
-    composite.modifiers_mut().push(
-        block::Composite::new(
-            new_block.clone().rotate(GridRotation::CLOCKWISE),
-            block::CompositeOperator::Over,
-        )
-        .into(),
-    );
-    composite.rotate(placement_rot)
 }
 
 #[allow(clippy::too_many_arguments)]

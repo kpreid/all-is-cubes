@@ -43,7 +43,6 @@ pub enum DemoBlocks {
     Arrow,
     Road,
     Curb,
-    CurbCorner,
     ExhibitBackground,
     Pedestal,
     Signboard,
@@ -293,26 +292,6 @@ pub async fn install_demo_blocks(
                 // TODO: rotation should specify curb line direction
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, curb_fn)?
-                .build(),
-
-            CurbCorner => Block::builder()
-                .display_name("Curb Corner")
-                .collision(BlockCollision::Recur)
-                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                .voxels_fn(universe, resolution, |cube| {
-                    // TODO: rework so this isn't redoing the rotation calculations for every single voxel
-                    // We should have tools for composing blocks instead...
-                    for rot in GridRotation::CLOCKWISE.iterate() {
-                        let block = curb_fn(
-                            rot.to_positive_octant_matrix(resolution.into())
-                                .transform_cube(cube),
-                        );
-                        if block != AIR {
-                            return block;
-                        }
-                    }
-                    AIR
-                })?
                 .build(),
 
             ExhibitBackground => {

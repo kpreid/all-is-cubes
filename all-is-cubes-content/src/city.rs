@@ -3,16 +3,16 @@
 
 use std::sync::Arc;
 
-use all_is_cubes::drawing::embedded_graphics::text::{Alignment, TextStyleBuilder};
-use all_is_cubes::transaction::Transaction;
-use all_is_cubes::vui::{install_widgets, widgets, Align, Gravity, LayoutGrant, WidgetTree};
 use futures_core::future::BoxFuture;
 use instant::Instant;
 
-use all_is_cubes::cgmath::{EuclideanSpace as _, One as _, Vector3};
-use all_is_cubes::drawing::embedded_graphics::{mono_font::iso_8859_1 as font, text::Baseline};
+use all_is_cubes::cgmath::{One as _, Vector3};
+use all_is_cubes::drawing::embedded_graphics::{
+    mono_font::iso_8859_1 as font,
+    text::{Alignment, Baseline, TextStyleBuilder},
+};
 
-use all_is_cubes::block::{Block, BlockAttributes, BlockCollision, Resolution::*, AIR};
+use all_is_cubes::block::{self, Block, BlockAttributes, BlockCollision, Resolution::*, AIR};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
@@ -20,14 +20,17 @@ use all_is_cubes::inv::Slot;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridPoint, GridRotation,
-    GridVector, Rgb,
+    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridRotation, GridVector,
+    Rgb,
 };
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder, SpacePhysics};
+use all_is_cubes::transaction::Transaction;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::vui::LayoutTree;
+use all_is_cubes::vui::{
+    install_widgets, widgets, Align, Gravity, LayoutGrant, LayoutTree, WidgetTree,
+};
 
 use crate::{
     clouds::clouds, logo::logo_text, noise::NoiseFnExt, space_to_space_copy, wavy_landscape,
@@ -152,7 +155,6 @@ pub(crate) async fn demo_city(
 
     // Roads and lamps
     for face in [Face6::PX, Face6::NX, Face6::PZ, Face6::NZ] {
-        let forward: GridVector = face.normal_vector();
         let perpendicular: GridVector = GridRotation::CLOCKWISE.transform(face).normal_vector();
         let road_aligned_rotation = GridRotation::from_to(Face6::NZ, face, Face6::PY).unwrap();
         let other_side_of_road =
@@ -171,9 +173,15 @@ pub(crate) async fn demo_city(
             // Curbs
             if i > road_radius {
                 for (side, &p) in [-(road_radius + 1), road_radius + 1].iter().enumerate() {
+                    let position = step.cube_ahead() + perpendicular * p + curb_y;
+
                     space.set(
-                        step.cube_ahead() + perpendicular * p + curb_y,
-                        demo_blocks[Curb].clone().rotate(rotations[side]),
+                        position,
+                        block::Composite::new(
+                            demo_blocks[Curb].clone().rotate(rotations[side]),
+                            block::CompositeOperator::Over,
+                        )
+                        .compose_or_replace(space[position].clone()),
                     )?;
                 }
             }
@@ -211,14 +219,6 @@ pub(crate) async fn demo_city(
                     )?;
                 }
             }
-        }
-
-        // Patch up curb corners
-        for &p in &[-(road_radius + 1), road_radius + 1] {
-            space.set(
-                GridPoint::origin() + curb_y + forward * (road_radius + 1) + perpendicular * p,
-                &demo_blocks[CurbCorner],
-            )?;
         }
     }
     p.progress(0.4).await;
