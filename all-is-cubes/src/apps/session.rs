@@ -62,26 +62,41 @@ pub struct Session {
     last_step_info: UniverseStepInfo,
 
     tick_counter_for_logging: u8,
-    // When adding fields, remember to update the `Debug` impl.
 }
 
 impl fmt::Debug for Session {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            frame_clock,
+            input_processor,
+            graphics_options,
+            game_universe,
+            game_character,
+            game_universe_in_progress,
+            paused,
+            ui,
+            control_channel: _,
+            control_channel_sender: _,
+            cursor_result,
+            last_step_info,
+            tick_counter_for_logging,
+        } = self;
+
         f.debug_struct("Session")
-            .field("frame_clock", &self.frame_clock)
-            .field("input_processor", &self.input_processor)
-            .field("graphics_options", &self.graphics_options)
-            .field("game_universe", &self.game_universe)
-            .field("game_character", &self.game_character)
+            .field("frame_clock", frame_clock)
+            .field("input_processor", input_processor)
+            .field("graphics_options", graphics_options)
+            .field("game_universe", game_universe)
+            .field("game_character", game_character)
             .field(
                 "game_universe_in_progress",
-                &self.game_universe_in_progress.as_ref().map(|_| "..."),
+                &game_universe_in_progress.as_ref().map(|_| "..."),
             )
-            .field("paused", &self.paused)
-            .field("ui", &self.ui)
-            .field("cursor_result", &self.cursor_result)
-            .field("last_step_info", &self.last_step_info)
-            .field("tick_counter_for_logging", &self.tick_counter_for_logging)
+            .field("paused", &paused)
+            .field("ui", &ui)
+            .field("cursor_result", &cursor_result)
+            .field("last_step_info", &last_step_info)
+            .field("tick_counter_for_logging", &tick_counter_for_logging)
             .finish_non_exhaustive()
     }
 }
