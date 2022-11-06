@@ -68,4 +68,40 @@ export class CanvasHelper {
       y / this.viewportPx[1] * -2 + 1,
     ];
   }
+
+  // Attempt to enter or leave fullscreen mode.
+  // 
+  // TODO: This and its companion isFullscreen() make document.body fullscreen, but for
+  // more flexibility we should have an explicit canvas-and-everything container element.
+  setFullscreen(shouldBeFullscreen) {
+    const document = this.canvas.ownerDocument;
+
+    if (shouldBeFullscreen) {
+      if (document.body.requestFullscreen) {
+        document.body.requestFullscreen();
+      } else if (document.body.webkitRequestFullscreen) {
+        // Safari still does not have unprefixed fullscreen API as of version 16.1
+        document.body.webkitRequestFullscreen();
+      } else {
+        // TODO: instead we should have noticed this from the start and not enabled
+        // fullscreen control
+        alert("Full screen not supported, apparently.");
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    }
+  }
+
+  isFullscreen() {
+    const document = this.canvas.ownerDocument;
+
+    // Note: this test must be consistent with what we _make_ fullscreen.
+    console.log("fse", document.webkitFullscreenElement);
+    return document.fullscreenElement === document.body
+      || document.webkitFullscreenElement === document.body;
+  }
 }

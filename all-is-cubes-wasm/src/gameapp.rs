@@ -1,5 +1,6 @@
 use std::cell::{BorrowMutError, RefCell};
 use std::rc::{Rc, Weak};
+use std::sync::Arc;
 use std::time::Duration;
 
 use js_sys::Error;
@@ -104,7 +105,8 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .loading_log
         .append_data("\nInitializing application...")?;
     app_progress.progress(0.2).await;
-    let (session, viewport_cell) = create_session(&gui_helpers, graphics_options).await;
+    let (session, viewport_cell, fullscreen_cell) =
+        create_session(&gui_helpers, graphics_options).await;
 
     static_dom
         .loading_log
@@ -158,6 +160,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         session,
         renderer,
         viewport_cell,
+        fullscreen_cell,
     );
     root.borrow().start_loop();
 
@@ -201,6 +204,7 @@ struct WebGameRoot {
     session: Session,
     renderer: WebRenderer,
     viewport_cell: ListenableCell<Viewport>,
+    fullscreen_cell: ListenableCell<Option<bool>>,
     raf_callback: Closure<dyn FnMut(f64)>,
     step_callback: Closure<dyn FnMut()>,
     step_callback_scheduled: bool,
@@ -215,6 +219,7 @@ impl WebGameRoot {
         session: Session,
         renderer: WebRenderer,
         viewport_cell: ListenableCell<Viewport>,
+        fullscreen_cell: ListenableCell<Option<bool>>,
     ) -> Rc<RefCell<WebGameRoot>> {
         // Construct a non-self-referential initial mutable object.
         let self_cell_ref = Rc::new(RefCell::new(Self {
@@ -225,6 +230,7 @@ impl WebGameRoot {
             session,
             renderer,
             viewport_cell,
+            fullscreen_cell,
             raf_callback: Closure::wrap(Box::new(|_| { /* dummy no-op for initialization */ })),
             step_callback: Closure::wrap(Box::new(|| { /* dummy no-op for initialization */ })),
             step_callback_scheduled: false,
@@ -342,6 +348,25 @@ impl WebGameRoot {
             },
             &AddEventListenerOptions::new(),
         );
+
+        // Fullscreen event listener, which goes on the document, not the canvas
+        {
+            let weak_self_ref = self.self_ref.clone();
+            let ch = self.gui_helpers.canvas_helper();
+            let target = &ch.canvas().owner_document().unwrap();
+            let listener = move |_event: Event| {
+                Self::upgrade_in_callback(&weak_self_ref, |this| {
+                    let state = Some(ch.is_fullscreen());
+                    log::warn!("got fullscreenchange {state:?}");
+                    this.fullscreen_cell.set(state);
+                })
+            };
+            let mut options = AddEventListenerOptions::new();
+            options.passive(true);
+            add_event_listener(target, "fullscreenchange", listener.clone(), &options);
+            // Safari still does not have unprefixed fullscreen API as of version 16.1
+            add_event_listener(target, "webkitfullscreenchange", listener, &options);
+        }
     }
 
     fn add_canvas_to_self_event_listener<E, F>(&self, event_name: &str, passive: bool, callback: F)
@@ -544,16 +569,30 @@ impl StaticDom {
 async fn create_session(
     gui_helpers: &GuiHelpers,
     graphics_options: GraphicsOptions,
-) -> (Session, ListenableCell<Viewport>) {
+) -> (
+    Session,
+    ListenableCell<Viewport>,
+    ListenableCell<Option<bool>>,
+) {
     // The main cost of this is constructing the `Vui` instance.
     // TODO: pipe in YieldProgress
+
     let viewport_cell = ListenableCell::new(gui_helpers.canvas_helper().viewport());
+
+    let fullscreen_cell = ListenableCell::new(Some(false)); // TODO: check
+
     let session = Session::builder()
         .ui(viewport_cell.as_source())
+        .fullscreen(fullscreen_cell.as_source(), {
+            let canvas_helper = SendWrapper::new(gui_helpers.canvas_helper());
+            Some(Arc::new(move |value: bool| {
+                canvas_helper.set_fullscreen(value)
+            }))
+        })
         .build()
         .await;
     session.graphics_options_mut().set(graphics_options);
-    (session, viewport_cell)
+    (session, viewport_cell, fullscreen_cell)
 }
 
 fn map_keyboard_event(event: &KeyboardEvent) -> Option<Key> {

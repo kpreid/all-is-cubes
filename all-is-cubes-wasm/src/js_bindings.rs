@@ -13,9 +13,14 @@ extern "C" {
     #[wasm_bindgen(method, getter, js_name = canvasHelper)]
     pub fn canvas_helper(this: &GuiHelpers) -> CanvasHelper;
 
+    #[derive(Clone)]
     pub type CanvasHelper;
     #[wasm_bindgen(method, js_name = updateViewport)]
     pub fn update_viewport(this: &CanvasHelper);
+    #[wasm_bindgen(method, js_name = setFullscreen)]
+    pub fn set_fullscreen(this: &CanvasHelper, value: bool);
+    #[wasm_bindgen(method, js_name = isFullscreen)]
+    pub fn is_fullscreen(this: &CanvasHelper) -> bool;
     #[wasm_bindgen(method, getter)]
     pub fn canvas(this: &CanvasHelper) -> HtmlCanvasElement;
     #[wasm_bindgen(method, getter, js_name = viewportPx)]
