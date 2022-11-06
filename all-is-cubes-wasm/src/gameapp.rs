@@ -14,7 +14,7 @@ use web_sys::{
 };
 
 use all_is_cubes::apps::{CursorIcon, Key, Session, StandardCameras};
-use all_is_cubes::camera::Viewport;
+use all_is_cubes::camera::{GraphicsOptions, Viewport};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::universe::UniverseStepInfo;
@@ -104,14 +104,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         .loading_log
         .append_data("\nInitializing application...")?;
     app_progress.progress(0.2).await;
-    // The main cost of this is constructing the `Vui` instance.
-    // TODO: pipe in YieldProgress
-    let viewport_cell = ListenableCell::new(gui_helpers.canvas_helper().viewport());
-    let session = Session::builder()
-        .ui(viewport_cell.as_source())
-        .build()
-        .await;
-    session.graphics_options_mut().set(graphics_options);
+    let (session, viewport_cell) = create_session(&gui_helpers, graphics_options).await;
 
     static_dom
         .loading_log
@@ -546,6 +539,21 @@ impl StaticDom {
             )?),
         })
     }
+}
+
+async fn create_session(
+    gui_helpers: &GuiHelpers,
+    graphics_options: GraphicsOptions,
+) -> (Session, ListenableCell<Viewport>) {
+    // The main cost of this is constructing the `Vui` instance.
+    // TODO: pipe in YieldProgress
+    let viewport_cell = ListenableCell::new(gui_helpers.canvas_helper().viewport());
+    let session = Session::builder()
+        .ui(viewport_cell.as_source())
+        .build()
+        .await;
+    session.graphics_options_mut().set(graphics_options);
+    (session, viewport_cell)
 }
 
 fn map_keyboard_event(event: &KeyboardEvent) -> Option<Key> {
