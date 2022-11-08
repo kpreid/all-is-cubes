@@ -61,6 +61,28 @@ pub trait TextureTile: Clone {
     fn write(&mut self, data: &[Texel]);
 }
 
+impl<T: TextureAllocator> TextureAllocator for &T {
+    type Tile = T::Tile;
+    type Point = T::Point;
+    fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
+        <T as TextureAllocator>::allocate(self, bounds)
+    }
+}
+impl<T: TextureAllocator> TextureAllocator for std::sync::Arc<T> {
+    type Tile = T::Tile;
+    type Point = T::Point;
+    fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
+        <T as TextureAllocator>::allocate(self, bounds)
+    }
+}
+impl<T: TextureAllocator> TextureAllocator for std::rc::Rc<T> {
+    type Tile = T::Tile;
+    type Point = T::Point;
+    fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
+        <T as TextureAllocator>::allocate(self, bounds)
+    }
+}
+
 pub(super) fn copy_voxels_to_texture<A: TextureAllocator>(
     texture_allocator: &A,
     voxels: &GridArray<Evoxel>,
