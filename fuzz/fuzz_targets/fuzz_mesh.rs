@@ -7,11 +7,8 @@ use all_is_cubes::mesh::{BlockMesh, BlockVertex, MeshOptions, TestTextureAllocat
 
 fuzz_target!(|input: (EvaluatedBlock, MeshOptions)| {
     let (block, options) = input;
-    let _ = BlockMesh::<BlockVertex<TtPoint>, _>::new(
-        &block,
-        &mut TestTextureAllocator::new(),
-        &options,
-    );
+    let _ =
+        BlockMesh::<BlockVertex<TtPoint>, _>::new(&block, &TestTextureAllocator::new(), &options);
 });
 
 // TODO: coverage for other mesh operations
