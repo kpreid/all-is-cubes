@@ -7,5 +7,9 @@
     "rust-analyzer.checkOnSave.command": "clippy",
     "rust-analyzer.checkOnSave.allTargets": true,
     "rust-analyzer.imports.granularity.group": "module",
-    "rust-analyzer.imports.prefix": "crate"
+    "rust-analyzer.imports.prefix": "crate",
+    "rust-analyzer.linkedProjects": [
+        "Cargo.toml",
+        "fuzz/Cargo.toml",
+    ]
 }
