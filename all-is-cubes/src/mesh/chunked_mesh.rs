@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::collections::{hash_map::Entry::*, HashMap, HashSet};
 use std::fmt;
 use std::num::NonZeroU32;
@@ -14,7 +13,9 @@ use crate::camera::Camera;
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
 use crate::listen::Listener;
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint};
-use crate::mesh::{BlockMesh, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator, TextureTile};
+use crate::mesh::{
+    BlockMesh, BlockMeshProvider, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator, TextureTile,
+};
 use crate::space::{BlockIndex, Space, SpaceChange};
 use crate::universe::URef;
 use crate::util::{ConciseDebug, CustomFormat, StatusText, TimeStats};
@@ -374,11 +375,8 @@ impl CustomFormat<StatusText> for CsmUpdateInfo {
 
 #[derive(Debug)]
 struct VersionedBlockMeshes<Vert, Tile> {
-    meshes: Vec<BlockMesh<Vert, Tile>>,
-
-    /// Version IDs used to track whether chunks have stale block meshes.
-    /// Indices are block indices and values are version numbers.
-    versioning: Vec<BlockMeshVersion>,
+    /// Indices of this vector are block IDs in the Space.
+    meshes: Vec<VersionedBlockMesh<Vert, Tile>>,
 
     last_version_counter: NonZeroU32,
 }
@@ -391,7 +389,6 @@ where
     fn new() -> Self {
         Self {
             meshes: Vec::new(),
-            versioning: Vec::new(),
             last_version_counter: NonZeroU32::new(u32::MAX).unwrap(),
         }
     }
@@ -401,14 +398,13 @@ where
     /// extra data.
     fn clear(&mut self) {
         self.meshes.clear();
-        self.versioning.clear();
     }
 
     /// Update block meshes based on the given [`Space`].
     ///
-    /// After this method returns, `self.meshes.len()` and `self.versioning.len()` will
-    /// always equal `space.block_data().len()`. They may not be fully updated yet, but
-    /// they will be the correct length.
+    /// After this method returns, `self.meshes.len()` will
+    /// always equal `space.block_data().len()`. It may not be fully updated yet, but
+    /// it will be the correct length.
     ///
     /// TODO: Missing handling for `mesh_options` changing.
     fn update<A>(
@@ -434,23 +430,11 @@ where
         let block_data = space.block_data();
 
         // Update the vector length to match the space.
-        let new_length = block_data.len();
-        let old_length = self.meshes.len();
-        match new_length.cmp(&old_length) {
-            Ordering::Less => {
-                self.meshes.truncate(new_length);
-                self.versioning.truncate(new_length);
-            }
-            Ordering::Greater => {
-                let added = old_length..new_length;
-                self.meshes
-                    .extend(added.clone().map(|_| BlockMesh::default()));
-                self.versioning
-                    .extend(added.map(|_| BlockMeshVersion::NotReady));
-            }
-            Ordering::Equal => {}
-        }
-        assert_eq!(self.meshes.len(), new_length);
+        self.meshes
+            .resize_with(block_data.len(), || VersionedBlockMesh {
+                mesh: BlockMesh::default(),
+                version: BlockMeshVersion::NotReady,
+            });
 
         // Update individual meshes.
         let mut last_start_time = Instant::now();
@@ -462,7 +446,7 @@ where
 
             let bd = &block_data[index];
             let new_evaluated_block: &EvaluatedBlock = bd.evaluated();
-            let current_mesh: &mut BlockMesh<_, _> = &mut self.meshes[index];
+            let current_mesh_entry: &mut VersionedBlockMesh<_, _> = &mut self.meshes[index];
 
             // TODO: Consider re-introducing approximate cost measurement
             // to hit the deadline better.
@@ -471,7 +455,10 @@ where
             //     None => 1,
             // };
 
-            if current_mesh.try_update_texture_only(new_evaluated_block) {
+            if current_mesh_entry
+                .mesh
+                .try_update_texture_only(new_evaluated_block)
+            {
                 // Updated the texture in-place. No need for mesh updates.
             } else {
                 let new_block_mesh =
@@ -485,11 +472,13 @@ where
                 // never reuses textures. (If it did, we'd need to consider what we want to do
                 // about stale chunks with fresh textures, which might have geometry gaps or
                 // otherwise be obviously inconsistent.)
-                if new_block_mesh != *current_mesh
-                    || self.versioning[index] == BlockMeshVersion::NotReady
+                if new_block_mesh != current_mesh_entry.mesh
+                    || current_mesh_entry.version == BlockMeshVersion::NotReady
                 {
-                    *current_mesh = new_block_mesh;
-                    self.versioning[index] = BlockMeshVersion::Numbered(self.last_version_counter);
+                    *current_mesh_entry = VersionedBlockMesh {
+                        mesh: new_block_mesh,
+                        version: BlockMeshVersion::Numbered(self.last_version_counter),
+                    };
                 } else {
                     // The new mesh is identical to the old one (which might happen because
                     // interior voxels or non-rendered attributes were changed), so don't invalidate
@@ -509,6 +498,21 @@ where
 
         stats
     }
+}
+
+impl<'a, Vert, Tile> BlockMeshProvider<'a, Vert, Tile> for &'a VersionedBlockMeshes<Vert, Tile> {
+    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<Vert, Tile>> {
+        Some(&self.meshes.get(usize::from(index))?.mesh)
+    }
+}
+
+/// Entry in [`VersionedBlockMeshes`].
+#[derive(Debug)]
+struct VersionedBlockMesh<Vert, Tile> {
+    mesh: BlockMesh<Vert, Tile>,
+    /// Version ID used to track whether chunks have stale block meshes (ones that don't
+    /// match the current definition of that block-index in the space).
+    version: BlockMeshVersion,
 }
 
 /// Together with a [`BlockIndex`], uniquely identifies a block mesh.
@@ -577,8 +581,7 @@ where
     ) {
         let compute_start: Option<Instant> = LOG_CHUNK_UPDATES.then(Instant::now);
         let bounds = self.position.bounds();
-        self.mesh
-            .compute(space, bounds, options, &*block_meshes.meshes);
+        self.mesh.compute(space, bounds, options, block_meshes);
 
         // Logging
         if let Some(start) = compute_start {
@@ -608,7 +611,7 @@ where
         self.block_dependencies.extend(
             self.mesh
                 .blocks_used_iter()
-                .map(|index| (index, block_meshes.versioning[usize::from(index)])),
+                .map(|index| (index, block_meshes.meshes[usize::from(index)].version)),
         );
 
         chunk_todo.recompute_mesh = false;
@@ -628,11 +631,11 @@ where
     fn stale_blocks(&self, block_meshes: &VersionedBlockMeshes<Vert, Tex::Tile>) -> bool {
         self.block_dependencies
             .iter()
-            .any(|&(index, version)| block_meshes.versioning[usize::from(index)] != version)
+            .any(|&(index, version)| block_meshes.meshes[usize::from(index)].version != version)
         // Note: We could also check here to avoid recomputing the mesh while we're still
         // working on blocks that the mesh needs,
         // && self.block_dependencies.iter().all(|&(index, _version)| {
-        //     block_meshes.versioning[usize::from(index)] != BlockMeshVersion::NotReady
+        //     block_meshes.meshes[usize::from(index)].version != BlockMeshVersion::NotReady
         // })
         // but empirically, I tried that and the startup performance is near-identical.
     }
