@@ -190,7 +190,7 @@ impl Recorder {
                 // not here
                 rec.csm.update_blocks_and_some_chunks(
                     &rec.cameras.cameras().world,
-                    &mut rec.tex,
+                    &rec.tex,
                     Instant::now() + Duration::from_secs(86400),
                     |u| {
                         if u.indices_only {

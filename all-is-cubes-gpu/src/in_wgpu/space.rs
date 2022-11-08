@@ -203,7 +203,7 @@ impl SpaceRenderer {
         // Update chunks
         let csm_info = self.csm.update_blocks_and_some_chunks(
             camera,
-            &mut self.block_texture,
+            &self.block_texture,
             deadline, // TODO: decrease deadline by some guess at texture writing time
             |u| {
                 if u.indices_only {

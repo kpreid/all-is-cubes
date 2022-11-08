@@ -27,7 +27,7 @@ fn mesh_benches(c: &mut Criterion) {
             |()| {
                 BlockMesh::<BlockVertex<TtPoint>, _>::new(
                     &ev,
-                    &mut TestTextureAllocator::new(),
+                    &TestTextureAllocator::new(),
                     options,
                 )
             },
@@ -48,7 +48,7 @@ fn mesh_benches(c: &mut Criterion) {
             |()| {
                 BlockMesh::<BlockVertex<TtPoint>, _>::new(
                     &ev,
-                    &mut TestTextureAllocator::new(),
+                    &TestTextureAllocator::new(),
                     options,
                 )
             },
@@ -118,7 +118,7 @@ fn checkerboard_space_bench_setup(
         }),
     ]);
 
-    let block_meshes = block_meshes_for_space(&space, &mut TestTextureAllocator::new(), options);
+    let block_meshes = block_meshes_for_space(&space, &TestTextureAllocator::new(), options);
 
     (space, block_meshes)
 }

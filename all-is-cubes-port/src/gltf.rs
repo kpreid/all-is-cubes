@@ -333,7 +333,7 @@ mod tests {
         Index<gltf_json::Mesh>,
     ) {
         let options = &MeshOptions::new(&GraphicsOptions::default());
-        let blocks = block_meshes_for_space(space, &mut writer.texture_allocator(), options);
+        let blocks = block_meshes_for_space(space, &writer.texture_allocator(), options);
         let mesh: SpaceMesh<GltfVertex, GltfTextureRef> =
             SpaceMesh::new(space, space.bounds(), options, &*blocks);
 

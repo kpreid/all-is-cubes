@@ -151,7 +151,7 @@ where
     /// Generate the [`BlockMesh`] for a block's current appearance.
     ///
     /// This may then be may be used as input to [`SpaceMesh::new`](super::SpaceMesh::new).
-    pub fn new<A>(block: &EvaluatedBlock, texture_allocator: &mut A, options: &MeshOptions) -> Self
+    pub fn new<A>(block: &EvaluatedBlock, texture_allocator: &A, options: &MeshOptions) -> Self
     where
         A: TextureAllocator<Tile = T>,
     {
@@ -453,7 +453,7 @@ impl<V, T> Default for BlockMesh<V, T> {
 /// [`BlockIndex`](crate::space::BlockIndex) values.
 pub fn block_meshes_for_space<V, A>(
     space: &Space,
-    texture_allocator: &mut A,
+    texture_allocator: &A,
     options: &MeshOptions,
 ) -> BlockMeshes<V, A::Tile>
 where

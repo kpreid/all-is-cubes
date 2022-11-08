@@ -46,7 +46,7 @@ fn v_t(
 fn test_block_mesh(block: Block) -> BlockMesh<BlockVertex<TtPoint>, TestTextureTile> {
     BlockMesh::new(
         &block.evaluate().unwrap(),
-        &mut TestTextureAllocator::new(),
+        &TestTextureAllocator::new(),
         &MeshOptions {
             transparency: TransparencyOption::Volumetric,
             ..MeshOptions::dont_care_for_test()
@@ -59,7 +59,7 @@ fn test_block_mesh(block: Block) -> BlockMesh<BlockVertex<TtPoint>, TestTextureT
 fn test_block_mesh_threshold(block: Block) -> BlockMesh<BlockVertex<TtPoint>, TestTextureTile> {
     BlockMesh::new(
         &block.evaluate().unwrap(),
-        &mut TestTextureAllocator::new(),
+        &TestTextureAllocator::new(),
         &MeshOptions {
             transparency: TransparencyOption::Threshold(notnan!(0.5)),
             ..MeshOptions::dont_care_for_test()
@@ -77,8 +77,8 @@ fn mesh_blocks_and_space(
     SpaceMesh<BlockVertex<TtPoint>, TestTextureTile>,
 ) {
     let options = &MeshOptions::new(&GraphicsOptions::default());
-    let mut tex = TestTextureAllocator::new();
-    let block_meshes = block_meshes_for_space(space, &mut tex, options);
+    let tex = TestTextureAllocator::new();
+    let block_meshes = block_meshes_for_space(space, &tex, options);
     let space_mesh: SpaceMesh<BlockVertex<TtPoint>, TestTextureTile> =
         SpaceMesh::new(space, space.bounds(), options, &*block_meshes);
     (tex, block_meshes, space_mesh)
@@ -131,7 +131,7 @@ fn no_panic_on_missing_blocks() {
     let mut space = Space::empty_positive(2, 1, 1);
     let block_meshes: BlockMeshes<BlockVertex<TtPoint>, _> = block_meshes_for_space(
         &space,
-        &mut TestTextureAllocator::new(),
+        &TestTextureAllocator::new(),
         &MeshOptions::dont_care_for_test(),
     );
     assert_eq!(block_meshes.len(), 1); // check our assumption
@@ -505,7 +505,7 @@ fn handling_allocation_failure() {
     let capacity = 0;
     tex.set_capacity(capacity);
     let block_meshes: BlockMeshes<BlockVertex<TtPoint>, _> =
-        block_meshes_for_space(&space, &mut tex, &MeshOptions::dont_care_for_test());
+        block_meshes_for_space(&space, &tex, &MeshOptions::dont_care_for_test());
 
     // Check results.
     assert_eq!(tex.count_allocated(), capacity);

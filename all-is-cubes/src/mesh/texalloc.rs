@@ -62,7 +62,7 @@ pub trait TextureTile: Clone {
 }
 
 pub(super) fn copy_voxels_to_texture<A: TextureAllocator>(
-    texture_allocator: &mut A,
+    texture_allocator: &A,
     voxels: &GridArray<Evoxel>,
 ) -> Option<A::Tile> {
     texture_allocator

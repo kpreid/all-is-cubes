@@ -138,7 +138,7 @@ where
     pub fn update_blocks_and_some_chunks<F>(
         &mut self,
         camera: &Camera,
-        block_texture_allocator: &mut Tex,
+        block_texture_allocator: &Tex,
         deadline: Instant,
         mut chunk_render_updater: F,
     ) -> CsmUpdateInfo
@@ -411,7 +411,7 @@ where
         &mut self,
         todo: &mut FnvHashSet<BlockIndex>,
         space: &Space,
-        block_texture_allocator: &mut A,
+        block_texture_allocator: &A,
         mesh_options: &MeshOptions,
         deadline: Instant,
     ) -> TimeStats
@@ -918,7 +918,7 @@ mod tests {
         {
             self.csm.update_blocks_and_some_chunks(
                 &self.camera,
-                &mut NoTextures,
+                &NoTextures,
                 // In theory we should have a “fake time source” for testing purposes,
                 // but this will do until we have tests of the actual timing logic.
                 Instant::now() + Duration::from_secs(1_000_000),
