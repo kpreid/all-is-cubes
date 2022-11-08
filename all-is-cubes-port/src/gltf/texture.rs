@@ -29,7 +29,7 @@ impl TextureAllocator for GltfTextureAllocator {
     type Tile = GltfTextureRef;
     type Point = TexPoint;
 
-    fn allocate(&mut self, _bounds: GridAab) -> Option<GltfTextureRef> {
+    fn allocate(&self, _bounds: GridAab) -> Option<GltfTextureRef> {
         //let result = GltfTextureRef { bounds };
         //Some(result)
         None // TODO: do nothing until the texture allocation actually works.

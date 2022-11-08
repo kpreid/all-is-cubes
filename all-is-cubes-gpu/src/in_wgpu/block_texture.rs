@@ -32,7 +32,6 @@ pub struct AtlasAllocator {
     // CPU allocation tracking
     /// Note on lock ordering: Do not attempt to acquire this lock while a tile's lock is held.
     backing: Arc<Mutex<AllocatorBacking>>,
-    in_use: Vec<Weak<Mutex<TileBacking>>>,
 }
 
 /// Texture tile handle used by [`AtlasAllocator`].
@@ -73,9 +72,16 @@ struct TileBacking {
 /// Data shared by [`AtlasAllocator`] and all its [`AtlasTile`]s.
 #[derive(Debug)]
 struct AllocatorBacking {
+    /// Tracks which regions of the texture are free or allocated.
+    alloctree: Alloctree,
+
     /// Whether flush needs to do anything.
     dirty: bool,
-    alloctree: Alloctree,
+
+    /// Weak references to every tile.
+    /// This is used to gather all data that needs to be flushed (written to the GPU
+    /// texture).
+    in_use: Vec<Weak<Mutex<TileBacking>>>,
 }
 
 impl AtlasAllocator {
@@ -128,10 +134,10 @@ impl AtlasAllocator {
             texture_view,
             sampler,
             backing: Arc::new(Mutex::new(AllocatorBacking {
-                dirty: false,
                 alloctree,
+                dirty: false,
+                in_use: Vec::new(),
             })),
-            in_use: Vec::new(),
         })
     }
 
@@ -142,7 +148,7 @@ impl AtlasAllocator {
 
         let mut count_written = 0;
         if allocator_backing.dirty {
-            self.in_use.retain(|weak_backing| {
+            allocator_backing.in_use.retain(|weak_backing| {
                 // Process the non-dropped weak references
                 weak_backing.upgrade().map_or(false, |strong_backing| {
                     let backing: &mut TileBacking = &mut strong_backing.lock().unwrap();
@@ -168,7 +174,7 @@ impl AtlasAllocator {
         BlockTextureInfo {
             flushed: count_written,
             flush_time: Instant::now().duration_since(start_time),
-            in_use_tiles: self.in_use.len(),
+            in_use_tiles: allocator_backing.in_use.len(),
             in_use_texels: allocator_backing.alloctree.occupied_volume(),
             capacity_texels: allocator_backing.alloctree.bounds().volume(),
         }
@@ -179,12 +185,12 @@ impl TextureAllocator for AtlasAllocator {
     type Tile = AtlasTile;
     type Point = TexPoint;
 
-    fn allocate(&mut self, requested_bounds: GridAab) -> Option<AtlasTile> {
-        let alloctree = &mut self.backing.lock().unwrap().alloctree;
-        let handle = alloctree.allocate(requested_bounds)?;
+    fn allocate(&self, requested_bounds: GridAab) -> Option<AtlasTile> {
+        let mut allocator_backing = self.backing.lock().unwrap();
+        let handle = allocator_backing.alloctree.allocate(requested_bounds)?;
         let result = AtlasTile {
             offset: handle.offset.map(|c| c as TextureCoordinate),
-            scale: (alloctree.bounds().size().x as TextureCoordinate).recip(),
+            scale: (allocator_backing.alloctree.bounds().size().x as TextureCoordinate).recip(),
             backing: Arc::new(Mutex::new(TileBacking {
                 handle: Some(handle),
                 data: None,
@@ -192,7 +198,9 @@ impl TextureAllocator for AtlasAllocator {
                 allocator: Arc::downgrade(&self.backing),
             })),
         };
-        self.in_use.push(Arc::downgrade(&result.backing));
+        allocator_backing
+            .in_use
+            .push(Arc::downgrade(&result.backing));
         Some(result)
     }
 }

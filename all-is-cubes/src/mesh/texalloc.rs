@@ -5,6 +5,7 @@
 // both of them.
 
 use std::fmt;
+use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 
 use cgmath::Point3;
 
@@ -35,7 +36,7 @@ pub trait TextureAllocator {
     /// texture coordinate transformation convenient for the caller.
     ///
     /// Returns [`None`] if no space is available for another tile.
-    fn allocate(&mut self, bounds: GridAab) -> Option<Self::Tile>;
+    fn allocate(&self, bounds: GridAab) -> Option<Self::Tile>;
 }
 
 /// 3D texture slice to paint a block's voxels in. When all clones of this value are
@@ -108,7 +109,7 @@ impl TextureAllocator for NoTextures {
     type Tile = NoTexture;
     type Point = NoTexture;
 
-    fn allocate(&mut self, _: GridAab) -> Option<Self::Tile> {
+    fn allocate(&self, _: GridAab) -> Option<Self::Tile> {
         None
     }
 }
@@ -147,17 +148,17 @@ impl CustomFormat<ConciseDebug> for NoTexture {
 /// This type is public so that it may be used in benchmarks and such, but not intended to be used
 /// outside of All is Cubes itself.
 #[doc(hidden)]
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct TestTextureAllocator {
     capacity: usize,
-    count_allocated: usize,
+    count_allocated: AtomicUsize,
 }
 
 impl TestTextureAllocator {
     pub const fn new() -> Self {
         Self {
             capacity: usize::MAX,
-            count_allocated: 0,
+            count_allocated: AtomicUsize::new(0),
         }
     }
 
@@ -168,7 +169,7 @@ impl TestTextureAllocator {
 
     /// Number of tiles allocated. Does not decrement for deallocations.
     pub fn count_allocated(&self) -> usize {
-        self.count_allocated
+        self.count_allocated.load(SeqCst)
     }
 }
 
@@ -182,13 +183,18 @@ impl TextureAllocator for TestTextureAllocator {
     type Tile = TestTextureTile;
     type Point = TtPoint;
 
-    fn allocate(&mut self, bounds: GridAab) -> Option<Self::Tile> {
-        if self.count_allocated == self.capacity {
-            None
-        } else {
-            self.count_allocated += 1;
-            Some(TestTextureTile { bounds })
-        }
+    fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
+        self.count_allocated
+            .fetch_update(SeqCst, SeqCst, |count| {
+                if count < self.capacity {
+                    Some(count + 1)
+                } else {
+                    None
+                }
+            })
+            .ok()
+            .map(|_| ())?;
+        Some(TestTextureTile { bounds })
     }
 }
 
