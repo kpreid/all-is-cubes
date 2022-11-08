@@ -50,7 +50,7 @@ pub(crate) struct SpaceRenderer {
     /// Cached copy of `space.physics.sky_color`.
     pub(crate) sky_color: Rgb,
 
-    block_texture: AtlasAllocator,
+    block_texture: Arc<AtlasAllocator>,
     light_texture: SpaceLightTexture,
 
     /// Buffer containing the [`ShaderSpaceCamera`] configured for this Space.
@@ -80,12 +80,12 @@ impl SpaceRenderer {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         pipelines: &Pipelines,
+        block_texture: Arc<AtlasAllocator>,
     ) -> Result<Self, GraphicsResourceError> {
         let space_borrowed = space
             .try_borrow()
             .map_err(GraphicsResourceError::read_err)?;
 
-        let block_texture = AtlasAllocator::new(&space_label, device, queue)?;
         let light_texture = SpaceLightTexture::new(&space_label, device, space_borrowed.bounds());
 
         let space_bind_group = create_space_bind_group(

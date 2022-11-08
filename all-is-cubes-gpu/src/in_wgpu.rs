@@ -18,11 +18,12 @@ use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
 
-use crate::in_wgpu::frame_texture::FbtFeatures;
 use crate::{
     gather_debug_lines,
     in_wgpu::{
+        block_texture::AtlasAllocator,
         camera::ShaderPostprocessCamera,
+        frame_texture::FbtFeatures,
         glue::{
             create_wgsl_module_from_reloadable, to_wgpu_color, BeltWritingParts, ResizingBuffer,
         },
@@ -165,6 +166,8 @@ pub struct EverythingRenderer {
     pipelines: Pipelines,
 
     space_renderers: Layers<Option<SpaceRenderer>>,
+    /// Texture atlas shared between all space renderers.
+    block_texture: Arc<AtlasAllocator>,
 
     /// Cursor and debug lines are written to this buffer.
     lines_buffer: ResizingBuffer,
@@ -285,6 +288,9 @@ impl EverythingRenderer {
             fb,
 
             space_renderers: Default::default(),
+            block_texture: Arc::new(
+                AtlasAllocator::new("EverythingRenderer", &device).unwrap(/* TODO */),
+            ),
 
             lines_buffer: ResizingBuffer::default(),
             lines_vertex_count: 0,
@@ -458,6 +464,7 @@ impl EverythingRenderer {
             &self.device,
             queue,
             &self.pipelines,
+            &self.block_texture,
         )?;
         Self::update_space_renderer(
             "ui",
@@ -466,6 +473,7 @@ impl EverythingRenderer {
             &self.device,
             queue,
             &self.pipelines,
+            &self.block_texture,
         )?;
 
         let mut encoder = self
@@ -583,6 +591,7 @@ impl EverythingRenderer {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         pipelines: &Pipelines,
+        block_texture: &Arc<AtlasAllocator>,
     ) -> Result<(), GraphicsResourceError> {
         match (renderer, space) {
             (None, None) => {}
@@ -593,6 +602,7 @@ impl EverythingRenderer {
                     device,
                     queue,
                     pipelines,
+                    Arc::clone(block_texture),
                 )?);
             }
             (Some(r), Some(space)) => {

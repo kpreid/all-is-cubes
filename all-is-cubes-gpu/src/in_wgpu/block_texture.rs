@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex, Weak};
 use instant::Instant;
 
 use all_is_cubes::cgmath::{Point3, Vector3};
-use all_is_cubes::content::palette;
 use all_is_cubes::math::GridAab;
 use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
@@ -85,11 +84,7 @@ struct AllocatorBacking {
 }
 
 impl AtlasAllocator {
-    pub fn new(
-        label_prefix: &str,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-    ) -> Result<Self, GraphicsResourceError> {
+    pub fn new(label_prefix: &str, device: &wgpu::Device) -> Result<Self, GraphicsResourceError> {
         // TODO: When we have reallocation implemented, be willing to use
         // a smaller texture to start, to save GPU memory.
         let alloctree = Alloctree::new(8);
@@ -105,16 +100,17 @@ impl AtlasAllocator {
             label: Some(&format!("{label_prefix} block texture")),
         });
 
-        // Fill texture with a marker color, so it isn't transparent.
-        // (If we didn't, wgpu would leave it as [0, 0, 0, 0].)
-        // This is mostly useful for debugging since the texture allocation
-        // procedure should never actually let unwritten texels appear.
-        write_texture_by_aab(
-            queue,
-            &texture,
-            alloctree.bounds(),
-            &vec![palette::UNPAINTED_TEXTURE_FALLBACK.to_srgb8(); alloctree.bounds().volume()],
-        );
+        // TODO: schedule this write lazily
+        // // Fill texture with a marker color, so it isn't transparent.
+        // // (If we didn't, wgpu would leave it as [0, 0, 0, 0].)
+        // // This is mostly useful for debugging since the texture allocation
+        // // procedure should never actually let unwritten texels appear.
+        // write_texture_by_aab(
+        //     queue,
+        //     &texture,
+        //     alloctree.bounds(),
+        //     &vec![palette::UNPAINTED_TEXTURE_FALLBACK.to_srgb8(); alloctree.bounds().volume()],
+        // );
 
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -142,7 +138,7 @@ impl AtlasAllocator {
     }
 
     /// Copy the texels of all modified and still-referenced tiles to the GPU's texture.
-    pub fn flush(&mut self, queue: &wgpu::Queue) -> BlockTextureInfo {
+    pub fn flush(&self, queue: &wgpu::Queue) -> BlockTextureInfo {
         let start_time = Instant::now();
         let mut allocator_backing = self.backing.lock().unwrap();
 
