@@ -8,12 +8,12 @@ use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
 use embedded_graphics::Drawable;
 use instant::Duration;
 
-use crate::block::{Block, BlockAttributes, Primitive, Resolution, AIR};
+use crate::block::{self, Block, BlockAttributes, Primitive, Resolution, AIR};
 use crate::character::Character;
 use crate::content::palette;
 use crate::inv::{Slot, TOOL_SELECTIONS};
 use crate::listen::{DirtyFlag, Gate, ListenableSource, Listener};
-use crate::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
+use crate::math::{FaceMap, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
 use crate::space::{Space, SpacePhysics, SpaceTransaction};
 use crate::time::Tick;
 use crate::transaction::Merge as _;
@@ -246,47 +246,62 @@ impl ToolbarController {
 
 impl WidgetController for ToolbarController {
     fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
-        let hud_blocks = &self.definition.hud_blocks;
         let slot_count = self.definition.slot_count;
         let slot_text_resolution = self.definition.slot_text_resolution;
 
         let mut txn = SpaceTransaction::default();
 
-        txn = txn
-            .merge(
-                hud_blocks
-                    .toolbar_left_cap
-                    .paint_transaction(self.slot_position(0) + GridVector::new(-1, 0, 0)),
-            )
-            .unwrap();
-        txn = txn
-            .merge(
-                hud_blocks.toolbar_right_cap.paint_transaction(
-                    self.slot_position(slot_count - 1) + GridVector::new(1, 0, 0),
+        // Compute the volume in which the slot frame graphics land.
+        let frame_region = GridAab::single_cube(self.first_slot_position).expand(FaceMap {
+            nx: 1,
+            ny: 1,
+            nz: 1,
+            px: (slot_count as i32) * 2 - 1, // TODO: magic number for spacing
+            py: -1,
+            pz: 1,
+            ..Default::default()
+        });
+
+        /// TODO: figure out how to express this as a general helper
+        fn zoom(block: &Block, pos: GridPoint) -> Block {
+            let mut block = block.clone();
+            block
+                .modifiers_mut()
+                .push(block::Zoom::new(block::Resolution::R4, pos).into());
+            block
+        }
+        let frame_multiblock = &self.definition.hud_blocks.blocks[UiBlocks::ToolbarSlotFrame];
+        for cube in frame_region.interior_iter() {
+            let relative = cube - self.first_slot_position;
+            let x = relative.x;
+
+            let left_or_middle = zoom(
+                frame_multiblock,
+                GridPoint::new(
+                    (relative.x + 1).rem_euclid(2),
+                    relative.y + 1,
+                    relative.z + 1,
                 ),
-            )
-            .unwrap();
-        for index in 0..slot_count {
-            txn = txn
-                .merge(
-                    hud_blocks
-                        .toolbar_middle
-                        .paint_transaction(self.slot_position(index)),
-                )
-                .unwrap();
-            if index > 0 {
-                txn = txn
-                    .merge(
-                        hud_blocks.toolbar_divider.paint_transaction(
-                            self.slot_position(index) + GridVector::new(-1, 0, 0),
-                        ),
-                    )
-                    .unwrap();
-            }
+            );
+            let right = zoom(
+                frame_multiblock,
+                GridPoint::new(2, relative.y + 1, relative.z + 1),
+            );
+
+            let frame_part = if x == (slot_count as i32) * 2 - 1 {
+                // Right end cap of row.
+                right
+            } else if x.rem_euclid(2) == 1 && x > 0 {
+                // Overlap between adjacent slots' frames: composite left and right.
+                block::Composite::new(left_or_middle, block::CompositeOperator::Over)
+                    .compose_or_replace(right)
+            } else {
+                left_or_middle
+            };
+            txn.set_overwrite(cube, frame_part);
         }
 
-        // Place stack-count text blocks. This is done separately because it's easier
-        // without getting `draw_target` involved.
+        // Place stack-count text blocks.
         for index in 0..slot_count {
             txn.set_overwrite(
                 self.slot_position(index) + GridVector::new(-1, 0, 0),

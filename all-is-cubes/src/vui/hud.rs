@@ -2,20 +2,16 @@ use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
 
 use cgmath::Vector2;
-use embedded_graphics::geometry::Point;
-use embedded_graphics::prelude::{Primitive as _, Transform as _};
-use embedded_graphics::primitives::{Circle, PrimitiveStyleBuilder};
-use embedded_graphics::Drawable as _;
 
 use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
-use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, AIR};
+use crate::block::{Block, AIR};
 use crate::camera::{GraphicsOptions, Viewport};
 use crate::character::Character;
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::linking::BlockProvider;
 use crate::listen::ListenableSource;
-use crate::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridRotation, Rgba};
+use crate::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, Rgba};
 use crate::space::{Space, SpacePhysics};
 use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
@@ -210,20 +206,10 @@ pub(crate) struct HudBlocks {
     pub(crate) blocks: BlockProvider<UiBlocks>,
     pub(crate) icons: BlockProvider<Icons>,
     pub(crate) text: VoxelBrush<'static>,
-    pub(crate) toolbar_left_cap: VoxelBrush<'static>,
-    pub(crate) toolbar_right_cap: VoxelBrush<'static>,
-    pub(crate) toolbar_divider: VoxelBrush<'static>,
-    pub(crate) toolbar_middle: VoxelBrush<'static>,
 }
 
 impl HudBlocks {
-    pub(crate) async fn new(
-        universe: &mut Universe,
-        p: YieldProgress,
-        resolution: Resolution,
-    ) -> Self {
-        let resolution_g = GridCoordinate::from(resolution);
-
+    pub(crate) async fn new(universe: &mut Universe, p: YieldProgress) -> Self {
         let [p1, p2] = p.split(0.5);
         let ui_blocks = UiBlocks::new(universe, p1).await.install(universe).unwrap();
         let icons = Icons::new(universe, p2).await.install(universe).unwrap();
@@ -236,82 +222,10 @@ impl HudBlocks {
             ([0, -1, 0], palette::HUD_TEXT_STROKE.into()),
         ]);
 
-        // TODO: This toolbar graphic is a "get the bugs in the drawing tools worked out"
-        // placeholder for better art...
-        // The frame is drawn multiple times, with different copies having different status
-        // indicators present, so that we can have the graphics not rigidly aligned to blocks.
-        let frame_count = 4;
-        let frame_spacing_blocks = 2;
-
-        let toolbar_frame_block_bounds =
-            GridAab::from_lower_size([-1, -1, -1], [1 + frame_count * frame_spacing_blocks, 3, 3]);
-        let toolbar_frame_voxel_bounds = toolbar_frame_block_bounds.multiply(resolution_g);
-        let mut toolbar_drawing_space = Space::builder(toolbar_frame_voxel_bounds)
-            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-            .build();
-
-        // Draw background for icons to “rest on”
-        let horizontal_drawing = &mut toolbar_drawing_space.draw_target(
-            GridMatrix::from_translation([0, -2, 0]) * GridRotation::RXZY.to_rotation_matrix(),
-        );
-        let padding = 3;
-        let stroke_width = 1;
-        let background_fill = VoxelBrush::single(palette::HUD_TOOLBAR_BACK);
-        let background_stroke = VoxelBrush::single(palette::HUD_TOOLBAR_FRAME);
-        let icon_background_rectangle = Circle::new(
-            // TODO: confirm these offsets are exactly right
-            Point::new(-padding, -padding),
-            (resolution_g + padding * 2) as u32,
-        )
-        .into_styled(
-            PrimitiveStyleBuilder::new()
-                .fill_color(&background_fill)
-                .stroke_color(&background_stroke)
-                .stroke_width(stroke_width as u32)
-                .build(),
-        );
-        for i in 0..frame_count {
-            icon_background_rectangle
-                .translate(Point::new(resolution_g * frame_spacing_blocks * i, 0))
-                .draw(horizontal_drawing)
-                .unwrap();
-        }
-
-        // TODO: use a name for the space
-        let toolbar_blocks_space = space_to_blocks(
-            resolution,
-            BlockAttributes::default(),
-            universe.insert_anonymous(toolbar_drawing_space),
-        )
-        .unwrap();
-
-        // TODO: Make this a feature of VoxelBrush?
-        let slice_drawing = |points: GridAab| {
-            VoxelBrush::new(
-                points
-                    .interior_iter()
-                    .map(|p| (p, toolbar_blocks_space[p].clone())),
-            )
-        };
-
         Self {
             blocks: ui_blocks,
             icons,
             text: text_brush,
-            toolbar_middle: slice_drawing(GridAab::from_lower_upper((0, -1, -1), (1, 2, 2))),
-            toolbar_divider: slice_drawing(GridAab::from_lower_upper((1, -1, -1), (2, 2, 2)))
-                .translate((-1, 0, 0)),
-            toolbar_left_cap: slice_drawing(GridAab::from_lower_upper((-1, -1, -1), (0, 2, 2)))
-                .translate((1, 0, 0)),
-            // Right cap comes from the right end of the frames
-            toolbar_right_cap: slice_drawing(
-                GridAab::from_lower_upper((1, -1, -1), (2, 2, 2)).translate([
-                    frame_spacing_blocks * (frame_count - 1),
-                    0,
-                    0,
-                ]),
-            )
-            .translate([-(frame_spacing_blocks * (frame_count - 1) + 1), 0, 0]),
         }
     }
 }
