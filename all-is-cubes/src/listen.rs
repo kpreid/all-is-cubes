@@ -11,7 +11,7 @@
 //! messages, which will then be read and cleared by a separate part of the game loop.
 
 use std::fmt;
-use std::sync::{RwLock, Weak};
+use std::sync::{Arc, RwLock, Weak};
 
 mod cell;
 pub use cell::*;
@@ -32,7 +32,7 @@ pub use util::*;
 /// references *some* of the time — making `M` be a reference type can't have a
 /// satisfactory lifetime.
 pub struct Notifier<M> {
-    listeners: RwLock<Vec<Box<dyn Listener<M> + Send + Sync>>>,
+    listeners: RwLock<Vec<DynListener<M>>>,
 }
 
 impl<M: Clone + Send> Notifier<M> {
@@ -50,13 +50,13 @@ impl<M: Clone + Send> Notifier<M> {
         }
         let mut listeners = self.listeners.write().unwrap();
         Self::cleanup(&mut listeners);
-        listeners.push(Box::new(listener));
+        listeners.push(listener.erased());
     }
 
     /// Returns a [`Listener`] which forwards messages to the listeners registered with
-    /// this `Notifier`, provided that it is owned by an `Rc`.
+    /// this `Notifier`, provided that it is owned by an [`Arc`].
     ///
-    /// This may be used together with [`Listener::filter`] to forward notifications
+    /// This may be used together with [`Listener::filter()`] to forward notifications
     /// of changes in dependencies. Using this operation means that the dependent does not
     /// need to fan out listener registrations to all of its current dependencies.
     ///
@@ -94,7 +94,7 @@ impl<M: Clone + Send> Notifier<M> {
     /// Computes the exact count of listeners, including asking all current listeners
     /// if they are [`alive()`](Listener::alive).
     ///
-    /// This operation is intended for testing purposes.
+    /// This operation is intended for testing and diagnostic purposes.
     pub fn count(&self) -> usize {
         let mut listeners = self.listeners.write().unwrap();
         Self::cleanup(&mut listeners);
@@ -102,7 +102,7 @@ impl<M: Clone + Send> Notifier<M> {
     }
 
     /// Discard all dead weak pointers in `listeners`.
-    fn cleanup(listeners: &mut Vec<Box<dyn Listener<M> + Send + Sync>>) {
+    fn cleanup(listeners: &mut Vec<DynListener<M>>) {
         let mut i = 0;
         while i < listeners.len() {
             if listeners[i].alive() {
@@ -136,6 +136,9 @@ impl<M> fmt::Debug for Notifier<M> {
 /// Implementors should also implement [`Clone`] whenever possible; this allows
 /// for a "listen" operation to be implemented in terms of delegating to several others.
 /// This is not required, so that the `Listener` trait remains object-safe.
+///
+/// Implementors should also implement [`Send`] and [`Sync`], as most usage of listeners
+/// might cross threads. However, this is not strictly required.
 pub trait Listener<M> {
     /// Process and store a message.
     ///
@@ -148,10 +151,26 @@ pub trait Listener<M> {
     /// used by the `Listener` and its destination, as that could result in deadlock.
     fn receive(&self, message: M);
 
-    /// Returns [`false`] if the [`Listener`] should not receive any further messages
-    /// because its destination is no longer interested in them or they would not
-    /// have any effects on the rest of the system.
+    /// Whether the [`Listener`]'s destination is still interested in receiving messages.
+    ///
+    /// This method should start returning [`false`] as soon as its destination is no
+    /// longer interested in them or they would not have any effects on the rest of the
+    /// system; this informs [`Notifier`]s that they should drop this listener and avoid
+    /// memory leaks in the form of defunct listeners.
     fn alive(&self) -> bool;
+
+    /// Convert this listener into trait object form, allowing it to be stored in
+    /// collections or passed non-generically.
+    ///
+    /// The purpose of this method over simply calling [`Arc::new()`] is that it will
+    /// avoid double-wrapping of a listener that's already in [`Arc`]. **Other
+    /// implementors should not override this.**
+    fn erased(self) -> DynListener<M>
+    where
+        Self: Sized + Send + Sync + 'static,
+    {
+        Arc::new(self)
+    }
 
     /// Apply a map/filter function to incoming messages.
     ///
@@ -191,6 +210,23 @@ pub trait Listener<M> {
     }
 }
 
+/// Type-erased form of a [`Listener`] which accepts messages of type `M`.
+pub type DynListener<M> = Arc<dyn Listener<M> + Send + Sync>;
+
+impl<M> Listener<M> for DynListener<M> {
+    fn receive(&self, message: M) {
+        (**self).receive(message)
+    }
+
+    fn alive(&self) -> bool {
+        (**self).alive()
+    }
+
+    fn erased(self) -> DynListener<M> {
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -211,5 +247,29 @@ mod tests {
         cn.notify(2);
         assert_eq!(sink.drain(), vec![1, 2]);
         assert_eq!(format!("{:?}", cn), "Notifier(1)");
+    }
+
+    #[test]
+    #[allow(clippy::vtable_address_comparisons)]
+    fn erased_listener() {
+        let sink = Sink::new();
+        let listener: DynListener<&str> = sink.listener().erased();
+
+        // Should not gain a new wrapper when erased() again.
+        assert_eq!(
+            Arc::as_ptr(&listener),
+            Arc::as_ptr(&listener.clone().erased())
+        );
+
+        // Should report alive (and not infinitely recurse).
+        assert!(listener.alive());
+
+        // Should deliver messages.
+        listener.receive("a");
+        assert_eq!(sink.drain(), vec!["a"]);
+
+        // Should report dead
+        drop(sink);
+        assert!(!listener.alive());
     }
 }
