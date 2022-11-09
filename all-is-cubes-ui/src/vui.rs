@@ -9,7 +9,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use all_is_cubes::camera::{FogOption, GraphicsOptions, UiViewState, ViewTransform, Viewport};
 use all_is_cubes::cgmath::{Angle as _, Decomposed, Deg, One, Transform, Vector3};
 use all_is_cubes::character::{Character, Cursor};
-use all_is_cubes::inv::{Tool, ToolError, ToolInput};
+use all_is_cubes::inv::{EphemeralOpaque, Tool, ToolError, ToolInput};
 use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier};
 use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::math::NotNan;
@@ -60,6 +60,8 @@ pub(crate) struct Vui {
     hud_page: PageInst,
     paused_page: PageInst,
     about_page: PageInst,
+    /// Whatever [`VuiPageState::Dump`] contained.
+    dump_page: PageInst,
 
     /// Receiving internal messages from widgets for controlling the UI itself
     /// (changing `state`, etc).
@@ -139,6 +141,7 @@ impl Vui {
             hud_page: PageInst::new(hud_widget_tree),
             paused_page: PageInst::new(paused_widget_tree),
             about_page: PageInst::new(about_widget_tree),
+            dump_page: PageInst::new(LayoutTree::empty()),
 
             control_channel: control_recv,
             changed_character: DirtyFlag::listening(false, &character_source),
@@ -158,6 +161,21 @@ impl Vui {
 
     pub(crate) fn set_state(&mut self, state: VuiPageState) {
         self.state.set(state);
+
+        // Special case: the dump state has to replace the widget tree, and
+        // unconditionally because we can't just check if it is equal (WidgetTree: !Eq)
+        if let VuiPageState::Dump {
+            previous: _,
+            content,
+        } = &*self.state.get()
+        {
+            let content: WidgetTree = match content.try_ref() {
+                Some(tree) => (*tree).clone(),
+                None => LayoutTree::empty(),
+            };
+            self.dump_page = PageInst::new(content);
+        }
+
         self.set_space_from_state();
     }
 
@@ -170,6 +188,11 @@ impl Vui {
             VuiPageState::Hud => Some(self.hud_page.get_or_create_space(size, universe)),
             VuiPageState::Paused => Some(self.paused_page.get_or_create_space(size, universe)),
             VuiPageState::AboutText => Some(self.about_page.get_or_create_space(size, universe)),
+            // Note: checking the `content` is handled in `set_state()`.
+            VuiPageState::Dump {
+                previous: _,
+                content: _,
+            } => Some(self.dump_page.get_or_create_space(size, universe)),
         };
 
         if next_space.as_ref() != Option::as_ref(&self.current_view.get().space) {
@@ -360,6 +383,9 @@ impl Vui {
                 // TODO: Instead check right now, but in a reusable fashion.
                 self.set_state(VuiPageState::Hud);
             }
+            VuiPageState::Dump { ref previous, .. } => {
+                self.set_state(*previous.clone());
+            }
         }
     }
 }
@@ -374,6 +400,14 @@ pub(crate) enum VuiPageState {
     /// and reactivate mouselook.
     Paused,
     AboutText,
+    /// Arbitrary widgets that have already been computed, and which don't demand
+    /// any navigation behavior more complex than “cancellable”. This is to be used for
+    /// viewing various reports/dialogs until we have a better idea.
+    #[allow(dead_code)] // TODO: Use this
+    Dump {
+        previous: Box<VuiPageState>,
+        content: EphemeralOpaque<WidgetTree>,
+    },
 }
 
 /// Message indicating a UI action that affects the UI itself
