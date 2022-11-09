@@ -335,7 +335,7 @@ impl FbtConfig {
         // Furthermore, backends may or may not support multisampling together with Rgba16Float.
         if features.float_can_render {
             // We can definitely use Rgba16Float. But can we multisample?
-            if false {
+            if features.float_can_multisample {
                 // All features present -- choose HDR format and whatever sample_count
                 // is wanted.
                 Self {
