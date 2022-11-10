@@ -1,24 +1,18 @@
 use std::fmt;
 
 use embedded_graphics::mono_font::iso_8859_1 as font;
-use embedded_graphics::prelude::Point;
-use embedded_graphics::primitives::{Circle, Primitive as _, PrimitiveStyleBuilder};
-use embedded_graphics::transform::Transform as _;
-use embedded_graphics::Drawable as _;
 use exhaust::Exhaust;
 
 use crate::block::{Block, Resolution::*, AIR};
 use crate::content::load_image::{default_srgb, include_image, space_from_image};
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
-use crate::inv::TOOL_SELECTIONS;
-use crate::linking::{BlockModule, BlockProvider};
-use crate::math::{GridAab, GridMatrix, GridRotation};
-use crate::space::{Space, SpacePhysics};
-use crate::universe::Universe;
-
 #[cfg(doc)]
 use crate::inv::Tool;
+use crate::inv::TOOL_SELECTIONS;
+use crate::linking::{BlockModule, BlockProvider};
+use crate::math::GridRotation;
+use crate::universe::Universe;
 use crate::util::YieldProgress;
 use crate::vui::widgets::{ActionButtonVisualState, ButtonBase, ToggleButtonVisualState};
 
@@ -100,47 +94,14 @@ impl UiBlocks {
                     .build(),
 
                 UiBlocks::ToolbarSlotFrame => {
-                    // TODO: this should probably be replaced with an image file
-                    let resolution_g = 16;
-
-                    let toolbar_frame_voxel_bounds = GridAab::from_lower_size(
-                        [0, resolution_g - 1, 0],
-                        [3 * resolution_g, 1, 3 * resolution_g],
-                    );
-                    let mut toolbar_drawing_space = Space::builder(toolbar_frame_voxel_bounds)
-                        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-                        .build();
-
-                    let horizontal_drawing = &mut toolbar_drawing_space.draw_target(
-                        GridMatrix::from_translation([
-                            resolution_g,
-                            resolution_g - 1,
-                            resolution_g,
-                        ]) * GridRotation::RXZY.to_rotation_matrix(),
-                    );
-                    let padding = 3;
-                    let stroke_width = 1;
-                    let background_fill = VoxelBrush::single(palette::HUD_TOOLBAR_BACK);
-                    let background_stroke = VoxelBrush::single(palette::HUD_TOOLBAR_FRAME);
-                    let shape = Circle::new(
-                        Point::new(-padding, -padding),
-                        (resolution_g + padding * 2) as u32,
-                    )
-                    .into_styled(
-                        PrimitiveStyleBuilder::new()
-                            .fill_color(&background_fill)
-                            .stroke_color(&background_stroke)
-                            .stroke_width(stroke_width as u32)
-                            .build(),
-                    );
-                    shape
-                        .translate(Point::new(0, 0))
-                        .draw(horizontal_drawing)
-                        .unwrap();
-
                     Block::builder()
                         .display_name("Toolbar Slot Frame")
-                        .voxels_ref(R64, universe.insert_anonymous(toolbar_drawing_space))
+                        .voxels_ref(R64, universe.insert_anonymous(space_from_image(
+                            include_image!("icons/toolbar-slot.png"),
+                            GridRotation::RXZY,
+                            // TODO: better way to do translations
+                            |pixel| default_srgb(pixel).translate([0, 16 - 1, 0]),
+                        )?))
                         .build()
                 }
 
