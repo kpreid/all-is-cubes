@@ -7,7 +7,7 @@
 //! When [`Notifier::notify`] is called to send a message, it is synchronously delivered
 //! to all listeners; therefore, listeners are obligated to avoid making further
 //! significant state changes. The typical pattern is for a listener to contain a
-//! `Weak<RefCell<...>>` or similar multiply-owned mutable structure to aggregate incoming
+//! `Weak<Mutex<...>>` or similar multiply-owned mutable structure to aggregate incoming
 //! messages, which will then be read and cleared by a separate part of the game loop.
 
 use std::fmt;
