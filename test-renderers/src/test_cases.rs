@@ -109,8 +109,12 @@ async fn antialias(mut context: RenderTestContext, antialias_option: Antialiasin
     options.antialiasing = antialias_option;
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
+    // Max diff 28 is from *one pixel* difference we observed in GitHub Actions CI.
+    // TODO: Implement pixel-count thresholds and then make this test stricter.
+    // (But we also theoretically need a better algorithm for comparing antialiased images
+    // which may have various intermediate shades.)
     context
-        .render_comparison_test(15, scene, Overlays::NONE)
+        .render_comparison_test(28, scene, Overlays::NONE)
         .await;
 }
 
