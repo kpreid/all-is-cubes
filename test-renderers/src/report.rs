@@ -12,7 +12,7 @@ use crate::{test_data_dir_path, ComparisonRecord, RendererId, TestId, Version};
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TestCaseOutput {
     pub test_id: TestId,
-    pub passed: bool,
+    pub outcome: Result<(), String>,
     pub comparisons: Vec<ComparisonRecord>,
 }
 
@@ -54,18 +54,21 @@ pub(crate) fn write_report_file() -> PathBuf {
                     .iter()
                     .map(|records| match records.get(test_id) {
                         Some(&TestCaseOutput {
-                            passed,
+                            ref outcome,
                             test_id: _,
                             ref comparisons,
                         }) => tmpl::StatusCell {
-                            test_outcome: if passed { "✅" } else { "❌" },
+                            test_outcome: match outcome {
+                                Ok(()) => "✅".to_owned(),
+                                Err(e) => format!("❌ {e}"),
+                            },
                             comparisons: comparisons
                                 .iter()
                                 .map(tmpl::TmplComparison::from)
                                 .collect(),
                         },
                         None => tmpl::StatusCell {
-                            test_outcome: "Not run",
+                            test_outcome: "Not run".into(),
                             comparisons: vec![],
                         },
                     })
@@ -104,7 +107,7 @@ mod tmpl {
 
     #[derive(serde::Serialize)]
     pub struct StatusCell {
-        pub test_outcome: &'static str,
+        pub test_outcome: String,
         pub comparisons: Vec<TmplComparison>,
     }
 

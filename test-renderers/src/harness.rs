@@ -223,29 +223,36 @@ where
             outcome,
             comparison_log,
         } = result;
+
+        // Print out outcome of test
         write!(logging, "test {name:20} ...").unwrap();
-        let passed = match outcome {
+        let outcome_for_report = match outcome {
             Ok(case_time) => {
                 writeln!(logging, " ok in {}", case_time.custom_format(StatusText)).unwrap();
                 count_passed += 1;
                 cumulative_time += case_time;
-                true
+                Ok(())
             }
             Err(e) => {
+                count_failed += 1;
                 if e.is_panic() {
-                    writeln!(logging, " panicked").unwrap();
+                    let panic_str: String = match e.into_panic().downcast::<String>() {
+                        Ok(boxed_str) => *boxed_str,
+                        Err(_) => "<non-string panic>".into(),
+                    };
+                    writeln!(logging, " panicked: {panic_str}").unwrap();
+                    Err(panic_str)
                 } else {
                     writeln!(logging, " unknown outcome {e:?}").unwrap();
+                    Err(e.to_string())
                 }
-                count_failed += 1;
-                false
             }
         };
 
         per_test_output.insert(
             name.clone(),
             TestCaseOutput {
-                passed,
+                outcome: outcome_for_report,
                 test_id: name,
                 comparisons: Arc::try_unwrap(comparison_log)
                     .expect("somebody hung onto the log")
