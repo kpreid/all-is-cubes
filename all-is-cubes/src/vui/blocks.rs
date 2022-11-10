@@ -96,15 +96,19 @@ impl UiBlocks {
                 UiBlocks::ToolbarSlotFrame => {
                     Block::builder()
                         .display_name("Toolbar Slot Frame")
-                        .voxels_ref(R64, universe.insert_anonymous(space_from_image(
-                            include_image!("icons/toolbar-slot.png"),
-                            GridRotation::RXZY,
-                            // TODO: better way to do translations
-                            |pixel| default_srgb(pixel).translate([0, 16 - 1, 0]),
-                        )?))
+                        .voxels_ref(
+                            R64,
+                            universe.insert_anonymous(space_from_image(
+                                include_image!("icons/toolbar-slot.png"),
+                                GridRotation::RXZY,
+                                // TODO: better way to do translations
+                                |pixel| default_srgb(pixel).translate([0, 16 - 1, 0]),
+                            )?),
+                        )
                         .build()
                 }
 
+                #[rustfmt::skip] // otherwise it breaks
                 UiBlocks::ToolbarPointer([
                     ToolbarButtonState::Unmapped,
                     ToolbarButtonState::Unmapped,
