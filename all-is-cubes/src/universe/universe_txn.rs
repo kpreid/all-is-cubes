@@ -38,7 +38,7 @@ where
 ///
 /// TODO: Better name.
 #[derive(Debug, Eq)]
-struct TransactionInUniverse<O: Transactional> {
+struct TransactionInUniverse<O: Transactional + 'static> {
     target: URef<O>,
     transaction: O::Transaction,
 }

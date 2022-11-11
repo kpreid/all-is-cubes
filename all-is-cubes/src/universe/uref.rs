@@ -187,24 +187,36 @@ impl<T: 'static> URef<T> {
     }
 }
 
-impl<T> fmt::Debug for URef<T> {
+impl<T: fmt::Debug + 'static> fmt::Debug for URef<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO: Maybe print dead refs differently?
+
+        write!(f, "URef({}", self.name)?;
 
         // Note: strong_init is never held for long operations, so it is safe
         // to block on locking it.
         match self.strong_init.lock() {
-            Ok(opt_strong) => {
-                if opt_strong.is_some() {
-                    write!(f, "URef(no universe, {})", self.name)?;
-                } else {
-                    write!(f, "URef({})", self.name)?;
+            Ok(strong_init_guard) => {
+                if let Some(strong_ref) = &*strong_init_guard {
+                    write!(f, " in no universe")?;
+                    if self.weak_ref.strong_count() <= 1 {
+                        // Write the contents, but only if there are no other refs and thus we
+                        // cannot possibly cause an infinite recursion of formatting.
+                        // TODO: maybe only do it if we are in alternate/prettyprint format.
+                        write!(f, " = ")?;
+                        match strong_ref.try_read() {
+                            Ok(uentry) => fmt::Debug::fmt(&uentry.data, f)?,
+                            Err(e) => write!(f, "<entry lock error: {e}>")?,
+                        }
+                    }
                 }
             }
-            Err(_) => {
-                write!(f, "URef(<lock error>, {})", self.name)?;
+            Err(e) => {
+                write!(f, ", <strong init lock error: {e}>")?;
             }
         }
+
+        write!(f, ")")?;
         Ok(())
     }
 }
@@ -393,14 +405,17 @@ impl<T: 'static> URefErased for URef<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::{Block, BlockDef};
+    use crate::math::Rgba;
     use crate::space::Space;
     use crate::universe::{Universe, UniverseIndex};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn uref_debug_in_universe() {
         let mut u = Universe::new();
         let r = u
-            .insert("foo".into(), Space::empty_positive(1, 2, 3))
+            .insert("foo".into(), BlockDef::new(Block::from(Rgba::WHITE)))
             .unwrap();
         assert_eq!(format!("{:?}", r), "URef('foo')");
         assert_eq!(format!("{:#?}", r), "URef('foo')");
@@ -408,9 +423,29 @@ mod tests {
 
     #[test]
     fn uref_debug_pending() {
-        let r = URef::new_pending("foo".into(), Space::empty_positive(1, 2, 3));
-        assert_eq!(format!("{:?}", r), "URef(no universe, 'foo')");
-        assert_eq!(format!("{:#?}", r), "URef(no universe, 'foo')");
+        let r = URef::new_pending("foo".into(), BlockDef::new(Block::from(Rgba::WHITE)));
+        assert_eq!(
+            format!("{:?}", r),
+            "URef('foo' in no universe = BlockDef { \
+                block: Block { primitive: Atom(BlockAttributes {}, Rgba(1.0, 1.0, 1.0, 1.0)) }, \
+                notifier: Notifier(0), \
+                block_listen_gate: Gate })"
+        );
+        assert_eq!(
+            format!("{:#?}", r),
+            indoc::indoc! { "\
+            URef('foo' in no universe = BlockDef {
+                block: Block {
+                    primitive: Atom(
+                        BlockAttributes {},
+                        Rgba(1.0, 1.0, 1.0, 1.0),
+                    ),
+                },
+                notifier: Notifier(0),
+                block_listen_gate: Gate,
+            })"
+            }
+        );
     }
 
     #[test]
