@@ -542,6 +542,8 @@ pub enum CompositeOperator {
 
 impl CompositeOperator {
     fn blend_color(&self, source: Rgba, destination: Rgba) -> Rgba {
+        let source = source.clamp();
+        let destination = destination.clamp();
         match self {
             Self::Over => {
                 // TODO: Surely this is not the only place we have implemented rgba blending?
@@ -758,6 +760,15 @@ mod tests {
         assert_eq!(
             rotated_twice.evaluate().unwrap(),
             two_rotations.evaluate().unwrap()
+        );
+    }
+
+    #[test]
+    fn composite_silly_floats() {
+        // We just want to see this does not panic on NaN.
+        CompositeOperator::Over.blend_color(
+            Rgba::new(2e25, 2e25, 2e25, 2e25),
+            Rgba::new(2e25, 2e25, 2e25, 2e25),
         );
     }
 
