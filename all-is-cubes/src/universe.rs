@@ -49,6 +49,7 @@ mod tests;
 /// Internally uses [`Arc`] to be cheap to clone. Might be interned in future versions.
 #[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Name {
     /// An explicitly set name.
     Specific(Arc<str>),

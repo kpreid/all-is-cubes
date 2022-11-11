@@ -236,6 +236,29 @@ impl<T> Clone for URef<T> {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a, T: arbitrary::Arbitrary<'a> + 'static> arbitrary::Arbitrary<'a> for URef<T> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(if u.arbitrary()? {
+            URef::new_pending(Name::arbitrary(u)?, T::arbitrary(u)?)
+        } else {
+            URef::new_gone(Name::arbitrary(u)?)
+        })
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        arbitrary::size_hint::recursion_guard(depth, |depth| {
+            arbitrary::size_hint::and(
+                bool::size_hint(depth),
+                arbitrary::size_hint::or(
+                    Name::size_hint(depth),
+                    arbitrary::size_hint::and(Name::size_hint(depth), T::size_hint(depth)),
+                ),
+            )
+        })
+    }
+}
+
 /// Errors resulting from attempting to borrow/dereference a [`URef`].
 #[allow(clippy::exhaustive_enums)] // If this has to change it will be a major semantic change
 #[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
