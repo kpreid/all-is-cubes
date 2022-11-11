@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use std::{fmt, hash};
 
-use crate::block::{Block, Modifier, Primitive, RotationPlacementRule, AIR};
+use crate::block::{self, Block, Modifier, Primitive, RotationPlacementRule, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::inv::{InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
@@ -168,7 +168,7 @@ impl Tool {
                 }
 
                 let velocity = 8;
-                let [move_out, move_in] = Modifier::paired_move(direction, 0, velocity);
+                let [move_out, move_in] = block::Move::paired_move(direction, 0, velocity);
                 let leaving = input.set_cube(
                     cursor.place.cube,
                     cursor.block.clone(),

@@ -6,7 +6,7 @@ use std::f64::consts::PI;
 
 use all_is_cubes::block::{
     space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Composite,
-    CompositeOperator, Modifier, Resolution::*, RotationPlacementRule, Zoom, AIR,
+    CompositeOperator, Move, Resolution::*, RotationPlacementRule, Zoom, AIR,
 };
 use all_is_cubes::cgmath::{
     Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Point3, Rad, Rotation as _,
@@ -650,13 +650,13 @@ async fn MOVED_BLOCKS(_: &Exhibit, universe: &mut Universe) {
             let i = x + z * 8;
             let distance = (i * 16).try_into().unwrap();
             let block = &blocks[i as usize];
-            let [move_out, move_in] = Modifier::paired_move(Face6::PY, distance, 0);
+            let [move_out, move_in] = Move::paired_move(Face6::PY, distance, 0);
             // TODO: Move should be able to spawn a "tail" on its own when animated?
             space.set([x * 2, 0, (1 - z) * 2], move_out.attach(block.clone()))?;
             space.set([x * 2, 1, (1 - z) * 2], move_in.attach(block.clone()))?;
 
             // Horizontal
-            let [move_out, move_in] = Modifier::paired_move(Face6::PZ, distance, 0);
+            let [move_out, move_in] = Move::paired_move(Face6::PZ, distance, 0);
             space.set([i, 0, -2], move_out.attach(block.clone()))?;
             space.set([i, 0, -1], move_in.attach(block.clone()))?;
         }
