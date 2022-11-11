@@ -79,7 +79,6 @@ struct BlockParts {
 
 /// The possible fundamental representations of a [`Block`]'s shape.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-//#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Primitive {
     /// A block whose definition is stored elsewhere in a
@@ -492,6 +491,62 @@ impl From<Rgb> for Cow<'_, Block> {
 impl From<Rgba> for Cow<'_, Block> {
     fn from(color: Rgba) -> Self {
         Cow::Owned(Block::from(color))
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+mod arbitrary_block {
+    use super::*;
+    use arbitrary::{size_hint, Arbitrary, Unstructured};
+
+    // Manual impl to skip past BlockPtr etc.
+    // This means we're not exercising the `&'static` case, but that's not possible
+    // unless we decide to leak memory.
+    impl<'a> Arbitrary<'a> for Block {
+        fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+            let mut block = Block::from_primitive(Primitive::arbitrary(u)?);
+            *block.modifiers_mut() = Vec::arbitrary(u)?;
+            Ok(block)
+        }
+
+        fn size_hint(depth: usize) -> (usize, Option<usize>) {
+            size_hint::and(
+                Primitive::size_hint(depth),
+                Vec::<Modifier>::size_hint(depth),
+            )
+        }
+    }
+
+    // Manual impl because `GridPoint` doesn't impl Arbitrary.
+    impl<'a> Arbitrary<'a> for Primitive {
+        fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+            Ok(match u.int_in_range(0..=2)? {
+                0 => Primitive::Atom(BlockAttributes::arbitrary(u)?, Rgba::arbitrary(u)?),
+                1 => Primitive::Indirect(URef::arbitrary(u)?),
+                2 => Primitive::Recur {
+                    attributes: BlockAttributes::arbitrary(u)?,
+                    offset: GridPoint::from(<[i32; 3]>::arbitrary(u)?),
+                    resolution: Resolution::arbitrary(u)?,
+                    space: URef::arbitrary(u)?,
+                },
+                _ => unreachable!(),
+            })
+        }
+
+        fn size_hint(depth: usize) -> (usize, Option<usize>) {
+            arbitrary::size_hint::recursion_guard(depth, |depth| {
+                size_hint::or_all(&[
+                    size_hint::and(BlockAttributes::size_hint(depth), Rgba::size_hint(depth)),
+                    URef::<BlockDef>::size_hint(depth),
+                    size_hint::and_all(&[
+                        BlockAttributes::size_hint(depth),
+                        <[i32; 3]>::size_hint(depth),
+                        Resolution::size_hint(depth),
+                        URef::<Space>::size_hint(depth),
+                    ]),
+                ])
+            })
+        }
     }
 }
 

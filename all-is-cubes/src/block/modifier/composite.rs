@@ -15,6 +15,7 @@ use crate::universe;
 /// the blocks' attributes (right now it always chooses the destination), and the ability to
 /// systematically combine or break apart the composite when applicable.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub struct Composite {
     pub source: Block,
@@ -168,21 +169,6 @@ impl universe::VisitRefs for Composite {
             reverse: _,
         } = self;
         source.visit_refs(visitor);
-    }
-}
-
-#[cfg(feature = "arbitrary")]
-impl<'a> arbitrary::Arbitrary<'a> for Composite {
-    // This noop manual implementation is necessary because there there is no `Arbitrary for Block`,
-    // because blocks can't directly own further voxel blocks. TODO: We should put block building
-    // behind some `ArbitraryBlock` type that is a bundle for a Universe, or better, make
-    // limited owning URefs possible.
-    fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Err(arbitrary::Error::EmptyChoose)
-    }
-
-    fn size_hint(_depth: usize) -> (usize, Option<usize>) {
-        (0, Some(0))
     }
 }
 

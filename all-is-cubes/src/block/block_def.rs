@@ -93,6 +93,17 @@ impl Transactional for BlockDef {
     type Transaction = BlockDefTransaction;
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for BlockDef {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(BlockDef::new(Block::arbitrary(u)?))
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        Block::size_hint(depth)
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[must_use]
 pub struct BlockDefTransaction {
