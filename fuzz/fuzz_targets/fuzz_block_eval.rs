@@ -32,4 +32,12 @@ fuzz_target!(|input: (
     let evaluated = block.evaluate().unwrap();
 
     evaluated.consistency_check();
+
+    // Exercise listen(), because it is a recursive operation on the block + modifiers.
+    let sink = all_is_cubes::listen::Sink::new();
+    block.listen(sink.listener()).unwrap();
+
+    // Exercise visit_refs(), because it is a recursive operation on the block + modifiers.
+    // TODO: To do this we need a handy visitor, but I think it should be simplified...
+    // block.visit_refs(visitor);
 });
