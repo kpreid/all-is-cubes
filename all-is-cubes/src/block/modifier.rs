@@ -7,6 +7,8 @@ mod composite;
 pub use composite::*;
 mod r#move;
 pub use r#move::*;
+mod quote;
+pub use quote::*;
 mod zoom;
 pub use zoom::*;
 
@@ -18,13 +20,7 @@ pub use zoom::*;
 pub enum Modifier {
     /// Suppresses all behaviors of the [`Block`] that might affect the space around it,
     /// (or itself).
-    // TODO: figure out how to publicly construct this given that we want to still have
-    // the option to add variants
-    #[non_exhaustive]
-    Quote {
-        /// If true, also suppress light and sound effects.
-        ambient: bool,
-    },
+    Quote(Quote),
 
     /// Rotate the block about its cube center by the given rotation.
     Rotate(GridRotation),
@@ -67,9 +63,9 @@ impl Modifier {
         depth: u8,
     ) -> Result<EvaluatedBlock, EvalBlockError> {
         Ok(match *self {
-            Modifier::Quote { ambient } => {
+            Modifier::Quote(Quote { suppress_ambient }) => {
                 value.attributes.tick_action = None;
-                if ambient {
+                if suppress_ambient {
                     value.attributes.light_emission = Rgb::ZERO;
                 }
                 value
@@ -143,8 +139,8 @@ impl Modifier {
 impl VisitRefs for Modifier {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
         match self {
-            Modifier::Quote { .. } => {}
-            Modifier::Rotate(..) => {}
+            Modifier::Quote(m) => m.visit_refs(visitor),
+            Modifier::Rotate(_) => {}
             Modifier::Composite(m) => m.visit_refs(visitor),
             Modifier::Zoom(m) => m.visit_refs(visitor),
             Modifier::Move(m) => m.visit_refs(visitor),
@@ -161,23 +157,6 @@ mod tests {
     use crate::math::{GridAab, GridPoint, OpacityCategory, Rgba};
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
-
-    #[test]
-    fn quote_evaluation() {
-        let l = Rgb::new(1.0, 2.0, 3.0);
-        let mut block = Block::builder()
-            .light_emission(l)
-            .color(Rgba::WHITE)
-            .build();
-        assert_eq!(block.evaluate().unwrap().attributes.light_emission, l);
-        block
-            .modifiers_mut()
-            .push(Modifier::Quote { ambient: true });
-        assert_eq!(
-            block.evaluate().unwrap().attributes.light_emission,
-            Rgb::ZERO
-        );
-    }
 
     // Unlike other tests, this one asserts the entire `EvaluatedBlock` value because
     // a new field is a potential bug.

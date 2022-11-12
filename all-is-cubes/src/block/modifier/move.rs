@@ -75,7 +75,7 @@ impl Move {
         // don't interfere with movement or cause duplication.
         // (In the future we may want a more nuanced policy that allows internal changes,
         // but that will probably involve refining tick_action processing.)
-        input = Modifier::Quote { ambient: false }.evaluate(
+        input = Modifier::from(block::Quote::default()).evaluate(
             block,
             this_modifier_index,
             input,

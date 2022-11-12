@@ -231,7 +231,7 @@ impl Tool {
             // TODO: InfiniteBlocks should have a different name and appearance
             // (or maybe that distinction should appear in the quantity-text field)
             Self::Block(block) | Self::InfiniteBlocks(block) => {
-                Cow::Owned(Modifier::Quote { ambient: false }.attach(block.clone()))
+                Cow::Owned(Modifier::from(block::Quote::default()).attach(block.clone()))
             }
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
             Self::EditBlock => Cow::Borrowed(&predefined[Icons::EditBlock]),
@@ -651,7 +651,10 @@ mod tests {
         let [block] = make_some_blocks();
         assert_eq!(
             *Tool::InfiniteBlocks(block.clone()).icon(&dummy_icons),
-            Modifier::Quote { ambient: false }.attach(block),
+            Modifier::Quote(block::Quote {
+                suppress_ambient: false
+            })
+            .attach(block),
         );
     }
 
