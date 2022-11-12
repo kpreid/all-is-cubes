@@ -105,8 +105,14 @@
 //! * `arbitrary`: Adds implementations of the [`arbitrary::Arbitrary`] trait for
 //!   fuzzing / property testing on types defined by this crate.
 //!
-//! This crate is not `no_std` compatible due to need for floating-point functions,
-//! and several currenty incompatible dependencies.
+//! ## Platform compatibility
+//!
+//! * This crate is not `no_std` compatible due to need for floating-point functions,
+//!   and several currently incompatible dependencies.
+//! * However, it is compatible with web `wasm32-unknown-unknown`.
+//!   That is, the parts of `std` it uses are the thread-safety and floating-point parts,
+//!   not IO (and not creating threads, unless requested).
+//! * `usize` must be at least 32 bits (that is, not 16).
 //!
 //! ## Dependencies and global state
 //!
