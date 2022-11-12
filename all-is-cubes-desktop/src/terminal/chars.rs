@@ -6,11 +6,11 @@ use std::io;
 use crossterm::style::{Color, Colors, SetColors};
 use crossterm::QueueableCommand as _;
 
-use all_is_cubes::cgmath::Vector2;
-use all_is_cubes::math::Rgba;
+use all_is_cubes::cgmath::{InnerSpace, Vector2};
+use all_is_cubes::math::{Rgb, Rgba};
 
 use super::options::{CharacterMode, ColorMode};
-use super::TextRayImage;
+use super::{TextAndColor, TextRayImage};
 
 pub(super) fn image_patch_to_character(
     image: &TextRayImage,
@@ -34,7 +34,9 @@ pub(super) fn image_patch_to_character(
             };
 
             let text = match &options.characters {
-                CharacterMode::Names | CharacterMode::Shades => unreachable!(),
+                CharacterMode::Names | CharacterMode::Shades | CharacterMode::Braille => {
+                    unreachable!()
+                }
                 CharacterMode::Split => match (lum1 > threshold1, lum2 > threshold2) {
                     // Assume that background is black and foreground is white (this could be an option).
                     (true, true) => "█",  // U+2588 FULL BLOCK
@@ -109,8 +111,85 @@ pub(super) fn image_patch_to_character(
                 Colors::new(Color::Reset, Color::Reset),
             )
         }
+        (CharacterMode::Braille, _) => {
+            let braille_dot_bit = |(_, color): &TextAndColor, number_z: usize| -> usize {
+                if let Some(color) = color {
+                    let threshold = ((number_z as f32
+                        + char_pos
+                            .map(|c| c as f32)
+                            .dot(Vector2::new(284.1834, 100.2384)))
+                    .rem_euclid(8.0)
+                        + 0.5)
+                        / 8.0;
+                    usize::from(color.luminance() > threshold) << number_z
+                } else {
+                    0
+                }
+            };
+            fn crgb((_, color): &TextAndColor) -> Rgb {
+                color.unwrap_or(Rgba::TRANSPARENT).to_rgb()
+            }
+
+            let [[one, four], [two, five], [three, six], [seven, eight]] =
+                image.get_patch(char_pos);
+            // The numbering of Braille dots goes
+            // (1) (4)
+            // (2) (5)
+            // (3) (6)
+            // (7) (8)
+            // and the binary encoding numbers bits the same.
+            // <https://en.wikipedia.org/wiki/Braille_Patterns?oldid=1074057238#Identifying,_naming_and_ordering>
+            let braille_index = braille_dot_bit(one, 0)
+                + braille_dot_bit(two, 1)
+                + braille_dot_bit(three, 2)
+                + braille_dot_bit(four, 3)
+                + braille_dot_bit(five, 4)
+                + braille_dot_bit(six, 5)
+                + braille_dot_bit(seven, 6)
+                + braille_dot_bit(eight, 7);
+
+            let color_sum = crgb(one)
+                + crgb(two)
+                + crgb(three)
+                + crgb(four)
+                + crgb(five)
+                + crgb(six)
+                + crgb(seven)
+                + crgb(eight);
+
+            let hue = color_sum * (0.75 / color_sum.luminance().max(0.1));
+
+            (
+                BRAILLE_TABLE[braille_index],
+                match options.colors.convert(Some(hue.with_alpha_one())) {
+                    Some(color) => Colors::new(color, Color::Black),
+                    None => Colors::new(Color::Reset, Color::Reset),
+                },
+            )
+        }
     }
 }
+
+/// This is all of the Braille Unicode characters, as individual `&str`s.
+#[rustfmt::skip]
+const BRAILLE_TABLE: [&str; 256] = [
+    "⠀","⠁","⠂","⠃","⠄","⠅","⠆","⠇","⠈","⠉","⠊","⠋","⠌","⠍","⠎","⠏",
+    "⠐","⠑","⠒","⠓","⠔","⠕","⠖","⠗","⠘","⠙","⠚","⠛","⠜","⠝","⠞","⠟",
+    "⠠","⠡","⠢","⠣","⠤","⠥","⠦","⠧","⠨","⠩","⠪","⠫","⠬","⠭","⠮","⠯",
+    "⠰","⠱","⠲","⠳","⠴","⠵","⠶","⠷","⠸","⠹","⠺","⠻","⠼","⠽","⠾","⠿",
+    "⡀","⡁","⡂","⡃","⡄","⡅","⡆","⡇","⡈","⡉","⡊","⡋","⡌","⡍","⡎","⡏",
+    "⡐","⡑","⡒","⡓","⡔","⡕","⡖","⡗","⡘","⡙","⡚","⡛","⡜","⡝","⡞","⡟",
+    "⡠","⡡","⡢","⡣","⡤","⡥","⡦","⡧","⡨","⡩","⡪","⡫","⡬","⡭","⡮","⡯",
+    "⡰","⡱","⡲","⡳","⡴","⡵","⡶","⡷","⡸","⡹","⡺","⡻","⡼","⡽","⡾","⡿",
+    "⢀","⢁","⢂","⢃","⢄","⢅","⢆","⢇","⢈","⢉","⢊","⢋","⢌","⢍","⢎","⢏",
+    "⢐","⢑","⢒","⢓","⢔","⢕","⢖","⢗","⢘","⢙","⢚","⢛","⢜","⢝","⢞","⢟",
+    "⢠","⢡","⢢","⢣","⢤","⢥","⢦","⢧","⢨","⢩","⢪","⢫","⢬","⢭","⢮","⢯",
+    "⢰","⢱","⢲","⢳","⢴","⢵","⢶","⢷","⢸","⢹","⢺","⢻","⢼","⢽","⢾","⢿",
+    "⣀","⣁","⣂","⣃","⣄","⣅","⣆","⣇","⣈","⣉","⣊","⣋","⣌","⣍","⣎","⣏",
+    "⣐","⣑","⣒","⣓","⣔","⣕","⣖","⣗","⣘","⣙","⣚","⣛","⣜","⣝","⣞","⣟",
+    "⣠","⣡","⣢","⣣","⣤","⣥","⣦","⣧","⣨","⣩","⣪","⣫","⣬","⣭","⣮","⣯",
+    "⣰","⣱","⣲","⣳","⣴","⣵","⣶","⣷","⣸","⣹","⣺","⣻","⣼","⣽","⣾","⣿",
+];
 
 pub(crate) fn write_colored_and_measure<B: tui::backend::Backend + io::Write>(
     backend: &mut B,

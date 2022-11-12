@@ -155,6 +155,9 @@ pub(crate) enum CharacterMode {
     /// If colors are enabled, equivalent to [`CharacterMode::Split`].
     /// Otherwise, use block drawing characters to approximately represent brightness.
     Shapes,
+
+    /// Use Braille symbols as 2×4 dot patterns.
+    Braille,
 }
 
 impl CharacterMode {
@@ -165,7 +168,8 @@ impl CharacterMode {
             Names => Shades,
             Shades => Split,
             Split => Shapes,
-            Shapes => Names,
+            Shapes => Braille,
+            Braille => Names,
         }
     }
 
@@ -174,6 +178,7 @@ impl CharacterMode {
         match self {
             Names | Shades => Vector2::new(1, 1),
             Split | Shapes => Vector2::new(1, 2),
+            Braille => Vector2::new(2, 4),
         }
     }
 }
