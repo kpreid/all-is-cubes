@@ -20,6 +20,7 @@ bench = false
 all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }
 # TODO: remove dependency on anyhow in favor of more precisely designed errors
 anyhow = "1.0"
+# TODO: dot_vox 5.x is currently nightly-only for unclear reasons -- issue filed
 dot_vox = "4.1.0"
 # TODO: replace logging with explicit reporting data flow
 log = { version = "0.4.14", default-features = false }
