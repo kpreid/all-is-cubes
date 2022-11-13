@@ -35,8 +35,19 @@ jobs:
             primary: false
           
           # Nightly Rust
+          # We test on this so that we can report new compiler bugs fast.
+          # However, by the same premise, it breaks often.
           - os: ubuntu-latest
             toolchain: nightly
+            depversions: locked
+            primary: false
+          
+          # Beta Rust (future stable release)
+          # We test on this so that we can report compiler bugs that made it out of
+          # nightly and their fixes should be backported, and so that we have signal
+          # that is less unstable than nightly.
+          - os: ubuntu-latest
+            toolchain: beta
             depversions: locked
             primary: false
           
