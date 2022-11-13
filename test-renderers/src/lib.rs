@@ -21,11 +21,10 @@
 )]
 
 use std::fs;
-use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
-use image::{ImageError, RgbaImage};
+use image::RgbaImage;
 
 use all_is_cubes::character::Character;
 use all_is_cubes::space::Space;
@@ -134,24 +133,18 @@ pub fn compare_rendered_image(
 
     // TODO: all this needs a bunch of code deduplication for conveniently trying-to-open and carrying around the image and path
 
-    let expected_file_path = image_path(&test, Version::Expected);
-
     // Load expected image, if any
     let (expected_image, expected_file_path): (RgbaImage, PathBuf) =
-        match image::open(&expected_file_path) {
-            Ok(image) => (image.to_rgba8(), expected_file_path),
-            Err(ImageError::IoError(e)) if e.kind() == io::ErrorKind::NotFound => {
+        match load_and_copy_expected_image(&test) {
+            Ok(r) => r,
+            Err(NotFound(_)) => {
                 // Look for a generic all-renderers output file
-                let expected_file_path = image_path(
-                    &ImageId {
-                        renderer: RendererId::All,
-                        ..test
-                    },
-                    Version::Expected,
-                );
-                match image::open(&expected_file_path) {
-                    Ok(image) => (image.to_rgba8(), expected_file_path),
-                    Err(ImageError::IoError(e)) if e.kind() == io::ErrorKind::NotFound => {
+                match load_and_copy_expected_image(&ImageId {
+                    renderer: RendererId::All,
+                    ..test
+                }) {
+                    Ok(r) => r,
+                    Err(NotFound(expected_file_path)) => {
                         return ComparisonRecord::from_paths(
                             &expected_file_path,
                             &actual_file_path,
@@ -159,16 +152,8 @@ pub fn compare_rendered_image(
                             ComparisonOutcome::NoExpected,
                         );
                     }
-                    Err(e) => panic!(
-                        "Failed to read expected image '{p}': {e}",
-                        p = expected_file_path.display()
-                    ),
                 }
             }
-            Err(e) => panic!(
-                "Failed to read expected image '{p}': {e}",
-                p = expected_file_path.display()
-            ),
         };
 
     // Compare expected and actual images

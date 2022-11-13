@@ -107,9 +107,7 @@ jobs:
       with:
         name: test-renderers-output ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
-          target/test-renderers-*/
-          test-renderers/expected/
-          test-renderers/src/report.css
+          target/test-renderers-output/
 
     # Unlike the tests, we *do* run lint against all versions because future
     # warnings might be interesting.

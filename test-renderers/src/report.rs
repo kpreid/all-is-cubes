@@ -79,15 +79,21 @@ pub(crate) fn write_report_file() -> PathBuf {
 
     let rendered = tt.render("report", &context).unwrap();
 
-    let mut report_path: PathBuf = test_data_dir_path(Version::Actual);
-    report_path.push("index.html");
-
+    let report_path: PathBuf = test_data_dir_path(Version::Root).join("index.html");
     fs::write(&report_path, rendered).unwrap();
+
+    // Copy report CSS so it is self-contained
+    fs::write(
+        test_data_dir_path(Version::Root).join("report.css"),
+        include_bytes!("report.css"),
+    )
+    .unwrap();
+
     report_path
 }
 
 pub fn results_json_path(renderer_id: RendererId) -> PathBuf {
-    test_data_dir_path(Version::Actual).join(format!("results-{renderer_id}.json"))
+    test_data_dir_path(Version::Root).join(format!("results-{renderer_id}.json"))
 }
 
 /// Types for the HTML templating

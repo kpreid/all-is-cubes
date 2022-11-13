@@ -3,7 +3,7 @@
   <title>All is Cubes test-renderers report</title>
   <meta http-equiv="content-type" content="text/html; charset=UTF-8">
   <meta name="viewport" content="width=device-width">
-  <link rel="stylesheet" type="text/css" href="../../test-renderers/src/report.css">
+  <link rel="stylesheet" type="text/css" href="./report.css">
 </head>
 <body>
   <table class="results-table">
@@ -27,16 +27,16 @@
             ">
               {{ if comp_record.show_expected_for_comparison }}
                 <figure>
-                  <img src="../../test-renderers/expected/{comp_record.expected_file_name}" title="Expected">
+                  <img src="expected/{comp_record.expected_file_name}" title="Expected">
                   <figcaption>Expected</figcaption>
                 </figure><!--
                 --><figure>
-                  <img src="../test-renderers-diffs/{comp_record.diff_file_name}" title="Diff">
+                  <img src="diff/{comp_record.diff_file_name}" title="Diff">
                   <figcaption>Diff</figcaption>
                 </figure>
               {{- endif -}}
               <figure>
-                <img src="./{comp_record.actual_file_name}" title="Actual">
+                <img src="actual/{comp_record.actual_file_name}" title="Actual">
                 <figcaption>
                   {{ if comp_record.show_expected_for_comparison }}Actual{{ endif }}
                   {comp_record.flawedness}
