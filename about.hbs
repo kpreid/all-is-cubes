@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html><head>
+    <meta http-equiv="Content-Type" value="text/html;charset=utf-8">
+    <style>
+        /* Colors */
+        /* TODO: make these colors agree with All is Cubes' own theming, where applicable */
+        body {
+            background: white;
+            color: black;
+        }
+        :link { background: none; color: #0000ff; }
+        :visited { background: none; color: #aa00ff; }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #333;
+                color: white;
+            }
+            :link { background: none; color: skyblue; }
+            :visited { background: none; color: #ddaaff; }
+        }
+
+        /* Page layout */
+        .intro, h2, .context, .licenses-overview {
+            max-width: 30rem;
+            margin: 0.8em auto;
+        }
+        h1 {
+            text-align: center;
+        }
+        .licenses-list {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* License text readability */
+        .license-text {
+            border: 0.05em solid #777777;
+            padding: 1em;
+
+            white-space: pre-wrap;
+        }
+        @media screen {
+            .license-text-layout-wrapper {
+                text-align: center;
+            }
+            .license-text-layout-wrapper details {
+                display: inline-block;
+                margin: 0 auto;
+            }
+            .license-text {
+                text-align: left;
+                overflow-y: scroll;
+                max-height: 40em; /* fallback if unsupported */
+                max-height: 90vh; /* don't make a scrollable bigger than the viewport */
+            }
+        }
+    </style>
+</head><body>
+
+<div class="intro">
+    <h1>Third Party Licenses</h1>
+    <p>This page lists the licenses of the software libraries used in All is Cubes.
+    These licenses may affect your obligations if you choose to distribute copies of the
+    compiled forms of All is Cubes.
+    They do not necessarily apply to distributing copies of the source code of All is Cubes
+    itself; in that case, please read the license files included with said source code.</p>
+
+    <p>The following types of licenses (as classified within the 
+    <a href="https://spdx.org/licenses/">SPDX</a> identification system) are present:</p>
+
+    <ul class="licenses-overview">
+        {{#each overview}}
+        <li><a href="#{{id}}">{{name}}</a> (× {{count}})</li>
+        {{/each}}
+    </ul>
+</div>
+
+<h2>Text of all licenses</h2>
+<ul class="licenses-list">
+    {{#each licenses}}
+    <li class="license">
+        <div class="context">
+            <h3 id="{{id}}">{{name}}</h3>
+            <p>The {{name}}, with the text given below, is used by the following packages:</p>
+            <ul class="license-used-by">
+                {{#each used_by}}
+                <!-- link to crates.io (not the repository) for stable addressing -->
+                <li><a href="https://crates.io/crates/{{crate.name}}/{{crate.version}}">
+                    {{crate.name}} {{crate.version}}
+                </a></li>
+                {{/each}}
+            </ul>
+        </div>
+        <div class="license-text-layout-wrapper">
+            <details open>
+                <summary>Full text</summary>
+                <pre class="license-text">{{text}}</pre>
+            </details>
+        </div>
+    </li>
+    {{/each}}
+</ul>
+
+</body></html>
