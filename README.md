@@ -26,7 +26,7 @@ Building and running
 
 * `npm` (use your choice of source)
 * `wasm-pack` (I suggest `cargo install wasm-pack`)
-* [`cargo-about`] (`cargo install wasm-pack)
+* [`cargo-about`] (`cargo install cargo-about`)
 
 (If you would like to avoid all of this, then descend into the `all-is-cubes` or `all-is-cubes-desktop` directories as applicable and work using plain `cargo [build|test|run]` there, since those directories contain no web dependencies.)
 
@@ -69,4 +69,5 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
 
-[cargo-about]: https://crates.io/crates/cargo-about
+
+[`cargo-about`]: https://crates.io/crates/cargo-about
