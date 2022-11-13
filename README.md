@@ -22,7 +22,13 @@ This repository is divided into several Rust packages:
 Building and running
 --------------------
 
-**First time setup:** Unless you don't intend to build the WebAssembly/WebGL version of all-is-cubes or run the full test suite, you will need to install `npm` (use your choice of source) and `wasm-pack` (I suggest `cargo install wasm-pack`). (If you would like to avoid this, then descend into the `all-is-cubes` or `all-is-cubes-desktop` directories as applicable and work using plain `cargo [build|test|run]` there, since those directories contain no web dependencies.)
+**First time setup:** Unless you don't intend to build the WebAssembly/WebGL version of all-is-cubes or run the full test suite, you will need to install
+
+* `npm` (use your choice of source)
+* `wasm-pack` (I suggest `cargo install wasm-pack`)
+* [`cargo-about`] (`cargo install wasm-pack)
+
+(If you would like to avoid all of this, then descend into the `all-is-cubes` or `all-is-cubes-desktop` directories as applicable and work using plain `cargo [build|test|run]` there, since those directories contain no web dependencies.)
 
 Because of the complication of having some wasm-specific code, some commands for building, testing, and running the entire project are collected in the `xtask` build tool for convenience and to ensure all non-Rust files are built when needed.
 
@@ -62,3 +68,5 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
+
+[cargo-about]: https://crates.io/crates/cargo-about

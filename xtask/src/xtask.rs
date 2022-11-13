@@ -15,6 +15,7 @@
 
 use std::ffi::OsStr;
 use std::fmt;
+use std::fs;
 use std::io::Write as _;
 use std::mem;
 use std::path::Component;
@@ -22,6 +23,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
 use std::time::Instant;
+use std::time::SystemTime;
 
 use anyhow::Context as _;
 use anyhow::Error as ActionError;
@@ -158,7 +160,7 @@ fn main() -> Result<(), ActionError> {
                 eprint!("Editing {manifest_path}...");
                 let _ = std::io::stderr().flush();
                 let mut manifest: toml_edit::Document =
-                    std::fs::read_to_string(&manifest_path)?.parse()?;
+                    fs::read_to_string(&manifest_path)?.parse()?;
                 assert_eq!(manifest["package"]["name"].as_str(), Some(package));
 
                 // Update version of the package itself
@@ -176,7 +178,7 @@ fn main() -> Result<(), ActionError> {
                     count_deps += 1;
                 }
 
-                std::fs::write(&manifest_path, manifest.to_string())?;
+                fs::write(&manifest_path, manifest.to_string())?;
                 eprintln!("wrote version and {count_deps} deps.");
             }
             eprint!(
@@ -335,7 +337,7 @@ fn write_development_files() -> Result<(), ActionError> {
     // supported.
     if let Some(dir) = PROJECT_DIR.to_str() {
         let desktop_path = format!("{dir}/all-is-cubes-desktop/all-is-cubes.desktop");
-        std::fs::write(
+        fs::write(
             &desktop_path,
             format!(
                 "\
@@ -359,12 +361,12 @@ SingleMainWindow=true
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt as _;
-            let mut permissions = std::fs::metadata(&desktop_path)
+            let mut permissions = fs::metadata(&desktop_path)
                 .context("read metadata for desktop file")?
                 .permissions();
             // Set execute bit
             permissions.set_mode(permissions.mode() | 0o111);
-            std::fs::set_permissions(&desktop_path, permissions)
+            fs::set_permissions(&desktop_path, permissions)
                 .context("write metadata for desktop file")?;
         }
     } else {
@@ -397,6 +399,26 @@ fn ensure_wasm_tools_installed(time_log: &mut Vec<Timing>) -> Result<(), ActionE
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
         cmd!("npm install").run()?;
     }
+
+    // Generate combined license file.
+    let license_html_path = PROJECT_DIR.join("all-is-cubes-wasm/static/third-party-licenses.html");
+    let license_template_path = PROJECT_DIR.join("about.hbs");
+    if newer_than(
+        [&PROJECT_DIR.join("Cargo.lock"), &license_template_path],
+        [&license_html_path],
+    ) {
+        // TODO: also ensure cargo-about is installed and has at least the expected version
+        cargo()
+            .args([
+                "about",
+                "generate",
+                license_template_path.to_str().unwrap(),
+                "-o",
+                license_html_path.to_str().unwrap(),
+            ])
+            .run()?;
+    }
+
     Ok(())
 }
 
@@ -447,6 +469,52 @@ static PROJECT_DIR: Lazy<PathBuf> = Lazy::new(|| {
 /// Start a [`Cmd`] with the cargo command we should use.
 fn cargo() -> Cmd {
     Cmd::new(std::env::var("CARGO").expect("CARGO environment variable not set"))
+}
+
+/// Test if some input files are newer than some output files, or if the output files don't exist.
+#[track_caller]
+fn newer_than<P1, P2>(inputs: impl AsRef<[P1]>, outputs: impl AsRef<[P2]>) -> bool
+where
+    P1: AsRef<Path>,
+    P2: AsRef<Path>,
+{
+    let newest_input: SystemTime = inputs
+        .as_ref()
+        .iter()
+        .map(|path| {
+            fs::metadata(path)
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "IO error while checking timestamp of {p}: {e}",
+                        p = path.as_ref().display()
+                    )
+                })
+                .modified()
+                .expect("mtime support required")
+        })
+        .max()
+        .expect("Must have at least one input file");
+    let oldest_output: Option<SystemTime> = outputs
+        .as_ref()
+        .iter()
+        .map(|path| {
+            let path: &Path = path.as_ref();
+            match fs::metadata(path) {
+                Ok(metadata) => Some(metadata.modified().unwrap()),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+                Err(e) => panic!(
+                    "IO error while checking timestamp of {p}: {e}",
+                    p = path.display()
+                ),
+            }
+        })
+        .min()
+        .expect("Must have at least one output file");
+
+    match oldest_output {
+        None => true, // some file did not exist
+        Some(t) => newest_input >= t,
+    }
 }
 
 /// Describe how long a sub-task took.

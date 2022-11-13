@@ -1,8 +1,11 @@
-# Rust (Cargo) build files
+# Rust (Cargo) build output files
 /target
 /*/target
 
-# JavaScript (NPM) build files
+# JavaScript (NPM) dependency and build output files
 /all-is-cubes-wasm/node_modules
 /all-is-cubes-wasm/dist
 /all-is-cubes-wasm/pkg
+
+# Generated file (by xtask) which is an input to NPM build
+/all-is-cubes-wasm/static/third-party-licenses.html
