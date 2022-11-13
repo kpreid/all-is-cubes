@@ -98,6 +98,8 @@ pub fn results_json_path(renderer_id: RendererId) -> PathBuf {
 
 /// Types for the HTML templating
 mod tmpl {
+    use itertools::Itertools;
+
     use crate::{ComparisonOutcome, ComparisonRecord};
 
     #[derive(serde::Serialize)]
@@ -124,6 +126,7 @@ mod tmpl {
         actual_file_name: String,
         diff_file_name: String,
         show_expected_for_comparison: bool,
+        diffcount: String,
         flawedness: String,
     }
 
@@ -138,6 +141,18 @@ mod tmpl {
                     ComparisonOutcome::Equal => false,
                     ComparisonOutcome::Flawed(_) => false,
                     ComparisonOutcome::NoExpected => true,
+                },
+                // Show histogram details but only if not flawed
+                diffcount: match &input.outcome {
+                    ComparisonOutcome::Flawed(_) => "".into(),
+                    _ => input
+                        .diff_histogram
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .filter(|&(delta, count)| count > 0 && delta > 0)
+                        .map(|(delta, count)| format!("Δ{delta} ×{count}"))
+                        .join(", "),
                 },
                 flawedness: match &input.outcome {
                     ComparisonOutcome::Flawed(flaws) => format!("Flaws: {flaws}"),

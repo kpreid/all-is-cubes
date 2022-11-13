@@ -59,6 +59,7 @@ pub struct ComparisonRecord {
     expected_file_name: String,
     actual_file_name: String,
     diff_file_name: Option<String>,
+    diff_histogram: Vec<usize>, // length 256; is a Vec for serializability
     outcome: ComparisonOutcome,
 }
 
@@ -80,6 +81,7 @@ impl ComparisonRecord {
         expected_file_path: &Path,
         actual_file_path: &Path,
         diff_file_path: Option<&Path>,
+        diff_histogram: [usize; 256],
         outcome: ComparisonOutcome,
     ) -> Self {
         ComparisonRecord {
@@ -97,6 +99,7 @@ impl ComparisonRecord {
                 .to_string(),
             diff_file_name: diff_file_path
                 .map(|p| p.file_name().unwrap().to_str().unwrap().to_string()),
+            diff_histogram: diff_histogram.into_iter().collect(),
             outcome,
         }
     }
@@ -149,6 +152,7 @@ pub fn compare_rendered_image(
                             &expected_file_path,
                             &actual_file_path,
                             None,
+                            [0; 256],
                             ComparisonOutcome::NoExpected,
                         );
                     }
@@ -170,6 +174,7 @@ pub fn compare_rendered_image(
         &expected_file_path,
         &actual_file_path,
         Some(&diff_file_path),
+        diff_result.histogram,
         if diff_result.equal_or_different_below_threshold(allowed_difference) {
             ComparisonOutcome::Equal
         } else {
