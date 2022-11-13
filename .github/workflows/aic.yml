@@ -73,9 +73,14 @@ jobs:
     - uses: Swatinem/rust-cache@v2.0.2
 
     - name: Install wasm-pack
-      # Use workspace target directory for cargo install's build,
-      # so that the build of wasm-pack will be cached by rust-cache action.
       run: cargo install wasm-pack
+      # Use workspace target dir for cargo install's build, so that the build will be cached.
+      env:
+        CARGO_TARGET_DIR: target/
+
+    - name: Install cargo-about
+      run: cargo install cargo-about
+      # Use workspace target dir for cargo install's build, so that the build will be cached.
       env:
         CARGO_TARGET_DIR: target/
 

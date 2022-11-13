@@ -11,7 +11,7 @@ html, body {
   position: absolute;
   font-weight: bold;
   color: white;
-  text-shadow: 0 0 .3em #000;
+  text-shadow: 0 0 .1em #000,  0 0 .1em #000;
   margin: 0 0;
   display: table;
   pointer-events: none;
@@ -138,9 +138,15 @@ body {
   font: message-box;
 }
 
-#toggles {
+#license-overlay {
   position: absolute;
-  top: 6px;
+  bottom: 6px;
   right: 6px;
   text-align: right;
+}
+#license-overlay * {
+  /* override link color for contrast */
+  color: white;
+  text-shadow: 0 0 .1em #000;
+  background: none;
 }
