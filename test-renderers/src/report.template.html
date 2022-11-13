@@ -25,7 +25,10 @@
             <div class="comparison-record
             {{ if comp_record.show_expected_for_comparison }}comparison-record-with-diff{{ endif }}
             ">
-              {{ if comp_record.show_expected_for_comparison }}
+              <details class="expected-and-diff-details">
+                <summary
+                  {{ if comp_record.show_expected_for_comparison }} open {{ endif }}               
+                >🔍</summary>
                 <figure>
                   <img src="expected/{comp_record.expected_file_name}" title="Expected">
                   <figcaption>Expected</figcaption>
@@ -34,12 +37,12 @@
                   <img src="diff/{comp_record.diff_file_name}" title="Diff">
                   <figcaption>Diff</figcaption>
                 </figure>
-              {{- endif -}}
-              <figure>
+              </details><!--
+              --><figure>
                 <img src="actual/{comp_record.actual_file_name}" title="Actual">
                 <figcaption>
-                  {{ if comp_record.show_expected_for_comparison }}Actual{{ endif }}
-                  {comp_record.flawedness}
+                  <div>Actual</div>
+                  <div>{comp_record.flawedness}</div>
                 </figcaption>
               </figure>
             </div>

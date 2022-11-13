@@ -27,6 +27,10 @@ td.test-case-name-cell {
     vertical-align: baseline;
 }
 
+.test-outcome {
+    float: left;
+}
+
 /* Image comparisons */
 
 .comparison-record {
@@ -38,9 +42,21 @@ td.test-case-name-cell {
     white-space: nowrap;
 }
 
+.comparison-record > * {
+    vertical-align: top;
+}
+
 .comparison-record-with-diff {
     /* Both highlight errors, and group diff results together. */
     border-color: red;
+}
+
+details.expected-and-diff-details {
+    display: inline;
+}
+.expected-and-diff-details > summary {
+    display: inline;
+    cursor: pointer;
 }
 
 figure {
