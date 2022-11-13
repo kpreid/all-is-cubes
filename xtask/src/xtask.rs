@@ -183,7 +183,7 @@ fn main() -> Result<(), ActionError> {
             }
             eprint!(
                 "Versions updated. Manual updates are still needed for:\n\
-                Documentation links\n\
+                Documentation links in the main README\n\
                 npm package\n\
                 "
             );
@@ -194,13 +194,16 @@ fn main() -> Result<(), ActionError> {
             let maybe_dry = if for_real { vec![] } else { vec!["--dry-run"] };
             for package in ALL_NONTEST_PACKAGES {
                 if package == "all-is-cubes-wasm" {
-                    // Not published to crates.io; built and packaged as a part of of all-is-cubes-server.
+                    // Not published to crates.io; built and packaged as a part of all-is-cubes-server.
                     continue;
                 }
 
                 let _pushd: Pushd = pushd(package)?;
                 if for_real {
-                    // Let crates.io pick up the new all-is-cubes version or publishing dependents will fail
+                    // Let crates.io pick up the new all-is-cubes version,
+                    // or publishing dependents will fail.
+                    // TODO: This will stop being necessary in Rust 1.66:
+                    // <https://github.com/rust-lang/cargo/issues/9507>
                     std::thread::sleep(Duration::from_secs(10));
                 }
                 cargo()
