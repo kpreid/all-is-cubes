@@ -1,0 +1,114 @@
+{
+  "asset": {
+    "extras": {},
+    "generator": "all-is-cubes",
+    "version": "2.0"
+  },
+  "extras": {},
+  "cameras": [
+    {
+      "perspective": {
+        "aspectRatio": 1.3333334,
+        "yfov": 1.5707964,
+        "zfar": 200.0,
+        "znear": 0.03125,
+        "extras": {}
+      },
+      "type": "perspective",
+      "extras": {}
+    }
+  ],
+  "materials": [
+    {
+      "alphaMode": "OPAQUE",
+      "doubleSided": false,
+      "name": "aic-vertex-opaque",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 1.0,
+        "extras": {}
+      },
+      "emissiveFactor": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "extras": {}
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": false,
+      "name": "aic-vertex-transparent",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 1.0,
+        "extras": {}
+      },
+      "emissiveFactor": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "extensions": {
+        "KHR_materials_transmission": {
+          "transmissionFactor": 0.0,
+          "extras": {}
+        },
+        "KHR_materials_volume": {
+          "thicknessFactor": 1.0,
+          "attenuationDistance": null,
+          "attenuationColor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "extras": {}
+        }
+      },
+      "extras": {}
+    }
+  ],
+  "nodes": [
+    {
+      "camera": 0,
+      "extras": {},
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "extras": {},
+      "name": "recording",
+      "nodes": [
+        0
+      ]
+    }
+  ]
+}
