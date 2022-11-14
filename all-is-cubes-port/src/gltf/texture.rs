@@ -13,7 +13,7 @@ pub(crate) type TexPoint = Vector3<f32>;
 /// You may use this with [`SpaceMesh`] to create meshes that can be exported.
 ///
 /// [`SpaceMesh`]: all_is_cubes::mesh::SpaceMesh
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct GltfTextureAllocator {
     #[allow(dead_code)] // TODO: work-in-progress code
     pub(crate) destination: GltfDataDestination,

@@ -53,6 +53,9 @@ pub struct GltfWriter {
     /// Where to write the buffers and textures.
     buffer_dest: GltfDataDestination,
 
+    /// Testure allocator configured to write to this destination.
+    texture_allocator: GltfTextureAllocator,
+
     /// Materials the meshes need.
     materials: Materials,
 
@@ -84,6 +87,7 @@ impl GltfWriter {
 
         Self {
             materials: Materials::new(&mut root.materials),
+            texture_allocator: GltfTextureAllocator::new(buffer_dest.clone()),
 
             root,
             buffer_dest,
@@ -96,9 +100,7 @@ impl GltfWriter {
     /// Returns a [`TextureAllocator`](all_is_cubes::mesh::TextureAllocator) that writes
     /// textures into this glTF asset
     pub fn texture_allocator(&self) -> GltfTextureAllocator {
-        GltfTextureAllocator {
-            destination: self.buffer_dest.clone(),
-        }
+        self.texture_allocator.clone()
     }
 
     /// Add one frame of an animated scene.
