@@ -76,6 +76,9 @@ impl GltfWriter {
                 generator: Some(String::from("all-is-cubes")),
                 ..gltf_json::Asset::default()
             },
+            extensions_used: ["KHR_materials_transmission", "KHR_materials_volume"]
+                .map(String::from)
+                .to_vec(),
             ..gltf_json::Root::default()
         };
 
