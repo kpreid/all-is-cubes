@@ -8,8 +8,11 @@ use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::camera::Camera;
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::math::GridAab;
 use all_is_cubes::mesh::{chunked_mesh::ChunkedSpaceMesh, SpaceMesh};
 use all_is_cubes::raytracer::RtRenderer;
+use all_is_cubes::space::Space;
+use all_is_cubes::universe;
 use all_is_cubes_port::gltf::{
     json as gltf_json, json::Index, GltfDataDestination, GltfTextureAllocator, GltfTextureRef,
     GltfVertex, GltfWriter,
@@ -143,7 +146,15 @@ impl Recorder {
                 RecorderInner::Mesh(MeshRecorder {
                     // TODO: We need to tell the ChunkedSpaceMesh to have an infinite view distance
                     // (or at least as much data as we care about).
-                    csm: ChunkedSpaceMesh::new(cameras.world_space().snapshot().unwrap()),
+                    csm: ChunkedSpaceMesh::new(cameras.world_space().snapshot().unwrap_or_else(
+                        || {
+                            universe::URef::new_pending(
+                                universe::Name::from("empty-space-placeholder"),
+                                Space::builder(GridAab::from_lower_size([0, 0, 0], [0, 0, 0]))
+                                    .build(),
+                            )
+                        },
+                    )),
                     tex,
                     scene_sender: Some(scene_sender),
                     cameras,
