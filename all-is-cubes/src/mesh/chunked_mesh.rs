@@ -52,16 +52,18 @@ where
     /// The chunk in which the last [`Camera`] provided is located.
     view_chunk: ChunkPos<CHUNK_SIZE>,
 
-    /// Whether, on the previous frame, some chunks were unavailable.
-    /// If so, then we prioritize adding new chunks over updating existing ones.
-    chunks_were_missing: bool,
+    /// Whether, on the previous frame, we did not finish updating all visible chunks.
+    ///
+    /// If so, then we prioritize adding new chunks over updating existing ones,
+    /// because blank world is a worse outcome than slightly stale world.
+    did_not_finish_chunks: bool,
 
     /// The [`MeshOptions`] specified by the last [`Camera`] provided.
     last_mesh_options: Option<MeshOptions>,
 
     /// Most recent time at which we reset to no data.
     zero_time: Instant,
-    /// Earliest time prior to `zero_time` at which we finished everything in the queue.
+    /// Earliest time prior to `zero_time` at which we finished everything in the queues.
     complete_time: Option<Instant>,
 }
 
@@ -85,7 +87,7 @@ where
             chunks: FnvHashMap::default(),
             chunk_chart: ChunkChart::new(0.0),
             view_chunk: ChunkPos(Point3::new(0, 0, 0)),
-            chunks_were_missing: true,
+            did_not_finish_chunks: true,
             last_mesh_options: None,
             zero_time: Instant::now(),
             complete_time: None,
@@ -224,7 +226,7 @@ where
         let chunk_bounds = space.bounds().divide(CHUNK_SIZE);
         let mut chunk_mesh_generation_times = TimeStats::default();
         let mut chunk_mesh_callback_times = TimeStats::default();
-        let mut chunks_are_missing = false;
+        let mut did_not_finish = false;
         for p in self.chunk_chart.chunks(view_chunk, OctantMask::ALL) {
             if !chunk_bounds.contains_cube(p.0) {
                 // Chunk not in the Space
@@ -233,6 +235,7 @@ where
 
             let this_chunk_start_time = Instant::now();
             if this_chunk_start_time > deadline {
+                did_not_finish = true;
                 break;
             }
 
@@ -243,7 +246,7 @@ where
                 .get(&p)
                 .map(|ct| ct.recompute_mesh)
                 .unwrap_or(false)
-                && !self.chunks_were_missing)
+                && !self.did_not_finish_chunks)
                 || matches!(chunk_entry, Vacant(_))
                 || matches!(
                     chunk_entry,
@@ -251,9 +254,7 @@ where
             {
                 //let compute_start = Instant::now();
                 let chunk = chunk_entry.or_insert_with(|| {
-                    // Chunk is missing. Note this for update planning.
-                    chunks_are_missing = true;
-                    // Remember that we want to track dirty flags.
+                    // Remember that we want to track dirty flags for this chunk.
                     todo.chunks.insert(p, ChunkTodo::CLEAN);
                     // Generate new chunk.
                     ChunkMesh::new(p)
@@ -273,7 +274,7 @@ where
                     TimeStats::one(Instant::now().duration_since(compute_end_update_start));
             }
         }
-        self.chunks_were_missing = chunks_are_missing;
+        self.did_not_finish_chunks = did_not_finish;
         let chunk_scan_end_time = Instant::now();
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
@@ -288,7 +289,7 @@ where
             None
         };
 
-        if all_done_with_blocks && !chunks_are_missing && self.complete_time.is_none() {
+        if all_done_with_blocks && !did_not_finish && self.complete_time.is_none() {
             let t = Instant::now();
             log::debug!(
                 "SpaceRenderer({space}): all meshes done in {time}",
@@ -1037,5 +1038,41 @@ mod tests {
         // Check that there is not indefinite accumulation of chunks.
         // (But allow some slop for a caching policy.)
         assert!(tester.csm.iter_chunks().count() < initial_chunk_count * 3);
+    }
+
+    /// Test the logic which decides whether `ChunkedSpaceMesh` managed to completely
+    /// update itself.
+    #[test]
+    fn did_not_finish_detection() {
+        let mut tester = CsmTester::new(Space::empty_positive(1000, 1, 1), LARGE_VIEW_DISTANCE);
+
+        eprintln!("--- timing out update");
+        // Perform an update with no time available so it will always time out and not
+        // update anything.
+        let _ = tester.csm.update_blocks_and_some_chunks(
+            &tester.camera,
+            &NoTextures,
+            Instant::now() - Duration::from_secs(1),
+            |_| {},
+        );
+
+        // This is the state that should(n't) be affected.
+        // (If we stop having `complete_time` then it's okay to just delete that part of
+        // the assertion.)
+        assert_eq!(
+            (tester.csm.did_not_finish_chunks, tester.csm.complete_time),
+            (true, None)
+        );
+
+        eprintln!("--- normal update");
+        // Now while we're at it, try finishing things and check that state too.
+        tester.update(|_| {});
+        assert_eq!(
+            (
+                tester.csm.did_not_finish_chunks,
+                tester.csm.complete_time.is_some(),
+            ),
+            (false, true)
+        );
     }
 }
