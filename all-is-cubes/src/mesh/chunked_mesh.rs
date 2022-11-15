@@ -9,7 +9,7 @@ use indoc::indoc;
 use instant::{Duration, Instant};
 
 use crate::block::EvaluatedBlock;
-use crate::camera::Camera;
+use crate::camera::{Camera, Flaws};
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
 use crate::listen::Listener;
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint};
@@ -289,7 +289,8 @@ where
             None
         };
 
-        if all_done_with_blocks && !did_not_finish && self.complete_time.is_none() {
+        let complete = all_done_with_blocks && !did_not_finish;
+        if complete && self.complete_time.is_none() {
             let t = Instant::now();
             log::debug!(
                 "SpaceRenderer({space}): all meshes done in {time}",
@@ -299,7 +300,16 @@ where
             self.complete_time = Some(t);
         }
 
+        let mut flaws = Flaws::empty();
+        // TODO: also report missing block textures as flaws
+        if !complete {
+            // TODO: Make this a little less strict; if we timed out but there is nothing in todo
+            // and we were previously complete, then there isn't actually any flaw.
+            flaws |= Flaws::UNFINISHED;
+        }
+
         CsmUpdateInfo {
+            flaws,
             total_time: depth_sort_end_time
                 .unwrap_or(chunk_scan_end_time)
                 .duration_since(update_start_time),
@@ -326,6 +336,7 @@ where
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct CsmUpdateInfo {
+    pub flaws: Flaws,
     pub total_time: Duration,
     /// Time spent on gathering information before starting the chunk scan.
     pub prep_time: Duration,
@@ -344,6 +355,7 @@ pub struct CsmUpdateInfo {
 impl CustomFormat<StatusText> for CsmUpdateInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
         let CsmUpdateInfo {
+            flaws,
             total_time: _,
             prep_time,
             chunk_scan_time,
@@ -355,13 +367,14 @@ impl CustomFormat<StatusText> for CsmUpdateInfo {
         write!(
             fmt,
             indoc! {"
-                Space prep     {prep_time}
+                Space prep     {prep_time}       Mesh flaws: {flaws:?}
                 Block mesh gen {block_updates}
                 Chunk scan     {chunk_scan_time}
                       mesh gen {chunk_mesh_generation_times}
                       upload   {chunk_mesh_callback_times}
                       depthsort {depth_sort_time}\
             "},
+            flaws = flaws,
             prep_time = prep_time.custom_format(StatusText),
             block_updates = block_updates,
             chunk_scan_time = chunk_scan_time.custom_format(StatusText),
@@ -1049,7 +1062,7 @@ mod tests {
         eprintln!("--- timing out update");
         // Perform an update with no time available so it will always time out and not
         // update anything.
-        let _ = tester.csm.update_blocks_and_some_chunks(
+        let info = tester.csm.update_blocks_and_some_chunks(
             &tester.camera,
             &NoTextures,
             Instant::now() - Duration::from_secs(1),
@@ -1060,19 +1073,24 @@ mod tests {
         // (If we stop having `complete_time` then it's okay to just delete that part of
         // the assertion.)
         assert_eq!(
-            (tester.csm.did_not_finish_chunks, tester.csm.complete_time),
-            (true, None)
+            (
+                info.flaws,
+                tester.csm.did_not_finish_chunks,
+                tester.csm.complete_time
+            ),
+            (Flaws::UNFINISHED, true, None)
         );
 
         eprintln!("--- normal update");
         // Now while we're at it, try finishing things and check that state too.
-        tester.update(|_| {});
+        let info = tester.update(|_| {});
         assert_eq!(
             (
+                info.flaws,
                 tester.csm.did_not_finish_chunks,
                 tester.csm.complete_time.is_some(),
             ),
-            (false, true)
+            (Flaws::empty(), false, true)
         );
     }
 }

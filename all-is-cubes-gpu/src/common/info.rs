@@ -26,6 +26,10 @@ pub struct RenderInfo {
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct UpdateInfo {
+    /// Known flaws detected at update time.
+    ///
+    /// This should include all flaws reported within `spaces` too.
+    pub(crate) flaws: Flaws,
     /// Start-to-finish time for the update operation.
     pub(crate) total_time: Duration,
     /// Time taken on miscellaneous preparatory actions such as calculating the current
@@ -38,6 +42,13 @@ pub struct UpdateInfo {
     pub(crate) submit_time: Option<Duration>,
     /// Per-space details, including time taken.
     pub(crate) spaces: Layers<SpaceUpdateInfo>,
+}
+
+impl UpdateInfo {
+    #[doc(hidden)] // unstable
+    pub fn flaws(&self) -> Flaws {
+        self.flaws
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -56,6 +67,7 @@ impl CustomFormat<StatusText> for RenderInfo {
         let &Self {
             update:
                 UpdateInfo {
+                    flaws: _, // flaws are aggregated up
                     total_time: update_time,
                     prep_time: update_prep_time,
                     lines_time,
@@ -142,6 +154,12 @@ pub struct SpaceUpdateInfo {
     pub(crate) light_update_time: Duration,
     /// Number of light cubes updated
     pub(crate) light_update_count: usize,
+}
+
+impl SpaceUpdateInfo {
+    pub(crate) fn flaws(&self) -> Flaws {
+        self.chunk_info.flaws
+    }
 }
 
 impl CustomFormat<StatusText> for SpaceUpdateInfo {

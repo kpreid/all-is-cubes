@@ -380,9 +380,12 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
             .assume()
             .into_result()?;
 
+        let update_flaws = space_update_info.world.flaws() | space_update_info.ui.flaws();
+
         let end_time = Instant::now();
         Ok(RenderInfo {
             update: UpdateInfo {
+                flaws: update_flaws,
                 total_time: update_to_draw_time.duration_since(start_frame_time),
                 prep_time: update_prep_to_space_update_time.duration_since(start_frame_time),
                 lines_time: update_to_draw_time.duration_since(space_update_to_lines_time),
@@ -401,7 +404,7 @@ impl<Backend: AicLumBackend> EverythingRenderer<Backend> {
                 submit_time: None,
             },
             flaws: {
-                let mut flaws = Flaws::empty();
+                let mut flaws = update_flaws;
                 let options = self.cameras().graphics_options();
                 if !matches!(options.antialiasing, AntialiasingOption::None) {
                     // Technically antialiasing may happen, but only if the context was

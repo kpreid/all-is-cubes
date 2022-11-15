@@ -9,7 +9,7 @@ use instant::Instant;
 use once_cell::sync::Lazy;
 
 use all_is_cubes::apps::{Layers, StandardCameras};
-use all_is_cubes::camera::{info_text_drawable, Flaws};
+use all_is_cubes::camera::info_text_drawable;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
@@ -131,9 +131,9 @@ impl SurfaceRenderer {
         let output = self.surface.get_current_texture()?;
         let draw_info = self.everything.draw_frame_linear(&self.queue)?;
         let info = RenderInfo {
+            flaws: update_info.flaws,
             update: update_info,
             draw: draw_info,
-            flaws: self.everything.flaws(),
         };
         self.everything.add_info_text_and_postprocess(
             &self.queue,
@@ -387,11 +387,6 @@ impl EverythingRenderer {
         })
     }
 
-    /// Rendering flaws, current as of the last call to [`Self::update()`].
-    pub fn flaws(&self) -> Flaws {
-        self.fb.flaws()
-    }
-
     /// Read current scene content, compute meshes, and send updated resources
     /// to the GPU to prepare for actually drawing it.
     pub fn update(
@@ -571,6 +566,7 @@ impl EverythingRenderer {
 
         let finish_update_time = Instant::now();
         Ok(UpdateInfo {
+            flaws: self.fb.flaws() | space_infos.world.flaws() | space_infos.ui.flaws(),
             total_time: finish_update_time.duration_since(start_frame_time),
             prep_time: update_prep_to_space_update_time.duration_since(start_frame_time),
             lines_time: lines_to_submit_time.duration_since(space_update_to_lines_time),

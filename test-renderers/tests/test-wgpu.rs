@@ -83,6 +83,7 @@ impl RendererFactory for WgpuFactory {
             everything,
             viewport_source,
             viewport_dirty,
+            flaws: Flaws::UNFINISHED, // unfinished because no update() yet
         })
     }
 
@@ -98,6 +99,7 @@ struct WgpuHeadlessRenderer {
     everything: EverythingRenderer,
     viewport_source: ListenableSource<Viewport>,
     viewport_dirty: DirtyFlag,
+    flaws: Flaws,
 }
 
 impl HeadlessRenderer for WgpuHeadlessRenderer {
@@ -106,13 +108,15 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
         cursor: Option<&'a Cursor>,
     ) -> BoxFuture<'a, Result<(), RenderError>> {
         Box::pin(async move {
-            self.everything
+            let info = self
+                .everything
                 .update(
                     &self.factory.queue,
                     cursor,
                     &FrameBudget::PRACTICALLY_INFINITE,
                 )
                 .map_err(GraphicsResourceError::into_render_error_or_panic)?;
+            self.flaws = info.flaws();
             Ok(())
         })
     }
@@ -127,7 +131,7 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
         }
 
         Box::pin(async move {
-            let _dinfo = self
+            let _draw_info = self
                 .everything
                 .draw_frame_linear(&self.factory.queue)
                 .unwrap();
@@ -143,7 +147,7 @@ impl HeadlessRenderer for WgpuHeadlessRenderer {
                 viewport,
             )
             .await;
-            Ok((image, self.everything.flaws()))
+            Ok((image, self.flaws))
         })
     }
 }
