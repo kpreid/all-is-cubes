@@ -42,3 +42,8 @@ overflow-checks = true
 
 [profile.bench]
 overflow-checks = true
+
+[patch.crates-io]
+# Here are some patches we might want to apply for development:
+#
+# wgpu = { git = "https://github.com/gfx-rs/wgpu/", branch = "master" }
