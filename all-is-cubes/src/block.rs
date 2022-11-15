@@ -1,5 +1,8 @@
-//! Definition of blocks, which are game objects which live in the grid of a
+//! Definition of blocks, which are the game objects which occupy the grid of a
 //! [`Space`]. See [`Block`] for details.
+//!
+//! The types of most interest in this module are [`Block`], [`Primitive`],
+//! [`BlockAttributes`], and [`Modifier`].
 
 use std::borrow::Cow;
 use std::fmt;
@@ -39,16 +42,21 @@ mod tests;
 // File organization: This is a series of closely related type definitions together before
 // any of their `impl`s, so the types can be understood in context.
 
-/// A `Block` is something that can exist in the grid of a [`Space`]; it occupies one unit
-/// cube of space and has a specified appearance and behavior.
+/// A [`Block`] is something that can exist in the grid of a [`Space`]; it occupies one
+/// unit cube of simulated physical space, and has a specified appearance and behavior.
+///
+/// A [`Block`] is made up of a [`Primitive`] and zero or more [`Modifier`]s.
 ///
 /// In general, when a block appears multiple times from an in-game perspective, that may
-/// or may not be the the same copy; `Block`s are "by value". However, some blocks are
-/// defined by reference to shared mutable data, in which case changes to that data should
-/// take effect everywhere a `Block` having that same reference occurs.
+/// or may not be the the same copy; `Block`s are "by value" and any block [`Eq`] to
+/// another will behave identically and should be treated identically. However, some
+/// blocks are defined by reference to shared mutable data, and [`Block`] containers such
+/// as [`Space`] must follow those changes.
 ///
-/// To obtain the concrete appearance and behavior of a block, use [`Block::evaluate`] to
-/// obtain an [`EvaluatedBlock`] value, preferably with caching.
+/// To obtain the concrete appearance and behavior of a block, use [`Block::evaluate()`]
+/// to obtain an [`EvaluatedBlock`] value, preferably with caching.
+/// Use [`Block::listen()`] to be informed of possible changes to the result of
+/// evaluation.
 #[derive(Clone)]
 pub struct Block(BlockPtr);
 
@@ -74,11 +82,17 @@ struct BlockParts {
 //#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Primitive {
-    /// A block whose definition is stored in a [`Universe`](crate::universe::Universe).
+    /// A block whose definition is stored elsewhere in a
+    /// [`Universe`](crate::universe::Universe).
+    ///
+    /// Note that this is a reference to a [`Block`], not a [`Primitive`]; the referenced
+    /// [`BlockDef`] may have its own [`Modifier`]s, and thus the result of
+    /// [evaluating](Block::evaluate) a primitive with no modifiers is not necessarily
+    /// free of the effects of modifiers.
     Indirect(URef<BlockDef>),
 
     /// A block that is a single-colored unit cube. (It may still be be transparent or
-    /// non-solid to physics.)
+    /// non-solid to physics; in fact, [`AIR`] is such an atom.)
     Atom(BlockAttributes, Rgba),
 
     /// A block that is composed of smaller blocks, defined by the referenced `Space`.
@@ -330,11 +344,13 @@ impl Block {
     /// Registers a listener for mutations of any data sources which may affect this
     /// block's [`Block::evaluate`] result.
     ///
-    /// Note that this does not listen for mutations of the `Block` value itself —
-    /// which would be impossible since it is an enum and all its fields
-    /// are public. In contrast, [`BlockDef`] does perform such tracking.
+    /// Note that this does not listen for mutations of the [`Block`] value itself, in the
+    /// sense that none of the methods on [`Block`] will cause this listener to fire.
+    /// Rather, it listens for changes in by-reference-to-interior-mutable-data sources
+    /// such as the [`Space`] referred to by a [`Primitive::Recur`] or the [`BlockDef`]
+    /// referred to by a [`Primitive::Indirect`].
     ///
-    /// This may fail under the same conditions as [`Block::evaluate`]; it returns the
+    /// This may fail under the same conditions as [`Block::evaluate()`]; it returns the
     /// same error type so that callers which both evaluate and listen don't need to
     /// handle this separately.
     pub fn listen(

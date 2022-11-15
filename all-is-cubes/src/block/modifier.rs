@@ -13,7 +13,41 @@ mod zoom;
 pub use zoom::*;
 
 /// Modifiers can be applied to a [`Block`] to change the result of
-/// [`evaluate()`](Block::evaluate)ing it.
+/// [`evaluate()`](Block::evaluate)ing it, and thus create variations, such as rotations
+/// or combinations of multiple blocks.
+///
+/// # Usage
+///
+/// Most modifiers have their own dedicated structs, such as [`Composite`]; these may
+/// be converted to [`Modifier`] using their [`From`] implementations, or by constructing
+/// the enum variant ([`Modifier::Composite`]) explicitly. Some modifiers have specific
+/// functions for constructing their typical usages, such as [`Block::rotate()`].
+///
+/// [`Modifier::attach()`] is provided to conveniently add a single modifier to a block;
+/// [`Block::modifiers()`] and [`Block::modifiers_mut()`] provide general direct access.
+/// Note that [`Block`] is a clone-on-write type for when modifiers are changed.
+///
+/// # Arranging modifiers
+///
+/// Operations which add or remove modifiers, such as [`Block::rotate()`],
+/// follow some general principles and special cases:
+///
+/// * There should not be consecutive [`Rotate`] modifiers, but a single
+///   one with the combined rotation. [`Block::rotate()`] maintains this property.
+/// * It is preferable to have [`Rotate`] appear last, since rotation and
+///   [unrotation](Block::unspecialize) is part of player interaction, and the identity
+///   of block modifiers, not just their final result, determines whether blocks are
+///   equal for purposes of inventory management.
+///     * [`Composite::compose_or_replace()`] avoids applying [`Composite`] after
+///       [`Rotate`], so that rotated versions of the same combination are represented
+///       identically.
+///
+/// There is not yet any general “algebra” defining all cases where combinations of
+/// modifiers should be canonicalized to other forms. Future versions of All is Cubes may
+/// do so; that will be a breaking change (particularly since [`Block::modifiers_mut()`]
+/// exists, so no rules are currently enforceable).
+///
+/// [`Rotate`]: Self::Rotate
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
@@ -23,6 +57,8 @@ pub enum Modifier {
     Quote(Quote),
 
     /// Rotate the block about its cube center by the given rotation.
+    ///
+    /// This modifier should normally be used by means of [`Block::rotate()`].
     Rotate(GridRotation),
 
     /// Combine the voxels of multiple blocks using some per-voxel rule.
@@ -37,7 +73,7 @@ pub enum Modifier {
 }
 
 impl Modifier {
-    /// Return the given `block` with `self` added as the outermost modifier.
+    /// Return the given `block` with `self` added as the outermost/last modifier.
     pub fn attach(self, mut block: Block) -> Block {
         block.modifiers_mut().push(self);
         block
