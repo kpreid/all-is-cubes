@@ -243,6 +243,7 @@ impl EverythingRenderer {
             &device,
             &config,
             cameras.graphics_options(),
+            false,
         );
 
         let postprocess_bind_group_layout =

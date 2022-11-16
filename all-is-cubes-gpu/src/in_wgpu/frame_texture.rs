@@ -149,14 +149,19 @@ pub(crate) struct FramebufferTextures {
     /// Is a floating-point texture allowing HDR rendering, if the backend supports that.
     /// "Linear" in that the values stored in it are not sRGB-encoded as read and written,
     /// though they are if that's all we can support.
-    pub(crate) linear_scene_texture_view: wgpu::TextureView,
+    linear_scene_tex: wgpu::Texture,
+    /// View for writing into [`Self::linear_scene_texture`], and reading if multisampling
+    /// is not enabled.
+    linear_scene_view: wgpu::TextureView,
 
     /// If multisampling is enabled, provides the “resolve target” companion to
-    /// `linear_scene_texture_view`. This texture has a sample_count of 1, is
+    /// `linear_scene_texture`. This texture has a sample_count of 1, is
     /// automatically written to when we do multisampled rendering, and is the *input*
     /// to postprocessing. If multisampling is not enabled, we use the
-    /// `linear_scene_texture_view` directly as input to postprocessing.
-    pub(crate) linear_scene_resolved: Option<wgpu::TextureView>,
+    /// `linear_scene_texture` directly as input to postprocessing.
+    linear_scene_resolved_tex: Option<wgpu::Texture>,
+    /// View for reading [`Self::linear_scene_resolved_tex`].
+    linear_scene_resolved_view: Option<wgpu::TextureView>,
 
     /// Depth texture to pair with `linear_scene_texture`.
     pub(crate) depth_texture_view: wgpu::TextureView,
@@ -167,7 +172,7 @@ impl FramebufferTextures {
     pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
     /// Texture usages that the `linear_scene_texture_format` must support.
-    pub(crate) const LINEAR_SCENE_TEXTURE_USAGES: wgpu::TextureUsages =
+    pub const LINEAR_SCENE_TEXTURE_USAGES: wgpu::TextureUsages =
         wgpu::TextureUsages::RENDER_ATTACHMENT.union(wgpu::TextureUsages::TEXTURE_BINDING);
 
     /// `config` must be valid (in particular, not zero sized).
@@ -176,20 +181,42 @@ impl FramebufferTextures {
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
         options: &GraphicsOptions,
+        enable_copy_out: bool,
     ) -> Self {
-        Self::new_from_config(device, FbtConfig::new(config, features, options))
+        Self::new_from_config(
+            device,
+            FbtConfig::new(config, features, options, enable_copy_out),
+        )
     }
 
     fn new_from_config(device: &wgpu::Device, config: FbtConfig) -> Self {
-        let linear_scene_texture = device.create_texture(&wgpu::TextureDescriptor {
+        let mut linear_scene_texture_usages_with_copy = Self::LINEAR_SCENE_TEXTURE_USAGES;
+        if config.enable_copy_out {
+            linear_scene_texture_usages_with_copy |= wgpu::TextureUsages::COPY_SRC;
+        }
+
+        let linear_scene_tex = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("linear_scene_texture"),
             size: config.size,
             mip_level_count: 1,
             sample_count: config.sample_count,
             dimension: wgpu::TextureDimension::D2,
             format: config.linear_scene_texture_format,
-            usage: Self::LINEAR_SCENE_TEXTURE_USAGES,
+            usage: linear_scene_texture_usages_with_copy,
         });
+        let linear_scene_resolved_tex = if config.sample_count > 1 {
+            Some(device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("linear_scene_texture_resolve_target"),
+                size: config.size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: config.linear_scene_texture_format,
+                usage: linear_scene_texture_usages_with_copy,
+            }))
+        } else {
+            None
+        };
         let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("depth_texture"),
             size: config.size,
@@ -201,27 +228,16 @@ impl FramebufferTextures {
         });
 
         Self {
-            config,
-            linear_scene_resolved: if config.sample_count > 1 {
-                Some(
-                    device
-                        .create_texture(&wgpu::TextureDescriptor {
-                            label: Some("linear_scene_texture_resolve_target"),
-                            size: config.size,
-                            mip_level_count: 1,
-                            sample_count: 1,
-                            dimension: wgpu::TextureDimension::D2,
-                            format: config.linear_scene_texture_format,
-                            usage: Self::LINEAR_SCENE_TEXTURE_USAGES,
-                        })
-                        .create_view(&wgpu::TextureViewDescriptor::default()),
-                )
-            } else {
-                None
-            },
-            linear_scene_texture_view: linear_scene_texture
+            linear_scene_view: linear_scene_tex
                 .create_view(&wgpu::TextureViewDescriptor::default()),
+            linear_scene_resolved_view: linear_scene_resolved_tex
+                .as_ref()
+                .map(|t| t.create_view(&wgpu::TextureViewDescriptor::default())),
             depth_texture_view: depth_texture.create_view(&Default::default()),
+
+            config,
+            linear_scene_tex,
+            linear_scene_resolved_tex,
         }
     }
 
@@ -232,8 +248,8 @@ impl FramebufferTextures {
         color_load_op: wgpu::LoadOp<wgpu::Color>,
     ) -> wgpu::RenderPassColorAttachment<'_> {
         wgpu::RenderPassColorAttachment {
-            view: &self.linear_scene_texture_view,
-            resolve_target: self.linear_scene_resolved.as_ref(),
+            view: &self.linear_scene_view,
+            resolve_target: self.linear_scene_resolved_view.as_ref(),
             ops: wgpu::Operations {
                 load: color_load_op,
                 store: true,
@@ -242,10 +258,19 @@ impl FramebufferTextures {
     }
 
     pub(crate) fn scene_for_postprocessing_input(&self) -> &wgpu::TextureView {
-        if let Some(resolved) = &self.linear_scene_resolved {
+        if let Some(resolved) = &self.linear_scene_resolved_view {
             resolved
         } else {
-            &self.linear_scene_texture_view
+            &self.linear_scene_view
+        }
+    }
+
+    #[allow(unused)] // Used only in cfg(test) and so are the fields; this is simple.
+    pub(crate) fn scene_for_test_copy(&self) -> &wgpu::Texture {
+        if let Some(resolved) = &self.linear_scene_resolved_tex {
+            resolved
+        } else {
+            &self.linear_scene_tex
         }
     }
 
@@ -271,7 +296,12 @@ impl FramebufferTextures {
         surface_config: &wgpu::SurfaceConfiguration,
         options: &GraphicsOptions,
     ) -> bool {
-        let new_config = FbtConfig::new(surface_config, self.config.features, options);
+        let new_config = FbtConfig::new(
+            surface_config,
+            self.config.features,
+            options,
+            self.config.enable_copy_out,
+        );
         if new_config != self.config {
             *self = Self::new_from_config(device, new_config);
             true
@@ -297,15 +327,18 @@ pub(crate) struct FbtConfig {
     /// Size of all textures.
     size: wgpu::Extent3d,
 
-    /// Texture format of the `linear_scene_texture_view` and `linear_scene_resolved`.
+    /// Texture format of the `linear_scene` and `linear_scene_resolved`.
     ///
     /// This is a floating-point format in order to support HDR rendering, *if* the
     /// adapter supports the necessary features (blending and multisample).
     pub(crate) linear_scene_texture_format: wgpu::TextureFormat,
 
-    /// Sample count of `linear_scene_texture_view`.
+    /// Sample count of `linear_scene_tex`.
     /// Currently always 1 or 4.
     pub(crate) sample_count: u32,
+
+    /// Whether to enable copying out of the linear scene texture for testing purposes.
+    enable_copy_out: bool,
 
     /// Rendering flaws resulting from necessary compromises.
     flaws: Flaws,
@@ -316,6 +349,7 @@ impl FbtConfig {
         surface_config: &wgpu::SurfaceConfiguration,
         features: FbtFeatures,
         options: &GraphicsOptions,
+        enable_copy_out: bool,
     ) -> Self {
         let size = wgpu::Extent3d {
             width: surface_config.width,
@@ -343,6 +377,7 @@ impl FbtConfig {
                     size,
                     linear_scene_texture_format: wgpu::TextureFormat::Rgba16Float,
                     sample_count: sample_count_if_ok,
+                    enable_copy_out,
                     flaws: Flaws::empty(),
                 }
             } else {
@@ -352,6 +387,7 @@ impl FbtConfig {
                     size,
                     linear_scene_texture_format: wgpu::TextureFormat::Rgba16Float,
                     sample_count: 1,
+                    enable_copy_out,
                     flaws: if sample_count_if_ok != 1 {
                         Flaws::NO_ANTIALIASING
                     } else {
@@ -367,6 +403,7 @@ impl FbtConfig {
                 size,
                 linear_scene_texture_format: wgpu::TextureFormat::Rgba8UnormSrgb,
                 sample_count: sample_count_if_ok,
+                enable_copy_out,
                 flaws: Flaws::empty(),
             }
         }
