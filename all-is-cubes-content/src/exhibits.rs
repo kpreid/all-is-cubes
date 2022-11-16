@@ -60,6 +60,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     CHUNK_CHART,
     COLOR_LIGHTS,
     IMAGES,
+    SMALLEST,
     SWIMMING_POOL,
     COLORS,
     TEXT,
@@ -470,6 +471,35 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
     }
 
     Ok(space)
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "World's Smallest Voxel",
+    subtitle: "1/256th the length of a standard block",
+)]
+async fn SMALLEST(_: &Exhibit, universe: &mut Universe) {
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+    let pedestal = &demo_blocks[DemoBlocks::Pedestal];
+
+    let block_space = Space::builder(GridAab::from_lower_size([128, 0, 128], [1, 1, 1]))
+        .filled_with(Block::from(palette::ALMOST_BLACK))
+        .build();
+
+    let mut exhibit_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 1])).build();
+    stack(
+        &mut exhibit_space,
+        [0, 0, 0],
+        [
+            pedestal,
+            &Block::builder()
+                .collision(BlockCollision::Recur)
+                .voxels_ref(R256, universe.insert_anonymous(block_space))
+                .build(),
+        ],
+    )?;
+
+    Ok(exhibit_space)
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
