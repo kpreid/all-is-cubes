@@ -40,6 +40,11 @@ pub(crate) struct Pipelines {
     /// Bind group layout for SpaceRenderer's space data and block textures.
     pub(crate) space_texture_bind_group_layout: wgpu::BindGroupLayout,
 
+    /// Pipeline layout for using the blocks-and-lines shader.
+    /// Saved for use by tests.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) block_render_pipeline_layout: wgpu::PipelineLayout,
+
     /// Pipeline for drawing opaque blocks (alpha = 1, not in the sense of BlockAttributes::opaque).
     pub(crate) opaque_render_pipeline: wgpu::RenderPipeline,
 
@@ -47,7 +52,10 @@ pub(crate) struct Pipelines {
     pub(crate) transparent_render_pipeline: wgpu::RenderPipeline,
 }
 
-static BLOCKS_AND_LINES_SHADER: Lazy<Reloadable> =
+/// Shader code for rendering `Space` content, and debug lines.
+///
+/// Public for use in `shader_tests`.
+pub(crate) static BLOCKS_AND_LINES_SHADER: Lazy<Reloadable> =
     Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/blocks-and-lines.wgsl"));
 
 impl Pipelines {
@@ -269,6 +277,7 @@ impl Pipelines {
             graphics_options,
             camera_bind_group_layout,
             space_texture_bind_group_layout,
+            block_render_pipeline_layout,
             opaque_render_pipeline,
             transparent_render_pipeline,
 

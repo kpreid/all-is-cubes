@@ -191,7 +191,7 @@ fn block_vertex_main(
 
 // Modulo, not remainder (matches GLSL builtin mod())
 fn modulo(a: f32, b: f32) -> f32 {
-    return ((a % b) + 1.0) % b;
+    return ((a % b) + b) % b;
 }
 
 // Find the smallest positive `t` such that `s + t * ds` is an integer,

@@ -44,6 +44,8 @@ pub mod headless;
 #[doc(hidden)]
 pub mod init;
 mod pipelines;
+#[doc(hidden)] // public for tests/shader_tests.rs
+pub mod shader_testing;
 mod space;
 use space::SpaceRenderer;
 mod vertex;

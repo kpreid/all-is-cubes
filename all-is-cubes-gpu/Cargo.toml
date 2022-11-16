@@ -18,6 +18,10 @@ all-features = true
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
 bench = false
 
+[[test]]
+name = "shader_tests"
+required-features = ["wgpu"]
+
 [features]
 # Enable wgpu support.
 # (The library is useless without this, but we used to have multiple GPU API support
@@ -50,5 +54,7 @@ wgpu = { version = "0.14.0", optional = true, features = ["webgl"] }
 resource = { version = "0.5.0", features = ["force-static"] }
 
 [dev-dependencies]
+# f16 support for working with floating point textures in tests. Using older version 1.8 because that's already indirectly in our dev-dependencies.
+half = { version = "1.8.2", features = ["bytemuck"] }
 # Using tokio for async test-running.
 tokio = { version = "1.18.0", features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }

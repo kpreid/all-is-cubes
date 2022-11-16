@@ -485,13 +485,18 @@ impl SpaceRenderer {
 #[derive(Debug)]
 pub(in crate::in_wgpu) struct SpaceCameraBuffer {
     /// Buffer containing a [`ShaderSpaceCamera`].
-    buffer: wgpu::Buffer,
+    ///
+    /// Public for use in `shader_tests`.
+    pub buffer: wgpu::Buffer,
+
     /// Bind group binding the buffer.
-    bind_group: wgpu::BindGroup,
+    ///
+    /// Public for use in `shader_tests`.
+    pub bind_group: wgpu::BindGroup,
 }
 
 impl SpaceCameraBuffer {
-    fn new(space_label: &str, device: &wgpu::Device, pipelines: &Pipelines) -> Self {
+    pub fn new(space_label: &str, device: &wgpu::Device, pipelines: &Pipelines) -> Self {
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(&format!("{space_label} camera_buffer")),
             size: std::mem::size_of::<ShaderSpaceCamera>().try_into().unwrap(),
@@ -510,7 +515,10 @@ impl SpaceCameraBuffer {
     }
 }
 
-fn create_space_bind_group(
+/// Create the bind group to be used with [`Pipelines::space_texture_bind_group_layout`].
+///
+/// Public for use in `shader_tests`.
+pub(in crate::in_wgpu) fn create_space_bind_group(
     space_label: &str,
     device: &wgpu::Device,
     pipelines: &Pipelines,
@@ -643,7 +651,7 @@ impl Listener<SpaceChange> for TodoListener {
 ///
 /// The texels are in [`PackedLight`] form.
 #[derive(Debug)]
-struct SpaceLightTexture {
+pub(in crate::in_wgpu) struct SpaceLightTexture {
     texture: wgpu::Texture,
     texture_view: wgpu::TextureView,
     /// The region of cube coordinates for which there are valid texels.
