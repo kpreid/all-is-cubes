@@ -8,8 +8,8 @@ use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 use super::POSITION_EPSILON;
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{
-    Aab, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridArray, GridCoordinate, GridPoint,
-    Rgba,
+    Aab, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridAab, GridArray, GridCoordinate,
+    GridPoint, Rgba,
 };
 use crate::raycast::{Ray, Raycaster};
 use crate::space::Space;
@@ -217,13 +217,21 @@ where
             break;
         }
 
+        // Compute the AAB of the potential intersection, excluding the exterior of the
+        // space.
+        let potential_intersection_bounds =
+            match step_aab.round_up_to_grid().intersection(space.bounds()) {
+                Some(aab) => aab,
+                None => continue,
+            };
+
         // Loop over all the cubes that our AAB is just now intersecting and check if
         // any of them are solid, and if so, how far into their volume is a hit.
         // TODO: Useful optimization for large AABs would be skipping all the interior
         // cubes that must have been detected in the _previous_ step.
         let mut something_hit = None;
         let mut nothing_hit = true;
-        for cube in step_aab.round_up_to_grid().interior_iter() {
+        for cube in potential_intersection_bounds.interior_iter() {
             let cell = space.get_cell(cube);
             let full_cube_end = CollisionRayEnd {
                 t_distance: ray_step.t_distance(),
@@ -337,6 +345,9 @@ where
 pub(crate) trait CollisionSpace {
     type Cell;
 
+    /// Bounds outside of which there is definitely nothing that collides.
+    fn bounds(&self) -> GridAab;
+
     /// Retrieve a cell value from the grid.
     /// Should return a non-colliding value if the point is out of bounds.
     fn get_cell(&self, cube: GridPoint) -> &Self::Cell;
@@ -361,6 +372,10 @@ pub(crate) trait CollisionSpace {
 
 impl CollisionSpace for Space {
     type Cell = EvaluatedBlock;
+
+    fn bounds(&self) -> GridAab {
+        Space::bounds(self)
+    }
 
     #[inline]
     fn get_cell(&self, cube: GridPoint) -> &Self::Cell {
@@ -432,6 +447,10 @@ impl CollisionSpace for Space {
 // *can* be implemented for EvaluatedBlock.
 impl CollisionSpace for GridArray<Evoxel> {
     type Cell = Evoxel;
+
+    fn bounds(&self) -> GridAab {
+        GridArray::bounds(self)
+    }
 
     #[inline]
     fn get_cell(&self, cube: GridPoint) -> &Self::Cell {
