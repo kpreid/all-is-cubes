@@ -15,7 +15,7 @@ use all_is_cubes::math::Rgba;
 use all_is_cubes::raytracer::{CharacterBuf, CharacterRtData, ColorBuf, PixelBuf, RtRenderer};
 
 use crate::glue::crossterm::{event_to_key, map_mouse_button};
-use crate::session::{ClockSource, DesktopSession};
+use crate::session::DesktopSession;
 
 mod chars;
 mod options;
@@ -130,20 +130,18 @@ pub(crate) fn create_terminal_session(
             }
         })?;
 
-    Ok(DesktopSession {
-        session,
-        renderer: TerminalRenderer {
+    Ok(DesktopSession::new(
+        TerminalRenderer {
             cameras,
             options,
             buffer_reuse_out,
             render_pipe_in,
             render_pipe_out,
         },
-        window: TerminalWindow::new()?,
+        TerminalWindow::new()?,
+        session,
         viewport_cell,
-        clock_source: ClockSource::Instant,
-        recorder: None,
-    })
+    ))
 }
 
 /// Run the simulation and interactive UI. Returns after user's quit command.

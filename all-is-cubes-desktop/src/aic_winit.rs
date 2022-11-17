@@ -21,7 +21,7 @@ use crate::glue::winit::{
     cursor_icon_to_winit, logical_size_from_vec, map_key, map_mouse_button,
     monitor_size_for_window, physical_size_to_viewport, sync_cursor_grab,
 };
-use crate::session::{ClockSource, DesktopSession};
+use crate::session::DesktopSession;
 
 /// Run Winit/wgpu-based rendering and event loop.
 ///
@@ -130,14 +130,7 @@ pub(crate) async fn create_winit_wgpu_desktop_session(
     )
     .await?;
 
-    let dsession = DesktopSession {
-        session,
-        renderer,
-        window,
-        viewport_cell,
-        clock_source: ClockSource::Instant,
-        recorder: None,
-    };
+    let dsession = DesktopSession::new(renderer, window, session, viewport_cell);
 
     let ready_time = Instant::now();
     log::debug!(
@@ -178,14 +171,12 @@ pub(crate) fn create_winit_rt_desktop_session(
         ListenableSource::constant(()),
     );
 
-    let dsession = DesktopSession {
-        session,
+    let dsession = DesktopSession::new(
         renderer,
-        window: sb_context, // softbuffer takes ownership of the window for safety
+        sb_context, // softbuffer takes ownership of the window for safety
+        session,
         viewport_cell,
-        clock_source: ClockSource::Instant,
-        recorder: None,
-    };
+    );
 
     let ready_time = Instant::now();
     log::debug!(

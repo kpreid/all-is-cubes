@@ -29,6 +29,22 @@ pub(crate) struct DesktopSession<Ren, Win> {
 }
 
 impl<Ren, Win> DesktopSession<Ren, Win> {
+    pub fn new(
+        renderer: Ren,
+        window: Win,
+        session: Session,
+        viewport_cell: ListenableCell<Viewport>,
+    ) -> Self {
+        Self {
+            session,
+            renderer,
+            window,
+            viewport_cell,
+            clock_source: ClockSource::Instant,
+            recorder: None,
+        }
+    }
+
     pub fn advance_time_and_maybe_step(&mut self) -> Option<UniverseStepInfo> {
         match self.clock_source {
             ClockSource::Instant => {

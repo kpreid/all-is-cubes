@@ -65,7 +65,7 @@ use crate::command_options::{
     determine_record_format, parse_universe_source, AicDesktopArgs, DisplaySizeArg, UniverseSource,
 };
 use crate::record::{create_recording_session, RecordFormat};
-use crate::session::{ClockSource, DesktopSession};
+use crate::session::DesktopSession;
 use crate::terminal::{
     create_terminal_session, terminal_main_loop, terminal_print_once, TerminalOptions,
 };
@@ -229,14 +229,7 @@ fn main() -> Result<(), anyhow::Error> {
             )
         }
         GraphicsType::Headless => {
-            let mut dsession = DesktopSession {
-                session,
-                renderer: (),
-                window: (),
-                viewport_cell,
-                clock_source: ClockSource::Instant,
-                recorder: None,
-            };
+            let mut dsession = DesktopSession::new((), (), session, viewport_cell);
 
             // TODO: Right now this is useless. Eventually, we may have other paths for side
             // effects from the universe, or interesting logging.

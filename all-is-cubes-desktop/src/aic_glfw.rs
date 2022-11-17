@@ -19,7 +19,7 @@ use crate::choose_graphical_window_size;
 use crate::glue::glfw::{
     cursor_icon_to_glfw, get_workarea_size, map_key, map_mouse_button, window_size_as_viewport,
 };
-use crate::session::{ClockSource, DesktopSession};
+use crate::session::DesktopSession;
 
 type Renderer = SurfaceRenderer<GL33Context>;
 type EventReceiver = mpsc::Receiver<(f64, WindowEvent)>;
@@ -154,17 +154,15 @@ pub(crate) fn create_glfw_desktop_session(
     })?;
 
     viewport_cell.set(window_size_as_viewport(&context.window));
-    let dsession = DesktopSession {
-        renderer: SurfaceRenderer::new(
+    let dsession = DesktopSession::new(
+        SurfaceRenderer::new(
             context,
             StandardCameras::from_session(&session, viewport_cell.as_source())?,
         )?,
-        window: events_rx,
+        events_rx,
         session,
         viewport_cell,
-        clock_source: ClockSource::Instant,
-        recorder: None,
-    };
+    );
 
     let ready_time = Instant::now();
     log::debug!(

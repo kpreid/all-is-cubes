@@ -24,17 +24,13 @@ pub(crate) fn create_recording_session(
         options.clone(),
         StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap(),
     )?;
-    let dsession = DesktopSession {
-        session,
-        renderer: (),
-        window: (),
-        viewport_cell,
-        clock_source: ClockSource::Fixed(match &options.animation {
-            Some(anim) => anim.frame_period,
-            None => Duration::ZERO,
-        }),
-        recorder: Some(recorder),
-    };
+
+    let mut dsession = DesktopSession::new((), (), session, viewport_cell);
+    dsession.clock_source = ClockSource::Fixed(match &options.animation {
+        Some(anim) => anim.frame_period,
+        None => Duration::ZERO,
+    });
+    dsession.recorder = Some(recorder);
 
     Ok((dsession, status_receiver))
 }
