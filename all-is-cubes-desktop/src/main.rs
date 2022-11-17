@@ -160,7 +160,10 @@ fn main() -> Result<(), anyhow::Error> {
     // type of event loop to run. Hence, this match combines
     // * creating a window
     // * creating a DesktopSession
-    // * starting the main loop
+    // * calling `inner_main()` to do the rest, including starting the event loop
+    //
+    // Note that _every_ branch of this match calls `inner_main()`.
+    //
     // Note that while its return type is nominally Result<()>, it does not necessarily
     // ever return “successfully”, so no code should follow it.
     match graphics_type {
@@ -172,7 +175,7 @@ fn main() -> Result<(), anyhow::Error> {
                 fullscreen,
                 viewport_cell,
             )?;
-            glfw_main_loop(dsession)
+            inner_main(glfw_main_loop, dsession)
         }
         GraphicsType::Window => {
             let event_loop = winit::event_loop::EventLoop::new();
@@ -186,7 +189,10 @@ fn main() -> Result<(), anyhow::Error> {
                 )?,
                 viewport_cell,
             ))?;
-            winit_main_loop(event_loop, dsession)
+            inner_main(
+                move |dsession| winit_main_loop(event_loop, dsession),
+                dsession,
+            )
         }
         GraphicsType::WindowRt => {
             let event_loop = winit::event_loop::EventLoop::new();
@@ -200,12 +206,15 @@ fn main() -> Result<(), anyhow::Error> {
                 )?,
                 viewport_cell,
             )?;
-            winit_main_loop(event_loop, dsession)
+            inner_main(
+                move |dsession| winit_main_loop(event_loop, dsession),
+                dsession,
+            )
         }
         GraphicsType::Terminal => {
             let dsession =
                 create_terminal_session(session, TerminalOptions::default(), viewport_cell)?;
-            terminal_main_loop(dsession)
+            inner_main(terminal_main_loop, dsession)
         }
         GraphicsType::Record => {
             // TODO: record_options validation should just be part of the regular arg parsing
@@ -214,46 +223,45 @@ fn main() -> Result<(), anyhow::Error> {
                 .record_options()
                 .map_err(|e| e.format(&mut AicDesktopArgs::command()))?;
             let (dsession, sr) = create_recording_session(session, &record_options, viewport_cell)?;
-            record_main(dsession, record_options, sr)
+            inner_main(
+                |dsession| record_main(dsession, record_options, sr),
+                dsession,
+            )
         }
         GraphicsType::Print => {
             let dsession =
                 create_terminal_session(session, TerminalOptions::default(), viewport_cell)?;
-            terminal_print_once(
+            inner_main(
+                |dsession| {
+                    terminal_print_once(
+                        dsession,
+                        // TODO: Default display size should be based on terminal width
+                        // (but not necessarily the full height)
+                        display_size
+                            .unwrap_or_else(|| Vector2::new(80, 24))
+                            .map(|component| component.min(u16::MAX.into()) as u16),
+                    )
+                },
                 dsession,
-                // TODO: Default display size should be based on terminal width
-                // (but not necessarily the full height)
-                display_size
-                    .unwrap_or_else(|| Vector2::new(80, 24))
-                    .map(|component| component.min(u16::MAX.into()) as u16),
             )
         }
-        GraphicsType::Headless => {
-            let mut dsession = DesktopSession::new((), (), session, viewport_cell);
-
-            // TODO: Right now this is useless. Eventually, we may have other paths for side
-            // effects from the universe, or interesting logging.
-            log::info!("Simulating a universe nobody's looking at...");
-
-            let duration = duration.map(Duration::from_secs_f64);
-
-            let t0 = Instant::now();
-            loop {
-                dsession.advance_time_and_maybe_step();
-
-                if duration
-                    .map(|d| Instant::now().duration_since(t0) > d)
-                    .unwrap_or(false)
-                {
-                    break;
-                } else if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
-                    std::thread::sleep(t - Instant::now());
-                }
-            }
-
-            Ok(())
-        }
+        GraphicsType::Headless => inner_main(
+            |dsession| headless_main_loop(dsession, duration),
+            DesktopSession::new((), (), session, viewport_cell),
+        ),
     }
+}
+
+/// Given a [`DesktopSession`] and an event loop type already decided, run the remainder
+/// of main operations.
+///
+/// This function may or may not ever return, depending on the type of event loop.
+fn inner_main<Ren, Win>(
+    looper: impl FnOnce(DesktopSession<Ren, Win>) -> Result<(), anyhow::Error>,
+    dsession: DesktopSession<Ren, Win>,
+) -> Result<(), anyhow::Error> {
+    log::debug!("Initialized graphics"); // TODO: thread in info to compute a time delta
+    looper(dsession)
 }
 
 /// Perform and log the creation of the universe.
@@ -306,6 +314,35 @@ fn create_universe(
     }
 
     Ok(universe)
+}
+
+/// Main loop that does nothing but run the simulation.
+/// This may be used in case the simulation has interesting side-effects.
+fn headless_main_loop(
+    mut dsession: DesktopSession<(), ()>,
+    duration: Option<f64>,
+) -> Result<(), anyhow::Error> {
+    // TODO: Right now this is useless. Eventually, we may have other paths for side
+    // effects from the universe, or interesting logging.
+    log::info!("Simulating a universe nobody's looking at...");
+
+    let duration = duration.map(Duration::from_secs_f64);
+
+    let t0 = Instant::now();
+    loop {
+        dsession.advance_time_and_maybe_step();
+
+        if duration
+            .map(|d| Instant::now().duration_since(t0) > d)
+            .unwrap_or(false)
+        {
+            break;
+        } else if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
+            std::thread::sleep(t - Instant::now());
+        }
+    }
+
+    Ok(())
 }
 
 fn evaluate_light_with_progress(space: &mut Space) {
