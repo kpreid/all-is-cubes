@@ -156,6 +156,12 @@ fn main() -> Result<(), anyhow::Error> {
     let universe = create_universe(input_source, precompute_light)?;
     session.set_universe(universe);
 
+    // Bundle of inputs to `inner_main()`, which — unlike this function — is generic over
+    // the kind of window system we're using.
+    let inner_params = InnerMainParams {
+        before_loop_time: Instant::now(),
+    };
+
     // The graphics type selects not only the kind of 'window' we create, but also the
     // type of event loop to run. Hence, this match combines
     // * creating a window
@@ -175,7 +181,7 @@ fn main() -> Result<(), anyhow::Error> {
                 fullscreen,
                 viewport_cell,
             )?;
-            inner_main(glfw_main_loop, dsession)
+            inner_main(inner_params, glfw_main_loop, dsession)
         }
         GraphicsType::Window => {
             let event_loop = winit::event_loop::EventLoop::new();
@@ -190,6 +196,7 @@ fn main() -> Result<(), anyhow::Error> {
                 viewport_cell,
             ))?;
             inner_main(
+                inner_params,
                 move |dsession| winit_main_loop(event_loop, dsession),
                 dsession,
             )
@@ -207,6 +214,7 @@ fn main() -> Result<(), anyhow::Error> {
                 viewport_cell,
             )?;
             inner_main(
+                inner_params,
                 move |dsession| winit_main_loop(event_loop, dsession),
                 dsession,
             )
@@ -214,7 +222,7 @@ fn main() -> Result<(), anyhow::Error> {
         GraphicsType::Terminal => {
             let dsession =
                 create_terminal_session(session, TerminalOptions::default(), viewport_cell)?;
-            inner_main(terminal_main_loop, dsession)
+            inner_main(inner_params, terminal_main_loop, dsession)
         }
         GraphicsType::Record => {
             // TODO: record_options validation should just be part of the regular arg parsing
@@ -224,6 +232,7 @@ fn main() -> Result<(), anyhow::Error> {
                 .map_err(|e| e.format(&mut AicDesktopArgs::command()))?;
             let (dsession, sr) = create_recording_session(session, &record_options, viewport_cell)?;
             inner_main(
+                inner_params,
                 |dsession| record_main(dsession, record_options, sr),
                 dsession,
             )
@@ -232,6 +241,7 @@ fn main() -> Result<(), anyhow::Error> {
             let dsession =
                 create_terminal_session(session, TerminalOptions::default(), viewport_cell)?;
             inner_main(
+                inner_params,
                 |dsession| {
                     terminal_print_once(
                         dsession,
@@ -246,6 +256,7 @@ fn main() -> Result<(), anyhow::Error> {
             )
         }
         GraphicsType::Headless => inner_main(
+            inner_params,
             |dsession| headless_main_loop(dsession, duration),
             DesktopSession::new((), (), session, viewport_cell),
         ),
@@ -257,11 +268,23 @@ fn main() -> Result<(), anyhow::Error> {
 ///
 /// This function may or may not ever return, depending on the type of event loop.
 fn inner_main<Ren, Win>(
+    params: InnerMainParams,
     looper: impl FnOnce(DesktopSession<Ren, Win>) -> Result<(), anyhow::Error>,
     dsession: DesktopSession<Ren, Win>,
 ) -> Result<(), anyhow::Error> {
-    log::debug!("Initialized graphics"); // TODO: thread in info to compute a time delta
+    log::debug!(
+        "Initialized desktop-session ({:.3} s); entering event loop",
+        Instant::now()
+            .duration_since(params.before_loop_time)
+            .as_secs_f64()
+    );
     looper(dsession)
+}
+
+/// Ad-hoc struct of arguments to [`inner_main`] that can be constructed beforehand.
+/// TODO: If this doesn't grow more parameters, get rid of it.
+struct InnerMainParams {
+    before_loop_time: Instant,
 }
 
 /// Perform and log the creation of the universe.
