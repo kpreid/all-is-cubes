@@ -109,7 +109,7 @@ impl<V, T> BlockMesh<V, T> {
 
     /// Returns whether this mesh contains no vertices so it has no visual effect.
     pub fn is_empty(&self) -> bool {
-        self.faces.iter().all(|(_, ft)| ft.is_empty())
+        self.faces.values().all(|fm| fm.is_empty())
     }
 
     /// Update this mesh's textures in-place to the given new block data, if this is

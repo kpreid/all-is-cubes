@@ -651,9 +651,14 @@ impl<V> FaceMap<V> {
         Vector3::new(self.px, self.py, self.pz)
     }
 
-    /// Iterate over the map entries by reference.
+    /// Iterate over the map's key-value pairs by reference, in the same order as [`Face7::ALL`].
     pub fn iter(&self) -> impl Iterator<Item = (Face7, &V)> {
         Face7::ALL.iter().copied().map(move |f| (f, &self[f]))
+    }
+
+    /// Iterate over the map values by reference, in the same order as [`Face7::ALL`].
+    pub fn values(&self) -> impl Iterator<Item = &V> {
+        Face7::ALL.iter().copied().map(move |f| &self[f])
     }
 
     pub fn into_values(self) -> [V; 7] {
@@ -867,7 +872,11 @@ mod tests {
         assert_eq!(
             Face7::ALL.to_vec(),
             map.iter().map(|(_, &v)| v).collect::<Vec<_>>(),
-        )
+        );
+        assert_eq!(
+            Face7::ALL.to_vec(),
+            map.values().copied().collect::<Vec<_>>(),
+        );
     }
 
     // TODO: More tests of FaceMap

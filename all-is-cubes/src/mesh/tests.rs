@@ -200,8 +200,8 @@ fn space_mesh_equals_block_mesh() {
         space_rendered.vertices().to_vec(),
         block_meshes[0]
             .faces
-            .iter()
-            .flat_map(|(_face, face_render)| face_render.vertices.clone().into_iter())
+            .values()
+            .flat_map(|face_mesh| face_mesh.vertices.clone().into_iter())
             .collect::<Vec<_>>()
     );
     assert_eq!(tex.count_allocated(), 1); // for striped faces
