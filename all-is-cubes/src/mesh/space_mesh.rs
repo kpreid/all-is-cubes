@@ -4,7 +4,7 @@ use ordered_float::OrderedFloat;
 use std::fmt::Debug;
 use std::ops::Range;
 
-use crate::math::{Face7, GridAab, GridCoordinate, GridRotation};
+use crate::math::{Face7, GridAab, GridCoordinate, GridPoint, GridRotation};
 use crate::mesh::{BlockMesh, GfxVertex, MeshOptions, TextureTile};
 use crate::space::{BlockIndex, Space};
 
@@ -185,51 +185,31 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                     .extend(block_mesh.textures().iter().cloned());
             }
 
-            if block_mesh.is_empty() {
-                continue;
-            }
-
-            let inst = V::instantiate_block(cube);
-
-            for face in Face7::ALL {
-                let face_mesh = &block_mesh.faces[face];
-                if face_mesh.is_empty() {
-                    // Nothing to do; skip adjacent_cube lookup.
-                    continue;
-                }
-
-                let adjacent_cube = cube + face.normal_vector();
-                if let Some(adj_block_index) = space.get_block_index(adjacent_cube) {
-                    if block_meshes
-                        .get(adj_block_index)
-                        .map(|adj_mesh| adj_mesh.faces[face.opposite()].fully_opaque)
-                        .unwrap_or(false)
-                    {
-                        // Don't draw obscured faces
-                        // (but do record that we depended onthem)
-                        bitset_set_and_get(&mut self.block_indices_used, adj_block_index.into());
-                        continue;
+            write_block_mesh_to_space_mesh(
+                block_mesh,
+                cube,
+                &mut self.vertices,
+                &mut self.indices,
+                &mut transparent_indices,
+                |face| {
+                    let adjacent_cube = cube + face.normal_vector();
+                    if let Some(adj_block_index) = space.get_block_index(adjacent_cube) {
+                        if block_meshes
+                            .get(adj_block_index)
+                            .map(|adj_mesh| adj_mesh.faces[face.opposite()].fully_opaque)
+                            .unwrap_or(false)
+                        {
+                            // Don't draw obscured faces, but do record that we depended on them.
+                            bitset_set_and_get(
+                                &mut self.block_indices_used,
+                                adj_block_index.into(),
+                            );
+                            return true;
+                        }
                     }
-                }
-
-                // Copy vertices, offset to the block position
-                let index_offset_usize = self.vertices.len();
-                let index_offset: u32 = index_offset_usize
-                    .try_into()
-                    .expect("vertex index overflow");
-                self.vertices.extend(face_mesh.vertices.iter());
-                for vertex in &mut self.vertices[index_offset_usize..] {
-                    vertex.instantiate_vertex(inst);
-                }
-                self.indices
-                    .extend(face_mesh.indices_opaque.iter().map(|i| i + index_offset));
-                transparent_indices.extend(
-                    face_mesh
-                        .indices_transparent
-                        .iter()
-                        .map(|i| i + index_offset),
-                );
-            }
+                    false
+                },
+            );
         }
 
         self.sort_and_store_transparent_indices(transparent_indices);
@@ -380,12 +360,60 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     }
 }
 
+/// Copy and adjust vertices from a [`BlockMesh`] into the storage of a [`SpaceMesh`].
+///
+/// This does not perform depth sorting and does not account for mesh or texture dependencies.
+fn write_block_mesh_to_space_mesh<V: GfxVertex, T: TextureTile>(
+    block_mesh: &BlockMesh<V, T>,
+    cube: GridPoint,
+    vertices: &mut Vec<V>,
+    opaque_indices: &mut Vec<u32>,
+    transparent_indices: &mut Vec<u32>,
+    mut neighbor_is_fully_opaque: impl FnMut(Face7) -> bool,
+) {
+    if block_mesh.is_empty() {
+        return;
+    }
+
+    let inst = V::instantiate_block(cube);
+
+    for face in Face7::ALL {
+        let face_mesh = &block_mesh.faces[face];
+        if face_mesh.is_empty() {
+            // Nothing to do; skip opacity lookup.
+            continue;
+        }
+        if neighbor_is_fully_opaque(face) {
+            // Skip face fully obscured by a neighbor.
+            continue;
+        }
+
+        // Copy vertices, offset to the block position
+        let index_offset_usize = vertices.len();
+        let index_offset: u32 = index_offset_usize
+            .try_into()
+            .expect("vertex index overflow");
+        vertices.extend(face_mesh.vertices.iter());
+        for vertex in &mut vertices[index_offset_usize..] {
+            vertex.instantiate_vertex(inst);
+        }
+        opaque_indices.extend(face_mesh.indices_opaque.iter().map(|i| i + index_offset));
+        transparent_indices.extend(
+            face_mesh
+                .indices_transparent
+                .iter()
+                .map(|i| i + index_offset),
+        );
+    }
+}
+
+/// We need a Range constant to be able to initialize arrays.
+const ZERO_RANGE: Range<usize> = 0..0;
+
 impl<V, T> Default for SpaceMesh<V, T> {
     /// Construct an empty [`SpaceMesh`] which draws nothing.
     #[inline]
     fn default() -> Self {
-        // We need a Range constant to be able to initialize the array with copies of it.
-        const ZERO_RANGE: Range<usize> = Range { start: 0, end: 0 };
         Self {
             vertices: Vec::new(),
             indices: Vec::new(),
@@ -394,6 +422,54 @@ impl<V, T> Default for SpaceMesh<V, T> {
             block_indices_used: BitVec::new(),
             textures_used: Vec::new(),
         }
+    }
+}
+
+impl<V: GfxVertex, T: TextureTile> From<&BlockMesh<V, T>> for SpaceMesh<V, T> {
+    /// Construct a `SpaceMesh` containing the given `BlockMesh`.
+    ///
+    /// The result will be identical to creating a [`Space`] with bounds
+    /// `GridAab::single_cube(GridPoint::origin())` and placing the block in it,
+    /// but more efficient.
+    fn from(block_mesh: &BlockMesh<V, T>) -> Self {
+        let mut block_indices_used = BitVec::new();
+        block_indices_used.push(true);
+
+        let mut space_mesh = Self {
+            vertices: Vec::with_capacity(
+                block_mesh.faces.values().map(|fm| fm.vertices.len()).sum(),
+            ),
+            indices: Vec::with_capacity(
+                block_mesh
+                    .faces
+                    .values()
+                    .map(|fm| fm.indices_opaque.len())
+                    .sum(),
+            ),
+            opaque_range: 0..0,
+            transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
+            block_indices_used,
+            textures_used: block_mesh.textures_used.clone(),
+        };
+
+        let mut transparent_indices = Vec::with_capacity(
+            block_mesh
+                .faces
+                .values()
+                .map(|fm| fm.indices_transparent.len())
+                .sum(),
+        );
+        write_block_mesh_to_space_mesh(
+            block_mesh,
+            GridPoint::origin(),
+            &mut space_mesh.vertices,
+            &mut space_mesh.indices,
+            &mut transparent_indices,
+            |_| false,
+        );
+        space_mesh.sort_and_store_transparent_indices(transparent_indices);
+
+        space_mesh
     }
 }
 

@@ -175,6 +175,12 @@ fn trivial_voxels_equals_atom() {
 }
 
 /// [`SpaceMesh`] of a 1×1×1 space has the same geometry as the contents.
+///
+/// This test compares 3 different values:
+///
+/// * A [`BlockMesh`] (with texture).
+/// * A [`SpaceMesh`] produced from it via normal construction.
+/// * A [`SpaceMesh`] produced from it via [`SpaceMesh::from`].
 #[test]
 fn space_mesh_equals_block_mesh() {
     // Construct recursive block.
@@ -196,6 +202,7 @@ fn space_mesh_equals_block_mesh() {
     eprintln!("{:#?}", block_meshes);
     eprintln!("{:#?}", space_rendered);
 
+    // Compare the contents of the space mesh and block mesh.
     assert_eq!(
         space_rendered.vertices().to_vec(),
         block_meshes[0]
@@ -205,6 +212,10 @@ fn space_mesh_equals_block_mesh() {
             .collect::<Vec<_>>()
     );
     assert_eq!(tex.count_allocated(), 1); // for striped faces
+
+    // Compare the result of a `From<&BlockMesh>` conversion with the result of the
+    // normal `SpaceMesh` creation.
+    assert_eq!(space_rendered, SpaceMesh::from(&block_meshes[0]));
 }
 
 /// TODO: This test stops being meaningful when we finish migrating the texture allocator to use arbitrary-sized tiles
