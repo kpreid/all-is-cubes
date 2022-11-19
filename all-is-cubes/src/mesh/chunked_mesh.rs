@@ -480,12 +480,12 @@ where
 
                 // Only invalidate the chunks if we actually have different data.
                 // Note: This comparison depends on such things as the definition of PartialEq
-                // for Tex::Tile (whose particular implementation LumAtlasTile
-                // compares by pointer).
-                // TODO: We don't currently make use of this optimally because the triangulator
-                // never reuses textures. (If it did, we'd need to consider what we want to do
-                // about stale chunks with fresh textures, which might have geometry gaps or
-                // otherwise be obviously inconsistent.)
+                // for Tex::Tile.
+                // TODO: We don't currently make use of this optimally because textures are never
+                // reused, except in the case of texture-only updates handled above.
+                // (If they were, we'd need to consider what we want to do about stale chunks with
+                // updated texture tiles, which might have geometry gaps or otherwise be obviously
+                // inconsistent.)
                 if new_block_mesh != current_mesh_entry.mesh
                     || current_mesh_entry.version == BlockMeshVersion::NotReady
                 {
