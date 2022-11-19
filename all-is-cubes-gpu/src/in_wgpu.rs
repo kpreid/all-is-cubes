@@ -462,7 +462,6 @@ impl EverythingRenderer {
             &mut self.space_renderers.world,
             spaces_to_render.world,
             &self.device,
-            queue,
             &self.pipelines,
             &self.block_texture,
         )?;
@@ -471,7 +470,6 @@ impl EverythingRenderer {
             &mut self.space_renderers.ui,
             spaces_to_render.ui,
             &self.device,
-            queue,
             &self.pipelines,
             &self.block_texture,
         )?;
@@ -589,7 +587,6 @@ impl EverythingRenderer {
         renderer: &mut Option<SpaceRenderer>,
         space: Option<&URef<Space>>,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
         pipelines: &Pipelines,
         block_texture: &Arc<AtlasAllocator>,
     ) -> Result<(), GraphicsResourceError> {
@@ -600,7 +597,6 @@ impl EverythingRenderer {
                     space.clone(),
                     String::from(label),
                     device,
-                    queue,
                     pipelines,
                     Arc::clone(block_texture),
                 )?);

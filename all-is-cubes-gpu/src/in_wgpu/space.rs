@@ -78,7 +78,6 @@ impl SpaceRenderer {
         space: URef<Space>,
         space_label: String,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
         pipelines: &Pipelines,
         block_texture: Arc<AtlasAllocator>,
     ) -> Result<Self, GraphicsResourceError> {
