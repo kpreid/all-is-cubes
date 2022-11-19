@@ -8,7 +8,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 use indoc::indoc;
 use instant::{Duration, Instant};
 
-use crate::block::EvaluatedBlock;
+use crate::block::{EvaluatedBlock, Resolution};
 use crate::camera::{Camera, Flaws};
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
 use crate::listen::Listener;
@@ -437,18 +437,50 @@ where
             return TimeStats::default();
         }
 
+        // Bump version number.
         self.last_version_counter = match self.last_version_counter.get().checked_add(1) {
             None => NonZeroU32::new(1).unwrap(),
             Some(n) => NonZeroU32::new(n).unwrap(),
         };
+        let current_version_number = BlockMeshVersion::Numbered(self.last_version_counter);
+
         let block_data = space.block_data();
 
-        // Update the vector length to match the space.
-        self.meshes
-            .resize_with(block_data.len(), || VersionedBlockMesh {
-                mesh: BlockMesh::default(),
-                version: BlockMeshVersion::NotReady,
-            });
+        // Synchronize the mesh storage vector's length.
+        {
+            let old_len = self.meshes.len();
+            let new_len = block_data.len();
+            if old_len > new_len {
+                self.meshes.truncate(new_len);
+            } else {
+                // Increase length, and initialize the new elements.
+                // This must be done quickly, so that we do not have a hiccup when initializing
+                // from a space with many blocks.
+
+                let mut fast_options = mesh_options.clone();
+                fast_options.ignore_voxels = true;
+
+                self.meshes.reserve(new_len);
+                for bd in &block_data[self.meshes.len()..new_len] {
+                    let evaluated = bd.evaluated();
+                    self.meshes.push(if evaluated.resolution > Resolution::R1 {
+                        // If the block has voxels, generate a placeholder mesh,
+                        // marked as not-ready so it will be replaced eventually.
+                        VersionedBlockMesh {
+                            mesh: BlockMesh::new(evaluated, block_texture_allocator, &fast_options),
+                            version: BlockMeshVersion::NotReady,
+                        }
+                    } else {
+                        // If the block does not have voxels, then we can just generate the
+                        // final mesh.
+                        VersionedBlockMesh {
+                            mesh: BlockMesh::new(evaluated, block_texture_allocator, mesh_options),
+                            version: current_version_number,
+                        }
+                    });
+                }
+            }
+        }
 
         // Update individual meshes.
         let mut last_start_time = Instant::now();
@@ -491,7 +523,7 @@ where
                 {
                     *current_mesh_entry = VersionedBlockMesh {
                         mesh: new_block_mesh,
-                        version: BlockMeshVersion::Numbered(self.last_version_counter),
+                        version: current_version_number,
                     };
                 } else {
                     // The new mesh is identical to the old one (which might happen because

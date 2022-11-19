@@ -5,7 +5,7 @@
 use cgmath::{Point2, Point3, Transform as _};
 use std::fmt::Debug;
 
-use crate::block::{AnimationChange, EvaluatedBlock, Evoxel};
+use crate::block::{AnimationChange, EvaluatedBlock, Evoxel, Resolution};
 use crate::content::palette;
 use crate::math::{
     Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, OpacityCategory,
@@ -160,7 +160,7 @@ where
 
         let mut used_any_vertex_colors = false;
 
-        match &block.voxels {
+        match block.voxels.as_ref().filter(|_| !options.ignore_voxels) {
             None => {
                 let faces = FaceMap::from_fn(|face| {
                     let face = match Face6::try_from(face) {
@@ -186,7 +186,7 @@ where
                                 indices_transparent.reserve_exact(6);
                                 &mut indices_transparent
                             },
-                            &QuadTransform::new(face, block.resolution),
+                            &QuadTransform::new(face, Resolution::R1),
                             /* depth= */ 0.,
                             Point2 { x: 0., y: 0. },
                             Point2 { x: 1., y: 1. },

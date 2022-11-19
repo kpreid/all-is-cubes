@@ -39,6 +39,11 @@ mod tests;
 pub struct MeshOptions {
     /// Input to TransparencyOption::limit_alpha.
     transparency: TransparencyOption,
+
+    /// Ignore blocks' [`voxels`] data and use only the overall color.
+    ///
+    /// [`voxels`]: crate::block::EvaluatedBlock::voxels
+    ignore_voxels: bool,
 }
 
 impl MeshOptions {
@@ -46,6 +51,7 @@ impl MeshOptions {
     pub fn new(graphics_options: &GraphicsOptions) -> Self {
         Self {
             transparency: graphics_options.transparency.clone(),
+            ignore_voxels: false,
         }
     }
 
@@ -55,6 +61,7 @@ impl MeshOptions {
     pub fn dont_care_for_test() -> Self {
         Self {
             transparency: TransparencyOption::Volumetric,
+            ignore_voxels: false,
         }
     }
 }
