@@ -38,6 +38,7 @@ impl Composite {
     /// Compose `self` and `destination`, except that:
     ///
     /// * If `destination` is [`AIR`], then the `self.source` block will be returned.
+    /// * If `self.source` is [`AIR`], then `destination` will be returned.
     /// * If `destination` has a rotation modifier, it will be rearranged to be last.
     ///   (In this way, there won't be any unequal-but-equivalent blocks generated due
     ///   to rotation.)
@@ -64,9 +65,12 @@ impl Composite {
         if destination == AIR {
             // If the destination is AIR, discard it.
             // Note: Since we removed rotation, this is currently equivalent to
-            // Block::unspecialize(), but it might not be in the future. We could use
-            // a better solution
+            // testing against Block::unspecialize(), but it might not be in the future.
+            // We could use a better solution.
             self.source
+        } else if self.source == AIR {
+            // If the source is AIR, produce the original destination block.
+            destination.rotate(dest_rot)
         } else {
             self.source = self.source.rotate(dest_rot.inverse());
             Modifier::from(self).attach(destination).rotate(dest_rot)
@@ -233,6 +237,8 @@ impl CompositeOperator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::content::make_some_blocks;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn composite_silly_floats() {
@@ -240,6 +246,24 @@ mod tests {
         CompositeOperator::Over.blend_color(
             Rgba::new(2e25, 2e25, 2e25, 2e25),
             Rgba::new(2e25, 2e25, 2e25, 2e25),
+        );
+    }
+
+    #[test]
+    fn compose_or_replace_source_is_air() {
+        let [block] = make_some_blocks();
+        assert_eq!(
+            Composite::new(AIR, CompositeOperator::Over).compose_or_replace(block.clone()),
+            block
+        );
+    }
+
+    #[test]
+    fn compose_or_replace_destination_is_air() {
+        let [block] = make_some_blocks();
+        assert_eq!(
+            Composite::new(block.clone(), CompositeOperator::Over).compose_or_replace(AIR),
+            block
         );
     }
 }

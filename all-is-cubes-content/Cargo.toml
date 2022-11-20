@@ -45,3 +45,4 @@ criterion = { version = "0.4.0", features = ["async_futures", "cargo_bench_suppo
 # Note: This is a executor for tests and does not imply any more general requirement
 # for using `futures-executor` with All is Cubes.
 futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
+pretty_assertions = "1.2.0"

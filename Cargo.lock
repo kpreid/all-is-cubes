@@ -83,6 +83,7 @@ dependencies = [
  "maze_generator",
  "noise",
  "paste",
+ "pretty_assertions",
  "rand 0.8.5",
  "rand_xoshiro",
  "strum",
