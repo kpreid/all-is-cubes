@@ -68,6 +68,7 @@ mod landscape;
 pub use landscape::*;
 mod menu;
 mod noise;
+mod tree;
 
 // Reexport the content parts that are implemented in the core crate.
 pub use all_is_cubes::content::*;

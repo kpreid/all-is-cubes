@@ -3,7 +3,11 @@ use std::fmt;
 use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
-use all_is_cubes::block::{Block, BlockCollision, Resolution, AIR};
+use all_is_cubes::block::{
+    Block, BlockCollision,
+    Resolution::{self, R16},
+    AIR,
+};
 use all_is_cubes::cgmath::EuclideanSpace;
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{
@@ -14,9 +18,9 @@ use all_is_cubes::space::{SetCubeError, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 
+use crate::blocks::scale_color;
 use crate::noise::{array_of_noise, NoiseFnExt};
-use crate::voronoi_pattern;
-use crate::{blocks::scale_color, palette};
+use crate::{palette, tree, voronoi_pattern};
 
 /// Names for blocks assigned specific roles in generating outdoor landscapes.
 ///
@@ -26,11 +30,14 @@ use crate::{blocks::scale_color, palette};
 #[non_exhaustive]
 pub enum LandscapeBlocks {
     Grass,
-    GrassBlades { variant: bool },
+    GrassBlades {
+        variant: bool,
+    },
     Dirt,
     Stone,
-    Trunk,
-    Leaves,
+    /// Half a tree part; composite it with another one to make a log/branch.
+    Log(tree::TreeGrowth),
+    Leaves(tree::TreeGrowth),
 }
 
 impl fmt::Display for LandscapeBlocks {
@@ -47,8 +54,8 @@ impl fmt::Display for LandscapeBlocks {
             ),
             LandscapeBlocks::Dirt => write!(f, "dirt"),
             LandscapeBlocks::Stone => write!(f, "stone"),
-            LandscapeBlocks::Trunk => write!(f, "trunk"),
-            LandscapeBlocks::Leaves => write!(f, "leaves"),
+            LandscapeBlocks::Log(growth) => write!(f, "log/{growth}"),
+            LandscapeBlocks::Leaves(growth) => write!(f, "leaves/{growth}"),
         }
     }
 }
@@ -83,8 +90,12 @@ impl DefaultProvision for LandscapeBlocks {
             GrassBlades { variant: _ } => blades(),
             Dirt => color_and_name(palette::DIRT, "Dirt"),
             Stone => color_and_name(palette::STONE, "Stone"),
-            Trunk => color_and_name(palette::TREE_BARK, "Wood"),
-            Leaves => color_and_name(palette::TREE_LEAVES, "Leaves"),
+            Log(g) => color_and_name(
+                palette::TREE_BARK * (0.8 + (8. - g.radius() as f32) * 0.1),
+                "Wood",
+            ),
+
+            Leaves(_g) => color_and_name(palette::TREE_LEAVES, "Leaves"),
         }
     }
 }
@@ -199,11 +210,35 @@ pub async fn install_landscape_blocks(
                 .voxels_fn(universe, resolution, &dirt_pattern)?
                 .build(),
 
-            Trunk => colors[Trunk].clone(),
+            Log(stage) => {
+                let resolution = R16;
+                let mid = GridCoordinate::from(resolution) / 2;
+                let radius = stage as GridCoordinate;
+                let trunk_box = GridAab::from_lower_upper(
+                    [mid - radius, 0, mid - radius],
+                    [mid + radius, mid + radius, mid + radius],
+                );
+                Block::builder()
+                    .attributes(
+                        colors[Log(stage)]
+                            .evaluate()
+                            .map_err(InGenError::other)?
+                            .attributes,
+                    )
+                    .voxels_fn(universe, resolution, |cube| {
+                        if trunk_box.contains_cube(cube) {
+                            &colors[Log(stage)]
+                        } else {
+                            &AIR
+                        }
+                    })?
+                    .build()
+            }
 
-            Leaves => Block::builder()
+            // TODO: implement growth stages for leaves
+            key @ Leaves(_growth) => Block::builder()
                 .attributes(
-                    colors[Leaves]
+                    colors[key]
                         .evaluate()
                         .map_err(InGenError::other)?
                         .attributes,
@@ -224,7 +259,7 @@ pub async fn install_landscape_blocks(
                     {
                         &AIR
                     } else {
-                        &colors[Leaves]
+                        &colors[key]
                     }
                 })?
                 .build(),

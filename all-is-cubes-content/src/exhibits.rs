@@ -4,6 +4,9 @@
 use std::convert::TryFrom;
 use std::f64::consts::PI;
 
+use exhaust::Exhaust as _;
+use rand::SeedableRng as _;
+
 use all_is_cubes::block::{
     space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Composite,
     CompositeOperator, Move, Resolution::*, RotationPlacementRule, Zoom, AIR,
@@ -34,12 +37,13 @@ use all_is_cubes::math::{
     GridVector, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics};
+use all_is_cubes::transaction::Transaction as _;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::{include_image, rgb_const, rgba_const};
 
 use crate::{
-    four_walls, make_slab, make_some_blocks, make_some_voxel_blocks, palette, AnimatedVoxels,
-    DemoBlocks, Exhibit, Fire,
+    four_walls, make_slab, make_some_blocks, make_some_voxel_blocks, palette, tree, AnimatedVoxels,
+    DemoBlocks, Exhibit, Fire, LandscapeBlocks,
 };
 
 /// All exhibits which will show up in [`crate::UniverseTemplate::DemoCity`].
@@ -57,6 +61,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     MOVED_BLOCKS,
     ROTATIONS,
     UI_BLOCKS,
+    TREES,
     CHUNK_CHART,
     COLOR_LIGHTS,
     IMAGES,
@@ -1111,6 +1116,54 @@ pub async fn ui_blocks_exhibit(universe: &mut Universe) -> Result<Space, InGenEr
                 block,
             )
             .unwrap();
+    }
+
+    Ok(space)
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "Trees",
+    subtitle: "",
+)]
+async fn TREES(_: &Exhibit, universe: &mut Universe) {
+    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
+    let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(128947981240);
+
+    let n_x = 5;
+    let n_z = 5;
+    let spacing_x = 5;
+    let spacing_z = 5;
+    let bounds = GridAab::from_lower_upper(
+        [-2, -1, -2],
+        [(n_x - 1) * spacing_x + 3, 20, (n_z - 1) * spacing_z + 3],
+    );
+    let mut space = Space::builder(bounds).build();
+
+    // Grassy floor
+    space.fill_uniform(
+        bounds.abut(Face6::NY, -1).unwrap(),
+        &landscape_blocks[LandscapeBlocks::Grass],
+    )?;
+
+    for ix in 0..n_x {
+        for iy in 0..n_z {
+            tree::make_tree(
+                &landscape_blocks,
+                &mut rng,
+                GridPoint::new(ix * 5, 0, iy * 5),
+                ix + iy * 2,
+            )?
+            .execute(&mut space)?;
+        }
+    }
+
+    // exhibit of leaves growth stages for debugging
+    for (i, g) in tree::TreeGrowth::exhaust().enumerate() {
+        space.set(
+            [i as GridCoordinate * 2, 0, bounds.lower_bounds().z],
+            &landscape_blocks[LandscapeBlocks::Leaves(g)],
+        )?;
     }
 
     Ok(space)

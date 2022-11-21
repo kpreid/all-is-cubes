@@ -23,7 +23,7 @@ use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{include_image, rgb_const};
 
 use crate::dungeon::{build_dungeon, d2f, m2gp, maze_to_array, DungeonGrid, Theme};
-use crate::{four_walls, DemoBlocks, LandscapeBlocks};
+use crate::{four_walls, tree, DemoBlocks, LandscapeBlocks};
 
 const WINDOW_PATTERN: [GridCoordinate; 3] = [-2, 0, 2];
 
@@ -474,7 +474,7 @@ pub(crate) async fn demo_dungeon(
                             &demo_blocks[DemoBlocks::Lamp],
                             &demo_blocks[DemoBlocks::Signboard],
                             // TODO: can't do this until we have an "item" form: &demo_blocks[DemoBlocks::Explosion(0)],
-                            &landscape_blocks[LandscapeBlocks::Leaves],
+                            &landscape_blocks[LandscapeBlocks::Leaves(tree::TreeGrowth::Block)],
                             &landscape_blocks[LandscapeBlocks::Grass],
                             &landscape_blocks[LandscapeBlocks::Dirt],
                             &landscape_blocks[LandscapeBlocks::Stone],
