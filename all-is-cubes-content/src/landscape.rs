@@ -11,7 +11,7 @@ use all_is_cubes::block::{
 use all_is_cubes::cgmath::EuclideanSpace;
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{
-    cube_to_midpoint, Aab, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, Rgb,
+    Aab, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, Rgb,
 };
 use all_is_cubes::notnan;
 use all_is_cubes::space::{SetCubeError, Space};
@@ -235,31 +235,42 @@ pub async fn install_landscape_blocks(
                     .build()
             }
 
-            // TODO: implement growth stages for leaves
-            key @ Leaves(_growth) => Block::builder()
+            key @ Leaves(growth) => Block::builder()
                 .attributes(
                     colors[key]
                         .evaluate()
                         .map_err(InGenError::other)?
                         .attributes,
                 )
+                .collision(match growth {
+                    tree::TreeGrowth::Block => BlockCollision::Hard,
+                    _ => BlockCollision::Recur,
+                })
                 .voxels_fn(universe, resolution, |cube| {
-                    // TODO: we should have standard math for "how close to the edge
-                    // of a box is this point", since it comes up a bunch.
-                    let unit_radius_point = cube_to_midpoint(cube)
-                        .map(|c| c / (FreeCoordinate::from(resolution) / 2.0) - 1.0);
-                    let boxy_radius = unit_radius_point
+                    // Distance this cube is from the center.
+                    // TODO: This is the same computation as done by square_radius() but
+                    // not with the same output. Can we share some logic there?
+                    // Or add a helpful method on GridAab?
+                    let radius_vec =
+                        cube.map(|c| (c * 2 + 1 - GridCoordinate::from(resolution)).abs() / 2 + 1);
+                    let radius = radius_vec
                         .x
                         .abs()
-                        .max(unit_radius_point.y.abs())
-                        .max(unit_radius_point.z.abs());
-                    let distance_from_edge = 1.0 - boxy_radius;
+                        .max(radius_vec.y.abs())
+                        .max(radius_vec.z.abs());
 
-                    if rng.gen_bool(((distance_from_edge * 4.0).powi(2) / 2.0 + 0.5).clamp(0., 1.))
+                    let signed_distance_from_edge = radius - growth.radius();
+                    let unit_scale_distance =
+                        f64::from(signed_distance_from_edge) / f64::from(growth.radius());
+
+                    if unit_scale_distance <= 1.0
+                        && !rng.gen_bool(
+                            ((unit_scale_distance * 4.0).powi(2) / 2.0 + 0.5).clamp(0., 1.),
+                        )
                     {
-                        &AIR
-                    } else {
                         &colors[key]
+                    } else {
+                        &AIR
                     }
                 })?
                 .build(),
