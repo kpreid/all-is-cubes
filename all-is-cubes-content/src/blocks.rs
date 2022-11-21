@@ -505,9 +505,8 @@ pub(crate) fn gradient_lookup(gradient: &[Block], value: f32) -> &Block {
 
 /// Compute the cube's distance from the midpoint of the Y axis of the block volume.
 ///
-/// If the resolution is even, then the centermost 4 cubes all have a distance of 1.
-/// If the resolution is odd, then there is only 1 cube that has a distance of 1.
-/// (No cube has a distance of 0, so 0 can be used in a comparison for “never”.)
+/// The centermost 4 cubes that exist in every resolution above 1 all have a distance of 1.
+/// (No cube ever has a distance of 0, so 0 can be used in a comparison for “never”.)
 ///
 /// The first returned number is the "radius" value and the second is the distance
 /// on the lesser axis, which may be used for distance from the center or corner along
