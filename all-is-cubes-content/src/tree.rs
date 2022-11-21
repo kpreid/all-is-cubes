@@ -2,10 +2,13 @@ use std::fmt;
 
 use all_is_cubes::block::{self, Block, AIR};
 use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::{Face6, FaceMap, GridCoordinate, GridPoint, GridRotation, GridVector};
+use all_is_cubes::math::{
+    Face6, Face7, FaceMap, GridCoordinate, GridPoint, GridRotation, GridVector,
+};
 use all_is_cubes::space::SpaceTransaction;
+use all_is_cubes::transaction::Merge;
 
-use crate::LandscapeBlocks::Leaves;
+use crate::LandscapeBlocks::{self, Leaves, Log};
 
 /// Tree segment sizes or growth stages.
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, exhaust::Exhaust)]
@@ -28,18 +31,19 @@ impl fmt::Display for TreeGrowth {
 }
 
 impl TreeGrowth {
-    pub fn from_radius(index: GridCoordinate) -> Option<Self> {
-        Some(match index {
-            1 => Self::Sapling,
+    /// Convert a log radius (meaningful range 1 to 8) to the enum.
+    /// Out-of-range values will be clamped/saturated.
+    pub fn from_radius(index: GridCoordinate) -> Self {
+        match index {
+            i if i <= 1 => Self::Sapling,
             2 => Self::G2,
             3 => Self::G3,
             4 => Self::G4,
             5 => Self::G5,
             6 => Self::G6,
             7 => Self::G7,
-            8 => Self::Block,
-            _ => return None,
-        })
+            _ => Self::Block,
+        }
     }
 
     pub fn radius(self) -> GridCoordinate {
@@ -50,8 +54,9 @@ impl TreeGrowth {
 /// Construct a tree log/branch block whose faces each have the specified cross-section size,
 /// or [`None`] for no branch in that direction.
 pub(crate) fn make_log(
-    blocks: &BlockProvider<crate::LandscapeBlocks>,
+    blocks: &BlockProvider<LandscapeBlocks>,
     directions: FaceMap<Option<TreeGrowth>>,
+    leaves: Option<TreeGrowth>,
 ) -> Block {
     // TODO: this needs to canonicalize rotations so that we don't end up with
     // identical-looking but differently defined blocks.
@@ -61,13 +66,17 @@ pub(crate) fn make_log(
         .map(|(face, &growth)| {
             let Ok(face) = Face6::try_from(face) else { return AIR; };
             let Some(growth) = growth else { return AIR; };
-            blocks[crate::LandscapeBlocks::Log(growth)].clone().rotate(
+            blocks[Log(growth)].clone().rotate(
                 GridRotation::from_to(Face6::NY, face, Face6::PX)
                     .or_else(|| GridRotation::from_to(Face6::NY, face, Face6::PZ))
                     .unwrap(),
             )
         })
         .collect();
+
+    if let Some(leaves_growth) = leaves {
+        parts.push(blocks[Leaves(leaves_growth)].clone());
+    }
 
     let Some(mut block) = parts.pop() else { return AIR; };
     for next in parts {
@@ -80,33 +89,64 @@ pub(crate) fn make_log(
 
 /// Construct a tree whose lowest trunk piece is at `origin` and whose maximum height is `height`.
 pub(crate) fn make_tree(
-    blocks: &BlockProvider<crate::LandscapeBlocks>,
-    mut rng: impl rand::Rng,
+    blocks: &BlockProvider<LandscapeBlocks>,
+    rng: &mut impl rand::Rng,
     mut origin: GridPoint,
     mut height: GridCoordinate,
 ) -> Result<SpaceTransaction, InGenError> {
     let mut txn = SpaceTransaction::default();
 
     while height > 1 {
-        let log = make_log(
-            blocks,
-            FaceMap {
-                ny: Some(TreeGrowth::from_radius(height).unwrap_or(TreeGrowth::Block)),
-                py: Some(TreeGrowth::from_radius(height - 1).unwrap_or(TreeGrowth::Block)),
-                nx: if rng.gen_bool(0.2) {
-                    Some(TreeGrowth::G2)
-                } else {
-                    None
-                },
-                ..FaceMap::repeat(None)
-            },
-        );
-        txn.set_overwrite(origin, log);
+        let mut branches = FaceMap {
+            ny: Some(TreeGrowth::from_radius(height)),
+            py: Some(TreeGrowth::from_radius(height - 1)),
+            ..FaceMap::repeat(None)
+        };
+
+        for side in [Face6::PX, Face6::PZ, Face6::NX, Face6::NZ] {
+            if rng.gen_bool(0.2 / f64::from(height)) {
+                let branch_length = rng.gen_range(0..height - 1);
+                if branch_length > 0 {
+                    let branch_base_growth = TreeGrowth::from_radius(branch_length);
+                    branches[side.into()] = Some(branch_base_growth);
+
+                    txn.set_overwrite(
+                        origin + side.normal_vector(),
+                        make_log(
+                            blocks,
+                            FaceMap::default()
+                                .with(Face7::PY, Some(branch_base_growth))
+                                .with(side.opposite().into(), Some(branch_base_growth)),
+                            None,
+                        ),
+                    );
+
+                    let branch_txn = make_tree(
+                        blocks,
+                        rng,
+                        origin + side.normal_vector() + GridVector::unit_y(),
+                        branch_length,
+                    )?;
+                    if let Ok(check) = txn.check_merge(&branch_txn) {
+                        txn = txn.commit_merge(branch_txn, check);
+                    }
+                }
+            }
+        }
+
+        txn.set_overwrite(origin, make_log(blocks, branches, None));
         origin += GridVector::unit_y();
         height -= 1;
     }
     if height > 0 {
-        txn.set_overwrite(origin, blocks[Leaves(TreeGrowth::G7)].clone());
+        txn.set_overwrite(
+            origin,
+            make_log(
+                blocks,
+                FaceMap::default().with(Face7::NY, Some(TreeGrowth::Sapling)),
+                Some(TreeGrowth::G6),
+            ),
+        );
     }
 
     Ok(txn)
