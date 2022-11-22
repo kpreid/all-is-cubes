@@ -161,14 +161,23 @@ fn main() -> Result<(), ActionError> {
                 // Note that a timeout is specified because if any one fuzz task takes
                 // more than a fraction of a second, that's a sign that something has
                 // gone wrong, because all of the things we are fuzzing are supposed to
-                // be fast. (TODO: Tune this per-target.)
-                let timeout = 5; // seconds
+                // be fast.
+                let timeout_seconds = match target.name.as_str() {
+                    // TODO: we don't really want to spend this much time on a
+                    // block evaluation, but right now, we don't have good strategies
+                    // to cap it without interfering with intended uses.
+                    // Eventually we should implement some sort of evaluation cost model
+                    // that deterministically limits how much time is spent on one
+                    // (just like the recursion limit currently does).
+                    "fuzz_block_eval" => 15,
+                    _ => 5,
+                };
 
                 cmd!("cargo +nightly fuzz run")
                     .env("RUST_BACKTRACE", "1")
                     .arg(&target.name)
                     .arg("--")
-                    .arg(format!("-timeout={timeout}"))
+                    .arg(format!("-timeout={timeout_seconds}"))
                     .arg(format!("-max_total_time={duration}"))
                     .run()?;
             }
