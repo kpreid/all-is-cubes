@@ -1,7 +1,7 @@
 use std::ops;
 
 #[cfg(doc)]
-use crate::block::{EvaluatedBlock, Primitive, Modifier};
+use crate::block::{EvaluatedBlock, Modifier, Primitive};
 
 /// Scale factor between a [recursive block](Primitive::Recur) and its component voxels.
 ///
@@ -18,7 +18,7 @@ use crate::block::{EvaluatedBlock, Primitive, Modifier};
 /// = 262,144 voxels, occupying several megabytes just for color data.
 /// High resolutions are permitted for special purposes that do not necessarily use the
 /// full cube volume:
-/// 
+///
 /// * *Thin* blocks (e.g. 128 × 128 × 1) can display high resolution text and other 2D
 ///   images.
 /// * Multi-block structures can be defined using [`Modifier::Zoom`]; their total size

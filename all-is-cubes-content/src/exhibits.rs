@@ -490,7 +490,7 @@ async fn SMALLEST(_: &Exhibit, universe: &mut Universe) {
     let resolution = R128;
     let rg = GridCoordinate::from(resolution);
 
-    let block_space = Space::builder(GridAab::from_lower_size([rg/2, 0, rg/2], [1, 1, 1]))
+    let block_space = Space::builder(GridAab::from_lower_size([rg / 2, 0, rg / 2], [1, 1, 1]))
         .filled_with(Block::from(palette::ALMOST_BLACK))
         .build();
 
@@ -501,7 +501,7 @@ async fn SMALLEST(_: &Exhibit, universe: &mut Universe) {
         [
             pedestal,
             &Block::builder()
-            .display_name("World's Smallest Voxel")
+                .display_name("World's Smallest Voxel")
                 .collision(BlockCollision::Recur)
                 .voxels_ref(resolution, universe.insert_anonymous(block_space))
                 .build(),
