@@ -472,7 +472,8 @@ impl GridAab {
         }
     }
 
-    /// Moves the box to another location with unchanged size and orientation.
+    /// Displaces the box by the given `offset`, leaving its size unchanged
+    /// (unless that is impossible due to numeric overflow).
     ///
     /// ```
     /// use all_is_cubes::math::GridAab;
@@ -484,11 +485,14 @@ impl GridAab {
     /// ```
     #[must_use]
     pub fn translate(&self, offset: impl Into<GridVector>) -> Self {
-        // TODO: Must check for upper bounds overflow
-        Self {
-            lower_bounds: self.lower_bounds + offset.into(),
-            sizes: self.sizes,
-        }
+        let offset = GridPoint::from_vec(offset.into());
+        let new_lb = self
+            .lower_bounds()
+            .zip(offset, GridCoordinate::saturating_add);
+        let new_ub = self
+            .upper_bounds()
+            .zip(offset, GridCoordinate::saturating_add);
+        Self::from_lower_upper(new_lb, new_ub)
     }
 
     /// Transforms the box.
@@ -902,10 +906,19 @@ impl<V> GridArray<V> {
 
     /// Adds to the origin of the array without affecting the contents.
     ///
+    /// Panics if this would cause numeric overflow.
+    ///
     /// TODO: example
     #[must_use]
+    #[track_caller]
     pub fn translate(mut self, offset: impl Into<GridVector>) -> Self {
-        self.bounds = self.bounds.translate(offset);
+        let new_bounds = self.bounds.translate(offset);
+        if new_bounds.size() != self.bounds.size() {
+            // We can't just continue like `GridAab::translate` does, because that would
+            // break the invariant that self.bounds.volume() == self.contents.len().
+            panic!("GridArray::translate() offset caused numeric overflow");
+        }
+        self.bounds = new_bounds;
         self
     }
 
@@ -1109,6 +1122,50 @@ mod tests {
     }
 
     // TODO: test and improve transform() on matrices with skew / other non-axis-swaps
+
+    /// Translation overflowing to partially outside of the numeric range
+    /// clips the box's size to the range.
+    #[test]
+    fn translate_overflow_partial() {
+        assert_eq!(
+            GridAab::from_lower_size([0, 0, 0], [100, 20, 30]).translate([
+                GridCoordinate::MAX - 50,
+                0,
+                0
+            ]),
+            GridAab::from_lower_size([GridCoordinate::MAX - 50, 0, 0], [50, 20, 30])
+        );
+        assert_eq!(
+            GridAab::from_lower_size([-100, 0, 0], [100, 20, 30]).translate([
+                GridCoordinate::MIN + 50,
+                0,
+                0
+            ]),
+            GridAab::from_lower_size([GridCoordinate::MIN, 0, 0], [50, 20, 30])
+        );
+    }
+
+    /// Translation overflowing to completely outside of the numeric range
+    /// becomes a zero-volume “squashed” box.
+    #[test]
+    fn translate_overflow_total() {
+        assert_eq!(
+            GridAab::from_lower_size([100, 0, 0], [100, 20, 30]).translate([
+                GridCoordinate::MAX - 50,
+                0,
+                0
+            ]),
+            GridAab::from_lower_size([GridCoordinate::MAX, 0, 0], [0, 20, 30])
+        );
+        assert_eq!(
+            GridAab::from_lower_size([-200, 0, 0], [100, 20, 30]).translate([
+                GridCoordinate::MIN + 50,
+                0,
+                0
+            ]),
+            GridAab::from_lower_size([GridCoordinate::MIN, 0, 0], [0, 20, 30])
+        );
+    }
 
     /// Test `Debug` formatting. Note this should be similar to the [`Aab`] formatting.
     #[test]
