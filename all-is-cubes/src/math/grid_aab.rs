@@ -1037,8 +1037,8 @@ mod tests {
             GridAab::from_lower_size([0, 0, 0], [16, 16, 16])
         );
         assert_eq!(
-            GridAab::for_block(R256),
-            GridAab::from_lower_size([0, 0, 0], [256, 256, 256])
+            GridAab::for_block(R128),
+            GridAab::from_lower_size([0, 0, 0], [128, 128, 128])
         );
     }
 

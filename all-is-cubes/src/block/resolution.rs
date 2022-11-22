@@ -1,7 +1,7 @@
 use std::ops;
 
 #[cfg(doc)]
-use crate::block::{EvaluatedBlock, Primitive};
+use crate::block::{EvaluatedBlock, Primitive, Modifier};
 
 /// Scale factor between a [recursive block](Primitive::Recur) and its component voxels.
 ///
@@ -14,10 +14,15 @@ use crate::block::{EvaluatedBlock, Primitive};
 /// shifting the existing voxel boundaries.
 ///
 /// Note that while quite high resolutions are permitted, this does not mean that it is
-/// practical to construct a full block at that resolution. For example, 256 × 256 × 256
-/// = 16,777,216 voxels, occupying 335 MB when [evaluated](EvaluatedBlock). Higher
-/// resolutions are permitted so that *thin* blocks (e.g. 256 × 256 × 1) can display high
-/// resolution text and other 2D images.
+/// practical to routinely use full blocks at that resolution. For example, 64 × 64 × 64
+/// = 262,144 voxels, occupying several megabytes just for color data.
+/// High resolutions are permitted for special purposes that do not necessarily use the
+/// full cube volume:
+/// 
+/// * *Thin* blocks (e.g. 128 × 128 × 1) can display high resolution text and other 2D
+///   images.
+/// * Multi-block structures can be defined using [`Modifier::Zoom`]; their total size
+///   is limited by the resolution limit.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[repr(u8)]
@@ -31,7 +36,6 @@ pub enum Resolution {
     R32 = 5,
     R64 = 6,
     R128 = 7,
-    R256 = 8,
 }
 use std::fmt;
 
@@ -49,8 +53,7 @@ impl Resolution {
             Self::R16 => Some(Self::R32),
             Self::R32 => Some(Self::R64),
             Self::R64 => Some(Self::R128),
-            Self::R128 => Some(Self::R256),
-            Self::R256 => None,
+            Self::R128 => None,
         }
     }
 
@@ -67,7 +70,6 @@ impl Resolution {
             Self::R32 => Some(Self::R16),
             Self::R64 => Some(Self::R32),
             Self::R128 => Some(Self::R64),
-            Self::R256 => Some(Self::R128),
         }
     }
 
@@ -104,7 +106,6 @@ macro_rules! impl_try_from {
                     32 => Ok(Self::R32),
                     64 => Ok(Self::R64),
                     128 => Ok(Self::R128),
-                    256 => Ok(Self::R256),
                     _ => Err(()),
                 }
             }
@@ -187,7 +188,7 @@ mod tests {
     use super::*;
     use Resolution::*;
 
-    const RS: [Resolution; 9] = [R1, R2, R4, R8, R16, R32, R64, R128, R256];
+    const RS: [Resolution; 8] = [R1, R2, R4, R8, R16, R32, R64, R128];
 
     #[test]
     fn resolution_steps() {
@@ -199,24 +200,24 @@ mod tests {
 
     #[test]
     fn resolution_values() {
-        assert_eq!(RS.map(i32::from), [1, 2, 4, 8, 16, 32, 64, 128, 256]);
-        assert_eq!(RS.map(u16::from), [1, 2, 4, 8, 16, 32, 64, 128, 256]);
-        assert_eq!(RS.map(u32::from), [1, 2, 4, 8, 16, 32, 64, 128, 256]);
-        assert_eq!(RS.map(usize::from), [1, 2, 4, 8, 16, 32, 64, 128, 256]);
+        assert_eq!(RS.map(i32::from), [1, 2, 4, 8, 16, 32, 64, 128]);
+        assert_eq!(RS.map(u16::from), [1, 2, 4, 8, 16, 32, 64, 128]);
+        assert_eq!(RS.map(u32::from), [1, 2, 4, 8, 16, 32, 64, 128]);
+        assert_eq!(RS.map(usize::from), [1, 2, 4, 8, 16, 32, 64, 128]);
     }
 
     #[test]
     fn mul() {
         assert_eq!(R4 * R2, Some(R8));
-        assert_eq!(R256 * R2, None);
-        assert_eq!(R2 * R256, None);
+        assert_eq!(R128 * R2, None);
+        assert_eq!(R2 * R128, None);
     }
 
     #[test]
     fn div() {
         assert_eq!(R8 / R2, Some(R4));
-        assert_eq!(R256 / R256, Some(R1));
+        assert_eq!(R128 / R128, Some(R1));
         assert_eq!(R1 / R2, None);
-        assert_eq!(R128 / R256, None);
+        assert_eq!(R64 / R128, None);
     }
 }
