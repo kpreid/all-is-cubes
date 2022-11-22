@@ -133,6 +133,9 @@ impl GltfWriter {
             .extend(meshes.iter().map(|index| index.value()));
     }
 
+    /// Add one [`SpaceMesh`] and return its index.
+    ///
+    /// The mesh's texture allocator must be [`self.texture_allocator()`].
     pub fn add_mesh(
         &mut self,
         name: String,

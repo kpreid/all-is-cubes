@@ -33,6 +33,7 @@ use crate::palette;
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::IntoStaticStr /* kludge */, Exhaust)]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum DemoBlocks {
     GlassBlock,
     Lamp,

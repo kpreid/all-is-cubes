@@ -20,7 +20,8 @@ pub struct GltfTextureAllocator {
 }
 
 impl GltfTextureAllocator {
-    pub fn new(destination: GltfDataDestination) -> Self {
+    /// Public access is via [`GltfWriter::texture_allocator()`].
+    pub(crate) fn new(destination: GltfDataDestination) -> Self {
         Self { destination }
     }
 }

@@ -38,8 +38,8 @@
 // #![warn(unused_crate_dependencies)]  // noisy for dev-dependencies; enable sometimes for review
 
 // Crate-specific lint settings.
-// * TODO: warn(missing_docs), eventually.
 #![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
 use std::collections::HashSet;
 

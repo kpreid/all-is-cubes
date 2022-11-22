@@ -28,6 +28,7 @@ use crate::{palette, tree, voronoi_pattern};
 /// placeholder.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum LandscapeBlocks {
     Grass,
     GrassBlades {

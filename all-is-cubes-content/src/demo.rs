@@ -66,16 +66,39 @@ macro_rules! generate_template_test {
 pub enum UniverseTemplate {
     /// Provides an interactive menu of other templates.
     Menu,
+
+    /// New universe with no contents at all.
     Blank,
+
     /// Always produces an error, for testing error-handling functionality.
     Fail,
+
+    /// Space with assorted “exhibits” demonstrating or testing various features of All is Cubes.
     DemoCity,
+
+    /// Randomly generated connected rooms.
+    /// Someday this might have challenges or become a tutorial.
     Dungeon,
+
     /// Large space with separate floating islands.
     Islands,
+
+    /// A procedural voxel version of the classic [Sponza] Atrium rendering test scene.
+    ///
+    /// [Sponza]: https://en.wikipedia.org/wiki/Sponza_Palace
     Atrium,
+
+    /// A procedural voxel version of the classic [Cornell Box] rendering test scene.
+    ///
+    /// [Cornell Box]: https://en.wikipedia.org/wiki/Cornell_box
     CornellBox,
+
+    /// A [Menger sponge] fractal.
+    ///
+    /// [Menger sponge]: https://en.wikipedia.org/wiki/Menger_sponge
     MengerSponge,
+
+    /// A test scene containing various shapes and colors to exercise the lighting algorithm.
     LightingBench,
 
     /// Use entirely random choices.
@@ -107,6 +130,11 @@ impl UniverseTemplate {
         }
     }
 
+    /// Create a new [`Universe`] based on this template's specifications.
+    ///
+    /// The `seed` will be used for any randomization which the template performs.
+    /// Not all templates have random elements.
+    //
     // Design note: u64 was chosen as that both `std::hash::Hasher` and `rand::SeedableRng`
     // agree on this many bits.
     pub async fn build(self, p: YieldProgress, seed: u64) -> Result<Universe, GenError> {
