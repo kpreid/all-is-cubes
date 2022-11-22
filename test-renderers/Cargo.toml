@@ -53,5 +53,5 @@ simplelog = "0.12.0"
 # so let's use it for our output report template.
 tinytemplate = "1.2.1"
 # Using tokio for async test-running.
-tokio = { version = "1.18.0", features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
+tokio = { version = "1.22.0", features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
 wgpu = { version = "0.14.0", features = ["webgl"] }
