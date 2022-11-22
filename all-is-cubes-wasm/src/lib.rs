@@ -34,8 +34,8 @@
 // TODO: warn(missing_docs), eventually
 // #![warn(unused_crate_dependencies)]  // noisy for dev-dependencies; enable sometimes for review
 
-// unused_unit false positives from wasm-bindgen (as of Rust 1.59.0)
-#![allow(clippy::unused_unit)]
+// Crate-specific lint settings.
+#![forbid(unsafe_code)]
 
 #[cfg(target_family = "wasm")]
 pub mod gameapp;

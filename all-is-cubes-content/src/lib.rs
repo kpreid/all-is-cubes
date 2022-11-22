@@ -38,6 +38,9 @@
 // TODO: warn(missing_docs), eventually
 // #![warn(unused_crate_dependencies)]  // noisy for dev-dependencies; enable sometimes for review
 
+// Crate-specific lint settings.
+#![forbid(unsafe_code)]
+
 use std::collections::HashSet;
 
 use all_is_cubes::block::{Block, Resolution, AIR};

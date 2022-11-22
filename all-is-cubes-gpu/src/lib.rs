@@ -35,7 +35,8 @@
 // TODO: warn(missing_docs), eventually
 // #![warn(unused_crate_dependencies)]  // noisy for dev-dependencies; enable sometimes for review
 
-// Lints only enabled in all-is-cubes-gpu
+// Crate-specific lint settings.
+#![forbid(unsafe_code)]
 #![warn(trivial_casts)]
 
 #[cfg_attr(not(any(feature = "luminance", feature = "wgpu")), allow(unused))]
