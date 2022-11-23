@@ -126,7 +126,7 @@ impl EvaluatedBlock {
             attributes,
             // The single color is the mean of the actual block colors.
             color: Rgba::try_from(
-                (color_sum.truncate() / (voxels.bounds().volume() as f32))
+                (color_sum.truncate() / (voxels.bounds().volume().max(1) as f32))
                     .extend(color_sum.w / (full_block_bounds.volume() as f32)),
             )
             .expect("Recursive block color computation produced NaN"),
@@ -234,7 +234,7 @@ impl Evoxel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{AnimationHint, Block, AIR};
+    use crate::block::{AnimationHint, Block, Resolution, AIR};
 
     #[test]
     fn visible_or_animated() {
@@ -248,5 +248,28 @@ mod tests {
             .color(Rgba::TRANSPARENT)
             .animation_hint(AnimationHint::TEMPORARY)
             .build()));
+    }
+
+    #[test]
+    fn from_voxels_zero_bounds() {
+        let attributes = BlockAttributes::default();
+        let resolution = Resolution::R4;
+        let bounds = GridAab::from_lower_size([1, 2, 3], [0, 0, 0]);
+        assert_eq!(
+            EvaluatedBlock::from_voxels(
+                attributes.clone(),
+                resolution,
+                GridArray::from_elements(bounds, []).unwrap()
+            ),
+            EvaluatedBlock {
+                attributes,
+                color: Rgba::TRANSPARENT,
+                voxels: Some(GridArray::from_elements(bounds, []).unwrap()),
+                resolution,
+                opaque: false,
+                visible: false,
+                voxel_opacity_mask: Some(GridArray::from_elements(bounds, []).unwrap())
+            }
+        );
     }
 }
