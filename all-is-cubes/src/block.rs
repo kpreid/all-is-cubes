@@ -309,14 +309,14 @@ impl Block {
             } => {
                 let block_space = space_ref.try_borrow()?;
 
-                let resolution_g: GridCoordinate = resolution.into();
                 let full_resolution_bounds =
-                    GridAab::from_lower_size(offset, [resolution_g, resolution_g, resolution_g]);
+                    GridAab::for_block(resolution).translate(offset.to_vec());
                 let occupied_bounds = full_resolution_bounds
                     .intersection(block_space.bounds())
-                    .unwrap_or_else(
-                        || GridAab::from_lower_size(offset, [1, 1, 1]), /* arbitrary value */
-                    );
+                    .unwrap_or_else(|| {
+                        // Arbitrary placeholder of zero size that won't overflow.
+                        GridAab::from_lower_size(offset, [0, 0, 0])
+                    });
 
                 let voxels = block_space
                     .extract(
