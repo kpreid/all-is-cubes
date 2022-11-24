@@ -75,7 +75,10 @@ jobs:
       if: ${{ runner.os == 'Linux' }}
       run: |
           sudo apt update
-          sudo apt-get -y install libxrandr-dev xorg-dev libglfw3-dev 
+          sudo apt-get -y install libxrandr-dev xorg-dev libglfw3-dev libasound2-dev
+      # libxrandr-dev xorg-dev: needed for all windowing
+      # libglfw3-dev: needed for `glfw`
+      # libasound2-dev: needed for audio via `kira`
     
     - name: Update dependencies
       if: ${{ matrix.depversions == 'latest' }}
