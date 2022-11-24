@@ -163,6 +163,7 @@ fn main() -> Result<(), anyhow::Error> {
     // the kind of window system we're using.
     let inner_params = InnerMainParams {
         before_loop_time: Instant::now(),
+        headless: options.is_headless(),
     };
 
     // The graphics type selects not only the kind of 'window' we create, but also the
@@ -275,7 +276,16 @@ fn inner_main<Ren, Win>(
     looper: impl FnOnce(DesktopSession<Ren, Win>) -> Result<(), anyhow::Error>,
     mut dsession: DesktopSession<Ren, Win>,
 ) -> Result<(), anyhow::Error> {
-    dsession.audio = Some(audio::init_sound(&dsession.session)?);
+    if !params.headless {
+        match audio::init_sound(&dsession.session) {
+            Ok(audio_out) => dsession.audio = Some(audio_out),
+            Err(e) => log::error!(
+                // note that `e` is an anyhow::Error and will benefit from its
+                // chain printing
+                "Failed to initialize audio. Will proceed without.\n{e:#}",
+            ),
+        };
+    }
 
     log::debug!(
         "Initialized desktop-session ({:.3} s); entering event loop",
@@ -291,6 +301,7 @@ fn inner_main<Ren, Win>(
 /// TODO: If this doesn't grow more parameters, get rid of it.
 struct InnerMainParams {
     before_loop_time: Instant,
+    headless: bool,
 }
 
 /// Perform and log the creation of the universe.

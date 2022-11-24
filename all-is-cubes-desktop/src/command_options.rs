@@ -145,6 +145,22 @@ impl AicDesktopArgs {
             },
         })
     }
+
+    /// Whether the command arguments requested “headless” (no real-time UI) operation.
+    ///
+    /// Concretely, this is expected to imply not contacting audio or display devices.
+    pub(crate) fn is_headless(&self) -> bool {
+        match self.graphics {
+            GraphicsType::Window => false,
+            GraphicsType::WindowGl => false,
+            GraphicsType::WindowRt => false,
+            GraphicsType::Terminal => false,
+
+            GraphicsType::Headless => true,
+            GraphicsType::Record => true,
+            GraphicsType::Print => true,
+        }
+    }
 }
 
 /// clap doesn't automatically compile the possible value help
