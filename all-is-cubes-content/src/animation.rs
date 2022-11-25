@@ -67,6 +67,7 @@ impl<F: Fn(GridPoint, u64) -> Block + Clone + Send + Sync + 'static> Behavior<Sp
             mut_self.accumulator -= mut_self.frame_period;
             mut_self.frame = mut_self.frame.wrapping_add(1);
 
+            // TODO: should be using the attachment bounds instead of space bounds
             let paint_txn = mut_self.paint(context.host.bounds());
             context
                 .replace_self(mut_self)
@@ -104,6 +105,7 @@ impl<F> VisitRefs for AnimatedVoxels<F> {
 pub(crate) struct Fire {
     blocks: [Block; 4],
     /// The bounds of this array determine the affected blocks.
+    // TODO: should be using the attachment bounds instead of internally stored bounds
     fire_state: GridArray<u8>,
     rng: Xoshiro256Plus,
     /// Time accumulation not yet equal to a whole frame.

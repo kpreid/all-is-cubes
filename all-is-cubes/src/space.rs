@@ -17,7 +17,7 @@ use crate::drawing::DrawingPlane;
 use crate::listen::{Gate, Listener, Notifier};
 use crate::math::{
     point_checked_add, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix,
-    GridPoint, NotNan, Rgb,
+    GridPoint, GridRotation, NotNan, Rgb,
 };
 use crate::time::Tick;
 use crate::transaction::{Merge, Transaction as _};
@@ -720,11 +720,11 @@ impl Space {
         self.spawn = spawn;
     }
 
-    pub fn add_behavior<B>(&mut self, behavior: B)
+    pub fn add_behavior<B>(&mut self, bounds: GridAab, behavior: B)
     where
         B: Behavior<Self> + 'static,
     {
-        BehaviorSetTransaction::insert((), Arc::new(behavior))
+        BehaviorSetTransaction::insert(SpaceBehaviorAttachment::new(bounds), Arc::new(behavior))
             .execute(&mut self.behaviors)
             .unwrap();
     }
@@ -893,7 +893,7 @@ impl VisitRefs for Space {
 }
 
 impl crate::behavior::BehaviorHost for Space {
-    type Attachment = (); // TODO: { GridAab, GridRotation }
+    type Attachment = SpaceBehaviorAttachment;
 }
 
 impl SpaceBlockData {
@@ -954,6 +954,30 @@ impl SpaceBlockData {
 
     // TODO: Expose the count field? It is the most like an internal bookkeeping field,
     // but might be interesting 'statistics'.
+}
+
+/// Description of where in a [`Space`] a [`Behavior<Space>`](Behavior) exists.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct SpaceBehaviorAttachment {
+    bounds: GridAab,
+    rotation: GridRotation,
+}
+
+impl SpaceBehaviorAttachment {
+    pub fn new(bounds: GridAab) -> Self {
+        Self {
+            bounds,
+            rotation: GridRotation::IDENTITY,
+        }
+    }
+
+    pub fn bounds(&self) -> GridAab {
+        self.bounds
+    }
+
+    pub fn rotation(&self) -> GridRotation {
+        self.rotation
+    }
 }
 
 /// The global characteristics of a [`Space`], more or less independent of location within

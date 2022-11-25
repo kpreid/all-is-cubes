@@ -25,7 +25,7 @@ use crate::inv::EphemeralOpaque;
 use crate::linking::InGenError;
 use crate::listen::{DirtyFlag, ListenableSource};
 use crate::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
-use crate::space::{Space, SpacePhysics, SpaceTransaction};
+use crate::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
 use crate::time::Tick;
 use crate::transaction::Merge;
 use crate::universe::Universe;
@@ -106,8 +106,8 @@ impl vui::WidgetController for ActionButtonController {
     fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         let icon =
             SpaceTransaction::set_cube(self.position, None, Some(self.definition.block.clone()));
-        let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
-            (),
+        let activatable = space::SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
+            space::SpaceBehaviorAttachment::new(GridAab::single_cube(self.position)),
             Arc::new(vui::ActivatableRegion {
                 region: GridAab::single_cube(self.position),
                 effect: self.definition.action.clone(),
@@ -218,7 +218,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
 {
     fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
-            (),
+            SpaceBehaviorAttachment::new(GridAab::single_cube(self.position)),
             Arc::new(vui::ActivatableRegion {
                 region: GridAab::single_cube(self.position),
                 effect: self.definition.action.clone(),

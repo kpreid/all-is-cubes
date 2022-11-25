@@ -549,16 +549,19 @@ mod tests {
         let cube = GridPoint::new(0, 0, 0);
 
         let signal = Arc::new(AtomicU32::new(0));
-        space.add_behavior(ActivatableRegion {
-            region: GridAab::single_cube(cube),
-            // TODO: This sure is clunky
-            effect: EphemeralOpaque::from(Arc::new({
-                let signal = signal.clone();
-                move || {
-                    signal.fetch_add(1, Ordering::Relaxed);
-                }
-            }) as Arc<dyn Fn() + Send + Sync>),
-        });
+        space.add_behavior(
+            GridAab::single_cube(cube),
+            ActivatableRegion {
+                region: GridAab::single_cube(cube),
+                // TODO: This sure is clunky
+                effect: EphemeralOpaque::from(Arc::new({
+                    let signal = signal.clone();
+                    move || {
+                        signal.fetch_add(1, Ordering::Relaxed);
+                    }
+                }) as Arc<dyn Fn() + Send + Sync>),
+            },
+        );
 
         SpaceTransaction::activate_block(cube)
             .execute(&mut space)

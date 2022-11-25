@@ -536,7 +536,7 @@ async fn install_atrium_blocks(
                     let fire_inset = 2;
                     if false {
                         // TODO: Actually enable the fire. We need graphics optimizations for animation first, or this will swamp chunk updating capacity.
-                        space.add_behavior(Fire::new(GridAab::from_lower_upper(
+                        let bounds = GridAab::from_lower_upper(
                             // Vertical overlap will be overwritten, making a bowl shape
                             [fire_inset, resolution_g / 2 - 2, fire_inset],
                             [
@@ -544,7 +544,8 @@ async fn install_atrium_blocks(
                                 resolution_g,
                                 resolution_g - fire_inset,
                             ],
-                        )));
+                        );
+                        space.add_behavior(bounds, Fire::new(bounds));
                     }
                     universe.insert_anonymous(space)
                 })

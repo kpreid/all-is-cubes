@@ -388,7 +388,7 @@ pub async fn install_demo_blocks(
                 let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [16, 16, 1]))
                     .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
                     .build();
-                space.add_behavior(crate::animation::Clock::new());
+                space.add_behavior(space.bounds(), crate::animation::Clock::new());
                 Block::builder()
                     .display_name("Clock")
                     .collision(BlockCollision::None)

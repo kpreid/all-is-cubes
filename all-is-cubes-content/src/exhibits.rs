@@ -336,16 +336,19 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
             Block::from(Rgb::new(0.0, 0.3, 1.0)),
         ];
         let repeats_per_fill = 6;
-        block_space.add_behavior(AnimatedVoxels::new(move |p, frame| {
-            let n = fills.len() as GridCoordinate * repeats_per_fill;
-            let location_offset = p.x + p.y + p.z;
-            let time_offset = (frame as GridCoordinate).rem_euclid(n);
-            let value = location_offset.wrapping_sub(time_offset);
-            fills[value
-                .div_euclid(repeats_per_fill)
-                .rem_euclid(fills.len() as GridCoordinate) as usize]
-                .clone()
-        }));
+        block_space.add_behavior(
+            block_space.bounds(),
+            AnimatedVoxels::new(move |p, frame| {
+                let n = fills.len() as GridCoordinate * repeats_per_fill;
+                let location_offset = p.x + p.y + p.z;
+                let time_offset = (frame as GridCoordinate).rem_euclid(n);
+                let value = location_offset.wrapping_sub(time_offset);
+                fills[value
+                    .div_euclid(repeats_per_fill)
+                    .rem_euclid(fills.len() as GridCoordinate) as usize]
+                    .clone()
+            }),
+        );
         Block::builder()
             .animation_hint(AnimationHint::CONTINUOUS)
             .collision(BlockCollision::Recur)
@@ -363,7 +366,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
                 let fire_bounds = GridAab::for_block(fire_resolution);
                 let mut space = Space::for_block(fire_resolution).build();
                 space.set([0, 0, 0], Rgb::ONE)?; // placeholder for not fully transparent so first pass lighting is better
-                space.add_behavior(Fire::new(fire_bounds));
+                space.add_behavior(fire_bounds, Fire::new(fire_bounds));
                 universe.insert_anonymous(space)
             })
             .build()

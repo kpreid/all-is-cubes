@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use crate::behavior::{Behavior, BehaviorContext, BehaviorSetTransaction};
 use crate::inv::EphemeralOpaque;
 use crate::math::GridAab;
-use crate::space::{Space, SpaceTransaction};
+use crate::space::{self, Space, SpaceTransaction};
 use crate::time::Tick;
 use crate::transaction::{Merge as _, TransactionConflict};
 use crate::universe::{RefVisitor, VisitRefs};
@@ -137,7 +137,8 @@ impl WidgetBehavior {
             }
         };
         let add_txn = BehaviorSetTransaction::insert(
-            (),
+            // TODO: widgets should be rotatable and that should go here
+            space::SpaceBehaviorAttachment::new(widget.position.bounds),
             Arc::new(WidgetBehavior {
                 widget,
                 controller: Mutex::new(controller),
@@ -167,6 +168,7 @@ impl Behavior<Space> for WidgetBehavior {
             .unwrap()
             .step(tick)
             .expect("TODO: behaviors should have an error reporting path");
+        // TODO: should be using the attachment bounds instead of the layout grant to validate bounds
         validate_widget_transaction(&self.widget.value, &txn, &self.widget.position)
             .expect("transaction validation failed");
         context.bind_host(txn)
@@ -245,6 +247,7 @@ pub enum InstallVuiError {
 /// TODO: Make the better version of this public
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ActivatableRegion {
+    // TODO: should be using the attachment bounds instead of internally stored bounds
     pub(crate) region: GridAab,
     pub(crate) effect: EphemeralOpaque<dyn Fn() + Send + Sync>,
 }
