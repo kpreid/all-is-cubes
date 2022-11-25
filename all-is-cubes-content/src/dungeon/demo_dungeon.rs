@@ -17,7 +17,7 @@ use all_is_cubes::math::{
     point_to_enclosing_cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint,
     GridRotation, GridVector, Rgb, Rgba,
 };
-use all_is_cubes::space::Space;
+use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{include_image, rgb_const};
@@ -374,7 +374,7 @@ pub(crate) async fn demo_dungeon(
     progress: YieldProgress,
     seed: u64,
 ) -> Result<Space, InGenError> {
-    let [blocks_progress, progress] = progress.split(0.2);
+    let [blocks_progress, mut progress] = progress.split(0.2);
     install_dungeon_blocks(universe, blocks_progress).await?;
 
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
@@ -405,6 +405,7 @@ pub(crate) async fn demo_dungeon(
         .map_err(|e| InGenError::Other(e.into()))?;
 
     let maze = maze_to_array(&maze);
+    progress = progress.finish_and_cut(0.1).await; // finished maze gen
 
     // Expand bounds to allow for extra-tall rooms.
     let expanded_bounds = maze.bounds().expand(FaceMap::symmetric([0, 1, 0]));
@@ -485,12 +486,14 @@ pub(crate) async fn demo_dungeon(
                 }),
         })
     });
+    progress = progress.finish_and_cut(0.1).await; // finished room planning
 
     let space_bounds = dungeon_grid
         .minimum_space_for_rooms(dungeon_map.bounds())
         .expand(FaceMap::symmetric([30, 1, 30]));
     let mut space = Space::builder(space_bounds)
         .sky_color(palette::DAY_SKY_COLOR * 2.0)
+        .light_physics(LightPhysics::None) // temporary
         .build();
 
     // Fill in (under)ground areas
@@ -512,8 +515,24 @@ pub(crate) async fn demo_dungeon(
         },
         &landscape_blocks[LandscapeBlocks::Dirt],
     )?;
+    progress = progress.finish_and_cut(0.1).await; // finished maze construction
 
-    build_dungeon(&mut space, &theme, &dungeon_map, progress).await?;
+    let [build_progress, light_progress] = progress.split(0.2);
+    build_dungeon(&mut space, &theme, &dungeon_map, build_progress).await?;
+
+    // Enable lighting
+    let mut physics = space.physics().clone();
+    physics.light = LightPhysics::Rays {
+        // account for large rooms
+        maximum_distance: (dungeon_grid.room_box.size().y * 4) as u16,
+    };
+    space.set_physics(physics);
+    // Make a rough lighting pass so that we don't have completely black rooms on start.
+    space.evaluate_light(254, |_i| {
+        // TODO: report progress
+        // light_progress.progress(i.max_queue_priority as f32 / 255.0)
+    });
+    light_progress.progress(1.0).await;
 
     Ok(space)
 }
