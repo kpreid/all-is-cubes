@@ -10,7 +10,7 @@ use futures_task::noop_waker_ref;
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets, StandardCameras};
 use crate::camera::{GraphicsOptions, Viewport};
 use crate::character::{Character, Cursor};
-use crate::fluff;
+use crate::fluff::Fluff;
 use crate::inv::ToolError;
 use crate::listen::{
     ListenableCell, ListenableCellWithLocal, ListenableSource, Listener, Notifier,
@@ -46,7 +46,7 @@ pub struct Session {
     /// to replace `self.game_universe`. See [`Self::set_universe_async`].
     game_universe_in_progress: Option<BoxFuture<'static, Result<Universe, ()>>>,
 
-    fluff_notifier: Notifier<fluff::Fluff>, // TODO: should include spatial information
+    fluff_notifier: Notifier<Fluff>, // TODO: should include spatial information
 
     paused: ListenableCell<bool>,
 
@@ -174,7 +174,7 @@ impl Session {
 
     /// Listen for [`Fluff`] events from this session. Fluff constitutes short-duration
     /// sound or particle effects.
-    pub fn listen_fluff(&self, listener: impl Listener<fluff::Fluff> + Send + Sync + 'static) {
+    pub fn listen_fluff(&self, listener: impl Listener<Fluff> + Send + Sync + 'static) {
         self.fluff_notifier.listen(listener)
     }
 

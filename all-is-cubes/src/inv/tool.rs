@@ -6,7 +6,7 @@ use std::{fmt, hash};
 
 use crate::block::{self, Block, Modifier, Primitive, RotationPlacementRule, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
-use crate::fluff;
+use crate::fluff::Fluff;
 use crate::inv::{InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
 use crate::math::{Face6, GridPoint, GridRotation};
@@ -403,8 +403,8 @@ impl ToolError {
     ///
     /// TODO: This should have spatial information (located at the cursor target or the
     /// character's "hand" or other).
-    pub fn fluff(&self) -> impl Iterator<Item = fluff::Fluff> {
-        std::iter::once(fluff::Fluff::Beep)
+    pub fn fluff(&self) -> impl Iterator<Item = Fluff> {
+        std::iter::once(Fluff::Beep)
     }
 }
 
