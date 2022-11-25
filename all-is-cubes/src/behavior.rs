@@ -19,9 +19,7 @@ use crate::universe::{RefVisitor, UniverseTransaction, VisitRefs};
 /// Dynamic add-ons to game objects; we might also have called them “components”.
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
 /// is invoked.
-pub trait Behavior<H: Transactional + 'static>:
-    Debug + Send + Sync + Downcast + VisitRefs + 'static
-{
+pub trait Behavior<H: BehaviorHost>: Debug + Send + Sync + Downcast + VisitRefs + 'static {
     /// Computes a transaction to apply the effects of this behavior for one timestep.
     ///
     /// TODO: Define what happens if the transaction fails.
@@ -43,16 +41,22 @@ pub trait Behavior<H: Transactional + 'static>:
     // TODO: serialization, quiescence, incoming events...
 }
 
-impl_downcast!(Behavior<H> where H: Transactional);
+impl_downcast!(Behavior<H> where H: BehaviorHost);
+
+/// A type that can have attached behaviors.
+pub trait BehaviorHost: Transactional + 'static {
+    /// Additional data about “where” the behavior is attached to the host.
+    type Attachment: Debug + Clone + Eq + 'static;
+}
 
 #[non_exhaustive]
-pub struct BehaviorContext<'a, H: Transactional> {
+pub struct BehaviorContext<'a, H: BehaviorHost> {
     pub host: &'a H,
     host_transaction_binder: &'a dyn Fn(H::Transaction) -> UniverseTransaction,
     self_transaction_binder: &'a dyn Fn(Arc<dyn Behavior<H>>) -> UniverseTransaction,
 }
 
-impl<'a, H: Transactional + 'static> BehaviorContext<'a, H> {
+impl<'a, H: BehaviorHost> BehaviorContext<'a, H> {
     pub fn bind_host(&self, transaction: H::Transaction) -> UniverseTransaction {
         (self.host_transaction_binder)(transaction)
     }
@@ -61,7 +65,7 @@ impl<'a, H: Transactional + 'static> BehaviorContext<'a, H> {
     }
 }
 
-impl<'a, H: Transactional + Debug> Debug for BehaviorContext<'a, H> {
+impl<'a, H: BehaviorHost + Debug> Debug for BehaviorContext<'a, H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // binder functions are not debuggable
         f.debug_struct("BehaviorContext")
@@ -76,13 +80,13 @@ impl<'a, H: Transactional + Debug> Debug for BehaviorContext<'a, H> {
 /// are currently subject to change.
 ///
 /// To modify the set, use a [`BehaviorSetTransaction`].
-pub struct BehaviorSet<H> {
+pub struct BehaviorSet<H: BehaviorHost> {
     /// Behaviors are stored in [`Arc`] so that they can be used in transactions in ways
     /// that would otherwise require `Clone + PartialEq`.
-    items: Vec<Arc<dyn Behavior<H>>>,
+    items: Vec<BehaviorSetEntry<H>>,
 }
 
-impl<H: Transactional + 'static> BehaviorSet<H> {
+impl<H: BehaviorHost> BehaviorSet<H> {
     pub(crate) fn new() -> Self {
         BehaviorSet { items: Vec::new() }
     }
@@ -100,8 +104,8 @@ impl<H: Transactional + 'static> BehaviorSet<H> {
         self.items
             .iter()
             .map(
-                move |ref_to_arc: &'a Arc<dyn Behavior<H>>| -> &'a (dyn Behavior<H> + 'static) {
-                    &**ref_to_arc
+                move |entry: &'a BehaviorSetEntry<H>| -> &'a (dyn Behavior<H> + 'static) {
+                    &*entry.behavior
                 },
             )
             .filter(move |behavior| (*behavior).type_id() == t)
@@ -118,7 +122,7 @@ impl<H: Transactional + 'static> BehaviorSet<H> {
         tick: Tick,
     ) -> UniverseTransaction {
         let mut transactions = Vec::new();
-        for (index, behavior) in self.items.iter().enumerate() {
+        for (index, entry) in self.items.iter().enumerate() {
             let context = &BehaviorContext {
                 host,
                 host_transaction_binder,
@@ -128,8 +132,8 @@ impl<H: Transactional + 'static> BehaviorSet<H> {
                     ))
                 },
             };
-            if behavior.alive(context) {
-                transactions.push(behavior.step(context, tick));
+            if entry.behavior.alive(context) {
+                transactions.push(entry.behavior.step(context, tick));
             } else {
                 // TODO: mark for removal and prove it was done
             }
@@ -141,7 +145,7 @@ impl<H: Transactional + 'static> BehaviorSet<H> {
     }
 }
 
-impl<H> std::fmt::Debug for BehaviorSet<H> {
+impl<H: BehaviorHost> std::fmt::Debug for BehaviorSet<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "BehaviorSet(")?;
         f.debug_list().entries(&*self.items).finish()?;
@@ -150,26 +154,60 @@ impl<H> std::fmt::Debug for BehaviorSet<H> {
     }
 }
 
-impl<H> VisitRefs for BehaviorSet<H> {
+impl<H: BehaviorHost> VisitRefs for BehaviorSet<H> {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
         let Self { items } = self;
-        for behavior in items {
-            behavior.visit_refs(visitor);
+        for entry in items {
+            entry.behavior.visit_refs(visitor);
         }
     }
 }
 
-impl<H> Transactional for BehaviorSet<H> {
+impl<H: BehaviorHost> Transactional for BehaviorSet<H> {
     type Transaction = BehaviorSetTransaction<H>;
 }
 
-#[derive(Debug)]
-pub struct BehaviorSetTransaction<H> {
-    replace: BTreeMap<usize, Arc<dyn Behavior<H>>>,
-    insert: Vec<Arc<dyn Behavior<H>>>,
+struct BehaviorSetEntry<H: BehaviorHost> {
+    attachment: H::Attachment,
+    behavior: Arc<dyn Behavior<H>>,
 }
 
-impl<H> BehaviorSetTransaction<H> {
+impl<H: BehaviorHost> Clone for BehaviorSetEntry<H> {
+    fn clone(&self) -> Self {
+        // Manual impl avoids `H: Clone` bound.
+        Self {
+            attachment: self.attachment.clone(),
+            behavior: self.behavior.clone(),
+        }
+    }
+}
+
+impl<H: BehaviorHost> Debug for BehaviorSetEntry<H> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let BehaviorSetEntry {
+            attachment,
+            behavior,
+        } = self;
+        behavior.fmt(f)?; // inherit alternate prettyprint mode
+        write!(f, " @ {attachment:?}")?; // don't
+        Ok(())
+    }
+}
+
+impl<H: BehaviorHost> PartialEq for BehaviorSetEntry<H> {
+    #[allow(clippy::vtable_address_comparisons)] // The hazards should be okay for this use case
+    fn eq(&self, other: &Self) -> bool {
+        self.attachment == other.attachment && Arc::ptr_eq(&self.behavior, &other.behavior)
+    }
+}
+
+#[derive(Debug)]
+pub struct BehaviorSetTransaction<H: BehaviorHost> {
+    replace: BTreeMap<usize, Arc<dyn Behavior<H>>>,
+    insert: Vec<BehaviorSetEntry<H>>,
+}
+
+impl<H: BehaviorHost> BehaviorSetTransaction<H> {
     // TODO: replace this with an empty constant or Default::default to compare with, once that's stable in Rust
     pub(crate) fn is_empty(&self) -> bool {
         self.replace.is_empty() && self.insert.is_empty()
@@ -185,15 +223,18 @@ impl<H> BehaviorSetTransaction<H> {
         }
     }
 
-    pub fn insert(behavior: Arc<dyn Behavior<H>>) -> Self {
+    pub fn insert(attachment: H::Attachment, behavior: Arc<dyn Behavior<H>>) -> Self {
         BehaviorSetTransaction {
-            insert: vec![behavior],
+            insert: vec![BehaviorSetEntry {
+                attachment,
+                behavior,
+            }],
             ..Default::default()
         }
     }
 }
 
-impl<H> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
+impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
     type CommitCheck = ();
     type Output = ();
 
@@ -215,14 +256,14 @@ impl<H> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
         (): Self::CommitCheck,
     ) -> Result<(), CommitError> {
         for (index, new) in &self.replace {
-            target.items[*index] = new.clone();
+            target.items[*index].behavior = new.clone();
         }
         target.items.extend(self.insert.iter().cloned());
         Ok(())
     }
 }
 
-impl<H> Merge for BehaviorSetTransaction<H> {
+impl<H: BehaviorHost> Merge for BehaviorSetTransaction<H> {
     type MergeCheck = ();
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
@@ -244,7 +285,7 @@ impl<H> Merge for BehaviorSetTransaction<H> {
     }
 }
 
-impl<H> Clone for BehaviorSetTransaction<H> {
+impl<H: BehaviorHost> Clone for BehaviorSetTransaction<H> {
     // Manual implementation to avoid bounds on `H`.
     fn clone(&self) -> Self {
         Self {
@@ -254,7 +295,7 @@ impl<H> Clone for BehaviorSetTransaction<H> {
     }
 }
 
-impl<H> Default for BehaviorSetTransaction<H> {
+impl<H: BehaviorHost> Default for BehaviorSetTransaction<H> {
     // Manual implementation to avoid bounds on `H`.
     fn default() -> Self {
         Self {
@@ -264,7 +305,7 @@ impl<H> Default for BehaviorSetTransaction<H> {
     }
 }
 
-impl<H> PartialEq for BehaviorSetTransaction<H> {
+impl<H: BehaviorHost> PartialEq for BehaviorSetTransaction<H> {
     // Manual implementation to avoid bounds on `H` and to implement the partiality (comparing pointers instead of values).
     #[allow(clippy::vtable_address_comparisons)] // The hazards should be okay for this use case
     fn eq(&self, other: &Self) -> bool {
@@ -272,15 +313,11 @@ impl<H> PartialEq for BehaviorSetTransaction<H> {
             |((a_index, a_behavior), (b_index, b_behavior))| {
                 a_index == b_index && Arc::ptr_eq(a_behavior, b_behavior)
             },
-        ) && self
-            .insert
-            .iter()
-            .zip(other.insert.iter())
-            .all(|(a, b)| Arc::ptr_eq(a, b))
+        ) && self.insert == other.insert
     }
 }
 
-impl<H> Eq for BehaviorSetTransaction<H> {}
+impl<H: BehaviorHost> Eq for BehaviorSetTransaction<H> {}
 
 /// A simple behavior for exercising the system, which causes a `Character`'s viewpoint to
 /// rotate without user input.
@@ -324,7 +361,9 @@ mod tests {
         use pretty_assertions::assert_eq;
 
         #[derive(Debug)]
-        struct DebugBehavior;
+        struct DebugBehavior {
+            _x: i32,
+        }
         impl Behavior<Character> for DebugBehavior {
             fn alive(&self, _context: &BehaviorContext<'_, Character>) -> bool {
                 true
@@ -341,15 +380,20 @@ mod tests {
         let mut set = BehaviorSet::<Character>::new();
         assert_eq!(format!("{:?}", set), "BehaviorSet([])");
         assert_eq!(format!("{:#?}", set), "BehaviorSet([])");
-        BehaviorSetTransaction::insert(Arc::new(DebugBehavior))
+        BehaviorSetTransaction::insert((), Arc::new(DebugBehavior { _x: 1 }))
             .execute(&mut set)
             .unwrap();
-        assert_eq!(format!("{:?}", set), "BehaviorSet([DebugBehavior])");
+        assert_eq!(
+            format!("{:?}", set),
+            "BehaviorSet([DebugBehavior { _x: 1 } @ ()])"
+        );
         assert_eq!(
             format!("{:#?}\n", set),
             indoc! {"
                 BehaviorSet([
-                    DebugBehavior,
+                    DebugBehavior {
+                        _x: 1,
+                    } @ (),
                 ])
             "},
         );
@@ -430,11 +474,11 @@ mod tests {
         }
 
         let mut set = BehaviorSet::<Character>::new();
-        BehaviorSetTransaction::insert(Arc::new(Q(Expected)))
+        BehaviorSetTransaction::insert((), Arc::new(Q(Expected)))
             .execute(&mut set)
             .unwrap();
         // different type, so it should not be found
-        BehaviorSetTransaction::insert(Arc::new(Q(Unexpected)))
+        BehaviorSetTransaction::insert((), Arc::new(Q(Unexpected)))
             .execute(&mut set)
             .unwrap();
         assert_eq!(

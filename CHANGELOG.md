@@ -40,6 +40,8 @@
 
     - Breaking: `mesh::TextureAllocator` implementations may now choose an arbitrary type to represent their texture coordinates. `mesh::BlockVertex` is now generic to accomodate this.
 
+    - Breaking: `behavior::BehaviorSet` now stores additional data, the “attachment”, with each behavior, which must be specified when adding a behavior.
+
     - Breaking: `apps::Session::new()` (formerly `AllIsCubesAppState::new()`) has been replaced with `SessionBuilder`, whose `build()` is now an async function.
     - Breaking: `apps::StandardCameras` now works with a `ListenableSource<Viewport>` instead of a `Viewport` and `set_viewport()` method.
     - Breaking: `block::AnimationHint` (from `BlockAttributes::animation_hint`) has been redesigned to be more systematic.

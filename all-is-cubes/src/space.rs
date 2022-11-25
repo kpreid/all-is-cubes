@@ -724,7 +724,7 @@ impl Space {
     where
         B: Behavior<Self> + 'static,
     {
-        BehaviorSetTransaction::insert(Arc::new(behavior))
+        BehaviorSetTransaction::insert((), Arc::new(behavior))
             .execute(&mut self.behaviors)
             .unwrap();
     }
@@ -890,6 +890,10 @@ impl VisitRefs for Space {
         behaviors.visit_refs(visitor);
         spawn.visit_refs(visitor);
     }
+}
+
+impl crate::behavior::BehaviorHost for Space {
+    type Attachment = (); // TODO: { GridAab, GridRotation }
 }
 
 impl SpaceBlockData {

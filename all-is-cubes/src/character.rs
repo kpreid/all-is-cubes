@@ -239,7 +239,7 @@ impl Character {
     where
         B: Behavior<Character> + 'static,
     {
-        BehaviorSetTransaction::insert(Arc::new(behavior))
+        BehaviorSetTransaction::insert((), Arc::new(behavior))
             .execute(&mut self.behaviors)
             .unwrap();
     }
@@ -525,6 +525,10 @@ impl VisitRefs for Character {
 
 impl Transactional for Character {
     type Transaction = CharacterTransaction;
+}
+
+impl crate::behavior::BehaviorHost for Character {
+    type Attachment = ();
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

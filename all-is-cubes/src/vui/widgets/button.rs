@@ -106,12 +106,13 @@ impl vui::WidgetController for ActionButtonController {
     fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         let icon =
             SpaceTransaction::set_cube(self.position, None, Some(self.definition.block.clone()));
-        let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(Arc::new(
-            vui::ActivatableRegion {
+        let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
+            (),
+            Arc::new(vui::ActivatableRegion {
                 region: GridAab::single_cube(self.position),
                 effect: self.definition.action.clone(),
-            },
-        )));
+            }),
+        ));
         icon.merge(activatable)
             .map_err(|error| vui::InstallVuiError::Conflict { error })
     }
@@ -217,6 +218,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
 {
     fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
+            (),
             Arc::new(vui::ActivatableRegion {
                 region: GridAab::single_cube(self.position),
                 effect: self.definition.action.clone(),

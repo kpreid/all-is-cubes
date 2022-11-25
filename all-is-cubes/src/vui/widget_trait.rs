@@ -89,10 +89,13 @@ impl WidgetBehavior {
                 });
             }
         };
-        let add_txn = BehaviorSetTransaction::insert(Arc::new(WidgetBehavior {
-            widget,
-            controller: Mutex::new(controller),
-        }));
+        let add_txn = BehaviorSetTransaction::insert(
+            (),
+            Arc::new(WidgetBehavior {
+                widget,
+                controller: Mutex::new(controller),
+            }),
+        );
         init_txn
             .merge(SpaceTransaction::behaviors(add_txn))
             .map_err(|error| InstallVuiError::Conflict { error })
