@@ -34,7 +34,7 @@ struct DemoRoom {
 
     /// In a *relative* room coordinate system (1 unit = 1 room box),
     /// how big is this room? Occupying multiple rooms' space if this
-    /// is not equal to `GridAab::for_block(R1)`.
+    /// is not equal to `GridAab::ORIGIN_CUBE`.
     extended_bounds: GridAab,
 
     /// Which faces have doors-to-corridors in them.
@@ -414,7 +414,7 @@ pub(crate) async fn demo_dungeon(
 
         let corridor_only = rng.gen_bool(0.5);
 
-        let mut extended_bounds = GridAab::for_block(R1);
+        let mut extended_bounds = GridAab::ORIGIN_CUBE;
         // Optional high ceiling
         if !corridor_only && rng.gen_bool(0.25) {
             extended_bounds = extended_bounds.expand(FaceMap::default().with(Face7::PY, 1));

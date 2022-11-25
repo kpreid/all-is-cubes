@@ -34,6 +34,25 @@ pub struct GridAab {
 }
 
 impl GridAab {
+    /// Box containing the unit cube from `[0, 0, 0]` to `[1, 1, 1]`.
+    ///
+    /// This constant is for convenience; there are several other ways that this box could
+    /// be constructed, but they're all kind of verbose:
+    ///
+    /// ```
+    /// use all_is_cubes::block::Resolution;
+    /// use all_is_cubes::math::{GridAab, GridPoint};
+    ///
+    /// assert_eq!(GridAab::ORIGIN_CUBE, GridAab::from_lower_upper([0, 0, 0], [1, 1, 1]));
+    ///
+    /// // Note that GridAab::for_block() is const too.
+    /// assert_eq!(GridAab::ORIGIN_CUBE, GridAab::for_block(Resolution::R1));
+    ///
+    /// assert_eq!(GridAab::ORIGIN_CUBE, GridAab::single_cube(GridPoint::new(0, 0, 0)));
+    /// ```
+    ///
+    pub const ORIGIN_CUBE: GridAab = GridAab::for_block(Resolution::R1);
+
     /// Constructs a [`GridAab`] from coordinate lower bounds and sizes.
     ///
     /// For example, if on one axis the lower bound is 5 and the size is 10,
@@ -828,14 +847,13 @@ impl<V> GridArray<V> {
         Self::from_fn(bounds, |_| value.clone())
     }
 
-    /// Constructs a [`GridArray`] with a single value, in bounds
-    /// `GridAab::from_lower_size([0, 0, 0], [1, 1, 1])`.
+    /// Constructs a [`GridArray`] with a single value, in bounds `ORIGIN_CUBE`.
     ///
     /// If the single element should be at a different location, you can call
     /// [`.translate(offset)`](Self::translate), or use [`GridArray::from_elements()`]
     /// instead.
     pub fn from_element(value: V) -> Self {
-        Self::from_elements(GridAab::for_block(Resolution::R1), [value]).unwrap()
+        Self::from_elements(GridAab::ORIGIN_CUBE, [value]).unwrap()
     }
 
     /// Constructs a [`GridArray`] containing the provided elements, which must be in the
@@ -1255,7 +1273,7 @@ mod tests {
         let element = String::from("x");
         assert_eq!(
             GridArray::from_element(element.clone()),
-            GridArray::from_elements(GridAab::for_block(Resolution::R1), [element]).unwrap(),
+            GridArray::from_elements(GridAab::ORIGIN_CUBE, [element]).unwrap(),
         );
     }
 

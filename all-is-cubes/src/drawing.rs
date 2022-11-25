@@ -27,7 +27,7 @@ use std::ops::Range;
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
 
-use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution, Resolution::R1};
+use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution};
 use crate::math::{
     Face7, FaceMap, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
 };
@@ -39,7 +39,7 @@ use crate::universe::Universe;
 /// [`Drawable`] with those bounds on a [`DrawingPlane`] with the given `transform`.
 ///
 /// `max_brush` should be the union of bounds of [`VoxelBrush`]es used by the drawable.
-/// If using plain colors, `GridAab::single_cube(GridPoint::origin())` is the appropriate
+/// If using plain colors, `GridAab::ORIGIN_CUBE` is the appropriate
 /// input.
 ///
 /// Please note that coordinate behavior may be surprising. [`embedded_graphics`]
@@ -184,7 +184,7 @@ impl<C> Dimensions for DrawingPlane<'_, Space, C> {
                     .expand(FaceMap::from_fn(|f| if f.is_positive() { -1 } else { 0 }))
                     .transform(t)
             })
-            .unwrap_or_else(|| GridAab::for_block(R1));
+            .unwrap_or(GridAab::ORIGIN_CUBE);
 
         let size = bounds.unsigned_size();
         Rectangle {
@@ -494,7 +494,11 @@ where
 mod tests {
     use super::*;
     use crate::block::EvalBlockError;
-    use crate::block::{self, Resolution::R16, AIR};
+    use crate::block::{
+        self,
+        Resolution::{R1, R16},
+        AIR,
+    };
     use crate::content::make_some_blocks;
     use crate::math::{GridRotation, Rgba};
     use crate::raytracer::print_space;
@@ -510,7 +514,7 @@ mod tests {
             rectangle_to_aab(
                 Rectangle::new(Point::new(3, 4), Size::new(10, 20)),
                 GridMatrix::one(),
-                GridAab::single_cube(GridPoint::origin())
+                GridAab::ORIGIN_CUBE
             ),
             GridAab::from_lower_size([3, 4, 0], [10, 20, 1])
         );
@@ -522,7 +526,7 @@ mod tests {
             rectangle_to_aab(
                 Rectangle::new(Point::new(3, 4), Size::new(10, 20)),
                 GridMatrix::FLIP_Y,
-                GridAab::single_cube(GridPoint::origin())
+                GridAab::ORIGIN_CUBE
             ),
             GridAab::from_lower_size([3, -4 - 20 + 1, 0], [10, 20, 1])
         );
@@ -547,7 +551,7 @@ mod tests {
             rectangle_to_aab(
                 Rectangle::new(Point::new(3, 4), Size::new(0, 10)),
                 GridMatrix::one(),
-                GridAab::single_cube(GridPoint::origin())
+                GridAab::ORIGIN_CUBE
             ),
             GridAab::from_lower_size([3, 4, 0], [0, 10, 1])
         );
@@ -555,7 +559,7 @@ mod tests {
             rectangle_to_aab(
                 Rectangle::new(Point::new(3, 4), Size::new(10, 0)),
                 GridMatrix::one(),
-                GridAab::single_cube(GridPoint::origin())
+                GridAab::ORIGIN_CUBE
             ),
             GridAab::from_lower_size([3, 4, 0], [0, 10, 1])
         );

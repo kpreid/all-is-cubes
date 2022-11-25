@@ -429,7 +429,7 @@ impl<V: GfxVertex, T: TextureTile> From<&BlockMesh<V, T>> for SpaceMesh<V, T> {
     /// Construct a `SpaceMesh` containing the given `BlockMesh`.
     ///
     /// The result will be identical to creating a [`Space`] with bounds
-    /// `GridAab::single_cube(GridPoint::origin())` and placing the block in it,
+    /// `GridAab::ORIGIN_CUBE` and placing the block in it,
     /// but more efficient.
     fn from(block_mesh: &BlockMesh<V, T>) -> Self {
         let mut block_indices_used = BitVec::new();

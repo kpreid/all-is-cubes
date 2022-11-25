@@ -1,14 +1,13 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use cgmath::EuclideanSpace;
 use embedded_graphics::mono_font::{MonoFont, MonoTextStyle};
 use embedded_graphics::prelude::{Dimensions, Point};
 use embedded_graphics::text::{Text, TextStyle};
 use embedded_graphics::Drawable;
 
 use crate::drawing::{rectangle_to_aab, VoxelBrush};
-use crate::math::{GridAab, GridMatrix, GridPoint};
+use crate::math::{GridAab, GridMatrix};
 use crate::space::SpaceTransaction;
 use crate::vui::{widgets, LayoutGrant, LayoutRequest, Layoutable, Widget, WidgetController};
 
@@ -42,9 +41,7 @@ impl LargeText {
         rectangle_to_aab(
             self.drawable().bounding_box(),
             GridMatrix::FLIP_Y,
-            self.brush
-                .bounds()
-                .unwrap_or_else(|| GridAab::single_cube(GridPoint::origin())),
+            self.brush.bounds().unwrap_or(GridAab::ORIGIN_CUBE),
         )
     }
 }

@@ -7,7 +7,6 @@ use std::hash::Hash;
 use std::io;
 use std::ops::Deref;
 
-use cgmath::Point3;
 use embedded_graphics::image::ImageDrawable;
 use embedded_graphics::prelude::{Dimensions as _, DrawTarget, Point, Size};
 use embedded_graphics::primitives::{PointsIter, Rectangle};
@@ -55,7 +54,7 @@ where
         Self {
             image_ref,
             color_map,
-            max_brush: max_brush.unwrap_or_else(|| GridAab::single_cube(Point3::new(0, 0, 0))),
+            max_brush: max_brush.unwrap_or(GridAab::ORIGIN_CUBE),
         }
     }
 }
