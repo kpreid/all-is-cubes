@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 use std::fmt;
+use std::sync::Arc;
 
 use cgmath::{
     Angle as _, Basis3, Decomposed, Deg, ElementWise as _, EuclideanSpace as _, Matrix3, Point3,
@@ -238,7 +239,9 @@ impl Character {
     where
         B: Behavior<Character> + 'static,
     {
-        self.behaviors.insert(behavior);
+        BehaviorSetTransaction::insert(Arc::new(behavior))
+            .execute(&mut self.behaviors)
+            .unwrap();
     }
 
     pub fn selected_slots(&self) -> [usize; TOOL_SELECTIONS] {

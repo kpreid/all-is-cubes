@@ -74,6 +74,8 @@ impl<'a, H: Transactional + Debug> Debug for BehaviorContext<'a, H> {
 ///
 /// Note: This type is public out of necessity because it is revealed elsewhere, but its details
 /// are currently subject to change.
+///
+/// To modify the set, use a [`BehaviorSetTransaction`].
 pub struct BehaviorSet<H> {
     /// Behaviors are stored in [`Arc`] so that they can be used in transactions in ways
     /// that would otherwise require `Clone + PartialEq`.
@@ -83,14 +85,6 @@ pub struct BehaviorSet<H> {
 impl<H: Transactional + 'static> BehaviorSet<H> {
     pub(crate) fn new() -> Self {
         BehaviorSet { items: Vec::new() }
-    }
-
-    /// Add a behavior to the set.
-    pub(crate) fn insert<B>(&mut self, behavior: B)
-    where
-        B: Behavior<H> + 'static,
-    {
-        self.items.push(Arc::new(behavior));
     }
 
     /// Find behaviors of a specified type.
@@ -347,7 +341,9 @@ mod tests {
         let mut set = BehaviorSet::<Character>::new();
         assert_eq!(format!("{:?}", set), "BehaviorSet([])");
         assert_eq!(format!("{:#?}", set), "BehaviorSet([])");
-        set.insert(DebugBehavior);
+        BehaviorSetTransaction::insert(Arc::new(DebugBehavior))
+            .execute(&mut set)
+            .unwrap();
         assert_eq!(format!("{:?}", set), "BehaviorSet([DebugBehavior])");
         assert_eq!(
             format!("{:#?}\n", set),
@@ -434,8 +430,13 @@ mod tests {
         }
 
         let mut set = BehaviorSet::<Character>::new();
-        set.insert(Q(Expected));
-        set.insert(Q(Unexpected)); // different type, so it should not be found
+        BehaviorSetTransaction::insert(Arc::new(Q(Expected)))
+            .execute(&mut set)
+            .unwrap();
+        // different type, so it should not be found
+        BehaviorSetTransaction::insert(Arc::new(Q(Unexpected)))
+            .execute(&mut set)
+            .unwrap();
         assert_eq!(
             set.query_dyn(TypeId::of::<Q<Expected>>())
                 .map(|b| b.downcast_ref::<Q<Expected>>().unwrap())

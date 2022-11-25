@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 use cgmath::Vector3;
 
-use crate::behavior::{Behavior, BehaviorSet};
+use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::block::{
     Block, BlockChange, EvalBlockError, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED,
 };
@@ -724,7 +724,9 @@ impl Space {
     where
         B: Behavior<Self> + 'static,
     {
-        self.behaviors.insert(behavior);
+        BehaviorSetTransaction::insert(Arc::new(behavior))
+            .execute(&mut self.behaviors)
+            .unwrap();
     }
 
     /// Finds or assigns an index to denote the block.
