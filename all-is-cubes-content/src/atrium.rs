@@ -12,8 +12,8 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix,
-    GridPoint, GridRotation, GridVector, Rgb, Rgba,
+    Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix, GridPoint,
+    GridRotation, GridVector, Rgb, Rgba,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
@@ -56,7 +56,7 @@ pub(crate) async fn atrium(
     let top_floor_pos = GridVector::new(0, (ceiling_height + WALL) * 2, 0);
 
     let space_bounds = outer_walls_footprint
-        .expand(FaceMap::default().with(Face7::PY, ceiling_height * floor_count + sun_height));
+        .expand(FaceMap::default().with(Face6::PY, ceiling_height * floor_count + sun_height));
 
     let floor_with_cutout = |mut p: GridPoint| {
         p.y = 0;
@@ -100,7 +100,7 @@ pub(crate) async fn atrium(
     // Outer walls
     four_walls(
         outer_walls_footprint
-            .expand(FaceMap::default().with(Face7::PY, ceiling_height * floor_count)),
+            .expand(FaceMap::default().with(Face6::PY, ceiling_height * floor_count)),
         |_origin, direction, _length, wall_excluding_corners| -> Result<(), InGenError> {
             space.fill_uniform(
                 wall_excluding_corners,
@@ -126,7 +126,7 @@ pub(crate) async fn atrium(
         outer_walls_footprint
             .translate(top_floor_pos)
             .expand(FaceMap::from_fn(|f| {
-                GridCoordinate::from(f == Face7::PY) * ceiling_height
+                GridCoordinate::from(f == Face6::PY) * ceiling_height
             })),
         floor_with_cutout,
     )?;

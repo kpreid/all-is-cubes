@@ -14,7 +14,7 @@ use all_is_cubes::content::palette;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    point_to_enclosing_cube, Face6, Face7, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint,
+    point_to_enclosing_cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint,
     GridRotation, GridVector, Rgb, Rgba,
 };
 use all_is_cubes::space::Space;
@@ -247,7 +247,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     FloorKind::Bridge => {
                         let midpoint = point_to_enclosing_cube(floor_layer.center()).unwrap();
                         for direction in [Face6::NX, Face6::NZ, Face6::PX, Face6::PZ] {
-                            if room_data.door_faces[direction.into()] {
+                            if room_data.door_faces[direction] {
                                 let wall_cube = point_to_enclosing_cube(
                                     floor_layer.abut(direction, -1).unwrap().center(),
                                 )
@@ -289,7 +289,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     interior.expand(FaceMap::repeat(1)),
                     |origin, along_wall, length, wall_excluding_corners_box| {
                         let wall = GridRotation::CLOCKWISE.transform(along_wall); // TODO: make four_walls provide this in a nice name
-                        if room_data.windowed_faces[wall.into()] {
+                        if room_data.windowed_faces[wall] {
                             let midpoint = length / 2;
                             for step in WINDOW_PATTERN {
                                 let mut window_pos =
@@ -308,7 +308,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 )?;
 
                 // Ceiling light port (not handled by four_walls above)
-                if room_data.windowed_faces[Face7::PY] {
+                if room_data.windowed_faces[Face6::PY] {
                     let midpoint =
                         point_to_enclosing_cube(interior.abut(Face6::PY, 1).unwrap().center())
                             .unwrap();
@@ -324,7 +324,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
             }
             1 => {
                 for face in [Face6::PX, Face6::PZ] {
-                    if room_data.door_faces[face.into()] {
+                    if room_data.door_faces[face] {
                         self.inside_doorway(space, map, room_position, face)?;
                     }
                 }
@@ -353,7 +353,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 
                     // Orient towards the first room's exit.
                     for face in Face6::ALL {
-                        if room_data.door_faces[face.into()] {
+                        if room_data.door_faces[face] {
                             spawn.set_look_direction(face.normal_vector());
                             break;
                         }
@@ -417,14 +417,14 @@ pub(crate) async fn demo_dungeon(
         let mut extended_bounds = GridAab::ORIGIN_CUBE;
         // Optional high ceiling
         if !corridor_only && rng.gen_bool(0.25) {
-            extended_bounds = extended_bounds.expand(FaceMap::default().with(Face7::PY, 1));
+            extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::PY, 1));
         };
         // Floor pit
         let floor = if !corridor_only
             && matches!(maze_field.field_type, FieldType::Normal)
             && rng.gen_bool(0.25)
         {
-            extended_bounds = extended_bounds.expand(FaceMap::default().with(Face7::NY, 1));
+            extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::NY, 1));
             *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
                 .choose(&mut rng)
                 .unwrap()
@@ -436,9 +436,9 @@ pub(crate) async fn demo_dungeon(
             FaceMap::from_fn(|face| {
                 // Create windows only if they look into space outside the maze
                 let adjacent = m2gp(maze_field.coordinates) + face.normal_vector();
-                if maze.bounds().contains_cube(adjacent) || corridor_only || face == Face7::NY {
+                if maze.bounds().contains_cube(adjacent) || corridor_only || face == Face6::NY {
                     false
-                } else if face == Face7::PY {
+                } else if face == Face6::PY {
                     // ceilings are more common overall and we want more internally-lit ones
                     rng.gen_bool(0.25)
                 } else {
@@ -464,7 +464,7 @@ pub(crate) async fn demo_dungeon(
             windowed_faces,
             floor,
             corridor_only,
-            lit: !windowed_faces[Face7::PY] && rng.gen_bool(0.75),
+            lit: !windowed_faces[Face6::PY] && rng.gen_bool(0.75),
             grants_item: (matches!(floor, FloorKind::Solid) && !corridor_only && rng.gen_bool(0.5))
                 .then(|| {
                     // Random assortment of blocks to provide

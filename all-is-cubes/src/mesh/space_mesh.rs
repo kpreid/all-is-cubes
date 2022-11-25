@@ -4,7 +4,7 @@ use ordered_float::OrderedFloat;
 use std::fmt::Debug;
 use std::ops::Range;
 
-use crate::math::{Face7, GridAab, GridCoordinate, GridPoint, GridRotation};
+use crate::math::{Face6, GridAab, GridCoordinate, GridPoint, GridRotation};
 use crate::mesh::{BlockMesh, GfxVertex, MeshOptions, TextureTile};
 use crate::space::{BlockIndex, Space};
 
@@ -196,7 +196,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                     if let Some(adj_block_index) = space.get_block_index(adjacent_cube) {
                         if block_meshes
                             .get(adj_block_index)
-                            .map(|adj_mesh| adj_mesh.faces[face.opposite()].fully_opaque)
+                            .map(|adj_mesh| adj_mesh.face_vertices[face.opposite()].fully_opaque)
                             .unwrap_or(false)
                         {
                             // Don't draw obscured faces, but do record that we depended on them.
@@ -369,7 +369,7 @@ fn write_block_mesh_to_space_mesh<V: GfxVertex, T: TextureTile>(
     vertices: &mut Vec<V>,
     opaque_indices: &mut Vec<u32>,
     transparent_indices: &mut Vec<u32>,
-    mut neighbor_is_fully_opaque: impl FnMut(Face7) -> bool,
+    mut neighbor_is_fully_opaque: impl FnMut(Face6) -> bool,
 ) {
     if block_mesh.is_empty() {
         return;
@@ -377,15 +377,16 @@ fn write_block_mesh_to_space_mesh<V: GfxVertex, T: TextureTile>(
 
     let inst = V::instantiate_block(cube);
 
-    for face in Face7::ALL {
-        let face_mesh = &block_mesh.faces[face];
+    for (face, face_mesh) in block_mesh.all_face_meshes() {
         if face_mesh.is_empty() {
             // Nothing to do; skip opacity lookup.
             continue;
         }
-        if neighbor_is_fully_opaque(face) {
-            // Skip face fully obscured by a neighbor.
-            continue;
+        if let Ok(face) = Face6::try_from(face) {
+            if neighbor_is_fully_opaque(face) {
+                // Skip face fully obscured by a neighbor.
+                continue;
+            }
         }
 
         // Copy vertices, offset to the block position
@@ -437,13 +438,15 @@ impl<V: GfxVertex, T: TextureTile> From<&BlockMesh<V, T>> for SpaceMesh<V, T> {
 
         let mut space_mesh = Self {
             vertices: Vec::with_capacity(
-                block_mesh.faces.values().map(|fm| fm.vertices.len()).sum(),
+                block_mesh
+                    .all_face_meshes()
+                    .map(|(_, fm)| fm.vertices.len())
+                    .sum(),
             ),
             indices: Vec::with_capacity(
                 block_mesh
-                    .faces
-                    .values()
-                    .map(|fm| fm.indices_opaque.len())
+                    .all_face_meshes()
+                    .map(|(_, fm)| fm.indices_opaque.len())
                     .sum(),
             ),
             opaque_range: 0..0,
@@ -454,9 +457,8 @@ impl<V: GfxVertex, T: TextureTile> From<&BlockMesh<V, T>> for SpaceMesh<V, T> {
 
         let mut transparent_indices = Vec::with_capacity(
             block_mesh
-                .faces
-                .values()
-                .map(|fm| fm.indices_transparent.len())
+                .all_face_meshes()
+                .map(|(_, fm)| fm.indices_transparent.len())
                 .sum(),
         );
         write_block_mesh_to_space_mesh(

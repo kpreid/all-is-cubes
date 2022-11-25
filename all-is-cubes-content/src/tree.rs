@@ -2,9 +2,7 @@ use std::fmt;
 
 use all_is_cubes::block::{self, Block, AIR};
 use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::{
-    Face6, Face7, FaceMap, GridCoordinate, GridPoint, GridRotation, GridVector,
-};
+use all_is_cubes::math::{Face6, FaceMap, GridCoordinate, GridPoint, GridRotation, GridVector};
 use all_is_cubes::space::SpaceTransaction;
 use all_is_cubes::transaction::Merge;
 
@@ -64,7 +62,6 @@ pub(crate) fn make_log(
     let mut parts: Vec<Block> = directions
         .iter()
         .map(|(face, &growth)| {
-            let Ok(face) = Face6::try_from(face) else { return AIR; };
             let Some(growth) = growth else { return AIR; };
             blocks[Log(growth)].clone().rotate(
                 GridRotation::from_to(Face6::NY, face, Face6::PX)
@@ -108,15 +105,15 @@ pub(crate) fn make_tree(
                 let branch_length = rng.gen_range(0..height - 1);
                 if branch_length > 0 {
                     let branch_base_growth = TreeGrowth::from_radius(branch_length);
-                    branches[side.into()] = Some(branch_base_growth);
+                    branches[side] = Some(branch_base_growth);
 
                     txn.set_overwrite(
                         origin + side.normal_vector(),
                         make_log(
                             blocks,
                             FaceMap::default()
-                                .with(Face7::PY, Some(branch_base_growth))
-                                .with(side.opposite().into(), Some(branch_base_growth)),
+                                .with(Face6::PY, Some(branch_base_growth))
+                                .with(side.opposite(), Some(branch_base_growth)),
                             None,
                         ),
                     );
@@ -143,7 +140,7 @@ pub(crate) fn make_tree(
             origin,
             make_log(
                 blocks,
-                FaceMap::default().with(Face7::NY, Some(TreeGrowth::Sapling)),
+                FaceMap::default().with(Face6::NY, Some(TreeGrowth::Sapling)),
                 Some(TreeGrowth::G6),
             ),
         );

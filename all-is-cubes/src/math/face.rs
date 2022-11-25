@@ -578,44 +578,40 @@ impl TryFrom<GridVector> for Face7 {
 #[allow(clippy::exhaustive_structs)]
 pub struct Faceless;
 
-/// Container for values keyed by [`Face7`]s.
+/// Container for values keyed by [`Face6`]s. Always holds exactly six elements.
 #[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq)]
 pub struct FaceMap<V> {
-    /// The value whose key is `Face7::Within`.
-    pub within: V,
-    /// The value whose key is `Face7::NX`.
+    /// The value whose key is [`Face6::NX`].
     pub nx: V,
-    /// The value whose key is `Face7::NY`.
+    /// The value whose key is [`Face6::NY`].
     pub ny: V,
-    /// The value whose key is `Face7::NZ`.
+    /// The value whose key is [`Face6::NZ`].
     pub nz: V,
-    /// The value whose key is `Face7::PX`.
+    /// The value whose key is [`Face6::PX`].
     pub px: V,
-    /// The value whose key is `Face7::PY`.
+    /// The value whose key is [`Face6::PY`].
     pub py: V,
-    /// The value whose key is `Face7::PZ`.
+    /// The value whose key is [`Face6::PZ`].
     pub pz: V,
 }
 
 impl<V> FaceMap<V> {
     /// Constructs a [`FaceMap`] by using the provided function to compute
-    /// a value for each [`Face7`] enum variant.
+    /// a value for each [`Face6`] enum variant.
     #[inline]
-    pub fn from_fn(mut f: impl FnMut(Face7) -> V) -> Self {
+    pub fn from_fn(mut f: impl FnMut(Face6) -> V) -> Self {
         Self {
-            within: f(Face7::Within),
-            nx: f(Face7::NX),
-            ny: f(Face7::NY),
-            nz: f(Face7::NZ),
-            px: f(Face7::PX),
-            py: f(Face7::PY),
-            pz: f(Face7::PZ),
+            nx: f(Face6::NX),
+            ny: f(Face6::NY),
+            nz: f(Face6::NZ),
+            px: f(Face6::PX),
+            py: f(Face6::PY),
+            pz: f(Face6::PZ),
         }
     }
 
-    /// Constructs a [`FaceMap`] whose negative and positive directions are
-    /// equal, and whose [`Face7::Within`] value is the default.
+    /// Constructs a [`FaceMap`] whose negative and positive directions are equal.
     // TODO: Evaluate whether this is a good API.
     #[inline]
     #[doc(hidden)] // used by all-is-cubes-content
@@ -625,7 +621,6 @@ impl<V> FaceMap<V> {
     {
         let values = values.into();
         Self {
-            within: Default::default(),
             nx: values.x.clone(),
             px: values.x,
             ny: values.y.clone(),
@@ -651,26 +646,18 @@ impl<V> FaceMap<V> {
         Vector3::new(self.px, self.py, self.pz)
     }
 
-    /// Iterate over the map's key-value pairs by reference, in the same order as [`Face7::ALL`].
-    pub fn iter(&self) -> impl Iterator<Item = (Face7, &V)> {
-        Face7::ALL.iter().copied().map(move |f| (f, &self[f]))
+    /// Iterate over the map's key-value pairs by reference, in the same order as [`Face6::ALL`].
+    pub fn iter(&self) -> impl Iterator<Item = (Face6, &V)> {
+        Face6::ALL.iter().copied().map(move |f| (f, &self[f]))
     }
 
-    /// Iterate over the map values by reference, in the same order as [`Face7::ALL`].
+    /// Iterate over the map values by reference, in the same order as [`Face6::ALL`].
     pub fn values(&self) -> impl Iterator<Item = &V> {
-        Face7::ALL.iter().copied().map(move |f| &self[f])
+        Face6::ALL.iter().copied().map(move |f| &self[f])
     }
 
-    pub fn into_values(self) -> [V; 7] {
-        [
-            self.within,
-            self.nx,
-            self.ny,
-            self.nz,
-            self.px,
-            self.py,
-            self.pz,
-        ]
+    pub fn into_values(self) -> [V; 6] {
+        [self.nx, self.ny, self.nz, self.px, self.py, self.pz]
     }
 
     pub fn into_values_iter(self) -> impl Iterator<Item = V> {
@@ -679,28 +666,26 @@ impl<V> FaceMap<V> {
     }
 
     /// Transform values.
-    pub fn map<U>(self, mut f: impl FnMut(Face7, V) -> U) -> FaceMap<U> {
+    pub fn map<U>(self, mut f: impl FnMut(Face6, V) -> U) -> FaceMap<U> {
         FaceMap {
-            within: f(Face7::Within, self.within),
-            nx: f(Face7::NX, self.nx),
-            ny: f(Face7::NY, self.ny),
-            nz: f(Face7::NZ, self.nz),
-            px: f(Face7::PX, self.px),
-            py: f(Face7::PY, self.py),
-            pz: f(Face7::PZ, self.pz),
+            nx: f(Face6::NX, self.nx),
+            ny: f(Face6::NY, self.ny),
+            nz: f(Face6::NZ, self.nz),
+            px: f(Face6::PX, self.px),
+            py: f(Face6::PY, self.py),
+            pz: f(Face6::PZ, self.pz),
         }
     }
 
-    /// Combine two `FaceMap`s using a function applied to each pair of corresponding values.
-    pub fn zip<U, R>(self, other: FaceMap<U>, mut f: impl FnMut(Face7, V, U) -> R) -> FaceMap<R> {
+    /// Combine two [`FaceMap`]s using a function applied to each pair of corresponding values.
+    pub fn zip<U, R>(self, other: FaceMap<U>, mut f: impl FnMut(Face6, V, U) -> R) -> FaceMap<R> {
         FaceMap {
-            within: f(Face7::Within, self.within, other.within),
-            nx: f(Face7::NX, self.nx, other.nx),
-            ny: f(Face7::NY, self.ny, other.ny),
-            nz: f(Face7::NZ, self.nz, other.nz),
-            px: f(Face7::PX, self.px, other.px),
-            py: f(Face7::PY, self.py, other.py),
-            pz: f(Face7::PZ, self.pz, other.pz),
+            nx: f(Face6::NX, self.nx, other.nx),
+            ny: f(Face6::NY, self.ny, other.ny),
+            nz: f(Face6::NZ, self.nz, other.nz),
+            px: f(Face6::PX, self.px, other.px),
+            py: f(Face6::PY, self.py, other.py),
+            pz: f(Face6::PZ, self.pz, other.pz),
         }
     }
 
@@ -709,19 +694,19 @@ impl<V> FaceMap<V> {
     /// This may be used for constructing a map with only one interesting entry:
     ///
     /// ```
-    /// use all_is_cubes::math::{Face7, FaceMap};
+    /// use all_is_cubes::math::{Face6, FaceMap};
     ///
     /// assert_eq!(
-    ///     FaceMap::default().with(Face7::PY, 10),
+    ///     FaceMap::default().with(Face6::PY, 10),
     ///     {
     ///         let mut m = FaceMap::default();
-    ///         m[Face7::PY] = 10;
+    ///         m[Face6::PY] = 10;
     ///         m
     ///     },
     /// );
     /// ```
     #[must_use]
-    pub fn with(mut self, face: Face7, value: V) -> Self {
+    pub fn with(mut self, face: Face6, value: V) -> Self {
         self[face] = value;
         self
     }
@@ -734,7 +719,6 @@ impl<V: Clone> FaceMap<V> {
     #[inline]
     pub fn repeat(value: V) -> Self {
         Self {
-            within: value.clone(),
             nx: value.clone(),
             ny: value.clone(),
             nz: value.clone(),
@@ -745,31 +729,29 @@ impl<V: Clone> FaceMap<V> {
     }
 }
 
-impl<V> Index<Face7> for FaceMap<V> {
+impl<V> Index<Face6> for FaceMap<V> {
     type Output = V;
-    fn index(&self, face: Face7) -> &V {
+    fn index(&self, face: Face6) -> &V {
         match face {
-            Face7::Within => &self.within,
-            Face7::NX => &self.nx,
-            Face7::NY => &self.ny,
-            Face7::NZ => &self.nz,
-            Face7::PX => &self.px,
-            Face7::PY => &self.py,
-            Face7::PZ => &self.pz,
+            Face6::NX => &self.nx,
+            Face6::NY => &self.ny,
+            Face6::NZ => &self.nz,
+            Face6::PX => &self.px,
+            Face6::PY => &self.py,
+            Face6::PZ => &self.pz,
         }
     }
 }
 
-impl<V> IndexMut<Face7> for FaceMap<V> {
-    fn index_mut(&mut self, face: Face7) -> &mut V {
+impl<V> IndexMut<Face6> for FaceMap<V> {
+    fn index_mut(&mut self, face: Face6) -> &mut V {
         match face {
-            Face7::Within => &mut self.within,
-            Face7::NX => &mut self.nx,
-            Face7::NY => &mut self.ny,
-            Face7::NZ => &mut self.nz,
-            Face7::PX => &mut self.px,
-            Face7::PY => &mut self.py,
-            Face7::PZ => &mut self.pz,
+            Face6::NX => &mut self.nx,
+            Face6::NY => &mut self.ny,
+            Face6::NZ => &mut self.nz,
+            Face6::PX => &mut self.px,
+            Face6::PY => &mut self.py,
+            Face6::PZ => &mut self.pz,
         }
     }
 }
@@ -870,11 +852,11 @@ mod tests {
         // TODO: Maybe generalize this to _all_ the Face/FaceMap methods that have an ordering?
         let map = FaceMap::from_fn(|f| f);
         assert_eq!(
-            Face7::ALL.to_vec(),
+            Face6::ALL.to_vec(),
             map.iter().map(|(_, &v)| v).collect::<Vec<_>>(),
         );
         assert_eq!(
-            Face7::ALL.to_vec(),
+            Face6::ALL.to_vec(),
             map.values().copied().collect::<Vec<_>>(),
         );
     }

@@ -9,7 +9,7 @@ use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::linking::{BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Face7, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb, Rgba,
+    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb, Rgba,
 };
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::universe::{Name, URef, Universe, UniverseIndex};
@@ -250,7 +250,7 @@ async fn islands(
         .intersection(bounds)
         .expect("island outside space bounds");
         // TODO: randomize island location in cell?
-        let occupied_bounds = cell_bounds.expand(FaceMap::repeat(-10).with(Face7::PY, -25));
+        let occupied_bounds = cell_bounds.expand(FaceMap::repeat(-10).with(Face6::PY, -25));
         wavy_landscape(occupied_bounds, &mut space, &landscape_blocks, 0.5)?;
         p.progress(i as f32 / island_grid.volume() as f32).await;
     }

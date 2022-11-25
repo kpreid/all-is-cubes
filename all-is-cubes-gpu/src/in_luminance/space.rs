@@ -587,7 +587,6 @@ impl<Backend: AicLumBackend> SpaceLightTexture<Backend> {
             nx: 0,
             ny: 0,
             nz: 0,
-            within: 0,
         });
         let texture = context.new_texture(
             texture_bounds.unsigned_size().into(),

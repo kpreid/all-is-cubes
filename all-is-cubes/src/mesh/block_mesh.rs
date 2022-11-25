@@ -76,8 +76,12 @@ impl<V> Default for BlockFaceMesh<V> {
 /// [`Block`]: crate::block::Block
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockMesh<V, T> {
-    /// Vertices grouped by the face they belong to.
-    pub(super) faces: FaceMap<BlockFaceMesh<V>>,
+    /// Vertices grouped by which face being obscured would obscure those vertices.
+    pub(super) face_vertices: FaceMap<BlockFaceMesh<V>>,
+
+    /// Vertices not fitting into [`Self::face_vertices`] because they may be visible
+    /// from multiple directions or when the eye position is inside the block.
+    pub(super) interior_vertices: BlockFaceMesh<V>,
 
     /// Texture tiles used by the vertices; holding these objects is intended to ensure
     /// the texture coordinates stay valid.
@@ -99,6 +103,18 @@ pub struct BlockMesh<V, T> {
 }
 
 impl<V, T> BlockMesh<V, T> {
+    /// Iterate over all seven [`BlockFaceMesh`]es, including the interior vertices.
+    ///
+    /// This function is not public because it is mostly a helper for higher-level
+    /// operations, and the details of [`BlockFaceMesh`] may change.
+    pub(super) fn all_face_meshes(&self) -> impl Iterator<Item = (Face7, &BlockFaceMesh<V>)> {
+        std::iter::once((Face7::Within, &self.interior_vertices)).chain(
+            self.face_vertices
+                .iter()
+                .map(|(f, mesh)| (Face7::from(f), mesh)),
+        )
+    }
+
     /// Return the textures used for this block. This may be used to retain the textures
     /// for as long as the associated vertices are being used, rather than only as long as
     /// the life of this mesh.
@@ -109,7 +125,7 @@ impl<V, T> BlockMesh<V, T> {
 
     /// Returns whether this mesh contains no vertices so it has no visual effect.
     pub fn is_empty(&self) -> bool {
-        self.faces.values().all(|fm| fm.is_empty())
+        self.all_face_meshes().all(|(_, fm)| fm.is_empty())
     }
 
     /// Update this mesh's textures in-place to the given new block data, if this is
@@ -162,14 +178,7 @@ where
 
         match block.voxels.as_ref().filter(|_| !options.ignore_voxels) {
             None => {
-                let faces = FaceMap::from_fn(|face| {
-                    let face = match Face6::try_from(face) {
-                        Ok(f) => f,
-                        Err(_) => {
-                            // No interior detail for atom blocks.
-                            return BlockFaceMesh::default();
-                        }
-                    };
+                let face_vertices = FaceMap::from_fn(|face| {
                     let color = options.transparency.limit_alpha(block.color);
 
                     let mut vertices: Vec<V> = Vec::new();
@@ -204,7 +213,9 @@ where
                 });
 
                 BlockMesh {
-                    faces,
+                    face_vertices,
+                    // No interior detail for atom blocks.
+                    interior_vertices: BlockFaceMesh::default(),
                     textures_used: vec![],
                     voxel_opacity_mask: None,
                 }
@@ -223,9 +234,8 @@ where
 
                 let block_resolution = GridCoordinate::from(block.resolution);
 
-                // Construct empty output to mutate, because inside the loops we'll be
-                // updating `Within` independently of other faces.
-                let mut output_by_face = FaceMap::from_fn(|face| BlockFaceMesh {
+                // Construct empty output to mutate.
+                let mut output_by_face = FaceMap::from_fn(|_| BlockFaceMesh {
                     vertices: Vec::new(),
                     indices_opaque: Vec::new(),
                     indices_transparent: Vec::new(),
@@ -234,8 +244,9 @@ where
                     // that consumes this structure will say "draw this face if its adjacent
                     // cube's opposing face is not opaque", and `Within` means the adjacent
                     // cube is ourself.
-                    fully_opaque: face != Face7::Within,
+                    fully_opaque: true,
                 });
+                let mut output_interior = BlockFaceMesh::default();
 
                 let mut texture_if_needed: Option<A::Tile> = None;
 
@@ -259,7 +270,7 @@ where
                         || rotated_voxel_range.x_range() != (0..block_resolution)
                         || rotated_voxel_range.y_range() != (0..block_resolution)
                     {
-                        output_by_face[Face7::from(face)].fully_opaque = false;
+                        output_by_face[face].fully_opaque = false;
                     }
 
                     // Layer 0 is the outside surface of the cube and successive layers are
@@ -294,7 +305,7 @@ where
                                 if layer == 0 && !color.fully_opaque() {
                                     // If the first layer is transparent in any cube at all, then the face is
                                     // not fully opaque
-                                    output_by_face[Face7::from(face)].fully_opaque = false;
+                                    output_by_face[face].fully_opaque = false;
                                 }
 
                                 let voxel_is_visible = {
@@ -360,11 +371,11 @@ where
                             indices_opaque,
                             indices_transparent,
                             ..
-                        } = &mut output_by_face[if layer == 0 {
-                            Face7::from(face)
+                        } = if layer == 0 {
+                            &mut output_by_face[face]
                         } else {
-                            Face7::Within
-                        }];
+                            &mut output_interior
+                        };
                         let depth = FreeCoordinate::from(layer);
 
                         // Traverse `visible_image` using the "greedy meshing" algorithm for
@@ -420,7 +431,8 @@ where
                 }
 
                 BlockMesh {
-                    faces: output_by_face,
+                    face_vertices: output_by_face,
+                    interior_vertices: output_interior,
                     textures_used: texture_if_needed.into_iter().collect(),
                     voxel_opacity_mask: if used_any_vertex_colors {
                         None
@@ -439,7 +451,8 @@ impl<V, T> Default for BlockMesh<V, T> {
     fn default() -> Self {
         // This implementation can't be derived since `V` and `T` don't have defaults themselves.
         Self {
-            faces: FaceMap::default(),
+            face_vertices: FaceMap::default(),
+            interior_vertices: BlockFaceMesh::default(),
             textures_used: Vec::new(),
             voxel_opacity_mask: None,
         }

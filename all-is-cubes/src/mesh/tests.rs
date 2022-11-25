@@ -9,7 +9,7 @@ use crate::camera::{GraphicsOptions, TransparencyOption};
 use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::math::{
     Face6::{self, *},
-    Face7, FaceMap, FreeCoordinate, GridAab, GridPoint, GridRotation, Rgba,
+    FaceMap, FreeCoordinate, GridAab, GridPoint, GridRotation, Rgba,
 };
 use crate::mesh::BlockMesh;
 use crate::space::{Space, SpacePhysics};
@@ -206,9 +206,8 @@ fn space_mesh_equals_block_mesh() {
     assert_eq!(
         space_rendered.vertices().to_vec(),
         block_meshes[0]
-            .faces
-            .values()
-            .flat_map(|face_mesh| face_mesh.vertices.clone().into_iter())
+            .all_face_meshes()
+            .flat_map(|(_, face_mesh)| face_mesh.vertices.clone().into_iter())
             .collect::<Vec<_>>()
     );
     assert_eq!(tex.count_allocated(), 1); // for striped faces
@@ -356,36 +355,28 @@ fn shrunken_box_uniform_color() {
     );
 }
 
-/// Make a [`FaceMap`] with uniform values except for [`Face7::Within`].
-fn except_within<T: Clone>(without: T, within: T) -> FaceMap<T> {
-    FaceMap::from_fn(|face| {
-        if face == Face7::Within {
-            within.clone()
-        } else {
-            without.clone()
-        }
-    })
+fn opacities<V, T>(mesh: &BlockMesh<V, T>) -> FaceMap<bool> {
+    assert!(
+        !mesh.interior_vertices.fully_opaque,
+        "interior opacity should never be true because it doesn't mean anything"
+    );
+    // TODO: this could be simplified by a FaceMap by-ref operation
+    FaceMap::from_fn(|face| mesh.face_vertices[face].fully_opaque)
 }
 
 #[test]
 fn atom_transparency() {
     assert_eq!(
-        test_block_mesh(Block::from(Rgba::WHITE))
-            .faces
-            .map(|_, ft| ft.fully_opaque),
-        except_within(true, false)
+        opacities(&test_block_mesh(Block::from(Rgba::WHITE))),
+        FaceMap::repeat(true)
     );
     assert_eq!(
-        test_block_mesh(Block::from(Rgba::TRANSPARENT))
-            .faces
-            .map(|_, ft| ft.fully_opaque),
-        except_within(false, false)
+        opacities(&test_block_mesh(Block::from(Rgba::TRANSPARENT))),
+        FaceMap::repeat(false)
     );
     assert_eq!(
-        test_block_mesh(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.5)))
-            .faces
-            .map(|_, ft| ft.fully_opaque),
-        except_within(false, false)
+        opacities(&test_block_mesh(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.5)))),
+        FaceMap::repeat(false)
     );
 }
 
@@ -393,12 +384,12 @@ fn atom_transparency() {
 fn atom_transparency_thresholded() {
     // Threshold means that partial transparency should produce exactly the same mesh as 0 or 1
     assert_eq!(
-        test_block_mesh_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.25))).faces,
-        test_block_mesh_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.0))).faces,
+        test_block_mesh_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.25))),
+        test_block_mesh_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.0))),
     );
     assert_eq!(
-        test_block_mesh_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.75))).faces,
-        test_block_mesh_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 1.0))).faces,
+        test_block_mesh_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 0.75))),
+        test_block_mesh_threshold(Block::from(Rgba::new(1.0, 1.0, 1.0, 1.0))),
     );
 
     // TODO: also test voxels -- including self-occlusion (thresholded voxel in front of truly opaque voxel)
@@ -422,9 +413,8 @@ fn fully_opaque_voxels() {
         .unwrap()
         .build();
     assert_eq!(
-        test_block_mesh(block).faces.map(|_, ft| ft.fully_opaque),
+        opacities(&test_block_mesh(block)),
         FaceMap {
-            within: false,
             nx: true,
             ny: true,
             nz: true,
@@ -452,9 +442,8 @@ fn fully_opaque_partial_block() {
         })
         .build();
     assert_eq!(
-        test_block_mesh(block).faces.map(|_, ft| ft.fully_opaque),
+        opacities(&test_block_mesh(block)),
         FaceMap {
-            within: false,
             nx: true,
             ny: false,
             nz: false,
@@ -584,7 +573,7 @@ fn texture_clamp_coordinate_ordering() {
     let mut universe = Universe::new();
     let [block] = make_some_voxel_blocks(&mut universe);
     let mesh = test_block_mesh(block);
-    for (face, face_mesh) in mesh.faces.iter() {
+    for (face, face_mesh) in mesh.all_face_meshes() {
         for vertex in face_mesh.vertices.iter() {
             let mut had_any_textured = false;
             match vertex.coloring {

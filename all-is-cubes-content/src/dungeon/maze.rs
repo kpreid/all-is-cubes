@@ -1,6 +1,6 @@
 use maze_generator::prelude::{Direction, Field, Maze};
 
-use all_is_cubes::math::{Face7, GridAab, GridArray, GridPoint};
+use all_is_cubes::math::{Face6, GridAab, GridArray, GridPoint};
 
 pub fn maze_to_array(maze: &Maze) -> GridArray<Field> {
     GridArray::from_fn(
@@ -17,11 +17,11 @@ pub fn gp2m(p: GridPoint) -> maze_generator::prelude::Coordinates {
     maze_generator::prelude::Coordinates { x: p.x, y: p.z }
 }
 
-pub fn d2f(direction: Direction) -> Face7 {
+pub fn d2f(direction: Direction) -> Face6 {
     match direction {
-        Direction::North => Face7::NZ,
-        Direction::East => Face7::PX,
-        Direction::South => Face7::PZ,
-        Direction::West => Face7::NX,
+        Direction::North => Face6::NZ,
+        Direction::East => Face6::PX,
+        Direction::South => Face6::PZ,
+        Direction::West => Face6::NX,
     }
 }

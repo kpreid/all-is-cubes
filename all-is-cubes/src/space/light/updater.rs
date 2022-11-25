@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use super::debug::LightComputeOutput;
 use super::LightUpdateRequest;
 use crate::block::EvaluatedBlock;
-use crate::math::{Face6, Face7, FaceMap, FreeCoordinate, Geometry, GridPoint, NotNan, Rgb};
+use crate::math::{Face6, FaceMap, FreeCoordinate, Geometry, GridPoint, NotNan, Rgb};
 use crate::raycast::{Ray, RaycastStep};
 use crate::space::light::LightUpdateRayInfo;
 use crate::space::{GridAab, LightPhysics, PackedLight, PackedLightScalar, Space, SpaceChange};
@@ -175,14 +175,9 @@ impl Space {
                 cube_buffer.add_weighted_light(ev_origin.attributes.light_emission, 1.0);
             }
         } else {
-            let ev_neighbors = FaceMap::from_fn(|face| {
-                if face == Face7::Within {
-                    ev_origin
-                } else {
-                    self.get_evaluated(cube + face.normal_vector())
-                }
-            });
-            let direction_weights = directions_to_seek_light(ev_neighbors);
+            let ev_neighbors =
+                FaceMap::from_fn(|face| self.get_evaluated(cube + face.normal_vector()));
+            let direction_weights = directions_to_seek_light(ev_origin, ev_neighbors);
 
             // TODO: Choose a ray pattern that suits the maximum_distance.
             for &LightRayData { ray, face_cosines } in &LIGHT_RAYS[..] {
@@ -294,10 +289,11 @@ impl LightPhysics {
 
 /// Given a block and its neighbors, which directions should we cast rays to find light
 /// falling on it?
-///
-/// The returned [`FaceMap`]'s `within` value is meaningless.
-fn directions_to_seek_light(neighborhood: FaceMap<&EvaluatedBlock>) -> FaceMap<f32> {
-    if neighborhood.within.visible_or_animated() {
+fn directions_to_seek_light(
+    origin: &EvaluatedBlock,
+    neighborhood: FaceMap<&EvaluatedBlock>,
+) -> FaceMap<f32> {
+    if origin.visible_or_animated() {
         // Non-opaque blocks should work the same as blocks which have all six adjacent faces present.
         FaceMap::repeat(1.0)
     } else {

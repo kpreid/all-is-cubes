@@ -9,7 +9,7 @@ use cgmath::{EuclideanSpace, Point3, Transform, Vector3};
 
 use crate::block::Resolution;
 use crate::math::{
-    sort_two, Aab, Face6, Face7, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint,
+    sort_two, Aab, Face6, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint,
     GridVector,
 };
 
@@ -611,7 +611,6 @@ impl GridAab {
     /// assert_eq!(
     ///     GridAab::from_lower_upper([10, 10, 10], [20, 20, 20])
     ///         .expand(FaceMap {
-    ///             within: 999, // This value is not used.
     ///             nx: 1, ny: 2, nz: 3,
     ///             px: 4, py: 5, pz: 6,
     ///         }),
@@ -622,7 +621,7 @@ impl GridAab {
     #[track_caller] // TODO: better error reporting
     #[must_use]
     pub fn expand(self, deltas: FaceMap<GridCoordinate>) -> Self {
-        use Face7::*;
+        use Face6::*;
         let l = self.lower_bounds();
         let u = self.upper_bounds();
         Self::from_lower_upper(

@@ -138,7 +138,6 @@ fn light_source_self_illumination_opaque() {
         // Some of the values also differ due to our current choice of discarding
         // light updates with priority 1.
         FaceMap {
-            within: light,
             nx: Rgb::new(0.13053422, 0.26106843, 0.52213687),
             ny: Rgb::new(0.16210495, 0.3242099, 0.6484198),
             nz: Rgb::new(0.20131129, 0.40262258, 0.80524516),

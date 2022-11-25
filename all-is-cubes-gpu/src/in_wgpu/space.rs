@@ -589,7 +589,6 @@ impl SpaceLightTexture {
             nx: 0,
             ny: 0,
             nz: 0,
-            within: 0,
         });
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             size: size_vector_to_extent(texture_bounds.size()),
