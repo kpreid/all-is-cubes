@@ -11,7 +11,9 @@ use std::sync::Arc;
 use cgmath::{EuclideanSpace as _, Point3};
 
 use crate::listen::Listener;
-use crate::math::{FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba};
+use crate::math::{
+    FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba,
+};
 use crate::raycast::{Ray, Raycaster};
 use crate::space::{SetCubeError, Space, SpaceChange};
 use crate::universe::URef;
@@ -309,24 +311,32 @@ impl Block {
             } => {
                 let block_space = space_ref.try_borrow()?;
 
+                // The region of `space` that the parameters say to look at.
                 let full_resolution_bounds =
                     GridAab::for_block(resolution).translate(offset.to_vec());
-                let occupied_bounds = full_resolution_bounds
-                    .intersection(block_space.bounds())
-                    .unwrap_or_else(|| {
-                        // Arbitrary placeholder of zero size that won't overflow.
-                        GridAab::from_lower_size(offset, [0, 0, 0])
-                    });
 
-                let voxels = block_space
-                    .extract(
-                        occupied_bounds,
-                        #[inline(always)]
-                        |_index, sub_block_data, _lighting| {
-                            Evoxel::from_block(sub_block_data.evaluated())
-                        },
-                    )
-                    .translate(-offset.to_vec());
+                // Intersect that region with the actual bounds of `space`.
+                let voxels: GridArray<Evoxel> =
+                    match full_resolution_bounds.intersection(block_space.bounds()) {
+                        Some(occupied_bounds) => block_space
+                            .extract(
+                                occupied_bounds,
+                                #[inline(always)]
+                                |_index, sub_block_data, _lighting| {
+                                    Evoxel::from_block(sub_block_data.evaluated())
+                                },
+                            )
+                            .translate(-offset.to_vec()),
+                        None => {
+                            // If there is no intersection, then return an empty voxel array,
+                            // with an arbitrary position.
+                            GridArray::from_elements(
+                                GridAab::from_lower_size([0, 0, 0], [0, 0, 0]),
+                                Box::<[Evoxel]>::default(),
+                            )
+                            .unwrap()
+                        }
+                    };
 
                 EvaluatedBlock::from_voxels(attributes.clone(), resolution, voxels)
             }

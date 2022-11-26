@@ -298,6 +298,26 @@ fn recur_with_offset() {
     );
 }
 
+/// Fuzzer-derived regression test for numeric overflow
+#[test]
+fn recur_offset_negative_overflow() {
+    let mut universe = Universe::new();
+    let space = Space::builder(GridAab::from_lower_upper(
+        [1743229108, 939544399, -2147463345],
+        [1743229109, 939544400, -2147461505],
+    ))
+    .build();
+    let block_at_offset = Block::from_primitive(Primitive::Recur {
+        attributes: BlockAttributes::default(),
+        offset: GridPoint::new(-414232629, -2147483648, -13697025),
+        resolution: R128,
+        space: universe.insert_anonymous(space),
+    });
+
+    let e = block_at_offset.evaluate().unwrap();
+    assert!(!e.visible);
+}
+
 #[test]
 fn indirect_equivalence() {
     let resolution = R4;
