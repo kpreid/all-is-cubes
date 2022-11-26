@@ -10,7 +10,7 @@
 
 use std::fmt;
 
-use cgmath::{EuclideanSpace as _, InnerSpace as _, Point2, Vector2, Vector3};
+use cgmath::{EuclideanSpace as _, InnerSpace as _, Point2, Vector2, Vector3, VectorSpace as _};
 use cgmath::{Point3, Vector4};
 use ordered_float::NotNan;
 #[cfg(feature = "threads")]
@@ -223,15 +223,11 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let far12 = far12.value_with_ambient_occlusion();
 
         // Perform bilinear interpolation.
-        fn mix(x: Vector4<f32>, y: Vector4<f32>, a: FreeCoordinate) -> Vector4<f32> {
-            // This should be replaced with https://doc.rust-lang.org/nightly/std/primitive.f32.html#method.lerp when that's stable
-            let a = a as f32;
-            x * (1. - a) + y * a
-        }
-        let v = mix(
-            mix(near12, near1far2, mix_2),
-            mix(near2far1, far12, mix_2),
-            mix_1,
+        // TODO: most of the prior math for the mix values should be f32 already
+        let v = Vector4::lerp(
+            Vector4::lerp(near12, near1far2, mix_2 as f32),
+            Vector4::lerp(near2far1, far12, mix_2 as f32),
+            mix_1 as f32,
         );
         Rgb::try_from(v.truncate() / v.w.max(0.1)).unwrap()
     }
