@@ -75,13 +75,12 @@ pub(crate) fn make_log(
         parts.push(blocks[Leaves(leaves_growth)].clone());
     }
 
-    let Some(mut block) = parts.pop() else { return AIR; };
-    for next in parts {
-        // compose_or_replace will take care of simplifying away `AIR`s.
-        block =
-            block::Composite::new(next, block::CompositeOperator::Over).compose_or_replace(block);
-    }
-    block
+    block::Composite::stack(
+        AIR,
+        parts
+            .into_iter()
+            .map(|block| block::Composite::new(block, block::CompositeOperator::Over)),
+    )
 }
 
 /// Construct a tree whose lowest trunk piece is at `origin` and whose maximum height is `height`.

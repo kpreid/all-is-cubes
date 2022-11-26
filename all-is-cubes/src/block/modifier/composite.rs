@@ -78,6 +78,13 @@ impl Composite {
         }
     }
 
+    /// Use [`Composite::compose_or_replace()`] repeatedly to assemble a block from parts.
+    pub fn stack(destination: Block, parts: impl IntoIterator<Item = Composite>) -> Block {
+        parts
+            .into_iter()
+            .fold(destination, |block, part| part.compose_or_replace(block))
+    }
+
     /// Called by [`Modifier::evaluate`].
     pub(super) fn evaluate(
         &self,
