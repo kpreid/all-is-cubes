@@ -79,6 +79,10 @@ pub trait PixelBuf: Default {
         result.add(color, &Self::BlockData::sky(options));
         result
     }
+
+    /// Combine multiple completed buffers into one, such as multiple samples for
+    /// antialiasing.
+    fn mean<const N: usize>(items: [Self; N]) -> Self;
 }
 
 /// Precomputed data about a [`Space`]'s blocks that may be used by a [`PixelBuf`].
@@ -116,7 +120,7 @@ impl RtBlockData for () {
 
 /// Implements [`PixelBuf`] for RGB(A) color with [`f32`] components,
 /// and conversion to [`Rgba`].
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ColorBuf {
     /// Color buffer.
     ///
@@ -149,6 +153,18 @@ impl PixelBuf for ColorBuf {
         let alpha_for_add = surface_alpha * self.ray_alpha;
         self.ray_alpha *= 1.0 - surface_alpha;
         self.color_accumulator += color_vector * alpha_for_add;
+    }
+
+    #[inline]
+    fn mean<const N: usize>(items: [Self; N]) -> Self {
+        Self {
+            color_accumulator: items
+                .iter()
+                .map(|cb| cb.color_accumulator)
+                .sum::<Vector3<f32>>()
+                / (N as f32),
+            ray_alpha: items.iter().map(|cb| cb.ray_alpha).sum::<f32>() / (N as f32),
+        }
     }
 }
 
@@ -192,11 +208,11 @@ mod tests {
         let color_3 = Rgba::new(0.0, 0.0, 1.0, 1.0);
 
         let mut buf = ColorBuf::default();
-        assert_eq!(Rgba::from(buf.clone()), Rgba::TRANSPARENT);
+        assert_eq!(Rgba::from(buf), Rgba::TRANSPARENT);
         assert!(!buf.opaque());
 
         buf.add(color_1, &());
-        assert_eq!(Rgba::from(buf.clone()), color_1);
+        assert_eq!(Rgba::from(buf), color_1);
         assert!(!buf.opaque());
 
         buf.add(color_2, &());
@@ -209,7 +225,7 @@ mod tests {
         assert!(!buf.opaque());
 
         buf.add(color_3, &());
-        assert!(Rgba::from(buf.clone()).fully_opaque());
+        assert!(Rgba::from(buf).fully_opaque());
         //assert_eq!(
         //    buf.result(),
         //    (color_1.to_rgb() * 0.75 + color_2.to_rgb() * 0.125 + color_3.to_rgb() * 0.125)

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use cgmath::{Point2, Vector2};
+use cgmath::{ElementWise, Point2, Vector2};
 use futures_core::future::BoxFuture;
 use image::RgbaImage;
 
@@ -254,12 +254,6 @@ impl HeadlessRenderer for RtRenderer<()> {
 
             let options = self.cameras.graphics_options();
             let mut flaws = Flaws::empty();
-            if !matches!(
-                options.antialiasing,
-                AntialiasingOption::IfCheap | AntialiasingOption::None
-            ) {
-                flaws |= Flaws::NO_ANTIALIASING;
-            }
             if self.had_cursor {
                 flaws |= Flaws::NO_CURSOR;
             }
@@ -292,12 +286,13 @@ impl<'a, P: PixelBuf> Clone for RtScene<'a, P> {
 impl<P: PixelBuf> Copy for RtScene<'_, P> {}
 
 impl<P: PixelBuf> RtScene<'_, P> {
+    /// Called from threaded or non-threaded `trace_scene_to_image()` implementations
+    /// to produce a single image pixel.
     #[inline]
-    fn trace_ray(&self, ndc_pos: Point2<f64>) -> (P, RaytraceInfo) {
+    fn trace_patch(&self, patch: NdcRect) -> (P, RaytraceInfo) {
         if let Some(ui) = self.rts.ui {
-            // TODO: need to ask the UI scene to not have a sky color
             let (pixel, info): (P, RaytraceInfo) =
-                ui.trace_ray(self.cameras.ui.project_ndc_into_world(ndc_pos), false);
+                trace_patch_in_one_space(ui, &self.cameras.ui, patch, false);
             if pixel.opaque() {
                 // TODO: We should be doing alpha blending, but doing that requires
                 // having control over the PixelBuf that trace_ray starts with.
@@ -305,7 +300,7 @@ impl<P: PixelBuf> RtScene<'_, P> {
             }
         }
         if let Some(world) = self.rts.world {
-            return world.trace_ray(self.cameras.world.project_ndc_into_world(ndc_pos), true);
+            return trace_patch_in_one_space(world, &self.cameras.world, patch, true);
         }
         (
             P::paint(palette::NO_WORLD_TO_SHOW, self.options),
@@ -314,10 +309,59 @@ impl<P: PixelBuf> RtScene<'_, P> {
     }
 }
 
+fn trace_patch_in_one_space<P: PixelBuf>(
+    space: &SpaceRaytracer<<P as PixelBuf>::BlockData>,
+    camera: &Camera,
+    patch: NdcRect,
+    include_sky: bool,
+) -> (P, RaytraceInfo) {
+    match camera.options().antialiasing {
+        AntialiasingOption::None | AntialiasingOption::IfCheap => {
+            space.trace_ray(camera.project_ndc_into_world(patch.center()), include_sky)
+        }
+        AntialiasingOption::Always => {
+            const N: usize = 4;
+            const SAMPLE_POINTS: [Vector2<f64>; N] = [
+                Vector2::new(1. / 8., 5. / 8.),
+                Vector2::new(3. / 8., 1. / 8.),
+                Vector2::new(5. / 8., 7. / 8.),
+                Vector2::new(7. / 8., 3. / 8.),
+            ];
+            let mut info = RaytraceInfo::default();
+            let samples: [P; N] = std::array::from_fn(|i| {
+                let (p, i) = space.trace_ray(
+                    camera.project_ndc_into_world(patch.point_within(SAMPLE_POINTS[i])),
+                    include_sky,
+                );
+                info += i;
+                p
+            });
+            (P::mean(samples), info)
+        }
+    }
+}
+
+/// A rectangle in normalized device coordinates (-1 to 1 is the viewport).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct NdcRect {
+    low: Point2<f64>,
+    high: Point2<f64>,
+}
+impl NdcRect {
+    fn center(self) -> Point2<f64> {
+        self.low.zip(self.high, |a, b| (a + b) / 2.)
+    }
+
+    fn point_within(self, uv: Vector2<f64>) -> Point2<f64> {
+        self.low + (self.high - self.low).mul_element_wise(uv.x)
+    }
+}
+
 /// Threaded and non-threaded implementations of generating a full image.
 /// TODO: The design of this code (and its documentation) are slightly residual from
 /// when `trace_scene_to_image()` was a public interface. Revisit them.
 mod trace_image {
+    use super::*;
     use crate::raytracer::{PixelBuf, RaytraceInfo};
     use cgmath::Point2;
 
@@ -359,13 +403,18 @@ mod trace_image {
             .par_chunks_mut(viewport_size.x.max(1))
             .enumerate()
             .map(move |(ych, raster_row)| {
-                let y = viewport.normalize_fb_y(ych);
+                let y0 = viewport.normalize_fb_y_edge(ych);
+                let y1 = viewport.normalize_fb_y_edge(ych + 1);
                 raster_row
                     .into_par_iter()
                     .enumerate()
                     .map(move |(xch, pixel_out)| {
-                        let x = viewport.normalize_fb_x(xch);
-                        let (pixel, info) = scene.trace_ray(Point2::new(x, y));
+                        let x0 = viewport.normalize_fb_x_edge(xch);
+                        let x1 = viewport.normalize_fb_x_edge(xch + 1);
+                        let (pixel, info) = scene.trace_patch(NdcRect {
+                            low: Point2::new(x0, y0),
+                            high: Point2::new(x1, y1),
+                        });
                         *pixel_out = encoder(pixel);
                         info
                     })
@@ -404,15 +453,22 @@ mod trace_image {
 
         let mut total_info = RaytraceInfo::default();
         let mut index = 0;
-        for ych in 0..viewport_size.y {
-            let y = viewport.normalize_fb_y(ych);
-            for xch in 0..viewport_size.x {
-                let x = viewport.normalize_fb_x(xch);
-                let (pixel, info) = scene.trace_ray(Point2::new(x, y));
+        let mut y0 = viewport.normalize_fb_y_edge(0);
+        for y_edge in 1..=viewport_size.y {
+            let y1 = viewport.normalize_fb_y_edge(y_edge);
+            let mut x0 = viewport.normalize_fb_x_edge(0);
+            for x_edge in 1..=viewport_size.x {
+                let x1 = viewport.normalize_fb_x_edge(x_edge);
+                let (pixel, info) = scene.trace_patch(NdcRect {
+                    low: Point2::new(x0, y0),
+                    high: Point2::new(x1, y1),
+                });
                 output[index] = encoder(pixel);
                 total_info += info;
                 index += 1;
+                x0 = x1;
             }
+            y0 = y1;
         }
 
         total_info

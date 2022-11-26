@@ -340,6 +340,15 @@ impl PixelBuf for ColorCharacterBuf {
             .add(Rgba::TRANSPARENT, &CharacterRtData(Cow::Borrowed(" ")));
         self.override_color = true;
     }
+
+    fn mean<const N: usize>(mut items: [Self; N]) -> Self {
+        use std::{array::from_fn, mem::take};
+        Self {
+            color: ColorBuf::mean::<N>(from_fn(|i| items[i].color)),
+            text: CharacterBuf::mean::<N>(from_fn(|i| take(&mut items[i].text))),
+            override_color: items.into_iter().all(|ccb| ccb.override_color),
+        }
+    }
 }
 
 fn rect_size(rect: Rect) -> Vector2<u16> {

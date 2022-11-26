@@ -420,6 +420,20 @@ impl Viewport {
         -((y as FreeCoordinate + 0.5) / FreeCoordinate::from(self.framebuffer_size.y) * 2.0 - 1.0)
     }
 
+    /// Convert an *x* coordinate from the range `0..=self.framebuffer_size.x` (inclusive)
+    /// to OpenGL normalized device coordinates, range -1 to 1 (at pixel *edges*).
+    #[inline]
+    pub fn normalize_fb_x_edge(&self, x: usize) -> FreeCoordinate {
+        (x as FreeCoordinate) / FreeCoordinate::from(self.framebuffer_size.x) * 2.0 - 1.0
+    }
+
+    /// Convert a *y* coordinate from the range `0..=self.framebuffer_size.y` (inclusive)
+    /// to OpenGL normalized device coordinates, range -1 to 1 (at pixel *edges*) and flipped.
+    #[inline]
+    pub fn normalize_fb_y_edge(&self, y: usize) -> FreeCoordinate {
+        -((y as FreeCoordinate) / FreeCoordinate::from(self.framebuffer_size.y) * 2.0 - 1.0)
+    }
+
     /// Convert a point in the [`Self::nominal_size`] coordinate system to
     /// to OpenGL normalized device coordinates, range -1 to 1 (at pixel centers) with Y flipped.
     ///

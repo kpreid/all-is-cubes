@@ -67,6 +67,13 @@ impl PixelBuf for CharacterBuf {
     fn hit_nothing(&mut self) {
         self.hit_text = Some(".".to_owned());
     }
+
+    fn mean<const N: usize>(items: [Self; N]) -> Self {
+        // TODO: we should at least find the mode (or maybe prefer None) instead of the first
+        Self {
+            hit_text: items.into_iter().flat_map(|cb| cb.hit_text).next(),
+        }
+    }
 }
 
 impl From<CharacterBuf> for String {
