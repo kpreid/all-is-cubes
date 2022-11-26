@@ -1,3 +1,4 @@
+use std::fmt;
 use std::sync::{Arc, Weak};
 
 use crate::listen::{Listener, Notifier};
@@ -34,8 +35,14 @@ where
 ///
 /// Construct this using [`Listener::gate`], or if a placeholder instance with no
 /// effect is required, [`Gate::default`].
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct Gate(Arc<()>);
+
+impl fmt::Debug for Gate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Gate")
+    }
+}
 
 impl Gate {
     pub(super) fn new<L>(listener: L) -> (Gate, GateListener<L>) {

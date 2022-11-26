@@ -122,10 +122,11 @@ impl<M: Clone + Send> Default for Notifier<M> {
 
 impl<M> fmt::Debug for Notifier<M> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // not using fmt.debug_tuple() so this is never printed on multiple lines
         if let Ok(listeners) = self.listeners.try_read() {
-            fmt.debug_tuple("Notifier").field(&listeners.len()).finish()
+            write!(fmt, "Notifier({})", listeners.len())
         } else {
-            fmt.debug_tuple("Notifier").field(&"?").finish()
+            write!(fmt, "Notifier(?)")
         }
     }
 }
