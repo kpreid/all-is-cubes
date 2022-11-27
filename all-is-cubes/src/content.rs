@@ -23,14 +23,13 @@ use crate::raycast::Raycaster;
 use crate::space::{SetCubeError, Space};
 use crate::universe::Universe;
 
-/// TODO: make public with better API
-#[doc(hidden)]
+mod draw_box;
+#[doc(hidden)] // public for exhibit testing
+pub use draw_box::*;
+#[doc(hidden)] // TODO: make public with better API
 pub mod load_image;
-
 pub mod logo;
-
 pub mod palette;
-
 #[doc(hidden)]
 pub mod testing;
 

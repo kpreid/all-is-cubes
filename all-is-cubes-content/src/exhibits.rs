@@ -57,6 +57,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     RESOLUTIONS,
     ANIMATION,
     MAKE_SOME_BLOCKS,
+    DASHED_BOXES,
     COMPOSITE,
     MOVED_BLOCKS,
     ROTATIONS,
@@ -987,6 +988,57 @@ async fn MAKE_SOME_BLOCKS(_: &Exhibit, universe: &mut Universe) {
             space.set([2, y as GridCoordinate, h as GridCoordinate], block_v)?;
         }
     }
+    Ok(space)
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "Dashed outline boxes",
+    subtitle: "",
+)]
+async fn DASHED_BOXES(_: &Exhibit, universe: &mut Universe) {
+    let color = Rgb::new(1.0, 0.5, 0.5);
+    let brush = Block::from(color);
+    let corner_brush = Block::from(color * 0.6);
+    let line_segment = Block::builder()
+        .display_name("Dashed Box Segment")
+        .collision(BlockCollision::None)
+        .voxels_fn(universe, R16, |p| {
+            let zmod = p.z.rem_euclid(4);
+            if p.x == 0 && p.y == 0 && zmod > 0 && zmod < 3 {
+                &brush
+            } else {
+                &AIR
+            }
+        })?
+        .build();
+    let corner = Block::builder()
+        .display_name("Dashed Box Corner")
+        .collision(BlockCollision::None)
+        .voxels_fn(universe, R16, |p| {
+            if p.x < 2 && p.z < 2 && p.y < 2 {
+                &corner_brush
+            } else {
+                &AIR
+            }
+        })?
+        .build();
+    let style = crate::BoxStyle::from_composited_corner_and_edge(corner, line_segment);
+
+    let mut space = Space::empty_positive(7, 3, 3);
+    // Unit sized box
+    style
+        .create_box(GridAab::from_lower_size([0, 0, 1], [1, 1, 1]))
+        .execute(&mut space)?;
+    // Tall box
+    style
+        .create_box(GridAab::from_lower_size([2, 0, 1], [1, 3, 1]))
+        .execute(&mut space)?;
+    // Large box
+    style
+        .create_box(GridAab::from_lower_size([4, 0, 0], [3, 3, 3]))
+        .execute(&mut space)?;
+
     Ok(space)
 }
 
