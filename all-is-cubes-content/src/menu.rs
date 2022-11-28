@@ -25,9 +25,8 @@ use all_is_cubes::{
     transaction::{Merge, Transaction as _},
     universe::Universe,
     vui::{
-        self, install_widgets,
-        widgets::{self, Frame},
-        Align, LayoutGrant, LayoutRequest, LayoutTree, Layoutable, WidgetController,
+        self, install_widgets, widgets, Align, LayoutGrant, LayoutRequest, LayoutTree, Layoutable,
+        WidgetController,
     },
 };
 
@@ -154,7 +153,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
     let tree: vui::WidgetTree = Arc::new(LayoutTree::Stack {
         direction: Face6::PZ,
         children: vec![
-            LayoutTree::leaf(Frame::new()),
+            LayoutTree::leaf(widgets::Frame::for_menu()),
             Arc::new(LayoutTree::Stack {
                 direction: Face6::NY,
                 children: vertical_widgets,

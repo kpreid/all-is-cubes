@@ -193,7 +193,10 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
         // reveal the bounds by adding a widgets::Frame
         Arc::new(LayoutTree::Stack {
             direction: Face6::PZ,
-            children: vec![LayoutTree::leaf(widgets::Frame::new()), control_bar_widgets],
+            children: vec![
+                LayoutTree::leaf(widgets::Frame::for_menu()),
+                control_bar_widgets,
+            ],
         })
     } else {
         control_bar_widgets
