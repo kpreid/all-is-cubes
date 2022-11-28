@@ -17,36 +17,83 @@ use crate::vui::{validate_widget_transaction, LayoutGrant, Layoutable, Positione
 /// Placeholder for likely wanting to change this later.
 pub type WidgetTransaction = SpaceTransaction;
 
-/// Something that can participate in layout and turn into some contents of a Space.
+/// Something that can participate in UI layout (via [`Layoutable`]), and then turn into
+/// some interactive contents of a [`Space`] (via [`controller()`]) positioned according
+/// to that layout.
 ///
 /// This trait is object-safe so that collections (and in particular [`LayoutTree`]s) of
-/// `Arc<dyn Widget>` can be used.
+/// <code>[Arc]&lt;dyn Widget&gt;</code> can be used.
 ///
-/// TODO: Can we name this trait in verb instead of noun form?
+/// # Mutability and dependence
 ///
-/// TODO: Explain expectations about interior mutability and sharing.
+/// A widget may be instantiated in multiple [`Space`]s by calling [`controller()`] more
+/// than once. All such instances should operate independently (not interfering with each
+/// other) and equivalently.
+///
+/// A widget may reference changing data (e.g. the current value of some setting).
+/// However, a widget should not behave differently in response to such data, as the
+/// systems which manage widgets do not track such changes.
+/// In particular, the widget's implementation of [`Layoutable`] should always give the
+/// same answer, and the [`WidgetController`] it produces should be equivalent to instances
+/// created at other times.
+/// Instead, the [`WidgetController`], once created, is responsible for updating the
+/// particular piece of [`Space`] granted to the widget whenever the input data changes
+/// or the widget is interacted with.
+///
+/// # Where to find widgets
+///
+/// Standard widgets may be found in the [`vui::widgets`](crate::vui::widgets) module.
 ///
 /// [`LayoutTree`]: crate::vui::LayoutTree
+/// [`controller()`]: Self::controller
 pub trait Widget: Layoutable + Debug + Send + Sync {
-    fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController>;
+    /// Create a [`WidgetController`] to manage the widget's existence in a particular
+    /// region of a particular [`Space`].
+    ///
+    /// The difference between a [`Widget`] and its [`WidgetController`]s is that each
+    /// [`WidgetController`] must *separately* keep track of which changes need to be
+    /// performed within its associated [`Space`]; the [`Widget`] may be instantiated in
+    /// any number of [`Space`]s but does not need to keep track of them all. It is
+    /// common for a [`WidgetController`] to hold an [`Arc`] pointer to its [`Widget`] to
+    /// make use of information from its original definition.
+    ///
+    /// You should not usually need to call this method, but rather use
+    /// [`WidgetTree::installation()`](crate::vui::LayoutTree::installation) to create
+    /// controllers and attach them to a [`Space`]. However, it is valid for a widget to
+    /// reuse another widget's controller implementation.
+    fn controller(self: Arc<Self>, grant: &LayoutGrant) -> Box<dyn WidgetController>;
 }
 
-/// A form of using a region of a [`Space`] as a UI widget.
+/// Does the work of making a particular region of a [`Space`] behave as a particular
+/// [`Widget`].
 ///
-/// TODO: Merge this into the Behavior trait
+/// Instances of [`WidgetController`] are obtained by calling [`Widget::controller()`].
+/// In most cases, [`Widget`] implementations have corresponding [`WidgetController`]
+/// implementations, though there are common utilities such as [`OneshotController`].
+///
+/// Currently, [`WidgetController`]s are expected to manager their state and todo by being
+/// mutable — unlike the normal [`Behavior`] contract. This has been chosen as an acceptable
+/// compromise for convenience because controllers are required not to operate outside
+/// their assigned regions of space and therefore will not experience transaction conflicts.
+///
+/// [`OneshotController`]: crate::vui::widgets::OneshotController
 pub trait WidgetController: Debug + Send + Sync + 'static {
     /// Write the initial state of the widget to the space.
-    ///
-    /// TODO: Stop using &mut self in favor of a transaction, like Behavior
-    /// TODO: Should this even have an error return?
+    /// This is called at most once.
     fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
         Ok(WidgetTransaction::default())
     }
 
+    /// Called every frame to update the state of the space to match the current state of
+    /// the widget's data sources or user interaction.
+    ///
+    /// TODO: Arrange a waking mechanism so that the widget need not be called every frame.
+    ///
     /// TODO: Be more specific than `Box<dyn Error>`
-    /// TODO: Stop using `&mut self` in favor of a transaction, like `Behavior`
+    ///
     /// TODO: If this is not overridden, arrange to automatically drop the controller for efficiency
-    fn step(&mut self, _tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
+    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
+        let _ = tick;
         Ok(WidgetTransaction::default())
     }
 }
