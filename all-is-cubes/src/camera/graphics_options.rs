@@ -6,7 +6,8 @@ use crate::math::{FreeCoordinate, Rgb, Rgba};
 /// Options for controlling rendering (not affecting gameplay except informationally).
 ///
 /// Some options may be ignored by some renderers, such as when they request a particular
-/// implementation approach or debug visualization.
+/// implementation approach or debug visualization. Renderers should make an effort to
+/// report such failings via [`Flaws`](crate::camera::Flaws).
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 #[non_exhaustive]
