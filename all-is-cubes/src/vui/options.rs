@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
 use crate::apps::ControlMessage;
-use crate::camera::GraphicsOptions;
+use crate::camera::{AntialiasingOption, GraphicsOptions};
 use crate::vui::hud::HudInputs;
 use crate::vui::widgets::{self, ToggleButtonVisualState};
 use crate::vui::{LayoutTree, UiBlocks, Widget, WidgetTree};
 
-#[allow(clippy::redundant_clone)]
 pub(crate) fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree> {
     let mut w: Vec<WidgetTree> = Vec::with_capacity(5);
     if let Some(setter) = hud_inputs.set_fullscreen.clone() {
@@ -23,6 +22,21 @@ pub(crate) fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree
         )));
     }
     w.extend([
+        // TODO: this needs to be a different kind of button for the multiple states. But
+        // for now, while we have only small interactive controls and the IfCheap option
+        // is just conditional on the renderer type, there's no reason to select IfCheap.
+        LayoutTree::leaf(graphics_toggle_button(
+            hud_inputs,
+            UiBlocks::AntialiasButton,
+            |g| g.antialiasing != AntialiasingOption::None,
+            |g, _v| {
+                g.antialiasing = match g.antialiasing {
+                    AntialiasingOption::None => AntialiasingOption::Always,
+                    AntialiasingOption::IfCheap => AntialiasingOption::None,
+                    AntialiasingOption::Always => AntialiasingOption::None,
+                }
+            },
+        )),
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,
             UiBlocks::DebugInfoTextButton,

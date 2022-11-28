@@ -40,6 +40,7 @@ pub enum UiBlocks {
     PauseButton(ToggleButtonVisualState),
     MouselookButton(ToggleButtonVisualState),
     FullscreenButton(ToggleButtonVisualState),
+    AntialiasButton(ToggleButtonVisualState),
     DebugInfoTextButton(ToggleButtonVisualState),
     DebugChunkBoxesButton(ToggleButtonVisualState),
     DebugCollisionBoxesButton(ToggleButtonVisualState),
@@ -65,6 +66,7 @@ impl fmt::Display for UiBlocks {
             UiBlocks::PauseButton(state) => write!(f, "pause-button/{}", state),
             UiBlocks::MouselookButton(state) => write!(f, "mouselook-button/{}", state),
             UiBlocks::FullscreenButton(state) => write!(f, "fullscreen-button/{}", state),
+            UiBlocks::AntialiasButton(state) => write!(f, "antialias-button/{}", state),
             UiBlocks::DebugInfoTextButton(state) => write!(f, "debug-info-text-button/{}", state),
             UiBlocks::DebugChunkBoxesButton(state) => {
                 write!(f, "debug-chunk-boxes-button/{}", state)
@@ -160,6 +162,12 @@ impl UiBlocks {
                     let mut button_builder = state.button_builder()?;
                     button_builder.draw_icon(include_image!("icons/button-fullscreen.png"))?;
                     button_builder.build(universe, "Mouselook")
+                }
+
+                UiBlocks::AntialiasButton(state) => {
+                    let mut button_builder = state.button_builder()?;
+                    button_builder.draw_icon(include_image!("icons/button-antialias.png"))?;
+                    button_builder.build(universe, "Antialiasing")
                 }
 
                 UiBlocks::DebugInfoTextButton(state) => {
