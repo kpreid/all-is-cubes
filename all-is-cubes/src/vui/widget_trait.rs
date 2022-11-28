@@ -274,6 +274,23 @@ impl VisitRefs for ActivatableRegion {
     }
 }
 
+/// Create a [`Space`] to put a widget in.
+#[cfg(test)]
+#[track_caller]
+pub(crate) fn instantiate_widget<W: Widget + 'static>(
+    grant: LayoutGrant,
+    widget: W,
+) -> (Option<GridAab>, Space) {
+    use crate::transaction::Transaction as _;
+    use crate::vui;
+
+    let mut space = Space::builder(grant.bounds).build();
+    let txn = vui::install_widgets(grant, &vui::LayoutTree::leaf(Arc::new(widget)))
+        .expect("widget instantiation");
+    txn.execute(&mut space).expect("widget transaction");
+    (txn.bounds(), space)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

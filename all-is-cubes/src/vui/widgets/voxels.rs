@@ -108,30 +108,15 @@ impl vui::Widget for Voxels {
 mod tests {
     use super::*;
     use crate::block::Resolution::*;
-    use crate::transaction::Transaction;
     use crate::universe::Universe;
-    use crate::vui::{install_widgets, Align, LayoutTree};
+    use crate::vui::{instantiate_widget, Align};
     use cgmath::{Point3, Vector3};
-
-    /// Create a Space to put a widget in.
-    /// TODO: if this is a useful test helper it should live somewhere else
-    #[track_caller]
-    fn instantiate_widget<W: vui::Widget + 'static>(
-        grant: vui::LayoutGrant,
-        widget: W,
-    ) -> (GridAab, Space) {
-        let mut space = Space::builder(grant.bounds).build();
-        let txn = install_widgets(grant, &LayoutTree::leaf(Arc::new(widget)))
-            .expect("widget instantiation");
-        txn.execute(&mut space).expect("widget transaction");
-        (txn.bounds().unwrap(), space)
-    }
 
     fn test_voxels_widget(
         voxel_space_bounds: GridAab,
         grant: vui::LayoutGrant,
         attributes: BlockAttributes,
-    ) -> (GridAab, Space) {
+    ) -> (Option<GridAab>, Space) {
         let mut universe = Universe::new();
         instantiate_widget(
             grant,
@@ -172,7 +157,7 @@ mod tests {
         let (output_bounds, output) =
             test_voxels_widget(v_space_bounds, grant, BlockAttributes::default());
         assert_eq!(
-            output_bounds,
+            output_bounds.unwrap(),
             GridAab::from_lower_size([100, 101, 101], [1, 1, 2])
         );
         // Expect two adjacent recursive blocks
