@@ -2,6 +2,7 @@ use std::f64::consts::TAU;
 
 use all_is_cubes::content::load_image::space_from_image;
 use all_is_cubes::drawing::VoxelBrush;
+use all_is_cubes::transaction::Transaction as _;
 use exhaust::Exhaust;
 use maze_generator::prelude::{Direction, FieldType, Generator};
 use rand::prelude::SliceRandom;
@@ -86,22 +87,15 @@ impl DemoTheme {
     ) -> Result<(), InGenError> {
         let wall_block = wall_block.unwrap_or(&self.wall_block);
 
-        space.fill_uniform(
-            interior.abut(Face6::NY, 1).unwrap(),
-            &self.blocks[FloorTile],
-        )?;
-        space.fill_uniform(interior.abut(Face6::PY, 1).unwrap(), wall_block)?;
-
-        four_walls(
-            interior.expand(FaceMap::repeat(1)),
-            |_, _, _, wall_excluding_corners| {
-                space.fill_uniform(wall_excluding_corners, wall_block)?;
-
-                Ok::<(), InGenError>(())
-            },
-        )?;
-
-        space.fill_uniform(interior, &AIR)?;
+        crate::BoxStyle::from_whole_blocks_for_walls(
+            Some(wall_block.clone()),
+            Some(self.blocks[FloorTile].clone()),
+            Some(wall_block.clone()),
+            None,
+        )
+        .with_interior(Some(AIR))
+        .create_box(interior.expand(FaceMap::repeat(1)))
+        .execute(space)?;
 
         Ok(())
     }
