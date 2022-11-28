@@ -7,8 +7,6 @@ use crate::math::{FreeCoordinate, Rgb, Rgba};
 ///
 /// Some options may be ignored by some renderers, such as when they request a particular
 /// implementation approach or debug visualization.
-///
-/// TODO: This may not be the best module location. Possibly it should get its own module.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 #[non_exhaustive]
@@ -55,8 +53,6 @@ pub struct GraphicsOptions {
     pub show_ui: bool,
 
     /// Whether to apply antialiasing techniques.
-    ///
-    /// TODO: Not implemented in raytracer
     pub antialiasing: AntialiasingOption,
 
     /// Whether to use frustum culling for drawing only in-view chunks and objects.
@@ -209,9 +205,6 @@ pub enum TransparencyOption {
     Surface,
     /// Accounts for the thickness of material passed through; colors' alpha values are
     /// interpreted as the opacity of a unit thickness of the material.
-    ///
-    /// TODO: Not implemented in the raytracer.
-    /// TODO: Not implemented correctly for recursive blocks.
     Volumetric,
     /// Alpha above or below the given threshold value will be rounded to fully opaque
     /// or fully transparent, respectively.
