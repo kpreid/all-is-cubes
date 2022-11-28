@@ -12,27 +12,26 @@ bitflags::bitflags! {
     ///
     /// [`GraphicsOptions`]: super::GraphicsOptions
     pub struct Flaws: u16 {
-        /// Whether the scene is incomplete due to the renderer not having had enough
+        /// The rendering is incomplete due to the renderer not having had enough
         /// time to finish initialization or catch up to changes.
         const UNFINISHED = 1 << 0;
 
         // TODO:
-        // /// Whether the rendering is incomplete due to insufficient resources to
+        // /// The rendering is incomplete due to insufficient resources to
         // /// support the full complexity of the scene.
         // const TOO_MUCH = 1 << 1;
 
-        /// Whether antialiasing has not been used,
+        /// Antialiasing has not been used,
         /// despite being requested by the graphics options.
         const NO_ANTIALIASING = 1 << 2;
 
-        /// Whether a cursor has not been rendered,
-        /// despite one being given.
+        /// A cursor has not been rendered, despite one being given.
         const NO_CURSOR = 1 << 3;
 
-        /// Whether view-distance fog has not been rendered,
-        /// despite being requested by the graphics options.
+        /// View-distance fog has not been rendered, despite being requested by the
+        /// graphics options.
         ///
-        /// This does not cover explicitly semitransparent objects within the scene.
+        /// This does not refer to explicitly semitransparent objects within the scene.
         const NO_FOG = 1 << 4;
     }
 }
