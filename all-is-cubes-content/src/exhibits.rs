@@ -863,26 +863,14 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
         .build();
 
     // Construct room.
-    // Floor
-    space.fill_uniform(interior.abut(Face6::NY, 1).unwrap(), &wall_block)?;
-    // Ceiling
-    space.fill_uniform(interior.abut(Face6::PY, 1).unwrap(), &wall_block)?;
-    // Walls
-    four_walls(
-        space.bounds(),
-        |origin, direction, _length, wall_excluding_corners| {
-            // Corner pillar
-            space.fill_uniform(
-                GridAab::from_lower_size(origin + GridVector::unit_y(), [1, room_height + 1, 1]),
-                corner
-                    .clone()
-                    .rotate(GridRotation::from_to(Face6::NZ, direction, Face6::PY).unwrap()),
-            )?;
-            // Wall face
-            space.fill_uniform(wall_excluding_corners, &wall_block)?;
-            Ok::<(), InGenError>(())
-        },
-    )?;
+    crate::BoxStyle::from_whole_blocks_for_walls(
+        Some(wall_block.clone()),
+        Some(wall_block.clone()),
+        Some(wall_block.clone()),
+        Some(corner.rotate(GridRotation::RxYz)),
+    )
+    .create_box(interior.expand(FaceMap::repeat(1)))
+    .execute(&mut space)?;
 
     // Vertical separators
     space.fill_uniform(
