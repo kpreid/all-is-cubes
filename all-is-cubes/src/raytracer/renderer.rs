@@ -76,8 +76,8 @@ where
         self.cameras.update();
 
         fn sync_space<D: RtBlockData>(
-            rt: &mut Option<UpdatingSpaceRaytracer<D>>,
-            space: Option<&URef<Space>>,
+            cached_rt: &mut Option<UpdatingSpaceRaytracer<D>>,
+            optional_space: Option<&URef<Space>>,
             graphics_options_source: &ListenableSource<GraphicsOptions>,
             custom_options_source: &ListenableSource<D::Options>,
         ) -> Result<(), RenderError>
@@ -85,18 +85,29 @@ where
             D::Options: Clone + Sync + 'static,
         {
             // TODO: this Option-synchronization pattern is recurring in renderers but also ugly ... look for ways to make it nicer
-            if let Some(rt) = rt.as_mut().filter(|rt| Some(rt.space()) == space) {
-                rt.update().map_err(RenderError::Read)?;
-            } else {
-                *rt = space.cloned().map(|space| {
-                    UpdatingSpaceRaytracer::new(
-                        space,
-                        graphics_options_source.clone(),
-                        custom_options_source.clone(),
-                    )
-                });
+            match optional_space {
+                None => {
+                    *cached_rt = None;
+                    Ok(())
+                }
+                Some(space) => {
+                    // Discard raytracer if it's for the wrong space.
+                    if matches!(cached_rt, Some(rt) if rt.space() != space) {
+                        *cached_rt = None;
+                    }
+                    // Create new raytracer if needed.
+                    let rt = cached_rt.get_or_insert_with(|| {
+                        UpdatingSpaceRaytracer::new(
+                            space.clone(),
+                            graphics_options_source.clone(),
+                            custom_options_source.clone(),
+                        )
+                    });
+
+                    rt.update().map_err(RenderError::Read)?;
+                    Ok(())
+                }
             }
-            Ok(())
         }
         let gs = self.cameras.graphics_options_source();
         sync_space(
