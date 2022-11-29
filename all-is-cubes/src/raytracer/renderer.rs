@@ -85,29 +85,27 @@ where
             D::Options: Clone + Sync + 'static,
         {
             // TODO: this Option-synchronization pattern is recurring in renderers but also ugly ... look for ways to make it nicer
-            match optional_space {
-                None => {
-                    *cached_rt = None;
-                    Ok(())
-                }
-                Some(space) => {
-                    // Discard raytracer if it's for the wrong space.
-                    if matches!(cached_rt, Some(rt) if rt.space() != space) {
-                        *cached_rt = None;
-                    }
-                    // Create new raytracer if needed.
-                    let rt = cached_rt.get_or_insert_with(|| {
-                        UpdatingSpaceRaytracer::new(
-                            space.clone(),
-                            graphics_options_source.clone(),
-                            custom_options_source.clone(),
-                        )
-                    });
 
-                    rt.update().map_err(RenderError::Read)?;
-                    Ok(())
+            // Check whether we need to replace the raytracer:
+            match (optional_space, &mut *cached_rt) {
+                // Matches already
+                (Some(space), Some(rt)) if space == rt.space() => {}
+                // Needs replacement
+                (Some(space), rt) => {
+                    *rt = Some(UpdatingSpaceRaytracer::new(
+                        space.clone(),
+                        graphics_options_source.clone(),
+                        custom_options_source.clone(),
+                    ))
                 }
+                // Space is None, so drop raytracer if any
+                (None, c) => *c = None,
             }
+            // Now that we have one if we should have one, update it.
+            if let Some(rt) = cached_rt {
+                rt.update().map_err(RenderError::Read)?;
+            }
+            Ok(())
         }
         let gs = self.cameras.graphics_options_source();
         sync_space(
