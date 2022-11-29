@@ -19,7 +19,8 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use crate::block::{Evoxel, Resolution, AIR};
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 use crate::math::{
-    point_to_enclosing_cube, smoothstep, Face7, FreeCoordinate, GridArray, GridPoint, Rgb, Rgba,
+    point_to_enclosing_cube, smoothstep, Face7, FreeCoordinate, GridAab, GridArray, GridPoint, Rgb,
+    Rgba,
 };
 use crate::raycast::Ray;
 use crate::space::{BlockIndex, PackedLight, Space, SpaceBlockData};
@@ -67,6 +68,29 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                 .map(|sbd| TracingBlock::<D>::from_block(options, sbd))
                 .collect(),
             cubes: prepare_cubes(space),
+            sky_color,
+            sky_data: D::sky(options),
+            packed_sky_color: sky_color.into(),
+
+            graphics_options,
+            custom_options,
+        }
+    }
+
+    /// Construct a [`SpaceRaytracer`] with nothing to render.
+    pub(crate) fn new_empty(
+        sky_color: Rgb,
+        graphics_options: GraphicsOptions,
+        custom_options: D::Options,
+    ) -> Self {
+        let options = RtOptionsRef {
+            graphics_options: &graphics_options,
+            custom_options: &custom_options,
+        };
+        SpaceRaytracer {
+            blocks: vec![],
+            cubes: GridArray::from_elements(GridAab::from_lower_upper([0, 0, 0], [0, 0, 0]), [])
+                .unwrap(),
             sky_color,
             sky_data: D::sky(options),
             packed_sky_color: sky_color.into(),

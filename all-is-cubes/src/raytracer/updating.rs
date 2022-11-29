@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 use crate::block::AIR;
 use crate::camera::GraphicsOptions;
+use crate::content::palette;
 use crate::listen::{ListenableSource, Listener};
 use crate::math::GridPoint;
 use crate::raytracer::RtOptionsRef;
@@ -45,25 +46,30 @@ impl<D: RtBlockData> UpdatingSpaceRaytracer<D>
 where
     D::Options: Clone + Sync + 'static,
 {
-    // TODO: document args
+    /// Construct a new [`UpdatingSpaceRaytracer`] which follows the given `space`.
+    ///
+    /// The space is not accessed (and thus, nothing is updated) until the first call to
+    /// [`update()`](Self::update). (This is done so that this constructor cannot fail and
+    /// so the space is accessed on a consistent schedule.)
     pub fn new(
         space: URef<Space>,
         graphics_options: ListenableSource<GraphicsOptions>,
         custom_options: ListenableSource<D::Options>,
     ) -> Self {
-        // TODO: don't unconditionally borrow and maybe panic on the first call
-        let todo = Arc::default();
-
-        let space_borrowed = space.borrow();
-        space_borrowed.listen(TodoListener(Arc::downgrade(&todo)));
+        let todo = Arc::new(Mutex::new(SrtTodo {
+            listener: true,
+            everything: true,
+            blocks: HashSet::new(),
+            cubes: HashSet::new(),
+        }));
 
         // TODO: Placeholder for more detailed graphics options updating
         graphics_options
             .listen(TodoListener(Arc::downgrade(&todo)).filter(|()| Some(SpaceChange::EveryBlock)));
 
         Self {
-            state: SpaceRaytracer::new(
-                &space_borrowed,
+            state: SpaceRaytracer::new_empty(
+                palette::NO_WORLD_TO_SHOW.to_rgb(),
                 graphics_options.snapshot(),
                 custom_options.snapshot(),
             ),
@@ -95,11 +101,15 @@ where
         // we must reorder the actions here (or perhaps acquire the todo lock twice) to
         // avoid deadlock.
         let mut todo = self.todo.lock().unwrap();
-        if !todo.everything && todo.blocks.is_empty() && todo.cubes.is_empty() {
+        if !todo.listener && !todo.everything && todo.blocks.is_empty() && todo.cubes.is_empty() {
             // Nothing to do
             return Ok(());
         }
         let space = self.space.try_borrow()?;
+
+        if mem::take(&mut todo.listener) {
+            space.listen(TodoListener(Arc::downgrade(&self.todo)));
+        }
 
         if mem::take(&mut todo.everything) {
             self.state = SpaceRaytracer::new(
@@ -147,9 +157,14 @@ where
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct SrtTodo {
+    /// Listener upon the space is not yet installed.
+    listener: bool,
+
+    /// All blocks and cubes must be updated.
     everything: bool,
+
     // TODO: Benchmark using a BitVec instead.
     blocks: HashSet<BlockIndex>,
     cubes: HashSet<GridPoint>,
@@ -300,5 +315,36 @@ mod tests {
         tester.update_and_assert().unwrap();
 
         // TODO: Also test changing existing block's data
+    }
+
+    #[test]
+    fn updating_after_space_is_unavailable() {
+        let mut universe = Universe::new();
+        let mut space = Space::empty_positive(3, 2, 3);
+
+        // Initial state
+        let [block1, block2] = make_some_voxel_blocks(&mut universe);
+        space.set([0, 0, 0], &block1).unwrap();
+
+        let space = universe.insert_anonymous(space);
+        let mut tester = EquivalenceTester::new(space.clone());
+
+        {
+            let _obstruction = space.try_borrow_mut().unwrap();
+
+            assert_eq!(
+                tester.updating.update().unwrap_err(),
+                RefError::InUse(space.name().clone()),
+            );
+        }
+
+        // Now after the failure, we should still successfully update.
+        tester.update_and_assert().unwrap();
+
+        // And also follow changes correctly.
+        space
+            .try_modify(|space| space.set([1, 0, 0], &block2).unwrap())
+            .unwrap();
+        tester.update_and_assert().unwrap();
     }
 }
