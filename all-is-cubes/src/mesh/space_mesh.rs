@@ -46,7 +46,7 @@ impl<V, T> SpaceMesh<V, T> {
     /// Computes a triangle mesh of a [`Space`].
     ///
     /// Shorthand for
-    /// <code>[SpaceMesh::new()].[compute](SpaceMesh::compute)(space, bounds, block_meshes)</code>.
+    /// <code>[SpaceMesh::default()].[compute](SpaceMesh::compute)(space, bounds, block_meshes)</code>.
     #[inline]
     pub fn new<'p, P>(
         space: &Space,
@@ -134,6 +134,10 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     /// Computes triangles for the contents of `space` within `bounds` and stores them
     /// in `self`.
     ///
+    /// The generated vertex positions will be translated so that `bounds.lower_bounds()`
+    /// in `space`'s coordinate system will be zero in the mesh's coordinate system.
+    /// (This ensures that large `Space`s do not affect the precision of rendering.)
+    ///
     /// `block_meshes` should be the result of [`block_meshes_for_space`] or another
     /// [`BlockMeshProvider`],
     /// and must be up-to-date with the [`Space`]'s blocks or the result will be inaccurate
@@ -187,7 +191,8 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
 
             write_block_mesh_to_space_mesh(
                 block_mesh,
-                cube,
+                // translate mesh to be always located at lower_bounds
+                cube - bounds.lower_bounds().to_vec(),
                 &mut self.vertices,
                 &mut self.indices,
                 &mut transparent_indices,
