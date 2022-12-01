@@ -363,6 +363,13 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
 /// Copy and adjust vertices from a [`BlockMesh`] into the storage of a [`SpaceMesh`].
 ///
 /// This does not perform depth sorting and does not account for mesh or texture dependencies.
+///
+/// * `block_mesh` is the input mesh to copy.
+/// * `cube` is the position passed to `V::instantiate_block()`.
+/// * `vertices`, `opaque_indices`, and `transparent_indices` are the destination to append to.
+/// * `neighbor_is_fully_opaque` is called to determine whether this block's faces are
+///   obscured. It is a function so that lookups can be skipped if their answer would
+///   make no difference.
 fn write_block_mesh_to_space_mesh<V: GfxVertex, T: TextureTile>(
     block_mesh: &BlockMesh<V, T>,
     cube: GridPoint,
