@@ -1,27 +1,18 @@
 //! Headless image (and someday video) generation.
 
 use std::fs::File;
-use std::sync::{mpsc, Arc};
-use std::time::{Duration, Instant};
+use std::sync::mpsc;
 
 use all_is_cubes::apps::StandardCameras;
-use all_is_cubes::camera::Camera;
-use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::listen::ListenableSource;
-use all_is_cubes::math::GridAab;
-use all_is_cubes::mesh::{chunked_mesh::ChunkedSpaceMesh, SpaceMesh};
 use all_is_cubes::raytracer::RtRenderer;
-use all_is_cubes::space::Space;
-use all_is_cubes::universe;
-use all_is_cubes_port::gltf::{
-    json as gltf_json, json::Index, GltfDataDestination, GltfTextureAllocator, GltfTextureRef,
-    GltfVertex, GltfWriter,
-};
+use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
 
 mod options;
 pub(crate) use options::*;
 mod record_main;
 pub(crate) use record_main::{create_recording_session, record_main};
+mod write_gltf;
 mod write_png;
 
 type FrameNumber = usize;
@@ -34,11 +25,13 @@ pub(crate) struct Recorder {
     inner: RecorderInner,
 }
 
+// TODO: should this be a trait? It's also an awful lot like HeadlessRenderer, except without the image output...
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 enum RecorderInner {
+    Shutdown,
     Raytrace(RtRecorder),
-    Mesh(MeshRecorder),
+    Mesh(write_gltf::MeshRecorder),
 }
 
 impl Recorder {
@@ -90,75 +83,22 @@ impl Recorder {
 
                 RecorderInner::Raytrace(RtRecorder {
                     cameras,
-                    scene_sender: Some(scene_sender),
+                    scene_sender,
                 })
             }
             RecordFormat::Gltf => {
-                let (scene_sender, scene_receiver) = mpsc::sync_channel::<MeshRecordMsg>(1);
+                let (scene_sender, scene_receiver) =
+                    mpsc::sync_channel::<write_gltf::MeshRecordMsg>(1);
 
-                // Create file early so we get a prompt error.
-                // Currently this path should always have a .gltf extension.
-                let file = File::create(&options.output_path)?;
-
-                let mut writer =
-                    GltfWriter::new(GltfDataDestination::new(Some(options.output_path), 2000));
+                let writer = GltfWriter::new(GltfDataDestination::new(
+                    Some(options.output_path.clone()),
+                    2000,
+                ));
                 let tex = writer.texture_allocator();
 
-                std::thread::Builder::new()
-                    .name("Mesh data encoder".to_string())
-                    .spawn({
-                        move || {
-                            while let Ok(msg) = scene_receiver.recv() {
-                                match msg {
-                                    MeshRecordMsg::AddMesh(position, mesh, mesh_index_cell) => {
-                                        let position: [i32; 3] = position.0.into();
-                                        let mesh_index =
-                                            writer.add_mesh(format!("chunk {position:?}"), &mesh);
-                                        *mesh_index_cell.lock().unwrap() = Some(mesh_index);
-                                    }
-                                    MeshRecordMsg::FinishFrame(frame_id, camera, meshes) => {
-                                        writer.add_frame(
-                                            Some(&camera),
-                                            &meshes
-                                                .into_iter()
-                                                .filter_map(|lock| *lock.lock().unwrap())
-                                                .collect::<Vec<Index<gltf_json::Mesh>>>(),
-                                        );
-                                        status_sender.send(frame_id).unwrap();
-                                    }
-                                }
-                            }
+                write_gltf::start_gltf_writing(&options, writer, scene_receiver, status_sender)?;
 
-                            // Write and close file
-                            writer
-                                .into_root(
-                                    options.animation.map_or(Duration::ZERO, |a| a.frame_period),
-                                )
-                                .unwrap()
-                                .to_writer_pretty(&file)
-                                .unwrap();
-                            file.sync_all().unwrap();
-                            drop(file);
-                            // TODO: communicate "successfully completed" or errors on the status channel
-                        }
-                    })?;
-
-                RecorderInner::Mesh(MeshRecorder {
-                    // TODO: We need to tell the ChunkedSpaceMesh to have an infinite view distance
-                    // (or at least as much data as we care about).
-                    csm: ChunkedSpaceMesh::new(cameras.world_space().snapshot().unwrap_or_else(
-                        || {
-                            universe::URef::new_pending(
-                                universe::Name::from("empty-space-placeholder"),
-                                Space::builder(GridAab::from_lower_size([0, 0, 0], [0, 0, 0]))
-                                    .build(),
-                            )
-                        },
-                    )),
-                    tex,
-                    scene_sender: Some(scene_sender),
-                    cameras,
-                })
+                RecorderInner::Mesh(write_gltf::MeshRecorder::new(cameras, tex, scene_sender))
             }
         };
 
@@ -187,60 +127,16 @@ impl Recorder {
 
                 // TODO: instead of panic on send failure, log the problem
                 rec.scene_sender
-                    .as_ref()
-                    .expect("cannot send_frame() after no_more_frames()")
                     .send((this_frame_number, renderer))
                     .expect("channel closed; recorder render thread died?");
             }
-            RecorderInner::Mesh(rec) => {
-                let sender = rec
-                    .scene_sender
-                    .as_ref()
-                    .expect("cannot send_frame() after no_more_frames()");
-                // TODO: this glue logic belongs in our gltf module and crate,
-                // not here
-                rec.csm.update_blocks_and_some_chunks(
-                    &rec.cameras.cameras().world,
-                    &rec.tex,
-                    Instant::now() + Duration::from_secs(86400),
-                    |u| {
-                        if u.indices_only {
-                            return;
-                        }
-                        // We could probably get away with reusing the cells but this is safer.
-                        let new_cell = MeshIndexCell::default();
-                        // Ignore error since finish_frame() will catch it anyway
-                        let _ = sender.send(MeshRecordMsg::AddMesh(
-                            u.position,
-                            u.mesh.clone(),
-                            Arc::clone(&new_cell),
-                        ));
-                        *u.render_data = new_cell;
-                    },
-                );
-                sender
-                    .send(MeshRecordMsg::FinishFrame(
-                        this_frame_number,
-                        rec.cameras.cameras().world.clone(),
-                        rec.csm
-                            .iter_chunks()
-                            .map(|c| c.render_data.clone())
-                            .collect(),
-                    ))
-                    .expect("channel closed; recorder render thread died?")
-            }
+            RecorderInner::Mesh(rec) => rec.capture_frame(this_frame_number),
+            RecorderInner::Shutdown => unreachable!(),
         }
     }
 
     pub fn no_more_frames(&mut self) {
-        match &mut self.inner {
-            RecorderInner::Raytrace(rec) => {
-                rec.scene_sender = None;
-            }
-            RecorderInner::Mesh(rec) => {
-                rec.scene_sender = None;
-            }
-        }
+        self.inner = RecorderInner::Shutdown;
     }
 }
 
@@ -249,27 +145,5 @@ impl Recorder {
 #[derive(Debug)]
 pub(crate) struct RtRecorder {
     cameras: StandardCameras,
-    /// None if dropped to signal no more frames
-    scene_sender: Option<mpsc::SyncSender<(FrameNumber, RtRenderer)>>,
+    scene_sender: mpsc::SyncSender<(FrameNumber, RtRenderer)>,
 }
-
-#[derive(Debug)]
-pub(crate) struct MeshRecorder {
-    cameras: StandardCameras,
-    csm: ChunkedSpaceMesh<MeshIndexCell, GltfVertex, GltfTextureAllocator, 32>,
-    tex: GltfTextureAllocator,
-    scene_sender: Option<mpsc::SyncSender<MeshRecordMsg>>,
-}
-
-/// Data stream sent from the mesh creation stage to the glTF serialization stage.
-#[derive(Debug)]
-enum MeshRecordMsg {
-    AddMesh(
-        ChunkPos<32>,
-        SpaceMesh<GltfVertex, GltfTextureRef>,
-        MeshIndexCell,
-    ), // TODO: needs more work
-    FinishFrame(FrameNumber, Camera, Vec<MeshIndexCell>),
-}
-
-type MeshIndexCell = Arc<std::sync::Mutex<Option<gltf_json::Index<gltf_json::Mesh>>>>;
