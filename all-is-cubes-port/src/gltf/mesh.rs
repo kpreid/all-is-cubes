@@ -231,9 +231,10 @@ mod tests {
             .unwrap();
 
         let mut writer = GltfWriter::new(GltfDataDestination::null());
-        let (_, mesh_index) = gltf_mesh(&space, &mut writer);
+        let (_, node_index) = gltf_mesh(&space, &mut writer);
         let root = writer.into_root(Duration::ZERO).unwrap();
 
+        let mesh_index = root.get(node_index).unwrap().mesh.unwrap();
         let mesh = root.get(mesh_index).unwrap();
         let index_accessor_index = mesh.primitives[0].indices.unwrap();
         let vertex_accessor_index = *mesh.primitives[0].attributes.values().next().unwrap();

@@ -13,7 +13,7 @@ use all_is_cubes::mesh::chunked_mesh::ChunkedSpaceMesh;
 use all_is_cubes::space::Space;
 use all_is_cubes::{camera, universe};
 use all_is_cubes_port::gltf::{
-    json as gltf_json, json::Index, GltfTextureAllocator, GltfTextureRef, GltfVertex, GltfWriter,
+    json as gltf_json, GltfTextureAllocator, GltfTextureRef, GltfVertex, GltfWriter,
 };
 
 use crate::record::RecordOptions;
@@ -93,7 +93,8 @@ pub(crate) enum MeshRecordMsg {
     FinishFrame(super::FrameNumber, camera::Camera, Vec<MeshIndexCell>),
 }
 
-type MeshIndexCell = Arc<std::sync::Mutex<Option<gltf_json::Index<gltf_json::Mesh>>>>;
+/// Storage for an index that may not yet have been assigned, but will be when it is needed.
+type MeshIndexCell = Arc<std::sync::Mutex<Option<gltf_json::Index<gltf_json::Node>>>>;
 
 /// Spawn a thread that receives [`MeshRecordMsg`] and writes glTF data.
 pub(super) fn start_gltf_writing(
@@ -117,9 +118,10 @@ pub(super) fn start_gltf_writing(
             while let Ok(msg) = scene_receiver.recv() {
                 match msg {
                     MeshRecordMsg::AddMesh(position, mesh, mesh_index_cell) => {
-                        let position: [i32; 3] = position.0.into();
-                        let mesh_index = writer.add_mesh(format!("chunk {position:?}"), &mesh);
-                        *mesh_index_cell.lock().unwrap() = Some(mesh_index);
+                        let position_for_name: [i32; 3] = position.0.into();
+                        let node_index =
+                            writer.add_mesh(format!("chunk {position_for_name:?}"), &mesh);
+                        *mesh_index_cell.lock().unwrap() = Some(node_index);
                     }
                     MeshRecordMsg::FinishFrame(frame_id, camera, meshes) => {
                         writer.add_frame(
@@ -127,7 +129,7 @@ pub(super) fn start_gltf_writing(
                             &meshes
                                 .into_iter()
                                 .filter_map(|lock| *lock.lock().unwrap())
-                                .collect::<Vec<Index<gltf_json::Mesh>>>(),
+                                .collect::<Vec<_>>(),
                         );
                         status_sender.send(frame_id).unwrap();
                     }
