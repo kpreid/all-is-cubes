@@ -10,12 +10,13 @@ use std::collections::{BTreeMap, HashSet};
 use std::io;
 use std::time::Duration;
 
+use all_is_cubes::math::GridCoordinate;
 pub use gltf_json as json;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
 use all_is_cubes::camera::{Camera, ViewTransform};
-use all_is_cubes::cgmath::One as _;
+use all_is_cubes::cgmath::{One as _, Vector3};
 use all_is_cubes::mesh::SpaceMesh;
 
 mod buffer;
@@ -144,6 +145,7 @@ impl GltfWriter {
         &mut self,
         name: String,
         mesh: &SpaceMesh<GltfVertex, GltfTextureRef>,
+        translation: Vector3<GridCoordinate>,
     ) -> Index<gltf_json::Node> {
         // TODO: Deduplicate meshes so that we don't have to store the same data twice if
         // a world change is undone, or in a cyclic animation (or if two chunks have the
@@ -154,7 +156,7 @@ impl GltfWriter {
             &mut self.root.nodes,
             gltf_json::Node {
                 mesh: Some(mesh_index),
-                translation: None, // TODO
+                translation: Some(translation.map(|c| c as f32).into()),
                 ..empty_node(Some(name))
             },
         )
@@ -330,6 +332,7 @@ mod tests {
     use super::*;
     use all_is_cubes::block::{Block, Resolution, AIR};
     use all_is_cubes::camera::GraphicsOptions;
+    use all_is_cubes::cgmath::Zero as _;
     use all_is_cubes::content::make_some_blocks;
     use all_is_cubes::mesh::{block_meshes_for_space, MeshOptions, SpaceMesh};
     use all_is_cubes::space::Space;
@@ -349,7 +352,7 @@ mod tests {
         let mesh: SpaceMesh<GltfVertex, GltfTextureRef> =
             SpaceMesh::new(space, space.bounds(), options, &*blocks);
 
-        let index = writer.add_mesh("mesh".into(), &mesh);
+        let index = writer.add_mesh("mesh".into(), &mesh, Vector3::zero());
 
         (mesh, index)
     }

@@ -6,6 +6,7 @@ use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
 use all_is_cubes::apps::StandardCameras;
+use all_is_cubes::cgmath::EuclideanSpace as _;
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::math::GridAab;
 use all_is_cubes::mesh;
@@ -119,8 +120,11 @@ pub(super) fn start_gltf_writing(
                 match msg {
                     MeshRecordMsg::AddMesh(position, mesh, mesh_index_cell) => {
                         let position_for_name: [i32; 3] = position.0.into();
-                        let node_index =
-                            writer.add_mesh(format!("chunk {position_for_name:?}"), &mesh);
+                        let node_index = writer.add_mesh(
+                            format!("chunk {position_for_name:?}"),
+                            &mesh,
+                            position.bounds().lower_bounds().to_vec(),
+                        );
                         *mesh_index_cell.lock().unwrap() = Some(node_index);
                     }
                     MeshRecordMsg::FinishFrame(frame_id, camera, meshes) => {
