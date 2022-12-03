@@ -31,11 +31,13 @@ futures-core = { version = "0.3.17", default-features = false, features = ["allo
 # TODO: all-is-cubes should be reexporting image since the load_image module reveals it
 image = { version = "0.24.2", default-features = false }
 instant = "0.1.9"
+itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"] }
 log = { version = "0.4.14", default-features = false }
 macro_rules_attribute = "0.1.0"
 maze_generator = "2.0.0"
 noise = { version = "0.8.2", default-features = false }
 paste = "1.0.5"
+petgraph = { version = "0.6.2", default-features = false, features = ["graphmap"] }
 rand = { version = "0.8.2", default-features = false }
 rand_xoshiro = "0.6.0"
 strum = { version = "0.24.0", default-features = false, features = ["derive"] }

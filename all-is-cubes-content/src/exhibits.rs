@@ -1174,10 +1174,10 @@ async fn TREES(_: &Exhibit, universe: &mut Universe) {
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(128947981240);
 
-    let n_x = 5;
-    let n_z = 5;
-    let spacing_x = 5;
-    let spacing_z = 5;
+    let n_x = 4;
+    let n_z = 4;
+    let spacing_x = 6;
+    let spacing_z = 6;
     let bounds = GridAab::from_lower_upper(
         [-2, -1, -2],
         [(n_x - 1) * spacing_x + 3, 20, (n_z - 1) * spacing_z + 3],
@@ -1191,12 +1191,20 @@ async fn TREES(_: &Exhibit, universe: &mut Universe) {
     )?;
 
     for ix in 0..n_x {
-        for iy in 0..n_z {
+        for iz in 0..n_z {
+            let origin = GridPoint::new(ix * spacing_x, 0, iz * spacing_z);
             tree::make_tree(
                 &landscape_blocks,
                 &mut rng,
-                GridPoint::new(ix * 5, 0, iy * 5),
-                ix + iy * 2,
+                origin,
+                GridAab::single_cube(origin).expand(FaceMap {
+                    nx: 2,
+                    ny: 0,
+                    nz: 2,
+                    px: 2,
+                    py: ix + iz * 2,
+                    pz: 2,
+                }),
             )?
             .execute(&mut space)?;
         }

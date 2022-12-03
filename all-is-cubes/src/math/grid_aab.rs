@@ -921,6 +921,15 @@ impl<V> GridArray<V> {
             .map(|index| &self.contents[index])
     }
 
+    /// Returns a mutable reference to the element at `position` of this array,
+    /// or [`None`] if `position` is out of bounds.
+    #[inline]
+    pub fn get_mut(&mut self, position: impl Into<GridPoint>) -> Option<&mut V> {
+        self.bounds
+            .index(position)
+            .map(|index| &mut self.contents[index])
+    }
+
     /// Adds to the origin of the array without affecting the contents.
     ///
     /// Panics if this would cause numeric overflow.
