@@ -23,6 +23,11 @@ struct WgpuBlockVertex {
     @location(4) clamp_max: vec3<f32>,
 };
 
+// Mirrors `struct WgpuInstanceData` on the Rust side.
+struct WgpuInstanceData {
+    @location(6) translation: vec3<f32>,
+};
+
 // Mirrors `struct WgpuLinesVertex` on the Rust side.
 struct WgpuLinesVertex {
     @location(0) position: vec3<f32>,
@@ -85,7 +90,9 @@ fn compute_fog(world_position: vec3<f32>) -> f32 {
 struct BlockFragmentInput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) world_position: vec3<f32>,
-    @location(1) cube: vec3<f32>,
+    // Cube position in world coordinates, used for space data lookups
+    // (currently only LightingOption::Flat).
+    @location(1) world_cube: vec3<f32>,
     @location(2) normal: vec3<f32>,
     @location(3) color_or_texture: vec4<f32>,
     @location(4) clamp_min: vec3<f32>,
@@ -102,6 +109,7 @@ struct BlockFragmentInput {
 @vertex
 fn block_vertex_main(
     input: WgpuBlockVertex,
+    instance_input: WgpuInstanceData,
 ) -> BlockFragmentInput {
     // Unpack position (three u16s represented as two u32s).
     let position_in_cube_fixed = vec3<u32>(
@@ -125,12 +133,14 @@ fn block_vertex_main(
     }
 
     let combined_matrix = camera.projection * camera.view_matrix;
-    let world_position = vec3<f32>(input.cube) + position_in_cube;
+    // TODO: eventually this should become a camera-relative position, not a world position.
+    // That will require further work in light-lookup cooordinates.
+    let world_position = vec3<f32>(input.cube) + position_in_cube + instance_input.translation;
 
     return BlockFragmentInput(
         /* clip_position = */ combined_matrix * vec4<f32>(world_position, 1.0),
         world_position,
-        vec3<f32>(input.cube),
+        /* world_cube = */ instance_input.translation + vec3<f32>(input.cube),
         normal,
         input.color_or_texture,
         input.clamp_min,
@@ -338,7 +348,7 @@ fn lighting(in: BlockFragmentInput) -> vec3<f32> {
         
         // LightingOption::Flat
         case 1 {
-            let origin = in.cube + in.normal + vec3<f32>(0.5);
+            let origin = in.world_cube + in.normal + vec3<f32>(0.5);
             let local_light = light_texture_fetch(origin).rgb;
             return fixed_directional_lighting(in.normal) * local_light;
         }

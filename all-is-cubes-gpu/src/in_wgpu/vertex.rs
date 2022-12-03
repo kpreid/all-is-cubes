@@ -1,5 +1,5 @@
 use all_is_cubes::cgmath::{Point3, Vector3};
-use all_is_cubes::math::GridPoint;
+use all_is_cubes::math::{GridPoint, GridVector};
 use all_is_cubes::mesh::{BlockVertex, Coloring, GfxVertex};
 
 use crate::DebugLineVertex;
@@ -12,16 +12,10 @@ pub(crate) type TexPoint = Point3<f32>;
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub(crate) struct WgpuBlockVertex {
-    /// World position of the cube containing the triangle this vertex belongs to.
-    ///
-    /// This is used for looking up light data, so the light data texture must be in the
-    /// same coordinate system.
+    /// Chunk-relative position of the cube containing the triangle this vertex belongs to.
     ///
     /// Note that this is not the same as floor() of the final coordinates, since a
     /// block's mesh coordinates range from 0 to 1 inclusive.
-    ///
-    /// TODO: Once we implement storing chunks in relative coordinates for better
-    /// precision, we can reduce this representation size.
     cube: [i32; 3],
     /// Vertex position within the cube, fixed point; and vertex normal in [`Face7`] format.
     ///
@@ -56,6 +50,7 @@ impl WgpuBlockVertex {
         2 => Float32x4, // color_or_texture
         3 => Float32x3, // clamp_min
         4 => Float32x3, // clamp_max
+        // location numbers must not clash with WgpuInstanceData
     ];
 
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -133,6 +128,39 @@ impl GfxVertex for WgpuBlockVertex {
             z: pos_packed[1] & 0xFFFF,
         };
         Point3::from(self.cube).map(|c| c as f32) + position_in_cube_fixed.map(|c| c as f32 / 256.)
+    }
+}
+
+/// Data for a block mesh instance (in the sense of _instancing_).
+#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub(crate) struct WgpuInstanceData {
+    /// Translation vector which may be added to [`WgpuBlockVertex::position`]
+    /// to obtain world (that is, [`Space`]) coordinates.
+    ///
+    /// TODO: Eventually we want to be able to use camera-relative coordinates, to make
+    /// the best use of f32 precision in the shader.
+    pub translation: [f32; 3],
+}
+
+impl WgpuInstanceData {
+    const ATTRIBUTE_LAYOUT: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![
+        // location numbers must start after WgpuBlockVertex ends
+        6 => Float32x3,
+    ];
+
+    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: Self::ATTRIBUTE_LAYOUT,
+        }
+    }
+
+    pub fn new(translation: GridVector) -> Self {
+        Self {
+            translation: translation.map(|int| int as f32).into(),
+        }
     }
 }
 

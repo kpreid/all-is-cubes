@@ -237,6 +237,14 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
         }
         space
     }
+
+    /// Returns the total number of chunks in this chart.
+    /// Currently overestimates.
+    #[doc(hidden)] // TODO: unclear if good api
+    pub fn count_all(&self) -> usize {
+        // TODO: this is an overcount because it doesn't allow for axis-plane chunks that aren't mirrored
+        self.octant_range.end * 8
+    }
 }
 
 fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<[GridVector]> {

@@ -3,7 +3,7 @@ use std::fmt;
 use std::num::NonZeroU32;
 use std::sync::{Arc, Mutex, Weak};
 
-use cgmath::Point3;
+use cgmath::{EuclideanSpace, Point3};
 use fnv::{FnvHashMap, FnvHashSet};
 use indoc::indoc;
 use instant::{Duration, Instant};
@@ -664,14 +664,27 @@ where
     }
 
     /// Sort the existing indices of `self.transparent_range(DepthOrdering::Within)` for
-    /// the given view position.
+    /// the given view position in world coordinates.
     ///
     /// This is intended to be cheap enough to do every frame.
     ///
     /// Returns whether anything was done, i.e. whether the new indices should be copied
     /// to the GPU.
     pub fn depth_sort_for_view(&mut self, view_position: Point3<Vert::Coordinate>) -> bool {
-        self.mesh.depth_sort_for_view(view_position)
+        // Subtract chunk origin because the mesh coordinates are in chunk-relative
+        // coordinates but the incoming view position is in world coordinates.
+        // TODO: This makes poor use of the precision of Vert::Coordinate (probably f32).
+        // Instead we should explicitly accept relative coordinates.
+        self.mesh.depth_sort_for_view(
+            view_position
+                - self
+                    .position
+                    .bounds()
+                    .lower_bounds()
+                    .to_vec()
+                    .cast()
+                    .unwrap(),
+        )
     }
 
     fn stale_blocks(&self, block_meshes: &VersionedBlockMeshes<Vert, Tex::Tile>) -> bool {

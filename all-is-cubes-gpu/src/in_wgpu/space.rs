@@ -21,7 +21,7 @@ use all_is_cubes::universe::URef;
 use crate::in_wgpu::frame_texture::FramebufferTextures;
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
 use crate::in_wgpu::pipelines::Pipelines;
-use crate::in_wgpu::vertex::WgpuLinesVertex;
+use crate::in_wgpu::vertex::{WgpuInstanceData, WgpuLinesVertex};
 use crate::in_wgpu::{
     block_texture::{AtlasAllocator, AtlasTile},
     camera::ShaderSpaceCamera,
@@ -38,10 +38,11 @@ const CHUNK_SIZE: GridCoordinate = 16;
 /// following its changes.
 #[derive(Debug)]
 pub(crate) struct SpaceRenderer {
+    space_label: String,
     /// A debugging label for the space's render pass.
     /// (Derived from constructor's space_label)
     render_pass_label: String,
-    space_label: String,
+    instance_buffer_label: String,
 
     /// Tracks information we need to update from the `Space`.
     /// Note that `self.csm` has its own todo listener too.
@@ -55,6 +56,10 @@ pub(crate) struct SpaceRenderer {
 
     /// Buffer containing the [`ShaderSpaceCamera`] configured for this Space.
     camera_buffer: SpaceCameraBuffer,
+
+    /// Buffer for instance data.
+    /// Rewritten every frame, but reused to save reallocation.
+    instance_buffer: ResizingBuffer,
 
     /// Bind group containing our block texture and light texture.
     space_bind_group: wgpu::BindGroup,
@@ -103,12 +108,14 @@ impl SpaceRenderer {
         Ok(SpaceRenderer {
             todo,
             render_pass_label: format!("{space_label} render_pass"),
+            instance_buffer_label: format!("{space_label} instances"),
             space_label,
             sky_color: space_borrowed.physics().sky_color,
             block_texture,
             light_texture,
             space_bind_group,
             camera_buffer,
+            instance_buffer: ResizingBuffer::default(),
             csm: ChunkedSpaceMesh::new(space),
         })
     }
@@ -130,13 +137,15 @@ impl SpaceRenderer {
 
         // Destructuring to explicitly skip or handle each field.
         let SpaceRenderer {
-            render_pass_label: _,
             space_label,
+            render_pass_label: _,
+            instance_buffer_label: _,
             todo,
             sky_color,
             block_texture,
             light_texture,
             camera_buffer: _,
+            instance_buffer: _,
             space_bind_group,
             csm,
         } = self;
@@ -225,6 +234,20 @@ impl SpaceRenderer {
             },
         );
 
+        // Ensure instance buffer is big enough.
+        self.instance_buffer.resize_at_least(
+            bwp.device,
+            &wgpu::BufferDescriptor {
+                label: Some(&self.instance_buffer_label),
+                size: u64::try_from(
+                    self.csm.chunk_chart().count_all() * std::mem::size_of::<WgpuInstanceData>(),
+                )
+                .expect("instance buffer size overflow"),
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX,
+                mapped_at_creation: false,
+            },
+        );
+
         // Flush all texture updates to GPU.
         // This must happen after `csm.update_blocks_and_some_chunks` so that the newly
         // generated meshes have the texels they expect.
@@ -268,6 +291,15 @@ impl SpaceRenderer {
         let view_direction_mask = camera.view_direction_mask();
         let view_chunk = csm.view_chunk();
 
+        // Accumulates instance data for meshes, which we will then write as part of this
+        // submission. (Draw commands always happen after buffer writes even if they
+        // enter the command encoder first.)
+        let mut instance_data: Vec<WgpuInstanceData> = Vec::with_capacity(
+            self.instance_buffer
+                .get()
+                .map_or(0, |buffer| usize::try_from(buffer.size()).unwrap_or(0)),
+        );
+
         queue.write_buffer(
             &self.camera_buffer.buffer,
             0,
@@ -292,6 +324,29 @@ impl SpaceRenderer {
         });
         render_pass.set_bind_group(0, &self.camera_buffer.bind_group, &[]);
         render_pass.set_bind_group(1, &self.space_bind_group, &[]);
+        if let Some(buffer) = self.instance_buffer.get() {
+            render_pass.set_vertex_buffer(1, buffer.slice(..));
+        } else {
+            // If there's no buffer then there must also be no instances; no action needed.
+        }
+
+        // Helper for the common logic of opaque + transparent drawing
+        fn draw_instance<'pass>(
+            range: std::ops::Range<usize>,
+            render_pass: &mut wgpu::RenderPass<'pass>,
+            buffers: &'pass ChunkBuffers,
+            instance_data: &mut Vec<WgpuInstanceData>,
+            p: ChunkPos<CHUNK_SIZE>,
+            squares_drawn: &mut usize,
+        ) {
+            if !range.is_empty() {
+                set_buffers(render_pass, buffers);
+                let id = u32::try_from(instance_data.len()).unwrap();
+                instance_data.push(WgpuInstanceData::new(p.bounds().lower_bounds().to_vec()));
+                render_pass.draw_indexed(to_wgpu_index_range(range.clone()), 0, id..(id + 1));
+                *squares_drawn += range.len() / 6;
+            }
+        }
 
         // Opaque geometry first, in front-to-back order
         let start_opaque_draw_time = Instant::now();
@@ -309,12 +364,14 @@ impl SpaceRenderer {
                 chunks_drawn += 1;
 
                 if let Some(buffers) = &chunk.render_data {
-                    let range = chunk.mesh().opaque_range();
-                    if !range.is_empty() {
-                        set_buffers(&mut render_pass, buffers);
-                        render_pass.draw_indexed(to_wgpu_index_range(range.clone()), 0, 0..1);
-                        squares_drawn += range.len() / 6;
-                    }
+                    draw_instance(
+                        chunk.mesh().opaque_range(),
+                        &mut render_pass,
+                        buffers,
+                        &mut instance_data,
+                        p,
+                        &mut squares_drawn,
+                    );
                 }
             }
             // TODO: If the chunk is missing, draw a blocking shape, possibly?
@@ -335,19 +392,30 @@ impl SpaceRenderer {
                         continue;
                     }
                     if let Some(buffers) = &chunk.render_data {
-                        let range = chunk.mesh().transparent_range(
-                            // TODO: avoid adding and then subtracting view_chunk
-                            DepthOrdering::from_view_direction(p.0 - view_chunk.0),
+                        draw_instance(
+                            chunk.mesh().transparent_range(
+                                // TODO: avoid adding and then subtracting view_chunk
+                                DepthOrdering::from_view_direction(p.0 - view_chunk.0),
+                            ),
+                            &mut render_pass,
+                            buffers,
+                            &mut instance_data,
+                            p,
+                            &mut squares_drawn,
                         );
-                        if !range.is_empty() {
-                            set_buffers(&mut render_pass, buffers);
-                            render_pass.draw_indexed(to_wgpu_index_range(range.clone()), 0, 0..1);
-                            squares_drawn += range.len() / 6;
-                        }
                     }
                 }
             }
         }
+
+        queue.write_buffer(
+            self.instance_buffer
+                .get()
+                .expect("SpaceRenderer::instance_buffer should have been created but wasn't"),
+            0,
+            bytemuck::cast_slice::<WgpuInstanceData, u8>(instance_data.as_slice()),
+        );
+
         let end_time = Instant::now();
 
         Ok(SpaceDrawInfo {

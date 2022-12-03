@@ -190,4 +190,21 @@ impl ResizingBuffer {
             self.buffer = Some(bwp.device.create_buffer_init(descriptor));
         }
     }
+
+    /// Reallocate if needed, but don't write anything.
+    ///
+    /// Note that the fields of the `BufferDescriptor` other than `contents` are ignored
+    /// if the existing buffer is used. TODO: Provide a means of lazy loading the label.
+    pub(crate) fn resize_at_least(
+        &mut self,
+        device: &wgpu::Device,
+        descriptor: &wgpu::BufferDescriptor<'_>,
+    ) {
+        let new_size = descriptor.size;
+        if self.buffer.as_ref().map_or(0, |b| b.size()) >= new_size {
+            // Already sufficient size
+        } else {
+            self.buffer = Some(device.create_buffer(descriptor));
+        }
+    }
 }

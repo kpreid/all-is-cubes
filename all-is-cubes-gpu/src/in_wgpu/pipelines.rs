@@ -10,6 +10,7 @@ use all_is_cubes::listen::DirtyFlag;
 use crate::in_wgpu::frame_texture::FramebufferTextures;
 use crate::in_wgpu::glue::create_wgsl_module_from_reloadable;
 use crate::in_wgpu::vertex::WgpuBlockVertex;
+use crate::in_wgpu::vertex::WgpuInstanceData;
 use crate::in_wgpu::vertex::WgpuLinesVertex;
 use crate::reloadable::{reloadable_str, Reloadable};
 
@@ -136,6 +137,7 @@ impl Pipelines {
             unclipped_depth: false,
             conservative: false,
         };
+        let vertex_buffers = &[WgpuBlockVertex::desc(), WgpuInstanceData::desc()];
 
         let multisample = fb.linear_scene_multisample_state();
 
@@ -146,7 +148,7 @@ impl Pipelines {
                 vertex: wgpu::VertexState {
                     module: &shader,
                     entry_point: "block_vertex_main",
-                    buffers: &[WgpuBlockVertex::desc()],
+                    buffers: vertex_buffers,
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
@@ -176,7 +178,7 @@ impl Pipelines {
                 vertex: wgpu::VertexState {
                     module: &shader,
                     entry_point: "block_vertex_main",
-                    buffers: &[WgpuBlockVertex::desc()],
+                    buffers: vertex_buffers,
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
