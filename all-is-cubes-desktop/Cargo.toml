@@ -51,4 +51,6 @@ unicode-width = { version = "0.1.9", default-features = false }
 winit = { version = "0.27.2", default-features = false, features = ["x11"] }
 
 [dev-dependencies]
+gltf = "1.0.0" # for round-trip test
+tempfile = "3.3.0"
 trycmd = "0.14.1"
