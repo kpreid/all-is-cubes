@@ -191,15 +191,18 @@ impl Materials {
                     double_sided: false,
                     pbr_metallic_roughness,
                     extensions: Some(gltf_json::extensions::material::Material {
-                        volume: Some(gltf_json::extensions::material::Volume {
-                            thickness_factor: gltf_json::extensions::material::ThicknessFactor(1.0),
-                            thickness_texture: None,
-                            attenuation_distance:
-                                gltf_json::extensions::material::AttenuationDistance::default(),
-                            attenuation_color:
-                                gltf_json::extensions::material::AttenuationColor::default(),
-                            extras: Void::default(),
-                        }),
+                        volume: None,
+                        // TODO: Reenable this when attenuation_distance serialization bug is fixed.
+                        // https://github.com/gltf-rs/gltf/issues/364
+                        // Some(gltf_json::extensions::material::Volume {
+                        //     thickness_factor: gltf_json::extensions::material::ThicknessFactor(1.0),
+                        //     thickness_texture: None,
+                        //     attenuation_distance:
+                        //         gltf_json::extensions::material::AttenuationDistance::default(),
+                        //     attenuation_color:
+                        //         gltf_json::extensions::material::AttenuationColor::default(),
+                        //     extras: Void::default(),
+                        // }),
                         transmission: Some(gltf_json::extensions::material::Transmission {
                             transmission_factor:
                                 gltf_json::extensions::material::TransmissionFactor::default(),

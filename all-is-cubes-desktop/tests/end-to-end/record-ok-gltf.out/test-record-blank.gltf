@@ -69,16 +69,6 @@
         "KHR_materials_transmission": {
           "transmissionFactor": 0.0,
           "extras": {}
-        },
-        "KHR_materials_volume": {
-          "thicknessFactor": 1.0,
-          "attenuationDistance": null,
-          "attenuationColor": [
-            1.0,
-            1.0,
-            1.0
-          ],
-          "extras": {}
         }
       },
       "extras": {}
