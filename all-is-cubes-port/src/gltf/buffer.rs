@@ -168,7 +168,11 @@ impl SwitchingWriter {
                 let prefix = "data:application/gltf-buffer;base64,";
                 let mut url = String::with_capacity(prefix.len() + buffer.len() * 6 / 8 + 3);
                 url += prefix;
-                base64::encode_config_buf(&buffer, base64::URL_SAFE_NO_PAD, &mut url);
+                // Note: The so-called “URL_SAFE” character set is *not* the correct
+                // format for data URLs; standard base64 is correct. The URL safety
+                // in question is for e.g. base64 components within ordinary URLs or
+                // file names.
+                base64::encode_config_buf(&buffer, base64::STANDARD_NO_PAD, &mut url);
                 Ok((Some(url), buffer.len()))
             }
             SwitchingWriter::File {
@@ -316,7 +320,7 @@ mod tests {
         assert_eq!(buffer_entity.name, Some("foo".into()));
         assert_eq!(
             buffer_entity.uri.as_deref(),
-            Some("data:application/gltf-buffer;base64,AQL_") // AQL_ = 000000 010000 001011 111111
+            Some("data:application/gltf-buffer;base64,AQL/") // AQL/ = 000000 010000 001011 111111
         );
         assert_eq!(buffer_entity.byte_length, 3);
     }
