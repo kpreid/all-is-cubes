@@ -11,6 +11,9 @@ license = "MIT OR Apache-2.0"
 # TODO: revisit categories once it's more settled how useful this is as a game engine
 categories = ["games", "graphics", "rendering::engine"]
 
+[package.metadata.docs.rs]
+features = ["arbitrary"]
+
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
 bench = false
