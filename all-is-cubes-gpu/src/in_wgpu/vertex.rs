@@ -1,4 +1,4 @@
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
+use all_is_cubes::cgmath::{Point3, Vector3};
 use all_is_cubes::math::GridPoint;
 use all_is_cubes::mesh::{BlockVertex, Coloring, GfxVertex};
 
@@ -23,14 +23,22 @@ pub(crate) struct WgpuBlockVertex {
     /// TODO: Once we implement storing chunks in relative coordinates for better
     /// precision, we can reduce this representation size.
     cube: [i32; 3],
-    /// Vertex position within the cube. Ranges from 0 to 1 inclusive.
-    /// This is added to `cube` to make the true vertex position.
+    /// Vertex position within the cube, fixed point; and vertex normal in [`Face7`] format.
     ///
-    /// TODO: Try storing this in fixed point u16s
-    position_in_cube: [f32; 3],
-    /// Vertex normal in [`Face7`] format.
-    /// TODO: Make use of all the spare bits here for something.
-    normal: u32,
+    /// * The first u32 is a bitwise combination of two u16s:
+    ///   `(position.x * 256) + (position.y * 256) << 16`.
+    ///   The scale factor 256 is chosen as being greater than the smallest [`Resolution`]
+    ///   available. (Equal would also work.)
+    /// * The second u32 is
+    ///   `position.z * 256 + (face << 16)`
+    ///   where `face` is a `Face6` converted to integer.
+    ///
+    /// Vertex position is added to `cube` to make the true vertex position.
+    ///
+    /// There is no reason that the position and normal are packed together other than
+    /// convenience and making efficient use of `u32` bits. (`u32` is the minimum size
+    /// of integer that WGSL allows.)
+    position_in_cube_and_normal_packed: [u32; 2],
     /// Packed format:
     /// * If `[3]` is in the range 0.0 to 1.0, then the attribute is a linear RGBA color.
     /// * If `[3]` is -1.0, then the first three components are 3D texture coordinates.
@@ -44,11 +52,10 @@ pub(crate) struct WgpuBlockVertex {
 impl WgpuBlockVertex {
     const ATTRIBUTE_LAYOUT: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![
         0 => Sint32x3, // cube
-        1 => Float32x3, // position_in_cube
-        2 => Uint32, // normal
-        3 => Float32x4, // color_or_texture
-        4 => Float32x3, // clamp_min
-        5 => Float32x3, // clamp_max
+        1 => Uint32x2, // position_in_cube_and_normal_packed
+        2 => Float32x4, // color_or_texture
+        3 => Float32x3, // clamp_min
+        4 => Float32x3, // clamp_max
     ];
 
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -63,9 +70,15 @@ impl WgpuBlockVertex {
 impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
     #[inline]
     fn from(vertex: BlockVertex<TexPoint>) -> Self {
-        let position_in_cube: [f32; 3] = vertex.position.cast::<f32>().unwrap().to_vec().into();
+        let position_in_cube_fixed: Point3<u32> =
+            vertex.position.map(|coord| (coord * 256.) as u32);
         let cube = [0, 0, 0]; // will be overwritten later by instantiate_vertex()
         let normal = vertex.face as u32;
+
+        let position_in_cube_and_normal_packed = [
+            position_in_cube_fixed.x + (position_in_cube_fixed.y << 16),
+            position_in_cube_fixed.z + (normal << 16),
+        ];
         match vertex.coloring {
             Coloring::Solid(color) => {
                 let mut color_attribute: [f32; 4] = color.into();
@@ -73,9 +86,8 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
                 // VertexColorOrTexture protocol (not less than zero).
                 color_attribute[3] = color_attribute[3].clamp(0., 1.);
                 Self {
-                    position_in_cube,
                     cube,
-                    normal,
+                    position_in_cube_and_normal_packed,
                     color_or_texture: color_attribute,
                     clamp_min: [0., 0., 0.],
                     clamp_max: [0., 0., 0.],
@@ -86,9 +98,8 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
                 clamp_min,
                 clamp_max,
             } => Self {
-                position_in_cube,
                 cube,
-                normal,
+                position_in_cube_and_normal_packed,
                 color_or_texture: [tc[0], tc[1], tc[2], -1.0],
                 clamp_min: clamp_min.into(),
                 clamp_max: clamp_max.into(),
@@ -115,7 +126,13 @@ impl GfxVertex for WgpuBlockVertex {
 
     #[inline]
     fn position(&self) -> Point3<Self::Coordinate> {
-        Point3::from(self.cube).map(|c| c as f32) + Vector3::from(self.position_in_cube)
+        let pos_packed = self.position_in_cube_and_normal_packed;
+        let position_in_cube_fixed = Vector3 {
+            x: pos_packed[0] & 0xFFFF,
+            y: (pos_packed[0] >> 16) & 0xFFFF,
+            z: pos_packed[1] & 0xFFFF,
+        };
+        Point3::from(self.cube).map(|c| c as f32) + position_in_cube_fixed.map(|c| c as f32 / 256.)
     }
 }
 
@@ -166,7 +183,7 @@ mod tests {
     /// the struct is designed to have a fixed layout communicating to the shader anyway.
     #[test]
     fn vertex_size() {
-        assert_eq!(mem::size_of::<WgpuBlockVertex>(), 68);
+        assert_eq!(mem::size_of::<WgpuBlockVertex>(), 60);
         assert_eq!(mem::size_of::<WgpuLinesVertex>(), 28);
     }
 

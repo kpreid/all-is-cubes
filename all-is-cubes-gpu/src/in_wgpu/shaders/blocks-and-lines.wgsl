@@ -17,11 +17,10 @@ struct ShaderSpaceCamera {
 // Mirrors `struct WgpuBlockVertex` on the Rust side.
 struct WgpuBlockVertex {
     @location(0) cube: vec3<i32>,
-    @location(1) position_in_cube: vec3<f32>,
-    @location(2) normal_face: u32,
-    @location(3) color_or_texture: vec4<f32>,
-    @location(4) clamp_min: vec3<f32>,
-    @location(5) clamp_max: vec3<f32>,
+    @location(1) position_in_cube_and_normal_packed: vec2<u32>,
+    @location(2) color_or_texture: vec4<f32>,
+    @location(3) clamp_min: vec3<f32>,
+    @location(4) clamp_max: vec3<f32>,
 };
 
 // Mirrors `struct WgpuLinesVertex` on the Rust side.
@@ -104,11 +103,18 @@ struct BlockFragmentInput {
 fn block_vertex_main(
     input: WgpuBlockVertex,
 ) -> BlockFragmentInput {
-    let combined_matrix = camera.projection * camera.view_matrix;
-    let world_position = vec3<f32>(input.cube) + input.position_in_cube;
+    // Unpack position (three u16s represented as two u32s).
+    let position_in_cube_fixed = vec3<u32>(
+        input.position_in_cube_and_normal_packed[0] & 0xFFFFu,
+        (input.position_in_cube_and_normal_packed[0] >> 16u) & 0xFFFFu,
+        input.position_in_cube_and_normal_packed[1] & 0xFFFFu
+    );
+    // Undo fixed-point scale by 256.
+    let position_in_cube = vec3<f32>(position_in_cube_fixed) / 256.0;
 
+    // Unpack normal.
     var normal = vec3<f32>(1.0);
-    switch input.normal_face {
+    switch ((input.position_in_cube_and_normal_packed[1] >> 16u) & 0xFFFFu) {
         case 1u { normal = vec3<f32>(-1.0, 0.0, 0.0); }
         case 2u { normal = vec3<f32>(0.0, -1.0, 0.0); }
         case 3u { normal = vec3<f32>(0.0, 0.0, -1.0); }
@@ -117,6 +123,9 @@ fn block_vertex_main(
         case 6u { normal = vec3<f32>(0.0, 0.0, 1.0); }
         default {}
     }
+
+    let combined_matrix = camera.projection * camera.view_matrix;
+    let world_position = vec3<f32>(input.cube) + position_in_cube;
 
     return BlockFragmentInput(
         /* clip_position = */ combined_matrix * vec4<f32>(world_position, 1.0),
@@ -127,7 +136,7 @@ fn block_vertex_main(
         input.clamp_min,
         input.clamp_max,
         compute_fog(world_position),
-        input.position_in_cube,
+        position_in_cube,
         // Note that we do not normalize this vector: by keeping things linear, we
         // allow linear interpolation between vertices to get the right answer.
         /* camera_ray_direction = */ world_position - camera.view_position,
