@@ -236,11 +236,11 @@ mod tests {
             coloring: Coloring::Solid(Rgba::new(0.0, 0.5, 1.0, 0.5)),
         });
         vertex.instantiate_vertex(WgpuBlockVertex::instantiate_block(Point3::new(
-            100, -100, 7,
+            100, 50, 7,
         )));
         assert_eq!(
             GfxVertex::position(&vertex),
-            Point3::new(100.25, -100.0, 8.0)
+            Point3::new(100.25, 50.0, 8.0)
         );
     }
 }
