@@ -16,7 +16,7 @@ struct ShaderSpaceCamera {
 
 // Mirrors `struct WgpuBlockVertex` on the Rust side.
 struct WgpuBlockVertex {
-    @location(0) cube: vec3<i32>,
+    @location(0) cube_packed: u32,
     @location(1) position_in_cube_and_normal_packed: vec2<u32>,
     @location(2) color_or_texture: vec4<f32>,
     @location(3) clamp_min: vec3<f32>,
@@ -111,7 +111,14 @@ fn block_vertex_main(
     input: WgpuBlockVertex,
     instance_input: WgpuInstanceData,
 ) -> BlockFragmentInput {
-    // Unpack position (three u16s represented as two u32s).
+    // Unpack cube (three u8s represented as one u32).
+    let cube = vec3<u32>(
+        input.cube_packed & 0xFFu,
+        (input.cube_packed >> 8u) & 0xFFu,
+        (input.cube_packed >> 16u) & 0xFFu
+    );
+
+    // Unpack position_in_cube (three u16s represented as two u32s).
     let position_in_cube_fixed = vec3<u32>(
         input.position_in_cube_and_normal_packed[0] & 0xFFFFu,
         (input.position_in_cube_and_normal_packed[0] >> 16u) & 0xFFFFu,
@@ -135,12 +142,12 @@ fn block_vertex_main(
     let combined_matrix = camera.projection * camera.view_matrix;
     // TODO: eventually this should become a camera-relative position, not a world position.
     // That will require further work in light-lookup cooordinates.
-    let world_position = vec3<f32>(input.cube) + position_in_cube + instance_input.translation;
+    let world_position = vec3<f32>(cube) + position_in_cube + instance_input.translation;
 
     return BlockFragmentInput(
         /* clip_position = */ combined_matrix * vec4<f32>(world_position, 1.0),
         world_position,
-        /* world_cube = */ instance_input.translation + vec3<f32>(input.cube),
+        /* world_cube = */ instance_input.translation + vec3<f32>(cube),
         normal,
         input.color_or_texture,
         input.clamp_min,

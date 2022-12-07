@@ -12,19 +12,20 @@ pub(crate) type TexPoint = Point3<f32>;
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub(crate) struct WgpuBlockVertex {
-    /// Chunk-relative position of the cube containing the triangle this vertex belongs to.
+    /// Chunk-relative position of the cube containing the triangle this vertex belongs to,
+    /// packed into a u32 as x + (y << 8) + (z << 16).
     ///
     /// Note that this is not the same as floor() of the final coordinates, since a
     /// block's mesh coordinates range from 0 to 1 inclusive.
-    cube: [i32; 3],
+    cube_packed: u32,
     /// Vertex position within the cube, fixed point; and vertex normal in [`Face7`] format.
     ///
     /// * The first u32 is a bitwise combination of two u16s:
-    ///   `(position.x * 256) + (position.y * 256) << 16`.
+    ///   `(position.x * 256) | (position.y * 256) << 16`.
     ///   The scale factor 256 is chosen as being greater than the smallest [`Resolution`]
     ///   available. (Equal would also work.)
     /// * The second u32 is
-    ///   `position.z * 256 + (face << 16)`
+    ///   `position.z * 256 | (face << 16)`
     ///   where `face` is a `Face6` converted to integer.
     ///
     /// Vertex position is added to `cube` to make the true vertex position.
@@ -45,7 +46,7 @@ pub(crate) struct WgpuBlockVertex {
 
 impl WgpuBlockVertex {
     const ATTRIBUTE_LAYOUT: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![
-        0 => Sint32x3, // cube
+        0 => Uint32, // cube_packed
         1 => Uint32x2, // position_in_cube_and_normal_packed
         2 => Float32x4, // color_or_texture
         3 => Float32x3, // clamp_min
@@ -67,12 +68,12 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
     fn from(vertex: BlockVertex<TexPoint>) -> Self {
         let position_in_cube_fixed: Point3<u32> =
             vertex.position.map(|coord| (coord * 256.) as u32);
-        let cube = [0, 0, 0]; // will be overwritten later by instantiate_vertex()
+        let cube_packed = 0; // will be overwritten later by instantiate_vertex()
         let normal = vertex.face as u32;
 
         let position_in_cube_and_normal_packed = [
-            position_in_cube_fixed.x + (position_in_cube_fixed.y << 16),
-            position_in_cube_fixed.z + (normal << 16),
+            position_in_cube_fixed.x | (position_in_cube_fixed.y << 16),
+            position_in_cube_fixed.z | (normal << 16),
         ];
         match vertex.coloring {
             Coloring::Solid(color) => {
@@ -81,7 +82,7 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
                 // VertexColorOrTexture protocol (not less than zero).
                 color_attribute[3] = color_attribute[3].clamp(0., 1.);
                 Self {
-                    cube,
+                    cube_packed,
                     position_in_cube_and_normal_packed,
                     color_or_texture: color_attribute,
                     clamp_min: [0., 0., 0.],
@@ -93,7 +94,7 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
                 clamp_min,
                 clamp_max,
             } => Self {
-                cube,
+                cube_packed,
                 position_in_cube_and_normal_packed,
                 color_or_texture: [tc[0], tc[1], tc[2], -1.0],
                 clamp_min: clamp_min.into(),
@@ -105,29 +106,38 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
 
 impl GfxVertex for WgpuBlockVertex {
     const WANTS_DEPTH_SORTING: bool = true;
+    /// TODO: no reason this should be f32 other than scaling to fractional integers.
+    /// The depth sorting system should be made more flexible here.
     type Coordinate = f32;
-    type BlockInst = [i32; 3];
+    /// Packed cube coordinates
+    type BlockInst = u32;
     type TexPoint = TexPoint;
 
     #[inline]
     fn instantiate_block(cube: GridPoint) -> Self::BlockInst {
-        cube.into()
+        let cube = cube.map(|c| c as u32);
+        cube.x | (cube.y << 8) | (cube.z << 16)
     }
 
     #[inline]
-    fn instantiate_vertex(&mut self, cube: Self::BlockInst) {
-        self.cube = cube;
+    fn instantiate_vertex(&mut self, cube_packed: Self::BlockInst) {
+        self.cube_packed = cube_packed;
     }
 
     #[inline]
     fn position(&self) -> Point3<Self::Coordinate> {
+        let cube = Point3 {
+            x: self.cube_packed & 0xFF,
+            y: (self.cube_packed >> 8) & 0xFF,
+            z: (self.cube_packed >> 16) & 0xFF,
+        };
         let pos_packed = self.position_in_cube_and_normal_packed;
         let position_in_cube_fixed = Vector3 {
             x: pos_packed[0] & 0xFFFF,
             y: (pos_packed[0] >> 16) & 0xFFFF,
             z: pos_packed[1] & 0xFFFF,
         };
-        Point3::from(self.cube).map(|c| c as f32) + position_in_cube_fixed.map(|c| c as f32 / 256.)
+        cube.map(|c| c as f32) + position_in_cube_fixed.map(|c| c as f32 / 256.)
     }
 }
 
@@ -211,7 +221,7 @@ mod tests {
     /// the struct is designed to have a fixed layout communicating to the shader anyway.
     #[test]
     fn vertex_size() {
-        assert_eq!(mem::size_of::<WgpuBlockVertex>(), 60);
+        assert_eq!(mem::size_of::<WgpuBlockVertex>(), 52);
         assert_eq!(mem::size_of::<WgpuLinesVertex>(), 28);
     }
 
