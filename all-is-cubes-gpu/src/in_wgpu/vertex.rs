@@ -153,3 +153,39 @@ impl DebugLineVertex for WgpuLinesVertex {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use all_is_cubes::math::{Face6, Rgba};
+    use std::mem;
+
+    use super::*;
+
+    /// Assert the vertex's size, just so that we're reminded to think about it when we
+    /// change the amount of data in it. This assertion is not platform-dependent because
+    /// the struct is designed to have a fixed layout communicating to the shader anyway.
+    #[test]
+    fn vertex_size() {
+        assert_eq!(mem::size_of::<WgpuBlockVertex>(), 68);
+        assert_eq!(mem::size_of::<WgpuLinesVertex>(), 28);
+    }
+
+    /// Test implementation of [`GfxVertex::position()`],
+    /// because if it's wrong the only thing that breaks is depth-sorting,
+    /// and because it is a useful test of the outgoing coordinate processing logic too.
+    #[test]
+    fn block_vertex_position() {
+        let mut vertex = WgpuBlockVertex::from(BlockVertex {
+            position: Point3::new(0.25, 0.0, 1.0),
+            face: Face6::PX,
+            coloring: Coloring::Solid(Rgba::new(0.0, 0.5, 1.0, 0.5)),
+        });
+        vertex.instantiate_vertex(WgpuBlockVertex::instantiate_block(Point3::new(
+            100, -100, 7,
+        )));
+        assert_eq!(
+            GfxVertex::position(&vertex),
+            Point3::new(100.25, -100.0, 8.0)
+        );
+    }
+}
