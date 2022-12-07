@@ -48,8 +48,6 @@ use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
 use all_is_cubes::util::YieldProgress;
 
-mod aic_glfw;
-use aic_glfw::glfw_main_loop;
 mod aic_winit;
 use aic_winit::winit_main_loop;
 mod command_options;
@@ -62,7 +60,6 @@ mod audio;
 mod session;
 mod terminal;
 
-use crate::aic_glfw::create_glfw_desktop_session;
 use crate::aic_winit::{create_winit_rt_desktop_session, create_winit_wgpu_desktop_session};
 use crate::command_options::{
     determine_record_format, parse_universe_source, AicDesktopArgs, DisplaySizeArg, UniverseSource,
@@ -177,16 +174,6 @@ fn main() -> Result<(), anyhow::Error> {
     // Note that while its return type is nominally Result<()>, it does not necessarily
     // ever return “successfully”, so no code should follow it.
     match graphics_type {
-        GraphicsType::WindowGl => {
-            let dsession = create_glfw_desktop_session(
-                session,
-                &title_and_version(),
-                display_size,
-                fullscreen,
-                viewport_cell,
-            )?;
-            inner_main(inner_params, glfw_main_loop, dsession)
-        }
         GraphicsType::Window => {
             let event_loop = winit::event_loop::EventLoop::new();
             let dsession = block_on(create_winit_wgpu_desktop_session(

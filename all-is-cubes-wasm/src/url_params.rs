@@ -20,7 +20,6 @@ pub struct OptionsInUrl {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum RendererOption {
-    Luminance,
     #[default]
     Wgpu,
 }
@@ -55,7 +54,6 @@ where
             .and_then(|s| {
                 let s = s.borrow();
                 match s {
-                    "luminance" => Some(RendererOption::Luminance),
                     "wgpu" => Some(RendererOption::Wgpu),
                     _ => {
                         log::warn!("Unrecognized value for renderer=: {:?}", s);

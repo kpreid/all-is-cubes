@@ -4,14 +4,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use js_sys::Error;
-use luminance_web_sys::WebSysWebGL2Surface;
 use rand::{thread_rng, Rng as _};
 use send_wrapper::SendWrapper;
 use wasm_bindgen::prelude::{wasm_bindgen, Closure, JsValue};
 use wasm_bindgen::JsCast; // dyn_into()
 use web_sys::{
     console, AddEventListenerOptions, Document, Element, Event, FocusEvent, HtmlElement,
-    HtmlProgressElement, KeyboardEvent, MouseEvent, Text, WebGlContextAttributes,
+    HtmlProgressElement, KeyboardEvent, MouseEvent, Text,
 };
 
 use all_is_cubes::apps::{CursorIcon, Key, Session, StandardCameras};
@@ -20,7 +19,6 @@ use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_gpu::in_luminance;
 use all_is_cubes_gpu::in_wgpu;
 
 use crate::js_bindings::GuiHelpers;
@@ -32,7 +30,6 @@ use crate::web_glue::{
 
 #[allow(clippy::large_enum_variant)]
 enum WebRenderer {
-    Luminance(in_luminance::SurfaceRenderer<WebSysWebGL2Surface>),
     Wgpu(in_wgpu::SurfaceRenderer),
 }
 
@@ -115,21 +112,6 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
 
     let cameras = StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap();
     let renderer = match renderer_option {
-        RendererOption::Luminance => {
-            let surface = WebSysWebGL2Surface::from_canvas_with_params(
-                web_sys::window().unwrap(), // TODO messy
-                document,
-                gui_helpers.canvas_helper().canvas(),
-                WebGlContextAttributes::new()
-                    .antialias(cameras.graphics_options().antialiasing.is_msaa()),
-            )
-            .map_err(|e| Error::new(&format!("did not initialize WebGL: {}", e)))?;
-
-            let renderer = in_luminance::SurfaceRenderer::new(surface, cameras)
-                .map_err(|e| Error::new(&format!("did not initialize renderer: {}", e)))?;
-
-            WebRenderer::Luminance(renderer)
-        }
         RendererOption::Wgpu => {
             let wgpu_instance = wgpu::Instance::new(wgpu::Backends::all());
             let surface =
@@ -425,12 +407,7 @@ impl WebGameRoot {
             if viewport != *self.viewport_cell.get() {
                 self.viewport_cell.set(viewport);
             }
-            // TODO: assist this using common traits
             match &mut self.renderer {
-                WebRenderer::Luminance(renderer) => {
-                    renderer.objects.update_world_camera();
-                    self.session.update_cursor(renderer.objects.cameras());
-                }
                 WebRenderer::Wgpu(renderer) => {
                     renderer.update_world_camera();
                     self.session.update_cursor(renderer.cameras());
@@ -452,9 +429,6 @@ impl WebGameRoot {
 
             // Do graphics
             let render_info = match &mut self.renderer {
-                WebRenderer::Luminance(renderer) => renderer
-                    .render_frame(self.session.cursor_result())
-                    .expect("error in render_frame"),
                 WebRenderer::Wgpu(renderer) => {
                     // note: info text is HTML on web, so no string passed here
                     renderer
@@ -465,7 +439,6 @@ impl WebGameRoot {
 
             // Update info text
             let cameras: &StandardCameras = match &self.renderer {
-                WebRenderer::Luminance(renderer) => renderer.objects.cameras(),
                 WebRenderer::Wgpu(renderer) => renderer.cameras(),
             };
             if cameras.cameras().world.options().debug_info_text {

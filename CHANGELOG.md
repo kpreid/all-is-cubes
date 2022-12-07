@@ -68,9 +68,7 @@
     - Renamed: The feature `"rayon"` is now `"threads"`.
 
 - `all-is-cubes-gpu` library:
-    - To allow for working with alternative GPU APIs, everything specific to `luminance` has been moved into a submodule `in_luminance`.
-      Some non-specific types have remained at the top level.
-    - `GLRenderer` has been renamed to `SurfaceRenderer`.
+    - No longer supports `luminance` GPU API; uses `wgpu` instead.
 
 ### Removed
 

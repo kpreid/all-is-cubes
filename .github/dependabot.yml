@@ -24,4 +24,3 @@ updates:
         # does not make the error of increasing version *requirements* to require
         # the patch. See comments above on versioning-strategy.
         update-types: ["version-update:semver-patch"]
-      - dependency-name: "glfw" # Must be updated in sync with `luminance` anyway.

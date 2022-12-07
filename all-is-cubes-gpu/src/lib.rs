@@ -1,6 +1,8 @@
 //! Algorithms for rendering [All is Cubes] content using a GPU, via
-//! the [`luminance`] graphics library.
-//! Other backends are being considered, hence the module structure.
+//! the [`wgpu`] graphics library.
+//!
+//! This library used to support multiple GPU interface libraries, hence the
+//! common vs. specific module layout.
 //!
 //! [All is Cubes]: all_is_cubes
 
@@ -39,12 +41,9 @@
 #![forbid(unsafe_code)]
 #![warn(trivial_casts)]
 
-#[cfg_attr(not(any(feature = "luminance", feature = "wgpu")), allow(unused))]
+#[cfg_attr(not(feature = "wgpu"), allow(unused))]
 mod common;
 pub use common::*;
-
-#[cfg(feature = "luminance")]
-pub mod in_luminance;
 
 /// Re-export the version of the `wgpu` crate we're using.
 #[cfg(feature = "wgpu")]

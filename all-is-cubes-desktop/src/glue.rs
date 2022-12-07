@@ -4,5 +4,4 @@
 //! choices.
 
 pub(crate) mod crossterm;
-pub(crate) mod glfw;
 pub(crate) mod winit;

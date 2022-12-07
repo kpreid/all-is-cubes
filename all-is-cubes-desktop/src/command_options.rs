@@ -152,7 +152,6 @@ impl AicDesktopArgs {
     pub(crate) fn is_headless(&self) -> bool {
         match self.graphics {
             GraphicsType::Window => false,
-            GraphicsType::WindowGl => false,
             GraphicsType::WindowRt => false,
             GraphicsType::Terminal => false,
 
@@ -200,8 +199,6 @@ pub enum GraphicsType {
     // These variants are sorted for the benefit of the help text presentation.
     #[value(help = "Open a window (uses GPU rendering)")]
     Window,
-    #[value(help = "Open a window (uses GPU with OpenGL backend)")]
-    WindowGl,
     #[value(help = "EXPERIMENTAL: Open a window (uses CPU raytracing)")]
     WindowRt,
     #[value(help = "Colored text in this terminal (uses raytracing)")]

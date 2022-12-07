@@ -25,7 +25,6 @@ pub(crate) fn write_report_file() -> PathBuf {
     let comparison_records: Vec<BTreeMap<TestId, TestCaseOutput>> = [
         // These must be in the same order that the template displays columns
         RendererId::Raytracer,
-        RendererId::Luminance,
         RendererId::Wgpu,
     ]
     .into_iter()

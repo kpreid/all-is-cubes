@@ -56,11 +56,6 @@ impl Reloadable {
         }
     }
 
-    pub fn get(&self) -> Arc<str> {
-        self.as_source().snapshot()
-    }
-
-    // TODO: not the best interface, since callers are using it just to listen
     pub fn as_source(&self) -> ListenableSource<Arc<str>> {
         self.0.cell.as_source()
     }

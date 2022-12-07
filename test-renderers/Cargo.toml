@@ -7,18 +7,13 @@ rust-version = "1.65"
 description = "Rendering tests for all-is-cubes."
 publish = false
 
-# Tests use custom test harness because the `luminance` tests require custom main
-# thread actions, and we also want to skip the tests if there is no GPU on the system.
+# Tests use a custom test harness; among other reasons, we want to explicitly skip the
+# tests if there is no GPU on the system rather than just making them “pass” falsely.
 
 [lib]
 doctest = false
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
 bench = false
-
-[[test]]
-name = "test-luminance"
-doctest = false
-harness = false
 
 [[test]]
 name = "test-raytracer"
@@ -33,18 +28,14 @@ harness = false
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.4.0", features = ["threads"] }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
-all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0", features = ["luminance", "wgpu"] }
+all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0", features = ["wgpu"] }
 async_fn_traits = "0.1.1"
 # Using clap for parsing test command-line arguments
 clap = { version = "4.0.12", default-features = false, features = ["deprecated", "derive", "std", "suggestions"] }
 exhaust = "0.1.0"
 futures = { version = "0.3.21", default-features = false, features = ["alloc", "std"] }
-glfw = "0.44.0"
 image = { version = "0.24.2", default-features = false, features = ["png"] }
 itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"] }
-luminance = "0.47.0"
-luminance-gl = "0.19.1"
-luminance-glfw = "0.18.2"
 send_wrapper = "0.6.0"
 serde = { version = "1.0.126", default-features = false, features = ["derive"] }
 serde_json = "1.0.64"

@@ -17,7 +17,6 @@ pub enum RendererId {
     All,
 
     Raytracer,
-    Luminance,
     Wgpu,
 }
 
@@ -26,7 +25,6 @@ impl fmt::Display for RendererId {
         match self {
             RendererId::All => write!(f, "all"),
             RendererId::Raytracer => write!(f, "ray"),
-            RendererId::Luminance => write!(f, "lum"),
             RendererId::Wgpu => write!(f, "wgpu"),
         }
     }
