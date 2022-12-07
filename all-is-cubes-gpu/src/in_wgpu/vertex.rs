@@ -12,14 +12,22 @@ pub(crate) type TexPoint = Point3<f32>;
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub(crate) struct WgpuBlockVertex {
-    /// Vertex position.
-    position: [f32; 3],
-    /// Position of the cube containing the triangle this vertex belongs to.
-    /// Note that this is not the same as floor() of `self.position`.
+    /// World position of the cube containing the triangle this vertex belongs to.
+    ///
+    /// This is used for looking up light data, so the light data texture must be in the
+    /// same coordinate system.
+    ///
+    /// Note that this is not the same as floor() of the final coordinates, since a
+    /// block's mesh coordinates range from 0 to 1 inclusive.
     ///
     /// TODO: Once we implement storing chunks in relative coordinates for better
-    /// precision, we can reduce this representation size down to i8 or u8.
-    cube: [f32; 3],
+    /// precision, we can reduce this representation size.
+    cube: [i32; 3],
+    /// Vertex position within the cube. Ranges from 0 to 1 inclusive.
+    /// This is added to `cube` to make the true vertex position.
+    ///
+    /// TODO: Try storing this in fixed point u16s
+    position_in_cube: [f32; 3],
     /// Vertex normal in [`Face7`] format.
     /// TODO: Make use of all the spare bits here for something.
     normal: u32,
@@ -35,8 +43,8 @@ pub(crate) struct WgpuBlockVertex {
 
 impl WgpuBlockVertex {
     const ATTRIBUTE_LAYOUT: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![
-        0 => Float32x3, // position
-        1 => Float32x3, // cube
+        0 => Sint32x3, // cube
+        1 => Float32x3, // position_in_cube
         2 => Uint32, // normal
         3 => Float32x4, // color_or_texture
         4 => Float32x3, // clamp_min
@@ -55,8 +63,8 @@ impl WgpuBlockVertex {
 impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
     #[inline]
     fn from(vertex: BlockVertex<TexPoint>) -> Self {
-        let position = vertex.position.cast::<f32>().unwrap().to_vec();
-        let cube = [0., 0., 0.];
+        let position_in_cube: [f32; 3] = vertex.position.cast::<f32>().unwrap().to_vec().into();
+        let cube = [0, 0, 0]; // will be overwritten later by instantiate_vertex()
         let normal = vertex.face as u32;
         match vertex.coloring {
             Coloring::Solid(color) => {
@@ -65,7 +73,7 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
                 // VertexColorOrTexture protocol (not less than zero).
                 color_attribute[3] = color_attribute[3].clamp(0., 1.);
                 Self {
-                    position: position.into(),
+                    position_in_cube,
                     cube,
                     normal,
                     color_or_texture: color_attribute,
@@ -78,7 +86,7 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
                 clamp_min,
                 clamp_max,
             } => Self {
-                position: position.into(),
+                position_in_cube,
                 cube,
                 normal,
                 color_or_texture: [tc[0], tc[1], tc[2], -1.0],
@@ -92,25 +100,22 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
 impl GfxVertex for WgpuBlockVertex {
     const WANTS_DEPTH_SORTING: bool = true;
     type Coordinate = f32;
-    type BlockInst = Vector3<f32>;
+    type BlockInst = [i32; 3];
     type TexPoint = TexPoint;
 
     #[inline]
     fn instantiate_block(cube: GridPoint) -> Self::BlockInst {
-        cube.to_vec().map(|s| s as f32)
+        cube.into()
     }
 
     #[inline]
     fn instantiate_vertex(&mut self, cube: Self::BlockInst) {
-        self.position[0] += cube.x;
-        self.position[1] += cube.y;
-        self.position[2] += cube.z;
-        self.cube = cube.into();
+        self.cube = cube;
     }
 
     #[inline]
     fn position(&self) -> Point3<Self::Coordinate> {
-        Point3::from(self.position)
+        Point3::from(self.cube).map(|c| c as f32) + Vector3::from(self.position_in_cube)
     }
 }
 

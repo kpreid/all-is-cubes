@@ -16,8 +16,8 @@ struct ShaderSpaceCamera {
 
 // Mirrors `struct WgpuBlockVertex` on the Rust side.
 struct WgpuBlockVertex {
-    @location(0) position: vec3<f32>,
-    @location(1) cube: vec3<f32>,
+    @location(0) cube: vec3<i32>,
+    @location(1) position_in_cube: vec3<f32>,
     @location(2) normal_face: u32,
     @location(3) color_or_texture: vec4<f32>,
     @location(4) clamp_min: vec3<f32>,
@@ -104,6 +104,9 @@ struct BlockFragmentInput {
 fn block_vertex_main(
     input: WgpuBlockVertex,
 ) -> BlockFragmentInput {
+    let combined_matrix = camera.projection * camera.view_matrix;
+    let world_position = vec3<f32>(input.cube) + input.position_in_cube;
+
     var normal = vec3<f32>(1.0);
     switch input.normal_face {
         case 1u { normal = vec3<f32>(-1.0, 0.0, 0.0); }
@@ -116,19 +119,18 @@ fn block_vertex_main(
     }
 
     return BlockFragmentInput(
-        camera.projection * camera.view_matrix * vec4<f32>(input.position, 1.0),
-        input.position,
-        input.cube,
+        /* clip_position = */ combined_matrix * vec4<f32>(world_position, 1.0),
+        world_position,
+        vec3<f32>(input.cube),
         normal,
         input.color_or_texture,
         input.clamp_min,
         input.clamp_max,
-        compute_fog(input.position),
-        input.position - input.cube,
-        // camera_ray_direction:
+        compute_fog(world_position),
+        input.position_in_cube,
         // Note that we do not normalize this vector: by keeping things linear, we
         // allow linear interpolation between vertices to get the right answer.
-        input.position - camera.view_position,
+        /* camera_ray_direction = */ world_position - camera.view_position,
     );
 }
 
