@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 use instant::Instant;
 
-use all_is_cubes::camera::Camera;
+use all_is_cubes::camera::{Camera, Flaws};
 use all_is_cubes::cgmath::{EuclideanSpace, Point3, Transform, Vector3};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
@@ -291,6 +291,8 @@ impl SpaceRenderer {
         let view_direction_mask = camera.view_direction_mask();
         let view_chunk = csm.view_chunk();
 
+        let mut flaws = Flaws::empty();
+
         // Accumulates instance data for meshes, which we will then write as part of this
         // submission. (Draw commands always happen after buffer writes even if they
         // enter the command encoder first.)
@@ -373,6 +375,7 @@ impl SpaceRenderer {
                         &mut squares_drawn,
                     );
                 }
+                flaws |= chunk.mesh().flaws();
             }
             // TODO: If the chunk is missing, draw a blocking shape, possibly?
         }
@@ -404,6 +407,7 @@ impl SpaceRenderer {
                             &mut squares_drawn,
                         );
                     }
+                    flaws |= chunk.mesh().flaws();
                 }
             }
         }
@@ -424,6 +428,7 @@ impl SpaceRenderer {
             draw_transparent_time: end_time.duration_since(start_draw_transparent_time),
             squares_drawn,
             chunks_drawn,
+            flaws,
         })
     }
 

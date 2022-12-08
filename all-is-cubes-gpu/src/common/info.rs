@@ -211,6 +211,8 @@ pub struct SpaceDrawInfo {
     /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
     /// to draw this frame.
     pub(crate) squares_drawn: usize,
+
+    pub(crate) flaws: Flaws,
 }
 
 impl CustomFormat<StatusText> for SpaceDrawInfo {
@@ -221,6 +223,7 @@ impl CustomFormat<StatusText> for SpaceDrawInfo {
             draw_transparent_time,
             chunks_drawn,
             squares_drawn,
+            flaws: _, // TODO: include or exclude?
         } = self;
 
         let draw_init_time = draw_init_time.custom_format(format_type);

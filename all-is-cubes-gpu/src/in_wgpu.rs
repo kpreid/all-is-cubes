@@ -131,11 +131,27 @@ impl SurfaceRenderer {
 
         let output = self.surface.get_current_texture()?;
         let draw_info = self.everything.draw_frame_linear(&self.queue)?;
+
+        // Construct aggregated info.
+        // TODO: the flaws combination logic is awkward. Should we combine them at printing
+        // time only?
+        let Layers {
+            world: SpaceDrawInfo {
+                flaws: world_flaws, ..
+            },
+            ui: SpaceDrawInfo {
+                flaws: ui_flaws, ..
+            },
+        } = draw_info.space_info;
         let info = RenderInfo {
-            flaws: update_info.flaws,
+            flaws: update_info.flaws | world_flaws | ui_flaws,
             update: update_info,
             draw: draw_info,
         };
+
+        // Render info and postprocessing step.
+        // TODO: We should record the amount of time this takes, then display that
+        // next frame.
         self.everything.add_info_text_and_postprocess(
             &self.queue,
             &output.texture,
