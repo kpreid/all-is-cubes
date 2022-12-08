@@ -301,7 +301,6 @@ where
         }
 
         let mut flaws = Flaws::empty();
-        // TODO: also report missing block textures as flaws
         if !complete {
             // TODO: Make this a little less strict; if we timed out but there is nothing in todo
             // and we were previously complete, then there isn't actually any flaw.
@@ -336,6 +335,9 @@ where
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct CsmUpdateInfo {
+    /// Flaws detected during update.
+    /// Note that this does not include mesh flaws; the caller must gather those when
+    /// drawing the chunks.
     pub flaws: Flaws,
     pub total_time: Duration,
     /// Time spent on gathering information before starting the chunk scan.
