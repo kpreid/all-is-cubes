@@ -5,14 +5,14 @@ use std::sync::mpsc;
 use image::RgbaImage;
 use png::{chunk::ChunkType, Encoder};
 
-use crate::record::RecordOptions;
+use crate::record::{RecordOptions, Status};
 
 /// Occupy a thread with writing a sequence of frames as (A)PNG data.
-pub(crate) fn threaded_write_frames<K: Send + 'static>(
+pub(crate) fn threaded_write_frames(
     file: File,
     options: RecordOptions,
-    image_data_receiver: mpsc::Receiver<(K, RgbaImage)>,
-    write_status_sender: &mut mpsc::Sender<K>,
+    image_data_receiver: mpsc::Receiver<(Status, RgbaImage)>,
+    write_status_sender: &mut mpsc::Sender<Status>,
 ) -> Result<(), std::io::Error> {
     let mut buf_writer = BufWriter::new(file);
     {

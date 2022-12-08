@@ -413,7 +413,7 @@ impl RendererToWinit for RtRenderer {
     fn redraw(&mut self, session: &Session, window: &mut Self::Window) {
         self.update(session.cursor_result()).unwrap(/* TODO: fix */);
 
-        let (image, _render_info) =
+        let (image, _render_info, _flaws) =
             self.draw_rgba(|render_info| session.info_text(render_info).to_string());
 
         // At least on macOS, softbuffer's idea of "size of the window" is logical size

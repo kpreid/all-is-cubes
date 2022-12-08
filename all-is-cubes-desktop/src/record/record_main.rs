@@ -5,11 +5,11 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use all_is_cubes::apps::{Session, StandardCameras};
 use all_is_cubes::behavior::AutoRotate;
-use all_is_cubes::camera::Viewport;
+use all_is_cubes::camera::{Flaws, Viewport};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::math::NotNan;
 
-use crate::record::{RecordOptions, Recorder};
+use crate::record::{RecordOptions, Recorder, Status};
 use crate::session::{ClockSource, DesktopSession};
 
 // TODO: the status_receiver passing is awkward. Maybe Recorder should just provide it as a broadcast output?
@@ -18,7 +18,7 @@ pub(crate) fn create_recording_session(
     session: Session,
     options: &RecordOptions,
     viewport_cell: ListenableCell<Viewport>,
-) -> Result<(DesktopSession<(), ()>, mpsc::Receiver<usize>), anyhow::Error> {
+) -> Result<(DesktopSession<(), ()>, mpsc::Receiver<Status>), anyhow::Error> {
     viewport_cell.set(options.viewport());
     let (recorder, status_receiver) = Recorder::new(
         options.clone(),
@@ -38,7 +38,7 @@ pub(crate) fn create_recording_session(
 pub(crate) fn record_main(
     mut dsession: DesktopSession<(), ()>,
     options: RecordOptions,
-    status_receiver: mpsc::Receiver<usize>,
+    status_receiver: mpsc::Receiver<Status>,
 ) -> Result<(), anyhow::Error> {
     let progress_style = ProgressStyle::default_bar()
         .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
@@ -69,6 +69,7 @@ pub(crate) fn record_main(
     // Use main thread for universe stepping, raytracer snapshotting, and progress updating.
     // (We could move the universe stepping to another thread to get more precise progress updates,
     // but that doesn't seem necessary.)
+    let mut flaws_total = Flaws::empty();
     {
         let drawing_progress_bar = ProgressBar::new(options.frame_range().size_hint().0 as u64)
             .with_style(progress_style)
@@ -80,15 +81,26 @@ pub(crate) fn record_main(
             dsession.advance_time_and_maybe_step();
 
             // Update progress bar.
-            if let Ok(frame_number) = status_receiver.try_recv() {
+            if let Ok(Status {
+                frame_number,
+                flaws,
+            }) = status_receiver.try_recv()
+            {
                 drawing_progress_bar.set_position((frame_number + 1) as u64);
+                flaws_total |= flaws;
             }
         }
         dsession.recorder.as_mut().unwrap().no_more_frames();
 
         // We've completed sending frames; now block on their completion.
-        while let Ok(frame_number) = status_receiver.recv() {
+        // TODO: deduplicate receiving logic
+        while let Ok(Status {
+            frame_number,
+            flaws,
+        }) = status_receiver.recv()
+        {
             drawing_progress_bar.set_position((frame_number + 1) as u64);
+            flaws_total |= flaws;
         }
         assert_eq!(
             drawing_progress_bar.position() as usize,
@@ -100,6 +112,10 @@ pub(crate) fn record_main(
 
     // Report completion
     eprintln!("\nWrote {}", options.output_path.to_string_lossy());
+    if flaws_total != Flaws::empty() {
+        // TODO: write user-facing formatting for Flaws
+        eprintln!("Flaws in recording: {:?}", flaws_total);
+    }
 
     Ok(())
 }

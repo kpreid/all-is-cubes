@@ -96,6 +96,8 @@ pub(crate) fn add_mesh(
         ),
     ]);
 
+    writer.flaws |= mesh.flaws();
+
     push_and_return_index(
         &mut writer.root.meshes,
         gltf_json::Mesh {

@@ -213,7 +213,7 @@ impl RtRenderer<()> {
     pub fn draw_rgba(
         &self,
         info_text_fn: impl FnOnce(&RaytraceInfo) -> String,
-    ) -> (RgbaImage, RaytraceInfo) {
+    ) -> (RgbaImage, RaytraceInfo, Flaws) {
         let camera = self.cameras.cameras().world.clone();
 
         let Vector2 {
@@ -228,7 +228,16 @@ impl RtRenderer<()> {
             bytemuck::cast_slice_mut::<u8, [u8; 4]>(image.as_mut()),
         );
 
-        (image, info)
+        let options = self.cameras.graphics_options();
+        let mut flaws = Flaws::empty();
+        if self.had_cursor {
+            flaws |= Flaws::NO_CURSOR;
+        }
+        if !matches!(options.fog, FogOption::None) {
+            flaws |= Flaws::NO_FOG;
+        }
+
+        (image, info, flaws)
     }
 }
 
@@ -259,16 +268,7 @@ impl HeadlessRenderer for RtRenderer<()> {
         info_text: &'a str,
     ) -> BoxFuture<'a, Result<(RgbaImage, Flaws), RenderError>> {
         Box::pin(async {
-            let (image, _rt_info) = self.draw_rgba(|_| info_text.to_string());
-
-            let options = self.cameras.graphics_options();
-            let mut flaws = Flaws::empty();
-            if self.had_cursor {
-                flaws |= Flaws::NO_CURSOR;
-            }
-            if !matches!(options.fog, FogOption::None) {
-                flaws |= Flaws::NO_FOG;
-            }
+            let (image, _rt_info, flaws) = self.draw_rgba(|_| info_text.to_string());
 
             Ok((image, flaws))
         })

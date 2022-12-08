@@ -4,6 +4,7 @@ use std::fs::File;
 use std::sync::mpsc;
 
 use all_is_cubes::apps::StandardCameras;
+use all_is_cubes::camera::Flaws;
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::raytracer::RtRenderer;
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
@@ -22,6 +23,7 @@ type FrameNumber = usize;
 pub(crate) struct Recorder {
     /// The number of times [`Self::send_frame`] has been called.
     sending_frame_number: FrameNumber,
+
     inner: RecorderInner,
 }
 
@@ -34,14 +36,24 @@ enum RecorderInner {
     Mesh(write_gltf::MeshRecorder),
 }
 
+/// Per-frame status reports from [`Recorder`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct Status {
+    pub frame_number: FrameNumber,
+
+    /// Flaws detected during the recording process for this frame.
+    pub flaws: Flaws,
+}
+
 impl Recorder {
     /// TODO: This is only implementing part of the [`RecordOptions`] (not the frame timing);
     /// refactor.
     fn new(
         options: RecordOptions,
         cameras: StandardCameras,
-    ) -> Result<(Self, mpsc::Receiver<FrameNumber>), anyhow::Error> {
-        let (mut status_sender, status_receiver) = mpsc::channel();
+    ) -> Result<(Self, mpsc::Receiver<Status>), anyhow::Error> {
+        let (mut status_sender, status_receiver) = mpsc::channel::<Status>();
 
         let inner = match options.output_format {
             RecordFormat::PngOrApng => {
@@ -57,10 +69,17 @@ impl Recorder {
                     .name("renderer".to_string())
                     .spawn({
                         move || {
-                            while let Ok((frame_id, renderer)) = scene_receiver.recv() {
-                                // TODO: error handling
-                                let (image, _info) = renderer.draw_rgba(|_| String::new());
-                                image_data_sender.send((frame_id, image)).unwrap();
+                            while let Ok((frame_number, renderer)) = scene_receiver.recv() {
+                                let (image, _info, flaws) = renderer.draw_rgba(|_| String::new());
+                                image_data_sender
+                                    .send((
+                                        Status {
+                                            frame_number,
+                                            flaws,
+                                        },
+                                        image,
+                                    ))
+                                    .unwrap();
                             }
                         }
                     })?;

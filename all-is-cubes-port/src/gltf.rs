@@ -15,7 +15,7 @@ pub use gltf_json as json;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
-use all_is_cubes::camera::{Camera, ViewTransform};
+use all_is_cubes::camera::{Camera, Flaws, ViewTransform};
 use all_is_cubes::cgmath::{One as _, Vector3};
 use all_is_cubes::mesh::SpaceMesh;
 
@@ -70,6 +70,9 @@ pub struct GltfWriter {
     /// Every mesh index appearing anywhere in `frame_states`.
     /// A set of `Index<gltf_json::Node>`, but that doesn't implement Hash.
     any_time_visible_mesh_nodes: HashSet<usize>,
+
+    /// All flaws encountered so far.
+    flaws: Flaws,
 }
 
 impl GltfWriter {
@@ -95,6 +98,7 @@ impl GltfWriter {
             camera: None,
             frame_states: Vec::new(),
             any_time_visible_mesh_nodes: HashSet::new(),
+            flaws: Flaws::empty(),
         }
     }
 
@@ -112,13 +116,15 @@ impl GltfWriter {
     /// `visible_nodes` is a list of every node that should be visible in the current scene,
     /// which should have been produced by previous calls to [`GltfWriter::add_mesh()`].
     ///
+    /// Returns flaws which come from
+    ///
     /// TODO: This is not a clean API yet; it was designed around the needs of
     /// `all-is-cubes-desktop`'s recording mode.
     pub fn add_frame(
         &mut self,
         our_camera: Option<&Camera>,
         visible_nodes: &[Index<gltf_json::Node>],
-    ) {
+    ) -> Flaws {
         // Create camera if and only if one was given and we didn't have one.
         if self.camera.is_none() {
             if let Some(our_camera) = our_camera.as_ref() {
@@ -136,6 +142,9 @@ impl GltfWriter {
         });
         self.any_time_visible_mesh_nodes
             .extend(visible_nodes.iter().map(|index| index.value()));
+
+        // TODO: report only flaws from this frame
+        self.flaws
     }
 
     /// Add one [`SpaceMesh`], with a containing node, and return its index.

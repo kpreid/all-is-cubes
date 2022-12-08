@@ -102,7 +102,7 @@ pub(super) fn start_gltf_writing(
     options: &RecordOptions,
     mut writer: GltfWriter,
     scene_receiver: mpsc::Receiver<MeshRecordMsg>,
-    status_sender: mpsc::Sender<super::FrameNumber>,
+    status_sender: mpsc::Sender<super::Status>,
 ) -> Result<(), anyhow::Error> {
     // Create file early so we get a prompt error.
     // Currently this path should always have a .gltf extension.
@@ -127,15 +127,20 @@ pub(super) fn start_gltf_writing(
                         );
                         *mesh_index_cell.lock().unwrap() = Some(node_index);
                     }
-                    MeshRecordMsg::FinishFrame(frame_id, camera, meshes) => {
-                        writer.add_frame(
+                    MeshRecordMsg::FinishFrame(frame_number, camera, meshes) => {
+                        let flaws = writer.add_frame(
                             Some(&camera),
                             &meshes
                                 .into_iter()
                                 .filter_map(|lock| *lock.lock().unwrap())
                                 .collect::<Vec<_>>(),
                         );
-                        status_sender.send(frame_id).unwrap();
+                        status_sender
+                            .send(super::Status {
+                                frame_number,
+                                flaws,
+                            })
+                            .unwrap();
                     }
                 }
             }
