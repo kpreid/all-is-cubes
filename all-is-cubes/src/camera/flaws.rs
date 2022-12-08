@@ -33,6 +33,10 @@ bitflags::bitflags! {
         ///
         /// This does not refer to explicitly semitransparent objects within the scene.
         const NO_FOG = 1 << 4;
+
+        /// Surfaces that should have textures rather than a solid color don't.
+        // TODO: Should this just be one of the things TOO_MUCH means?
+        const MISSING_TEXTURES = 1 << 5;
     }
 }
 

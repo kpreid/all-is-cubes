@@ -6,6 +6,7 @@ use cgmath::{Point2, Point3, Transform as _};
 use std::fmt::Debug;
 
 use crate::block::{AnimationChange, EvaluatedBlock, Evoxel, Resolution};
+use crate::camera::Flaws;
 use crate::content::palette;
 use crate::math::{
     Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, OpacityCategory,
@@ -100,6 +101,9 @@ pub struct BlockMesh<V, T> {
     /// (TODO: We could be more precise about which voxels are so frozen -- revisit
     /// whether that's worthwhile.)
     pub(super) voxel_opacity_mask: Option<GridArray<OpacityCategory>>,
+
+    /// Flaws in this mesh, that should be reported as flaws in any rendering containing it.
+    flaws: Flaws,
 }
 
 impl<V, T> BlockMesh<V, T> {
@@ -121,6 +125,12 @@ impl<V, T> BlockMesh<V, T> {
     // TODO: revisit this interface design. Maybe callers should just have an Rc<BlockMesh>?
     pub(crate) fn textures(&self) -> &[T] {
         &self.textures_used
+    }
+
+    /// Reports any flaws in this mesh: reasons why using it to create a rendering would
+    /// fail to accurately represent the scene.
+    pub fn flaws(&self) -> Flaws {
+        self.flaws
     }
 
     /// Returns whether this mesh contains no vertices so it has no visual effect.
@@ -175,6 +185,7 @@ where
         let prefer_textures = block.attributes.animation_hint.redefinition != AnimationChange::None;
 
         let mut used_any_vertex_colors = false;
+        let mut flaws = Flaws::empty();
 
         match block.voxels.as_ref().filter(|_| !options.ignore_voxels) {
             None => {
@@ -218,6 +229,7 @@ where
                     interior_vertices: BlockFaceMesh::default(),
                     textures_used: vec![],
                     voxel_opacity_mask: None,
+                    flaws,
                 }
             }
             Some(voxels) => {
@@ -403,12 +415,10 @@ where
                                     QuadColoring::Texture(texture)
                                 } else {
                                     // Texture allocation failure.
-                                    // TODO: Mark this mesh as defective in the return value, so
-                                    // that when more space is available, it can be retried, rather than
-                                    // having lingering failures.
                                     // TODO: Add other fallback strategies such as using multiple quads instead
                                     // of textures.
                                     used_any_vertex_colors = true;
+                                    flaws |= Flaws::MISSING_TEXTURES;
                                     QuadColoring::Solid(palette::MISSING_TEXTURE_FALLBACK)
                                 }
                             };
@@ -439,6 +449,7 @@ where
                     } else {
                         block.voxel_opacity_mask.clone()
                     },
+                    flaws,
                 }
             }
         }
@@ -455,6 +466,7 @@ impl<V, T> Default for BlockMesh<V, T> {
             interior_vertices: BlockFaceMesh::default(),
             textures_used: Vec::new(),
             voxel_opacity_mask: None,
+            flaws: Flaws::empty(),
         }
     }
 }

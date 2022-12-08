@@ -5,7 +5,7 @@ use pretty_assertions::assert_eq;
 
 use super::*;
 use crate::block::{Block, BlockAttributes, Primitive, Resolution::*, AIR};
-use crate::camera::{GraphicsOptions, TransparencyOption};
+use crate::camera::{Flaws, GraphicsOptions, TransparencyOption};
 use crate::content::{make_some_blocks, make_some_voxel_blocks};
 use crate::math::{
     Face6::{self, *},
@@ -105,6 +105,7 @@ fn excludes_hidden_faces_of_blocks() {
         .unwrap();
     let (_, _, space_mesh) = mesh_blocks_and_space(&space);
 
+    assert_eq!(space_mesh.flaws(), Flaws::empty());
     // The space rendering should be a 2×2×2 cube of tiles, without any hidden interior faces.
     assert_eq!(
         Vec::<&BlockVertex<TtPoint>>::new(),
@@ -136,15 +137,18 @@ fn no_panic_on_missing_blocks() {
     );
     assert_eq!(block_meshes.len(), 1); // check our assumption
 
-    // This should not panic; visual glitches are preferable to failure.
     space.set((0, 0, 0), &block).unwrap(); // render data does not know about this
 
-    SpaceMesh::new(
+    // This should not panic; visual glitches are preferable to failure.
+    let space_mesh = SpaceMesh::new(
         &space,
         space.bounds(),
         &MeshOptions::dont_care_for_test(),
         &*block_meshes,
     );
+
+    // TODO: This should report Flaws::INCOMPLETE
+    assert_eq!(space_mesh.flaws(), Flaws::empty());
 }
 
 /// Construct a 1x1 recursive block and test that this is equivalent in geometry
@@ -486,12 +490,13 @@ fn transparency_split() {
 fn handling_allocation_failure() {
     let resolution = R8;
     let mut u = Universe::new();
+    let [atom1, atom2] = make_some_blocks();
     let complex_block = Block::builder()
         .voxels_fn(&mut u, resolution, |cube| {
             if (cube.x + cube.y + cube.z).rem_euclid(2) == 0 {
-                Rgba::WHITE.into()
+                &atom1
             } else {
-                AIR
+                &atom2
             }
         })
         .unwrap()
@@ -501,23 +506,27 @@ fn handling_allocation_failure() {
     space.set((0, 0, 0), &complex_block).unwrap();
 
     let mut tex = TestTextureAllocator::new();
-    // TODO: Once we support tiling for high resolution blocks, make this a partial failure.
-    let capacity = 0;
-    tex.set_capacity(capacity);
+    tex.set_capacity(0);
     let block_meshes: BlockMeshes<BlockVertex<TtPoint>, _> =
         block_meshes_for_space(&space, &tex, &MeshOptions::dont_care_for_test());
 
     // Check results.
-    assert_eq!(tex.count_allocated(), capacity);
+    assert_eq!(tex.count_allocated(), 0);
     assert_eq!(1, block_meshes.len());
-    // TODO: Check that the mesh includes the failure marker/fallback color.
-    let _complex_block_mesh = &block_meshes[0];
+    // TODO: Check the mesh's color
+    let mesh = &block_meshes[0];
+    assert_eq!(mesh.flaws(), Flaws::MISSING_TEXTURES);
+
+    // Check that the flaw carries over to SpaceMesh.
+    // TODO: No coverage of the *normal* path of SpaceMesh::compute()
+    assert_eq!(SpaceMesh::from(mesh).flaws(), Flaws::MISSING_TEXTURES);
 }
 
 #[test]
 fn space_mesh_empty() {
     let t = SpaceMesh::<BlockVertex<TtPoint>, TestTextureTile>::default();
     assert!(t.is_empty());
+    assert_eq!(t.flaws(), Flaws::empty());
     assert_eq!(t.vertices(), &[]);
     // type annotation to prevent spurious inference failures in the presence
     // of other compiler errors

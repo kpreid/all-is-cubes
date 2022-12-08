@@ -4,6 +4,7 @@ use ordered_float::OrderedFloat;
 use std::fmt::Debug;
 use std::ops::Range;
 
+use crate::camera::Flaws;
 use crate::math::{Face6, GridAab, GridCoordinate, GridPoint, GridRotation};
 use crate::mesh::{BlockMesh, GfxVertex, MeshOptions, TextureTile};
 use crate::space::{BlockIndex, Space};
@@ -39,6 +40,12 @@ pub struct SpaceMesh<V, T> {
     /// Texture tiles used by the vertices; holding these objects is intended to ensure
     /// the texture coordinates stay valid.
     textures_used: Vec<T>,
+
+    /// Flaws in this mesh, that should be reported as flaws in any rendering containing it.
+    //
+    // TODO: evaluate whether we should have a dedicated `MeshFlaws`, once we have seen how
+    // this works out.
+    flaws: Flaws,
 }
 
 impl<V, T> SpaceMesh<V, T> {
@@ -80,6 +87,12 @@ impl<V, T> SpaceMesh<V, T> {
     #[inline]
     pub fn indices(&self) -> &[u32] {
         &self.indices
+    }
+
+    /// Reports any flaws in this mesh: reasons why using it to create a rendering would
+    /// fail to accurately represent the scene.
+    pub fn flaws(&self) -> Flaws {
+        self.flaws
     }
 
     /// True if there is nothing to draw.
@@ -165,6 +178,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
         self.indices.clear();
         self.block_indices_used.clear();
         self.textures_used.clear();
+        self.flaws = Flaws::empty();
 
         // Use temporary buffer for positioning the transparent indices
         // TODO: Consider reuse
@@ -187,6 +201,8 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                 // Capture texture handles to ensure that our texture coordinates stay valid.
                 self.textures_used
                     .extend(block_mesh.textures().iter().cloned());
+                // Record flaws
+                self.flaws |= block_mesh.flaws();
             }
 
             write_block_mesh_to_space_mesh(
@@ -434,6 +450,7 @@ impl<V, T> Default for SpaceMesh<V, T> {
             transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
             block_indices_used: BitVec::new(),
             textures_used: Vec::new(),
+            flaws: Flaws::empty(),
         }
     }
 }
@@ -465,6 +482,7 @@ impl<V: GfxVertex, T: TextureTile> From<&BlockMesh<V, T>> for SpaceMesh<V, T> {
             transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
             block_indices_used,
             textures_used: block_mesh.textures_used.clone(),
+            flaws: block_mesh.flaws(),
         };
 
         let mut transparent_indices = Vec::with_capacity(
