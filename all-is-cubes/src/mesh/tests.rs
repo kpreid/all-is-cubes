@@ -501,6 +501,7 @@ fn handling_allocation_failure() {
         })
         .unwrap()
         .build();
+    let block_derived_color = complex_block.evaluate().unwrap().color;
 
     let mut space = Space::empty_positive(1, 1, 1);
     space.set((0, 0, 0), &complex_block).unwrap();
@@ -513,13 +514,25 @@ fn handling_allocation_failure() {
     // Check results.
     assert_eq!(tex.count_allocated(), 0);
     assert_eq!(1, block_meshes.len());
-    // TODO: Check the mesh's color
     let mesh = &block_meshes[0];
     assert_eq!(mesh.flaws(), Flaws::MISSING_TEXTURES);
 
     // Check that the flaw carries over to SpaceMesh.
     // TODO: No coverage of the *normal* path of SpaceMesh::compute()
-    assert_eq!(SpaceMesh::from(mesh).flaws(), Flaws::MISSING_TEXTURES);
+    let space_mesh = SpaceMesh::from(mesh);
+    assert_eq!(space_mesh.flaws(), Flaws::MISSING_TEXTURES);
+
+    // Check the color of the produced mesh. (Easier to do with SpaceMesh.)
+    let allowed_colors = [atom1.color(), atom2.color(), block_derived_color];
+    for vertex in space_mesh.vertices() {
+        match vertex.coloring {
+            Coloring::Solid(c) if allowed_colors.contains(&c) => { /* OK */ }
+            Coloring::Solid(c) => {
+                panic!("unexpected color {c:?}")
+            }
+            t @ Coloring::Texture { .. } => panic!("unexpected texture {t:?}"),
+        }
+    }
 }
 
 #[test]

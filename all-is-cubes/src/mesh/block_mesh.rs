@@ -7,7 +7,6 @@ use std::fmt::Debug;
 
 use crate::block::{AnimationChange, EvaluatedBlock, Evoxel, Resolution};
 use crate::camera::Flaws;
-use crate::content::palette;
 use crate::math::{
     Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, OpacityCategory,
     Rgba,
@@ -184,22 +183,22 @@ where
         // If this is true, avoid using vertex coloring even on solid rectangles.
         let prefer_textures = block.attributes.animation_hint.redefinition != AnimationChange::None;
 
+        let block_color = options.transparency.limit_alpha(block.color);
+
         let mut used_any_vertex_colors = false;
         let mut flaws = Flaws::empty();
 
         match block.voxels.as_ref().filter(|_| !options.ignore_voxels) {
             None => {
                 let face_vertices = FaceMap::from_fn(|face| {
-                    let color = options.transparency.limit_alpha(block.color);
-
                     let mut vertices: Vec<V> = Vec::new();
                     let mut indices_opaque: Vec<u32> = Vec::new();
                     let mut indices_transparent: Vec<u32> = Vec::new();
-                    if !color.fully_transparent() {
+                    if !block_color.fully_transparent() {
                         vertices.reserve_exact(4);
                         push_quad(
                             &mut vertices,
-                            if color.fully_opaque() {
+                            if block_color.fully_opaque() {
                                 indices_opaque.reserve_exact(6);
                                 &mut indices_opaque
                             } else {
@@ -211,12 +210,12 @@ where
                             Point2 { x: 0., y: 0. },
                             Point2 { x: 1., y: 1. },
                             // TODO: Respect the prefer_textures option.
-                            QuadColoring::<A::Tile>::Solid(color),
+                            QuadColoring::<A::Tile>::Solid(block_color),
                         );
                         used_any_vertex_colors = true;
                     }
                     BlockFaceMesh {
-                        fully_opaque: color.fully_opaque(),
+                        fully_opaque: block_color.fully_opaque(),
                         vertices,
                         indices_opaque,
                         indices_transparent,
@@ -415,11 +414,14 @@ where
                                     QuadColoring::Texture(texture)
                                 } else {
                                     // Texture allocation failure.
-                                    // TODO: Add other fallback strategies such as using multiple quads instead
-                                    // of textures.
+                                    // Report the flaw and use block color as a fallback.
+                                    // Further improvement that could be had here:
+                                    // * Compute and use per-face colors in EvaluatedBlock
+                                    // * Offer the alternative of generating as much
+                                    //   geometry as needed.
                                     used_any_vertex_colors = true;
                                     flaws |= Flaws::MISSING_TEXTURES;
-                                    QuadColoring::Solid(palette::MISSING_TEXTURE_FALLBACK)
+                                    QuadColoring::Solid(block_color)
                                 }
                             };
 

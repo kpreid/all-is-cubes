@@ -63,6 +63,10 @@ palette! {
     // Rendering fallbacks.
     /// Used on the surface of a mesh where there should be a texture, but something went
     /// wrong.
+    ///
+    /// TODO: This is no longer actually used, as the mesh generation now explicitly
+    /// reports flaws while using an approximate value. But perhaps we should use this
+    /// for another error condition.
     MISSING_TEXTURE_FALLBACK = srgb[0xFF 0x00 0xBB 0xFF];
     /// Used when a recursive block definition should have provided a voxel color but did not.
     MISSING_VOXEL_FALLBACK = srgb[0xBB 0x00 0xFF 0xFF];
