@@ -133,7 +133,7 @@ pub(crate) async fn demo_city(
     {
         let grass_noise = noise::ScaleBias::new(noise::OpenSimplex::new(0x21b5cc6b))
             .set_bias(0.0)
-            .set_scale(4.0);
+            .set_scale(8.0);
         let grass_threshold = 1.2;
         space.fill(
             GridAab::from_lower_upper((-radius_xz, 1, -radius_xz), (radius_xz, 2, radius_xz)),
@@ -175,13 +175,21 @@ pub(crate) async fn demo_city(
                 for (side, &p) in [-(road_radius + 1), road_radius + 1].iter().enumerate() {
                     let position = step.cube_ahead() + perpendicular * p + curb_y;
 
+                    // Place curb and combine it with other curb blocks .
+                    let mut to_compose_with = space[position].clone();
+                    // TODO: .unspecialize() is a maybe expensive way to make this test, and
+                    // this isn't the first time this has come up. Benchmark a "block view"
+                    // to cheaply filter out modifiers.
+                    if to_compose_with.clone().unspecialize() != demo_blocks[Curb] {
+                        to_compose_with = AIR;
+                    }
                     space.set(
                         position,
                         block::Composite::new(
                             demo_blocks[Curb].clone().rotate(rotations[side]),
                             block::CompositeOperator::Over,
                         )
-                        .compose_or_replace(space[position].clone()),
+                        .compose_or_replace(to_compose_with),
                     )?;
                 }
             }
@@ -297,16 +305,19 @@ pub(crate) async fn demo_city(
             .find_plot(enclosure_footprint)
             .expect("Out of city space!");
         let plot = exhibit_footprint.transform(plot_transform).unwrap();
+        let enclosure_at_plot = enclosure_footprint.transform(plot_transform).unwrap();
 
-        // Mark the exhibit bounds
+        // Create enclosure, with a block replacing all ground blocks 1 block around,
+        // and everything else cleared
         let enclosure = GridAab::from_lower_upper(
-            plot.lower_bounds().map(|x| x - 1),
+            enclosure_at_plot.lower_bounds(),
             [
-                plot.upper_bounds().x + 1,
+                enclosure_at_plot.upper_bounds().x,
                 1.max(plot.lower_bounds()[1]), // handles case where plot is floating
-                plot.upper_bounds().z + 1,
+                enclosure_at_plot.upper_bounds().z,
             ],
         );
+        space.fill_uniform(enclosure_at_plot, &AIR)?;
         space.fill_uniform(enclosure, &demo_blocks[ExhibitBackground])?;
         exhibit_progress.progress(0.9).await;
 
