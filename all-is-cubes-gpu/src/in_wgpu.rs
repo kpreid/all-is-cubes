@@ -129,7 +129,12 @@ impl SurfaceRenderer {
             }
         }
 
+        // If the GPU is busy, `get_current_texture()` blocks until a previous texture
+        // is no longer in use (except on wasm, in which case submit() seems to take the time).
+        let before_get = Instant::now();
         let output = self.surface.get_current_texture()?;
+        let after_get = Instant::now();
+
         let draw_info = self.everything.draw_frame_linear(&self.queue)?;
 
         // Construct aggregated info.
@@ -144,6 +149,7 @@ impl SurfaceRenderer {
             },
         } = draw_info.space_info;
         let info = RenderInfo {
+            waiting_for_gpu: after_get.duration_since(before_get),
             flaws: update_info.flaws | world_flaws | ui_flaws,
             update: update_info,
             draw: draw_info,

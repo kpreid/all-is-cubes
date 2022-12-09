@@ -13,6 +13,7 @@ use all_is_cubes::util::{CustomFormat, StatusText};
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct RenderInfo {
+    pub(crate) waiting_for_gpu: Duration,
     pub(crate) update: UpdateInfo,
     pub(crate) draw: DrawInfo,
     pub flaws: Flaws,
@@ -65,6 +66,7 @@ pub struct DrawInfo {
 impl CustomFormat<StatusText> for RenderInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
         let &Self {
+            waiting_for_gpu,
             update:
                 UpdateInfo {
                     flaws: _, // flaws are aggregated up
@@ -83,7 +85,8 @@ impl CustomFormat<StatusText> for RenderInfo {
             flaws,
         } = self;
 
-        let total_time = update_time
+        let total_time = waiting_for_gpu
+            .saturating_add(update_time)
             .saturating_add(draw_time.world)
             .saturating_add(draw_time.ui);
 
@@ -91,8 +94,9 @@ impl CustomFormat<StatusText> for RenderInfo {
         write!(
             fmt,
             // TODO: adjust this format to account for more pieces
-            "Frame time: {} (update {}, draw world {}, ui {}",
+            "Frame time: {} (GPU wait {}, update {}, draw world {}, ui {}",
             total_time.custom_format(StatusText),
+            waiting_for_gpu.custom_format(StatusText),
             update_time.custom_format(StatusText),
             draw_time.world.custom_format(StatusText),
             draw_time.ui.custom_format(StatusText),
