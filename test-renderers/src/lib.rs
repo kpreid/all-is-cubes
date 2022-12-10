@@ -21,6 +21,7 @@
 )]
 
 use std::fs;
+use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -167,7 +168,16 @@ pub fn compare_rendered_image(
             .save(&diff_file_path)
             .expect("failed to write renderer diff image");
     } else {
-        fs::remove_file(&diff_file_path).expect("failed to delete renderer diff image");
+        match fs::remove_file(&diff_file_path) {
+            Ok(()) => {}
+            Err(e) if matches!(e.kind(), io::ErrorKind::NotFound) => {}
+            Err(e) => {
+                panic!(
+                    "failed to delete renderer diff image {p}: {e}",
+                    p = diff_file_path.display()
+                )
+            }
+        }
     }
 
     ComparisonRecord::from_paths(
