@@ -1105,13 +1105,9 @@ async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
         "Blocks from the UI system (inactive)",
 )]
 async fn UI_BLOCKS(_: &Exhibit, universe: &mut Universe) {
-    ui_blocks_exhibit(universe).await
-}
+    // TODO: This was designed for a render test and is still shaped for that rather than
+    // any-viewpoint examination.
 
-/// Display all the [`Icons`] and [`UiBlocks`].
-/// Separate function for the UI blocks exhibit which we can use in render tests as well.
-#[doc(hidden)]
-pub async fn ui_blocks_exhibit(universe: &mut Universe) -> Result<Space, InGenError> {
     use all_is_cubes::vui::blocks::ToolbarButtonState;
     use all_is_cubes::vui::blocks::UiBlocks;
 
@@ -1120,18 +1116,18 @@ pub async fn ui_blocks_exhibit(universe: &mut Universe) -> Result<Space, InGenEr
 
     let ui_blocks = BlockProvider::<UiBlocks>::using(universe)?;
     let ui_blocks = ui_blocks
-        .iter()
-        .filter(|&(key, _)| match key {
-            // Filter out large number of pointer blocks
-            UiBlocks::ToolbarPointer([
-                ToolbarButtonState::Unmapped,
-                ToolbarButtonState::Mapped,
-                ToolbarButtonState::Pressed
-            ]) => true,
-            UiBlocks::ToolbarPointer(_) => false,
-            _ => true,
-        })
-        .map(|(_, block)| block.clone());
+            .iter()
+            .filter(|&(key, _)| match key {
+                // Filter out large number of pointer blocks
+                UiBlocks::ToolbarPointer([
+                    ToolbarButtonState::Unmapped,
+                    ToolbarButtonState::Mapped,
+                    ToolbarButtonState::Pressed
+                ]) => true,
+                UiBlocks::ToolbarPointer(_) => false,
+                _ => true,
+            })
+            .map(|(_, block)| block.clone());
 
     let all_blocks: Vec<Block> = icons.chain(ui_blocks).collect();
 

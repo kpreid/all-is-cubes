@@ -33,8 +33,8 @@ use all_is_cubes::vui::{
 };
 
 use crate::{
-    clouds::clouds, logo::logo_text, noise::NoiseFnExt, space_to_space_copy, wavy_landscape,
-    DemoBlocks, LandscapeBlocks, DEMO_CITY_EXHIBITS,
+    clouds::clouds, exhibits::DEMO_CITY_EXHIBITS, logo::logo_text, noise::NoiseFnExt,
+    space_to_space_copy, wavy_landscape, DemoBlocks, LandscapeBlocks,
 };
 
 pub(crate) async fn demo_city(

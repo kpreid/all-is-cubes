@@ -81,7 +81,7 @@ impl vui::Widget for ActionButton {
 /// The [`fmt::Display`] implementation of this type produces a string form suitable for
 /// naming blocks depicting this state; the [`Exhaust`] implementation allows iterating
 /// over all possible states.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, Exhaust)]
 #[non_exhaustive]
 pub struct ActionButtonVisualState {
     // TODO: Add hover, pressed, disabled
@@ -202,6 +202,13 @@ impl fmt::Display for ToggleButtonVisualState {
             Self { value: true } => write!(f, "on"),
             Self { value: false } => write!(f, "off"),
         }
+    }
+}
+
+impl ToggleButtonVisualState {
+    /// Returns the “off” (false) or “on” (true) state.
+    pub const fn new(value: bool) -> Self {
+        Self { value }
     }
 }
 

@@ -15,12 +15,13 @@ use all_is_cubes::camera::{
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector2, Vector3};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use all_is_cubes::math::{Face6, GridAab, GridPoint, GridRotation, NotNan, Rgb};
+use all_is_cubes::math::{
+    Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, NotNan, Rgb,
+};
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::transaction::Transaction;
 use all_is_cubes::universe::{RefError, URef, Universe, UniverseIndex, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::vui::{blocks::UiBlocks, Icons};
 use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::{make_some_voxel_blocks, palette};
 
@@ -362,11 +363,20 @@ async fn follow_options_change(mut context: RenderTestContext) {
         .await;
 }
 
-/// Display all the [`Icons`] and [`UiBlocks`].
+/// Display some of the [`Icons`] and [`UiBlocks`].
 ///
 /// This is more of a content test than a renderer test, except that it also
 /// exercises the renderers with various block shapes.
+///
+/// It does not draw everything because that would mean the render test requires an
+/// update every time a new UI block is added, which is tedious and not a greatly useful
+/// test.
 async fn icons(mut context: RenderTestContext) {
+    use all_is_cubes::linking::{BlockModule, BlockProvider};
+    use all_is_cubes::vui::blocks::{ToolbarButtonState, UiBlocks};
+    use all_is_cubes::vui::widgets::{ActionButtonVisualState, ToggleButtonVisualState};
+    use all_is_cubes::vui::Icons;
+
     let universe = &mut Universe::new();
     Icons::new(universe, YieldProgress::noop())
         .await
@@ -377,9 +387,74 @@ async fn icons(mut context: RenderTestContext) {
         .install(universe)
         .unwrap();
 
-    let mut space = all_is_cubes_content::ui_blocks_exhibit(universe)
-        .await
-        .unwrap();
+    fn get_blocks<E: BlockModule + 'static>(
+        universe: &Universe,
+        keys: impl IntoIterator<Item = E>,
+    ) -> impl Iterator<Item = Block> {
+        let provider = BlockProvider::<E>::using(universe).unwrap();
+        keys.into_iter().map(move |key| provider[key].clone())
+    }
+
+    let icons = get_blocks(
+        universe,
+        [
+            Icons::Activate,
+            Icons::Delete,
+            Icons::PushPull,
+            Icons::Jetpack { active: false },
+            Icons::Jetpack { active: true },
+        ],
+    );
+
+    let ui_blocks = get_blocks(
+        universe,
+        [
+            UiBlocks::Crosshair,
+            UiBlocks::ToolbarSlotFrame,
+            UiBlocks::ToolbarPointer([
+                ToolbarButtonState::Unmapped,
+                ToolbarButtonState::Mapped,
+                ToolbarButtonState::Pressed,
+            ]),
+            UiBlocks::BackButton(ActionButtonVisualState::default()),
+            UiBlocks::DebugInfoTextButton(ToggleButtonVisualState::new(false)),
+            UiBlocks::DebugInfoTextButton(ToggleButtonVisualState::new(true)),
+            UiBlocks::DebugLightRaysButton(ToggleButtonVisualState::new(false)),
+            UiBlocks::DebugLightRaysButton(ToggleButtonVisualState::new(true)),
+        ],
+    );
+
+    let all_blocks: Vec<Block> = icons.chain(ui_blocks).collect();
+
+    // Compute layout
+    let count = all_blocks.len() as GridCoordinate;
+    let row_length = 4;
+    let bounds = GridAab::from_lower_upper(
+        [0, 0, 0],
+        [row_length, ((count + row_length - 1) / row_length), 2],
+    );
+
+    // Fill space with blocks
+    let mut space = Space::builder(bounds)
+        .spawn_position(Point3::new(
+            FreeCoordinate::from(bounds.size().x) / 2.,
+            FreeCoordinate::from(bounds.size().y) / 2.,
+            FreeCoordinate::from(bounds.size().y) * 1.5,
+        ))
+        .build();
+    for (index, block) in all_blocks.into_iter().enumerate() {
+        let index = index as GridCoordinate;
+        space
+            .set(
+                [
+                    index.rem_euclid(row_length),
+                    index.div_euclid(row_length),
+                    0,
+                ],
+                block,
+            )
+            .unwrap();
+    }
 
     let aspect_ratio = f64::from(space.bounds().size().y) / f64::from(space.bounds().size().x);
 
