@@ -89,21 +89,36 @@ fn compute_fog(world_position: vec3<f32>) -> f32 {
 // Vertex-to-fragment data for blocks
 struct BlockFragmentInput {
     @builtin(position) clip_position: vec4<f32>,
+    
     @location(0) world_position: vec3<f32>,
-    // Cube position in world coordinates, used for space data lookups
-    // (currently only LightingOption::Flat).
-    @location(1) world_cube: vec3<f32>,
-    @location(2) normal: vec3<f32>,
-    @location(3) color_or_texture: vec4<f32>,
-    @location(4) clamp_min: vec3<f32>,
-    @location(5) clamp_max: vec3<f32>,
-    @location(6) fog_mix: f32,
+    
     // Position of the fragment relative to the cube it belongs to.
     // Range of 0.0 to 1.0 inclusive.
-    @location(7) position_in_cube: vec3<f32>,
+    @location(1) position_in_cube: vec3<f32>,
+
+    // Cube position in world coordinates, used for space data lookups
+    // (currently only LightingOption::Flat).
+    @location(2) world_cube: vec3<f32>,
+
+    // Vectors making up a transformation matrix from tangent space to world space,
+    // also known as a TBN (tangent, bitangent, normal) matrix.
+    // One of them is the normal vector.
+    // Both tangents are always positive.
+    //
+    // Used to look up world light data when computing interpolated light.
+    @location(3) tangent: vec3<f32>,
+    @location(4) bitangent: vec3<f32>,
+    @location(5) normal: vec3<f32>,
+    
+    @location(6) color_or_texture: vec4<f32>,
+    @location(7) clamp_min: vec3<f32>,
+    @location(8) clamp_max: vec3<f32>,
+    
+    @location(9) fog_mix: f32,
+
     // Direction vector, in the world coordinate system, which points
     // from the camera position to this fragment.
-    @location(8) camera_ray_direction: vec3<f32>,
+    @location(10) camera_ray_direction: vec3<f32>,
 };
 
 @vertex
@@ -138,6 +153,16 @@ fn block_vertex_main(
         case 6u { normal = vec3<f32>(0.0, 0.0, 1.0); }
         default {}
     }
+    
+    // Generate tangents (with always positive components).
+    // TODO: Would it be better to just put this in the above switch statement?
+    // TODO: Is the always-positive rule actually needed?
+    var tangent = vec3<f32>(0.0, 1.0, 0.0);
+    var bitangent = vec3<f32>(0.0, 0.0, 1.0);
+    if (normal.x == 0.0) {
+        tangent = vec3<f32>(1.0, 0.0, 0.0);
+        bitangent = abs(cross(tangent, normal));
+    }
 
     let combined_matrix = camera.projection * camera.view_matrix;
     // TODO: eventually this should become a camera-relative position, not a world position.
@@ -147,13 +172,15 @@ fn block_vertex_main(
     return BlockFragmentInput(
         /* clip_position = */ combined_matrix * vec4<f32>(world_position, 1.0),
         world_position,
+        position_in_cube,
         /* world_cube = */ instance_input.translation + vec3<f32>(cube),
+        tangent,
+        bitangent,
         normal,
         input.color_or_texture,
         input.clamp_min,
         input.clamp_max,
         compute_fog(world_position),
-        position_in_cube,
         // Note that we do not normalize this vector: by keeping things linear, we
         // allow linear interpolation between vertices to get the right answer.
         /* camera_ray_direction = */ world_position - camera.view_position,
@@ -268,19 +295,6 @@ fn ao_fudge(light_value: vec4<f32>) -> vec4<f32> {
 // Compute the interpolated ('smooth') light for the surface from light_texture.
 // This implementation is duplicated in Rust at all-is-cubes/src/raytracer.rs
 fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
-    // Choose two vectors that are perpendicular to each other and the normal,
-    // and in the positive direction on that axis.
-    // Assumes in.normal is an axis-aligned unit vector.
-    var v_perpendicular_1: vec3<f32>;
-    var v_perpendicular_2: vec3<f32>;
-    if (in.normal.x != 0.0) {
-        v_perpendicular_1 = vec3<f32>(0.0, 1.0, 0.0);
-        v_perpendicular_2 = vec3<f32>(0.0, 0.0, 1.0);
-    } else {
-        v_perpendicular_1 = vec3<f32>(1.0, 0.0, 0.0);
-        v_perpendicular_2 = abs(cross(v_perpendicular_1, in.normal));
-    }
-
     // About half the size of the smallest permissible voxel.
     let above_surface_epsilon = 0.5 / 256.0;
 
@@ -289,12 +303,12 @@ fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
 
     // Find linear interpolation coefficients based on where we are relative to
     // a half-cube-offset grid.
-    var mix_1: f32 = modulo(dot(origin, v_perpendicular_1) - 0.5, 1.0);
-    var mix_2: f32 = modulo(dot(origin, v_perpendicular_2) - 0.5, 1.0);
+    var mix_1: f32 = modulo(dot(origin, in.tangent) - 0.5, 1.0);
+    var mix_2: f32 = modulo(dot(origin, in.bitangent) - 0.5, 1.0);
 
-    // Ensure that mix <= 0.5, i.e. the 'near' side below is the side we are on
-    var dir_1: vec3<f32> = v_perpendicular_1;
-    var dir_2: vec3<f32> = v_perpendicular_2;
+    // Ensure that mix <= 0.5, i.e. the 'near' side below is the side we are on.
+    var dir_1: vec3<f32> = in.tangent;
+    var dir_2: vec3<f32> = in.bitangent;
     if (mix_1 > 0.5) {
         dir_1 = dir_1 * -1.0;
         mix_1 = 1.0 - mix_1;
