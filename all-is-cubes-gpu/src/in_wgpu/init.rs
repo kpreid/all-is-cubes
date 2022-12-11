@@ -93,6 +93,22 @@ where
     }
 
     let size_of_texel = components * std::mem::size_of::<C>();
+
+    // Check alignment
+    {
+        let alignment = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
+        let width = usize::try_from(dimensions.x).unwrap();
+        let bytes_per_row = width * size_of_texel;
+        if bytes_per_row % alignment != 0 {
+            // Produce a more helpful error than wgpu's validation error.
+            // TODO: Repack the bytes instead.
+            panic!(
+                "Cannot copy {width} texels of {size_of_texel} bytes = \
+                {bytes_per_row} bytes per row, which is not aligned to {alignment}"
+            );
+        }
+    }
+
     let temp_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("GPU-to-CPU image copy buffer"),
         size: u64::from(dimensions.x)
