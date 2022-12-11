@@ -40,6 +40,7 @@ mod camera;
 mod frame_texture;
 use frame_texture::{DrawableTexture, FramebufferTextures};
 mod glue;
+pub mod headless;
 #[doc(hidden)]
 pub mod init;
 mod pipelines;
