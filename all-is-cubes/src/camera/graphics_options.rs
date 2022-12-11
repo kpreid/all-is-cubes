@@ -28,6 +28,10 @@ pub struct GraphicsOptions {
     /// [`tone_mapping`](ToneMappingOperator).
     pub exposure: ExposureOption,
 
+    /// Proportion of bloom (blurred image) to mix into the original image.
+    /// 0.0 is no bloom and 1.0 is no original image.
+    pub bloom_intensity: NotNan<f32>,
+
     /// Distance, in unit cubes, from the camera to the farthest visible point.
     ///
     /// TODO: Implement view distance limit (and fog) in raytracer.
@@ -89,6 +93,7 @@ impl GraphicsOptions {
     /// (except for quantization error and background colors) to the [`Rgba`] colors
     /// in the depicted [`Atom`](crate::block::Primitive::Atom)s.
     ///
+    /// * [`Self::bloom_intensity`] = `0`
     /// * [`Self::fog`] = [`FogOption::None`]
     /// * [`Self::lighting_display`] = [`LightingOption::None`]
     /// * [`Self::tone_mapping`] = [`ToneMappingOperator::Clamp`]
@@ -101,6 +106,7 @@ impl GraphicsOptions {
         // TODO: Change tone mapping default once we have a good implementation.
         tone_mapping: ToneMappingOperator::Clamp,
         exposure: ExposureOption::Fixed(notnan!(1.)),
+        bloom_intensity: notnan!(0.),
         view_distance: notnan!(200.),
         lighting_display: LightingOption::None,
         transparency: TransparencyOption::Volumetric,
@@ -118,6 +124,7 @@ impl GraphicsOptions {
     #[must_use]
     pub fn repair(mut self) -> Self {
         self.fov_y = self.fov_y.clamp(NotNan::from(1), NotNan::from(189));
+        self.bloom_intensity = self.bloom_intensity.clamp(notnan!(0.0), notnan!(1.0));
         self.view_distance = self
             .view_distance
             .clamp(NotNan::from(1), NotNan::from(10000));
@@ -137,6 +144,7 @@ impl Default for GraphicsOptions {
             // TODO: Change tone mapping default once we have a good implementation.
             tone_mapping: ToneMappingOperator::Clamp,
             exposure: ExposureOption::default(),
+            bloom_intensity: notnan!(0.125),
             view_distance: NotNan::from(200),
             lighting_display: LightingOption::Smooth,
             transparency: TransparencyOption::Volumetric,
@@ -345,6 +353,7 @@ mod tests {
                 fog: FogOption::None,
                 tone_mapping: ToneMappingOperator::Clamp,
                 exposure: ExposureOption::Fixed(NotNan::one()),
+                bloom_intensity: NotNan::from(0u8),
                 lighting_display: LightingOption::None,
                 antialiasing: AntialiasingOption::None,
                 ..GraphicsOptions::default()

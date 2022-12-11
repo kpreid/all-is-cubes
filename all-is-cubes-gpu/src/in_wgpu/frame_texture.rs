@@ -5,6 +5,7 @@ use all_is_cubes::camera::{Flaws, GraphicsOptions};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
 
+use super::bloom;
 use crate::EgFramebuffer;
 
 /// A RGBA [`wgpu::Texture`] with a local buffer that can be drawn on.
@@ -166,6 +167,9 @@ pub(crate) struct FramebufferTextures {
 
     /// Depth texture to pair with `linear_scene_texture`.
     pub(crate) depth_texture_view: wgpu::TextureView,
+
+    /// Resources necessary for computing bloom if enabled.
+    pub(crate) bloom: Option<bloom::BloomResources>,
 }
 
 impl FramebufferTextures {
@@ -220,6 +224,7 @@ impl FramebufferTextures {
         } else {
             None
         };
+
         let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("depth_texture"),
             size: config.size,
@@ -231,12 +236,29 @@ impl FramebufferTextures {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         });
 
+        let linear_scene_view = linear_scene_tex.create_view(&Default::default());
+        let linear_scene_resolved_view = linear_scene_resolved_tex
+            .as_ref()
+            .map(|t| t.create_view(&Default::default()));
+
+        // TODO: duplicative with scene_for_postprocessing_input
+        let bloom_input_view = if let Some(resolved) = &linear_scene_resolved_view {
+            resolved
+        } else {
+            &linear_scene_view
+        };
+
         Self {
-            linear_scene_view: linear_scene_tex
-                .create_view(&wgpu::TextureViewDescriptor::default()),
-            linear_scene_resolved_view: linear_scene_resolved_tex
-                .as_ref()
-                .map(|t| t.create_view(&wgpu::TextureViewDescriptor::default())),
+            bloom: Some(bloom::BloomResources::new(
+                device,
+                // TODO: Don't reconstruct on every resize, but reuse it. Has a circularity
+                // problem with needing FbtConfig, but it really only needs FbtFeatures.
+                bloom::BloomPipelines::new(device, config.linear_scene_texture_format),
+                &config,
+                bloom_input_view,
+            )),
+            linear_scene_view,
+            linear_scene_resolved_view,
             depth_texture_view: depth_texture.create_view(&Default::default()),
 
             config,
@@ -317,6 +339,14 @@ impl FramebufferTextures {
     pub(crate) fn flaws(&self) -> Flaws {
         self.config.flaws
     }
+
+    pub(crate) fn bloom_data_texture(&self) -> &wgpu::TextureView {
+        &self
+            .bloom
+            .as_ref()
+            .expect("TODO: disabling bloom not implemented")
+            .bloom_output_texture_view
+    }
 }
 
 /// A decision about what texture format [`FramebufferTextures`] should employ,
@@ -329,7 +359,7 @@ pub(crate) struct FbtConfig {
     features: FbtFeatures,
 
     /// Size of all textures.
-    size: wgpu::Extent3d,
+    pub(crate) size: wgpu::Extent3d,
 
     /// Texture format of the `linear_scene` and `linear_scene_resolved`.
     ///

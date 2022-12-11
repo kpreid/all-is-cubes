@@ -5,6 +5,7 @@
 use std::mem;
 use std::sync::Arc;
 
+use all_is_cubes::notnan;
 use instant::Instant;
 use once_cell::sync::Lazy;
 
@@ -35,6 +36,7 @@ use crate::{
 };
 
 mod block_texture;
+mod bloom;
 mod camera;
 mod frame_texture;
 use frame_texture::{DrawableTexture, FramebufferTextures};
@@ -294,6 +296,17 @@ impl EverythingRenderer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
                             min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    // Binding for bloom_texture
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
                         },
                         count: None,
                     },
@@ -733,7 +746,7 @@ impl EverythingRenderer {
         } else {
             SpaceDrawInfo::default()
         };
-        let ui_to_submit_time = Instant::now();
+        let ui_to_postprocess_time = Instant::now();
 
         // Write the postprocess camera data.
         // Note: this can't use the StagingBelt because it was already finish()ed.
@@ -746,6 +759,14 @@ impl EverythingRenderer {
             )),
         );
 
+        if self.cameras.graphics_options().bloom_intensity > notnan!(0.0) {
+            if let Some(bloom) = &self.fb.bloom {
+                bloom.run(&mut encoder);
+            }
+        }
+
+        // let postprocess_to_submit_time = Instant::now();
+
         queue.submit(std::iter::once(encoder.finish()));
         self.staging_belt.recall();
 
@@ -753,13 +774,14 @@ impl EverythingRenderer {
         Ok(DrawInfo {
             times: Layers {
                 world: world_to_lines_time.duration_since(start_draw_time),
-                ui: ui_to_submit_time.duration_since(lines_to_ui_time),
+                ui: ui_to_postprocess_time.duration_since(lines_to_ui_time),
             },
             space_info: Layers {
                 world: world_draw_info,
                 ui: ui_draw_info,
             },
-            submit_time: Some(end_time.duration_since(ui_to_submit_time)), // also counting recall()
+            // TODO: count bloom (call it postprocess) time separately from submit
+            submit_time: Some(end_time.duration_since(ui_to_postprocess_time)),
         })
     }
 
@@ -831,6 +853,12 @@ impl EverythingRenderer {
                             wgpu::BindGroupEntry {
                                 binding: 3,
                                 resource: self.postprocess_camera_buffer.as_entire_binding(),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 4,
+                                resource: wgpu::BindingResource::TextureView(
+                                    self.fb.bloom_data_texture(),
+                                ),
                             },
                         ],
                         label: Some("EverythingRenderer::postprocess_bind_group"),

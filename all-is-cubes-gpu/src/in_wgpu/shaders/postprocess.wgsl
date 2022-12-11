@@ -4,7 +4,8 @@
 struct ShaderPostprocessCamera {
     tone_mapping_id: i32,
     scene_texture_valid: i32,
-    _padding: vec2<i32>,
+    bloom_intensity: f32,
+    _padding: f32,
 };
 
 
@@ -13,6 +14,7 @@ struct ShaderPostprocessCamera {
 @group(0) @binding(1) var text_sampler: sampler;
 @group(0) @binding(2) var linear_scene_texture: texture_2d<f32>;
 @group(0) @binding(3) var<uniform> camera: ShaderPostprocessCamera;
+@group(0) @binding(4) var bloom_texture: texture_2d<f32>;
 
 // --- Vertex shader -----------------------------------------------------------
 
@@ -58,21 +60,30 @@ fn tone_map(linear_rgb: vec3<f32>) -> vec3<f32> {
 // Fetch scene pixel, if scene texture is present.
 // (It may be absent because there might have been nothing to draw in previous stages.)
 fn scene_pixel(texcoord: vec2<f32>) -> vec4<f32> {
-    var scene_color: vec4<f32>;
-    if (camera.scene_texture_valid != 0) {
-        scene_color = textureSampleLevel(
-            linear_scene_texture,
-            text_sampler,
-            texcoord,
-            0.0
-        );
-    } else {
+    if (camera.scene_texture_valid == 0) {
         // TODO: make this a checkerboard or something to distinguish from “oops, all black”.
         // (And when we do that, also use it for UI-on-top-of-nothing, by reading the alpha.)
         // Note: this color is equal to all_is_cubes::palette::NO_WORLD_TO_SHOW.
-        scene_color = vec4<f32>(0.5, 0.5, 0.5, 1.0);
+        return vec4<f32>(0.5, 0.5, 0.5, 1.0);
     }
-    return scene_color;
+
+    var scene_color: vec4<f32> = textureSampleLevel(
+        linear_scene_texture,
+        text_sampler,
+        texcoord,
+        0.0
+    );
+
+    // Add bloom.
+    let bloom_color = textureSampleLevel(
+        bloom_texture,
+        text_sampler, // TODO: probably provide a sampler specifically for bloom?
+        texcoord,
+        0.0
+    );
+
+    // TODO: think about what alpha handling we want
+    return vec4<f32>(mix(scene_color.rgb, bloom_color.rgb, camera.bloom_intensity), scene_color.a);
 }
 
 // Given a point in the viewport using 0-1 coordinates, find the opacity the info text's

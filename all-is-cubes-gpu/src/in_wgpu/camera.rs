@@ -104,8 +104,10 @@ pub(crate) struct ShaderPostprocessCamera {
     /// indication instead of reading the scene texture.
     texture_is_valid: i32,
 
+    bloom_intensity: f32,
+
     /// pad out to multiple of vec4<something32>
-    _padding: [i32; 2],
+    _padding: f32,
 }
 
 impl ShaderPostprocessCamera {
@@ -118,6 +120,8 @@ impl ShaderPostprocessCamera {
             },
 
             texture_is_valid: i32::from(texture_is_valid),
+
+            bloom_intensity: options.bloom_intensity.into_inner(),
 
             _padding: Default::default(),
         }
