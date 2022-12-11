@@ -187,7 +187,13 @@ fn main() -> Result<(), ActionError> {
             cmd!("npm start").run()?;
         }
         XtaskCommand::RunGameServer => {
-            cargo().arg("run").arg("--bin").arg("aic-server").run()?;
+            update_server_static(&mut time_log)?;
+
+            cargo()
+                .arg("run")
+                .arg("--bin=aic-server")
+                .arg("--features=embed")
+                .run()?;
         }
         XtaskCommand::Update => {
             cargo().arg("update").run()?;
