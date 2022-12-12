@@ -328,8 +328,10 @@ impl Session {
         if let Err(error @ ToolError::Internal(_)) = &result {
             // Log the message because the UI text field currently doesn't
             // fit long errors at all.
-            // TODO: include source() chain
-            log::error!("Error applying tool: {error}");
+            log::error!(
+                "Error applying tool: {error}",
+                error = crate::util::ErrorChain(&error)
+            );
         }
 
         if let Err(error) = &result {

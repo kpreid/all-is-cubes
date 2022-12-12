@@ -1,5 +1,6 @@
 //! Tools that we could imagine being in the Rust standard library, but aren't.
 
+use std::error::Error;
 use std::fmt::{self, Debug, Display};
 use std::future::Future;
 use std::marker::PhantomData;
@@ -150,6 +151,35 @@ impl CustomFormat<StatusText> for Duration {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
         write!(fmt, "{:5.2?} ms", (self.as_micros() as f32) / 1000.0)
     }
+}
+
+/// Formatting wrapper which prints an [`Error`] together with its
+/// `source()` chain, with at least one newline between each.
+///
+/// The text begins with the [`std::fmt::Display`] format of the error.
+///
+/// Design note: This is not a [`CustomFormat`] because that has a blanket implementation
+/// which interferes with this one for [`Error`].
+#[doc(hidden)] // not something we wish to be stable public API
+#[derive(Clone, Copy, Debug)]
+#[allow(clippy::exhaustive_structs)]
+pub struct ErrorChain<'a>(pub &'a (dyn Error + 'a));
+
+impl Display for ErrorChain<'_> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        format_error_chain(fmt, self.0)
+    }
+}
+fn format_error_chain(fmt: &mut fmt::Formatter<'_>, mut error: &(dyn Error + '_)) -> fmt::Result {
+    // Write the error's own message. This is expected NOT to contain the sources itself.
+    write!(fmt, "{error}")?;
+
+    while let Some(source) = error.source() {
+        error = source;
+        write!(fmt, "\n\nCaused by:\n    {error}")?;
+    }
+
+    Ok(())
 }
 
 /// Equivalent of [`Iterator::map`] but applied to an [`Extend`] instead, transforming
@@ -394,6 +424,21 @@ mod tests {
         }
         assert_eq!("Foo", format!("{:?}", Foo));
         assert_eq!("<Foo>", format!("{:?}", Foo.custom_format(ConciseDebug)));
+    }
+
+    #[test]
+    fn error_chain() {
+        #[derive(Debug, thiserror::Error)]
+        #[error("TestError1")]
+        struct TestError1;
+        #[derive(Debug, thiserror::Error)]
+        #[error("TestError2")]
+        struct TestError2(#[source] TestError1);
+
+        assert_eq!(
+            format!("{}", ErrorChain(&TestError2(TestError1))),
+            "TestError2\n\nCaused by:\n    TestError1"
+        );
     }
 
     #[test]

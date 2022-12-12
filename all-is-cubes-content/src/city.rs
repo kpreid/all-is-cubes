@@ -286,11 +286,11 @@ pub(crate) async fn demo_city(
         let exhibit_space = match (exhibit.factory)(exhibit, universe).await {
             Ok(s) => s,
             Err(error) => {
-                // TODO: include cause chain in logging.
                 // TODO: put the error on a sign in place of the exhibit
                 log::error!(
                     "Exhibit generation failure.\nExhibit: {name}\nError: {error}",
-                    name = exhibit.name
+                    name = exhibit.name,
+                    error = all_is_cubes::util::ErrorChain(&error),
                 );
                 continue 'exhibit;
             }

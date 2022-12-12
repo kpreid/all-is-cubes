@@ -164,8 +164,10 @@ pub fn default_srgb<P: image::Pixel<Subpixel = u8>>(pixel: P) -> VoxelBrush<'sta
 pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DynamicImage {
     match image::load(io::Cursor::new(bytes), image::ImageFormat::Png) {
         Ok(i) => i,
-        // TODO: include error source chain
-        Err(e) => panic!("Error loading image asset {name:?}: {e}"),
+        Err(error) => panic!(
+            "Error loading image asset {name:?}: {error}",
+            error = crate::util::ErrorChain(&error)
+        ),
     }
 }
 

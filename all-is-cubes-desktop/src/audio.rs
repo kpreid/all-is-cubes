@@ -67,7 +67,10 @@ fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: Aud
         match message {
             AudioCommand::Fluff(Fluff::Beep) => match manager.play(beep.clone()) {
                 Ok(_) => {}
-                Err(e) => log::error!("Playback error: {e}"),
+                Err(error) => log::error!(
+                    "Playback error: {error}",
+                    error = all_is_cubes::util::ErrorChain(&error)
+                ),
             },
             AudioCommand::Fluff(f) => log::debug!("No known sound for Fluff value: {f:?}"),
         }
