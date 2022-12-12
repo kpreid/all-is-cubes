@@ -17,7 +17,10 @@ use crate::GraphicsResourceError;
 /// we should be *handling* some or all of [`wgpu::SurfaceError`] with a retry.
 impl From<wgpu::SurfaceError> for GraphicsResourceError {
     fn from(source: wgpu::SurfaceError) -> Self {
-        GraphicsResourceError::new(source)
+        GraphicsResourceError::new(
+            String::from("obtaining surface texture for rendering the next frame"),
+            source,
+        )
     }
 }
 

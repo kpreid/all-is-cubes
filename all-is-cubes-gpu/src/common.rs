@@ -39,9 +39,9 @@ pub struct GraphicsResourceError {
 }
 
 impl GraphicsResourceError {
-    pub(crate) fn new<E: Error + Send + Sync + 'static>(source: E) -> Self {
+    pub(crate) fn new<E: Error + Send + Sync + 'static>(context: String, source: E) -> Self {
         GraphicsResourceError {
-            context: None,
+            context: Some(context),
             source: Box::new(source),
         }
     }

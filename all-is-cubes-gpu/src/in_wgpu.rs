@@ -72,7 +72,12 @@ impl SurfaceRenderer {
         let (device, queue) = adapter
             .request_device(&EverythingRenderer::device_descriptor(), None)
             .await
-            .unwrap();
+            .map_err(|e| {
+                GraphicsResourceError::new(
+                    String::from("requesting Device from wgpu to create a SurfaceRenderer"),
+                    e,
+                )
+            })?;
         let device = Arc::new(device);
 
         let viewport_source = cameras.viewport_source();
