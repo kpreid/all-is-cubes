@@ -78,6 +78,32 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
         list.add_1("state-loading").unwrap();
     }
 
+    // This function split is basically a `try {}` if that were stable.
+    match start_game_with_dom(document, gui_helpers, &static_dom).await {
+        Ok(()) => Ok(()),
+        // TODO: log errors with details into the console and loading_log.
+        Err(error) => {
+            let formatted = format!(
+                "\n--- ERROR WHILE LOADING ---\n{error}",
+                error = all_is_cubes::util::ErrorChain(&*error)
+            );
+            static_dom.append_to_loading_log(&formatted);
+            console::error_1(&JsValue::from(formatted));
+            Err(Error::new(&format!(
+                "Error occurred during loading (further details may be in log): {error}"
+            ))
+            .into())
+        }
+    }
+}
+
+/// Inner helper of `start_game` which returns an error to be nicely logged, instead of
+/// raw [`JsValue`] exception type.
+async fn start_game_with_dom(
+    document: Document,
+    gui_helpers: GuiHelpers,
+    static_dom: &StaticDom,
+) -> Result<(), Box<dyn std::error::Error>> {
     let progress = YieldProgress::new(yield_to_event_loop, {
         let progress_bar = SendWrapper::new(static_dom.progress_bar.clone());
         move |fraction| progress_bar.set_value(fraction.into())
@@ -85,29 +111,21 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     let [app_progress, progress] = progress.split(0.1);
     let [universe_progress, post_universe_progress] = progress.split(0.98);
 
+    let query_string: String = document
+        .location()
+        .map_or_else(String::new, |q| q.search().unwrap_or_default());
     let OptionsInUrl {
         template,
         graphics_options,
         renderer: renderer_option,
-    } = options_from_query_string(
-        document
-            .location()
-            .unwrap()
-            .search()?
-            .trim_start_matches('?')
-            .as_bytes(),
-    );
+    } = options_from_query_string(query_string.trim_start_matches('?').as_bytes());
 
-    static_dom
-        .loading_log
-        .append_data("\nInitializing application...")?;
+    static_dom.append_to_loading_log("\nInitializing application...");
     app_progress.progress(0.2).await;
     let (session, viewport_cell, fullscreen_cell) =
         create_session(&gui_helpers, graphics_options).await;
 
-    static_dom
-        .loading_log
-        .append_data("\nInitializing graphics...")?;
+    static_dom.append_to_loading_log("\nInitializing graphics...");
     app_progress.progress(0.4).await;
 
     let cameras = StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap();
@@ -124,17 +142,13 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
                     force_fallback_adapter: false,
                 })
                 .await
-                .ok_or_else(|| Error::new("Could not request suitable graphics adapter"))?;
-            let renderer = in_wgpu::SurfaceRenderer::new(cameras, surface, &adapter)
-                .await
-                .map_err(|e| Error::new(&format!("did not initialize GPU: {}", e)))?;
+                .ok_or("Could not request suitable graphics adapter")?;
+            let renderer = in_wgpu::SurfaceRenderer::new(cameras, surface, &adapter).await?;
             WebRenderer::Wgpu(renderer)
         }
     };
 
-    static_dom
-        .loading_log
-        .append_data("\nStarting game loop...")?;
+    static_dom.append_to_loading_log("\nStarting game loop...");
     app_progress.progress(0.8).await;
     let root = WebGameRoot::new(
         gui_helpers,
@@ -146,9 +160,7 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     );
     root.borrow().start_loop();
 
-    static_dom
-        .loading_log
-        .append_data("\nConstructing universe...")?;
+    static_dom.append_to_loading_log("\nConstructing universe...");
     app_progress.progress(1.0).await;
     let universe = template
         .build(universe_progress, thread_rng().gen())
@@ -536,6 +548,10 @@ impl StaticDom {
                 "scene-info-text",
             )?),
         })
+    }
+
+    fn append_to_loading_log(&self, text: &str) {
+        let _ = self.loading_log.append_data(text);
     }
 }
 
