@@ -5,7 +5,6 @@
 
 use std::borrow::Cow;
 
-use cgmath::{Vector3, Vector4};
 use embedded_graphics::mono_font::iso_8859_1::FONT_9X15_BOLD;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::prelude::{Drawable, Point};
@@ -178,31 +177,31 @@ pub fn make_slab(
 pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
     for face in Face6::ALL {
         let axis = face.axis_number();
+        let axis_color = [
+            palette::UNIFORM_LUMINANCE_RED,
+            palette::UNIFORM_LUMINANCE_GREEN,
+            palette::UNIFORM_LUMINANCE_BLUE,
+        ][axis];
         let direction = face.normal_vector::<GridCoordinate>()[axis];
         let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
             .within(space.bounds());
         for step in raycaster {
             let i = step.cube_ahead()[axis] * direction; // always positive
-            let mut color = Vector4::new(0.0, 0.0, 0.0, 1.0);
-            let mut light = Vector3::new(0.0, 0.0, 0.0);
-            let mut display_name: Cow<'static, str> = i.rem_euclid(10).to_string().into();
-            if i.rem_euclid(2) == 0 {
-                color[axis] = if direction > 0 { 1.0 } else { 0.9 };
+            let (color, display_name): (Rgb, Cow<'static, str>) = if i.rem_euclid(2) == 0 {
+                (axis_color, i.rem_euclid(10).to_string().into())
             } else {
                 if direction > 0 {
-                    color = Vector4::new(1.0, 1.0, 1.0, 1.0);
-                    display_name = ["X", "Y", "Z"][axis].into();
+                    (rgb_const!(1.0, 1.0, 1.0), ["X", "Y", "Z"][axis].into())
                 } else {
-                    display_name = ["x", "y", "z"][axis].into();
-                };
-            }
-            light[axis] = 3.0;
+                    (rgb_const!(0.0, 0.0, 0.0), ["x", "y", "z"][axis].into())
+                }
+            };
             space.set(
                 step.cube_ahead(),
                 Block::builder()
                     .display_name(display_name)
-                    .light_emission(Rgb::try_from(light).unwrap())
-                    .color(Rgba::try_from(color).expect("axes() color generation failed"))
+                    .light_emission(axis_color * 3.0)
+                    .color(color.with_alpha_one())
                     .build(),
             )?;
         }
