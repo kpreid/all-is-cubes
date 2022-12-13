@@ -74,7 +74,7 @@ impl RenderTestContext {
     }
 
     // TODO: better name
-    #[track_caller]
+    // #[track_caller] // TODO: should be enabled, but the compiler doesn't support this yet
     pub async fn render_comparison_test_with_renderer(
         &mut self,
         allowed_difference: u8,
