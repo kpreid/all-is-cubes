@@ -61,7 +61,6 @@ impl RenderTestContext {
             .expect("RenderTestContext not configured with universe input")
     }
 
-    #[track_caller]
     pub async fn render_comparison_test(
         &mut self,
         allowed_difference: u8,
