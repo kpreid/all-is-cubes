@@ -7,13 +7,12 @@ use std::sync::Arc;
 
 use crate::block::Block;
 use crate::character::{Character, CharacterTransaction, Cursor};
-use crate::inv::{Tool, ToolError, ToolInput};
+use crate::inv::{Icons, Tool, ToolError, ToolInput};
 use crate::linking::BlockProvider;
 use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict,
 };
 use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
-use crate::vui::Icons;
 
 /// A collection of [`Tool`]s (items).
 ///

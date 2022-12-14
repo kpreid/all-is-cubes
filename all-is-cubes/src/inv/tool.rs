@@ -7,13 +7,12 @@ use std::{fmt, hash};
 use crate::block::{self, Block, Modifier, Primitive, RotationPlacementRule, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::fluff::Fluff;
-use crate::inv::{InventoryTransaction, StackLimit};
+use crate::inv::{Icons, InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
 use crate::math::{Face6, GridPoint, GridRotation};
 use crate::space::{Space, SpaceTransaction};
 use crate::transaction::{Merge, Transaction};
 use crate::universe::{RefError, RefVisitor, URef, UniverseTransaction, VisitRefs};
-use crate::vui::Icons;
 
 /// A `Tool` is an object which a character can use to have some effect in the game,
 /// such as placing or removing a block. In particular, a tool use usually corresponds

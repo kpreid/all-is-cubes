@@ -58,7 +58,7 @@ pub(crate) async fn demo_city(
         .install(universe)
         .unwrap();
     let [icons_blocks_progress, p] = p.split(0.05);
-    all_is_cubes::vui::Icons::new(universe, icons_blocks_progress)
+    all_is_cubes::inv::Icons::new(universe, icons_blocks_progress)
         .await
         .install(universe)
         .unwrap();

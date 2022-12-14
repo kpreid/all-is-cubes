@@ -9,6 +9,7 @@ use crate::camera::{GraphicsOptions, Viewport};
 use crate::character::Character;
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
+use crate::inv::Icons;
 use crate::linking::BlockProvider;
 use crate::listen::ListenableSource;
 use crate::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, Rgba};
@@ -17,9 +18,7 @@ use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
 use crate::vui::options::{graphics_options_widgets, pause_toggle_button};
 use crate::vui::widgets::{self, Crosshair, TooltipState};
-use crate::vui::{
-    CueNotifier, Icons, LayoutTree, UiBlocks, VuiMessage, VuiPageState, Widget, WidgetTree,
-};
+use crate::vui::{CueNotifier, LayoutTree, UiBlocks, VuiMessage, VuiPageState, Widget, WidgetTree};
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 

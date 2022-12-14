@@ -372,10 +372,10 @@ async fn follow_options_change(mut context: RenderTestContext) {
 /// update every time a new UI block is added, which is tedious and not a greatly useful
 /// test.
 async fn icons(mut context: RenderTestContext) {
+    use all_is_cubes::inv::Icons;
     use all_is_cubes::linking::{BlockModule, BlockProvider};
     use all_is_cubes::vui::blocks::{ToolbarButtonState, UiBlocks};
     use all_is_cubes::vui::widgets::{ActionButtonVisualState, ToggleButtonVisualState};
-    use all_is_cubes::vui::Icons;
 
     let universe = &mut Universe::new();
     Icons::new(universe, YieldProgress::noop())

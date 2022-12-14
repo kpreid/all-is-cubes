@@ -64,6 +64,7 @@
     - Renamed: `mesh::triangulate_space()` is now `mesh::SpaceMesh::new()`.
     - Renamed: `space::SpaceBuilder::build_empty()` is now `build()`.
     - Renamed: `transaction::UniverseTransaction` is now `universe::UniverseTransaction`.
+    - Renamed: `vui::Icons` is now `inv::Icons`.
 
     - Renamed: The feature `"rayon"` is now `"threads"`.
 

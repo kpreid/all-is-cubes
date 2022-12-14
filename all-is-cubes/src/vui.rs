@@ -28,8 +28,6 @@ pub mod blocks;
 pub(crate) use blocks::UiBlocks;
 mod hud;
 use hud::*;
-mod icons;
-pub use icons::*;
 mod layout;
 pub use layout::*;
 mod options;

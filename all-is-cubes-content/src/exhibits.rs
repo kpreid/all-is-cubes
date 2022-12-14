@@ -1111,7 +1111,7 @@ async fn UI_BLOCKS(_: &Exhibit, universe: &mut Universe) {
     use all_is_cubes::vui::blocks::ToolbarButtonState;
     use all_is_cubes::vui::blocks::UiBlocks;
 
-    let icons = BlockProvider::<all_is_cubes::vui::Icons>::using(universe)?;
+    let icons = BlockProvider::<all_is_cubes::inv::Icons>::using(universe)?;
     let icons = icons.iter().map(|(_, block)| block.clone());
 
     let ui_blocks = BlockProvider::<UiBlocks>::using(universe)?;
