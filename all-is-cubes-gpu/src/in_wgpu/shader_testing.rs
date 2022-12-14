@@ -6,7 +6,7 @@
 //! library tests.
 //!
 //! The code in this module is located here so that we do not need to make many pieces
-//! of the infrastructure, like [`FramebufferTextures`], `pub`, but only this module.
+//! of the infrastructure, like `FramebufferTextures`, `pub`, but only this module.
 
 use all_is_cubes::block::Resolution;
 use wgpu::util::DeviceExt;
