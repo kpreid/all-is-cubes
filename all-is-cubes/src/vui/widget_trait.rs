@@ -247,8 +247,6 @@ pub enum InstallVuiError {
 /// TODO: Make the better version of this public
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ActivatableRegion {
-    // TODO: should be using the attachment bounds instead of internally stored bounds
-    pub(crate) region: GridAab,
     pub(crate) effect: EphemeralOpaque<dyn Fn() + Send + Sync>,
 }
 

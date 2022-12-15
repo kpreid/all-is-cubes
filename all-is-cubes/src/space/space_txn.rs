@@ -252,7 +252,7 @@ impl Transaction<Space> for SpaceTransaction {
                 // TODO: error return from the function? error report for nonexistence?
                 for cube in to_activate.iter().copied() {
                     // TODO: this should be part of the query instead, to allow efficient search
-                    if query_item.behavior.region.contains_cube(cube) {
+                    if query_item.attachment.bounds.contains_cube(cube) {
                         query_item.behavior.activate();
                         continue 'b;
                     }
@@ -553,7 +553,6 @@ mod tests {
         space.add_behavior(
             GridAab::single_cube(cube),
             ActivatableRegion {
-                region: GridAab::single_cube(cube),
                 // TODO: This sure is clunky
                 effect: EphemeralOpaque::from(Arc::new({
                     let signal = signal.clone();

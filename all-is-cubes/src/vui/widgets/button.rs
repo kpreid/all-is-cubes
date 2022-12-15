@@ -109,7 +109,6 @@ impl vui::WidgetController for ActionButtonController {
         let activatable = space::SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             space::SpaceBehaviorAttachment::new(GridAab::single_cube(self.position)),
             Arc::new(vui::ActivatableRegion {
-                region: GridAab::single_cube(self.position),
                 effect: self.definition.action.clone(),
             }),
         ));
@@ -227,7 +226,6 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
         Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             SpaceBehaviorAttachment::new(GridAab::single_cube(self.position)),
             Arc::new(vui::ActivatableRegion {
-                region: GridAab::single_cube(self.position),
                 effect: self.definition.action.clone(),
             }),
         )))
