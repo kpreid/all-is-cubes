@@ -57,9 +57,10 @@ impl BlockModule for DemoBlocks {
 }
 impl fmt::Display for DemoBlocks {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let variant = <&str>::from(self); // borrow strum::IntoStaticStr to do the base work
         match self {
-            DemoBlocks::Explosion(i) => write!(f, "{}/{}", <&str>::from(self), i),
-            _ => write!(f, "{}", <&str>::from(self)),
+            DemoBlocks::Explosion(i) => write!(f, "{variant}/{i}"),
+            _ => write!(f, "{variant}"),
         }
     }
 }
@@ -401,7 +402,7 @@ pub async fn install_demo_blocks(
             Explosion(timer) => {
                 let decay = (f32::from(timer) * -0.1).exp();
                 Block::builder()
-                    .display_name(format!("Explosion {}", timer))
+                    .display_name(format!("Explosion {timer}"))
                     .collision(BlockCollision::None)
                     .light_emission(Rgb::ONE * decay)
                     .color(Rgb::ONE.with_alpha(NotNan::new(decay).unwrap()))

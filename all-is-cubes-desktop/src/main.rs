@@ -76,7 +76,7 @@ static TITLE: &str = "All is Cubes";
 
 fn title_and_version() -> String {
     // TODO: include git version if different
-    format!("{} v{}", TITLE, clap::crate_version!())
+    format!("{TITLE} v{v}", v = clap::crate_version!())
 }
 
 fn main() -> Result<(), anyhow::Error> {

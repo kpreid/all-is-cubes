@@ -24,7 +24,7 @@ use crate::util::YieldProgress;
 use crate::vui::InstallVuiError;
 
 fn name_in_module<E: BlockModule>(key: &E) -> Name {
-    Name::from(format!("{}/{}", E::namespace(), key).as_str())
+    Name::from(format!("{ns}/{key}", ns = E::namespace()).as_str())
 }
 
 /// Allows the use of [`BlockProvider::default`] to construct a [`BlockProvider`]
@@ -192,7 +192,7 @@ impl fmt::Display for GenError {
         // Don't include `detail` because that's our `Error::source()`.
         // The assumption is that the cause chain will be walked when printing an error.
         if let Some(name) = &self.for_object {
-            write!(f, "An error occurred while generating object {}", name)?;
+            write!(f, "An error occurred while generating object {name}")?;
         } else {
             write!(f, "An error occurred while generating an object")?;
         }

@@ -64,8 +64,8 @@ impl From<&str> for Name {
 impl fmt::Display for Name {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Name::Specific(name) => write!(f, "'{}'", name),
-            Name::Anonym(index) => write!(f, "[anonymous #{}]", index),
+            Name::Specific(name) => write!(f, "'{name}'"),
+            Name::Anonym(index) => write!(f, "[anonymous #{index}]"),
         }
     }
 }

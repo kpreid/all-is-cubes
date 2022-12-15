@@ -169,7 +169,7 @@ impl ToolbarController {
                 Text::with_text_style(
                     &match slots.get(index).unwrap_or(&Slot::Empty).count() {
                         0 | 1 => String::default(),
-                        count => format!("{}", count),
+                        count => format!("{count}"),
                     },
                     Point::new(
                         // index + 1 locates the right edge of the space for index

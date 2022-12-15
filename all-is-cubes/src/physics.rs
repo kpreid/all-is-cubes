@@ -148,7 +148,7 @@ mod tests {
         body.velocity.x = 0.0;
 
         for t in 1..=1000 {
-            eprintln!("--- step {}", t);
+            eprintln!("--- step {t}");
             body.step(Tick::from_seconds(1.0), Some(&space), |_| {});
             assert!(
                 (body.position.y - 1.0).abs() < 1e-6,
@@ -190,7 +190,7 @@ mod tests {
         space.set([0, 0, 0], &AIR).unwrap();
 
         let one_test = |velocity: Vector3<FreeCoordinate>| {
-            print!("Velocity {:?}... ", velocity);
+            print!("Velocity {velocity:?}... ");
             let start = Point3::new(0.5, 0.5, 0.5);
             let box_radius = 0.375; // use an exact float to minimize complications
             let mut body = Body {
@@ -233,7 +233,7 @@ mod tests {
                 }
                 position_history.truncate(10);
             }
-            println!("{:?} iterations to {:?}", iterations, body.position);
+            println!("{iterations:?} iterations to {:?}", body.position);
             let distance_from_start = max_norm(body.position - start);
             assert!(
                 distance_from_start > 0.09,

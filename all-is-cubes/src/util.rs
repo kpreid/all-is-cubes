@@ -61,12 +61,12 @@ impl<F: Copy, T: CustomFormat<F>> CustomFormat<F> for &'_ T {
 pub(crate) struct Unquote;
 impl CustomFormat<Unquote> for String {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: Unquote) -> fmt::Result {
-        write!(fmt, "{}", self)
+        write!(fmt, "{self}")
     }
 }
 impl CustomFormat<Unquote> for &'_ str {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: Unquote) -> fmt::Result {
-        write!(fmt, "{}", self)
+        write!(fmt, "{self}")
     }
 }
 
@@ -422,7 +422,7 @@ mod tests {
                 write!(fmt, "<Foo>")
             }
         }
-        assert_eq!("Foo", format!("{:?}", Foo));
+        assert_eq!("Foo", format!("{Foo:?}"));
         assert_eq!("<Foo>", format!("{:?}", Foo.custom_format(ConciseDebug)));
     }
 

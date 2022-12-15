@@ -240,7 +240,7 @@ mod tests {
         for request in requests {
             let handle = match t.allocate(request) {
                 Some(val) => val,
-                None => panic!("check_no_overlaps: allocation failure for {:?}", request),
+                None => panic!("check_no_overlaps: allocation failure for {request:?}"),
             };
             assert_eq!(
                 request.size(),
@@ -270,7 +270,7 @@ mod tests {
         let _allocations: Vec<AlloctreeHandle> = (0..8)
             .map(|i| match t.allocate(GridAab::for_block(R16)) {
                 Some(val) => val,
-                None => panic!("basic_complete_fill allocation failure for #{}", i),
+                None => panic!("basic_complete_fill allocation failure for #{i}"),
             })
             .collect();
         assert_eq!(None, t.allocate(GridAab::for_block(R16)));

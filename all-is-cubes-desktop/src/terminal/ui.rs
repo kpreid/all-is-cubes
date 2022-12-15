@@ -232,7 +232,7 @@ pub(super) fn write_ui(
                         } else {
                             SELECTED_BLANK
                         },
-                        Span::from(format!(" {} ", i)),
+                        Span::from(format!(" {i} ")),
                         if selected_slots[1] == i {
                             SELECTED_1
                         } else {
@@ -247,14 +247,14 @@ pub(super) fn write_ui(
                             // TODO: Use item icon text -- we need a way to access the predefined icons from here
                             Slot::Empty => Paragraph::new(""),
                             Slot::Stack(count, item) if count.get() == 1 => {
-                                Paragraph::new(format!("{:?}", item))
+                                Paragraph::new(format!("{item:?}"))
                             }
                             Slot::Stack(count, item) => {
-                                Paragraph::new(format!("{} × {:?}", count, item))
+                                Paragraph::new(format!("{count} × {item:?}"))
                             }
 
                             // Fallback
-                            slot => Paragraph::new(format!("{:?}", slot)),
+                            slot => Paragraph::new(format!("{slot:?}")),
                         }
                         .block(block),
                         rect,

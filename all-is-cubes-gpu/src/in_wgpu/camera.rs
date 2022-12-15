@@ -114,7 +114,7 @@ impl ShaderPostprocessCamera {
             tone_mapping_id: match options.tone_mapping {
                 ToneMappingOperator::Clamp => 0,
                 ToneMappingOperator::Reinhard => 1,
-                ref tmo => panic!("Missing implementation for tone mapping operator {:?}", tmo),
+                ref tmo => panic!("Missing implementation for tone mapping operator {tmo:?}"),
             },
 
             texture_is_valid: i32::from(texture_is_valid),

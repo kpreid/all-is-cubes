@@ -546,7 +546,7 @@ async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
                         ..BlockAttributes::default()
                     },
                     &Text::with_baseline(
-                        &format!("{:?}", rot),
+                        &format!("{rot:?}"),
                         Point::new(0, -1),
                         MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
                         Baseline::Bottom,

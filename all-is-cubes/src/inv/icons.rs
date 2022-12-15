@@ -61,7 +61,7 @@ impl fmt::Display for Icons {
             Icons::CopyFromSpace => write!(f, "copy-from-space"),
             Icons::EditBlock => write!(f, "edit-block"),
             Icons::PushPull => write!(f, "push"),
-            Icons::Jetpack { active } => write!(f, "jetpack/{}", active),
+            Icons::Jetpack { active } => write!(f, "jetpack/{active}"),
         }
     }
 }

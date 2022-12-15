@@ -422,17 +422,17 @@ mod tests {
         }
 
         let mut set = BehaviorSet::<Character>::new();
-        assert_eq!(format!("{:?}", set), "BehaviorSet([])");
-        assert_eq!(format!("{:#?}", set), "BehaviorSet([])");
+        assert_eq!(format!("{set:?}"), "BehaviorSet([])");
+        assert_eq!(format!("{set:#?}"), "BehaviorSet([])");
         BehaviorSetTransaction::insert((), Arc::new(DebugBehavior { _x: 1 }))
             .execute(&mut set)
             .unwrap();
         assert_eq!(
-            format!("{:?}", set),
+            format!("{set:?}"),
             "BehaviorSet([DebugBehavior { _x: 1 } @ ()])"
         );
         assert_eq!(
-            format!("{:#?}\n", set),
+            format!("{set:#?}\n"),
             indoc! {"
                 BehaviorSet([
                     DebugBehavior {

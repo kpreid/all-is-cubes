@@ -226,7 +226,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 // Spikes on the bottom of the pit
                 // (TODO: revise this condition when staircase-ish rooms exist)
                 if room_data.extended_map_bounds().lower_bounds().y < 0 {
-                    assert!(!room_data.corridor_only, "{:?}", room_data);
+                    assert!(!room_data.corridor_only, "{room_data:?}");
                     space.fill_uniform(
                         interior.abut(Face6::NY, -1).unwrap(),
                         &self.blocks[DungeonBlocks::Spikes],

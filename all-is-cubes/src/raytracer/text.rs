@@ -93,7 +93,7 @@ impl From<CharacterBuf> for String {
 /// the center of the space. The text output will be 80 columns wide.
 pub fn print_space(space: &Space, direction: impl Into<Vector3<FreeCoordinate>>) {
     print_space_impl(space, direction, |s| {
-        print!("{}", s);
+        print!("{s}");
     });
 }
 
@@ -147,7 +147,7 @@ mod tests {
 
         let mut output = String::new();
         print_space_impl(&space, (1., 1., 1.), |s| output += s);
-        print!("{}", output);
+        print!("{output}");
         pretty_assertions::assert_eq!(
             output,
             "\
@@ -217,7 +217,7 @@ mod tests {
 
         let mut output = String::new();
         print_space_impl(&space, (1., 1., 1.), |s| output += s);
-        print!("{}", output);
+        print!("{output}");
         pretty_assertions::assert_eq!(
             output,
             "\

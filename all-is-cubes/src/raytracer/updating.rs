@@ -277,7 +277,7 @@ mod tests {
                 image_updating.custom_format(Unquote),
                 image_fresh.custom_format(Unquote)
             );
-            print!("{}", image_updating);
+            print!("{image_updating}");
             Ok(())
         }
     }

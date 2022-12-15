@@ -39,7 +39,7 @@ pub(crate) async fn load_dot_vox(
         let mut space = convert_dot_vox_model(&palette, model)?;
         space.fast_evaluate_light();
 
-        let name = Name::from(&*format!("model_{}", i));
+        let name = Name::from(&*format!("model_{i}"));
         let space_ref = universe
             .insert(name, space)
             .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?;

@@ -609,7 +609,7 @@ mod tests {
         fn assert_count(distance_in_chunks: FreeCoordinate, count: usize) {
             let chart = ChunkChart::<16>::new(distance_in_chunks * 16.);
 
-            println!("distance {}, expected count {}", distance_in_chunks, count);
+            println!("distance {distance_in_chunks}, expected count {count}");
             print_space(&chart.visualization(), (1., 1., 1.));
 
             let chunks: Vec<_> = chart
@@ -651,7 +651,7 @@ mod tests {
     fn chunk_chart_sorting() {
         // Caution: O(n^6) in the chart radius...
         let chart = ChunkChart::<16>::new(4.0 * 16.);
-        println!("{:?}", chart);
+        println!("{chart:?}");
 
         let mut seen: HashSet<GridPoint> = HashSet::new();
         for ChunkPos(p) in chart.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL) {

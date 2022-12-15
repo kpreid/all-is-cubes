@@ -313,7 +313,7 @@ mod tests {
     fn debug() {
         let default = BlockAttributes::default;
         fn debug(a: BlockAttributes) -> String {
-            format!("{:?}", a)
+            format!("{a:?}")
         }
         assert_eq!(&*debug(BlockAttributes::default()), "BlockAttributes {}",);
         assert_eq!(

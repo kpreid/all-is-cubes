@@ -12,12 +12,11 @@ use web_sys::{AddEventListenerOptions, Document, Element, Event, EventTarget, Te
 pub fn get_mandatory_element<E: JsCast>(document: &Document, id: &'static str) -> Result<E, Error> {
     document
         .get_element_by_id(id)
-        .ok_or_else(|| Error::new(&format!("missing element {:?}", id)))?
+        .ok_or_else(|| Error::new(&format!("missing element {id:?}")))?
         .dyn_into::<E>()
         .map_err(|_| {
             Error::new(&format!(
-                "element {:?} was not a {:?}",
-                id,
+                "element {id:?} was not a {:?}",
                 std::any::type_name::<E>()
             ))
         })

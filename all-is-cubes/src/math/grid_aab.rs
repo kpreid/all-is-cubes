@@ -97,11 +97,11 @@ impl GridAab {
                 )));
             }
             lower_bounds[i].checked_add(sizes[i]).ok_or_else(|| {
-                GridOverflowError(format!("lower_bounds[{}] too large for sizes", i))
+                GridOverflowError(format!("lower_bounds[{i}] too large for sizes"))
             })?;
         }
         Self::checked_volume_helper(sizes)
-            .map_err(|()| GridOverflowError(format!("volume too large; {:?} overflows", sizes)))?;
+            .map_err(|()| GridOverflowError(format!("volume too large; {sizes:?} overflows")))?;
 
         Ok(GridAab {
             lower_bounds,
@@ -1197,10 +1197,10 @@ mod tests {
     #[test]
     fn debug() {
         let b = GridAab::from_lower_size([1, 2, 3], [10, 20, 30]);
-        println!("{:#?}", b);
-        assert_eq!(format!("{:?}", b), "GridAab(1..11, 2..22, 3..33)");
+        println!("{b:#?}");
+        assert_eq!(format!("{b:?}"), "GridAab(1..11, 2..22, 3..33)");
         assert_eq!(
-            format!("{:#?}\n", b),
+            format!("{b:#?}\n"),
             indoc! {"
                 GridAab(
                     1..11,

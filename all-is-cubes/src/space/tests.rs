@@ -105,7 +105,7 @@ fn set_failure_too_many() {
         match space.set([i.into(), 0, 0], &blocks[usize::from(i)]) {
             Ok(true) => {}
             Err(SetCubeError::TooManyBlocks()) => break,
-            unexpected => panic!("unexpected result: {:?}", unexpected),
+            unexpected => panic!("unexpected result: {unexpected:?}"),
         }
     }
     space.consistency_check(); // bonus testing
@@ -362,9 +362,9 @@ fn space_debug() {
         light: LightPhysics::None,
         ..SpacePhysics::default()
     });
-    println!("{:#?}", space);
+    println!("{space:#?}");
     pretty_assertions::assert_str_eq!(
-        format!("{:#?}\n", space),
+        format!("{space:#?}\n"),
         indoc! {"
             Space {
                 bounds: GridAab(

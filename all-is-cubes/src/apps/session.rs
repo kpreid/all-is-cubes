@@ -560,7 +560,7 @@ impl<T: CustomFormat<StatusText>> fmt::Display for InfoText<'_, T> {
             self.render.custom_format(StatusText),
         )?;
         match self.session.cursor_result() {
-            Some(cursor) => write!(f, "{}", cursor),
+            Some(cursor) => write!(f, "{cursor}"),
             None => write!(f, "No block"),
         }?;
         Ok(())

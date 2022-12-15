@@ -96,7 +96,7 @@ where
     // TODO: test formatting of this
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Coloring::Solid(color) => write!(fmt, "Solid({:?})", color),
+            Coloring::Solid(color) => write!(fmt, "Solid({color:?})"),
             Coloring::Texture { pos, .. } => {
                 write!(fmt, "Texture({:?})", pos.custom_format(ConciseDebug))
             }

@@ -467,7 +467,7 @@ impl CustomFormat<ConciseDebug> for MoveSegment {
                 write!(fmt, " ")?;
             }
             nonempty = true;
-            write!(fmt, "stopped by {:?}", stopped_by)?;
+            write!(fmt, "stopped by {stopped_by:?}")?;
         }
         if !nonempty {
             write!(fmt, "0")?;
@@ -547,7 +547,7 @@ mod tests {
         let do_test = |direction, yaw, pitch| {
             let mut body = Body::new_minimal((10., 0., 0.), Aab::ZERO);
             body.look_at(Point3::new(10., 0., 0.) + Vector3::from(direction));
-            println!("{:?} {} {}", direction, yaw, pitch);
+            println!("{direction:?} {yaw} {pitch}");
             assert_eq!(body.yaw, yaw);
             assert_eq!(body.pitch, pitch);
         };
@@ -582,7 +582,7 @@ mod tests {
                         ..before.clone()
                     };
                     if after != expected {
-                        return Err(format!("unequal to {:#?}", expected).into());
+                        return Err(format!("unequal to {expected:#?}").into());
                     }
                 }
                 Ok(())

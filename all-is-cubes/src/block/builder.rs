@@ -381,7 +381,7 @@ mod tests {
         let space_ref = if let Primitive::Recur { space, .. } = block.primitive() {
             space.clone()
         } else {
-            panic!("expected Recur, found {:?}", block);
+            panic!("expected Recur, found {block:?}");
         };
 
         assert_eq!(

@@ -869,6 +869,6 @@ mod tests {
             cube: GridPoint::new(1, 2, 3),
             face: Face7::NY,
         };
-        assert_eq!(&format!("{:#?}", cube_face), "CubeFace((+1, +2, +3), NY)");
+        assert_eq!(&format!("{cube_face:#?}"), "CubeFace((+1, +2, +3), NY)");
     }
 }

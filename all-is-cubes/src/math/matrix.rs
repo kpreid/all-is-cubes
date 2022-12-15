@@ -412,6 +412,6 @@ mod tests {
                 nontrivial += 1;
             }
         }
-        assert!(nontrivial > 100, "got {} inverses", nontrivial);
+        assert!(nontrivial > 100, "got {nontrivial} inverses");
     }
 }

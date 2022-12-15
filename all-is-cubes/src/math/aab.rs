@@ -361,11 +361,11 @@ mod tests {
     fn aab_debug() {
         let aab = Aab::new(1.0000001, 2.0, 3.0, 4.0, 5.0, 6.0);
         assert_eq!(
-            format!("{:?}", aab),
+            format!("{aab:?}"),
             "Aab(1.0000001..=2.0, 3.0..=4.0, 5.0..=6.0)"
         );
         assert_eq!(
-            format!("{:#?}\n", aab),
+            format!("{aab:#?}\n"),
             indoc::indoc! {"
                 Aab(
                     1.0000001..=2.0,

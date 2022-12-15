@@ -61,20 +61,20 @@ impl fmt::Display for UiBlocks {
             UiBlocks::ToolbarPointer([b0, b1, b2]) => {
                 write!(f, "toolbar-pointer/{b0}-{b1}-{b2}")
             }
-            UiBlocks::BackButton(state) => write!(f, "back-button/{}", state),
-            UiBlocks::AboutButton(state) => write!(f, "about-button/{}", state),
-            UiBlocks::PauseButton(state) => write!(f, "pause-button/{}", state),
-            UiBlocks::MouselookButton(state) => write!(f, "mouselook-button/{}", state),
-            UiBlocks::FullscreenButton(state) => write!(f, "fullscreen-button/{}", state),
-            UiBlocks::AntialiasButton(state) => write!(f, "antialias-button/{}", state),
-            UiBlocks::DebugInfoTextButton(state) => write!(f, "debug-info-text-button/{}", state),
+            UiBlocks::BackButton(state) => write!(f, "back-button/{state}"),
+            UiBlocks::AboutButton(state) => write!(f, "about-button/{state}"),
+            UiBlocks::PauseButton(state) => write!(f, "pause-button/{state}"),
+            UiBlocks::MouselookButton(state) => write!(f, "mouselook-button/{state}"),
+            UiBlocks::FullscreenButton(state) => write!(f, "fullscreen-button/{state}"),
+            UiBlocks::AntialiasButton(state) => write!(f, "antialias-button/{state}"),
+            UiBlocks::DebugInfoTextButton(state) => write!(f, "debug-info-text-button/{state}"),
             UiBlocks::DebugChunkBoxesButton(state) => {
-                write!(f, "debug-chunk-boxes-button/{}", state)
+                write!(f, "debug-chunk-boxes-button/{state}")
             }
             UiBlocks::DebugCollisionBoxesButton(state) => {
-                write!(f, "debug-collision-boxes-button/{}", state)
+                write!(f, "debug-collision-boxes-button/{state}")
             }
-            UiBlocks::DebugLightRaysButton(state) => write!(f, "debug-light-rays-button/{}", state),
+            UiBlocks::DebugLightRaysButton(state) => write!(f, "debug-light-rays-button/{state}"),
         }
     }
 }

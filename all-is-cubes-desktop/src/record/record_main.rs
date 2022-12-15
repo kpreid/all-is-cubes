@@ -114,7 +114,7 @@ pub(crate) fn record_main(
     eprintln!("\nWrote {}", options.output_path.to_string_lossy());
     if flaws_total != Flaws::empty() {
         // TODO: write user-facing formatting for Flaws
-        eprintln!("Flaws in recording: {:?}", flaws_total);
+        eprintln!("Flaws in recording: {flaws_total:?}");
     }
 
     Ok(())

@@ -230,7 +230,7 @@ pub fn parse_dimensions(input: &str) -> Result<Option<Vector2<u32>>, String> {
             .split(&['×', 'x', ',', ';', ' '][..])
             .map(|s| {
                 s.parse::<u32>()
-                    .map_err(|_| format!("{:?} not an integer or \"auto\"", s))
+                    .map_err(|_| format!("{s:?} not an integer or \"auto\""))
             })
             .collect::<Result<Vec<u32>, String>>()?
             .try_into()

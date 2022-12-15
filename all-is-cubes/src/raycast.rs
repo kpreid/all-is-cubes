@@ -1022,7 +1022,7 @@ mod tests {
         let mut r2 = r.clone();
         r2.next();
         // Compare the Debug strings, since the state is otherwise private.
-        assert_eq!(format!("{:?}", r), format!("{:?}", r2));
+        assert_eq!(format!("{r:?}"), format!("{r2:?}"));
     }
 
     #[test]

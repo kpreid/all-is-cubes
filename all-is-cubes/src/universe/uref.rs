@@ -417,22 +417,22 @@ mod tests {
         let r = u
             .insert("foo".into(), BlockDef::new(Block::from(Rgba::WHITE)))
             .unwrap();
-        assert_eq!(format!("{:?}", r), "URef('foo')");
-        assert_eq!(format!("{:#?}", r), "URef('foo')");
+        assert_eq!(format!("{r:?}"), "URef('foo')");
+        assert_eq!(format!("{r:#?}"), "URef('foo')");
     }
 
     #[test]
     fn uref_debug_pending() {
         let r = URef::new_pending("foo".into(), BlockDef::new(Block::from(Rgba::WHITE)));
         assert_eq!(
-            format!("{:?}", r),
+            format!("{r:?}"),
             "URef('foo' in no universe = BlockDef { \
                 block: Block { primitive: Atom(BlockAttributes {}, Rgba(1.0, 1.0, 1.0, 1.0)) }, \
                 notifier: Notifier(0), \
                 block_listen_gate: Gate })"
         );
         assert_eq!(
-            format!("{:#?}", r),
+            format!("{r:#?}"),
             indoc::indoc! { "\
             URef('foo' in no universe = BlockDef {
                 block: Block {

@@ -86,7 +86,7 @@ impl fmt::Debug for Contact {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Block(CubeFace { cube, face }) => {
-                write!(f, "{:?} of {}", face, cube.custom_format(ConciseDebug))
+                write!(f, "{face:?} of {}", cube.custom_format(ConciseDebug))
             }
             Self::Voxel {
                 cube,

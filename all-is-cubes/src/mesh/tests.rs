@@ -203,8 +203,8 @@ fn space_mesh_equals_block_mesh() {
 
     let (tex, block_meshes, space_rendered) = mesh_blocks_and_space(&outer_space);
 
-    eprintln!("{:#?}", block_meshes);
-    eprintln!("{:#?}", space_rendered);
+    eprintln!("{block_meshes:#?}");
+    eprintln!("{space_rendered:#?}");
 
     // Compare the contents of the space mesh and block mesh.
     assert_eq!(

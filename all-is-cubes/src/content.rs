@@ -143,7 +143,7 @@ pub fn make_slab(
         Block::from(palette::PLANK * 1.06),
     ];
     Block::builder()
-        .display_name(format!("Slab {}/{}", numerator, denominator))
+        .display_name(format!("Slab {numerator}/{denominator}"))
         .collision(BlockCollision::Recur)
         .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
         .voxels_fn(universe, denominator, |cube| {

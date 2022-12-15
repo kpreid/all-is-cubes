@@ -740,7 +740,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
         // Print all the results before asserting
-        eprintln!("{:#?}", results);
+        eprintln!("{results:#?}");
         // Filter out correct roundtrip results.
         let bad = results
             .into_iter()

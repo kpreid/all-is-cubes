@@ -655,9 +655,9 @@ mod tests {
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let transaction = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(space);
 
-        println!("{:#?}", transaction);
+        println!("{transaction:#?}");
         pretty_assertions::assert_str_eq!(
-            format!("{:#?}\n", transaction),
+            format!("{transaction:#?}\n"),
             indoc! {"
             UniverseTransaction {
                 [anonymous #0]: SpaceTransaction {

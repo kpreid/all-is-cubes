@@ -259,6 +259,6 @@ mod tests {
         assert_eq!(format!("{:?}", DirtyFlag::new(true)), "DirtyFlag(true)");
         let dirtied = DirtyFlag::new(false);
         dirtied.listener().receive(());
-        assert_eq!(format!("{:?}", dirtied), "DirtyFlag(true)");
+        assert_eq!(format!("{dirtied:?}"), "DirtyFlag(true)");
     }
 }

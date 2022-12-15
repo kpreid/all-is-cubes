@@ -523,7 +523,7 @@ mod tests {
     fn all_but_reflections() {
         let mut set = HashSet::new();
         for rot in GridRotation::ALL_BUT_REFLECTIONS {
-            assert!(!rot.is_reflection(), "{:?} is a reflection", rot);
+            assert!(!rot.is_reflection(), "{rot:?} is a reflection");
             set.insert(rot);
         }
         assert_eq!(set.len(), GridRotation::ALL_BUT_REFLECTIONS.len());

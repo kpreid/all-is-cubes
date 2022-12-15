@@ -235,19 +235,19 @@ mod tests {
     #[test]
     fn notifier_basics_and_debug() {
         let cn: Notifier<u8> = Notifier::new();
-        assert_eq!(format!("{:?}", cn), "Notifier(0)");
+        assert_eq!(format!("{cn:?}"), "Notifier(0)");
         cn.notify(0);
-        assert_eq!(format!("{:?}", cn), "Notifier(0)");
+        assert_eq!(format!("{cn:?}"), "Notifier(0)");
         let sink = Sink::new();
         cn.listen(sink.listener());
-        assert_eq!(format!("{:?}", cn), "Notifier(1)");
+        assert_eq!(format!("{cn:?}"), "Notifier(1)");
         // type annotation to prevent spurious inference failures in the presence
         // of other compiler errors
         assert_eq!(sink.drain(), Vec::<u8>::new());
         cn.notify(1);
         cn.notify(2);
         assert_eq!(sink.drain(), vec![1, 2]);
-        assert_eq!(format!("{:?}", cn), "Notifier(1)");
+        assert_eq!(format!("{cn:?}"), "Notifier(1)");
     }
 
     #[test]
