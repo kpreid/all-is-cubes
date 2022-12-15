@@ -15,6 +15,7 @@
 #![warn(clippy::modulo_arithmetic)]
 #![warn(clippy::return_self_not_must_use)]
 #![warn(clippy::undocumented_unsafe_blocks)]
+#![warn(clippy::uninlined_format_args)]
 #![warn(clippy::unnecessary_self_imports)]
 #![warn(clippy::wrong_self_convention)]
 #![warn(explicit_outlives_requirements)]
