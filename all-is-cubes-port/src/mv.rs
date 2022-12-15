@@ -42,13 +42,17 @@ pub(crate) async fn dot_vox_data_to_universe(
         models,
         palette,
         materials,
+        scenes,
+        layers,
     } = data;
     // TODO: have a better path for reporting this kind of info
     log::info!(
-        "Loaded MagicaVoxel .vox format: version {}, {} models, {} ignored materials",
+        "Loaded MagicaVoxel .vox format: version {}, {} models, {} ignored materials, {} ignored scenes, {} ignored layers",
         version,
         models.len(),
         materials.len(),
+        scenes.len(),
+        layers.len(),
     );
     p.progress(0.15).await;
 
@@ -102,7 +106,7 @@ pub(crate) async fn export_to_dot_vox_data(
         });
     }
 
-    let mut palette: Vec<u32> = Vec::new();
+    let mut palette: Vec<dot_vox::Color> = Vec::new();
     let mut models: Vec<dot_vox::Model> = Vec::with_capacity(to_export.len());
 
     for (mut p, space_ref) in p.split_evenly(to_export.len()).zip(to_export.into_iter()) {
@@ -115,29 +119,31 @@ pub(crate) async fn export_to_dot_vox_data(
         version: 150, // TODO: magic number taken from examples; may not be right
         models,
         palette,
+        scenes: Vec::new(),
+        layers: Vec::new(),
         materials: Vec::new(),
     })
 }
 
-fn dot_vox_palette_to_blocks(palette: &[u32]) -> Vec<Block> {
+fn dot_vox_palette_to_blocks(palette: &[dot_vox::Color]) -> Vec<Block> {
     palette
         .iter()
         .enumerate()
-        .map(|(index, rgba)| {
-            // TODO: Which endianness / component ordering should we expect?
+        .map(|(index, &dot_vox::Color { r, g, b, a })| {
             Block::builder()
                 .display_name(index.to_string())
-                .color(Rgba::from_srgb8(rgba.to_le_bytes()))
+                .color(Rgba::from_srgb8([r, g, b, a]))
                 .build()
         })
         .collect()
 }
-fn block_to_dot_vox_palette_entry(evaluated: &block::EvaluatedBlock) -> Option<u32> {
+fn block_to_dot_vox_palette_entry(evaluated: &block::EvaluatedBlock) -> Option<dot_vox::Color> {
     // TODO: should we compare identity or color?
     if *evaluated == block::AIR_EVALUATED {
         None
     } else {
-        Some(u32::from_le_bytes(evaluated.color.to_srgb8()))
+        let [r, g, b, a] = evaluated.color.to_srgb8();
+        Some(dot_vox::Color { r, g, b, a })
     }
 }
 
@@ -197,7 +203,7 @@ fn dot_vox_model_to_space(
 }
 fn space_to_dot_vox_model(
     space_ref: &universe::URef<Space>,
-    palette: &mut Vec<u32>,
+    palette: &mut Vec<dot_vox::Color>,
 ) -> Result<dot_vox::Model, ExportError> {
     let space = space_ref.read()?;
     let bounds = space.bounds();
