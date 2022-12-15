@@ -115,6 +115,27 @@ where
         self.chunks.values()
     }
 
+    /// Iterate over the [`ChunkMesh`]es that are in view from the given camera,
+    /// in front-to-back order. (Use `.rev()` to iterate in back-to-front order.)
+    ///
+    /// Uses `camera`'s position, rotation, and options to decide which chunks to return.
+    pub fn iter_in_view<'a>(
+        &'a self,
+        camera: &'a Camera,
+    ) -> impl Iterator<Item = &'a ChunkMesh<D, Vert, Tex, CHUNK_SIZE>> + DoubleEndedIterator + 'a
+    {
+        // TODO: can we make fewer details (like view_direction_mask) public, now that this method exists? Should we?
+        self.chunk_chart
+            .chunks(self.view_chunk(), camera.view_direction_mask())
+            // Chunk existence lookup is faster than the frustum culling test,
+            // so we do that first.
+            .filter_map(|pos| self.chunk(pos))
+            .filter(|chunk| {
+                !camera.options().use_frustum_culling
+                    || camera.aab_in_view(chunk.position.bounds().into())
+            })
+    }
+
     /// Retrieves a [`ChunkMesh`] for the specified chunk position, if one exists.
     ///
     /// Call this while drawing, after [`Self::update_blocks_and_some_chunks`]
@@ -604,8 +625,14 @@ where
         }
     }
 
+    #[inline]
     pub fn mesh(&self) -> &SpaceMesh<Vert, Tex::Tile> {
         &self.mesh
+    }
+
+    #[inline]
+    pub fn position(&self) -> ChunkPos<CHUNK_SIZE> {
+        self.position
     }
 
     fn borrow_for_update(

@@ -288,7 +288,6 @@ impl SpaceRenderer {
         let start_time = Instant::now();
 
         let csm = &self.csm;
-        let view_direction_mask = camera.view_direction_mask();
         let view_chunk = csm.view_chunk();
 
         let mut flaws = Flaws::empty();
@@ -355,60 +354,44 @@ impl SpaceRenderer {
         let mut chunks_drawn = 0;
         let mut squares_drawn = 0;
         render_pass.set_pipeline(&pipelines.opaque_render_pipeline);
-        // TODO: ChunkedSpaceMesh should probably provide this chunk iterator itself
-        // since every caller needs it.
-        for p in csm.chunk_chart().chunks(view_chunk, view_direction_mask) {
-            // Chunk existence lookup is faster than the frustum culling test, so we do that first.
-            if let Some(chunk) = csm.chunk(p) {
-                if cull(camera, p) {
-                    continue;
-                }
-                chunks_drawn += 1;
+        for chunk in csm.iter_in_view(camera) {
+            chunks_drawn += 1;
 
-                if let Some(buffers) = &chunk.render_data {
-                    draw_instance(
-                        chunk.mesh().opaque_range(),
-                        &mut render_pass,
-                        buffers,
-                        &mut instance_data,
-                        p,
-                        &mut squares_drawn,
-                    );
-                }
-                flaws |= chunk.mesh().flaws();
+            if let Some(buffers) = &chunk.render_data {
+                draw_instance(
+                    chunk.mesh().opaque_range(),
+                    &mut render_pass,
+                    buffers,
+                    &mut instance_data,
+                    chunk.position(),
+                    &mut squares_drawn,
+                );
+            } else {
+                // TODO: If the chunk is missing, draw a blocking shape, possibly?
             }
-            // TODO: If the chunk is missing, draw a blocking shape, possibly?
+            flaws |= chunk.mesh().flaws();
         }
 
         // Transparent geometry after opaque geometry, in back-to-front order
         let start_draw_transparent_time = Instant::now();
         if camera.options().transparency.will_output_alpha() {
             render_pass.set_pipeline(&pipelines.transparent_render_pipeline);
-            for p in csm
-                .chunk_chart()
-                .chunks(view_chunk, view_direction_mask)
-                .rev()
-            {
-                // Chunk existence lookup is faster than the frustum culling test, so we do that first.
-                if let Some(chunk) = csm.chunk(p) {
-                    if cull(camera, p) {
-                        continue;
-                    }
-                    if let Some(buffers) = &chunk.render_data {
-                        draw_instance(
-                            chunk.mesh().transparent_range(
-                                // TODO: avoid adding and then subtracting view_chunk
-                                DepthOrdering::from_view_direction(p.0 - view_chunk.0),
-                            ),
-                            &mut render_pass,
-                            buffers,
-                            &mut instance_data,
-                            p,
-                            &mut squares_drawn,
-                        );
-                    }
-                    flaws |= chunk.mesh().flaws();
+            for chunk in csm.iter_in_view(camera).rev() {
+                if let Some(buffers) = &chunk.render_data {
+                    draw_instance(
+                        chunk
+                            .mesh()
+                            .transparent_range(DepthOrdering::from_view_direction(
+                                chunk.position().0 - view_chunk.0,
+                            )),
+                        &mut render_pass,
+                        buffers,
+                        &mut instance_data,
+                        chunk.position(),
+                        &mut squares_drawn,
+                    );
                 }
+                flaws |= chunk.mesh().flaws();
             }
         }
 
@@ -543,11 +526,6 @@ pub(in crate::in_wgpu) fn create_space_bind_group(
         ],
         label: Some(&format!("{space_label} space_bind_group")),
     })
-}
-
-/// TODO: this probably should be a method on the camera
-fn cull(camera: &Camera, chunk: ChunkPos<CHUNK_SIZE>) -> bool {
-    camera.options().use_frustum_culling && !camera.aab_in_view(chunk.bounds().into())
 }
 
 fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuffers) {
