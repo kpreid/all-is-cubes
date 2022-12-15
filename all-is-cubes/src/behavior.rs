@@ -52,6 +52,7 @@ pub trait BehaviorHost: Transactional + 'static {
 #[non_exhaustive]
 pub struct BehaviorContext<'a, H: BehaviorHost> {
     pub host: &'a H,
+    pub attachment: &'a H::Attachment,
     host_transaction_binder: &'a dyn Fn(H::Transaction) -> UniverseTransaction,
     self_transaction_binder: &'a dyn Fn(Arc<dyn Behavior<H>>) -> UniverseTransaction,
 }
@@ -138,6 +139,7 @@ impl<H: BehaviorHost> BehaviorSet<H> {
         for (index, entry) in self.items.iter().enumerate() {
             let context = &BehaviorContext {
                 host,
+                attachment: &entry.attachment,
                 host_transaction_binder,
                 self_transaction_binder: &|new_behavior| {
                     host_transaction_binder(set_transaction_binder(
