@@ -94,21 +94,34 @@ impl<H: BehaviorHost> BehaviorSet<H> {
     /// Find behaviors of a specified type.
     ///
     /// TODO: We probably want other filtering strategies than just type, so this might change.
-    pub fn query<T: Behavior<H>>(&self) -> impl Iterator<Item = &T> + '_ {
-        self.query_dyn(TypeId::of::<T>())
-            .map(|b| b.downcast_ref::<T>().unwrap())
+    pub fn query<T: Behavior<H>>(&self) -> impl Iterator<Item = QueryItem<'_, H, T>> + '_ {
+        self.query_dyn(TypeId::of::<T>()).map(
+            |QueryItem {
+                 attachment,
+                 behavior,
+             }| QueryItem {
+                attachment,
+                behavior: behavior.downcast_ref::<T>().unwrap(),
+            },
+        )
     }
 
     /// Implementation for [`Self::query`].
-    fn query_dyn<'a>(&'a self, t: TypeId) -> impl Iterator<Item = &'a (dyn Behavior<H>)> + 'a {
+    fn query_dyn<'a>(
+        &'a self,
+        t: TypeId,
+    ) -> impl Iterator<Item = QueryItem<'a, H, dyn Behavior<H> + 'static>> + 'a {
         self.items
             .iter()
             .map(
-                move |entry: &'a BehaviorSetEntry<H>| -> &'a (dyn Behavior<H> + 'static) {
-                    &*entry.behavior
+                move |entry: &'a BehaviorSetEntry<H>| -> QueryItem<'a, H, dyn Behavior<H> + 'static> {
+                    QueryItem {
+                        attachment: &entry.attachment,
+                        behavior: &*entry.behavior,
+                    }
                 },
             )
-            .filter(move |behavior| (*behavior).type_id() == t)
+            .filter(move |qi| (*qi.behavior).type_id() == t)
     }
 
     pub(crate) fn step(
@@ -198,6 +211,35 @@ impl<H: BehaviorHost> PartialEq for BehaviorSetEntry<H> {
     #[allow(clippy::vtable_address_comparisons)] // The hazards should be okay for this use case
     fn eq(&self, other: &Self) -> bool {
         self.attachment == other.attachment && Arc::ptr_eq(&self.behavior, &other.behavior)
+    }
+}
+
+/// Result of [`BehaviorSet::query()`].
+#[non_exhaustive]
+pub struct QueryItem<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> {
+    pub attachment: &'a H::Attachment,
+    pub behavior: &'a B,
+}
+
+impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> Clone for QueryItem<'a, H, B> {
+    fn clone(&self) -> Self {
+        // Manual impl avoids `H: Clone` bound.
+        Self {
+            attachment: self.attachment,
+            behavior: self.behavior,
+        }
+    }
+}
+
+impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> Debug for QueryItem<'a, H, B> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let QueryItem {
+            attachment,
+            behavior,
+        } = self;
+        behavior.fmt(f)?; // inherit alternate prettyprint mode
+        write!(f, " @ {attachment:?}")?; // don't
+        Ok(())
     }
 }
 
@@ -483,7 +525,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             set.query_dyn(TypeId::of::<Q<Expected>>())
-                .map(|b| b.downcast_ref::<Q<Expected>>().unwrap())
+                .map(|qi| qi.behavior.downcast_ref::<Q<Expected>>().unwrap())
                 .collect::<Vec<_>>(),
             vec![&Q(Expected)],
         )

@@ -248,11 +248,12 @@ impl Transaction<Space> for SpaceTransaction {
             .commit(&mut space.behaviors, check)
             .map_err(|e| e.context("behaviors".into()))?;
         if !to_activate.is_empty() {
-            'b: for behavior in space.behaviors.query::<ActivatableRegion>() {
+            'b: for query_item in space.behaviors.query::<ActivatableRegion>() {
                 // TODO: error return from the function? error report for nonexistence?
                 for cube in to_activate.iter().copied() {
-                    if behavior.region.contains_cube(cube) {
-                        behavior.activate();
+                    // TODO: this should be part of the query instead, to allow efficient search
+                    if query_item.behavior.region.contains_cube(cube) {
+                        query_item.behavior.activate();
                         continue 'b;
                     }
                 }
