@@ -338,6 +338,9 @@ impl Session {
             for fluff in error.fluff() {
                 self.fluff_notifier.notify(fluff);
             }
+        } else {
+            // TODO: placeholder; this should come out of in-world behavior or widget behavior instead.
+            self.fluff_notifier.notify(Fluff::Happened);
         }
 
         if let Some(ui) = &self.ui {

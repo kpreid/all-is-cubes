@@ -4,6 +4,7 @@ use std::sync::{atomic, mpsc, Arc};
 use all_is_cubes::apps::Session;
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::listen::Listener;
+use kira::manager::error::PlaySoundError;
 use kira::manager::AudioManager;
 use kira::sound::static_sound::StaticSoundData;
 
@@ -62,18 +63,41 @@ fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: Aud
         ),
         settings: kira::sound::static_sound::StaticSoundSettings::default(),
     };
+    let happened = StaticSoundData {
+        sample_rate: 44100,
+        frames: Arc::new(
+            (0..220)
+                .map(|i| {
+                    let wave = (i as f32 / 44.1 * 2.0).sin() * 0.1;
+                    kira::dsp::Frame {
+                        left: wave,
+                        right: wave,
+                    }
+                })
+                .collect(),
+        ),
+        settings: kira::sound::static_sound::StaticSoundSettings::default(),
+    };
 
     while let Ok(message) = receiver.recv() {
         match message {
-            AudioCommand::Fluff(Fluff::Beep) => match manager.play(beep.clone()) {
-                Ok(_) => {}
-                Err(error) => log::error!(
-                    "Playback error: {error}",
-                    error = all_is_cubes::util::ErrorChain(&error)
-                ),
-            },
+            AudioCommand::Fluff(Fluff::Beep) => play_fluff(&mut manager, &beep),
+            AudioCommand::Fluff(Fluff::Happened) => play_fluff(&mut manager, &happened),
             AudioCommand::Fluff(f) => log::debug!("No known sound for Fluff value: {f:?}"),
         }
+    }
+}
+
+fn play_fluff(manager: &mut AudioManager, sound: &StaticSoundData) {
+    match manager.play(sound.clone()) {
+        Ok(_handle) => {}
+        Err(PlaySoundError::SoundLimitReached) => {
+            // Ignore this, since fluff is inconsequential
+        }
+        Err(error) => log::error!(
+            "Playback error: {error}",
+            error = all_is_cubes::util::ErrorChain(&error)
+        ),
     }
 }
 
