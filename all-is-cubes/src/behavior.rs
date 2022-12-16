@@ -6,10 +6,7 @@ use std::fmt::{self, Debug};
 use std::sync::Arc;
 
 use downcast_rs::{impl_downcast, Downcast};
-use ordered_float::NotNan;
 
-use crate::character::{Character, CharacterTransaction};
-use crate::physics::BodyTransaction;
 use crate::time::Tick;
 use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
@@ -363,39 +360,12 @@ impl<H: BehaviorHost> PartialEq for BehaviorSetTransaction<H> {
 
 impl<H: BehaviorHost> Eq for BehaviorSetTransaction<H> {}
 
-/// A simple behavior for exercising the system, which causes a `Character`'s viewpoint to
-/// rotate without user input.
-/// TODO: Delete this, replace with a more general camera movement scripting mechanism.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
-pub struct AutoRotate {
-    pub rate: NotNan<f64>,
-}
-impl Behavior<Character> for AutoRotate {
-    fn step(&self, c: &BehaviorContext<'_, Character>, tick: Tick) -> UniverseTransaction {
-        c.bind_host(CharacterTransaction::body(BodyTransaction {
-            delta_yaw: self.rate.into_inner() * tick.delta_t.as_secs_f64(),
-        }))
-    }
-
-    fn alive(&self, _context: &BehaviorContext<'_, Character>) -> bool {
-        true
-    }
-
-    fn ephemeral(&self) -> bool {
-        false
-    }
-}
-
-impl VisitRefs for AutoRotate {
-    // No references
-    fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::character::{Character, CharacterTransaction};
     use crate::math::FreeCoordinate;
+    use crate::physics::BodyTransaction;
     use crate::space::Space;
     use crate::universe::Universe;
     use indoc::indoc;
