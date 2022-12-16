@@ -45,6 +45,12 @@ pub(crate) fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree
         )),
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,
+            UiBlocks::DebugBehaviorsButton,
+            |g| g.debug_behaviors,
+            |g, v| g.debug_behaviors = v,
+        )),
+        LayoutTree::leaf(graphics_toggle_button(
+            hud_inputs,
             UiBlocks::DebugChunkBoxesButton,
             |g| g.debug_chunk_boxes,
             |g, v| g.debug_chunk_boxes = v,

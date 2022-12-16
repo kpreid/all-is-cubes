@@ -17,7 +17,20 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
     cursor_result: Option<&Cursor>,
 ) {
     // All of these debug visualizations currently depend on the character
+    // TODO: Make it possible to render debug_behaviors with just a Space
     if let Some(character) = character {
+        if graphics_options.debug_behaviors {
+            if let Ok(space) = character.space.try_borrow() {
+                for item in space.behaviors().query_any(None) {
+                    wireframe_vertices(
+                        v,
+                        palette::DEBUG_BEHAVIOR_BOUNDS,
+                        &Aab::from(item.attachment.bounds()),
+                    );
+                }
+            }
+        }
+
         if graphics_options.debug_collision_boxes {
             // Character collision box
             wireframe_vertices(

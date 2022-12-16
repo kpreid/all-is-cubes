@@ -133,6 +133,7 @@ pub const BUTTON_ACTIVATED_GLOW: Rgb = rgb_const!(2.0, 0.4, 0.4); // not represe
 palette! {
     // In-world debug UI elements (all wireframe)
     // TODO: these have no reason to be public
+    DEBUG_BEHAVIOR_BOUNDS = srgb[0x00 0x70 0x00 0xFF];
     DEBUG_COLLISION_BOX = srgb[0x00 0x00 0xFF 0xFF];
     DEBUG_COLLISION_CUBES = srgb[0xFF 0x00 0x00 0xFF];
     DEBUG_CHUNK_MAJOR = srgb[0x00 0x00 0xE8 0xFF];

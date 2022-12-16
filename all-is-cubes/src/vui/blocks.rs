@@ -42,6 +42,7 @@ pub enum UiBlocks {
     FullscreenButton(ToggleButtonVisualState),
     AntialiasButton(ToggleButtonVisualState),
     DebugInfoTextButton(ToggleButtonVisualState),
+    DebugBehaviorsButton(ToggleButtonVisualState),
     DebugChunkBoxesButton(ToggleButtonVisualState),
     DebugCollisionBoxesButton(ToggleButtonVisualState),
     DebugLightRaysButton(ToggleButtonVisualState),
@@ -68,6 +69,7 @@ impl fmt::Display for UiBlocks {
             UiBlocks::FullscreenButton(state) => write!(f, "fullscreen-button/{state}"),
             UiBlocks::AntialiasButton(state) => write!(f, "antialias-button/{state}"),
             UiBlocks::DebugInfoTextButton(state) => write!(f, "debug-info-text-button/{state}"),
+            UiBlocks::DebugBehaviorsButton(state) => write!(f, "debug-behaviors-button/{state}"),
             UiBlocks::DebugChunkBoxesButton(state) => {
                 write!(f, "debug-chunk-boxes-button/{state}")
             }
@@ -181,6 +183,12 @@ impl UiBlocks {
                     button_builder
                         .draw_icon(include_image!("icons/button-debug-chunk-boxes.png"))?;
                     button_builder.build(universe, "Debug: Chunk Boxes")
+                }
+
+                UiBlocks::DebugBehaviorsButton(state) => {
+                    let mut button_builder = state.button_builder()?;
+                    button_builder.draw_icon(include_image!("icons/button-debug-behaviors.png"))?;
+                    button_builder.build(universe, "Debug: Behaviors")
                 }
 
                 UiBlocks::DebugCollisionBoxesButton(state) => {

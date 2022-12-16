@@ -65,6 +65,13 @@ pub struct GraphicsOptions {
     /// Draw text overlay showing debug information.
     pub debug_info_text: bool,
 
+    /// Draw boxes around [`Behavior`]s attached to parts of [`Space`]s.
+    /// This may also eventually include further in-world diagnostic information.
+    ///
+    /// [`Behavior`]: crate::behavior::Behavior
+    /// [`Space`]: crate::space::Space
+    pub debug_behaviors: bool,
+
     /// Draw boxes around chunk borders and some debug info.
     pub debug_chunk_boxes: bool,
 
@@ -102,6 +109,7 @@ impl Default for GraphicsOptions {
             antialiasing: AntialiasingOption::default(),
             use_frustum_culling: true,
             debug_info_text: true,
+            debug_behaviors: false,
             debug_chunk_boxes: false,
             debug_collision_boxes: false,
             debug_light_rays_at_cursor: false,

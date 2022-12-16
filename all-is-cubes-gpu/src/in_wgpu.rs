@@ -201,7 +201,7 @@ pub struct EverythingRenderer {
 
     /// Cursor and debug lines are written to this buffer.
     lines_buffer: ResizingBuffer,
-    /// Number of vertices currently in `lines_buffer`
+    /// Number of vertices currently in `lines_buffer`.
     lines_vertex_count: u32,
 
     /// Pipeline for the color postprocessing + info text layer drawing.
