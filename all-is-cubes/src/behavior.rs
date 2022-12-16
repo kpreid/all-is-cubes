@@ -91,9 +91,9 @@ impl<H: BehaviorHost> BehaviorSet<H> {
 
     /// Find behaviors of a specified type.
     ///
-    /// TODO: We probably want other filtering strategies than just type, so this might change.
+    /// TODO: Allow querying by attachment details (spatial, etc)
     pub fn query<T: Behavior<H>>(&self) -> impl Iterator<Item = QueryItem<'_, H, T>> + '_ {
-        self.query_dyn(TypeId::of::<T>()).map(
+        self.query_any(Some(TypeId::of::<T>())).map(
             |QueryItem {
                  attachment,
                  behavior,
@@ -104,10 +104,12 @@ impl<H: BehaviorHost> BehaviorSet<H> {
         )
     }
 
-    /// Implementation for [`Self::query`].
-    fn query_dyn<'a>(
+    /// Find behaviors by filter criteria. All `None`s mean “anything”.
+    ///
+    /// TODO: Allow querying by attachment details (spatial, etc)
+    pub fn query_any<'a>(
         &'a self,
-        t: TypeId,
+        type_filter: Option<TypeId>,
     ) -> impl Iterator<Item = QueryItem<'a, H, dyn Behavior<H> + 'static>> + 'a {
         self.items
             .iter()
@@ -119,7 +121,7 @@ impl<H: BehaviorHost> BehaviorSet<H> {
                     }
                 },
             )
-            .filter(move |qi| (*qi.behavior).type_id() == t)
+            .filter(move |qi| type_filter.map_or(true, |t| (*qi.behavior).type_id() == t))
     }
 
     pub(crate) fn step(
@@ -488,18 +490,33 @@ mod tests {
         }
 
         let mut set = BehaviorSet::<Character>::new();
-        BehaviorSetTransaction::insert((), Arc::new(Q(Expected)))
+        let arc_qe = Arc::new(Q(Expected));
+        BehaviorSetTransaction::insert((), arc_qe.clone())
             .execute(&mut set)
             .unwrap();
         // different type, so it should not be found
-        BehaviorSetTransaction::insert((), Arc::new(Q(Unexpected)))
+        let arc_qu = Arc::new(Q(Unexpected));
+        BehaviorSetTransaction::insert((), arc_qu.clone())
             .execute(&mut set)
             .unwrap();
+
+        // Type-specific query should find one
         assert_eq!(
-            set.query_dyn(TypeId::of::<Q<Expected>>())
-                .map(|qi| qi.behavior.downcast_ref::<Q<Expected>>().unwrap())
+            set.query::<Q<Expected>>()
+                .map(|qi| qi.behavior)
                 .collect::<Vec<_>>(),
             vec![&Q(Expected)],
+        );
+
+        // General query should find both
+        assert_eq!(
+            set.query_any(None)
+                .map(|qi| qi.behavior as *const dyn Behavior<Character>)
+                .collect::<Vec<_>>(),
+            vec![
+                Arc::as_ptr(&arc_qe) as *const dyn Behavior<Character>,
+                Arc::as_ptr(&arc_qu) as *const dyn Behavior<Character>
+            ],
         )
     }
 }
