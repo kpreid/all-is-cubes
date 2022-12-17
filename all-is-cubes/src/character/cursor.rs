@@ -193,11 +193,24 @@ impl Geometry for Cursor {
     where
         E: Extend<(Point3<FreeCoordinate>, Option<crate::math::Rgba>)>,
     {
+        let evaluated = &self.hit().evaluated;
+
         // Compute an approximate offset that will prevent Z-fighting.
         let offset_from_surface = 0.001 * self.distance_to_point;
 
-        // Draw box
-        Aab::from_cube(self.hit().position)
+        // AABB of the block's actual content. We use this rather than the full extent of
+        // the cube so that it feels more accurate.
+        //
+        // TODO: voxels_bounds() is not really an intentionally designed selection box and
+        // will often be oversized.
+        // (But maybe we should guarantee it is right-sized within block evaluation?)
+        // (Perhaps a better box would be the bounds of all `selectable` voxels?)
+        let block_aabb = Aab::from(evaluated.voxels_bounds())
+            .scale(FreeCoordinate::from(evaluated.resolution).recip())
+            .translate(self.cube().to_vec().map(FreeCoordinate::from));
+
+        // Add wireframe of the block.
+        block_aabb
             .expand(offset_from_surface)
             .wireframe_points(&mut MapExtend::new(
                 output,
@@ -208,7 +221,9 @@ impl Geometry for Cursor {
             Matrix4::from_translation(self.hit().position.map(FreeCoordinate::from).to_vec())
                 * self.face_entered.matrix(1).to_free();
 
-        // Frame the selected face with a square
+        // Frame the selected face with a square.
+        // TODO: Position this frame relative to block_aabb, but only once the cursor
+        // selection behavior reflects that too.
         let inset = 1. / 128.;
         for &p in [
             Point3::new(inset, inset, -offset_from_surface),

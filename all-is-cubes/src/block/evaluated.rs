@@ -36,8 +36,7 @@ pub struct EvaluatedBlock {
     /// If [`Self::voxels`] is present, then this is the voxel resolution (number of
     /// voxels along an edge) of the block.
     ///
-    /// If [`Self::voxels`] is [`None`], then this value is irrelevant and should be set
-    /// to 1.
+    /// If [`Self::voxels`] is [`None`], then this value will always be 1.
     pub resolution: Resolution,
 
     /// Whether the block is known to be completely opaque to light passing in or out of
@@ -164,6 +163,20 @@ impl EvaluatedBlock {
     #[inline]
     pub(crate) fn visible_or_animated(&self) -> bool {
         self.visible || self.attributes.animation_hint.might_become_visible()
+    }
+
+    /// Returns the bounding box of the voxels, or the full cube if no voxels,
+    /// scaled up by `resolution`.
+    ///
+    /// TODO: This isn't a great operation to be exposing because it “leaks” the implementation
+    /// detail of whether the bounds are tightly fitting or not, particularly for the purpose
+    /// it is being used for (cursor drawing). Figure out what we want to do instead.
+    #[doc(hidden)]
+    pub fn voxels_bounds(&self) -> GridAab {
+        match &self.voxels {
+            Some(v) => v.bounds(),
+            None => GridAab::ORIGIN_CUBE,
+        }
     }
 
     #[doc(hidden)]
