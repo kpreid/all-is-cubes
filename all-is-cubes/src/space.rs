@@ -720,6 +720,10 @@ impl Space {
         self.spawn = spawn;
     }
 
+    pub fn behaviors(&self) -> &BehaviorSet<Space> {
+        &self.behaviors
+    }
+
     /// Finds or assigns an index to denote the block.
     ///
     /// The caller is responsible for incrementing `self.block_data[index].count`.
