@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 use cgmath::Vector3;
 
-use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
+use crate::behavior::BehaviorSet;
 use crate::block::{
     Block, BlockChange, EvalBlockError, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED,
 };
@@ -720,15 +720,6 @@ impl Space {
         self.spawn = spawn;
     }
 
-    pub fn add_behavior<B>(&mut self, bounds: GridAab, behavior: B)
-    where
-        B: Behavior<Self> + 'static,
-    {
-        BehaviorSetTransaction::insert(SpaceBehaviorAttachment::new(bounds), Arc::new(behavior))
-            .execute(&mut self.behaviors)
-            .unwrap();
-    }
-
     /// Finds or assigns an index to denote the block.
     ///
     /// The caller is responsible for incrementing `self.block_data[index].count`.
@@ -956,7 +947,8 @@ impl SpaceBlockData {
     // but might be interesting 'statistics'.
 }
 
-/// Description of where in a [`Space`] a [`Behavior<Space>`](Behavior) exists.
+/// Description of where in a [`Space`] a [`Behavior<Space>`](crate::behavior::Behavior)
+/// exists.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct SpaceBehaviorAttachment {
     bounds: GridAab,

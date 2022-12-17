@@ -15,7 +15,8 @@ use all_is_cubes::math::{
     Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix, GridPoint,
     GridRotation, GridVector, Rgb, Rgba,
 };
-use all_is_cubes::space::{SetCubeError, Space, SpacePhysics};
+use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
+use all_is_cubes::transaction::Transaction as _;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{rgb_const, rgba_const};
@@ -545,7 +546,9 @@ async fn install_atrium_blocks(
                                 resolution_g - fire_inset,
                             ],
                         );
-                        space.add_behavior(bounds, Fire::new(bounds));
+                        SpaceTransaction::add_behavior(bounds, Fire::new(bounds))
+                            .execute(&mut space)
+                            .unwrap();
                     }
                     universe.insert_anonymous(space)
                 })

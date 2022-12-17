@@ -2,9 +2,10 @@
 
 use std::collections::btree_map::Entry::*;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::{fmt, mem};
 
-use crate::behavior::{BehaviorSet, BehaviorSetTransaction};
+use crate::behavior::{self, BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::drawing::DrawingPlane;
 use crate::math::{GridCoordinate, GridMatrix, GridPoint};
@@ -135,11 +136,23 @@ impl SpaceTransaction {
         }
     }
 
-    pub fn behaviors(t: BehaviorSetTransaction<Space>) -> Self {
+    pub fn behaviors(t: behavior::BehaviorSetTransaction<Space>) -> Self {
         Self {
             behaviors: t,
             ..Default::default()
         }
+    }
+
+    /// Add a behavior to the [`Space`].
+    /// This is a shortcut for creating a [`BehaviorSetTransaction`].
+    pub fn add_behavior<B>(bounds: GridAab, behavior: B) -> Self
+    where
+        B: behavior::Behavior<Space> + 'static,
+    {
+        Self::behaviors(behavior::BehaviorSetTransaction::insert(
+            super::SpaceBehaviorAttachment::new(bounds),
+            Arc::new(behavior),
+        ))
     }
 
     pub(crate) fn activate_block(cube: GridPoint) -> Self {
@@ -550,7 +563,7 @@ mod tests {
         let cube = GridPoint::new(0, 0, 0);
 
         let signal = Arc::new(AtomicU32::new(0));
-        space.add_behavior(
+        SpaceTransaction::add_behavior(
             GridAab::single_cube(cube),
             ActivatableRegion {
                 // TODO: This sure is clunky
@@ -561,7 +574,9 @@ mod tests {
                     }
                 }) as Arc<dyn Fn() + Send + Sync>),
             },
-        );
+        )
+        .execute(&mut space)
+        .unwrap();
 
         SpaceTransaction::activate_block(cube)
             .execute(&mut space)

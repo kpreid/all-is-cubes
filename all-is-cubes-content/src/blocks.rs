@@ -20,7 +20,8 @@ use all_is_cubes::math::{
     cube_to_midpoint, Face6, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridPoint,
     GridRotation, GridVector, NotNan, Rgb, Rgba,
 };
-use all_is_cubes::space::{Space, SpacePhysics};
+use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
+use all_is_cubes::transaction::Transaction as _;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{rgb_const, rgba_const};
@@ -389,7 +390,9 @@ pub async fn install_demo_blocks(
                 let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [16, 16, 1]))
                     .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
                     .build();
-                space.add_behavior(space.bounds(), crate::animation::Clock::new());
+                SpaceTransaction::add_behavior(space.bounds(), crate::animation::Clock::new())
+                    .execute(&mut space)
+                    .unwrap();
                 Block::builder()
                     .display_name("Clock")
                     .collision(BlockCollision::None)

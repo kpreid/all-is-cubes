@@ -36,7 +36,7 @@ use all_is_cubes::math::{
     Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridPoint, GridRotation,
     GridVector, NotNan, Rgb, Rgba,
 };
-use all_is_cubes::space::{SetCubeError, Space, SpacePhysics};
+use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::Transaction as _;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::{include_image, rgb_const, rgba_const};
@@ -336,7 +336,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
             Block::from(Rgb::new(0.0, 0.3, 1.0)),
         ];
         let repeats_per_fill = 6;
-        block_space.add_behavior(
+        SpaceTransaction::add_behavior(
             block_space.bounds(),
             AnimatedVoxels::new(move |p, frame| {
                 let n = fills.len() as GridCoordinate * repeats_per_fill;
@@ -348,7 +348,8 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
                     .rem_euclid(fills.len() as GridCoordinate) as usize]
                     .clone()
             }),
-        );
+        )
+        .execute(&mut block_space)?;
         Block::builder()
             .animation_hint(AnimationHint::CONTINUOUS)
             .collision(BlockCollision::Recur)
@@ -366,7 +367,9 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
                 let fire_bounds = GridAab::for_block(fire_resolution);
                 let mut space = Space::for_block(fire_resolution).build();
                 space.set([0, 0, 0], Rgb::ONE)?; // placeholder for not fully transparent so first pass lighting is better
-                space.add_behavior(fire_bounds, Fire::new(fire_bounds));
+                SpaceTransaction::add_behavior(fire_bounds, Fire::new(fire_bounds))
+                    .execute(&mut space)
+                    .unwrap();
                 universe.insert_anonymous(space)
             })
             .build()
