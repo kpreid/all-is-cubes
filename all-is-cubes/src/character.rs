@@ -458,7 +458,7 @@ impl Character {
         // Check that this is not a cursor into some other space.
         // This shouldn't happen according to game rules but it might due to a UI/session
         // update glitch, and if it does, we do
-        if let Some(cursor_space) = cursor.map(|c| &c.space) {
+        if let Some(cursor_space) = cursor.map(Cursor::space) {
             let our_space = &tb.space;
             if cursor_space != our_space {
                 return Err(ToolError::Internal(format!(

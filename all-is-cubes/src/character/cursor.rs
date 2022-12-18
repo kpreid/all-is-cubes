@@ -9,7 +9,7 @@ use cgmath::{InnerSpace as _, Point3, Transform};
 use crate::block::{recursive_raycast, Block, EvaluatedBlock};
 use crate::content::palette;
 use crate::math::{
-    Aab, CubeFace, Face7, FreeCoordinate, Geometry, GridCoordinate, GridVector, Rgba,
+    Aab, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridVector, Rgba,
 };
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
@@ -32,8 +32,6 @@ pub fn cursor_raycast(
 
         let cube = step.cube_ahead();
         let evaluated = space.get_evaluated(cube);
-        let lighting_ahead = space.get_lighting(cube);
-        let lighting_behind = space.get_lighting(step.cube_behind());
 
         // Check intersection with recursive block
         if let Some(voxels) = &evaluated.voxels {
@@ -48,13 +46,26 @@ pub fn cursor_raycast(
         if evaluated.attributes.selectable {
             return Some(Cursor {
                 space: space_ref.clone(),
-                place: step.cube_face(),
-                point: step.intersection_point(ray),
-                distance: step.t_distance(),
-                block: space[cube].clone(),
-                evaluated: evaluated.clone(),
-                lighting_ahead,
-                lighting_behind,
+                face_entered: step.face(),
+                point_entered: step.intersection_point(ray),
+                distance_to_point: step.t_distance(),
+                hit: CubeSnapshot {
+                    position: cube,
+                    block: space[cube].clone(),
+                    evaluated: evaluated.clone(),
+                    light: space.get_lighting(cube),
+                },
+                preceding: if step.face() != Face7::Within {
+                    let pcube = step.cube_behind();
+                    Some(CubeSnapshot {
+                        position: pcube,
+                        block: space[pcube].clone(),
+                        evaluated: space.get_evaluated(pcube).clone(),
+                        light: space.get_lighting(pcube),
+                    })
+                } else {
+                    None
+                },
             });
         }
     }
@@ -65,20 +76,80 @@ pub fn cursor_raycast(
 ///
 /// TODO: Should carry information about both the struck and preceding cubes.
 #[derive(Clone, Debug, PartialEq)]
-#[non_exhaustive]
 pub struct Cursor {
-    pub space: URef<Space>,
-    /// The cube the cursor is at and which face was hit.
-    pub place: CubeFace,
-    pub point: Point3<FreeCoordinate>,
-    /// Distance from viewpoint to intersection point.
-    pub distance: FreeCoordinate,
-    /// The block that was found in the given cube.
+    /// The space the selected cube is in.
+    space: URef<Space>,
+
+    /// The face that the cursor ray entered the cube via.
+    ///
+    /// Note that this is not necessarily the same as “the face of the block” in the case
+    /// where the block occupies less than the full volume.
+    face_entered: Face7,
+
+    /// Intersection point where the ray entered the cube.
+    point_entered: Point3<FreeCoordinate>,
+
+    /// Distance from ray origin (viewpoint) to `point_entered`.
+    distance_to_point: FreeCoordinate,
+
+    /// Data about the cube the cursor selected/hit.
+    hit: CubeSnapshot,
+
+    /// Data about the cube the cursor ray was in before it hit [`Self::hit`],
+    /// if there was one, or `None` if the cursor ray started in the cube it hit.
+    preceding: Option<CubeSnapshot>,
+}
+
+/// Snapshot of the contents of one cube of a [`Space`], independent of the [`Space`].
+///
+/// TODO: Can we find a cleaner name for this class?
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct CubeSnapshot {
+    pub position: GridPoint,
     pub block: Block,
-    /// The EvaluatedBlock data for the block.
     pub evaluated: EvaluatedBlock,
-    pub lighting_ahead: PackedLight,
-    pub lighting_behind: PackedLight,
+    pub light: PackedLight,
+}
+
+impl Cursor {
+    /// The space the selected cube is in.
+    #[inline]
+    pub fn space(&self) -> &URef<Space> {
+        &self.space
+    }
+
+    /// Which cube of the space that the cursor ray selected/hit.
+    pub fn cube(&self) -> GridPoint {
+        self.hit.position
+    }
+
+    pub fn preceding_cube(&self) -> GridPoint {
+        self.cube() + self.face_entered.normal_vector()
+    }
+
+    pub fn face_selected(&self) -> Face7 {
+        // TODO: this should reflect the face of the block hit, not the cube
+        self.face_entered
+    }
+
+    /// Returns data about the cube the cursor selected/hit.
+    #[inline]
+    pub fn hit(&self) -> &CubeSnapshot {
+        &self.hit
+    }
+
+    // TODO: Preceding data is actually unused except for debug info via fmt::Display...
+    // Should we remove it? Tools do care about the preceding space but not quite this way.
+    // I think there was some use-case for having the preceding/selected-adjacent block's
+    // EvaluatedBlock data, though.
+    //
+    // /// Returns data about the cube the cursor ray passed through just before it hit anything.
+    // /// If the ray started from within the cube it hit, returns the same as [`hit()`](Self::hit).
+    // #[inline]
+    // pub fn preceding_or_within(&self) -> &CubeSnapshot {
+    //     self.preceding.as_ref().unwrap_or(&self.hit)
+    // }
 }
 
 // TODO: this probably shouldn't be Display any more, but Debug or ConciseDebug
@@ -87,8 +158,12 @@ impl fmt::Display for Cursor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Block at {:?}\n{:#?}\nLighting within {:?}, behind {:?}",
-            self.place, self.evaluated, self.lighting_ahead, self.lighting_behind,
+            "Block at {c:?} face {f:?}\n{ev:#?}\nLighting within {la:?}, behind {lb:?}",
+            c = self.cube(),
+            f = self.face_entered,
+            ev = self.hit().evaluated,
+            la = self.hit().light,
+            lb = self.preceding.as_ref().map(|s| s.light),
         )
     }
 }
@@ -99,10 +174,9 @@ impl fmt::Display for Cursor {
 impl Geometry for Cursor {
     type Coord = GridCoordinate;
 
-    fn translate(mut self, offset: GridVector) -> Self {
-        self.place.cube += offset;
-        self.point += offset.map(FreeCoordinate::from);
-        self
+    /// Not implemented for [`Cursor`].
+    fn translate(self, _offset: GridVector) -> Self {
+        unimplemented!()
     }
 
     fn wireframe_points<E>(&self, output: &mut E)
@@ -110,10 +184,10 @@ impl Geometry for Cursor {
         E: Extend<(Point3<FreeCoordinate>, Option<crate::math::Rgba>)>,
     {
         // Compute an approximate offset that will prevent Z-fighting.
-        let offset_from_surface = 0.001 * self.distance;
+        let offset_from_surface = 0.001 * self.distance_to_point;
 
         // TODO: Maybe highlight the selected face's rectangle
-        Aab::from_cube(self.place.cube)
+        Aab::from_cube(self.hit().position)
             .expand(offset_from_surface)
             .wireframe_points(&mut MapExtend::new(
                 output,
@@ -123,7 +197,7 @@ impl Geometry for Cursor {
         // Frame the cursor intersection point with a diamond.
         // TODO: This addition is experimental and we may or may not want to keep it.
         // For now, it visualizes the intersection and face information.
-        let face_frame = self.place.face.matrix(0).to_free();
+        let face_frame = self.face_entered.matrix(0).to_free();
         for f in [
             Face7::PX,
             Face7::PY,
@@ -134,8 +208,8 @@ impl Geometry for Cursor {
             Face7::NY,
             Face7::PX,
         ] {
-            let p = self.point
-                + self.place.face.normal_vector() * offset_from_surface
+            let p = self.point_entered
+                + self.face_entered.normal_vector() * offset_from_surface
                 + face_frame.transform_vector(f.normal_vector() * (1.0 / 32.0));
             output.extend([(p, Some(palette::CURSOR_OUTLINE))]);
         }

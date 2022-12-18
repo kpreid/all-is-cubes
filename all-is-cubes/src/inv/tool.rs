@@ -94,21 +94,19 @@ impl Tool {
                 // TODO: cursor is probably not _exactly_ the right set of data that should be passed on
                 Ok((
                     Some(self),
-                    SpaceTransaction::activate_block(cursor.place.cube).bind(cursor.space.clone()),
+                    SpaceTransaction::activate_block(cursor.cube()).bind(cursor.space().clone()),
                 ))
             }
             Self::RemoveBlock { keep } => {
                 let cursor = input.cursor()?;
-                let deletion = input.set_cube(cursor.place.cube, cursor.block.clone(), AIR)?;
+                let deletion = input.set_cube(cursor.cube(), cursor.hit().block.clone(), AIR)?;
                 Ok((
                     Some(self),
                     if keep {
                         deletion
-                            .merge(
-                                input.produce_item(Tool::Block(
-                                    cursor.block.clone().unspecialize(),
-                                ))?,
-                            )
+                            .merge(input.produce_item(Tool::Block(
+                                cursor.hit().block.clone().unspecialize(),
+                            ))?)
                             .unwrap()
                     } else {
                         deletion
@@ -129,8 +127,9 @@ impl Tool {
                 let cursor = input.cursor()?;
                 Ok((
                     Some(self),
-                    input
-                        .produce_item(Tool::InfiniteBlocks(cursor.block.clone().unspecialize()))?,
+                    input.produce_item(Tool::InfiniteBlocks(
+                        cursor.hit().block.clone().unspecialize(),
+                    ))?,
                 ))
             }
             Self::EditBlock => {
@@ -142,7 +141,7 @@ impl Tool {
                         Primitive::Recur { space, .. } => Ok(Some(space.clone())),
                     }
                 }
-                match find_space(&input.cursor()?.block) {
+                match find_space(&input.cursor()?.hit().block) {
                     // TODO: Actually implement the tool.
                     Ok(Some(_space_ref)) => {
                         Err(ToolError::Internal("EditBlock not implemented".to_string()))
@@ -155,29 +154,28 @@ impl Tool {
             Self::PushPull => {
                 let cursor = input.cursor()?;
                 let mut direction: Face6 = cursor
-                    .place
-                    .face
+                    .face_selected()
                     .opposite()
                     .try_into()
                     .map_err(|_| ToolError::NotUsable)?;
 
                 // If we can't push, then try pulling.
                 // TODO: Tool should have user-controllable modes
-                if cursor.space.borrow()[cursor.place.cube + direction.normal_vector()] != AIR {
+                if cursor.space().borrow()[cursor.cube() + direction.normal_vector()] != AIR {
                     direction = direction.opposite();
                 }
 
                 let velocity = 8;
                 let [move_out, move_in] = block::Move::paired_move(direction, 0, velocity);
                 let leaving = input.set_cube(
-                    cursor.place.cube,
-                    cursor.block.clone(),
-                    move_out.attach(cursor.block.clone()),
+                    cursor.cube(),
+                    cursor.hit().block.clone(),
+                    move_out.attach(cursor.hit().block.clone()),
                 )?;
                 let entering = input.set_cube(
-                    cursor.place.cube + direction.normal_vector(),
+                    cursor.cube() + direction.normal_vector(),
                     AIR,
-                    move_in.attach(cursor.block.clone()),
+                    move_in.attach(cursor.hit().block.clone()),
                 )?;
                 Ok((
                     Some(self),
@@ -302,7 +300,7 @@ impl ToolInput {
         old_block: Block,
         new_block: Block,
     ) -> Result<UniverseTransaction, ToolError> {
-        let space_ref = &self.cursor()?.space;
+        let space_ref = self.cursor()?.space();
         let space = space_ref.try_borrow().map_err(ToolError::SpaceRef)?;
         if space[cube] != old_block {
             return Err(ToolError::Obstacle);
@@ -330,8 +328,11 @@ impl ToolInput {
         {
             RotationPlacementRule::Never => GridRotation::IDENTITY,
             RotationPlacementRule::Attach { by: attached_face } => {
-                let world_cube_face: Face6 =
-                    cursor.place.face.opposite().try_into().unwrap_or(Face6::NZ);
+                let world_cube_face: Face6 = cursor
+                    .face_selected()
+                    .opposite()
+                    .try_into()
+                    .unwrap_or(Face6::NZ);
                 // TODO: RotationPlacementRule should control the "up" axis choices
                 GridRotation::from_to(attached_face, world_cube_face, Face6::PY)
                     .or_else(|| GridRotation::from_to(attached_face, world_cube_face, Face6::PX))
@@ -340,7 +341,7 @@ impl ToolInput {
             }
         };
         self.set_cube(
-            cursor.place.adjacent(),
+            cursor.preceding_cube(),
             old_block,
             new_block.rotate(rotation),
         )

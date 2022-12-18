@@ -296,7 +296,7 @@ impl Vui {
 
     /// Handle clicks that hit the UI itself
     pub fn click(&mut self, _button: usize, cursor: Option<Cursor>) -> Result<(), ToolError> {
-        if cursor.as_ref().map(|c| &c.space) != Option::as_ref(&self.current_space.get()) {
+        if cursor.as_ref().map(Cursor::space) != Option::as_ref(&self.current_space.get()) {
             return Err(ToolError::Internal(String::from(
                 "Vui::click: space didn't match",
             )));

@@ -351,7 +351,7 @@ impl Session {
     /// Implementation of click interpretation logic, called by [`Self::click`].
     /// TODO: This function needs tests.
     fn click_impl(&mut self, button: usize) -> Result<(), ToolError> {
-        let cursor_space = self.cursor_result.as_ref().map(|c| &c.space);
+        let cursor_space = self.cursor_result.as_ref().map(|c| c.space());
         // TODO: A better condition for this would be "is one of the spaces in the UI universe"
         if cursor_space == Option::as_ref(&self.ui_space().get()) {
             // TODO: refactor away unwrap
@@ -371,7 +371,7 @@ impl Session {
 
                 // Spend a little time doing light updates, to ensure that changes right in front of
                 // the player are clean (and not flashes of blackness).
-                if let Some(space_ref) = self.cursor_result.as_ref().map(|c| &c.space) {
+                if let Some(space_ref) = self.cursor_result.as_ref().map(Cursor::space) {
                     // TODO: Instead of ignoring error, log it
                     let _ = space_ref.try_modify(|space| {
                         space.update_lighting_from_queue();

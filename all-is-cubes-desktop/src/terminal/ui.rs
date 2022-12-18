@@ -308,8 +308,10 @@ pub(super) fn write_ui(
             if let Some(cursor) = dsession.session.cursor_result() {
                 // TODO: design good formatting for cursor data
                 Paragraph::new(format!(
-                    "{:?} : {}",
-                    cursor.place, cursor.evaluated.attributes.display_name
+                    "{:?} {:?} : {}",
+                    cursor.cube(),
+                    cursor.face_selected(),
+                    cursor.hit().evaluated.attributes.display_name
                 ))
             } else {
                 Paragraph::new("")

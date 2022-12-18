@@ -46,11 +46,11 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
         if graphics_options.debug_light_rays_at_cursor {
             if let Some(cursor) = cursor_result {
                 // TODO: We should be able to draw wireframes in the UI space too, and when we do that will enable supporting this.
-                if cursor.space == character.space {
+                if cursor.space() == &character.space {
                     let space = character.space.borrow();
                     let (_, _, _, lighting_info) = space
                         .compute_lighting::<all_is_cubes::space::LightUpdateCubeInfo>(
-                            cursor.place.adjacent(),
+                            cursor.preceding_cube(),
                         );
                     wireframe_vertices(v, Rgba::new(0.8, 0.8, 1.0, 1.0), &lighting_info);
                 }
