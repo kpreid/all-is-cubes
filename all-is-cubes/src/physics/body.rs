@@ -127,7 +127,7 @@ impl Body {
     pub fn step<CC>(
         &mut self,
         tick: Tick,
-        colliding_space: Option<&Space>,
+        mut colliding_space: Option<&Space>,
         mut collision_callback: CC,
     ) -> BodyStepInfo
     where
@@ -136,6 +136,10 @@ impl Body {
         let dt = tick.delta_t.as_secs_f64();
         let mut move_segments = [MoveSegment::default(); 3];
         let mut already_colliding = None;
+
+        if self.noclip {
+            colliding_space = None;
+        }
 
         let mut collision_callback = |contact: Contact| {
             if contact.normal() == Face7::Within {
