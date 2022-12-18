@@ -581,6 +581,7 @@ pub struct Faceless;
 /// Container for values keyed by [`Face6`]s. Always holds exactly six elements.
 #[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct FaceMap<V> {
     /// The value whose key is [`Face6::NX`].
     pub nx: V,
@@ -732,6 +733,25 @@ impl<V: Clone> FaceMap<V> {
             nz: value.clone(),
             px: value.clone(),
             py: value.clone(),
+            pz: value,
+        }
+    }
+}
+
+impl<V: Copy> FaceMap<V> {
+    /// Constructs a [`FaceMap`] containing copies of the provided value.
+    ///
+    /// This is practically identical to [`FaceMap::repeat()`] except that it is a
+    /// `const fn`. It may be removed from future major versions once Rust supports const
+    /// trait function calls.
+    #[inline]
+    pub const fn repeat_copy(value: V) -> Self {
+        Self {
+            nx: value,
+            ny: value,
+            nz: value,
+            px: value,
+            py: value,
             pz: value,
         }
     }

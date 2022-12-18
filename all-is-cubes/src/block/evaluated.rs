@@ -5,7 +5,7 @@ use std::fmt;
 use cgmath::{Vector4, Zero as _};
 
 use crate::block::{BlockAttributes, BlockCollision, Resolution, Resolution::R1};
-use crate::math::{GridAab, GridArray, OpacityCategory, Rgba};
+use crate::math::{FaceMap, GridAab, GridArray, OpacityCategory, Rgba};
 use crate::universe::RefError;
 
 // Things mentioned in doc comments only
@@ -15,7 +15,7 @@ use super::{Block, Primitive, URef, AIR, AIR_EVALUATED};
 /// A snapshotted form of [`Block`] which contains all information needed for rendering
 /// and physics, and does not require dereferencing [`URef`]s or unbounded computation.
 #[derive(Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))] // TODO: Should have a custom Arbitrary producing only “possible” results
 #[non_exhaustive]
 pub struct EvaluatedBlock {
     /// The block's attributes.
@@ -40,12 +40,14 @@ pub struct EvaluatedBlock {
     /// to 1.
     pub resolution: Resolution,
 
-    /// Whether the block is known to be completely opaque to light on all six faces.
+    /// Whether the block is known to be completely opaque to light passing in or out of
+    /// each face.
     ///
-    /// Currently, this is defined to be that each of the surfaces of the block are
+    /// Currently, this is calculated as whether each of the surfaces of the block are
     /// fully opaque, but in the future it might be refined to permit concave surfaces.
-    // TODO: generalize opaque to multiple faces and partial opacity, for better light transport
-    pub opaque: bool,
+    // TODO: generalize this to a matrix of face/face visibility and opacity relationships,
+    // so that light transport can be refined.
+    pub opaque: FaceMap<bool>,
 
     /// Whether the block has any voxels/color at all that make it visible; that is, this
     /// is false if the block is completely transparent.
@@ -96,7 +98,7 @@ impl EvaluatedBlock {
             color,
             voxels: None,
             resolution: R1,
-            opaque: color.fully_opaque(),
+            opaque: FaceMap::repeat(color.fully_opaque()),
             visible: !color.fully_transparent(),
             voxel_opacity_mask: if color.fully_transparent() {
                 None
@@ -131,12 +133,19 @@ impl EvaluatedBlock {
             )
             .expect("Recursive block color computation produced NaN"),
             resolution,
-            // TODO wrong test: we want to see if the _faces_ are all opaque but allow hollows
-            opaque: voxels.bounds() == full_block_bounds
-                && voxels.bounds().interior_iter().all(
-                    #[inline(always)]
-                    |p| voxels[p].color.fully_opaque(),
-                ),
+            opaque: FaceMap::from_fn(|face| {
+                // TODO: This test should be refined by flood-filling in from the face,
+                // so that we can also consider a face opaque if it has hollows/engravings.
+                let surface_volume = GridAab::for_block(resolution).abut(face, -1).unwrap();
+                if surface_volume.intersection(voxels.bounds()) == Some(surface_volume) {
+                    surface_volume.interior_iter().all(
+                        #[inline(always)]
+                        |p| voxels[p].color.fully_opaque(),
+                    )
+                } else {
+                    false
+                }
+            }),
             visible: voxels.bounds().interior_iter().any(
                 #[inline(always)]
                 |p| !voxels[p].color.fully_transparent(),
@@ -266,7 +275,7 @@ mod tests {
                 color: Rgba::TRANSPARENT,
                 voxels: Some(GridArray::from_elements(bounds, []).unwrap()),
                 resolution,
-                opaque: false,
+                opaque: FaceMap::repeat(false),
                 visible: false,
                 voxel_opacity_mask: Some(GridArray::from_elements(bounds, []).unwrap())
             }

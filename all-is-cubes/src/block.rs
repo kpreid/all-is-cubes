@@ -12,7 +12,7 @@ use cgmath::{EuclideanSpace as _, Point3};
 
 use crate::listen::Listener;
 use crate::math::{
-    FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba,
+    FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba,
 };
 use crate::raycast::{Ray, Raycaster};
 use crate::space::{SetCubeError, Space, SpaceChange};
@@ -582,7 +582,7 @@ pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     color: Rgba::TRANSPARENT,
     voxels: None,
     resolution: Resolution::R1,
-    opaque: false,
+    opaque: FaceMap::repeat_copy(false),
     visible: false,
     voxel_opacity_mask: None,
 };

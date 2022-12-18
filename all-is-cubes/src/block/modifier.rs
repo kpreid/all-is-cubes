@@ -137,7 +137,7 @@ impl Modifier {
                         attributes: value.attributes,
                         color: value.color,
                         resolution,
-                        opaque: value.opaque,
+                        opaque: value.opaque.rotate(rotation),
                         visible: value.visible,
                     }
                 }
@@ -190,7 +190,7 @@ mod tests {
     use crate::block::Resolution::R2;
     use crate::block::{BlockAttributes, BlockCollision, Evoxel, Primitive};
     use crate::content::make_some_voxel_blocks;
-    use crate::math::{GridAab, GridPoint, OpacityCategory, Rgba};
+    use crate::math::{Face6, FaceMap, GridAab, GridPoint, OpacityCategory, Rgba};
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
 
@@ -238,7 +238,7 @@ mod tests {
                     }
                 })),
                 resolution: R2,
-                opaque: false,
+                opaque: FaceMap::repeat(false).with(rotation.transform(Face6::NY), true),
                 visible: true,
                 voxel_opacity_mask: Some(GridArray::from_fn(block_bounds, |cube| {
                     if cube.x == 0 {

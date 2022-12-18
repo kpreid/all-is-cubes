@@ -19,8 +19,8 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::listen::{NullListener, Sink};
 use crate::math::{
-    GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, GridVector, OpacityCategory, Rgb,
-    Rgba,
+    Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, GridVector,
+    OpacityCategory, Rgb, Rgba,
 };
 use crate::space::{Space, SpaceTransaction};
 use crate::universe::Universe;
@@ -94,7 +94,7 @@ fn evaluate_opaque_atom_and_attributes() {
     assert_eq!(e.color, block.color());
     assert!(e.voxels.is_none());
     assert_eq!(e.resolution, R1);
-    assert_eq!(e.opaque, true);
+    assert_eq!(e.opaque, FaceMap::repeat(true));
     assert_eq!(e.visible, true);
     assert_eq!(
         e.voxel_opacity_mask,
@@ -109,7 +109,7 @@ fn evaluate_transparent_atom() {
     let e = block.evaluate().unwrap();
     assert_eq!(e.color, block.color());
     assert!(e.voxels.is_none());
-    assert_eq!(e.opaque, false);
+    assert_eq!(e.opaque, FaceMap::repeat(false));
     assert_eq!(e.visible, true);
     assert_eq!(
         e.voxel_opacity_mask,
@@ -126,7 +126,7 @@ fn evaluate_invisible_atom() {
     let e = block.evaluate().unwrap();
     assert_eq!(e.color, Rgba::TRANSPARENT);
     assert!(e.voxels.is_none());
-    assert_eq!(e.opaque, false);
+    assert_eq!(e.opaque, FaceMap::repeat(false));
     assert_eq!(e.visible, false);
     assert_eq!(e.voxel_opacity_mask, None)
 }
@@ -167,7 +167,7 @@ fn evaluate_voxels_checked_individually() {
     );
     assert_eq!(e.color, Rgba::new(0.5, 0.5, 0.5, 1.0));
     assert_eq!(e.resolution, resolution);
-    assert_eq!(e.opaque, true);
+    assert_eq!(e.opaque, FaceMap::repeat(true));
     assert_eq!(e.visible, true);
     assert_eq!(
         e.voxel_opacity_mask,
@@ -203,7 +203,17 @@ fn evaluate_transparent_voxels() {
         e.color,
         Rgba::new(0.0, 0.0, 0.0, 1.0 - (0.5 / f32::from(resolution).powi(3)))
     );
-    assert_eq!(e.opaque, false);
+    assert_eq!(
+        e.opaque,
+        FaceMap {
+            nx: false,
+            ny: false,
+            nz: false,
+            px: true,
+            py: true,
+            pz: true,
+        }
+    );
     assert_eq!(e.visible, true);
 }
 
@@ -233,7 +243,7 @@ fn evaluate_voxels_not_filling_block() {
         Rgba::new(0.0, 0.0, 0.0, 1.0 / f32::from(resolution).powi(3))
     );
     assert_eq!(e.resolution, resolution);
-    assert_eq!(e.opaque, false);
+    assert_eq!(e.opaque, FaceMap::repeat(false));
     assert_eq!(e.visible, true);
 }
 
@@ -255,7 +265,7 @@ fn evaluate_voxels_partial_not_filling() {
     let e = block.evaluate().unwrap();
     assert_eq!(e.color, Rgba::new(1.0, 1.0, 1.0, 0.5));
     assert_eq!(e.resolution, resolution);
-    assert_eq!(e.opaque, false);
+    assert_eq!(e.opaque, FaceMap::repeat(false).with(Face6::NX, true));
     assert_eq!(e.visible, true);
 }
 

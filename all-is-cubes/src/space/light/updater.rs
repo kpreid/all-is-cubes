@@ -169,7 +169,8 @@ impl Space {
         let mut info_rays = D::RayInfoBuffer::default();
 
         let ev_origin = self.get_evaluated(cube);
-        if ev_origin.opaque {
+        let origin_is_opaque = ev_origin.opaque == FaceMap::repeat(true);
+        if origin_is_opaque {
             // Opaque blocks are always dark inside — unless they are light sources.
             if !opaque_for_light_computation(ev_origin) {
                 cube_buffer.add_weighted_light(ev_origin.attributes.light_emission, 1.0);
@@ -211,7 +212,7 @@ impl Space {
             }
         }
 
-        let new_light_value = cube_buffer.finish(ev_origin.opaque);
+        let new_light_value = cube_buffer.finish(origin_is_opaque);
 
         (
             new_light_value,
@@ -392,9 +393,15 @@ impl LightBuffer {
             return;
         }
 
-        // TODO: Implement blocks with some faces opaque.
-        if ev_hit.opaque {
-            // On striking a fully opaque block, we use the light value from its
+        // Compute whether we hit an opaque face which should stop propagation.
+        // TODO: Also count the opacity of the face we *exited* of the previous block,
+        let hit_opaque_face = match Face6::try_from(hit.face()) {
+            Ok(face) => ev_hit.opaque[face],
+            Err(_) => ev_hit.opaque == FaceMap::repeat(true),
+        };
+
+        if hit_opaque_face {
+            // On striking a fully opaque block face, we use the light value from its
             // adjacent cube as the light falling on that face.
             let light_cube = hit.cube_behind();
             if light_cube == hit.cube_ahead() {
@@ -551,5 +558,5 @@ impl CustomFormat<StatusText> for LightUpdatesInfo {
 /// This function is fairly straightforward; it exists for purposes of *documenting
 /// the places that care about this* rather than for code reduction.
 pub(crate) fn opaque_for_light_computation(block: &EvaluatedBlock) -> bool {
-    block.opaque && block.attributes.light_emission == Rgb::ZERO
+    block.opaque == FaceMap::repeat(true) && block.attributes.light_emission == Rgb::ZERO
 }

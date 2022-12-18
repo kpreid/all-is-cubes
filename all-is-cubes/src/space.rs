@@ -444,8 +444,8 @@ impl Space {
             }
             for face in Face6::ALL {
                 if let Some(neighbor) = point_checked_add(position, face.normal_vector()) {
-                    // Skip neighbor light updates in the definitely-black-inside case.
-                    if !self.get_evaluated(neighbor).opaque {
+                    // Perform neighbor light updates if they can be affected by us
+                    if !self.get_evaluated(neighbor).opaque[face.opposite()] {
                         self.light_needs_update(neighbor, PackedLightScalar::MAX);
                     }
                 }

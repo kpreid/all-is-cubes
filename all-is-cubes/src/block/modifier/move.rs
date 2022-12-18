@@ -195,7 +195,7 @@ mod tests {
 
     use crate::block::{Block, Modifier, Resolution::R2};
     use crate::content::make_some_blocks;
-    use crate::math::{GridPoint, OpacityCategory};
+    use crate::math::{FaceMap, GridPoint, OpacityCategory};
     use crate::space::Space;
     use crate::time::Tick;
     use crate::universe::Universe;
@@ -229,7 +229,7 @@ mod tests {
                     Evoxel::from_block(&ev_original)
                 )),
                 resolution: R16,
-                opaque: false,
+                opaque: FaceMap::repeat(false).with(Face6::PY, true),
                 visible: true,
                 voxel_opacity_mask: Some(GridArray::repeat(
                     expected_bounds,
@@ -272,7 +272,7 @@ mod tests {
                     Evoxel::from_block(&ev_original)
                 )),
                 resolution,
-                opaque: false,
+                opaque: FaceMap::repeat(false).with(Face6::PY, true),
                 visible: true,
                 voxel_opacity_mask: Some(GridArray::repeat(
                     expected_bounds,
