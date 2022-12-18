@@ -711,7 +711,15 @@ impl<V> FaceMap<V> {
         self
     }
 
-    // TODO: provide more convenience methods for iteration & transformation
+    /// Shuffle the values in this map according to the given rotation.
+    #[must_use]
+    pub fn rotate(self, rotation: GridRotation) -> Self {
+        // TODO: Can we make this cleaner? (If GridRotation had a way to ask it what swaps
+        // it corresponds to, that might also be useful for GridArray rotations.)
+        let to_source = rotation.inverse();
+        let mut source = self.map(|_, value| Some(value));
+        Self::from_fn(|face| source[to_source.transform(face)].take().unwrap())
+    }
 }
 
 impl<V: Clone> FaceMap<V> {
@@ -859,6 +867,28 @@ mod tests {
             Face6::ALL.to_vec(),
             map.values().copied().collect::<Vec<_>>(),
         );
+    }
+
+    #[test]
+    fn face_map_rotate() {
+        assert_eq!(
+            FaceMap {
+                nx: 10,
+                px: 20,
+                ny: 11,
+                py: 21,
+                nz: 12,
+                pz: 22,
+            }.rotate(GridRotation::RyXZ),
+            FaceMap {
+                nx: 11,
+                px: 21,
+                ny: 20,
+                py: 10,
+                nz: 12,
+                pz: 22,
+            }
+        )
     }
 
     // TODO: More tests of FaceMap
