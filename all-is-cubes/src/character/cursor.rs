@@ -6,7 +6,7 @@ use std::fmt;
 
 use cgmath::{EuclideanSpace, InnerSpace as _, Matrix4, Point3, Transform as _};
 
-use crate::block::{recursive_raycast, Block, EvaluatedBlock};
+use crate::block::{recursive_raycast, Block, EvaluatedBlock, Evoxel};
 use crate::content::palette;
 use crate::math::{
     Aab, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridVector, Rgba,
@@ -33,41 +33,51 @@ pub fn cursor_raycast(
         let cube = step.cube_ahead();
         let evaluated = space.get_evaluated(cube);
 
+        if !evaluated.attributes.selectable {
+            continue;
+        }
+
         // Check intersection with recursive block
         if let Some(voxels) = &evaluated.voxels {
-            if !recursive_raycast(ray, step.cube_ahead(), evaluated.resolution)
-                .flat_map(|voxel_step| voxels.get(voxel_step.cube_ahead()))
-                .any(|v| v.selectable)
-            {
+            let recursive_hit: Option<(GridPoint, &Evoxel)> =
+                recursive_raycast(ray, step.cube_ahead(), evaluated.resolution)
+                    .filter_map(|voxel_step| {
+                        voxels
+                            .get(voxel_step.cube_ahead())
+                            .map(|v| (voxel_step.cube_ahead(), v))
+                    })
+                    .find(|(_, v)| v.selectable);
+            if recursive_hit.is_none() {
                 continue;
+            } else {
+                // TODO: Record intersection information about which voxel was hit,
+                // and also let it contribute to the determination of which face is selected.
             }
         }
 
-        if evaluated.attributes.selectable {
-            return Some(Cursor {
-                space: space_ref.clone(),
-                face_entered: step.face(),
-                point_entered: step.intersection_point(ray),
-                distance_to_point: step.t_distance(),
-                hit: CubeSnapshot {
-                    position: cube,
-                    block: space[cube].clone(),
-                    evaluated: evaluated.clone(),
-                    light: space.get_lighting(cube),
-                },
-                preceding: if step.face() != Face7::Within {
-                    let pcube = step.cube_behind();
-                    Some(CubeSnapshot {
-                        position: pcube,
-                        block: space[pcube].clone(),
-                        evaluated: space.get_evaluated(pcube).clone(),
-                        light: space.get_lighting(pcube),
-                    })
-                } else {
-                    None
-                },
-            });
-        }
+        return Some(Cursor {
+            space: space_ref.clone(),
+            face_entered: step.face(),
+            point_entered: step.intersection_point(ray),
+            distance_to_point: step.t_distance(),
+            hit: CubeSnapshot {
+                position: cube,
+                block: space[cube].clone(),
+                evaluated: evaluated.clone(),
+                light: space.get_lighting(cube),
+            },
+            preceding: if step.face() != Face7::Within {
+                let pcube = step.cube_behind();
+                Some(CubeSnapshot {
+                    position: pcube,
+                    block: space[pcube].clone(),
+                    evaluated: space.get_evaluated(pcube).clone(),
+                    light: space.get_lighting(pcube),
+                })
+            } else {
+                None
+            },
+        });
     }
     None
 }
