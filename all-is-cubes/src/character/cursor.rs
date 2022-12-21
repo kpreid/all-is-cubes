@@ -32,6 +32,7 @@ pub fn cursor_raycast(
 
         let cube = step.cube_ahead();
         let evaluated = space.get_evaluated(cube);
+        let mut face_selected = None;
 
         if !evaluated.attributes.selectable {
             continue;
@@ -43,6 +44,7 @@ pub fn cursor_raycast(
                 if !evoxel.selectable {
                     continue;
                 }
+                face_selected = Some(step.face());
             }
             Evoxels::Many(resolution, ref voxels) => {
                 let recursive_hit: Option<(GridPoint, &Evoxel)> =
@@ -50,6 +52,14 @@ pub fn cursor_raycast(
                         .cast()
                         .within(voxels.bounds())
                         .filter_map(|voxel_step| {
+                            if face_selected.is_none() {
+                                // Set the selected face to the first face we hit, which
+                                // will be the face of the bounding box we hit.
+                                // TODO: Either don't rely on the bounding box (perhaps
+                                // only take faces of selectable voxels) or change block
+                                // evaluation to make the bounding box guaranteed tight.
+                                face_selected = Some(voxel_step.face());
+                            }
                             voxels
                                 .get(voxel_step.cube_ahead())
                                 .map(|v| (voxel_step.cube_ahead(), v))
@@ -57,16 +67,14 @@ pub fn cursor_raycast(
                         .find(|(_, v)| v.selectable);
                 if recursive_hit.is_none() {
                     continue;
-                } else {
-                    // TODO: Record intersection information about which voxel was hit,
-                    // and also let it contribute to the determination of which face is selected.
                 }
             }
-        }
+        };
 
         return Some(Cursor {
             space: space_ref.clone(),
             face_entered: step.face(),
+            face_selected: face_selected.expect("failed to determine face_selected"),
             point_entered: step.intersection_point(ray),
             distance_to_point: step.t_distance(),
             hit: CubeSnapshot {
@@ -104,6 +112,9 @@ pub struct Cursor {
     /// Note that this is not necessarily the same as “the face of the block” in the case
     /// where the block occupies less than the full volume.
     face_entered: Face7,
+
+    /// The face of the block that is being selected.
+    face_selected: Face7,
 
     /// Intersection point where the ray entered the cube.
     point_entered: Point3<FreeCoordinate>,
@@ -153,13 +164,16 @@ impl Cursor {
 
     /// Which face of the block the cursor ray selected/hit.
     ///
-    /// This is currently defined as the face of the *cube* that the ray entered, but
-    /// that is planned to be revised to a more block-shape-sensitive definition.
+    /// Note that this is not necessarily the same as the face of the enclosing cube,
+    /// in the case where the block occupies less than the full volume; rather it is
+    /// intended to make sense to the human who does not get to see the cube grid.
+    /// It is currently defined to be the hit face of the bounding box of the block data
+    /// (which is often but not always tightly bounding the visible voxels, so this will
+    /// have the unsurprising value for any box-shaped block).
     ///
-    /// Will be [`Face7::Within`] if the ray started in the same cube.
+    /// Will be [`Face7::Within`] if the ray started inside the block.
     pub fn face_selected(&self) -> Face7 {
-        // TODO: this should reflect the face of the block hit, not the cube
-        self.face_entered
+        self.face_selected
     }
 
     /// Returns data about the cube the cursor selected/hit.
@@ -367,5 +381,50 @@ mod tests {
         let cursor = cursor_raycast(X_RAY, &space_ref, f64::INFINITY).unwrap();
         assert_eq!(cursor.cube(), GridPoint::new(1, 0, 0));
         assert_eq!(cursor.hit().block, selectable_voxels);
+    }
+
+    /// A [`Ray`] which will pass through the left face and then the middle Y plane of a
+    /// block located at [0, 0, 0].
+    ///
+    /// ```text
+    /// 1 +----•-+------+
+    ///   |     \|      |
+    ///   |      \      |
+    ///   |      |\     |
+    ///   |      | \    |
+    ///   |      |  \   |
+    ///   |      |   ↘  |
+    /// 0 +------+------+
+    ///  -1      0      1
+    /// ```
+    const SLOPING_RAY: Ray = Ray {
+        origin: Point3::new(-0.25, 1.0, 0.5),
+        direction: Vector3::new(1.0, -1.0, 0.0),
+    };
+
+    /// Testing the “normal” case in contrast to `slope_hits_face_different_from_entered`.
+    #[test]
+    fn slope_hits_face_of_full_block() {
+        let universe = &mut Universe::new();
+        let [block] = make_some_blocks();
+        let space_ref = test_space(universe, [&block]);
+
+        let cursor = cursor_raycast(SLOPING_RAY, &space_ref, f64::INFINITY).unwrap();
+        assert_eq!(cursor.face_entered, Face7::NX);
+        assert_eq!(cursor.face_selected(), Face7::NX);
+    }
+
+    /// Test the case where the face of the block the cursor ray hits is not equal to the
+    /// face of the cube the ray entered.
+    #[test]
+    fn slope_hits_face_different_from_entered() {
+        let universe = &mut Universe::new();
+        let slab = make_slab(universe, 1, R2);
+        let space_ref = test_space(universe, [&slab]);
+
+        let cursor = cursor_raycast(SLOPING_RAY, &space_ref, f64::INFINITY).unwrap();
+        dbg!(&cursor);
+        assert_eq!(cursor.face_entered, Face7::NX);
+        assert_eq!(cursor.face_selected(), Face7::PY);
     }
 }
