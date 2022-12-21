@@ -229,3 +229,93 @@ impl Geometry for Cursor {
         }
     }
 }
+
+/// These are tests of [`cursor_raycast()`] and the data it returns.
+/// For tests of behavior when actually _using_ a [`Cursor`] to invoke a tool,
+/// see [`crate::character::tests`] and [`crate::inv`].
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::block::{Resolution::*, AIR};
+    use crate::content::{make_slab, make_some_blocks};
+    use crate::math::GridAab;
+    use crate::universe::Universe;
+    use cgmath::Vector3;
+
+    fn test_space<const N: usize>(universe: &mut Universe, blocks: [&Block; N]) -> URef<Space> {
+        let mut space =
+            Space::builder(GridAab::from_lower_size([0, 0, 0], [N as i32, 1, 1])).build();
+        space
+            .fill(space.bounds(), |p| Some(blocks[p.x as usize]))
+            .unwrap();
+        universe.insert_anonymous(space)
+    }
+
+    /// A [`Ray`] aligned with the X axis, such that it starts in cube [-1, 0, 0] and hits
+    /// [0, 0, 0], [1, 0, 0], [2, 0, 0], et cetera, and just slightly above the midpoint.
+    const X_RAY: Ray = Ray {
+        origin: Point3::new(-0.5, 0.500001, 0.500001),
+        direction: Vector3::new(1., 0., 0.),
+    };
+
+    #[test]
+    fn simple_hit_after_air() {
+        let universe = &mut Universe::new();
+        let [block] = make_some_blocks();
+        let space_ref = test_space(universe, [&AIR, &block]);
+
+        let cursor = cursor_raycast(X_RAY, &space_ref, f64::INFINITY).unwrap();
+        assert_eq!(cursor.hit().block, block);
+        assert_eq!(cursor.cube(), GridPoint::new(1, 0, 0));
+        assert_eq!(cursor.face_selected(), Face7::NX);
+    }
+
+    #[test]
+    fn maximum_distance_too_short() {
+        let universe = &mut Universe::new();
+        let [block] = make_some_blocks();
+        let space_ref = test_space(universe, [&AIR, &block]);
+
+        assert_eq!(cursor_raycast(X_RAY, &space_ref, 1.0), None);
+    }
+
+    #[test]
+    fn ignores_not_selectable_atom() {
+        let universe = &mut Universe::new();
+        let [block] = make_some_blocks();
+        let not_selectable = Block::builder()
+            .color(Rgba::WHITE)
+            .selectable(false)
+            .build();
+        let space_ref = test_space(universe, [&not_selectable, &block]);
+
+        let cursor = cursor_raycast(X_RAY, &space_ref, f64::INFINITY).unwrap();
+        // If the non-selectable block was hit, this would be [0, 0, 0]
+        assert_eq!(cursor.cube(), GridPoint::new(1, 0, 0));
+        assert_eq!(cursor.hit().block, block);
+    }
+
+    #[test]
+    fn ignores_not_selectable_voxels() {
+        let universe = &mut Universe::new();
+        let [block] = make_some_blocks();
+        let not_selectable = make_slab(universe, 1, R2); // Upper half is nonselectable air
+        let space_ref = test_space(universe, [&not_selectable, &block]);
+
+        let cursor = cursor_raycast(X_RAY, &space_ref, f64::INFINITY).unwrap();
+        assert_eq!(cursor.cube(), GridPoint::new(1, 0, 0));
+        assert_eq!(cursor.hit().block, block);
+    }
+
+    #[test]
+    fn hits_selectable_voxels() {
+        let universe = &mut Universe::new();
+        let [other_block] = make_some_blocks();
+        let selectable_voxels = make_slab(universe, 3, R4);
+        let space_ref = test_space(universe, [&AIR, &selectable_voxels, &other_block]);
+
+        let cursor = cursor_raycast(X_RAY, &space_ref, f64::INFINITY).unwrap();
+        assert_eq!(cursor.cube(), GridPoint::new(1, 0, 0));
+        assert_eq!(cursor.hit().block, selectable_voxels);
+    }
+}
