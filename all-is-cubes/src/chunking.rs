@@ -523,6 +523,7 @@ mod tests {
             chart.chunks(chunk, OctantMask::ALL).collect::<Vec<_>>(),
             vec![chunk]
         );
+        assert!(dbg!(chart.count_all()) >= 1);
     }
 
     /// If we look a tiny bit outside the origin chunk, there are 9³ - 1 neighbors.
@@ -565,7 +566,8 @@ mod tests {
                 ChunkPos::new(1, 1, -1),
                 ChunkPos::new(1, 1, 1),
             ]
-        )
+        );
+        assert!(dbg!(chart.count_all()) >= 29);
     }
 
     /// As [`chunk_chart_epsilon_size()`], but exercise the octant mask.
