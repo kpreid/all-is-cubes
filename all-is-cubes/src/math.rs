@@ -130,3 +130,15 @@ pub trait Geometry {
     where
         E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn smoothstep_test() {
+        assert_eq!(smoothstep(0.0), 0.0);
+        assert_eq!(smoothstep(0.5), 0.5);
+        assert_eq!(smoothstep(1.0), 1.0);
+    }
+}
