@@ -221,7 +221,7 @@ pub(super) fn write_ui(
                 .split(toolbar_rect);
 
             if let Some(character_ref) = dsession.session.character().snapshot() {
-                let character = character_ref.borrow();
+                let character = character_ref.read().unwrap();
                 let selected_slots = character.selected_slots();
                 let slots = &character.inventory().slots;
                 for (i, rect) in slot_rects.into_iter().enumerate() {

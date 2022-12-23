@@ -347,7 +347,7 @@ fn indirect_equivalence() {
         .build();
     let eval_bare = block.evaluate();
     let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
-    let eval_def = block_def_ref.borrow().evaluate();
+    let eval_def = block_def_ref.read().unwrap().evaluate();
     assert_eq!(eval_bare, eval_def);
 }
 

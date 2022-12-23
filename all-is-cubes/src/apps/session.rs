@@ -550,7 +550,12 @@ pub struct InfoText<'a, T> {
 impl<T: CustomFormat<StatusText>> fmt::Display for InfoText<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(character_ref) = self.session.game_character.borrow() {
-            write!(f, "{}", character_ref.borrow().custom_format(StatusText)).unwrap();
+            write!(
+                f,
+                "{}",
+                character_ref.read().unwrap().custom_format(StatusText)
+            )
+            .unwrap();
         }
         write!(
             f,

@@ -296,7 +296,7 @@ impl Block {
     fn evaluate_impl(&self, depth: u8) -> Result<EvaluatedBlock, EvalBlockError> {
         let mut value: EvaluatedBlock = match *self.primitive() {
             Primitive::Indirect(ref def_ref) => {
-                def_ref.try_borrow()?.evaluate_impl(next_depth(depth)?)?
+                def_ref.read()?.evaluate_impl(next_depth(depth)?)?
             }
 
             Primitive::Atom(ref attributes, color) => {
@@ -309,7 +309,7 @@ impl Block {
                 resolution,
                 space: ref space_ref,
             } => {
-                let block_space = space_ref.try_borrow()?;
+                let block_space = space_ref.read()?;
 
                 // The region of `space` that the parameters say to look at.
                 let full_resolution_bounds =
@@ -383,7 +383,7 @@ impl Block {
             Primitive::Indirect(ref def_ref) => {
                 // Note: This does not pass the recursion depth because BlockDef provides
                 // its own internal listening and thus this does not recurse.
-                def_ref.try_borrow()?.listen(listener)?;
+                def_ref.read()?.listen(listener)?;
             }
             Primitive::Atom(_, _) => {
                 // Atoms don't refer to anything external and thus cannot change other
@@ -397,7 +397,7 @@ impl Block {
                 ..
             } => {
                 let relevant_cubes = GridAab::for_block(resolution).translate(offset.to_vec());
-                space_ref.try_borrow()?.listen(listener.filter(move |msg| {
+                space_ref.read()?.listen(listener.filter(move |msg| {
                     match msg {
                         SpaceChange::Block(cube) if relevant_cubes.contains_cube(cube) => {
                             Some(BlockChange::new())
@@ -658,7 +658,7 @@ pub fn space_to_blocks(
 ) -> Result<Space, SetCubeError> {
     let resolution_g: GridCoordinate = resolution.into();
     let source_bounds = space_ref
-        .try_borrow()
+        .read()
         // TODO: Not really the right error since this isn't actually an eval error.
         // Or is it close enough?
         .map_err(EvalBlockError::DataRefIs)?

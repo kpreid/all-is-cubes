@@ -321,7 +321,7 @@ mod tests {
         for _ in 0..257 {
             universe.step(Tick::arbitrary());
         }
-        checker(&space.borrow(), &block);
+        checker(&space.read().unwrap(), &block);
     }
 
     #[test]

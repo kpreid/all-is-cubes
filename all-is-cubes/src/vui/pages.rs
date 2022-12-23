@@ -44,7 +44,7 @@ impl PageInst {
         universe: &mut Universe,
     ) -> URef<Space> {
         if let Some(space) = self.space.as_ref() {
-            if space.borrow().bounds() == layout.bounds() {
+            if space.read().unwrap().bounds() == layout.bounds() {
                 return space.clone();
             }
         }

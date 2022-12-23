@@ -66,7 +66,7 @@ mod testers {
 
         pub fn list<T: VisitRefs + 'static>(target: &URef<T>) -> Vec<Name> {
             let mut visitor = Self::new();
-            target.borrow().visit_refs(&mut visitor);
+            target.read().unwrap().visit_refs(&mut visitor);
             visitor.names
         }
     }

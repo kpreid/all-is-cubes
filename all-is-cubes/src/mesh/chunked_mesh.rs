@@ -43,7 +43,7 @@ where
     block_meshes: VersionedBlockMeshes<Vert, Tex::Tile>,
 
     /// Invariant: the set of present chunks (keys here) is the same as the set of keys
-    /// in `todo.borrow().chunks`.
+    /// in `todo.read().unwrap().chunks`.
     chunks: FnvHashMap<ChunkPos<CHUNK_SIZE>, ChunkMesh<D, Vert, Tex, CHUNK_SIZE>>,
 
     /// Resized as needed upon each [`Self::update_blocks_and_some_chunks()`].
@@ -75,7 +75,7 @@ where
     Tex::Tile: PartialEq,
 {
     pub fn new(space: URef<Space>) -> Self {
-        let space_borrowed = space.borrow();
+        let space_borrowed = space.read().unwrap();
         let todo = CsmTodo::initially_dirty();
         let todo_rc = Arc::new(Mutex::new(todo));
         space_borrowed.listen(TodoListener(Arc::downgrade(&todo_rc)));
@@ -180,7 +180,7 @@ where
 
         let mut todo = self.todo.lock().unwrap();
 
-        let space = &*if let Ok(space) = self.space.try_borrow() {
+        let space = &*if let Ok(space) = self.space.read() {
             space
         } else {
             // TODO: report error

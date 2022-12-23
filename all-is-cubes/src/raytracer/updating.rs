@@ -105,7 +105,7 @@ where
             // Nothing to do
             return Ok(());
         }
-        let space = self.space.try_borrow()?;
+        let space = self.space.read()?;
 
         if mem::take(&mut todo.listener) {
             space.listen(TodoListener(Arc::downgrade(&self.todo)));
@@ -222,7 +222,7 @@ mod tests {
 
     impl EquivalenceTester {
         fn new(space: URef<Space>) -> Self {
-            let bounds = space.borrow().bounds();
+            let bounds = space.read().unwrap().bounds();
 
             // TODO: add tests of changing the options
             let graphics_options = ListenableSource::constant(GraphicsOptions::default());
@@ -267,7 +267,7 @@ mod tests {
                 .trace_scene_to_string::<CharacterBuf>(&self.camera, "\n");
             #[allow(clippy::unit_arg)]
             let image_fresh = SpaceRaytracer::<CharacterRtData>::new(
-                &self.space.borrow(),
+                &self.space.read().unwrap(),
                 self.graphics_options.snapshot(),
                 self.custom_options.snapshot(),
             )

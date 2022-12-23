@@ -208,7 +208,7 @@ impl StandardCameras {
                 // TODO: try_borrow()
                 // TODO: ...or just skip the whole idea
                 self.cameras.ui.set_view_transform(Vui::view_transform(
-                    &space_ref.borrow(),
+                    &space_ref.read().unwrap(),
                     self.cameras.ui.fov_y(),
                 ));
             }
@@ -224,7 +224,7 @@ impl StandardCameras {
         }
 
         if let Some(character_ref) = &self.character {
-            match character_ref.try_borrow() {
+            match character_ref.read() {
                 Ok(character) => {
                     // TODO: Shouldn't we also grab the character's Space while we
                     // have the access? Renderers could use that.
@@ -317,7 +317,7 @@ impl StandardCameras {
         if let Some(character_ref) = self.character.as_ref() {
             let ray = self.cameras.world.project_ndc_into_world(ndc_pos);
             // TODO: maximum distance should be determined by character/universe parameters instead of hardcoded
-            if let Some(cursor) = cursor_raycast(ray, &character_ref.borrow().space, 6.0) {
+            if let Some(cursor) = cursor_raycast(ray, &character_ref.read().unwrap().space, 6.0) {
                 return Some(cursor);
             }
         }

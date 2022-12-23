@@ -86,9 +86,7 @@ impl SpaceRenderer {
         pipelines: &Pipelines,
         block_texture: Arc<AtlasAllocator>,
     ) -> Result<Self, GraphicsResourceError> {
-        let space_borrowed = space
-            .try_borrow()
-            .map_err(GraphicsResourceError::read_err)?;
+        let space_borrowed = space.read().map_err(GraphicsResourceError::read_err)?;
 
         let light_texture = SpaceLightTexture::new(&space_label, device, space_borrowed.bounds());
 
@@ -150,7 +148,7 @@ impl SpaceRenderer {
             csm,
         } = self;
 
-        let space_borrowed = space.borrow();
+        let space_borrowed = space.read().unwrap();
 
         *todo = {
             let todo = Arc::new(Mutex::new(SpaceRendererTodo::default()));
@@ -184,7 +182,7 @@ impl SpaceRenderer {
         let space = &*self
             .csm
             .space()
-            .try_borrow()
+            .read()
             .map_err(GraphicsResourceError::read_err)?;
 
         // Update sky color (cheap so we don't bother todo-tracking it)

@@ -107,7 +107,7 @@ impl Widget for Toolbar {
         let (character_listener_gate, character_listener) =
             Listener::<()>::gate(todo_inventory.listener());
         if let Some(character) = &character {
-            character.borrow().listen(character_listener);
+            character.read().unwrap().listen(character_listener);
         }
 
         Box::new(ToolbarController {
@@ -326,7 +326,7 @@ impl WidgetController for ToolbarController {
 
             let (gate, listener) = Listener::<()>::gate(self.todo_inventory.listener());
             if let Some(character) = &self.character {
-                character.borrow().listen(listener);
+                character.read().unwrap().listen(listener);
             }
             self.character_listener_gate = gate;
             self.todo_inventory.set();
@@ -352,7 +352,7 @@ impl WidgetController for ToolbarController {
         let should_update_inventory = self.todo_inventory.get_and_clear();
         let slots_txn = if should_update_inventory {
             if let Some(inventory_source) = &self.character {
-                let character = inventory_source.borrow();
+                let character = inventory_source.read().unwrap();
                 self.write_items(&character.inventory().slots)?
             } else {
                 // TODO: clear toolbar ... once self.inventory_source can transition from Some to None at all
@@ -366,7 +366,7 @@ impl WidgetController for ToolbarController {
         // TODO: it should be separate by listening more precisely to the CharacterChange
         let pointers_txn = if should_update_inventory || should_update_pointers {
             if let Some(inventory_source) = &self.character {
-                let character = inventory_source.borrow();
+                let character = inventory_source.read().unwrap();
                 self.write_pointers(&character.selected_slots(), pressed_buttons)?
             } else {
                 self.write_pointers(&[], pressed_buttons)?

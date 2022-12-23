@@ -398,9 +398,12 @@ mod tests {
         );
 
         // Check the space's characteristics
-        assert_eq!(space_ref.borrow().bounds(), GridAab::for_block(resolution));
         assert_eq!(
-            space_ref.borrow().physics(),
+            space_ref.read().unwrap().bounds(),
+            GridAab::for_block(resolution)
+        );
+        assert_eq!(
+            space_ref.read().unwrap().physics(),
             &SpacePhysics::DEFAULT_FOR_BLOCK
         );
 

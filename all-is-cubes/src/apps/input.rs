@@ -512,13 +512,13 @@ mod tests {
         input.key_down(Key::Character('5'));
         input.key_up(Key::Character('5'));
         apply_input_helper(&mut input, u, &character);
-        assert_eq!(character.borrow().selected_slots()[1], 4);
+        assert_eq!(character.read().unwrap().selected_slots()[1], 4);
 
         // Tenth slot
         input.key_down(Key::Character('0'));
         input.key_up(Key::Character('0'));
         apply_input_helper(&mut input, u, &character);
-        assert_eq!(character.borrow().selected_slots()[1], 9);
+        assert_eq!(character.read().unwrap().selected_slots()[1], 9);
     }
 
     // TODO: test jump and flying logic

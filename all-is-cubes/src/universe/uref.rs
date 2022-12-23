@@ -19,10 +19,8 @@ type StrongEntryRef<T> = Arc<RwLock<UEntry<T>>>;
 /// A reference from an object in a [`Universe`] to another.
 ///
 /// If they are held by objects outside of the [`Universe`], it is not guaranteed
-/// that they will remain valid (in which case using the `URef` will return an error
-/// or panic depending on the method).
-/// To ensure an object does not vanish while operating on it, [`URef::borrow`] it.
-/// (TODO: Should there be an operation in the style of `Weak::upgrade`?)
+/// that they will remain valid (in which case trying to use the `URef` to read or write
+/// the object will return an error).
 ///
 /// **Thread-safety caveat:** See the documentation on [avoiding deadlock].
 ///
@@ -99,20 +97,10 @@ impl<T: 'static> URef<T> {
         self.universe_id
     }
 
-    /// Borrow the value, in the sense of `RefCell::borrow`, and panic on failure.
+    /// Acquire temporary read access the value, in the sense of [`RwLock::try_read()`].
     ///
-    /// TODO: Update docs to discuss `RwLock` instead of `RefCell`, once we have a policy
-    /// about waiting for locks.
-    #[track_caller]
-    pub fn borrow(&self) -> UBorrow<T> {
-        self.try_borrow().unwrap()
-    }
-
-    /// Borrow the value, in the sense of `RefCell::try_borrow`.
-    ///
-    /// TODO: Update docs to discuss `RwLock` instead of `RefCell`, once we have a policy
-    /// about waiting for locks.
-    pub fn try_borrow(&self) -> Result<UBorrow<T>, RefError> {
+    /// TODO: There is not currently any way to block on / wait for read access.
+    pub fn read(&self) -> Result<UBorrow<T>, RefError> {
         let inner = UBorrowImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
             strong
                 .try_read()
@@ -453,10 +441,7 @@ mod tests {
         let mut u = Universe::new();
         let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         r.try_modify(|_| {
-            assert_eq!(
-                r.try_borrow().unwrap_err(),
-                RefError::InUse(Name::Anonym(0))
-            );
+            assert_eq!(r.read().unwrap_err(), RefError::InUse(Name::Anonym(0)));
         })
         .unwrap();
     }
@@ -465,7 +450,7 @@ mod tests {
     fn uref_try_borrow_mut_in_use() {
         let mut u = Universe::new();
         let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let _borrow_1 = r.borrow();
+        let _borrow_1 = r.read().unwrap();
         assert_eq!(
             r.try_borrow_mut().unwrap_err(),
             RefError::InUse(Name::Anonym(0))
@@ -476,7 +461,7 @@ mod tests {
     fn uref_try_modify_in_use() {
         let mut u = Universe::new();
         let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let _borrow_1 = r.borrow();
+        let _borrow_1 = r.read().unwrap();
         assert_eq!(
             r.try_modify(|_| {}).unwrap_err(),
             RefError::InUse(Name::Anonym(0))
@@ -489,7 +474,7 @@ mod tests {
         let r: URef<Space> = URef::new_gone(name.clone());
         assert_eq!(r.name(), &name);
         assert_eq!(r.universe_id(), None);
-        assert_eq!(r.try_borrow().unwrap_err(), RefError::Gone(name.clone()));
+        assert_eq!(r.read().unwrap_err(), RefError::Gone(name.clone()));
         assert_eq!(
             r.try_borrow_mut().unwrap_err(),
             RefError::Gone(name.clone())

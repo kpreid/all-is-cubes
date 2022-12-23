@@ -334,7 +334,8 @@ fn create_universe(
 
     if precompute_light {
         if let Some(c) = universe.get_default_character() {
-            c.borrow()
+            c.read()
+                .unwrap()
                 .space
                 .try_modify(evaluate_light_with_progress)
                 .unwrap();

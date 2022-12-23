@@ -741,13 +741,13 @@ mod tests {
             ..
         } = space[(0, -1, 0)].primitive()
         {
-            print_space(&block_space_ref.borrow(), [0., 1., -1.]);
+            print_space(&block_space_ref.read().unwrap(), [0., 1., -1.]);
             assert_eq!(
                 offset,
                 GridPoint::new(0, -GridCoordinate::from(resolution), 0)
             );
             assert_eq!(
-                block_space_ref.borrow()[(0, -2, z)].color(),
+                block_space_ref.read().unwrap()[(0, -2, z)].color(),
                 a_primitive_color()
             );
         } else {
@@ -782,13 +782,13 @@ mod tests {
             ..
         } = space[(-1, 0, 0)].primitive()
         {
-            print_space(&block_space_ref.borrow(), [0., 1., -1.]);
+            print_space(&block_space_ref.read().unwrap(), [0., 1., -1.]);
             assert_eq!(
                 *offset,
                 GridPoint::new(-GridCoordinate::from(resolution), 0, 0)
             );
             assert_eq!(
-                block_space_ref.borrow()[(-2, 1, z)].color(),
+                block_space_ref.read().unwrap()[(-2, 1, z)].color(),
                 a_primitive_color()
             );
         } else {

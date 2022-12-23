@@ -54,7 +54,7 @@ impl TooltipState {
             .gate();
 
         // TODO: Think about what state results if either of the locks/borrows fails
-        character.borrow().listen(listener);
+        character.read().unwrap().listen(listener);
         {
             let mut this = this_ref.lock().unwrap();
             this.character = Some(character);
@@ -88,7 +88,7 @@ impl TooltipState {
             self.dirty_inventory = false;
 
             if let Some(character_ref) = &self.character {
-                let character = character_ref.borrow();
+                let character = character_ref.read().unwrap();
                 let selected_slot = character
                     .selected_slots()
                     .get(1)

@@ -463,7 +463,7 @@ mod tests {
 
         // Until we have a way to query the behavior set, the best test we can do is to
         // read its effects.
-        assert_eq!(character.borrow().body.yaw, 3.0);
+        assert_eq!(character.read().unwrap().body.yaw, 3.0);
     }
 
     #[test]

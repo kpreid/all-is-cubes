@@ -210,7 +210,7 @@ impl Character {
     /// Constructs a [`Character`] within/looking at the given `space`
     /// with the initial state specified by [`Space::spawn`].
     pub fn spawn_default(space: URef<Space>) -> Self {
-        Self::spawn(space.borrow().spawn(), space)
+        Self::spawn(space.read().unwrap().spawn(), space)
     }
 
     /// Registers a listener for mutations of this character.
@@ -298,7 +298,7 @@ impl Character {
         self.body.velocity +=
             (velocity_target - self.body.velocity).mul_element_wise(stiffness) * dt;
 
-        let body_step_info = if let Ok(space) = self.space.try_borrow() {
+        let body_step_info = if let Ok(space) = self.space.read() {
             self.update_exposure(&space, dt);
 
             let colliding_cubes = &mut self.colliding_cubes;
@@ -453,7 +453,7 @@ impl Character {
         cursor: Option<&Cursor>,
         button: usize,
     ) -> Result<UniverseTransaction, ToolError> {
-        let tb = this.borrow();
+        let tb = this.read().unwrap();
 
         // Check that this is not a cursor into some other space.
         // This shouldn't happen according to game rules but it might due to a UI/session

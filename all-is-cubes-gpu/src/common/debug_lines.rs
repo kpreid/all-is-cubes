@@ -20,7 +20,7 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
     // TODO: Make it possible to render debug_behaviors with just a Space
     if let Some(character) = character {
         if graphics_options.debug_behaviors {
-            if let Ok(space) = character.space.try_borrow() {
+            if let Ok(space) = character.space.read() {
                 for item in space.behaviors().query_any(None) {
                     wireframe_vertices(
                         v,
@@ -47,7 +47,14 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
         // Show light update debug info.
         // This is enabled/disabled inside the lighting algorithm, not as a graphics
         // option.
-        for cube in character.space.borrow().last_light_updates.iter().copied() {
+        for cube in character
+            .space
+            .read()
+            .unwrap()
+            .last_light_updates
+            .iter()
+            .copied()
+        {
             wireframe_vertices(
                 v,
                 Rgba::new(1.0, 1.0, 0.0, 1.0),
@@ -60,7 +67,7 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
             if let Some(cursor) = cursor_result {
                 // TODO: We should be able to draw wireframes in the UI space too, and when we do that will enable supporting this.
                 if cursor.space() == &character.space {
-                    let space = character.space.borrow();
+                    let space = character.space.read().unwrap();
                     let (_, _, _, lighting_info) = space
                         .compute_lighting::<all_is_cubes::space::LightUpdateCubeInfo>(
                             cursor.preceding_cube(),

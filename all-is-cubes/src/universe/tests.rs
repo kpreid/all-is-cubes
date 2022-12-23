@@ -86,8 +86,8 @@ fn insert_anonymous_makes_distinct_names() {
         .unwrap();
     assert_ne!(ref_a, ref_b, "not equal");
     assert_ne!(
-        &**ref_a.borrow() as &Block,
-        &**ref_b.borrow(),
+        &**ref_a.read().unwrap() as &Block,
+        &**ref_b.read().unwrap(),
         "different values"
     );
 }
@@ -135,14 +135,14 @@ fn delete_success() {
     let ref_1 = u
         .insert(name.clone(), BlockDef::new(blocks[0].clone()))
         .unwrap();
-    let _ = ref_1.try_borrow().unwrap();
+    let _ = ref_1.read().unwrap();
 
     UniverseTransaction::delete(ref_1.clone())
         .execute(&mut u)
         .unwrap();
     assert_eq!(
         ref_1
-            .try_borrow()
+            .read()
             .expect_err("should be no longer reachable by ref"),
         RefError::Gone(name.clone()),
     );
@@ -154,10 +154,10 @@ fn delete_success() {
         .insert(name.clone(), BlockDef::new(blocks[1].clone()))
         .unwrap();
     assert_eq!(
-        ref_1.try_borrow().expect_err("should not be resurrected"),
+        ref_1.read().expect_err("should not be resurrected"),
         RefError::Gone(name),
     );
-    let _ = ref_2.try_borrow().unwrap();
+    let _ = ref_2.read().unwrap();
 }
 
 /// Anonymous members are strictly garbage collected, and cannot be deleted.

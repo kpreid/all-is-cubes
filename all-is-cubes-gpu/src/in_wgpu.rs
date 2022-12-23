@@ -573,7 +573,10 @@ impl EverythingRenderer {
             }
 
             gather_debug_lines(
-                self.cameras.character().map(|c| c.borrow()).as_deref(),
+                self.cameras
+                    .character()
+                    .map(|c| c.read().unwrap())
+                    .as_deref(),
                 self.cameras.graphics_options(),
                 &mut v,
                 cursor_result,

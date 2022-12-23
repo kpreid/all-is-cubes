@@ -404,7 +404,7 @@ mod tests {
             let mut u = result.unwrap();
 
             if template != UniverseTemplate::Blank {
-                let _ = u.get_default_character().unwrap().borrow();
+                let _ = u.get_default_character().unwrap().read().unwrap();
             }
             u.step(Tick::arbitrary());
         }

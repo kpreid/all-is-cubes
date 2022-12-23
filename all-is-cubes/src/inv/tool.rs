@@ -136,7 +136,7 @@ impl Tool {
                 // TODO: this should probably be a utility on Block itself
                 fn find_space(block: &Block) -> Result<Option<URef<Space>>, RefError> {
                     match block.primitive() {
-                        Primitive::Indirect(r) => find_space(&**r.try_borrow()?),
+                        Primitive::Indirect(r) => find_space(&**r.read()?),
                         Primitive::Atom(_, _) => Ok(None),
                         Primitive::Recur { space, .. } => Ok(Some(space.clone())),
                     }
@@ -161,7 +161,8 @@ impl Tool {
 
                 // If we can't push, then try pulling.
                 // TODO: Tool should have user-controllable modes
-                if cursor.space().borrow()[cursor.cube() + direction.normal_vector()] != AIR {
+                if cursor.space().read().unwrap()[cursor.cube() + direction.normal_vector()] != AIR
+                {
                     direction = direction.opposite();
                 }
 
@@ -301,7 +302,7 @@ impl ToolInput {
         new_block: Block,
     ) -> Result<UniverseTransaction, ToolError> {
         let space_ref = self.cursor()?.space();
-        let space = space_ref.try_borrow().map_err(ToolError::SpaceRef)?;
+        let space = space_ref.read().map_err(ToolError::SpaceRef)?;
         if space[cube] != old_block {
             return Err(ToolError::Obstacle);
         }
@@ -558,13 +559,13 @@ mod tests {
         }
 
         fn space(&self) -> UBorrow<Space> {
-            self.space_ref.borrow()
+            self.space_ref.read().unwrap()
         }
         fn space_ref(&self) -> &URef<Space> {
             &self.space_ref
         }
         fn character(&self) -> UBorrow<Character> {
-            self.character_ref.borrow()
+            self.character_ref.read().unwrap()
         }
     }
 
