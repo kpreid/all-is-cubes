@@ -369,6 +369,7 @@ mod tests {
     use crate::math::FreeCoordinate;
     use crate::physics::BodyTransaction;
     use crate::space::Space;
+    use crate::transaction::TransactionTester;
     use crate::universe::Universe;
     use indoc::indoc;
 
@@ -518,5 +519,34 @@ mod tests {
                 Arc::as_ptr(&arc_qu) as *const dyn Behavior<Character>
             ],
         )
+    }
+
+    #[test]
+    fn systematic() {
+        let b1 = Arc::new(SelfModifyingBehavior { foo: 100 });
+        let b2 = Arc::new(SelfModifyingBehavior { foo: 200 });
+
+        // TODO: cannot test replace() because we don't have stable indexes/keys
+
+        TransactionTester::new()
+            .transaction(BehaviorSetTransaction::default(), |_, _| Ok(()))
+            .transaction(BehaviorSetTransaction::insert((), b1), |_, after| {
+                after
+                    .query::<SelfModifyingBehavior>()
+                    .map(|item| item.behavior)
+                    .find(|b| b.foo == 100)
+                    .ok_or("expected b1")?;
+                Ok(())
+            })
+            .transaction(BehaviorSetTransaction::insert((), b2), |_, after| {
+                after
+                    .query::<SelfModifyingBehavior>()
+                    .map(|item| item.behavior)
+                    .find(|b| b.foo == 200)
+                    .ok_or("expected b2")?;
+                Ok(())
+            })
+            .target(BehaviorSet::new)
+            .test()
     }
 }
