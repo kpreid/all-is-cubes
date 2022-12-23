@@ -350,10 +350,11 @@ impl OctantMask {
         self.flags |= 1 << index;
     }
 
-    #[inline(always)]
-    fn count(self) -> usize {
-        self.flags.count_ones() as usize
-    }
+    // TODO: formerly used for iterator size estimation that didn't work; bring this back?
+    // #[inline(always)]
+    // fn count(self) -> usize {
+    //     self.flags.count_ones() as usize
+    // }
 
     /// Returns the index of the first octant included in the mask.
     ///
@@ -445,11 +446,14 @@ impl Iterator for AxisMirrorIter {
             .first()
             .map(|index| self.generate_and_clear(index))
     }
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let count = self.todo.count();
-        (count, Some(count))
-    }
+
+    // Not useful because in the one place AxisMirrorIter is used, use of `flat_map()`
+    // defeats it.
+    // #[inline]
+    // fn size_hint(&self) -> (usize, Option<usize>) {
+    //     let count = self.todo.count();
+    //     (count, Some(count))
+    // }
 }
 impl DoubleEndedIterator for AxisMirrorIter {
     #[inline]
