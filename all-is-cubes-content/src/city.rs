@@ -295,7 +295,7 @@ pub(crate) async fn demo_city(
                 continue 'exhibit;
             }
         };
-        exhibit_progress.progress(0.7).await;
+        exhibit_progress.progress(0.33).await;
 
         let exhibit_footprint = exhibit_space.bounds();
 
@@ -319,7 +319,7 @@ pub(crate) async fn demo_city(
         );
         space.fill_uniform(enclosure_at_plot, &AIR)?;
         space.fill_uniform(enclosure, &demo_blocks[ExhibitBackground])?;
-        exhibit_progress.progress(0.9).await;
+        exhibit_progress.progress(0.4).await;
 
         // TODO: Add "entrances" so it's clear what the "front" of the exhibit is supposed to be.
 
@@ -390,6 +390,7 @@ pub(crate) async fn demo_city(
                 sign_transform,
             )?;
         }
+        exhibit_progress.progress(0.66).await;
 
         // Place exhibit content
         space_to_space_copy(
@@ -408,7 +409,7 @@ pub(crate) async fn demo_city(
         );
 
         exhibit_progress.progress(1.0).await;
-    }
+    } // end per-exhibit loop
 
     final_progress.progress(0.5).await;
 
