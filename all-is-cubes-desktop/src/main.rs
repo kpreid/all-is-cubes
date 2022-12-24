@@ -301,7 +301,7 @@ fn create_universe(
     let universe_progress_bar = ProgressBar::new(100)
         .with_style(
             common_progress_style()
-                .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}%      ")
+                .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}% {msg:36}")
                 .unwrap(),
         )
         .with_prefix("Building");
@@ -310,7 +310,10 @@ fn create_universe(
         let universe_progress_bar = universe_progress_bar.clone();
         YieldProgress::new(
             || std::future::ready(()),
-            move |fraction| universe_progress_bar.set_position((fraction * 100.0) as u64),
+            move |fraction, label| {
+                universe_progress_bar.set_position((fraction * 100.0) as u64);
+                universe_progress_bar.set_message(String::from(label));
+            },
         )
     };
     let universe = block_on(async {
@@ -396,7 +399,7 @@ fn lighting_progress_adapter(progress: &ProgressBar) -> impl FnMut(LightUpdatesI
 /// [`ProgressStyle`] for progress bars we display.
 fn common_progress_style() -> ProgressStyle {
     ProgressStyle::default_bar()
-        .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
+        .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6} {msg:30}")
         .unwrap()
 }
 

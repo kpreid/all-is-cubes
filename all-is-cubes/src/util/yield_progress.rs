@@ -20,9 +20,20 @@ use instant::{Duration, Instant};
 pub struct YieldProgress {
     start: f32,
     end: f32,
-    // common: Arc<Mutex<YpCommon>>,
+
+    /// Name given to this specific portion of work. Inherited from the parent if not
+    /// overridden.
+    ///
+    /// TODO: Eventually we will want to have things like "label this segment as a
+    /// fallback if it has no better label", which will require some notion of distinguishing
+    /// inheritance from having been explicitly set.
+    label: Option<Arc<str>>,
+
     yielding: Arc<Yielding<dyn Fn() -> BoxFuture<'static, ()> + Send + Sync>>,
-    progressor: Arc<dyn Fn(f32) + Send + Sync>,
+    // TODO: change progress reporting interface to support efficient handling of
+    // the label string being the same as last time.
+    #[allow(clippy::type_complexity)]
+    progressor: Arc<dyn Fn(f32, &str) + Send + Sync>,
 }
 
 /// Piggyback on the `Arc` we need to store the `dyn Fn` anyway to also store some state.
@@ -32,12 +43,13 @@ struct Yielding<F: ?Sized> {
     yielder: F,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct YieldState {
     /// The most recent instant at which `yielder`'s future completed.
     /// Used to detect overlong time periods between yields.
     last_finished_yielding: Instant,
     last_yield_location: &'static Location<'static>,
+    last_yield_label: Option<Arc<str>>,
 }
 
 impl fmt::Debug for YieldProgress {
@@ -45,6 +57,7 @@ impl fmt::Debug for YieldProgress {
         f.debug_struct("YieldProgress")
             .field("start", &self.start)
             .field("end", &self.end)
+            .field("label", &self.label)
             .finish_non_exhaustive()
     }
 }
@@ -60,12 +73,13 @@ impl YieldProgress {
     where
         Y: Fn() -> YFut + Send + Sync + 'static,
         YFut: Future<Output = ()> + Send + 'static,
-        P: Fn(f32) + Send + Sync + 'static,
+        P: Fn(f32, &str) + Send + Sync + 'static,
     {
         let yielding: Arc<Yielding<_>> = Arc::new(Yielding {
             state: Mutex::new(YieldState {
                 last_finished_yielding: Instant::now(),
                 last_yield_location: Location::caller(),
+                last_yield_label: None,
             }),
             yielder: move || -> BoxFuture<'static, ()> { Box::pin(yielder()) },
         });
@@ -73,6 +87,7 @@ impl YieldProgress {
         Self {
             start: 0.0,
             end: 1.0,
+            label: None,
             yielding,
             progressor: Arc::new(progressor),
         }
@@ -80,7 +95,14 @@ impl YieldProgress {
 
     /// Returns a [`YieldProgress`] that does no progress reporting and no yielding.
     pub fn noop() -> Self {
-        Self::new(|| std::future::ready(()), |_| {})
+        Self::new(|| std::future::ready(()), |_, _| {})
+    }
+
+    /// Add a name for the portion of work this [`YieldProgress`] covers.
+    ///
+    /// If there is already a label, it will be overwritten.
+    pub fn set_label(&mut self, label: impl fmt::Display) {
+        self.label = Some(Arc::from(label.to_string()))
     }
 
     /// Map a `0..=1` value to `self.start..=self.end`.
@@ -101,9 +123,15 @@ impl YieldProgress {
     #[track_caller] // This is not an `async fn` because `track_caller` is not compatible
     pub fn progress(&self, progress_fraction: f32) -> impl Future<Output = ()> + Send + 'static {
         let location = Location::caller();
-        (self.progressor)(self.point_in_range(progress_fraction));
+        let label = self.label.clone();
+        (self.progressor)(
+            self.point_in_range(progress_fraction),
+            self.label
+                .as_ref()
+                .map_or("", |arc_str_ref| -> &str { arc_str_ref }),
+        );
 
-        self.yielding.clone().yield_only(location)
+        self.yielding.clone().yield_only(location, label)
     }
 
     /// Report that the given amount of progress has been made, then return
@@ -125,6 +153,7 @@ impl YieldProgress {
         Self {
             start,
             end,
+            label: self.label.clone(),
             yielding: Arc::clone(&self.yielding),
             progressor: Arc::clone(&self.progressor),
         }
@@ -155,20 +184,30 @@ impl YieldProgress {
 }
 
 impl<F: ?Sized + Fn() -> BoxFuture<'static, ()> + Send + Sync> Yielding<F> {
-    async fn yield_only(self: Arc<Self>, location: &'static Location<'static>) {
+    async fn yield_only(
+        self: Arc<Self>,
+        location: &'static Location<'static>,
+        label: Option<Arc<str>>,
+    ) {
         // Note that we avoid holding the lock while calling yielder().
         // The worst outcome of an inconsistency is that we will output a meaningless
         // "between {location} and {location} message", but none should occur because
         // [`YieldProgress`] is intended to be used in a sequential manner.
-        let previous_state: YieldState = { *self.state.lock().unwrap() };
+        let previous_state: YieldState = { self.state.lock().unwrap().clone() };
 
         let delta = Instant::now().duration_since(previous_state.last_finished_yielding);
         if delta > Duration::from_millis(100) {
+            let last_label = previous_state.last_yield_label;
             log::trace!(
-                "Yielding after {delta} ms between {old_location} and {new_location}",
+                "Yielding after {delta} ms between {old_location} and {new_location} {rel}",
                 delta = delta.as_millis(),
                 old_location = previous_state.last_yield_location,
                 new_location = location,
+                rel = if label == last_label {
+                    format!("during {label:?}")
+                } else {
+                    format!("between {last_label:?} and {label:?}")
+                }
             );
         }
 
@@ -181,6 +220,7 @@ impl<F: ?Sized + Fn() -> BoxFuture<'static, ()> + Send + Sync> Yielding<F> {
             let mut state = self.state.lock().unwrap();
             state.last_finished_yielding = Instant::now();
             state.last_yield_location = location;
+            state.last_yield_label = label;
         }
     }
 }
