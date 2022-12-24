@@ -342,7 +342,7 @@ impl OctantMask {
     /// The mask including no octants.
     pub const NONE: Self = Self { flags: 0x00 };
 
-    /// Set the flat for the octant the given vector occupies.
+    /// Set the flag for the octant the given vector occupies.
     pub(crate) fn set_octant_of(&mut self, vector: Vector3<FreeCoordinate>) {
         let index = u8::from(vector.x >= 0.) << 2
             | u8::from(vector.y >= 0.) << 1
@@ -691,5 +691,17 @@ mod tests {
                 .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
                 .collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn octant_mask_smoke_test() {
+        let mut mask = OctantMask::NONE;
+        assert_eq!(mask, OctantMask::NONE);
+        mask.set_octant_of(Vector3::new(1., 1., 1.));
+        assert_eq!(mask, OctantMask { flags: 0b1000_0000 });
+        mask.set_octant_of(Vector3::new(-1., -1., -1.));
+        assert_eq!(mask, OctantMask { flags: 0b1000_0001 });
+        assert_eq!(mask.first(), Some(0));
+        assert_eq!(mask.last(), Some(7));
     }
 }
