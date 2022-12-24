@@ -4,6 +4,7 @@ use crate::block::{Block, BlockDef, BlockDefTransaction, Primitive, Resolution, 
 use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
+use crate::math::Rgba;
 use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::Transaction;
@@ -270,9 +271,16 @@ fn visit_refs_character() {
 }
 #[test]
 fn visit_refs_space() {
-    let space = Space::empty_positive(1, 1, 1);
+    let mut universe = Universe::new();
+    let mut space = Space::empty_positive(1, 1, 1);
+    let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
+    space
+        .set(
+            [0, 0, 0],
+            Block::from_primitive(Primitive::Indirect(block_def_ref.clone())),
+        )
+        .unwrap();
 
-    // Currently, a `Space` cannot contain references except through `Behavior`.
-    // TODO: Extend `Behavior` to be visitable and test thathere.
-    assert_eq!(ListRefs::list(&space), vec![]);
+    // TODO: Also add a behavior and a spawn inventory item containing refs and check those
+    assert_eq!(ListRefs::list(&space), vec![block_def_ref.name().clone()]);
 }
