@@ -52,12 +52,14 @@ pub(crate) async fn demo_city(
     // We do this once so that if multiple exhibits end up wanting them there are no conflicts.
     // TODO: We want a "module loading" system that allows expressing dependencies.
     // TODO: Give YieldProgress a nicer interface for this
-    let [ui_blocks_progress, p] = p.split(0.05);
+    let [mut ui_blocks_progress, p] = p.split(0.05);
+    ui_blocks_progress.set_label("UiBlocks");
     all_is_cubes::vui::blocks::UiBlocks::new(universe, ui_blocks_progress)
         .await
         .install(universe)
         .unwrap();
-    let [icons_blocks_progress, p] = p.split(0.05);
+    let [mut icons_blocks_progress, p] = p.split(0.05);
+    icons_blocks_progress.set_label("Icons");
     all_is_cubes::inv::Icons::new(universe, icons_blocks_progress)
         .await
         .install(universe)
@@ -240,14 +242,18 @@ pub(crate) async fn demo_city(
     );
 
     // Landscape filling one quadrant
+    let [mut landscape_progress, p] = p.split(0.4);
+    landscape_progress.set_label("Landscape");
+    landscape_progress.progress(0.0).await;
     let landscape_region = GridAab::from_lower_upper(
         [-radius_xz, -ground_depth * 8 / 10, -radius_xz],
         [-exhibit_front_radius, sky_height, -exhibit_front_radius],
     );
     space.fill_uniform(landscape_region, AIR)?;
-    p.progress(0.5).await;
+    landscape_progress.progress(0.5).await;
     wavy_landscape(landscape_region, &mut space, &landscape_blocks, 1.0)?;
     planner.occupied_plots.push(landscape_region);
+    landscape_progress.progress(1.0).await;
 
     // Clouds (needs to be done after landscape to not be overwritten)
     // TODO: Enable this once transparency rendering is better.
@@ -261,7 +267,7 @@ pub(crate) async fn demo_city(
         "Landscape took {:.3} s",
         landscape_time.duration_since(blank_city_time).as_secs_f32()
     );
-    let [exhibits_progress, final_progress] = p.finish_and_cut(0.6).await.split(0.8);
+    let [exhibits_progress, final_progress] = p.split(0.8);
 
     // All is Cubes logo
     let logo_location = space
@@ -278,11 +284,16 @@ pub(crate) async fn demo_city(
     planner.occupied_plots.push(logo_location);
 
     // Exhibits
-    'exhibit: for (exhibit, exhibit_progress) in DEMO_CITY_EXHIBITS
+    'exhibit: for (exhibit, mut exhibit_progress) in DEMO_CITY_EXHIBITS
         .iter()
         .zip(exhibits_progress.split_evenly(DEMO_CITY_EXHIBITS.len()))
     {
+        exhibit_progress.set_label(format!("Exhibit “{name}”", name = exhibit.name));
+        exhibit_progress.progress(0.0).await;
         let start_exhibit_time = Instant::now();
+
+        // Execute the exhibit factory function.
+        // TODO: Factory should be given a YieldProgress.
         let exhibit_space = match (exhibit.factory)(exhibit, universe).await {
             Ok(s) => s,
             Err(error) => {
@@ -297,6 +308,7 @@ pub(crate) async fn demo_city(
         };
         exhibit_progress.progress(0.33).await;
 
+        // Now that we know the size of the exhibit, find a place for it.
         let exhibit_footprint = exhibit_space.bounds();
 
         let enclosure_footprint = exhibit_footprint.expand(FaceMap::repeat(1));
