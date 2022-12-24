@@ -218,9 +218,7 @@ fn gc_implicit() {
 
 #[test]
 fn visit_refs_block_def_no_ref() {
-    let mut u = Universe::new();
-    let block_ref = u.insert("no_refs".into(), BlockDef::new(AIR)).unwrap();
-    assert_eq!(ListRefs::list(&block_ref), vec![]);
+    assert_eq!(ListRefs::list(&BlockDef::new(AIR)), vec![]);
 }
 
 #[test]
@@ -234,8 +232,7 @@ fn visit_refs_block_def_space() {
             .voxels_ref(Resolution::R1, space_ref)
             .build(),
     );
-    let block_ref = u.insert("has_refs".into(), block_def).unwrap();
-    assert_eq!(ListRefs::list(&block_ref), vec!["s".into()]);
+    assert_eq!(ListRefs::list(&block_def), vec!["s".into()]);
 }
 
 #[test]
@@ -244,8 +241,7 @@ fn visit_refs_block_def_indirect() {
     let b1 = BlockDef::new(AIR);
     let b1_ref = u.insert("destination".into(), b1).unwrap();
     let b2 = BlockDef::new(Block::from_primitive(Primitive::Indirect(b1_ref)));
-    let b2_ref = u.insert("has_refs".into(), b2).unwrap();
-    assert_eq!(ListRefs::list(&b2_ref), vec!["destination".into()]);
+    assert_eq!(ListRefs::list(&b2), vec!["destination".into()]);
 }
 
 #[test]
@@ -267,20 +263,16 @@ fn visit_refs_character() {
     .execute(&mut character)
     .unwrap();
 
-    let character_ref = u.insert("c".into(), character).unwrap();
     assert_eq!(
-        ListRefs::list(&character_ref),
+        ListRefs::list(&character),
         vec!["space".into(), "block".into()]
     );
 }
 #[test]
 fn visit_refs_space() {
-    let mut u = Universe::new();
-    let space_ref = u
-        .insert("s".into(), Space::empty_positive(1, 1, 1))
-        .unwrap();
+    let space = Space::empty_positive(1, 1, 1);
 
     // Currently, a `Space` cannot contain references except through `Behavior`.
     // TODO: Extend `Behavior` to be visitable and test thathere.
-    assert_eq!(ListRefs::list(&space_ref), vec![]);
+    assert_eq!(ListRefs::list(&space), vec![]);
 }

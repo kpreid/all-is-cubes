@@ -46,11 +46,9 @@ impl<T: VisitRefs, const N: usize> VisitRefs for [T; N] {
 #[cfg(test)]
 mod testers {
     use super::*;
-    use crate::universe::{Name, URef};
+    use crate::universe::Name;
 
     /// An implementation of `RefVisitor` for testing implementations of `VisitRefs`.
-    /// It reports names and types, but also checks for consistency between [`RefVisitor`] and
-    /// [`RefVisitorMut`].
     #[derive(Clone, Debug, Default, Eq, PartialEq)]
     pub(crate) struct ListRefs {
         // In principle we'd like to store the whole `URef`, but the `Name` is conveniently
@@ -64,9 +62,9 @@ mod testers {
             Self::default()
         }
 
-        pub fn list<T: VisitRefs + 'static>(target: &URef<T>) -> Vec<Name> {
+        pub fn list<T: VisitRefs + 'static>(target: &T) -> Vec<Name> {
             let mut visitor = Self::new();
-            target.read().unwrap().visit_refs(&mut visitor);
+            target.visit_refs(&mut visitor);
             visitor.names
         }
     }
