@@ -20,7 +20,7 @@ use crate::time::Tick;
 use crate::transaction::Transaction;
 use crate::universe::{URef, Universe, UniverseStepInfo};
 use crate::util::YieldProgress;
-use crate::vui::pages::PageInst;
+use crate::vui::pages::{PageInst, UiSize};
 use crate::vui::widgets::TooltipState;
 
 #[doc(hidden)] // public for use by test-renderers only
@@ -52,8 +52,8 @@ pub(crate) struct Vui {
 
     changed_viewport: DirtyFlag,
     viewport_source: ListenableSource<Viewport>,
-    /// `HudLayout` computed from `viewport_source`.
-    last_hud_layout: HudLayout,
+    /// Size computed from `viewport_source` and compared with `PageInst`.
+    last_ui_size: UiSize,
     #[allow(dead_code)] // TODO: probably going to need this for more dynamic UIs
     hud_inputs: HudInputs,
 
@@ -103,7 +103,7 @@ impl Vui {
 
         // TODO: terrible mess of tightly coupled parameters
         let changed_viewport = DirtyFlag::listening(false, |l| viewport_source.listen(l));
-        let hud_layout = HudLayout::new(viewport_source.snapshot());
+        let ui_size = UiSize::new(viewport_source.snapshot());
         let hud_inputs = HudInputs {
             hud_blocks,
             cue_channel: cue_channel.clone(),
@@ -119,7 +119,6 @@ impl Vui {
         let hud_widget_tree = new_hud_widget_tree(
             character_source.clone(),
             &hud_inputs,
-            &hud_layout,
             &mut universe,
             tooltip_state.clone(),
         );
@@ -134,7 +133,7 @@ impl Vui {
 
             changed_viewport,
             viewport_source,
-            last_hud_layout: hud_layout,
+            last_ui_size: ui_size,
             hud_inputs,
 
             hud_page: PageInst::new(hud_widget_tree),
@@ -164,13 +163,13 @@ impl Vui {
 
     /// Update `self.current_space` from `self.state` and the source of the selected space.
     fn set_space_from_state(&mut self) {
-        let layout = &self.last_hud_layout;
+        let size = self.last_ui_size;
         let universe = &mut self.universe;
 
         let next_space: Option<URef<Space>> = match &*self.state.get() {
-            VuiPageState::Hud => Some(self.hud_page.get_or_create_space(layout, universe)),
-            VuiPageState::Paused => Some(self.paused_page.get_or_create_space(layout, universe)),
-            VuiPageState::AboutText => Some(self.about_page.get_or_create_space(layout, universe)),
+            VuiPageState::Hud => Some(self.hud_page.get_or_create_space(size, universe)),
+            VuiPageState::Paused => Some(self.paused_page.get_or_create_space(size, universe)),
+            VuiPageState::AboutText => Some(self.about_page.get_or_create_space(size, universe)),
         };
 
         if next_space.as_ref() != Option::as_ref(&self.current_space.get()) {
@@ -254,9 +253,9 @@ impl Vui {
 
         if self.changed_viewport.get_and_clear() {
             let new_viewport = self.viewport_source.snapshot();
-            let new_layout = HudLayout::new(new_viewport);
-            if new_layout != self.last_hud_layout {
-                self.last_hud_layout = new_layout;
+            let new_size = UiSize::new(new_viewport);
+            if new_size != self.last_ui_size {
+                self.last_ui_size = new_size;
                 self.current_space.set(None); // force reconstruction
                 self.set_space_from_state();
             }

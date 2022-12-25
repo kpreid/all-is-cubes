@@ -1,19 +1,16 @@
 use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
 
-use cgmath::Vector2;
-
 use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
-use crate::block::{Block, AIR};
-use crate::camera::{GraphicsOptions, Viewport};
+use crate::block::Block;
+use crate::camera::GraphicsOptions;
 use crate::character::Character;
 use crate::content::palette;
 use crate::drawing::VoxelBrush;
 use crate::inv::Icons;
 use crate::linking::BlockProvider;
 use crate::listen::ListenableSource;
-use crate::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, Rgba};
-use crate::space::{Space, SpacePhysics};
+use crate::math::Face6;
 use crate::universe::{URef, Universe};
 use crate::util::YieldProgress;
 use crate::vui::options::{graphics_options_widgets, pause_toggle_button};
@@ -22,78 +19,7 @@ use crate::vui::{CueNotifier, LayoutTree, UiBlocks, VuiMessage, VuiPageState, Wi
 
 pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
-/// Knows where and how to place graphics within the HUD space, but does not store
-/// the space or any related state itself; depends only on the screen size and other
-/// parameters not primarily dependent on user interaction. This split is intended to
-/// simplify the problem of adapting to size changes.
-///
-/// TODO: Since introducing widgets, `HudLayout` does much less work. Think about whether it should exist.
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct HudLayout {
-    size: Vector2<GridCoordinate>,
-    pub(crate) toolbar_positions: usize,
-}
-
-impl HudLayout {
-    pub(crate) const DEPTH_BEHIND_VIEW_PLANE: GridCoordinate = 5;
-
-    /// Construct `HudLayout` with a size that suits the given viewport
-    /// (based on pixel resolution and aspect ratio)
-    pub fn new(viewport: Viewport) -> Self {
-        // Note: Dimensions are enforced to be odd so that the crosshair can work.
-        // The toolbar is also designed to be odd width when it has an even number of positions.
-        let width = 25;
-        // we want to ceil() the height because the camera setup makes the height match
-        // the viewport and ignores width, so we want to prefer too-narrow over too-wide
-        let height = ((FreeCoordinate::from(width) / viewport.nominal_aspect_ratio()).ceil()
-            as GridCoordinate)
-            .max(8);
-        let height = height / 2 * 2 + 1; // ensure odd
-        Self {
-            size: Vector2::new(width, height),
-            toolbar_positions: 10,
-        }
-    }
-
-    pub(crate) fn bounds(&self) -> GridAab {
-        GridAab::from_lower_upper(
-            (0, 0, -Self::DEPTH_BEHIND_VIEW_PLANE),
-            (self.size.x, self.size.y, 5),
-        )
-    }
-
-    /// Create a new space with the size controlled by this layout,
-    /// and a standard lighting condition.
-    // TODO: validate this doesn't crash on wonky sizes.
-    pub(crate) fn new_space(&self) -> Space {
-        let Vector2 { x: w, y: h } = self.size;
-        let bounds = self.bounds();
-        let mut space = Space::builder(bounds)
-            .physics(SpacePhysics {
-                sky_color: palette::HUD_SKY,
-                ..SpacePhysics::default()
-            })
-            .build();
-
-        if false {
-            // Visualization of the bounds of the space we're drawing.
-            let mut add_frame = |z, color| {
-                let frame_block = Block::from(color);
-                space
-                    .fill_uniform(GridAab::from_lower_size([0, 0, z], [w, h, 1]), frame_block)
-                    .unwrap();
-                space
-                    .fill_uniform(GridAab::from_lower_size([1, 1, z], [w - 2, h - 2, 1]), &AIR)
-                    .unwrap();
-            };
-            add_frame(bounds.lower_bounds().z, Rgba::new(0.5, 0., 0., 1.));
-            add_frame(-1, Rgba::new(0.5, 0.5, 0.5, 1.));
-            add_frame(bounds.upper_bounds().z - 1, Rgba::new(0., 1., 1., 1.));
-        }
-
-        space
-    }
-}
+pub(crate) const TOOLBAR_POSITIONS: usize = 10;
 
 /// Ad-hoc bundle of elements needed to construct HUD UI widgets.
 ///
@@ -117,12 +43,11 @@ impl fmt::Debug for HudInputs {
     }
 }
 
-#[allow(clippy::too_many_arguments, clippy::redundant_clone)]
+#[allow(clippy::redundant_clone)]
 pub(super) fn new_hud_widget_tree(
-    // TODO: terrible mess of tightly coupled parameters
+    // TODO: mess of tightly coupled parameters
     character_source: ListenableSource<Option<URef<Character>>>,
     hud_inputs: &HudInputs,
-    hud_layout: &HudLayout,
     // TODO: stop mutating the universe in widget construction
     universe: &mut Universe,
     tooltip_state: Arc<Mutex<TooltipState>>,
@@ -130,7 +55,7 @@ pub(super) fn new_hud_widget_tree(
     let toolbar: Arc<dyn Widget> = widgets::Toolbar::new(
         character_source,
         Arc::clone(&hud_inputs.hud_blocks),
-        hud_layout.toolbar_positions,
+        TOOLBAR_POSITIONS,
         universe,
         hud_inputs.cue_channel.clone(),
     );
@@ -228,30 +153,6 @@ impl HudBlocks {
             blocks: ui_blocks,
             icons,
             text: text_brush,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn hud_layout_sizes() {
-        let cases: Vec<([u32; 2], [i32; 2])> =
-            vec![([800, 600], [25, 19]), ([1000, 600], [25, 15])];
-        let mut failed = 0;
-        for (nominal_viewport, expected_size) in cases {
-            let actual_size =
-                HudLayout::new(Viewport::with_scale(1.0, nominal_viewport.into())).size;
-            let actual_size: [i32; 2] = actual_size.into();
-            if actual_size != expected_size {
-                println!("{nominal_viewport:?} expected to produce {expected_size:?}; got {actual_size:?}");
-                failed += 1;
-            }
-        }
-        if failed > 0 {
-            panic!("{failed} cases failed");
         }
     }
 }

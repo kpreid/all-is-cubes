@@ -1,25 +1,102 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use cgmath::Vector2;
 use embedded_graphics::mono_font::iso_8859_1 as font;
 use embedded_graphics::text::TextStyle;
 
-use crate::block::{
-    Block, BlockAttributes,
-    Resolution::{self, *},
-};
+use crate::block::AIR;
+use crate::camera;
 use crate::content::logo::logo_text;
 use crate::drawing::VoxelBrush;
-use crate::math::{Face6, GridVector, Rgba};
+use crate::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgba};
 use crate::space::{Space, SpaceBuilder, SpacePhysics};
 use crate::universe::{URef, Universe};
-use crate::vui::hud::{HudInputs, HudLayout};
+use crate::vui::hud::HudInputs;
 use crate::vui::options::pause_toggle_button;
 use crate::vui::widgets::{self, Frame};
 use crate::vui::{
     install_widgets, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest, LayoutTree,
     Widget, WidgetTree,
 };
+use crate::{
+    block::{
+        Block, BlockAttributes,
+        Resolution::{self, *},
+    },
+    content::palette,
+};
+
+/// Bounds for UI display; a choice of scale and aspect ratio based on the viewport size
+/// and aspect ratio (and maybe in the future, preferences).
+///
+///
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) struct UiSize {
+    /// Two-dimensional size; individual pages may have their own choices of depth.
+    size: Vector2<GridCoordinate>,
+}
+
+impl UiSize {
+    pub(crate) const DEPTH_BEHIND_VIEW_PLANE: GridCoordinate = 5;
+
+    /// Construct [`UiSize`] that suits the given viewport
+    /// (based on pixel resolution and aspect ratio).
+    pub fn new(viewport: camera::Viewport) -> Self {
+        // Note: Dimensions are enforced to be odd so that the crosshair can work.
+        // The toolbar is also designed to be odd width when it has an even number of positions.
+        let width = 25;
+        // we want to ceil() the height because the camera setup makes the height match
+        // the viewport and ignores width, so we want to prefer too-narrow over too-wide
+        let height = ((FreeCoordinate::from(width) / viewport.nominal_aspect_ratio()).ceil()
+            as GridCoordinate)
+            .max(8);
+        let height = height / 2 * 2 + 1; // ensure odd
+        Self {
+            size: Vector2::new(width, height),
+        }
+    }
+
+    /// TODO: depth should be up to the choice of the individual pages.
+    pub(crate) fn space_bounds(&self) -> GridAab {
+        GridAab::from_lower_upper(
+            (0, 0, -Self::DEPTH_BEHIND_VIEW_PLANE),
+            (self.size.x, self.size.y, 5),
+        )
+    }
+
+    /// Create a new space with the specified bounds and a standard lighting condition for UI.
+    // TODO: validate this doesn't crash on wonky sizes.
+    pub(crate) fn create_space(self) -> Space {
+        let bounds = self.space_bounds();
+        let Vector2 { x: w, y: h } = self.size;
+        let mut space = Space::builder(bounds)
+            .physics(SpacePhysics {
+                sky_color: palette::HUD_SKY,
+                ..SpacePhysics::default()
+            })
+            .build();
+
+        if false {
+            // Visualization of the bounds of the space we're drawing.
+            // TODO: Use `BoxStyle` to draw this instead
+            let mut add_frame = |z, color| {
+                let frame_block = Block::from(color);
+                space
+                    .fill_uniform(GridAab::from_lower_size([0, 0, z], [w, h, 1]), frame_block)
+                    .unwrap();
+                space
+                    .fill_uniform(GridAab::from_lower_size([1, 1, z], [w - 2, h - 2, 1]), &AIR)
+                    .unwrap();
+            };
+            add_frame(bounds.lower_bounds().z, Rgba::new(0.5, 0., 0., 1.));
+            add_frame(-1, Rgba::new(0.5, 0.5, 0.5, 1.));
+            add_frame(bounds.upper_bounds().z - 1, Rgba::new(0., 1., 1., 1.));
+        }
+
+        space
+    }
+}
 
 /// Pair of a widget tree and a cached space it is instantiated in with a particular size,
 /// which can be recreated with a different size as needed.
@@ -36,26 +113,21 @@ impl PageInst {
         Self { tree, space: None }
     }
 
-    // TODO: Disentangle this from the concept of "HUD" — i.e. the input should be
-    // not a `HudLayout` or `HudLayout` should become less specific.
-    pub fn get_or_create_space(
-        &mut self,
-        layout: &HudLayout,
-        universe: &mut Universe,
-    ) -> URef<Space> {
+    pub fn get_or_create_space(&mut self, size: UiSize, universe: &mut Universe) -> URef<Space> {
         if let Some(space) = self.space.as_ref() {
-            if space.read().unwrap().bounds() == layout.bounds() {
+            // TODO: We will need to be comparing the entire size if it gains other fields
+            if space.read().unwrap().bounds() == size.space_bounds() {
                 return space.clone();
             }
         }
 
         // Size didn't match, so recreate the space.
-        // TODO: Resize in-place instead.
-        let space = universe.insert_anonymous(layout.new_space());
+        // TODO: Resize in-place instead, once `Space` supports that.
+        let space = universe.insert_anonymous(size.create_space());
         // TODO: error handling for layout
         space
             .execute(
-                &install_widgets(LayoutGrant::new(layout.bounds()), &self.tree)
+                &install_widgets(LayoutGrant::new(size.space_bounds()), &self.tree)
                     .expect("layout/widget error"),
             )
             .expect("transaction error");
@@ -82,7 +154,7 @@ fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
                 // magic number 2 allows us to fill the edges of the viewport, ish
                 // TODO: VUI camera positioning should give us the option of "overscan",
                 // where all edges of the space spill off the window.
-                minimum: GridVector::new(0, 0, HudLayout::DEPTH_BEHIND_VIEW_PLANE + 2),
+                minimum: GridVector::new(0, 0, UiSize::DEPTH_BEHIND_VIEW_PLANE + 2),
             })),
             LayoutTree::leaf(
                 Frame::with_block(Block::from(Rgba::new(0., 0., 0., 0.7))) as Arc<dyn Widget>
@@ -175,4 +247,28 @@ pub(super) fn new_about_widget_tree(
             // LayoutTree::leaf(shrink(R32, paragraph("TODO"))?),
         ],
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ui_size() {
+        let cases: Vec<([u32; 2], [i32; 2])> =
+            vec![([800, 600], [25, 19]), ([1000, 600], [25, 15])];
+        let mut failed = 0;
+        for (nominal_viewport, expected_size) in cases {
+            let actual_size =
+                UiSize::new(camera::Viewport::with_scale(1.0, nominal_viewport.into())).size;
+            let actual_size: [i32; 2] = actual_size.into();
+            if actual_size != expected_size {
+                println!("{nominal_viewport:?} expected to produce {expected_size:?}; got {actual_size:?}");
+                failed += 1;
+            }
+        }
+        if failed > 0 {
+            panic!("{failed} cases failed");
+        }
+    }
 }
