@@ -7,13 +7,14 @@ use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, text, Block, Resolution};
 use all_is_cubes::character::Character;
 use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
-use all_is_cubes::listen::{DirtyFlag, Gate, Listen as _, ListenableSource, Listener};
+use all_is_cubes::listen::{Listen as _, ListenableSource, Listener};
 use all_is_cubes::math::{Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridSize, GridVector};
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::time::Duration;
 use all_is_cubes::transaction::Merge as _;
 use all_is_cubes::universe::{URef, Universe};
 
+use crate::inv_watch::InventoryWatcher;
 use crate::ui_content::{hud::HudBlocks, CueMessage, CueNotifier};
 use crate::vui::widgets::{ToolbarButtonState, WidgetBlocks};
 use crate::vui::{
@@ -26,10 +27,10 @@ use crate::vui::{
 #[derive(Debug)]
 pub(crate) struct Toolbar {
     hud_blocks: Arc<HudBlocks>,
-    /// Which character we display the inventory of
-    character_source: ListenableSource<Option<URef<Character>>>,
+    watcher: Arc<Mutex<InventoryWatcher>>,
     cue_channel: CueNotifier,
 
+    /// Number of slots this toolbar draws.
     slot_count: usize,
 
     slot_info_text_template: text::TextBuilder,
@@ -44,12 +45,15 @@ impl Toolbar {
         // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
         hud_blocks: Arc<HudBlocks>,
         slot_count: usize,
-        _universe: &mut Universe,
+        universe: &mut Universe,
         cue_channel: CueNotifier,
     ) -> Arc<Self> {
         Arc::new(Self {
             hud_blocks,
-            character_source,
+            watcher: Arc::new(Mutex::new(InventoryWatcher::new(
+                character_source,
+                universe,
+            ))),
             cue_channel,
             slot_count,
             slot_info_text_template: text::Text::builder()
@@ -84,28 +88,14 @@ impl Widget for Toolbar {
     fn controller(self: Arc<Self>, grant: &crate::vui::LayoutGrant) -> Box<dyn WidgetController> {
         let bounds = grant.bounds;
 
-        let todo_change_character = DirtyFlag::listening(false, &self.character_source);
-        let todo_inventory = DirtyFlag::new(true);
         let todo_more = Arc::new(Mutex::new(ToolbarTodo {
             button_pressed_decay: [Duration::ZERO; TOOL_SELECTIONS],
         }));
         self.cue_channel
             .listen(CueListener(Arc::downgrade(&todo_more)));
 
-        let character = self.character_source.snapshot();
-
-        let (character_listener_gate, character_listener) =
-            Listener::<()>::gate(todo_inventory.listener());
-        if let Some(character) = &character {
-            character.read().unwrap().listen(character_listener);
-        }
-
         Box::new(ToolbarController {
-            todo_change_character,
-            todo_inventory,
             todo_more,
-            character,
-            character_listener_gate,
             // TODO: obey gravity when positioning within the grant
             first_slot_position: Cube::new(
                 (bounds.lower_bounds().x + bounds.upper_bounds().x) / 2
@@ -122,14 +112,7 @@ impl Widget for Toolbar {
 #[derive(Debug)]
 struct ToolbarController {
     definition: Arc<Toolbar>,
-    todo_change_character: DirtyFlag,
-    todo_inventory: DirtyFlag,
     todo_more: Arc<Mutex<ToolbarTodo>>,
-    /// Latest character we've fetched from character_source,
-    /// and the character whose inventory changes todo_inventory is tracking
-    /// TODO: Generalize to noncharacters
-    character: Option<URef<Character>>,
-    character_listener_gate: Gate,
     first_slot_position: Cube,
 }
 
@@ -286,17 +269,6 @@ impl WidgetController for ToolbarController {
         &mut self,
         context: &vui::WidgetContext<'_>,
     ) -> Result<(WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
-        if self.todo_change_character.get_and_clear() {
-            self.character = self.definition.character_source.snapshot();
-
-            let (gate, listener) = Listener::<()>::gate(self.todo_inventory.listener());
-            if let Some(character) = &self.character {
-                character.read().unwrap().listen(listener);
-            }
-            self.character_listener_gate = gate;
-            self.todo_inventory.set();
-        }
-
         // Extract button pressed state from todo (don't hold the lock more than necessary)
         let mut pressed_buttons: [bool; TOOL_SELECTIONS] = [false; TOOL_SELECTIONS];
         let mut should_update_pointers = false;
@@ -312,34 +284,27 @@ impl WidgetController for ToolbarController {
             }
         }
 
-        // TODO: consolidate the two character borrows
+        let watcher = &mut *self.definition.watcher.lock().unwrap();
+        watcher.update();
 
-        let should_update_inventory = self.todo_inventory.get_and_clear();
+        // TODO: check watcher's notifs on whether we should update or not
+        let should_update_inventory = true;
+
         let slots_txn = if should_update_inventory {
-            if let Some(inventory_source) = &self.character {
-                let character = inventory_source.read().unwrap();
-                self.write_items(&character.inventory().slots)?
-            } else {
-                // TODO: clear toolbar ... once self.inventory_source can transition from Some to None at all
-                vui::WidgetTransaction::default()
-            }
+            self.write_items(&watcher.inventory().slots)?
         } else {
             vui::WidgetTransaction::default()
         };
 
         // should_update_inventory is currently true when the selected_slots value changes.
-        // TODO: it should be separate by listening more precisely to the CharacterChange
+        // TODO: InventoryWatcher should provide us this
         let pointers_txn = if should_update_inventory || should_update_pointers {
-            if let Some(inventory_source) = &self.character {
-                let character = inventory_source.read().unwrap();
-                self.write_pointers(&character.selected_slots(), pressed_buttons)?
-            } else {
-                self.write_pointers(&[], pressed_buttons)?
-            }
+            self.write_pointers(&watcher.selected_slots(), pressed_buttons)?
         } else {
             vui::WidgetTransaction::default()
         };
 
+        // TODO: Use Then::Sleep and a waker
         Ok((slots_txn.merge(pointers_txn).unwrap(), vui::Then::Step))
     }
 }

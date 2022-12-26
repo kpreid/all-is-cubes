@@ -23,6 +23,23 @@ impl<M> Listener<M> for NullListener {
     }
 }
 
+/// Tuples of listeners may be used to distribute messages.
+impl<M, L1, L2> Listener<M> for (L1, L2)
+where
+    M: Clone,
+    L1: Listener<M>,
+    L2: Listener<M>,
+{
+    fn receive(&self, message: M) {
+        self.0.receive(message.clone());
+        self.1.receive(message);
+    }
+
+    fn alive(&self) -> bool {
+        self.0.alive() || self.1.alive()
+    }
+}
+
 /// A [`Listener`] which delivers messages by calling a function on a [`Weak`] reference's
 /// referent, and stops when the weak reference breaks.
 #[derive(Clone)]
