@@ -2261,6 +2261,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nom8"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75d908f0297c3526d34e478d438b07eefe3d7b0416494d7ffccb17f1c7f7262c"
+dependencies = [
+ "memchr",
+ "minimal-lexical",
+]
+
+[[package]]
 name = "normalize-line-endings"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3669,6 +3679,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml_edit"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dcd65b83c7473af53e3fd994eb2888dfddfeb28cac9a82825ec5803c233c882c"
+dependencies = [
+ "indexmap",
+ "itertools",
+ "nom8",
+ "toml_datetime",
+]
+
+[[package]]
 name = "tower"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3761,7 +3783,7 @@ dependencies = [
  "serde",
  "shlex",
  "snapbox",
- "toml_edit",
+ "toml_edit 0.15.0",
 ]
 
 [[package]]
@@ -4376,7 +4398,7 @@ dependencies = [
  "cargo_metadata",
  "clap 4.0.26",
  "once_cell",
- "toml_edit",
+ "toml_edit 0.16.0",
  "xshell",
 ]
 
