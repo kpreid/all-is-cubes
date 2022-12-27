@@ -183,6 +183,8 @@ impl SwitchingWriter {
             } => {
                 let file = file.into_inner()?;
                 file.sync_all()?;
+                // clippy false positive when this code is compiled for wasm -- TODO: remove the file support when compiling for wasm
+                #[allow(clippy::drop_non_drop)]
                 drop(file);
                 Ok((file_uri, bytes_written))
             }
