@@ -6,13 +6,13 @@ use std::sync::Arc;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 
-use all_is_cubes::apps::StandardCameras;
+use all_is_cubes::apps::{StandardCameras, UiViewState};
 use all_is_cubes::block::{Block, Resolution::R2};
 use all_is_cubes::camera::{
     AntialiasingOption, ExposureOption, FogOption, GraphicsOptions, LightingOption, RenderError,
-    ToneMappingOperator, TransparencyOption, Viewport,
+    ToneMappingOperator, TransparencyOption, ViewTransform, Viewport,
 };
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Point3, Vector2, Vector3};
+use all_is_cubes::cgmath::{EuclideanSpace as _, One, Point2, Point3, Vector2, Vector3};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
@@ -296,7 +296,7 @@ async fn follow_character_change(context: RenderTestContext) {
         ListenableSource::constant(GraphicsOptions::default()),
         ListenableSource::constant(COMMON_VIEWPORT),
         character_cell.as_source(),
-        ListenableSource::constant(None),
+        ListenableSource::constant(UiViewState::default()),
     )
     .unwrap();
     let mut renderer = context.renderer(cameras);
@@ -345,7 +345,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
         options_cell.as_source(),
         ListenableSource::constant(COMMON_VIEWPORT),
         ListenableSource::constant(universe.get_default_character()),
-        ListenableSource::constant(None),
+        ListenableSource::constant(UiViewState::default()),
     )
     .unwrap();
 
@@ -491,10 +491,14 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
     let mut options = GraphicsOptions::default();
     options.show_ui = show_ui;
     let cameras: StandardCameras = StandardCameras::new(
-        ListenableSource::constant(options),
+        ListenableSource::constant(options.clone()),
         ListenableSource::constant(COMMON_VIEWPORT),
         ListenableSource::constant(universe.get_default_character()),
-        ListenableSource::constant(Some(ui_space(&mut universe))),
+        ListenableSource::constant(UiViewState {
+            space: Some(ui_space(&mut universe)),
+            view_transform: ViewTransform::one(),
+            graphics_options: options,
+        }),
     )
     .unwrap();
 
@@ -538,7 +542,11 @@ async fn layers_ui_only(mut context: RenderTestContext) {
         ListenableSource::constant(GraphicsOptions::default()),
         ListenableSource::constant(COMMON_VIEWPORT),
         ListenableSource::constant(None),
-        ListenableSource::constant(Some(ui_space(&mut universe))),
+        ListenableSource::constant(UiViewState {
+            space: Some(ui_space(&mut universe)),
+            view_transform: ViewTransform::one(),
+            graphics_options: GraphicsOptions::default(),
+        }),
     )
     .unwrap();
 
@@ -657,7 +665,7 @@ async fn zero_viewport(mut context: RenderTestContext) {
         ListenableSource::constant(GraphicsOptions::default()),
         viewport_cell.as_source(),
         ListenableSource::constant(universe.get_default_character()),
-        ListenableSource::constant(None),
+        ListenableSource::constant(UiViewState::default()),
     )
     .unwrap();
     let overlays = Overlays {
@@ -738,13 +746,11 @@ fn looking_at_one_cube_spawn(bounds: GridAab) -> Spawn {
 
 /// A simple space to draw something in the UI layer.
 fn ui_space(universe: &mut Universe) -> URef<Space> {
-    let mut ui_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [4, 4, 4]))
+    let ui_space = Space::builder(GridAab::from_lower_size([-3, -3, -4], [1, 1, 1]))
         .light_physics(all_is_cubes::space::LightPhysics::None)
         .sky_color(rgb_const!(1.0, 1.0, 0.5)) // blatantly wrong color that should not be seen
+        .filled_with(Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
         .build();
-    ui_space
-        .set([0, 0, 0], Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
-        .unwrap();
     universe.insert("ui_space".into(), ui_space).unwrap()
 }
 

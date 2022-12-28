@@ -7,7 +7,9 @@ use std::task::{Context, Poll};
 use futures_core::future::BoxFuture;
 use futures_task::noop_waker_ref;
 
-use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets, StandardCameras};
+use crate::apps::{
+    FpsCounter, FrameClock, InputProcessor, InputTargets, StandardCameras, UiViewState,
+};
 use crate::camera::{GraphicsOptions, Viewport};
 use crate::character::{Character, Cursor};
 use crate::fluff::Fluff;
@@ -15,7 +17,6 @@ use crate::inv::ToolError;
 use crate::listen::{
     ListenableCell, ListenableCellWithLocal, ListenableSource, Listener, Notifier,
 };
-use crate::space::Space;
 use crate::transaction::Transaction;
 use crate::universe::{URef, Universe, UniverseStepInfo};
 use crate::util::{CustomFormat, StatusText};
@@ -157,10 +158,10 @@ impl Session {
         &mut self.game_universe
     }
 
-    pub fn ui_space(&self) -> ListenableSource<Option<URef<Space>>> {
+    pub fn ui_view(&self) -> ListenableSource<UiViewState> {
         match &self.ui {
-            Some(ui) => ui.current_space(),
-            None => ListenableSource::constant(None), // TODO: cache this to allocate less
+            Some(ui) => ui.view(),
+            None => ListenableSource::constant(UiViewState::default()), // TODO: cache this to allocate less
         }
     }
 
@@ -353,7 +354,7 @@ impl Session {
     fn click_impl(&mut self, button: usize) -> Result<(), ToolError> {
         let cursor_space = self.cursor_result.as_ref().map(|c| c.space());
         // TODO: A better condition for this would be "is one of the spaces in the UI universe"
-        if cursor_space == Option::as_ref(&self.ui_space().get()) {
+        if cursor_space == Option::as_ref(&self.ui_view().get().space) {
             // TODO: refactor away unwrap
             self.ui
                 .as_mut()

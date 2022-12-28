@@ -1,13 +1,12 @@
 use cgmath::{One, Point2};
 
 use crate::apps::Session;
-use crate::camera::{Camera, GraphicsOptions, Viewport};
+use crate::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
 use crate::character::{cursor_raycast, Character, Cursor};
 use crate::listen::{DirtyFlag, ListenableCell, ListenableSource};
 use crate::math::FreeCoordinate;
 use crate::space::Space;
 use crate::universe::{URef, Universe};
-use crate::vui::Vui;
 
 /// A collection of values associated with each of the layers of graphics that
 /// is normally drawn (HUD on top of world, currently).
@@ -79,11 +78,11 @@ pub struct StandardCameras {
     character_dirty: DirtyFlag,
     character: Option<URef<Character>>,
     /// Cached and listenable version of character's space.
-    /// TODO: This should be in a Layers along with ui_space.
+    /// TODO: This should be in a Layers along with ui_state...?
     world_space: ListenableCell<Option<URef<Space>>>,
 
-    ui_space_source: ListenableSource<Option<URef<Space>>>,
-    ui_space_dirty: DirtyFlag,
+    ui_source: ListenableSource<UiViewState>,
+    ui_dirty: DirtyFlag,
     ui_space: Option<URef<Space>>,
 
     viewport_source: ListenableSource<Viewport>,
@@ -100,7 +99,7 @@ impl StandardCameras {
         graphics_options: ListenableSource<GraphicsOptions>,
         viewport_source: ListenableSource<Viewport>,
         character_source: ListenableSource<Option<URef<Character>>>,
-        ui_space_source: ListenableSource<Option<URef<Space>>>,
+        ui_source: ListenableSource<UiViewState>,
     ) -> Result<Self, std::convert::Infallible> {
         // TODO: Add a unit test that each of these listeners works as intended.
         // TODO: This is also an awful lot of repetitive code; we should design a pattern
@@ -111,7 +110,14 @@ impl StandardCameras {
         let initial_options: &GraphicsOptions = &graphics_options.get();
         let initial_viewport: Viewport = *viewport_source.get();
 
+        let ui_state = ui_source.get();
+
         let mut this = Self {
+            cameras: Layers {
+                ui: Camera::new(ui_state.graphics_options.clone(), initial_viewport),
+                world: Camera::new(initial_options.clone(), initial_viewport),
+            },
+
             graphics_options,
             graphics_options_dirty,
 
@@ -120,20 +126,12 @@ impl StandardCameras {
             character: None, // update() will fix these up
             world_space: ListenableCell::new(None),
 
-            ui_space: ui_space_source.snapshot(),
-            ui_space_dirty: DirtyFlag::listening(true, |l| ui_space_source.listen(l)),
-            ui_space_source,
+            ui_space: ui_state.space.clone(),
+            ui_dirty: DirtyFlag::listening(true, |l| ui_source.listen(l)),
+            ui_source,
 
             viewport_dirty,
             viewport_source,
-
-            cameras: Layers {
-                ui: Camera::new(
-                    Vui::graphics_options(initial_options.clone()),
-                    initial_viewport,
-                ),
-                world: Camera::new(initial_options.clone(), initial_viewport),
-            },
         };
 
         this.update();
@@ -149,7 +147,7 @@ impl StandardCameras {
             session.graphics_options(),
             viewport_source,
             session.character(),
-            session.ui_space(),
+            session.ui_view(),
         )
     }
 
@@ -163,7 +161,7 @@ impl StandardCameras {
             ListenableSource::constant(graphics_options),
             ListenableSource::constant(viewport),
             ListenableSource::constant(universe.get_default_character()),
-            ListenableSource::constant(None),
+            ListenableSource::constant(UiViewState::default()),
         )
         .unwrap()
     }
@@ -175,43 +173,36 @@ impl StandardCameras {
     pub fn update(&mut self) {
         let options_dirty = self.graphics_options_dirty.get_and_clear();
         if options_dirty {
-            let current_options = self.graphics_options.snapshot();
-            self.cameras.world.set_options(current_options.clone());
             self.cameras
-                .ui
-                .set_options(Vui::graphics_options(current_options));
+                .world
+                .set_options(self.graphics_options.snapshot());
         }
 
-        let ui_space_dirty = self.ui_space_dirty.get_and_clear();
-        if ui_space_dirty || options_dirty {
-            self.ui_space = if self.cameras.ui.options().show_ui {
-                self.ui_space_source.snapshot()
+        let ui_dirty = self.ui_dirty.get_and_clear();
+        if ui_dirty || options_dirty {
+            let UiViewState {
+                space,
+                view_transform: ui_transform,
+                graphics_options: ui_options,
+            } = if self.graphics_options.get().show_ui {
+                self.ui_source.snapshot()
             } else {
-                None
+                UiViewState::default()
             };
-            if self.ui_space.is_none() {
-                // Reset transform so it isn't a *stale* transform.
-                // TODO: set an error flag saying that nothing should be drawn
-                self.cameras.ui.set_view_transform(One::one());
-            }
+            self.ui_space = space;
+            self.cameras.ui.set_options(ui_options);
+            self.cameras.ui.set_view_transform(ui_transform);
         }
 
-        // Update viewports, and UI view if the FOV changed or the viewport did
+        // Update viewports.
+        // Note: The UI does its own independent re-layout when the viewport aspect ratio
+        // changes.
         let viewport_dirty = self.viewport_dirty.get_and_clear();
-        if options_dirty || viewport_dirty || ui_space_dirty {
+        if viewport_dirty {
             let viewport: Viewport = self.viewport_source.snapshot();
             // TODO: this should be a Layers::iter_mut() or something
             self.cameras.world.set_viewport(viewport);
             self.cameras.ui.set_viewport(viewport);
-
-            if let Some(space_ref) = &self.ui_space {
-                // TODO: try_borrow()
-                // TODO: ...or just skip the whole idea
-                self.cameras.ui.set_view_transform(Vui::view_transform(
-                    &space_ref.read().unwrap(),
-                    self.cameras.ui.fov_y(),
-                ));
-            }
         }
 
         if self.character_dirty.get_and_clear() {
@@ -335,9 +326,37 @@ impl Clone for StandardCameras {
             self.graphics_options.clone(),
             self.viewport_source.clone(),
             self.character_source.clone(),
-            self.ui_space_source.clone(),
+            self.ui_source.clone(),
         )
         .unwrap()
+    }
+}
+
+/// Specifies what to render for the UI layer in front of the world.
+///
+/// This struct contains all the information needed to know how to render the UI
+/// *specifically* (distinct from the world). It differs from [`Camera`] in that it
+/// includes the [`Space`] and excludes the viewport.
+///
+/// TODO: This struct needs a better name. And is it good for non-UI, too?
+/// Note that we may wish to revise this bundle if we start having continuously changing
+/// `view_transform`.
+#[derive(Clone, Debug)]
+#[allow(clippy::exhaustive_structs)]
+pub struct UiViewState {
+    pub space: Option<URef<Space>>,
+    pub view_transform: ViewTransform,
+    pub graphics_options: GraphicsOptions, // TODO: may be big; should we Arc it?
+}
+
+impl Default for UiViewState {
+    /// Draws no space, with default graphics options.
+    fn default() -> Self {
+        Self {
+            space: Default::default(),
+            view_transform: ViewTransform::one(),
+            graphics_options: Default::default(),
+        }
     }
 }
 

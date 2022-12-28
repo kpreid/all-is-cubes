@@ -6,10 +6,10 @@
 use std::sync::mpsc::TryRecvError;
 use std::sync::{mpsc, Arc, Mutex};
 
-use cgmath::{Angle as _, Decomposed, Deg, Transform, Vector3};
+use cgmath::{Angle as _, Decomposed, Deg, One, Transform, Vector3};
 use ordered_float::NotNan;
 
-use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState, InputProcessor};
+use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState, InputProcessor, UiViewState};
 use crate::camera::{FogOption, GraphicsOptions, ViewTransform, Viewport};
 use crate::character::{Character, Cursor};
 use crate::inv::{Tool, ToolError, ToolInput};
@@ -45,7 +45,7 @@ pub(crate) struct Vui {
 
     /// The space that should be displayed to the user, drawn on top of the world.
     /// The value of this cell is derived from `self.state`.
-    current_space: ListenableCell<Option<URef<Space>>>,
+    current_view: ListenableCell<UiViewState>,
     /// Identifies which “page” the UI should be showing — what
     /// should be in `current_space`, taken from one of the [`PageInst`]s.
     state: ListenableCell<VuiPageState>,
@@ -128,7 +128,7 @@ impl Vui {
 
         let mut new_self = Self {
             universe,
-            current_space: ListenableCell::new(None),
+            current_view: ListenableCell::new(UiViewState::default()),
             state: ListenableCell::new(VuiPageState::Hud),
 
             changed_viewport,
@@ -152,8 +152,8 @@ impl Vui {
 
     /// The space that should be displayed to the user, drawn on top of the world.
     // TODO: It'd be more encapsulating if we could provide a _read-only_ URef...
-    pub fn current_space(&self) -> ListenableSource<Option<URef<Space>>> {
-        self.current_space.as_source()
+    pub fn view(&self) -> ListenableSource<UiViewState> {
+        self.current_view.as_source()
     }
 
     pub(crate) fn set_state(&mut self, state: VuiPageState) {
@@ -172,13 +172,31 @@ impl Vui {
             VuiPageState::AboutText => Some(self.about_page.get_or_create_space(size, universe)),
         };
 
-        if next_space.as_ref() != Option::as_ref(&self.current_space.get()) {
-            self.current_space.set(next_space);
+        if next_space.as_ref() != Option::as_ref(&self.current_view.get().space) {
+            self.current_view
+                .set(Self::view_state_for(next_space, &self.hud_inputs));
             log::trace!(
                 "UI switched to {:?} ({:?})",
-                self.current_space.get(),
+                self.current_view.get().space,
                 self.state.get()
             );
+        }
+    }
+
+    fn view_state_for(space: Option<URef<Space>>, inputs: &HudInputs) -> UiViewState {
+        // TODO: compute the derived graphics options only once
+        let graphics_options = Self::graphics_options(inputs.graphics_options.snapshot());
+
+        UiViewState {
+            view_transform: match space.as_ref() {
+                Some(space) => Self::view_transform(
+                    &space.read().unwrap(), // TODO: eliminate this unwrap
+                    cgmath::Deg(graphics_options.fov_y.into_inner()),
+                ),
+                None => ViewTransform::one(),
+            },
+            space,
+            graphics_options,
         }
     }
 
@@ -186,9 +204,8 @@ impl Vui {
     ///
     /// It does not need to be rechecked other than on aspect ratio changes.
     ///
-    /// TODO: This is not a method because the code structure makes it inconvenient for
-    /// renderers to get access to `Vui` itself. Add some other communication path.
-    pub fn view_transform(space: &Space, fov_y: Deg<FreeCoordinate>) -> ViewTransform {
+    /// TODO: used to be public before [`UiViewState`]; refactor in light of
+    fn view_transform(space: &Space, fov_y: Deg<FreeCoordinate>) -> ViewTransform {
         let bounds = space.bounds();
         let mut ui_center = bounds.center();
 
@@ -207,7 +224,7 @@ impl Vui {
     }
 
     /// Compute graphics options to render the VUI space given the user's regular options.
-    pub fn graphics_options(mut options: GraphicsOptions) -> GraphicsOptions {
+    fn graphics_options(mut options: GraphicsOptions) -> GraphicsOptions {
         // Set FOV to give a predictable, not-too-wide-angle perspective.
         options.fov_y = NotNan::from(30);
 
@@ -256,7 +273,7 @@ impl Vui {
             let new_size = UiSize::new(new_viewport);
             if new_size != self.last_ui_size {
                 self.last_ui_size = new_size;
-                self.current_space.set(None); // force reconstruction
+                self.current_view.set(UiViewState::default()); // force reconstruction
                 self.set_space_from_state();
             }
         }
@@ -295,7 +312,7 @@ impl Vui {
 
     /// Handle clicks that hit the UI itself
     pub fn click(&mut self, _button: usize, cursor: Option<Cursor>) -> Result<(), ToolError> {
-        if cursor.as_ref().map(Cursor::space) != Option::as_ref(&self.current_space.get()) {
+        if cursor.as_ref().map(Cursor::space) != Option::as_ref(&self.current_view.get().space) {
             return Err(ToolError::Internal(String::from(
                 "Vui::click: space didn't match",
             )));
