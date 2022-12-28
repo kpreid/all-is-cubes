@@ -108,7 +108,7 @@ impl vui::WidgetController for ActionButtonController {
             SpaceTransaction::set_cube(self.position, None, Some(self.definition.block.clone()));
         let activatable = space::SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             space::SpaceBehaviorAttachment::new(GridAab::single_cube(self.position)),
-            Arc::new(vui::ActivatableRegion {
+            Arc::new(space::ActivatableRegion {
                 effect: self.definition.action.clone(),
             }),
         ));
@@ -225,7 +225,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
     fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             SpaceBehaviorAttachment::new(GridAab::single_cube(self.position)),
-            Arc::new(vui::ActivatableRegion {
+            Arc::new(space::ActivatableRegion {
                 effect: self.definition.action.clone(),
             }),
         )))

@@ -9,12 +9,11 @@ use crate::behavior::{self, BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::drawing::DrawingPlane;
 use crate::math::{GridCoordinate, GridMatrix, GridPoint};
-use crate::space::{GridAab, SetCubeError, Space};
+use crate::space::{ActivatableRegion, GridAab, SetCubeError, Space};
 use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
 use crate::util::{ConciseDebug, CustomFormat as _};
-use crate::vui::ActivatableRegion;
 
 impl Transactional for Space {
     type Transaction = SpaceTransaction;

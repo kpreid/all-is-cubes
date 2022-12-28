@@ -5,7 +5,6 @@ use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
 use crate::behavior::{Behavior, BehaviorContext, BehaviorSetTransaction};
-use crate::inv::EphemeralOpaque;
 use crate::math::GridAab;
 use crate::space::{self, Space, SpaceTransaction};
 use crate::time::Tick;
@@ -236,43 +235,6 @@ pub enum InstallVuiError {
         #[source]
         error: crate::transaction::ExecuteError,
     },
-}
-
-/// A region of a [`Space`] that does something if [`Tool::Activate`] is used on it.
-///
-/// TODO: This is a placeholder for a better design; it's too specific (external side
-/// effect) and yet also not general enough (we would like buttons to have detailed
-/// reactions to clicking) considering that it's hardcoded in Space.
-///
-/// TODO: Make the better version of this public
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ActivatableRegion {
-    pub(crate) effect: EphemeralOpaque<dyn Fn() + Send + Sync>,
-}
-
-impl ActivatableRegion {
-    pub fn activate(&self) {
-        if let Some(f) = &self.effect.0 {
-            f();
-        }
-    }
-}
-
-impl Behavior<Space> for ActivatableRegion {
-    fn alive(&self, _: &BehaviorContext<'_, Space>) -> bool {
-        // TODO: Give a way for this to be deleted automatically
-        true
-    }
-
-    fn ephemeral(&self) -> bool {
-        true
-    }
-}
-
-impl VisitRefs for ActivatableRegion {
-    fn visit_refs(&self, _: &mut dyn RefVisitor) {
-        // Our only interesting member is an EphemeralOpaque — which is opaque.
-    }
 }
 
 /// Create a [`Space`] to put a widget in.
