@@ -237,6 +237,12 @@ pub enum InstallVuiError {
     },
 }
 
+impl From<InstallVuiError> for crate::linking::InGenError {
+    fn from(value: InstallVuiError) -> Self {
+        crate::linking::InGenError::other(value)
+    }
+}
+
 /// Create a [`Space`] to put a widget in.
 #[cfg(test)]
 #[track_caller]
