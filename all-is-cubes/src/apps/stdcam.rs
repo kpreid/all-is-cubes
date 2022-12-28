@@ -347,15 +347,18 @@ impl Default for UiViewState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::apps::Session;
     use crate::space::Space;
     use crate::universe::{Universe, UniverseIndex};
-    use futures_executor::block_on;
 
     #[test]
     fn cameras_follow_character_and_world() {
-        let mut session = block_on(Session::builder().build());
-        let mut cameras = session.create_cameras(ListenableSource::constant(Viewport::ARBITRARY));
+        let character_cell = ListenableCell::new(None);
+        let mut cameras = StandardCameras::new(
+            ListenableSource::constant(GraphicsOptions::default()),
+            ListenableSource::constant(Viewport::ARBITRARY),
+            character_cell.as_source(),
+            ListenableSource::constant(UiViewState::default()),
+        );
 
         let world_source = cameras.world_space();
         let flag = DirtyFlag::listening(false, |l| world_source.listen(l));
@@ -366,18 +369,15 @@ mod tests {
         assert!(!flag.get_and_clear());
 
         // Create a universe with space and character
-        // TODO: This has to be a new one because there currently isn't an Session::set_character()!
         let mut universe = Universe::new();
         let space_ref = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
-        // TODO: "character" is a special default name used for finding the character the
-        // player actually uses, and we should replace that or handle it more formally.
-        universe
+        let character = universe
             .insert(
                 "character".into(),
                 Character::spawn_default(space_ref.clone()),
             )
             .unwrap();
-        session.set_universe(universe);
+        character_cell.set(Some(character));
 
         // Now the world_source should be reporting the new space
         assert!(!flag.get_and_clear());
@@ -394,14 +394,19 @@ mod tests {
 
     #[test]
     fn cameras_clone() {
-        let session = block_on(Session::builder().build());
-        let mut cameras = session.create_cameras(ListenableSource::constant(Viewport::ARBITRARY));
+        let options_cell = ListenableCell::new(GraphicsOptions::default());
+        let mut cameras = StandardCameras::new(
+            options_cell.as_source(),
+            ListenableSource::constant(Viewport::ARBITRARY),
+            ListenableSource::constant(None),
+            ListenableSource::constant(UiViewState::default()),
+        );
         let mut cameras2 = cameras.clone();
 
         let default_o = GraphicsOptions::default();
         let mut different_o = default_o.clone();
         different_o.debug_chunk_boxes = true;
-        session.graphics_options_mut().set(different_o.clone());
+        options_cell.set(different_o.clone());
 
         // Each `StandardCameras` has independent updating from the same data sources.
         assert_eq!(cameras.cameras().world.options(), &default_o);
