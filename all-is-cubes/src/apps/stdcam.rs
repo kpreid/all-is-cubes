@@ -1,6 +1,5 @@
 use cgmath::{One, Point2};
 
-use crate::apps::Session;
 use crate::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
 use crate::character::{cursor_raycast, Character, Cursor};
 use crate::listen::{DirtyFlag, ListenableCell, ListenableSource};
@@ -100,7 +99,7 @@ impl StandardCameras {
         viewport_source: ListenableSource<Viewport>,
         character_source: ListenableSource<Option<URef<Character>>>,
         ui_source: ListenableSource<UiViewState>,
-    ) -> Result<Self, std::convert::Infallible> {
+    ) -> Self {
         // TODO: Add a unit test that each of these listeners works as intended.
         // TODO: This is also an awful lot of repetitive code; we should design a pattern
         // to not have it (some kind of "following cell")?
@@ -112,7 +111,7 @@ impl StandardCameras {
 
         let ui_state = ui_source.get();
 
-        let mut this = Self {
+        let mut new_self = Self {
             cameras: Layers {
                 ui: Camera::new(ui_state.graphics_options.clone(), initial_viewport),
                 world: Camera::new(initial_options.clone(), initial_viewport),
@@ -134,21 +133,8 @@ impl StandardCameras {
             viewport_source,
         };
 
-        this.update();
-        Ok(this)
-    }
-
-    /// Constructs a [`StandardCameras`] that will display, and track, the current state of the [`Session`].
-    pub fn from_session(
-        session: &Session,
-        viewport_source: ListenableSource<Viewport>,
-    ) -> Result<Self, std::convert::Infallible> {
-        Self::new(
-            session.graphics_options(),
-            viewport_source,
-            session.character(),
-            session.ui_view(),
-        )
+        new_self.update();
+        new_self
     }
 
     #[doc(hidden)]
@@ -163,7 +149,6 @@ impl StandardCameras {
             ListenableSource::constant(universe.get_default_character()),
             ListenableSource::constant(UiViewState::default()),
         )
-        .unwrap()
     }
 
     /// Updates camera state from data sources.
@@ -328,7 +313,6 @@ impl Clone for StandardCameras {
             self.character_source.clone(),
             self.ui_source.clone(),
         )
-        .unwrap()
     }
 }
 
@@ -363,6 +347,7 @@ impl Default for UiViewState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::apps::Session;
     use crate::space::Space;
     use crate::universe::{Universe, UniverseIndex};
     use futures_executor::block_on;
@@ -370,11 +355,7 @@ mod tests {
     #[test]
     fn cameras_follow_character_and_world() {
         let mut session = block_on(Session::builder().build());
-        let mut cameras = StandardCameras::from_session(
-            &session,
-            ListenableSource::constant(Viewport::ARBITRARY),
-        )
-        .unwrap();
+        let mut cameras = session.create_cameras(ListenableSource::constant(Viewport::ARBITRARY));
 
         let world_source = cameras.world_space();
         let flag = DirtyFlag::listening(false, |l| world_source.listen(l));
@@ -414,11 +395,7 @@ mod tests {
     #[test]
     fn cameras_clone() {
         let session = block_on(Session::builder().build());
-        let mut cameras = StandardCameras::from_session(
-            &session,
-            ListenableSource::constant(Viewport::ARBITRARY),
-        )
-        .unwrap();
+        let mut cameras = session.create_cameras(ListenableSource::constant(Viewport::ARBITRARY));
         let mut cameras2 = cameras.clone();
 
         let default_o = GraphicsOptions::default();

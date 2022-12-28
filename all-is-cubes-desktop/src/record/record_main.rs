@@ -7,7 +7,7 @@ use all_is_cubes::time::Tick;
 use all_is_cubes::{behavior, universe};
 use indicatif::{ProgressBar, ProgressStyle};
 
-use all_is_cubes::apps::{Session, StandardCameras};
+use all_is_cubes::apps::Session;
 use all_is_cubes::camera::{Flaws, Viewport};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::math::NotNan;
@@ -25,7 +25,7 @@ pub(crate) fn create_recording_session(
     viewport_cell.set(options.viewport());
     let (recorder, status_receiver) = Recorder::new(
         options.clone(),
-        StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap(),
+        session.create_cameras(viewport_cell.as_source()),
     )?;
 
     let mut dsession = DesktopSession::new((), (), session, viewport_cell);

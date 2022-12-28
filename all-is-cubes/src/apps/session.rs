@@ -173,6 +173,16 @@ impl Session {
         &self.graphics_options
     }
 
+    /// Create [`StandardCameras`] which may be used in rendering a view of this session.
+    pub fn create_cameras(&self, viewport_source: ListenableSource<Viewport>) -> StandardCameras {
+        StandardCameras::new(
+            self.graphics_options(),
+            viewport_source,
+            self.character(),
+            self.ui_view(),
+        )
+    }
+
     /// Listen for [`Fluff`] events from this session. Fluff constitutes short-duration
     /// sound or particle effects.
     pub fn listen_fluff(&self, listener: impl Listener<Fluff> + Send + Sync + 'static) {

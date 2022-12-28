@@ -297,8 +297,7 @@ async fn follow_character_change(context: RenderTestContext) {
         ListenableSource::constant(COMMON_VIEWPORT),
         character_cell.as_source(),
         ListenableSource::constant(UiViewState::default()),
-    )
-    .unwrap();
+    );
     let mut renderer = context.renderer(cameras);
 
     // Draw the first character
@@ -346,8 +345,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
         ListenableSource::constant(COMMON_VIEWPORT),
         ListenableSource::constant(universe.get_default_character()),
         ListenableSource::constant(UiViewState::default()),
-    )
-    .unwrap();
+    );
 
     // Render the image once. This isn't that interesting a comparison test,
     // but we do want to display the image for manual verification of the change.
@@ -499,8 +497,7 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
             view_transform: ViewTransform::one(),
             graphics_options: options,
         }),
-    )
-    .unwrap();
+    );
 
     context
         .render_comparison_test(
@@ -547,8 +544,7 @@ async fn layers_ui_only(mut context: RenderTestContext) {
             view_transform: ViewTransform::one(),
             graphics_options: GraphicsOptions::default(),
         }),
-    )
-    .unwrap();
+    );
 
     context
         .render_comparison_test(
@@ -666,8 +662,7 @@ async fn zero_viewport(mut context: RenderTestContext) {
         viewport_cell.as_source(),
         ListenableSource::constant(universe.get_default_character()),
         ListenableSource::constant(UiViewState::default()),
-    )
-    .unwrap();
+    );
     let overlays = Overlays {
         cursor: None,
         info_text: Some("hello world"),

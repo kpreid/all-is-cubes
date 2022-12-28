@@ -124,7 +124,7 @@ pub(crate) async fn create_winit_wgpu_desktop_session(
     log::debug!("Adapter: {:?}", adapter.get_info());
 
     let renderer = SurfaceRenderer::new(
-        StandardCameras::from_session(&session, viewport_cell.as_source())?,
+        session.create_cameras(viewport_cell.as_source()),
         surface,
         &adapter,
     )
@@ -166,7 +166,7 @@ pub(crate) fn create_winit_rt_desktop_session(
     }
 
     let renderer = RtRenderer::new(
-        StandardCameras::from_session(&session, viewport_cell.as_source())?,
+        session.create_cameras(viewport_cell.as_source()),
         Box::new(raytracer_size_policy),
         ListenableSource::constant(()),
     );

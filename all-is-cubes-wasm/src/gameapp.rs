@@ -131,7 +131,7 @@ async fn start_game_with_dom(
     static_dom.append_to_loading_log("\nInitializing graphics...");
     app_progress.progress(0.4).await;
 
-    let cameras = StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap();
+    let cameras = session.create_cameras(viewport_cell.as_source());
     let renderer = match renderer_option {
         RendererOption::Wgpu => {
             let wgpu_instance = wgpu::Instance::new(wgpu::Backends::all());

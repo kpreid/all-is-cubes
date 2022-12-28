@@ -80,7 +80,7 @@ pub(crate) fn create_terminal_session(
     viewport_cell: ListenableCell<Viewport>,
 ) -> crossterm::Result<DesktopSession<TerminalRenderer, TerminalWindow>> {
     viewport_cell.set(options.viewport_from_terminal_size(rect_size(Rect::default())));
-    let cameras = StandardCameras::from_session(&session, viewport_cell.as_source()).unwrap();
+    let cameras = session.create_cameras(viewport_cell.as_source());
 
     // Generate reusable buffers for scene.
     // They are recirculated through the channels so that one can be updated while another is being raytraced.
