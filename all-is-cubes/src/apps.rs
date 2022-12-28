@@ -3,9 +3,6 @@
 mod input;
 pub use input::*;
 
-mod stdcam;
-pub use stdcam::*;
-
 mod session;
 pub use session::*;
 

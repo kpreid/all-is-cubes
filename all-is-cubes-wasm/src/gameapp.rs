@@ -14,8 +14,8 @@ use web_sys::{
     FocusEvent, HtmlElement, HtmlProgressElement, KeyboardEvent, MouseEvent, Text,
 };
 
-use all_is_cubes::apps::{CursorIcon, Key, Session, StandardCameras};
-use all_is_cubes::camera::{GraphicsOptions, Viewport};
+use all_is_cubes::apps::{CursorIcon, Key, Session};
+use all_is_cubes::camera::{GraphicsOptions, StandardCameras, Viewport};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::universe::UniverseStepInfo;

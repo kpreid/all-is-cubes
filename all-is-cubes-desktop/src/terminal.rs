@@ -7,8 +7,8 @@ use std::time::{Duration, Instant};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use tui::layout::Rect;
 
-use all_is_cubes::apps::{Session, StandardCameras};
-use all_is_cubes::camera::{Camera, Viewport};
+use all_is_cubes::apps::Session;
+use all_is_cubes::camera::{Camera, StandardCameras, Viewport};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::Rgba;

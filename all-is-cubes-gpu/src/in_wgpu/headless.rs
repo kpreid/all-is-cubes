@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use futures_core::future::BoxFuture;
 
-use all_is_cubes::apps::StandardCameras;
-use all_is_cubes::camera::{self, Flaws, HeadlessRenderer, Viewport};
+use all_is_cubes::camera::{self, Flaws, HeadlessRenderer, StandardCameras, Viewport};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 

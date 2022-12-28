@@ -8,7 +8,10 @@ use crate::space::Space;
 use crate::universe::{URef, Universe};
 
 /// A collection of values associated with each of the layers of graphics that
-/// is normally drawn (HUD on top of world, currently).
+/// is normally drawn (HUD on top of world, currently) by [`HeadlessRenderer`] or
+/// other renderers.
+///
+/// [`HeadlessRenderer`]: crate::camera::HeadlessRenderer
 // Exhaustive: Changing this will probably be breaking anyway, until we make it a
 // more thorough abstraction.
 #[allow(clippy::exhaustive_structs)]

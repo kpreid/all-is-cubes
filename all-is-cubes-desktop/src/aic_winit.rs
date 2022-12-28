@@ -8,8 +8,8 @@ use winit::event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent}
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 
-use all_is_cubes::apps::{Session, StandardCameras};
-use all_is_cubes::camera::Viewport;
+use all_is_cubes::apps::Session;
+use all_is_cubes::camera::{StandardCameras, Viewport};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::raytracer::RtRenderer;

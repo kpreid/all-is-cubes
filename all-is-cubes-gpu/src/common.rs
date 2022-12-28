@@ -2,11 +2,10 @@
 
 use std::error::Error;
 
-use all_is_cubes::camera::RenderError;
-use all_is_cubes::universe::RefError;
 use instant::Duration;
 
-use all_is_cubes::apps::Layers;
+use all_is_cubes::camera::{Layers, RenderError};
+use all_is_cubes::universe::RefError;
 
 mod debug_lines;
 pub(crate) use debug_lines::*;

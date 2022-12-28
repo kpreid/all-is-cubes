@@ -2,8 +2,7 @@ use std::fmt;
 
 use instant::Duration;
 
-use all_is_cubes::apps::Layers;
-use all_is_cubes::camera::Flaws;
+use all_is_cubes::camera::{Flaws, Layers};
 use all_is_cubes::mesh::chunked_mesh::CsmUpdateInfo;
 use all_is_cubes::util::{CustomFormat, StatusText};
 

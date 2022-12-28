@@ -3,8 +3,7 @@
 use std::fs::File;
 use std::sync::mpsc;
 
-use all_is_cubes::apps::StandardCameras;
-use all_is_cubes::camera::Flaws;
+use all_is_cubes::camera::{Flaws, StandardCameras};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::raytracer::RtRenderer;
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};

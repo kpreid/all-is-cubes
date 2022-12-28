@@ -4,10 +4,9 @@ use cgmath::{ElementWise, Point2, Vector2};
 use futures_core::future::BoxFuture;
 use image::RgbaImage;
 
-use crate::apps::{Layers, StandardCameras};
 use crate::camera::{
-    AntialiasingOption, Camera, Flaws, FogOption, GraphicsOptions, HeadlessRenderer, RenderError,
-    Viewport,
+    AntialiasingOption, Camera, Flaws, FogOption, GraphicsOptions, HeadlessRenderer, Layers,
+    RenderError, StandardCameras, Viewport,
 };
 use crate::character::Cursor;
 use crate::content::palette;

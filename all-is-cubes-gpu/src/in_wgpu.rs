@@ -8,8 +8,7 @@ use std::sync::Arc;
 use instant::Instant;
 use once_cell::sync::Lazy;
 
-use all_is_cubes::apps::{Layers, StandardCameras};
-use all_is_cubes::camera::info_text_drawable;
+use all_is_cubes::camera::{info_text_drawable, Layers, StandardCameras};
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;

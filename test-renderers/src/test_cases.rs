@@ -6,11 +6,10 @@ use std::sync::Arc;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 
-use all_is_cubes::apps::{StandardCameras, UiViewState};
 use all_is_cubes::block::{Block, Resolution::R2};
 use all_is_cubes::camera::{
     AntialiasingOption, ExposureOption, FogOption, GraphicsOptions, LightingOption, RenderError,
-    ToneMappingOperator, TransparencyOption, ViewTransform, Viewport,
+    StandardCameras, ToneMappingOperator, TransparencyOption, UiViewState, ViewTransform, Viewport,
 };
 use all_is_cubes::cgmath::{EuclideanSpace as _, One, Point2, Point3, Vector2, Vector3};
 use all_is_cubes::character::{Character, Spawn};

@@ -7,10 +7,8 @@ use std::task::{Context, Poll};
 use futures_core::future::BoxFuture;
 use futures_task::noop_waker_ref;
 
-use crate::apps::{
-    FpsCounter, FrameClock, InputProcessor, InputTargets, StandardCameras, UiViewState,
-};
-use crate::camera::{GraphicsOptions, Viewport};
+use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
+use crate::camera::{GraphicsOptions, StandardCameras, UiViewState, Viewport};
 use crate::character::{Character, Cursor};
 use crate::fluff::Fluff;
 use crate::inv::ToolError;

@@ -4,8 +4,7 @@ use std::sync::Arc;
 use clap::Parser as _;
 use tokio::sync::OnceCell;
 
-use all_is_cubes::apps::StandardCameras;
-use all_is_cubes::camera::HeadlessRenderer;
+use all_is_cubes::camera::{HeadlessRenderer, StandardCameras};
 use all_is_cubes_gpu::in_wgpu::{headless, init};
 use test_renderers::{RendererFactory, RendererId};
 

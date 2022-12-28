@@ -5,7 +5,6 @@ use std::fs;
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
-use all_is_cubes::apps::StandardCameras;
 use all_is_cubes::cgmath::EuclideanSpace as _;
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::math::GridAab;
@@ -21,7 +20,7 @@ use crate::record::RecordOptions;
 
 #[derive(Debug)]
 pub(super) struct MeshRecorder {
-    cameras: StandardCameras,
+    cameras: camera::StandardCameras,
     csm: ChunkedSpaceMesh<MeshIndexCell, GltfVertex, GltfTextureAllocator, 32>,
     tex: GltfTextureAllocator,
     scene_sender: mpsc::SyncSender<MeshRecordMsg>,
@@ -29,7 +28,7 @@ pub(super) struct MeshRecorder {
 
 impl MeshRecorder {
     pub fn new(
-        cameras: StandardCameras,
+        cameras: camera::StandardCameras,
         tex: GltfTextureAllocator,
         scene_sender: mpsc::SyncSender<MeshRecordMsg>,
     ) -> Self {

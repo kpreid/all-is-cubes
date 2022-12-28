@@ -9,8 +9,8 @@ use std::sync::{mpsc, Arc, Mutex};
 use cgmath::{Angle as _, Decomposed, Deg, One, Transform, Vector3};
 use ordered_float::NotNan;
 
-use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState, InputProcessor, UiViewState};
-use crate::camera::{FogOption, GraphicsOptions, ViewTransform, Viewport};
+use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState, InputProcessor};
+use crate::camera::{FogOption, GraphicsOptions, UiViewState, ViewTransform, Viewport};
 use crate::character::{Character, Cursor};
 use crate::inv::{Tool, ToolError, ToolInput};
 use crate::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier};

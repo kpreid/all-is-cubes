@@ -1,7 +1,6 @@
 use clap::Parser as _;
 
-use all_is_cubes::apps::StandardCameras;
-use all_is_cubes::camera::HeadlessRenderer;
+use all_is_cubes::camera::{HeadlessRenderer, StandardCameras};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::raytracer::RtRenderer;
 use test_renderers::{RendererFactory, RendererId};

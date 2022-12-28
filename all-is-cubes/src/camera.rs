@@ -14,10 +14,16 @@ use crate::raycast::Ray;
 
 mod flaws;
 pub use flaws::*;
+
 mod graphics_options;
 pub use graphics_options::*;
+
 mod renderer;
 pub use renderer::*;
+
+mod stdcam;
+pub use stdcam::*;
+
 #[cfg(test)]
 mod tests;
 
@@ -34,8 +40,8 @@ pub type ViewTransform = Decomposed<Vector3<FreeCoordinate>, Basis3<FreeCoordina
 /// Defines a viewpoint in/of the world: a viewport (aspect ratio), projection matrix,
 /// and view matrix.
 ///
-/// See also [`StandardCameras`](crate::apps::StandardCameras), which adds self-updating
-/// from a character’s viewport, among other features.
+/// See also [`StandardCameras`], which adds self-updating from a character’s viewport,
+/// among other features.
 #[derive(Clone, Debug)]
 pub struct Camera {
     /// Caller-provided options. Always validated by [`GraphicsOptions::repair`].
