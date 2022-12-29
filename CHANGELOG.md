@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.5.1 (2022-12-29)
+
+- Fixed packaging error in `all-is-cubes-desktop`.
+
 ## 0.5.0 (2022-12-28)
 
 This is a large revision with many breaking changes. This log does not record all of them; I have chosen “get a release out” over “document everything”.
