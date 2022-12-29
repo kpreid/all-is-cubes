@@ -52,7 +52,8 @@ Stability and versioning
 
 All is Cubes is an ambitious hobby project; many features necessary to be “complete” are not yet implemented, and implementing them will require incompatible changes. During development, library APIs change regularly, and the version numbering will mark these versions as incompatible (e.g. 0.3 to 0.4); there will be no 1.0 version until I am confident that future versions will at least have save data compatibility. However, I have made some attempt to document API elements that are _more likely_ to change in future versions.
 
-MSRV: The minimum supported Rust version is the current _stable_ version. This policy may change after a future 1.0 release.
+MSRV policy: The current release accurately documents its `rust-version` in `Cargo.toml`.
+Future releases will typically require the current stable Rust version as of that release.
 
 License
 -------
