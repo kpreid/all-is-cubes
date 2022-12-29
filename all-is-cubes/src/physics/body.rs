@@ -19,11 +19,11 @@ use crate::util::{ConciseDebug, CustomFormat, StatusText};
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
 const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
 
-/// Velocities larger than this are clamped.
+/// Velocities larger than this (in cubes per second) are clamped.
 ///
 /// This provides an upper limit on the collision detection computation,
 /// per body per frame.
-pub(crate) const VELOCITY_MAGNITUDE_LIMIT: FreeCoordinate = 1e5_f64;
+pub(crate) const VELOCITY_MAGNITUDE_LIMIT: FreeCoordinate = 1e4_f64;
 pub(crate) const VELOCITY_MAGNITUDE_LIMIT_SQUARED: FreeCoordinate =
     VELOCITY_MAGNITUDE_LIMIT * VELOCITY_MAGNITUDE_LIMIT;
 
