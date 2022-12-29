@@ -2,7 +2,8 @@
 //! are themselves made of “smaller” blocks (voxels) that define their appearance and
 //! behavior.
 //!
-//! This crate defines the world model, simulation rules, and basic non-GPU-accelerated rendering
+//! This crate defines the world model, simulation rules, and basic non-GPU-accelerated
+//! rendering.
 //! (User interface components, platform glue, and game content are kept in other crates.)
 //! This crate is designed to be a reusable library for simulating and rendering voxel
 //! world/scenes, but is not yet mature.
