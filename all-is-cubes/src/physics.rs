@@ -303,8 +303,14 @@ mod tests {
         body.step(Tick::from_seconds(2.0), None, collision_noop);
 
         // Velocity is capped and *then* applied to position
-        assert_eq!(body.velocity, Vector3::new(1e5, 0., 0.));
-        assert_eq!(body.position, Point3::new(2e5, 0., 0.));
+        assert_eq!(
+            body.velocity,
+            Vector3::new(VELOCITY_MAGNITUDE_LIMIT, 0., 0.)
+        );
+        assert_eq!(
+            body.position,
+            Point3::new(2. * VELOCITY_MAGNITUDE_LIMIT, 0., 0.)
+        );
     }
 
     /// Takes the maximum length on all coordinate axes; all points forming a cube
