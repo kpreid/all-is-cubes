@@ -211,24 +211,29 @@ pub async fn install_landscape_blocks(
                 .voxels_fn(universe, resolution, &dirt_pattern)?
                 .build(),
 
-            Log(stage) => {
+            key @ Log(growth) => {
                 let resolution = R16;
                 let mid = GridCoordinate::from(resolution) / 2;
-                let radius = stage as GridCoordinate;
+                let radius = growth as GridCoordinate;
                 let trunk_box = GridAab::from_lower_upper(
                     [mid - radius, 0, mid - radius],
                     [mid + radius, mid + radius, mid + radius],
                 );
                 Block::builder()
                     .attributes(
-                        colors[Log(stage)]
+                        colors[key]
                             .evaluate()
                             .map_err(InGenError::other)?
                             .attributes,
                     )
+                    .collision(match growth {
+                        tree::TreeGrowth::Block => BlockCollision::Hard,
+                        // TODO: ideal would be a collision mode that says "collide with the bounding box"
+                        _ => BlockCollision::Recur,
+                    })
                     .voxels_fn(universe, resolution, |cube| {
                         if trunk_box.contains_cube(cube) {
-                            &colors[Log(stage)]
+                            &colors[key]
                         } else {
                             &AIR
                         }
@@ -245,6 +250,7 @@ pub async fn install_landscape_blocks(
                 )
                 .collision(match growth {
                     tree::TreeGrowth::Block => BlockCollision::Hard,
+                    // TODO: ideal would be a collision mode that says "collide with the bounding box"
                     _ => BlockCollision::Recur,
                 })
                 .voxels_fn(universe, resolution, |cube| {
