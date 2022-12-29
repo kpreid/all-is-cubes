@@ -1,9 +1,9 @@
 use std::fmt;
 use std::sync::{atomic, mpsc, Arc};
 
-use all_is_cubes::apps::Session;
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::listen::Listener;
+use all_is_cubes_ui::apps::Session;
 use kira::manager::error::PlaySoundError;
 use kira::manager::AudioManager;
 use kira::sound::static_sound::StaticSoundData;

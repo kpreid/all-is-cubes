@@ -1,14 +1,16 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use embedded_graphics::mono_font::{MonoFont, MonoTextStyle};
-use embedded_graphics::prelude::{Dimensions, Point};
-use embedded_graphics::text::{Text, TextStyle};
-use embedded_graphics::Drawable;
+use all_is_cubes::drawing::embedded_graphics::{
+    mono_font::{MonoFont, MonoTextStyle},
+    prelude::{Dimensions, Point},
+    text::{Text, TextStyle},
+    Drawable,
+};
+use all_is_cubes::drawing::{rectangle_to_aab, VoxelBrush};
+use all_is_cubes::math::{GridAab, GridMatrix};
+use all_is_cubes::space::SpaceTransaction;
 
-use crate::drawing::{rectangle_to_aab, VoxelBrush};
-use crate::math::{GridAab, GridMatrix};
-use crate::space::SpaceTransaction;
 use crate::vui::{widgets, LayoutGrant, LayoutRequest, Layoutable, Widget, WidgetController};
 
 /// Widget which draws text using a block per font pixel.
@@ -74,12 +76,11 @@ impl Widget for LargeText {
 
 #[cfg(test)]
 mod tests {
-    use embedded_graphics::mono_font::iso_8859_1::FONT_9X15_BOLD;
-
-    use crate::block::Block;
-    use crate::math::{GridVector, Rgba};
-
     use super::*;
+    use all_is_cubes::block::Block;
+    use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1::FONT_9X15_BOLD;
+    use all_is_cubes::math::{GridVector, Rgba};
+
     #[test]
     fn text_size() {
         let text = "abc";

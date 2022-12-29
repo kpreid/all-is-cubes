@@ -361,7 +361,8 @@ pub enum InsertError {
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct UniverseStepInfo {
-    pub(crate) computation_time: Duration,
+    #[doc(hidden)]
+    pub computation_time: Duration,
     space_step: SpaceStepInfo,
 }
 impl std::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {

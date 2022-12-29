@@ -89,7 +89,8 @@ impl Space {
     }
 
     /// Do some lighting updates.
-    pub(crate) fn update_lighting_from_queue(&mut self) -> LightUpdatesInfo {
+    #[doc(hidden)] // TODO: eliminate
+    pub fn update_lighting_from_queue(&mut self) -> LightUpdatesInfo {
         let mut light_update_count: usize = 0;
         self.last_light_updates.clear();
         let mut max_difference: PackedLightScalar = 0;

@@ -1,44 +1,28 @@
 #![no_main]
 extern crate all_is_cubes;
 
-use std::time::Instant;
-
-use futures_executor::block_on;
-
-use all_is_cubes::apps::Session;
-use all_is_cubes::camera::Viewport;
 use all_is_cubes::character::Character;
-use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::space::Space;
+use all_is_cubes::time::Tick;
+use all_is_cubes::universe::Universe;
 
 use libfuzzer_sys::{arbitrary::Arbitrary, fuzz_target};
 
 #[derive(Arbitrary, Debug)]
 struct FuzzUniverseTemplate {
     space: Space,
-    viewport: Viewport,
 }
 
 fuzz_target!(|input: FuzzUniverseTemplate| {
-    // TODO: Should we be enabling UI or not?
-    let mut session = block_on(
-        Session::builder()
-            .ui(ListenableSource::constant(input.viewport))
-            .build(),
-    );
+    let mut universe = Universe::new();
 
     // TODO: add some of all kinds of universe objects
-    let space = session.universe_mut().insert_anonymous(input.space);
+    let space = universe.insert_anonymous(input.space);
     // TODO: arbitrary-ize character except for the ref
-    let _character = session
-        .universe_mut()
-        .insert_anonymous(Character::spawn_default(space));
-
-    // TODO: need to be able to insert a character into the session for testing the input interactions
+    let _character = universe.insert_anonymous(Character::spawn_default(space));
 
     for _ in 1..100 {
-        // TODO: give arbitrary "user" inputs to the input processor
-        session.frame_clock.advance_to(Instant::now());
-        session.maybe_step_universe();
+        // TODO: give arbitrary "user" inputs to the character and other universe manipulations
+        universe.step(Tick::arbitrary());
     }
 });

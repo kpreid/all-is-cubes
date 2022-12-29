@@ -7,12 +7,12 @@ use std::time::{Duration, Instant};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use tui::layout::Rect;
 
-use all_is_cubes::apps::Session;
 use all_is_cubes::camera::{Camera, StandardCameras, Viewport};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::Rgba;
 use all_is_cubes::raytracer::{CharacterBuf, CharacterRtData, ColorBuf, PixelBuf, RtRenderer};
+use all_is_cubes_ui::apps::Session;
 
 use crate::glue::crossterm::{event_to_key, map_mouse_button};
 use crate::session::DesktopSession;

@@ -19,14 +19,15 @@ impl<M> Listener<M> for NullListener {
 }
 
 /// A [`Listener`] which delivers messages by calling a function on a [`Weak`] reference's
-/// referent.
-pub(crate) struct FnListener<F, T> {
+/// referent, and stops when the weak reference breaks.
+#[derive(Clone, Debug)]
+pub struct FnListener<F, T> {
     function: F,
     weak_target: Weak<T>,
 }
 
 impl<F, T> FnListener<F, T> {
-    pub(crate) fn new(target: &Arc<T>, function: F) -> Self {
+    pub fn new(target: &Arc<T>, function: F) -> Self {
         Self {
             function,
             weak_target: Arc::downgrade(target),

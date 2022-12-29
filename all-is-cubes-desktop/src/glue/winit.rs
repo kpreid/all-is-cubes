@@ -1,9 +1,9 @@
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::monitor::MonitorHandle;
 
-use all_is_cubes::apps::InputProcessor;
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
+use all_is_cubes_ui::apps::InputProcessor;
 use winit::window::CursorGrabMode;
 
 pub fn physical_size_to_viewport(scale_factor: f64, size: PhysicalSize<u32>) -> Viewport {
@@ -35,8 +35,8 @@ pub fn map_mouse_button(button: winit::event::MouseButton) -> usize {
     }
 }
 
-pub fn map_key(key: winit::event::VirtualKeyCode) -> Option<all_is_cubes::apps::Key> {
-    use all_is_cubes::apps::Key as A;
+pub fn map_key(key: winit::event::VirtualKeyCode) -> Option<all_is_cubes_ui::apps::Key> {
+    use all_is_cubes_ui::apps::Key as A;
     use winit::event::VirtualKeyCode as V;
     Some(match key {
         V::Key1 => A::Character('1'),
@@ -224,8 +224,8 @@ pub fn sync_cursor_grab(window: &winit::window::Window, input_processor: &mut In
     }
 }
 
-pub fn cursor_icon_to_winit(icon: &all_is_cubes::apps::CursorIcon) -> winit::window::CursorIcon {
-    use all_is_cubes::apps::CursorIcon as A;
+pub fn cursor_icon_to_winit(icon: &all_is_cubes_ui::apps::CursorIcon) -> winit::window::CursorIcon {
+    use all_is_cubes_ui::apps::CursorIcon as A;
     use winit::window::CursorIcon as W;
     match icon {
         A::Crosshair => W::Crosshair,

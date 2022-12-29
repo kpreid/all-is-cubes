@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
+use all_is_cubes::camera::{AntialiasingOption, GraphicsOptions};
+
 use crate::apps::ControlMessage;
-use crate::camera::{AntialiasingOption, GraphicsOptions};
 use crate::vui::hud::HudInputs;
 use crate::vui::widgets::{self, ToggleButtonVisualState};
 use crate::vui::{LayoutTree, UiBlocks, Widget, WidgetTree};
@@ -34,6 +35,7 @@ pub(crate) fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree
                     AntialiasingOption::None => AntialiasingOption::Always,
                     AntialiasingOption::IfCheap => AntialiasingOption::None,
                     AntialiasingOption::Always => AntialiasingOption::None,
+                    _ => AntialiasingOption::None,
                 }
             },
         )),

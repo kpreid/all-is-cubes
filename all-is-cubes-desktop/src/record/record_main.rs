@@ -7,10 +7,10 @@ use all_is_cubes::time::Tick;
 use all_is_cubes::{behavior, universe};
 use indicatif::{ProgressBar, ProgressStyle};
 
-use all_is_cubes::apps::Session;
 use all_is_cubes::camera::{Flaws, Viewport};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::math::NotNan;
+use all_is_cubes_ui::apps::Session;
 
 use crate::record::{RecordOptions, Recorder, Status};
 use crate::session::{ClockSource, DesktopSession};

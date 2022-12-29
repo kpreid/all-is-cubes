@@ -56,7 +56,7 @@ impl<T> Layers<T> {
 /// * A [`Viewport`] specifying the dimensions of image to render.
 /// * A [`URef`] to the [`Character`] whose eyes we look through to render the “world”
 ///   [`Space`].
-/// * A [`URef`] to the [VUI](crate::vui) [`Space`] overlaid on the world.
+/// * A [`URef`] to the UI/HUD [`Space`] overlaid on the world, if any.
 ///
 /// When [`StandardCameras::update()`] is called, all of these data sources are read
 /// and used to update the [`Camera`] data. Those cameras, and copies of the input

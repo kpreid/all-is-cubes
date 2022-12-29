@@ -29,6 +29,7 @@ harness = false
 all-is-cubes = { path = "../all-is-cubes", version = "0.4.0", features = ["threads"] }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0", features = ["wgpu"] }
+all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.4.0" }
 async_fn_traits = "0.1.1"
 # Using clap for parsing test command-line arguments
 clap = { version = "4.0.12", default-features = false, features = ["deprecated", "derive", "std", "suggestions"] }

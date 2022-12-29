@@ -2,9 +2,10 @@
 
 use std::sync::Arc;
 
-use crate::block::Block;
-use crate::math::GridVector;
-use crate::space::SpaceTransaction;
+use all_is_cubes::block::Block;
+use all_is_cubes::math::GridVector;
+use all_is_cubes::space::SpaceTransaction;
+
 use crate::vui;
 
 mod crosshair;
@@ -83,10 +84,10 @@ impl vui::Layoutable for Block {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::content::make_some_blocks;
-    use crate::math::{GridAab, GridPoint};
     use crate::vui::Align;
-    use cgmath::Vector3;
+    use all_is_cubes::cgmath::Vector3;
+    use all_is_cubes::content::make_some_blocks;
+    use all_is_cubes::math::{GridAab, GridPoint};
 
     #[test]
     fn block_widget_in_position() {

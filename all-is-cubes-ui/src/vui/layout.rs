@@ -1,11 +1,13 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use cgmath::{Vector3, Zero as _};
+use all_is_cubes::cgmath::{Vector3, Zero as _};
+use all_is_cubes::math::{
+    point_to_enclosing_cube, Face6, GridAab, GridCoordinate, GridPoint, GridVector,
+};
+use all_is_cubes::space::{Space, SpaceBuilder, SpaceTransaction};
+use all_is_cubes::transaction::{Merge as _, Transaction};
 
-use crate::math::{point_to_enclosing_cube, Face6, GridAab, GridCoordinate, GridPoint, GridVector};
-use crate::space::{Space, SpaceBuilder, SpaceTransaction};
-use crate::transaction::{Merge as _, Transaction};
 use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
 
 // TODO: can we come up with a way to not even need this type alias?
@@ -336,7 +338,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
 }
 
 impl LayoutTree<Arc<dyn Widget>> {
-    pub fn to_space<B: crate::space::SpaceBuilderBounds>(
+    pub fn to_space<B: all_is_cubes::space::SpaceBuilderBounds>(
         self: Arc<Self>,
         builder: SpaceBuilder<B>,
         gravity: Gravity,
@@ -446,9 +448,8 @@ pub(super) fn validate_widget_transaction(
 
 #[cfg(test)]
 mod tests {
-    use crate::math::Face6;
-
     use super::*;
+    use all_is_cubes::math::Face6;
     use pretty_assertions::assert_eq;
 
     /// Trivial implementation of [`Layoutable`].

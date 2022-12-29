@@ -1,23 +1,26 @@
 use std::error::Error;
 use std::sync::{Arc, Mutex, Weak};
 
-use cgmath::EuclideanSpace;
-use embedded_graphics::mono_font::{iso_8859_1, MonoTextStyle};
-use embedded_graphics::prelude::Point;
-use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
-use embedded_graphics::Drawable;
 use instant::Duration;
 
-use crate::block::{self, Block, BlockAttributes, Primitive, Resolution, AIR};
-use crate::character::Character;
-use crate::content::palette;
-use crate::inv::{Slot, TOOL_SELECTIONS};
-use crate::listen::{DirtyFlag, Gate, ListenableSource, Listener};
-use crate::math::{FaceMap, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
-use crate::space::{Space, SpacePhysics, SpaceTransaction};
-use crate::time::Tick;
-use crate::transaction::Merge as _;
-use crate::universe::{URef, Universe};
+use all_is_cubes::block::{self, Block, BlockAttributes, Primitive, Resolution, AIR};
+use all_is_cubes::cgmath::EuclideanSpace;
+use all_is_cubes::character::Character;
+use all_is_cubes::content::palette;
+use all_is_cubes::drawing::embedded_graphics::{
+    mono_font::{iso_8859_1, MonoTextStyle},
+    prelude::Point,
+    text::{Alignment, Baseline, Text, TextStyleBuilder},
+    Drawable,
+};
+use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
+use all_is_cubes::listen::{DirtyFlag, Gate, ListenableSource, Listener};
+use all_is_cubes::math::{FaceMap, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
+use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
+use all_is_cubes::time::Tick;
+use all_is_cubes::transaction::Merge as _;
+use all_is_cubes::universe::{URef, Universe};
+
 use crate::vui::blocks::ToolbarButtonState;
 use crate::vui::hud::HudBlocks;
 use crate::vui::{
@@ -342,7 +345,7 @@ impl WidgetController for ToolbarController {
                     // include a final goes-to-zero update
                     should_update_pointers = true;
                 }
-                *t = t.saturating_sub(tick.delta_t);
+                *t = t.saturating_sub(tick.delta_t());
                 pressed_buttons[i] = *t != Duration::ZERO;
             }
         }

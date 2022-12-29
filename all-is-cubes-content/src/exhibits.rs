@@ -1111,8 +1111,7 @@ async fn UI_BLOCKS(_: &Exhibit, universe: &mut Universe) {
     // TODO: This was designed for a render test and is still shaped for that rather than
     // any-viewpoint examination.
 
-    use all_is_cubes::vui::blocks::ToolbarButtonState;
-    use all_is_cubes::vui::blocks::UiBlocks;
+    use all_is_cubes_ui::vui::blocks::{ToolbarButtonState, UiBlocks};
 
     let icons = BlockProvider::<all_is_cubes::inv::Icons>::using(universe)?;
     let icons = icons.iter().map(|(_, block)| block.clone());

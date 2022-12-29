@@ -24,7 +24,10 @@ use crate::universe::{RefError, RefVisitor, URef, UniverseTransaction, VisitRefs
 #[non_exhaustive]
 pub enum Tool {
     /// “Click”, or “push button”, or generally “activate the function of this”
-    /// as opposed to editing it. Used for [`vui`](crate::vui) interaction.
+    /// as opposed to editing it.
+    ///
+    /// This can activate an [`ActivatableRegion`](crate::space::ActivatableRegion).
+    /// It may have more functions in the future.
     Activate,
 
     /// Destroy any targeted block. If `keep` is true, move it to inventory.
@@ -283,10 +286,11 @@ impl VisitRefs for Tool {
 /// This is intended to provide future extensibility compared to having a complex
 /// parameter list for `Tool::use_tool`.
 #[derive(Debug)]
+#[allow(clippy::exhaustive_structs)]
 pub struct ToolInput {
-    pub(crate) cursor: Option<Cursor>,
+    pub cursor: Option<Cursor>,
     /// TODO: We want to be able to express “inventory host”, not just specifically Character (but there aren't any other examples).
-    pub(crate) character: Option<URef<Character>>,
+    pub character: Option<URef<Character>>,
 }
 
 impl ToolInput {

@@ -66,10 +66,7 @@ impl<B> SpaceBuilder<B> {
 
 impl<B: SpaceBuilderBounds> SpaceBuilder<B> {
     /// Set the bounds unless they have already been set.
-    pub(crate) fn bounds_if_not_set(
-        self,
-        bounds_fn: impl FnOnce() -> GridAab,
-    ) -> SpaceBuilder<GridAab> {
+    pub fn bounds_if_not_set(self, bounds_fn: impl FnOnce() -> GridAab) -> SpaceBuilder<GridAab> {
         // Delegate to the trait. (This method exists so the trait need not be imported.)
         SpaceBuilderBounds::bounds_if_not_set(self, bounds_fn)
     }
@@ -131,37 +128,40 @@ impl Default for SpaceBuilder<()> {
     }
 }
 
+/// Helper for [`SpaceBuilder::bounds_if_not_set()`]. Do not call or implement this trait.
+pub trait SpaceBuilderBounds: sbb::SbbSealed + Sized {
+    fn bounds_if_not_set(
+        builder: SpaceBuilder<Self>,
+        bounds_fn: impl FnOnce() -> GridAab,
+    ) -> SpaceBuilder<GridAab>;
+}
+
+impl SpaceBuilderBounds for () {
+    fn bounds_if_not_set(
+        builder: SpaceBuilder<Self>,
+        bounds_fn: impl FnOnce() -> GridAab,
+    ) -> SpaceBuilder<GridAab> {
+        builder.bounds(bounds_fn())
+    }
+}
+
+impl SpaceBuilderBounds for GridAab {
+    fn bounds_if_not_set(
+        builder: SpaceBuilder<Self>,
+        _bounds_fn: impl FnOnce() -> GridAab,
+    ) -> SpaceBuilder<GridAab> {
+        builder
+    }
+}
+
 /// Module for sealed trait
 mod sbb {
     use super::*;
-
-    /// Helper for [`SpaceBuilder::bounds_if_not_set()`].
-    pub trait SpaceBuilderBounds: Sized {
-        fn bounds_if_not_set(
-            builder: SpaceBuilder<Self>,
-            bounds_fn: impl FnOnce() -> GridAab,
-        ) -> SpaceBuilder<GridAab>;
-    }
-
-    impl SpaceBuilderBounds for () {
-        fn bounds_if_not_set(
-            builder: SpaceBuilder<Self>,
-            bounds_fn: impl FnOnce() -> GridAab,
-        ) -> SpaceBuilder<GridAab> {
-            builder.bounds(bounds_fn())
-        }
-    }
-
-    impl SpaceBuilderBounds for GridAab {
-        fn bounds_if_not_set(
-            builder: SpaceBuilder<Self>,
-            _bounds_fn: impl FnOnce() -> GridAab,
-        ) -> SpaceBuilder<GridAab> {
-            builder
-        }
-    }
+    #[doc(hidden)]
+    pub trait SbbSealed {}
+    impl SbbSealed for () {}
+    impl SbbSealed for GridAab {}
 }
-pub(crate) use sbb::SpaceBuilderBounds;
 
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for Space {

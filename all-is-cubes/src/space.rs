@@ -27,8 +27,7 @@ use crate::util::ConciseDebug;
 use crate::util::{CustomFormat, StatusText};
 
 mod builder;
-pub use builder::SpaceBuilder;
-pub(crate) use builder::SpaceBuilderBounds;
+pub use builder::{SpaceBuilder, SpaceBuilderBounds};
 
 mod light;
 #[doc(hidden)] // pub only for visualization by all-is-cubes-gpu
@@ -1201,10 +1200,11 @@ impl Listener<BlockChange> for SpaceBlockChangeListener {
 /// effect) and yet also not general enough (we would like buttons to have detailed
 /// reactions to clicking) considering that it's hardcoded in Space.
 ///
-/// TODO: Make the better version of this public
+/// [`Tool::Activate`]: crate::inv::Tool::Activate
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ActivatableRegion {
-    pub(crate) effect: EphemeralOpaque<dyn Fn() + Send + Sync>,
+#[allow(clippy::exhaustive_structs)]
+pub struct ActivatableRegion {
+    pub effect: EphemeralOpaque<dyn Fn() + Send + Sync>,
 }
 
 impl ActivatableRegion {

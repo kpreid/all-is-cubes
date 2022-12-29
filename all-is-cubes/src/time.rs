@@ -7,7 +7,7 @@
 // yet synchronized game systems). If that doesn't happen, it should be merged
 // into universe.rs or something like that.
 
-use instant::Duration;
+pub use instant::{Duration, Instant};
 
 /// Specifies an amount of time passing in a [`Universe`](crate::universe::Universe)
 /// and its contents.
@@ -34,7 +34,8 @@ impl Tick {
         }
     }
 
-    pub(crate) fn from_duration(delta_t: Duration) -> Self {
+    /// Construct a [`Tick`] of the specified length.
+    pub const fn from_duration(delta_t: Duration) -> Self {
         Self {
             delta_t,
             paused: false,

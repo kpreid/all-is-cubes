@@ -1,19 +1,21 @@
 use std::fmt;
 
-use embedded_graphics::mono_font::iso_8859_1 as font;
 use exhaust::Exhaust;
 
-use crate::block::{Block, Resolution::*, AIR};
-use crate::content::load_image::{default_srgb, include_image, space_from_image};
-use crate::content::palette;
-use crate::drawing::VoxelBrush;
+use all_is_cubes::block::{Block, Resolution::*, AIR};
+use all_is_cubes::content::load_image::{default_srgb, space_from_image};
+use all_is_cubes::content::palette;
+use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1 as font;
+use all_is_cubes::drawing::VoxelBrush;
 #[cfg(doc)]
-use crate::inv::Tool;
-use crate::inv::TOOL_SELECTIONS;
-use crate::linking::{BlockModule, BlockProvider};
-use crate::math::GridRotation;
-use crate::universe::Universe;
-use crate::util::YieldProgress;
+use all_is_cubes::inv::Tool;
+use all_is_cubes::inv::TOOL_SELECTIONS;
+use all_is_cubes::linking::{BlockModule, BlockProvider};
+use all_is_cubes::math::GridRotation;
+use all_is_cubes::universe::Universe;
+use all_is_cubes::util::YieldProgress;
+use all_is_cubes::{include_image, rgba_const};
+
 use crate::vui::widgets::{ActionButtonVisualState, ButtonBase, ToggleButtonVisualState};
 
 /// Blocks that are used within the VUI, only.

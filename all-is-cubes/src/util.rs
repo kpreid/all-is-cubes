@@ -299,8 +299,8 @@ impl Display for TimeStats {
     }
 }
 
-#[cfg(test)]
-pub(crate) fn assert_send_sync<T: Send + Sync>() {
+#[doc(hidden)]
+pub fn assert_send_sync<T: Send + Sync>() {
     // We don't need to do anything in this function; the call to it having been successfully
     // compiled is the assertion.
 }

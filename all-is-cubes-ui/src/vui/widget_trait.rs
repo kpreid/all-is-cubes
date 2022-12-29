@@ -4,12 +4,13 @@ use std::error::Error;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
-use crate::behavior::{Behavior, BehaviorContext, BehaviorSetTransaction};
-use crate::math::GridAab;
-use crate::space::{self, Space, SpaceTransaction};
-use crate::time::Tick;
-use crate::transaction::{Merge as _, TransactionConflict};
-use crate::universe::{RefVisitor, VisitRefs};
+use all_is_cubes::behavior::{Behavior, BehaviorContext, BehaviorSetTransaction};
+use all_is_cubes::math::GridAab;
+use all_is_cubes::space::{self, Space, SpaceTransaction};
+use all_is_cubes::time::Tick;
+use all_is_cubes::transaction::{self, Merge as _, TransactionConflict};
+use all_is_cubes::universe::{RefVisitor, VisitRefs};
+
 use crate::vui::{validate_widget_transaction, LayoutGrant, Layoutable, Positioned};
 
 /// Transaction type produced by [`WidgetController`]s.
@@ -160,7 +161,7 @@ impl Behavior<Space> for WidgetBehavior {
         &self,
         context: &BehaviorContext<'_, Space>,
         tick: Tick,
-    ) -> crate::universe::UniverseTransaction {
+    ) -> all_is_cubes::universe::UniverseTransaction {
         let txn = self
             .controller
             .lock()
@@ -233,13 +234,13 @@ pub enum InstallVuiError {
     #[non_exhaustive]
     ExecuteInstallation {
         #[source]
-        error: crate::transaction::ExecuteError,
+        error: transaction::ExecuteError,
     },
 }
 
-impl From<InstallVuiError> for crate::linking::InGenError {
+impl From<InstallVuiError> for all_is_cubes::linking::InGenError {
     fn from(value: InstallVuiError) -> Self {
-        crate::linking::InGenError::other(value)
+        all_is_cubes::linking::InGenError::other(value)
     }
 }
 
@@ -250,8 +251,8 @@ pub(crate) fn instantiate_widget<W: Widget + 'static>(
     grant: LayoutGrant,
     widget: W,
 ) -> (Option<GridAab>, Space) {
-    use crate::transaction::Transaction as _;
     use crate::vui;
+    use all_is_cubes::transaction::Transaction as _;
 
     let mut space = Space::builder(grant.bounds).build();
     let txn = vui::install_widgets(grant, &vui::LayoutTree::leaf(Arc::new(widget)))
@@ -263,7 +264,7 @@ pub(crate) fn instantiate_widget<W: Widget + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::assert_send_sync;
+    use all_is_cubes::util::assert_send_sync;
 
     #[test]
     fn error_is_send_sync() {

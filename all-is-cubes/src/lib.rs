@@ -2,9 +2,8 @@
 //! are themselves made of “smaller” blocks (voxels) that define their appearance and
 //! behavior.
 //!
-//! This crate defines the world model, simulation rules, rendering, and in-game user
-//! interface. (Glue for display and user interface on specific platforms is kept in
-//! other crates.)
+//! This crate defines the world model, simulation rules, and basic non-GPU-accelerated rendering
+//! (User interface components, platform glue, and game content are kept in other crates.)
 //! This crate is designed to be a reusable library for simulating and rendering voxel
 //! world/scenes, but is not yet mature.
 //!
@@ -76,23 +75,7 @@
 //!   matrix which use the same coordinate system as [`camera`].
 //!   Jumping is also hardcoded to work in the +Y direction.
 //!   Future versions may support arbitrary character orientation.
-//! * [`vui`] uses the same coordinate system as [`camera`] for user interface layout
-//!   and text orientation.
 //! * [`mesh`] algorithms generate triangles with counterclockwise winding order.
-//!
-//! ### User interface, rendering, application
-//!
-//! This crate does not provide any platform bindings, but it does contain components for
-//! the platform-independent components of the complete interactive game application.
-//! If you create a [`Session`], it will manage the [`Universe`], the [UI](crate::vui),
-//! and user input; you need to provide:
-//!
-//! * A renderer, possibly using the [`all-is-cubes-gpu`](https://docs.rs/all-is-cubes-gpu),
-//!   [the software raytracer](crate::raytracer), or your own code.
-//! * Deliver input events to [`Session::input_processor`].
-//!
-//! It is also possible to ignore the provided application structure entirely and use the
-//! [`Universe`] and rendering functions as you see fit.
 //!
 //! ## Crate features
 //!
@@ -136,8 +119,6 @@
 //! [`Character`]: crate::character::Character
 //! [`Modifier`]: crate::block::Modifier
 //! [`Primitive`]: crate::block::Primitive
-//! [`Session`]: crate::apps::Session
-//! [`Session::input_processor`]: crate::apps::Session::input_processor
 //! [`Space`]: crate::space::Space
 //! [`SpacePhysics`]: crate::space::SpacePhysics
 //! [`Tool`]: crate::inv::Tool
@@ -186,7 +167,6 @@
 #[macro_use]
 pub mod math;
 
-pub mod apps;
 pub mod behavior;
 pub mod block;
 pub mod camera;
@@ -212,7 +192,6 @@ pub mod time;
 pub mod transaction;
 pub mod universe;
 pub mod util;
-pub mod vui;
 
 /// Re-export the version of the `cgmath` crate we're using.
 pub use cgmath;

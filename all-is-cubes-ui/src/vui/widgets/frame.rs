@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
-use crate::block::Block;
-use crate::content::palette;
-use crate::math::GridVector;
+use all_is_cubes::block::Block;
+use all_is_cubes::content::palette;
+use all_is_cubes::math::GridVector;
+
 use crate::vui;
 
 // Reexported for use with VUI because it isn't currently publicly exported otherwise.
 // TODO: unclear where this type should be canonically exported.
-pub use crate::content::BoxStyle;
+pub use all_is_cubes::content::BoxStyle;
 
 /// Widget that fills its volume with some [`BoxStyle`], and requests at least 1 cube of
 /// depth.

@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use cgmath::EuclideanSpace;
+use all_is_cubes::block::{Block, BlockAttributes, Primitive, Resolution};
+use all_is_cubes::cgmath::EuclideanSpace as _;
+use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
+use all_is_cubes::space::{Space, SpaceTransaction};
+use all_is_cubes::universe::URef;
 
-use crate::block::{Block, BlockAttributes, Primitive, Resolution};
-use crate::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
-use crate::space::{Space, SpaceTransaction};
-use crate::universe::URef;
-use crate::vui::{self, Layoutable};
+use crate::vui::{self, Layoutable as _};
 
 /// Widget that takes a [`Space`] and displays it shrunken, such as for a text label,
 /// with no interactive behavior.
@@ -107,10 +107,10 @@ impl vui::Widget for Voxels {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::Resolution::*;
-    use crate::universe::Universe;
     use crate::vui::{instantiate_widget, Align};
-    use cgmath::{Point3, Vector3};
+    use all_is_cubes::block::Resolution::*;
+    use all_is_cubes::cgmath::{Point3, Vector3};
+    use all_is_cubes::universe::Universe;
 
     fn test_voxels_widget(
         voxel_space_bounds: GridAab,

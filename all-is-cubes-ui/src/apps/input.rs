@@ -1,15 +1,19 @@
-use cgmath::{EuclideanSpace as _, Point2, Vector2, Vector3, Zero as _};
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
 use std::time::Duration;
 
+use all_is_cubes::camera::{
+    FogOption, GraphicsOptions, LightingOption, TransparencyOption, Viewport,
+};
+use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Vector2, Vector3, Zero as _};
+use all_is_cubes::character::Character;
+use all_is_cubes::listen::{ListenableCell, ListenableSource};
+use all_is_cubes::math::FreeCoordinate;
+use all_is_cubes::notnan;
+use all_is_cubes::time::Tick;
+use all_is_cubes::universe::{URef, Universe};
+
 use crate::apps::ControlMessage;
-use crate::camera::{FogOption, GraphicsOptions, LightingOption, TransparencyOption, Viewport};
-use crate::character::Character;
-use crate::listen::{ListenableCell, ListenableSource};
-use crate::math::FreeCoordinate;
-use crate::time::Tick;
-use crate::universe::{URef, Universe};
 
 /// Parse input events, particularly key-down/up pairs, into character control and such.
 ///
@@ -60,6 +64,9 @@ pub struct InputProcessor {
 }
 
 impl InputProcessor {
+    /// Constructs a new [`InputProcessor`].
+    ///
+    /// Consider using [`Session`](crate::apps::Session) instead of directly calling this.
     #[allow(clippy::new_without_default)] // I expect it'll grow some parameters
     pub fn new() -> Self {
         Self {
@@ -249,7 +256,7 @@ impl InputProcessor {
     pub(crate) fn step(&mut self, tick: Tick) {
         let mut to_drop = Vec::new();
         for (key, duration) in self.momentary_timeout.iter_mut() {
-            if let Some(reduced) = duration.checked_sub(tick.delta_t) {
+            if let Some(reduced) = duration.checked_sub(tick.delta_t()) {
                 *duration = reduced;
             } else {
                 to_drop.push(*key);
@@ -277,7 +284,7 @@ impl InputProcessor {
         // TODO: universe input is not yet used but it will be, as we start having inputs that trigger transactions
         let _ = universe;
 
-        let dt = tick.delta_t.as_secs_f64();
+        let dt = tick.delta_t().as_secs_f64();
         let key_turning_step = 80.0 * dt;
 
         // Direct character controls
@@ -317,6 +324,7 @@ impl InputProcessor {
                                 LightingOption::None => LightingOption::Flat,
                                 LightingOption::Flat => LightingOption::Smooth,
                                 LightingOption::Smooth => LightingOption::None,
+                                _ => LightingOption::None, // TODO: either stop doing cycle-commands or put it on the enum so it can be exhaustive
                             };
                         });
                     }
@@ -339,6 +347,7 @@ impl InputProcessor {
                                     TransparencyOption::Threshold(notnan!(0.5))
                                 }
                                 TransparencyOption::Threshold(_) => TransparencyOption::Surface,
+                                _ => TransparencyOption::Surface, // TODO: either stop doing cycle-commands or put it on the enum so it can be exhaustive
                             };
                         });
                     }
@@ -357,6 +366,7 @@ impl InputProcessor {
                                 FogOption::Abrupt => FogOption::Compromise,
                                 FogOption::Compromise => FogOption::Physical,
                                 FogOption::Physical => FogOption::None,
+                                _ => FogOption::None, // TODO: either stop doing cycle-commands or put it on the enum so it can be exhaustive
                             };
                         });
                     }
@@ -452,8 +462,8 @@ pub enum Key {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::space::Space;
-    use crate::universe::{URef, Universe};
+    use all_is_cubes::space::Space;
+    use all_is_cubes::universe::{URef, Universe};
 
     fn apply_input_helper(
         input: &mut InputProcessor,

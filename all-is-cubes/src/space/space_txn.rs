@@ -160,12 +160,11 @@ impl SpaceTransaction {
 
     /// Computes the region affected by this transaction.
     ///
-    /// TODO: This does not currently report behaviors but it should, once they have
-    /// formalized regions of attachment.
+    /// TODO: This does not currently report behaviors but it should.
     ///
     /// TODO: Handle the case where the total volume is too large.
     /// (Maybe `GridAab` should lose that restriction.)
-    pub(crate) fn bounds(&self) -> Option<GridAab> {
+    pub fn bounds(&self) -> Option<GridAab> {
         // Destructuring to statically check that we consider all fields.
         let Self {
             cubes,

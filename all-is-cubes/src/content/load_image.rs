@@ -19,7 +19,9 @@ use crate::math::{GridAab, GridRotation, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics};
 
 /// Adapter from [`image::GenericImageView`] to [`embedded_graphics::Drawable`].
-pub(crate) struct ImageAdapter<'b, I>
+#[doc(hidden)] // still experimental API
+#[allow(missing_debug_implementations)]
+pub struct ImageAdapter<'b, I>
 where
     I: Deref,
     I::Target: GenericImageView,

@@ -475,10 +475,12 @@ impl Character {
         tb.inventory.use_tool(cursor, this, slot_index)
     }
 
-    // TODO: this code's location is driven by colliding_cubes being here, which is probably wrong
-    // If nothing else, the jump height probably belongs elsewhere.
-    // Figure out what the correct overall thing is and make it public
-    pub(crate) fn jump_if_able(&mut self) {
+    /// Make the character jump, if they are on ground to jump from as of the last [`step()`](Self::step).
+    ///
+    /// TODO: this code's location is driven by `colliding_cubes` being here, which is probably wrong.
+    /// If nothing else, the jump height probably belongs elsewhere.
+    /// Figure out what the correct overall thing is.
+    pub fn jump_if_able(&mut self) {
         if self.is_on_ground() {
             self.body.velocity += Vector3 {
                 x: 0.,
@@ -641,10 +643,8 @@ impl Merge for CharacterTransaction {
 
 /// Description of a change to a [`Character`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-#[non_exhaustive]
+#[allow(clippy::exhaustive_enums)] // any change will probably be breaking anyway
 pub enum CharacterChange {
-    // We'll probably want more but these are the ones needed for now.
-    // (Also note that anything that's a public field can't be reliably notified about.)
     /// Inventory contents.
     Inventory(InventoryChange),
     /// Which inventory slots are selected.

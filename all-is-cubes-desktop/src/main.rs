@@ -42,12 +42,12 @@ use futures::executor::block_on;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::{thread_rng, Rng};
 
-use all_is_cubes::apps::Session;
 use all_is_cubes::camera::{GraphicsOptions, Viewport};
 use all_is_cubes::cgmath::{Vector2, Zero as _};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
 use all_is_cubes::util::YieldProgress;
+use all_is_cubes_ui::apps::Session;
 
 mod aic_winit;
 use aic_winit::winit_main_loop;

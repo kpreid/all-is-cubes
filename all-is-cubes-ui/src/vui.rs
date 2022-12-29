@@ -6,20 +6,20 @@
 use std::sync::mpsc::TryRecvError;
 use std::sync::{mpsc, Arc, Mutex};
 
-use cgmath::{Angle as _, Decomposed, Deg, One, Transform, Vector3};
-use ordered_float::NotNan;
+use all_is_cubes::camera::{FogOption, GraphicsOptions, UiViewState, ViewTransform, Viewport};
+use all_is_cubes::cgmath::{Angle as _, Decomposed, Deg, One, Transform, Vector3};
+use all_is_cubes::character::{Character, Cursor};
+use all_is_cubes::inv::{Tool, ToolError, ToolInput};
+use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier};
+use all_is_cubes::math::FreeCoordinate;
+use all_is_cubes::math::NotNan;
+use all_is_cubes::space::Space;
+use all_is_cubes::time::Tick;
+use all_is_cubes::transaction::Transaction;
+use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
+use all_is_cubes::util::YieldProgress;
 
 use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState, InputProcessor};
-use crate::camera::{FogOption, GraphicsOptions, UiViewState, ViewTransform, Viewport};
-use crate::character::{Character, Cursor};
-use crate::inv::{Tool, ToolError, ToolInput};
-use crate::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier};
-use crate::math::FreeCoordinate;
-use crate::space::Space;
-use crate::time::Tick;
-use crate::transaction::Transaction;
-use crate::universe::{URef, Universe, UniverseStepInfo};
-use crate::util::YieldProgress;
 use crate::vui::pages::{PageInst, UiSize};
 use crate::vui::widgets::TooltipState;
 
@@ -191,7 +191,7 @@ impl Vui {
             view_transform: match space.as_ref() {
                 Some(space) => Self::view_transform(
                     &space.read().unwrap(), // TODO: eliminate this unwrap
-                    cgmath::Deg(graphics_options.fov_y.into_inner()),
+                    all_is_cubes::cgmath::Deg(graphics_options.fov_y.into_inner()),
                 ),
                 None => ViewTransform::one(),
             },

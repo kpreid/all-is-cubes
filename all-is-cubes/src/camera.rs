@@ -390,8 +390,8 @@ impl Viewport {
 
     /// A meaningless but valid [`Viewport`] value for use in tests which require one
     /// but do not care about its effects.
-    #[cfg(test)]
-    pub(crate) const ARBITRARY: Viewport = Viewport {
+    #[doc(hidden)]
+    pub const ARBITRARY: Viewport = Viewport {
         nominal_size: Vector2::new(2.0, 2.0),
         framebuffer_size: Vector2::new(2, 2),
     };

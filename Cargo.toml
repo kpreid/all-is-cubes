@@ -4,6 +4,7 @@ members = [
   "all-is-cubes-content",
   "all-is-cubes-desktop",
   "all-is-cubes-server",
+  "all-is-cubes-ui",
   "all-is-cubes-wasm",
   "test-renderers",
   "xtask",

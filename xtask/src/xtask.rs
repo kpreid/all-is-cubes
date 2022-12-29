@@ -28,7 +28,6 @@
 #![warn(clippy::modulo_arithmetic)]
 #![warn(clippy::return_self_not_must_use)]
 #![warn(clippy::undocumented_unsafe_blocks)]
-#![warn(clippy::uninlined_format_args)]
 #![warn(clippy::unnecessary_self_imports)]
 #![warn(clippy::wrong_self_convention)]
 #![warn(explicit_outlives_requirements)]
@@ -273,8 +272,9 @@ fn main() -> Result<(), ActionError> {
 /// TODO: fetch this list (or at least cross-check it) using `cargo metadata`.
 ///
 /// See also [`do_for_all_workspaces`].
-const ALL_NONTEST_PACKAGES: [&str; 7] = [
+const ALL_NONTEST_PACKAGES: [&str; 8] = [
     "all-is-cubes",
+    "all-is-cubes-ui",
     "all-is-cubes-gpu",
     "all-is-cubes-content",
     "all-is-cubes-port",

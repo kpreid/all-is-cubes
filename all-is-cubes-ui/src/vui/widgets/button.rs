@@ -3,33 +3,36 @@ use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
 
-use embedded_graphics::image::Image as EgImage;
-use embedded_graphics::mono_font::{MonoFont, MonoTextStyle};
-use embedded_graphics::prelude::{Dimensions, PixelColor, Point, Size};
-use embedded_graphics::primitives::{
-    Circle, Primitive, PrimitiveStyleBuilder, Rectangle, RoundedRectangle, StrokeAlignment,
-};
-use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
-use embedded_graphics::Drawable;
 use exhaust::Exhaust;
 
-use crate::behavior::BehaviorSetTransaction;
-use crate::block::{
+use all_is_cubes::behavior::BehaviorSetTransaction;
+use all_is_cubes::block::{
     Block,
     Resolution::{self, R32},
 };
-use crate::content::load_image::{default_srgb, ImageAdapter};
-use crate::content::palette;
-use crate::drawing::{DrawingPlane, VoxelBrush};
-use crate::inv::EphemeralOpaque;
-use crate::linking::InGenError;
-use crate::listen::{DirtyFlag, ListenableSource};
-use crate::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
-use crate::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
-use crate::time::Tick;
-use crate::transaction::Merge;
-use crate::universe::Universe;
-use crate::vui::{self, Layoutable};
+use all_is_cubes::content::load_image::{default_srgb, ImageAdapter};
+use all_is_cubes::content::palette;
+use all_is_cubes::drawing::embedded_graphics::{
+    image::Image as EgImage,
+    mono_font::{MonoFont, MonoTextStyle},
+    prelude::{Dimensions, PixelColor, Point, Size},
+    primitives::{
+        Circle, Primitive, PrimitiveStyleBuilder, Rectangle, RoundedRectangle, StrokeAlignment,
+    },
+    text::{Alignment, Baseline, Text, TextStyleBuilder},
+    Drawable,
+};
+use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
+use all_is_cubes::inv::EphemeralOpaque;
+use all_is_cubes::linking::InGenError;
+use all_is_cubes::listen::{DirtyFlag, ListenableSource};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
+use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
+use all_is_cubes::time::Tick;
+use all_is_cubes::transaction::Merge;
+use all_is_cubes::universe::Universe;
+
+use crate::vui::{self, Layoutable as _};
 
 type Action = EphemeralOpaque<dyn Fn() + Send + Sync>;
 
@@ -58,7 +61,7 @@ impl ActionButton {
     }
 }
 
-impl Layoutable for ActionButton {
+impl vui::Layoutable for ActionButton {
     fn requirements(&self) -> vui::LayoutRequest {
         REQUIREMENT
     }
@@ -258,7 +261,9 @@ pub struct ButtonBlockBuilder {
 }
 
 impl ButtonBlockBuilder {
+    /// Resolution of the produced blocks.
     pub const RESOLUTION: Resolution = theme::RESOLUTION;
+    /// Resolution of the produced blocks, as [`GridCoordinate`].
     pub const RESOLUTION_G: GridCoordinate = Self::RESOLUTION.to_grid();
 
     /// Construct a new [`ButtonBlockBuilder`] ready to draw into;
@@ -287,7 +292,7 @@ impl ButtonBlockBuilder {
     ///
     /// Consult the [`ButtonBase`] in use for the appropriate size.
     ///
-    /// [`DrawTarget`]: embedded_graphics::prelude::DrawTarget
+    /// [`DrawTarget`]: all_is_cubes::drawing::embedded_graphics::prelude::DrawTarget
     pub fn label_draw_target<C: PixelColor>(&mut self) -> DrawingPlane<'_, Space, C> {
         self.space.draw_target(
             GridMatrix::from_translation([

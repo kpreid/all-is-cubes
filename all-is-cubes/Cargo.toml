@@ -54,7 +54,6 @@ embedded-graphics = "0.7.0"
 exhaust = "0.1.0"
 fnv = "1.0.7"
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
-futures-task = { version = "0.3.17", default-features = false, features = [] }
 # image is used for its common image data types (for HeadlessRenderer),
 # and for PNG asset loading.
 image = { version = "0.24.2", default-features = false, features = ["png"] }
@@ -74,6 +73,5 @@ thiserror = "1.0.22"
 
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["cargo_bench_support", "html_reports"] }
-futures-channel = { version = "0.3.17", default-features = false, features = ["alloc"] }
 futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
 pretty_assertions = "1.2.0"

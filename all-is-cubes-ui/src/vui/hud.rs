@@ -2,22 +2,22 @@ use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
 
 use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
-use crate::block::Block;
-use crate::camera::GraphicsOptions;
-use crate::character::Character;
-use crate::content::palette;
-use crate::drawing::VoxelBrush;
-use crate::inv::Icons;
-use crate::linking::BlockProvider;
-use crate::listen::ListenableSource;
-use crate::math::Face6;
-use crate::universe::{URef, Universe};
-use crate::util::YieldProgress;
 use crate::vui::options::{graphics_options_widgets, pause_toggle_button};
 use crate::vui::widgets::{self, Crosshair, TooltipState};
 use crate::vui::{CueNotifier, LayoutTree, UiBlocks, VuiMessage, VuiPageState, Widget, WidgetTree};
+use all_is_cubes::block::Block;
+use all_is_cubes::camera::GraphicsOptions;
+use all_is_cubes::character::Character;
+use all_is_cubes::content::palette;
+use all_is_cubes::drawing::VoxelBrush;
+use all_is_cubes::inv::Icons;
+use all_is_cubes::linking::BlockProvider;
+use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::math::Face6;
+use all_is_cubes::universe::{URef, Universe};
+use all_is_cubes::util::YieldProgress;
 
-pub(crate) use embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
+pub(crate) use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
 pub(crate) const TOOLBAR_POSITIONS: usize = 10;
 

@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use all_is_cubes::apps::Session;
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
+use all_is_cubes_ui::apps::Session;
 
 /// Wraps a basic [`Session`] to add functionality that is common within
 /// all-is-cubes-desktop's scope of supported usage (such as loading a universe

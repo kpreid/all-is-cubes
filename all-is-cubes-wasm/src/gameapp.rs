@@ -14,7 +14,6 @@ use web_sys::{
     FocusEvent, HtmlElement, HtmlProgressElement, KeyboardEvent, MouseEvent, Text,
 };
 
-use all_is_cubes::apps::{CursorIcon, Key, Session};
 use all_is_cubes::camera::{GraphicsOptions, StandardCameras, Viewport};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::ListenableCell;
@@ -22,6 +21,7 @@ use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_gpu::in_wgpu;
 use all_is_cubes_port::file::NonDiskFile;
+use all_is_cubes_ui::apps::{CursorIcon, Key, Session};
 
 use crate::js_bindings::GuiHelpers;
 use crate::url_params::{options_from_query_string, OptionsInUrl, RendererOption};

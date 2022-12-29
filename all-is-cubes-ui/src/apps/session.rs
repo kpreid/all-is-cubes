@@ -7,17 +7,18 @@ use std::task::{Context, Poll};
 use futures_core::future::BoxFuture;
 use futures_task::noop_waker_ref;
 
-use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
-use crate::camera::{GraphicsOptions, StandardCameras, UiViewState, Viewport};
-use crate::character::{Character, Cursor};
-use crate::fluff::Fluff;
-use crate::inv::ToolError;
-use crate::listen::{
+use all_is_cubes::camera::{GraphicsOptions, StandardCameras, UiViewState, Viewport};
+use all_is_cubes::character::{Character, Cursor};
+use all_is_cubes::fluff::Fluff;
+use all_is_cubes::inv::ToolError;
+use all_is_cubes::listen::{
     ListenableCell, ListenableCellWithLocal, ListenableSource, Listener, Notifier,
 };
-use crate::transaction::Transaction;
-use crate::universe::{URef, Universe, UniverseStepInfo};
-use crate::util::{CustomFormat, StatusText};
+use all_is_cubes::transaction::Transaction;
+use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
+use all_is_cubes::util::{CustomFormat, StatusText};
+
+use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
 use crate::vui::Vui;
 
 const LOG_FIRST_FRAMES: bool = false;
@@ -156,6 +157,7 @@ impl Session {
         &mut self.game_universe
     }
 
+    /// What the renderer should be displaying on screen for the UI.
     pub fn ui_view(&self) -> ListenableSource<UiViewState> {
         match &self.ui {
             Some(ui) => ui.view(),
@@ -339,7 +341,7 @@ impl Session {
             // fit long errors at all.
             log::error!(
                 "Error applying tool: {error}",
-                error = crate::util::ErrorChain(&error)
+                error = all_is_cubes::util::ErrorChain(&error)
             );
         }
 
@@ -381,7 +383,7 @@ impl Session {
                 // Spend a little time doing light updates, to ensure that changes right in front of
                 // the player are clean (and not flashes of blackness).
                 if let Some(space_ref) = self.cursor_result.as_ref().map(Cursor::space) {
-                    // TODO: Instead of ignoring error, log it
+                    // TODO: make this a kind of SpaceTransaction, eliminating this try_modify.
                     let _ = space_ref.try_modify(|space| {
                         space.update_lighting_from_queue();
                     });
@@ -601,8 +603,8 @@ pub enum CursorIcon {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::space::Space;
-    use crate::universe::{Name, Universe, UniverseIndex};
+    use all_is_cubes::space::Space;
+    use all_is_cubes::universe::{Name, Universe, UniverseIndex};
     use futures_channel::oneshot;
     use futures_executor::block_on;
 

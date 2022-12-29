@@ -1,6 +1,6 @@
 use std::{borrow::Cow, sync::Arc};
 
-use crate::{
+use all_is_cubes::{
     block::Block,
     content::palette,
     drawing::{
@@ -10,15 +10,16 @@ use crate::{
         },
         VoxelBrush,
     },
-    vui::{widgets::LargeText, Widget},
 };
 
+use crate::vui;
+
 /// All is Cubes logo text as a widget, at "1:1" scale (1 block per font pixel).
-pub fn logo_text() -> Arc<dyn Widget> {
+pub fn logo_text() -> Arc<dyn vui::Widget> {
     let foreground_text_block: Block = palette::LOGO_FILL.into();
     let background_text_block: Block = palette::LOGO_STROKE.into();
 
-    Arc::new(LargeText {
+    Arc::new(vui::widgets::LargeText {
         text: Cow::Borrowed("All is Cubes"),
         font: || &FONT_9X15_BOLD,
         brush: {
@@ -40,7 +41,7 @@ pub fn logo_text() -> Arc<dyn Widget> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::GridVector;
+    use all_is_cubes::math::GridVector;
 
     #[test]
     fn logo_extent_as_expected() {

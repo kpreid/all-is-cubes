@@ -1,11 +1,12 @@
 use std::error::Error;
 use std::sync::Arc;
 
-use crate::block::{Block, AIR};
-use crate::listen::{DirtyFlag, ListenableSource};
-use crate::math::{GridPoint, GridVector};
-use crate::space::SpaceTransaction;
-use crate::time::Tick;
+use all_is_cubes::block::{Block, AIR};
+use all_is_cubes::listen::{DirtyFlag, ListenableSource};
+use all_is_cubes::math::{GridPoint, GridVector};
+use all_is_cubes::space::SpaceTransaction;
+use all_is_cubes::time::Tick;
+
 use crate::vui;
 
 #[derive(Debug)]

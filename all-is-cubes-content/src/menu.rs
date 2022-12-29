@@ -24,13 +24,14 @@ use all_is_cubes::{
     space::{Space, SpaceBuilder, SpacePhysics, SpaceTransaction},
     transaction::{Merge, Transaction as _},
     universe::Universe,
-    vui::{
-        self, install_widgets, widgets, Align, LayoutGrant, LayoutRequest, LayoutTree, Layoutable,
-        WidgetController,
-    },
+};
+use all_is_cubes_ui::logo::logo_text;
+use all_is_cubes_ui::vui::{
+    self, install_widgets, widgets, Align, LayoutGrant, LayoutRequest, LayoutTree, Layoutable,
+    WidgetController,
 };
 
-use crate::{logo::logo_text, UniverseTemplate};
+use crate::UniverseTemplate;
 
 #[derive(Debug)]
 struct TemplateButton {

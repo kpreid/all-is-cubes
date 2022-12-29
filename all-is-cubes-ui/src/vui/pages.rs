@@ -1,30 +1,27 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use cgmath::Vector2;
-use embedded_graphics::mono_font::iso_8859_1 as font;
-use embedded_graphics::text::TextStyle;
+use all_is_cubes::block::AIR;
+use all_is_cubes::block::{
+    Block, BlockAttributes,
+    Resolution::{self, *},
+};
+use all_is_cubes::camera;
+use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::content::palette;
+use all_is_cubes::drawing::embedded_graphics::{mono_font::iso_8859_1 as font, text::TextStyle};
+use all_is_cubes::drawing::VoxelBrush;
+use all_is_cubes::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgba};
+use all_is_cubes::space::{Space, SpaceBuilder, SpacePhysics};
+use all_is_cubes::universe::{URef, Universe};
 
-use crate::block::AIR;
-use crate::camera;
-use crate::content::logo::logo_text;
-use crate::drawing::VoxelBrush;
-use crate::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgba};
-use crate::space::{Space, SpaceBuilder, SpacePhysics};
-use crate::universe::{URef, Universe};
+use crate::logo::logo_text;
 use crate::vui::hud::HudInputs;
 use crate::vui::options::pause_toggle_button;
-use crate::vui::widgets::{self, Frame};
+use crate::vui::widgets;
 use crate::vui::{
     install_widgets, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest, LayoutTree,
     Widget, WidgetTree,
-};
-use crate::{
-    block::{
-        Block, BlockAttributes,
-        Resolution::{self, *},
-    },
-    content::palette,
 };
 
 /// Bounds for UI display; a choice of scale and aspect ratio based on the viewport size
@@ -71,9 +68,10 @@ impl UiSize {
         let bounds = self.space_bounds();
         let Vector2 { x: w, y: h } = self.size;
         let mut space = Space::builder(bounds)
-            .physics(SpacePhysics {
-                sky_color: palette::HUD_SKY,
-                ..SpacePhysics::default()
+            .physics({
+                let mut physics = SpacePhysics::default();
+                physics.sky_color = palette::HUD_SKY;
+                physics
             })
             .build();
 
@@ -157,7 +155,8 @@ fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
                 minimum: GridVector::new(0, 0, UiSize::DEPTH_BEHIND_VIEW_PLANE + 2),
             })),
             LayoutTree::leaf(
-                Frame::with_block(Block::from(Rgba::new(0., 0., 0., 0.7))) as Arc<dyn Widget>
+                widgets::Frame::with_block(Block::from(Rgba::new(0., 0., 0., 0.7)))
+                    as Arc<dyn Widget>,
             ),
             foreground,
         ],

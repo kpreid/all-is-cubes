@@ -1,21 +1,24 @@
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 
-use cgmath::EuclideanSpace as _;
-use embedded_graphics::mono_font::MonoTextStyle;
-use embedded_graphics::prelude::Point;
-use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
-use embedded_graphics::Drawable as _;
 use instant::Duration;
 use once_cell::sync::Lazy;
 
-use crate::block::{space_to_blocks, AnimationHint, BlockAttributes, Resolution, AIR};
-use crate::character::{Character, CharacterChange};
-use crate::listen::{FnListener, Gate, Listener};
-use crate::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
-use crate::space::{Space, SpacePhysics, SpaceTransaction};
-use crate::time::Tick;
-use crate::universe::{URef, Universe};
+use all_is_cubes::block::{space_to_blocks, AnimationHint, BlockAttributes, Resolution, AIR};
+use all_is_cubes::cgmath::EuclideanSpace as _;
+use all_is_cubes::character::{Character, CharacterChange};
+use all_is_cubes::drawing::embedded_graphics::{
+    mono_font::MonoTextStyle,
+    prelude::Point,
+    text::{Alignment, Baseline, Text, TextStyleBuilder},
+    Drawable as _,
+};
+use all_is_cubes::listen::{FnListener, Gate, Listener};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
+use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
+use all_is_cubes::time::Tick;
+use all_is_cubes::universe::{URef, Universe};
+
 use crate::vui::hud::{HudBlocks, HudFont};
 use crate::vui::{LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction};
 
@@ -77,7 +80,7 @@ impl TooltipState {
     /// Advances time and returns the string that should be newly written to the screen, if different than the previous call.
     fn step(&mut self, hud_blocks: &HudBlocks, tick: Tick) -> Option<Arc<str>> {
         if let Some(ref mut age) = self.age {
-            *age += tick.delta_t;
+            *age += tick.delta_t();
             if *age > Duration::from_secs(1) {
                 self.set_contents(TooltipContents::Blanked);
                 self.age = None;
@@ -307,9 +310,8 @@ impl WidgetController for TooltipController {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::YieldProgress;
-
     use super::*;
+    use all_is_cubes::util::YieldProgress;
     use futures_executor::block_on;
 
     #[test]

@@ -4,6 +4,12 @@
 
 ### Added
 
+- New crate `all-is-cubes-port` contains import/export routines (not very many, for now):
+    - Import MagicaVoxel `.vox` files.
+    - Export glTF 3D model files. (This support is very incomplete and currently is not feasible to use outside of the export feature in `all-is-cubes-desktop`).
+
+- New crate `all-is-cubes-ui` contains the user interface components which used to be in `all-is-cubes`. This separation should improve compilation times.
+
 - Graphics:
     - The `all-is-cubes-gpu` renderer now fully supports blocks with a resolution greater than 16.
 
@@ -65,6 +71,8 @@
     - Renamed: `space::SpaceBuilder::build_empty()` is now `build()`.
     - Renamed: `transaction::UniverseTransaction` is now `universe::UniverseTransaction`.
     - Renamed: `vui::Icons` is now `inv::Icons`.
+
+    - Moved to `all-is-cubes-ui`: the modules `apps` and `vui`.
 
     - Renamed: The feature `"rayon"` is now `"threads"`.
 
