@@ -7,7 +7,6 @@ This is a work in progress; it's my very first project written in Rust, and I am
 
 * Core data model of [Blocks] and [Spaces] (subject to change).
 * Rendering using a CPU-only raytracer. (See `all-is-cubes-gpu` for GPU.)
-* Basic user interface (not yet able to edit all aspects of the data).
 * 2D drawing into the voxel space, built on top of the [embedded-graphics] library.
 
 For more information on the capabilities, limitations, and requirements of the library,
@@ -15,9 +14,9 @@ please consult [the crate documentation].
 
 This library is intended to be somewhat reusable for working with block/voxel data, but it does not currently have a particularly stable interface as I am still changing it as requirements are discovered.
 
-[the crate documentation]: https://docs.rs/all-is-cubes/0.4.0/all_is_cubes/
-[Blocks]: https://docs.rs/all-is-cubes/0.4.0/all_is_cubes/block/enum.Block.html
-[Spaces]: https://docs.rs/all-is-cubes/0.4.0/all_is_cubes/space/struct.Space.html
+[the crate documentation]: https://docs.rs/all-is-cubes/0.5.0/all_is_cubes/
+[Blocks]: https://docs.rs/all-is-cubes/0.5.0/all_is_cubes/block/enum.Block.html
+[Spaces]: https://docs.rs/all-is-cubes/0.5.0/all_is_cubes/space/struct.Space.html
 [embedded-graphics]: https://crates.io/crates/embedded-graphics
 
 Related crates
@@ -25,6 +24,8 @@ Related crates
 
 *   [`all-is-cubes-gpu`](https://crates.io/crates/all-is-cubes-gpu)
     renders using GPU functionality rather than CPU-only.
+*   [`all-is-cubes-ui`](https://crates.io/crates/all-is-cubes-ui)
+    contains a widget framework and basic user interface functions (not platform-specific)
 *   [`all-is-cubes-content`](https://crates.io/crates/all-is-cubes-content)
     contains procedural generation and data for “game content” as opposed to the engine; it is separated so that it is possible to depend on the engine alone, and for compilation speed.
 *   [`all-is-cubes-desktop`](https://crates.io/crates/all-is-cubes-desktop)
@@ -39,7 +40,7 @@ Stability and versioning
 
 All is Cubes is an ambitious hobby project; many features necessary to be “complete” are not yet implemented, and implementing them will require incompatible changes. During development, library APIs change regularly, and the version numbering will mark these versions as incompatible (e.g. 0.3 to 0.4); there will be no 1.0 version until I am confident that future versions will at least have save data compatibility. However, I have made some attempt to document API elements that are _more likely_ to change in future versions.
 
-MSRV: The minimum supported Rust version is the current _stable_ version. This policy may change after a future 1.0 release.
+MSRV policy: Future releases will typically require the current stable Rust version as of that release.
 
 License
 -------

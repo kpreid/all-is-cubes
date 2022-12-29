@@ -1,6 +1,6 @@
 [package]
 name = "all-is-cubes-desktop"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2021"
 rust-version = "1.65"
@@ -19,11 +19,11 @@ doc = false # Do not overwrite library crate's documentation
 bench = false
 
 [dependencies]
-all-is-cubes = { path = "../all-is-cubes", version = "0.4.0", features = ["threads"] }
-all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.4.0" }
-all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.4.0", features = ["wgpu"] }
-all-is-cubes-port = { path = "../all-is-cubes-port", version = "0.4.0" }
-all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.4.0" }
+all-is-cubes = { path = "../all-is-cubes", version = "0.5.0", features = ["threads"] }
+all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.5.0" }
+all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.5.0", features = ["wgpu"] }
+all-is-cubes-port = { path = "../all-is-cubes-port", version = "0.5.0" }
+all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.5.0" }
 anyhow = "1.0"
 bytemuck = { version = "1.12.1", default-features = false }
 clap = { version = "4.0.12", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }

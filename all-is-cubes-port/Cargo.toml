@@ -1,6 +1,6 @@
 [package]
 name = "all-is-cubes-port"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2021"
 rust-version = "1.65"
@@ -17,7 +17,7 @@ bench = false
 [features]
 
 [dependencies]
-all-is-cubes = { path = "../all-is-cubes", version = "0.4.0" }
+all-is-cubes = { path = "../all-is-cubes", version = "0.5.0" }
 # TODO: remove dependency on anyhow in favor of more precisely designed errors
 anyhow = "1.0"
 # TODO: dot_vox 5.x is currently nightly-only for unclear reasons -- issue filed

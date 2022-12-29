@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.5.0 (2022-12-28)
+
+This is a large revision with many breaking changes. This log does not record all of them; I have chosen “get a release out” over “document everything”.
+
 ### Added
 
 - New crate `all-is-cubes-port` contains import/export routines (not very many, for now):

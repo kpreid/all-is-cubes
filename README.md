@@ -14,6 +14,7 @@ This repository is divided into several Rust packages:
 
 * `all-is-cubes/` is a library containing all of the fundamental data types and algorithms. It is intended to be usable as a library but also contains the non-platform-specific top-level application logic.
 * `all-is-cubes-gpu/` is a library containing the GPU-based rendering code, depending on [`wgpu`](https://wgpu.rs/).
+* `all-is-cubes-ui/` is a library containing a widget framework and basic user interface functions (not platform-specific).
 * `all-is-cubes-content/` is a library containing “game content” — procedural generation and demos — that does not need to be part of the core library but is used by all of the below binaries.
 * `all-is-cubes-desktop/` is a standalone game app which will use `winit` and `wgpu` for platform windowing & graphics, or ASCII-art raytracing in the terminal.
 * `all-is-cubes-wasm/` is the game app code for the browser/WebAssembly environment (if compiled outside of `wasm32` architecture, it will be empty). It is also a NPM package, which embeds the Rust code by way of `wasm-pack`. In order to use this, you must use either webpack-dev-server or the web server described next.

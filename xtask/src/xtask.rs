@@ -231,8 +231,9 @@ fn main() -> Result<(), ActionError> {
             }
             eprint!(
                 "Versions updated. Manual updates are still needed for:\n\
-                Documentation links in the main README\n\
-                npm package\n\
+                • Changelog\n\
+                • Documentation links in all-is-cubes/README.md\n\
+                • npm package\n\
                 "
             );
         }
