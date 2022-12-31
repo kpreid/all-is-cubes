@@ -191,6 +191,9 @@ pub enum LayoutTree<W> {
         children: Vec<Arc<LayoutTree<W>>>,
     },
 
+    /// Don't lay out the contents bigger than minimum.
+    Shrink(Arc<LayoutTree<W>>),
+
     /// A custom layout dedicated to the HUD.
     /// TODO: Find a better abstraction than a variant of `LayoutTree` for this.
     Hud {
@@ -242,6 +245,9 @@ impl<W> LayoutTree<W> {
                 for child in children {
                     child.for_each_leaf(function)
                 }
+            }
+            LayoutTree::Shrink(child) => {
+                child.for_each_leaf(function);
             }
             LayoutTree::Hud {
                 crosshair,
@@ -305,6 +311,10 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                     direction,
                     children: positioned_children,
                 }
+            }
+            LayoutTree::Shrink(ref child) => {
+                let grant = grant.shrink_to(child.requirements().minimum, true);
+                LayoutTree::Shrink(child.perform_layout(grant)?)
             }
             LayoutTree::Hud {
                 ref crosshair,
@@ -423,6 +433,7 @@ impl<W: Layoutable> Layoutable for LayoutTree<W> {
                     minimum: accumulator,
                 }
             }
+            LayoutTree::Shrink(ref child) => child.requirements(),
             LayoutTree::Hud {
                 ref crosshair,
                 ref toolbar,
