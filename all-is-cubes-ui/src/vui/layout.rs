@@ -80,12 +80,28 @@ impl LayoutGrant {
     ///
     /// If the given size is larger than this grant on any axis then that axis will be
     /// unchanged.
+    ///
+    /// `enlarge_for_symmetry` controls the behavior when `sizes` has different parity on
+    /// any axis than `self.bounds` (one size is odd and the other is even), and
+    /// `self.gravity` requests centering; `true` requests that the returned size should
+    /// be one greater on that axis, and `false` that the position should be rounded down
+    /// (asymmetric placement).
     #[must_use]
-    pub fn shrink_to(self, sizes: GridVector) -> Self {
+    pub fn shrink_to(self, mut sizes: GridVector, enlarge_for_symmetry: bool) -> Self {
         assert!(
             sizes.x >= 0 && sizes.y >= 0 && sizes.z >= 0,
             "sizes to shrink to must be positive, not {sizes:?}"
         );
+
+        if enlarge_for_symmetry {
+            for axis in 0..3 {
+                if self.gravity[axis] == Align::Center
+                    && self.bounds.size()[axis].rem_euclid(2) != sizes[axis].rem_euclid(2)
+                {
+                    sizes[axis] += 1;
+                }
+            }
+        }
 
         // Ensure we don't enlarge the size of self by clamping the proposed size
         let sizes = sizes.zip(self.bounds.size(), GridCoordinate::min);
@@ -96,7 +112,7 @@ impl LayoutGrant {
             let h = self.bounds.upper_bounds()[axis] - sizes[axis];
             origin[axis] = match self.gravity[axis] {
                 Align::Low => l,
-                Align::Center => l + (h - l) / 2, // TODO: check and document rounding behavior
+                Align::Center => l + (h - l) / 2,
                 Align::High => h,
             };
         }
@@ -563,8 +579,46 @@ mod tests {
         // (because LayoutGrant::new sets gravity to center)
         assert_eq!(
             LayoutGrant::new(GridAab::from_lower_size([0, 0, 0], [5, 10, 20]))
-                .shrink_to(Vector3::new(10, 10, 10)),
+                .shrink_to(Vector3::new(10, 10, 10), false),
             LayoutGrant::new(GridAab::from_lower_size([0, 0, 5], [5, 10, 10]))
+        );
+    }
+
+    /// `shrink_to()` called with centering and `enlarge_for_symmetry` false.
+    #[test]
+    fn shrink_to_rounding_without_enlarging() {
+        let grant = LayoutGrant {
+            bounds: GridAab::from_lower_size([10, 10, 10], [10, 10, 11]),
+            gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
+        };
+        assert_eq!(
+            grant.shrink_to(Vector3::new(1, 2, 2), false),
+            LayoutGrant {
+                bounds: GridAab::from_lower_size([14, 14, 14], [1, 2, 2]), // TODO: oughta be rounding down
+                gravity: grant.gravity,
+            }
+        );
+    }
+
+    /// `shrink_to()` called with centering and `enlarge_for_symmetry` true.
+    #[test]
+    fn shrink_to_with_enlarging() {
+        // In each case where the parity does not match between the minimum and the
+        // grant, the size of the post-layout grant should be enlarged to match the
+        // original grant's parity.
+        // X axis is an odd size in even grant
+        // Y axis is an even size in an even grant (should stay the same size)
+        // Z axis is an even size in an odd grant
+        let grant = LayoutGrant {
+            bounds: GridAab::from_lower_size([10, 10, 10], [10, 10, 9]),
+            gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
+        };
+        assert_eq!(
+            grant.shrink_to(Vector3::new(1, 2, 2), true),
+            LayoutGrant {
+                bounds: GridAab::from_lower_size([14, 14, 13], [2, 2, 3]),
+                gravity: grant.gravity,
+            }
         );
     }
 }

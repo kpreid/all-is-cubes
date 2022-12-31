@@ -61,7 +61,7 @@ impl vui::Widget for Voxels {
         // This is similar but not identical to block::space_to_blocks().
 
         let scale_g = GridCoordinate::from(self.scale);
-        let position = position.shrink_to(self.requirements().minimum);
+        let position = position.shrink_to(self.requirements().minimum, true);
 
         // Calculate where the voxels should land in the blocks, respecting layout gravity,
         // by using the shrink_to algorithm again.
@@ -71,7 +71,7 @@ impl vui::Widget for Voxels {
             bounds: grant_in_voxels,
             gravity: position.gravity,
         }
-        .shrink_to(self.region.size())
+        .shrink_to(self.region.size(), false)
         .bounds
         .lower_bounds()
         .to_vec();

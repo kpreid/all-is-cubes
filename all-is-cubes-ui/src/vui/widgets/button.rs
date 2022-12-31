@@ -71,7 +71,7 @@ impl vui::Widget for ActionButton {
     fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         Box::new(ActionButtonController {
             position: position
-                .shrink_to(self.requirements().minimum)
+                .shrink_to(self.requirements().minimum, false)
                 .bounds
                 .lower_bounds(),
             definition: self,
@@ -176,7 +176,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton
         Box::new(ToggleButtonController {
             todo: DirtyFlag::listening(true, |l| self.data_source.listen(l)),
             position: position
-                .shrink_to(self.requirements().minimum)
+                .shrink_to(self.requirements().minimum, false)
                 .bounds
                 .lower_bounds(),
             definition: self,

@@ -62,12 +62,17 @@ impl Widget for LargeText {
         let drawable = self.drawable();
         let draw_bounds = self.bounds();
         drawable
-            .draw(&mut txn.draw_target(
-                GridMatrix::from_translation(
-                    position.shrink_to(draw_bounds.size()).bounds.lower_bounds()
-                        - draw_bounds.lower_bounds(),
-                ) * GridMatrix::FLIP_Y,
-            ))
+            .draw(
+                &mut txn.draw_target(
+                    GridMatrix::from_translation(
+                        position
+                            .shrink_to(draw_bounds.size(), false)
+                            .bounds
+                            .lower_bounds()
+                            - draw_bounds.lower_bounds(),
+                    ) * GridMatrix::FLIP_Y,
+                ),
+            )
             .unwrap();
 
         widgets::OneshotController::new(txn)
