@@ -368,9 +368,9 @@ fn space_debug() {
         indoc! {"
             Space {
                 bounds: GridAab(
-                    0..1,
-                    0..1,
-                    0..1,
+                    0..1 (1),
+                    0..1 (1),
+                    0..1 (1),
                 ),
                 block_data: [
                     SpaceBlockData {

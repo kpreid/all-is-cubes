@@ -705,9 +705,9 @@ impl GridAab {
 impl fmt::Debug for GridAab {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("GridAab")
-            .field(&self.x_range())
-            .field(&self.y_range())
-            .field(&self.z_range())
+            .field(&RangeWithLength(self.x_range()))
+            .field(&RangeWithLength(self.y_range()))
+            .field(&RangeWithLength(self.z_range()))
             .finish()
     }
 }
@@ -1036,6 +1036,19 @@ pub struct ArrayLengthError {
     bounds: GridAab,
 }
 
+/// `Debug`-formatting helper
+struct RangeWithLength(Range<GridCoordinate>);
+impl fmt::Debug for RangeWithLength {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let range = &self.0;
+        if f.alternate() {
+            write!(f, "{range:?} ({len})", len = range.len())
+        } else {
+            range.fmt(f)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1203,9 +1216,9 @@ mod tests {
             format!("{b:#?}\n"),
             indoc! {"
                 GridAab(
-                    1..11,
-                    2..22,
-                    3..33,
+                    1..11 (10),
+                    2..22 (20),
+                    3..33 (30),
                 )
             "}
         );
