@@ -576,6 +576,7 @@ impl EverythingRenderer {
                     .character()
                     .map(|c| c.read().unwrap())
                     .as_deref(),
+                spaces_to_render.world.map(|s| s.read().unwrap()).as_deref(),
                 self.cameras.graphics_options(),
                 &mut v,
                 cursor_result,
