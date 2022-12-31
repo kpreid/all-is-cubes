@@ -166,49 +166,33 @@ fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
 
 // TODO: Disentangle general UI from the concept of "HUD" — i.e. the input accepted should be
 // not a `HudInputs` should become less specific, since this isn't actually part of the HUD.
-pub(super) fn new_paused_widget_tree(hud_inputs: &HudInputs) -> WidgetTree {
-    page_modal_backdrop(LayoutTree::leaf(pause_toggle_button(hud_inputs)))
+pub(super) fn new_paused_widget_tree(
+    u: &mut Universe,
+    hud_inputs: &HudInputs,
+) -> Result<WidgetTree, InstallVuiError> {
+    use parts::{heading, shrink};
+
+    let contents = Arc::new(LayoutTree::Stack {
+        direction: Face6::NY,
+        children: vec![
+            // TODO: establish standard resolutions for logo etc
+            LayoutTree::leaf(shrink(u, R32, LayoutTree::leaf(logo_text()))?),
+            LayoutTree::leaf(shrink(u, R32, heading("Paused"))?),
+            LayoutTree::leaf(pause_toggle_button(hud_inputs)),
+        ],
+    });
+    Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
+        widgets::Frame::for_menu().as_background_of(contents),
+    ))))
 }
 
 /// TODO: The content of the about page should be customizable in the final build or
 /// by configuration of the [`Session`].
 pub(super) fn new_about_widget_tree(
-    universe: &mut Universe,
+    u: &mut Universe,
     hud_inputs: &HudInputs,
 ) -> Result<WidgetTree, InstallVuiError> {
-    // TODO: refactor this into something reusable since it will be a key element of any
-    // UI with labeled things.
-    let mut shrink =
-        |resolution: Resolution, large: WidgetTree| -> Result<Arc<dyn Widget>, InstallVuiError> {
-            let space = large.to_space(
-                SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
-                Gravity::new(Align::Center, Align::Center, Align::Low),
-            )?;
-            Ok(Arc::new(widgets::Voxels::new(
-                space.bounds(),
-                universe.insert_anonymous(space),
-                resolution,
-                BlockAttributes::default(),
-            )))
-        };
-
-    fn heading(text: impl Into<Cow<'static, str>>) -> WidgetTree {
-        LayoutTree::leaf(Arc::new(widgets::LargeText {
-            text: text.into(),
-            font: || &font::FONT_9X15_BOLD,
-            brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
-            text_style: TextStyle::default(),
-        }))
-    }
-
-    fn paragraph(text: impl Into<Cow<'static, str>>) -> WidgetTree {
-        LayoutTree::leaf(Arc::new(widgets::LargeText {
-            text: text.into(),
-            font: || &font::FONT_6X10,
-            brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
-            text_style: TextStyle::default(),
-        }))
-    }
+    use parts::{heading, paragraph, shrink};
 
     let controls_text = indoc::indoc! {"
         W A S D    movement
@@ -237,19 +221,60 @@ pub(super) fn new_about_widget_tree(
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
-            LayoutTree::leaf(shrink(R8, LayoutTree::leaf(logo_text()))?),
+            LayoutTree::leaf(shrink(u, R8, LayoutTree::leaf(logo_text()))?),
             back_button,
-            LayoutTree::leaf(shrink(R32, heading("Controls"))?),
-            LayoutTree::leaf(shrink(R32, paragraph(controls_text))?),
-            LayoutTree::leaf(shrink(R32, heading("About"))?),
-            LayoutTree::leaf(shrink(R32, paragraph(about_text))?),
-            // LayoutTree::leaf(shrink(R32, heading("License"))?),
-            // LayoutTree::leaf(shrink(R32, paragraph("TODO"))?),
+            LayoutTree::leaf(shrink(u, R32, heading("Controls"))?),
+            LayoutTree::leaf(shrink(u, R32, paragraph(controls_text))?),
+            LayoutTree::leaf(shrink(u, R32, heading("About"))?),
+            LayoutTree::leaf(shrink(u, R32, paragraph(about_text))?),
+            // LayoutTree::leaf(shrink(u, R32, heading("License"))?),
+            // LayoutTree::leaf(shrink(u, R32, paragraph("TODO"))?),
         ],
     });
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
         widgets::Frame::for_menu().as_background_of(contents),
     ))))
+}
+
+/// Helpers for assembling widget trees into dialog stuff.
+mod parts {
+    use super::*;
+
+    /// Construct a [`Voxels`] widget around a widget tree containing [`LargeText`] or similar.
+    pub fn shrink(
+        universe: &mut Universe,
+        resolution: Resolution,
+        large: WidgetTree,
+    ) -> Result<Arc<dyn Widget>, InstallVuiError> {
+        let space = large.to_space(
+            SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
+            Gravity::new(Align::Center, Align::Center, Align::Low),
+        )?;
+        Ok(Arc::new(widgets::Voxels::new(
+            space.bounds(),
+            universe.insert_anonymous(space),
+            resolution,
+            BlockAttributes::default(),
+        )))
+    }
+
+    pub fn heading(text: impl Into<Cow<'static, str>>) -> WidgetTree {
+        LayoutTree::leaf(Arc::new(widgets::LargeText {
+            text: text.into(),
+            font: || &font::FONT_9X15_BOLD,
+            brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
+            text_style: TextStyle::default(),
+        }))
+    }
+
+    pub fn paragraph(text: impl Into<Cow<'static, str>>) -> WidgetTree {
+        LayoutTree::leaf(Arc::new(widgets::LargeText {
+            text: text.into(),
+            font: || &font::FONT_6X10,
+            brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
+            text_style: TextStyle::default(),
+        }))
+    }
 }
 
 #[cfg(test)]

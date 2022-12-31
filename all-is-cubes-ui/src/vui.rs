@@ -123,7 +123,7 @@ impl Vui {
             tooltip_state.clone(),
         );
 
-        let paused_widget_tree = pages::new_paused_widget_tree(&hud_inputs);
+        let paused_widget_tree = pages::new_paused_widget_tree(&mut universe, &hud_inputs).unwrap();
         let about_widget_tree = pages::new_about_widget_tree(&mut universe, &hud_inputs).unwrap();
 
         let mut new_self = Self {
