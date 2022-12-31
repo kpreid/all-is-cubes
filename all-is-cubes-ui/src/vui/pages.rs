@@ -143,6 +143,7 @@ impl PageInst {
     }
 }
 
+/// Wrap the given widget tree in a transparent screen-filling background.
 fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
     Arc::new(LayoutTree::Stack {
         direction: Face6::PZ,
@@ -195,7 +196,7 @@ pub(super) fn new_about_widget_tree(
         LayoutTree::leaf(Arc::new(widgets::LargeText {
             text: text.into(),
             font: || &font::FONT_9X15_BOLD,
-            brush: VoxelBrush::single(Block::from(Rgba::WHITE)),
+            brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
             text_style: TextStyle::default(),
         }))
     }
@@ -204,7 +205,7 @@ pub(super) fn new_about_widget_tree(
         LayoutTree::leaf(Arc::new(widgets::LargeText {
             text: text.into(),
             font: || &font::FONT_6X10,
-            brush: VoxelBrush::single(Block::from(Rgba::WHITE)),
+            brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
             text_style: TextStyle::default(),
         }))
     }
@@ -233,7 +234,7 @@ pub(super) fn new_about_widget_tree(
 
     let back_button = widgets::back_button(hud_inputs);
 
-    Ok(page_modal_backdrop(Arc::new(LayoutTree::Stack {
+    let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
             LayoutTree::leaf(shrink(R8, LayoutTree::leaf(logo_text()))?),
@@ -245,7 +246,10 @@ pub(super) fn new_about_widget_tree(
             // LayoutTree::leaf(shrink(R32, heading("License"))?),
             // LayoutTree::leaf(shrink(R32, paragraph("TODO"))?),
         ],
-    })))
+    });
+    Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
+        widgets::Frame::for_menu().as_background_of(contents),
+    ))))
 }
 
 #[cfg(test)]
