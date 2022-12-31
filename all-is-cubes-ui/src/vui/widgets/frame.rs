@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::content::palette;
-use all_is_cubes::math::GridVector;
+use all_is_cubes::math::{Face6, GridVector};
 
 use crate::vui;
 
@@ -44,6 +44,16 @@ impl Frame {
             Some(block.clone()),
             Some(block),
         ))
+    }
+
+    /// Put this frame behind the given widget tree.
+    ///
+    /// TODO: Allow fully enclosing the widgets (this will require new layout capabilities)
+    pub fn as_background_of(self: Arc<Self>, tree: vui::WidgetTree) -> vui::WidgetTree {
+        Arc::new(vui::LayoutTree::Stack {
+            direction: Face6::PZ,
+            children: vec![vui::LayoutTree::leaf(self as Arc<dyn vui::Widget>), tree],
+        })
     }
 }
 
