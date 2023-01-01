@@ -302,14 +302,14 @@ impl Raycaster {
         // Update t_max to reflect that we have crossed the previous t_max boundary.
         self.t_max[axis] += self.t_delta[axis];
 
-        // Update face crossing info
-        static FACE_TABLE: [[Face7; 3]; 3] = [
-            // Middle column is never used.
-            [Face7::PX, Face7::Within, Face7::NX],
-            [Face7::PY, Face7::Within, Face7::NY],
-            [Face7::PZ, Face7::Within, Face7::NZ],
+        // Update face crossing info.
+        // Performance note: Using a match for this turns out to be just slightly slower.
+        const FACE_TABLE: [[Face7; 2]; 3] = [
+            [Face7::PX, Face7::NX],
+            [Face7::PY, Face7::NY],
+            [Face7::PZ, Face7::NZ],
         ];
-        self.last_face = FACE_TABLE[axis][(self.step[axis] + 1) as usize];
+        self.last_face = FACE_TABLE[axis][usize::from(self.step[axis] > 0)];
 
         Ok(())
     }
