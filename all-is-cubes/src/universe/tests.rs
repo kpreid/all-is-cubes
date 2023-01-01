@@ -9,7 +9,7 @@ use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::Transaction;
 use crate::universe::{
-    InsertError, ListRefs, Name, RefError, URef, Universe, UniverseIndex, UniverseTransaction,
+    list_refs, InsertError, Name, RefError, URef, Universe, UniverseIndex, UniverseTransaction,
 };
 use crate::util::assert_send_sync;
 
@@ -219,7 +219,7 @@ fn gc_implicit() {
 
 #[test]
 fn visit_refs_block_def_no_ref() {
-    assert_eq!(ListRefs::list(&BlockDef::new(AIR)), vec![]);
+    assert_eq!(list_refs(&BlockDef::new(AIR)), vec![]);
 }
 
 #[test]
@@ -233,7 +233,7 @@ fn visit_refs_block_def_space() {
             .voxels_ref(Resolution::R1, space_ref)
             .build(),
     );
-    assert_eq!(ListRefs::list(&block_def), vec!["s".into()]);
+    assert_eq!(list_refs(&block_def), vec!["s".into()]);
 }
 
 #[test]
@@ -242,7 +242,7 @@ fn visit_refs_block_def_indirect() {
     let b1 = BlockDef::new(AIR);
     let b1_ref = u.insert("destination".into(), b1).unwrap();
     let b2 = BlockDef::new(Block::from_primitive(Primitive::Indirect(b1_ref)));
-    assert_eq!(ListRefs::list(&b2), vec!["destination".into()]);
+    assert_eq!(list_refs(&b2), vec!["destination".into()]);
 }
 
 #[test]
@@ -264,11 +264,9 @@ fn visit_refs_character() {
     .execute(&mut character)
     .unwrap();
 
-    assert_eq!(
-        ListRefs::list(&character),
-        vec!["space".into(), "block".into()]
-    );
+    assert_eq!(list_refs(&character), vec!["space".into(), "block".into()]);
 }
+
 #[test]
 fn visit_refs_space() {
     let mut universe = Universe::new();
@@ -282,5 +280,5 @@ fn visit_refs_space() {
         .unwrap();
 
     // TODO: Also add a behavior and a spawn inventory item containing refs and check those
-    assert_eq!(ListRefs::list(&space), vec![block_def_ref.name().clone()]);
+    assert_eq!(list_refs(&space), vec![block_def_ref.name().clone()]);
 }

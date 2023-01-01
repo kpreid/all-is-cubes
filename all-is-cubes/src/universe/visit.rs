@@ -15,15 +15,17 @@ pub trait VisitRefs {
 
 /// Callback used by [`VisitRefs::visit_refs`].
 ///
-/// TODO: Consider whether to turn this into just `FnMut(&dyn URefErased)`.
+/// Note that this is automatically implemented for functions.
 pub trait RefVisitor {
     fn visit(&mut self, r: &dyn URefErased);
 }
 
-/// A mutable reference to any [`RefVisitor`] may be used as one itself.
-impl<V: RefVisitor> RefVisitor for &mut V {
+impl<F> RefVisitor for F
+where
+    F: FnMut(&dyn URefErased),
+{
     fn visit(&mut self, r: &dyn URefErased) {
-        (*self).visit(r);
+        (*self)(r)
     }
 }
 
@@ -44,36 +46,8 @@ impl<T: VisitRefs, const N: usize> VisitRefs for [T; N] {
 }
 
 #[cfg(test)]
-mod testers {
-    use super::*;
-    use crate::universe::Name;
-
-    /// An implementation of `RefVisitor` for testing implementations of `VisitRefs`.
-    #[derive(Clone, Debug, Default, Eq, PartialEq)]
-    pub(crate) struct ListRefs {
-        // In principle we'd like to store the whole `URef`, but the `Name` is conveniently
-        // monomorphic.
-        names: Vec<Name>,
-        names_as_mut: Vec<Name>,
-    }
-
-    impl ListRefs {
-        pub fn new() -> Self {
-            Self::default()
-        }
-
-        pub fn list<T: VisitRefs + 'static>(target: &T) -> Vec<Name> {
-            let mut visitor = Self::new();
-            target.visit_refs(&mut visitor);
-            visitor.names
-        }
-    }
-
-    impl RefVisitor for ListRefs {
-        fn visit(&mut self, r: &dyn URefErased) {
-            self.names.push(r.name().clone());
-        }
-    }
+pub(crate) fn list_refs<T: VisitRefs + 'static>(target: &T) -> Vec<super::Name> {
+    let mut names: Vec<super::Name> = Vec::new();
+    target.visit_refs(&mut |r: &dyn URefErased| names.push(r.name().clone()));
+    names
 }
-#[cfg(test)]
-pub(crate) use testers::*;

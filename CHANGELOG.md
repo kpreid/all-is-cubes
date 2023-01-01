@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- `all-is-cubes` library:
+    - `universe::RefVisitor` is now implemented for all `FnMut(&dyn URefErased)`, allowing visitors to simply be functions.
+
 ## 0.5.1 (2022-12-29)
 
 - Fixed packaging error in `all-is-cubes-desktop`.
