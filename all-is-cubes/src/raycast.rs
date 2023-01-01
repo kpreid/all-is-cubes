@@ -259,36 +259,32 @@ impl Raycaster {
         self.bounds = None;
     }
 
+    /// Determine the axis to step on and move in the appropriate direction along that axis.
+    ///
+    /// If this step would overflow the [`GridCoordinate`] range, returns [`Err`].
     #[inline(always)]
     #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
     fn step(&mut self) -> Result<(), ()> {
         // t_max stores the t-value at which we cross a cube boundary along the
         // X axis, per component. Therefore, choosing the least t_max axis
         // chooses the closest cube boundary.
-        if self.t_max.x < self.t_max.y {
+        let axis: usize = if self.t_max.x < self.t_max.y {
             if self.t_max.x < self.t_max.z {
-                self.step_on_axis(0 /* x */)
+                0 /* x */
             } else {
-                self.step_on_axis(2 /* z */)
+                2 /* z */
             }
         } else {
             if self.t_max.y < self.t_max.z {
-                self.step_on_axis(1 /* y */)
+                1 /* y */
             } else {
-                self.step_on_axis(2 /* z */)
+                2 /* z */
             }
-        }
-    }
+        };
 
-    /// Make a step in the appropriate direction along the given axis.
-    ///
-    /// If this step would overflow the [`GridCoordinate`] range, returns [`Err`].
-    #[inline(always)]
-    #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
-    fn step_on_axis(&mut self, axis: usize) -> Result<(), ()> {
         assert!(
             self.step[axis] != 0,
-            "step_on_axis on axis {} which is zero; state = {:#?}",
+            "step on axis {} which is zero; state = {:#?}",
             axis,
             self
         );
