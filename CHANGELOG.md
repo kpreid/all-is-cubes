@@ -7,6 +7,14 @@
 - `all-is-cubes` library:
     - `universe::RefVisitor` is now implemented for all `FnMut(&dyn URefErased)`, allowing visitors to simply be functions.
 
+- `all-is-cubes-ui` library:
+    - `vui::LayoutTree::Shrink` allows a subtree to be shrunk to only be as big as needed, rather than filling available space, allowing for “shrink wrapped” layouts such as framed dialog boxes.
+
+### Changed
+
+- `all-is-cubes-ui` library:
+    - `vui::LayoutGrant` now takes an additional parameter, `enlarge_for_symmetry`. Existing calls should be changed to pass `false` to get the prior behavior.
+
 ## 0.5.1 (2022-12-29)
 
 - Fixed packaging error in `all-is-cubes-desktop`.
