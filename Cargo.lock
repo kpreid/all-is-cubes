@@ -166,6 +166,8 @@ dependencies = [
  "base64 0.13.1",
  "bytemuck",
  "dot_vox",
+ "either",
+ "futures",
  "gltf-json",
  "log",
  "serde_json",

@@ -417,9 +417,8 @@ impl Block {
         Ok(())
     }
 
-    /// Returns the single [Rgba] color of this block, or panics if it does not have a
-    /// single color. For use in tests only.
-    #[cfg(test)]
+    /// Returns the [`Rgba`] color of this block's [`Primitive::Atom`], or panics if it
+    /// has a different kind of primitive. **Intended for use in tests only.**
     pub fn color(&self) -> Rgba {
         match *self.primitive() {
             Primitive::Atom(_, c) => c,

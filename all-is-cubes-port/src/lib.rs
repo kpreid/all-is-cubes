@@ -42,9 +42,13 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+use std::fs;
+use std::path::PathBuf;
+
 use anyhow::Context;
 
-use all_is_cubes::universe::Universe;
+use all_is_cubes::space::Space;
+use all_is_cubes::universe::{self, URef, Universe, UniverseIndex as _};
 use all_is_cubes::util::YieldProgress;
 
 pub mod file;
@@ -69,4 +73,86 @@ pub async fn load_universe_from_file(
             file.display_full_path()
         )
     })
+}
+
+/// Export data specified by an [`ExportSet`] to a file on disk.
+///
+/// TODO: Define what happens for formats with auxiliary files.
+///
+/// TODO: Generalize this or add a parallel function for non-filesystem destinations.
+pub async fn export_to_path(
+    progress: YieldProgress,
+    format: ExportFormat,
+    source: ExportSet,
+    destination: PathBuf,
+) -> Result<(), crate::ExportError> {
+    match format {
+        ExportFormat::DotVox => {
+            // TODO: async file IO?
+            mv::export_dot_vox(progress, source, fs::File::create(destination)?).await
+        }
+    }
+}
+
+/// Selection of the data to be exported.
+#[derive(Clone, Debug)]
+pub struct ExportSet {
+    spaces: Vec<URef<Space>>,
+}
+
+impl ExportSet {
+    /// Construct an [`ExportSet`] specifying exporting all members of the universe
+    /// (insofar as that is possible).
+    ///
+    /// Any members added between the call to this function and the export operation will
+    /// not be included; removals may cause errors.
+    pub fn all_of_universe(universe: &Universe) -> Self {
+        Self {
+            spaces: universe.iter_by_type().map(|(_, r)| r).collect(),
+        }
+    }
+
+    /// Construct an [`ExportSet`] specifying exporting only the given [`Space`]s.
+    pub fn from_spaces(spaces: Vec<URef<Space>>) -> Self {
+        Self {
+            spaces: spaces.into_iter().collect(),
+        }
+    }
+}
+
+/// File formats that All is Cubes data can be exported to.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum ExportFormat {
+    /// MagicaVoxel [`.vox`] file.
+    ///
+    /// TODO: document version details and export limitations
+    DotVox,
+}
+
+/// Fatal errors that may be encountered during an export operation.
+///
+/// TODO: Define non-fatal export flaws reporting, and link to it here.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ExportError {
+    /// IO error while writing the data to a file or stream.
+    ///
+    /// TODO: also represent file path if available
+    #[error("could not write export data")]
+    Write(#[from] std::io::Error),
+
+    /// `RefError` while reading the data to be exported.
+    #[error("could not read universe to be exported")]
+    Read(#[from] universe::RefError),
+
+    /// The requested [`ExportSet`] contained data that cannot be represented in the
+    /// requested [`ExportFormat`].
+    #[error("could not convert data to requested format: {reason}")]
+    NotRepresentable {
+        /// Name of the item being exported.
+        name: universe::Name,
+        /// The reason why it cannot be represented.
+        reason: String,
+    },
 }

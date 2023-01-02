@@ -25,6 +25,7 @@ dot_vox = "4.1.0"
 # TODO: replace logging with explicit reporting data flow
 log = { version = "0.4.14", default-features = false }
 thiserror = "1.0.22"
+futures = { version = "0.3.21", default-features = false, features = ["alloc", "std"] }
 
 # glTF related dependencies
 base64 = "0.13.0" # data URL generation
@@ -33,6 +34,7 @@ gltf-json = { version = "1.0.0", default-features = false, features = ["names", 
 serde_json = "1.0.64"
 
 [dev-dependencies]
+either = "1.8.0"
 tempfile = "3.3.0"
 # for async tests
 tokio = { version = "1.0", features = ["macros", "rt"] }
