@@ -154,8 +154,12 @@ pub struct Raycaster {
     /// The t_max value used in the previous step; thus, the position along the
     /// ray where we passed through last_face.
     last_t_distance: FreeCoordinate,
+
     /// Bounds to filter our outputs to within. This makes the iteration finite.
-    bounds: Option<GridAab>,
+    ///
+    /// Stored as ranges rather than [`GridAab`] because we need to work with only the
+    /// upper bound and not the size. (TODO: Maybe `GridAab` should do that too?)
+    bounds: Option<Vector3<std::ops::Range<GridCoordinate>>>,
 }
 
 impl Raycaster {
@@ -240,7 +244,11 @@ impl Raycaster {
     /// TODO: This function was added for the needs of the raytracer. Think about API design more.
     pub(crate) fn set_bounds(&mut self, bounds: GridAab) {
         if self.bounds.is_none() {
-            self.bounds = Some(bounds);
+            self.bounds = Some(Vector3::new(
+                bounds.x_range(),
+                bounds.y_range(),
+                bounds.z_range(),
+            ));
         } else {
             unimplemented!("multiple uses of .within()");
         }
@@ -326,36 +334,45 @@ impl Raycaster {
 
     /// Returns whether `self.cube` is outside of `self.bounds`.
     ///
-    /// If `direction` is `1`, only the bounds relevant to _exiting_ are tested.
-    /// If `-1`, only the bounds relevant to entering.
-    // Performance note: inline(always) makes this slower.
-    fn is_out_of_bounds(&self, direction: GridCoordinate) -> bool {
-        if let Some(bounds) = self.bounds {
-            for axis in 0..3 {
-                let direction_on_axis = self.step[axis] * direction;
-                // If direction_on_axis is zero, we test both sides. This handles the case
-                // where a ray that has zero component in that axis either always or never
-                // intersects that axis.
-                if direction_on_axis >= 0 {
-                    if self.cube[axis] >= bounds.upper_bounds()[axis] {
-                        return true;
+    /// The first boolean is if the ray has _not yet entered_ the bounds,
+    /// and the second boolean is if it the ray has _left_ the bounds. If the ray does
+    /// not intersect the bounds, one or both might be true.
+    fn is_out_of_bounds(&self) -> (bool, bool) {
+        match &self.bounds {
+            None => (false, false),
+            Some(bound_v) => {
+                let mut oob_enter = false;
+                let mut oob_exit = false;
+                for axis in 0..3 {
+                    let oob_low = self.cube[axis] < bound_v[axis].start;
+                    let oob_high = self.cube[axis] >= bound_v[axis].end;
+                    if self.step[axis] == 0 {
+                        // Case where the ray has no motion on that axis.
+                        oob_enter |= oob_low | oob_high;
+                        oob_exit |= oob_low | oob_high;
+                    } else {
+                        if self.step[axis] > 0 {
+                            oob_enter |= oob_low;
+                            oob_exit |= oob_high;
+                        } else {
+                            oob_enter |= oob_high;
+                            oob_exit |= oob_low;
+                        }
                     }
                 }
-                if direction_on_axis <= 0 {
-                    if self.cube[axis] < bounds.lower_bounds()[axis] {
-                        return true;
-                    }
-                }
+                (oob_enter, oob_exit)
             }
         }
-        false
     }
 
     /// In the case where the current position is outside the bounds but might intersect
     /// the bounds later, attempt to move the position to intersect sooner.
     #[mutants::skip] // an optimization not a behavior change
     fn fast_forward(&mut self) {
-        let bounds: GridAab = self.bounds.unwrap();
+        let bounds = {
+            let Vector3 { x, y, z } = self.bounds.clone().unwrap();
+            GridAab::from_lower_upper([x.start, y.start, z.start], [x.end, y.end, z.end])
+        };
 
         // Find the point which is the origin of all three planes that we want to
         // intersect with. (Strictly speaking, this could be combined with the next
@@ -391,7 +408,7 @@ impl Raycaster {
             let t_start = if t_start.is_finite() { t_start } else { max_t };
             let mut new_state = self.ray.advance(t_start).cast();
 
-            new_state.bounds = Some(bounds); // .within() would recurse
+            new_state.bounds = self.bounds.clone(); // .within() would recurse
 
             // Adapt t values
             new_state.t_max = new_state.t_max.map(|t| t + t_start);
@@ -420,15 +437,15 @@ impl Iterator for Raycaster {
                 self.step().ok()?;
             }
 
-            if self.is_out_of_bounds(1) {
+            let (oob_enter, oob_exit) = self.is_out_of_bounds();
+            if oob_exit {
                 // We are past the bounds. There will never again be a cube to report.
                 // Prevent extraneous next() calls from doing any stepping that could overflow
                 // by reusing the emit_current logic.
                 self.emit_current = true;
                 return None;
             }
-
-            if self.is_out_of_bounds(-1) {
+            if oob_enter {
                 // We have not yet intersected the bounds.
                 continue;
             }
