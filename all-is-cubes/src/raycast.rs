@@ -328,7 +328,7 @@ impl Raycaster {
     ///
     /// If `direction` is `1`, only the bounds relevant to _exiting_ are tested.
     /// If `-1`, only the bounds relevant to entering.
-    #[inline(always)]
+    // Performance note: inline(always) makes this slower.
     fn is_out_of_bounds(&self, direction: GridCoordinate) -> bool {
         if let Some(bounds) = self.bounds {
             for axis in 0..3 {
@@ -353,7 +353,6 @@ impl Raycaster {
 
     /// In the case where the current position is outside the bounds but might intersect
     /// the bounds later, attempt to move the position to intersect sooner.
-    #[inline(always)]
     #[mutants::skip] // an optimization not a behavior change
     fn fast_forward(&mut self) {
         let bounds: GridAab = self.bounds.unwrap();
