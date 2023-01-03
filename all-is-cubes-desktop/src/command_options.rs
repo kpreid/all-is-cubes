@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
 
+use all_is_cubes_port::ExportFormat;
 use clap::builder::{PathBufValueParser, PossibleValue, PossibleValuesParser};
 use clap::{builder::TypedValueParser, Parser, ValueEnum};
 use once_cell::sync::Lazy;
@@ -72,8 +73,12 @@ pub(crate) struct AicDesktopArgs {
 
     /// Output file name for 'record' mode.
     ///
-    /// The file name must have an extension specifying the type; currently only PNG is supported
-    /// ('.png' or '.apng').
+    /// The file name must have an extension specifying the format to use:
+    ///
+    /// * “.png” or “.apng” — export rendered scene.
+    /// * “.gltf” — export scene as meshes in glTF format
+    ///   (has accompanying “.glbin” data files).
+    /// * “.vox” — export world to MagicaVoxel .vox format.
     #[arg(
         long = "output",
         short = 'o',
@@ -83,6 +88,7 @@ pub(crate) struct AicDesktopArgs {
             let _format = determine_record_format(&value)?;
             Ok::<PathBuf, &str>(value)
         }),
+        verbatim_doc_comment,
     )]
     pub(crate) output_file: Option<PathBuf>,
 
@@ -243,9 +249,11 @@ pub fn determine_record_format(output_path: &Path) -> Result<RecordFormat, &'sta
     if let Some(extension) = output_path.extension() {
         match extension.to_str() {
             // When updating this match, also update the docs for output_file!
+            // TODO: RecordFormat and ExportFormat should be merged?
             Some("png" | "PNG") => return Ok(RecordFormat::PngOrApng),
             Some("apng" | "APNG") => return Ok(RecordFormat::PngOrApng),
             Some("gltf" | "GLTF") => return Ok(RecordFormat::Gltf),
+            Some("vox" | "VOX") => return Ok(RecordFormat::Export(ExportFormat::DotVox)),
             _ => {}
         }
     }

@@ -31,6 +31,7 @@ pub enum RecordFormat {
     // PNG and Animated-PNG are (currently) the same implementation, just with multiple frames or not
     PngOrApng,
     Gltf,
+    Export(all_is_cubes_port::ExportFormat),
 }
 
 impl RecordOptions {

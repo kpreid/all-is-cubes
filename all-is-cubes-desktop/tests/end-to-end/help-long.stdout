@@ -52,8 +52,12 @@ Options:
   -o, --output <FILE>
           Output file name for 'record' mode.
           
-          The file name must have an extension specifying the type; currently only PNG is supported
-          ('.png' or '.apng').
+          The file name must have an extension specifying the format to use:
+          
+          * “.png” or “.apng” — export rendered scene.
+          * “.gltf” — export scene as meshes in glTF format
+            (has accompanying “.glbin” data files).
+          * “.vox” — export world to MagicaVoxel .vox format.
 
       --precompute-light
           Fully calculate light before starting the game

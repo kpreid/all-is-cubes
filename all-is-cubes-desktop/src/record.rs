@@ -6,6 +6,7 @@ use std::sync::mpsc;
 use all_is_cubes::camera::{Flaws, StandardCameras};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::raytracer::RtRenderer;
+use all_is_cubes::util::YieldProgress;
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
 
 mod options;
@@ -117,6 +118,23 @@ impl Recorder {
                 write_gltf::start_gltf_writing(&options, writer, scene_receiver, status_sender)?;
 
                 RecorderInner::Mesh(write_gltf::MeshRecorder::new(cameras, tex, scene_sender))
+            }
+            RecordFormat::Export(export_format) => {
+                // TODO: Stop doing this inside of record initialization, and give export
+                // its own separate main code path.
+                let path_str = options.output_path.to_string_lossy().to_string();
+                futures::executor::block_on(all_is_cubes_port::export_to_path(
+                    YieldProgress::noop(),
+                    export_format,
+                    all_is_cubes_port::ExportSet::from_spaces(vec![cameras
+                        .world_space()
+                        .snapshot()
+                        .unwrap()]),
+                    options.output_path,
+                ))?;
+                eprintln!("\nWrote {path_str}");
+                log::trace!("shenanigan: exiting out of record initialization");
+                std::process::exit(0);
             }
         };
 
