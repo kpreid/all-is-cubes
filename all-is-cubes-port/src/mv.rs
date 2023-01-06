@@ -1,11 +1,11 @@
 //! Import of MagicaVoxel `.vox` files.
 
 use all_is_cubes::block::Block;
-use all_is_cubes::cgmath::Vector3;
+use all_is_cubes::cgmath::{Point3, Vector3};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{GridAab, GridPoint, Rgb, Rgba};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridRotation, Rgb, Rgba};
 use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
 use all_is_cubes::universe::{Name, Universe, UniverseIndex};
 use all_is_cubes::util::YieldProgress;
@@ -75,33 +75,39 @@ fn convert_dot_vox_model(
     palette_blocks: &[Block],
     model: dot_vox::Model,
 ) -> Result<Space, DotVoxConversionError> {
-    let extent = GridAab::from_lower_size(
+    let transform = mv_to_aic_coordinate_transform(model.size);
+    let bounds = GridAab::from_lower_size(
         [0, 0, 0],
         [
             model.size.x as i32,
-            model.size.z as i32,
             model.size.y as i32,
+            model.size.z as i32,
         ],
-    );
-    let mut space = Space::builder(extent)
+    )
+    .transform(transform)
+    .expect("TODO: return error");
+
+    let mut space = Space::builder(bounds)
         .spawn({
-            let mut spawn = Spawn::looking_at_space(extent, Vector3::new(-1., 1., 1.));
+            let mut spawn = Spawn::looking_at_space(bounds, Vector3::new(-1., 1., 1.));
             spawn.set_inventory(free_editing_starter_inventory(true));
             spawn
         })
         .light_physics(LightPhysics::Rays {
-            maximum_distance: extent.y_range().len() as u16,
+            maximum_distance: bounds.y_range().len() as u16,
         })
         .sky_color(Rgb::ONE)
         .build();
+
     for v in model.voxels {
-        // Coordinates are Z-up right-handed compared to our Y-up right-handed,
-        // so swap Z into Y and invert Y as Z.
-        let cube = GridPoint::new(
-            i32::from(v.x),
-            i32::from(v.z),
-            (model.size.y as i32) - 1 - i32::from(v.y),
-        );
+        let converted_cube: Point3<GridCoordinate> = Point3 {
+            x: v.x,
+            y: v.y,
+            z: v.z,
+        }
+        .map(i32::from);
+        let transformed_cube = transform.transform_cube(converted_cube);
+
         #[allow(clippy::unnecessary_lazy_evaluations)] // dubious positive
         let block = palette_blocks.get(v.i as usize).ok_or_else(|| {
             DotVoxConversionError::PaletteTooShort {
@@ -109,8 +115,9 @@ fn convert_dot_vox_model(
                 index: v.i,
             }
         })?;
+
         space
-            .set(cube, block)
+            .set(transformed_cube, block)
             .map_err(DotVoxConversionError::SetCube)?;
     }
 
@@ -137,9 +144,48 @@ impl From<DotVoxConversionError> for InGenError {
     }
 }
 
+/// Coordinate transform which converts the coordinate system handedness and “up”
+/// direction conventional for MagicaVoxel to the one conventional for All is Cubes.
+///
+/// The input size should be in the original MagicaVoxel coordinate system.
+fn mv_to_aic_coordinate_transform(mv_size: dot_vox::Size) -> GridMatrix {
+    // Coordinates are Z-up right-handed compared to our Y-up right-handed,
+    // so swap Z into Y and invert Y as Z.
+    // (This is not a `GridRotation::to_positive_octant_matrix()` because the `sizes` are
+    // not necessarily equal.)
+    GridMatrix::from_translation([0, 0, mv_size.y as i32]) * GridRotation::RXzY.to_rotation_matrix()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::math::GridPoint;
+
+    #[test]
+    #[ignore]
+    fn print_many_transforms() {
+        let gbox = GridAab::from_lower_size([0, 0, 0], [2, 2, 2]);
+        let transform = mv_to_aic_coordinate_transform(dot_vox::Size { x: 2, y: 2, z: 2 });
+        for point in gbox.interior_iter() {
+            let tmat = transform.transform_cube(point);
+
+            println!("{point:?} -> {tmat:?}");
+        }
+        panic!(); // cause output to be displayed
+    }
+
+    #[test]
+    fn coordinate_transform() {
+        let t = mv_to_aic_coordinate_transform(dot_vox::Size {
+            x: 100,
+            y: 100,
+            z: 100,
+        });
+        assert_eq!(
+            t.transform_cube(GridPoint::new(10, 20, 30)),
+            GridPoint::new(10, 30, 79)
+        );
+    }
 
     #[tokio::test]
     async fn invalid_file_error() {
