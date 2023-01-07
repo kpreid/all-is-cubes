@@ -164,6 +164,13 @@ impl Universe {
         self.get(&"character".into())
     }
 
+    /// Returns a unique identifier for this particular [`Universe`] (within this memory space).
+    ///
+    /// It may be used to determine whether a given [`URef`] belongs to this universe or not.
+    pub fn universe_id(&self) -> UniverseId {
+        self.id
+    }
+
     /// Advance time for all members.
     pub fn step(&mut self, tick: Tick) -> UniverseStepInfo {
         let mut info = UniverseStepInfo::default();
