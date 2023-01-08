@@ -53,9 +53,14 @@ mod tests;
 pub enum Name {
     /// An explicitly set name.
     Specific(Arc<str>),
+
     /// An automatically assigned name.
     Anonym(usize),
+
+    /// Not yet been assigned a name; this may be replaced with `Anonym` but not `Specific`.
+    Pending,
 }
+
 impl From<&str> for Name {
     fn from(value: &str) -> Self {
         Self::Specific(value.into())
@@ -66,6 +71,7 @@ impl fmt::Display for Name {
         match self {
             Name::Specific(name) => write!(f, "'{name}'"),
             Name::Anonym(index) => write!(f, "[anonymous #{index}]"),
+            Name::Pending => write!(f, "[pending anonymous]"),
         }
     }
 }

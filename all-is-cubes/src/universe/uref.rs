@@ -31,19 +31,47 @@ pub struct URef<T> {
     /// and that [`Universe`] will ensure no entry goes away while referenced.
     weak_ref: Weak<RwLock<UEntry<T>>>,
 
-    /// Contains an optional strong reference to the same target as `weak_ref`.
-    /// This is used to allow constructing `URef`s with targets *before* they are
-    /// inserted into a [`Universe`], and thus inserting entire trees into the
-    /// Universe. Upon that insertion, these strong references are dropped.
-    strong_init: Arc<Mutex<Option<StrongEntryRef<T>>>>,
+    state: Arc<Mutex<State<T>>>,
+}
 
-    /// Name by which the universe knows this ref.
-    name: Name,
-
-    /// ID of the universe this ref belongs to.
+/// Strongly-referenced mutable state shared by all clones of a [`URef`].
+/// This is modified by operations such as inserting into a [`Universe`].
+#[derive(Debug)]
+enum State<T> {
+    /// Not yet (or never will be) inserted into a [`Universe`].
     ///
-    /// None if it was created by [`Self::new_gone()`] or not yet inserted into a universe.
-    universe_id: Option<UniverseId>,
+    /// May transition to [`State::Member`].
+    Pending {
+        /// Name that will apply once the ref is in a [`Universe`].
+        ///
+        /// * May be [`Name::Specific`].
+        /// * May be [`Name::Pending`] to assign a [`Name::Anonym`] later.
+        /// * May not be [`Name::Anonym`].
+        name: Name,
+
+        /// Contains a strong reference to the same target as [`URef::weak_ref`].
+        /// This is used to allow constructing `URef`s with targets *before* they are
+        /// inserted into a [`Universe`], and thus inserting entire trees into the
+        /// Universe. Upon that insertion, these strong references are dropped by
+        /// changing the state.
+        strong: StrongEntryRef<T>,
+    },
+    /// In a [`Universe`] (or has been deleted from one).
+    Member {
+        /// Name of this member within the [`Universe`].
+        ///
+        /// * May be [`Name::Specific`].
+        /// * May be [`Name::Anonym`].
+        /// * May not be [`Name::Pending`].
+        name: Name,
+
+        /// ID of the universe this ref belongs to.
+        ///
+        /// None or not yet inserted into a universe.
+        universe_id: UniverseId,
+    },
+    /// State of [`URef::new_gone()`].
+    Gone { name: Name },
 }
 
 impl<T: 'static> URef<T> {
@@ -54,6 +82,9 @@ impl<T: 'static> URef<T> {
     /// [`Universe`]. Caution: creating cyclic structure and never inserting it
     /// will result in a memory leak.
     ///
+    /// Note that specifying a [`Name::Anonym`] will create a `URef` which cannot actually
+    /// be inserted into another [`Universe`], even if the specified number is free.
+    ///
     /// TODO: Actually inserting these into a [`Universe`] is not yet implemented.
     pub fn new_pending(name: Name, initial_value: T) -> Self {
         let strong_ref = Arc::new(RwLock::new(UEntry {
@@ -61,9 +92,10 @@ impl<T: 'static> URef<T> {
         }));
         URef {
             weak_ref: Arc::downgrade(&strong_ref),
-            strong_init: Arc::new(Mutex::new(Some(strong_ref))),
-            name,
-            universe_id: None,
+            state: Arc::new(Mutex::new(State::Pending {
+                name,
+                strong: strong_ref,
+            })),
         }
     }
 
@@ -78,23 +110,35 @@ impl<T: 'static> URef<T> {
     pub fn new_gone(name: Name) -> URef<T> {
         URef {
             weak_ref: Weak::new(),
-            strong_init: Arc::new(Mutex::new(None)),
-            name,
-            universe_id: None,
+            state: Arc::new(Mutex::new(State::Gone { name })),
         }
     }
 
-    pub fn name(&self) -> &Name {
-        &self.name
+    /// Name by which the [`Universe`] knows this ref.
+    ///
+    /// This may change from [`Name::Pending`] to another name when the ref is inserted into
+    /// a [`Universe`].
+    pub fn name(&self) -> Name {
+        match self.state.lock().as_deref() {
+            Ok(State::Pending { name, .. }) => name.clone(),
+            Ok(State::Member { name, .. }) => name.clone(),
+            Ok(State::Gone { name }) => name.clone(),
+            Err(_) => Name::Pending,
+        }
     }
 
     /// Returns the unique ID of the universe this reference belongs to.
     ///
     /// This may be used to confirm that two [`URef`]s belong to the same universe.
     ///
-    /// Returns [`None`] if this [`URef`] is not yet associated with a universe.
+    /// Returns [`None`] if this [`URef`] is not yet associated with a universe, or if
+    ///  if it was created by [`Self::new_gone()`].
     pub fn universe_id(&self) -> Option<UniverseId> {
-        self.universe_id
+        match *self.state.lock().ok()? {
+            State::Pending { .. } => None,
+            State::Member { universe_id, .. } => Some(universe_id),
+            State::Gone { .. } => None,
+        }
     }
 
     /// Acquire temporary read access the value, in the sense of [`RwLock::try_read()`].
@@ -102,9 +146,7 @@ impl<T: 'static> URef<T> {
     /// TODO: There is not currently any way to block on / wait for read access.
     pub fn read(&self) -> Result<UBorrow<T>, RefError> {
         let inner = UBorrowImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
-            strong
-                .try_read()
-                .map_err(|_| RefError::InUse(self.name.clone()))
+            strong.try_read().map_err(|_| RefError::InUse(self.name()))
         })?;
         Ok(UBorrow(inner))
     }
@@ -127,7 +169,7 @@ impl<T: 'static> URef<T> {
         let strong: Arc<RwLock<UEntry<T>>> = self.upgrade()?;
         let mut borrow = strong
             .try_write()
-            .map_err(|_| RefError::InUse(self.name.clone()))?;
+            .map_err(|_| RefError::InUse(self.name()))?;
         Ok(function(&mut borrow.data))
     }
 
@@ -138,9 +180,7 @@ impl<T: 'static> URef<T> {
     /// purposes.
     pub(crate) fn try_borrow_mut(&self) -> Result<UBorrowMutImpl<T>, RefError> {
         UBorrowMutImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
-            strong
-                .try_write()
-                .map_err(|_| RefError::InUse(self.name.clone()))
+            strong.try_write().map_err(|_| RefError::InUse(self.name()))
         })
     }
 
@@ -171,7 +211,7 @@ impl<T: 'static> URef<T> {
     fn upgrade(&self) -> Result<StrongEntryRef<T>, RefError> {
         self.weak_ref
             .upgrade()
-            .ok_or_else(|| RefError::Gone(self.name.clone()))
+            .ok_or_else(|| RefError::Gone(self.name()))
     }
 }
 
@@ -179,28 +219,32 @@ impl<T: fmt::Debug + 'static> fmt::Debug for URef<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO: Maybe print dead refs differently?
 
-        write!(f, "URef({}", self.name)?;
+        write!(f, "URef({}", self.name())?;
 
-        // Note: strong_init is never held for long operations, so it is safe
+        // Note: self.state is never held for long operations, so it is safe
         // to block on locking it.
-        match self.strong_init.lock() {
-            Ok(strong_init_guard) => {
-                if let Some(strong_ref) = &*strong_init_guard {
-                    write!(f, " in no universe")?;
-                    if self.weak_ref.strong_count() <= 1 {
-                        // Write the contents, but only if there are no other refs and thus we
-                        // cannot possibly cause an infinite recursion of formatting.
-                        // TODO: maybe only do it if we are in alternate/prettyprint format.
-                        write!(f, " = ")?;
-                        match strong_ref.try_read() {
-                            Ok(uentry) => fmt::Debug::fmt(&uentry.data, f)?,
-                            Err(e) => write!(f, "<entry lock error: {e}>")?,
+        match self.state.lock() {
+            Ok(state_guard) => {
+                match &*state_guard {
+                    State::Pending { strong, .. } => {
+                        write!(f, " in no universe")?;
+                        if self.weak_ref.strong_count() <= 1 {
+                            // Write the contents, but only if there are no other refs and thus we
+                            // cannot possibly cause an infinite recursion of formatting.
+                            // TODO: maybe only do it if we are in alternate/prettyprint format.
+                            write!(f, " = ")?;
+                            match strong.try_read() {
+                                Ok(uentry) => fmt::Debug::fmt(&uentry.data, f)?,
+                                Err(e) => write!(f, "<entry lock error: {e}>")?,
+                            }
                         }
                     }
+                    // TODO: print all states
+                    _ => (),
                 }
             }
             Err(e) => {
-                write!(f, ", <strong init lock error: {e}>")?;
+                write!(f, ", <state lock error: {e}>")?;
             }
         }
 
@@ -213,14 +257,15 @@ impl<T: fmt::Debug + 'static> fmt::Debug for URef<T> {
 /// the same mutable cell.
 impl<T> PartialEq for URef<T> {
     fn eq(&self, other: &Self) -> bool {
-        Weak::ptr_eq(&self.weak_ref, &other.weak_ref)
+        Weak::ptr_eq(&self.weak_ref, &other.weak_ref) && Arc::ptr_eq(&self.state, &other.state)
     }
 }
 /// `URef`s are compared by pointer equality.
 impl<T> Eq for URef<T> {}
 impl<T> hash::Hash for URef<T> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
+        Weak::as_ptr(&self.weak_ref).hash(state);
+        Arc::as_ptr(&self.state).hash(state);
     }
 }
 
@@ -229,9 +274,7 @@ impl<T> Clone for URef<T> {
     fn clone(&self) -> Self {
         URef {
             weak_ref: self.weak_ref.clone(),
-            strong_init: self.strong_init.clone(),
-            name: self.name.clone(),
-            universe_id: self.universe_id,
+            state: self.state.clone(),
         }
     }
 }
@@ -336,13 +379,14 @@ struct UEntry<T> {
     data: T,
 }
 
-/// The unique reference to an entry in a `Universe` from that `Universe`.
+/// The unique reference to an entry in a [`Universe`] from that `Universe`.
 /// Normal usage is via `URef` instead.
+///
+/// This is essentially a strong-reference version of [`URef`] (which is weak).
 #[derive(Debug)]
 pub(super) struct URootRef<T> {
     strong_ref: StrongEntryRef<T>,
-    name: Name,
-    universe_id: UniverseId,
+    state: Arc<Mutex<State<T>>>,
 }
 
 impl<T> URootRef<T> {
@@ -351,8 +395,7 @@ impl<T> URootRef<T> {
             strong_ref: Arc::new(RwLock::new(UEntry {
                 data: initial_value,
             })),
-            name,
-            universe_id,
+            state: Arc::new(Mutex::new(State::Member { name, universe_id })),
         }
     }
 
@@ -364,9 +407,7 @@ impl<T> URootRef<T> {
         URef {
             weak_ref: Arc::downgrade(&self.strong_ref),
             // TODO: we only need one of these per type; save allocation?
-            strong_init: Arc::new(Mutex::new(None)),
-            name: self.name.clone(),
-            universe_id: Some(self.universe_id),
+            state: Arc::clone(&self.state),
         }
     }
 
@@ -381,11 +422,11 @@ impl<T> URootRef<T> {
 ///
 /// TODO: seal this trait?
 pub trait URefErased: core::any::Any {
-    fn name(&self) -> &Name;
+    fn name(&self) -> Name;
 }
 
 impl<T: 'static> URefErased for URef<T> {
-    fn name(&self) -> &Name {
+    fn name(&self) -> Name {
         URef::name(self)
     }
 }
@@ -472,7 +513,7 @@ mod tests {
     fn new_gone_properties() {
         let name = Name::from("foo");
         let r: URef<Space> = URef::new_gone(name.clone());
-        assert_eq!(r.name(), &name);
+        assert_eq!(r.name(), name);
         assert_eq!(r.universe_id(), None);
         assert_eq!(r.read().unwrap_err(), RefError::Gone(name.clone()));
         assert_eq!(
@@ -481,14 +522,16 @@ mod tests {
         );
     }
 
-    /// Note: Equality behavior is inherited from `Weak::new` and `Weak::ptr_eq`,
-    /// not necessarily what we actually want.
+    /// Note: It is unclear what the best behavior is. The current one is that every
+    /// `new_gone()` is unique.
     #[test]
     fn new_gone_equality() {
         let name = Name::from("foo");
         let r1: URef<Space> = URef::new_gone(name.clone());
-        let r2: URef<Space> = URef::new_gone(name.clone());
-        assert_eq!(r1, r2);
+        let r2: URef<Space> = URef::new_gone(name);
+        let r_different: URef<Space> = URef::new_gone("bar".into());
+        assert_ne!(r1, r2);
+        assert_ne!(r1, r_different);
     }
 
     #[test]

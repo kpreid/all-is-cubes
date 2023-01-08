@@ -131,7 +131,7 @@ enum AnyTransaction {
 type AnyTransactionCheck = Box<dyn Any>;
 
 impl AnyTransaction {
-    fn target_name(&self) -> Option<&Name> {
+    fn target_name(&self) -> Option<Name> {
         use AnyTransaction::*;
         match self {
             Noop => None,
@@ -338,7 +338,7 @@ impl UniverseTransaction {
     ///
     /// [`RefError::Gone`]: crate::universe::RefError::Gone
     pub fn delete<R: super::URefErased>(member_ref: R) -> Self {
-        Self::from_member_txn(member_ref.name().clone(), MemberTxn::Delete)
+        Self::from_member_txn(member_ref.name(), MemberTxn::Delete)
     }
 
     /// If this transaction contains any operations that are on a specific member of a
@@ -352,7 +352,7 @@ impl UniverseTransaction {
 impl From<AnyTransaction> for UniverseTransaction {
     fn from(transaction: AnyTransaction) -> Self {
         if let Some(name) = transaction.target_name() {
-            Self::from_member_txn(name.clone(), MemberTxn::Modify(transaction))
+            Self::from_member_txn(name, MemberTxn::Modify(transaction))
         } else {
             UniverseTransaction::default()
         }
@@ -375,6 +375,19 @@ impl Transaction<Universe> for UniverseTransaction {
         }
         let mut checks = HashMap::new();
         for (name, member) in self.members.iter() {
+            match name {
+                Name::Specific(_) | Name::Anonym(_) => {}
+                Name::Pending => {
+                    // TODO: This is a weird place to implement this constraint.
+                    // It would be better (?) to check when the transaction is created,
+                    // but that will be quite a lot of fallibility...
+                    return Err(PreconditionFailed {
+                        location: "UniverseTransaction",
+                        problem: "universe transactions may not involve pending URefs",
+                    });
+                }
+            }
+
             checks.insert(name.clone(), member.check(target, name)?);
         }
         Ok(UniverseCommitCheck(checks))
