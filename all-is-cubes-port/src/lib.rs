@@ -130,6 +130,15 @@ pub enum ExportFormat {
     DotVox,
 }
 
+impl ExportFormat {
+    /// Whether exporting to this format is capable of including [`Space`] light data.
+    pub fn includes_light(self) -> bool {
+        match self {
+            ExportFormat::DotVox => false,
+        }
+    }
+}
+
 /// Fatal errors that may be encountered during an export operation.
 ///
 /// TODO: Define non-fatal export flaws reporting, and link to it here.

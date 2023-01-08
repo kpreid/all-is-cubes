@@ -65,7 +65,7 @@ use crate::aic_winit::{create_winit_rt_desktop_session, create_winit_wgpu_deskto
 use crate::command_options::{
     determine_record_format, parse_universe_source, AicDesktopArgs, DisplaySizeArg, UniverseSource,
 };
-use crate::record::{create_recording_session, RecordFormat};
+use crate::record::create_recording_session;
 use crate::session::DesktopSession;
 use crate::terminal::{
     create_terminal_session, terminal_main_loop, terminal_print_once, TerminalOptions,
@@ -150,10 +150,9 @@ fn main() -> Result<(), anyhow::Error> {
     // TODO: refactor this to work through RecordOptions
     let precompute_light = precompute_light
         || (graphics_type == GraphicsType::Record
-            && output_file
-                .as_ref()
-                .and_then(|f| determine_record_format(f).ok())
-                != Some(RecordFormat::Gltf));
+            && output_file.as_ref().map_or(false, |file| {
+                determine_record_format(file).map_or(false, |fmt| fmt.includes_light())
+            }));
     let universe = create_universe(input_source, precompute_light)?;
     session.set_universe(universe);
 

@@ -52,3 +52,13 @@ impl RecordAnimationOptions {
         self.frame_period * u32::try_from(self.frame_count).unwrap_or(u32::MAX)
     }
 }
+
+impl RecordFormat {
+    pub(crate) fn includes_light(&self) -> bool {
+        match self {
+            RecordFormat::PngOrApng => true,
+            RecordFormat::Gltf => false,
+            RecordFormat::Export(f) => f.includes_light(),
+        }
+    }
+}
