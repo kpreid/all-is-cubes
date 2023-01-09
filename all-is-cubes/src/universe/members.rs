@@ -115,6 +115,12 @@ macro_rules! member_enums {
                     $( Self::$member_type(r) => r.check_upgrade_pending(universe_id), )*
                 }
             }
+
+            fn as_erased(&self) -> &dyn $crate::universe::URefErased {
+                match self {
+                    $( Self::$member_type(r) => r as &dyn $crate::universe::URefErased, )*
+                }
+            }
         }
     }
 }
@@ -131,3 +137,12 @@ impl_universe_for_member!(Character, characters);
 impl_universe_for_member!(Space, spaces);
 
 member_enums!((BlockDef), (Character), (Space),);
+
+impl super::URefErased for AnyURef {
+    fn name(&self) -> Name {
+        self.as_erased().name()
+    }
+    fn universe_id(&self) -> Option<super::UniverseId> {
+        self.as_erased().universe_id()
+    }
+}

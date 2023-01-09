@@ -9,7 +9,8 @@ use crate::transaction::{
     CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
 use crate::universe::{
-    AnyURef, Name, UBorrowMutImpl, URef, Universe, UniverseId, UniverseMember, UniverseTable,
+    AnyURef, Name, UBorrowMutImpl, URef, URefErased as _, Universe, UniverseId, UniverseMember,
+    UniverseTable,
 };
 
 /// Conversion from concrete transaction types to [`UniverseTransaction`].
@@ -287,7 +288,20 @@ mod any_transaction {
 #[derive(Clone, Default, PartialEq)]
 #[must_use]
 pub struct UniverseTransaction {
+    /// Transactions on existing members or named insertions.
+    /// Invariant: None of the names are [`Name::Pending`].
     members: HashMap<Name, MemberTxn>,
+
+    /// Insertions of anonymous members, kept separate since they do not have unique [`Name`]s.
+    /// Unlike insertions of named members, these cannot fail to merge or commit.
+    ///
+    /// Note that due to concurrent operations on the ref, some of the entries in this
+    /// vector might turn out to have been given names. In that case, the transaction
+    /// should fail. (TODO: Write test verifying that.)
+    ///
+    /// Invariant: Every element of this vector is a `MemberTxn::Insert`.
+    anonymous_insertions: Vec<MemberTxn>,
+
     /// Invariant: Has a universe ID if any of the `members` do.
     universe_id: Option<UniverseId>,
 }
@@ -298,7 +312,10 @@ pub struct UniverseTransaction {
 pub struct UniverseMergeCheck(HashMap<Name, MemberMergeCheck>);
 #[doc(hidden)] // Almost certainly will never need to be used explicitly
 #[derive(Debug)]
-pub struct UniverseCommitCheck(HashMap<Name, MemberCommitCheck>);
+pub struct UniverseCommitCheck {
+    members: HashMap<Name, MemberCommitCheck>,
+    anonymous_insertions: Vec<MemberCommitCheck>,
+}
 
 impl Transactional for Universe {
     type Transaction = UniverseTransaction;
@@ -312,6 +329,7 @@ impl UniverseTransaction {
         UniverseTransaction {
             universe_id: transaction.universe_id(),
             members: HashMap::from([(name, transaction)]),
+            anonymous_insertions: Vec::new(),
         }
     }
 
@@ -320,11 +338,20 @@ impl UniverseTransaction {
     ///
     /// Note that this transaction can only ever succeed once.
     pub fn insert<T: UniverseMember>(reference: URef<T>) -> Self {
-        // TODO: fail right away if the ref is already in a universe?
-        Self::from_member_txn(
-            reference.name(),
-            MemberTxn::Insert(UniverseMember::into_any_ref(reference)),
-        )
+        // TODO: fail right away if the ref is already in a universe or if it is Anonym?
+        match reference.name() {
+            Name::Specific(_) | Name::Anonym(_) => Self::from_member_txn(
+                reference.name(),
+                MemberTxn::Insert(UniverseMember::into_any_ref(reference)),
+            ),
+            Name::Pending => Self {
+                members: HashMap::new(),
+                anonymous_insertions: vec![MemberTxn::Insert(UniverseMember::into_any_ref(
+                    reference,
+                ))],
+                universe_id: None,
+            },
+        }
     }
 
     /// Delete this member from the universe.
@@ -373,7 +400,7 @@ impl Transaction<Universe> for UniverseTransaction {
                 });
             }
         }
-        let mut checks = HashMap::new();
+        let mut member_checks = HashMap::with_capacity(self.members.len());
         for (name, member) in self.members.iter() {
             match name {
                 Name::Specific(_) | Name::Anonym(_) => {}
@@ -388,21 +415,36 @@ impl Transaction<Universe> for UniverseTransaction {
                 }
             }
 
-            checks.insert(name.clone(), member.check(target, name)?);
+            member_checks.insert(name.clone(), member.check(target, name)?);
         }
-        Ok(UniverseCommitCheck(checks))
+
+        let mut insert_checks = Vec::with_capacity(self.anonymous_insertions.len());
+        for insert_txn in self.anonymous_insertions.iter() {
+            insert_checks.push(insert_txn.check(target, &Name::Pending)?);
+        }
+
+        Ok(UniverseCommitCheck {
+            members: member_checks,
+            anonymous_insertions: insert_checks,
+        })
     }
 
-    fn commit(
-        &self,
-        target: &mut Universe,
-        UniverseCommitCheck(checks): Self::CommitCheck,
-    ) -> Result<(), CommitError> {
-        for (name, check) in checks {
+    fn commit(&self, target: &mut Universe, checks: Self::CommitCheck) -> Result<(), CommitError> {
+        for (name, check) in checks.members {
             self.members[&name]
                 .commit(target, &name, check)
                 .map_err(|e| e.context(format!("universe member {name}")))?;
         }
+
+        for (new_member, check) in self
+            .anonymous_insertions
+            .iter()
+            .cloned()
+            .zip(checks.anonymous_insertions)
+        {
+            new_member.commit(target, &Name::Pending, check)?;
+        }
+
         Ok(())
     }
 }
@@ -425,9 +467,13 @@ impl Merge for UniverseTransaction {
     where
         Self: Sized,
     {
+        let mut anonymous_insertions = self.anonymous_insertions;
+        anonymous_insertions.extend(other.anonymous_insertions);
+
         UniverseTransaction {
             members: self.members.commit_merge(other.members, check),
             universe_id: self.universe_id.or(other.universe_id),
+            anonymous_insertions,
         }
     }
 }
@@ -486,20 +532,21 @@ impl MemberTxn {
             // so we don't actually pass anything here.
             MemberTxn::Modify(txn) => Ok(MemberCommitCheck(Some(txn.check(&())?))),
             MemberTxn::Insert(pending_ref) => {
+                if pending_ref.name() != *name {
+                    return Err(PreconditionFailed {
+                        location: "UniverseTransaction",
+                        // TODO: better error reporting
+                        problem: "insert(): the URef is already in a universe (or name data is erroneous)",
+                    });
+                }
+
                 // TODO: Deduplicate this check logic vs. Universe::allocate_name
                 match name {
-                    Name::Specific(_) => {}
+                    Name::Specific(_) | Name::Pending => {}
                     Name::Anonym(_) => {
                         return Err(PreconditionFailed {
                             location: "UniverseTransaction",
                             problem: "insert(): cannot insert Name::Anonym",
-                        })
-                    }
-                    Name::Pending => {
-                        return Err(PreconditionFailed {
-                            location: "UniverseTransaction",
-                            problem:
-                                "insert(): anonymous inserts via transaction not yet supported",
                         })
                     }
                 }
@@ -667,8 +714,8 @@ mod tests {
         assert_eq!(
             UniverseTransaction::default(),
             UniverseTransaction {
-                // TODO: Replace this literal with some other means of specifying an empty transaction
                 members: HashMap::new(),
+                anonymous_insertions: Vec::new(),
                 universe_id: None,
             }
         )
@@ -761,6 +808,28 @@ mod tests {
         // TODO: Also verify that pending_1 is not still in the pending state
     }
 
+    /// Anonymous refs require special handling because, before being inserted, they do
+    /// not have unique names.
+    #[test]
+    fn insert_anonymous() {
+        let mut u = Universe::new();
+
+        // TODO: Cleaner public API for new anonymous?
+        let foo = URef::new_pending(Name::Pending, Space::empty_positive(1, 1, 1));
+        let bar = URef::new_pending(Name::Pending, Space::empty_positive(2, 2, 2));
+
+        UniverseTransaction::insert(foo.clone())
+            .merge(UniverseTransaction::insert(bar.clone()))
+            .expect("merge should allow 2 pending")
+            .execute(&mut u)
+            .expect("execute");
+
+        // Now check all the naming turned out correctly.
+        assert_eq!(u.get(&foo.name()).unwrap(), foo);
+        assert_eq!(u.get(&bar.name()).unwrap(), bar);
+        assert_ne!(foo, bar);
+    }
+
     #[test]
     #[ignore] // TODO: figure out how to get this to work w/ insert transactions
     fn systematic() {
@@ -807,7 +876,7 @@ mod tests {
     }
 
     #[test]
-    fn insert_ref_already_in_different_universe() {
+    fn insert_named_already_in_different_universe() {
         let mut u1 = Universe::new();
         let mut u2 = Universe::new();
         let r = u1
@@ -820,6 +889,25 @@ mod tests {
             dbg!(e),
             ExecuteError::Check(PreconditionFailed {
                 problem: "insert(): the URef is already in a universe",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn insert_anonymous_already_in_different_universe() {
+        let r = URef::new_pending(Name::Pending, Space::empty_positive(1, 1, 1));
+        let mut u1 = Universe::new();
+        let mut u2 = Universe::new();
+        let txn = UniverseTransaction::insert(r);
+
+        txn.execute(&mut u1).unwrap();
+        let e = txn.execute(&mut u2).unwrap_err();
+
+        assert!(matches!(
+            dbg!(e),
+            ExecuteError::Check(PreconditionFailed {
+                problem: "insert(): the URef is already in a universe (or name data is erroneous)",
                 ..
             })
         ));
