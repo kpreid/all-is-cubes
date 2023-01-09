@@ -68,6 +68,13 @@ use xshell::{cmd, pushd, Cmd, Pushd};
 struct XtaskArgs {
     #[clap(subcommand)]
     command: XtaskCommand,
+
+    /// Pass the `--timings` flag to all `cargo` build invocations, producing
+    /// HTML files reporting the time taken.
+    ///
+    /// Note that a single `xtask` command may end up invoking `cargo` multiple times.
+    #[arg(long, global = true)]
+    timings: bool,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -118,8 +125,15 @@ enum XtaskCommand {
 }
 
 fn main() -> Result<(), ActionError> {
-    let XtaskArgs { command } = <XtaskArgs as clap::Parser>::parse();
+    let (config, command) = {
+        let XtaskArgs { command, timings } = <XtaskArgs as clap::Parser>::parse();
+        let config = Config {
+            cargo_timings: timings,
+        };
+        (config, command)
+    };
 
+    // TODO: fold time_log into the Config to reduce number of pieces passed around
     let mut time_log: Vec<Timing> = Vec::new();
 
     match command {
@@ -128,13 +142,13 @@ fn main() -> Result<(), ActionError> {
             update_server_static(&mut time_log)?; // includes installing wasm tools
         }
         XtaskCommand::Test => {
-            do_for_all_packages(TestOrCheck::Test, Features::Default, &mut time_log)?;
+            do_for_all_packages(&config, TestOrCheck::Test, Features::Default, &mut time_log)?;
         }
         XtaskCommand::TestMore => {
-            exhaustive_test(&mut time_log)?;
+            exhaustive_test(&config, &mut time_log)?;
         }
         XtaskCommand::Lint => {
-            do_for_all_packages(TestOrCheck::Lint, Features::Default, &mut time_log)?;
+            do_for_all_packages(&config, TestOrCheck::Lint, Features::Default, &mut time_log)?;
 
             // Build docs to verify that there are no broken doc links.
             {
@@ -191,6 +205,7 @@ fn main() -> Result<(), ActionError> {
 
             cargo()
                 .arg("run")
+                .args(config.cargo_build_args())
                 .arg("--bin=aic-server")
                 .arg("--features=embed")
                 .run()?;
@@ -238,7 +253,7 @@ fn main() -> Result<(), ActionError> {
             );
         }
         XtaskCommand::PublishAll { for_real } => {
-            exhaustive_test(&mut time_log)?;
+            exhaustive_test(&config, &mut time_log)?;
 
             let maybe_dry = if for_real { vec![] } else { vec!["--dry-run"] };
             for package in ALL_NONTEST_PACKAGES {
@@ -270,6 +285,23 @@ fn main() -> Result<(), ActionError> {
     Ok(())
 }
 
+#[derive(Debug)]
+struct Config {
+    cargo_timings: bool,
+}
+
+impl Config {
+    /// Arguments that should be passed to any Cargo command that runs a build
+    /// (`build`, `test`, `run`)
+    fn cargo_build_args(&self) -> Vec<&str> {
+        let mut args = Vec::with_capacity(1);
+        if self.cargo_timings {
+            args.push("--timings")
+        }
+        args
+    }
+}
+
 /// TODO: fetch this list (or at least cross-check it) using `cargo metadata`.
 ///
 /// See also [`do_for_all_workspaces`].
@@ -289,11 +321,11 @@ const TARGET_WASM: &str = "--target=wasm32-unknown-unknown";
 
 // Test all combinations of situations (that we've bothered to program test
 // setup for).
-fn exhaustive_test(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
+fn exhaustive_test(config: &Config, time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
     // building server with `--feature embed` requires static files
     update_server_static(time_log)?;
 
-    do_for_all_packages(TestOrCheck::Test, Features::AllAndNothing, time_log)?;
+    do_for_all_packages(config, TestOrCheck::Test, Features::AllAndNothing, time_log)?;
     Ok(())
 }
 
@@ -312,6 +344,7 @@ fn update_server_static(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
 
 /// Run check or tests for all targets.
 fn do_for_all_packages(
+    config: &Config,
     op: TestOrCheck,
     features: Features,
     time_log: &mut Vec<Timing>,
@@ -335,20 +368,20 @@ fn do_for_all_packages(
         match features {
             Features::Default => {
                 let _t = CaptureTime::new(time_log, format!("{op:?}"));
-                op.cargo_cmd().run()?;
+                op.cargo_cmd(config).run()?;
             }
 
             Features::AllAndNothing => {
                 {
                     let _t = CaptureTime::new(time_log, format!("{op:?} --all-features"));
-                    op.cargo_cmd().arg("--all-features").run()?;
+                    op.cargo_cmd(config).arg("--all-features").run()?;
                 }
 
                 // To test with limited features, we need to run commands separately for each
                 // package, as otherwise they will enable dependencies' features.
                 for package_name in ALL_NONTEST_PACKAGES {
                     let _t = CaptureTime::new(time_log, format!("{op:?} --package {package_name}"));
-                    op.cargo_cmd()
+                    op.cargo_cmd(config)
                         .args(["--package", package_name, "--no-default-features"])
                         .run()?;
                 }
@@ -362,20 +395,31 @@ fn do_for_all_packages(
     {
         let _t = CaptureTime::new(time_log, format!("{op:?} all-is-cubes-wasm"));
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
-        cargo().arg(CHECK_SUBCMD).arg(TARGET_WASM).run()?;
+        cargo()
+            .arg(CHECK_SUBCMD)
+            .args(config.cargo_build_args())
+            .arg(TARGET_WASM)
+            .run()?;
     }
 
     // Build everything else in the workspace, so non-test targets are checked for compile errors.
     {
         let _t = CaptureTime::new(time_log, "check --all-targets");
-        cargo().arg(CHECK_SUBCMD).arg("--all-targets").run()?;
+        cargo()
+            .arg(CHECK_SUBCMD)
+            .args(config.cargo_build_args())
+            .arg("--all-targets")
+            .run()?;
     }
 
     // Build fuzz targets that are not in the workspace
     {
         let _t = CaptureTime::new(time_log, "check fuzz");
         let _pushd: Pushd = pushd("fuzz")?;
-        cargo().arg(CHECK_SUBCMD).run()?;
+        cargo()
+            .arg(CHECK_SUBCMD)
+            .args(config.cargo_build_args())
+            .run()?;
     }
 
     Ok(())
@@ -482,11 +526,13 @@ enum TestOrCheck {
 }
 
 impl TestOrCheck {
-    fn cargo_cmd(self) -> Cmd {
-        cargo().arg(match self {
-            Self::Test => "test",
-            Self::Lint => CHECK_SUBCMD,
-        })
+    fn cargo_cmd(self, config: &Config) -> Cmd {
+        cargo()
+            .arg(match self {
+                Self::Test => "test",
+                Self::Lint => CHECK_SUBCMD,
+            })
+            .args(config.cargo_build_args())
     }
 }
 
