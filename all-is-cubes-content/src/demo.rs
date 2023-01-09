@@ -156,7 +156,7 @@ impl UniverseTemplate {
             Fail => Some(Err(InGenError::Other(
                 "the Fail template always fails to generate".into(),
             ))),
-            DemoCity => Some(demo_city(&mut universe, p.take().unwrap()).await),
+            DemoCity => Some(demo_city(&mut universe, p.take().unwrap(), seed).await),
             Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), seed).await),
             Islands => Some(islands(&mut universe, p.take().unwrap(), 1000).await),
             Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),

@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use futures_core::future::BoxFuture;
 use instant::Instant;
+use rand::{Rng, SeedableRng as _};
 
 use all_is_cubes::cgmath::{One as _, Vector3};
 use all_is_cubes::drawing::embedded_graphics::{
@@ -41,6 +42,7 @@ use crate::{
 pub(crate) async fn demo_city(
     universe: &mut Universe,
     p: YieldProgress,
+    seed: u64,
 ) -> Result<Space, InGenError> {
     let start_city_time = Instant::now();
 
@@ -424,6 +426,31 @@ pub(crate) async fn demo_city(
         exhibit_progress.progress(1.0).await;
     } // end per-exhibit loop
 
+    final_progress.progress(0.0).await;
+
+    // Sprinkle some trees around in the remaining space.
+    {
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
+        let possible_tree_origins: GridAab = planner.y_range(1, 2);
+        for _ in 0..60 {
+            // won't get this many trees, because some will be blocked
+            let tree_origin = possible_tree_origins.random_cube(&mut rng).unwrap();
+            let height = rng.gen_range(1..8);
+            let tree_bounds = GridAab::single_cube(tree_origin).expand(FaceMap {
+                nx: height / 3,
+                ny: 0,
+                nz: height / 3,
+                px: height / 3,
+                py: height - 1,
+                pz: height / 3,
+            });
+            if space.bounds().contains_box(tree_bounds) && !planner.is_occupied(tree_bounds) {
+                crate::tree::make_tree(&landscape_blocks, &mut rng, tree_origin, tree_bounds)?
+                    .execute(&mut space)?;
+            }
+        }
+    }
+
     final_progress.progress(0.5).await;
 
     // Enable light computation
@@ -564,10 +591,8 @@ impl CityPlanner {
                     let for_occupancy_check =
                         transformed.expand(FaceMap::repeat(Self::GAP_BETWEEN_PLOTS));
 
-                    for occupied in self.occupied_plots.iter() {
-                        if occupied.intersection(for_occupancy_check).is_some() {
-                            continue 'search;
-                        }
+                    if self.is_occupied(for_occupancy_check) {
+                        continue 'search;
                     }
 
                     self.occupied_plots.push(transformed);
@@ -576,6 +601,15 @@ impl CityPlanner {
             }
         }
         None
+    }
+
+    fn is_occupied(&self, query: GridAab) -> bool {
+        for occupied in self.occupied_plots.iter() {
+            if occupied.intersection(query).is_some() {
+                return true;
+            }
+        }
+        false
     }
 
     fn y_range(&self, lower_y: GridCoordinate, upper_y: GridCoordinate) -> GridAab {
