@@ -115,6 +115,8 @@ pub(crate) struct BlockAttributesV1Ser {
     #[serde(default, skip_serializing_if = "is_default")]
     pub rotation_rule: RotationPlacementRuleSer,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placement_action: Option<PlacementActionSer>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tick_action: Option<TickActionSer>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activation_action: Option<op::Operation>,
@@ -154,6 +156,12 @@ pub(crate) enum RotationPlacementRuleSer {
 pub(crate) struct TickActionSer {
     pub operation: op::Operation,
     pub schedule: Schedule,
+}
+/// Unversioned because it's versioned by the parent struct
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct PlacementActionSer {
+    pub operation: op::Operation,
+    pub in_front: bool,
 }
 #[derive(Copy, Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(tag = "type")]

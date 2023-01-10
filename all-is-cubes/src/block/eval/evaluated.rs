@@ -372,6 +372,7 @@ const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
     selectable: false,
     inventory: inv::InvInBlock::EMPTY,
     rotation_rule: block::RotationPlacementRule::Never,
+    placement_action: None,
     tick_action: None,
     activation_action: None,
     animation_hint: block::AnimationHint::UNCHANGING,
@@ -554,6 +555,7 @@ impl PartialEq for EvKey {
                     selectable,
                     ref inventory,
                     rotation_rule,
+                    ref placement_action,
                     ref tick_action,
                     ref activation_action,
                     animation_hint,
@@ -568,6 +570,7 @@ impl PartialEq for EvKey {
         ) && selectable == other.attributes.selectable
             && *inventory == other.attributes.inventory
             && rotation_rule == other.attributes.rotation_rule
+            && *placement_action == other.attributes.placement_action
             && *tick_action == other.attributes.tick_action
             && *activation_action == other.attributes.activation_action
             && animation_hint == other.attributes.animation_hint
@@ -584,6 +587,7 @@ impl core::hash::Hash for EvKey {
                     selectable,
                     ref inventory,
                     rotation_rule,
+                    ref placement_action,
                     ref tick_action,
                     ref activation_action,
                     animation_hint,
@@ -595,6 +599,7 @@ impl core::hash::Hash for EvKey {
         selectable.hash(state);
         inventory.hash(state);
         rotation_rule.hash(state);
+        placement_action.hash(state);
         tick_action.hash(state);
         activation_action.hash(state);
         animation_hint.hash(state);

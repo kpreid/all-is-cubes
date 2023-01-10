@@ -81,7 +81,8 @@ mod block {
     use super::*;
     use crate::block::{
         text, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision,
-        Composite, Modifier, Move, Primitive, Quote, RotationPlacementRule, TickAction, Zoom,
+        Composite, Modifier, Move, PlacementAction, Primitive, Quote, RotationPlacementRule,
+        TickAction, Zoom,
     };
     use crate::math::{Rgb, Rgba};
     use schema::{BlockSer, ModifierSer};
@@ -209,6 +210,7 @@ mod block {
                 selectable,
                 ref inventory,
                 rotation_rule,
+                ref placement_action,
                 ref tick_action,
                 ref activation_action,
                 animation_hint,
@@ -218,6 +220,15 @@ mod block {
                 selectable,
                 inventory: inventory.into(),
                 rotation_rule: rotation_rule.into(),
+                placement_action: placement_action.as_ref().map(
+                    |&PlacementAction {
+                         ref operation,
+                         in_front,
+                     }| schema::PlacementActionSer {
+                        operation: operation.clone(),
+                        in_front,
+                    },
+                ),
                 tick_action: tick_action.as_ref().map(
                     |&TickAction {
                          ref operation,
@@ -240,6 +251,7 @@ mod block {
                 selectable,
                 inventory,
                 rotation_rule,
+                placement_action,
                 tick_action,
                 activation_action,
                 animation_hint,
@@ -249,6 +261,15 @@ mod block {
                 selectable,
                 inventory: inventory.into(),
                 rotation_rule: rotation_rule.into(),
+                placement_action: placement_action.map(
+                    |schema::PlacementActionSer {
+                         operation,
+                         in_front,
+                     }| PlacementAction {
+                        operation,
+                        in_front,
+                    },
+                ),
                 tick_action: tick_action.map(
                     |schema::TickActionSer {
                          operation,

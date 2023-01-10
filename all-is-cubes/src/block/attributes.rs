@@ -51,7 +51,15 @@ pub struct BlockAttributes {
     /// some agent not otherwise specifying rotation.
     ///
     /// The default value is [`RotationPlacementRule::Never`].
+    //---
+    // TODO: Replace this with `placement_action` features?
     pub rotation_rule: RotationPlacementRule,
+
+    /// Something to do instead of placing this block in a [`Space`].
+    //---
+    // TODO: Should this not be optional, instead having a value that expresses the default
+    // block placement behavior?
+    pub placement_action: Option<PlacementAction>,
 
     /// Something this block does when time passes.
     pub tick_action: Option<TickAction>,
@@ -81,6 +89,7 @@ impl fmt::Debug for BlockAttributes {
                 selectable,
                 inventory,
                 rotation_rule,
+                placement_action,
                 tick_action,
                 activation_action,
                 animation_hint,
@@ -99,6 +108,9 @@ impl fmt::Debug for BlockAttributes {
             }
             if *rotation_rule != Self::DEFAULT_REF.rotation_rule {
                 s.field("rotation_rule", rotation_rule);
+            }
+            if *placement_action != Self::DEFAULT_REF.placement_action {
+                s.field("placement_action", placement_action);
             }
             if *tick_action != Self::DEFAULT_REF.tick_action {
                 s.field("tick_action", tick_action);
@@ -120,6 +132,7 @@ impl BlockAttributes {
         selectable: true,
         inventory: InvInBlock::EMPTY,
         rotation_rule: RotationPlacementRule::Never,
+        placement_action: None,
         tick_action: None,
         activation_action: None,
         animation_hint: AnimationHint::UNCHANGING,
@@ -144,6 +157,7 @@ impl BlockAttributes {
             selectable: _,
             inventory,
             rotation_rule,
+            placement_action,
             tick_action,
             activation_action,
             animation_hint: _,
@@ -151,6 +165,9 @@ impl BlockAttributes {
 
         inventory.rotationally_symmetric()
             && rotation_rule.rotationally_symmetric()
+            && placement_action
+                .as_ref()
+                .is_none_or(|a| a.rotationally_symmetric())
             && tick_action
                 .as_ref()
                 .is_none_or(|a| a.rotationally_symmetric())
@@ -165,25 +182,20 @@ impl BlockAttributes {
             selectable,
             inventory,
             rotation_rule,
-            mut tick_action,
-            mut activation_action,
+            placement_action,
+            tick_action,
+            activation_action,
             animation_hint,
         } = self;
-
-        if let Some(a) = tick_action {
-            tick_action = Some(a.rotate(rotation));
-        }
-        if let Some(a) = activation_action {
-            activation_action = Some(a.rotate(rotation));
-        }
 
         Self {
             display_name,
             selectable,
             inventory: inventory.rotate(rotation),
             rotation_rule: rotation_rule.rotate(rotation),
-            tick_action,
-            activation_action,
+            placement_action: placement_action.map(|a| a.rotate(rotation)),
+            tick_action: tick_action.map(|a| a.rotate(rotation)),
+            activation_action: activation_action.map(|a| a.rotate(rotation)),
             animation_hint,
         }
     }
@@ -207,6 +219,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
             selectable: u.arbitrary()?,
             inventory: u.arbitrary()?,
             rotation_rule: u.arbitrary()?,
+            placement_action: u.arbitrary()?,
             tick_action: u.arbitrary()?,
             activation_action: u.arbitrary()?,
             animation_hint: u.arbitrary()?,
@@ -225,7 +238,8 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
                 bool::try_size_hint(depth)?,
                 InvInBlock::try_size_hint(depth)?,
                 RotationPlacementRule::try_size_hint(depth)?,
-                TickAction::try_size_hint(depth)?,
+                Option::<PlacementAction>::try_size_hint(depth)?,
+                Option::<TickAction>::try_size_hint(depth)?,
                 AnimationHint::try_size_hint(depth)?,
             ]))
         })
@@ -239,11 +253,13 @@ impl crate::universe::VisitHandles for BlockAttributes {
             selectable: _,
             inventory,
             rotation_rule: _,
+            placement_action,
             tick_action,
             activation_action,
             animation_hint: _,
         } = self;
         inventory.visit_handles(visitor);
+        placement_action.visit_handles(visitor);
         tick_action.visit_handles(visitor);
         activation_action.visit_handles(visitor);
     }
@@ -507,6 +523,49 @@ impl crate::universe::VisitHandles for TickAction {
         let Self {
             operation,
             schedule: _,
+        } = self;
+        operation.visit_handles(visitor);
+    }
+}
+
+/// [Attribute](BlockAttributes) of a [`Block`] that specifies what happens instead of the default
+/// when a player attempts to place it in some [`Space`].
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[expect(clippy::exhaustive_structs, reason = "no better plan yet")]
+pub struct PlacementAction {
+    /// The operation to perform instead of placing this block.
+    pub operation: Operation,
+
+    /// Whether to affect the cube in front of (nearer to the character than) the targeted cube,
+    /// instead of the targeted block itself.
+    /// `true` is the normal behavior for placed blocks;
+    /// `false` is for modifying a block already present in some way.
+    pub in_front: bool,
+}
+
+impl PlacementAction {
+    fn rotationally_symmetric(&self) -> bool {
+        let Self {
+            operation,
+            in_front: _,
+        } = self;
+        operation.rotationally_symmetric()
+    }
+
+    fn rotate(self, rotation: GridRotation) -> PlacementAction {
+        Self {
+            operation: self.operation.rotate(rotation),
+            in_front: self.in_front,
+        }
+    }
+}
+
+impl crate::universe::VisitHandles for PlacementAction {
+    fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
+        let Self {
+            operation,
+            in_front: _,
         } = self;
         operation.visit_handles(visitor);
     }

@@ -108,7 +108,10 @@ impl Tool {
                 if let Some(activation_action) =
                     &cursor.hit().evaluated.attributes().activation_action
                 {
-                    input.apply_operation(self, activation_action)
+                    Ok((
+                        Some(self),
+                        input.apply_operation(activation_action, GridRotation::IDENTITY, false)?,
+                    ))
                 } else {
                     // TODO: we should probably replace the activate transaction with some other
                     // mechanism, that can communicate "nothing found".
@@ -209,13 +212,19 @@ impl Tool {
                     .into(),
                 );
 
-                input.apply_operation(self.clone(), &op)
+                Ok((
+                    Some(self),
+                    input.apply_operation(&op, GridRotation::IDENTITY, false)?,
+                ))
             }
             Self::Jetpack { active } => Ok((
                 Some(Self::Jetpack { active: !active }),
                 UniverseTransaction::default(),
             )),
-            Self::Custom { ref op, icon: _ } => input.apply_operation(self.clone(), op),
+            Self::Custom { ref op, icon: _ } => Ok((
+                Some(self.clone()),
+                input.apply_operation(op, GridRotation::IDENTITY, false)?,
+            )),
         }
     }
 
@@ -361,13 +370,12 @@ impl ToolInput {
         old_block: Block,
         new_block: Block,
     ) -> Result<UniverseTransaction, ToolError> {
-        let affected_cube = cursor.cube() + cursor.face_selected().normal_vector();
-        let rotation = match new_block
+        // TODO: better error typing here
+        let new_ev = new_block
             .evaluate()
-            .map_err(|e| ToolError::Internal(e.to_string()))? // TODO: better error typing here
-            .attributes()
-            .rotation_rule
-        {
+            .map_err(|e| ToolError::Internal(e.to_string()))?;
+
+        let rotation = match new_ev.attributes().rotation_rule {
             RotationPlacementRule::Never => GridRotation::IDENTITY,
             RotationPlacementRule::Attach { by: attached_face } => {
                 let world_cube_face: Face6 = cursor
@@ -383,17 +391,27 @@ impl ToolInput {
             }
         };
 
-        let mut txn = self.set_cube(affected_cube, old_block, new_block.rotate(rotation))?;
+        if let Some(ref action) = new_ev.attributes().placement_action {
+            let &block::PlacementAction {
+                ref operation,
+                in_front,
+            } = action;
+            self.apply_operation(operation, rotation, in_front)
+        } else {
+            let affected_cube = cursor.cube() + cursor.face_selected().normal_vector();
 
-        // Add fluff. TODO: This should probably be part of set_cube()?
-        txn.merge_from(
-            CubeTransaction::fluff(Fluff::PlaceBlockGeneric)
-                .at(affected_cube)
-                .bind(self.cursor()?.space().clone()),
-        )
-        .expect("fluff never fails to merge");
+            let mut txn = self.set_cube(affected_cube, old_block, new_block.rotate(rotation))?;
 
-        Ok(txn)
+            // Add fluff. TODO: This should probably be part of set_cube()?
+            txn.merge_from(
+                CubeTransaction::fluff(Fluff::PlaceBlockGeneric)
+                    .at(affected_cube)
+                    .bind(self.cursor()?.space().clone()),
+            )
+            .expect("fluff never fails to merge");
+
+            Ok(txn)
+        }
     }
 
     /// Returns a [`Cursor`] indicating what blocks the tool should act on, if it is
@@ -425,9 +443,10 @@ impl ToolInput {
 
     pub(crate) fn apply_operation(
         &self,
-        tool: Tool,
         op: &Operation,
-    ) -> Result<(Option<Tool>, UniverseTransaction), ToolError> {
+        rotation: GridRotation,
+        in_front: bool,
+    ) -> Result<UniverseTransaction, ToolError> {
         // TODO: This is a mess; figure out how much impedance-mismatch we want to fix here.
 
         let cursor = self.cursor()?; // TODO: allow op to not be spatial, i.e. not always fail
@@ -435,13 +454,17 @@ impl ToolInput {
         let character_guard: Option<UBorrow<Character>> =
             self.character.as_ref().map(|c| c.read()).transpose()?;
 
+        let cube = if in_front {
+            cursor.preceding_cube()
+        } else {
+            cursor.cube()
+        };
+
         let (space_txn, inventory_txn) = op.apply(
             &*cursor.space().read()?,
             character_guard.as_ref().map(|c| c.inventory()),
-            // TODO: Should there be rotation based on cursor ray direction?
-            // Or is that a separate input?
-            // (Should `ToolInput` be merged into `Operation` stuff?)
-            Gridgid::from_translation(cursor.cube().lower_bounds().to_vector()),
+            Gridgid::from_translation(cube.lower_bounds().to_vector())
+                * rotation.to_positive_octant_transform(1),
         )?;
         let mut txn = space_txn.bind(cursor.space().clone());
         if inventory_txn != InventoryTransaction::default() {
@@ -455,7 +478,7 @@ impl ToolInput {
             ))
             .unwrap();
         }
-        Ok((Some(tool), txn))
+        Ok(txn)
     }
 }
 
@@ -617,13 +640,14 @@ mod tests {
     use crate::character::cursor_raycast;
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::inv::Slot;
-    use crate::math::FreeCoordinate;
+    use crate::math::{rgba_const, FreeCoordinate};
     use crate::raycast::Ray;
     use crate::raytracer::print_space;
     use crate::transaction;
     use crate::universe::Universe;
     use crate::util::yield_progress_for_testing;
     use all_is_cubes_base::math::Rgba;
+    use arcstr::literal;
     use pretty_assertions::assert_eq;
     use rstest::rstest;
 
@@ -910,6 +934,89 @@ mod tests {
                 t
             }
             .bind(tester.space_handle.clone())
+        );
+    }
+
+    /// If a block has a `placement_action`, then that action is performed instead of the
+    /// normal placement. TODO: how this interacts with consumption is not yet worked out.
+    #[rstest]
+    fn use_block_which_has_placement_action(
+        #[values(Tool::Block, Tool::InfiniteBlocks)] tool_ctor: fn(Block) -> Tool,
+        #[values(false, true)] in_front: bool,
+    ) {
+        let [existing_target] = make_some_blocks();
+        let modifier_to_add: block::Modifier = block::BlockAttributes {
+            display_name: literal!("modifier_to_add"),
+            ..Default::default()
+        }
+        .into();
+        let existing_affected_block = if in_front {
+            AIR
+        } else {
+            existing_target.clone()
+        };
+        let tool_block = Block::builder()
+            .color(rgba_const!(1.0, 0.0, 0.0, 0.0))
+            .display_name("tool_block")
+            .placement_action(block::PlacementAction {
+                operation: Operation::AddModifiers([modifier_to_add.clone()].into()),
+                in_front,
+            })
+            .build();
+        let tool = tool_ctor(tool_block.clone());
+        let expect_consume = matches!(tool, Tool::Block(_));
+        let expected_result_block = existing_affected_block
+            .clone()
+            .with_modifier(modifier_to_add.clone());
+
+        dbg!(&tool);
+        let mut tester = ToolTester::new(|space| {
+            space.set([1, 0, 0], &existing_target).unwrap();
+        });
+        let transaction = tester.equip_and_use_tool(tool.clone()).unwrap();
+
+        let expected_cube_transaction = SpaceTransaction::set_cube(
+            if in_front {
+                Cube::ORIGIN
+            } else {
+                Cube::new(1, 0, 0)
+            },
+            Some(existing_affected_block.clone()),
+            Some(expected_result_block.clone()),
+        );
+        // note there is *not* a place-block fluff -- the operation should do that if
+        // applicable
+        let mut expected_cube_transaction =
+            expected_cube_transaction.bind(tester.space_handle.clone());
+        if expect_consume {
+            expected_cube_transaction
+                .merge_from(
+                    CharacterTransaction::inventory(InventoryTransaction::replace(
+                        0,
+                        Slot::from(tool.clone()),
+                        Slot::Empty,
+                    ))
+                    .bind(tester.character_handle.clone()),
+                )
+                .unwrap();
+        }
+        assert_eq!(
+            transaction, expected_cube_transaction,
+            "actual transaction ≠ expected transaction"
+        );
+
+        transaction
+            .execute(&mut tester.universe, &mut drop)
+            .unwrap();
+        print_space(&tester.space(), [-1., 1., 1.]);
+        assert_eq!(
+            (&tester.space()[[1, 0, 0]], &tester.space()[[0, 0, 0]]),
+            if in_front {
+                (&existing_target, &expected_result_block)
+            } else {
+                (&expected_result_block, &AIR)
+            },
+            "actual space state ≠ expected space state"
         );
     }
 

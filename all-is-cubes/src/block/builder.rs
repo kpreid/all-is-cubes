@@ -108,6 +108,12 @@ impl<P, Txn> Builder<P, Txn> {
         self
     }
 
+    /// Sets the value for [`BlockAttributes::placement_action`].
+    pub fn placement_action(mut self, value: impl Into<Option<super::PlacementAction>>) -> Self {
+        self.attributes.placement_action = value.into();
+        self
+    }
+
     /// Sets the value for [`BlockAttributes::tick_action`].
     pub fn tick_action(mut self, value: impl Into<Option<super::TickAction>>) -> Self {
         self.attributes.tick_action = value.into();
@@ -466,6 +472,10 @@ mod tests {
         let emission = Rgb::new(0.1, 3.0, 0.1);
         let inventory = inv::InvInBlock::new_placeholder();
         let rotation_rule = RotationPlacementRule::Attach { by: Face6::NZ };
+        let placement_action = Some(block::PlacementAction {
+            operation: Operation::Become(color_block!(1.0, 0.0, 1.0)),
+            in_front: false,
+        });
         let tick_action = Some(TickAction::from(Operation::Become(AIR)));
         let activation_action = Some(Operation::Become(color_block!(1.0, 1.0, 1.0)));
         assert_eq!(
@@ -477,6 +487,7 @@ mod tests {
                 .rotation_rule(rotation_rule)
                 .selectable(false)
                 .light_emission(emission)
+                .placement_action(placement_action.clone())
                 .tick_action(tick_action.clone())
                 .activation_action(activation_action.clone())
                 .animation_hint(AnimationHint::replacement(block::AnimationChange::Shape))
@@ -490,6 +501,7 @@ mod tests {
             .with_modifier(BlockAttributes {
                 display_name: "hello world".into(),
                 selectable: false,
+                placement_action,
                 inventory,
                 rotation_rule,
                 tick_action,

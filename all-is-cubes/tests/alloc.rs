@@ -17,8 +17,10 @@ fn clone_block_attributes() {
         selectable: true,
         animation_hint: block::AnimationHint::UNCHANGING,
 
-        // TODO: These fields could allocate when cloned and we should fix that and test it
-        // (though that's more of an `Operation` problem)
+        placement_action: Some(block::PlacementAction {
+            operation: Operation::Become(block::AIR),
+            in_front: false,
+        }),
         tick_action: Some(block::TickAction::from(Operation::Become(block::AIR))),
         activation_action: Some(Operation::Become(block::AIR)),
 
@@ -50,6 +52,8 @@ fn clone_evaluated_block() {
         clone = Some(original.clone());
     });
 }
+
+// TODO: Test cloning of `Operation`
 
 #[track_caller]
 fn assert_no_alloc(f: impl FnOnce()) {

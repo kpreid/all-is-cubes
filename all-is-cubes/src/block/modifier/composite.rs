@@ -259,6 +259,18 @@ fn evaluate_composition(
         selectable: src_att.selectable | dst_att.selectable,
         inventory: src_att.inventory.concatenate(dst_att.inventory),
         rotation_rule: dst_att.rotation_rule, // TODO merge
+        placement_action: operator
+            .blend_operations(
+                ctx,
+                src_att.placement_action.as_ref().map(|a| &a.operation),
+                dst_att.placement_action.as_ref().map(|a| &a.operation),
+            )
+            .map(|operation| block::PlacementAction {
+                operation,
+                // TODO: unclear if logical OR is the right merge rule here
+                in_front: src_att.placement_action.is_some_and(|a| a.in_front)
+                    || dst_att.placement_action.is_some_and(|a| a.in_front),
+            }),
         tick_action: operator
             .blend_operations(
                 ctx,
