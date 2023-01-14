@@ -292,6 +292,18 @@ impl<H: BehaviorHost> BehaviorSetTransaction<H> {
             ..Default::default()
         }
     }
+
+    /// Returns an iterator over every behavior attachment added, removed, or modified by
+    /// this transaction (not necessary free of duplicates).
+    pub(crate) fn attachments_affected(&self) -> impl Iterator<Item = &H::Attachment> {
+        // TODO: needs to collect `replace` attachments too
+        let replace = self
+            .replace
+            .values()
+            .flat_map(|Replace { old, new }| [&old.attachment, &new.attachment]);
+        let insert = self.insert.iter().map(|entry| &entry.attachment);
+        replace.chain(insert)
+    }
 }
 
 impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
@@ -600,6 +612,43 @@ mod tests {
                 Arc::as_ptr(&arc_qu) as *const dyn Behavior<Character>
             ],
         )
+    }
+
+    #[test]
+    fn txn_attachments_insert() {
+        let attachment =
+            SpaceBehaviorAttachment::new(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]));
+        let transaction =
+            BehaviorSetTransaction::<Space>::insert(attachment, Arc::new(NoopBehavior(1)));
+        assert_eq!(
+            transaction.attachments_affected().collect::<Vec<_>>(),
+            vec![&attachment]
+        );
+    }
+
+    #[test]
+    fn txn_attachments_replace() {
+        let attachment1 =
+            SpaceBehaviorAttachment::new(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]));
+        let attachment2 =
+            SpaceBehaviorAttachment::new(GridAab::from_lower_size([10, 0, 0], [1, 1, 1]));
+        let transaction = BehaviorSetTransaction::<Space>::replace(
+            0,
+            Replace {
+                old: BehaviorSetEntry {
+                    attachment: attachment1,
+                    behavior: Arc::new(NoopBehavior(1)),
+                },
+                new: BehaviorSetEntry {
+                    attachment: attachment2,
+                    behavior: Arc::new(NoopBehavior(1)),
+                },
+            },
+        );
+        assert_eq!(
+            transaction.attachments_affected().collect::<Vec<_>>(),
+            vec![&attachment1, &attachment2]
+        );
     }
 
     #[test]
