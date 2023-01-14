@@ -363,6 +363,39 @@ impl<H: BehaviorHost> PartialEq for BehaviorSetTransaction<H> {
 impl<H: BehaviorHost> Eq for BehaviorSetTransaction<H> {}
 
 #[cfg(test)]
+pub(crate) use testing::*;
+#[cfg(test)]
+mod testing {
+    use super::*;
+
+    /// A [`Behavior`] implementation that does nothing and carries arbitrary data, for testing.
+    #[derive(Clone)]
+    pub(crate) struct NoopBehavior<D>(pub D);
+
+    impl<D: Debug> fmt::Debug for NoopBehavior<D> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "NoopBehavior(")?;
+            self.0.fmt(f)?; // inherit Formatter::alternate() flag
+            write!(f, ")")?;
+            Ok(())
+        }
+    }
+
+    impl<H: BehaviorHost, D: Debug + Send + Sync + 'static> Behavior<H> for NoopBehavior<D> {
+        fn alive(&self, _context: &BehaviorContext<'_, H>) -> bool {
+            true
+        }
+        fn ephemeral(&self) -> bool {
+            false
+        }
+    }
+
+    impl<D> VisitRefs for NoopBehavior<D> {
+        fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::character::{Character, CharacterTransaction};
@@ -377,40 +410,18 @@ mod tests {
     fn behavior_set_debug() {
         use pretty_assertions::assert_eq;
 
-        #[derive(Debug)]
-        struct DebugBehavior {
-            _x: i32,
-        }
-        impl Behavior<Character> for DebugBehavior {
-            fn alive(&self, _context: &BehaviorContext<'_, Character>) -> bool {
-                true
-            }
-            fn ephemeral(&self) -> bool {
-                false
-            }
-        }
-        impl VisitRefs for DebugBehavior {
-            // No references
-            fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
-        }
-
         let mut set = BehaviorSet::<Character>::new();
         assert_eq!(format!("{set:?}"), "BehaviorSet([])");
         assert_eq!(format!("{set:#?}"), "BehaviorSet([])");
-        BehaviorSetTransaction::insert((), Arc::new(DebugBehavior { _x: 1 }))
+        BehaviorSetTransaction::insert((), Arc::new(NoopBehavior(1)))
             .execute(&mut set)
             .unwrap();
-        assert_eq!(
-            format!("{set:?}"),
-            "BehaviorSet([DebugBehavior { _x: 1 } @ ()])"
-        );
+        assert_eq!(format!("{set:?}"), "BehaviorSet([NoopBehavior(1) @ ()])");
         assert_eq!(
             format!("{set:#?}\n"),
             indoc! {"
                 BehaviorSet([
-                    DebugBehavior {
-                        _x: 1,
-                    } @ (),
+                    NoopBehavior(1) @ (),
                 ])
             "},
         );
