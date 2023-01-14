@@ -34,14 +34,12 @@ clap = { version = "4.0.12", default-features = false, features = ["cargo", "dep
 criterion = { version = "0.4.0", features = ["cargo_bench_support", "html_reports"] }
 either = "1.8.0"
 exhaust = "0.1.0"
-# TODO: remove use of `futures` in favor of subcrates
-futures = { version = "0.3.21", default-features = false, features = ["alloc", "std"] }
 futures-channel = { version = "0.3.24", default-features = false, features = ["alloc"] }
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 # Note: This is a executor for tests and does not imply any more general requirement
 # for using `futures-executor` with All is Cubes.
 # TODO: Consider sticking to tokio instead
-futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
+futures-executor = { version = "0.3.25", default-features = false, features = ["std"] }
 futures-task = { version = "0.3.17", default-features = false }
 futures-util = { version = "0.3.21", default-features = false, features = ["alloc"] }
 image = { version = "0.24.2", default-features = false }

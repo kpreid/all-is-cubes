@@ -3,8 +3,8 @@
 use std::future::Future;
 use std::sync::Arc;
 
-use futures::future::BoxFuture;
-use futures::FutureExt;
+use futures_core::future::BoxFuture;
+use futures_util::FutureExt;
 
 use all_is_cubes::block::{Block, Resolution::R2};
 use all_is_cubes::camera::{

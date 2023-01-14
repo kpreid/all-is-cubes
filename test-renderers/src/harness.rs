@@ -6,9 +6,10 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use async_fn_traits::{AsyncFn0, AsyncFn1, AsyncFn2};
-use futures::future::{BoxFuture, Shared};
-use futures::stream::FuturesUnordered;
-use futures::{FutureExt, StreamExt as _};
+use futures_core::future::BoxFuture;
+use futures_util::future::Shared;
+use futures_util::stream::FuturesUnordered;
+use futures_util::{FutureExt as _, StreamExt as _};
 use image::RgbaImage;
 use itertools::Itertools;
 

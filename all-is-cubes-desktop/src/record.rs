@@ -123,7 +123,7 @@ impl Recorder {
                 // TODO: Stop doing this inside of record initialization, and give export
                 // its own separate main code path.
                 let path_str = options.output_path.to_string_lossy().to_string();
-                futures::executor::block_on(all_is_cubes_port::export_to_path(
+                futures_executor::block_on(all_is_cubes_port::export_to_path(
                     YieldProgress::noop(),
                     export_format,
                     all_is_cubes_port::ExportSet::from_spaces(vec![cameras

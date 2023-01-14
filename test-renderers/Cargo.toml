@@ -34,7 +34,8 @@ async_fn_traits = { workspace = true }
 # Using clap for parsing test command-line arguments
 clap = { workspace = true }
 exhaust = { workspace = true }
-futures = { workspace = true }
+futures-core = { workspace = true }
+futures-util = { workspace = true }
 image = { workspace = true, features = ["png"] }
 itertools = { workspace = true }
 send_wrapper = { workspace = true }

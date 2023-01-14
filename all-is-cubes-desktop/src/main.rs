@@ -38,7 +38,7 @@ use std::time::{Duration, Instant};
 
 use all_is_cubes::universe::Universe;
 use clap::{CommandFactory as _, Parser as _};
-use futures::executor::block_on;
+use futures_executor::block_on;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::{thread_rng, Rng};
 
