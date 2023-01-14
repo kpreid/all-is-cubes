@@ -142,7 +142,16 @@ impl<H: BehaviorHost> BehaviorSet<H> {
                 host_transaction_binder,
                 self_transaction_binder: &|new_behavior| {
                     host_transaction_binder(set_transaction_binder(
-                        BehaviorSetTransaction::replace(index, new_behavior),
+                        BehaviorSetTransaction::replace(
+                            index,
+                            Replace {
+                                old: entry.clone(),
+                                new: BehaviorSetEntry {
+                                    attachment: entry.attachment.clone(),
+                                    behavior: new_behavior,
+                                },
+                            },
+                        ),
                     ))
                 },
             };
@@ -246,8 +255,17 @@ impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> Debug for QueryItem<'a, H, B>
 
 #[derive(Debug)]
 pub struct BehaviorSetTransaction<H: BehaviorHost> {
-    replace: BTreeMap<usize, Arc<dyn Behavior<H>>>,
+    /// Replacement of existing behaviors or their attachments.
+    replace: BTreeMap<usize, Replace<H>>,
+    /// Newly inserted behaviors.
     insert: Vec<BehaviorSetEntry<H>>,
+}
+
+#[derive(Debug)]
+struct Replace<H: BehaviorHost> {
+    // TODO: Should we also offer not replacing behavior or not replacing attachment?
+    old: BehaviorSetEntry<H>,
+    new: BehaviorSetEntry<H>,
 }
 
 impl<H: BehaviorHost> BehaviorSetTransaction<H> {
@@ -256,12 +274,11 @@ impl<H: BehaviorHost> BehaviorSetTransaction<H> {
         self.replace.is_empty() && self.insert.is_empty()
     }
 
-    fn replace(index: usize, new: Arc<dyn Behavior<H>>) -> Self {
-        // TODO: Should inventories store `Rc<Tool>` so callers can avoid cloning for the sake of `old`s?
-        let mut replace = BTreeMap::new();
-        replace.insert(index, new);
+    /// This function is private because the normal way it is used is via
+    /// [`BehaviorContext::replace_self()`]
+    fn replace(index: usize, replacement: Replace<H>) -> Self {
         BehaviorSetTransaction {
-            replace,
+            replace: BTreeMap::from([(index, replacement)]),
             ..Default::default()
         }
     }
@@ -281,16 +298,40 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
     type CommitCheck = ();
     type Output = ();
 
+    #[allow(clippy::vtable_address_comparisons)] // The hazards should be okay for this use case
     fn check(&self, target: &BehaviorSet<H>) -> Result<Self::CommitCheck, PreconditionFailed> {
-        if matches!(self.replace.keys().copied().max(), Some(index) if index >= target.items.len())
-        {
-            Err(PreconditionFailed {
-                location: "BehaviorSet",
-                problem: "behavior(s) not found",
-            })
-        } else {
-            Ok(())
+        let Self { replace, insert } = self;
+        // TODO: need to compare replacement preconditions
+        for (&index, Replace { old, new: _ }) in replace {
+            if let Some(BehaviorSetEntry {
+                attachment,
+                behavior,
+            }) = target.items.get(index)
+            {
+                if attachment != &old.attachment {
+                    return Err(PreconditionFailed {
+                        location: "BehaviorSet",
+                        problem: "existing behavior attachment is not as expected",
+                    });
+                }
+                if !Arc::ptr_eq(behavior, &old.behavior) {
+                    return Err(PreconditionFailed {
+                        location: "BehaviorSet",
+                        problem: "existing behavior value is not as expected",
+                    });
+                }
+            } else {
+                return Err(PreconditionFailed {
+                    location: "BehaviorSet",
+                    problem: "behavior(s) not found",
+                });
+            }
         }
+
+        // Currently, insertions always succeed.
+        let _ = insert;
+
+        Ok(())
     }
 
     fn commit(
@@ -298,8 +339,8 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
         target: &mut BehaviorSet<H>,
         (): Self::CommitCheck,
     ) -> Result<(), CommitError> {
-        for (index, new) in &self.replace {
-            target.items[*index].behavior = new.clone();
+        for (index, replacement) in &self.replace {
+            target.items[*index] = replacement.new.clone();
         }
         target.items.extend(self.insert.iter().cloned());
         Ok(())
@@ -349,18 +390,47 @@ impl<H: BehaviorHost> Default for BehaviorSetTransaction<H> {
 }
 
 impl<H: BehaviorHost> PartialEq for BehaviorSetTransaction<H> {
+    // Manual implementation to avoid bounds on `H`.
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            replace: r1,
+            insert: i1,
+        } = self;
+        let Self {
+            replace: r2,
+            insert: i2,
+        } = other;
+        r1 == r2 && i1 == i2
+    }
+}
+impl<H: BehaviorHost> PartialEq for Replace<H> {
     // Manual implementation to avoid bounds on `H` and to implement the partiality (comparing pointers instead of values).
     #[allow(clippy::vtable_address_comparisons)] // The hazards should be okay for this use case
     fn eq(&self, other: &Self) -> bool {
-        self.replace.iter().zip(other.replace.iter()).all(
-            |((a_index, a_behavior), (b_index, b_behavior))| {
-                a_index == b_index && Arc::ptr_eq(a_behavior, b_behavior)
-            },
-        ) && self.insert == other.insert
+        let Self {
+            old: old1,
+            new: new1,
+        } = self;
+        let Self {
+            old: old2,
+            new: new2,
+        } = other;
+        old1 == old2 && new1 == new2
     }
 }
 
 impl<H: BehaviorHost> Eq for BehaviorSetTransaction<H> {}
+impl<H: BehaviorHost> Eq for Replace<H> {}
+
+impl<H: BehaviorHost> Clone for Replace<H> {
+    // Manual implementation to avoid bounds on `H`.
+    fn clone(&self) -> Self {
+        Self {
+            old: self.old.clone(),
+            new: self.new.clone(),
+        }
+    }
+}
 
 #[cfg(test)]
 pub(crate) use testing::*;
@@ -399,9 +469,9 @@ mod testing {
 mod tests {
     use super::*;
     use crate::character::{Character, CharacterTransaction};
-    use crate::math::FreeCoordinate;
+    use crate::math::{FreeCoordinate, GridAab};
     use crate::physics::BodyTransaction;
-    use crate::space::Space;
+    use crate::space::{Space, SpaceBehaviorAttachment};
     use crate::transaction::TransactionTester;
     use crate::universe::Universe;
     use indoc::indoc;
@@ -533,7 +603,66 @@ mod tests {
     }
 
     #[test]
-    fn systematic() {
+    fn txn_check_non_matching_old() {
+        // Set up behavior set
+        let mut set = BehaviorSet::<Space>::new();
+        let attachment =
+            SpaceBehaviorAttachment::new(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]));
+        BehaviorSetTransaction::insert(attachment, Arc::new(NoopBehavior(1)))
+            .execute(&mut set)
+            .unwrap();
+
+        // Try mismatched behavior
+        let transaction = BehaviorSetTransaction::<Space>::replace(
+            0,
+            Replace {
+                old: BehaviorSetEntry {
+                    attachment,
+                    behavior: Arc::new(NoopBehavior(2)), // not equal to actual behavior
+                },
+                new: BehaviorSetEntry {
+                    attachment,
+                    behavior: Arc::new(NoopBehavior(3)),
+                },
+            },
+        );
+        assert_eq!(
+            transaction.check(&set).unwrap_err(),
+            PreconditionFailed {
+                location: "BehaviorSet",
+                problem: "existing behavior value is not as expected"
+            }
+        );
+
+        // Try mismatched attachment
+        let transaction = BehaviorSetTransaction::<Space>::replace(
+            0,
+            Replace {
+                old: BehaviorSetEntry {
+                    // not equal to attachment
+                    attachment: SpaceBehaviorAttachment::new(GridAab::from_lower_size(
+                        [100, 0, 0],
+                        [1, 1, 1],
+                    )),
+                    behavior: Arc::new(NoopBehavior(1)),
+                },
+                new: BehaviorSetEntry {
+                    attachment,
+                    behavior: Arc::new(NoopBehavior(1)),
+                },
+            },
+        );
+        assert_eq!(
+            transaction.check(&set).unwrap_err(),
+            PreconditionFailed {
+                location: "BehaviorSet",
+                problem: "existing behavior attachment is not as expected"
+            }
+        );
+    }
+
+    #[test]
+    fn txn_systematic() {
         let b1 = Arc::new(SelfModifyingBehavior { foo: 100 });
         let b2 = Arc::new(SelfModifyingBehavior { foo: 200 });
 
