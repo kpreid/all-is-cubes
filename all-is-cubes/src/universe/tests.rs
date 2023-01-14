@@ -171,15 +171,11 @@ fn insert_pending_becomes_anonym_direct() {
 }
 
 #[test]
-#[ignore = "UniverseTransaction does not yet support pending"]
 fn insert_pending_becomes_anonym_via_txn() {
     let mut u = Universe::new();
-    UniverseTransaction::insert(URef::new_pending(
-        Name::Pending,
-        Space::empty_positive(1, 1, 1),
-    ))
-    .execute(&mut u)
-    .unwrap();
+    UniverseTransaction::insert(URef::new_pending(Name::Pending, BlockDef::new(AIR)))
+        .execute(&mut u)
+        .unwrap();
     assert_eq!(u.blocks.keys().collect::<Vec<_>>(), vec![&Name::Anonym(0)]);
 }
 
