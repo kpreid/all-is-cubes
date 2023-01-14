@@ -25,7 +25,6 @@ dot_vox = "4.1.0"
 # TODO: replace logging with explicit reporting data flow
 log = { version = "0.4.14", default-features = false }
 thiserror = "1.0.22"
-futures = { version = "0.3.21", default-features = false, features = ["alloc", "std"] }
 
 # glTF related dependencies
 base64 = "0.13.0" # data URL generation

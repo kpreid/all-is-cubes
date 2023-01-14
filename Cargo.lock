@@ -167,7 +167,6 @@ dependencies = [
  "bytemuck",
  "dot_vox",
  "either",
- "futures",
  "gltf-json",
  "log",
  "serde_json",
