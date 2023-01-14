@@ -105,7 +105,7 @@ impl<T: 'static> URef<T> {
     /// is now defunct.
     ///
     /// When dereferenced, this will always produce the error [`RefError::Gone`].
-    /// When compared, this will be equal to any other created with the same name.
+    /// When compared, this will be equal only to clones of itself.
     ///
     /// This may be used in tests to exercise error handling.
     #[doc(hidden)] // TODO: decide if this is good API
@@ -369,6 +369,8 @@ impl<T: fmt::Debug + 'static> fmt::Debug for URef<T> {
 /// the same mutable cell.
 impl<T> PartialEq for URef<T> {
     fn eq(&self, other: &Self) -> bool {
+        // Note: Comparing the state pointer causes `URef::new_gone()` to produce distinct
+        // instances. This seems better to me than comparing them by name and type only.
         Weak::ptr_eq(&self.weak_ref, &other.weak_ref) && Arc::ptr_eq(&self.state, &other.state)
     }
 }
