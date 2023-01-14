@@ -158,20 +158,21 @@ impl SpaceTransaction {
         Self::single(cube, CubeTransaction::ACTIVATE)
     }
 
-    /// Computes the region affected by this transaction.
+    /// Computes the region of cubes directly affected by this transaction.
+    /// Ignores behaviors.
     ///
-    /// TODO: This does not currently report behaviors but it should.
+    /// Returns [`None`] if no cubes are affected.
     ///
     /// TODO: Handle the case where the total volume is too large.
     /// (Maybe `GridAab` should lose that restriction.)
-    pub fn bounds(&self) -> Option<GridAab> {
+    pub fn bounds_only_cubes(&self) -> Option<GridAab> {
         // Destructuring to statically check that we consider all fields.
         let Self {
             cubes,
             behaviors: _,
         } = self;
-
         let mut bounds: Option<GridAab> = None;
+
         for &cube_array in cubes.keys() {
             let cube = GridPoint::from(cube_array);
             if let Some(bounds) = &mut bounds {
@@ -180,6 +181,29 @@ impl SpaceTransaction {
                 bounds = Some(GridAab::single_cube(cube));
             }
         }
+
+        bounds
+    }
+
+    /// Computes the region affected by this transaction.
+    ///
+    /// Returns [`None`] if no specific regions of the space are affected.
+    pub fn bounds(&self) -> Option<GridAab> {
+        // Destructuring to statically check that we consider all fields.
+        let Self {
+            cubes: _,
+            behaviors,
+        } = self;
+        let mut bounds: Option<GridAab> = self.bounds_only_cubes();
+
+        for attachment in behaviors.attachments_affected() {
+            if let Some(bounds) = &mut bounds {
+                *bounds = (*bounds).union(attachment.bounds).unwrap();
+            } else {
+                bounds = Some(attachment.bounds);
+            }
+        }
+
         bounds
     }
 }
@@ -407,6 +431,7 @@ mod tests {
 
     use pretty_assertions::assert_eq;
 
+    use crate::behavior::NoopBehavior;
     use crate::block::AIR;
     use crate::content::make_some_blocks;
     use crate::inv::EphemeralOpaque;
@@ -672,5 +697,12 @@ mod tests {
             t1.merge(t2).unwrap().bounds(),
             Some(GridAab::from_lower_upper([-7, 3, 5], [11, 4, 6]))
         );
+    }
+
+    #[test]
+    fn bounds_behavior() {
+        let bounds = GridAab::from_lower_size([1, 2, 3], [4, 5, 6]);
+        let txn = SpaceTransaction::add_behavior(bounds, NoopBehavior(1));
+        assert_eq!(txn.bounds(), Some(bounds));
     }
 }
