@@ -253,9 +253,9 @@ impl fmt::Display for ToolbarButtonState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_executor::block_on;
-    #[test]
-    fn blocks_smoke_test() {
-        block_on(UiBlocks::new(&mut Universe::new(), YieldProgress::noop()));
+
+    #[tokio::test]
+    async fn blocks_smoke_test() {
+        UiBlocks::new(&mut Universe::new(), YieldProgress::noop()).await;
     }
 }

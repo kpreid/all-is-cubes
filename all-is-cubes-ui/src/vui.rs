@@ -409,11 +409,10 @@ pub(crate) enum CueMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_executor::block_on;
 
-    fn new_vui_for_test(paused: bool) -> (Vui, mpsc::Receiver<ControlMessage>) {
+    async fn new_vui_for_test(paused: bool) -> (Vui, mpsc::Receiver<ControlMessage>) {
         let (cctx, ccrx) = mpsc::sync_channel(1);
-        let vui = block_on(Vui::new(
+        let vui = Vui::new(
             &InputProcessor::new(),
             ListenableSource::constant(None),
             ListenableSource::constant(paused),
@@ -422,22 +421,23 @@ mod tests {
             ListenableSource::constant(Viewport::ARBITRARY),
             ListenableSource::constant(None),
             None,
-        ));
+        )
+        .await;
         (vui, ccrx)
     }
 
-    #[test]
-    fn back_pause() {
-        let (mut vui, control_channel) = new_vui_for_test(false);
+    #[tokio::test]
+    async fn back_pause() {
+        let (mut vui, control_channel) = new_vui_for_test(false).await;
         vui.back();
         let msg = control_channel.try_recv().unwrap();
         assert!(matches!(msg, ControlMessage::TogglePause), "{msg:?}");
         assert!(control_channel.try_recv().is_err());
     }
 
-    #[test]
-    fn back_unpause() {
-        let (mut vui, control_channel) = new_vui_for_test(true);
+    #[tokio::test]
+    async fn back_unpause() {
+        let (mut vui, control_channel) = new_vui_for_test(true).await;
         vui.set_state(VuiPageState::Paused);
         vui.back();
         let msg = control_channel.try_recv().unwrap();

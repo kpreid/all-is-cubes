@@ -52,7 +52,6 @@ dependencies = [
  "exhaust",
  "fnv",
  "futures-core",
- "futures-executor",
  "image 0.24.5",
  "indoc",
  "instant",
@@ -69,6 +68,7 @@ dependencies = [
  "rayon",
  "serde",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -81,7 +81,6 @@ dependencies = [
  "criterion",
  "exhaust",
  "futures-core",
- "futures-executor",
  "image 0.24.5",
  "instant",
  "itertools",
@@ -95,6 +94,7 @@ dependencies = [
  "rand 0.8.5",
  "rand_xoshiro",
  "strum",
+ "tokio",
 ]
 
 [[package]]
@@ -111,7 +111,6 @@ dependencies = [
  "clap 4.0.32",
  "crossterm",
  "directories-next",
- "futures-executor",
  "gltf",
  "image 0.24.5",
  "indicatif",
@@ -127,6 +126,7 @@ dependencies = [
  "strum",
  "tempfile",
  "thiserror",
+ "tokio",
  "trycmd",
  "tui",
  "unicode-width",
@@ -195,7 +195,6 @@ dependencies = [
  "exhaust",
  "futures-channel",
  "futures-core",
- "futures-executor",
  "futures-task",
  "image 0.24.5",
  "indoc",
@@ -204,6 +203,7 @@ dependencies = [
  "once_cell",
  "pretty_assertions",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

@@ -36,10 +36,11 @@ macro_rules! generate_template_test {
         $(
             paste! {
                 $( #[cfg($variant_cfg)] )*
-                #[test]
+                #[cfg(test)]
+                #[tokio::test]
                 #[allow(non_snake_case)]
-                fn [< template_ $variant_name >] () {
-                    tests::check_universe_template($enum_name::$variant_name);
+                async fn [< template_ $variant_name >] () {
+                    tests::check_universe_template($enum_name::$variant_name).await;
                 }
             }
         )*
@@ -365,36 +366,34 @@ mod tests {
     use super::*;
     use all_is_cubes::time::Tick;
     use futures_core::future::BoxFuture;
-    use futures_executor::block_on;
 
     fn _test_build_future_is_send() {
         let _: BoxFuture<'_, _> =
             Box::pin(UniverseTemplate::Atrium.build(YieldProgress::noop(), 0));
     }
 
-    pub(super) fn check_universe_template(template: UniverseTemplate) {
+    pub(super) async fn check_universe_template(template: UniverseTemplate) {
         let result = if let UniverseTemplate::Islands = template {
             // Kludge: the islands template is known to be very slow.
             // We should work on making what it does faster, but for now, let's
             // run a much smaller instance of it for the does-it-succeed test.
             // TODO: This should instead be handled by the template having an official
             // user-configurable size parameter.
-            block_on(async {
-                let mut universe = Universe::new();
-                install_demo_blocks(&mut universe, YieldProgress::noop())
-                    .await
-                    .unwrap();
-                islands(&mut universe, YieldProgress::noop(), 100)
-                    .await
-                    .unwrap();
-            });
+
+            let mut universe = Universe::new();
+            install_demo_blocks(&mut universe, YieldProgress::noop())
+                .await
+                .unwrap();
+            islands(&mut universe, YieldProgress::noop(), 100)
+                .await
+                .unwrap();
+
             return; // TODO: skipping final test because we didn't create the character
         } else {
-            block_on(
-                template
-                    .clone()
-                    .build(YieldProgress::noop(), 0x7f16dfe65954583e),
-            )
+            template
+                .clone()
+                .build(YieldProgress::noop(), 0x7f16dfe65954583e)
+                .await
         };
 
         if matches!(template, UniverseTemplate::Fail) {

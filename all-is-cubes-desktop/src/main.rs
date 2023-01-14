@@ -38,7 +38,6 @@ use std::time::{Duration, Instant};
 
 use all_is_cubes::universe::Universe;
 use clap::{CommandFactory as _, Parser as _};
-use futures_executor::block_on;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::{thread_rng, Rng};
 
@@ -80,6 +79,8 @@ fn title_and_version() -> String {
 }
 
 fn main() -> Result<(), anyhow::Error> {
+    let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
+
     // Parse and transform command-line arguments.
     let options = AicDesktopArgs::parse();
     // Destructure as a check that we're using/skipping all the args
@@ -137,7 +138,7 @@ fn main() -> Result<(), anyhow::Error> {
     ));
 
     let start_session_time = Instant::now();
-    let mut session = block_on(Session::builder().ui(viewport_cell.as_source()).build());
+    let mut session = runtime.block_on(Session::builder().ui(viewport_cell.as_source()).build());
     session.graphics_options_mut().set(graphics_options);
     let session_done_time = Instant::now();
     log::debug!(
@@ -153,7 +154,7 @@ fn main() -> Result<(), anyhow::Error> {
             && output_file.as_ref().map_or(false, |file| {
                 determine_record_format(file).map_or(false, |fmt| fmt.includes_light())
             }));
-    let universe = create_universe(input_source, precompute_light)?;
+    let universe = runtime.block_on(create_universe(input_source, precompute_light))?;
     session.set_universe(universe);
 
     // Bundle of inputs to `inner_main()`, which — unlike this function — is generic over
@@ -176,7 +177,7 @@ fn main() -> Result<(), anyhow::Error> {
     match graphics_type {
         GraphicsType::Window => {
             let event_loop = winit::event_loop::EventLoop::new();
-            let dsession = block_on(create_winit_wgpu_desktop_session(
+            let dsession = runtime.block_on(create_winit_wgpu_desktop_session(
                 session,
                 aic_winit::create_window(
                     &event_loop,
@@ -292,7 +293,7 @@ struct InnerMainParams {
 }
 
 /// Perform and log the creation of the universe.
-fn create_universe(
+async fn create_universe(
     input_source: UniverseSource,
     precompute_light: bool,
 ) -> Result<Universe, anyhow::Error> {
@@ -315,17 +316,15 @@ fn create_universe(
             },
         )
     };
-    let universe = block_on(async {
-        match input_source.clone() {
-            UniverseSource::Template(template) => template
-                .build(yield_progress, thread_rng().gen())
-                .await
-                .map_err(anyhow::Error::from),
-            UniverseSource::File(path) => {
-                all_is_cubes_port::load_universe_from_file(yield_progress, &*path).await
-            }
+    let universe = match input_source.clone() {
+        UniverseSource::Template(template) => template
+            .build(yield_progress, thread_rng().gen())
+            .await
+            .map_err(anyhow::Error::from),
+        UniverseSource::File(path) => {
+            all_is_cubes_port::load_universe_from_file(yield_progress, &*path).await
         }
-    })?;
+    }?;
     universe_progress_bar.finish();
     let universe_done_time = Instant::now();
     log::debug!(

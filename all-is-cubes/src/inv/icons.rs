@@ -272,9 +272,9 @@ impl Icons {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_executor::block_on;
-    #[test]
-    fn icons_smoke_test() {
-        block_on(Icons::new(&mut Universe::new(), YieldProgress::noop()));
+
+    #[tokio::test]
+    async fn icons_smoke_test() {
+        Icons::new(&mut Universe::new(), YieldProgress::noop()).await;
     }
 }

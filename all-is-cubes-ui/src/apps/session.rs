@@ -606,13 +606,12 @@ mod tests {
     use all_is_cubes::space::Space;
     use all_is_cubes::universe::{Name, Universe, UniverseIndex};
     use futures_channel::oneshot;
-    use futures_executor::block_on;
 
-    #[test]
-    fn set_universe_async() {
+    #[tokio::test]
+    async fn set_universe_async() {
         let old_marker = Name::from("old");
         let new_marker = Name::from("new");
-        let mut session = block_on(Session::builder().build());
+        let mut session = Session::builder().build().await;
         session
             .universe_mut()
             .insert(old_marker.clone(), Space::empty_positive(1, 1, 1))

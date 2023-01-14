@@ -530,14 +530,12 @@ mod tests {
     use super::*;
     use all_is_cubes::content::make_some_blocks;
 
-    #[test]
-    pub fn install_demo_blocks_test() {
+    #[tokio::test]
+    pub async fn install_demo_blocks_test() {
         let mut universe = Universe::new();
-        futures_executor::block_on(async {
-            install_demo_blocks(&mut universe, YieldProgress::noop())
-                .await
-                .unwrap()
-        });
+        install_demo_blocks(&mut universe, YieldProgress::noop())
+            .await
+            .unwrap();
         // TODO: assert what entries were created, once Universe has iteration
     }
 

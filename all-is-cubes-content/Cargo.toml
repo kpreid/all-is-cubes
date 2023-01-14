@@ -48,8 +48,7 @@ strum = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_futures"] }
-# Note: This is a executor for tests and does not imply any more general requirement
-# for using `futures-executor` with All is Cubes.
-futures-executor = { workspace = true }
 pretty_assertions = { workspace = true }
+# Using tokio for async test-running.
+tokio = { workspace = true, features = ["macros", "rt"] }
 

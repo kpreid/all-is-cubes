@@ -36,10 +36,6 @@ either = "1.8.0"
 exhaust = "0.1.0"
 futures-channel = { version = "0.3.24", default-features = false, features = ["alloc"] }
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
-# Note: This is a executor for tests and does not imply any more general requirement
-# for using `futures-executor` with All is Cubes.
-# TODO: Consider sticking to tokio instead
-futures-executor = { version = "0.3.25", default-features = false, features = ["std"] }
 futures-task = { version = "0.3.17", default-features = false }
 futures-util = { version = "0.3.21", default-features = false, features = ["alloc"] }
 image = { version = "0.24.2", default-features = false }

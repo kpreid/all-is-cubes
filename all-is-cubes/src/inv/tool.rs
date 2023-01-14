@@ -487,7 +487,6 @@ mod tests {
     use crate::space::Space;
     use crate::universe::{UBorrow, URef, Universe};
     use crate::util::YieldProgress;
-    use futures_executor::block_on;
     use pretty_assertions::assert_eq;
     use std::error::Error;
 
@@ -574,18 +573,17 @@ mod tests {
         }
     }
 
-    fn dummy_icons() -> BlockProvider<Icons> {
+    async fn dummy_icons() -> BlockProvider<Icons> {
         // TODO: Might be good to generate differently labeled blocks... maybe BlockProvider should have a way to do that for any enum.
         let [block] = make_some_blocks();
-        block_on(BlockProvider::new(YieldProgress::noop(), |_| {
-            Ok(block.clone())
-        }))
-        .unwrap()
+        BlockProvider::new(YieldProgress::noop(), |_| Ok(block.clone()))
+            .await
+            .unwrap()
     }
 
-    #[test]
-    fn icon_activate() {
-        let dummy_icons = dummy_icons();
+    #[tokio::test]
+    async fn icon_activate() {
+        let dummy_icons = dummy_icons().await;
         assert_eq!(
             &*Tool::Activate.icon(&dummy_icons),
             &dummy_icons[Icons::Activate]
@@ -608,9 +606,9 @@ mod tests {
         // (unless the transaction fails), so there are no tests for that.
     }
 
-    #[test]
-    fn icon_remove_block() {
-        let dummy_icons = dummy_icons();
+    #[tokio::test]
+    async fn icon_remove_block() {
+        let dummy_icons = dummy_icons().await;
         assert_eq!(
             &*Tool::RemoveBlock { keep: true }.icon(&dummy_icons),
             &dummy_icons[Icons::Delete]
@@ -662,9 +660,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn icon_place_block() {
-        let dummy_icons = dummy_icons();
+    #[tokio::test]
+    async fn icon_place_block() {
+        let dummy_icons = dummy_icons().await;
         let [block] = make_some_blocks();
         assert_eq!(
             *Tool::InfiniteBlocks(block.clone()).icon(&dummy_icons),

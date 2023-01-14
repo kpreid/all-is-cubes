@@ -24,5 +24,6 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 futures-channel = { workspace = true }
-futures-executor = { workspace = true }
 pretty_assertions = { workspace = true }
+# Using tokio for async test-running.
+tokio = { workspace = true, features = ["macros", "rt"] }
