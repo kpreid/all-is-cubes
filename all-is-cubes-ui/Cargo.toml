@@ -12,17 +12,17 @@ categories = ["games", "gui"]
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.5.0" }
-exhaust = "0.1.0"
-futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
-futures-task = { version = "0.3.17", default-features = false, features = [] }
-image = { version = "0.24.2", default-features = false, features = ["png"] }
-indoc = "1.0.3"
-instant = "0.1.9"
-log = { version = "0.4.14", default-features = false }
-once_cell = "1.4.1"
-thiserror = "1.0.22"
+exhaust = { workspace = true }
+futures-core = { workspace = true }
+futures-task = { workspace = true }
+image = { workspace = true, features = ["png"] }
+indoc = { workspace = true }
+instant = { workspace = true }
+log = { workspace = true }
+once_cell = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-futures-channel = { version = "0.3.17", default-features = false, features = ["alloc"] }
-futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
-pretty_assertions = "1.2.0"
+futures-channel = { workspace = true }
+futures-executor = { workspace = true }
+pretty_assertions = { workspace = true }

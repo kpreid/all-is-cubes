@@ -29,26 +29,27 @@ arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary", "rand/std", "rand/std_rn
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.5.0" }
 all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.5.0" }
-arbitrary = { version = "1.1.6", optional = true, features = ["derive"] }
-exhaust = "0.1.0"
-futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
+arbitrary = { workspace = true, optional = true }
+exhaust = { workspace = true }
+futures-core = { workspace = true }
 # TODO: all-is-cubes should be reexporting image since the load_image module reveals it
-image = { version = "0.24.2", default-features = false }
-instant = "0.1.9"
-itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"] }
-log = { version = "0.4.14", default-features = false }
-macro_rules_attribute = "0.1.0"
+image = { workspace = true }
+instant = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+macro_rules_attribute = { workspace = true }
 maze_generator = "2.0.0"
 noise = { version = "0.8.2", default-features = false }
 paste = "1.0.5"
 petgraph = { version = "0.6.2", default-features = false, features = ["graphmap"] }
-rand = { version = "0.8.2", default-features = false }
-rand_xoshiro = "0.6.0"
-strum = { version = "0.24.0", default-features = false, features = ["derive"] }
+rand = { workspace = true }
+rand_xoshiro = { workspace = true}
+strum = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
-criterion = { version = "0.4.0", features = ["async_futures", "cargo_bench_support", "html_reports"] }
+criterion = { workspace = true, features = ["async_futures"] }
 # Note: This is a executor for tests and does not imply any more general requirement
 # for using `futures-executor` with All is Cubes.
-futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
-pretty_assertions = "1.2.0"
+futures-executor = { workspace = true }
+pretty_assertions = { workspace = true }
+

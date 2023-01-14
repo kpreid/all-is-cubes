@@ -30,20 +30,20 @@ all-is-cubes = { path = "../all-is-cubes", version = "0.5.0", features = ["threa
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.5.0" }
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.5.0", features = ["wgpu"] }
 all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.5.0" }
-async_fn_traits = "0.1.1"
+async_fn_traits = { workspace = true }
 # Using clap for parsing test command-line arguments
-clap = { version = "4.0.12", default-features = false, features = ["deprecated", "derive", "std", "suggestions"] }
-exhaust = "0.1.0"
-futures = { version = "0.3.21", default-features = false, features = ["alloc", "std"] }
-image = { version = "0.24.2", default-features = false, features = ["png"] }
-itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"] }
-send_wrapper = "0.6.0"
-serde = { version = "1.0.126", default-features = false, features = ["derive"] }
-serde_json = "1.0.64"
-simplelog = "0.12.0"
+clap = { workspace = true }
+exhaust = { workspace = true }
+futures = { workspace = true }
+image = { workspace = true, features = ["png"] }
+itertools = { workspace = true }
+send_wrapper = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+simplelog = { workspace = true }
 # tinytemplate is already in the workspace's dependency tree via criterion,
 # so let's use it for our output report template.
 tinytemplate = "1.2.1"
 # Using tokio for async test-running.
-tokio = { version = "1.18.0", features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
-wgpu = { version = "0.14.0", features = ["webgl"] }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
+wgpu = { workspace = true }

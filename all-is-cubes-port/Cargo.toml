@@ -19,21 +19,21 @@ bench = false
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.5.0" }
 # TODO: remove dependency on anyhow in favor of more precisely designed errors
-anyhow = "1.0"
+anyhow = { workspace = true }
 # TODO: dot_vox 5.x is currently nightly-only for unclear reasons -- issue filed
 dot_vox = "4.1.0"
 # TODO: replace logging with explicit reporting data flow
-log = { version = "0.4.14", default-features = false }
-thiserror = "1.0.22"
+log = { workspace = true }
+thiserror = { workspace = true }
 
 # glTF related dependencies
 base64 = "0.13.0" # data URL generation
-bytemuck = { version = "1.12.1", default-features = false, features = ["derive"] }
+bytemuck = { workspace = true, features = ["derive"] }
 gltf-json = { version = "1.0.0", default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }
-serde_json = "1.0.64"
+serde_json = { workspace = true }
 
 [dev-dependencies]
-either = "1.8.0"
-tempfile = "3.3.0"
+either = { workspace = true }
+tempfile = { workspace = true }
 # for async tests
-tokio = { version = "1.0", features = ["macros", "rt"] }
+tokio = { workspace = true, features = ["macros", "rt"] }

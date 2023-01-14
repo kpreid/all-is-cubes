@@ -12,6 +12,7 @@ rust-version = "1.65"
 cargo-fuzz = true
 
 [dependencies]
+# Note: Cannot use workspace dependencies here!
 all-is-cubes = { path = "../all-is-cubes/", features = ["arbitrary"] }
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu/" }
 arbitrary = { version = "1.1.6", features = ["derive"] }

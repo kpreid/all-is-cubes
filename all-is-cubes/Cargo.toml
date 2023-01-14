@@ -40,39 +40,40 @@ harness = false
 
 [features]
 default = []
-arbitrary = ["dep:arbitrary"]
+arbitrary = ["dep:arbitrary", "ordered-float/arbitrary"]
 threads = ["dep:rayon"]
 
 [dependencies]
-arbitrary = { version = "1.1.6", optional = true, features = ["derive"] }
-bitflags = "1.3.2"
+arbitrary = { workspace = true, optional = true }
+bitflags = { workspace = true }
 bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
-bytemuck = { version = "1.12.1", default-features = false }
+bytemuck = { workspace = true }
 cgmath = "0.18.0"
 downcast-rs = "1.2.0"
 embedded-graphics = "0.7.0"
-exhaust = "0.1.0"
+exhaust = { workspace = true }
 fnv = "1.0.7"
-futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
+futures-core = { workspace = true }
 # image is used for its common image data types (for HeadlessRenderer),
 # and for PNG asset loading.
-image = { version = "0.24.2", default-features = false, features = ["png"] }
-indoc = "1.0.3"
-instant = "0.1.9"
-itertools = { version = "0.10.0", default-features = false }
-log = { version = "0.4.14", default-features = false }
-mutants = "0.0.3"
-num-traits = "0.2.12"
-once_cell = "1.4.1"
-ordered-float = { version = "3.0.0", features = ["serde", "arbitrary"] }
-ouroboros = "0.15.0"
-rand = { version = "0.8.2", default-features = false }
-rand_xoshiro = "0.6.0"
-rayon = { version = "1.3.1", optional = true }
-serde = { version = "1.0.126", default-features = false, features = ["derive"] }
-thiserror = "1.0.22"
+image = { workspace = true, features = ["png"] }
+indoc = { workspace = true }
+instant = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+mutants = { workspace = true }
+num-traits = { workspace = true }
+once_cell = { workspace = true }
+ordered-float = { workspace = true }
+ouroboros = { workspace = true }
+rand = { workspace = true }
+rand_xoshiro = { workspace = true }
+rayon = { workspace = true, optional = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-criterion = { version = "0.4.0", features = ["cargo_bench_support", "html_reports"] }
-futures-executor = { version = "0.3.17", default-features = false, features = ["std"] }
-pretty_assertions = "1.2.0"
+criterion = { workspace = true }
+futures-executor = { workspace = true }
+pretty_assertions = { workspace = true }
+

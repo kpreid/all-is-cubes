@@ -29,16 +29,16 @@ embed = []
 [dependencies]
 # TODO: server doesn't actually have any game-server functionality so this is unnecessary
 # all-is-cubes = { path = "../all-is-cubes", version = "0.5.0", features = ["threads"] }
-anyhow = "1.0"
+anyhow = { workspace = true }
 axum = { version = "0.5.13", features = ["tower-log"] }
 include_dir = "0.7.2"
 mime_guess = "2.0.4" # also used indirectly by tower-http
-simplelog = "0.12.0"
-tokio = { version = "1.0.0", features = ["macros", "rt-multi-thread"] }
+simplelog = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tower-http = { version = "0.3.4", features = ["fs"] }
 
 [dev-dependencies]
-async_fn_traits = "0.1.1"
+async_fn_traits = { workspace = true }
 reqwest = "0.11.11"
 # add "process" feature for tests to spawn the server
-tokio = { version = "1.0.0", features = ["process"] }
+tokio = { workspace = true, features = ["process"] }
