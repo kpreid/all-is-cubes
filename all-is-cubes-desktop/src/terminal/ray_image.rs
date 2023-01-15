@@ -1,3 +1,5 @@
+use std::fmt;
+
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::{ElementWise as _, Vector2};
 use all_is_cubes::raytracer::RaytraceInfo;
@@ -18,6 +20,15 @@ pub(super) struct TextRayImage {
     /// Not relevant to the image per se, but it is convenient to carry along the info
     /// through this path.
     pub info: RaytraceInfo,
+}
+
+impl fmt::Debug for TextRayImage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TextRayImage")
+            .field("viewport", &self.viewport)
+            .field("info", &self.info)
+            .finish_non_exhaustive() // don't print the pixels
+    }
 }
 
 impl TextRayImage {

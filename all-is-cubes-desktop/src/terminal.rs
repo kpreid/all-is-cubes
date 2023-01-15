@@ -23,7 +23,7 @@ pub(crate) use options::TerminalOptions;
 mod ray_image;
 use ray_image::TextRayImage;
 mod ui;
-use ui::{write_ui, TerminalWindow};
+use ui::{InventoryDisplay, OutMsg, TerminalWindow, UiFrame};
 
 /// Print the scene to stdout and return, instead of starting any interaction.
 ///
@@ -33,7 +33,9 @@ pub(crate) fn terminal_print_once(
     mut dsession: DesktopSession<TerminalRenderer, TerminalWindow>,
     display_size: Vector2<u16>,
 ) -> Result<(), anyhow::Error> {
-    dsession.window.viewport_position = Rect::new(0, 0, display_size.x, display_size.y);
+    let rect = Rect::new(0, 0, display_size.x, display_size.y);
+    dsession.window.send(OutMsg::OverrideViewport(rect));
+    dsession.window.wait_for_sync();
     sync_viewport(&mut dsession);
 
     dsession
@@ -44,9 +46,9 @@ pub(crate) fn terminal_print_once(
         .render_pipe_out
         .recv()
         .expect("Internal error in rendering");
-    dsession.window.write_frame(frame, false)?;
+    dsession.window.send(OutMsg::WriteFrameOnly(frame));
 
-    dsession.window.clean_up_terminal()?; // note this is _also_ run on drop
+    dsession.window.stop()?;
     Ok(())
 }
 
@@ -149,14 +151,14 @@ pub(crate) fn terminal_main_loop(
     mut dsession: DesktopSession<TerminalRenderer, TerminalWindow>,
 ) -> Result<(), anyhow::Error> {
     run(&mut dsession)?;
-    dsession.window.clean_up_terminal()?; // note this is _also_ run on drop
+    dsession.window.stop()?;
     Ok(())
 }
 
 /// Run the simulation and interactive UI. Returns after user's quit command.
 /// Caller is responsible for `clean_up_terminal()`.
 fn run(dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>) -> crossterm::Result<()> {
-    dsession.window.begin_fullscreen()?;
+    dsession.window.send(OutMsg::BeginFullscreen);
 
     loop {
         'input: while crossterm::event::poll(Duration::ZERO)? {
@@ -229,12 +231,16 @@ fn run(dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>) -> cross
         }
 
         dsession.advance_time_and_maybe_step();
+        sync_viewport(dsession); // TODO: do this on a notification
 
         match dsession.renderer.render_pipe_out.try_recv() {
-            Ok(frame) => {
-                write_ui(dsession, &frame)?;
-                dsession.window.write_frame(frame, true)?;
-            }
+            Ok(frame) => dsession.window.send(OutMsg::WriteUiAndFrame(UiFrame {
+                frame,
+                cursor: dsession.session.cursor_result().cloned(),
+                frames_per_second: dsession.session.draw_fps_counter().frames_per_second(),
+                terminal_options: dsession.renderer.options.clone(),
+                inventory: InventoryDisplay::new(dsession.session.character().snapshot()),
+            })),
             // TODO: Even if we don't have a frame, we might want to update the UI anyway.
             Err(mpsc::TryRecvError::Empty) => {}
             Err(mpsc::TryRecvError::Disconnected) => panic!("render thread died"),
@@ -282,12 +288,13 @@ impl TerminalRenderer {
 
 /// Copy session's current viewport state to the viewport cell.
 fn sync_viewport(dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>) {
-    dsession.viewport_cell.set(
-        dsession
-            .renderer
-            .options
-            .viewport_from_terminal_size(rect_size(dsession.window.viewport_position)),
-    );
+    let new = dsession
+        .renderer
+        .options
+        .viewport_from_terminal_size(rect_size(dsession.window.viewport_position()));
+    if *dsession.viewport_cell.get() != new {
+        dsession.viewport_cell.set(new);
+    }
 }
 
 /// Output of [`ColorCharacterBuf`]
