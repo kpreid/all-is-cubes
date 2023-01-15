@@ -316,9 +316,10 @@ pub(crate) async fn demo_city(
 
         let enclosure_footprint = exhibit_footprint.expand(FaceMap::repeat(1));
 
-        let plot_transform = planner
-            .find_plot(enclosure_footprint)
-            .expect("Out of city space!");
+        let Some(plot_transform) = planner.find_plot(enclosure_footprint) else {
+            log::error!("Out of city space!");
+            break 'exhibit;
+        };
         let plot = exhibit_footprint.transform(plot_transform).unwrap();
         let enclosure_at_plot = enclosure_footprint.transform(plot_transform).unwrap();
 
