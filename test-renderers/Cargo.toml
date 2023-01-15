@@ -35,7 +35,7 @@ async_fn_traits = { workspace = true }
 clap = { workspace = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }
-futures-util = { workspace = true }
+futures-util = { workspace = true, features = ["std"] }
 image = { workspace = true, features = ["png"] }
 itertools = { workspace = true }
 send_wrapper = { workspace = true }
