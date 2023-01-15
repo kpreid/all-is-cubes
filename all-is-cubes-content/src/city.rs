@@ -530,8 +530,11 @@ struct CityPlanner {
 
 impl CityPlanner {
     const ROAD_RADIUS: GridCoordinate = 2;
+    /// Distance from the center cube to the line of cubes where lampposts are placed.
     const LAMP_POSITION_RADIUS: GridCoordinate = Self::ROAD_RADIUS + 2;
-    const PLOT_FRONT_RADIUS: GridCoordinate = Self::LAMP_POSITION_RADIUS + 2;
+    /// Distance from the center cube to the line of the front of each placed exhibit.
+    /// TODO: The units of this isn't being consistent, since it is actually + 2 from the lamps
+    const PLOT_FRONT_RADIUS: GridCoordinate = Self::LAMP_POSITION_RADIUS + 1;
     const GAP_BETWEEN_PLOTS: GridCoordinate = 1;
 
     pub fn new(space_bounds: GridAab) -> Self {
@@ -558,11 +561,15 @@ impl CityPlanner {
         // TODO: We'd like to resume the search from _when we left off_, but that's tricky since a
         // smaller plot might fit where a large one didn't. So, quadratic search it is for now.
         for d in 0..=self.city_radius {
-            for street_axis in GridRotation::COUNTERCLOCKWISE.iterate() {
+            for street_axis in GridRotation::CLOCKWISE.iterate() {
                 // TODO exercising opposite sides logic
                 'search: for &left_side in &[false, true] {
                     // The translation is expressed along the +X axis street, so
                     // "left" is -Z and "right" is +Z.
+                    //
+                    // The rotations are about the origin cube (GridAab::ORIGIN_CUBE), so
+                    // they are done with .to_positive_octant_matrix(1).
+
                     let mut transform = GridMatrix::from_translation(GridVector::new(
                         d,
                         1,
@@ -575,10 +582,10 @@ impl CityPlanner {
                         GridMatrix::one()
                     } else {
                         (GridRotation::COUNTERCLOCKWISE * GridRotation::COUNTERCLOCKWISE)
-                            .to_rotation_matrix()
+                            .to_positive_octant_matrix(1)
                     };
                     // Rotate to match street
-                    transform = street_axis.to_rotation_matrix() * transform;
+                    transform = street_axis.to_positive_octant_matrix(1) * transform;
 
                     let transformed = plot_shape
                         .transform(transform)
