@@ -10,6 +10,9 @@ use all_is_cubes_ui::apps::Session;
 /// Wraps a basic [`Session`] to add functionality that is common within
 /// all-is-cubes-desktop's scope of supported usage (such as loading a universe
 /// from disk).
+///
+/// This type guarantees that the `renderer` will be dropped before the `window`;
+/// `unsafe` graphics code may rely on this.
 #[derive(Debug)]
 pub(crate) struct DesktopSession<Ren, Win> {
     pub(crate) session: Session,
@@ -104,4 +107,43 @@ pub(crate) enum ClockSource {
     /// Every time [`DesktopSession::advance_time_and_maybe_step`] is called, advance time
     /// by the specified amount.
     Fixed(Duration),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn drop_order() {
+        use std::sync::mpsc;
+
+        struct DropLogger {
+            sender: mpsc::Sender<&'static str>,
+            message: &'static str,
+        }
+        impl Drop for DropLogger {
+            fn drop(&mut self) {
+                self.sender.send(self.message).unwrap();
+            }
+        }
+
+        let (sender, receiver) = std::sync::mpsc::channel();
+        drop(DesktopSession::new(
+            DropLogger {
+                sender: sender.clone(),
+                message: "renderer",
+            },
+            DropLogger {
+                sender,
+                message: "window",
+            },
+            Session::builder().build().await,
+            ListenableCell::new(Viewport::ARBITRARY),
+        ));
+
+        assert_eq!(
+            receiver.into_iter().collect::<Vec<_>>(),
+            vec!["renderer", "window"]
+        );
+    }
 }

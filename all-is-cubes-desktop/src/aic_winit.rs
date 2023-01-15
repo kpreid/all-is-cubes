@@ -23,12 +23,12 @@ use crate::glue::winit::{
 };
 use crate::session::DesktopSession;
 
-/// Run Winit/wgpu-based rendering and event loop.
+/// Run `winit` event loop, using [`RendererToWinit`] to perform rendering.
 ///
 /// Does not return; exits the process instead.
 pub(crate) fn winit_main_loop<Ren: RendererToWinit + 'static>(
     event_loop: EventLoop<()>,
-    mut dsession: DesktopSession<Ren, Ren::Window>,
+    mut dsession: DesktopSession<Ren, Window>,
 ) -> Result<(), anyhow::Error> {
     let loop_start_time = Instant::now();
     let mut first_frame = true;
@@ -42,10 +42,7 @@ pub(crate) fn winit_main_loop<Ren: RendererToWinit + 'static>(
         }
 
         // Sync UI state back to window
-        sync_cursor_grab(
-            dsession.window.window(),
-            &mut dsession.session.input_processor,
-        );
+        sync_cursor_grab(&dsession.window, &mut dsession.session.input_processor);
 
         // Compute when we want to resume.
         // Note that handle_winit_event() might override this.
@@ -145,7 +142,7 @@ pub(crate) fn create_winit_rt_desktop_session(
     session: Session,
     window: Window,
     viewport_cell: ListenableCell<Viewport>,
-) -> Result<DesktopSession<RtRenderer, softbuffer::GraphicsContext<Window>>, anyhow::Error> {
+) -> Result<DesktopSession<RtToSoftbuffer, Window>, anyhow::Error> {
     let start_time = Instant::now();
 
     viewport_cell.set(physical_size_to_viewport(
@@ -156,7 +153,10 @@ pub(crate) fn create_winit_rt_desktop_session(
     // Safety:
     // GraphicsContext::new says "Ensure that the passed object is valid to draw a 2D buffer to".
     // What does that mean? Well, we're not doing anything *else*...
-    let sb_context = unsafe { softbuffer::GraphicsContext::new(window) }
+    // Second, it specifies "and are valid for the lifetime of the GraphicsContext", which
+    // we ensure by bundling them into one `DesktopSession` (which provides the necessary
+    // drop order guarantee).
+    let context = unsafe { softbuffer::GraphicsContext::new(&window, &window) }
         .map_err(|_| anyhow!("Failed to initialize softbuffer GraphicsContext"))?;
 
     fn raytracer_size_policy(mut viewport: Viewport) -> Viewport {
@@ -172,8 +172,8 @@ pub(crate) fn create_winit_rt_desktop_session(
     );
 
     let dsession = DesktopSession::new(
-        renderer,
-        sb_context, // softbuffer takes ownership of the window for safety
+        RtToSoftbuffer { renderer, context },
+        window,
         session,
         viewport_cell,
     );
@@ -196,13 +196,13 @@ pub(crate) fn create_winit_rt_desktop_session(
 /// fitting on the screen) and possible refactoring towards having a common abstract main-loop.
 fn handle_winit_event<Ren: RendererToWinit>(
     event: Event<'_, ()>,
-    dsession: &mut DesktopSession<Ren, Ren::Window>,
+    dsession: &mut DesktopSession<Ren, Window>,
     control_flow: &mut ControlFlow,
 ) {
     let input_processor = &mut dsession.session.input_processor;
     match event {
         Event::NewEvents(_) => {}
-        Event::WindowEvent { window_id, event } if window_id == dsession.window.window().id() => {
+        Event::WindowEvent { window_id, event } if window_id == dsession.window.id() => {
             match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
 
@@ -239,7 +239,7 @@ fn handle_winit_event<Ren: RendererToWinit>(
                     let position: [f64; 2] = position.into();
                     input_processor.mouse_pixel_position(
                         *dsession.viewport_cell.get(),
-                        Some(Point2::from(position) / dsession.window.window().scale_factor()),
+                        Some(Point2::from(position) / dsession.window.scale_factor()),
                         false,
                     );
                     // TODO: Is it worth improving responsiveness by immediately executing
@@ -269,7 +269,7 @@ fn handle_winit_event<Ren: RendererToWinit>(
                 // Window state
                 WindowEvent::Resized(physical_size) => {
                     dsession.viewport_cell.set(physical_size_to_viewport(
-                        dsession.window.window().scale_factor(),
+                        dsession.window.scale_factor(),
                         physical_size,
                     ));
                 }
@@ -323,21 +323,20 @@ fn handle_winit_event<Ren: RendererToWinit>(
             // Run simulation if it's time
             dsession.advance_time_and_maybe_step();
             if dsession.session.frame_clock.should_draw() {
-                dsession.window.window().request_redraw();
+                dsession.window.request_redraw();
             }
         }
 
-        Event::RedrawRequested(id) if id == dsession.window.window().id() => {
+        Event::RedrawRequested(id) if id == dsession.window.id() => {
             dsession.renderer.update_world_camera();
             dsession.session.update_cursor(dsession.renderer.cameras());
             dsession
                 .window
-                .window()
                 .set_cursor_icon(cursor_icon_to_winit(dsession.session.cursor_icon()));
 
             dsession
                 .renderer
-                .redraw(&dsession.session, &mut dsession.window);
+                .redraw(&dsession.session, &dsession.window);
 
             dsession.session.frame_clock.did_draw();
         }
@@ -353,35 +352,14 @@ fn handle_winit_event<Ren: RendererToWinit>(
     }
 }
 
-/// Trait to generically deal with softbuffer's entirely reasonable ownership requirement.
-/// May be made obsolete if <https://github.com/john01dav/softbuffer/pull/6> is accepted.
-pub(crate) trait HasWindow {
-    fn window(&self) -> &Window;
-}
-
-impl HasWindow for Window {
-    fn window(&self) -> &Window {
-        self
-    }
-}
-
-impl HasWindow for softbuffer::GraphicsContext<Window> {
-    fn window(&self) -> &Window {
-        softbuffer::GraphicsContext::window(self)
-    }
-}
-
 /// TODO: Give this a better name and definition
 pub(crate) trait RendererToWinit: 'static {
-    type Window: HasWindow + 'static;
     fn update_world_camera(&mut self);
     fn cameras(&self) -> &StandardCameras;
-    fn redraw(&mut self, session: &Session, window: &mut Self::Window);
+    fn redraw(&mut self, session: &Session, window: &Window);
 }
 
 impl RendererToWinit for SurfaceRenderer {
-    type Window = Window;
-
     fn update_world_camera(&mut self) {
         self.update_world_camera()
     }
@@ -390,7 +368,7 @@ impl RendererToWinit for SurfaceRenderer {
         self.cameras()
     }
 
-    fn redraw(&mut self, session: &Session, _window: &mut Self::Window) {
+    fn redraw(&mut self, session: &Session, _window: &Window) {
         let _info = self
             .render_frame(session.cursor_result(), |render_info| {
                 format!("{}", session.info_text(render_info))
@@ -399,32 +377,33 @@ impl RendererToWinit for SurfaceRenderer {
     }
 }
 
-impl RendererToWinit for RtRenderer {
-    type Window = softbuffer::GraphicsContext<Window>;
+/// Ingredients to display [`RtRenderer`] via [`softbuffer`].
+pub(crate) struct RtToSoftbuffer {
+    renderer: RtRenderer,
+    context: softbuffer::GraphicsContext,
+}
 
+impl RendererToWinit for RtToSoftbuffer {
     fn update_world_camera(&mut self) {
         // TODO: implement this or eliminate its necessity...
     }
 
     fn cameras(&self) -> &StandardCameras {
-        self.cameras()
+        self.renderer.cameras()
     }
 
-    fn redraw(&mut self, session: &Session, window: &mut Self::Window) {
-        self.update(session.cursor_result()).unwrap(/* TODO: fix */);
+    fn redraw(&mut self, session: &Session, window: &Window) {
+        self.renderer.update(session.cursor_result()).unwrap(/* TODO: fix */);
 
-        let (image, _render_info, _flaws) =
-            self.draw_rgba(|render_info| session.info_text(render_info).to_string());
+        let (image, _render_info, _flaws) = self
+            .renderer
+            .draw_rgba(|render_info| session.info_text(render_info).to_string());
 
-        // At least on macOS, softbuffer's idea of "size of the window" is logical size
-        let actual_size = window
-            .window()
-            .inner_size()
-            .to_logical(window.window().scale_factor());
+        let sb_image_size = window.inner_size();
         let scaled_image = imageops::resize(
             &image,
-            actual_size.width,
-            actual_size.height,
+            sb_image_size.width,
+            sb_image_size.height,
             FilterType::Triangle,
         );
         let mut data: Vec<u8> = scaled_image.into_vec();
@@ -441,10 +420,10 @@ impl RendererToWinit for RtRenderer {
             *pixel = u32::to_ne_bytes(u32::from_be_bytes([0, r, g, b]));
         }
 
-        window.set_buffer(
+        self.context.set_buffer(
             bytemuck::cast_slice::<u8, u32>(&data),
-            actual_size.width as u16,
-            actual_size.height as u16,
+            sb_image_size.width as u16,
+            sb_image_size.height as u16,
         );
     }
 }
