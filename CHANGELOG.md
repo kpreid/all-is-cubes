@@ -13,6 +13,7 @@
 ### Changed
 
 - `all-is-cubes` library:
+    - `block::AIR` now has its own dedicated primitive, `Primitive::Air`. The behavior is unchanged.
     - `universe::UniverseTransaction::insert()` now takes a `URef` created by `URef::new_pending()`, instead of a bare value.
       This allows associations between the new member and other objects to be created within the same transaction.
 

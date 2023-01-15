@@ -376,14 +376,7 @@ fn space_debug() {
                     SpaceBlockData {
                         count: 1,
                         block: Block {
-                            primitive: Atom(
-                                BlockAttributes {
-                                    display_name: \"<air>\",
-                                    selectable: false,
-                                    collision: None,
-                                },
-                                Rgba(0.0, 0.0, 0.0, 0.0),
-                            ),
+                            primitive: Air,
                         },
                         ..
                     },

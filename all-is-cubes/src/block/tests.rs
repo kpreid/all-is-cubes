@@ -44,12 +44,7 @@ fn block_static_eq_to_non_static() {
 
 #[test]
 fn block_debug_air() {
-    assert_eq!(
-        &format!("{:?}", &AIR),
-        "Block { primitive: Atom(\
-            BlockAttributes { display_name: \"<air>\", selectable: false, collision: None }, \
-            Rgba(0.0, 0.0, 0.0, 0.0)) }"
-    );
+    assert_eq!(&format!("{:?}", &AIR), "Block { primitive: Air }");
 }
 
 #[test]
@@ -76,6 +71,10 @@ fn block_debug_with_modifiers() {
 #[test]
 fn evaluate_air_consistent() {
     assert_eq!(AIR.evaluate().unwrap(), AIR_EVALUATED);
+    assert_eq!(
+        Block::from(Primitive::Air).evaluate().unwrap(),
+        AIR_EVALUATED
+    );
 }
 
 #[test]

@@ -140,7 +140,7 @@ impl Tool {
                 fn find_space(block: &Block) -> Result<Option<URef<Space>>, RefError> {
                     match block.primitive() {
                         Primitive::Indirect(r) => find_space(&**r.read()?),
-                        Primitive::Atom(_, _) => Ok(None),
+                        Primitive::Atom(_, _) | Primitive::Air => Ok(None),
                         Primitive::Recur { space, .. } => Ok(Some(space.clone())),
                     }
                 }

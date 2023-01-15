@@ -107,6 +107,15 @@ pub enum Primitive {
         resolution: Resolution,
         space: URef<Space>,
     },
+
+    /// An invisible, unselectable, inert block used as “no block”; the primitive of [`AIR`].
+    ///
+    /// This is essentially a specific [`Primitive::Atom`]. There are a number of
+    /// algorithms which treat this block specially or which return it (e.g. outside the
+    /// bounds of a `Space`), so it exists here to make it an explicit element of the
+    /// data model — so that if it is, say, serialized and loaded in a future version,
+    /// it is still recognized as [`AIR`]. Additionally, it's cheaper to compare this way.
+    Air,
 }
 
 // --- End of type declarations, beginning of impls ---
@@ -133,10 +142,15 @@ impl Block {
     /// Construct a [`Block`] from a [`Primitive`] value.
     // TODO: Decide whether this should go away as temporary from refactoring.
     pub fn from_primitive(p: Primitive) -> Self {
-        Block(BlockPtr::Owned(Arc::new(BlockParts {
-            primitive: p,
-            modifiers: vec![],
-        })))
+        if let Primitive::Air = p {
+            // Avoid allocating an Arc.
+            AIR
+        } else {
+            Block(BlockPtr::Owned(Arc::new(BlockParts {
+                primitive: p,
+                modifiers: vec![],
+            })))
+        }
     }
 
     /// Construct a [`Block`] from a [`Primitive`] constant.
@@ -190,7 +204,10 @@ impl Block {
     fn make_parts_mut(&mut self) -> &mut BlockParts {
         match self.0 {
             BlockPtr::Static(static_primitive) => {
-                *self = Block::from_primitive(static_primitive.clone());
+                *self = Block(BlockPtr::Owned(Arc::new(BlockParts {
+                    primitive: static_primitive.clone(),
+                    modifiers: vec![],
+                })));
                 match self.0 {
                     BlockPtr::Owned(ref mut arc_repr) => Arc::make_mut(arc_repr),
                     _ => unreachable!(),
@@ -212,7 +229,7 @@ impl Block {
     /// ```
     /// use all_is_cubes::block::{AIR, Block, Modifier};
     /// use all_is_cubes::content::make_some_voxel_blocks;
-    /// use all_is_cubes::math::GridRotation;
+    /// use all_is_cubes::math::{GridRotation, Rgba};
     /// use all_is_cubes::universe::Universe;
     ///
     /// let mut universe = Universe::new();
@@ -227,28 +244,33 @@ impl Block {
     /// let double = rotated.clone().rotate(clockwise);
     /// assert_eq!(double.modifiers(), &[Modifier::Rotate(clockwise * clockwise)]);
     ///
-    /// // AIR is never rotated
-    /// assert_eq!(AIR, AIR.rotate(clockwise));
+    /// // Atoms and AIR are never rotated
+    /// let atom = Block::from(Rgba::WHITE);
+    /// assert_eq!(atom.clone().rotate(clockwise), atom);
+    /// assert_eq!(AIR.rotate(clockwise), AIR);
     /// ```
     #[must_use]
     pub fn rotate(mut self, rotation: GridRotation) -> Self {
-        if matches!(self.primitive(), Primitive::Atom(..)) {
-            // TODO: Just checking for Primitive::Atom doesn't help when the atom
-            // is hidden behind Primitive::Indirect. In general, we need to evaluate()
-            // (which suggests that this perhaps should be at least available
-            // as a function that takes Block + EvaluatedBlock).
-            return self;
-        }
-
-        let parts = self.make_parts_mut();
-        match parts.modifiers.last_mut() {
-            // TODO: If the combined rotation is the identity, discard the modifier
-            Some(Modifier::Rotate(existing_rotation)) => {
-                *existing_rotation = rotation * *existing_rotation;
+        match (self.primitive(), self.modifiers().is_empty()) {
+            (Primitive::Atom(..) | Primitive::Air, true) => {
+                // TODO: Just checking for Primitive::Atom doesn't help when the atom
+                // is hidden behind Primitive::Indirect. In general, we need to evaluate()
+                // (which suggests that this perhaps should be at least available
+                // as a function that takes Block + EvaluatedBlock).
+                self
             }
-            None | Some(_) => parts.modifiers.push(Modifier::Rotate(rotation)),
+            _ => {
+                let parts = self.make_parts_mut();
+                match parts.modifiers.last_mut() {
+                    // TODO: If the combined rotation is the identity, discard the modifier
+                    Some(Modifier::Rotate(existing_rotation)) => {
+                        *existing_rotation = rotation * *existing_rotation;
+                    }
+                    None | Some(_) => parts.modifiers.push(Modifier::Rotate(rotation)),
+                }
+                self
+            }
         }
-        self
     }
 
     /// Standardizes any characteristics of this block which may be presumed to be
@@ -259,13 +281,13 @@ impl Block {
     /// ```
     /// use all_is_cubes::block::Block;
     /// use all_is_cubes::content::make_some_voxel_blocks;
-    /// use all_is_cubes::math::{Face6::*, GridRotation};
+    /// use all_is_cubes::math::GridRotation;
     /// use all_is_cubes::universe::Universe;
     ///
     /// let mut universe = Universe::new();
     /// let [block] = make_some_voxel_blocks(&mut universe);
-    /// let clockwise = GridRotation::from_basis([PZ, PY, NX]);
-    /// let rotated = block.clone().rotate(clockwise);
+    /// let rotated = block.clone().rotate(GridRotation::CLOCKWISE);
+    ///
     /// assert_ne!(&block, &rotated);
     /// assert_eq!(block, rotated.clone().unspecialize());
     /// assert_eq!(block, rotated.clone().unspecialize().unspecialize());
@@ -302,6 +324,8 @@ impl Block {
             Primitive::Atom(ref attributes, color) => {
                 EvaluatedBlock::from_color(attributes.clone(), color)
             }
+
+            Primitive::Air => AIR_EVALUATED,
 
             Primitive::Recur {
                 ref attributes,
@@ -385,7 +409,7 @@ impl Block {
                 // its own internal listening and thus this does not recurse.
                 def_ref.read()?.listen(listener)?;
             }
-            Primitive::Atom(_, _) => {
+            Primitive::Atom(_, _) | Primitive::Air => {
                 // Atoms don't refer to anything external and thus cannot change other
                 // than being directly overwritten, which is out of the scope of this
                 // operation.
@@ -417,12 +441,16 @@ impl Block {
         Ok(())
     }
 
-    /// Returns the [`Rgba`] color of this block's [`Primitive::Atom`], or panics if it
-    /// has a different kind of primitive. **Intended for use in tests only.**
+    /// Returns the single [`Rgba`] color of this block's [`Primitive::Atom`] or
+    /// [`Primitive::Air`], or panics if it has a different kind of primitive.
+    /// **Intended for use in tests only.**
     pub fn color(&self) -> Rgba {
         match *self.primitive() {
             Primitive::Atom(_, c) => c,
-            _ => panic!("Block::color not defined for non-atom blocks"),
+            Primitive::Air => AIR_EVALUATED.color,
+            Primitive::Indirect(_) | Primitive::Recur { .. } => {
+                panic!("Block::color not defined for non-atom blocks")
+            }
         }
     }
 }
@@ -529,10 +557,11 @@ mod arbitrary_block {
     // Manual impl because `GridPoint` doesn't impl Arbitrary.
     impl<'a> Arbitrary<'a> for Primitive {
         fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-            Ok(match u.int_in_range(0..=2)? {
-                0 => Primitive::Atom(BlockAttributes::arbitrary(u)?, Rgba::arbitrary(u)?),
-                1 => Primitive::Indirect(URef::arbitrary(u)?),
-                2 => Primitive::Recur {
+            Ok(match u.int_in_range(0..=3)? {
+                0 => Primitive::Air,
+                1 => Primitive::Atom(BlockAttributes::arbitrary(u)?, Rgba::arbitrary(u)?),
+                2 => Primitive::Indirect(URef::arbitrary(u)?),
+                3 => Primitive::Recur {
                     attributes: BlockAttributes::arbitrary(u)?,
                     offset: GridPoint::from(<[i32; 3]>::arbitrary(u)?),
                     resolution: Resolution::arbitrary(u)?,
@@ -559,13 +588,13 @@ mod arbitrary_block {
     }
 }
 
-/// Generic 'empty'/'null' block. It is used by [`Space`] to respond to out-of-bounds requests.
+/// An invisible, unselectable, inert block used as “no block”.
 ///
-/// See also [`AIR_EVALUATED`].
-pub const AIR: Block = Block(BlockPtr::Static(&Primitive::Atom(
-    AIR_ATTRIBUTES,
-    Rgba::TRANSPARENT,
-)));
+/// It is used by [`Space`] to respond to out-of-bounds requests,
+/// as well as other algorithms treating it as replaceable or discardable.
+///
+/// When evaluated, will always produce [`AIR_EVALUATED`].
+pub const AIR: Block = Block(BlockPtr::Static(&Primitive::Air));
 
 /// The result of <code>[AIR].[evaluate()](Block::evaluate)</code>, as a constant.
 /// This may be used when an [`EvaluatedBlock`] value is needed but there is no block

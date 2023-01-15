@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crate::block::{
     AnimationHint, Block, BlockAttributes, BlockCollision, BlockDef, BlockParts, BlockPtr,
-    Modifier, Primitive, Resolution, RotationPlacementRule,
+    Modifier, Primitive, Resolution, RotationPlacementRule, AIR,
 };
 use crate::drawing::VoxelBrush;
 use crate::math::{GridPoint, Rgb, Rgba};
@@ -180,10 +180,16 @@ impl<C> BlockBuilder<C> {
     where
         C: BuildPrimitiveIndependent,
     {
-        Block(BlockPtr::Owned(Arc::new(BlockParts {
-            primitive: self.primitive_builder.build_i(self.attributes),
-            modifiers: self.modifiers,
-        })))
+        let primitive = self.primitive_builder.build_i(self.attributes);
+        if matches!(primitive, Primitive::Air) && self.modifiers.is_empty() {
+            // Avoid allocating an Arc.
+            AIR
+        } else {
+            Block(BlockPtr::Owned(Arc::new(BlockParts {
+                primitive,
+                modifiers: self.modifiers,
+            })))
+        }
     }
 
     /// Converts this builder into a block value and stores it as a [`BlockDef`] in
