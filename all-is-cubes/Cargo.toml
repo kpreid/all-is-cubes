@@ -19,6 +19,10 @@ features = ["arbitrary"]
 bench = false
 
 [[bench]]
+name = "block_bench"
+harness = false
+
+[[bench]]
 name = "chunk_bench"
 harness = false
 
