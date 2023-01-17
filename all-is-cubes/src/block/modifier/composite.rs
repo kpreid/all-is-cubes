@@ -2,9 +2,8 @@ use std::mem;
 
 use ordered_float::NotNan;
 
-use crate::block::Evoxels;
 use crate::block::{
-    self, Block, BlockCollision, EvaluatedBlock, Evoxel, Modifier, Resolution::R1, AIR,
+    self, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, Resolution::R1, AIR,
 };
 use crate::math::{GridAab, GridArray, GridCoordinate, GridRotation, Rgba};
 use crate::universe;
@@ -89,9 +88,9 @@ impl Composite {
     /// Called by [`Modifier::evaluate`].
     pub(super) fn evaluate(
         &self,
-        mut dst_evaluated: EvaluatedBlock,
+        mut dst_evaluated: MinEval,
         depth: u8,
-    ) -> Result<EvaluatedBlock, block::EvalBlockError> {
+    ) -> Result<MinEval, block::EvalBlockError> {
         let Composite {
             ref source,
             operator,
@@ -106,21 +105,13 @@ impl Composite {
             mem::swap(&mut src_evaluated, &mut dst_evaluated);
         }
         // Unpack blocks.
-        let EvaluatedBlock {
+        let MinEval {
             attributes,
-            color: _,
             voxels: dst_voxels,
-            opaque: _,
-            visible: _,
-            voxel_opacity_mask: _,
         } = dst_evaluated;
-        let EvaluatedBlock {
-            attributes: _, // TODO: merge attributes
-            color: _,
+        let MinEval {
+            attributes: _, // TODO: merge attributes using the operator, instead of discarding one set
             voxels: src_voxels,
-            opaque: _,
-            visible: _,
-            voxel_opacity_mask: _,
         } = src_evaluated;
 
         let src_resolution = src_voxels.resolution();
@@ -132,19 +123,19 @@ impl Composite {
             GridCoordinate::from(effective_resolution) / GridCoordinate::from(dst_resolution);
 
         Ok(if effective_resolution == R1 {
-            EvaluatedBlock::from_voxels(
+            MinEval {
                 attributes,
-                Evoxels::One(operator.blend_evoxel(
+                voxels: Evoxels::One(operator.blend_evoxel(
                     src_voxels.single_voxel().unwrap(),
                     dst_voxels.single_voxel().unwrap(),
                 )),
-            )
+            }
         } else {
-            EvaluatedBlock::from_voxels(
+            MinEval {
                 // TODO: merge attributes
                 attributes,
                 // TODO: use narrower array bounds (union of both inputs' bounds)
-                Evoxels::Many(
+                voxels: Evoxels::Many(
                     effective_resolution,
                     GridArray::from_fn(GridAab::for_block(effective_resolution), |p| {
                         operator.blend_evoxel(
@@ -153,7 +144,7 @@ impl Composite {
                         )
                     }),
                 ),
-            )
+            }
         })
     }
 }

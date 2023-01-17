@@ -1,11 +1,11 @@
 use cgmath::Zero;
 
-use crate::block::Evoxels;
 use crate::block::{
-    self, Block, BlockAttributes, BlockCollision, EvaluatedBlock, Modifier, Resolution::R16, AIR,
+    self, Block, BlockAttributes, BlockCollision, Evoxel, Evoxels, MinEval, Modifier,
+    Resolution::R16, AIR,
 };
 use crate::drawing::VoxelBrush;
-use crate::math::{Face6, GridAab, GridArray, GridCoordinate, Rgba};
+use crate::math::{Face6, GridAab, GridArray, GridCoordinate};
 use crate::universe;
 
 /// Data for [`Modifier::Move`]; displaces the block out of the grid, cropping it.
@@ -62,9 +62,9 @@ impl Move {
         &self,
         block: &Block,
         this_modifier_index: usize,
-        mut input: EvaluatedBlock,
+        mut input: MinEval,
         depth: u8,
-    ) -> Result<EvaluatedBlock, block::EvalBlockError> {
+    ) -> Result<MinEval, block::EvalBlockError> {
         let Move {
             direction,
             distance,
@@ -170,9 +170,15 @@ impl Move {
                         )
                     }
                 };
-                EvaluatedBlock::from_voxels(attributes, displaced_voxels)
+                MinEval {
+                    attributes,
+                    voxels: displaced_voxels,
+                }
             }
-            None => EvaluatedBlock::from_color(attributes, Rgba::TRANSPARENT),
+            None => MinEval {
+                attributes,
+                voxels: Evoxels::One(Evoxel::AIR),
+            },
         })
     }
 }
@@ -197,9 +203,9 @@ impl universe::VisitRefs for Move {
 mod tests {
     use cgmath::EuclideanSpace;
 
-    use crate::block::{Block, Evoxel, Modifier, Resolution::*};
+    use crate::block::{Block, EvaluatedBlock, Evoxel, Modifier, Resolution::*};
     use crate::content::make_some_blocks;
-    use crate::math::{FaceMap, GridPoint, OpacityCategory};
+    use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgba};
     use crate::space::Space;
     use crate::time::Tick;
     use crate::universe::Universe;

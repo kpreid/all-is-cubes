@@ -1,4 +1,4 @@
-use crate::block::{Block, BlockChange, EvalBlockError, EvaluatedBlock, Evoxels};
+use crate::block::{Block, BlockChange, EvalBlockError, Evoxels, MinEval};
 use crate::listen::Listener;
 use crate::math::{GridArray, GridRotation, Rgb};
 use crate::universe::{RefVisitor, VisitRefs};
@@ -95,9 +95,9 @@ impl Modifier {
         &self,
         block: &Block,
         this_modifier_index: usize,
-        mut value: EvaluatedBlock,
+        mut value: MinEval,
         depth: u8,
-    ) -> Result<EvaluatedBlock, EvalBlockError> {
+    ) -> Result<MinEval, EvalBlockError> {
         Ok(match *self {
             Modifier::Quote(Quote { suppress_ambient }) => {
                 value.attributes.tick_action = None;
@@ -108,7 +108,7 @@ impl Modifier {
             }
 
             Modifier::Rotate(rotation) => {
-                if matches!(value.voxels, Evoxels::One(_)) && value.voxel_opacity_mask.is_none() {
+                if matches!(value.voxels, Evoxels::One(_)) {
                     // Skip computation of transforms
                     value
                 } else {
@@ -119,7 +119,7 @@ impl Modifier {
                         .inverse()
                         .to_positive_octant_matrix(resolution.into());
 
-                    EvaluatedBlock {
+                    MinEval {
                         voxels: Evoxels::Many(
                             resolution,
                             GridArray::from_fn(
@@ -132,18 +132,7 @@ impl Modifier {
                                 },
                             ),
                         ),
-                        voxel_opacity_mask: value.voxel_opacity_mask.map(|mask| {
-                            GridArray::from_fn(
-                                mask.bounds().transform(inner_to_outer).unwrap(),
-                                |cube| mask[outer_to_inner.transform_cube(cube)],
-                            )
-                        }),
-
-                        // Unaffected
                         attributes: value.attributes,
-                        color: value.color,
-                        opaque: value.opaque.rotate(rotation),
-                        visible: value.visible,
                     }
                 }
             }
@@ -192,15 +181,12 @@ impl VisitRefs for Modifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::Resolution::R2;
-    use crate::block::{BlockAttributes, BlockCollision, Evoxel, Primitive};
+    use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Primitive, Resolution::R2};
     use crate::content::make_some_voxel_blocks;
     use crate::math::{Face6, FaceMap, GridAab, GridPoint, OpacityCategory, Rgba};
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
 
-    // Unlike other tests, this one asserts the entire `EvaluatedBlock` value because
-    // a new field is a potential bug.
     #[test]
     fn rotate_evaluation() {
         let resolution = R2;
@@ -223,17 +209,24 @@ mod tests {
             )
         };
         let block = Block::builder()
+            .display_name("foo")
             .voxels_fn(&mut universe, resolution, |cube| {
                 // Construct a lower half block with all voxels distinct
                 Block::from(color_fn(cube))
             })
             .unwrap()
             .build();
+
+        let oe = block.evaluate().unwrap();
         let rotated = block.clone().rotate(rotation);
+        let re = rotated.evaluate().unwrap();
+
+        // TODO: We don't quite yet have rotation for any attributes, but we *will*
+        // (rotation_rule in particular might need to adapt).
         assert_eq!(
-            rotated.evaluate().unwrap(),
+            re,
             EvaluatedBlock {
-                attributes: BlockAttributes::default(),
+                attributes: oe.attributes,
                 color: rgba_const!(0.5, 0.5, 0.5, 0.5),
                 voxels: Evoxels::Many(
                     R2,

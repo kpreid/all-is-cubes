@@ -396,9 +396,12 @@ impl LightBuffer {
 
         // Compute whether we hit an opaque face which should stop propagation.
         // TODO: Also count the opacity of the face we *exited* of the previous block,
-        let hit_opaque_face = match Face6::try_from(hit.face()) {
-            Ok(face) => ev_hit.opaque[face],
-            Err(_) => ev_hit.opaque == FaceMap::repeat(true),
+        let hit_opaque_face = {
+            let hit_opaque = ev_hit.opaque;
+            match Face6::try_from(hit.face()) {
+                Ok(face) => hit_opaque[face],
+                Err(_) => hit_opaque == FaceMap::repeat(true),
+            }
         };
 
         if hit_opaque_face {

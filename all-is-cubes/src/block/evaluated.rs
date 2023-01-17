@@ -4,13 +4,13 @@ use std::fmt;
 
 use cgmath::{Vector4, Zero as _};
 
-use crate::block::{BlockAttributes, BlockCollision, Resolution, Resolution::R1};
-use crate::math::{FaceMap, GridAab, GridArray, GridPoint, OpacityCategory, Rgba};
+use crate::block::{self, BlockAttributes, Resolution, Resolution::R1};
+use crate::math::{FaceMap, GridAab, GridArray, GridPoint, OpacityCategory, Rgb, Rgba};
 use crate::universe::RefError;
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
-use super::{Block, Primitive, URef, AIR, AIR_EVALUATED};
+use super::{Block, Primitive, URef, AIR};
 
 /// A snapshotted form of [`Block`] which contains all information needed for rendering
 /// and physics, and does not require dereferencing [`URef`]s or unbounded computation.
@@ -50,7 +50,7 @@ pub struct EvaluatedBlock {
     /// obligating [`AIR_EVALUATED`] to allocate at compile time, which is impossible.
     /// It doesn't harm normal operation because the point of having this is to compare
     /// block shapes, which is trivial if the block is invisible.)
-    pub(crate) voxel_opacity_mask: Option<GridArray<OpacityCategory>>,
+    pub voxel_opacity_mask: Option<GridArray<OpacityCategory>>,
 }
 
 impl fmt::Debug for EvaluatedBlock {
@@ -87,45 +87,64 @@ impl fmt::Debug for EvaluatedBlock {
 }
 
 impl EvaluatedBlock {
-    /// Computes the derived values of a single-color block.
-    pub(crate) fn from_color(attributes: BlockAttributes, color: Rgba) -> EvaluatedBlock {
-        // Note: This must produce the same result as
-        //     EvaluatedBlock::from_voxels(attributes, Evoxel::from_color(color)).
-        EvaluatedBlock {
-            attributes,
-            color,
-            voxels: Evoxels::One(Evoxel::from_color(color)),
-            opaque: FaceMap::repeat(color.fully_opaque()),
-            visible: !color.fully_transparent(),
-            voxel_opacity_mask: if color.fully_transparent() {
-                None
-            } else {
-                Some(GridArray::from_element(color.opacity_category()))
-            },
-        }
-    }
+    // --- Constructors ---
 
     /// Computes the derived values of a voxel block.
+    ///
+    /// This is also available as `impl From<MinEval> for EvaluatedBlock`.
     pub(crate) fn from_voxels(attributes: BlockAttributes, voxels: Evoxels) -> EvaluatedBlock {
+        // Optimization for single voxels:
+        // don't allocate any `GridArray`s or perform any generalized scans.
+        if let Some(evoxel) = voxels.single_voxel() {
+            let color = evoxel.color;
+            let visible = !color.fully_transparent();
+            return EvaluatedBlock {
+                attributes,
+                color,
+                voxels,
+                opaque: FaceMap::repeat(color.fully_opaque()),
+                visible,
+                // Note an edge case shenanigan:
+                // `AIR_EVALUATED` cannot allocate a mask, and we want this to match the
+                // output of that so that `EvaluatedBlock::consistency_check()` will agree.)
+                // It's also useful to skip the mask when the block is invisible, but
+                // that's not the motivation of doing this this way.
+                voxel_opacity_mask: if !visible {
+                    None
+                } else {
+                    Some(GridArray::from_element(color.opacity_category()))
+                },
+            };
+        }
+
         let resolution = voxels.resolution();
+        let full_block_bounds = GridAab::for_block(resolution);
 
         // Compute color sum from voxels
         // TODO: Give GridArray an iter() or something
         // TODO: The color sum actually needs to be weighted by alpha. (Too bad we're not using premultiplied alpha.)
         // TODO: Should not be counting interior voxels for the color, only visible surfaces.
-        let mut color_sum: Vector4<f32> = Vector4::zero();
-        for position in voxels.bounds().interior_iter() {
-            color_sum += voxels[position].color.into();
-        }
+        let color = {
+            let mut color_sum: Vector4<f32> = Vector4::zero();
+            for position in voxels.bounds().interior_iter() {
+                color_sum += voxels[position].color.into();
+            }
+            Rgba::try_from(
+                (color_sum.truncate() / (voxels.bounds().volume().max(1) as f32))
+                    .extend(color_sum.w / (full_block_bounds.volume() as f32)),
+            )
+            .expect("Recursive block color computation produced NaN")
+        };
 
-        let full_block_bounds = GridAab::for_block(resolution);
+        let visible = voxels.bounds().interior_iter().any(
+            #[inline(always)]
+            |p| !voxels[p].color.fully_transparent(),
+        );
 
-        // Generate an opacity mask *if it's useful* (the block has some visible part).
-        // (But this is actually motivated by other reasons: `AIR_EVALUATED` cannot
-        // allocate a mask, and we want this to match the output of that so that
-        // `EvaluatedBlock::consistency_check()` will agree.)
-        let voxel_opacity_mask = if matches!(voxels.single_voxel(), Some(Evoxel { color, ..}) if color.fully_transparent())
-        {
+        // Generate mask only if the block is not invisible, because it will never be
+        // useful for invisible blocks. (The purpose of the mask is to allow re-texturing
+        // a mesh of the appropriate shape, and invisible blocks have no mesh.)
+        let voxel_opacity_mask = if !visible {
             None
         } else {
             Some(GridArray::from_fn(voxels.bounds(), |p| {
@@ -136,15 +155,11 @@ impl EvaluatedBlock {
         EvaluatedBlock {
             attributes,
             // The single color is the mean of the actual block colors.
-            color: Rgba::try_from(
-                (color_sum.truncate() / (voxels.bounds().volume().max(1) as f32))
-                    .extend(color_sum.w / (full_block_bounds.volume() as f32)),
-            )
-            .expect("Recursive block color computation produced NaN"),
+            color,
             opaque: FaceMap::from_fn(|face| {
                 // TODO: This test should be refined by flood-filling in from the face,
                 // so that we can also consider a face opaque if it has hollows/engravings.
-                let surface_volume = GridAab::for_block(resolution).abut(face, -1).unwrap();
+                let surface_volume = full_block_bounds.abut(face, -1).unwrap();
                 if surface_volume.intersection(voxels.bounds()) == Some(surface_volume) {
                     surface_volume.interior_iter().all(
                         #[inline(always)]
@@ -154,20 +169,20 @@ impl EvaluatedBlock {
                     false
                 }
             }),
-            visible: voxels.bounds().interior_iter().any(
-                #[inline(always)]
-                |p| !voxels[p].color.fully_transparent(),
-            ),
-
+            visible,
             voxel_opacity_mask,
             voxels,
         }
     }
 
+    // --- Accessors ---
+
     #[inline]
     pub fn resolution(&self) -> Resolution {
         self.voxels.resolution()
     }
+
+    // --- Simple computed properties ---
 
     /// Returns whether [`Self::visible`] is true (the block has some visible color/voxels)
     /// or [`BlockAttributes::animation_hint`] indicates that the block might _become_
@@ -187,6 +202,8 @@ impl EvaluatedBlock {
     pub fn voxels_bounds(&self) -> GridAab {
         self.voxels.bounds()
     }
+
+    // --- Other ---
 
     #[doc(hidden)]
     #[track_caller]
@@ -219,7 +236,7 @@ pub struct Evoxel {
     // These are frequently going to be copied into 32-bit texture color anyway.
     pub color: Rgba,
     pub selectable: bool,
-    pub collision: BlockCollision,
+    pub collision: block::BlockCollision,
 }
 
 impl Evoxel {
@@ -229,7 +246,7 @@ impl Evoxel {
     pub const AIR: Self = Self {
         color: Rgba::TRANSPARENT,
         selectable: false,
-        collision: BlockCollision::None,
+        collision: block::BlockCollision::None,
     };
 
     /// Construct an [`Evoxel`] which represents the given evaluated block.
@@ -294,6 +311,7 @@ impl Evoxels {
     }
 
     /// If this has a resolution of 1, then return that single voxel.
+    #[inline]
     pub fn single_voxel(&self) -> Option<Evoxel> {
         match *self {
             Evoxels::One(v) => Some(v),
@@ -367,10 +385,76 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
     }
 }
 
+/// The result of <code>[AIR].[evaluate()](Block::evaluate)</code>, as a constant.
+/// This may be used when an [`EvaluatedBlock`] value is needed but there is no block
+/// value.
+///
+/// ```
+/// use all_is_cubes::block::{AIR, AIR_EVALUATED};
+///
+/// assert_eq!(Ok(AIR_EVALUATED), AIR.evaluate());
+/// ```
+pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
+    attributes: AIR_ATTRIBUTES,
+    color: Rgba::TRANSPARENT,
+    voxels: Evoxels::One(AIR_INNER_EVOXEL),
+    opaque: FaceMap::repeat_copy(false),
+    visible: false,
+    voxel_opacity_mask: None,
+};
+
+pub(super) const AIR_EVALUATED_MIN: MinEval = MinEval {
+    attributes: AIR_ATTRIBUTES,
+    voxels: Evoxels::One(AIR_INNER_EVOXEL),
+};
+
+/// Note that this voxel is *not* no-collision and unselectable; the block attributes
+/// override it. For now, all atom blocks work this way. TODO: Perhaps we should change that.
+const AIR_INNER_EVOXEL: Evoxel = Evoxel::from_color(Rgba::TRANSPARENT);
+
+/// Used only by [`AIR_EVALUATED`].
+const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
+    display_name: std::borrow::Cow::Borrowed("<air>"),
+    selectable: false,
+    collision: block::BlockCollision::None,
+    rotation_rule: block::RotationPlacementRule::Never,
+    light_emission: Rgb::ZERO,
+    tick_action: None,
+    animation_hint: block::AnimationHint::UNCHANGING,
+};
+
+/// A minimal version of [`EvaluatedBlock`] which contains all the fundamental data, but
+/// none of the computed data.
+///
+/// This type is used as the intermediate type inside block modifier evaluation, so as to
+/// avoid computing any derived data that will be discarded anyway, or possibly
+/// mis-computing some of the derived data as an attempted optimization.
+/// This type is never exposed as part of the public API; only [`EvaluatedBlock`] is.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct MinEval {
+    pub(crate) attributes: BlockAttributes,
+    pub(crate) voxels: Evoxels,
+}
+
+impl From<MinEval> for EvaluatedBlock {
+    fn from(value: MinEval) -> Self {
+        let MinEval { attributes, voxels } = value;
+        // TODO: EvaluatedBlock::from* should probably be entirely replaced with this
+        EvaluatedBlock::from_voxels(attributes, voxels)
+    }
+}
+
+impl MinEval {
+    pub fn resolution(&self) -> Resolution {
+        self.voxels.resolution()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{AnimationHint, Block, Resolution, AIR};
+    use crate::block::{AnimationHint, Block, Resolution, Resolution::R2, AIR};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn visible_or_animated() {
@@ -402,13 +486,13 @@ mod tests {
                 voxels: Evoxels::Many(resolution, GridArray::from_elements(bounds, []).unwrap()),
                 opaque: FaceMap::repeat(false),
                 visible: false,
-                voxel_opacity_mask: Some(GridArray::from_elements(bounds, []).unwrap())
+                voxel_opacity_mask: None
             }
         );
     }
 
     #[test]
-    fn from_color_equals_from_block() {
+    fn solid_block_equivalent_at_any_resolution() {
         let mut attributes = BlockAttributes::default();
         attributes.display_name = "foo".into();
 
@@ -416,14 +500,23 @@ mod tests {
             Rgba::BLACK,
             Rgba::WHITE,
             Rgba::TRANSPARENT,
-            Rgba::new(0.1, 0.2, 0.3, 0.4),
+            Rgba::new(0.0, 0.5, 1.0, 0.5),
         ] {
+            let voxel = Evoxel::from_color(color);
+            let ev_one = EvaluatedBlock::from_voxels(attributes.clone(), Evoxels::One(voxel));
+            let ev_many = EvaluatedBlock::from_voxels(
+                attributes.clone(),
+                Evoxels::Many(R2, GridArray::from_fn(GridAab::for_block(R2), |_| voxel)),
+            );
+
+            // Check that they are identical except for the voxel data
             assert_eq!(
-                EvaluatedBlock::from_color(attributes.clone(), color),
-                EvaluatedBlock::from_voxels(
-                    attributes.clone(),
-                    Evoxels::One(Evoxel::from_color(color))
-                ),
+                EvaluatedBlock {
+                    voxels: ev_one.voxels.clone(),
+                    voxel_opacity_mask: ev_one.voxel_opacity_mask.clone(),
+                    ..ev_many
+                },
+                ev_one
             );
         }
     }

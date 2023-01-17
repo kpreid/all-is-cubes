@@ -1,8 +1,10 @@
 use cgmath::{EuclideanSpace as _, Point3};
 
-use crate::block::{self, EvaluatedBlock, Modifier, Resolution::R1};
-use crate::block::{Evoxels, Resolution};
-use crate::math::{GridAab, GridArray, GridCoordinate, GridPoint, Rgba};
+use crate::block::{
+    self, Evoxel, Evoxels, MinEval, Modifier,
+    Resolution::{self, R1},
+};
+use crate::math::{GridAab, GridArray, GridCoordinate, GridPoint};
 use crate::universe;
 
 /// Data for [`Modifier::Zoom`], describing a portion of the original block that is scaled
@@ -44,10 +46,7 @@ impl Zoom {
         }
     }
 
-    pub(super) fn evaluate(
-        &self,
-        input: EvaluatedBlock,
-    ) -> Result<EvaluatedBlock, block::EvalBlockError> {
+    pub(super) fn evaluate(&self, input: MinEval) -> Result<MinEval, block::EvalBlockError> {
         let Zoom {
             offset: offset_in_zoomed_blocks,
             scale,
@@ -58,41 +57,40 @@ impl Zoom {
         // of the primitive voxels are evaluated. (Modifier::Move will also benefit.)
 
         let original_resolution = input.resolution();
-        let EvaluatedBlock {
-            attributes,
-            color,
-            voxels,
-            opaque: _,
-            visible: _,
-            voxel_opacity_mask: _,
-        } = input;
+        let MinEval { attributes, voxels } = input;
 
         // TODO: write test cases for what happens if the division fails
         // (this is probably wrong in that we need to duplicate voxels if it happens)
         let zoom_resolution = (original_resolution / scale).unwrap_or(R1);
 
-        Ok(if let Evoxels::Many(_, voxels) = voxels {
-            let voxel_offset = offset_in_zoomed_blocks.map(GridCoordinate::from).to_vec()
-                * GridCoordinate::from(zoom_resolution);
-            match GridAab::for_block(zoom_resolution)
-                .intersection(voxels.bounds().translate(-voxel_offset))
-            {
-                // This case occurs when the voxels' actual bounds (which may be smaller
-                // than the block bounding box) don't intersect the zoom region.
-                None => EvaluatedBlock::from_color(attributes, Rgba::TRANSPARENT),
-                Some(intersected_bounds) => EvaluatedBlock::from_voxels(
-                    attributes,
-                    Evoxels::Many(
-                        zoom_resolution,
-                        GridArray::from_fn(intersected_bounds, |p| voxels[p + voxel_offset]),
-                    ),
-                ),
+        Ok(match voxels {
+            Evoxels::One(_) => {
+                // Block has resolution 1.
+                // Zoom::new() checks that the region is not outside the block's unit cube,
+                // so we can just unconditionally return the original color.
+                MinEval { attributes, voxels }
             }
-        } else {
-            // Block has resolution 1.
-            // Zoom::new() checks that the region is not outside the block's unit cube,
-            // so we can just unconditionally return the original color.
-            EvaluatedBlock::from_color(attributes, color)
+            Evoxels::Many(_, voxels) => {
+                let voxel_offset = offset_in_zoomed_blocks.map(GridCoordinate::from).to_vec()
+                    * GridCoordinate::from(zoom_resolution);
+                match GridAab::for_block(zoom_resolution)
+                    .intersection(voxels.bounds().translate(-voxel_offset))
+                {
+                    // This case occurs when the voxels' actual bounds (which may be smaller
+                    // than the block bounding box) don't intersect the zoom region.
+                    None => MinEval {
+                        attributes,
+                        voxels: Evoxels::One(Evoxel::AIR),
+                    },
+                    Some(intersected_bounds) => MinEval {
+                        attributes,
+                        voxels: Evoxels::Many(
+                            zoom_resolution,
+                            GridArray::from_fn(intersected_bounds, |p| voxels[p + voxel_offset]),
+                        ),
+                    },
+                }
+            }
         })
     }
 }
@@ -139,7 +137,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Zoom {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::Resolution::R2;
+    use crate::block::{EvaluatedBlock, Resolution::R2};
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::math::{GridAab, GridVector, Rgba};
     use crate::universe::Universe;
@@ -182,7 +180,10 @@ mod tests {
                 ev_zoomed,
                 if x >= 2 {
                     // out of range
-                    EvaluatedBlock::from_color(ev_original.attributes.clone(), Rgba::TRANSPARENT)
+                    EvaluatedBlock::from_voxels(
+                        ev_original.attributes.clone(),
+                        Evoxels::One(Evoxel::from_color(Rgba::TRANSPARENT)),
+                    )
                 } else {
                     EvaluatedBlock::from_voxels(
                         ev_original.attributes.clone(),

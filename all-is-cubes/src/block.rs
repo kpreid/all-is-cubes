@@ -12,7 +12,7 @@ use cgmath::{EuclideanSpace as _, Point3};
 
 use crate::listen::Listener;
 use crate::math::{
-    FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba,
+    FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba,
 };
 use crate::raycast::{Ray, Raycaster};
 use crate::space::{SetCubeError, Space, SpaceChange};
@@ -311,21 +311,26 @@ impl Block {
     /// information needed for rendering and physics, and does not require [`URef`] access
     /// to other objects.
     pub fn evaluate(&self) -> Result<EvaluatedBlock, EvalBlockError> {
-        self.evaluate_impl(0)
+        Ok(EvaluatedBlock::from(self.evaluate_impl(0)?))
     }
 
     #[inline]
-    fn evaluate_impl(&self, depth: u8) -> Result<EvaluatedBlock, EvalBlockError> {
-        let mut value: EvaluatedBlock = match *self.primitive() {
+    fn evaluate_impl(&self, depth: u8) -> Result<MinEval, EvalBlockError> {
+        let mut value: MinEval = match *self.primitive() {
             Primitive::Indirect(ref def_ref) => {
                 def_ref.read()?.evaluate_impl(next_depth(depth)?)?
             }
 
-            Primitive::Atom(ref attributes, color) => {
-                EvaluatedBlock::from_color(attributes.clone(), color)
-            }
+            Primitive::Atom(ref attributes, color) => MinEval {
+                attributes: attributes.clone(),
+                voxels: Evoxels::One(Evoxel {
+                    color,
+                    selectable: attributes.selectable,
+                    collision: attributes.collision,
+                }),
+            },
 
-            Primitive::Air => AIR_EVALUATED,
+            Primitive::Air => AIR_EVALUATED_MIN,
 
             Primitive::Recur {
                 ref attributes,
@@ -362,7 +367,10 @@ impl Block {
                         }
                     };
 
-                EvaluatedBlock::from_voxels(attributes.clone(), Evoxels::Many(resolution, voxels))
+                MinEval {
+                    attributes: attributes.clone(),
+                    voxels: Evoxels::Many(resolution, voxels),
+                }
             }
         };
 
@@ -595,36 +603,6 @@ mod arbitrary_block {
 ///
 /// When evaluated, will always produce [`AIR_EVALUATED`].
 pub const AIR: Block = Block(BlockPtr::Static(&Primitive::Air));
-
-/// The result of <code>[AIR].[evaluate()](Block::evaluate)</code>, as a constant.
-/// This may be used when an [`EvaluatedBlock`] value is needed but there is no block
-/// value.
-///
-/// ```
-/// use all_is_cubes::block::{AIR, AIR_EVALUATED};
-///
-/// assert_eq!(Ok(AIR_EVALUATED), AIR.evaluate());
-/// ```
-pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
-    attributes: AIR_ATTRIBUTES,
-    color: Rgba::TRANSPARENT,
-    // Note that this voxel is *not* no-collision and unselectable; the block attributes
-    // override it. For now, all atom blocks work this way. TODO: Perhaps we should change that.
-    voxels: Evoxels::One(Evoxel::from_color(Rgba::TRANSPARENT)),
-    opaque: FaceMap::repeat_copy(false),
-    visible: false,
-    voxel_opacity_mask: None,
-};
-
-const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
-    display_name: Cow::Borrowed("<air>"),
-    selectable: false,
-    collision: BlockCollision::None,
-    rotation_rule: RotationPlacementRule::Never,
-    light_emission: Rgb::ZERO,
-    tick_action: None,
-    animation_hint: AnimationHint::UNCHANGING,
-};
 
 /// Given the `resolution` of some recursive block occupying `cube`, transform `ray`
 /// into an equivalent ray intersecting the recursive grid.
