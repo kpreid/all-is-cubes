@@ -24,8 +24,11 @@ pub fn start_server(
     )))
     .handle_error(handle_error);
 
-    // TODO: serve static at well defined subdir
-    let app = axum::Router::new().route("/*path", static_service);
+    // TODO: serve static at well defined subdir separate from root, so that we have
+    // more division of responsibility in which urls mean what
+    let app = axum::Router::new()
+        .route("/", static_service.clone())
+        .route("/*path", static_service);
 
     let server = axum::Server::bind(&bind_addr).serve(app.into_make_service());
     // TODO: refactor so stdout writing isn't hardcoded into this function

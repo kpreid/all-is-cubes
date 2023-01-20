@@ -7,13 +7,14 @@ static CLIENT_STATIC: include_dir::Dir<'static> =
     include_dir::include_dir!("$CARGO_MANIFEST_DIR/../all-is-cubes-wasm/dist");
 
 /// Handler for client static files
-pub(crate) async fn client(Path(path): Path<String>) -> impl IntoResponse {
+pub(crate) async fn client(path: Option<Path<String>>) -> impl IntoResponse {
     // based on example code https://bloerg.net/posts/serve-static-content-with-axum/
-    let path = if path == "/" {
-        "index.html"
-    } else {
-        // TODO: validate that this is url-escaping-correct (i.e. over-escaped characters should still match)
-        path.trim_start_matches('/') // absolute to relative
+    let path = match &path {
+        None => "index.html",
+        Some(Path(path_string)) => {
+            // TODO: validate that this is url-escaping-correct (i.e. over-escaped characters should still match)
+            path_string.as_str()
+        }
     };
     match CLIENT_STATIC.get_file(path) {
         None => Response::builder()
