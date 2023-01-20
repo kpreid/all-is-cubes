@@ -195,8 +195,7 @@ where
 
     debug_assert!(
         ray.direction.magnitude2() < super::body::VELOCITY_MAGNITUDE_LIMIT_SQUARED * 2.,
-        "Attempting to collide_along_ray a very long distance: {:?}",
-        ray
+        "Attempting to collide_along_ray a very long distance: {ray:?}"
     );
 
     // Note: no `.within()` because that would not work when the leading corner is not
@@ -751,18 +750,13 @@ mod tests {
                 let nudge_length = (adjusted_segment.direction - segment.direction).magnitude();
                 assert!(
                     nudge_length <= 0.001,
-                    "nudge moved too far\nfrom {:?}\n  to {:?}\ndistance of {}",
-                    segment,
-                    adjusted_segment,
-                    nudge_length
+                    "nudge moved too far\nfrom {segment:?}\n  to {adjusted_segment:?}\ndistance of {nudge_length}"
                 );
 
                 // Check that the nudge was not backwards of the ray
                 assert!(
                     adjusted_segment.direction.dot(segment.direction) >= 0.0,
-                    "nudge went backwards to {:?} from starting position {:?}",
-                    adjusted_segment,
-                    segment,
+                    "nudge went backwards to {adjusted_segment:?} from starting position {segment:?}",
                 );
 
                 // Check expected position properties
@@ -770,15 +764,11 @@ mod tests {
                 let fraction = position_on_axis - position_on_axis.round();
                 assert!(
                     fraction.abs() > POSITION_EPSILON / 2.,
-                    "{:?} coord {:?} shouldn't be at surface",
-                    face_to_nudge,
-                    position_on_axis,
+                    "{face_to_nudge:?} coord {position_on_axis:?} shouldn't be at surface",
                 );
                 assert!(
                     fraction.abs() < POSITION_EPSILON * 2.,
-                    "{:?} coord {:?} shouldn't be so large",
-                    face_to_nudge,
-                    position_on_axis,
+                    "{face_to_nudge:?} coord {position_on_axis:?} shouldn't be so large",
                 );
 
                 let enclosing = nudged_aab.round_up_to_grid();
@@ -789,12 +779,11 @@ mod tests {
                     assert_eq!(
                         enclosing.axis_range(axis),
                         expected_enclosing.axis_range(axis),
-                        "\ncase {:?}\nface {:?}\nsegment {:?}\nunnudged_aab {:#?}\nnudged {:#?}\n",
-                        case_number,
-                        face_to_nudge,
-                        segment,
-                        unnudged_aab,
-                        nudged_aab,
+                        "\ncase {case_number:?}\n\
+                        face {face_to_nudge:?}\n\
+                        segment {segment:?}\n\
+                        unnudged_aab {unnudged_aab:#?}\n\
+                        nudged {nudged_aab:#?}\n",
                     );
                 } else {
                     // TODO check the forward cases

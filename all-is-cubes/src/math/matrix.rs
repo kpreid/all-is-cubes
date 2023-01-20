@@ -406,8 +406,7 @@ mod tests {
                 assert_eq!(
                     Some(inv.to_free()),
                     m.to_free().inverse_transform(),
-                    "inverse of {:?}",
-                    m,
+                    "inverse of {m:?}",
                 );
                 nontrivial += 1;
             }

@@ -107,9 +107,7 @@ impl AlloctreeNode {
         // shouldn't break the condition.
         assert!(
             fits(request, size_exponent),
-            "request {:?} unexpectedly too big for {}",
-            request,
-            size_exponent
+            "request {request:?} unexpectedly too big for {size_exponent}"
         );
 
         match self {
@@ -284,8 +282,7 @@ mod tests {
             .map(|i| match t.allocate(GridAab::for_block(R16)) {
                 Some(val) => Some(val),
                 None => panic!(
-                    "free_and_allocate_again initial allocation failure for #{}",
-                    i
+                    "free_and_allocate_again initial allocation failure for #{i}"
                 ),
             })
             .collect();

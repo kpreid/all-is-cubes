@@ -14,7 +14,7 @@ pub fn space_bulk_mutation(c: &mut Criterion) {
         let bounds =
             GridAab::from_lower_size([0, 0, 0], [mutation_size, mutation_size, mutation_size]);
         let bigger_bounds = bounds.multiply(2);
-        let size_description = format!("{}×{}×{}", mutation_size, mutation_size, mutation_size);
+        let size_description = format!("{mutation_size}×{mutation_size}×{mutation_size}");
         let mutation_volume = bounds.volume();
         group.throughput(Throughput::Elements(mutation_volume as u64));
 

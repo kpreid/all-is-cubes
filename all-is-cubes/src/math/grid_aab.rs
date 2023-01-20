@@ -563,8 +563,7 @@ impl GridAab {
     pub fn divide(self, divisor: GridCoordinate) -> Self {
         assert!(
             divisor > 0,
-            "GridAab::divide: divisor must be > 0, not {}",
-            divisor
+            "GridAab::divide: divisor must be > 0, not {divisor}"
         );
         let upper_bounds = self.upper_bounds();
         Self::from_lower_upper(

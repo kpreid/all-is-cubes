@@ -237,8 +237,7 @@ mod tests {
             let distance_from_start = max_norm(body.position - start);
             assert!(
                 distance_from_start > 0.09,
-                "didn't move away from origin: {}",
-                distance_from_start
+                "didn't move away from origin: {distance_from_start}"
             );
         };
 

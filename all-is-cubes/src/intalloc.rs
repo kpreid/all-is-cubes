@@ -56,8 +56,7 @@ impl<T: PrimInt + Debug> IntAllocator<T> {
     pub fn free(&mut self, value: T) {
         assert!(
             value >= T::zero(),
-            "tried to free a negative number: {:?}",
-            value
+            "tried to free a negative number: {value:?}"
         );
         // TODO: we can cheaply check if value > self.last_allocated, so do that.
         if self.last_allocated == Some(value) {

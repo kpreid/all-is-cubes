@@ -292,9 +292,7 @@ impl Raycaster {
 
         assert!(
             self.step[axis] != 0,
-            "step on axis {} which is zero; state = {:#?}",
-            axis,
-            self
+            "step on axis {axis} which is zero; state = {self:#?}"
         );
 
         // Save t position before we update it.
@@ -639,10 +637,7 @@ fn scale_to_integer_step(mut s: FreeCoordinate, mut ds: FreeCoordinate) -> FreeC
 
     debug_assert!(
         result.signum() > 0.0 || ds.is_nan() || s.is_nan(),
-        "scale_to_integer_step failed ({}, {}) => {}",
-        s,
-        ds,
-        result
+        "scale_to_integer_step failed ({s}, {ds}) => {result}"
     );
     result
 }

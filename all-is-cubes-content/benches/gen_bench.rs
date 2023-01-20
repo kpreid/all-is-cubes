@@ -21,7 +21,7 @@ pub fn template_bench(c: &mut Criterion) {
     group.confidence_level(0.99);
 
     for template in UniverseTemplate::iter() {
-        group.bench_function(&format!("{}", template), |b| {
+        group.bench_function(&format!("{template}"), |b| {
             b.to_async(FuturesExecutor)
                 .iter_with_large_drop(|| template.clone().build(YieldProgress::noop(), 0))
         });

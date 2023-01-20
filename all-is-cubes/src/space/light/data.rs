@@ -411,9 +411,7 @@ mod tests {
                 assert_eq!(
                     v1 == v2,
                     v1.difference_priority(v2) == 0,
-                    "v1={:?} v2={:?}",
-                    v1,
-                    v2
+                    "v1={v1:?} v2={v2:?}"
                 );
             }
         }

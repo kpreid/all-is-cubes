@@ -321,8 +321,7 @@ mod tests {
                     for_object: Some(Name::Specific(_)),
                 })
             ),
-            "got error: {:?}",
-            r
+            "got error: {r:?}"
         );
     }
 }

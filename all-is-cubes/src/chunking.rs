@@ -669,9 +669,7 @@ mod tests {
                         || p.x.abs() > q.x.abs()
                         || p.y.abs() > q.y.abs()
                         || p.z.abs() > q.z.abs(),
-                    "{:?} should be before {:?}",
-                    p,
-                    q
+                    "{p:?} should be before {q:?}"
                 );
             }
             seen.insert(p);

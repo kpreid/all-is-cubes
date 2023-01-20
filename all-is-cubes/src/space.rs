@@ -827,8 +827,7 @@ impl Space {
             let data = self.block_data.get(usize::from(index));
             if Some(block) != data.map(|data| &data.block) {
                 problems.push(format!(
-                    "block_to_index[{:?}] points to {} : {:?}",
-                    block, index, data
+                    "block_to_index[{block:?}] points to {index} : {data:?}"
                 ));
             }
         }

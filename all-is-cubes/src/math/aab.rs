@@ -221,8 +221,7 @@ impl Aab {
         // looks a lot like generally constructing a new Aab.
         assert!(
             distance >= 0.0,
-            "distance must be nonnegative, not {}",
-            distance
+            "distance must be nonnegative, not {distance}"
         );
         let distance_vec = Vector3::new(1.0, 1.0, 1.0) * distance;
         Self::from_lower_upper(

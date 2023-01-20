@@ -171,8 +171,7 @@ impl GridRotation {
             [NZ, NY, NX] => Rzyx,
 
             _ => panic!(
-                "Invalid basis given to GridRotation::from_basis: {:?}",
-                basis
+                "Invalid basis given to GridRotation::from_basis: {basis:?}"
             ),
         }
     }
@@ -498,9 +497,7 @@ mod tests {
                 assert_eq!(
                     a.is_reflection() ^ b.is_reflection(),
                     (a * b).is_reflection(),
-                    "{:?}, {:?}",
-                    a,
-                    b,
+                    "{a:?}, {b:?}",
                 );
             }
         }
@@ -548,22 +545,19 @@ mod tests {
                             assert_eq!(
                                 result.transform(from_face),
                                 to_face,
-                                "wrong from-to: {:?}",
-                                info
+                                "wrong from-to: {info:?}"
                             );
                             assert_eq!(
                                 result.transform(up_face),
                                 up_face,
-                                "did not preserve up vector: {:?}",
-                                info
+                                "did not preserve up vector: {info:?}"
                             );
                         }
                         None => {
                             assert!(
                                 up_face.axis_number() == from_face.axis_number()
                                     || up_face.axis_number() == to_face.axis_number(),
-                                "returned None incorrectly: {:?}",
-                                info
+                                "returned None incorrectly: {info:?}"
                             );
                         }
                     }
