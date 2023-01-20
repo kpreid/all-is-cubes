@@ -14,7 +14,7 @@ use pretty_assertions::assert_eq;
 
 use crate::block::{
     Block, BlockAttributes, BlockCollision, BlockDef, BlockDefTransaction, EvalBlockError, Evoxel,
-    Modifier, Primitive, Resolution, Resolution::*, AIR, AIR_EVALUATED,
+    Evoxels, Modifier, Primitive, Resolution, Resolution::*, AIR, AIR_EVALUATED,
 };
 use crate::content::make_some_blocks;
 use crate::listen::{NullListener, Sink};
@@ -69,12 +69,30 @@ fn block_debug_with_modifiers() {
 }
 
 #[test]
-fn evaluate_air_consistent() {
+fn evaluate_air_self_consistent() {
+    AIR.evaluate().unwrap().consistency_check();
+}
+
+#[test]
+fn evaluate_air_consistent_with_constant() {
     assert_eq!(AIR.evaluate().unwrap(), AIR_EVALUATED);
     assert_eq!(
         Block::from(Primitive::Air).evaluate().unwrap(),
         AIR_EVALUATED
     );
+}
+
+/// TODO: For now, AIR is processed like an `Atom` block and has selectable and collision
+/// fields that are the default. It would probably be better to arrange so that all
+/// `Evoxel`s end up with the attributes they reasonably should have, but for now, for
+/// consistency with the rest of the architecture (designed before _all_ blocks had
+/// `Evoxel`s rather than just attributes and color), this test is expected to “fail”
+/// (find unequal evoxels).
+#[test]
+#[should_panic = "unequal air"]
+fn evaluate_air_vs_evoxel_air() {
+    let voxel_of_air: Evoxel = AIR.evaluate().unwrap().voxels.single_voxel().unwrap();
+    assert_eq!(voxel_of_air, Evoxel::AIR, "unequal air");
 }
 
 #[test]
@@ -91,8 +109,8 @@ fn evaluate_opaque_atom_and_attributes() {
     let e = block.evaluate().unwrap();
     assert_eq!(e.attributes, attributes);
     assert_eq!(e.color, block.color());
-    assert!(e.voxels.is_none());
-    assert_eq!(e.resolution, R1);
+    assert!(matches!(e.voxels, Evoxels::One(_)));
+    assert_eq!(e.resolution(), R1);
     assert_eq!(e.opaque, FaceMap::repeat(true));
     assert_eq!(e.visible, true);
     assert_eq!(
@@ -107,7 +125,7 @@ fn evaluate_transparent_atom() {
     let block = Block::from_primitive(Primitive::Atom(BlockAttributes::default(), color));
     let e = block.evaluate().unwrap();
     assert_eq!(e.color, block.color());
-    assert!(e.voxels.is_none());
+    assert!(matches!(e.voxels, Evoxels::One(_)));
     assert_eq!(e.opaque, FaceMap::repeat(false));
     assert_eq!(e.visible, true);
     assert_eq!(
@@ -124,7 +142,7 @@ fn evaluate_invisible_atom() {
     ));
     let e = block.evaluate().unwrap();
     assert_eq!(e.color, Rgba::TRANSPARENT);
-    assert!(e.voxels.is_none());
+    assert!(matches!(e.voxels, Evoxels::One(_)));
     assert_eq!(e.opaque, FaceMap::repeat(false));
     assert_eq!(e.visible, false);
     assert_eq!(e.voxel_opacity_mask, None)
@@ -152,20 +170,20 @@ fn evaluate_voxels_checked_individually() {
     assert_eq!(e.attributes, attributes);
     assert_eq!(
         e.voxels,
-        Some(GridArray::from_fn(
-            GridAab::for_block(resolution),
-            |point| {
+        Evoxels::Many(
+            resolution,
+            GridArray::from_fn(GridAab::for_block(resolution), |point| {
                 let point = point.cast::<f32>().unwrap();
                 Evoxel {
                     color: Rgba::new(point.x, point.y, point.z, 1.0),
                     selectable: true,
                     collision: BlockCollision::Hard,
                 }
-            }
-        ))
+            })
+        )
     );
     assert_eq!(e.color, Rgba::new(0.5, 0.5, 0.5, 1.0));
-    assert_eq!(e.resolution, resolution);
+    assert_eq!(e.resolution(), resolution);
     assert_eq!(e.opaque, FaceMap::repeat(true));
     assert_eq!(e.visible, true);
     assert_eq!(
@@ -241,7 +259,7 @@ fn evaluate_voxels_not_filling_block() {
         e.color,
         Rgba::new(0.0, 0.0, 0.0, 1.0 / f32::from(resolution).powi(3))
     );
-    assert_eq!(e.resolution, resolution);
+    assert_eq!(e.resolution(), resolution);
     assert_eq!(e.opaque, FaceMap::repeat(false));
     assert_eq!(e.visible, true);
 }
@@ -263,7 +281,7 @@ fn evaluate_voxels_partial_not_filling() {
 
     let e = block.evaluate().unwrap();
     assert_eq!(e.color, Rgba::new(1.0, 1.0, 1.0, 0.5));
-    assert_eq!(e.resolution, resolution);
+    assert_eq!(e.resolution(), resolution);
     assert_eq!(e.opaque, FaceMap::repeat(false).with(Face6::NX, true));
     assert_eq!(e.visible, true);
 }
@@ -293,17 +311,17 @@ fn recur_with_offset() {
     let e = block_at_offset.evaluate().unwrap();
     assert_eq!(
         e.voxels,
-        Some(GridArray::from_fn(
-            GridAab::for_block(resolution as Resolution),
-            |point| {
+        Evoxels::Many(
+            resolution,
+            GridArray::from_fn(GridAab::for_block(resolution as Resolution), |point| {
                 let point = (point + offset).cast::<f32>().unwrap();
                 Evoxel {
                     color: Rgba::new(point.x, point.y, point.z, 1.0),
                     selectable: true,
                     collision: BlockCollision::Hard,
                 }
-            }
-        ))
+            })
+        )
     );
 }
 

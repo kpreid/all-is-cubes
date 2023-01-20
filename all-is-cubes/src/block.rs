@@ -362,7 +362,7 @@ impl Block {
                         }
                     };
 
-                EvaluatedBlock::from_voxels(attributes.clone(), resolution, voxels)
+                EvaluatedBlock::from_voxels(attributes.clone(), Evoxels::Many(resolution, voxels))
             }
         };
 
@@ -608,8 +608,9 @@ pub const AIR: Block = Block(BlockPtr::Static(&Primitive::Air));
 pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     attributes: AIR_ATTRIBUTES,
     color: Rgba::TRANSPARENT,
-    voxels: None,
-    resolution: Resolution::R1,
+    // Note that this voxel is *not* no-collision and unselectable; the block attributes
+    // override it. For now, all atom blocks work this way. TODO: Perhaps we should change that.
+    voxels: Evoxels::One(Evoxel::from_color(Rgba::TRANSPARENT)),
     opaque: FaceMap::repeat_copy(false),
     visible: false,
     voxel_opacity_mask: None,

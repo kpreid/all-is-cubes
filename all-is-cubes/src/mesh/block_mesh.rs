@@ -5,7 +5,7 @@
 use cgmath::{Point2, Point3, Transform as _};
 use std::fmt::Debug;
 
-use crate::block::{AnimationChange, EvaluatedBlock, Evoxel, Resolution};
+use crate::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
 use crate::camera::Flaws;
 use crate::math::{
     Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, OpacityCategory,
@@ -156,7 +156,7 @@ impl<V, T> BlockMesh<V, T> {
                 Some(old_mask),
                 [existing_texture],
                 EvaluatedBlock {
-                    voxels: Some(voxels),
+                    voxels,
                     voxel_opacity_mask: Some(new_mask),
                     ..
                 },
@@ -184,13 +184,21 @@ where
         // If this is true, avoid using vertex coloring even on solid rectangles.
         let prefer_textures = block.attributes.animation_hint.redefinition != AnimationChange::None;
 
-        let block_color = options.transparency.limit_alpha(block.color);
-
         let mut used_any_vertex_colors = false;
         let mut flaws = Flaws::empty();
 
-        match block.voxels.as_ref().filter(|_| !options.ignore_voxels) {
-            None => {
+        let tmp_block_color_voxel;
+        let voxels = if options.ignore_voxels {
+            tmp_block_color_voxel = Evoxels::One(Evoxel::from_color(block.color));
+            &tmp_block_color_voxel
+        } else {
+            &block.voxels
+        };
+        match *voxels {
+            Evoxels::One(Evoxel {
+                color: block_color, ..
+            }) => {
+                let block_color = options.transparency.limit_alpha(block_color);
                 let face_vertices = FaceMap::from_fn(|face| {
                     let mut vertices: Vec<V> = Vec::new();
                     let mut indices_opaque: Vec<u32> = Vec::new();
@@ -232,19 +240,19 @@ where
                     flaws,
                 }
             }
-            Some(voxels) => {
+            Evoxels::Many(resolution, ref voxels_array) => {
                 // Exit when the voxel data is not at all in the right volume.
                 // This dodges some integer overflow cases on bad input.
                 // TODO: Add a test for this case
-                if voxels
+                if voxels_array
                     .bounds()
-                    .intersection(GridAab::for_block(block.resolution))
+                    .intersection(GridAab::for_block(resolution))
                     .is_none()
                 {
                     return BlockMesh::default();
                 }
 
-                let block_resolution = GridCoordinate::from(block.resolution);
+                let block_resolution = GridCoordinate::from(resolution);
 
                 // Construct empty output to mutate.
                 let mut output_by_face = FaceMap::from_fn(|_| BlockFaceMesh {
@@ -266,13 +274,13 @@ where
                 // generate for each layer and whether it needs a texture.
                 for face in Face6::ALL {
                     let voxel_transform = face.matrix(block_resolution - 1);
-                    let quad_transform = QuadTransform::new(face, block.resolution);
+                    let quad_transform = QuadTransform::new(face, resolution);
 
                     // Rotate the voxel array's extent into our local coordinate system, so we can find
                     // out what range to iterate over.
                     // TODO: Avoid using a matrix inversion
                     // TODO: Intersect the input voxels.bounds() with the block bounds so we don't scan *more* than we should.
-                    let rotated_voxel_range = voxels
+                    let rotated_voxel_range = voxels_array
                         .bounds()
                         .transform(face.matrix(block_resolution).inverse_transform().unwrap())
                         .unwrap();
@@ -310,9 +318,9 @@ where
                                 let cube: Point3<GridCoordinate> =
                                     voxel_transform.transform_point(Point3::new(s, t, layer));
 
-                                let color = options
-                                    .transparency
-                                    .limit_alpha(voxels.get(cube).unwrap_or(&Evoxel::AIR).color);
+                                let color = options.transparency.limit_alpha(
+                                    voxels_array.get(cube).unwrap_or(&Evoxel::AIR).color,
+                                );
 
                                 if layer == 0 && !color.fully_opaque() {
                                     // If the first layer is transparent in any cube at all, then the face is
@@ -327,7 +335,7 @@ where
                                         false
                                     } else {
                                         // Compute whether this voxel is not hidden behind another
-                                        let obscuring_cat = voxels
+                                        let obscuring_cat = voxels_array
                                             .get(cube + face.normal_vector())
                                             .map(|ev| {
                                                 options
@@ -422,7 +430,9 @@ where
                                     //   geometry as needed.
                                     used_any_vertex_colors = true;
                                     flaws |= Flaws::MISSING_TEXTURES;
-                                    QuadColoring::Solid(block_color)
+                                    QuadColoring::Solid(
+                                        options.transparency.limit_alpha(block.color),
+                                    )
                                 }
                             };
 

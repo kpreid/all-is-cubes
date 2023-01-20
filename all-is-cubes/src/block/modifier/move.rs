@@ -1,8 +1,8 @@
 use cgmath::Zero;
 
+use crate::block::Evoxels;
 use crate::block::{
-    self, Block, BlockAttributes, BlockCollision, EvaluatedBlock, Evoxel, Modifier,
-    Resolution::R16, AIR,
+    self, Block, BlockAttributes, BlockCollision, EvaluatedBlock, Modifier, Resolution::R16, AIR,
 };
 use crate::drawing::VoxelBrush;
 use crate::math::{Face6, GridAab, GridArray, GridCoordinate, Rgba};
@@ -82,10 +82,10 @@ impl Move {
             depth,
         )?;
 
-        let (original_bounds, effective_resolution) = match input.voxels.as_ref() {
-            Some(array) => (array.bounds(), input.resolution),
+        let (original_bounds, effective_resolution) = match input.voxels {
+            Evoxels::Many(resolution, ref array) => (array.bounds(), resolution),
             // Treat color blocks as having a resolution of 16. TODO: Improve on this hardcoded constant
-            None => (GridAab::for_block(R16), R16),
+            Evoxels::One(_) => (GridAab::for_block(R16), R16),
         };
 
         // For now, our strategy is to work in units of the block's resolution.
@@ -132,10 +132,6 @@ impl Move {
             None
         };
 
-        // Used by the solid color case; we have to do this before we move `attributes`
-        // out of `value`.
-        let voxel = Evoxel::from_block(&input);
-
         let attributes = BlockAttributes {
             // Switch to `Recur` collision so that the displacement collides as expected.
             // TODO: If the collision was `Hard` then we may need to edit the collision
@@ -157,16 +153,24 @@ impl Move {
 
         Ok(match displaced_bounds {
             Some(displaced_bounds) => {
-                let displaced_voxels = match input.voxels.as_ref() {
-                    Some(voxels) => GridArray::from_fn(displaced_bounds, |cube| {
-                        voxels[cube - translation_in_res]
-                    }),
-                    None => {
+                let displaced_voxels = match &input.voxels {
+                    Evoxels::Many(_, voxels) => Evoxels::Many(
+                        effective_resolution,
+                        GridArray::from_fn(displaced_bounds, |cube| {
+                            voxels[cube - translation_in_res]
+                        }),
+                    ),
+                    &Evoxels::One(voxel) => {
                         // Input block is a solid color; synthesize voxels.
-                        GridArray::from_fn(displaced_bounds, |_| voxel)
+                        // TODO: Also synthesize if the resolution is merely low
+                        // compared to the velocity.
+                        Evoxels::Many(
+                            effective_resolution,
+                            GridArray::from_fn(displaced_bounds, |_| voxel),
+                        )
                     }
                 };
-                EvaluatedBlock::from_voxels(attributes, effective_resolution, displaced_voxels)
+                EvaluatedBlock::from_voxels(attributes, displaced_voxels)
             }
             None => EvaluatedBlock::from_color(attributes, Rgba::TRANSPARENT),
         })
@@ -193,7 +197,7 @@ impl universe::VisitRefs for Move {
 mod tests {
     use cgmath::EuclideanSpace;
 
-    use crate::block::{Block, Modifier, Resolution::R2};
+    use crate::block::{Block, Evoxel, Modifier, Resolution::*};
     use crate::content::make_some_blocks;
     use crate::math::{FaceMap, GridPoint, OpacityCategory};
     use crate::space::Space;
@@ -224,11 +228,10 @@ mod tests {
                     ..ev_original.attributes.clone()
                 },
                 color: color.to_rgb().with_alpha(notnan!(0.5)),
-                voxels: Some(GridArray::repeat(
-                    expected_bounds,
-                    Evoxel::from_block(&ev_original)
-                )),
-                resolution: R16,
+                voxels: Evoxels::Many(
+                    R16,
+                    GridArray::repeat(expected_bounds, Evoxel::from_block(&ev_original))
+                ),
                 opaque: FaceMap::repeat(false).with(Face6::PY, true),
                 visible: true,
                 voxel_opacity_mask: Some(GridArray::repeat(
@@ -267,11 +270,10 @@ mod tests {
                     ..ev_original.attributes.clone()
                 },
                 color: color.to_rgb().with_alpha(notnan!(0.5)),
-                voxels: Some(GridArray::repeat(
-                    expected_bounds,
-                    Evoxel::from_block(&ev_original)
-                )),
-                resolution,
+                voxels: Evoxels::Many(
+                    resolution,
+                    GridArray::repeat(expected_bounds, Evoxel::from_block(&ev_original))
+                ),
                 opaque: FaceMap::repeat(false).with(Face6::PY, true),
                 visible: true,
                 voxel_opacity_mask: Some(GridArray::repeat(

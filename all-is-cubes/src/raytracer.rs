@@ -16,7 +16,7 @@ use ordered_float::NotNan;
 #[cfg(feature = "threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
-use crate::block::{Evoxel, Resolution, AIR};
+use crate::block::{Evoxels, AIR};
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 use crate::math::{
     point_to_enclosing_cube, smoothstep, Face7, FreeCoordinate, GridAab, GridArray, GridPoint, Rgb,
@@ -440,19 +440,20 @@ struct TracingCubeData {
 }
 
 #[derive(Clone, Debug)]
-enum TracingBlock<D> {
-    Atom(D, Rgba),
-    Recur(D, Resolution, GridArray<Evoxel>),
+struct TracingBlock<D> {
+    block_data: D,
+    // TODO: `Evoxels` carries more data than we actually need (color). Experiment with using a packed format.
+    voxels: Evoxels,
 }
 
 impl<D: RtBlockData> TracingBlock<D> {
-    fn from_block(options: RtOptionsRef<'_, D::Options>, block_data: &SpaceBlockData) -> Self {
-        let evaluated = block_data.evaluated();
-        let pixel_block_data = D::from_block(options, block_data);
-        if let Some(ref voxels) = evaluated.voxels {
-            TracingBlock::Recur(pixel_block_data, evaluated.resolution, voxels.clone())
-        } else {
-            TracingBlock::Atom(pixel_block_data, evaluated.color)
+    fn from_block(
+        options: RtOptionsRef<'_, D::Options>,
+        space_block_data: &SpaceBlockData,
+    ) -> Self {
+        TracingBlock {
+            block_data: D::from_block(options, space_block_data),
+            voxels: space_block_data.evaluated().voxels.clone(),
         }
     }
 }

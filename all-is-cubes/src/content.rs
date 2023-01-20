@@ -36,14 +36,14 @@ pub mod testing;
 /// They will be fully opaque.
 ///
 /// ```
-/// use all_is_cubes::block::Block;
-/// use all_is_cubes::content::make_some_blocks;
-///
+/// # use all_is_cubes::block::{Block, Resolution};
+/// # use all_is_cubes::content::make_some_blocks; // hide because wrong import path
+/// #
 /// let blocks: [Block; 3] = make_some_blocks();
 /// assert_ne!(blocks[0], blocks[1]);
 /// assert_ne!(blocks[0], blocks[2]);
 /// assert_ne!(blocks[1], blocks[2]);
-/// assert_eq!(blocks[0].evaluate().unwrap().voxels, None);
+/// assert_eq!(blocks[0].evaluate().unwrap().resolution(), Resolution::R1);
 /// ```
 ///
 /// [`Primitive::Atom`]: crate::block::Primitive::Atom
@@ -65,16 +65,16 @@ pub fn make_some_blocks<const COUNT: usize>() -> [Block; COUNT] {
 /// They will be fully opaque.
 ///
 /// ```
-/// use all_is_cubes::block::{Block, Resolution};
-/// use all_is_cubes::content::make_some_voxel_blocks;
-/// use all_is_cubes::universe::Universe;
-///
+/// # use all_is_cubes::block::{Block, Resolution};
+/// # use all_is_cubes::content::make_some_voxel_blocks; // hide because wrong import path
+/// # use all_is_cubes::universe::Universe;
+/// #
 /// let mut universe = Universe::new();
 /// let blocks: [Block; 3] = make_some_voxel_blocks(&mut universe);
 /// assert_ne!(blocks[0], blocks[1]);
 /// assert_ne!(blocks[0], blocks[2]);
 /// assert_ne!(blocks[1], blocks[2]);
-/// assert_eq!(blocks[0].evaluate().unwrap().resolution, Resolution::R16);
+/// assert_eq!(blocks[0].evaluate().unwrap().resolution(), Resolution::R16);
 /// ```
 ///
 /// [`Primitive::Recur`]: crate::block::Primitive::Recur

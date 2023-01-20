@@ -6,7 +6,7 @@ use std::fmt;
 
 use cgmath::{EuclideanSpace, InnerSpace as _, Matrix4, Point3, Transform as _};
 
-use crate::block::{recursive_raycast, Block, EvaluatedBlock, Evoxel};
+use crate::block::{recursive_raycast, Block, EvaluatedBlock, Evoxel, Evoxels};
 use crate::content::palette;
 use crate::math::{
     Aab, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridVector, Rgba,
@@ -38,20 +38,27 @@ pub fn cursor_raycast(
         }
 
         // Check intersection with recursive block
-        if let Some(voxels) = &evaluated.voxels {
-            let recursive_hit: Option<(GridPoint, &Evoxel)> =
-                recursive_raycast(ray, step.cube_ahead(), evaluated.resolution)
-                    .filter_map(|voxel_step| {
-                        voxels
-                            .get(voxel_step.cube_ahead())
-                            .map(|v| (voxel_step.cube_ahead(), v))
-                    })
-                    .find(|(_, v)| v.selectable);
-            if recursive_hit.is_none() {
-                continue;
-            } else {
-                // TODO: Record intersection information about which voxel was hit,
-                // and also let it contribute to the determination of which face is selected.
+        match evaluated.voxels {
+            Evoxels::One(evoxel) => {
+                if !evoxel.selectable {
+                    continue;
+                }
+            }
+            Evoxels::Many(resolution, ref voxels) => {
+                let recursive_hit: Option<(GridPoint, &Evoxel)> =
+                    recursive_raycast(ray, step.cube_ahead(), resolution)
+                        .filter_map(|voxel_step| {
+                            voxels
+                                .get(voxel_step.cube_ahead())
+                                .map(|v| (voxel_step.cube_ahead(), v))
+                        })
+                        .find(|(_, v)| v.selectable);
+                if recursive_hit.is_none() {
+                    continue;
+                } else {
+                    // TODO: Record intersection information about which voxel was hit,
+                    // and also let it contribute to the determination of which face is selected.
+                }
             }
         }
 
@@ -206,7 +213,7 @@ impl Geometry for Cursor {
         // (But maybe we should guarantee it is right-sized within block evaluation?)
         // (Perhaps a better box would be the bounds of all `selectable` voxels?)
         let block_aabb = Aab::from(evaluated.voxels_bounds())
-            .scale(FreeCoordinate::from(evaluated.resolution).recip())
+            .scale(FreeCoordinate::from(evaluated.resolution()).recip())
             .translate(self.cube().to_vec().map(FreeCoordinate::from));
 
         // Add wireframe of the block.

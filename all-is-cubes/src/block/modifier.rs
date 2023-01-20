@@ -1,4 +1,4 @@
-use crate::block::{Block, BlockChange, EvalBlockError, EvaluatedBlock};
+use crate::block::{Block, BlockChange, EvalBlockError, EvaluatedBlock, Evoxels};
 use crate::listen::Listener;
 use crate::math::{GridArray, GridRotation, Rgb};
 use crate::universe::{RefVisitor, VisitRefs};
@@ -108,24 +108,30 @@ impl Modifier {
             }
 
             Modifier::Rotate(rotation) => {
-                if value.voxels.is_none() && value.voxel_opacity_mask.is_none() {
+                if matches!(value.voxels, Evoxels::One(_)) && value.voxel_opacity_mask.is_none() {
                     // Skip computation of transforms
                     value
                 } else {
                     // TODO: Add a shuffle-in-place rotation operation to GridArray and try implementing this using that, which should have less arithmetic involved than these matrix ops
-                    let resolution = value.resolution;
+                    let resolution = value.resolution();
                     let inner_to_outer = rotation.to_positive_octant_matrix(resolution.into());
                     let outer_to_inner = rotation
                         .inverse()
                         .to_positive_octant_matrix(resolution.into());
 
                     EvaluatedBlock {
-                        voxels: value.voxels.map(|voxels| {
+                        voxels: Evoxels::Many(
+                            resolution,
                             GridArray::from_fn(
-                                voxels.bounds().transform(inner_to_outer).unwrap(),
-                                |cube| voxels[outer_to_inner.transform_cube(cube)],
-                            )
-                        }),
+                                value.voxels.bounds().transform(inner_to_outer).unwrap(),
+                                |cube| {
+                                    value
+                                        .voxels
+                                        .get(outer_to_inner.transform_cube(cube))
+                                        .unwrap()
+                                },
+                            ),
+                        ),
                         voxel_opacity_mask: value.voxel_opacity_mask.map(|mask| {
                             GridArray::from_fn(
                                 mask.bounds().transform(inner_to_outer).unwrap(),
@@ -136,7 +142,6 @@ impl Modifier {
                         // Unaffected
                         attributes: value.attributes,
                         color: value.color,
-                        resolution,
                         opaque: value.opaque.rotate(rotation),
                         visible: value.visible,
                     }
@@ -230,14 +235,16 @@ mod tests {
             EvaluatedBlock {
                 attributes: BlockAttributes::default(),
                 color: rgba_const!(0.5, 0.5, 0.5, 0.5),
-                voxels: Some(GridArray::from_fn(block_bounds, |cube| {
-                    Evoxel {
-                        color: rotated_color_fn(cube),
-                        selectable: true,
-                        collision: BlockCollision::Hard,
-                    }
-                })),
-                resolution: R2,
+                voxels: Evoxels::Many(
+                    R2,
+                    GridArray::from_fn(block_bounds, |cube| {
+                        Evoxel {
+                            color: rotated_color_fn(cube),
+                            selectable: true,
+                            collision: BlockCollision::Hard,
+                        }
+                    })
+                ),
                 opaque: FaceMap::repeat(false).with(rotation.transform(Face6::NY), true),
                 visible: true,
                 voxel_opacity_mask: Some(GridArray::from_fn(block_bounds, |cube| {

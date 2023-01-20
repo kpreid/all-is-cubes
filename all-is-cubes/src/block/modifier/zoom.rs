@@ -1,7 +1,7 @@
 use cgmath::{EuclideanSpace as _, Point3};
 
-use crate::block::Resolution;
 use crate::block::{self, EvaluatedBlock, Modifier, Resolution::R1};
+use crate::block::{Evoxels, Resolution};
 use crate::math::{GridAab, GridArray, GridCoordinate, GridPoint, Rgba};
 use crate::universe;
 
@@ -55,13 +55,13 @@ impl Zoom {
 
         // TODO: To efficiently implement this, we should be able to run in a phase
         // *before* the `Primitive` evaluation, which allows us to reduce how many
-        // of the primitive voxels are evaluated. (Modifier::Move will also help.)
+        // of the primitive voxels are evaluated. (Modifier::Move will also benefit.)
 
+        let original_resolution = input.resolution();
         let EvaluatedBlock {
             attributes,
             color,
             voxels,
-            resolution: original_resolution,
             opaque: _,
             visible: _,
             voxel_opacity_mask: _,
@@ -71,7 +71,7 @@ impl Zoom {
         // (this is probably wrong in that we need to duplicate voxels if it happens)
         let zoom_resolution = (original_resolution / scale).unwrap_or(R1);
 
-        Ok(if let Some(voxels) = voxels {
+        Ok(if let Evoxels::Many(_, voxels) = voxels {
             let voxel_offset = offset_in_zoomed_blocks.map(GridCoordinate::from).to_vec()
                 * GridCoordinate::from(zoom_resolution);
             match GridAab::for_block(zoom_resolution)
@@ -82,12 +82,14 @@ impl Zoom {
                 None => EvaluatedBlock::from_color(attributes, Rgba::TRANSPARENT),
                 Some(intersected_bounds) => EvaluatedBlock::from_voxels(
                     attributes,
-                    zoom_resolution,
-                    GridArray::from_fn(intersected_bounds, |p| voxels[p + voxel_offset]),
+                    Evoxels::Many(
+                        zoom_resolution,
+                        GridArray::from_fn(intersected_bounds, |p| voxels[p + voxel_offset]),
+                    ),
                 ),
             }
         } else {
-            // Atom block.
+            // Block has resolution 1.
             // Zoom::new() checks that the region is not outside the block's unit cube,
             // so we can just unconditionally return the original color.
             EvaluatedBlock::from_color(attributes, color)
@@ -161,8 +163,8 @@ mod tests {
         let [original_block] = make_some_voxel_blocks(&mut universe);
 
         let ev_original = original_block.evaluate().unwrap();
-        let zoom_resolution = ev_original.resolution.halve().unwrap();
-        let original_voxels = ev_original.voxels.as_ref().unwrap();
+        let zoom_resolution = ev_original.resolution().halve().unwrap();
+        let original_voxels = &ev_original.voxels;
 
         // Try zoom at multiple offset steps.
         for x in 0i32..2 {
@@ -184,14 +186,16 @@ mod tests {
                 } else {
                     EvaluatedBlock::from_voxels(
                         ev_original.attributes.clone(),
-                        zoom_resolution,
-                        GridArray::from_fn(GridAab::for_block(zoom_resolution), |p| {
-                            original_voxels[p + GridVector::new(
-                                GridCoordinate::from(zoom_resolution) * x,
-                                0,
-                                0,
-                            )]
-                        }),
+                        Evoxels::Many(
+                            zoom_resolution,
+                            GridArray::from_fn(GridAab::for_block(zoom_resolution), |p| {
+                                original_voxels[p + GridVector::new(
+                                    GridCoordinate::from(zoom_resolution) * x,
+                                    0,
+                                    0,
+                                )]
+                            }),
+                        ),
                     )
                 }
             );

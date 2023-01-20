@@ -9,9 +9,9 @@ use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 
 use cgmath::Point3;
 
-use crate::block::Evoxel;
+use crate::block::{Evoxel, Evoxels};
 use crate::content::palette;
-use crate::math::{GridAab, GridArray};
+use crate::math::{GridAab, GridPoint};
 use crate::mesh::TextureCoordinate;
 use crate::util::{ConciseDebug, CustomFormat};
 
@@ -88,7 +88,7 @@ impl<T: TextureAllocator> TextureAllocator for std::rc::Rc<T> {
 
 pub(super) fn copy_voxels_to_texture<A: TextureAllocator>(
     texture_allocator: &A,
-    voxels: &GridArray<Evoxel>,
+    voxels: &Evoxels,
 ) -> Option<A::Tile> {
     texture_allocator
         .allocate(voxels.bounds())
@@ -98,10 +98,7 @@ pub(super) fn copy_voxels_to_texture<A: TextureAllocator>(
         })
 }
 
-pub(super) fn copy_voxels_into_existing_texture<T: TextureTile>(
-    voxels: &GridArray<Evoxel>,
-    texture: &mut T,
-) {
+pub(super) fn copy_voxels_into_existing_texture<T: TextureTile>(voxels: &Evoxels, texture: &mut T) {
     let bounds = voxels.bounds();
     let mut texels: Vec<Texel> = Vec::with_capacity(bounds.volume());
     // TODO: Teach GridArray about alternate array orderings so that we can express
@@ -111,8 +108,8 @@ pub(super) fn copy_voxels_into_existing_texture<T: TextureTile>(
             for x in bounds.x_range() {
                 texels.push(
                     voxels
-                        .get([x, y, z])
-                        .unwrap_or(&Evoxel::from_color(palette::MISSING_VOXEL_FALLBACK))
+                        .get(GridPoint { x, y, z })
+                        .unwrap_or(Evoxel::from_color(palette::MISSING_VOXEL_FALLBACK))
                         .color
                         .to_srgb8(),
                 );

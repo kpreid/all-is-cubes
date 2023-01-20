@@ -486,21 +486,30 @@ where
                 self.meshes.reserve(new_len);
                 for bd in &block_data[self.meshes.len()..new_len] {
                     let evaluated = bd.evaluated();
-                    self.meshes.push(if evaluated.resolution > Resolution::R1 {
-                        // If the block has voxels, generate a placeholder mesh,
-                        // marked as not-ready so it will be replaced eventually.
-                        VersionedBlockMesh {
-                            mesh: BlockMesh::new(evaluated, block_texture_allocator, &fast_options),
-                            version: BlockMeshVersion::NotReady,
-                        }
-                    } else {
-                        // If the block does not have voxels, then we can just generate the
-                        // final mesh.
-                        VersionedBlockMesh {
-                            mesh: BlockMesh::new(evaluated, block_texture_allocator, mesh_options),
-                            version: current_version_number,
-                        }
-                    });
+                    self.meshes
+                        .push(if evaluated.resolution() > Resolution::R1 {
+                            // If the block has voxels, generate a placeholder mesh,
+                            // marked as not-ready so it will be replaced eventually.
+                            VersionedBlockMesh {
+                                mesh: BlockMesh::new(
+                                    evaluated,
+                                    block_texture_allocator,
+                                    &fast_options,
+                                ),
+                                version: BlockMeshVersion::NotReady,
+                            }
+                        } else {
+                            // If the block does not have voxels, then we can just generate the
+                            // final mesh as quick as the placeholder.
+                            VersionedBlockMesh {
+                                mesh: BlockMesh::new(
+                                    evaluated,
+                                    block_texture_allocator,
+                                    mesh_options,
+                                ),
+                                version: current_version_number,
+                            }
+                        });
                 }
             }
         }

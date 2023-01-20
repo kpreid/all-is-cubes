@@ -1,6 +1,6 @@
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
-use crate::block::{recursive_ray, Evoxel};
+use crate::block::{recursive_ray, Evoxel, Evoxels};
 use crate::camera::LightingOption;
 use crate::math::{Face7, FaceMap, FreeCoordinate, GridArray, GridPoint, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
@@ -184,8 +184,9 @@ impl<'a, D> Iterator for SurfaceIter<'a, D> {
             });
         }
 
-        Some(match &self.blocks[cube_data.block_index as usize] {
-            TracingBlock::Atom(block_data, color) => {
+        let tb: &TracingBlock<D> = &self.blocks[cube_data.block_index as usize];
+        Some(match tb.voxels {
+            Evoxels::One(Evoxel { color, .. }) => {
                 if color.fully_transparent() {
                     // The caller could generically skip transparent, but if we do it then
                     // we can skip some math too.
@@ -194,8 +195,8 @@ impl<'a, D> Iterator for SurfaceIter<'a, D> {
                     }
                 } else {
                     TraceStep::EnterSurface(Surface {
-                        block_data,
-                        diffuse_color: *color,
+                        block_data: &tb.block_data,
+                        diffuse_color: color,
                         cube: rc_step.cube_ahead(),
                         t_distance: rc_step.t_distance(),
                         intersection_point: rc_step.intersection_point(self.ray),
@@ -203,16 +204,15 @@ impl<'a, D> Iterator for SurfaceIter<'a, D> {
                     })
                 }
             }
-            TracingBlock::Recur(block_data, resolution, array) => {
+            Evoxels::Many(resolution, ref array) => {
                 let block_cube = rc_step.cube_ahead();
-                let resolution = *resolution;
                 let sub_ray = recursive_ray(self.ray, block_cube, resolution);
                 let antiscale = FreeCoordinate::from(resolution).recip();
 
                 self.current_block = Some(VoxelSurfaceIter {
                     voxel_ray: sub_ray,
                     voxel_raycaster: sub_ray.cast().within(array.bounds()),
-                    block_data,
+                    block_data: &tb.block_data,
                     antiscale,
                     array,
                     block_cube,

@@ -2,6 +2,7 @@ use std::mem;
 
 use ordered_float::NotNan;
 
+use crate::block::Evoxels;
 use crate::block::{
     self, Block, BlockCollision, EvaluatedBlock, Evoxel, Modifier, Resolution::R1, AIR,
 };
@@ -107,23 +108,23 @@ impl Composite {
         // Unpack blocks.
         let EvaluatedBlock {
             attributes,
-            color: dst_color,
+            color: _,
             voxels: dst_voxels,
-            resolution: dst_resolution,
             opaque: _,
             visible: _,
             voxel_opacity_mask: _,
         } = dst_evaluated;
         let EvaluatedBlock {
             attributes: _, // TODO: merge attributes
-            color: src_color,
+            color: _,
             voxels: src_voxels,
-            resolution: src_resolution,
             opaque: _,
             visible: _,
             voxel_opacity_mask: _,
         } = src_evaluated;
 
+        let src_resolution = src_voxels.resolution();
+        let dst_resolution = dst_voxels.resolution();
         let effective_resolution = src_resolution.max(dst_resolution);
         let src_scale =
             GridCoordinate::from(effective_resolution) / GridCoordinate::from(src_resolution);
@@ -131,32 +132,27 @@ impl Composite {
             GridCoordinate::from(effective_resolution) / GridCoordinate::from(dst_resolution);
 
         Ok(if effective_resolution == R1 {
-            EvaluatedBlock::from_color(attributes, operator.blend_color(src_color, dst_color))
+            EvaluatedBlock::from_voxels(
+                attributes,
+                Evoxels::One(operator.blend_evoxel(
+                    src_voxels.single_voxel().unwrap(),
+                    dst_voxels.single_voxel().unwrap(),
+                )),
+            )
         } else {
-            // TODO: avoid needing to allocate here. Define a GridArrayView type?
-            let src_voxels = src_voxels.unwrap_or_else(|| {
-                GridArray::from_fn(GridAab::for_block(R1), |_| Evoxel::from_color(src_color))
-            });
-            let dst_voxels = dst_voxels.unwrap_or_else(|| {
-                GridArray::from_fn(GridAab::for_block(R1), |_| Evoxel::from_color(src_color))
-            });
             EvaluatedBlock::from_voxels(
                 // TODO: merge attributes
                 attributes,
-                effective_resolution,
                 // TODO: use narrower array bounds (union of both inputs' bounds)
-                GridArray::from_fn(GridAab::for_block(effective_resolution), |p| {
-                    operator.blend_evoxel(
-                        src_voxels
-                            .get(p / src_scale)
-                            .copied()
-                            .unwrap_or(Evoxel::AIR),
-                        dst_voxels
-                            .get(p / dst_scale)
-                            .copied()
-                            .unwrap_or(Evoxel::AIR),
-                    )
-                }),
+                Evoxels::Many(
+                    effective_resolution,
+                    GridArray::from_fn(GridAab::for_block(effective_resolution), |p| {
+                        operator.blend_evoxel(
+                            src_voxels.get(p / src_scale).unwrap_or(Evoxel::AIR),
+                            dst_voxels.get(p / dst_scale).unwrap_or(Evoxel::AIR),
+                        )
+                    }),
+                ),
             )
         })
     }

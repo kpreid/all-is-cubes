@@ -6,6 +6,7 @@ use std::fmt;
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
 use super::POSITION_EPSILON;
+use crate::block::Evoxels;
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{
     Aab, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridAab, GridArray, GridCoordinate,
@@ -356,7 +357,7 @@ pub(crate) trait CollisionSpace {
     fn collision(cell: &Self::Cell) -> BlockCollision;
 
     /// TODO: document
-    fn get_voxels(cell: &Self::Cell) -> Option<(Resolution, &GridArray<Evoxel>)>;
+    fn get_voxels(cell: &Self::Cell) -> Option<&Evoxels>;
 
     /// TODO: document
     ///
@@ -388,8 +389,8 @@ impl CollisionSpace for Space {
     }
 
     #[inline]
-    fn get_voxels(evaluated: &EvaluatedBlock) -> Option<(Resolution, &GridArray<Evoxel>)> {
-        evaluated.voxels.as_ref().map(|v| (evaluated.resolution, v))
+    fn get_voxels(evaluated: &EvaluatedBlock) -> Option<&Evoxels> {
+        Some(&evaluated.voxels)
     }
 
     #[inline]
@@ -402,14 +403,14 @@ impl CollisionSpace for Space {
     ) -> Option<CollisionRayEnd> {
         match &evaluated.voxels {
             // Plain non-recursive collision
-            None => Some(entry_end),
-            Some(voxels) => {
+            Evoxels::One(_) => Some(entry_end),
+            &Evoxels::Many(resolution, ref voxels) => {
                 let cube_translation = entry_end
                     .contact
                     .cube()
                     .to_vec()
                     .map(|s| -FreeCoordinate::from(s));
-                let scale = FreeCoordinate::from(evaluated.resolution);
+                let scale = FreeCoordinate::from(resolution);
                 // Transform our original AAB and ray so that it is in the coordinate system of the block voxels.
                 // Note: aab is not translated since it's relative to the ray anyway.
                 let voxel_aab = space_aab.scale(scale);
@@ -427,7 +428,7 @@ impl CollisionSpace for Space {
                             t_distance: voxel_t_distance,
                             contact: Contact::Voxel {
                                 cube: entry_end.contact.cube(),
-                                resolution: evaluated.resolution,
+                                resolution,
                                 voxel,
                             },
                         }),
@@ -442,9 +443,6 @@ impl CollisionSpace for Space {
     }
 }
 
-// TODO: This impl is not yet used; it will be used for voxel block collision.
-// It exists now as a piece of incremental progress and to prove that `CollisionSpace`
-// *can* be implemented for EvaluatedBlock.
 impl CollisionSpace for GridArray<Evoxel> {
     type Cell = Evoxel;
 
@@ -463,7 +461,10 @@ impl CollisionSpace for GridArray<Evoxel> {
     }
 
     #[inline]
-    fn get_voxels(_cell: &Self::Cell) -> Option<(Resolution, &GridArray<Evoxel>)> {
+    fn get_voxels(_cell: &Self::Cell) -> Option<&Evoxels> {
+        // TODO: can't just return Evoxels::One because it would have to be owned (unless we
+        // changed the return type to Cow or used a different enum), but that might be
+        // elegant (or not)...revisit.
         None
     }
     #[inline(always)]
