@@ -159,7 +159,12 @@ impl Universe {
         None
     }
 
-    // TODO: temporary shortcuts to be replaced with more nuance
+    /// Returns the character named `"character"`.
+    /// This is currently assumed to be the “player character” for this universe.
+    ///
+    /// TODO: this is a temporary shortcut to be replaced with something with more nuance
+    /// (e.g. we might have temporary characters for editing purposes, which are 'current'
+    /// but not 'primary').
     pub fn get_default_character(&self) -> Option<URef<Character>> {
         self.get(&"character".into())
     }
@@ -399,20 +404,28 @@ impl Default for Universe {
     }
 }
 
-/// Errors resulting from attempting to insert an object in a `Universe`.
+/// Errors resulting from attempting to insert an object in a [`Universe`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct InsertError {
     /// The name given for the insertion.
     pub name: Name,
+    /// The problem that was detected.
     pub kind: InsertErrorKind,
 }
+
+/// Specific problems with attempting to insert an object in a [`Universe`].
+/// A component of [`InsertError`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum InsertErrorKind {
+    /// An object already exists with the proposed name.
     AlreadyExists,
+    /// The proposed name may not be used.
     InvalidName,
+    /// The provided [`URef`] does not have a value.
     Gone,
+    /// The provided [`URef`] was already inserted into some universe.
     AlreadyInserted,
 }
 

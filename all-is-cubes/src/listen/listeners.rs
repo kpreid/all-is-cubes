@@ -27,6 +27,7 @@ pub struct FnListener<F, T> {
 }
 
 impl<F, T> FnListener<F, T> {
+    #[allow(missing_docs)]
     pub fn new(target: &Arc<T>, function: F) -> Self {
         Self {
             function,
@@ -207,6 +208,10 @@ impl DirtyFlag {
         self.flag.swap(false, Ordering::Acquire)
     }
 
+    /// Set the flag value to [`true`].
+    ///
+    /// Usually a [`DirtyFlagListener`] is used instead of this, but it may be useful
+    /// in complex situations.
     pub fn set(&self) {
         self.flag.store(true, Ordering::Relaxed);
     }

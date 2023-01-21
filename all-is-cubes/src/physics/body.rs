@@ -419,7 +419,9 @@ impl Body {
 pub struct BodyStepInfo {
     /// Whether movement computation was skipped due to approximately zero velocity.
     pub quiescent: bool,
+    #[allow(missing_docs)] // TODO: explain
     pub push_out: Option<Vector3<FreeCoordinate>>,
+    #[allow(missing_docs)] // TODO: explain
     pub already_colliding: Option<Contact>,
     /// Details on movement and collision. A single frame's movement may have up to three
     /// segments as differently oriented faces are collided with.
@@ -491,12 +493,13 @@ impl Default for MoveSegment {
 
 /// The [`Transaction`] type for [`Body`].
 ///
-/// TODO: Very incomplete.
+/// TODO: Very incomplete; just a sketch of what eventually needs to exist.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[must_use]
 #[non_exhaustive]
 pub struct BodyTransaction {
     // TODO: Better strategy than just having public fields
+    #[allow(missing_docs)]
     pub delta_yaw: FreeCoordinate,
 }
 

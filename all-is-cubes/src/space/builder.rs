@@ -130,6 +130,11 @@ impl Default for SpaceBuilder<()> {
 
 /// Helper for [`SpaceBuilder::bounds_if_not_set()`]. Do not call or implement this trait.
 pub trait SpaceBuilderBounds: sbb::SbbSealed + Sized {
+    /// Set the bounds unless they have already been set.
+    ///
+    /// This function is an implementation detail; call
+    /// [`SpaceBuilder::bounds_if_not_set()`] instead.
+    #[doc(hidden)]
     fn bounds_if_not_set(
         builder: SpaceBuilder<Self>,
         bounds_fn: impl FnOnce() -> GridAab,

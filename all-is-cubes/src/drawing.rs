@@ -362,7 +362,7 @@ impl<'a> VoxelBrush<'a> {
         )
     }
 
-    /// Add the given offset to the offset of each blocks, offsetting everything drawn.
+    /// Add the given offset to the offset of each block, offsetting everything drawn.
     #[must_use]
     pub fn translate<V: Into<GridVector>>(mut self, offset: V) -> Self {
         let offset = offset.into();
@@ -373,9 +373,11 @@ impl<'a> VoxelBrush<'a> {
         self
     }
 
+    /// Apply the given transform to the position of each block.
     #[must_use]
     pub fn transform(mut self, transform: GridMatrix) -> Self {
         for (block_offset, _) in self.0.iter_mut() {
+            // TODO: shouldn't this be transform_cube?
             *block_offset = transform.transform_point(*block_offset);
         }
         self

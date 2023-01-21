@@ -42,22 +42,34 @@ impl_downcast!(Behavior<H> where H: BehaviorHost);
 
 /// A type that can have attached behaviors.
 pub trait BehaviorHost: Transactional + 'static {
-    /// Additional data about “where” the behavior is attached to the host.
+    /// Additional data about “where” the behavior is attached to the host; what part of
+    /// the host should be affected by the behavior.
     type Attachment: Debug + Clone + Eq + 'static;
 }
 
+/// Items available to a [`Behavior`] during [`Behavior::step()`].
 #[non_exhaustive]
 pub struct BehaviorContext<'a, H: BehaviorHost> {
+    /// The current state of the behavior's host object.
     pub host: &'a H,
+    /// Additional data about “where” the behavior is attached to the host; what part of
+    /// the host should be affected by the behavior.
     pub attachment: &'a H::Attachment,
     host_transaction_binder: &'a dyn Fn(H::Transaction) -> UniverseTransaction,
     self_transaction_binder: &'a dyn Fn(Arc<dyn Behavior<H>>) -> UniverseTransaction,
 }
 
 impl<'a, H: BehaviorHost> BehaviorContext<'a, H> {
+    /// Take a transaction applicable to the behavior's host, and wrap it to become a
+    /// [`UniverseTransaction`] for the host's containing universe.
     pub fn bind_host(&self, transaction: H::Transaction) -> UniverseTransaction {
         (self.host_transaction_binder)(transaction)
     }
+
+    /// Returns a transaction which will replace this behavior with a new value.
+    ///
+    /// This should be used whenever a behavior wishes to modify itself, to ensure that
+    /// the modification only takes effect when the behavior's other effects do.
     pub fn replace_self<B: Behavior<H> + 'static>(&self, new_behavior: B) -> UniverseTransaction {
         (self.self_transaction_binder)(Arc::new(new_behavior))
     }
@@ -227,8 +239,13 @@ impl<H: BehaviorHost> PartialEq for BehaviorSetEntry<H> {
 /// Result of [`BehaviorSet::query()`].
 #[non_exhaustive]
 pub struct QueryItem<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> {
-    pub attachment: &'a H::Attachment,
+    /// The found behavior's current value.
     pub behavior: &'a B,
+    /// The found behavior's current attachment.
+    ///
+    /// An attachment is additional data about “where” the behavior is attached to the host
+    /// what part of the host should be affected by the behavior.
+    pub attachment: &'a H::Attachment,
 }
 
 impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> Clone for QueryItem<'a, H, B> {
@@ -253,6 +270,7 @@ impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> Debug for QueryItem<'a, H, B>
     }
 }
 
+/// A [`Transaction`] that adds or modifies [`Behavior`]s in a [`BehaviorSet`].
 #[derive(Debug)]
 pub struct BehaviorSetTransaction<H: BehaviorHost> {
     /// Replacement of existing behaviors or their attachments.
@@ -283,6 +301,7 @@ impl<H: BehaviorHost> BehaviorSetTransaction<H> {
         }
     }
 
+    /// Constructs a transaction that adds a behavior to the behavior set.
     pub fn insert(attachment: H::Attachment, behavior: Arc<dyn Behavior<H>>) -> Self {
         BehaviorSetTransaction {
             insert: vec![BehaviorSetEntry {

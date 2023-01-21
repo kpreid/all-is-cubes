@@ -233,10 +233,14 @@ impl Character {
         }
     }
 
+    /// Returns the character's current inventory.
     pub fn inventory(&self) -> &Inventory {
         &self.inventory
     }
 
+    // TODO: delete this and stick to BehaviorSetTransactions
+    #[allow(missing_docs)]
+    #[doc(hidden)]
     pub fn add_behavior<B>(&mut self, behavior: B)
     where
         B: Behavior<Character> + 'static,
@@ -246,10 +250,15 @@ impl Character {
             .unwrap();
     }
 
+    /// Returns the character's currently selected inventory slots.
+    ///
+    /// The indices of this array are buttons (e.g. mouse buttons), and the values are
+    /// inventory slot indices.
     pub fn selected_slots(&self) -> [usize; TOOL_SELECTIONS] {
         self.selected_slots
     }
 
+    /// Changes which inventory slot is currently selected.
     pub fn set_selected_slot(&mut self, which_selection: usize, slot: usize) {
         if which_selection < self.selected_slots.len()
             && slot != self.selected_slots[which_selection]
@@ -366,6 +375,8 @@ impl Character {
         (body_step_info, result_transaction)
     }
 
+    /// Returns the character's current automatic-exposure calculation based on the light
+    /// around it.
     pub fn exposure(&self) -> f32 {
         self.exposure_log.exp()
     }
@@ -535,6 +546,7 @@ impl crate::behavior::BehaviorHost for Character {
     type Attachment = ();
 }
 
+/// A [`Transaction`] that modifies a [`Character`].
 #[derive(Clone, Debug, Default, PartialEq)]
 #[must_use]
 pub struct CharacterTransaction {
@@ -544,6 +556,7 @@ pub struct CharacterTransaction {
 }
 
 impl CharacterTransaction {
+    /// Modify the character's [`Body`].
     pub fn body(t: BodyTransaction) -> Self {
         CharacterTransaction {
             body: t,
@@ -551,6 +564,7 @@ impl CharacterTransaction {
         }
     }
 
+    /// Modify the character's [`Inventory`].
     pub fn inventory(t: InventoryTransaction) -> Self {
         CharacterTransaction {
             inventory: t,
@@ -558,6 +572,7 @@ impl CharacterTransaction {
         }
     }
 
+    /// Modify the character's [`BehaviorSet`].
     fn behaviors(t: BehaviorSetTransaction<Character>) -> Self {
         Self {
             behaviors: t,

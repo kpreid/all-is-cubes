@@ -9,7 +9,7 @@ use crate::math::{FreeCoordinate, Rgba};
 use crate::raytracer::{PixelBuf, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer};
 use crate::space::{Space, SpaceBlockData};
 
-// TODO: better name, docs
+/// TODO: better name, docs
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
 pub struct CharacterRtData(pub Cow<'static, str>);

@@ -197,6 +197,7 @@ impl Aab {
         )
     }
 
+    /// Scale this AAB by the given amount (about the zero point, not its center).
     #[must_use]
     pub fn scale(self, scalar: FreeCoordinate) -> Self {
         Self::from_lower_upper(self.lower_bounds * scalar, self.upper_bounds * scalar)

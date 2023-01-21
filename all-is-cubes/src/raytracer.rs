@@ -347,6 +347,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         Ok(total_info)
     }
 
+    /// As [`Self::trace_scene_to_text()`], but returning a string.
     pub fn trace_scene_to_string<P>(&self, camera: &Camera, line_ending: &str) -> String
     where
         P: PixelBuf<BlockData = D> + Into<String>,

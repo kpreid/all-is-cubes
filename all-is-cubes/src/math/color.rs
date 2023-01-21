@@ -157,6 +157,7 @@ impl Rgb {
             + (self.red().into_inner() * 0.2126 + self.blue().into_inner() * 0.0722)
     }
 
+    /// Converts sRGB 8-bits-per-component color to the corresponding linear [`Rgba`] value.
     #[inline]
     pub const fn from_srgb8(rgb: [u8; 3]) -> Self {
         Self(Vector3::new(
@@ -305,6 +306,7 @@ impl Rgba {
         ]
     }
 
+    /// Converts sRGB 8-bits-per-component color to the corresponding linear [`Rgba`] value.
     #[inline]
     pub const fn from_srgb8(rgba: [u8; 4]) -> Self {
         Self(Vector4::new(

@@ -258,5 +258,6 @@ pub struct TransactionConflict {}
 /// [`Transaction<T>`](Transaction) may be implemented by multiple types but there can
 /// be at most one `<T as Transactional>::Transaction`.
 pub trait Transactional {
+    /// The type of transaction which should be used with `Self`.
     type Transaction: Transaction<Self>;
 }

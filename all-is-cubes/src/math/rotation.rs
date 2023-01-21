@@ -24,6 +24,7 @@ use crate::math::*;
 #[rustfmt::skip]
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::exhaustive_enums)]
+#[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[repr(u8)]
@@ -71,6 +72,7 @@ impl GridRotation {
         ]
     };
 
+    /// The identity rotation, also known as [`RXYZ`](Self::RXYZ).
     pub const IDENTITY: Self = Self::RXYZ;
 
     /// The rotation that is clockwise in our Y-up right-handed coordinate system.
@@ -170,9 +172,7 @@ impl GridRotation {
             [NZ, NX, NY] => Rzxy,
             [NZ, NY, NX] => Rzyx,
 
-            _ => panic!(
-                "Invalid basis given to GridRotation::from_basis: {basis:?}"
-            ),
+            _ => panic!("Invalid basis given to GridRotation::from_basis: {basis:?}"),
         }
     }
 
@@ -329,6 +329,7 @@ impl GridRotation {
         self.to_positive_octant_matrix(0)
     }
 
+    /// Rotate the face by this rotation.
     // TODO: test equivalence with matrix
     #[inline]
     pub fn transform(self, face: Face6) -> Face6 {

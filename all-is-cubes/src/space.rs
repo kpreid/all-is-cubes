@@ -11,6 +11,8 @@ use crate::behavior::{self, BehaviorSet};
 use crate::block::{
     Block, BlockChange, EvalBlockError, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED,
 };
+#[cfg(doc)]
+use crate::character::Character;
 use crate::character::Spawn;
 use crate::content::palette;
 use crate::drawing::DrawingPlane;
@@ -712,14 +714,19 @@ impl Space {
         // TODO: Also send out a SpaceChange notification, if anything is different.
     }
 
+    /// Returns the current default [`Spawn`], which determines where new [`Character`]s
+    /// are placed in the space if no alternative applies.
     pub fn spawn(&self) -> &Spawn {
         &self.spawn
     }
 
+    /// Sets the default [`Spawn`], which determines where new [`Character`]s are placed
+    /// in the space if no alternative applies.
     pub fn set_spawn(&mut self, spawn: Spawn) {
         self.spawn = spawn;
     }
 
+    /// Returns the [`BehaviorSet`] of behaviors attached to this space.
     pub fn behaviors(&self) -> &BehaviorSet<Space> {
         &self.behaviors
     }
@@ -959,6 +966,7 @@ pub struct SpaceBehaviorAttachment {
 }
 
 impl SpaceBehaviorAttachment {
+    /// Constructs a new [`SpaceBehaviorAttachment`] with no rotation.
     pub fn new(bounds: GridAab) -> Self {
         Self {
             bounds,
@@ -966,10 +974,17 @@ impl SpaceBehaviorAttachment {
         }
     }
 
+    /// Returns the bounds of this attachment, which specify (without mandating) what
+    /// region the behavior should affect.
     pub fn bounds(&self) -> GridAab {
         self.bounds
     }
 
+    /// Returns the rotation of this attachment, which specifies, if applicable, which
+    /// orientation the behavior should operate in relative to the space.
+    /// The exact meaning of this is up to the behavior.
+    ///
+    /// TODO: explain with an example once we have a good one
     pub fn rotation(&self) -> GridRotation {
         self.rotation
     }
@@ -1099,10 +1114,12 @@ impl Default for LightPhysics {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum SetCubeError {
-    /// The given cube or region is out of the bounds of this Space.
+    /// The given cube or region is not within the bounds of this Space.
     #[error("{:?} is outside of the bounds {:?}", .modification, .space_bounds)]
     OutOfBounds {
+        /// The cube or region where modification was attempted.
         modification: GridAab,
+        /// The bounds of the space.
         space_bounds: GridAab,
     },
     /// [`Block::evaluate`] failed on a new block type.
@@ -1141,6 +1158,7 @@ pub enum SpaceChange {
 pub struct SpaceStepInfo {
     /// Number of spaces whose updates were aggregated into this value.
     pub spaces: usize,
+    /// Performance data about light updates within the space.
     pub light: LightUpdatesInfo,
 }
 impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
@@ -1204,10 +1222,12 @@ impl Listener<BlockChange> for SpaceBlockChangeListener {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
 pub struct ActivatableRegion {
+    /// The function to call when this region is activated.
     pub effect: EphemeralOpaque<dyn Fn() + Send + Sync>,
 }
 
 impl ActivatableRegion {
+    /// Activate this region, calling the embedded function.
     pub fn activate(&self) {
         if let Some(f) = &self.effect.0 {
             f();

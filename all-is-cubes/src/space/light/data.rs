@@ -82,6 +82,7 @@ impl PackedLight {
         }
     }
 
+    /// Returns the light level.
     #[inline]
     pub fn value(&self) -> Rgb {
         Rgb::new_nn(

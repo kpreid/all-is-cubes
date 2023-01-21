@@ -42,6 +42,7 @@ impl Tick {
         }
     }
 
+    /// Construct a non-paused [`Tick`] from a duration expressed in fractional seconds.
     pub fn from_seconds(dt: f64) -> Self {
         Self {
             delta_t: Duration::from_micros((dt * 1e6) as u64),

@@ -32,6 +32,8 @@ fn name_in_module<E: BlockModule>(key: &E) -> Name {
 ///
 /// See [`BlockModule`] for related expectations.
 pub trait DefaultProvision {
+    /// Returns the default block value to use for the given key. This will typically
+    /// have to be a [`Primitive::Atom`] block.
     fn default(self) -> Block;
 }
 
@@ -53,7 +55,7 @@ pub trait BlockModule: Exhaust + Display + Eq + Hash + Clone {
     fn namespace() -> &'static str;
 }
 
-// TODO: document
+/// TODO: document
 #[derive(Clone, Debug)]
 pub struct BlockProvider<E> {
     /// Guaranteed to contain an entry for every variant of `E` if `E`'s
@@ -102,6 +104,11 @@ where
         Ok(Self { map })
     }
 
+    /// Add the block definitions stored in this [`BlockProvider`] into `universe` as
+    /// [`BlockDef`]s, returning a new [`BlockProvider`] whose blocks refer to those
+    /// definitions (via [`Primitive::Indirect`]).
+    ///
+    /// TODO: Migrate this to operate via `UniverseTransaction` instead.
     pub fn install(&self, universe: &mut Universe) -> Result<BlockProvider<E>, InsertError> {
         for key in E::exhaust() {
             // TODO: the &* mess should not be required
@@ -110,6 +117,11 @@ where
         Ok(Self::using(universe).expect("failed to retrieve names we just inserted??"))
     }
 
+    /// Obtain the definitions of `E`'s blocks from `universe`, returning a new
+    /// [`BlockProvider`] whose blocks refer to those definitions (via
+    /// [`Primitive::Indirect`]).
+    ///
+    /// Returns an error if any of the blocks are not defined in that universe.
     pub fn using(universe: &Universe) -> Result<BlockProvider<E>, ProviderError>
     where
         E: Eq + Hash + Display,
@@ -140,6 +152,7 @@ where
         })
     }
 
+    /// Iterate over the entire contents of this.
     pub fn iter(&self) -> impl Iterator<Item = (E, &Block)> + Send
     where
         E: Sync,
@@ -160,6 +173,8 @@ impl<E: Eq + Hash> Index<E> for BlockProvider<E> {
     }
 }
 
+/// Error when a [`BlockProvider`] could not be created because the definitions of some
+/// of its blocks are missing.
 #[derive(Clone, Debug, Eq, thiserror::Error, PartialEq)]
 #[error("missing block definitions: {missing:?}")] // TODO: use Name's Display within the list
 pub struct ProviderError {
@@ -178,6 +193,8 @@ pub struct GenError {
 }
 
 impl GenError {
+    /// Wrap an error, that occurred while creating an object, as a [`GenError`] which also
+    /// names the object.
     pub fn failure(error: impl Into<InGenError>, object: Name) -> Self {
         Self {
             detail: error.into(),

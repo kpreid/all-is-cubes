@@ -12,6 +12,7 @@ use crate::space::SpaceBlockData;
 #[derive(Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct RtOptionsRef<'a, C> {
+    #[allow(missing_docs)]
     pub graphics_options: &'a GraphicsOptions,
     /// Arbitrary data for the [`RtBlockData`] in use.
     pub custom_options: &'a C,

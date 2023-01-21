@@ -25,7 +25,7 @@ pub struct BlockAttributes {
     /// reasonable choice for solid-color blocks with no special features.
     pub display_name: Cow<'static, str>,
 
-    /// Whether players' cursors target it or pass through it.
+    /// Whether players' [cursors](crate::character::Cursor) target it or pass through it.
     ///
     /// The default value is `true`.
     pub selectable: bool,

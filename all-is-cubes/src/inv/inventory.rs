@@ -140,7 +140,9 @@ impl VisitRefs for Inventory {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Slot {
+    /// Slot contains nothing.
     Empty,
+    /// Slot contains one or more of the given [`Tool`].
     Stack(NonZeroU16, Tool),
 }
 
@@ -151,6 +153,9 @@ impl Slot {
         unsafe { NonZeroU16::new_unchecked(1) }
     };
 
+    /// Construct a [`Slot`] containing `count` copies of `tool`.
+    ///
+    /// If `count` is zero, the `tool` will be ignored.
     pub fn stack(count: u16, tool: Tool) -> Self {
         match NonZeroU16::new(count) {
             Some(count) => Self::Stack(count, tool),
@@ -164,6 +169,9 @@ impl Slot {
         Self::Stack(Self::COUNT_ONE, tool)
     }
 
+    /// Returns the icon to use for this tool in the user interface.
+    ///
+    /// Note that this is _not_ the same as the block that a [`Tool::Block`] places.
     pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Cow<'a, Block> {
         match self {
             Slot::Empty => Cow::Borrowed(&predefined[Icons::EmptySlot]),
@@ -171,6 +179,7 @@ impl Slot {
         }
     }
 
+    /// Returns the count of items in this slot.
     pub fn count(&self) -> u16 {
         match self {
             Slot::Empty => 0,
@@ -448,6 +457,7 @@ pub struct InventoryCheck {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct InventoryChange {
+    /// Which slots of the inventory have been changed.
     pub slots: Arc<[usize]>,
 }
 

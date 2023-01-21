@@ -25,6 +25,7 @@ use crate::block::{EvaluatedBlock, Modifier, Primitive};
 ///   is limited by the resolution limit.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[allow(missing_docs)]
 #[repr(u8)]
 #[non_exhaustive] // unlikely to change but on general principle: not supposed to match this
 pub enum Resolution {

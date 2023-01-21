@@ -657,10 +657,12 @@ impl<V> FaceMap<V> {
         Face6::ALL.iter().copied().map(move |f| &self[f])
     }
 
+    /// Convert to an array, whose elements are arranged in the same order as [`Face6::ALL`].
     pub fn into_values(self) -> [V; 6] {
         [self.nx, self.ny, self.nz, self.px, self.py, self.pz]
     }
 
+    /// Convert to an iterator, whose items are arranged in the same order as [`Face6::ALL`].
     pub fn into_values_iter(self) -> impl Iterator<Item = V> {
         // TODO: eliminate this as not really useful in Rust 2021
         self.into_values().into_iter()
@@ -788,12 +790,14 @@ impl<V> IndexMut<Face6> for FaceMap<V> {
 /// one face of it. This pattern recurs in selection and collision detection.
 #[derive(Clone, Copy, Hash, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
+#[allow(missing_docs)]
 pub struct CubeFace {
     pub cube: GridPoint,
     pub face: Face7,
 }
 
 impl CubeFace {
+    #[allow(missing_docs)]
     #[inline]
     pub fn new(cube: impl Into<GridPoint>, face: Face7) -> Self {
         Self {
@@ -899,7 +903,8 @@ mod tests {
                 py: 21,
                 nz: 12,
                 pz: 22,
-            }.rotate(GridRotation::RyXZ),
+            }
+            .rotate(GridRotation::RyXZ),
             FaceMap {
                 nx: 11,
                 px: 21,

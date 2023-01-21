@@ -43,7 +43,10 @@ pub enum Icons {
     /// Icon for [`Tool::PushPull`].
     PushPull,
     /// Icon for [`Tool::Jetpack`].
-    Jetpack { active: bool },
+    Jetpack {
+        /// Actually flying?
+        active: bool,
+    },
 }
 
 impl BlockModule for Icons {
@@ -67,6 +70,9 @@ impl fmt::Display for Icons {
 }
 
 impl Icons {
+    /// Construct the standard icons, inserting block definitions into the given [`Universe`].
+    ///
+    /// TODO: Replace `&mut Universe` parameter with a transaction return value.
     pub async fn new(universe: &mut Universe, p: YieldProgress) -> BlockProvider<Icons> {
         let resolution = R16;
 

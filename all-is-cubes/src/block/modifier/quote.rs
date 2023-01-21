@@ -13,6 +13,7 @@ pub struct Quote {
 }
 
 impl Quote {
+    /// Construct an instance of [`Quote`], the same as [`Quote::default()`].
     pub fn new() -> Self {
         Self::default()
     }

@@ -17,7 +17,9 @@ use crate::universe::{URef, Universe};
 #[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Layers<T> {
+    /// The game world.
     pub world: T,
+    /// The user interface, or HUD, drawn in front of the world.
     pub ui: T,
 }
 
@@ -234,6 +236,8 @@ impl StandardCameras {
         self.cameras.world.options()
     }
 
+    /// Returns a clone of the source of graphics options that this [`StandardCameras`]
+    /// was created with.
     pub fn graphics_options_source(&self) -> ListenableSource<GraphicsOptions> {
         self.graphics_options.clone()
     }
@@ -331,8 +335,11 @@ impl Clone for StandardCameras {
 #[derive(Clone, Debug)]
 #[allow(clippy::exhaustive_structs)]
 pub struct UiViewState {
+    /// The [`Space`] to render as the UI.
     pub space: Option<URef<Space>>,
+    /// The viewpoint to render the `space` from.
     pub view_transform: ViewTransform,
+    /// The graphics options to render the `space` with.
     pub graphics_options: GraphicsOptions, // TODO: may be big; should we Arc it?
 }
 

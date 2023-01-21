@@ -114,6 +114,8 @@ impl<C> BlockBuilder<C> {
         self
     }
 
+    /// Adds a modifier to the end of the list of modifiers for the block.
+    /// It will be applied after all previously specified modifiers.
     pub fn modifier(mut self, modifier: Modifier) -> Self {
         // TODO: implement a modifier canonicalization procedure here
         self.modifiers.push(modifier);
@@ -255,10 +257,12 @@ impl From<Rgb> for BlockBuilder<Rgba> {
 pub struct NeedsPrimitive;
 
 /// Primitive-builder of a [`BlockBuilder`] that can build a block without a [`Universe`].
+#[doc(hidden)]
 pub trait BuildPrimitiveIndependent {
     fn build_i(self, attributes: BlockAttributes) -> Primitive;
 }
 /// Primitive-builder of a [`BlockBuilder`] that can only build a block with a [`Universe`].
+#[doc(hidden)]
 pub trait BuildPrimitiveInUniverse {
     fn build_u(self, attributes: BlockAttributes, universe: &mut Universe) -> Primitive;
 }
@@ -276,6 +280,7 @@ impl BuildPrimitiveIndependent for Rgba {
     }
 }
 
+/// Concrete type for a [`BlockBuilder`] that is building a voxel block.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct BlockBuilderVoxels {
     space: URef<Space>,

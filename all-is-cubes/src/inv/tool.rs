@@ -30,8 +30,11 @@ pub enum Tool {
     /// It may have more functions in the future.
     Activate,
 
-    /// Destroy any targeted block. If `keep` is true, move it to inventory.
-    RemoveBlock { keep: bool },
+    /// Delete any targeted block from the space.
+    RemoveBlock {
+        /// If true, move it to inventory. If false, discard it entirely.
+        keep: bool,
+    },
 
     /// Move the given block out of inventory (consuming this tool) into the targeted
     /// empty space.
@@ -55,13 +58,18 @@ pub enum Tool {
     ///
     /// TODO: This should probably be a feature a tool can have rather than a
     /// single-purpose item, but we don't yet have a plan for programmable items.
-    Jetpack { active: bool },
+    Jetpack {
+        /// Actually currently flying?
+        active: bool,
+    },
 
     /// A tool which calls an arbitrary function.
     ExternalAction {
         // TODO: Rework this so that the external component gets to update the icon.
         // (Perhaps that's "a block defined by an external source"?)
+        /// Function that will be called when the tool is activated.
         function: EphemeralOpaque<dyn Fn(&ToolInput) + Send + Sync>,
+        /// Icon for the tool.
         icon: Block,
     },
 }
@@ -286,9 +294,13 @@ impl VisitRefs for Tool {
 /// This is intended to provide future extensibility compared to having a complex
 /// parameter list for `Tool::use_tool`.
 #[derive(Debug)]
-#[allow(clippy::exhaustive_structs)]
+#[allow(clippy::exhaustive_structs)] // TODO: should be non_exhaustive
 pub struct ToolInput {
+    /// Cursor identifying block(s) to act on. If [`None`] then the tool was used while
+    /// pointing at nothing or by an agent without an ability to aim.
     pub cursor: Option<Cursor>,
+    /// Character that is using the tool.
+    ///
     /// TODO: We want to be able to express “inventory host”, not just specifically Character (but there aren't any other examples).
     pub character: Option<URef<Character>>,
 }

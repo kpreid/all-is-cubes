@@ -163,7 +163,7 @@
 // Crate-specific lint settings.
 // * This crate does not forbid(unsafe_code) for some compile-time unchecked constructors.
 //   No run-time unsafe is used.
-// * TODO: warn(missing_docs), eventually.
+#![warn(missing_docs)]
 
 #[macro_use]
 pub mod math;

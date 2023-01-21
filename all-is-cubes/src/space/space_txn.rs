@@ -19,6 +19,7 @@ impl Transactional for Space {
     type Transaction = SpaceTransaction;
 }
 
+/// A [`Transaction`] that modifies a [`Space`].
 #[derive(Clone, Default, Eq, PartialEq)]
 #[must_use]
 pub struct SpaceTransaction {
@@ -135,6 +136,7 @@ impl SpaceTransaction {
         }
     }
 
+    /// Modify the space's [`BehaviorSet`].
     pub fn behaviors(t: behavior::BehaviorSetTransaction<Space>) -> Self {
         Self {
             behaviors: t,

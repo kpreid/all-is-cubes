@@ -17,6 +17,8 @@ pub trait VisitRefs {
 ///
 /// Note that this is automatically implemented for functions.
 pub trait RefVisitor {
+    /// Called by a value which is responding to a [`VisitRefs::visit_refs()`] operation
+    /// to report one of the refs it contains.
     fn visit(&mut self, r: &dyn URefErased);
 }
 

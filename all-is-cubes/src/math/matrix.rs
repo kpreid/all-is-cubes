@@ -121,6 +121,7 @@ impl GridMatrix {
         }
     }
 
+    /// Convert this integer-valued matrix to an equivalent float-valued matrix.
     #[inline]
     pub fn to_free(self) -> Matrix4<FreeCoordinate> {
         Matrix4 {

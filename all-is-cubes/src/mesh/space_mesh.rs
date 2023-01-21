@@ -118,6 +118,11 @@ impl<V, T> SpaceMesh<V, T> {
         self.transparent_ranges[ordering.to_index()].clone()
     }
 
+    /// Returns an iterator over all of the block indices in the [`Space`] that occurred
+    /// in the region this mesh was constructed from.
+    ///
+    /// This may be used to determine when to invalidate this mesh because a block it
+    /// contains has changed its definition.
     #[inline]
     pub fn blocks_used_iter(&self) -> impl Iterator<Item = BlockIndex> + '_ {
         self.block_indices_used.iter_ones().map(|i| i as BlockIndex)
@@ -537,6 +542,7 @@ fn extend_giving_range<T>(
 /// TODO: This currently only has one implementation and should be discarded if it is not
 /// a useful abstraction.
 pub trait BlockMeshProvider<'a, V, T> {
+    /// Obtain a mesh for the given block index, or `None` if the index is out of range.
     fn get(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<V, T>>;
 }
 impl<'a, V, T> BlockMeshProvider<'a, V, T> for &'a [BlockMesh<V, T>] {

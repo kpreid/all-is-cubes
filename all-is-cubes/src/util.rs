@@ -232,13 +232,20 @@ where
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct TimeStats {
+    /// The number of events aggregated into this [`TimeStats`].
     pub count: usize,
+    /// The sum of the durations of all events.
     pub sum: Duration,
+    /// The minimum duration of all events, or [`None`] if there were no events.
     pub min: Option<Duration>,
+    /// The maximum duration of all events, or [`Duration::ZERO`] if there were no events.
     pub max: Duration,
 }
 
 impl TimeStats {
+    /// Constructs a [`TimeStats`] for a single event.
+    ///
+    /// Multiple of these may then be aggregated using the `+=` operator.
     pub const fn one(duration: Duration) -> Self {
         Self {
             count: 1,

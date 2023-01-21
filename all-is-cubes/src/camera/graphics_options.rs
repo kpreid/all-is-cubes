@@ -117,6 +117,7 @@ impl Default for GraphicsOptions {
     }
 }
 
+/// Choices for [`GraphicsOptions::fog`].
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 pub enum FogOption {
@@ -130,6 +131,7 @@ pub enum FogOption {
     Physical,
 }
 
+/// Choices for [`GraphicsOptions::tone_mapping`].
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 pub enum ToneMappingOperator {
@@ -146,6 +148,7 @@ pub enum ToneMappingOperator {
 }
 
 impl ToneMappingOperator {
+    /// Apply this operator to the given high-dynamic-range color value.
     #[inline]
     pub fn apply(&self, input: Rgb) -> Rgb {
         match self {
@@ -160,14 +163,17 @@ impl ToneMappingOperator {
 }
 
 /// “Camera exposure” control: selection of algorithm to control the scaling factor from
-/// scene luminance to displayed luminance.
+/// scene luminance to displayed luminance. Part of a [`GraphicsOptions`].
 ///
 /// Note that the exact interpretation of this value also depends on on the chosen
 /// [`ToneMappingOperator`].
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 pub enum ExposureOption {
+    /// Constant exposure; light values in the scene are multiplied by this value
+    /// before the tone mapping operator is applied.
     Fixed(NotNan<f32>),
+    /// Exposure adjusts to compensate for the actual brightness of the scene.
     Automatic,
 }
 
@@ -186,7 +192,7 @@ impl Default for ExposureOption {
     }
 }
 
-/// How to display light in a [`Space`].
+/// How to display light in a [`Space`]; part of a [`GraphicsOptions`].
 ///
 /// [`Space`]: crate::space::Space
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -244,6 +250,7 @@ impl TransparencyOption {
     }
 }
 
+/// Choices for [`GraphicsOptions::antialiasing`].
 #[derive(Clone, Debug, Default, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]

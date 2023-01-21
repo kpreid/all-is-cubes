@@ -26,6 +26,7 @@ pub enum Contact {
     /// Contact with a fully solid block; the [`CubeFace`] specifies the block position
     /// and the side of it that was collided with (hence also the contact normal).
     Block(CubeFace),
+    /// Contact with one voxel of a block with a potentially complex shape.
     Voxel {
         /// The “outer” cube in the [`Space`].
         cube: GridPoint,
@@ -40,6 +41,7 @@ pub enum Contact {
 }
 
 impl Contact {
+    /// Returns the cube that was collided with or within.
     pub fn cube(&self) -> GridPoint {
         match *self {
             Contact::Block(CubeFace { cube, .. }) => cube,
@@ -62,6 +64,7 @@ impl Contact {
         }
     }
 
+    /// Returns the scale of the voxel collided with.
     pub fn resolution(&self) -> Resolution {
         match *self {
             Contact::Block(_) => R1,

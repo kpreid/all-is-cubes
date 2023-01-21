@@ -81,6 +81,11 @@ pub struct Camera {
 
 #[allow(clippy::cast_lossless)]
 impl Camera {
+    /// Create a camera which has
+    ///
+    /// * `options` and `viewport` as given,
+    /// * a `view_transform` of [`ViewTransform::one()`], and
+    /// * an `exposure` determined based on the graphics options.
     pub fn new(options: GraphicsOptions, viewport: Viewport) -> Self {
         let options = options.repair();
         let mut new_self = Self {
@@ -112,6 +117,8 @@ impl Camera {
         &self.options
     }
 
+    /// Replace the [`GraphicsOptions`] stored in this camera with
+    /// [`options.repair()`](GraphicsOptions::repair).
     pub fn set_options(&mut self, options: GraphicsOptions) {
         let options = options.repair();
         self.exposure_value = options.exposure.initial();

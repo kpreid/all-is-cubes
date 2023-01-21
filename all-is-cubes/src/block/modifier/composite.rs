@@ -18,8 +18,13 @@ use crate::universe;
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub struct Composite {
+    /// The “source” input to the compositing operator.
+    /// (The “destination” input is the block this modifier is attached to.)
     pub source: Block,
+
+    /// The compositing operator used to combine the source and destination blocks.
     pub operator: CompositeOperator,
+
     /// Swap the roles of “source” and “destination” for the [`operator`](Self::operator).
     pub reverse: bool,
     // TODO: allow specifying another block to substitute the alpha, so as to be able to
@@ -28,6 +33,8 @@ pub struct Composite {
 }
 
 impl Composite {
+    /// Construct a new [`Composite`] modifier with the given source and operator, and
+    /// `reverse: false`.
     pub fn new(source: Block, operator: CompositeOperator) -> Self {
         Self {
             source,

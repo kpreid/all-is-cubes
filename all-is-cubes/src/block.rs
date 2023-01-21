@@ -96,16 +96,21 @@ pub enum Primitive {
     /// non-solid to physics; in fact, [`AIR`] is such an atom.)
     Atom(BlockAttributes, Rgba),
 
-    /// A block that is composed of smaller blocks, defined by the referenced `Space`.
+    /// A block that is composed of smaller blocks, defined by the referenced [`Space`].
     Recur {
+        #[allow(missing_docs)]
         attributes: BlockAttributes,
+
+        /// The space from which voxels are taken.
+        space: URef<Space>,
+
         /// Which portion of the space will be used, specified by the most negative
         /// corner.
         offset: GridPoint,
+
         /// The side length of the cubical volume of sub-blocks (voxels) used for this
         /// block.
         resolution: Resolution,
-        space: URef<Space>,
     },
 
     /// An invisible, unselectable, inert block used as “no block”; the primitive of [`AIR`].
@@ -645,6 +650,7 @@ pub struct BlockChange {
 
 impl BlockChange {
     #[allow(clippy::new_without_default)]
+    #[allow(missing_docs)] // TODO: why is this public, anyway?
     pub fn new() -> BlockChange {
         BlockChange { _not_public: () }
     }

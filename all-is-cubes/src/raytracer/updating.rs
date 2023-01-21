@@ -91,6 +91,9 @@ where
         &self.state
     }
 
+    /// Reads the previously provided [`Space`] and updates the local copy of its contents.
+    ///
+    /// Returns an error if reading fails.
     pub fn update(&mut self) -> Result<(), RefError> {
         // Deadlock safety note:
         // If the space is being updated, that will acquire the space's lock and then our

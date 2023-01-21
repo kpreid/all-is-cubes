@@ -177,6 +177,8 @@ impl EvaluatedBlock {
 
     // --- Accessors ---
 
+    /// Returns the resolution (scale factor) of this block's voxels.
+    /// See [`Resolution`] for more information.
     #[inline]
     pub fn resolution(&self) -> Resolution {
         self.voxels.resolution()
@@ -217,9 +219,12 @@ impl EvaluatedBlock {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum EvalBlockError {
+    /// The block definition contained recursion that exceeded the evaluation limit.
     #[error("block definition contains too much recursion")]
     StackOverflow,
-    /// This may be temporary or permanent.
+    /// Data referenced by the block definition was not available to read.
+    ///
+    /// This may be temporary or permanent; consult the [`RefError`] to determine that.
     #[error("block data inaccessible: {0}")]
     DataRefIs(#[from] RefError),
 }
@@ -232,10 +237,17 @@ pub enum EvalBlockError {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub struct Evoxel {
+    // Note: documentation wording here should match [`BlockAttributes`]
+    /// Diffuse reflection color.
     // TODO: Maybe we should convert to a smaller color format at this point?
     // These are frequently going to be copied into 32-bit texture color anyway.
     pub color: Rgba,
+
+    /// Whether players' [cursors](crate::character::Cursor) target this voxel's containing
+    /// block or pass through it.
     pub selectable: bool,
+
+    /// The effect on a [`Body`](crate::physics::Body) of colliding with this voxel.
     pub collision: block::BlockCollision,
 }
 
@@ -302,6 +314,8 @@ pub enum Evoxels {
 }
 
 impl Evoxels {
+    /// Returns the resolution (scale factor) of this set of voxels.
+    /// See [`Resolution`] for more information.
     #[inline]
     pub fn resolution(&self) -> Resolution {
         match *self {
@@ -338,6 +352,7 @@ impl Evoxels {
         }
     }
 
+    /// Returns the bounds of the voxel data.
     #[inline]
     pub fn bounds(&self) -> GridAab {
         match *self {

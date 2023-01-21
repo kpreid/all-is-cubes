@@ -26,6 +26,8 @@ pub struct BlockDef {
 }
 
 impl BlockDef {
+    /// Constructs a new [`BlockDef`] that stores the given block (which may be replaced
+    /// in the future).
     pub fn new(block: Block) -> Self {
         let notifier = Arc::new(Notifier::new());
         let (gate, block_listener) = Notifier::forwarder(Arc::downgrade(&notifier)).gate();
@@ -104,6 +106,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockDef {
     }
 }
 
+/// A [`Transaction`] which replaces (or checks) the [`Block`] stored in a [`BlockDef`].
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[must_use]
 pub struct BlockDefTransaction {
@@ -115,6 +118,8 @@ pub struct BlockDefTransaction {
 }
 
 impl BlockDefTransaction {
+    /// Returns a transaction which fails if the current value of the [`BlockDef`] is not
+    /// equal to `old`.
     pub fn expect(old: Block) -> Self {
         Self {
             old: Some(old),
@@ -122,6 +127,7 @@ impl BlockDefTransaction {
         }
     }
 
+    /// Returns a transaction which replaces the current value of the [`BlockDef`] with `new`.
     pub fn overwrite(new: Block) -> Self {
         Self {
             old: None,
@@ -129,6 +135,8 @@ impl BlockDefTransaction {
         }
     }
 
+    /// Returns a transaction which replaces the value of the [`BlockDef`] with `new`,
+    /// if it is equal to `old`, and otherwise fails.
     pub fn replace(old: Block, new: Block) -> Self {
         Self {
             old: Some(old),

@@ -76,6 +76,7 @@ impl Spawn {
         });
     }
 
+    /// Sets the bounds within which the character may be placed is allowed.
     pub fn set_bounds(&mut self, bounds: GridAab) {
         self.bounds = bounds;
     }

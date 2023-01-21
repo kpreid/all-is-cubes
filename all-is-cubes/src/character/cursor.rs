@@ -122,6 +122,7 @@ pub struct Cursor {
 /// TODO: Can we find a cleaner name for this class?
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
+#[allow(missing_docs)] // TODO
 pub struct CubeSnapshot {
     pub position: GridPoint,
     pub block: Block,
@@ -141,10 +142,19 @@ impl Cursor {
         self.hit.position
     }
 
+    /// The cube the ray passed through immediately before the selected cube.
+    ///
+    /// This may be the same cube if the ray started there.
     pub fn preceding_cube(&self) -> GridPoint {
         self.cube() + self.face_entered.normal_vector()
     }
 
+    /// Which face of the block the cursor ray selected/hit.
+    ///
+    /// This is currently defined as the face of the *cube* that the ray entered, but
+    /// that is planned to be revised to a more block-shape-sensitive definition.
+    ///
+    /// Will be [`Face7::Within`] if the ray started in the same cube.
     pub fn face_selected(&self) -> Face7 {
         // TODO: this should reflect the face of the block hit, not the cube
         self.face_entered

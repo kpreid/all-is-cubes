@@ -531,11 +531,12 @@ impl<T> URootRef<T> {
     }
 }
 
-/// Object-safe trait implemented for [`URef`].
-///
-/// TODO: seal this trait?
+/// Object-safe trait implemented for [`URef`], to allow code to operate on `URef<T>`
+/// regardless of `T`.
 pub trait URefErased: core::any::Any {
+    /// Same as [`URef::name()`].
     fn name(&self) -> Name;
+    /// Same as [`URef::universe_id()`].
     fn universe_id(&self) -> Option<UniverseId>;
 }
 
