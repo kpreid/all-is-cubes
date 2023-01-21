@@ -785,9 +785,6 @@ impl EverythingRenderer {
             info_text_texture.upload(queue);
         }
 
-        // TODO: avoid recreating this
-        let output_view = output.create_view(&wgpu::TextureViewDescriptor::default());
-
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -795,6 +792,7 @@ impl EverythingRenderer {
             });
 
         {
+            let output_view = output.create_view(&wgpu::TextureViewDescriptor::default());
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("add_info_text_and_postprocess() pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
