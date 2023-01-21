@@ -15,12 +15,12 @@ pub fn template_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("template");
     // These benchmarks are slow and noisy. Parameters adjusted so the overall run time
     // is not too long and there won't be too many false reports of change.
-    group.sample_size(30);
+    group.sample_size(10);
     group.measurement_time(Duration::from_secs(10));
     group.noise_threshold(0.05);
     group.confidence_level(0.99);
 
-    for template in UniverseTemplate::iter() {
+    for template in UniverseTemplate::iter().filter(|t| !matches!(t, UniverseTemplate::Islands)) {
         group.bench_function(&format!("{template}"), |b| {
             b.to_async(FuturesExecutor)
                 .iter_with_large_drop(|| template.clone().build(YieldProgress::noop(), 0))
