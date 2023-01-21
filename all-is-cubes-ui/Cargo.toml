@@ -10,6 +10,10 @@ repository = "https://github.com/kpreid/all-is-cubes"
 license = "MIT OR Apache-2.0"
 categories = ["games", "gui"]
 
+[lib]
+# Disable running as benchmark so that the default doesn't interfere with Criterion usage.
+bench = false
+
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.5.0" }
 exhaust = { workspace = true }
