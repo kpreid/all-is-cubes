@@ -64,28 +64,32 @@ pub(crate) fn make_log(
     // TODO: this needs to canonicalize rotations so that we don't end up with
     // identical-looking but differently defined blocks.
 
-    let mut parts: Vec<Block> = directions
-        .iter()
-        .map(|(face, &growth)| {
-            let Some(growth) = growth else { return AIR; };
-            blocks[Log(growth)].clone().rotate(
-                GridRotation::from_to(Face6::NY, face, Face6::PX)
-                    .or_else(|| GridRotation::from_to(Face6::NY, face, Face6::PZ))
-                    .unwrap(),
-            )
-        })
-        .collect();
+    let wood: Block = block::Composite::stack(
+        AIR,
+        directions
+            .iter()
+            .map(|(face, &growth)| {
+                let Some(growth) = growth else { return AIR; };
+                blocks[Log(growth)].clone().rotate(
+                    GridRotation::from_to(Face6::NY, face, Face6::PX)
+                        .or_else(|| GridRotation::from_to(Face6::NY, face, Face6::PZ))
+                        .unwrap(),
+                )
+            })
+            .map(|block| block::Composite::new(block, block::CompositeOperator::Over)),
+    );
 
     if let Some(leaves_growth) = leaves {
-        parts.push(blocks[Leaves(leaves_growth)].clone());
+        let mut leaves_composite = block::Composite::new(
+            blocks[Leaves(leaves_growth)].clone(),
+            block::CompositeOperator::Over,
+        );
+        leaves_composite.reverse = true; // wood always wins
+        leaves_composite.disassemblable = true;
+        block::Modifier::from(leaves_composite).attach(wood)
+    } else {
+        wood
     }
-
-    block::Composite::stack(
-        AIR,
-        parts
-            .into_iter()
-            .map(|block| block::Composite::new(block, block::CompositeOperator::Over)),
-    )
 }
 
 /// Construct a tree whose lowest trunk piece is at `root` and which is contained within

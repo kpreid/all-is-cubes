@@ -194,6 +194,7 @@ pub(crate) async fn demo_city(
                             demo_blocks[Curb].clone().rotate(rotations[side]),
                             block::CompositeOperator::Over,
                         )
+                        .with_disassemblable()
                         .compose_or_replace(to_compose_with),
                     )?;
                 }

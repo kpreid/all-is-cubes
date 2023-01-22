@@ -264,6 +264,7 @@ fn map_text_block(
                 .rotate(GridRotation::CLOCKWISE),
             block::CompositeOperator::Over,
         )
+        .with_disassemblable()
         .compose_or_replace(existing_block),
         // TODO: These are supposed to be planters
         b'P' => blocks[AtriumBlocks::Firepot].clone(),
