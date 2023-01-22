@@ -147,16 +147,14 @@ impl Modifier {
 
     /// Given a [`Block`] whose last modifier is `self`, returns the block that
     /// [`Block::unspecialize`] should produce instead of the modified block.
-    pub(crate) fn unspecialize(&self, _block: &Block) -> ModifierUnspecialize {
+    pub(crate) fn unspecialize(&self, block: &Block) -> ModifierUnspecialize {
         // When modifying this match, update the public documentation of `Block::unspecialize` too.
-        match *self {
+        match self {
             Modifier::Quote(_) => ModifierUnspecialize::Keep,
 
             Modifier::Rotate(_) => ModifierUnspecialize::Pop,
 
-            // TODO: Implement un-compositing.
-            // This will require returning multiple blocks in some cases.
-            Modifier::Composite(_) => ModifierUnspecialize::Keep,
+            Modifier::Composite(c) => c.unspecialize(block),
 
             // TODO: Implement removal of multiblock structures.
             // This will require awareness of neighboring blocks (so that the whole set
@@ -182,6 +180,7 @@ impl Modifier {
                 source,
                 operator: _,
                 reverse: _,
+                disassemblable: _,
             }) => source.listen_impl(listener.clone(), super::next_depth(depth)?)?,
             Modifier::Zoom(_) => {}
             Modifier::Move { .. } => {}

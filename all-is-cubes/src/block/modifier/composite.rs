@@ -27,6 +27,9 @@ pub struct Composite {
 
     /// Swap the roles of “source” and “destination” for the [`operator`](Self::operator).
     pub reverse: bool,
+
+    /// Whether the block should come apart into its components when removed from its place.
+    pub disassemblable: bool,
     // TODO: allow specifying another block to substitute the alpha, so as to be able to
     // make things become transparent? (That isn't strictly necessary since the “out” operator
     // will handle it, but a single unit might be useful)
@@ -40,7 +43,18 @@ impl Composite {
             source,
             operator,
             reverse: false,
+            disassemblable: false,
         }
+    }
+
+    /// Set the disassemblable flag to true.
+    ///
+    /// This will allow the composite to be taken apart by player action.
+    /// TODO: explain further
+    #[must_use]
+    pub fn with_disassemblable(mut self) -> Self {
+        self.disassemblable = true;
+        self
     }
 
     /// Compose `self` and `destination`, except that:
@@ -102,6 +116,7 @@ impl Composite {
             ref source,
             operator,
             reverse,
+            disassemblable: _,
         } = *self;
 
         // The destination block is already evaluated (it is the input to this
@@ -154,6 +169,20 @@ impl Composite {
             }
         })
     }
+
+    /// Called by [`Modifier::unspecialize()`].
+    pub(super) fn unspecialize(&self, entire_block: &Block) -> block::ModifierUnspecialize {
+        if self.disassemblable {
+            let mut destination = entire_block.clone();
+            destination
+                .modifiers_mut()
+                .pop()
+                .expect("Missing Composite modifier");
+            block::ModifierUnspecialize::Replace(vec![self.source.clone(), destination])
+        } else {
+            block::ModifierUnspecialize::Keep
+        }
+    }
 }
 
 impl From<Composite> for Modifier {
@@ -168,6 +197,7 @@ impl universe::VisitRefs for Composite {
             source,
             operator: _,
             reverse: _,
+            disassemblable: _,
         } = self;
         source.visit_refs(visitor);
     }
@@ -252,5 +282,23 @@ mod tests {
             Composite::new(block.clone(), CompositeOperator::Over).compose_or_replace(AIR),
             block
         );
+    }
+
+    #[test]
+    fn unspecialize_no() {
+        let [b1, b2] = make_some_blocks();
+        let composed =
+            Modifier::from(Composite::new(b2.clone(), CompositeOperator::Over)).attach(b1.clone());
+        assert_eq!(composed.unspecialize(), vec![composed]);
+    }
+
+    #[test]
+    fn unspecialize_yes() {
+        let [b1, b2] = make_some_blocks();
+        let composed = Modifier::from(
+            Composite::new(b2.clone(), CompositeOperator::Over).with_disassemblable(),
+        )
+        .attach(b1.clone());
+        assert_eq!(composed.unspecialize(), vec![b2, b1]);
     }
 }

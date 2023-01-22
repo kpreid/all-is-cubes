@@ -5,6 +5,7 @@
 ### Added
 
 - `all-is-cubes` library:
+    - `block::Modifier::Composite` has a new option `disassemblable`, which causes `Block::unspecialize()` (and its callers such as `Tool::RemoveBlock`) to return the composed blocks separately instead of the composite.
     - `universe::RefVisitor` is now implemented for all `FnMut(&dyn URefErased)`, allowing visitors to simply be functions.
 
 - `all-is-cubes-ui` library:
@@ -13,7 +14,7 @@
 ### Changed
 
 - `all-is-cubes` library:
-    - `block::Block::unspecialize()` now returns `Vec<Block>`.
+    - `block::Block::unspecialize()` now returns `Vec<Block>`, to allow for cases where a block comes apart into multiple parts, such as with `Modifier::Composite`.
     - `block::EvaluatedBlock` now has a `voxels` field of the new type `Evoxels`, which replaces the previous `resolution` and `voxels` fields.
       This simplifies the data model, in that there is now _always_ a set of `Evoxel`s defining a block's shape, even if there's only one of them, and it is always found in the `voxels` field. This is a breaking change for code that accesses `EvaluatedBlock` data.
     - `block::AIR` now has its own dedicated primitive, `Primitive::Air`. The behavior is unchanged.
