@@ -145,6 +145,30 @@ impl Modifier {
         })
     }
 
+    /// Given a [`Block`] whose last modifier is `self`, returns the block that
+    /// [`Block::unspecialize`] should produce instead of the modified block.
+    pub(crate) fn unspecialize(&self, _block: &Block) -> ModifierUnspecialize {
+        // When modifying this match, update the public documentation of `Block::unspecialize` too.
+        match *self {
+            Modifier::Quote(_) => ModifierUnspecialize::Keep,
+
+            Modifier::Rotate(_) => ModifierUnspecialize::Pop,
+
+            // TODO: Implement un-compositing.
+            // This will require returning multiple blocks in some cases.
+            Modifier::Composite(_) => ModifierUnspecialize::Keep,
+
+            // TODO: Implement removal of multiblock structures.
+            // This will require awareness of neighboring blocks (so that the whole set
+            // becomes one block) and probably a total replacement of the unspecialize() design.
+            Modifier::Zoom(_) => ModifierUnspecialize::Keep,
+
+            // TODO: Implement deletion of moving blocks.
+            // This is essentially a 2-block multiblock situation.
+            Modifier::Move(_) => ModifierUnspecialize::Keep,
+        }
+    }
+
     /// Called by [`Block::listen()`]; not designed to be used otherwise.
     pub(crate) fn listen_impl(
         &self,
@@ -176,6 +200,17 @@ impl VisitRefs for Modifier {
             Modifier::Move(m) => m.visit_refs(visitor),
         }
     }
+}
+
+/// Result of [`Modifier::unspecialize()`] returned to [`Block::unspecialize()`].
+#[derive(Debug)]
+pub(crate) enum ModifierUnspecialize {
+    /// Produce the block unchanged.
+    Keep,
+    /// Pop the modifier.
+    Pop,
+    // /// Replace with a different block.
+    // Replace(Block),
 }
 
 #[cfg(test)]

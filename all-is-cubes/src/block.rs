@@ -280,12 +280,18 @@ impl Block {
 
     /// Standardizes any characteristics of this block which may be presumed to be
     /// specific to its usage in its current location, so that it can be used elsewhere
-    /// or compared with others. Currently, this means removing rotation, but in the
-    /// there may be additional or customizable changes (hence the abstract name).
+    /// or compared with others. Specifically, it has the following effects:
     ///
+    /// * Removes [`Modifier::Rotate`].
+    ///
+    /// In future versions there may be additional changes or ones customizable per block.
+    ///
+    /// # Examples
+    ///
+    /// Removing rotation:
     /// ```
     /// use all_is_cubes::block::Block;
-    /// use all_is_cubes::content::make_some_voxel_blocks;
+    /// # use all_is_cubes::content::make_some_voxel_blocks;
     /// use all_is_cubes::math::GridRotation;
     /// use all_is_cubes::universe::Universe;
     ///
@@ -298,18 +304,24 @@ impl Block {
     /// assert_eq!(block, rotated.clone().unspecialize().unspecialize());
     /// ```
     #[must_use]
-    pub fn unspecialize(mut self) -> Self {
-        if self.modifiers().is_empty() {
+    pub fn unspecialize(&self) -> Self {
+        let mut block = self.clone();
+
+        if block.modifiers().is_empty() {
             // No need to reify the modifier list if it doesn't exist already.
-            return self;
+            return block;
         }
 
-        let modifiers = &mut self.make_parts_mut().modifiers;
-        while let Some(Modifier::Rotate(_)) = modifiers.last() {
-            modifiers.pop();
+        while let Some(modifier) = block.modifiers().last() {
+            match modifier.unspecialize(&block) {
+                ModifierUnspecialize::Keep => break,
+                ModifierUnspecialize::Pop => {
+                    block.modifiers_mut().pop();
+                }
+            }
         }
 
-        self
+        block
     }
 
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
