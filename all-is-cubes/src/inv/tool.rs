@@ -115,9 +115,16 @@ impl Tool {
                     Some(self),
                     if keep {
                         deletion
-                            .merge(input.produce_items([Tool::Block(
-                                cursor.hit().block.clone().unspecialize(),
-                            )])?)
+                            .merge(
+                                input.produce_items(
+                                    cursor
+                                        .hit()
+                                        .block
+                                        .unspecialize()
+                                        .into_iter()
+                                        .map(Tool::Block),
+                                )?,
+                            )
                             .unwrap()
                     } else {
                         deletion
@@ -136,11 +143,19 @@ impl Tool {
             }
             Self::CopyFromSpace => {
                 let cursor = input.cursor()?;
+                // TODO: if inventory already contains tool then don't add it, just select
+                // it
                 Ok((
                     Some(self),
-                    input.produce_items([Tool::InfiniteBlocks(
-                        cursor.hit().block.clone().unspecialize(),
-                    )])?,
+                    input.produce_items(
+                        cursor
+                            .hit()
+                            .block
+                            .clone()
+                            .unspecialize()
+                            .into_iter()
+                            .map(Tool::InfiniteBlocks),
+                    )?,
                 ))
             }
             Self::EditBlock => {

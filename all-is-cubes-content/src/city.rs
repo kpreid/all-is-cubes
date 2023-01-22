@@ -185,7 +185,7 @@ pub(crate) async fn demo_city(
                     // TODO: .unspecialize() is a maybe expensive way to make this test, and
                     // this isn't the first time this has come up. Benchmark a "block view"
                     // to cheaply filter out modifiers.
-                    if to_compose_with.clone().unspecialize() != demo_blocks[Curb] {
+                    if to_compose_with.clone().unspecialize() != vec![demo_blocks[Curb].clone()] {
                         to_compose_with = AIR;
                     }
                     space.set(

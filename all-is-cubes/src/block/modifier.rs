@@ -209,8 +209,9 @@ pub(crate) enum ModifierUnspecialize {
     Keep,
     /// Pop the modifier.
     Pop,
-    // /// Replace with a different block.
-    // Replace(Block),
+    /// Replace with a different set of blocks.
+    /// `unspecialize()` will be called on each of those automatically.
+    Replace(Vec<Block>),
 }
 
 #[cfg(test)]

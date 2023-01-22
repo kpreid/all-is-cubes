@@ -13,6 +13,7 @@
 ### Changed
 
 - `all-is-cubes` library:
+    - `block::Block::unspecialize()` now returns `Vec<Block>`.
     - `block::EvaluatedBlock` now has a `voxels` field of the new type `Evoxels`, which replaces the previous `resolution` and `voxels` fields.
       This simplifies the data model, in that there is now _always_ a set of `Evoxel`s defining a block's shape, even if there's only one of them, and it is always found in the `voxels` field. This is a breaking change for code that accesses `EvaluatedBlock` data.
     - `block::AIR` now has its own dedicated primitive, `Primitive::Air`. The behavior is unchanged.

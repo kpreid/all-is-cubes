@@ -5,6 +5,7 @@
 //! [`BlockAttributes`], and [`Modifier`].
 
 use std::borrow::Cow;
+use std::collections::VecDeque;
 use std::fmt;
 use std::sync::Arc;
 
@@ -300,28 +301,49 @@ impl Block {
     /// let rotated = block.clone().rotate(GridRotation::CLOCKWISE);
     ///
     /// assert_ne!(&block, &rotated);
-    /// assert_eq!(block, rotated.clone().unspecialize());
-    /// assert_eq!(block, rotated.clone().unspecialize().unspecialize());
+    /// assert_eq!(vec![block], rotated.clone().unspecialize());
     /// ```
     #[must_use]
-    pub fn unspecialize(&self) -> Self {
-        let mut block = self.clone();
+    pub fn unspecialize(&self) -> Vec<Block> {
+        let mut queue = VecDeque::from([self.clone()]);
+        let mut output = Vec::new();
 
-        if block.modifiers().is_empty() {
-            // No need to reify the modifier list if it doesn't exist already.
-            return block;
-        }
+        'queue: while let Some(mut block) = queue.pop_front() {
+            if block.modifiers().is_empty() {
+                // No need to reify the modifier list if it doesn't exist already.
+                output.push(block);
+                continue;
+            }
 
-        while let Some(modifier) = block.modifiers().last() {
-            match modifier.unspecialize(&block) {
-                ModifierUnspecialize::Keep => break,
-                ModifierUnspecialize::Pop => {
-                    block.modifiers_mut().pop();
+            while let Some(modifier) = block.modifiers().last() {
+                match modifier.unspecialize(&block) {
+                    ModifierUnspecialize::Keep => {
+                        output.push(block);
+                        continue 'queue;
+                    }
+                    ModifierUnspecialize::Pop => {
+                        block.modifiers_mut().pop();
+                        // and continue to possibly pop more...
+                    }
+                    ModifierUnspecialize::Replace(replacements) => {
+                        let replacements = replacements.into_iter().inspect(|r| {
+                            assert_ne!(
+                                r, &block,
+                                "infinite loop detected: \
+                            modifier returned original block from unspecialize()"
+                            );
+                        });
+                        queue.extend(replacements);
+                        continue 'queue;
+                    }
                 }
             }
+            // If and only if we got here rather than doing something else, the block
+            // now has all its unwanted modifiers popped or replaced.
+            output.push(block);
         }
 
-        block
+        output
     }
 
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
