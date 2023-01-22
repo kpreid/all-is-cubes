@@ -310,9 +310,9 @@ fn visit_refs_character() {
 
     // A block reference in inventory.
     let block_ref = u.insert("block".into(), BlockDef::new(AIR)).unwrap();
-    CharacterTransaction::inventory(InventoryTransaction::insert(Tool::Block(
+    CharacterTransaction::inventory(InventoryTransaction::insert([Tool::Block(
         Block::from_primitive(Primitive::Indirect(block_ref)),
-    )))
+    )]))
     .execute(&mut character)
     .unwrap();
 

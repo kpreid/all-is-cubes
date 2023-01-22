@@ -98,7 +98,7 @@ impl Inventory {
                                     original_tool.clone(),
                                 ),
                             )
-                            .merge(InventoryTransaction::insert(new_tool))
+                            .merge(InventoryTransaction::insert([new_tool]))
                             .unwrap(),
                         )
                     }
@@ -314,16 +314,18 @@ pub struct InventoryTransaction {
 }
 
 impl InventoryTransaction {
-    /// Transaction to insert an item/stack into an inventory, which will fail if there is no
-    /// space.
-    pub fn insert(stack: impl Into<Slot>) -> Self {
-        let stack = stack.into();
-        if matches!(stack, Slot::Empty) {
-            return Self::default();
-        }
+    /// Transaction to insert items/stacks into an inventory, which will fail if there is
+    /// not sufficient space.
+    pub fn insert<S: Into<Slot>, I: IntoIterator<Item = S>>(stacks: I) -> Self {
+        // TODO: Should we coalesce identical insertions? Or leave that for when the
+        // transaction is executed?
         Self {
             replace: BTreeMap::default(),
-            insert: vec![stack],
+            insert: stacks
+                .into_iter()
+                .map(|s| -> Slot { s.into() })
+                .filter(|s| s.count() > 0)
+                .collect(),
         }
     }
 
@@ -483,6 +485,23 @@ mod tests {
     }
 
     #[test]
+    fn txn_insert_empty_list() {
+        let list: [Slot; 0] = [];
+        assert_eq!(
+            InventoryTransaction::insert(list),
+            InventoryTransaction::default()
+        );
+    }
+
+    #[test]
+    fn txn_insert_filtered_empty() {
+        assert_eq!(
+            InventoryTransaction::insert([Slot::Empty, Slot::Empty]),
+            InventoryTransaction::default()
+        );
+    }
+
+    #[test]
     fn txn_insert_success() {
         let occupied_slot: Slot = Tool::CopyFromSpace.into();
         let mut inventory = Inventory::from_slots(vec![
@@ -496,7 +515,7 @@ mod tests {
 
         assert_eq!(inventory.slots[2], Slot::Empty);
         assert_eq!(
-            InventoryTransaction::insert(new_item.clone())
+            InventoryTransaction::insert([new_item.clone()])
                 .execute(&mut inventory)
                 .unwrap(),
             Some(InventoryChange {
@@ -516,7 +535,7 @@ mod tests {
         let new_item = Tool::InfiniteBlocks(Rgba::WHITE.into());
 
         assert_eq!(inventory.slots, contents);
-        InventoryTransaction::insert(new_item.clone())
+        InventoryTransaction::insert([new_item.clone()])
             .check(&inventory)
             .expect_err("should have failed");
         assert_eq!(inventory.slots, contents);
@@ -535,7 +554,7 @@ mod tests {
             Slot::stack(10, this.clone()),
             Slot::Empty,
         ]);
-        InventoryTransaction::insert(this.clone())
+        InventoryTransaction::insert([this.clone()])
             .execute(&mut inventory)
             .unwrap();
         assert_eq!(
@@ -560,7 +579,7 @@ mod tests {
 
         TransactionTester::new()
             .transaction(
-                InventoryTransaction::insert(new_item_1.clone()),
+                InventoryTransaction::insert([new_item_1.clone()]),
                 |before, after| {
                     if after.count_of(&new_item_1) <= before.count_of(&new_item_1) {
                         return Err("missing added new_item_1".into());

@@ -87,7 +87,7 @@ fn inventory_transaction() {
     let item = Tool::InfiniteBlocks(AIR);
     character_ref
         .execute(&CharacterTransaction::inventory(
-            InventoryTransaction::insert(item.clone()),
+            InventoryTransaction::insert([item.clone()]),
         ))
         .unwrap();
 
@@ -157,7 +157,7 @@ fn transaction_systematic() {
         .target(|| Character::spawn_default(space_ref.clone()))
         .target(|| {
             let mut character = Character::spawn_default(space_ref.clone());
-            CharacterTransaction::inventory(InventoryTransaction::insert(old_item.clone()))
+            CharacterTransaction::inventory(InventoryTransaction::insert([old_item.clone()]))
                 .execute(&mut character)
                 .unwrap();
             character

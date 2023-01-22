@@ -7,7 +7,7 @@ use std::{fmt, hash};
 use crate::block::{self, Block, Modifier, Primitive, RotationPlacementRule, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::fluff::Fluff;
-use crate::inv::{Icons, InventoryTransaction, StackLimit};
+use crate::inv::{self, Icons, InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
 use crate::math::{Face6, GridPoint, GridRotation};
 use crate::space::{Space, SpaceTransaction};
@@ -115,9 +115,9 @@ impl Tool {
                     Some(self),
                     if keep {
                         deletion
-                            .merge(input.produce_item(Tool::Block(
+                            .merge(input.produce_items([Tool::Block(
                                 cursor.hit().block.clone().unspecialize(),
-                            ))?)
+                            )])?)
                             .unwrap()
                     } else {
                         deletion
@@ -138,9 +138,9 @@ impl Tool {
                 let cursor = input.cursor()?;
                 Ok((
                     Some(self),
-                    input.produce_item(Tool::InfiniteBlocks(
+                    input.produce_items([Tool::InfiniteBlocks(
                         cursor.hit().block.clone().unspecialize(),
-                    ))?,
+                    )])?,
                 ))
             }
             Self::EditBlock => {
@@ -373,12 +373,16 @@ impl ToolInput {
         self.cursor.as_ref().ok_or(ToolError::NothingSelected)
     }
 
-    /// Add the provided item to the inventory from which the tool was used.
-    pub fn produce_item(&self, item: Tool) -> Result<UniverseTransaction, ToolError> {
+    /// Add the provided items to the inventory from which the tool was used.
+    pub fn produce_items<S: Into<inv::Slot>, I: IntoIterator<Item = S>>(
+        &self,
+        items: I,
+    ) -> Result<UniverseTransaction, ToolError> {
         if let Some(ref character) = self.character {
-            // TODO: pre-check whether there's enough inventory space
+            // TODO: pre-check whether there's enough inventory space to allow alternative
+            // handling
             Ok(
-                CharacterTransaction::inventory(InventoryTransaction::insert(item))
+                CharacterTransaction::inventory(InventoryTransaction::insert(items))
                     .bind(character.clone()),
             )
         } else {
@@ -646,9 +650,9 @@ mod tests {
                 if keep {
                     expected_delete
                         .merge(
-                            CharacterTransaction::inventory(InventoryTransaction::insert(
+                            CharacterTransaction::inventory(InventoryTransaction::insert([
                                 Tool::Block(existing),
-                            ))
+                            ]))
                             .bind(tester.character_ref.clone()),
                         )
                         .unwrap()
@@ -827,9 +831,9 @@ mod tests {
         let transaction = tester.equip_and_use_tool(Tool::CopyFromSpace).unwrap();
         assert_eq!(
             transaction,
-            CharacterTransaction::inventory(InventoryTransaction::insert(Tool::InfiniteBlocks(
+            CharacterTransaction::inventory(InventoryTransaction::insert([Tool::InfiniteBlocks(
                 existing.clone()
-            )))
+            )]))
             .bind(tester.character_ref.clone())
         );
         transaction.execute(&mut tester.universe).unwrap();
