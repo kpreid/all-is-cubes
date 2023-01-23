@@ -1,3 +1,4 @@
+use all_is_cubes::content::make_some_voxel_blocks;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::{Block, Resolution::R16, AIR};
@@ -11,13 +12,19 @@ use all_is_cubes::rgba_const;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
 
-criterion_group!(benches, mesh_benches);
+criterion_group!(
+    benches,
+    block_mesh_benches,
+    space_mesh_benches,
+    slow_mesh_benches
+);
 criterion_main!(benches);
 
-fn mesh_benches(c: &mut Criterion) {
+fn block_mesh_benches(c: &mut Criterion) {
+    let mut g = c.benchmark_group("block");
     let options = &MeshOptions::new(&GraphicsOptions::default());
 
-    c.bench_function("block, checkerboard", |b| {
+    g.bench_function("checkerboard", |b| {
         let mut universe = Universe::new();
         let block = checkerboard_block(&mut universe, [AIR, Block::from(Rgba::WHITE)]);
         let ev = block.evaluate().unwrap();
@@ -35,7 +42,7 @@ fn mesh_benches(c: &mut Criterion) {
         );
     });
 
-    c.bench_function("block, opaque", |b| {
+    g.bench_function("opaque", |b| {
         let mut universe = Universe::new();
         let block = checkerboard_block(
             &mut universe,
@@ -56,7 +63,32 @@ fn mesh_benches(c: &mut Criterion) {
         );
     });
 
-    c.bench_function("space, checkerboard, new buffer", |b| {
+    g.bench_function("msvb", |b| {
+        let mut universe = Universe::new();
+        let [block] = make_some_voxel_blocks(&mut universe);
+        let ev = block.evaluate().unwrap();
+
+        b.iter_batched_ref(
+            || (),
+            |()| {
+                BlockMesh::<BlockVertex<TtPoint>, _>::new(
+                    &ev,
+                    &TestTextureAllocator::new(),
+                    options,
+                )
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    // TODO: Add meshing a block that has a complex but not worst-case shape.
+}
+
+fn space_mesh_benches(c: &mut Criterion) {
+    let mut g = c.benchmark_group("space");
+    let options = &MeshOptions::new(&GraphicsOptions::default());
+
+    g.bench_function("checker-new", |b| {
         // The Space and block meshes are not mutated, so we can construct them once.
         // This also ensures we're not timing dropping them.
         let (space, block_meshes) = checkerboard_space_bench_setup(options, false);
@@ -70,7 +102,7 @@ fn mesh_benches(c: &mut Criterion) {
         );
     });
 
-    c.bench_function("space, checkerboard, reused buffer", |b| {
+    g.bench_function("checker-reused", |b| {
         let (space, block_meshes) = checkerboard_space_bench_setup(options, false);
         b.iter_batched_ref(
             || {
@@ -91,11 +123,14 @@ fn mesh_benches(c: &mut Criterion) {
             BatchSize::SmallInput,
         );
     });
+}
 
-    let mut slow_group = c.benchmark_group("slow");
-    slow_group.sample_size(10);
+fn slow_mesh_benches(c: &mut Criterion) {
+    let mut g = c.benchmark_group("slow");
+    g.sample_size(10);
+    let options = &MeshOptions::new(&GraphicsOptions::default());
 
-    slow_group.bench_function("space, transparent checkerboard, new buffer", |b| {
+    g.bench_function("transparent", |b| {
         let (space, block_meshes) = checkerboard_space_bench_setup(options, true);
         b.iter_batched_ref(
             || (),
