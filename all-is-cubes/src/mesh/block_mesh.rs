@@ -45,6 +45,19 @@ pub(super) struct BlockFaceMesh<V> {
 }
 
 impl<V> BlockFaceMesh<V> {
+    fn clear(&mut self) {
+        let Self {
+            vertices,
+            indices_opaque,
+            indices_transparent,
+            fully_opaque,
+        } = self;
+        vertices.clear();
+        indices_opaque.clear();
+        indices_transparent.clear();
+        *fully_opaque = false;
+    }
+
     pub fn is_empty(&self) -> bool {
         self.vertices.is_empty()
     }
@@ -181,11 +194,48 @@ where
     where
         A: TextureAllocator<Tile = T>,
     {
+        let mut new_self = Self::default();
+        new_self.compute(block, texture_allocator, options);
+        new_self
+    }
+
+    fn clear(&mut self) {
+        let Self {
+            face_vertices,
+            interior_vertices,
+            textures_used,
+            voxel_opacity_mask,
+            flaws,
+        } = self;
+        for (_, fv) in face_vertices.iter_mut() {
+            fv.clear();
+        }
+        interior_vertices.clear();
+        textures_used.clear();
+        *voxel_opacity_mask = None;
+        *flaws = Flaws::empty();
+    }
+
+    /// Generate the [`BlockMesh`] for a block's current appearance, writing it into
+    /// `self`. This is equivalent to [`BlockMesh::new()`] except that it reuses existing
+    /// memory allocations.
+    ///
+    /// TODO: This does not currently reuse the texture allocation.
+    /// Add the capability to do so if the caller requests it.
+    pub fn compute<A>(
+        &mut self,
+        block: &EvaluatedBlock,
+        texture_allocator: &A,
+        options: &MeshOptions,
+    ) where
+        A: TextureAllocator<Tile = T>,
+    {
+        self.clear();
+
         // If this is true, avoid using vertex coloring even on solid rectangles.
         let prefer_textures = block.attributes.animation_hint.redefinition != AnimationChange::None;
 
-        let mut used_any_vertex_colors = false;
-        let mut flaws = Flaws::empty();
+        let flaws = &mut self.flaws;
 
         let tmp_block_color_voxel;
         let voxels = if options.ignore_voxels {
@@ -199,20 +249,17 @@ where
                 color: block_color, ..
             }) => {
                 let block_color = options.transparency.limit_alpha(block_color);
-                let face_vertices = FaceMap::from_fn(|face| {
-                    let mut vertices: Vec<V> = Vec::new();
-                    let mut indices_opaque: Vec<u32> = Vec::new();
-                    let mut indices_transparent: Vec<u32> = Vec::new();
+                for (face, face_mesh) in self.face_vertices.iter_mut() {
                     if !block_color.fully_transparent() {
-                        vertices.reserve_exact(4);
+                        face_mesh.vertices.reserve_exact(4);
                         push_quad(
-                            &mut vertices,
+                            &mut face_mesh.vertices,
                             if block_color.fully_opaque() {
-                                indices_opaque.reserve_exact(6);
-                                &mut indices_opaque
+                                face_mesh.indices_opaque.reserve_exact(6);
+                                &mut face_mesh.indices_opaque
                             } else {
-                                indices_transparent.reserve_exact(6);
-                                &mut indices_transparent
+                                face_mesh.indices_transparent.reserve_exact(6);
+                                &mut face_mesh.indices_transparent
                             },
                             &QuadTransform::new(face, Resolution::R1),
                             /* depth= */ 0.,
@@ -221,26 +268,13 @@ where
                             // TODO: Respect the prefer_textures option.
                             QuadColoring::<A::Tile>::Solid(block_color),
                         );
-                        used_any_vertex_colors = true;
                     }
-                    BlockFaceMesh {
-                        fully_opaque: block_color.fully_opaque(),
-                        vertices,
-                        indices_opaque,
-                        indices_transparent,
-                    }
-                });
-
-                BlockMesh {
-                    face_vertices,
-                    // No interior detail for atom blocks.
-                    interior_vertices: BlockFaceMesh::default(),
-                    textures_used: vec![],
-                    voxel_opacity_mask: None,
-                    flaws,
+                    face_mesh.fully_opaque = block_color.fully_opaque();
                 }
             }
             Evoxels::Many(resolution, ref voxels_array) => {
+                let mut used_any_vertex_colors = false;
+
                 // Exit when the voxel data is not at all in the right volume.
                 // This dodges some integer overflow cases on bad input.
                 // TODO: Add a test for this case
@@ -249,24 +283,21 @@ where
                     .intersection(GridAab::for_block(resolution))
                     .is_none()
                 {
-                    return BlockMesh::default();
+                    return;
                 }
 
                 let block_resolution = GridCoordinate::from(resolution);
 
                 // Construct empty output to mutate.
-                let mut output_by_face = FaceMap::from_fn(|_| BlockFaceMesh {
-                    vertices: Vec::new(),
-                    indices_opaque: Vec::new(),
-                    indices_transparent: Vec::new(),
+                for (_, face_mesh) in self.face_vertices.iter_mut() {
                     // Start assuming opacity; if we find any transparent pixels we'll set
                     // this to false. `Within` is always "transparent" because the algorithm
                     // that consumes this structure will say "draw this face if its adjacent
                     // cube's opposing face is not opaque", and `Within` means the adjacent
                     // cube is ourself.
-                    fully_opaque: true,
-                });
-                let mut output_interior = BlockFaceMesh::default();
+                    face_mesh.fully_opaque = true;
+                }
+                let mut output_interior = &mut self.interior_vertices;
 
                 let mut texture_if_needed: Option<A::Tile> = None;
 
@@ -275,6 +306,7 @@ where
                 for face in Face6::ALL {
                     let voxel_transform = face.matrix(block_resolution - 1);
                     let quad_transform = QuadTransform::new(face, resolution);
+                    let face_mesh = &mut self.face_vertices[face];
 
                     // Rotate the voxel array's extent into our local coordinate system, so we can find
                     // out what range to iterate over.
@@ -290,7 +322,7 @@ where
                         || rotated_voxel_range.x_range() != (0..block_resolution)
                         || rotated_voxel_range.y_range() != (0..block_resolution)
                     {
-                        output_by_face[face].fully_opaque = false;
+                        face_mesh.fully_opaque = false;
                     }
 
                     // Layer 0 is the outside surface of the cube and successive layers are
@@ -325,7 +357,7 @@ where
                                 if layer == 0 && !color.fully_opaque() {
                                     // If the first layer is transparent in any cube at all, then the face is
                                     // not fully opaque
-                                    output_by_face[face].fully_opaque = false;
+                                    face_mesh.fully_opaque = false;
                                 }
 
                                 let voxel_is_visible = {
@@ -392,7 +424,7 @@ where
                             indices_transparent,
                             ..
                         } = if layer == 0 {
-                            &mut output_by_face[face]
+                            &mut *face_mesh
                         } else {
                             &mut output_interior
                         };
@@ -429,7 +461,7 @@ where
                                     // * Offer the alternative of generating as much
                                     //   geometry as needed.
                                     used_any_vertex_colors = true;
-                                    flaws |= Flaws::MISSING_TEXTURES;
+                                    *flaws |= Flaws::MISSING_TEXTURES;
                                     QuadColoring::Solid(
                                         options.transparency.limit_alpha(block.color),
                                     )
@@ -453,17 +485,13 @@ where
                     }
                 }
 
-                BlockMesh {
-                    face_vertices: output_by_face,
-                    interior_vertices: output_interior,
-                    textures_used: texture_if_needed.into_iter().collect(),
-                    voxel_opacity_mask: if used_any_vertex_colors {
-                        None
-                    } else {
-                        block.voxel_opacity_mask.clone()
-                    },
-                    flaws,
-                }
+                // TODO: avoid allocation
+                self.textures_used = texture_if_needed.into_iter().collect();
+                self.voxel_opacity_mask = if used_any_vertex_colors {
+                    None
+                } else {
+                    block.voxel_opacity_mask.clone()
+                };
             }
         }
     }

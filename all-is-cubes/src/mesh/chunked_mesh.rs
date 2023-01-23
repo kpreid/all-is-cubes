@@ -557,6 +557,10 @@ where
             {
                 // Updated the texture in-place. No need for mesh updates.
             } else {
+                // Compute a new mesh.
+                // TODO: Try using BlockMesh::compute() to reuse allocations.
+                // The catch is that then we will no longer be able to compare the new mesh
+                // to the existing mesh below, so this won't be a pure win.
                 let new_block_mesh =
                     BlockMesh::new(new_evaluated_block, block_texture_allocator, mesh_options);
 
