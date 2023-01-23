@@ -24,7 +24,7 @@ fn block_mesh_benches(c: &mut Criterion) {
     let mut g = c.benchmark_group("block");
     let options = &MeshOptions::new(&GraphicsOptions::default());
 
-    g.bench_function("checkerboard", |b| {
+    g.bench_function("checker-new", |b| {
         let mut universe = Universe::new();
         let block = checkerboard_block(&mut universe, [AIR, Block::from(Rgba::WHITE)]);
         let ev = block.evaluate().unwrap();
@@ -38,6 +38,20 @@ fn block_mesh_benches(c: &mut Criterion) {
                     options,
                 )
             },
+            BatchSize::SmallInput,
+        );
+    });
+
+    g.bench_function("checker-reused", |b| {
+        let mut universe = Universe::new();
+        let block = checkerboard_block(&mut universe, [AIR, Block::from(Rgba::WHITE)]);
+        let ev = block.evaluate().unwrap();
+
+        let mut shared_mesh = BlockMesh::<BlockVertex<TtPoint>, _>::default();
+
+        b.iter_batched_ref(
+            || (),
+            |()| shared_mesh.compute(&ev, &TestTextureAllocator::new(), options),
             BatchSize::SmallInput,
         );
     });
