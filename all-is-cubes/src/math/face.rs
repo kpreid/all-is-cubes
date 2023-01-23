@@ -652,6 +652,19 @@ impl<V> FaceMap<V> {
         Face6::ALL.iter().copied().map(move |f| (f, &self[f]))
     }
 
+    /// Iterate over the map's key-value pairs by mutable reference, in the same order as [`Face6::ALL`].
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Face6, &mut V)> {
+        [
+            (Face6::NX, &mut self.nx),
+            (Face6::NY, &mut self.ny),
+            (Face6::NZ, &mut self.nz),
+            (Face6::PX, &mut self.px),
+            (Face6::PY, &mut self.py),
+            (Face6::PZ, &mut self.pz),
+        ]
+        .into_iter()
+    }
+
     /// Iterate over the map values by reference, in the same order as [`Face6::ALL`].
     pub fn values(&self) -> impl Iterator<Item = &V> {
         Face6::ALL.iter().copied().map(move |f| &self[f])
@@ -879,18 +892,32 @@ mod tests {
 
     // TODO: More tests of face.matrix()
 
+    /// Test the ordering of all [`FaceMap`] methods that explicitly produce an ordered result.
     #[test]
     fn face_map_iter_in_enum_order() {
-        // TODO: Maybe generalize this to _all_ the Face/FaceMap methods that have an ordering?
-        let map = FaceMap::from_fn(|f| f);
+        let mut map = FaceMap::from_fn(|f| f);
+        let expected_both: Vec<(Face6, Face6)> = Face6::ALL.into_iter().zip(Face6::ALL).collect();
+
+        // FaceMap::iter()
         assert_eq!(
-            Face6::ALL.to_vec(),
-            map.iter().map(|(_, &v)| v).collect::<Vec<_>>(),
+            expected_both,
+            map.iter().map(|(k, &v)| (k, v)).collect::<Vec<_>>(),
         );
+
+        // FaceMap::iter_mut()
+        assert_eq!(
+            expected_both,
+            map.iter_mut().map(|(k, &mut v)| (k, v)).collect::<Vec<_>>(),
+        );
+
+        // FaceMap::values()
         assert_eq!(
             Face6::ALL.to_vec(),
             map.values().copied().collect::<Vec<_>>(),
         );
+
+        // FaceMap::into_values()
+        assert_eq!(Face6::ALL, map.into_values());
     }
 
     #[test]
