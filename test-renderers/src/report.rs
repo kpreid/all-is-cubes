@@ -52,10 +52,10 @@ pub(crate) fn write_report_file() -> PathBuf {
                 renderers: comparison_records
                     .iter()
                     .map(|records| match records.get(test_id) {
-                        Some(&TestCaseOutput {
-                            ref outcome,
+                        Some(TestCaseOutput {
+                            outcome,
                             test_id: _,
-                            ref comparisons,
+                            comparisons,
                         }) => tmpl::StatusCell {
                             test_outcome: match outcome {
                                 Ok(()) => "✅".to_owned(),

@@ -218,7 +218,7 @@ where
             block_texture_allocator,
             mesh_options,
             // TODO: don't hardcode this figure here, let the caller specify it
-            deadline - Duration::from_micros(500),
+            deadline.checked_sub(Duration::from_micros(500)).unwrap(),
         );
         let all_done_with_blocks = todo.blocks.is_empty();
 
@@ -1148,7 +1148,7 @@ mod tests {
         let info = tester.csm.update_blocks_and_some_chunks(
             &tester.camera,
             &NoTextures,
-            Instant::now() - Duration::from_secs(1),
+            Instant::now().checked_sub(Duration::from_secs(1)).unwrap(),
             |_| {},
         );
 

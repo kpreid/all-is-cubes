@@ -367,6 +367,7 @@ mod tests {
     use all_is_cubes::time::Tick;
     use futures_core::future::BoxFuture;
 
+    #[allow(clippy::let_underscore_future)]
     fn _test_build_future_is_send() {
         let _: BoxFuture<'_, _> =
             Box::pin(UniverseTemplate::Atrium.build(YieldProgress::noop(), 0));

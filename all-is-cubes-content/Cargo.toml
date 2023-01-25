@@ -43,7 +43,7 @@ noise = { version = "0.8.2", default-features = false }
 paste = "1.0.5"
 petgraph = { version = "0.6.2", default-features = false, features = ["graphmap"] }
 rand = { workspace = true }
-rand_xoshiro = { workspace = true}
+rand_xoshiro = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
