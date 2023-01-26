@@ -128,6 +128,7 @@ fn create_color_texture(device: &wgpu::Device, viewport: Viewport) -> wgpu::Text
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::Rgba8UnormSrgb,
+        view_formats: &[],
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
     })
 }

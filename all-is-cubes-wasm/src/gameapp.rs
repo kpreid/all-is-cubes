@@ -134,9 +134,10 @@ async fn start_game_with_dom(
     let cameras = session.create_cameras(viewport_cell.as_source());
     let renderer = match renderer_option {
         RendererOption::Wgpu => {
-            let wgpu_instance = wgpu::Instance::new(wgpu::Backends::all());
-            let surface =
-                wgpu_instance.create_surface_from_canvas(&gui_helpers.canvas_helper().canvas());
+            let wgpu_instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
+            let surface = wgpu_instance
+                .create_surface_from_canvas(&gui_helpers.canvas_helper().canvas())
+                .map_err(|_| "Requesting WebGL context failed")?;
             // TODO: we lost the 'request no MSAA' feature
             let adapter = wgpu_instance
                 .request_adapter(&wgpu::RequestAdapterOptions {

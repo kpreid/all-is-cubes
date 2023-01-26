@@ -93,15 +93,16 @@ pub(crate) async fn create_winit_wgpu_desktop_session(
         window.inner_size(),
     ));
 
-    let instance = wgpu::Instance::new(
-        wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all),
-    );
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all),
+        ..Default::default()
+    });
 
     // Safety: create_surface specifies that the window must be kept alive
     // as long as the surface is. We will do that by keeping them both in
     // the `DesktopSession` struct. TODO: Make this more robust by having
     // the renderer jointly own the window via `Arc`.
-    let surface = unsafe { instance.create_surface(&window) };
+    let surface = unsafe { instance.create_surface(&window) }?;
 
     // Pick an adapter.
     let mut adapter: Option<wgpu::Adapter> =

@@ -653,6 +653,7 @@ impl SpaceLightTexture {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D3,
             format: wgpu::TextureFormat::Rgba8Uint,
+            view_formats: &[],
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             label: Some(&format!("{label_prefix} space light")),
         });

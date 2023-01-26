@@ -12,7 +12,10 @@
 pub async fn create_instance_and_adapter_for_test() -> (wgpu::Instance, Option<wgpu::Adapter>) {
     let requested_backends =
         wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
-    let instance = wgpu::Instance::new(requested_backends);
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: requested_backends,
+        ..Default::default()
+    });
 
     // Report adapters that we *could* pick
     eprintln!("Available adapters (backend filter = {requested_backends:?}):");

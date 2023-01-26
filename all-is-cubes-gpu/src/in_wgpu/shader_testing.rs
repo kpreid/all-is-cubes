@@ -55,6 +55,7 @@ where
         &wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: wgpu::TextureFormat::Rgba16Float,
+            view_formats: vec![],
             width: output_viewport.framebuffer_size.x,
             height: output_viewport.framebuffer_size.y,
             present_mode: wgpu::PresentMode::Fifo,

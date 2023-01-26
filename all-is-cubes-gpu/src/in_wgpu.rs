@@ -85,7 +85,7 @@ impl SurfaceRenderer {
         let everything = EverythingRenderer::new(
             device.clone(),
             cameras,
-            choose_surface_format(&surface, adapter),
+            choose_surface_format(&surface.get_capabilities(adapter)),
             adapter,
         );
 
@@ -237,6 +237,7 @@ impl EverythingRenderer {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
+            view_formats: vec![],
             // wgpu operations will fail if the size is zero; set a minimum of 1 so we can
             // successfully initialize and get a working renderer later.
             width: viewport.framebuffer_size.x.max(1),
@@ -847,7 +848,7 @@ impl EverythingRenderer {
 }
 
 /// Choose the surface format we would prefer from among the supported formats.
-fn choose_surface_format(surface: &wgpu::Surface, adapter: &wgpu::Adapter) -> wgpu::TextureFormat {
+fn choose_surface_format(capabilities: &wgpu::SurfaceCapabilities) -> wgpu::TextureFormat {
     /// A structure whose maximum [`Ord`] value corresponds to the texture format we'd rather use.
     #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
     struct Rank {
@@ -860,8 +861,8 @@ fn choose_surface_format(surface: &wgpu::Surface, adapter: &wgpu::Adapter) -> wg
         negated_original_order: isize,
     }
 
-    let formats = surface.get_supported_formats(adapter);
-    let (index, best) = formats
+    let (index, best) = capabilities
+        .formats
         .iter()
         .copied()
         .enumerate()
@@ -881,7 +882,8 @@ fn choose_surface_format(surface: &wgpu::Surface, adapter: &wgpu::Adapter) -> wg
         .expect("wgpu::Surface::get_supported_formats() was empty");
     log::debug!(
         "Chose surface format {best:?}, #{index} out of {formats:?}",
-        index = index + 1
+        index = index + 1,
+        formats = capabilities.formats,
     );
     best
 }

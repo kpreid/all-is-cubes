@@ -50,6 +50,7 @@ impl DrawableTexture {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            view_formats: &[],
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         });
 
@@ -202,6 +203,7 @@ impl FramebufferTextures {
             sample_count: config.sample_count,
             dimension: wgpu::TextureDimension::D2,
             format: config.linear_scene_texture_format,
+            view_formats: &[],
             usage: linear_scene_texture_usages_with_copy,
         });
         let linear_scene_resolved_tex = if config.sample_count > 1 {
@@ -212,6 +214,7 @@ impl FramebufferTextures {
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: config.linear_scene_texture_format,
+                view_formats: &[],
                 usage: linear_scene_texture_usages_with_copy,
             }))
         } else {
@@ -224,6 +227,7 @@ impl FramebufferTextures {
             sample_count: config.sample_count,
             dimension: wgpu::TextureDimension::D2,
             format: Self::DEPTH_FORMAT,
+            view_formats: &[],
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         });
 
@@ -426,7 +430,7 @@ pub(crate) struct FbtFeatures {
 impl FbtFeatures {
     pub fn new(adapter: &wgpu::Adapter) -> Self {
         let float_format = wgpu::TextureFormat::Rgba16Float;
-        let multisample_flags = wgpu::TextureFormatFeatureFlags::MULTISAMPLE
+        let multisample_flags = wgpu::TextureFormatFeatureFlags::MULTISAMPLE_X4
             | wgpu::TextureFormatFeatureFlags::MULTISAMPLE_RESOLVE;
 
         let float_tff = adapter.get_texture_format_features(float_format);
