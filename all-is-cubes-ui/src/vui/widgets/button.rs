@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
@@ -6,8 +5,9 @@ use std::sync::Arc;
 use exhaust::Exhaust;
 
 use all_is_cubes::behavior::BehaviorSetTransaction;
+use all_is_cubes::block::builder::BlockBuilderVoxels;
 use all_is_cubes::block::{
-    Block,
+    self, Block, BlockBuilder,
     Resolution::{self, R32},
 };
 use all_is_cubes::content::load_image::{default_srgb, ImageAdapter};
@@ -24,15 +24,17 @@ use all_is_cubes::drawing::embedded_graphics::{
 };
 use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
 use all_is_cubes::inv::EphemeralOpaque;
-use all_is_cubes::linking::InGenError;
+use all_is_cubes::linking::{self, InGenError};
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
-use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba};
+use all_is_cubes::math::{
+    Face6, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
+};
 use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge;
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{URef, Universe};
 
-use crate::vui::{self, Layoutable as _};
+use crate::vui::{self, Layoutable as _, UiBlocks};
 
 type Action = EphemeralOpaque<dyn Fn() + Send + Sync>;
 
@@ -51,11 +53,13 @@ pub struct ActionButton {
 
 impl ActionButton {
     pub fn new(
-        mut blocks: impl FnMut(ActionButtonVisualState) -> Block,
+        label: Block,
+        theme: &linking::BlockProvider<UiBlocks>,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Arc<Self> {
+        let state = ActionButtonVisualState::default();
         Arc::new(Self {
-            block: blocks(ActionButtonVisualState { _dummy: () }),
+            block: assemble_button_via_provider(theme, state, UiBlocks::ActionButton, label),
             action: EphemeralOpaque::from(Arc::new(action) as Arc<dyn Fn() + Send + Sync>),
         })
     }
@@ -148,15 +152,26 @@ impl<D> ToggleButton<D> {
     pub fn new(
         data_source: ListenableSource<D>,
         projection: impl Fn(&D) -> bool + Send + Sync + 'static,
-        mut blocks: impl FnMut(ToggleButtonVisualState) -> Block,
+        label: Block,
+        theme: &linking::BlockProvider<UiBlocks>,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Arc<Self> {
         Arc::new(Self {
             data_source,
             projection: Arc::new(projection),
             states: [
-                blocks(ToggleButtonVisualState { value: false }),
-                blocks(ToggleButtonVisualState { value: true }),
+                assemble_button_via_provider(
+                    theme,
+                    ToggleButtonVisualState::new(false),
+                    UiBlocks::ToggleButton,
+                    label.clone(),
+                ),
+                assemble_button_via_provider(
+                    theme,
+                    ToggleButtonVisualState::new(true),
+                    UiBlocks::ToggleButton,
+                    label,
+                ),
             ],
             action: EphemeralOpaque::from(Arc::new(action) as Arc<dyn Fn() + Send + Sync>),
         })
@@ -257,97 +272,100 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
     }
 }
 
-/// Allows drawing a button [`Block`] (a shape in one of several states with a label on it)
-/// given a [`ButtonBase`] defining the style and state.
+/// Composite a button shape and a button label.
 ///
-/// These blocks may then be used with button widgets like [`ActionButton`] and [`ToggleButton`].
-#[derive(Debug)]
-pub struct ButtonBlockBuilder {
-    space: Space,
-    active: bool,
-    label_z: GridCoordinate,
-    label_color: Rgba,
+/// Not public because it is only used by button widgets.
+///
+/// `base` mus be the `ButtonBase` that produced `base_block`.
+/// TODO: Find a non-redundant way to pass this information.
+fn assemble_button(base: &dyn ButtonBase, base_block: Block, label_block: Block) -> Block {
+    let shifted_label = block::Modifier::from(block::Move::new(
+        Face6::PZ,
+        (base.button_label_z() * 256 / theme::RESOLUTION_G) as u16,
+        0,
+    ))
+    .attach(label_block);
+
+    block::Modifier::from(block::Composite::new(
+        shifted_label,
+        block::CompositeOperator::Over,
+    ))
+    .attach(base_block)
 }
 
-impl ButtonBlockBuilder {
-    /// Resolution of the produced blocks.
-    pub const RESOLUTION: Resolution = theme::RESOLUTION;
-    /// Resolution of the produced blocks, as [`GridCoordinate`].
-    pub const RESOLUTION_G: GridCoordinate = Self::RESOLUTION.to_grid();
+/// TODO: do this more elegantly somehow
+pub(crate) fn assemble_button_via_provider<B: Copy + ButtonBase, M: linking::BlockModule>(
+    blocks: &linking::BlockProvider<M>,
+    base: B,
+    ctor: fn(B) -> M,
+    label_block: Block,
+) -> Block {
+    assemble_button(&base, blocks[ctor(base)].clone(), label_block)
+}
 
-    /// Construct a new [`ButtonBlockBuilder`] ready to draw into;
-    /// equivalent to [`ButtonBase::button_builder()`].
-    pub fn new<S: ButtonBase>(state: S) -> Result<Self, InGenError> {
-        state.button_builder()
-    }
+/// Returns a [`DrawTarget`] for drawing the button label, with a
+/// Y-down coordinate system whose origin is centered on the button (or more precisely,
+/// (0, 0) is the lower-right pixel closest to the center, since e-g uses a convention
+/// where coordinates identify pixels, not their edges).
+///
+/// TODO: explain expected size
+///
+/// [`DrawTarget`]: all_is_cubes::drawing::embedded_graphics::prelude::DrawTarget
+pub(crate) fn draw_target_for_button_label<C: PixelColor>(
+    space: &mut Space,
+) -> DrawingPlane<'_, Space, C> {
+    space.draw_target(
+        GridMatrix::from_translation([theme::RESOLUTION_G / 2, theme::RESOLUTION_G / 2 - 1, 0])
+            * GridMatrix::FLIP_Y,
+    )
+}
 
-    /// Create the [`Block`] from this builder.
-    pub fn build(self, universe: &mut Universe, label: impl Into<Cow<'static, str>>) -> Block {
-        Block::builder()
-            .display_name(label)
-            .light_emission(if self.active {
-                palette::BUTTON_ACTIVATED_GLOW
-            } else {
-                Rgb::ZERO
-            })
-            .voxels_ref(Self::RESOLUTION, universe.insert_anonymous(self.space))
-            .build()
-    }
+pub(crate) enum ButtonIcon<'a> {
+    Icon(&'a image::DynamicImage),
+    Text(&'a MonoFont<'a>, &'a str),
+}
 
-    /// Returns a [`DrawTarget`] for drawing the button label, with a
-    /// Y-down coordinate system whose origin is centered on the button (or more precisely,
-    /// (0, 0) is the lower-right pixel closest to the center, since e-g uses a convention
-    /// where coordinates identify pixels, not their edges).
-    ///
-    /// Consult the [`ButtonBase`] in use for the appropriate size.
-    ///
-    /// [`DrawTarget`]: all_is_cubes::drawing::embedded_graphics::prelude::DrawTarget
-    pub fn label_draw_target<C: PixelColor>(&mut self) -> DrawingPlane<'_, Space, C> {
-        self.space.draw_target(
-            GridMatrix::from_translation([
-                Self::RESOLUTION_G / 2,
-                Self::RESOLUTION_G / 2 - 1,
-                self.label_z,
-            ]) * GridMatrix::FLIP_Y,
-        )
-    }
+/// TODO: document, refine, and make public
+pub(crate) fn make_button_label_block(
+    universe: &mut Universe,
+    name: &str,
+    icon: ButtonIcon<'_>,
+) -> Result<BlockBuilder<BlockBuilderVoxels>, InGenError> {
+    let mut space = Space::builder(GridAab::from_lower_size(
+        [0, 0, 0],
+        [theme::RESOLUTION_G, theme::RESOLUTION_G, 1],
+    ))
+    .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+    .build();
+    let mut draw_target = draw_target_for_button_label(&mut space);
 
-    /// Draw the given image, centered, as the button label.
-    ///
-    /// Consult the [`ButtonBase`] in use for the appropriate size.
-    pub fn draw_icon(&mut self, icon: &image::DynamicImage) -> Result<(), InGenError> {
-        let id = &ImageAdapter::adapt(icon, default_srgb);
-        EgImage::new(&id, -id.bounding_box().center() - Point::new(1, 1))
-            .draw(&mut self.label_draw_target())?;
-        Ok(())
+    match icon {
+        ButtonIcon::Icon(icon) => {
+            let id = &ImageAdapter::adapt(icon, default_srgb);
+            EgImage::new(&id, -id.bounding_box().center() - Point::new(1, 1))
+                .draw(&mut draw_target)?;
+        }
+        ButtonIcon::Text(font, text) => {
+            Text::with_text_style(
+                text,
+                Point::new(-1, -1),
+                MonoTextStyle::new(
+                    font,
+                    &VoxelBrush::single(Block::from(palette::BUTTON_LABEL)),
+                ),
+                TextStyleBuilder::new()
+                    .baseline(Baseline::Middle)
+                    .alignment(Alignment::Center)
+                    .build(),
+            )
+            .draw(&mut draw_target)?;
+        }
     }
-
-    /// Draw a text label.
-    ///
-    /// Consult the [`ButtonBase`] in use for the appropriate size.
-    #[allow(unused)] // TODO: delete this if we continue to have only icon buttons
-    pub fn draw_text(&mut self, font: &MonoFont<'_>, text: &str) -> Result<(), InGenError> {
-        Text::with_text_style(
-            text,
-            Point::new(-1, -1),
-            MonoTextStyle::new(font, self.label_color),
-            TextStyleBuilder::new()
-                .baseline(Baseline::Middle)
-                .alignment(Alignment::Center)
-                .build(),
-        )
-        .draw(&mut self.label_draw_target())?;
-        Ok(())
-    }
-
-    fn create_space(max_z: GridCoordinate) -> Space {
-        Space::builder(GridAab::from_lower_size(
-            [0, 0, 0],
-            [Self::RESOLUTION_G, Self::RESOLUTION_G, max_z],
-        ))
-        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build()
-    }
+    let space = universe.insert_anonymous(space);
+    Ok(Block::builder()
+        // .animation_hint(Replace)
+        .display_name(name.to_owned())
+        .voxels_ref(theme::RESOLUTION, space))
 }
 
 /// Common constants for button shapes.
@@ -360,6 +378,28 @@ mod theme {
     pub fn rim_lightening(color: Rgba) -> Rgba {
         color.map_rgb(|rgb| rgb * 1.1)
     }
+
+    pub fn create_space(max_z: GridCoordinate) -> Space {
+        Space::builder(GridAab::from_lower_size(
+            [0, 0, 0],
+            [RESOLUTION_G, RESOLUTION_G, max_z],
+        ))
+        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+        .build()
+    }
+
+    /// Build a [`Block`] for [`ButtonBase`].
+    pub fn common_block(space: URef<Space>, active: bool, name: &str) -> Block {
+        Block::builder()
+            .display_name(name.to_string())
+            .light_emission(if active {
+                palette::BUTTON_ACTIVATED_GLOW
+            } else {
+                Rgb::ZERO
+            })
+            .voxels_ref(RESOLUTION, space)
+            .build()
+    }
 }
 
 /// A shape for a button; defining the elements which communicate the type of the button
@@ -367,22 +407,28 @@ mod theme {
 /// toggled on, disabled, etc.), but not the label (symbol indicating what it does or
 /// controls).
 ///
-/// These shapes can then be turned into specific [`Block`]s using
-/// [`ButtonBase::button_builder()`], and used in button widgets like [`ActionButton`]
-/// and [`ToggleButton`].
-pub trait ButtonBase {
-    /// Returns a new [`ButtonBlockBuilder`] which can be used to draw a button label and
-    /// construct a [`Block`].
-    fn button_builder(&self) -> Result<ButtonBlockBuilder, InGenError>;
+/// These shapes are used in button widgets like [`ActionButton`] and [`ToggleButton`].
+pub(crate) trait ButtonBase {
+    /// Constructs the block for this kind of button in this state, without any label.
+    ///
+    /// TODO: switch from `&mut Universe` to transactions
+    fn button_block(&self, universe: &mut Universe) -> Result<Block, InGenError>;
+
+    /// Where within the [`Self::button_block()`] the label should be positioned.
+    ///
+    /// TODO: should be resolution-independent
+    fn button_label_z(&self) -> GridCoordinate;
 }
 
+/// The label drawn onto this button should fit within a 24/32 × 24/32 circle.
 impl ButtonBase for ActionButtonVisualState {
-    /// Returns a new [`ButtonBlockBuilder`] which can be used to construct [`Block`]s
-    /// suitable for [`ActionButton`]s. The label drawn onto this button should fit
-    /// within a 24 × 24 circle.
-    fn button_builder(&self) -> Result<ButtonBlockBuilder, InGenError> {
-        let label_z = theme::UNPRESSED_Z;
-        let back_block = palette::BUTTON_BACK; // TODO: different color theme?
+    fn button_label_z(&self) -> GridCoordinate {
+        theme::UNPRESSED_Z
+    }
+
+    fn button_block(&self, universe: &mut Universe) -> Result<Block, InGenError> {
+        let label_z = self.button_label_z();
+        let back_block = palette::BUTTON_BACK; // TODO: different color theme for action than toggle?
         let frame_brush = VoxelBrush::single(Block::from(palette::BUTTON_FRAME));
         let back_brush = VoxelBrush::with_thickness(back_block, 0..label_z);
         let cap_rim_brush = VoxelBrush::new([(
@@ -399,7 +445,7 @@ impl ButtonBase for ActionButtonVisualState {
             )
         };
 
-        let mut space = ButtonBlockBuilder::create_space(label_z + 1);
+        let mut space = theme::create_space(label_z);
         let draw_target = &mut space.draw_target(
             GridMatrix::from_translation([0, theme::RESOLUTION_G - 1, 0]) * GridMatrix::FLIP_Y,
         );
@@ -424,21 +470,22 @@ impl ButtonBase for ActionButtonVisualState {
             )
             .draw(draw_target)?;
 
-        Ok(ButtonBlockBuilder {
-            space,
-            active: false,
-            label_z,
-            label_color: palette::BUTTON_LABEL,
-        })
+        Ok(theme::common_block(
+            universe.insert_anonymous(space),
+            false,
+            "Action Button",
+        ))
     }
 }
 
+/// The label drawn onto this button should fit within a 24/32 × 24/32 square.
 impl ButtonBase for ToggleButtonVisualState {
-    /// Returns a new [`ButtonBlockBuilder`] which can be used to construct [`Block`]s
-    /// suitable for [`ToggleButton`]s. The label drawn onto this button should fit
-    /// within a 24 × 24 square.
-    fn button_builder(&self) -> Result<ButtonBlockBuilder, InGenError> {
-        let label_z = theme::UNPRESSED_Z;
+    fn button_label_z(&self) -> GridCoordinate {
+        theme::UNPRESSED_Z
+    }
+
+    fn button_block(&self, universe: &mut Universe) -> Result<Block, InGenError> {
+        let label_z = self.button_label_z();
         let active = self.value;
         let back_block = Block::from(if active {
             palette::BUTTON_ACTIVATED_BACK
@@ -468,7 +515,7 @@ impl ButtonBase for ToggleButtonVisualState {
             )
         };
 
-        let mut space = ButtonBlockBuilder::create_space(label_z + 1);
+        let mut space = theme::create_space(label_z);
         let draw_target = &mut space.draw_target(
             GridMatrix::from_translation([0, theme::RESOLUTION_G - 1, 0]) * GridMatrix::FLIP_Y,
         );
@@ -494,15 +541,10 @@ impl ButtonBase for ToggleButtonVisualState {
             )
             .draw(draw_target)?;
 
-        Ok(ButtonBlockBuilder {
-            space,
+        Ok(theme::common_block(
+            universe.insert_anonymous(space),
             active,
-            label_z,
-            label_color: if active {
-                palette::BUTTON_ACTIVATED_LABEL
-            } else {
-                palette::BUTTON_LABEL
-            },
-        })
+            &format!("Toggle Button {self}"),
+        ))
     }
 }

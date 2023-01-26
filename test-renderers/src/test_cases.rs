@@ -15,9 +15,10 @@ use all_is_cubes::cgmath::{EuclideanSpace as _, One, Point2, Point3, Vector2, Ve
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
-    Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, NotNan, Rgb,
+    Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, NotNan,
+    Rgb,
 };
-use all_is_cubes::space::{LightPhysics, Space};
+use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder};
 use all_is_cubes::transaction::Transaction;
 use all_is_cubes::universe::{RefError, URef, Universe, UniverseIndex, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
@@ -372,8 +373,9 @@ async fn icons(mut context: RenderTestContext) {
     use all_is_cubes::inv::Icons;
     use all_is_cubes::linking::{BlockModule, BlockProvider};
     use all_is_cubes_ui::vui::{
+        self,
         blocks::{ToolbarButtonState, UiBlocks},
-        widgets::{ActionButtonVisualState, ToggleButtonVisualState},
+        widgets, Align,
     };
 
     let universe = &mut Universe::new();
@@ -381,7 +383,7 @@ async fn icons(mut context: RenderTestContext) {
         .await
         .install(universe)
         .unwrap();
-    UiBlocks::new(universe, YieldProgress::noop())
+    let ui_blocks_p = UiBlocks::new(universe, YieldProgress::noop())
         .await
         .install(universe)
         .unwrap();
@@ -415,15 +417,49 @@ async fn icons(mut context: RenderTestContext) {
                 ToolbarButtonState::Mapped,
                 ToolbarButtonState::Pressed,
             ]),
-            UiBlocks::BackButton(ActionButtonVisualState::default()),
-            UiBlocks::DebugInfoTextButton(ToggleButtonVisualState::new(false)),
-            UiBlocks::DebugInfoTextButton(ToggleButtonVisualState::new(true)),
-            UiBlocks::DebugLightRaysButton(ToggleButtonVisualState::new(false)),
-            UiBlocks::DebugLightRaysButton(ToggleButtonVisualState::new(true)),
         ],
     );
 
-    let all_blocks: Vec<Block> = icons.chain(ui_blocks).collect();
+    fn block_from_widget(w: vui::WidgetTree) -> Block {
+        let space = w
+            .to_space(
+                SpaceBuilder::default(),
+                Vector3::new(Align::Low, Align::Low, Align::Low),
+            )
+            .unwrap();
+        assert_eq!(space.bounds().size(), GridVector::new(1, 1, 1));
+        space[space.bounds().lower_bounds()].clone()
+    }
+
+    let action_widgets = [UiBlocks::BackButtonLabel].map(|label_key| {
+        block_from_widget(vui::LayoutTree::leaf(widgets::ActionButton::new(
+            ui_blocks_p[label_key].clone(),
+            &ui_blocks_p,
+            || { /* do nothing */ },
+        )))
+    });
+
+    let toggle_widgets = [
+        (UiBlocks::DebugInfoTextButtonLabel, false),
+        (UiBlocks::DebugInfoTextButtonLabel, true),
+        (UiBlocks::DebugLightRaysButtonLabel, false),
+        (UiBlocks::DebugLightRaysButtonLabel, true),
+    ]
+    .map(|(label_key, state)| {
+        block_from_widget(vui::LayoutTree::leaf(widgets::ToggleButton::new(
+            ListenableSource::constant(state),
+            |state| *state,
+            ui_blocks_p[label_key].clone(),
+            &ui_blocks_p,
+            || { /* do nothing */ },
+        )))
+    });
+
+    let all_blocks: Vec<Block> = icons
+        .chain(ui_blocks)
+        .chain(action_widgets)
+        .chain(toggle_widgets)
+        .collect();
 
     // Compute layout
     let count = all_blocks.len() as GridCoordinate;

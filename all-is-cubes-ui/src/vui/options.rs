@@ -4,7 +4,7 @@ use all_is_cubes::camera::{AntialiasingOption, GraphicsOptions};
 
 use crate::apps::ControlMessage;
 use crate::vui::hud::HudInputs;
-use crate::vui::widgets::{self, ToggleButtonVisualState};
+use crate::vui::widgets;
 use crate::vui::{LayoutTree, UiBlocks, Widget, WidgetTree};
 
 pub(crate) fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree> {
@@ -13,7 +13,8 @@ pub(crate) fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree
         w.push(LayoutTree::leaf(widgets::ToggleButton::new(
             hud_inputs.fullscreen_mode.clone(),
             |opt_value| opt_value.unwrap_or(false),
-            |state| hud_inputs.hud_blocks.blocks[UiBlocks::FullscreenButton(state)].clone(),
+            hud_inputs.hud_blocks.blocks[UiBlocks::FullscreenButtonLabel].clone(),
+            &hud_inputs.hud_blocks.blocks,
             {
                 let cell = hud_inputs.fullscreen_mode.clone();
                 move || {
@@ -28,7 +29,7 @@ pub(crate) fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree
         // is just conditional on the renderer type, there's no reason to select IfCheap.
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,
-            UiBlocks::AntialiasButton,
+            UiBlocks::AntialiasButtonLabel,
             |g| g.antialiasing != AntialiasingOption::None,
             |g, _v| {
                 g.antialiasing = match g.antialiasing {
@@ -41,31 +42,31 @@ pub(crate) fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree
         )),
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,
-            UiBlocks::DebugInfoTextButton,
+            UiBlocks::DebugInfoTextButtonLabel,
             |g| g.debug_info_text,
             |g, v| g.debug_info_text = v,
         )),
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,
-            UiBlocks::DebugBehaviorsButton,
+            UiBlocks::DebugBehaviorsButtonLabel,
             |g| g.debug_behaviors,
             |g, v| g.debug_behaviors = v,
         )),
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,
-            UiBlocks::DebugChunkBoxesButton,
+            UiBlocks::DebugChunkBoxesButtonLabel,
             |g| g.debug_chunk_boxes,
             |g, v| g.debug_chunk_boxes = v,
         )),
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,
-            UiBlocks::DebugCollisionBoxesButton,
+            UiBlocks::DebugCollisionBoxesButtonLabel,
             |g| g.debug_collision_boxes,
             |g, v| g.debug_collision_boxes = v,
         )),
         LayoutTree::leaf(graphics_toggle_button(
             hud_inputs,
-            UiBlocks::DebugLightRaysButton,
+            UiBlocks::DebugLightRaysButtonLabel,
             |g| g.debug_light_rays_at_cursor,
             |g, v| g.debug_light_rays_at_cursor = v,
         )),
@@ -76,14 +77,15 @@ pub(crate) fn graphics_options_widgets(hud_inputs: &HudInputs) -> Vec<WidgetTree
 /// Generate a button that toggles a boolean graphics option.
 fn graphics_toggle_button(
     hud_inputs: &HudInputs,
-    icon_ctor: fn(ToggleButtonVisualState) -> UiBlocks,
+    icon_key: UiBlocks,
     getter: fn(&GraphicsOptions) -> bool,
     setter: fn(&mut GraphicsOptions, bool),
 ) -> Arc<dyn Widget> {
     widgets::ToggleButton::new(
         hud_inputs.graphics_options.clone(),
         getter,
-        |state| hud_inputs.hud_blocks.blocks[icon_ctor(state)].clone(),
+        hud_inputs.hud_blocks.blocks[icon_key].clone(),
+        &hud_inputs.hud_blocks.blocks,
         {
             let cc = hud_inputs.app_control_channel.clone();
             move || {
@@ -103,7 +105,8 @@ pub(crate) fn pause_toggle_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
     widgets::ToggleButton::new(
         hud_inputs.paused.clone(),
         |&value| value,
-        |state| hud_inputs.hud_blocks.blocks[UiBlocks::PauseButton(state)].clone(),
+        hud_inputs.hud_blocks.blocks[UiBlocks::PauseButtonLabel].clone(),
+        &hud_inputs.hud_blocks.blocks,
         {
             let cc = hud_inputs.app_control_channel.clone();
             move || {

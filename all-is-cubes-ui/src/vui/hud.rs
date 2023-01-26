@@ -91,7 +91,8 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
             LayoutTree::leaf(widgets::ToggleButton::new(
                 hud_inputs.page_state.clone(),
                 |page_state| matches!(page_state, VuiPageState::AboutText),
-                |state| hud_inputs.hud_blocks.blocks[UiBlocks::AboutButton(state)].clone(),
+                hud_inputs.hud_blocks.blocks[UiBlocks::AboutButtonLabel].clone(),
+                &hud_inputs.hud_blocks.blocks,
                 {
                     let cc = hud_inputs.vui_control_channel.clone();
                     move || {
@@ -103,7 +104,8 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
             LayoutTree::leaf(widgets::ToggleButton::new(
                 hud_inputs.mouselook_mode.clone(),
                 |&value| value,
-                |state| hud_inputs.hud_blocks.blocks[UiBlocks::MouselookButton(state)].clone(),
+                hud_inputs.hud_blocks.blocks[UiBlocks::MouselookButtonLabel].clone(),
+                &hud_inputs.hud_blocks.blocks,
                 {
                     let cc = hud_inputs.app_control_channel.clone();
                     move || {

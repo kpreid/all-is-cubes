@@ -16,7 +16,12 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{include_image, rgba_const};
 
-use crate::vui::widgets::{ActionButtonVisualState, ButtonBase, ToggleButtonVisualState};
+#[cfg(doc)]
+use crate::vui::widgets;
+use crate::vui::widgets::{
+    make_button_label_block, ActionButtonVisualState, ButtonBase, ButtonIcon,
+    ToggleButtonVisualState,
+};
 
 /// Blocks that are used within the VUI, only.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
@@ -34,20 +39,26 @@ pub enum UiBlocks {
     /// Each array element is the relationship of this toolbar item to that button index.
     ToolbarPointer([ToolbarButtonState; TOOL_SELECTIONS]),
 
-    /// Action button for navigating “back” in the user interface (closing dialogs, etc).
-    BackButton(ActionButtonVisualState),
+    // TODO: consider moving these to a separate "WidgetTheme" enum to shift the complexity
+    /// Appearance of a [`widgets::ActionButton`] without label.
+    ActionButton(ActionButtonVisualState),
+    /// Appearance of a [`widgets::ToggleButton`] without label.
+    ToggleButton(ToggleButtonVisualState),
 
-    // TODO: Should we do a `Button(ButtonLabel, ToggleButtonVisualState)` variant instead?
-    AboutButton(ToggleButtonVisualState),
-    PauseButton(ToggleButtonVisualState),
-    MouselookButton(ToggleButtonVisualState),
-    FullscreenButton(ToggleButtonVisualState),
-    AntialiasButton(ToggleButtonVisualState),
-    DebugInfoTextButton(ToggleButtonVisualState),
-    DebugBehaviorsButton(ToggleButtonVisualState),
-    DebugChunkBoxesButton(ToggleButtonVisualState),
-    DebugCollisionBoxesButton(ToggleButtonVisualState),
-    DebugLightRaysButton(ToggleButtonVisualState),
+    /// Label of the action button for navigating “back” in the user interface (closing
+    /// dialogs, etc).
+    BackButtonLabel,
+
+    AboutButtonLabel,
+    PauseButtonLabel,
+    MouselookButtonLabel,
+    FullscreenButtonLabel,
+    AntialiasButtonLabel,
+    DebugInfoTextButtonLabel,
+    DebugBehaviorsButtonLabel,
+    DebugChunkBoxesButtonLabel,
+    DebugCollisionBoxesButtonLabel,
+    DebugLightRaysButtonLabel,
 }
 
 impl BlockModule for UiBlocks {
@@ -64,21 +75,23 @@ impl fmt::Display for UiBlocks {
             UiBlocks::ToolbarPointer([b0, b1, b2]) => {
                 write!(f, "toolbar-pointer/{b0}-{b1}-{b2}")
             }
-            UiBlocks::BackButton(state) => write!(f, "back-button/{state}"),
-            UiBlocks::AboutButton(state) => write!(f, "about-button/{state}"),
-            UiBlocks::PauseButton(state) => write!(f, "pause-button/{state}"),
-            UiBlocks::MouselookButton(state) => write!(f, "mouselook-button/{state}"),
-            UiBlocks::FullscreenButton(state) => write!(f, "fullscreen-button/{state}"),
-            UiBlocks::AntialiasButton(state) => write!(f, "antialias-button/{state}"),
-            UiBlocks::DebugInfoTextButton(state) => write!(f, "debug-info-text-button/{state}"),
-            UiBlocks::DebugBehaviorsButton(state) => write!(f, "debug-behaviors-button/{state}"),
-            UiBlocks::DebugChunkBoxesButton(state) => {
-                write!(f, "debug-chunk-boxes-button/{state}")
+            UiBlocks::ActionButton(state) => write!(f, "action-button/{state}"),
+            UiBlocks::ToggleButton(state) => write!(f, "toggle-button/{state}"),
+            UiBlocks::BackButtonLabel => write!(f, "back-button"),
+            UiBlocks::AboutButtonLabel => write!(f, "about-button"),
+            UiBlocks::PauseButtonLabel => write!(f, "pause-button"),
+            UiBlocks::MouselookButtonLabel => write!(f, "mouselook-button"),
+            UiBlocks::FullscreenButtonLabel => write!(f, "fullscreen-button"),
+            UiBlocks::AntialiasButtonLabel => write!(f, "antialias-button"),
+            UiBlocks::DebugInfoTextButtonLabel => write!(f, "debug-info-text-button"),
+            UiBlocks::DebugBehaviorsButtonLabel => write!(f, "debug-behaviors-button"),
+            UiBlocks::DebugChunkBoxesButtonLabel => {
+                write!(f, "debug-chunk-boxes-button")
             }
-            UiBlocks::DebugCollisionBoxesButton(state) => {
-                write!(f, "debug-collision-boxes-button/{state}")
+            UiBlocks::DebugCollisionBoxesButtonLabel => {
+                write!(f, "debug-collision-boxes-button")
             }
-            UiBlocks::DebugLightRaysButton(state) => write!(f, "debug-light-rays-button/{state}"),
+            UiBlocks::DebugLightRaysButtonLabel => write!(f, "debug-light-rays-button"),
         }
     }
 }
@@ -138,74 +151,85 @@ impl UiBlocks {
                     )
                     .build(),
 
-                UiBlocks::BackButton(state) => {
-                    let mut button_builder = state.button_builder()?;
-                    button_builder.draw_icon(include_image!("icons/button-back.png"))?;
-                    button_builder.build(universe, "Back")
-                }
+                UiBlocks::ActionButton(state) => state.button_block(universe)?,
+                UiBlocks::ToggleButton(state) => state.button_block(universe)?,
 
-                UiBlocks::AboutButton(state) => {
-                    let mut button_builder = state.button_builder()?;
-                    button_builder.draw_text(&font::FONT_10X20, "?")?;
-                    button_builder.build(universe, "About")
-                }
+                UiBlocks::BackButtonLabel => make_button_label_block(
+                    universe,
+                    "Back",
+                    ButtonIcon::Icon(include_image!("icons/button-back.png")),
+                )?
+                .build(),
 
-                UiBlocks::PauseButton(state) => {
-                    let mut button_builder = state.button_builder()?;
-                    button_builder.draw_icon(include_image!("icons/button-pause.png"))?;
-                    button_builder.build(universe, "Pause")
-                }
+                UiBlocks::AboutButtonLabel => make_button_label_block(
+                    universe,
+                    "About",
+                    ButtonIcon::Text(&font::FONT_10X20, "?"),
+                )?
+                .build(),
 
-                UiBlocks::MouselookButton(state) => {
-                    let mut button_builder = state.button_builder()?;
-                    button_builder.draw_icon(include_image!("icons/button-mouselook.png"))?;
-                    button_builder.build(universe, "Mouselook")
-                }
+                UiBlocks::PauseButtonLabel => make_button_label_block(
+                    universe,
+                    "Back",
+                    ButtonIcon::Icon(include_image!("icons/button-pause.png")),
+                )?
+                .build(),
 
-                UiBlocks::FullscreenButton(state) => {
-                    let mut button_builder = state.button_builder()?;
-                    button_builder.draw_icon(include_image!("icons/button-fullscreen.png"))?;
-                    button_builder.build(universe, "Mouselook")
-                }
+                UiBlocks::MouselookButtonLabel => make_button_label_block(
+                    universe,
+                    "Mouselook",
+                    ButtonIcon::Icon(include_image!("icons/button-mouselook.png")),
+                )?
+                .build(),
 
-                UiBlocks::AntialiasButton(state) => {
-                    let mut button_builder = state.button_builder()?;
-                    button_builder.draw_icon(include_image!("icons/button-antialias.png"))?;
-                    button_builder.build(universe, "Antialiasing")
-                }
+                UiBlocks::FullscreenButtonLabel => make_button_label_block(
+                    universe,
+                    "Fullscreen",
+                    ButtonIcon::Icon(include_image!("icons/button-fullscreen.png")),
+                )?
+                .build(),
 
-                UiBlocks::DebugInfoTextButton(state) => {
-                    let mut button_builder = state.button_builder()?;
-                    button_builder.draw_icon(include_image!("icons/button-debug-info-text.png"))?;
-                    button_builder.build(universe, "Debug: Info Text")
-                }
+                UiBlocks::AntialiasButtonLabel => make_button_label_block(
+                    universe,
+                    "Antialiasing",
+                    ButtonIcon::Icon(include_image!("icons/button-antialias.png")),
+                )?
+                .build(),
 
-                UiBlocks::DebugChunkBoxesButton(state) => {
-                    let mut button_builder = state.button_builder()?;
-                    button_builder
-                        .draw_icon(include_image!("icons/button-debug-chunk-boxes.png"))?;
-                    button_builder.build(universe, "Debug: Chunk Boxes")
-                }
+                UiBlocks::DebugInfoTextButtonLabel => make_button_label_block(
+                    universe,
+                    "Debug: Info Text",
+                    ButtonIcon::Icon(include_image!("icons/button-debug-info-text.png")),
+                )?
+                .build(),
 
-                UiBlocks::DebugBehaviorsButton(state) => {
-                    let mut button_builder = state.button_builder()?;
-                    button_builder.draw_icon(include_image!("icons/button-debug-behaviors.png"))?;
-                    button_builder.build(universe, "Debug: Behaviors")
-                }
+                UiBlocks::DebugChunkBoxesButtonLabel => make_button_label_block(
+                    universe,
+                    "Debug: Chunk Boxes",
+                    ButtonIcon::Icon(include_image!("icons/button-debug-chunk-boxes.png")),
+                )?
+                .build(),
 
-                UiBlocks::DebugCollisionBoxesButton(state) => {
-                    let mut button_builder = state.button_builder()?;
-                    button_builder
-                        .draw_icon(include_image!("icons/button-debug-collision-boxes.png"))?;
-                    button_builder.build(universe, "Debug: Collision Boxes")
-                }
+                UiBlocks::DebugBehaviorsButtonLabel => make_button_label_block(
+                    universe,
+                    "Debug: Behaviors",
+                    ButtonIcon::Icon(include_image!("icons/button-debug-behaviors.png")),
+                )?
+                .build(),
 
-                UiBlocks::DebugLightRaysButton(state) => {
-                    let mut button_builder = state.button_builder()?;
-                    button_builder
-                        .draw_icon(include_image!("icons/button-debug-light-rays.png"))?;
-                    button_builder.build(universe, "Debug: Light Rays at Cursor")
-                }
+                UiBlocks::DebugCollisionBoxesButtonLabel => make_button_label_block(
+                    universe,
+                    "Debug: Collision Boxes",
+                    ButtonIcon::Icon(include_image!("icons/button-debug-collision-boxes.png")),
+                )?
+                .build(),
+
+                UiBlocks::DebugLightRaysButtonLabel => make_button_label_block(
+                    universe,
+                    "Debug: Light Rays at Cursor",
+                    ButtonIcon::Icon(include_image!("icons/button-debug-light-rays.png")),
+                )?
+                .build(),
             })
         })
         .await

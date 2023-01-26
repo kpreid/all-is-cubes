@@ -34,7 +34,14 @@ pub struct Move {
 }
 
 impl Move {
-    // TODO: add general constructor
+    /// TODO: make a cleaner, less internals-ish constructor
+    pub fn new(direction: Face6, distance: u16, velocity: i16) -> Self {
+        Self {
+            direction,
+            distance,
+            velocity,
+        }
+    }
 
     /// Create a pair of [`Modifier::Move`]s to displace a block.
     /// The first goes on the block being moved and the second on the air

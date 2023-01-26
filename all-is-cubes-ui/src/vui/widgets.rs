@@ -48,7 +48,8 @@ pub(crate) fn back_button(hud_inputs: &vui::HudInputs) -> vui::WidgetTree {
     // TODO: define a narrower set of inputs than HudInputs
     // TODO: this function should maybe live in a 'UI mid-level components' module?
     vui::LayoutTree::leaf(ActionButton::new(
-        |state| hud_inputs.hud_blocks.blocks[vui::UiBlocks::BackButton(state)].clone(),
+        hud_inputs.hud_blocks.blocks[vui::UiBlocks::BackButtonLabel].clone(),
+        &hud_inputs.hud_blocks.blocks,
         {
             let cc = hud_inputs.vui_control_channel.clone();
             move || {
