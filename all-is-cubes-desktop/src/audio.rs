@@ -1,3 +1,4 @@
+use std::f32::consts::PI;
 use std::fmt;
 use std::sync::{atomic, mpsc};
 
@@ -78,20 +79,46 @@ fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: Aud
 
         settings: kira::sound::static_sound::StaticSoundSettings::default(),
     };
+    let thump = StaticSoundData {
+        sample_rate: 44100,
+        frames: (0..440)
+            .map(|i| {
+                let envelope = ((i as f32 / 440. * PI).sin() + 1.0) / 2.0;
+                let wave = (i as f32 / 44.1 * 0.25).sin() * envelope;
+                kira::dsp::Frame {
+                    left: wave,
+                    right: wave,
+                }
+            })
+            .collect(),
+
+        settings: kira::sound::static_sound::StaticSoundSettings::default(),
+    };
 
     while let Ok(message) = receiver.recv() {
         match message {
-            AudioCommand::Fluff(Fluff::Beep) => play_fluff(&mut manager, &beep),
-            AudioCommand::Fluff(Fluff::Happened | Fluff::PlaceBlockGeneric) => {
-                play_fluff(&mut manager, &happened)
-            }
-            AudioCommand::Fluff(f) => log::debug!("No known sound for Fluff value: {f:?}"),
+            AudioCommand::Fluff(fluff) => match fluff {
+                Fluff::Beep => play_fluff(&mut manager, beep.clone()),
+                Fluff::Happened | Fluff::PlaceBlockGeneric => {
+                    play_fluff(&mut manager, happened.clone())
+                }
+                Fluff::BlockImpact { velocity, .. } => {
+                    let velocity = f64::from(velocity.into_inner());
+
+                    let volume = (velocity * 0.01).clamp(0.0, 1.0);
+
+                    let mut sound = thump.clone();
+                    sound.settings.volume = kira::Volume::Amplitude(volume).into();
+                    play_fluff(&mut manager, sound)
+                }
+                f => log::debug!("No known sound for Fluff value: {f:?}"),
+            },
         }
     }
 }
 
-fn play_fluff(manager: &mut AudioManager, sound: &StaticSoundData) {
-    match manager.play(sound.clone()) {
+fn play_fluff(manager: &mut AudioManager, sound: StaticSoundData) {
+    match manager.play(sound) {
         Ok(_handle) => {}
         Err(PlaySoundError::SoundLimitReached) => {
             // Ignore this, since fluff is inconsequential

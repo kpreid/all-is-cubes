@@ -1,5 +1,7 @@
 //! Momentary decorative effects produced by the game world, such as sound and particles.
 
+use ordered_float::NotNan;
+
 /// Momentary decorative effects produced by the game world, such as sound and particles.
 ///
 /// Each [`Fluff`] value represents the beginning of such an effect. It does not specify
@@ -20,4 +22,11 @@ pub enum Fluff {
     /// Sound and visual effect from a block having been placed in the game world
     /// by player action, without any more specific overriding styling.
     PlaceBlockGeneric,
+
+    /// Collision between a block and a moving object.
+    #[non_exhaustive]
+    BlockImpact {
+        /// Closing velocity in m/s.
+        velocity: NotNan<f32>,
+    },
 }

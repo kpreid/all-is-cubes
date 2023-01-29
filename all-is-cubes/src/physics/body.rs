@@ -14,6 +14,7 @@ use super::collision::{
     aab_raycast, collide_along_ray, escape_along_ray, find_colliding_cubes, nudge_on_ray, Contact,
 };
 use crate::block::{BlockCollision, Resolution};
+use crate::fluff::Fluff;
 #[cfg(not(feature = "std"))]
 use crate::math::Euclid as _;
 use crate::math::{Aab, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry as _, VectorOps};
@@ -147,6 +148,7 @@ impl Body {
     {
         self.step_with_rerun(
             tick,
+            Vector3D::zero(),
             colliding_space,
             collision_callback,
             #[cfg(feature = "rerun")]
@@ -166,6 +168,7 @@ impl Body {
     pub(crate) fn step_with_rerun<CC>(
         &mut self,
         tick: Tick,
+        external_delta_v: Vector3D<FreeCoordinate, Velocity>,
         mut colliding_space: Option<&Space>,
         mut collision_callback: CC,
         #[cfg(feature = "rerun")] rerun_destination: &crate::rerun_glue::Destination,
@@ -173,12 +176,15 @@ impl Body {
     where
         CC: FnMut(Contact),
     {
+        let velocity_before_gravity_and_collision = self.velocity;
         let dt = tick.delta_t().as_secs_f64();
         let mut move_segments = [MoveSegment::default(); 3];
         let mut move_segment_index = 0;
         let mut already_colliding = None;
         #[cfg(feature = "rerun")]
         let mut contact_accum: Vec<Contact> = Vec::new();
+
+        self.velocity += external_delta_v;
 
         if self.noclip {
             colliding_space = None;
@@ -201,6 +207,7 @@ impl Body {
                 already_colliding,
                 push_out: None,
                 move_segments,
+                delta_v: Vector3D::zero(),
             };
         }
 
@@ -227,6 +234,7 @@ impl Body {
                 already_colliding,
                 push_out: push_out_info,
                 move_segments,
+                delta_v: self.velocity - velocity_before_gravity_and_collision,
             };
         } else if velocity_magnitude_squared > VELOCITY_MAGNITUDE_LIMIT_SQUARED {
             self.velocity *= VELOCITY_MAGNITUDE_LIMIT / velocity_magnitude_squared.sqrt();
@@ -389,6 +397,7 @@ impl Body {
             already_colliding,
             push_out: push_out_info,
             move_segments,
+            delta_v: self.velocity - velocity_before_gravity_and_collision,
         }
     }
 
@@ -597,6 +606,9 @@ pub struct BodyStepInfo {
     /// Details on movement and collision. A single frame's movement may have up to three
     /// segments as differently oriented faces are collided with.
     pub move_segments: [MoveSegment; 3],
+
+    /// Change in velocity during this step.
+    pub(crate) delta_v: Vector3D<f64, Velocity>,
 }
 
 impl Fmt<ConciseDebug> for BodyStepInfo {
@@ -606,7 +618,22 @@ impl Fmt<ConciseDebug> for BodyStepInfo {
             .field("already_colliding", &self.already_colliding)
             .field("push_out", &self.push_out.as_ref().map(|v| v.refmt(fopt)))
             .field("move_segments", &self.move_segments.refmt(fopt))
+            .field("delta_v", &self.delta_v)
             .finish()
+    }
+}
+
+impl BodyStepInfo {
+    pub(crate) fn impact_fluff(&self) -> Option<Fluff> {
+        let velocity = self.delta_v.length();
+        // don't emit anything for slow change or movement in the air
+        if velocity >= 0.25 && self.move_segments.iter().any(|s| s.stopped_by.is_some()) {
+            Some(Fluff::BlockImpact {
+                velocity: NotNan::new(velocity as f32).ok()?,
+            })
+        } else {
+            None
+        }
     }
 }
 

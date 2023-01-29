@@ -23,7 +23,7 @@ use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};
 use crate::raycast::Ray;
 #[cfg(feature = "save")]
 use crate::save::schema;
-use crate::space::Space;
+use crate::space::{Space, SpaceTransaction};
 use crate::time::Tick;
 use crate::transaction::{
     self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
@@ -316,7 +316,7 @@ impl Character {
             Vector3D::new(10.8, 0., 10.8)
         }; // TODO constants/tables...
 
-        self.body.velocity += (velocity_target - self.body.velocity).component_mul(stiffness) * dt;
+        let control_delta_v = (velocity_target - self.body.velocity).component_mul(stiffness) * dt;
 
         let body_step_info = if let Ok(space) = self.space.read() {
             self.update_exposure(&space, dt);
@@ -325,6 +325,7 @@ impl Character {
             colliding_cubes.clear();
             let info = self.body.step_with_rerun(
                 tick,
+                control_delta_v,
                 Some(&*space),
                 |cube| {
                     colliding_cubes.insert(cube);
@@ -332,10 +333,23 @@ impl Character {
                 #[cfg(feature = "rerun")]
                 &self.rerun_destination,
             );
+
             if let Some(push_out_displacement) = info.push_out {
                 // Smooth out camera effect of push-outs
                 self.eye_displacement_pos -= push_out_displacement;
             }
+
+            if let Some(txn) = info.impact_fluff().and_then(|fluff| {
+                Some(SpaceTransaction::fluff(
+                    Cube::containing(self.body.position)?,
+                    fluff,
+                ))
+            }) {
+                result_transaction = result_transaction
+                    .merge(txn.bind(self.space.clone()))
+                    .unwrap(); // cannot fail
+            }
+
             Some(info)
         } else {
             // TODO: set a warning flag
