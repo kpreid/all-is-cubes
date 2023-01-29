@@ -7,7 +7,7 @@ use crate::inv::{InventoryTransaction, Tool};
 use crate::math::Rgba;
 use crate::space::Space;
 use crate::time::Tick;
-use crate::transaction::Transaction;
+use crate::transaction::{self, Transaction};
 use crate::universe::{
     list_refs, InsertError, InsertErrorKind, Name, RefError, URef, Universe, UniverseIndex,
     UniverseTransaction,
@@ -81,10 +81,16 @@ fn insert_anonymous_makes_distinct_names() {
     let ref_a = u.insert_anonymous(BlockDef::new(AIR));
     let ref_b = u.insert_anonymous(BlockDef::new(AIR));
     ref_a
-        .execute(&BlockDefTransaction::overwrite(block_0))
+        .execute(
+            &BlockDefTransaction::overwrite(block_0),
+            &mut transaction::no_outputs,
+        )
         .unwrap();
     ref_b
-        .execute(&BlockDefTransaction::overwrite(block_1))
+        .execute(
+            &BlockDefTransaction::overwrite(block_1),
+            &mut transaction::no_outputs,
+        )
         .unwrap();
     assert_ne!(ref_a, ref_b, "not equal");
     assert_ne!(
@@ -128,7 +134,7 @@ fn insert_duplicate_name_via_txn() {
         "test_thing".into(),
         Space::empty_positive(1, 1, 1),
     ))
-    .execute(&mut u)
+    .execute(&mut u, &mut transaction::no_outputs)
     .unwrap_err();
     // not a great assertion but it'll do
     assert_eq!(
@@ -154,7 +160,7 @@ fn insert_anonym_prohibited_via_txn() {
         Name::Anonym(0),
         Space::empty_positive(1, 1, 1),
     ))
-    .execute(&mut Universe::new())
+    .execute(&mut Universe::new(), &mut drop)
     .unwrap_err();
     // TODO: structured transaction errors
     assert_eq!(
@@ -174,7 +180,7 @@ fn insert_pending_becomes_anonym_direct() {
 fn insert_pending_becomes_anonym_via_txn() {
     let mut u = Universe::new();
     UniverseTransaction::insert(URef::new_pending(Name::Pending, BlockDef::new(AIR)))
-        .execute(&mut u)
+        .execute(&mut u, &mut drop)
         .unwrap();
     assert_eq!(u.blocks.keys().collect::<Vec<_>>(), vec![&Name::Anonym(0)]);
 }
@@ -191,7 +197,7 @@ fn delete_success() {
     let _ = ref_1.read().unwrap();
 
     UniverseTransaction::delete(ref_1.clone())
-        .execute(&mut u)
+        .execute(&mut u, &mut drop)
         .unwrap();
     assert_eq!(
         ref_1
@@ -219,7 +225,7 @@ fn delete_anonymous_fails() {
     let mut u = Universe::new();
     let anon = u.insert_anonymous(BlockDef::new(AIR));
     UniverseTransaction::delete(anon)
-        .execute(&mut u)
+        .execute(&mut u, &mut drop)
         .unwrap_err();
 }
 
@@ -233,9 +239,9 @@ fn delete_twice_fails() {
     let txn = UniverseTransaction::delete(uref);
 
     // Deletion should succeed...
-    txn.execute(&mut u).unwrap();
+    txn.execute(&mut u, &mut drop).unwrap();
     // ...but not trying to delete the same thing again.
-    txn.execute(&mut u).unwrap_err();
+    txn.execute(&mut u, &mut drop).unwrap_err();
 }
 
 #[test]
@@ -248,7 +254,7 @@ fn delete_wrong_universe_fails() {
 
     let txn = UniverseTransaction::delete(uref);
 
-    txn.execute(&mut u2).unwrap_err();
+    txn.execute(&mut u2, &mut drop).unwrap_err();
 }
 
 #[test]
@@ -313,7 +319,7 @@ fn visit_refs_character() {
     CharacterTransaction::inventory(InventoryTransaction::insert([Tool::Block(
         Block::from_primitive(Primitive::Indirect(block_ref)),
     )]))
-    .execute(&mut character)
+    .execute(&mut character, &mut drop)
     .unwrap();
 
     assert_eq!(list_refs(&character), vec!["space".into(), "block".into()]);

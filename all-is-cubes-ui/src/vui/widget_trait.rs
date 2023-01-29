@@ -257,7 +257,8 @@ pub(crate) fn instantiate_widget<W: Widget + 'static>(
     let mut space = Space::builder(grant.bounds).build();
     let txn = vui::install_widgets(grant, &vui::LayoutTree::leaf(Arc::new(widget)))
         .expect("widget instantiation");
-    txn.execute(&mut space).expect("widget transaction");
+    txn.execute(&mut space, &mut transaction::no_outputs)
+        .expect("widget transaction");
     (txn.bounds_only_cubes(), space)
 }
 

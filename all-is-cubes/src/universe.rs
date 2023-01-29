@@ -207,7 +207,7 @@ impl Universe {
 
         // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
         for t in transactions {
-            if let Err(e) = t.execute(self) {
+            if let Err(e) = t.execute(self, &mut drop) {
                 // TODO: Need to report these failures back to the source
                 // ... and perhaps in the UniverseStepInfo
                 log::info!("Transaction failure: {}", e);

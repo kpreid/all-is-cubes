@@ -19,7 +19,7 @@ use all_is_cubes::math::{
     Rgb,
 };
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder};
-use all_is_cubes::transaction::Transaction;
+use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{RefError, URef, Universe, UniverseIndex, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{notnan, rgb_const, rgba_const};
@@ -219,7 +219,7 @@ async fn error_character_gone(context: RenderTestContext) {
 
     let character_ref: URef<Character> = universe.get(&"character".into()).unwrap();
     UniverseTransaction::delete(character_ref)
-        .execute(&mut universe)
+        .execute(&mut universe, &mut transaction::no_outputs)
         .unwrap();
     drop(universe); // shouldn't make a difference but hey
 

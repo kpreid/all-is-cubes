@@ -39,7 +39,8 @@ pub trait Transaction<T: ?Sized>: Merge {
     /// call `commit` without `check`.
     type CommitCheck: 'static;
 
-    /// The result of a [`Transaction::commit()`] or [`Transaction::execute()`].
+    /// The results of a [`Transaction::commit()`] or [`Transaction::execute()`].
+    /// Each commit may produce any number of these messages.
     ///
     /// The [`Transaction`] trait imposes no requirements on this value, but it may be
     /// a change-notification message which could be redistributed via the target's
@@ -59,35 +60,44 @@ pub trait Transaction<T: ?Sized>: Merge {
     /// Returns [`Ok`] if the transaction completed normally, and [`Err`] if there was a
     /// problem which was not detected as a precondition; in this case the transaction may
     /// have been partially applied, since that problem was detected too late, by
-    /// definition.
+    /// definition. No [`Err`]s should be seen unless there is a bug.
+    ///
+    /// The `outputs` callback function is called to produce information resulting from
+    /// the transaction; what that information is is up to the individual transaction type.
     ///
     /// The target should not be mutated between the call to [`Transaction::check`] and
     /// [`Transaction::commit`] (including via interior mutability, however that applies
     /// to the particular `T`). The consequences of doing so may include mutating the
     /// wrong components, signaling an error partway through the transaction, or merely
     /// committing the transaction while its preconditions do not hold.
-    fn commit(&self, target: &mut T, check: Self::CommitCheck)
-        -> Result<Self::Output, CommitError>;
+    fn commit(
+        &self,
+        target: &mut T,
+        check: Self::CommitCheck,
+        outputs: &mut dyn FnMut(Self::Output),
+    ) -> Result<(), CommitError>;
 
     /// Convenience method to execute a transaction in one step. Implementations should not
     /// need to override this. Equivalent to:
     ///
     /// ```rust
-    /// # use all_is_cubes::transaction::Transaction;
+    /// # use all_is_cubes::transaction::{Transaction, no_outputs};
     /// # use all_is_cubes::universe::{Universe, UniverseTransaction};
     /// # let transaction = UniverseTransaction::default();
     /// # let target = &mut Universe::new();
+    /// # let outputs = &mut no_outputs;
     /// let check = transaction.check(target)?;
-    /// # let _output: () =
-    /// transaction.commit(target, check)?
-    /// # ;
+    /// transaction.commit(target, check, outputs)?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    ///
-    /// TODO: this should have an error type which distinguishes precondition from unexpected errors
-    fn execute(&self, target: &mut T) -> Result<Self::Output, ExecuteError> {
+    fn execute(
+        &self,
+        target: &mut T,
+        outputs: &mut dyn FnMut(Self::Output),
+    ) -> Result<(), ExecuteError> {
         let check = self.check(target).map_err(ExecuteError::Check)?;
-        self.commit(target, check).map_err(ExecuteError::Commit)
+        self.commit(target, check, outputs)
+            .map_err(ExecuteError::Commit)
     }
 
     /// Specify the target of this transaction as a [`URef`], and erase its type,
@@ -261,3 +271,10 @@ pub trait Transactional {
     /// The type of transaction which should be used with `Self`.
     type Transaction: Transaction<Self>;
 }
+
+/// Type of `Output` for a [`Transaction`] that never produces any outputs.
+pub type NoOutput = std::convert::Infallible; // TODO: use `!` never type if it stabilizes
+
+/// Output callback function for committing a [`Transaction`] whose `Output` type is
+/// [`NoOutput`] and therefore cannot produce any outputs.
+pub fn no_outputs(_: NoOutput) {}

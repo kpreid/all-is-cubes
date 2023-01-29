@@ -37,7 +37,7 @@ use all_is_cubes::math::{
     GridVector, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
-use all_is_cubes::transaction::Transaction as _;
+use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::{include_image, rgb_const, rgba_const};
 
@@ -349,7 +349,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
                     .clone()
             }),
         )
-        .execute(&mut block_space)?;
+        .execute(&mut block_space, &mut transaction::no_outputs)?;
         Block::builder()
             .animation_hint(AnimationHint::CONTINUOUS)
             .collision(BlockCollision::Recur)
@@ -368,7 +368,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
                 let mut space = Space::for_block(fire_resolution).build();
                 space.set([0, 0, 0], Rgb::ONE)?; // placeholder for not fully transparent so first pass lighting is better
                 SpaceTransaction::add_behavior(fire_bounds, Fire::new(fire_bounds))
-                    .execute(&mut space)
+                    .execute(&mut space, &mut transaction::no_outputs)
                     .unwrap();
                 universe.insert_anonymous(space)
             })
@@ -876,7 +876,7 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
         Some(corner.rotate(GridRotation::RxYz)),
     )
     .create_box(interior.expand(FaceMap::repeat(1)))
-    .execute(&mut space)?;
+    .execute(&mut space, &mut transaction::no_outputs)?;
 
     // Vertical separators
     space.fill_uniform(
@@ -1023,15 +1023,15 @@ async fn DASHED_BOXES(_: &Exhibit, universe: &mut Universe) {
     // Unit sized box
     style
         .create_box(GridAab::from_lower_size([0, 0, 1], [1, 1, 1]))
-        .execute(&mut space)?;
+        .execute(&mut space, &mut transaction::no_outputs)?;
     // Tall box
     style
         .create_box(GridAab::from_lower_size([2, 0, 1], [1, 3, 1]))
-        .execute(&mut space)?;
+        .execute(&mut space, &mut transaction::no_outputs)?;
     // Large box
     style
         .create_box(GridAab::from_lower_size([4, 0, 0], [3, 3, 3]))
-        .execute(&mut space)?;
+        .execute(&mut space, &mut transaction::no_outputs)?;
 
     Ok(space)
 }
@@ -1207,7 +1207,7 @@ async fn TREES(_: &Exhibit, universe: &mut Universe) {
                     pz: 2,
                 }),
             )?
-            .execute(&mut space)?;
+            .execute(&mut space, &mut transaction::no_outputs)?;
         }
     }
 

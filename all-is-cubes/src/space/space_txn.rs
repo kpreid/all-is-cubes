@@ -11,7 +11,8 @@ use crate::drawing::DrawingPlane;
 use crate::math::{GridCoordinate, GridMatrix, GridPoint};
 use crate::space::{ActivatableRegion, GridAab, SetCubeError, Space};
 use crate::transaction::{
-    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
+    no_outputs, CommitError, Merge, NoOutput, PreconditionFailed, Transaction, TransactionConflict,
+    Transactional,
 };
 use crate::util::{ConciseDebug, CustomFormat as _};
 
@@ -213,7 +214,7 @@ impl SpaceTransaction {
 impl Transaction<Space> for SpaceTransaction {
     type CommitCheck =
         <BehaviorSetTransaction<Space> as Transaction<BehaviorSet<Space>>>::CommitCheck;
-    type Output = ();
+    type Output = NoOutput;
 
     fn check(&self, space: &Space) -> Result<Self::CommitCheck, PreconditionFailed> {
         for (
@@ -254,7 +255,12 @@ impl Transaction<Space> for SpaceTransaction {
         self.behaviors.check(&space.behaviors)
     }
 
-    fn commit(&self, space: &mut Space, check: Self::CommitCheck) -> Result<(), CommitError> {
+    fn commit(
+        &self,
+        space: &mut Space,
+        check: Self::CommitCheck,
+        _outputs: &mut dyn FnMut(Self::Output),
+    ) -> Result<(), CommitError> {
         let mut to_activate = Vec::new();
         for (
             &cube,
@@ -282,7 +288,7 @@ impl Transaction<Space> for SpaceTransaction {
             }
         }
         self.behaviors
-            .commit(&mut space.behaviors, check)
+            .commit(&mut space.behaviors, check, &mut no_outputs)
             .map_err(|e| e.context("behaviors".into()))?;
         if !to_activate.is_empty() {
             'b: for query_item in space.behaviors.query::<ActivatableRegion>() {
@@ -438,7 +444,7 @@ mod tests {
     use crate::content::make_some_blocks;
     use crate::inv::EphemeralOpaque;
     use crate::math::GridAab;
-    use crate::transaction::TransactionTester;
+    use crate::transaction::{no_outputs, TransactionTester};
 
     use super::*;
 
@@ -456,7 +462,7 @@ mod tests {
         let [block] = make_some_blocks();
         SpaceTransaction::set_cube([1, 0, 0], None, Some(block))
             .nonconserved()
-            .execute(&mut Space::empty_positive(1, 1, 1))
+            .execute(&mut Space::empty_positive(1, 1, 1), &mut no_outputs)
             .unwrap();
     }
 
@@ -600,11 +606,11 @@ mod tests {
                 }) as Arc<dyn Fn() + Send + Sync>),
             },
         )
-        .execute(&mut space)
+        .execute(&mut space, &mut no_outputs)
         .unwrap();
 
         SpaceTransaction::activate_block(cube)
-            .execute(&mut space)
+            .execute(&mut space, &mut drop)
             .unwrap();
         assert_eq!(signal.load(Ordering::Relaxed), 1);
     }

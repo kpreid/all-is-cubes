@@ -8,9 +8,7 @@ use std::sync::Arc;
 use downcast_rs::{impl_downcast, Downcast};
 
 use crate::time::Tick;
-use crate::transaction::{
-    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
-};
+use crate::transaction::{self, Merge as _, Transaction};
 use crate::universe::{RefVisitor, UniverseTransaction, VisitRefs};
 
 /// Dynamic add-ons to game objects; we might also have called them “components”.
@@ -41,7 +39,7 @@ pub trait Behavior<H: BehaviorHost>: Debug + Send + Sync + Downcast + VisitRefs 
 impl_downcast!(Behavior<H> where H: BehaviorHost);
 
 /// A type that can have attached behaviors.
-pub trait BehaviorHost: Transactional + 'static {
+pub trait BehaviorHost: transaction::Transactional + 'static {
     /// Additional data about “where” the behavior is attached to the host; what part of
     /// the host should be affected by the behavior.
     type Attachment: Debug + Clone + Eq + 'static;
@@ -198,7 +196,7 @@ impl<H: BehaviorHost> VisitRefs for BehaviorSet<H> {
     }
 }
 
-impl<H: BehaviorHost> Transactional for BehaviorSet<H> {
+impl<H: BehaviorHost> transaction::Transactional for BehaviorSet<H> {
     type Transaction = BehaviorSetTransaction<H>;
 }
 
@@ -327,10 +325,13 @@ impl<H: BehaviorHost> BehaviorSetTransaction<H> {
 
 impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
     type CommitCheck = ();
-    type Output = ();
+    type Output = transaction::NoOutput;
 
     #[allow(clippy::vtable_address_comparisons)] // The hazards should be okay for this use case
-    fn check(&self, target: &BehaviorSet<H>) -> Result<Self::CommitCheck, PreconditionFailed> {
+    fn check(
+        &self,
+        target: &BehaviorSet<H>,
+    ) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
         let Self { replace, insert } = self;
         // TODO: need to compare replacement preconditions
         for (&index, Replace { old, new: _ }) in replace {
@@ -340,19 +341,19 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
             }) = target.items.get(index)
             {
                 if attachment != &old.attachment {
-                    return Err(PreconditionFailed {
+                    return Err(transaction::PreconditionFailed {
                         location: "BehaviorSet",
                         problem: "existing behavior attachment is not as expected",
                     });
                 }
                 if !Arc::ptr_eq(behavior, &old.behavior) {
-                    return Err(PreconditionFailed {
+                    return Err(transaction::PreconditionFailed {
                         location: "BehaviorSet",
                         problem: "existing behavior value is not as expected",
                     });
                 }
             } else {
-                return Err(PreconditionFailed {
+                return Err(transaction::PreconditionFailed {
                     location: "BehaviorSet",
                     problem: "behavior(s) not found",
                 });
@@ -369,7 +370,8 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
         &self,
         target: &mut BehaviorSet<H>,
         (): Self::CommitCheck,
-    ) -> Result<(), CommitError> {
+        _outputs: &mut dyn FnMut(Self::Output),
+    ) -> Result<(), transaction::CommitError> {
         for (index, replacement) in &self.replace {
             target.items[*index] = replacement.new.clone();
         }
@@ -378,17 +380,20 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
     }
 }
 
-impl<H: BehaviorHost> Merge for BehaviorSetTransaction<H> {
+impl<H: BehaviorHost> transaction::Merge for BehaviorSetTransaction<H> {
     type MergeCheck = ();
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
+    fn check_merge(
+        &self,
+        other: &Self,
+    ) -> Result<Self::MergeCheck, transaction::TransactionConflict> {
         // Don't allow any touching the same slot at all.
         if self
             .replace
             .keys()
             .any(|slot| other.replace.contains_key(slot))
         {
-            return Err(TransactionConflict {});
+            return Err(transaction::TransactionConflict {});
         }
         Ok(())
     }
@@ -503,7 +508,6 @@ mod tests {
     use crate::math::{FreeCoordinate, GridAab};
     use crate::physics::BodyTransaction;
     use crate::space::{Space, SpaceBehaviorAttachment};
-    use crate::transaction::TransactionTester;
     use crate::universe::Universe;
     use indoc::indoc;
 
@@ -515,7 +519,7 @@ mod tests {
         assert_eq!(format!("{set:?}"), "BehaviorSet([])");
         assert_eq!(format!("{set:#?}"), "BehaviorSet([])");
         BehaviorSetTransaction::insert((), Arc::new(NoopBehavior(1)))
-            .execute(&mut set)
+            .execute(&mut set, &mut transaction::no_outputs)
             .unwrap();
         assert_eq!(format!("{set:?}"), "BehaviorSet([NoopBehavior(1) @ ()])");
         assert_eq!(
@@ -605,12 +609,12 @@ mod tests {
         let mut set = BehaviorSet::<Character>::new();
         let arc_qe = Arc::new(Q(Expected));
         BehaviorSetTransaction::insert((), arc_qe.clone())
-            .execute(&mut set)
+            .execute(&mut set, &mut transaction::no_outputs)
             .unwrap();
         // different type, so it should not be found
         let arc_qu = Arc::new(Q(Unexpected));
         BehaviorSetTransaction::insert((), arc_qu.clone())
-            .execute(&mut set)
+            .execute(&mut set, &mut transaction::no_outputs)
             .unwrap();
 
         // Type-specific query should find one
@@ -677,7 +681,7 @@ mod tests {
         let attachment =
             SpaceBehaviorAttachment::new(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]));
         BehaviorSetTransaction::insert(attachment, Arc::new(NoopBehavior(1)))
-            .execute(&mut set)
+            .execute(&mut set, &mut transaction::no_outputs)
             .unwrap();
 
         // Try mismatched behavior
@@ -696,7 +700,7 @@ mod tests {
         );
         assert_eq!(
             transaction.check(&set).unwrap_err(),
-            PreconditionFailed {
+            transaction::PreconditionFailed {
                 location: "BehaviorSet",
                 problem: "existing behavior value is not as expected"
             }
@@ -722,7 +726,7 @@ mod tests {
         );
         assert_eq!(
             transaction.check(&set).unwrap_err(),
-            PreconditionFailed {
+            transaction::PreconditionFailed {
                 location: "BehaviorSet",
                 problem: "existing behavior attachment is not as expected"
             }
@@ -736,7 +740,7 @@ mod tests {
 
         // TODO: cannot test replace() because we don't have stable indexes/keys
 
-        TransactionTester::new()
+        transaction::TransactionTester::new()
             .transaction(BehaviorSetTransaction::default(), |_, _| Ok(()))
             .transaction(BehaviorSetTransaction::insert((), b1), |_, after| {
                 after

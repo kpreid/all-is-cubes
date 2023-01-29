@@ -70,10 +70,11 @@ where
                 let before = target_factory();
                 let mut target = target_factory();
                 if let Ok(check) = tap.transaction.check(&target) {
-                    match tap.transaction.commit(&mut target, check) {
-                        Ok(_output) => {
-                            // Nothing to assert about the output
-                        }
+                    let output_callback = &mut |_| {
+                        // TODO: allow assertions about the output
+                    };
+                    match tap.transaction.commit(&mut target, check, output_callback) {
+                        Ok(()) => {}
                         Err(e) => {
                             panic!(
                                 "Commit failed after check succeeded: {}\n\

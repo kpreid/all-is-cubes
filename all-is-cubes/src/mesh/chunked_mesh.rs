@@ -857,6 +857,7 @@ mod tests {
     use crate::math::{FreeCoordinate, GridAab, GridCoordinate};
     use crate::mesh::{BlockVertex, NoTexture, NoTextures};
     use crate::space::SpaceTransaction;
+    use crate::transaction;
     use crate::universe::Universe;
 
     const CHUNK_SIZE: GridCoordinate = 16;
@@ -1049,11 +1050,14 @@ mod tests {
         });
         tester
             .space
-            .execute(&SpaceTransaction::set_cube(
-                [0, 0, 0],
-                None,
-                Some(Block::from(rgba_const!(1.0, 1.0, 1.0, 0.5))),
-            ))
+            .execute(
+                &SpaceTransaction::set_cube(
+                    [0, 0, 0],
+                    None,
+                    Some(Block::from(rgba_const!(1.0, 1.0, 1.0, 0.5))),
+                ),
+                &mut transaction::no_outputs,
+            )
             .unwrap();
         let mut did_call = false;
         tester.update(|u| {

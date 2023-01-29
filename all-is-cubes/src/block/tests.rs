@@ -23,6 +23,7 @@ use crate::math::{
     OpacityCategory, Rgb, Rgba,
 };
 use crate::space::{Space, SpaceTransaction};
+use crate::transaction;
 use crate::universe::Universe;
 
 #[test]
@@ -388,7 +389,10 @@ fn listen_indirect_atom() {
 
     // Now mutate it and we should see a notification.
     block_def_ref
-        .execute(&BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)))
+        .execute(
+            &BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)),
+            &mut transaction::no_outputs,
+        )
         .unwrap();
     assert_eq!(sink.drain().len(), 1);
 }
@@ -409,18 +413,27 @@ fn listen_indirect_double() {
 
     // Now mutate the original block and we should see a notification.
     block_def_ref1
-        .execute(&BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)))
+        .execute(
+            &BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)),
+            &mut transaction::no_outputs,
+        )
         .unwrap();
     assert_eq!(sink.drain().len(), 1);
 
     // Remove block_def_ref1 from the contents of block_def_ref2...
     block_def_ref2
-        .execute(&BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)))
+        .execute(
+            &BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)),
+            &mut transaction::no_outputs,
+        )
         .unwrap();
     assert_eq!(sink.drain().len(), 1);
     // ...and then block_def_ref1's changes should NOT be forwarded.
     block_def_ref1
-        .execute(&BlockDefTransaction::overwrite(Block::from(Rgba::WHITE)))
+        .execute(
+            &BlockDefTransaction::overwrite(Block::from(Rgba::WHITE)),
+            &mut transaction::no_outputs,
+        )
         .unwrap();
     assert_eq!(sink.drain(), vec![]);
 }
@@ -438,7 +451,10 @@ fn listen_recur() {
 
     // Now mutate the space and we should see a notification.
     space_ref
-        .execute(&SpaceTransaction::set_cube([0, 0, 0], None, Some(block_0)))
+        .execute(
+            &SpaceTransaction::set_cube([0, 0, 0], None, Some(block_0)),
+            &mut transaction::no_outputs,
+        )
         .unwrap();
     assert_eq!(sink.drain().len(), 1);
 
@@ -446,7 +462,10 @@ fn listen_recur() {
 
     // A mutation out of bounds should not trigger a notification
     space_ref
-        .execute(&SpaceTransaction::set_cube([1, 0, 0], None, Some(block_1)))
+        .execute(
+            &SpaceTransaction::set_cube([1, 0, 0], None, Some(block_1)),
+            &mut transaction::no_outputs,
+        )
         .unwrap();
     assert_eq!(sink.drain(), vec![]);
 }
@@ -474,7 +493,10 @@ fn self_referential_block(universe: &mut Universe) -> Block {
     let block_def = universe.insert_anonymous(BlockDef::new(AIR));
     let indirect = Block::from_primitive(Primitive::Indirect(block_def.clone()));
     block_def
-        .execute(&BlockDefTransaction::overwrite(indirect.clone()))
+        .execute(
+            &BlockDefTransaction::overwrite(indirect.clone()),
+            &mut transaction::no_outputs,
+        )
         .unwrap();
     indirect
 }
@@ -499,7 +521,10 @@ mod txn {
 
         // Now mutate it and we should see a notification.
         block_def_ref
-            .execute(&BlockDefTransaction::overwrite(b2))
+            .execute(
+                &BlockDefTransaction::overwrite(b2),
+                &mut transaction::no_outputs,
+            )
             .unwrap();
         assert_eq!(sink.drain().len(), 1);
     }

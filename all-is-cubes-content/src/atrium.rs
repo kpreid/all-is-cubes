@@ -16,7 +16,7 @@ use all_is_cubes::math::{
     GridRotation, GridVector, Rgb, Rgba,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
-use all_is_cubes::transaction::Transaction as _;
+use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{rgb_const, rgba_const};
@@ -548,7 +548,7 @@ async fn install_atrium_blocks(
                             ],
                         );
                         SpaceTransaction::add_behavior(bounds, Fire::new(bounds))
-                            .execute(&mut space)
+                            .execute(&mut space, &mut transaction::no_outputs)
                             .unwrap();
                     }
                     universe.insert_anonymous(space)

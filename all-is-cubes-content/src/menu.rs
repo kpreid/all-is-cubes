@@ -22,7 +22,7 @@ use all_is_cubes::{
     linking::InGenError,
     math::{Face6, GridAab, GridMatrix, GridVector},
     space::{Space, SpaceBuilder, SpacePhysics, SpaceTransaction},
-    transaction::{Merge, Transaction as _},
+    transaction::{self, Merge, Transaction as _},
     universe::Universe,
 };
 use all_is_cubes_ui::logo::logo_text;
@@ -180,7 +180,8 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
         })
         .build();
 
-    install_widgets(LayoutGrant::new(bounds), &tree)?.execute(&mut space)?;
+    install_widgets(LayoutGrant::new(bounds), &tree)?
+        .execute(&mut space, &mut transaction::no_outputs)?;
 
     Ok(space)
 }

@@ -26,7 +26,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder, SpacePhysics};
-use all_is_cubes::transaction::Transaction;
+use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::logo::logo_text;
@@ -284,7 +284,7 @@ pub(crate) async fn demo_city(
         LayoutGrant::new(logo_location),
         &LayoutTree::leaf(logo_text()),
     )?
-    .execute(&mut space)?;
+    .execute(&mut space, &mut transaction::no_outputs)?;
     planner.occupied_plots.push(logo_location);
 
     // Exhibits
@@ -448,7 +448,7 @@ pub(crate) async fn demo_city(
             });
             if space.bounds().contains_box(tree_bounds) && !planner.is_occupied(tree_bounds) {
                 crate::tree::make_tree(&landscape_blocks, &mut rng, tree_origin, tree_bounds)?
-                    .execute(&mut space)?;
+                    .execute(&mut space, &mut transaction::no_outputs)?;
             }
         }
     }

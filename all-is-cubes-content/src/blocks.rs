@@ -21,7 +21,7 @@ use all_is_cubes::math::{
     GridRotation, GridVector, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
-use all_is_cubes::transaction::Transaction as _;
+use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{rgb_const, rgba_const};
@@ -391,7 +391,7 @@ pub async fn install_demo_blocks(
                     .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
                     .build();
                 SpaceTransaction::add_behavior(space.bounds(), crate::animation::Clock::new())
-                    .execute(&mut space)
+                    .execute(&mut space, &mut transaction::no_outputs)
                     .unwrap();
                 Block::builder()
                     .display_name("Clock")
@@ -473,7 +473,10 @@ pub async fn install_demo_blocks(
             }
 
             block_def_ref
-                .execute(&BlockDefTransaction::overwrite(block))
+                .execute(
+                    &BlockDefTransaction::overwrite(block),
+                    &mut transaction::no_outputs,
+                )
                 .unwrap();
         } else {
             panic!("not indirect");

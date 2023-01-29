@@ -23,7 +23,7 @@ use crate::raycast::Ray;
 use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::{
-    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
+    self, CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
 use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
@@ -246,7 +246,7 @@ impl Character {
         B: Behavior<Character> + 'static,
     {
         BehaviorSetTransaction::insert((), Arc::new(behavior))
-            .execute(&mut self.behaviors)
+            .execute(&mut self.behaviors, &mut transaction::no_outputs)
             .unwrap();
     }
 
@@ -588,7 +588,7 @@ impl Transaction<Character> for CharacterTransaction {
         <InventoryTransaction as Transaction<Inventory>>::CommitCheck,
         <BehaviorSetTransaction<Character> as Transaction<BehaviorSet<Character>>>::CommitCheck,
     );
-    type Output = ();
+    type Output = transaction::NoOutput;
 
     fn check(&self, target: &Character) -> Result<Self::CommitCheck, PreconditionFailed> {
         Ok((
@@ -602,24 +602,20 @@ impl Transaction<Character> for CharacterTransaction {
         &self,
         target: &mut Character,
         (body_check, inventory_check, behaviors_check): Self::CommitCheck,
+        outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
         self.body
-            .commit(&mut target.body, body_check)
+            .commit(&mut target.body, body_check, outputs)
             .map_err(|e| e.context("body".into()))?;
 
-        // TODO: Perhaps Transaction should have an explicit cheap ".is_empty()"?
-        if self.inventory != Default::default() {
-            let change = self
-                .inventory
-                .commit(&mut target.inventory, inventory_check)
-                .map_err(|e| e.context("inventory".into()))?;
-            if let Some(change) = change {
+        self.inventory
+            .commit(&mut target.inventory, inventory_check, &mut |change| {
                 target.notifier.notify(CharacterChange::Inventory(change));
-            }
-        }
+            })
+            .map_err(|e| e.context("inventory".into()))?;
 
         self.behaviors
-            .commit(&mut target.behaviors, behaviors_check)
+            .commit(&mut target.behaviors, behaviors_check, outputs)
             .map_err(|e| e.context("behaviors".into()))?;
 
         Ok(())

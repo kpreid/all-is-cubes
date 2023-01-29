@@ -1,8 +1,5 @@
 use std::f64::consts::TAU;
 
-use all_is_cubes::content::load_image::space_from_image;
-use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::transaction::Transaction as _;
 use exhaust::Exhaust;
 use maze_generator::prelude::{Direction, FieldType, Generator};
 use rand::prelude::SliceRandom;
@@ -11,7 +8,9 @@ use rand::{Rng, SeedableRng};
 use all_is_cubes::block::{Block, BlockCollision, Resolution::*, RotationPlacementRule, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, Vector3};
 use all_is_cubes::character::Spawn;
+use all_is_cubes::content::load_image::space_from_image;
 use all_is_cubes::content::palette;
+use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
@@ -19,6 +18,7 @@ use all_is_cubes::math::{
     GridRotation, GridVector, Rgb, Rgba,
 };
 use all_is_cubes::space::{LightPhysics, Space};
+use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{include_image, rgb_const};
@@ -95,7 +95,7 @@ impl DemoTheme {
         )
         .with_interior(Some(AIR))
         .create_box(interior.expand(FaceMap::repeat(1)))
-        .execute(space)?;
+        .execute(space, &mut transaction::no_outputs)?;
 
         Ok(())
     }

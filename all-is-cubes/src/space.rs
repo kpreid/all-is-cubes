@@ -631,7 +631,7 @@ impl Space {
         }
         // TODO: We need a strategy for, if this transaction fails, trying again while finding
         // the non-conflicting pieces in a deterministic fashion.
-        let _ignored_failure = tick_txn.execute(self);
+        let _ignored_failure = tick_txn.execute(self, &mut drop);
 
         let mut transaction = UniverseTransaction::default();
         if let Some(self_ref) = self_ref {

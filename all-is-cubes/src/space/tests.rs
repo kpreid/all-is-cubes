@@ -16,6 +16,7 @@ use crate::space::{
     GridAab, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpacePhysics,
 };
 use crate::time::Tick;
+use crate::transaction;
 use crate::universe::{RefError, Universe, UniverseIndex as _, UniverseTransaction};
 
 // TODO: test consistency between the index and get_* methods
@@ -343,7 +344,10 @@ fn listens_to_block_changes() {
     let new_block = Block::from(Rgba::BLACK);
     let new_evaluated = new_block.evaluate().unwrap();
     block_def_ref
-        .execute(&BlockDefTransaction::overwrite(new_block))
+        .execute(
+            &BlockDefTransaction::overwrite(new_block),
+            &mut transaction::no_outputs,
+        )
         .unwrap();
     // This does not result in an outgoing notification, because we don't want
     // computations like reevaluation to happen during the notification process.

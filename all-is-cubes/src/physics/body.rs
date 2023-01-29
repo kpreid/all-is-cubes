@@ -11,9 +11,7 @@ use crate::physics::{StopAt, POSITION_EPSILON};
 use crate::raycast::Ray;
 use crate::space::Space;
 use crate::time::Tick;
-use crate::transaction::{
-    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
-};
+use crate::transaction::{self, Transaction};
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
 
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
@@ -503,29 +501,37 @@ pub struct BodyTransaction {
     pub delta_yaw: FreeCoordinate,
 }
 
-impl Transactional for Body {
+impl transaction::Transactional for Body {
     type Transaction = BodyTransaction;
 }
 
 impl Transaction<Body> for BodyTransaction {
     type CommitCheck = ();
-    type Output = ();
+    type Output = transaction::NoOutput;
 
-    fn check(&self, _body: &Body) -> Result<Self::CommitCheck, PreconditionFailed> {
+    fn check(&self, _body: &Body) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
         // No conflicts currently possible.
         Ok(())
     }
 
-    fn commit(&self, body: &mut Body, _: Self::CommitCheck) -> Result<(), CommitError> {
+    fn commit(
+        &self,
+        body: &mut Body,
+        _: Self::CommitCheck,
+        _outputs: &mut dyn FnMut(Self::Output),
+    ) -> Result<(), transaction::CommitError> {
         body.yaw += self.delta_yaw;
         Ok(())
     }
 }
 
-impl Merge for BodyTransaction {
+impl transaction::Merge for BodyTransaction {
     type MergeCheck = ();
 
-    fn check_merge(&self, _other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
+    fn check_merge(
+        &self,
+        _other: &Self,
+    ) -> Result<Self::MergeCheck, transaction::TransactionConflict> {
         Ok(())
     }
 

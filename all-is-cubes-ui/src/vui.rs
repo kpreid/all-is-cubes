@@ -15,7 +15,7 @@ use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::math::NotNan;
 use all_is_cubes::space::Space;
 use all_is_cubes::time::Tick;
-use all_is_cubes::transaction::Transaction;
+use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
 use all_is_cubes::util::YieldProgress;
 
@@ -324,7 +324,7 @@ impl Vui {
             character: None,
         })?;
         transaction
-            .execute(&mut self.universe)
+            .execute(&mut self.universe, &mut transaction::no_outputs)
             .map_err(|e| ToolError::Internal(e.to_string()))?;
         Ok(())
     }

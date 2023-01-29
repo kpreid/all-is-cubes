@@ -3,9 +3,7 @@ use std::sync::Arc;
 
 use crate::block::{Block, BlockChange, Primitive};
 use crate::listen::{Gate, Listener, Notifier};
-use crate::transaction::{
-    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
-};
+use crate::transaction::{self, Transaction};
 use crate::universe::{RefError, RefVisitor, VisitRefs};
 
 /// Contains a [`Block`] and can be stored in a [`Universe`](crate::universe::Universe).
@@ -91,7 +89,7 @@ impl VisitRefs for Primitive {
     }
 }
 
-impl Transactional for BlockDef {
+impl transaction::Transactional for BlockDef {
     type Transaction = BlockDefTransaction;
 }
 
@@ -147,15 +145,15 @@ impl BlockDefTransaction {
 
 impl Transaction<BlockDef> for BlockDefTransaction {
     type CommitCheck = ();
-    type Output = ();
+    type Output = transaction::NoOutput;
 
     fn check(
         &self,
         target: &BlockDef,
-    ) -> Result<Self::CommitCheck, crate::transaction::PreconditionFailed> {
+    ) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
         if let Some(old) = &self.old {
             if **target != *old {
-                return Err(PreconditionFailed {
+                return Err(transaction::PreconditionFailed {
                     location: "BlockDef",
                     problem: "existing block not as expected",
                 });
@@ -168,7 +166,8 @@ impl Transaction<BlockDef> for BlockDefTransaction {
         &self,
         target: &mut BlockDef,
         (): Self::CommitCheck,
-    ) -> Result<Self::Output, CommitError> {
+        _outputs: &mut dyn FnMut(Self::Output),
+    ) -> Result<(), transaction::CommitError> {
         if let Some(new) = &self.new {
             target.block = new.clone();
 
@@ -185,7 +184,7 @@ impl Transaction<BlockDef> for BlockDefTransaction {
     }
 }
 
-impl Merge for BlockDefTransaction {
+impl transaction::Merge for BlockDefTransaction {
     type MergeCheck = ();
 
     fn check_merge(
@@ -193,10 +192,10 @@ impl Merge for BlockDefTransaction {
         other: &Self,
     ) -> Result<Self::MergeCheck, crate::transaction::TransactionConflict> {
         if matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b) {
-            return Err(TransactionConflict {});
+            return Err(transaction::TransactionConflict {});
         }
         if matches!((&self.new, &other.new), (Some(a), Some(b)) if a != b) {
-            return Err(TransactionConflict {});
+            return Err(transaction::TransactionConflict {});
         }
         Ok(())
     }

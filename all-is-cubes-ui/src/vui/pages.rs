@@ -13,6 +13,7 @@ use all_is_cubes::drawing::embedded_graphics::{mono_font::iso_8859_1 as font, te
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgba};
 use all_is_cubes::space::{Space, SpaceBuilder, SpacePhysics};
+use all_is_cubes::transaction;
 use all_is_cubes::universe::{URef, Universe};
 
 use crate::logo::logo_text;
@@ -127,6 +128,7 @@ impl PageInst {
             .execute(
                 &install_widgets(LayoutGrant::new(size.space_bounds()), &self.tree)
                     .expect("layout/widget error"),
+                &mut transaction::no_outputs,
             )
             .expect("transaction error");
 

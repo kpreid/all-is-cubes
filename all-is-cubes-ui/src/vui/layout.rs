@@ -6,7 +6,7 @@ use all_is_cubes::math::{
     point_to_enclosing_cube, Face6, GridAab, GridCoordinate, GridPoint, GridVector,
 };
 use all_is_cubes::space::{Space, SpaceBuilder, SpaceTransaction};
-use all_is_cubes::transaction::{Merge as _, Transaction};
+use all_is_cubes::transaction::{self, Merge as _, Transaction as _};
 
 use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
 
@@ -380,7 +380,7 @@ impl LayoutTree<Arc<dyn Widget>> {
             },
             &self,
         )?
-        .execute(&mut space)
+        .execute(&mut space, &mut transaction::no_outputs)
         .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;
 
         Ok(space)

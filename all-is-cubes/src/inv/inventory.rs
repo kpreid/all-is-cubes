@@ -346,7 +346,7 @@ impl InventoryTransaction {
 
 impl Transaction<Inventory> for InventoryTransaction {
     type CommitCheck = Option<InventoryCheck>;
-    type Output = Option<InventoryChange>;
+    type Output = InventoryChange;
 
     fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, PreconditionFailed> {
         // Don't do the expensive copy if we have one already
@@ -416,14 +416,14 @@ impl Transaction<Inventory> for InventoryTransaction {
         &self,
         inventory: &mut Inventory,
         check: Self::CommitCheck,
-    ) -> Result<Self::Output, CommitError> {
+        outputs: &mut dyn FnMut(Self::Output),
+    ) -> Result<(), CommitError> {
         if let Some(InventoryCheck { new, change }) = check {
             assert_eq!(new.len(), inventory.slots.len());
             inventory.slots = new;
-            Ok(Some(change))
-        } else {
-            Ok(None)
+            outputs(change);
         }
+        Ok(())
     }
 }
 
@@ -476,12 +476,11 @@ mod tests {
 
     #[test]
     fn txn_identity_no_notification() {
-        assert_eq!(
-            InventoryTransaction::default()
-                .execute(&mut Inventory::from_slots(vec![Slot::Empty]))
-                .unwrap(),
-            None
-        );
+        InventoryTransaction::default()
+            .execute(&mut Inventory::from_slots(vec![Slot::Empty]), &mut |_| {
+                unreachable!("shouldn't notify")
+            })
+            .unwrap()
     }
 
     #[test]
@@ -512,15 +511,18 @@ mod tests {
             Slot::Empty,
         ]);
         let new_item = Tool::InfiniteBlocks(Rgba::WHITE.into());
-
         assert_eq!(inventory.slots[2], Slot::Empty);
+
+        let mut outputs = Vec::new();
+        InventoryTransaction::insert([new_item.clone()])
+            .execute(&mut inventory, &mut |x| outputs.push(x))
+            .unwrap();
+
         assert_eq!(
-            InventoryTransaction::insert([new_item.clone()])
-                .execute(&mut inventory)
-                .unwrap(),
-            Some(InventoryChange {
+            outputs,
+            vec![InventoryChange {
                 slots: Arc::new([2])
-            })
+            }]
         );
         assert_eq!(inventory.slots[2], new_item.into());
     }
@@ -555,7 +557,7 @@ mod tests {
             Slot::Empty,
         ]);
         InventoryTransaction::insert([this.clone()])
-            .execute(&mut inventory)
+            .execute(&mut inventory, &mut drop)
             .unwrap();
         assert_eq!(
             inventory.slots,

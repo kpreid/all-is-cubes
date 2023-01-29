@@ -14,7 +14,7 @@ use all_is_cubes::inv::ToolError;
 use all_is_cubes::listen::{
     ListenableCell, ListenableCellWithLocal, ListenableSource, Listener, Notifier,
 };
-use all_is_cubes::transaction::Transaction;
+use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
 use all_is_cubes::util::{CustomFormat, StatusText};
 
@@ -377,7 +377,7 @@ impl Session {
                 let transaction =
                     Character::click(character_ref.clone(), self.cursor_result.as_ref(), button)?;
                 transaction
-                    .execute(self.universe_mut())
+                    .execute(self.universe_mut(), &mut transaction::no_outputs)
                     .map_err(|e| ToolError::Internal(e.to_string()))?;
 
                 // Spend a little time doing light updates, to ensure that changes right in front of

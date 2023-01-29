@@ -516,6 +516,7 @@ mod tests {
     use crate::raycast::Ray;
     use crate::raytracer::print_space;
     use crate::space::Space;
+    use crate::transaction;
     use crate::universe::{UBorrow, URef, Universe};
     use crate::util::YieldProgress;
     use pretty_assertions::assert_eq;
@@ -569,7 +570,7 @@ mod tests {
                         c.inventory().slots[index].clone(),
                         stack.into(),
                     ))
-                    .execute(&mut *c)
+                    .execute(&mut *c, &mut transaction::no_outputs)
                     .unwrap();
 
                     // Invoke Inventory::use_tool, which knows how to assemble the answer into a single transaction
@@ -589,7 +590,7 @@ mod tests {
             stack: impl Into<Slot>,
         ) -> Result<(), Box<dyn Error + Send + Sync>> {
             let transaction = self.equip_and_use_tool(stack)?;
-            transaction.execute(&mut self.universe)?;
+            transaction.execute(&mut self.universe, &mut transaction::no_outputs)?;
             Ok(())
         }
 
@@ -676,7 +677,9 @@ mod tests {
                 }
             );
 
-            actual_transaction.execute(&mut tester.universe).unwrap();
+            actual_transaction
+                .execute(&mut tester.universe, &mut drop)
+                .unwrap();
             print_space(&tester.space(), (-1., 1., 1.));
             assert_eq!(&tester.space()[(1, 0, 0)], &AIR);
         }
@@ -737,7 +740,9 @@ mod tests {
                 }
             );
 
-            transaction.execute(&mut tester.universe).unwrap();
+            transaction
+                .execute(&mut tester.universe, &mut drop)
+                .unwrap();
             print_space(&tester.space(), (-1., 1., 1.));
             assert_eq!(&tester.space()[(1, 0, 0)], &existing);
             assert_eq!(&tester.space()[(0, 0, 0)], &tool_block);
@@ -809,11 +814,10 @@ mod tests {
             // Place the obstacle after the raycast
             tester
                 .space_ref()
-                .execute(&SpaceTransaction::set_cube(
-                    [0, 0, 0],
-                    None,
-                    Some(obstacle.clone()),
-                ))
+                .execute(
+                    &SpaceTransaction::set_cube([0, 0, 0], None, Some(obstacle.clone())),
+                    &mut transaction::no_outputs,
+                )
                 .unwrap();
             assert_eq!(tester.equip_and_use_tool(tool), Err(ToolError::Obstacle));
             print_space(&tester.space(), (-1., 1., 1.));
@@ -851,7 +855,9 @@ mod tests {
             )]))
             .bind(tester.character_ref.clone())
         );
-        transaction.execute(&mut tester.universe).unwrap();
+        transaction
+            .execute(&mut tester.universe, &mut drop)
+            .unwrap();
         // Space is unmodified
         assert_eq!(&tester.space()[(1, 0, 0)], &existing);
     }

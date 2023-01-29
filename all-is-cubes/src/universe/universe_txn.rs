@@ -6,7 +6,7 @@ use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::Space;
 use crate::transaction::{
-    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
+    self, CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
 use crate::universe::{
     AnyURef, Name, UBorrowMutImpl, URef, URefErased as _, Universe, UniverseId, UniverseMember,
@@ -66,8 +66,9 @@ where
         &self,
         _dummy_target: &mut (),
         (mut borrow, check): Self::CommitCheck,
-    ) -> Result<Self::Output, CommitError> {
-        borrow.with_data_mut(|target_data| self.transaction.commit(target_data, check))
+        outputs: &mut dyn FnMut(Self::Output),
+    ) -> Result<(), CommitError> {
+        borrow.with_data_mut(|target_data| self.transaction.commit(target_data, check, outputs))
     }
 }
 
@@ -165,7 +166,7 @@ impl AnyTransaction {
 
 impl Transaction<()> for AnyTransaction {
     type CommitCheck = AnyTransactionCheck;
-    type Output = ();
+    type Output = transaction::NoOutput;
 
     fn check(&self, _target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
         use AnyTransaction::*;
@@ -177,10 +178,16 @@ impl Transaction<()> for AnyTransaction {
         })
     }
 
-    fn commit(&self, _target: &mut (), check: Self::CommitCheck) -> Result<(), CommitError> {
+    fn commit(
+        &self,
+        _target: &mut (),
+        check: Self::CommitCheck,
+        outputs: &mut dyn FnMut(Self::Output),
+    ) -> Result<(), CommitError> {
         fn commit_helper<O>(
             transaction: &TransactionInUniverse<O>,
             check: AnyTransactionCheck,
+            outputs: &mut dyn FnMut(<TransactionInUniverse<O> as Transaction<()>>::Output),
         ) -> Result<(), CommitError>
         where
             O: Transactional,
@@ -190,15 +197,15 @@ impl Transaction<()> for AnyTransaction {
                 *(check.downcast().map_err(|_| {
                     CommitError::message::<AnyTransaction>("type mismatch in check data".into())
                 })?);
-            transaction.commit(&mut (), check).map(|_| ())
+            transaction.commit(&mut (), check, outputs)
         }
 
         use AnyTransaction::*;
         match self {
             Noop => Ok(()),
-            BlockDef(t) => commit_helper(t, check),
-            Character(t) => commit_helper(t, check),
-            Space(t) => commit_helper(t, check),
+            BlockDef(t) => commit_helper(t, check, outputs),
+            Character(t) => commit_helper(t, check, outputs),
+            Space(t) => commit_helper(t, check, outputs),
         }
     }
 }
@@ -388,7 +395,7 @@ impl From<AnyTransaction> for UniverseTransaction {
 
 impl Transaction<Universe> for UniverseTransaction {
     type CommitCheck = UniverseCommitCheck;
-    type Output = ();
+    type Output = transaction::NoOutput;
 
     fn check(&self, target: &Universe) -> Result<Self::CommitCheck, PreconditionFailed> {
         if let Some(universe_id) = self.universe_id() {
@@ -429,10 +436,15 @@ impl Transaction<Universe> for UniverseTransaction {
         })
     }
 
-    fn commit(&self, target: &mut Universe, checks: Self::CommitCheck) -> Result<(), CommitError> {
+    fn commit(
+        &self,
+        target: &mut Universe,
+        checks: Self::CommitCheck,
+        outputs: &mut dyn FnMut(Self::Output),
+    ) -> Result<(), CommitError> {
         for (name, check) in checks.members {
             self.members[&name]
-                .commit(target, &name, check)
+                .commit(target, &name, check, outputs)
                 .map_err(|e| e.context(format!("universe member {name}")))?;
         }
 
@@ -442,7 +454,7 @@ impl Transaction<Universe> for UniverseTransaction {
             .cloned()
             .zip(checks.anonymous_insertions)
         {
-            new_member.commit(target, &Name::Pending, check)?;
+            new_member.commit(target, &Name::Pending, check, outputs)?;
         }
 
         Ok(())
@@ -587,13 +599,16 @@ impl MemberTxn {
         universe: &mut Universe,
         name: &Name,
         MemberCommitCheck(check): MemberCommitCheck,
+        outputs: &mut dyn FnMut(std::convert::Infallible), // TODO: placeholder for actual Fluff output
     ) -> Result<(), CommitError> {
         match self {
             MemberTxn::Noop => {
                 assert!(check.is_none());
                 Ok(())
             }
-            MemberTxn::Modify(txn) => txn.commit(&mut (), check.expect("missing check value")),
+            MemberTxn::Modify(txn) => {
+                txn.commit(&mut (), check.expect("missing check value"), outputs)
+            }
             MemberTxn::Insert(pending_ref) => {
                 /// Generic helper function to handle each type of ref.
                 fn do_insert<T>(
@@ -801,7 +816,7 @@ mod tests {
         let pending_2 = pending_1.clone();
 
         UniverseTransaction::insert(pending_2)
-            .execute(&mut u)
+            .execute(&mut u, &mut drop)
             .unwrap();
 
         assert_eq!(pending_1.universe_id(), Some(u.universe_id()));
@@ -821,7 +836,7 @@ mod tests {
         UniverseTransaction::insert(foo.clone())
             .merge(UniverseTransaction::insert(bar.clone()))
             .expect("merge should allow 2 pending")
-            .execute(&mut u)
+            .execute(&mut u, &mut drop)
             .expect("execute");
 
         // Now check all the naming turned out correctly.
@@ -857,7 +872,7 @@ mod tests {
         let s1 = u1.insert_anonymous(Space::empty_positive(1, 1, 1));
         let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(s1);
 
-        let e = t1.execute(&mut u2).unwrap_err();
+        let e = t1.execute(&mut u2, &mut drop).unwrap_err();
         assert!(matches!(e, ExecuteError::Check(_)));
     }
 
@@ -884,7 +899,7 @@ mod tests {
             .unwrap();
         let txn = UniverseTransaction::insert(r);
 
-        let e = txn.execute(&mut u2).unwrap_err();
+        let e = txn.execute(&mut u2, &mut drop).unwrap_err();
         assert!(matches!(
             dbg!(e),
             ExecuteError::Check(PreconditionFailed {
@@ -901,8 +916,8 @@ mod tests {
         let mut u2 = Universe::new();
         let txn = UniverseTransaction::insert(r);
 
-        txn.execute(&mut u1).unwrap();
-        let e = txn.execute(&mut u2).unwrap_err();
+        txn.execute(&mut u1, &mut drop).unwrap();
+        let e = txn.execute(&mut u2, &mut drop).unwrap_err();
 
         assert!(matches!(
             dbg!(e),

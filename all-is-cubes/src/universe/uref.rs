@@ -194,14 +194,13 @@ impl<T: 'static> URef<T> {
     pub fn execute(
         &self,
         transaction: &<T as Transactional>::Transaction,
-    ) -> Result<<<T as Transactional>::Transaction as Transaction<T>>::Output, ExecuteError>
+        outputs: &mut dyn FnMut(<<T as Transactional>::Transaction as Transaction<T>>::Output),
+    ) -> Result<(), ExecuteError>
     where
         T: Transactional,
     {
-        let outcome: Result<
-            Result<<<T as Transactional>::Transaction as Transaction<T>>::Output, ExecuteError>,
-            RefError,
-        > = self.try_modify(|data| transaction.execute(data));
+        let outcome: Result<Result<(), ExecuteError>, RefError> =
+            self.try_modify(|data| transaction.execute(data, outputs));
         outcome.map_err(|_| {
             ExecuteError::Check(PreconditionFailed {
                 location: "URef::execute()",

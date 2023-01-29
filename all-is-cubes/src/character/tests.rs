@@ -11,7 +11,7 @@ use crate::physics::BodyTransaction;
 use crate::raycast::Ray;
 use crate::space::Space;
 use crate::time::Tick;
-use crate::transaction::{Transaction as _, TransactionTester};
+use crate::transaction::{self, Transaction as _, TransactionTester};
 use crate::universe::Universe;
 
 fn test_spawn(f: impl Fn(&mut Space) -> Spawn) -> Character {
@@ -86,9 +86,10 @@ fn inventory_transaction() {
 
     let item = Tool::InfiniteBlocks(AIR);
     character_ref
-        .execute(&CharacterTransaction::inventory(
-            InventoryTransaction::insert([item.clone()]),
-        ))
+        .execute(
+            &CharacterTransaction::inventory(InventoryTransaction::insert([item.clone()])),
+            &mut transaction::no_outputs,
+        )
         .unwrap();
 
     // Check notification
@@ -158,7 +159,7 @@ fn transaction_systematic() {
         .target(|| {
             let mut character = Character::spawn_default(space_ref.clone());
             CharacterTransaction::inventory(InventoryTransaction::insert([old_item.clone()]))
-                .execute(&mut character)
+                .execute(&mut character, &mut transaction::no_outputs)
                 .unwrap();
             character
         })
