@@ -222,26 +222,35 @@ struct ToggleButtonController<D: Clone + Send + Sync> {
     todo: DirtyFlag,
 }
 
+impl<D: Clone + fmt::Debug + Send + Sync + 'static> ToggleButtonController<D> {
+    fn icon_txn(&self) -> vui::WidgetTransaction {
+        let value = (self.definition.projection)(&self.definition.data_source.get());
+        SpaceTransaction::set_cube(
+            self.position,
+            None,
+            Some(self.definition.states[usize::from(value)].clone()),
+        )
+    }
+}
+
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
     for ToggleButtonController<D>
 {
     fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
-        Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
+        let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             SpaceBehaviorAttachment::new(GridAab::single_cube(self.position)),
             Arc::new(space::ActivatableRegion {
                 effect: self.definition.action.clone(),
             }),
-        )))
+        ));
+        let icon = self.icon_txn();
+        icon.merge(activatable)
+            .map_err(|error| vui::InstallVuiError::Conflict { error })
     }
 
     fn step(&mut self, _: Tick) -> Result<vui::WidgetTransaction, Box<dyn Error + Send + Sync>> {
         Ok(if self.todo.get_and_clear() {
-            let value = (self.definition.projection)(&self.definition.data_source.get());
-            SpaceTransaction::set_cube(
-                self.position,
-                None,
-                Some(self.definition.states[usize::from(value)].clone()),
-            )
+            self.icon_txn()
         } else {
             SpaceTransaction::default()
         })
