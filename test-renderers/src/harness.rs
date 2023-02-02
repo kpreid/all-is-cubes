@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use async_fn_traits::{AsyncFn0, AsyncFn1, AsyncFn2};
 use futures_core::future::BoxFuture;
 use futures_util::future::Shared;
-use futures_util::stream::FuturesUnordered;
+use futures_util::stream::{self};
 use futures_util::{FutureExt as _, StreamExt as _};
 use image::RgbaImage;
 use itertools::Itertools;
@@ -158,11 +158,9 @@ where
     let mut test_table: BTreeMap<String, TestCase> = BTreeMap::new();
     test_suite(&mut TestCaseCollector(&mut test_table));
 
-    // Start the tests, in parallel.
-    // TODO: When we have more tests we might benefit from concurrency limits.
-    let suite_start_time = Instant::now();
+    // Filter tests, synchronously so we can count them simply.
     let mut count_filtered = 0;
-    let mut handles: FuturesUnordered<BoxFuture<'static, TestRunResult>> = test_table
+    let filtered_test_table: Vec<(String, TestCase)> = test_table
         .into_iter()
         .filter(|(name, _)| {
             // Same behavior as the standard rust test harness: if there are any arguments, each
@@ -173,6 +171,11 @@ where
             }
             included
         })
+        .collect();
+
+    // Start the tests, in parallel with a concurrency limit imposed by buffer_unordered().
+    let suite_start_time = Instant::now();
+    let mut handles = stream::iter(filtered_test_table)
         .map(|(name, test_case)| {
             let test_id = name.clone();
             let comparison_log: Arc<Mutex<Vec<ComparisonRecord>>> = Default::default();
@@ -207,7 +210,7 @@ where
             }
             .boxed()
         })
-        .collect();
+        .buffer_unordered(4);
 
     let mut logging = io::stderr();
     let mut per_test_output = BTreeMap::new();
