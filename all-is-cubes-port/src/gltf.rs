@@ -27,7 +27,7 @@ use animation::FrameState;
 mod mesh;
 use mesh::{add_mesh, Materials};
 mod glue;
-use glue::{convert_quaternion, empty_node, push_and_return_index, u32size};
+use glue::{convert_quaternion, empty_node, push_and_return_index};
 mod texture;
 pub use texture::{GltfTextureAllocator, GltfTextureRef};
 mod vertex;
@@ -68,8 +68,7 @@ pub struct GltfWriter {
     frame_states: Vec<FrameState>,
 
     /// Every mesh index appearing anywhere in `frame_states`.
-    /// A set of `Index<gltf_json::Node>`, but that doesn't implement Hash.
-    any_time_visible_mesh_nodes: HashSet<usize>,
+    any_time_visible_mesh_nodes: HashSet<Index<gltf_json::Node>>,
 
     /// All flaws encountered so far.
     flaws: Flaws,
@@ -141,7 +140,7 @@ impl GltfWriter {
                 .map_or_else(ViewTransform::one, |camera| camera.get_view_transform()),
         });
         self.any_time_visible_mesh_nodes
-            .extend(visible_nodes.iter().map(|index| index.value()));
+            .extend(visible_nodes.iter());
 
         // TODO: report only flaws from this frame
         self.flaws
@@ -198,20 +197,17 @@ impl GltfWriter {
         }
 
         // Attach *all* visible nodes to the scene.
-        scene_nodes.extend(
-            self.any_time_visible_mesh_nodes
-                .iter()
-                .map(|&i| Index::new(u32size(i))),
-        );
+        scene_nodes.extend(self.any_time_visible_mesh_nodes.iter());
 
         // Add world mesh animations.
         if self.frame_states.len() > 1 {
             // Timeline represented as BTreeMap<node, Vec<(frame number, visibility)>>.
             // The initial state is "visible", so any nonanimated mesh needs no entry.
-            let mut timelines: BTreeMap<usize, Vec<(usize, bool)>> = BTreeMap::new();
+            let mut timelines: BTreeMap<Index<gltf_json::Node>, Vec<(usize, bool)>> =
+                BTreeMap::new();
             for (frame_number, state) in self.frame_states.iter().enumerate() {
-                for node_index in &state.visible_nodes {
-                    let timeline = timelines.entry(node_index.value()).or_default();
+                for &node_index in &state.visible_nodes {
+                    let timeline = timelines.entry(node_index).or_default();
                     if !timeline.last().map_or(true, |&(_, vis)| vis) {
                         // Node needs to be made visible.
                         timeline.push((frame_number, true));
@@ -219,7 +215,7 @@ impl GltfWriter {
                 }
                 // Remove invisible meshes (including ones we haven't seen at all yet)
                 for &node_index in self.any_time_visible_mesh_nodes.iter() {
-                    if state.visible_nodes.iter().any(|v| v.value() == node_index) {
+                    if state.visible_nodes.contains(&node_index) {
                         // TODO: do a map lookup instead of linear scan?
                         continue;
                     }
@@ -280,7 +276,7 @@ impl GltfWriter {
                         },
                     ),
                     target: gltf_json::animation::Target {
-                        node: Index::new(u32size(node_index)),
+                        node: node_index,
                         path: Valid(gltf_json::animation::Property::Scale),
                         extensions: Default::default(),
                         extras: Default::default(),
