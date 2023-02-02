@@ -32,6 +32,8 @@ use crate::{
 
 /// Function to be called by the custom test harness to find all tests.
 pub fn all_tests(c: &mut TestCaseCollector<'_>) {
+    let light_test_universe = u(light_test_universe());
+
     if false {
         c.insert("dummy_failing_test", None, |_| async {
             panic!("intentional test failure");
@@ -74,7 +76,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert("layers_ui_only", None, layers_ui_only);
     c.insert_variants(
         "light",
-        u(light_test_universe()),
+        light_test_universe.clone(),
         light,
         [
             LightingOption::None,
@@ -86,7 +88,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert("sky_and_info_text", None, sky_and_info_text);
     c.insert_variants(
         "tone_mapping",
-        u(light_test_universe()),
+        light_test_universe,
         tone_mapping,
         [
             (ToneMappingOperator::Clamp, 0.5),
