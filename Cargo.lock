@@ -169,6 +169,7 @@ dependencies = [
  "either",
  "gltf-json",
  "log",
+ "once_cell",
  "serde_json",
  "tempfile",
  "thiserror",
