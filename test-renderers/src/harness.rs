@@ -160,7 +160,7 @@ where
 
     // Filter tests, synchronously so we can count them simply.
     let mut count_filtered = 0;
-    let filtered_test_table: Vec<(String, TestCase)> = test_table
+    let filtered_test_table: BTreeMap<String, TestCase> = test_table
         .into_iter()
         .filter(|(name, _)| {
             // Same behavior as the standard rust test harness: if there are any arguments, each
@@ -172,6 +172,15 @@ where
             included
         })
         .collect();
+
+    // Kick off all the universe_futures immediately, without the concurrency limit
+    // imposed on the individual tests.
+    // (Ideally we'd do them in order of need, but that's probably overkill.)
+    for test_case in filtered_test_table.values() {
+        if let Some(f) = &test_case.universe_source {
+            tokio::spawn(Shared::clone(f));
+        }
+    }
 
     // Start the tests, in parallel with a concurrency limit imposed by buffer_unordered().
     let suite_start_time = Instant::now();
