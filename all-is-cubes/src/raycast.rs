@@ -193,7 +193,21 @@ impl Raycaster {
         Self::new_impl(origin.into(), direction.into())
     }
 
-    fn new_impl(origin: Point3<FreeCoordinate>, direction: Vector3<FreeCoordinate>) -> Self {
+    fn new_impl(origin: Point3<FreeCoordinate>, mut direction: Vector3<FreeCoordinate>) -> Self {
+        // A ray whose direction vector is infinite — or very large — cannot be processed
+        // correctly because we rely on discriminating between different `t` values
+        // (distance in units of the direction vector) to choose the correct next cube.
+        // Therefore, treat it as no stepping -- this is too large to be practical anyway.
+        // (We cannot simply rescale the direction vector because that would change the
+        // reported `t` outputs.)
+        // TODO: Define better threshold value.
+        if !direction[..]
+            .iter()
+            .all(|d| d.abs().partial_cmp(&1e100) == Some(std::cmp::Ordering::Less))
+        {
+            direction = Vector3::zero();
+        }
+
         // If there is no enclosing cube then the current cube is undefined so we cannot make
         // meaningful progress. (In the event of within(), we could in theory have a
         // suitably bounded interpretation, but that is not of practical interest.)
