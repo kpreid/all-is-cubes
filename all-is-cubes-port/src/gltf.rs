@@ -6,7 +6,7 @@
 //!
 //! TODO: This is not a clean, well-abstracted library API yet.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::time::Duration;
 
@@ -68,7 +68,8 @@ pub struct GltfWriter {
     frame_states: Vec<FrameState>,
 
     /// Every mesh index appearing anywhere in `frame_states`.
-    any_time_visible_mesh_nodes: HashSet<Index<gltf_json::Node>>,
+    /// Using BTreeSet for stable ordering.
+    any_time_visible_mesh_nodes: BTreeSet<Index<gltf_json::Node>>,
 
     /// All flaws encountered so far.
     flaws: Flaws,
@@ -96,7 +97,7 @@ impl GltfWriter {
             buffer_dest,
             camera: None,
             frame_states: Vec::new(),
-            any_time_visible_mesh_nodes: HashSet::new(),
+            any_time_visible_mesh_nodes: BTreeSet::new(),
             flaws: Flaws::empty(),
         }
     }
