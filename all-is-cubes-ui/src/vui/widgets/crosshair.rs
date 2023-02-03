@@ -2,7 +2,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 use all_is_cubes::block::{Block, AIR};
-use all_is_cubes::listen::{DirtyFlag, ListenableSource};
+use all_is_cubes::listen::{DirtyFlag, Listen as _, ListenableSource};
 use all_is_cubes::math::{GridPoint, GridVector};
 use all_is_cubes::space::SpaceTransaction;
 use all_is_cubes::time::Tick;

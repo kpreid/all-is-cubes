@@ -13,7 +13,7 @@ use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Rgb888, Drawable};
-use all_is_cubes::listen::DirtyFlag;
+use all_is_cubes::listen::{DirtyFlag, Listen as _};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
 

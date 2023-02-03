@@ -6,14 +6,10 @@ use std::sync::{Arc, Mutex, Weak};
 use crate::block::AIR;
 use crate::camera::GraphicsOptions;
 use crate::content::palette;
-use crate::listen::{ListenableSource, Listener};
+use crate::listen::{Listen as _, ListenableSource, Listener};
 use crate::math::GridPoint;
-use crate::raytracer::RtOptionsRef;
-use crate::raytracer::TracingBlock;
-use crate::raytracer::TracingCubeData;
-use crate::raytracer::{RtBlockData, SpaceRaytracer};
-use crate::space::BlockIndex;
-use crate::space::{Space, SpaceChange};
+use crate::raytracer::{RtBlockData, RtOptionsRef, SpaceRaytracer, TracingBlock, TracingCubeData};
+use crate::space::{BlockIndex, Space, SpaceChange};
 use crate::universe::{RefError, URef};
 
 /// Manages a [`SpaceRaytracer`] so that it can be cheaply updated when the [`Space`] is

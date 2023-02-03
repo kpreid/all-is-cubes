@@ -10,7 +10,7 @@ use all_is_cubes::camera::{FogOption, GraphicsOptions, UiViewState, ViewTransfor
 use all_is_cubes::cgmath::{Angle as _, Decomposed, Deg, One, Transform, Vector3};
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::inv::{Tool, ToolError, ToolInput};
-use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier};
+use all_is_cubes::listen::{DirtyFlag, Listen as _, ListenableCell, ListenableSource, Notifier};
 use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::math::NotNan;
 use all_is_cubes::space::Space;

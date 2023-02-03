@@ -25,7 +25,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
 use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking::{self, InGenError};
-use all_is_cubes::listen::{DirtyFlag, ListenableSource};
+use all_is_cubes::listen::{DirtyFlag, Listen as _, ListenableSource};
 use all_is_cubes::math::{
     Face6, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
 };

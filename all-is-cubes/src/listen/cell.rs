@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::listen::{Listen as _, Listener, Notifier};
+use crate::listen::{Listen, Listener, Notifier};
 
 /// A interior-mutable container for a value which can notify that the value changed,
 /// and which has reference-counted read-only handles to read it.
@@ -108,9 +108,12 @@ impl<T: Clone + Sync> ListenableSource<T> {
         // TODO: This was originally written to avoid cloning the Rc if cloning the value is the final goal, but under threading we don't want to hold the lock unnecessarily or possibly cause it to be poisoned due to the clone operation panicking. What's the best option? Should this method just be deleted?
         T::clone(&*self.get())
     }
+}
 
-    /// Subscribes to change notifications.
-    pub fn listen(&self, listener: impl Listener<()> + Send + Sync + 'static) {
+impl<T: Clone + Sync> Listen for ListenableSource<T> {
+    type Msg = ();
+
+    fn listen<L: Listener<Self::Msg> + Send + Sync + 'static>(&self, listener: L) {
         if let Some(notifier) = &self.storage.notifier {
             notifier.listen(listener);
         }

@@ -1,8 +1,7 @@
 use std::mem;
 
-use all_is_cubes::camera::GraphicsOptions;
-use all_is_cubes::camera::TransparencyOption;
-use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::camera::{GraphicsOptions, TransparencyOption};
+use all_is_cubes::listen::{Listen, ListenableSource};
 use once_cell::sync::Lazy;
 
 use all_is_cubes::listen::DirtyFlag;

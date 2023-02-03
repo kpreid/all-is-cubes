@@ -4,7 +4,7 @@ use futures_core::future::BoxFuture;
 
 use all_is_cubes::camera::{self, Flaws, HeadlessRenderer, StandardCameras, Viewport};
 use all_is_cubes::character::Cursor;
-use all_is_cubes::listen::{DirtyFlag, ListenableSource};
+use all_is_cubes::listen::{DirtyFlag, Listen as _, ListenableSource};
 
 use crate::common::{FrameBudget, GraphicsResourceError};
 use crate::in_wgpu::{self, init};
