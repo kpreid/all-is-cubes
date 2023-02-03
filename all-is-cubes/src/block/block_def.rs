@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::block::{Block, BlockChange, Primitive};
 use crate::listen::{Gate, Listener, Notifier};
 use crate::transaction::{self, Transaction};
-use crate::universe::{RefError, RefVisitor, VisitRefs};
+use crate::universe::{RefVisitor, VisitRefs};
 
 /// Contains a [`Block`] and can be stored in a [`Universe`](crate::universe::Universe).
 /// Together with [`Primitive::Indirect`], this allows mutation of a block definition such
@@ -40,14 +40,8 @@ impl BlockDef {
 
     /// Registers a listener for mutations of any data sources which may affect the
     /// [`Block::evaluate`] result from blocks defined using this block definition.
-    pub fn listen(
-        &self,
-        listener: impl Listener<BlockChange> + Send + Sync + 'static,
-    ) -> Result<(), RefError> {
-        // TODO: Need to arrange listening to the contained block, and either translate
-        // that here or have our own notifier generate forwardings.
-        self.notifier.listen(listener);
-        Ok(())
+    pub fn listen(&self, listener: impl Listener<BlockChange> + Send + Sync + 'static) {
+        self.notifier.listen(listener)
     }
 }
 

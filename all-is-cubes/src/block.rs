@@ -454,7 +454,7 @@ impl Block {
             Primitive::Indirect(ref def_ref) => {
                 // Note: This does not pass the recursion depth because BlockDef provides
                 // its own internal listening and thus this does not recurse.
-                def_ref.read()?.listen(listener)?;
+                def_ref.read()?.listen(listener);
             }
             Primitive::Atom(_, _) | Primitive::Air => {
                 // Atoms don't refer to anything external and thus cannot change other
