@@ -16,7 +16,7 @@ use crate::camera::ViewTransform;
 use crate::inv::{
     Inventory, InventoryChange, InventoryTransaction, Slot, Tool, ToolError, TOOL_SELECTIONS,
 };
-use crate::listen::{Listen as _, Listener, Notifier};
+use crate::listen::{Listen, Listener, Notifier};
 use crate::math::{Aab, Face6, Face7, FreeCoordinate, Rgb};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
 use crate::raycast::Ray;
@@ -215,10 +215,6 @@ impl Character {
         Self::spawn(space.read().unwrap().spawn(), space)
     }
 
-    /// Registers a listener for mutations of this character.
-    pub fn listen(&self, listener: impl Listener<CharacterChange> + Send + Sync + 'static) {
-        self.notifier.listen(listener)
-    }
     /// Computes the view transform for this character's eye; translation and rotation from
     /// the camera coordinate system (whose look direction is the -Z axis) to the [`Space`]'s
     /// coordinate system.
@@ -535,6 +531,14 @@ impl VisitRefs for Character {
         visitor.visit(space);
         inventory.visit_refs(visitor);
         behaviors.visit_refs(visitor);
+    }
+}
+
+impl Listen for Character {
+    type Msg = CharacterChange;
+    /// Registers a listener for mutations of this character.
+    fn listen<L: Listener<CharacterChange> + Send + Sync + 'static>(&self, listener: L) {
+        self.notifier.listen(listener)
     }
 }
 

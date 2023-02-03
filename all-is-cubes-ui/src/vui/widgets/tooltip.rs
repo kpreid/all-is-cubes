@@ -13,7 +13,7 @@ use all_is_cubes::drawing::embedded_graphics::{
     text::{Alignment, Baseline, Text, TextStyleBuilder},
     Drawable as _,
 };
-use all_is_cubes::listen::{FnListener, Gate, Listener};
+use all_is_cubes::listen::{FnListener, Gate, Listen, Listener};
 use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time::Tick;

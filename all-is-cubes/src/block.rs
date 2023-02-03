@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use cgmath::{EuclideanSpace as _, Point3};
 
-use crate::listen::Listener;
+use crate::listen::{Listen, Listener};
 use crate::math::{
     FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba,
 };
@@ -433,6 +433,8 @@ impl Block {
     /// This may fail under the same conditions as [`Block::evaluate()`]; it returns the
     /// same error type so that callers which both evaluate and listen don't need to
     /// handle this separately.
+    ///
+    /// This is not an implementation of [`Listen`] because it can fail.
     pub fn listen(
         &self,
         listener: impl Listener<BlockChange> + Clone + Send + Sync + 'static,
@@ -454,7 +456,7 @@ impl Block {
             Primitive::Indirect(ref def_ref) => {
                 // Note: This does not pass the recursion depth because BlockDef provides
                 // its own internal listening and thus this does not recurse.
-                def_ref.read()?.listen(listener);
+                <BlockDef as Listen>::listen(&*(def_ref.read()?), listener);
             }
             Primitive::Atom(_, _) | Primitive::Air => {
                 // Atoms don't refer to anything external and thus cannot change other

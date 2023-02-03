@@ -5,7 +5,7 @@ use cgmath::{Angle as _, Deg, Point3, Vector3};
 use crate::block::{Block, AIR};
 use crate::character::{cursor_raycast, Character, CharacterChange, CharacterTransaction, Spawn};
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
-use crate::listen::Sink;
+use crate::listen::{Listen as _, Sink};
 use crate::math::{Aab, Face6, GridAab, Rgb};
 use crate::physics::BodyTransaction;
 use crate::raycast::Ray;

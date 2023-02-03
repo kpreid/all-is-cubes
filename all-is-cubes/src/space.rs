@@ -17,7 +17,7 @@ use crate::character::Spawn;
 use crate::content::palette;
 use crate::drawing::DrawingPlane;
 use crate::inv::EphemeralOpaque;
-use crate::listen::{Gate, Listen as _, Listener, Notifier};
+use crate::listen::{Gate, Listen, Listener, Notifier};
 use crate::math::{
     point_checked_add, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix,
     GridPoint, GridRotation, NotNan, Rgb,
@@ -218,11 +218,6 @@ impl Space {
     /// is in the +X+Y+Z octant. This is a shorthand intended mainly for tests.
     pub fn empty_positive(wx: GridCoordinate, wy: GridCoordinate, wz: GridCoordinate) -> Space {
         Space::empty(GridAab::from_lower_size([0, 0, 0], [wx, wy, wz]))
-    }
-
-    /// Registers a listener for mutations of this space.
-    pub fn listen(&self, listener: impl Listener<SpaceChange> + Send + Sync + 'static) {
-        self.notifier.listen(listener)
     }
 
     /// Returns the [`GridAab`] describing the bounds of this space; no blocks may exist
@@ -890,6 +885,14 @@ impl VisitRefs for Space {
         }
         behaviors.visit_refs(visitor);
         spawn.visit_refs(visitor);
+    }
+}
+
+impl Listen for Space {
+    type Msg = SpaceChange;
+    /// Registers a listener for mutations of this space.
+    fn listen<L: Listener<SpaceChange> + Send + Sync + 'static>(&self, listener: L) {
+        self.notifier.listen(listener)
     }
 }
 

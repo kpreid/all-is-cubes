@@ -9,7 +9,7 @@ use all_is_cubes::camera::{Camera, Flaws};
 use all_is_cubes::cgmath::{EuclideanSpace, Point3, Transform, Vector3};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
-use all_is_cubes::listen::Listener;
+use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{
     Aab, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, Rgb,
 };

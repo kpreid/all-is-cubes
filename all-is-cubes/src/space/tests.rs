@@ -10,7 +10,7 @@ use crate::block::{
 };
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
-use crate::listen::Sink;
+use crate::listen::{Listen as _, Sink};
 use crate::math::{GridCoordinate, GridPoint, Rgba};
 use crate::space::{
     GridAab, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpacePhysics,

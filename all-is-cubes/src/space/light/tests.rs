@@ -4,7 +4,7 @@ use pretty_assertions::assert_eq;
 
 use super::{data::LightStatus, LightUpdatesInfo, PackedLight};
 use crate::block::{AnimationHint, Block, AIR};
-use crate::listen::{Listener, Sink};
+use crate::listen::{Listen as _, Listener, Sink};
 use crate::math::{FaceMap, GridPoint, Rgb, Rgba};
 use crate::space::{GridAab, LightPhysics, Space, SpaceChange, SpacePhysics};
 use crate::time::Tick;

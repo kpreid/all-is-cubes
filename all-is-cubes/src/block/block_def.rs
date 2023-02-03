@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use crate::block::{Block, BlockChange, Primitive};
-use crate::listen::{Gate, Listen as _, Listener, Notifier};
+use crate::listen::{Gate, Listen, Listener, Notifier};
 use crate::transaction::{self, Transaction};
 use crate::universe::{RefVisitor, VisitRefs};
 
@@ -37,10 +37,14 @@ impl BlockDef {
             block_listen_gate: gate,
         }
     }
+}
+
+impl Listen for BlockDef {
+    type Msg = BlockChange;
 
     /// Registers a listener for mutations of any data sources which may affect the
     /// [`Block::evaluate`] result from blocks defined using this block definition.
-    pub fn listen(&self, listener: impl Listener<BlockChange> + Send + Sync + 'static) {
+    fn listen<L: Listener<BlockChange> + Send + Sync + 'static>(&self, listener: L) {
         self.notifier.listen(listener)
     }
 }

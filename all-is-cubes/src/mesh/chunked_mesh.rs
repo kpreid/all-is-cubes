@@ -11,7 +11,7 @@ use instant::{Duration, Instant};
 use crate::block::{EvaluatedBlock, Resolution};
 use crate::camera::{Camera, Flaws};
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
-use crate::listen::Listener;
+use crate::listen::{Listen as _, Listener};
 use crate::math::{FreeCoordinate, GridCoordinate, GridPoint};
 use crate::mesh::{
     BlockMesh, BlockMeshProvider, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator, TextureTile,
