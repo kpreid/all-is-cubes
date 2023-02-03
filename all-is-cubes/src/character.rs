@@ -16,7 +16,7 @@ use crate::camera::ViewTransform;
 use crate::inv::{
     Inventory, InventoryChange, InventoryTransaction, Slot, Tool, ToolError, TOOL_SELECTIONS,
 };
-use crate::listen::{Listener, Notifier};
+use crate::listen::{Listen as _, Listener, Notifier};
 use crate::math::{Aab, Face6, Face7, FreeCoordinate, Rgb};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
 use crate::raycast::Ray;

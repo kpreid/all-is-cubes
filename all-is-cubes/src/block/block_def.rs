@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use crate::block::{Block, BlockChange, Primitive};
-use crate::listen::{Gate, Listener, Notifier};
+use crate::listen::{Gate, Listen as _, Listener, Notifier};
 use crate::transaction::{self, Transaction};
 use crate::universe::{RefVisitor, VisitRefs};
 

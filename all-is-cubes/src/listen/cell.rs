@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::listen::{Listener, Notifier};
+use crate::listen::{Listen as _, Listener, Notifier};
 
 /// A interior-mutable container for a value which can notify that the value changed,
 /// and which has reference-counted read-only handles to read it.

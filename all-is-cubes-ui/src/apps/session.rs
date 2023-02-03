@@ -12,7 +12,7 @@ use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::inv::ToolError;
 use all_is_cubes::listen::{
-    ListenableCell, ListenableCellWithLocal, ListenableSource, Listener, Notifier,
+    Listen as _, ListenableCell, ListenableCellWithLocal, ListenableSource, Listener, Notifier,
 };
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};

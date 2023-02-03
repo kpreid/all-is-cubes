@@ -104,7 +104,7 @@ impl<M> Clone for NotifierForwarder<M> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::listen::Sink;
+    use crate::listen::{Listen as _, Sink};
 
     #[test]
     fn filter() {

@@ -14,7 +14,7 @@ use all_is_cubes::drawing::embedded_graphics::{
     Drawable,
 };
 use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
-use all_is_cubes::listen::{DirtyFlag, Gate, ListenableSource, Listener};
+use all_is_cubes::listen::{DirtyFlag, Gate, Listen as _, ListenableSource, Listener};
 use all_is_cubes::math::{FaceMap, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time::Tick;

@@ -17,7 +17,7 @@ use crate::character::Spawn;
 use crate::content::palette;
 use crate::drawing::DrawingPlane;
 use crate::inv::EphemeralOpaque;
-use crate::listen::{Gate, Listener, Notifier};
+use crate::listen::{Gate, Listen as _, Listener, Notifier};
 use crate::math::{
     point_checked_add, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix,
     GridPoint, GridRotation, NotNan, Rgb,

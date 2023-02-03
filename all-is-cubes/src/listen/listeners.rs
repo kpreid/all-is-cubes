@@ -230,7 +230,7 @@ impl<M> Listener<M> for DirtyFlagListener {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::listen::Notifier;
+    use crate::listen::{Listen as _, Notifier};
 
     #[test]
     fn null_alive() {

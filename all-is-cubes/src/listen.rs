@@ -1,4 +1,4 @@
-//! Mechanism for receiving notifications of state changes.
+//! Broadcasting of notifications of state changes, and other messages.
 //!
 //! Objects which wish to send notifications use [`Notifier`]s, which manage a collection
 //! of [`Listener`]s. Each listener reports when it is no longer needed and may be
@@ -8,7 +8,7 @@
 //! to all listeners; therefore, listeners are obligated to avoid making further
 //! significant state changes. The typical pattern is for a listener to contain a
 //! `Weak<Mutex<...>>` or similar multiply-owned mutable structure to aggregate incoming
-//! messages, which will then be read and cleared by a separate part of the game loop.
+//! messages, which will then be read and cleared by a later task.
 
 use std::fmt;
 use std::sync::{Arc, RwLock, Weak};
@@ -21,6 +21,35 @@ pub use listeners::*;
 
 mod util;
 pub use util::*;
+
+/// Ability to subscribe to a source of messages, causing a [`Listener`] to receive them
+/// as long as it wishes to.
+pub trait Listen {
+    /// The type of message which may be obtained from this source.
+    type Msg: Clone + Send;
+
+    /// Subscribe the given [`Listener`] to this source of messages.
+    ///
+    /// Note that listeners are removed only via their returning false from
+    /// [`Listener::alive()`]; there is no `unlisten()` operation, and identical listeners
+    /// are not deduplicated.
+    fn listen<L: Listener<Self::Msg> + Send + Sync + 'static>(&self, listener: L);
+}
+
+impl<T: Listen> Listen for &T {
+    type Msg = T::Msg;
+
+    fn listen<L: Listener<Self::Msg> + Send + Sync + 'static>(&self, listener: L) {
+        (**self).listen(listener)
+    }
+}
+impl<T: Listen> Listen for Arc<T> {
+    type Msg = T::Msg;
+
+    fn listen<L: Listener<Self::Msg> + Send + Sync + 'static>(&self, listener: L) {
+        (**self).listen(listener)
+    }
+}
 
 /// Mechanism for observing changes to objects. A [`Notifier`] delivers messages
 /// of type `M` to a set of listeners, each of which usually holds a weak reference
@@ -43,16 +72,6 @@ impl<M: Clone + Send> Notifier<M> {
         }
     }
 
-    /// Add a [`Listener`] to this set of listeners.
-    pub fn listen<L: Listener<M> + Send + Sync + 'static>(&self, listener: L) {
-        if !listener.alive() {
-            return;
-        }
-        let mut listeners = self.listeners.write().unwrap();
-        Self::cleanup(&mut listeners);
-        listeners.push(listener.erased());
-    }
-
     /// Returns a [`Listener`] which forwards messages to the listeners registered with
     /// this `Notifier`, provided that it is owned by an [`Arc`].
     ///
@@ -62,7 +81,7 @@ impl<M: Clone + Send> Notifier<M> {
     ///
     /// ```
     /// use std::sync::Arc;
-    /// use all_is_cubes::listen::{Notifier, Sink};
+    /// use all_is_cubes::listen::{Listen, Notifier, Sink};
     ///
     /// let notifier_1 = Notifier::new();
     /// let notifier_2 = Arc::new(Notifier::new());
@@ -114,6 +133,19 @@ impl<M: Clone + Send> Notifier<M> {
     }
 }
 
+impl<M: Clone + Send> Listen for Notifier<M> {
+    type Msg = M;
+
+    fn listen<L: Listener<M> + Send + Sync + 'static>(&self, listener: L) {
+        if !listener.alive() {
+            return;
+        }
+        let mut listeners = self.listeners.write().unwrap();
+        Self::cleanup(&mut listeners);
+        listeners.push(listener.erased());
+    }
+}
+
 impl<M: Clone + Send> Default for Notifier<M> {
     fn default() -> Self {
         Self::new()
@@ -131,8 +163,11 @@ impl<M> fmt::Debug for Notifier<M> {
     }
 }
 
-/// A receiver of messages which can indicate when it is no longer interested in
-/// them (typically because the associated recipient has been dropped).
+/// A receiver of messages (typically from something implementing [`Listen`]) which can
+/// indicate when it is no longer interested in them (typically because the associated
+/// recipient has been dropped).
+///
+/// Please note the requirements set out in [`Listener::receive()`].
 ///
 /// Implementors should also implement [`Clone`] whenever possible; this allows
 /// for a "listen" operation to be implemented in terms of delegating to several others.
@@ -143,13 +178,21 @@ impl<M> fmt::Debug for Notifier<M> {
 pub trait Listener<M> {
     /// Process and store a message.
     ///
-    /// Note that, since this method takes `&Self`, a Listener must use interior
+    /// Note that, since this method takes `&Self`, a `Listener` must use interior
     /// mutability of some variety to store the message. As a `Listener` may be called
     /// from various contexts, and in particular while the sender is still performing
     /// its work, that mutability should in general be limited to setting dirty flags
     /// or inserting into message queues — not attempting to directly perform further
     /// game state changes, and particularly not taking any locks that are not solely
     /// used by the `Listener` and its destination, as that could result in deadlock.
+    ///
+    /// The typical pattern is for a listener to contain a `Weak<Mutex<...>>` or similar
+    /// multiply-owned mutable structure to aggregate incoming messages, which will
+    /// then be read and cleared by a later task; see [`FnListener`] for assistance in
+    /// implementing this pattern.
+    ///
+    /// This method should not panic under any circumstances, or inconsistencies may
+    /// result due to further work not being done and messages not being sent.
     fn receive(&self, message: M);
 
     /// Whether the [`Listener`]'s destination is still interested in receiving messages.
@@ -158,6 +201,9 @@ pub trait Listener<M> {
     /// longer interested in them or they would not have any effects on the rest of the
     /// system; this informs [`Notifier`]s that they should drop this listener and avoid
     /// memory leaks in the form of defunct listeners.
+    ///
+    /// This method should not panic under any circumstances, or inconsistencies may
+    /// result due to further work not being done and messages not being sent.
     fn alive(&self) -> bool;
 
     /// Convert this listener into trait object form, allowing it to be stored in
@@ -193,7 +239,7 @@ pub trait Listener<M> {
     /// This may be used to stop forwarding messages when a dependency no longer exists.
     ///
     /// ```
-    /// use all_is_cubes::listen::{Listener, Gate, Sink};
+    /// use all_is_cubes::listen::{Listen, Listener, Gate, Sink};
     ///
     /// let sink = Sink::new();
     /// let (gate, gated) = sink.listener().gate();
