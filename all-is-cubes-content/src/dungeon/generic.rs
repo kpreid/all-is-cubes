@@ -117,12 +117,19 @@ pub async fn build_dungeon<Room, ThemeT: Theme<Room>>(
     progress: YieldProgress,
 ) -> Result<(), InGenError> {
     let passes = theme.passes();
-    for (pass, progress) in (0..passes).zip(progress.split_evenly(passes)) {
-        for (room_position, progress) in map
+    for (pass, mut progress) in (0..passes).zip(progress.split_evenly(passes)) {
+        progress.set_label(format_args!("pass {pass}/{passes}", pass = pass + 1));
+        progress.progress(0.0).await;
+        for (room_position, mut progress) in map
             .bounds()
             .interior_iter()
             .zip(progress.split_evenly(map.bounds().volume()))
         {
+            progress.set_label(format_args!(
+                "pass {pass} @ {room_position:?}",
+                pass = pass + 1
+            ));
+            progress.progress(0.0).await;
             theme.place_room(
                 space,
                 pass,
