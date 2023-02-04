@@ -21,6 +21,8 @@
     - `transaction::Transaction` can now produce any number of `Output`s, delivered through a callback.
     - `universe::UniverseTransaction::insert()` now takes a `URef` created by `URef::new_pending()`, instead of a bare value.
       This allows associations between the new member and other objects to be created within the same transaction.
+    - Types that previously had a `pub fn listen(&self, impl Listener)` now implement the `listen::Listen` trait instead.
+      `listen::DirtyFlag::listening()` now expects `impl Listen` instead of a closure.
 
 - `all-is-cubes-ui` library:
     - `vui::LayoutGrant` now takes an additional parameter, `enlarge_for_symmetry`. Existing calls should be changed to pass `false` to get the prior behavior.
