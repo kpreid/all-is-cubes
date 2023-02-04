@@ -268,11 +268,12 @@ impl Pipelines {
                 multiview: None,
             });
 
+        let dirty = DirtyFlag::new(false);
+        BLOCKS_AND_LINES_SHADER.as_source().listen(dirty.listener());
+        graphics_options.listen(dirty.listener());
+
         Self {
-            dirty: DirtyFlag::listening(false, |l| {
-                BLOCKS_AND_LINES_SHADER.as_source().listen(l.clone());
-                graphics_options.listen(l);
-            }),
+            dirty,
             graphics_options,
             camera_bind_group_layout,
             space_texture_bind_group_layout,

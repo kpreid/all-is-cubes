@@ -2,7 +2,7 @@ use cgmath::{One, Point2};
 
 use crate::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
 use crate::character::{cursor_raycast, Character, Cursor};
-use crate::listen::{DirtyFlag, Listen as _, ListenableCell, ListenableSource};
+use crate::listen::{DirtyFlag, ListenableCell, ListenableSource};
 use crate::math::FreeCoordinate;
 use crate::space::Space;
 use crate::universe::{URef, Universe};
@@ -108,8 +108,8 @@ impl StandardCameras {
         // TODO: Add a unit test that each of these listeners works as intended.
         // TODO: This is also an awful lot of repetitive code; we should design a pattern
         // to not have it (some kind of "following cell")?
-        let graphics_options_dirty = DirtyFlag::listening(false, |l| graphics_options.listen(l));
-        let viewport_dirty = DirtyFlag::listening(false, |l| viewport_source.listen(l));
+        let graphics_options_dirty = DirtyFlag::listening(false, &graphics_options);
+        let viewport_dirty = DirtyFlag::listening(false, &viewport_source);
 
         let initial_options: &GraphicsOptions = &graphics_options.get();
         let initial_viewport: Viewport = *viewport_source.get();
@@ -125,13 +125,13 @@ impl StandardCameras {
             graphics_options,
             graphics_options_dirty,
 
-            character_dirty: DirtyFlag::listening(true, |l| character_source.listen(l)),
+            character_dirty: DirtyFlag::listening(true, &character_source),
             character_source,
             character: None, // update() will fix these up
             world_space: ListenableCell::new(None),
 
             ui_space: ui_state.space.clone(),
-            ui_dirty: DirtyFlag::listening(true, |l| ui_source.listen(l)),
+            ui_dirty: DirtyFlag::listening(true, &ui_source),
             ui_source,
 
             viewport_dirty,
@@ -371,7 +371,7 @@ mod tests {
         );
 
         let world_source = cameras.world_space();
-        let flag = DirtyFlag::listening(false, |l| world_source.listen(l));
+        let flag = DirtyFlag::listening(false, &world_source);
         assert_eq!(world_source.snapshot().as_ref(), None);
 
         // No redundant notification when world is absent

@@ -25,7 +25,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
 use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking::{self, InGenError};
-use all_is_cubes::listen::{DirtyFlag, Listen as _, ListenableSource};
+use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use all_is_cubes::math::{
     Face6, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
 };
@@ -189,7 +189,7 @@ impl<D> vui::Layoutable for ToggleButton<D> {
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton<D> {
     fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         Box::new(ToggleButtonController {
-            todo: DirtyFlag::listening(true, |l| self.data_source.listen(l)),
+            todo: DirtyFlag::listening(true, &self.data_source),
             position: position
                 .shrink_to(self.requirements().minimum, false)
                 .bounds

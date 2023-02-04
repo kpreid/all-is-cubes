@@ -13,7 +13,7 @@ use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Rgb888, Drawable};
-use all_is_cubes::listen::{DirtyFlag, Listen as _};
+use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::URef;
 
@@ -90,7 +90,7 @@ impl SurfaceRenderer {
         );
 
         Ok(Self {
-            viewport_dirty: DirtyFlag::listening(true, |l| viewport_source.listen(l)),
+            viewport_dirty: DirtyFlag::listening(true, &viewport_source),
             everything,
             surface,
             device,
@@ -326,9 +326,7 @@ impl EverythingRenderer {
             lines_buffer: ResizingBuffer::default(),
             lines_vertex_count: 0,
 
-            postprocess_shader_dirty: DirtyFlag::listening(false, |l| {
-                POSTPROCESS_SHADER.as_source().listen(l)
-            }),
+            postprocess_shader_dirty: DirtyFlag::listening(false, POSTPROCESS_SHADER.as_source()),
             postprocess_render_pipeline: Self::create_postprocess_pipeline(
                 &device,
                 &postprocess_bind_group_layout,

@@ -2,7 +2,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 use all_is_cubes::block::{Block, AIR};
-use all_is_cubes::listen::{DirtyFlag, Listen as _, ListenableSource};
+use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use all_is_cubes::math::{GridPoint, GridVector};
 use all_is_cubes::space::SpaceTransaction;
 use all_is_cubes::time::Tick;
@@ -39,7 +39,7 @@ impl vui::Widget for Crosshair {
             .contains_cube(position.bounds.lower_bounds()));
         Box::new(CrosshairController {
             position: position.bounds.lower_bounds(),
-            todo: DirtyFlag::listening(false, |l| self.mouselook_mode.listen(l)),
+            todo: DirtyFlag::listening(false, &self.mouselook_mode),
             definition: self,
         })
     }

@@ -10,7 +10,7 @@ use all_is_cubes::camera::{FogOption, GraphicsOptions, UiViewState, ViewTransfor
 use all_is_cubes::cgmath::{Angle as _, Decomposed, Deg, One, Transform, Vector3};
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::inv::{Tool, ToolError, ToolInput};
-use all_is_cubes::listen::{DirtyFlag, Listen as _, ListenableCell, ListenableSource, Notifier};
+use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier};
 use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::math::NotNan;
 use all_is_cubes::space::Space;
@@ -102,7 +102,7 @@ impl Vui {
         let cue_channel: CueNotifier = Arc::new(Notifier::new());
 
         // TODO: terrible mess of tightly coupled parameters
-        let changed_viewport = DirtyFlag::listening(false, |l| viewport_source.listen(l));
+        let changed_viewport = DirtyFlag::listening(false, &viewport_source);
         let ui_size = UiSize::new(viewport_source.snapshot());
         let hud_inputs = HudInputs {
             hud_blocks,
@@ -141,7 +141,7 @@ impl Vui {
             about_page: PageInst::new(about_widget_tree),
 
             control_channel: control_recv,
-            changed_character: DirtyFlag::listening(false, |l| character_source.listen(l)),
+            changed_character: DirtyFlag::listening(false, &character_source),
             character_source,
             tooltip_state,
             cue_channel,

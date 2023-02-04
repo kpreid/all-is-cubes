@@ -96,8 +96,7 @@ impl Widget for Toolbar {
     fn controller(self: Arc<Self>, grant: &crate::vui::LayoutGrant) -> Box<dyn WidgetController> {
         let bounds = grant.bounds;
 
-        let todo_change_character =
-            DirtyFlag::listening(false, |l| self.character_source.listen(l));
+        let todo_change_character = DirtyFlag::listening(false, &self.character_source);
         let todo_inventory = DirtyFlag::new(true);
         let todo_more = Arc::new(Mutex::new(ToolbarTodo {
             button_pressed_decay: [Duration::ZERO; TOOL_SELECTIONS],

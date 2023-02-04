@@ -3,7 +3,7 @@ use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock, Weak};
 
-use crate::listen::Listener;
+use crate::listen::{Listen, Listener};
 
 /// A [`Listener`] which discards all messages and is suitable for filling
 /// listener parameters when no listener is needed.
@@ -185,13 +185,13 @@ impl DirtyFlag {
         }
     }
 
-    /// Constructs a new [`DirtyFlag`] with the given initial value
-    /// and provides its [`Listener`] to the given function to be installed.
+    /// Constructs a new [`DirtyFlag`] with the given initial value and call
+    /// [`Listen::listen()`] with its listener.
     ///
     /// This is a convenience for calling `new()` followed by `listener()`.
-    pub fn listening(value: bool, listener_acceptor: impl FnOnce(DirtyFlagListener)) -> Self {
+    pub fn listening(value: bool, source: impl Listen) -> Self {
         let new_self = Self::new(value);
-        listener_acceptor(new_self.listener());
+        source.listen(new_self.listener());
         new_self
     }
 
@@ -230,7 +230,7 @@ impl<M> Listener<M> for DirtyFlagListener {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::listen::{Listen as _, Notifier};
+    use crate::listen::Notifier;
 
     #[test]
     fn null_alive() {

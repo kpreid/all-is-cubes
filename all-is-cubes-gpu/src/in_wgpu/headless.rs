@@ -4,7 +4,7 @@ use futures_core::future::BoxFuture;
 
 use all_is_cubes::camera::{self, Flaws, HeadlessRenderer, StandardCameras, Viewport};
 use all_is_cubes::character::Cursor;
-use all_is_cubes::listen::{DirtyFlag, Listen as _, ListenableSource};
+use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 
 use crate::common::{FrameBudget, GraphicsResourceError};
 use crate::in_wgpu::{self, init};
@@ -42,7 +42,7 @@ impl Builder {
             &self.adapter,
         );
 
-        let viewport_dirty = DirtyFlag::listening(false, |l| viewport_source.listen(l));
+        let viewport_dirty = DirtyFlag::listening(false, &viewport_source);
         let viewport = viewport_source.snapshot();
         let color_texture = create_color_texture(&self.device, viewport);
 
