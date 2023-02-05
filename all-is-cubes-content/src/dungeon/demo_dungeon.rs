@@ -573,6 +573,10 @@ pub(crate) enum DungeonBlocks {
     FloorTile,
     /// Spikes for pit traps, facing upward.
     Spikes,
+    /// Gate for blocking passage in the Z axis and to be possibly slid sideways.
+    Gate,
+    /// Receptacle for a moved `Gate`.
+    GatePocket,
 }
 impl BlockModule for DungeonBlocks {
     fn namespace() -> &'static str {
@@ -611,6 +615,7 @@ pub async fn install_dungeon_blocks(
                     }
                 })?
                 .build(),
+
             FloorTile => {
                 let resolution = R32;
                 let space =
@@ -624,6 +629,7 @@ pub async fn install_dungeon_blocks(
                     .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()
             }
+
             Spikes => Block::builder()
                 .display_name("Spikes")
                 .collision(BlockCollision::None)
@@ -637,6 +643,38 @@ pub async fn install_dungeon_blocks(
                     }
                 })?
                 .build(),
+
+            Gate => {
+                let space =
+                    space_from_image(include_image!("fence.png"), GridRotation::RXyZ, |pixel| {
+                        // Note that this produces selectable collidable transparent blocks --
+                        // that's preferred here.
+                        let block = Block::builder().color(Rgba::from_srgb8(pixel.0)).build();
+                        VoxelBrush::with_thickness(block, 7..9)
+                    })?;
+                Block::builder()
+                    .display_name("Gate")
+                    .collision(BlockCollision::Recur)
+                    .voxels_ref(R16, universe.insert_anonymous(space))
+                    .build()
+            }
+
+            // TODO: improve this appearance
+            GatePocket => {
+                let space = space_from_image(
+                    include_image!("fence-pocket.png"),
+                    GridRotation::RXyZ,
+                    |pixel| {
+                        let block = Block::builder().color(Rgba::from_srgb8(pixel.0)).build();
+                        VoxelBrush::new([([0, 0, 6], block.clone()), ([0, 0, 9], block)])
+                    },
+                )?;
+                Block::builder()
+                    .display_name("Gate Pocket")
+                    .collision(BlockCollision::Recur)
+                    .voxels_ref(R16, universe.insert_anonymous(space))
+                    .build()
+            }
         })
     })
     .await?
