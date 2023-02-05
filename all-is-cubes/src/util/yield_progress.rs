@@ -237,9 +237,93 @@ impl<F: ?Sized + Fn() -> BoxFuture<'static, ()> + Send + Sync> Yielding<F> {
 mod tests {
     use super::*;
     use crate::util::assert_send_sync;
+    use tokio::sync::mpsc::{self, error::TryRecvError};
+
+    /// Something that the [`YieldProgress`] under test did.
+    #[derive(Debug, Clone, PartialEq)]
+    enum Entry {
+        Yielded,
+        Progress(f32, String),
+        /// The receiver was dropped
+        Dropped,
+    }
+    use Entry::*;
+
+    struct YpLog(mpsc::UnboundedReceiver<Entry>);
+
+    fn logging_yield_progress() -> (YieldProgress, YpLog) {
+        let (sender, receiver) = mpsc::unbounded_channel();
+        let yp = YieldProgress::new(
+            {
+                let sender = sender.clone();
+                move || {
+                    let _ = sender.send(Entry::Yielded);
+                    std::future::ready(())
+                }
+            },
+            move |progress, label| drop(sender.send(Entry::Progress(progress, label.to_owned()))),
+        );
+        (yp, YpLog(receiver))
+    }
+
+    impl YpLog {
+        fn drain(&mut self) -> Vec<Entry> {
+            let mut entries = Vec::new();
+            loop {
+                match self.0.try_recv() {
+                    Ok(entry) => entries.push(entry),
+                    Err(TryRecvError::Empty) => return entries,
+                    Err(TryRecvError::Disconnected) => {
+                        entries.push(Dropped);
+                        return entries;
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn yield_progress_is_sync() {
         assert_send_sync::<YieldProgress>()
     }
+
+    #[tokio::test]
+    async fn basic_progress() {
+        // Construct instance. Nothing happens immediately.
+        let (p, mut r) = logging_yield_progress();
+        assert_eq!(r.drain(), vec![]);
+
+        // Simple progress.
+        let progress_future = p.progress(0.25);
+        assert_eq!(r.drain(), vec![Progress(0.25, "".into())]);
+        progress_future.await;
+        assert_eq!(r.drain(), vec![Yielded]);
+    }
+
+    #[tokio::test]
+    async fn set_label() {
+        let (mut p, mut r) = logging_yield_progress();
+        p.set_label("hello");
+        assert_eq!(r.drain(), vec![]); // TODO: labels should take effect sooner, or should they?
+        p.progress(0.25).await;
+        assert_eq!(r.drain(), vec![Progress(0.25, "hello".into()), Yielded]);
+    }
+
+    #[tokio::test]
+    async fn finish() {
+        let (p, mut r) = logging_yield_progress();
+        p.finish().await;
+        assert_eq!(r.drain(), vec![Progress(1.0, "".into()), Yielded, Dropped]);
+    }
+
+    #[tokio::test]
+    async fn finish_and_cut() {
+        let (p, mut r) = logging_yield_progress();
+        let p2 = p.finish_and_cut(0.5).await;
+        assert_eq!(r.drain(), vec![Progress(0.5, "".into()), Yielded]);
+        p2.progress(0.5).await;
+        assert_eq!(r.drain(), vec![Progress(0.75, "".into()), Yielded]);
+    }
+
+    // TODO: test split() and split_evenly()
 }
