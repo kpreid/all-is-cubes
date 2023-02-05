@@ -99,7 +99,7 @@ where
                 .map_err(|e| GenError::failure(e, name_in_module(&key)))?
                 .into();
             map.insert(key, block);
-            progress.progress(1.0).await;
+            progress.finish().await;
         }
         Ok(Self { map })
     }

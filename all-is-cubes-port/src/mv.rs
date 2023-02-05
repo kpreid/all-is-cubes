@@ -73,7 +73,7 @@ pub(crate) async fn dot_vox_data_to_universe(
                 .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?;
         }
 
-        model_progress.progress(1.0).await;
+        model_progress.finish().await;
     }
 
     Ok(universe)
@@ -97,7 +97,7 @@ pub(crate) async fn export_to_dot_vox_data(
     for (mut p, space_ref) in p.split_evenly(to_export.len()).zip(to_export.into_iter()) {
         p.set_label(format!("Exporting space {}", space_ref.name()));
         models.push(space_to_dot_vox_model(&space_ref, &mut palette)?);
-        p.progress(1.0).await
+        p.finish().await
     }
 
     Ok(dot_vox::DotVoxData {

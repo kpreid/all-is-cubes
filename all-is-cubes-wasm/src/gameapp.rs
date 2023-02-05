@@ -165,7 +165,7 @@ async fn start_game_with_dom(
     root.borrow().start_loop();
 
     static_dom.append_to_loading_log("\nConstructing universe...");
-    app_progress.progress(1.0).await;
+    app_progress.finish().await;
     let universe = template
         .build(universe_progress, thread_rng().gen())
         .await
@@ -176,7 +176,7 @@ async fn start_game_with_dom(
     Box::leak(Box::new(root));
 
     // Do the final UI cleanup going from "loading" to "running".
-    post_universe_progress.progress(1.0).await;
+    post_universe_progress.finish().await;
     {
         // TODO: make this part the WebGameRoot's responsibility? Move the class list manip to StaticDom?
         let list = static_dom.app_root.class_list();

@@ -134,6 +134,14 @@ impl YieldProgress {
         self.yielding.clone().yield_only(location, label)
     }
 
+    /// Report that 100% of progress has been made.
+    ///
+    /// This is identical to `.progress(1.0)` but consumes the `YieldProgress` object.
+    #[track_caller] // This is not an `async fn` because `track_caller` is not compatible
+    pub fn finish(self) -> impl Future<Output = ()> + Send + 'static {
+        self.progress(1.0)
+    }
+
     /// Report that the given amount of progress has been made, then return
     /// a [`YieldProgress`] covering the remaining range.
     #[track_caller] // This is not an `async fn` because `track_caller` is not compatible
@@ -142,7 +150,7 @@ impl YieldProgress {
         progress_fraction: f32,
     ) -> impl Future<Output = Self> + Send + 'static {
         let [a, b] = self.split(progress_fraction);
-        let progress_future = a.progress(1.0);
+        let progress_future = a.finish();
         async move {
             progress_future.await;
             b

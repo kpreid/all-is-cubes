@@ -257,7 +257,7 @@ pub(crate) async fn demo_city(
     landscape_progress.progress(0.5).await;
     wavy_landscape(landscape_region, &mut space, &landscape_blocks, 1.0)?;
     planner.occupied_plots.push(landscape_region);
-    landscape_progress.progress(1.0).await;
+    landscape_progress.finish().await;
 
     // Clouds (needs to be done after landscape to not be overwritten)
     // TODO: Enable this once transparency rendering is better.
@@ -425,7 +425,7 @@ pub(crate) async fn demo_city(
             exhibit_time.as_secs_f32()
         );
 
-        exhibit_progress.progress(1.0).await;
+        exhibit_progress.finish().await;
     } // end per-exhibit loop
 
     final_progress.progress(0.0).await;
@@ -461,7 +461,7 @@ pub(crate) async fn demo_city(
         p.light = SpacePhysics::default().light;
         p
     });
-    final_progress.progress(1.0).await;
+    final_progress.finish().await;
 
     Ok(space)
 }

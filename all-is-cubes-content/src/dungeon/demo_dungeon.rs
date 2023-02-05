@@ -486,7 +486,7 @@ pub(crate) async fn demo_dungeon(
                 }),
             })
         });
-        maze_progress.progress(1.0).await;
+        maze_progress.finish().await;
         dungeon_map
     };
 
@@ -522,7 +522,7 @@ pub(crate) async fn demo_dungeon(
             },
             &landscape_blocks[LandscapeBlocks::Dirt],
         )?;
-        space_construction_progress.progress(1.0).await;
+        space_construction_progress.finish().await;
         space
     };
 
@@ -545,7 +545,7 @@ pub(crate) async fn demo_dungeon(
         // TODO: report progress
         // light_progress.progress(i.max_queue_priority as f32 / 255.0)
     });
-    light_progress.progress(1.0).await;
+    light_progress.finish().await;
 
     Ok(space)
 }
