@@ -157,6 +157,37 @@ impl YieldProgress {
         }
     }
 
+    /// Report the _beginning_ of a unit of work of size `progress_fraction` and described
+    /// by `label`. That fraction is cut off of the beginning range of `self`, and returned
+    /// as a separate [`YieldProgress`].
+    ///
+    /// ```no_run
+    /// # async fn foo() {
+    /// # use all_is_cubes::util::YieldProgress;
+    /// # let mut main_progress = YieldProgress::noop();
+    /// let a_progress = main_progress.start_and_cut(0.5, "task A").await;
+    /// // do task A...
+    /// a_progress.finish().await;
+    /// // continue using main_progress...
+    /// # }
+    /// ```
+    #[track_caller]
+    pub fn start_and_cut(
+        &mut self,
+        cut: f32,
+        label: impl fmt::Display,
+    ) -> impl Future<Output = Self> + Send + 'static {
+        let cut_abs = self.point_in_range(cut);
+        let mut portion = self.with_new_range(0.0, cut_abs);
+        self.start = cut_abs;
+
+        portion.set_label(label);
+        async {
+            portion.progress(0.0).await;
+            portion
+        }
+    }
+
     fn with_new_range(&self, start: f32, end: f32) -> Self {
         Self {
             start,
@@ -323,6 +354,24 @@ mod tests {
         assert_eq!(r.drain(), vec![Progress(0.5, "".into()), Yielded]);
         p2.progress(0.5).await;
         assert_eq!(r.drain(), vec![Progress(0.75, "".into()), Yielded]);
+    }
+
+    #[tokio::test]
+    async fn start_and_cut() {
+        let (mut p, mut r) = logging_yield_progress();
+
+        let piece = p.start_and_cut(0.5, "part 1").await;
+        assert_eq!(r.drain(), vec![Progress(0.0, "part 1".into()), Yielded]);
+
+        // The cut off piece is the first half.
+        piece.finish().await;
+        assert_eq!(r.drain(), vec![Progress(0.5, "part 1".into()), Yielded]);
+
+        // `p` is left with the remaining second half.
+        p.progress(0.5).await;
+        assert_eq!(r.drain(), vec![Progress(0.75, "".into()), Yielded]);
+        p.finish().await;
+        assert_eq!(r.drain(), vec![Progress(1.0, "".into()), Yielded, Dropped]);
     }
 
     // TODO: test split() and split_evenly()
