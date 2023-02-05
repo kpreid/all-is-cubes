@@ -60,7 +60,7 @@ enum WallFeature {
     /// Blank wall.
     Blank,
     /// Opening to a corridor.
-    Passage,
+    Passage { gate: bool },
     /// Window to the outside world.
     Window,
 }
@@ -114,6 +114,7 @@ impl DemoTheme {
         map: &GridArray<Option<DemoRoom>>,
         room_position: GridPoint,
         face: Face6,
+        has_gate: bool,
     ) -> Result<(), InGenError> {
         let passage_axis = face.axis_number();
 
@@ -136,6 +137,8 @@ impl DemoTheme {
         let wall_parallel = GridRotation::CLOCKWISE.transform(face);
         let parallel_axis = wall_parallel.axis_number();
         assert!(parallel_axis != 1);
+
+        let rotate_nz_to_face = GridRotation::from_to(Face6::NZ, face, Face6::PY).unwrap();
 
         let doorway_box = {
             let corridor_box = self
@@ -166,6 +169,28 @@ impl DemoTheme {
             &self.wall_block,
         )?;
         space.fill_uniform(doorway_box.abut(Face6::PY, 1).unwrap(), &self.wall_block)?; // TODO: ceiling block
+
+        // Gate
+        if has_gate {
+            let gate_box = doorway_box.abut(face, -1).unwrap().translate(
+                face.opposite().normal_vector() * doorway_box.size()[face.axis_number()] / 2,
+            );
+            let gate_side_1 = gate_box.abut(wall_parallel.opposite(), -1).unwrap();
+            let gate_side_2 = gate_box.abut(wall_parallel, -1).unwrap();
+            space.fill_uniform(
+                gate_side_2,
+                self.blocks[DungeonBlocks::Gate]
+                    .clone()
+                    .rotate(rotate_nz_to_face),
+            )?;
+            space.fill_uniform(
+                gate_side_1,
+                self.blocks[DungeonBlocks::GatePocket]
+                    .clone()
+                    .rotate(rotate_nz_to_face),
+            )?;
+            // TODO: add opening/closing mechanism and make some of these outright blocked
+        }
 
         Ok(())
     }
@@ -326,8 +351,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
             }
             1 => {
                 for face in [Face6::PX, Face6::PZ] {
-                    if let WallFeature::Passage = room_data.wall_features[face] {
-                        self.inside_doorway(space, map, room_position, face)?;
+                    if let WallFeature::Passage { gate } = room_data.wall_features[face] {
+                        self.inside_doorway(space, map, room_position, face, gate)?;
                     }
                 }
 
@@ -355,7 +380,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 
                     // Orient towards the first room's exit.
                     for face in Face6::ALL {
-                        if let WallFeature::Passage = room_data.wall_features[face] {
+                        if let WallFeature::Passage { .. } = room_data.wall_features[face] {
                             spawn.set_look_direction(face.normal_vector());
                             break;
                         }
@@ -448,7 +473,11 @@ pub(crate) async fn demo_dungeon(
                         // Bounds check is to work around the maze generator sometimes producing
                         // out-of-bounds passages.
                         if maze_field.has_passage(&direction) && neighbor_in_bounds {
-                            return WallFeature::Passage;
+                            return WallFeature::Passage {
+                                // TODO: generate gates that are actual puzzles with keys
+                                // or that cut off dead end rooms
+                                gate: rng.gen_bool(0.25),
+                            };
                         }
                     }
 
