@@ -1,7 +1,7 @@
 use std::f64::consts::TAU;
 
 use exhaust::Exhaust;
-use maze_generator::prelude::{Direction, FieldType, Generator};
+use maze_generator::prelude::{FieldType, Generator};
 use rand::prelude::SliceRandom;
 use rand::{Rng, SeedableRng};
 
@@ -23,7 +23,7 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{include_image, rgb_const};
 
-use crate::dungeon::{build_dungeon, d2f, m2gp, maze_to_array, DungeonGrid, Theme};
+use crate::dungeon::{build_dungeon, f2d, maze_to_array, DungeonGrid, Theme};
 use crate::{four_walls, tree, DemoBlocks, LandscapeBlocks};
 
 const WINDOW_PATTERN: [GridCoordinate; 3] = [-2, 0, 2];
@@ -38,10 +38,8 @@ struct DemoRoom {
     /// is not equal to `GridAab::ORIGIN_CUBE`.
     extended_bounds: GridAab,
 
-    /// Which faces have doors-to-corridors in them.
-    door_faces: FaceMap<bool>,
-    /// Which faces have windows to the outside in them.
-    windowed_faces: FaceMap<bool>,
+    /// Which walls/faces have something on them.
+    wall_features: FaceMap<WallFeature>,
 
     floor: FloorKind,
     corridor_only: bool,
@@ -55,6 +53,16 @@ impl DemoRoom {
     fn extended_map_bounds(&self) -> GridAab {
         self.extended_bounds
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WallFeature {
+    /// Blank wall.
+    Blank,
+    /// Opening to a corridor.
+    Passage,
+    /// Window to the outside world.
+    Window,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -241,7 +249,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     FloorKind::Bridge => {
                         let midpoint = point_to_enclosing_cube(floor_layer.center()).unwrap();
                         for direction in [Face6::NX, Face6::NZ, Face6::PX, Face6::PZ] {
-                            if room_data.door_faces[direction] {
+                            if room_data.wall_features[direction] != WallFeature::Blank {
                                 let wall_cube = point_to_enclosing_cube(
                                     floor_layer.abut(direction, -1).unwrap().center(),
                                 )
@@ -283,7 +291,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     interior.expand(FaceMap::repeat(1)),
                     |origin, along_wall, length, wall_excluding_corners_box| {
                         let wall = GridRotation::CLOCKWISE.transform(along_wall); // TODO: make four_walls provide this in a nice name
-                        if room_data.windowed_faces[wall] {
+                        if let WallFeature::Window = room_data.wall_features[wall] {
                             let midpoint = length / 2;
                             for step in WINDOW_PATTERN {
                                 let mut window_pos =
@@ -302,7 +310,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 )?;
 
                 // Ceiling light port (not handled by four_walls above)
-                if room_data.windowed_faces[Face6::PY] {
+                if let WallFeature::Window = room_data.wall_features[Face6::PY] {
                     let midpoint =
                         point_to_enclosing_cube(interior.abut(Face6::PY, 1).unwrap().center())
                             .unwrap();
@@ -318,7 +326,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
             }
             1 => {
                 for face in [Face6::PX, Face6::PZ] {
-                    if room_data.door_faces[face] {
+                    if let WallFeature::Passage = room_data.wall_features[face] {
                         self.inside_doorway(space, map, room_position, face)?;
                     }
                 }
@@ -347,7 +355,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 
                     // Orient towards the first room's exit.
                     for face in Face6::ALL {
-                        if room_data.door_faces[face] {
+                        if let WallFeature::Passage = room_data.wall_features[face] {
                             spawn.set_look_direction(face.normal_vector());
                             break;
                         }
@@ -431,39 +439,44 @@ pub(crate) async fn demo_dungeon(
                 FloorKind::Solid
             };
 
-            let windowed_faces = {
-                FaceMap::from_fn(|face| {
+            let wall_features = {
+                FaceMap::from_fn(|face| -> WallFeature {
+                    let neighbor = room_position + face.normal_vector();
+                    let neighbor_in_bounds = maze.bounds().contains_cube(neighbor);
+
+                    if let Some(direction) = f2d(face) {
+                        // Bounds check is to work around the maze generator sometimes producing
+                        // out-of-bounds passages.
+                        if maze_field.has_passage(&direction) && neighbor_in_bounds {
+                            return WallFeature::Passage;
+                        }
+                    }
+
                     // Create windows only if they look into space outside the maze
-                    let adjacent = m2gp(maze_field.coordinates) + face.normal_vector();
-                    if maze.bounds().contains_cube(adjacent) || corridor_only || face == Face6::NY {
+                    let have_window = if neighbor_in_bounds || corridor_only || face == Face6::NY {
                         false
                     } else if face == Face6::PY {
                         // ceilings are more common overall and we want more internally-lit ones
                         rng.gen_bool(0.25)
                     } else {
                         rng.gen_bool(0.75)
+                    };
+
+                    if have_window {
+                        WallFeature::Window
+                    } else {
+                        WallFeature::Blank
                     }
                 })
             };
 
-            let mut door_faces = FaceMap::default();
-            for direction in Direction::all() {
-                let face = d2f(direction);
-                let neighbor = room_position + face.normal_vector();
-                // contains_cube() check is to work around the maze generator sometimes producing
-                // out-of-bounds passages.
-                door_faces[face] =
-                    maze_field.has_passage(&direction) && maze.bounds().contains_cube(neighbor);
-            }
-
             Some(DemoRoom {
                 maze_field_type: maze_field.field_type,
                 extended_bounds,
-                door_faces,
-                windowed_faces,
+                wall_features,
                 floor,
                 corridor_only,
-                lit: !windowed_faces[Face6::PY] && rng.gen_bool(0.75),
+                lit: wall_features[Face6::PY] == WallFeature::Blank && rng.gen_bool(0.75),
                 grants_item: (matches!(floor, FloorKind::Solid)
                     && !corridor_only
                     && rng.gen_bool(0.5))

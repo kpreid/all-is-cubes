@@ -9,19 +9,20 @@ pub fn maze_to_array(maze: &Maze) -> GridArray<Field> {
     )
 }
 
-pub fn m2gp(p: maze_generator::prelude::Coordinates) -> GridPoint {
-    GridPoint::new(p.x, 0, p.y)
-}
+// pub fn m2gp(p: maze_generator::prelude::Coordinates) -> GridPoint {
+//     GridPoint::new(p.x, 0, p.y)
+// }
 
 pub fn gp2m(p: GridPoint) -> maze_generator::prelude::Coordinates {
     maze_generator::prelude::Coordinates { x: p.x, y: p.z }
 }
 
-pub fn d2f(direction: Direction) -> Face6 {
-    match direction {
-        Direction::North => Face6::NZ,
-        Direction::East => Face6::PX,
-        Direction::South => Face6::PZ,
-        Direction::West => Face6::NX,
-    }
+pub fn f2d(face: Face6) -> Option<Direction> {
+    Some(match face {
+        Face6::NZ => Direction::North,
+        Face6::PX => Direction::East,
+        Face6::PZ => Direction::South,
+        Face6::NX => Direction::West,
+        Face6::NY | Face6::PY => return None,
+    })
 }
