@@ -183,6 +183,7 @@ dependencies = [
  "anyhow",
  "async_fn_traits",
  "axum",
+ "clap 4.1.1",
  "include_dir",
  "mime_guess",
  "reqwest",

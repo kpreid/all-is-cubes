@@ -106,7 +106,9 @@ enum XtaskCommand {
     /// Run webpack dev server (for testing `all-is-cubes-wasm`).
     RunDev,
 
-    RunGameServer,
+    RunGameServer {
+        server_args: Vec<String>,
+    },
 
     /// Update dependency versions.
     Update,
@@ -200,7 +202,7 @@ fn main() -> Result<(), ActionError> {
             let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
             cmd!("npm start").run()?;
         }
-        XtaskCommand::RunGameServer => {
+        XtaskCommand::RunGameServer { server_args } => {
             update_server_static(&mut time_log)?;
 
             cargo()
@@ -208,6 +210,8 @@ fn main() -> Result<(), ActionError> {
                 .args(config.cargo_build_args())
                 .arg("--bin=aic-server")
                 .arg("--features=embed")
+                .arg("--")
+                .args(server_args)
                 .run()?;
         }
         XtaskCommand::Update => {
