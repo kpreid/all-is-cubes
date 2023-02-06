@@ -46,9 +46,12 @@
 // Crate-specific lint settings.
 #![forbid(unsafe_code)]
 
+use std::collections::BTreeSet;
 use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::fmt;
 use std::fs;
+use std::io;
 use std::io::Write as _;
 use std::mem;
 use std::path::Component;
@@ -106,7 +109,8 @@ enum XtaskCommand {
         duration: f64,
     },
 
-    /// Run webpack dev server (for testing `all-is-cubes-wasm`).
+    /// Run the game server inside of `cargo watch` (must be installed) and with options
+    /// suitable for development.
     RunDev,
 
     RunGameServer {
@@ -211,8 +215,13 @@ fn main() -> Result<(), ActionError> {
             }
         }
         XtaskCommand::RunDev => {
-            let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
-            cmd!("npm start").run()?;
+            // TODO: Replace cargo-watch with our own file watching built into the server
+            // so that we can avoid restarting it.
+            cargo()
+                .arg("watch")
+                .arg("-s")
+                .arg("cargo xtask run-game-server -- --client-source workspace --port 8080")
+                .run()?;
         }
         XtaskCommand::RunGameServer { server_args } => {
             update_server_static(&mut time_log)?;
@@ -228,9 +237,6 @@ fn main() -> Result<(), ActionError> {
         }
         XtaskCommand::Update => {
             cargo().arg("update").run()?;
-            let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
-            cmd!("npm update").run()?;
-            cmd!("npm install").run()?;
         }
         XtaskCommand::SetVersion { version } => {
             let version_value = toml_edit::value(version.as_str());
@@ -264,7 +270,6 @@ fn main() -> Result<(), ActionError> {
                 "Versions updated. Manual updates are still needed for:\n\
                 • Changelog\n\
                 • Documentation links in all-is-cubes/README.md\n\
-                • npm package\n\
                 "
             );
         }
@@ -350,12 +355,57 @@ fn exhaustive_test(config: &Config, time_log: &mut Vec<Timing>) -> Result<(), Ac
 /// the `embed` feature; needed for run regardless.
 fn update_server_static(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
     ensure_wasm_tools_installed(time_log)?;
-    {
+
+    // Run the compilation if needed, which ensures that the wasm binary is fresh.
+    // Note: This must use the same profile as the wasm-pack command is! (Both are dev for now)
+    cargo()
+        .arg("build")
+        .arg("--package=all-is-cubes-wasm")
+        .arg(TARGET_WASM)
+        .run()?;
+
+    // Run wasm-pack if and only if we need to.
+    // This is because it unconditionally runs `wasm-opt` which is slow and also means
+    // the files will be touched unnecessarily.
+    if newer_than(
+        ["target/wasm32-unknown-unknown/debug/all_is_cubes_wasm.wasm"],
+        ["all-is-cubes-wasm/pkg/all_is_cubes_wasm.js"],
+    ) {
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
-        cmd!("npm run-script build").run()?;
+        cmd!("wasm-pack build --dev --target web").run()?;
+    }
+
+    // Combine the static files and build results in the same way that webpack used to
+    // (This will need replacement if we get subdirectories)
+    let pkg_path = Path::new("all-is-cubes-wasm/pkg");
+    let pkg_files = dir_file_names(pkg_path)?;
+    let static_path = &Path::new("all-is-cubes-wasm/static");
+    let static_files = dir_file_names(static_path)?;
+    let dest_dir: &'static Path = Path::new("all-is-cubes-wasm/dist/");
+    fs::create_dir_all(dest_dir)?;
+    assert_eq!(
+        BTreeSet::intersection(&pkg_files, &static_files).next(),
+        None,
+        "conflicting files"
+    );
+    for src_file in pkg_files {
+        copy_file_with_context(&pkg_path.join(&src_file), &dest_dir.join(&src_file))?;
+    }
+    for src_file in static_files {
+        copy_file_with_context(&static_path.join(&src_file), &dest_dir.join(&src_file))?;
     }
 
     Ok(())
+}
+
+fn copy_file_with_context(src: &Path, dst: &Path) -> Result<u64, ActionError> {
+    fs::copy(src, dst).with_context(|| {
+        format!(
+            "copying {} to {}",
+            src.to_string_lossy(),
+            dst.to_string_lossy()
+        )
+    })
 }
 
 /// Run check or tests for all targets.
@@ -365,10 +415,7 @@ fn do_for_all_packages(
     features: Features,
     time_log: &mut Vec<Timing>,
 ) -> Result<(), ActionError> {
-    {
-        // Install npm-based tools for all-is-cubes-wasm build.
-        ensure_wasm_tools_installed(time_log)?;
-    }
+    ensure_wasm_tools_installed(time_log)?;
 
     // Ensure all-is-cubes-server build that might be looking for the files will succeed.
     // Note that this is only an “exists” check not a “up-to-date” check, on the assumption
@@ -406,8 +453,7 @@ fn do_for_all_packages(
     }
 
     // Check wasm-only code.
-    // (Supposedly, running `npm test` should run tests inside JS, but that seems
-    // to do nothing for me, so we're limited to confirming it compiles.)
+    // (TODO: Re-investigate running JS tests now that we dropped webpack.)
     {
         let _t = CaptureTime::new(time_log, format!("{op:?} all-is-cubes-wasm"));
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
@@ -507,11 +553,7 @@ where
 }
 
 fn ensure_wasm_tools_installed(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
-    if !Path::new("all-is-cubes-wasm/node_modules/.bin/webpack").exists() {
-        let _t = CaptureTime::new(time_log, "npm install");
-        let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
-        cmd!("npm install").run()?;
-    }
+    // TODO: check that wasm-pack is installed
 
     // Generate combined license file.
     let license_html_path = PROJECT_DIR.join("all-is-cubes-wasm/static/third-party-licenses.html");
@@ -520,6 +562,7 @@ fn ensure_wasm_tools_installed(time_log: &mut Vec<Timing>) -> Result<(), ActionE
         [&PROJECT_DIR.join("Cargo.lock"), &license_template_path],
         [&license_html_path],
     ) {
+        let _t = CaptureTime::new(time_log, "cargo about generate");
         // TODO: also ensure cargo-about is installed and has at least the expected version
         cargo()
             .args([
@@ -633,6 +676,12 @@ where
         None => true, // some file did not exist
         Some(t) => newest_input >= t,
     }
+}
+
+fn dir_file_names(dir: &Path) -> Result<BTreeSet<OsString>, io::Error> {
+    fs::read_dir(dir)?
+        .map(|entry_result| entry_result.map(|entry| entry.file_name()))
+        .collect::<Result<BTreeSet<OsString>, io::Error>>()
 }
 
 /// Describe how long a sub-task took.

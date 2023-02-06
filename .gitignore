@@ -2,12 +2,11 @@
 /target
 /*/target
 
-# JavaScript (NPM) dependency and build output files
-/all-is-cubes-wasm/node_modules
+# Web/wasm dependency and build output files
 /all-is-cubes-wasm/dist
 /all-is-cubes-wasm/pkg
 
-# Generated file (by xtask) which is an input to NPM build
+# Generated file (by xtask)
 /all-is-cubes-wasm/static/third-party-licenses.html
 
 # Tool outputs

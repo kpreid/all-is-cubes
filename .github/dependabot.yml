@@ -1,13 +1,5 @@
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/all-is-cubes-wasm/"
-    schedule:
-      interval: "weekly"
-      time: "17:00"
-      timezone: "America/Los_Angeles"
-    versioning-strategy: "increase"
-
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:

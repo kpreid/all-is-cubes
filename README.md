@@ -17,7 +17,7 @@ This repository is divided into several Rust packages:
 * `all-is-cubes-ui/` is a library containing a widget framework and basic user interface functions (not platform-specific).
 * `all-is-cubes-content/` is a library containing “game content” — procedural generation and demos — that does not need to be part of the core library but is used by all of the below binaries.
 * `all-is-cubes-desktop/` is a standalone game app which will use `winit` and `wgpu` for platform windowing & graphics, or ASCII-art raytracing in the terminal.
-* `all-is-cubes-wasm/` is the game app code for the browser/WebAssembly environment (if compiled outside of `wasm32` architecture, it will be empty). It is also a NPM package, which embeds the Rust code by way of `wasm-pack`. In order to use this, you must use either webpack-dev-server or the web server described next.
+* `all-is-cubes-wasm/` is the game app code for the browser/WebAssembly environment (if compiled outside of `wasm32` architecture, it will be an empty crate).
 * `all-is-cubes-server/` is to be a network server for the game, but right now only contains a preconfigured HTTP static file server.
 
 Building and running
@@ -25,8 +25,7 @@ Building and running
 
 **First time setup:** Unless you don't intend to build the WebAssembly/WebGL version of all-is-cubes or run the full test suite, you will need to install
 
-* `npm` (use your choice of source)
-* `wasm-pack` (I suggest `cargo install wasm-pack`)
+* `wasm-pack` (`cargo install wasm-pack`)
 * [`cargo-about`] (`cargo install cargo-about`)
 
 (If you would like to avoid all of this, then descend into the `all-is-cubes` or `all-is-cubes-desktop` directories as applicable and work using plain `cargo [build|test|run]` there, since those directories contain no web dependencies.)
@@ -39,9 +38,7 @@ Because of the complication of having some wasm-specific code, some commands for
 
 *   Build and lint all the code: `cargo xtask lint`
 
-*   Development server: `cargo xtask run-dev`
-
-    Note: the webpack-dev-server will automatically rebuild when files change *unless those files are outside of `all-is-cubes-wasm/`,* unfortunately.
+*   Wasm development server: `cargo xtask run-dev`
 
 *   Run the desktop/console game: `cargo run --bin all-is-cubes -- <options>`
 

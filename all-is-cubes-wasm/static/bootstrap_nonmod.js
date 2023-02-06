@@ -1,7 +1,7 @@
 // This file is the non-module entry point which will be loaded from HTML.
 
 document.getElementById('loading-log').innerText = 'Loading code...';
-import("../js/bootstrap.js").then(module => {
+import("./bootstrap.js").then(module => {
   module.bootstrap();
 }).catch(error => {
   document.getElementById('loading-log').innerText +=
