@@ -9,6 +9,7 @@ use tokio::io::AsyncBufReadExt;
 
 async fn with_server<F: AsyncFnOnce1<Url, Output = ()>>(f: F) {
     let mut server = tokio::process::Command::new(env!("CARGO_BIN_EXE_aic-server"))
+        .args(["--client-source=workspace"])
         .kill_on_drop(true)
         .stdout(Stdio::piped())
         .spawn()
