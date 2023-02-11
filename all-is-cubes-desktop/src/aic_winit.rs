@@ -287,18 +287,25 @@ fn handle_winit_event<Ren: RendererToWinit>(
                     // TODO: disable rendering if occluded
                 }
 
-                // Unused
+                // File drop
+                // TODO: Handle multiple files and hover feedback
+                // (need all-is-cubes-ui mechanisms to help with this)
                 WindowEvent::HoveredFile(_) => {}
                 WindowEvent::DroppedFile(path) => {
                     dsession.replace_universe_with_file(path);
                 }
                 WindowEvent::HoveredFileCancelled => {}
+
+                // Unused
                 WindowEvent::Moved(_) => {}
                 WindowEvent::Destroyed => {}
                 WindowEvent::TouchpadPressure { .. } => {}
                 WindowEvent::AxisMotion { .. } => {}
                 WindowEvent::Touch(_) => {}
                 WindowEvent::ThemeChanged(_) => {}
+                WindowEvent::TouchpadMagnify { .. } => {}
+                WindowEvent::SmartMagnify { .. } => {}
+                WindowEvent::TouchpadRotate { .. } => {}
             }
         }
         Event::DeviceEvent {
