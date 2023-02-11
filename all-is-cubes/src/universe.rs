@@ -449,7 +449,7 @@ impl fmt::Display for InsertError {
 /// Performance data returned by [`Universe::step`]. The exact contents of this structure
 /// are unstable; use only `Debug` formatting to examine its contents unless you have
 /// a specific need for one of the values.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
 pub struct UniverseStepInfo {
     #[doc(hidden)]

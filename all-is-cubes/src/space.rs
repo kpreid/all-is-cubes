@@ -6,6 +6,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex, Weak};
 
 use cgmath::Vector3;
+use instant::{Duration, Instant};
 
 use crate::behavior::{self, BehaviorSet};
 use crate::block::{
@@ -25,7 +26,7 @@ use crate::math::{
 use crate::time::Tick;
 use crate::transaction::{Merge, Transaction as _};
 use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
-use crate::util::ConciseDebug;
+use crate::util::{ConciseDebug, TimeStats};
 use crate::util::{CustomFormat, StatusText};
 
 mod builder;
@@ -601,6 +602,8 @@ impl Space {
         tick: Tick,
     ) -> (SpaceStepInfo, UniverseTransaction) {
         // Process changed block definitions.
+        let mut last_start_time = Instant::now();
+        let mut evaluations = TimeStats::default();
         for block_index in self.todo.lock().unwrap().blocks.drain() {
             self.notifier.notify(SpaceChange::BlockValue(block_index));
             let data: &mut SpaceBlockData = &mut self.block_data[usize::from(block_index)];
@@ -611,12 +614,18 @@ impl Space {
             data.evaluated = data.block.evaluate().expect("block reevaluation failed");
             // TODO: Process side effects on individual cubes such as reevaluating the
             // lighting influenced by the block.
+
+            evaluations.record_consecutive_interval(&mut last_start_time, Instant::now());
         }
+
+        let start_cube_ticks = last_start_time;
 
         // Process cubes_wanting_ticks.
         let mut tick_txn = SpaceTransaction::default();
         // TODO: don't empty the queue until the transaction succeeds
-        for position in std::mem::take(&mut self.cubes_wanting_ticks) {
+        let cubes_to_tick = std::mem::take(&mut self.cubes_wanting_ticks);
+        let count_cubes_ticked = cubes_to_tick.len();
+        for position in cubes_to_tick {
             if let Some(brush) = self.get_evaluated(position).attributes.tick_action.as_ref() {
                 // TODO: nonconserved should be at the block's choice
                 tick_txn = tick_txn
@@ -626,7 +635,12 @@ impl Space {
         }
         // TODO: We need a strategy for, if this transaction fails, trying again while finding
         // the non-conflicting pieces in a deterministic fashion.
+        // TODO: Should this potentially conflict with space behaviors?
+        //   Argument for: consistency; argument against: we don't need it for update-order
+        //   determinism since the order is fixed
         let _ignored_failure = tick_txn.execute(self, &mut drop);
+
+        let cube_ticks_to_space_behaviors = Instant::now();
 
         let mut transaction = UniverseTransaction::default();
         if let Some(self_ref) = self_ref {
@@ -640,9 +654,23 @@ impl Space {
             }
         }
 
+        let space_behaviors_to_lighting = Instant::now();
+
         let light = self.update_lighting_from_queue();
 
-        (SpaceStepInfo { spaces: 1, light }, transaction)
+        (
+            SpaceStepInfo {
+                spaces: 1,
+                evaluations,
+                cube_ticks: count_cubes_ticked,
+                cube_time: cube_ticks_to_space_behaviors
+                    .saturating_duration_since(start_cube_ticks),
+                behaviors_time: space_behaviors_to_lighting
+                    .saturating_duration_since(cube_ticks_to_space_behaviors),
+                light,
+            },
+            transaction,
+        )
     }
 
     /// Perform lighting updates until there are none left to do. Returns the number of
@@ -1156,11 +1184,28 @@ pub enum SpaceChange {
 /// Performance data returned by [`Space::step`]. The exact contents of this structure
 /// are unstable; use only `Debug` formatting to examine its contents unless you have
 /// a specific need for one of the values.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
 pub struct SpaceStepInfo {
     /// Number of spaces whose updates were aggregated into this value.
     pub spaces: usize,
+
+    /// Time and count of block re-evaluations.
+    ///
+    /// Note that this does not count evaluations resulting from modifications
+    /// that add new blocks to the space.
+    pub evaluations: TimeStats,
+
+    /// Number of individual cubes processed (`tick_action`).
+    cube_ticks: usize,
+
+    /// Time spent on processing individual cube updates
+    /// (measured as a whole because transaction conflict checking is needed),
+    cube_time: Duration,
+
+    /// Time spent on processing behaviors.
+    behaviors_time: Duration,
+
     /// Performance data about light updates within the space.
     pub light: LightUpdatesInfo,
 }
@@ -1171,15 +1216,41 @@ impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
             return;
         }
         self.spaces += other.spaces;
+        self.evaluations += other.evaluations;
+        self.cube_ticks += other.cube_ticks;
+        self.cube_time += other.cube_time;
+        self.behaviors_time += other.behaviors_time;
         self.light += other.light;
     }
 }
 impl CustomFormat<StatusText> for SpaceStepInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
-        write!(fmt, "{} spaces: ", self.spaces)?;
+        let Self {
+            spaces,
+            evaluations,
+            cube_ticks,
+            cube_time,
+            behaviors_time,
+            light,
+        } = self;
         if self.spaces > 0 {
-            write!(fmt, "Relighting: {}", self.light.custom_format(StatusText))?;
+            let light = light.custom_format(StatusText);
+            let cube_time = cube_time.custom_format(StatusText);
+            let behaviors_time = behaviors_time.custom_format(StatusText);
+            write!(
+                fmt,
+                "\
+                {spaces} spaces' steps:\n\
+                Block reeval: {evaluations}\n\
+                Cubes: {cube_ticks} cubes ticked in {cube_time}\n\
+                Behaviors: {behaviors_time}\n\
+                Light: {light}\
+                "
+            )?;
+        } else {
+            write!(fmt, "No spaces stepped")?;
         }
+
         Ok(())
     }
 }
