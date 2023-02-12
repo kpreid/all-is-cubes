@@ -210,7 +210,7 @@ impl universe::VisitRefs for Move {
 mod tests {
     use cgmath::EuclideanSpace;
 
-    use crate::block::{Block, EvaluatedBlock, Evoxel, Resolution::*};
+    use crate::block::{Block, Composite, EvaluatedBlock, Evoxel, Resolution::*};
     use crate::content::make_some_blocks;
     use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgba};
     use crate::space::Space;
@@ -358,5 +358,72 @@ mod tests {
             assert_eq!(&space[[0, 0, 0]], &AIR);
             assert_eq!(&space[[1, 0, 0]], block);
         });
+    }
+
+    /// Test [`Move`] acting within another modifier ([`Composite`]).
+    #[test]
+    fn move_inside_composite_destination() {
+        let [base, extra] = make_some_blocks();
+        let composite = Composite::new(extra, block::CompositeOperator::Over);
+
+        let block = base
+            .clone()
+            .with_modifier(Move {
+                direction: Face6::PX,
+                distance: 10,
+                velocity: 10,
+            })
+            .with_modifier(composite.clone());
+
+        let expected_after_tick = base
+            .clone()
+            .with_modifier(Move {
+                direction: Face6::PX,
+                distance: 20,
+                velocity: 10,
+            })
+            .with_modifier(composite);
+
+        assert_eq!(
+            block.evaluate().unwrap().attributes.tick_action,
+            Some(VoxelBrush::single(expected_after_tick))
+        );
+    }
+
+    /// Test [`Move`] acting within the `source` position of a [`Modifier::Composite`].
+    ///
+    /// TODO: This is not yet implemented, but should be.
+    #[test]
+    fn move_inside_composite_source() {
+        let [base, extra] = make_some_blocks();
+
+        let block = extra.clone().with_modifier(Composite::new(
+            base.clone().with_modifier(Move {
+                direction: Face6::PX,
+                distance: 10,
+                velocity: 10,
+            }),
+            block::CompositeOperator::Over,
+        ));
+
+        let expected_after_tick = extra.clone().with_modifier(Composite::new(
+            base.clone().with_modifier(Move {
+                direction: Face6::PX,
+                distance: 10,
+                velocity: 10,
+            }),
+            block::CompositeOperator::Over,
+        ));
+
+        if false {
+            // This is what we want to happen
+            assert_eq!(
+                block.evaluate().unwrap().attributes.tick_action,
+                Some(VoxelBrush::single(expected_after_tick))
+            );
+        } else {
+            // Placeholder to fail if the current behavior changes
+            assert_eq!(block.evaluate().unwrap().attributes.tick_action, None);
+        }
     }
 }
