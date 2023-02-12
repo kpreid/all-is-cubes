@@ -3757,18 +3757,6 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.17.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a34cc558345efd7e88b9eda9626df2138b80bb46a7606f695e751c892bc7dac6"
-dependencies = [
- "indexmap",
- "itertools",
- "nom8",
- "toml_datetime 0.5.1",
-]
-
-[[package]]
-name = "toml_edit"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56c59d8dd7d0dcbc6428bf7aa2f0e823e26e43b3c9aca15bbc9475d23e5fa12b"
@@ -4521,7 +4509,7 @@ dependencies = [
  "cargo_metadata",
  "clap 4.1.4",
  "once_cell",
- "toml_edit 0.17.1",
+ "toml_edit 0.19.1",
  "xshell",
 ]
 
