@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::{self, Display};
+use std::fmt;
 use std::hash::Hash;
 use std::ops::Index;
 
@@ -42,13 +42,13 @@ pub trait DefaultProvision {
 ///
 /// The names of the [`Universe`]'s corresponding [`BlockDef`]s are formed by
 /// combining the [`namespace()`](Self::namespace) and `self.to_string()` (the
-/// [`Display`] trait implementation).
+/// [`Display`](fmt::Display) trait implementation).
 ///
 /// Implement this trait for an enum, then use the functions of
 /// [`BlockProvider`] to work with the described set of blocks.
 ///
 /// TODO: consider replacing Display with a separate method so as not to presume its meaning
-pub trait BlockModule: Exhaust + Display + Eq + Hash + Clone {
+pub trait BlockModule: Exhaust + fmt::Debug + fmt::Display + Eq + Hash + Clone {
     /// A namespace for the members of this module; currently, this should be a
     /// `/`-separated path with no trailing slash, but (TODO:) we should have a
     /// more rigorous namespace scheme for [`Name`]s in future versions.
@@ -124,7 +124,7 @@ where
     /// Returns an error if any of the blocks are not defined in that universe.
     pub fn using(universe: &Universe) -> Result<BlockProvider<E>, ProviderError>
     where
-        E: Eq + Hash + Display,
+        E: Eq + Hash + fmt::Display,
     {
         let mut found: HashMap<E, URef<BlockDef>> = HashMap::new();
         let mut missing = Vec::new();
@@ -162,6 +162,59 @@ where
             let block: &Block = &self.map[&key];
             (key, block)
         })
+    }
+}
+
+/// These methods do not require `E` to be a [`BlockModule`].
+impl<E: Exhaust + fmt::Debug + Clone + Eq + Hash> BlockProvider<E> {
+    /// Alternative to [`Self::new()`] which is neither async nor fallible.
+    fn new_sync<F>(mut definer: F) -> Self
+    where
+        F: FnMut(E) -> Block,
+    {
+        BlockProvider {
+            map: E::exhaust()
+                .map(|key| (key.clone(), definer(key)))
+                .collect(),
+        }
+    }
+
+    /// Create another [`BlockProvider`] with different keys that map into a subset of
+    /// this provider's keys.
+    ///
+    /// TODO: add a test
+    #[must_use]
+    pub fn subset<K: Exhaust + fmt::Debug + Clone + Eq + Hash>(
+        &self,
+        function: impl Fn(K) -> E,
+    ) -> BlockProvider<K> {
+        BlockProvider::new_sync(|key: K| self[function(key)].clone())
+    }
+
+    /// Create another [`BlockProvider`] with a modification to each block.
+    #[must_use]
+    pub fn map(&self, mut function: impl FnMut(&E, &Block) -> Block) -> Self {
+        BlockProvider {
+            map: self
+                .map
+                .iter()
+                .map(|(key, block)| {
+                    let block = function(key, block);
+                    (key.clone(), block)
+                })
+                .collect(),
+        }
+    }
+
+    #[cfg(test)]
+    fn consistency_check(&self) {
+        use std::collections::HashSet;
+        let expected_keys: HashSet<E> = E::exhaust().collect();
+        let actual_keys: HashSet<E> = self.map.keys().cloned().collect();
+        assert_eq!(
+            expected_keys, actual_keys,
+            "BlockProvider keys are not as expected"
+        );
     }
 }
 
@@ -286,9 +339,49 @@ impl From<GenError> for InGenError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::Resolution::*;
+    use crate::block::{Quote, Resolution::*};
+    use crate::content::make_some_blocks;
     use crate::math::GridAab;
     use crate::util::assert_send_sync;
+
+    #[derive(Exhaust, Clone, Debug, Eq, Hash, PartialEq)]
+    enum Key {
+        A,
+        B,
+        C,
+    }
+
+    fn test_provider() -> ([Block; 3], BlockProvider<Key>) {
+        let blocks = make_some_blocks();
+        let provider = BlockProvider::new_sync(|k: Key| match k {
+            Key::A => blocks[0].clone(),
+            Key::B => blocks[1].clone(),
+            Key::C => blocks[2].clone(),
+        });
+        provider.consistency_check();
+
+        (blocks, provider)
+    }
+
+    #[test]
+    fn provider_subset() {
+        let (_, p1) = test_provider();
+        let p2 = p1.subset(|x: bool| if x { Key::A } else { Key::B });
+        p2.consistency_check();
+        assert_eq!(p1[Key::A], p2[true]);
+        assert_eq!(p1[Key::B], p2[false]);
+    }
+
+    #[test]
+    fn provider_map() {
+        let (_, p1) = test_provider();
+        let p2 = p1.map(|_, block| block.clone().with_modifier(Quote::default()));
+        p2.consistency_check();
+        assert_eq!(
+            p1[Key::A].clone().with_modifier(Quote::default()),
+            p2[Key::A],
+        );
+    }
 
     #[test]
     fn errors_are_send_sync() {
