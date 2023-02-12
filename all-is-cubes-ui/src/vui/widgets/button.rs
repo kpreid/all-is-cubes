@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt;
+use std::hash::Hash;
 use std::sync::Arc;
 
 use exhaust::Exhaust;
@@ -58,8 +59,11 @@ impl ActionButton {
         action: impl Fn() + Send + Sync + 'static,
     ) -> Arc<Self> {
         let state = ActionButtonVisualState::default();
+        let blocks = theme
+            .subset(UiBlocks::ActionButton)
+            .map(|state, base_block| assemble_button(state, base_block.clone(), label.clone()));
         Arc::new(Self {
-            block: assemble_button_via_provider(theme, state, UiBlocks::ActionButton, label),
+            block: blocks[state].clone(),
             action: EphemeralOpaque::from(Arc::new(action) as Arc<dyn Fn() + Send + Sync>),
         })
     }
@@ -128,7 +132,7 @@ impl vui::WidgetController for ActionButtonController {
 /// [`ListenableSource`] and can be clicked.
 #[derive(Clone)]
 pub struct ToggleButton<D> {
-    states: [Block; 2],
+    blocks: linking::BlockProvider<ToggleButtonVisualState>,
     data_source: ListenableSource<D>,
     projection: Arc<dyn Fn(&D) -> bool + Send + Sync>,
     action: Action,
@@ -137,7 +141,7 @@ pub struct ToggleButton<D> {
 impl<D: Clone + Sync + fmt::Debug> fmt::Debug for ToggleButton<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ToggleButton")
-            .field("states", &self.states)
+            .field("blocks", &self.blocks)
             .field("data_source", &self.data_source)
             .field(
                 "projection(data_source)",
@@ -156,23 +160,13 @@ impl<D> ToggleButton<D> {
         theme: &linking::BlockProvider<UiBlocks>,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Arc<Self> {
+        let blocks = theme
+            .subset(UiBlocks::ToggleButton)
+            .map(|state, base_block| assemble_button(state, base_block.clone(), label.clone()));
         Arc::new(Self {
+            blocks,
             data_source,
             projection: Arc::new(projection),
-            states: [
-                assemble_button_via_provider(
-                    theme,
-                    ToggleButtonVisualState::new(false),
-                    UiBlocks::ToggleButton,
-                    label.clone(),
-                ),
-                assemble_button_via_provider(
-                    theme,
-                    ToggleButtonVisualState::new(true),
-                    UiBlocks::ToggleButton,
-                    label,
-                ),
-            ],
             action: EphemeralOpaque::from(Arc::new(action) as Arc<dyn Fn() + Send + Sync>),
         })
     }
@@ -240,11 +234,8 @@ struct ToggleButtonController<D: Clone + Send + Sync> {
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> ToggleButtonController<D> {
     fn icon_txn(&self) -> vui::WidgetTransaction {
         let value = (self.definition.projection)(&self.definition.data_source.get());
-        SpaceTransaction::set_cube(
-            self.position,
-            None,
-            Some(self.definition.states[usize::from(value)].clone()),
-        )
+        let block = self.definition.blocks[ToggleButtonVisualState { value }].clone();
+        SpaceTransaction::set_cube(self.position, None, Some(block))
     }
 }
 
@@ -289,16 +280,6 @@ fn assemble_button(base: &dyn ButtonBase, base_block: Block, label_block: Block)
         shifted_label,
         block::CompositeOperator::Over,
     ))
-}
-
-/// TODO: do this more elegantly somehow
-pub(crate) fn assemble_button_via_provider<B: Copy + ButtonBase, M: linking::BlockModule>(
-    blocks: &linking::BlockProvider<M>,
-    base: B,
-    ctor: fn(B) -> M,
-    label_block: Block,
-) -> Block {
-    assemble_button(&base, blocks[ctor(base)].clone(), label_block)
 }
 
 /// Returns a [`DrawTarget`] for drawing the button label, with a

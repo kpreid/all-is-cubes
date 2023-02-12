@@ -93,7 +93,7 @@ where
         B: Into<Block>,
     {
         let count = E::exhaust().count();
-        let mut map = HashMap::new();
+        let mut map = HashMap::with_capacity(count);
         for (key, progress) in E::exhaust().zip(progress.split_evenly(count)) {
             let block: Block = definer(key.clone())
                 .map_err(|e| GenError::failure(e, name_in_module(&key)))?
