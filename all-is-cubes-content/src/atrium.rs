@@ -639,9 +639,7 @@ fn lookup_multiblock_2d(
     ctor: AtriumBlocks,
     [x, y]: [GridCoordinate; 2],
 ) -> Block {
-    let mut block = blocks[ctor].clone();
-    block
-        .modifiers_mut()
-        .push(Zoom::new(MULTIBLOCK_SCALE, GridPoint::new(0, y, x)).into());
-    block
+    blocks[ctor]
+        .clone()
+        .with_modifier(Zoom::new(MULTIBLOCK_SCALE, GridPoint::new(0, y, x)))
 }

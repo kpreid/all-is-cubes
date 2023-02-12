@@ -223,6 +223,17 @@ impl Block {
         }
     }
 
+    /// Add the given modifier to this block.
+    ///
+    /// This is a convenience operation which is exactly equivalent to
+    /// doing `block.modifiers_mut().push(modifier.into())`. It does not do any of the
+    /// special case logic that, for example, [`Block::rotate()`] does.
+    #[must_use]
+    pub fn with_modifier(mut self, modifier: impl Into<Modifier>) -> Self {
+        self.modifiers_mut().push(modifier.into());
+        self
+    }
+
     /// Rotates this block by the specified rotation.
     ///
     /// Compared to direct use of [`Modifier::Rotate`], this will:
@@ -230,7 +241,8 @@ impl Block {
     /// * Avoid constructing chains of redundant modifiers.
     /// * Not rotate blocks that should never appear rotated (including atom blocks).
     ///
-    /// (TODO: This should be replaced with an `add_modifier()` with general rules)
+    /// (TODO: This should be replaced with `with_modifier()` or similar having a general
+    /// rule set for combining modifiers.)
     ///
     /// ```
     /// use all_is_cubes::block::{AIR, Block, Modifier};

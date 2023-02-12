@@ -637,14 +637,10 @@ async fn COMPOSITE(_: &Exhibit, universe: &mut Universe) {
 
     for (di, destination) in destinations.into_iter().enumerate() {
         for (si, source) in sources.into_iter().enumerate() {
-            let mut composite = destination.clone();
-            composite.modifiers_mut().push(
-                Composite::new(
-                    source.clone().rotate(GridRotation::CLOCKWISE),
-                    CompositeOperator::Over,
-                )
-                .into(),
-            );
+            let composite = destination.clone().with_modifier(Composite::new(
+                source.clone().rotate(GridRotation::CLOCKWISE),
+                CompositeOperator::Over,
+            ));
 
             // TODO: stop using draw_to_blocks for these in favor of widgets?
             // or at least extract this to a function since 3 exhibits have them
@@ -698,13 +694,19 @@ async fn MOVED_BLOCKS(_: &Exhibit, universe: &mut Universe) {
             let block = &blocks[i as usize];
             let [move_out, move_in] = Move::paired_move(Face6::PY, distance, 0);
             // TODO: Move should be able to spawn a "tail" on its own when animated?
-            space.set([x * 2, 0, (1 - z) * 2], move_out.attach(block.clone()))?;
-            space.set([x * 2, 1, (1 - z) * 2], move_in.attach(block.clone()))?;
+            space.set(
+                [x * 2, 0, (1 - z) * 2],
+                block.clone().with_modifier(move_out),
+            )?;
+            space.set(
+                [x * 2, 1, (1 - z) * 2],
+                block.clone().with_modifier(move_in),
+            )?;
 
             // Horizontal
             let [move_out, move_in] = Move::paired_move(Face6::PZ, distance, 0);
-            space.set([i, 0, -2], move_out.attach(block.clone()))?;
-            space.set([i, 0, -1], move_in.attach(block.clone()))?;
+            space.set([i, 0, -2], block.clone().with_modifier(move_out))?;
+            space.set([i, 0, -1], block.clone().with_modifier(move_in))?;
         }
     }
     Ok(space)

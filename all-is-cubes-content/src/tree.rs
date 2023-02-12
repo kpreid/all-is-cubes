@@ -86,7 +86,7 @@ pub(crate) fn make_log(
         );
         leaves_composite.reverse = true; // wood always wins
         leaves_composite.disassemblable = true;
-        block::Modifier::from(leaves_composite).attach(wood)
+        wood.with_modifier(leaves_composite)
     } else {
         wood
     }

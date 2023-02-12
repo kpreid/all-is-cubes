@@ -17,6 +17,8 @@
     - `block::Block::unspecialize()` now returns `Vec<Block>`, to allow for cases where a block comes apart into multiple parts, such as with `Modifier::Composite`.
     - `block::EvaluatedBlock` now has a `voxels` field of the new type `Evoxels`, which replaces the previous `resolution` and `voxels` fields.
       This simplifies the data model, in that there is now _always_ a set of `Evoxel`s defining a block's shape, even if there's only one of them, and it is always found in the `voxels` field. This is a breaking change for code that accesses `EvaluatedBlock` data.
+    - `block::Modifier::attach()` has been replaced by `block::Block::with_modifier()`.
+      This is intended to be more convenient in all cases.
     - `block::AIR` now has its own dedicated primitive, `Primitive::Air`. The behavior is unchanged.
     - `transaction::Transaction` can now produce any number of `Output`s, delivered through a callback.
     - `universe::UniverseTransaction::insert()` now takes a `URef` created by `URef::new_pending()`, instead of a bare value.

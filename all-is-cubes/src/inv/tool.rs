@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use std::{fmt, hash};
 
-use crate::block::{self, Block, Modifier, Primitive, RotationPlacementRule, AIR};
+use crate::block::{self, Block, Primitive, RotationPlacementRule, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::fluff::Fluff;
 use crate::inv::{self, Icons, InventoryTransaction, StackLimit};
@@ -197,12 +197,12 @@ impl Tool {
                 let leaving = input.set_cube(
                     cursor.cube(),
                     cursor.hit().block.clone(),
-                    move_out.attach(cursor.hit().block.clone()),
+                    cursor.hit().block.clone().with_modifier(move_out),
                 )?;
                 let entering = input.set_cube(
                     cursor.cube() + direction.normal_vector(),
                     AIR,
-                    move_in.attach(cursor.hit().block.clone()),
+                    cursor.hit().block.clone().with_modifier(move_in),
                 )?;
                 Ok((
                     Some(self),
@@ -256,7 +256,7 @@ impl Tool {
             // TODO: InfiniteBlocks should have a different name and appearance
             // (or maybe that distinction should appear in the quantity-text field)
             Self::Block(block) | Self::InfiniteBlocks(block) => {
-                Cow::Owned(Modifier::from(block::Quote::default()).attach(block.clone()))
+                Cow::Owned(block.clone().with_modifier(block::Quote::default()))
             }
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
             Self::EditBlock => Cow::Borrowed(&predefined[Icons::EditBlock]),
@@ -700,10 +700,9 @@ mod tests {
         let [block] = make_some_blocks();
         assert_eq!(
             *Tool::InfiniteBlocks(block.clone()).icon(&dummy_icons),
-            Modifier::Quote(block::Quote {
+            block.with_modifier(block::Quote {
                 suppress_ambient: false
-            })
-            .attach(block),
+            }),
         );
     }
 

@@ -210,7 +210,7 @@ impl universe::VisitRefs for Move {
 mod tests {
     use cgmath::EuclideanSpace;
 
-    use crate::block::{Block, EvaluatedBlock, Evoxel, Modifier, Resolution::*};
+    use crate::block::{Block, EvaluatedBlock, Evoxel, Resolution::*};
     use crate::content::make_some_blocks;
     use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgba};
     use crate::space::Space;
@@ -223,12 +223,11 @@ mod tests {
     fn move_atom_block_evaluation() {
         let color = rgba_const!(1.0, 0.0, 0.0, 1.0);
         let original = Block::from(color);
-        let modifier = Modifier::from(Move {
+        let moved = original.clone().with_modifier(Move {
             direction: Face6::PY,
             distance: 128, // distance 1/2 block × scale factor of 256
             velocity: 0,
         });
-        let moved = modifier.attach(original.clone());
 
         let expected_bounds = GridAab::from_lower_size([0, 8, 0], [16, 8, 16]);
 
@@ -265,12 +264,11 @@ mod tests {
             .unwrap()
             .build();
 
-        let modifier = Modifier::from(Move {
+        let moved = original.clone().with_modifier(Move {
             direction: Face6::PY,
             distance: 128, // distance 1/2 block × scale factor of 256
             velocity: 0,
         });
-        let moved = modifier.attach(original.clone());
 
         let expected_bounds = GridAab::from_lower_size([0, 1, 0], [2, 1, 2]);
 
@@ -305,12 +303,11 @@ mod tests {
             .color(Rgba::WHITE)
             .tick_action(Some(VoxelBrush::single(AIR)))
             .build();
-        let moved = Modifier::from(Move {
+        let moved = original.with_modifier(Move {
             direction: Face6::PY,
             distance: 128,
             velocity: 0,
-        })
-        .attach(original);
+        });
 
         assert_eq!(moved.evaluate().unwrap().attributes.tick_action, None);
     }
@@ -321,12 +318,12 @@ mod tests {
         let mut space = Space::empty(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2]));
         let [move_out, move_in] = Move::paired_move(direction, 0, velocity);
         space
-            .set([0, 0, 0], move_out.attach(block.clone()))
+            .set([0, 0, 0], block.clone().with_modifier(move_out))
             .unwrap();
         space
             .set(
                 GridPoint::origin() + direction.normal_vector(),
-                move_in.attach(block.clone()),
+                block.clone().with_modifier(move_in),
             )
             .unwrap();
         let mut universe = Universe::new();

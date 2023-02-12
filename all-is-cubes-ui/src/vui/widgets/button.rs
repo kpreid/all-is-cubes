@@ -279,18 +279,16 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
 /// `base` mus be the `ButtonBase` that produced `base_block`.
 /// TODO: Find a non-redundant way to pass this information.
 fn assemble_button(base: &dyn ButtonBase, base_block: Block, label_block: Block) -> Block {
-    let shifted_label = block::Modifier::from(block::Move::new(
+    let shifted_label = label_block.with_modifier(block::Move::new(
         Face6::PZ,
         (base.button_label_z() * 256 / theme::RESOLUTION_G) as u16,
         0,
-    ))
-    .attach(label_block);
+    ));
 
-    block::Modifier::from(block::Composite::new(
+    base_block.with_modifier(block::Composite::new(
         shifted_label,
         block::CompositeOperator::Over,
     ))
-    .attach(base_block)
 }
 
 /// TODO: do this more elegantly somehow

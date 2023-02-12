@@ -167,14 +167,10 @@ mod tests {
         // Try zoom at multiple offset steps.
         for x in 0i32..2 {
             dbg!(x);
-            let mut zoomed = original_block.clone();
-            zoomed.modifiers_mut().push(
-                Zoom::new(
-                    R2, // scale up by two = divide resolution by two
-                    Point3::new(x, 0, 0),
-                )
-                .into(),
-            );
+            let zoomed = original_block.clone().with_modifier(Zoom::new(
+                R2, // scale up by two = divide resolution by two
+                Point3::new(x, 0, 0),
+            ));
             let ev_zoomed = zoomed.evaluate().unwrap();
             assert_eq!(
                 ev_zoomed,

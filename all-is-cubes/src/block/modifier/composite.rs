@@ -95,7 +95,7 @@ impl Composite {
             destination.rotate(dest_rot)
         } else {
             self.source = self.source.rotate(dest_rot.inverse());
-            Modifier::from(self).attach(destination).rotate(dest_rot)
+            destination.with_modifier(self).rotate(dest_rot)
         }
     }
 
@@ -287,18 +287,18 @@ mod tests {
     #[test]
     fn unspecialize_no() {
         let [b1, b2] = make_some_blocks();
-        let composed =
-            Modifier::from(Composite::new(b2.clone(), CompositeOperator::Over)).attach(b1.clone());
+        let composed = b1
+            .clone()
+            .with_modifier(Composite::new(b2.clone(), CompositeOperator::Over));
         assert_eq!(composed.unspecialize(), vec![composed]);
     }
 
     #[test]
     fn unspecialize_yes() {
         let [b1, b2] = make_some_blocks();
-        let composed = Modifier::from(
+        let composed = b1.clone().with_modifier(
             Composite::new(b2.clone(), CompositeOperator::Over).with_disassemblable(),
-        )
-        .attach(b1.clone());
+        );
         assert_eq!(composed.unspecialize(), vec![b2, b1]);
     }
 }

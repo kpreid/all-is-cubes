@@ -266,11 +266,9 @@ impl WidgetController for ToolbarController {
 
         /// TODO: figure out how to express this as a general helper
         fn zoom(block: &Block, pos: GridPoint) -> Block {
-            let mut block = block.clone();
             block
-                .modifiers_mut()
-                .push(block::Zoom::new(block::Resolution::R4, pos).into());
-            block
+                .clone()
+                .with_modifier(block::Zoom::new(block::Resolution::R4, pos))
         }
         let frame_multiblock = &self.definition.hud_blocks.blocks[UiBlocks::ToolbarSlotFrame];
         for cube in frame_region.interior_iter() {

@@ -23,7 +23,7 @@ pub use zoom::*;
 /// the enum variant ([`Modifier::Composite`]) explicitly. Some modifiers have specific
 /// functions for constructing their typical usages, such as [`Block::rotate()`].
 ///
-/// [`Modifier::attach()`] is provided to conveniently add a single modifier to a block;
+/// [`Block::with_modifier()`] is provided to conveniently add a single modifier to a block;
 /// [`Block::modifiers()`] and [`Block::modifiers_mut()`] provide general direct access.
 /// Note that [`Block`] is a clone-on-write type for when modifiers are changed.
 ///
@@ -73,12 +73,6 @@ pub enum Modifier {
 }
 
 impl Modifier {
-    /// Return the given `block` with `self` added as the outermost/last modifier.
-    pub fn attach(self, mut block: Block) -> Block {
-        block.modifiers_mut().push(self);
-        block
-    }
-
     /// Compute the effect of this modifier.
     ///
     /// * `block` is the original block value (modifiers do not alter it).
