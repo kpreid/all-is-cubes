@@ -146,6 +146,12 @@ pub async fn install_landscape_blocks(
     });
     let dirt_pattern = voronoi_pattern(resolution, &dirt_points);
 
+    // TODO: needs a tiling and abruptly-changing pattern -- perhaps a coordinate-streched voronoi noise instead
+    let bark_noise = {
+        let noise = noise::ScalePoint::new(noise::Value::new(0x28711937)).set_y_scale(1. / 4.);
+        move |p| noise.at_grid(p) * 0.4 + 0.7
+    };
+
     BlockProvider::<LandscapeBlocks>::new(progress, |key| {
         let grass_blades = |universe, index: GridCoordinate| -> Result<Block, InGenError> {
             Ok(Block::builder()
@@ -219,9 +225,10 @@ pub async fn install_landscape_blocks(
                     [mid - radius, 0, mid - radius],
                     [mid + radius, mid + radius, mid + radius],
                 );
+                let color_block = &colors[key];
                 Block::builder()
                     .attributes(
-                        colors[key]
+                        color_block
                             .evaluate()
                             .map_err(InGenError::other)?
                             .attributes,
@@ -233,9 +240,10 @@ pub async fn install_landscape_blocks(
                     })
                     .voxels_fn(universe, resolution, |cube| {
                         if trunk_box.contains_cube(cube) {
-                            &colors[key]
+                            // TODO: separate bark from inner wood
+                            scale_color(color_block.clone(), bark_noise(cube), 0.05)
                         } else {
-                            &AIR
+                            AIR
                         }
                     })?
                     .build()
