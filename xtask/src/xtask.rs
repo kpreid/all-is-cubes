@@ -87,7 +87,10 @@ enum XtaskCommand {
     Init,
 
     /// Run all tests (and some builds without tests) with default features.
-    Test,
+    Test {
+        #[arg(long)]
+        no_run: bool,
+    },
 
     /// Run tests exercising more combinations of features.
     TestMore,
@@ -143,8 +146,17 @@ fn main() -> Result<(), ActionError> {
             write_development_files()?;
             update_server_static(&mut time_log)?; // includes installing wasm tools
         }
-        XtaskCommand::Test => {
-            do_for_all_packages(&config, TestOrCheck::Test, Features::Default, &mut time_log)?;
+        XtaskCommand::Test { no_run } => {
+            do_for_all_packages(
+                &config,
+                if no_run {
+                    TestOrCheck::BuildTests
+                } else {
+                    TestOrCheck::Test
+                },
+                Features::Default,
+                &mut time_log,
+            )?;
         }
         XtaskCommand::TestMore => {
             exhaustive_test(&config, &mut time_log)?;
@@ -526,15 +538,17 @@ fn ensure_wasm_tools_installed(time_log: &mut Vec<Timing>) -> Result<(), ActionE
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum TestOrCheck {
     Test,
+    BuildTests,
     Lint,
 }
 
 impl TestOrCheck {
     fn cargo_cmd(self, config: &Config) -> Cmd {
         cargo()
-            .arg(match self {
-                Self::Test => "test",
-                Self::Lint => CHECK_SUBCMD,
+            .args(match self {
+                Self::Test => vec!["test"],
+                Self::BuildTests => vec!["test", "--no-run"],
+                Self::Lint => vec![CHECK_SUBCMD],
             })
             .args(config.cargo_build_args())
     }

@@ -115,6 +115,10 @@ jobs:
     # latest versions is intended to catch bugs in *our dependencies*; and the
     # two are sufficiently unlikely to interact that it doesn't seem worth
     # spending the CI latency to do both.
+    - name: Compile basic tests
+      # compile is broken out so we have visibility into compile vs. run times
+      if: ${{ runner.os != 'Windows' }}
+      run: cargo xtask test --timings --no-run
     - name: Run basic tests
       if: ${{ !matrix.primary && runner.os != 'Windows' }}
       run: cargo xtask test --timings
