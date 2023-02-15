@@ -35,7 +35,8 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-pub mod webserver;
+mod webserver;
+pub use webserver::start_server;
 
-#[cfg(feature = "embed")]
-mod embedded_client;
+mod client_static;
+pub use client_static::AicClientSource;

@@ -1,0 +1,85 @@
+use std::io;
+
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+
+/// Where to obtain the WebAssembly+JS code for the All is Cubes in-browser game engine.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum AicClientSource {
+    /// Use the copy embedded in this server binary.
+    #[cfg(feature = "embed")]
+    Embedded,
+
+    /// Fetch the code live from `../all-is-cubes-wasm/`.
+    ///
+    /// This option will only succeed if the the original All is Cubes development
+    /// workspace is present, and not in an installed binary.
+    /// TODO: Disable this in release builds? Or some other way to distinguish
+    Workspace,
+}
+
+impl AicClientSource {
+    pub(crate) fn static_service(&self) -> axum::routing::MethodRouter {
+        match self {
+            #[cfg(feature = "embed")]
+            AicClientSource::Embedded => axum::routing::get(embedded::client),
+            AicClientSource::Workspace => {
+                axum::routing::get_service(tower_http::services::ServeDir::new(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../all-is-cubes-wasm/dist/"
+                )))
+                .handle_error(handle_error)
+            }
+        }
+    }
+}
+
+async fn handle_error(_err: io::Error) -> impl IntoResponse {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "An internal error occurred.",
+    )
+}
+
+#[cfg(feature = "embed")]
+mod embedded {
+    use axum::body;
+    use axum::extract::Path;
+    use axum::http::StatusCode;
+    use axum::response::{IntoResponse, Response};
+
+    static CLIENT_STATIC: include_dir::Dir<'static> =
+        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../all-is-cubes-wasm/dist");
+
+    /// Handler for client static files
+    pub(crate) async fn client(path: Option<Path<String>>) -> impl IntoResponse {
+        // based on example code https://bloerg.net/posts/serve-static-content-with-axum/
+        let path = match &path {
+            None => "index.html",
+            Some(Path(path_string)) => {
+                // TODO: validate that this is url-escaping-correct (i.e. over-escaped characters should still match)
+                path_string.as_str()
+            }
+        };
+        match CLIENT_STATIC.get_file(path) {
+            None => Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(body::boxed(body::Body::from(String::from("Not found"))))
+                .unwrap(),
+            Some(file) => {
+                // Note that we're matching the *file's statically known path*, not the provided URL,
+                // to ensure that this is not controlled by the request.
+                // TODO: I'd rather have a hardcoded list for our purposes than mime_guess, but
+                // I want to match the non-embedded option and `tower_http::services::ServeDir`
+                // doesn't offer an option that isn't mime_guess.
+                let content_type = mime_guess::from_path(file.path()).first_or_octet_stream();
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", content_type.as_ref())
+                    .body(body::boxed(body::Full::from(file.contents())))
+                    .unwrap()
+            }
+        }
+    }
+}
