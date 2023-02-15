@@ -117,10 +117,10 @@ jobs:
     # spending the CI latency to do both.
     - name: Run basic tests
       if: ${{ !matrix.primary && runner.os != 'Windows' }}
-      run: cargo xtask test
+      run: cargo xtask test --timings
     - name: Run exhaustive tests
       if: ${{ matrix.primary }}
-      run: cargo xtask test-more
+      run: cargo xtask test-more --timings
     - name: Run Windows test
       # Temporary kludge because I haven't gotten npm (or xtask invoking npm)
       # working on Windows. So, we'll run only the desktop + render tests
@@ -142,8 +142,18 @@ jobs:
     - name: Lint
       # TODO: reenable on Windows when we figure out the npm problem
       if: ${{ runner.os != 'Windows' }}
-      run: cargo xtask lint
+      run: cargo xtask lint --timings
     
+    # Save timing reports so we can download and view them
+    # (for understanding build performance in CI)
+    - name: Save cargo --timings output
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: cargo-timings ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
+        path: |
+          target/cargo-timings/cargo-timing-*.html
+
     # Save wasm build so that we can optionally deploy it without rebuilding
     # (but only for the stablest matrix version)
     - name: Save wasm dist artifact
