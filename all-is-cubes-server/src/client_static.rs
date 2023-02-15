@@ -2,6 +2,7 @@ use std::io;
 
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+use axum::routing::Router;
 
 /// Where to obtain the WebAssembly+JS code for the All is Cubes in-browser game engine.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -20,8 +21,9 @@ pub enum AicClientSource {
 }
 
 impl AicClientSource {
-    pub(crate) fn static_service(&self) -> axum::routing::MethodRouter {
-        match self {
+    /// Returns a [`Router`] for paths to all client resources.
+    pub(crate) fn client_router(&self) -> Router {
+        let static_service = match self {
             #[cfg(feature = "embed")]
             AicClientSource::Embedded => axum::routing::get(embedded::client),
             AicClientSource::Workspace => {
@@ -31,7 +33,11 @@ impl AicClientSource {
                 )))
                 .handle_error(handle_error)
             }
-        }
+        };
+
+        axum::Router::new()
+            .route("/", static_service.clone())
+            .route("/*path", static_service)
     }
 }
 
@@ -77,6 +83,7 @@ mod embedded {
                 Response::builder()
                     .status(StatusCode::OK)
                     .header("Content-Type", content_type.as_ref())
+                    // TODO: caching headers
                     .body(body::boxed(body::Full::from(file.contents())))
                     .unwrap()
             }

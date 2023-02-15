@@ -11,13 +11,11 @@ pub fn start_server(
     bind_addr: SocketAddr,
     client_source: &crate::client_static::AicClientSource,
 ) -> Result<(String, impl Future<Output = Result<(), anyhow::Error>>), anyhow::Error> {
-    let static_service = client_source.static_service();
+    let static_router = client_source.client_router();
 
     // TODO: serve static at well defined subdir separate from root, so that we have
     // more division of responsibility in which urls mean what
-    let app = axum::Router::new()
-        .route("/", static_service.clone())
-        .route("/*path", static_service);
+    let app = static_router;
 
     let server = axum::Server::bind(&bind_addr).serve(app.into_make_service());
     // TODO: refactor so stdout writing isn't hardcoded into this function
