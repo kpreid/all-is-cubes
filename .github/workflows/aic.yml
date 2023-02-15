@@ -12,6 +12,10 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # Disable incremental compilation because we aren't caching incremental compilation
+  # artifacts, so they won't be useful for anything (other than maybe the exhaustive
+  # builds with different features).
+  CARGO_INCREMENTAL: 0
 
 jobs:
   build:
