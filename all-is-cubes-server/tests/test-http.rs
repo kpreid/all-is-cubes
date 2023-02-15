@@ -7,9 +7,10 @@ use reqwest::header::HeaderValue;
 use reqwest::Url;
 use tokio::io::AsyncBufReadExt;
 
-async fn with_server<F: AsyncFnOnce1<Url, Output = ()>>(f: F) {
+async fn with_server<F: AsyncFnOnce1<Url, Output = ()>>(client_source: &'static str, f: F) {
     let mut server = tokio::process::Command::new(env!("CARGO_BIN_EXE_aic-server"))
-        .args(["--client-source=workspace"])
+        .arg("--client-source")
+        .arg(client_source)
         .kill_on_drop(true)
         .stdout(Stdio::piped())
         .spawn()
@@ -33,19 +34,27 @@ async fn with_server<F: AsyncFnOnce1<Url, Output = ()>>(f: F) {
 
 /// This test will fail if the static file serving is not working.
 /// (Or if we change the URL layout.)
+async fn client_smoke_test(root_url: Url) {
+    let resp = reqwest::get(root_url.join("style.css").unwrap())
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+    assert_eq!(
+        resp.headers().get("Content-Type"),
+        // TODO: this should be ;charset=utf-8 but that will require more hand-built server code
+        Some(&HeaderValue::from_static("text/css"))
+    );
+
+    // TODO: also test that the wasm exists and is loadable (currently difficult because
+    // the address is variable)
+}
+#[cfg(feature = "embed")]
 #[tokio::test]
-async fn server_static_files_smoke_test() {
-    with_server(|root_url: Url| async move {
-        let resp = reqwest::get(root_url.join("style.css").unwrap())
-            .await
-            .unwrap()
-            .error_for_status()
-            .unwrap();
-        assert_eq!(
-            resp.headers().get("Content-Type"),
-            // TODO: this should be ;charset=utf-8 but that will require more hand-built server code
-            Some(&HeaderValue::from_static("text/css"))
-        );
-    })
-    .await
+async fn client_smoke_test_embedded() {
+    with_server("embedded", client_smoke_test).await
+}
+#[tokio::test]
+async fn client_smoke_test_workspace() {
+    with_server("workspace", client_smoke_test).await
 }
