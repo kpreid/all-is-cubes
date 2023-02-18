@@ -1303,7 +1303,7 @@ pub struct ActivatableRegion {
 impl ActivatableRegion {
     /// Activate this region, calling the embedded function.
     pub fn activate(&self) {
-        if let Some(f) = &self.effect.0 {
+        if let Some(f) = self.effect.try_ref() {
             f();
         }
     }

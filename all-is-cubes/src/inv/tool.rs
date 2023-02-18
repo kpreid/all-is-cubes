@@ -216,7 +216,7 @@ impl Tool {
                 UniverseTransaction::default(),
             )),
             Self::ExternalAction { ref function, .. } => {
-                if let Some(f) = &function.0 {
+                if let Some(f) = function.try_ref() {
                     f(input);
                     Ok((Some(self), UniverseTransaction::default()))
                 } else {
@@ -452,6 +452,13 @@ impl ToolError {
 /// TODO: Probably they should be their own kind of `UniverseMember`, so that they can
 /// be reattached in the future.
 pub struct EphemeralOpaque<T: ?Sized>(pub(crate) Option<Arc<T>>);
+
+impl<T: ?Sized> EphemeralOpaque<T> {
+    /// Get a reference to the value if it still exists.
+    pub fn try_ref(&self) -> Option<&T> {
+        self.0.as_deref()
+    }
+}
 
 impl<T: ?Sized> From<Arc<T>> for EphemeralOpaque<T> {
     fn from(contents: Arc<T>) -> Self {
