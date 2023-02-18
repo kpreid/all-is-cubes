@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use std::hash::Hash;
+use std::sync::atomic::{AtomicU8, Ordering::Relaxed};
 use std::sync::Arc;
 
 use exhaust::Exhaust;
@@ -189,6 +190,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton
                 .bounds
                 .lower_bounds(),
             definition: self,
+            recently_pressed: Arc::new(AtomicU8::new(0)),
         })
     }
 }
@@ -204,22 +206,36 @@ pub struct ToggleButtonVisualState {
     /// The on/off value depicted.
     pub value: bool,
     // TODO: add hover/press states
+    /// The button looks pushed in.
+    pressed: bool,
 }
 
 /// Represents this value as a string suitable for naming blocks depicting this state.
 impl fmt::Display for ToggleButtonVisualState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self { value: true } => write!(f, "on"),
-            Self { value: false } => write!(f, "off"),
-        }
+        let &Self { value, pressed } = self;
+        write!(
+            f,
+            "{value}-{pressed}",
+            value = match value {
+                false => "off",
+                true => "on",
+            },
+            pressed = match pressed {
+                false => "idle",
+                true => "pressed",
+            },
+        )
     }
 }
 
 impl ToggleButtonVisualState {
     /// Returns the “off” (false) or “on” (true) state.
     pub const fn new(value: bool) -> Self {
-        Self { value }
+        Self {
+            value,
+            pressed: false,
+        }
     }
 }
 
@@ -229,12 +245,24 @@ struct ToggleButtonController<D: Clone + Send + Sync> {
     definition: Arc<ToggleButton<D>>,
     position: GridPoint,
     todo: DirtyFlag,
+    recently_pressed: Arc<AtomicU8>,
 }
 
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> ToggleButtonController<D> {
     fn icon_txn(&self) -> vui::WidgetTransaction {
         let value = (self.definition.projection)(&self.definition.data_source.get());
-        let block = self.definition.blocks[ToggleButtonVisualState { value }].clone();
+        let block = self.definition.blocks[ToggleButtonVisualState {
+            value,
+            // TODO: once cursor/click system supports mousedown and up, use that instead
+            // of this crude animation behavior (but maybe *also* have a post-press
+            // animation, possibly based on block tick_actions instead).
+            pressed: self
+                .recently_pressed
+                .fetch_update(Relaxed, Relaxed, |counter| Some(counter.saturating_sub(1)))
+                .unwrap()
+                > 1,
+        }]
+        .clone();
         SpaceTransaction::set_cube(self.position, None, Some(block))
     }
 }
@@ -246,7 +274,20 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
         let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             SpaceBehaviorAttachment::new(GridAab::single_cube(self.position)),
             Arc::new(space::ActivatableRegion {
-                effect: self.definition.action.clone(),
+                effect: {
+                    let action = self.definition.action.clone();
+                    let recently_pressed = self.recently_pressed.clone();
+
+                    // TODO: awkward lack of composability here.
+                    // Perhaps ActivatableRegion should be replaced with being able to
+                    // activate any behavior, i.e. this WidgetBehavior?
+                    EphemeralOpaque::from(Arc::new(move || {
+                        recently_pressed.store(10, Relaxed);
+                        if let Some(f) = action.try_ref() {
+                            f();
+                        }
+                    }) as Arc<dyn Fn() + Send + Sync>)
+                },
             }),
         ));
         let icon = self.icon_txn();
@@ -255,11 +296,13 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
     }
 
     fn step(&mut self, _: Tick) -> Result<vui::WidgetTransaction, Box<dyn Error + Send + Sync>> {
-        Ok(if self.todo.get_and_clear() {
-            self.icon_txn()
-        } else {
-            SpaceTransaction::default()
-        })
+        Ok(
+            if self.todo.get_and_clear() || self.recently_pressed.load(Relaxed) > 0 {
+                self.icon_txn()
+            } else {
+                SpaceTransaction::default()
+            },
+        )
     }
 }
 
@@ -460,7 +503,7 @@ impl ButtonBase for ActionButtonVisualState {
 /// The label drawn onto this button should fit within a 24/32 × 24/32 square.
 impl ButtonBase for ToggleButtonVisualState {
     fn button_label_z(&self) -> GridCoordinate {
-        theme::UNPRESSED_Z
+        theme::UNPRESSED_Z + if self.pressed { -2 } else { 0 }
     }
 
     fn button_block(&self, universe: &mut Universe) -> Result<Block, InGenError> {
