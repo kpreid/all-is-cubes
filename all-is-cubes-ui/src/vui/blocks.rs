@@ -19,8 +19,7 @@ use all_is_cubes::{include_image, rgba_const};
 #[cfg(doc)]
 use crate::vui::widgets;
 use crate::vui::widgets::{
-    make_button_label_block, ActionButtonVisualState, ButtonBase, ButtonIcon,
-    ToggleButtonVisualState,
+    make_button_label_block, ButtonBase, ButtonIcon, ButtonVisualState, ToggleButtonVisualState,
 };
 
 /// Blocks that are used within the VUI, only.
@@ -41,7 +40,7 @@ pub enum UiBlocks {
 
     // TODO: consider moving these to a separate "WidgetTheme" enum to shift the complexity
     /// Appearance of a [`widgets::ActionButton`] without label.
-    ActionButton(ActionButtonVisualState),
+    ActionButton(ButtonVisualState),
     /// Appearance of a [`widgets::ToggleButton`] without label.
     ToggleButton(ToggleButtonVisualState),
 

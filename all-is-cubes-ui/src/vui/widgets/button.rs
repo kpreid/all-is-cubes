@@ -59,7 +59,7 @@ impl ActionButton {
         theme: &linking::BlockProvider<UiBlocks>,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Arc<Self> {
-        let state = ActionButtonVisualState::default();
+        let state = ButtonVisualState::default();
         let blocks = theme
             .subset(UiBlocks::ActionButton)
             .map(|state, base_block| assemble_button(state, base_block.clone(), label.clone()));
@@ -88,22 +88,25 @@ impl vui::Widget for ActionButton {
     }
 }
 
-/// Possible visual states of a [`ActionButton`].
+/// Possible visual states of a button.
+///
+/// [`ActionButton`] uses this directly, and other buttons' state may incorporate it.
 ///
 /// The [`fmt::Display`] implementation of this type produces a string form suitable for
 /// naming blocks depicting this state; the [`Exhaust`] implementation allows iterating
 /// over all possible states.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, Exhaust)]
 #[non_exhaustive]
-pub struct ActionButtonVisualState {
-    // TODO: Add hover, pressed, disabled
-    _dummy: (),
+pub struct ButtonVisualState {
+    // TODO: Add hover, disabled
+    /// The button looks pushed in.
+    pressed: bool,
 }
 
 /// Represents this value as a string suitable for naming blocks depicting this state.
-impl fmt::Display for ActionButtonVisualState {
+impl fmt::Display for ButtonVisualState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "idle")
+        if self.pressed { "pressed" } else { "idle" }.fmt(f)
     }
 }
 
@@ -203,27 +206,21 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Exhaust)]
 #[non_exhaustive]
 pub struct ToggleButtonVisualState {
+    common: ButtonVisualState,
     /// The on/off value depicted.
     pub value: bool,
-    // TODO: add hover/press states
-    /// The button looks pushed in.
-    pressed: bool,
 }
 
 /// Represents this value as a string suitable for naming blocks depicting this state.
 impl fmt::Display for ToggleButtonVisualState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let &Self { value, pressed } = self;
+        let &Self { value, common } = self;
         write!(
             f,
-            "{value}-{pressed}",
+            "{value}-{common}",
             value = match value {
                 false => "off",
                 true => "on",
-            },
-            pressed = match pressed {
-                false => "idle",
-                true => "pressed",
             },
         )
     }
@@ -234,7 +231,7 @@ impl ToggleButtonVisualState {
     pub const fn new(value: bool) -> Self {
         Self {
             value,
-            pressed: false,
+            common: ButtonVisualState { pressed: false },
         }
     }
 }
@@ -256,11 +253,13 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> ToggleButtonController<D> {
             // TODO: once cursor/click system supports mousedown and up, use that instead
             // of this crude animation behavior (but maybe *also* have a post-press
             // animation, possibly based on block tick_actions instead).
-            pressed: self
-                .recently_pressed
-                .fetch_update(Relaxed, Relaxed, |counter| Some(counter.saturating_sub(1)))
-                .unwrap()
-                > 1,
+            common: ButtonVisualState {
+                pressed: self
+                    .recently_pressed
+                    .fetch_update(Relaxed, Relaxed, |counter| Some(counter.saturating_sub(1)))
+                    .unwrap()
+                    > 1,
+            },
         }]
         .clone();
         SpaceTransaction::set_cube(self.position, None, Some(block))
@@ -443,9 +442,9 @@ pub(crate) trait ButtonBase {
 }
 
 /// The label drawn onto this button should fit within a 24/32 × 24/32 circle.
-impl ButtonBase for ActionButtonVisualState {
+impl ButtonBase for ButtonVisualState {
     fn button_label_z(&self) -> GridCoordinate {
-        theme::UNPRESSED_Z
+        theme::UNPRESSED_Z + if self.pressed { -2 } else { 0 }
     }
 
     fn button_block(&self, universe: &mut Universe) -> Result<Block, InGenError> {
@@ -503,7 +502,7 @@ impl ButtonBase for ActionButtonVisualState {
 /// The label drawn onto this button should fit within a 24/32 × 24/32 square.
 impl ButtonBase for ToggleButtonVisualState {
     fn button_label_z(&self) -> GridCoordinate {
-        theme::UNPRESSED_Z + if self.pressed { -2 } else { 0 }
+        self.common.button_label_z()
     }
 
     fn button_block(&self, universe: &mut Universe) -> Result<Block, InGenError> {
