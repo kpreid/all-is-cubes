@@ -1,11 +1,14 @@
 //! Conversion between the types in [`super::schema`] and those used in
 //! normal operation.
 
-#![allow(unused)] // TODO: use this
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use super::schema;
 
 /// Implements [`Serialize`] and [`Deserialize`] for `$library_type` using the conversions
 /// * `TryFrom<$schema_type> for $library_type`
 /// * `From<&$library_type> for $schema_type`
+#[allow(unused)] // TODO: use this
 macro_rules! impl_serde_via_schema_by_ref {
     ($library_type:ty, $schema_type:ty) => {
         impl ::serde::Serialize for $library_type {
@@ -31,4 +34,37 @@ macro_rules! impl_serde_via_schema_by_ref {
         }
     };
 }
-pub(crate) use impl_serde_via_schema_by_ref;
+
+mod universe {
+    use super::*;
+    use crate::universe::{Name, URef};
+    use schema::{NameSer, URefSer};
+
+    impl<T: 'static> Serialize for URef<T> {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            URefSer::URefV1 {
+                name: match self.name() {
+                    Name::Specific(s) => NameSer::Specific(s),
+                    Name::Anonym(n) => NameSer::Anonym(n),
+                    Name::Pending => {
+                        return Err(serde::ser::Error::custom("cannot serialize a pending URef"))
+                    }
+                },
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de, T: 'static> Deserialize<'de> for URef<T> {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            Ok(match URefSer::deserialize(deserializer)? {
+                // TODO: Instead of new_gone(), this needs to be a named ref that can be
+                // hooked up to its definition.
+                URefSer::URefV1 { name } => URef::new_gone(match name {
+                    NameSer::Specific(s) => Name::Specific(s),
+                    NameSer::Anonym(n) => Name::Anonym(n),
+                }),
+            })
+        }
+    }
+}

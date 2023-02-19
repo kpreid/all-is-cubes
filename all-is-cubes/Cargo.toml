@@ -73,7 +73,8 @@ ouroboros = { workspace = true }
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }
 rayon = { workspace = true, optional = true }
-serde = { workspace = true }
+# std and rc features needed because we are [de]serializing `Arc`s
+serde = { workspace = true, features = ["derive", "std", "rc"] }
 thiserror = { workspace = true }
 
 [dev-dependencies]

@@ -14,4 +14,21 @@
 //! * 3D vectors/points are represented as 3-element arrays
 //!   (and not, say, as structures with named fields).
 
-// TODO: Define schema
+use std::sync::Arc;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum URefSer {
+    URefV1 {
+        #[serde(flatten)]
+        name: NameSer,
+    },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) enum NameSer {
+    Specific(Arc<str>),
+    Anonym(usize),
+}
