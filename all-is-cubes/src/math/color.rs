@@ -338,6 +338,19 @@ impl From<Vector4<NotNan<f32>>> for Rgba {
     }
 }
 
+impl From<[NotNan<f32>; 3]> for Rgb {
+    #[inline]
+    fn from(value: [NotNan<f32>; 3]) -> Self {
+        Self(value.into())
+    }
+}
+impl From<[NotNan<f32>; 4]> for Rgba {
+    #[inline]
+    fn from(value: [NotNan<f32>; 4]) -> Self {
+        Self(value.into())
+    }
+}
+
 impl From<Rgb> for Vector3<f32> {
     #[inline]
     fn from(value: Rgb) -> Self {
@@ -348,6 +361,19 @@ impl From<Rgba> for Vector4<f32> {
     #[inline]
     fn from(value: Rgba) -> Self {
         value.0.map(NotNan::into_inner)
+    }
+}
+
+impl From<Rgb> for [NotNan<f32>; 3] {
+    #[inline]
+    fn from(value: Rgb) -> Self {
+        value.0.into()
+    }
+}
+impl From<Rgba> for [NotNan<f32>; 4] {
+    #[inline]
+    fn from(value: Rgba) -> Self {
+        value.0.into()
     }
 }
 
