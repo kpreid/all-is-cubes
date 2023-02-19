@@ -207,7 +207,7 @@ impl universe::VisitRefs for Composite {
 ///
 /// The “source” block is the [`Composite`]'s stored block, and the “destination” block
 /// is the block the modifier is attached to.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum CompositeOperator {
