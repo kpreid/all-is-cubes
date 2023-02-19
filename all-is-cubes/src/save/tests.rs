@@ -5,8 +5,8 @@ use std::fmt;
 use pretty_assertions::assert_eq;
 use serde_json::{from_value, json, to_value};
 
-use crate::block::{self, BlockDef};
-use crate::math::{Rgb, Rgba};
+use crate::block::{self, BlockDef, Modifier};
+use crate::math::{GridRotation, Rgb, Rgba};
 use crate::universe::{Name, URef};
 
 #[track_caller]
@@ -28,7 +28,7 @@ where
 // Tests corresponding to the `block` module
 
 #[test]
-fn block_serde_air() {
+fn block_air() {
     assert_round_trip(
         &block::AIR,
         json!({
@@ -39,7 +39,7 @@ fn block_serde_air() {
 }
 
 #[test]
-fn block_serde_atom_default() {
+fn block_atom_default() {
     assert_round_trip(
         &block::Block::from(Rgba::new(1.0, 0.5, 0.0, 0.5)),
         json!({
@@ -53,7 +53,7 @@ fn block_serde_atom_default() {
 }
 
 #[test]
-fn block_serde_atom_with_all_attributes() {
+fn block_atom_with_all_attributes() {
     // TODO: Not all attributes are serialized yet,
     // so this test tests only the ones that work so far.
     assert_round_trip(
@@ -75,6 +75,30 @@ fn block_serde_atom_with_all_attributes() {
         }),
     );
 }
+
+#[test]
+fn block_with_modifiers() {
+    assert_round_trip(
+        &block::Block::builder()
+            .color(Rgba::WHITE)
+            .modifier(Modifier::Quote(block::Quote::default()))
+            .modifier(Modifier::Rotate(GridRotation::RXyZ))
+            .build(),
+        json!({
+            "type": "BlockV1",
+            "primitive": {
+                "type": "AtomV1",
+                "color": [1.0, 1.0, 1.0, 1.0],
+            },
+            "modifiers": [
+                { "type": "QuoteV1", "suppress_ambient": false },
+                { "type": "RotateV1", "rotation": "RXyZ" },
+            ]
+        }),
+    );
+}
+
+// TODO: test serialization of each modifier
 
 //------------------------------------------------------------------------------------------------//
 // Tests corresponding to the `universe` module
