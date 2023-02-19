@@ -6,8 +6,9 @@ use pretty_assertions::assert_eq;
 use serde_json::{from_value, json, to_value};
 
 use crate::block::{self, BlockDef, Modifier};
+use crate::content::make_some_voxel_blocks;
 use crate::math::{GridRotation, Rgb, Rgba};
-use crate::universe::{Name, URef};
+use crate::universe::{Name, URef, Universe, UniverseIndex};
 
 #[track_caller]
 /// Serialize and deserialize.
@@ -102,6 +103,34 @@ fn block_with_modifiers() {
 
 //------------------------------------------------------------------------------------------------//
 // Tests corresponding to the `universe` module
+
+#[test]
+fn universe_block() {
+    let mut universe = Universe::new();
+    let [block] = make_some_voxel_blocks(&mut universe);
+    universe.insert("foo".into(), BlockDef::new(block)).unwrap();
+    assert_eq!(
+        to_value(&universe).unwrap(),
+        json!({
+            "type": "UniverseV1",
+            "members": [
+                // TODO: This should also contain the `Space`
+                {
+                    "name": {"Specific": "foo"},
+                    "value": {
+                        "type": "BlockV1",
+                        "primitive": {
+                            "type": "RecurV1",
+                            "space": {"type": "URefV1", "Anonym": 0},
+                            "resolution": 16,
+                            "display_name": "0",
+                        }
+                    }
+                }
+            ],
+        })
+    )
+}
 
 #[test]
 fn uref_de_named() {

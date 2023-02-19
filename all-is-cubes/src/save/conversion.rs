@@ -74,18 +74,23 @@ mod block {
 
     impl From<&Primitive> for schema::PrimitiveSer {
         fn from(value: &Primitive) -> Self {
-            match *value {
+            match value {
                 Primitive::Indirect(_) => todo!(),
-                Primitive::Atom(ref attributes, color) => schema::PrimitiveSer::AtomV1 {
+                &Primitive::Atom(ref attributes, color) => schema::PrimitiveSer::AtomV1 {
                     color: color.into(),
                     attributes: attributes.into(),
                 },
-                Primitive::Recur {
-                    attributes: _,
-                    space: _,
-                    offset: _,
-                    resolution: _,
-                } => todo!(),
+                &Primitive::Recur {
+                    ref attributes,
+                    ref space,
+                    offset,
+                    resolution,
+                } => schema::PrimitiveSer::RecurV1 {
+                    attributes: attributes.into(),
+                    space: space.clone(),
+                    offset: offset.into(),
+                    resolution,
+                },
                 Primitive::Air => schema::PrimitiveSer::AirV1,
             }
         }
@@ -98,6 +103,17 @@ mod block {
                 schema::PrimitiveSer::AtomV1 { attributes, color } => {
                     Primitive::Atom(BlockAttributes::from(attributes), Rgba::from(color))
                 }
+                schema::PrimitiveSer::RecurV1 {
+                    attributes,
+                    space,
+                    offset,
+                    resolution,
+                } => Primitive::Recur {
+                    attributes: attributes.into(),
+                    space,
+                    offset: offset.into(),
+                    resolution,
+                },
             }
         }
     }
@@ -204,21 +220,63 @@ mod block {
 
 mod universe {
     use super::*;
-    use crate::universe::{Name, URef};
-    use schema::{NameSer, URefSer};
+    use crate::block::{Block, BlockDef};
+    use crate::save::schema::MemberEntrySer;
+    use crate::universe::{Name, UBorrow, URef, Universe, UniverseIndex};
+    use schema::{AnyUniverseMemberSer, NameSer, URefSer};
+
+    impl From<&BlockDef> for schema::AnyUniverseMemberSer {
+        fn from(block_def: &BlockDef) -> Self {
+            let block: &Block = block_def;
+            schema::AnyUniverseMemberSer::BlockDef(block.clone())
+        }
+    }
+
+    impl Serialize for Universe {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            schema::UniverseSer::UniverseV1 {
+                members: self
+                    .iter_by_type()
+                    .map(|(name, member_ref): (Name, URef<BlockDef>)| -> Result<schema::MemberEntrySer, S::Error> {
+                        let read_guard: UBorrow<BlockDef> = member_ref.read().map_err(|e| {
+                            serde::ser::Error::custom(format!(
+                                "Failed to read universe member {name}: {e}"
+                            ))
+                        })?;
+                        let member_repr = schema::AnyUniverseMemberSer::from(&*read_guard);
+                        Ok(schema::MemberEntrySer { name, value: member_repr })
+                    })
+                    .collect::<Result<Vec<MemberEntrySer>, S::Error>>()?,
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Universe {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            let data = schema::UniverseSer::deserialize(deserializer)?;
+            let mut universe = Universe::new();
+            match data {
+                // TODO: Instead of new_gone(), this needs to be a named ref that can be
+                // hooked up to its definition.
+                schema::UniverseSer::UniverseV1 { members } => {
+                    for schema::MemberEntrySer { name, value } in members {
+                        match value {
+                            AnyUniverseMemberSer::BlockDef(block) => {
+                                universe.insert(name, BlockDef::new(block))
+                            }
+                        }
+                        .expect("insertion from deserialization failed");
+                    }
+                }
+            }
+            Ok(universe)
+        }
+    }
 
     impl<T: 'static> Serialize for URef<T> {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            URefSer::URefV1 {
-                name: match self.name() {
-                    Name::Specific(s) => NameSer::Specific(s),
-                    Name::Anonym(n) => NameSer::Anonym(n),
-                    Name::Pending => {
-                        return Err(serde::ser::Error::custom("cannot serialize a pending URef"))
-                    }
-                },
-            }
-            .serialize(serializer)
+            URefSer::URefV1 { name: self.name() }.serialize(serializer)
         }
     }
 
@@ -227,10 +285,29 @@ mod universe {
             Ok(match URefSer::deserialize(deserializer)? {
                 // TODO: Instead of new_gone(), this needs to be a named ref that can be
                 // hooked up to its definition.
-                URefSer::URefV1 { name } => URef::new_gone(match name {
-                    NameSer::Specific(s) => Name::Specific(s),
-                    NameSer::Anonym(n) => Name::Anonym(n),
-                }),
+                URefSer::URefV1 { name } => URef::new_gone(name),
+            })
+        }
+    }
+
+    impl Serialize for Name {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            match self {
+                Name::Specific(s) => NameSer::Specific(s.clone()),
+                &Name::Anonym(number) => NameSer::Anonym(number),
+                Name::Pending => {
+                    return Err(serde::ser::Error::custom("cannot serialize a pending URef"))
+                }
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Name {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            Ok(match NameSer::deserialize(deserializer)? {
+                NameSer::Specific(s) => Name::Specific(s),
+                NameSer::Anonym(n) => Name::Anonym(n),
             })
         }
     }

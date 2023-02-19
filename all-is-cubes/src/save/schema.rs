@@ -18,8 +18,8 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::block;
 use crate::math::{Face6, GridRotation};
+use crate::{block, space, universe};
 
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `block` module
@@ -38,11 +38,18 @@ pub(crate) enum BlockSer {
 #[serde(tag = "type")]
 pub(crate) enum PrimitiveSer {
     AirV1,
-    // TODO: need block attributes
     AtomV1 {
         color: RgbaSer,
         #[serde(flatten)]
         attributes: BlockAttributesV1Ser,
+    },
+    RecurV1 {
+        #[serde(flatten)]
+        attributes: BlockAttributesV1Ser,
+        space: universe::URef<space::Space>,
+        #[serde(default, skip_serializing_if = "is_default")]
+        offset: [i32; 3],
+        resolution: block::Resolution,
     },
 }
 
@@ -108,14 +115,37 @@ type RgbaSer = [ordered_float::NotNan<f32>; 4];
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum URefSer {
-    URefV1 {
-        #[serde(flatten)]
-        name: NameSer,
+pub(crate) enum UniverseSer {
+    UniverseV1 {
+        /// Note: We are currently targeting JSON output, which cannot use non-string keys.
+        /// Therefore, this is not expressed as a map.
+        members: Vec<MemberEntrySer>,
     },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct MemberEntrySer {
+    pub name: universe::Name,
+    pub value: AnyUniverseMemberSer,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)] // The type-and-version tags of each member suffice
+pub(crate) enum AnyUniverseMemberSer {
+    BlockDef(block::Block),
+    // TODO: add other universe member types
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum URefSer {
+    URefV1 {
+        #[serde(flatten)]
+        name: universe::Name,
+    },
+}
+
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub(crate) enum NameSer {
     Specific(Arc<str>),
     Anonym(usize),
