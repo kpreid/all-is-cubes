@@ -95,7 +95,7 @@ impl fmt::Display for Resolution {
 macro_rules! impl_try_from {
     ($t:ty) => {
         impl TryFrom<$t> for Resolution {
-            type Error = (); // TODO
+            type Error = IntoResolutionError<$t>;
             #[inline]
             fn try_from(value: $t) -> Result<Self, Self::Error> {
                 match value {
@@ -107,7 +107,7 @@ macro_rules! impl_try_from {
                     32 => Ok(Self::R32),
                     64 => Ok(Self::R64),
                     128 => Ok(Self::R128),
-                    _ => Err(()),
+                    _ => Err(IntoResolutionError(value)),
                 }
             }
         }
@@ -184,6 +184,35 @@ impl ops::Div<Resolution> for Resolution {
     }
 }
 
+impl serde::Serialize for Resolution {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        u16::from(*self).serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Resolution {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        u16::deserialize(deserializer)?
+            .try_into()
+            .map_err(serde::de::Error::custom)
+    }
+}
+
+/// Error type produced by [`TryFrom`] for [`Resolution`], and deserializing resolutions,
+/// when the number is not a permitted resolution value.
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, thiserror::Error)]
+pub struct IntoResolutionError<N>(N);
+
+impl<N: fmt::Display> fmt::Display for IntoResolutionError<N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{number} is not a permitted resolution; must be a power of 2 between 1 and 127",
+            number = self.0
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,5 +249,52 @@ mod tests {
         assert_eq!(R128 / R128, Some(R1));
         assert_eq!(R1 / R2, None);
         assert_eq!(R64 / R128, None);
+    }
+
+    #[test]
+    fn ser_ok() {
+        use serde_json::{json, to_value};
+        assert_eq!(to_value(R1).unwrap(), json!(1));
+        assert_eq!(to_value(R2).unwrap(), json!(2));
+        assert_eq!(to_value(R4).unwrap(), json!(4));
+        assert_eq!(to_value(R8).unwrap(), json!(8));
+        assert_eq!(to_value(R16).unwrap(), json!(16));
+        assert_eq!(to_value(R32).unwrap(), json!(32));
+        assert_eq!(to_value(R64).unwrap(), json!(64));
+        assert_eq!(to_value(R128).unwrap(), json!(128));
+    }
+
+    #[test]
+    fn de_ok() {
+        use serde_json::{from_value, json};
+        assert_eq!(from_value::<Resolution>(json!(1)).unwrap(), R1);
+        assert_eq!(from_value::<Resolution>(json!(2)).unwrap(), R2);
+        assert_eq!(from_value::<Resolution>(json!(4)).unwrap(), R4);
+        assert_eq!(from_value::<Resolution>(json!(8)).unwrap(), R8);
+        assert_eq!(from_value::<Resolution>(json!(16)).unwrap(), R16);
+        assert_eq!(from_value::<Resolution>(json!(32)).unwrap(), R32);
+        assert_eq!(from_value::<Resolution>(json!(64)).unwrap(), R64);
+        assert_eq!(from_value::<Resolution>(json!(128)).unwrap(), R128);
+    }
+
+    #[test]
+    fn de_err() {
+        use serde_json::{from_value, json};
+        assert_eq!(
+            from_value::<Resolution>(json!(-16))
+                .unwrap_err()
+                .to_string(),
+            "invalid value: integer `-16`, expected u16"
+        );
+        assert_eq!(
+            from_value::<Resolution>(json!(0)).unwrap_err().to_string(),
+            "0 is not a permitted resolution; must be a power of 2 between 1 and 127"
+        );
+        assert_eq!(
+            from_value::<Resolution>(json!(1.5))
+                .unwrap_err()
+                .to_string(),
+            "invalid type: floating point `1.5`, expected u16"
+        );
     }
 }
