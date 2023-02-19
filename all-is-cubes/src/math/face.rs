@@ -14,7 +14,9 @@ use crate::math::*;
 /// variant. The two enums use the same discriminant numbering.
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::exhaustive_enums)]
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, exhaust::Exhaust)]
+#[derive(
+    Clone, Copy, Debug, Hash, Eq, PartialEq, exhaust::Exhaust, serde::Deserialize, serde::Serialize,
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[repr(u8)]
 pub enum Face6 {
@@ -39,7 +41,9 @@ pub enum Face6 {
 /// provided. The two enums use the same discriminant numbering.
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::exhaustive_enums)]
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, exhaust::Exhaust)]
+#[derive(
+    Clone, Copy, Debug, Hash, Eq, PartialEq, exhaust::Exhaust, serde::Deserialize, serde::Serialize,
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[repr(u8)]
 pub enum Face7 {

@@ -18,6 +18,94 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+use crate::block;
+use crate::math::{Face6, GridRotation};
+
+//------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `block` module
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum BlockSer {
+    BlockV1 {
+        primitive: PrimitiveSer,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        modifiers: Vec<ModifierSer>,
+    },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum PrimitiveSer {
+    AirV1,
+    // TODO: need block attributes
+    AtomV1 {
+        color: RgbaSer,
+        #[serde(flatten)]
+        attributes: BlockAttributesV1Ser,
+    },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct BlockAttributesV1Ser {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub(crate) display_name: String,
+    #[serde(default = "return_true", skip_serializing_if = "is_true")]
+    pub(crate) selectable: bool,
+    // TODO: implement all attributes
+    //collision: BlockCollision,
+    //rotation_rule: RotationPlacementRule,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub(crate) light_emission: RgbSer,
+    //tick_action: Option<VoxelBrush<'static>>,
+    //animation_hint: AnimationHint,
+}
+fn return_true() -> bool {
+    true
+}
+fn is_true(value: &bool) -> bool {
+    *value
+}
+fn is_default<T: Default + PartialEq + Copy>(value: &T) -> bool {
+    *value == T::default()
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum ModifierSer {
+    QuoteV1 {
+        suppress_ambient: bool,
+    },
+    RotateV1 {
+        rotation: GridRotation,
+    },
+    CompositeV1 {
+        source: block::Block,
+        operator: block::CompositeOperator,
+        reverse: bool,
+        disassemblable: bool,
+    },
+    ZoomV1 {
+        scale: block::Resolution,
+        offset: [u8; 3],
+    },
+    MoveV1 {
+        direction: Face6,
+        distance: u16,
+        velocity: i16,
+    },
+}
+
+//------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `math` module
+
+type RgbSer = [ordered_float::NotNan<f32>; 3];
+
+type RgbaSer = [ordered_float::NotNan<f32>; 4];
+
+//------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `universe` module
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub(crate) enum URefSer {

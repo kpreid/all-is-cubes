@@ -46,6 +46,15 @@ impl Zoom {
         }
     }
 
+    /// Decompose into parts, for serialization.
+    pub(crate) fn to_serial_schema(&self) -> crate::save::schema::ModifierSer {
+        let Zoom { scale, offset } = *self;
+        crate::save::schema::ModifierSer::ZoomV1 {
+            scale,
+            offset: offset.into(),
+        }
+    }
+
     pub(super) fn evaluate(&self, input: MinEval) -> Result<MinEval, block::EvalBlockError> {
         let Zoom {
             offset: offset_in_zoomed_blocks,
