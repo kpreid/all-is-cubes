@@ -11,8 +11,8 @@ use crate::math::{GridRotation, Rgb, Rgba};
 use crate::universe::{Name, URef, Universe, UniverseIndex};
 
 #[track_caller]
-/// Serialize and deserialize.
-fn assert_round_trip<T>(value: &T, expected_json: serde_json::Value)
+/// Serialize and deserialize and assert the value is equal.
+fn assert_round_trip_value<T>(value: &T, expected_json: serde_json::Value)
 where
     T: PartialEq + fmt::Debug + serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -25,12 +25,38 @@ where
     );
 }
 
+#[track_caller]
+/// Deserialize and serialize and assert the JSON is equal.
+fn assert_round_trip_json<T>(json: serde_json::Value)
+where
+    T: fmt::Debug + serde::Serialize + serde::de::DeserializeOwned,
+{
+    let deserialized = from_value::<T>(json.clone()).expect("failed to deserialize");
+    let round_trip_json = to_value(deserialized).expect("failed to serialize");
+    assert_eq!(json, round_trip_json, "JSON not as expected");
+}
+
+/// Serialize the value, then deserialize it and serialize that to confirm the JSON is
+/// equal.
+///
+/// This is useful in lieu of [`assert_round_trip_value`] for when the values are
+/// necessarily unequal (anything involving [`URef`]s).
+#[track_caller]
+fn assert_serdeser<T>(value: &T, expected_json: serde_json::Value)
+where
+    T: fmt::Debug + serde::Serialize + serde::de::DeserializeOwned,
+{
+    let json_value = to_value(value).expect("failed to serialize");
+    assert_eq!(json_value, expected_json);
+    assert_round_trip_json::<T>(json_value);
+}
+
 //------------------------------------------------------------------------------------------------//
 // Tests corresponding to the `block` module
 
 #[test]
 fn block_air() {
-    assert_round_trip(
+    assert_round_trip_value(
         &block::AIR,
         json!({
             "type": "BlockV1",
@@ -41,7 +67,7 @@ fn block_air() {
 
 #[test]
 fn block_atom_default() {
-    assert_round_trip(
+    assert_round_trip_value(
         &block::Block::from(Rgba::new(1.0, 0.5, 0.0, 0.5)),
         json!({
             "type": "BlockV1",
@@ -57,7 +83,7 @@ fn block_atom_default() {
 fn block_atom_with_all_attributes() {
     // TODO: Not all attributes are serialized yet,
     // so this test tests only the ones that work so far.
-    assert_round_trip(
+    assert_round_trip_value(
         &block::Block::builder()
             .color(Rgba::new(1.0, 0.5, 0.0, 0.5))
             .display_name("foo")
@@ -79,7 +105,7 @@ fn block_atom_with_all_attributes() {
 
 #[test]
 fn block_with_modifiers() {
-    assert_round_trip(
+    assert_round_trip_value(
         &block::Block::builder()
             .color(Rgba::WHITE)
             .modifier(Modifier::Quote(block::Quote::default()))
@@ -109,8 +135,8 @@ fn universe_block() {
     let mut universe = Universe::new();
     let [block] = make_some_voxel_blocks(&mut universe);
     universe.insert("foo".into(), BlockDef::new(block)).unwrap();
-    assert_eq!(
-        to_value(&universe).unwrap(),
+    assert_serdeser(
+        &universe,
         json!({
             "type": "UniverseV1",
             "members": [
@@ -128,7 +154,7 @@ fn universe_block() {
                     }
                 }
             ],
-        })
+        }),
     )
 }
 
