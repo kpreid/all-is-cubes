@@ -958,6 +958,12 @@ impl<V> GridArray<V> {
             contents: self.contents.into_vec().into_iter().map(f).collect(),
         }
     }
+
+    /// Returns the contents without copying. They are ordered in the same order that
+    /// [`GridArray::from_elements()`] expects
+    pub(crate) fn into_elements(self) -> Box<[V]> {
+        self.contents
+    }
 }
 
 impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
