@@ -18,8 +18,13 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::math::{Face6, GridRotation};
+use crate::math::{Face6, GridAab, GridCoordinate, GridRotation};
+use crate::universe::URef;
 use crate::{block, space, universe};
+
+/// Placeholder type for when we want to serialize the *contents* of a `URef`,
+/// without cloning or referencing those contents immediately.
+pub(crate) struct SerializeRef<T>(pub(crate) URef<T>);
 
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `block` module
@@ -50,6 +55,9 @@ pub(crate) enum PrimitiveSer {
         #[serde(default, skip_serializing_if = "is_default")]
         offset: [i32; 3],
         resolution: block::Resolution,
+    },
+    IndirectV1 {
+        definition: universe::URef<block::BlockDef>,
     },
 }
 
@@ -106,35 +114,64 @@ pub(crate) enum ModifierSer {
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `math` module
 
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct GridAabSer {
+    // This one isn't an enum because I expect we'll not need to change it
+    pub(crate) lower: [GridCoordinate; 3],
+    pub(crate) upper: [GridCoordinate; 3],
+}
+
 type RgbSer = [ordered_float::NotNan<f32>; 3];
 
 type RgbaSer = [ordered_float::NotNan<f32>; 4];
 
 //------------------------------------------------------------------------------------------------//
-// Schema corresponding to the `universe` module
+// Schema corresponding to the `space` module
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum UniverseSer {
-    UniverseV1 {
-        /// Note: We are currently targeting JSON output, which cannot use non-string keys.
-        /// Therefore, this is not expressed as a map.
-        members: Vec<MemberEntrySer>,
+pub(crate) enum SpaceSer {
+    SpaceV1 {
+        bounds: GridAab,
+        blocks: Vec<block::Block>,
+        contents: Box<[space::BlockIndex]>,
+        // TODO: bounds, behaviors, lighting, spawn, physics
     },
 }
 
+//------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `universe` module
+
+/// Schema for `Universe` serialization and deserialization.
+/// The type parameters allow for the different data types wanted in the serialization
+/// case vs. the deserialization case.
 #[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct MemberEntrySer {
+#[serde(tag = "type")]
+pub(crate) enum UniverseSchema<S> {
+    UniverseV1 {
+        /// Note: We are currently targeting JSON output, which cannot use non-string keys.
+        /// Therefore, this is not expressed as a map.
+        members: Vec<MemberEntrySer<MemberSchema<S>>>,
+    },
+}
+pub(crate) type UniverseSer = UniverseSchema<SerializeRef<space::Space>>;
+pub(crate) type UniverseDe = UniverseSchema<space::Space>;
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct MemberEntrySer<T> {
     pub name: universe::Name,
-    pub value: AnyUniverseMemberSer,
+    pub value: T,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)] // The type-and-version tags of each member suffice
-pub(crate) enum AnyUniverseMemberSer {
+pub(crate) enum MemberSchema<S> {
     BlockDef(block::Block),
-    // TODO: add other universe member types
+    // TODO: Character(C)
+    Space(S),
 }
+pub(crate) type MemberSer = MemberSchema<SerializeRef<space::Space>>;
+pub(crate) type MemberDe = MemberSchema<space::Space>;
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]

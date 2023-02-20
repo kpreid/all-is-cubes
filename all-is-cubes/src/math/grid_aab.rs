@@ -124,6 +124,19 @@ impl GridAab {
         GridAab::from_lower_size(lower_bounds, upper_bounds.into() - lower_bounds)
     }
 
+    /// Constructs a [`GridAab`] from inclusive lower bounds and exclusive upper bounds.
+    ///
+    /// Returns [`Err`] if the bounds are reversed or the resulting range would cause
+    /// numeric overflow.
+    #[track_caller]
+    pub fn checked_from_lower_upper(
+        lower_bounds: impl Into<GridPoint>,
+        upper_bounds: impl Into<GridPoint>,
+    ) -> Result<Self, GridOverflowError> {
+        let lower_bounds = lower_bounds.into();
+        GridAab::checked_from_lower_size(lower_bounds, upper_bounds.into() - lower_bounds)
+    }
+
     /// Constructs a [`GridAab`] with a volume of 1, containing the specified cube.
     ///
     /// Panics if `cube` has any coordinates equal to [`GridCoordinate::MAX`](i32::MAX)

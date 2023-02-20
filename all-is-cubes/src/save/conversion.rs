@@ -75,7 +75,9 @@ mod block {
     impl From<&Primitive> for schema::PrimitiveSer {
         fn from(value: &Primitive) -> Self {
             match value {
-                Primitive::Indirect(_) => todo!(),
+                Primitive::Indirect(definition) => schema::PrimitiveSer::IndirectV1 {
+                    definition: definition.clone(),
+                },
                 &Primitive::Atom(ref attributes, color) => schema::PrimitiveSer::AtomV1 {
                     color: color.into(),
                     attributes: attributes.into(),
@@ -99,7 +101,7 @@ mod block {
     impl From<schema::PrimitiveSer> for Primitive {
         fn from(value: schema::PrimitiveSer) -> Self {
             match value {
-                schema::PrimitiveSer::AirV1 => Primitive::Air,
+                schema::PrimitiveSer::IndirectV1 { definition } => Primitive::Indirect(definition),
                 schema::PrimitiveSer::AtomV1 { attributes, color } => {
                     Primitive::Atom(BlockAttributes::from(attributes), Rgba::from(color))
                 }
@@ -114,6 +116,7 @@ mod block {
                     offset: offset.into(),
                     resolution,
                 },
+                schema::PrimitiveSer::AirV1 => Primitive::Air,
             }
         }
     }
@@ -218,35 +221,143 @@ mod block {
     }
 }
 
+mod math {
+    use super::*;
+    use crate::math::GridAab;
+
+    impl Serialize for GridAab {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            schema::GridAabSer {
+                lower: self.lower_bounds().into(),
+                upper: self.upper_bounds().into(),
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for GridAab {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let schema::GridAabSer { lower, upper } =
+                schema::GridAabSer::deserialize(deserializer)?;
+            GridAab::checked_from_lower_upper(lower, upper).map_err(serde::de::Error::custom)
+        }
+    }
+}
+
+mod space {
+    use super::*;
+    use crate::space::Space;
+
+    impl Serialize for Space {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            // TODO: more efficient serialization without extract() and with some kind of compression
+            schema::SpaceSer::SpaceV1 {
+                bounds: self.bounds(),
+                blocks: self
+                    .block_data()
+                    .iter()
+                    .map(|bd| bd.block().clone())
+                    .collect(),
+                contents: self
+                    .extract(self.bounds(), |index, _, _| {
+                        index.expect("shouldn't happen: serialization went out of bounds")
+                    })
+                    .into_elements(),
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Space {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            match schema::SpaceSer::deserialize(deserializer)? {
+                schema::SpaceSer::SpaceV1 {
+                    bounds,
+                    blocks,
+                    contents,
+                } => {
+                    // TODO: more efficient loading that sets blocks by index rather than value
+                    let mut space = Space::builder(bounds).build();
+                    for (cube, &block_index) in bounds.interior_iter().zip(contents.iter()) {
+                        space
+                            .set(
+                                cube,
+                                blocks.get(usize::from(block_index)).ok_or_else(|| {
+                                    serde::de::Error::custom(format!(
+                                    "Space contents block index {block_index} out of bounds of \
+                                    block table length {len}",
+                                    len = blocks.len()
+                                ))
+                                })?,
+                            )
+                            .unwrap();
+                    }
+                    Ok(space)
+                }
+            }
+        }
+    }
+}
+
 mod universe {
     use super::*;
     use crate::block::{Block, BlockDef};
     use crate::save::schema::MemberEntrySer;
+    use crate::space::Space;
     use crate::universe::{Name, UBorrow, URef, Universe, UniverseIndex};
-    use schema::{AnyUniverseMemberSer, NameSer, URefSer};
+    use schema::{MemberDe, NameSer, URefSer};
 
-    impl From<&BlockDef> for schema::AnyUniverseMemberSer {
+    impl From<&BlockDef> for schema::MemberSer {
         fn from(block_def: &BlockDef) -> Self {
             let block: &Block = block_def;
-            schema::AnyUniverseMemberSer::BlockDef(block.clone())
+            schema::MemberSer::BlockDef(block.clone())
         }
     }
 
     impl Serialize for Universe {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            schema::UniverseSer::UniverseV1 {
-                members: self
-                    .iter_by_type()
-                    .map(|(name, member_ref): (Name, URef<BlockDef>)| -> Result<schema::MemberEntrySer, S::Error> {
+            let block_defs =
+                self.iter_by_type()
+                    .map(|(name, member_ref): (Name, URef<BlockDef>)| {
                         let read_guard: UBorrow<BlockDef> = member_ref.read().map_err(|e| {
                             serde::ser::Error::custom(format!(
                                 "Failed to read universe member {name}: {e}"
                             ))
                         })?;
-                        let member_repr = schema::AnyUniverseMemberSer::from(&*read_guard);
-                        Ok(schema::MemberEntrySer { name, value: member_repr })
+                        let member_repr = schema::MemberSer::from(&*read_guard);
+                        Ok(schema::MemberEntrySer {
+                            name,
+                            value: member_repr,
+                        })
+                    });
+            let spaces = self
+                .iter_by_type()
+                .map(|(name, member_ref): (Name, URef<Space>)| {
+                    Ok(schema::MemberEntrySer {
+                        name,
+                        value: schema::MemberSer::Space(schema::SerializeRef(member_ref)),
                     })
-                    .collect::<Result<Vec<MemberEntrySer>, S::Error>>()?,
+                });
+
+            let characters = [/* TODO: serialize characters */];
+
+            schema::UniverseSer::UniverseV1 {
+                members: block_defs
+                    .chain(spaces)
+                    .chain(characters)
+                    .collect::<Result<Vec<MemberEntrySer<schema::MemberSer>>, S::Error>>()?,
             }
             .serialize(serializer)
         }
@@ -254,17 +365,18 @@ mod universe {
 
     impl<'de> Deserialize<'de> for Universe {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            let data = schema::UniverseSer::deserialize(deserializer)?;
+            let data = schema::UniverseDe::deserialize(deserializer)?;
             let mut universe = Universe::new();
             match data {
                 // TODO: Instead of new_gone(), this needs to be a named ref that can be
                 // hooked up to its definition.
-                schema::UniverseSer::UniverseV1 { members } => {
+                schema::UniverseDe::UniverseV1 { members } => {
                     for schema::MemberEntrySer { name, value } in members {
                         match value {
-                            AnyUniverseMemberSer::BlockDef(block) => {
-                                universe.insert(name, BlockDef::new(block))
+                            MemberDe::BlockDef(block) => {
+                                universe.insert(name, BlockDef::new(block)).map(|_| ())
                             }
+                            MemberDe::Space(space) => universe.insert(name, space).map(|_| ()),
                         }
                         .expect("insertion from deserialization failed");
                     }
@@ -309,6 +421,23 @@ mod universe {
                 NameSer::Specific(s) => Name::Specific(s),
                 NameSer::Anonym(n) => Name::Anonym(n),
             })
+        }
+    }
+
+    impl<T: Serialize + 'static> Serialize for schema::SerializeRef<T> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let uref: &URef<T> = &self.0;
+            let read_guard: UBorrow<T> = uref.read().map_err(|e| {
+                serde::ser::Error::custom(format!(
+                    "Failed to read universe member {name}: {e}",
+                    name = uref.name()
+                ))
+            })?;
+            let value: &T = &read_guard;
+            value.serialize(serializer)
         }
     }
 }
