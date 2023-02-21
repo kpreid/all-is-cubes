@@ -5,6 +5,9 @@
 ### Added
 
 - `all-is-cubes` library:
+    - Many types, including `Universe` and its components now support serialization via `serde`.
+      This serialization support is still a work in progress and long-term save data compatibility is planned but not currently guaranteed.
+
     - `block::Modifier::Composite` has a new option `disassemblable`, which causes `Block::unspecialize()` (and its callers such as `Tool::RemoveBlock`) to return the composed blocks separately instead of the composite.
     - `linking::BlockProvider` now has methods `subset()` (replace keys) and `map()` (replace values) to allow using `BlockProvider`s in more ways.
     - `universe::RefVisitor` is now implemented for all `FnMut(&dyn URefErased)`, allowing visitors to simply be functions.
