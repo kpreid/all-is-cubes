@@ -36,10 +36,12 @@ pub async fn main() -> test_renderers::HarnessResult {
 static WGPU_ADAPTER: OnceCell<Arc<wgpu::Adapter>> = OnceCell::const_new();
 
 async fn get_factory() -> WgpuFactory {
-    let adapter: Arc<wgpu::Adapter> = WGPU_ADAPTER
-        .get()
-        .expect("Called get_device() without initializing WGPU_ADAPTER")
-        .clone();
+    // Temporary workaround for <https://github.com/gfx-rs/wgpu/issues/3498>:
+    // Create a new adapter every time, rather than sharing one.
+    // TODO: Either remove this or keep it and remove WGPU_ADAPTER.
+    let (_instance, adapter) = init::create_instance_and_adapter_for_test().await;
+    let adapter = Arc::new(adapter.unwrap());
+
     let builder = headless::Builder::from_adapter(adapter)
         .await
         .expect("Adapter::request_device() failed");
