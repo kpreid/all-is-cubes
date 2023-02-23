@@ -22,7 +22,8 @@ async fn adapter() -> Arc<wgpu::Adapter> {
     static CELL: tokio::sync::OnceCell<Arc<wgpu::Adapter>> = tokio::sync::OnceCell::const_new();
 
     CELL.get_or_init(|| async {
-        let (_instance, adapter) = init::create_instance_and_adapter_for_test().await;
+        let (_instance, adapter) =
+            init::create_instance_and_adapter_for_test(|msg| eprintln!("{msg}")).await;
         match adapter {
             Some(adapter) => Arc::new(adapter),
             None => {

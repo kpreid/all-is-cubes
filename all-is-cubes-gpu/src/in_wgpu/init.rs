@@ -6,10 +6,13 @@
 /// Create a [`wgpu::Instance`] and [`wgpu::Adapter`] controlled by environment variables,
 /// and print information about the decision made.
 ///
-/// TODO: Replace eprintln!s with a callback the caller can print or log with.
+/// `log` receives whole lines with no trailing newlines, as suitable for logging or
+/// printing using [`println!()`].
 #[doc(hidden)]
 #[cfg(not(target_family = "wasm"))] // enumerate_adapters and environment not available
-pub async fn create_instance_and_adapter_for_test() -> (wgpu::Instance, Option<wgpu::Adapter>) {
+pub async fn create_instance_and_adapter_for_test(
+    mut log: impl FnMut(std::fmt::Arguments<'_>),
+) -> (wgpu::Instance, Option<wgpu::Adapter>) {
     let requested_backends =
         wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -18,9 +21,11 @@ pub async fn create_instance_and_adapter_for_test() -> (wgpu::Instance, Option<w
     });
 
     // Report adapters that we *could* pick
-    eprintln!("Available adapters (backend filter = {requested_backends:?}):");
+    log(format_args!(
+        "Available adapters (backend filter = {requested_backends:?}):"
+    ));
     for adapter in instance.enumerate_adapters(wgpu::Backends::all()) {
-        eprintln!("  {:?}", adapter.get_info());
+        log(format_args!("  {:?}", adapter.get_info()));
     }
 
     // Pick an adapter.
@@ -30,7 +35,9 @@ pub async fn create_instance_and_adapter_for_test() -> (wgpu::Instance, Option<w
     let mut adapter: Option<wgpu::Adapter> =
         wgpu::util::initialize_adapter_from_env(&instance, wgpu::Backends::all());
     if adapter.is_none() {
-        eprintln!("No adapter specified via WGPU_ADAPTER_NAME; picking automatically.");
+        log(format_args!(
+            "No adapter specified via WGPU_ADAPTER_NAME; picking automatically."
+        ));
         adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::util::power_preference_from_env()
@@ -42,7 +49,7 @@ pub async fn create_instance_and_adapter_for_test() -> (wgpu::Instance, Option<w
     }
 
     if let Some(adapter) = &adapter {
-        eprintln!("Using: {:?}", adapter.get_info());
+        log(format_args!("Using: {:?}", adapter.get_info()));
     }
 
     (instance, adapter)
