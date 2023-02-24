@@ -10,9 +10,7 @@ use all_is_cubes::cgmath::{EuclideanSpace, Point3, Transform, Vector3};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{Listen as _, Listener};
-use all_is_cubes::math::{
-    Aab, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, Rgb,
-};
+use all_is_cubes::math::{Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, Rgb};
 use all_is_cubes::mesh::chunked_mesh::{ChunkMeshUpdate, ChunkedSpaceMesh};
 use all_is_cubes::mesh::DepthOrdering;
 use all_is_cubes::space::{Space, SpaceChange};
@@ -28,9 +26,7 @@ use crate::in_wgpu::{
     glue::{to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
     vertex::WgpuBlockVertex,
 };
-use crate::{
-    wireframe_vertices, DebugLineVertex, GraphicsResourceError, SpaceDrawInfo, SpaceUpdateInfo,
-};
+use crate::{DebugLineVertex, GraphicsResourceError, SpaceDrawInfo, SpaceUpdateInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -422,18 +418,10 @@ impl SpaceRenderer {
     /// draw() was just called.
     pub(crate) fn debug_lines(&self, camera: &Camera, v: &mut Vec<WgpuLinesVertex>) {
         if camera.options().debug_chunk_boxes {
-            // TODO: remember view direction mask instead of rerequesting it?
-            for chunk in self
-                .csm
-                .chunk_chart()
-                .chunks(self.csm.view_chunk(), camera.view_direction_mask())
-            {
-                wireframe_vertices::<WgpuLinesVertex, _, _>(
-                    v,
-                    palette::DEBUG_CHUNK_MAJOR,
-                    &Aab::from(chunk.bounds()),
-                );
-            }
+            self.csm.chunk_debug_lines(
+                camera,
+                &mut crate::map_line_vertices::<WgpuLinesVertex>(v, palette::DEBUG_CHUNK_MAJOR),
+            );
 
             // Frame the nearest chunk in detail
             let chunk_origin = self

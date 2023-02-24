@@ -80,12 +80,19 @@ where
     V: DebugLineVertex,
     G: Geometry,
 {
-    geometry.wireframe_points(&mut MapExtend::new(
+    geometry.wireframe_points(&mut map_line_vertices(vertices, color))
+}
+
+pub(crate) fn map_line_vertices<'a, V: DebugLineVertex + 'a>(
+    vertices: &'a mut impl Extend<V>,
+    color: Rgba,
+) -> impl Extend<LineVertex> + 'a {
+    MapExtend::new(
         vertices,
-        |LineVertex {
-             position,
-             color: vertex_color,
-             ..
-         }| V::from_position_color(position, vertex_color.unwrap_or(color)),
-    ))
+        move |LineVertex {
+                  position,
+                  color: vertex_color,
+                  ..
+              }| V::from_position_color(position, vertex_color.unwrap_or(color)),
+    )
 }

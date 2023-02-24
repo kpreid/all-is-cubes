@@ -12,9 +12,10 @@ use crate::block::{EvaluatedBlock, Resolution};
 use crate::camera::{Camera, Flaws};
 use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
 use crate::listen::{Listen as _, Listener};
-use crate::math::{FreeCoordinate, GridCoordinate, GridPoint};
+use crate::math::{Aab, FreeCoordinate, Geometry as _, GridCoordinate, GridPoint};
 use crate::mesh::{
-    BlockMesh, BlockMeshProvider, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator, TextureTile,
+    BlockMesh, BlockMeshProvider, GfxVertex, LineVertex, MeshOptions, SpaceMesh, TextureAllocator,
+    TextureTile,
 };
 use crate::space::{BlockIndex, Space, SpaceChange};
 use crate::universe::URef;
@@ -357,6 +358,16 @@ where
     /// This may be used as the origin point to iterate over chunks in view.
     pub fn view_chunk(&self) -> ChunkPos<CHUNK_SIZE> {
         self.view_chunk
+    }
+
+    /// Produces lines that visualize the boundaries of visible nonempty chunks.
+    #[doc(hidden)] // TODO: good public API?
+    pub fn chunk_debug_lines(&self, camera: &Camera, output: &mut impl Extend<LineVertex>) {
+        for chunk_mesh in self.iter_in_view(camera) {
+            if !chunk_mesh.mesh.is_empty() {
+                Aab::from(chunk_mesh.position().bounds()).wireframe_points(output)
+            }
+        }
     }
 }
 
