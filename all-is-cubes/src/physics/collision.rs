@@ -3,15 +3,16 @@
 use std::collections::HashSet;
 use std::fmt;
 
-use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
+use cgmath::{EuclideanSpace as _, InnerSpace as _, Vector3, Zero as _};
 
 use super::POSITION_EPSILON;
 use crate::block::Evoxels;
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{
     Aab, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridAab, GridArray, GridCoordinate,
-    GridPoint, Rgba,
+    GridPoint,
 };
+use crate::mesh::LineVertex;
 use crate::raycast::{Ray, Raycaster};
 use crate::space::Space;
 use crate::util::{ConciseDebug, CustomFormat, MapExtend};
@@ -121,7 +122,7 @@ impl Geometry for Contact {
 
     fn wireframe_points<E>(&self, output: &mut E)
     where
-        E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
+        E: Extend<LineVertex>,
     {
         match self {
             Contact::Block(cube_face) => cube_face.wireframe_points(output),
@@ -131,13 +132,11 @@ impl Geometry for Contact {
                 voxel,
             } => {
                 let resolution: FreeCoordinate = (*resolution).into();
-                voxel.wireframe_points(&mut MapExtend::new(
-                    output,
-                    |mut vert: (Point3<FreeCoordinate>, Option<Rgba>)| {
-                        vert.0 = vert.0 / resolution + cube.to_vec().map(FreeCoordinate::from);
-                        vert
-                    },
-                ))
+                voxel.wireframe_points(&mut MapExtend::new(output, |mut vert: LineVertex| {
+                    vert.position =
+                        vert.position / resolution + cube.to_vec().map(FreeCoordinate::from);
+                    vert
+                }))
             }
         }
     }

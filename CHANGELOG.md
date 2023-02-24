@@ -24,6 +24,7 @@
     - `block::Modifier::attach()` has been replaced by `block::Block::with_modifier()`.
       This is intended to be more convenient in all cases.
     - `block::AIR` now has its own dedicated primitive, `Primitive::Air`. The behavior is unchanged.
+    - `math::Geometry::wireframe_points()` now produces a new type `mesh::LineVertex` instead of a tuple (with the same position and color data).
     - `transaction::Transaction` can now produce any number of `Output`s, delivered through a callback.
     - `universe::UniverseTransaction::insert()` now takes a `URef` created by `URef::new_pending()`, instead of a bare value.
       This allows associations between the new member and other objects to be created within the same transaction.

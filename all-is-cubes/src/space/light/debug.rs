@@ -4,9 +4,10 @@
 //! Note that this entire module is `doc(hidden)`; pub items inside it
 //! are for intra-project use only.
 
-use cgmath::{Point3, Vector3};
+use cgmath::Vector3;
 
-use crate::math::{Aab, FreeCoordinate, Geometry, GridPoint, Rgba};
+use crate::math::{Aab, FreeCoordinate, Geometry, GridPoint};
+use crate::mesh::LineVertex;
 use crate::raycast::Ray;
 use crate::space::PackedLight;
 use crate::util::MapExtend;
@@ -56,7 +57,7 @@ impl Geometry for LightUpdateCubeInfo {
 
     fn wireframe_points<E>(&self, output: &mut E)
     where
-        E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
+        E: Extend<LineVertex>,
     {
         // Draw output cube
         Aab::from_cube(self.cube)
@@ -87,16 +88,15 @@ impl Geometry for LightUpdateRayInfo {
 
     fn wireframe_points<E>(&self, output: &mut E)
     where
-        E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
+        E: Extend<LineVertex>,
     {
         Aab::from_cube(self.value_cube)
             .expand(0.01)
             .wireframe_points(output);
-        self.ray.wireframe_points(&mut MapExtend::new(
-            output,
-            |(p, _): (Point3<FreeCoordinate>, Option<Rgba>)| {
-                (p, Some(self.value.value().with_alpha_one()))
-            },
-        ))
+        self.ray
+            .wireframe_points(&mut MapExtend::new(output, |mut v: LineVertex| {
+                v.color = Some(self.value.value().with_alpha_one());
+                v
+            }))
     }
 }

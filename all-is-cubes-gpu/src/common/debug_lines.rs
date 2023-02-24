@@ -3,10 +3,11 @@ use all_is_cubes::cgmath::Point3;
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{Aab, FreeCoordinate, Geometry, Rgba};
+use all_is_cubes::mesh::LineVertex;
 use all_is_cubes::space::Space;
 use all_is_cubes::util::MapExtend;
 
-/// TODO: give this trait a better name
+/// TODO: give this trait a better name, especially now that `LineVertex` exists.
 pub(crate) trait DebugLineVertex {
     fn from_position_color(position: Point3<FreeCoordinate>, color: Rgba) -> Self;
 }
@@ -81,8 +82,10 @@ where
 {
     geometry.wireframe_points(&mut MapExtend::new(
         vertices,
-        |(p, vertex_color): (Point3<FreeCoordinate>, Option<Rgba>)| {
-            V::from_position_color(p, vertex_color.unwrap_or(color))
-        },
+        |LineVertex {
+             position,
+             color: vertex_color,
+             ..
+         }| V::from_position_color(position, vertex_color.unwrap_or(color)),
     ))
 }

@@ -853,7 +853,7 @@ impl Geometry for CubeFace {
 
     fn wireframe_points<E>(&self, output: &mut E)
     where
-        E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
+        E: Extend<crate::mesh::LineVertex>,
     {
         // TODO: How much to offset the lines should be a parameter of the wireframe_points process.
         let expansion = 0.005;
@@ -871,11 +871,10 @@ impl Geometry for CubeFace {
         // TODO: this is a messy kludge and really we should be stealing corner points
         // from the AAB instead, but there isn't yet a good way to do that.
         output.extend(X_POINTS.into_iter().map(|p| {
-            (
+            crate::mesh::LineVertex::from(
                 (face_matrix.transform_point(p))
                     .map(|c| (FreeCoordinate::from(c) - 0.5) * (1. + expansion * 2.) + 0.5)
                     + self.cube.to_vec().map(FreeCoordinate::from),
-                None,
             )
         }));
     }

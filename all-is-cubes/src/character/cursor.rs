@@ -8,9 +8,8 @@ use cgmath::{EuclideanSpace, InnerSpace as _, Matrix4, Point3, Transform as _};
 
 use crate::block::{recursive_raycast, Block, EvaluatedBlock, Evoxel, Evoxels};
 use crate::content::palette;
-use crate::math::{
-    Aab, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridVector, Rgba,
-};
+use crate::math::{Aab, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridVector};
+use crate::mesh::LineVertex;
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
 use crate::universe::URef;
@@ -208,7 +207,7 @@ impl Geometry for Cursor {
 
     fn wireframe_points<E>(&self, output: &mut E)
     where
-        E: Extend<(Point3<FreeCoordinate>, Option<crate::math::Rgba>)>,
+        E: Extend<LineVertex>,
     {
         let evaluated = &self.hit().evaluated;
 
@@ -229,10 +228,10 @@ impl Geometry for Cursor {
         // Add wireframe of the block.
         block_aabb
             .expand(offset_from_surface)
-            .wireframe_points(&mut MapExtend::new(
-                output,
-                |(p, _): (Point3<FreeCoordinate>, Option<Rgba>)| (p, Some(palette::CURSOR_OUTLINE)),
-            ));
+            .wireframe_points(&mut MapExtend::new(output, |mut v: LineVertex| {
+                v.color = Some(palette::CURSOR_OUTLINE);
+                v
+            }));
 
         let face_transform_full =
             Matrix4::from_translation(self.hit().position.map(FreeCoordinate::from).to_vec())
@@ -252,8 +251,11 @@ impl Geometry for Cursor {
         .windows(2)
         .flatten()
         {
-            let p = face_transform_full.transform_point(p);
-            output.extend([(p, Some(palette::CURSOR_OUTLINE))]);
+            let position = face_transform_full.transform_point(p);
+            output.extend([LineVertex {
+                position,
+                color: Some(palette::CURSOR_OUTLINE),
+            }]);
         }
 
         // Frame the cursor intersection point with a diamond.
@@ -264,10 +266,13 @@ impl Geometry for Cursor {
             .windows(2)
             .flatten()
         {
-            let p = self.point_entered
+            let position = self.point_entered
                 + self.face_entered.normal_vector() * offset_from_surface
                 + face_transform_axes_only.transform_vector(f.normal_vector() * (1.0 / 32.0));
-            output.extend([(p, Some(palette::CURSOR_OUTLINE))]);
+            output.extend([LineVertex {
+                position,
+                color: Some(palette::CURSOR_OUTLINE),
+            }]);
         }
     }
 }
@@ -280,7 +285,7 @@ mod tests {
     use super::*;
     use crate::block::{Resolution::*, AIR};
     use crate::content::{make_slab, make_some_blocks};
-    use crate::math::GridAab;
+    use crate::math::{GridAab, Rgba};
     use crate::universe::Universe;
     use cgmath::Vector3;
 

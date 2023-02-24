@@ -128,7 +128,7 @@ pub trait Geometry {
     /// will be awkward until `type_alias_impl_trait` is stable.
     fn wireframe_points<E>(&self, output: &mut E)
     where
-        E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>;
+        E: Extend<crate::mesh::LineVertex>;
 }
 
 #[cfg(test)]

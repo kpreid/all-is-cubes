@@ -9,7 +9,7 @@ use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
 use crate::math::{
     point_to_enclosing_cube, CubeFace, Face7, FreeCoordinate, Geometry, GridAab, GridCoordinate,
-    GridPoint, Rgba,
+    GridPoint,
 };
 
 /// A ray; a half-infinite line segment (sometimes used as finite by the length of the
@@ -103,10 +103,10 @@ impl Geometry for Ray {
 
     fn wireframe_points<E>(&self, output: &mut E)
     where
-        E: Extend<(Point3<FreeCoordinate>, Option<Rgba>)>,
+        E: Extend<crate::mesh::LineVertex>,
     {
         // TODO: add an arrowhead
-        output.extend([(self.origin, None), (self.unit_endpoint(), None)]);
+        output.extend([self.origin.into(), self.unit_endpoint().into()]);
     }
 }
 

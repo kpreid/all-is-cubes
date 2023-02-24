@@ -3,14 +3,9 @@
 //!
 //! All of the algorithms here are independent of graphics API, but they require providing
 //! vertex and texture data types suitable for the API or data format you wish to use.
-//!
-//! Note on terminology: Some sources say that “tesselation” would be a better verb
-//! for this operation than “triangulation”. However, “tesselation” means a specific
-//! other operation in OpenGL graphics programming, and “triangulation” seems to
-//! be the more commonly used term — at least among those who don't say “meshing”
-//! instead.
 
 use crate::camera::{GraphicsOptions, TransparencyOption};
+use crate::math::FreeCoordinate;
 
 mod block_vertex;
 pub use block_vertex::*;
@@ -19,6 +14,7 @@ pub use block_mesh::*;
 #[doc(hidden)] // TODO: candidate for being public
 pub mod chunked_mesh;
 mod space_mesh;
+use cgmath::Point3;
 pub use space_mesh::*;
 mod planar;
 use planar::*;
@@ -62,6 +58,37 @@ impl MeshOptions {
         Self {
             transparency: TransparencyOption::Volumetric,
             ignore_voxels: false,
+        }
+    }
+}
+
+/// One end of a line to be drawn.
+///
+/// Used for debugging visualizations and not for game content, with the current exception
+/// of [`Cursor`](crate::character::Cursor).
+///
+/// The primary way in which these are used in this crate is
+/// [`Geometry::wireframe_points()`](crate::math::Geometry::wireframe_points).
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct LineVertex {
+    /// Position of the vertex.
+    pub position: Point3<FreeCoordinate>,
+
+    /// Color in which to draw the line.
+    ///
+    /// If [`None`], a color set by the context/parent should be used instead.
+    ///
+    /// If the ends of a line are different colors, color should be interpolated along
+    /// the line.
+    pub color: Option<crate::math::Rgba>,
+}
+
+impl From<Point3<FreeCoordinate>> for LineVertex {
+    fn from(position: Point3<FreeCoordinate>) -> Self {
+        Self {
+            position,
+            color: None,
         }
     }
 }
