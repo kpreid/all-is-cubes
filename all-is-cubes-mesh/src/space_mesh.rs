@@ -649,6 +649,14 @@ impl<T> MeshMeta<T> {
         self.flaws
     }
 
+    /// Returns the number of vertex indices in this mesh (three times the number of
+    /// triangles).
+    // TODO(instancing): this exists to match `BlockMesh::count_indices()`.
+    #[allow(unused)]
+    pub(crate) fn count_indices(&self) -> usize {
+        self.opaque_range.len() + self.transparent_range(DepthOrdering::Any).len()
+    }
+
     /// The range of index data which contains the triangles with only alpha values
     /// of 0 or 1 and therefore may be drawn using a depth buffer rather than sorting.
     #[inline]
@@ -818,27 +826,25 @@ mod tests {
 
     type TestMesh = SpaceMesh<BlockVertex<TtPoint>, TestTextureTile>;
 
+    /// Test that `default()` returns an empty mesh and the characteristics of such a mesh.
     #[test]
-    fn empty_mesh() {
+    fn default_is_empty() {
         let mesh = TestMesh::default();
         assert!(mesh.is_empty());
         assert_eq!(mesh.vertices(), &[]);
         assert_eq!(mesh.indices(), IndexSlice::U16(&[]));
-    }
-
-    /// An empty mesh shouldn't allocate anything beyond itself.
-    #[test]
-    fn size_of_empty() {
-        let mesh = TestMesh::default();
+        assert_eq!(mesh.count_indices(), 0);
         assert_eq!(dbg!(mesh.total_byte_size()), mem::size_of::<TestMesh>());
     }
 
     #[test]
-    fn size_of_nonempty() {
+    fn nonempty_properties() {
         let space = Space::builder(GridAab::single_cube(GridPoint::origin()))
             .filled_with(Block::from(Rgba::WHITE))
             .build();
         let (_, _, mesh) = mesh_blocks_and_space(&space);
+
+        assert_eq!(mesh.count_indices(), 6 /* faces */ * 6 /* vertices */);
 
         let expected_data_size = std::mem::size_of_val::<[BlockVertex<TtPoint>]>(mesh.vertices())
             + mesh.indices().as_bytes().len();

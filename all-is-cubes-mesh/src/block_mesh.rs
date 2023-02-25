@@ -172,6 +172,19 @@ impl<V, T> BlockMesh<V, T> {
         self.all_face_meshes().all(|(_, fm)| fm.is_empty())
     }
 
+    /// Returns the number of vertex indices in this mesh (three times the number of
+    /// triangles).
+    // TODO(instancing): this is going to be used for deciding whether to draw blocks
+    // as instances or within chunk meshes. That's not implemented yet. After it's used
+    // there, think about whether this should be public and whether it should count
+    // indices or whole triangles. Whatever is decided, also update `MeshMeta::count_indices()`.
+    #[allow(unused)]
+    pub(crate) fn count_indices(&self) -> usize {
+        self.all_face_meshes()
+            .map(|(_, fm)| fm.indices_opaque.len() + fm.indices_transparent.len())
+            .sum()
+    }
+
     /// Update this mesh's textures in-place to the given new block data, if this is
     /// possible without changing the vertices.
     // TODO: non-public while we decide whether it's a good interface
@@ -595,6 +608,7 @@ mod tests {
         assert!(mesh.is_empty());
         assert_eq!(mesh.voxel_opacity_mask, None);
         assert!(mesh.textures().is_empty());
+        assert_eq!(mesh.count_indices(), 0);
     }
 
     #[test]
@@ -607,6 +621,7 @@ mod tests {
         );
 
         assert!(!mesh.is_empty());
+        assert_eq!(mesh.count_indices(), 6 /* faces */ * 6 /* vertices */);
     }
 
     #[test]
