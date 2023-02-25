@@ -230,10 +230,11 @@ impl Aab {
         Self::from_lower_upper(self.lower_bounds * scalar, self.upper_bounds * scalar)
     }
 
-    /// Enlarges the AAB by moving each face outward by the specified distance.
+    /// Enlarges the AAB by moving each face outward by the specified distance (or inward
+    /// if negative).
     ///
-    /// Panics if the distance is negative or NaN.
-    /// (TODO: Change that, and reconcile the incidental differences with [`GridAab::expand()`].)
+    /// If this would result in a negative or NaN size, produces a zero size AAB located
+    /// at the center point of `self`.
     ///
     /// ```
     /// use all_is_cubes::math::Aab;
@@ -247,15 +248,17 @@ impl Aab {
     pub fn expand(self, distance: FreeCoordinate) -> Self {
         // We could imagine a non-uniform version of this, but the fully general one
         // looks a lot like generally constructing a new Aab.
-        assert!(
-            distance >= 0.0,
-            "distance must be nonnegative, not {distance}"
-        );
         let distance_vec = Vector3::new(1.0, 1.0, 1.0) * distance;
-        Self::from_lower_upper(
+        match Self::checked_from_lower_upper(
             self.lower_bounds - distance_vec,
             self.upper_bounds + distance_vec,
-        )
+        ) {
+            Some(aab) => aab,
+            None => {
+                let center = self.center();
+                Aab::from_lower_upper(center, center)
+            }
+        }
     }
 
     #[inline]
@@ -434,15 +437,31 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn expand_nan() {
-        let _ = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(FreeCoordinate::NAN);
+        let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+        assert_eq!(
+            aab.expand(FreeCoordinate::NAN),
+            Aab::from_lower_upper(aab.center(), aab.center()),
+        );
+    }
+
+    #[test]
+    fn expand_negative_failure() {
+        let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+        assert_eq!(
+            aab.expand(-10.0),
+            Aab::from_lower_upper(aab.center(), aab.center()),
+        );
     }
 
     #[test]
     #[should_panic]
-    fn expand_negative() {
-        let _ = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(-0.1);
+    fn expand_negative_success() {
+        let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+        assert_eq!(
+            aab.expand(-0.25),
+            Aab::new(1.25, 2.25, 3.25, 3.75, 4.75, 5.75),
+        );
     }
 
     #[test]
