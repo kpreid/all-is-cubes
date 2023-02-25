@@ -365,7 +365,16 @@ where
     pub fn chunk_debug_lines(&self, camera: &Camera, output: &mut impl Extend<LineVertex>) {
         for chunk_mesh in self.iter_in_view(camera) {
             if !chunk_mesh.mesh.is_empty() {
-                Aab::from(chunk_mesh.position().bounds()).wireframe_points(output)
+                let aab = Aab::from(chunk_mesh.position().bounds());
+                aab.wireframe_points(output);
+
+                // Additional border that wiggles when updates happen.
+                aab.expand(if chunk_mesh.update_debug {
+                    -0.05
+                } else {
+                    -0.02
+                })
+                .wireframe_points(output)
             }
         }
     }
@@ -650,6 +659,10 @@ where
     mesh: SpaceMesh<Vert, Tex::Tile>,
     pub render_data: D,
     block_dependencies: Vec<(BlockIndex, BlockMeshVersion)>,
+
+    /// Toggled whenever the mesh is updated. Value is arbitrary (this is a looping
+    /// 2-state counter).
+    update_debug: bool,
 }
 
 impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate> ChunkMesh<D, Vert, Tex, CHUNK_SIZE>
@@ -664,6 +677,7 @@ where
             mesh: SpaceMesh::default(),
             render_data: D::default(),
             block_dependencies: Vec::new(),
+            update_debug: false,
         }
     }
 
@@ -722,6 +736,7 @@ where
                 );
             }
         }
+        self.update_debug = !self.update_debug;
 
         // Record the block meshes we incorporated into the chunk mesh.
         self.block_dependencies.clear();
