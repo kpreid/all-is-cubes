@@ -359,7 +359,7 @@ mod tests {
     #[test]
     /// Test `Debug` formatting. Note this should be similar to the [`GridAab`]
     /// formatting.
-    fn aab_debug() {
+    fn debug() {
         let aab = Aab::new(1.0000001, 2.0, 3.0, 4.0, 5.0, 6.0);
         assert_eq!(
             format!("{aab:?}"),
@@ -379,18 +379,18 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn aab_expand_nan() {
+    fn expand_nan() {
         let _ = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(FreeCoordinate::NAN);
     }
 
     #[test]
     #[should_panic]
-    fn aab_expand_negative() {
+    fn expand_negative() {
         let _ = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(-0.1);
     }
 
     #[test]
-    fn aab_expand_inf() {
+    fn expand_inf() {
         const INF: FreeCoordinate = FreeCoordinate::INFINITY;
         assert_eq!(
             Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(INF),
@@ -399,7 +399,7 @@ mod tests {
     }
 
     #[test]
-    fn aab_wireframe_smoke_test() {
+    fn wireframe_smoke_test() {
         let aab = Aab::from_cube(Point3::new(1, 2, 3));
         let mut wireframe: Vec<LineVertex> = Vec::new();
         aab.wireframe_points(&mut wireframe);
@@ -412,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    fn aab_leading_corner_consistency() {
+    fn leading_corner_consistency() {
         let aab = Aab::new(-1.1, 2.2, -3.3, 4.4, -5.5, 6.6);
         for direction in (-1..=1)
             .zip(-1..=1)
@@ -432,7 +432,7 @@ mod tests {
     /// This would be a doc test except `corner_points` is not public for now
     /// (since it's oddball and not fully nailed down).
     #[test]
-    fn aab_corner_points() {
+    fn corner_points() {
         // use all_is_cubes::cgmath::Point3;
         // use all_is_cubes::math::{Aab, GridPoint};
 
