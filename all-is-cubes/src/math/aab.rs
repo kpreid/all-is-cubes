@@ -55,19 +55,45 @@ impl Aab {
     }
 
     /// Constructs an [`Aab`] from most-negative and most-positive corner points.
+    ///
+    /// Panics if the points are not in the proper order or if they are NaN.
     #[track_caller]
-    #[rustfmt::skip]
     pub fn from_lower_upper(
         lower_bounds: impl Into<Point3<FreeCoordinate>>,
         upper_bounds: impl Into<Point3<FreeCoordinate>>,
     ) -> Self {
         let lower_bounds = lower_bounds.into();
         let upper_bounds = upper_bounds.into();
-        assert!(lower_bounds.x <= upper_bounds.x, "lower_bounds.x must be <= upper_bounds.x");
-        assert!(lower_bounds.y <= upper_bounds.y, "lower_bounds.y must be <= upper_bounds.y");
-        assert!(lower_bounds.z <= upper_bounds.z, "lower_bounds.z must be <= upper_bounds.z");
-        let sizes = upper_bounds - lower_bounds;
-        Self { lower_bounds, upper_bounds, sizes }
+        match Self::checked_from_lower_upper(lower_bounds, upper_bounds) {
+            Some(aab) => aab,
+            None => panic!(
+                "invalid AAB points that are misordered or NaN: \
+                lower {lower_bounds:?} upper {upper_bounds:?}"
+            ),
+        }
+    }
+
+    /// Constructs an [`Aab`] from most-negative and most-positive corner points.
+    ///
+    /// Returns [`None`] if the points are not in the proper order or if they are NaN.
+    // TODO: Make this public but give it an error type?
+    fn checked_from_lower_upper(
+        lower_bounds: Point3<FreeCoordinate>,
+        upper_bounds: Point3<FreeCoordinate>,
+    ) -> Option<Self> {
+        if lower_bounds.x <= upper_bounds.x
+            && lower_bounds.y <= upper_bounds.y
+            && lower_bounds.z <= upper_bounds.z
+        {
+            let sizes = upper_bounds - lower_bounds;
+            Some(Self {
+                lower_bounds,
+                upper_bounds,
+                sizes,
+            })
+        } else {
+            None
+        }
     }
 
     /// Returns the AAB of a given cube in the interpretation used by [`GridAab`] and
@@ -355,6 +381,36 @@ impl Geometry for Aab {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn new_wrong_order() {
+        assert_eq!(
+            Aab::checked_from_lower_upper(Point3::new(2., 1., 1.), Point3::new(1., 2., 2.)),
+            None
+        );
+        assert_eq!(
+            Aab::checked_from_lower_upper(Point3::new(1., 2., 1.), Point3::new(2., 1., 2.)),
+            None
+        );
+        assert_eq!(
+            Aab::checked_from_lower_upper(Point3::new(1., 1., 2.), Point3::new(2., 2., 1.)),
+            None
+        );
+    }
+
+    #[test]
+    fn new_nan() {
+        assert_eq!(
+            Aab::checked_from_lower_upper(Point3::new(0., 0., 0.), Point3::new(1., 1., f64::NAN)),
+            None
+        );
+    }
+
+    #[test]
+    #[should_panic = "invalid AAB points that are misordered or NaN: lower Point3 [0.0, 0.0, 0.0] upper Point3 [1.0, 1.0, NaN]"]
+    fn new_panic_message() {
+        Aab::from_lower_upper([0., 0., 0.], [1., 1., f64::NAN]);
+    }
 
     #[test]
     /// Test `Debug` formatting. Note this should be similar to the [`GridAab`]
