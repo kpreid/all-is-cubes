@@ -3,20 +3,22 @@
 //! TODO: This should really be a test in [`all_is_cubes_port`], but right now, some of
 //! the top-level glTF output logic is in this package so we need to test it here.
 
-use std::process::Command;
+use std::process;
 
 fn gltf_round_trip_test(args: &[&str]) {
     let temp_dir = tempfile::tempdir().unwrap();
     let gltf_path = temp_dir.path().join("output.gltf");
 
-    let status = Command::new(env!("CARGO_BIN_EXE_all-is-cubes"))
+    let output = process::Command::new(env!("CARGO_BIN_EXE_all-is-cubes"))
         .arg("--graphics=record")
         .arg("--output")
         .arg(&*gltf_path)
         .args(args) // to specify template, duration, etc
-        .status()
+        .output()
         .expect("Failed to start all-is-cubes process");
-    assert!(status.success());
+
+    print_output(&output);
+    assert!(output.status.success());
 
     // Run validation via import (but don't make any custom assertions, yet...)
     match gltf::import(&gltf_path) {
@@ -33,6 +35,14 @@ fn gltf_round_trip_test(args: &[&str]) {
             );
         }
     }
+}
+
+fn print_output(output: &process::Output) {
+    println!(
+        "[command stderr]\n{stderr}\n[command stdout]\n{stdout}\n[end of output]",
+        stderr = String::from_utf8_lossy(&output.stderr),
+        stdout = String::from_utf8_lossy(&output.stdout),
+    );
 }
 
 #[test]
