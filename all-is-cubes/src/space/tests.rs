@@ -17,7 +17,7 @@ use crate::space::{
 };
 use crate::time::Tick;
 use crate::transaction;
-use crate::universe::{RefError, Universe, UniverseIndex as _, UniverseTransaction};
+use crate::universe::{Name, RefError, Universe, UniverseIndex as _, UniverseTransaction};
 
 // TODO: test consistency between the index and get_* methods
 // TODO: test fill() equivalence and error handling
@@ -357,6 +357,40 @@ fn listens_to_block_changes() {
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(sink.drain(), vec![SpaceChange::BlockValue(0)]);
     assert_eq!(space.get_evaluated((0, 0, 0)), &new_evaluated);
+}
+
+#[test]
+fn indirect_becomes_evaluation_error() {
+    let block_name = Name::from("block");
+
+    // Set up 2 levels of indirect block
+    // (because right now, a URef going away is silent...)
+    let mut universe = Universe::new();
+    let block_def_ref = universe
+        .insert(block_name.clone(), BlockDef::new(Block::from(Rgba::WHITE)))
+        .unwrap();
+    let block = Block::from_primitive(Primitive::Indirect(block_def_ref.clone()));
+
+    // Set up space and listener
+    let mut space = Space::empty_positive(1, 1, 1);
+    space.set((0, 0, 0), &block).unwrap();
+    let sink = Sink::new();
+    space.listen(sink.listener());
+
+    // Make the block def refer to itself, guaranteeing an evaluation error
+    block_def_ref
+        .execute(&BlockDefTransaction::overwrite(block.clone()), &mut drop)
+        .unwrap();
+
+    // Step the space to let it notice.
+    let (_, _) = space.step(None, Tick::arbitrary());
+
+    // Now we should see a notification and the evaluated block data having changed.
+    assert_eq!(sink.drain(), vec![SpaceChange::BlockValue(0)]);
+    assert_eq!(
+        space.get_evaluated((0, 0, 0)),
+        &block.evaluate().unwrap_err().to_placeholder()
+    );
 }
 
 #[test]

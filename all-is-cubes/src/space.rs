@@ -607,11 +607,14 @@ impl Space {
         for block_index in self.todo.lock().unwrap().blocks.drain() {
             self.notifier.notify(SpaceChange::BlockValue(block_index));
             let data: &mut SpaceBlockData = &mut self.block_data[usize::from(block_index)];
-            // TODO: handle error by switching to a "broken block" state.
-            // We may want to have a higher-level error handling by pausing the world
+
+            // TODO: We may want to have a higher-level error handling by pausing the Space
             // and giving the user choices like reverting to save, editing to fix, or
-            // continuing with a partly broken world.
-            data.evaluated = data.block.evaluate().expect("block reevaluation failed");
+            // continuing with a partly broken world. Right now, we just continue with the
+            // placeholder, which may have cascading effects despite the placeholder's
+            // design to be innocuous.
+            data.evaluated = data.block.evaluate().unwrap_or_else(|e| e.to_placeholder());
+
             // TODO: Process side effects on individual cubes such as reevaluating the
             // lighting influenced by the block.
 
