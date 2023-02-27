@@ -5,6 +5,7 @@ use std::fmt;
 use cgmath::{Vector4, Zero as _};
 
 use crate::block::{self, BlockAttributes, Resolution, Resolution::R1};
+use crate::content::palette;
 use crate::math::{FaceMap, GridAab, GridArray, GridPoint, OpacityCategory, Rgb, Rgba};
 use crate::universe::RefError;
 
@@ -227,6 +228,38 @@ pub enum EvalBlockError {
     /// This may be temporary or permanent; consult the [`RefError`] to determine that.
     #[error("block data inaccessible: {0}")]
     DataRefIs(#[from] RefError),
+}
+
+impl EvalBlockError {
+    /// Convert this error into an [`EvaluatedBlock`] which represents that an error has
+    /// occurred.
+    ///
+    /// This block is fully opaque and as inert to game mechanics as currently possible.
+    // TODO: test this
+    pub fn to_placeholder(&self) -> EvaluatedBlock {
+        let resolution = Resolution::R8;
+        // TODO: dedicated palette colors, more detail (e.g. type of error as an icon)
+        let pattern = [
+            palette::MISSING_VOXEL_FALLBACK,
+            palette::MISSING_TEXTURE_FALLBACK,
+        ]
+        .map(Evoxel::from_color);
+
+        EvaluatedBlock::from_voxels(
+            BlockAttributes {
+                display_name: format!("Block error: {self}").into(),
+                selectable: false, // TODO: make this selectable but immutable
+                collision: block::BlockCollision::Hard,
+                ..Default::default()
+            },
+            Evoxels::Many(
+                resolution,
+                GridArray::from_fn(GridAab::for_block(resolution), |cube| {
+                    pattern[(cube.x + cube.y + cube.z).rem_euclid(2) as usize]
+                }),
+            ),
+        )
+    }
 }
 
 /// Properties of an individual voxel within [`EvaluatedBlock`].
