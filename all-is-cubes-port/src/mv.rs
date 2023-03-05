@@ -89,7 +89,18 @@ pub(crate) async fn export_to_dot_vox_data(
     p: YieldProgress,
     source: ExportSet,
 ) -> Result<dot_vox::DotVoxData, ExportError> {
-    let ExportSet { spaces: to_export } = source;
+    let ExportSet {
+        block_defs,
+        spaces: to_export,
+    } = source;
+
+    // If block def list is nonempty, fail.
+    if let Some(first) = block_defs.get(0) {
+        return Err(ExportError::NotRepresentable {
+            name: Some(first.name()),
+            reason: "Exporting BlockDefs to .vox is not yet supported".into(),
+        });
+    }
 
     let mut palette: Vec<u32> = Vec::new();
     let mut models: Vec<dot_vox::Model> = Vec::with_capacity(to_export.len());
@@ -300,6 +311,7 @@ fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> GridMatrix {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::block::BlockDef;
     use all_is_cubes::math::GridPoint;
     use all_is_cubes::raytracer::print_space;
     use all_is_cubes::universe::URef;
@@ -418,7 +430,7 @@ mod tests {
         // TODO: make more assertions about the data?
     }
 
-    /// [`dot_vox`] only supports coordinats from 0-255
+    /// [`dot_vox`] only supports coordinates from 0-255
     #[tokio::test]
     async fn export_too_large_space() {
         let mut universe = Universe::new();
@@ -431,6 +443,26 @@ mod tests {
                 .await
                 .unwrap_err();
         assert!(matches!(error, ExportError::NotRepresentable { .. }));
+    }
+
+    #[tokio::test]
+    async fn export_block_def() {
+        let mut universe = Universe::new();
+        universe
+            .insert("x".into(), BlockDef::new(block::AIR))
+            .unwrap();
+
+        let error =
+            export_to_dot_vox_data(YieldProgress::noop(), ExportSet::all_of_universe(&universe))
+                .await
+                .unwrap_err();
+        assert!(matches!(
+            error,
+            ExportError::NotRepresentable {
+                name: Some(name),
+                ..
+            }
+         if name == "x".into()));
     }
 
     // TODO: add tests of loading valid files (we will need to create test data files)

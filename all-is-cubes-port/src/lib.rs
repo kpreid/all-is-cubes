@@ -45,6 +45,7 @@
 use std::fs;
 use std::path::PathBuf;
 
+use all_is_cubes::block::BlockDef;
 use anyhow::Context;
 
 use all_is_cubes::space::Space;
@@ -101,6 +102,7 @@ pub async fn export_to_path(
 /// Selection of the data to be exported.
 #[derive(Clone, Debug)]
 pub struct ExportSet {
+    block_defs: Vec<URef<BlockDef>>,
     spaces: Vec<URef<Space>>,
 }
 
@@ -112,6 +114,7 @@ impl ExportSet {
     /// not be included; removals may cause errors.
     pub fn all_of_universe(universe: &Universe) -> Self {
         Self {
+            block_defs: universe.iter_by_type().map(|(_, r)| r).collect(),
             spaces: universe.iter_by_type().map(|(_, r)| r).collect(),
         }
     }
@@ -119,6 +122,7 @@ impl ExportSet {
     /// Construct an [`ExportSet`] specifying exporting only the given [`Space`]s.
     pub fn from_spaces(spaces: Vec<URef<Space>>) -> Self {
         Self {
+            block_defs: vec![],
             spaces: spaces.into_iter().collect(),
         }
     }
