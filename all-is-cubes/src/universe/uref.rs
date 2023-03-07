@@ -162,8 +162,6 @@ impl<T: 'static> URef<T> {
     /// only use the mutation operations provided by `T`.
     ///
     /// TODO: If possible, completely replace this operation with transactions.
-    /// If not possible, consider the overkill approach of using [`std::pin::Pin`] to
-    /// enforce no swapping.
     pub fn try_modify<F, Out>(&self, function: F) -> Result<Out, RefError>
     where
         F: FnOnce(&mut T) -> Out,
