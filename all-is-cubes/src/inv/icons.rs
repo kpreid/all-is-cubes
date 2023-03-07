@@ -181,16 +181,14 @@ impl Icons {
                                         [0x85, 0x85, 0x85, 255] => {
                                             VoxelBrush::new(vec![([0, 0, 0], dots(0))])
                                         }
-                                        [0, 127, 0, 255] => VoxelBrush::new(
-                                            (0..16).into_iter().map(|y| ([0, y, 0], dots(y))),
-                                        ),
+                                        [0, 127, 0, 255] => {
+                                            VoxelBrush::new((0..16).map(|y| ([0, y, 0], dots(y))))
+                                        }
                                         [0, 255, 0, 255] => VoxelBrush::new(
-                                            (0..16).into_iter().map(|y| ([0, y, 0], dots(y + 1))),
+                                            (0..16).map(|y| ([0, y, 0], dots(y + 1))),
                                         ),
                                         [255, 0, 0, 255] => VoxelBrush::new(
-                                            (0..16)
-                                                .into_iter()
-                                                .map(|y| ([0, y, 0], bcolor.clone())),
+                                            (0..16).map(|y| ([0, y, 0], bcolor.clone())),
                                         ),
                                         _ => VoxelBrush::new([([0, 0, 0], bcolor)]),
                                     }
