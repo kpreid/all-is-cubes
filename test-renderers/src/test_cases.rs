@@ -165,7 +165,7 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
 
     // TODO: if we ever get an orthographic camera this would be a great time to use it
     let cameras = StandardCameras::from_constant_for_test(
-        unaltered_color_options(),
+        GraphicsOptions::UNALTERED_COLORS,
         Viewport::with_scale(
             1.0,
             Vector2::new(1, 1) * (f64::from(bounds.size().x) * 4.) as u32,
@@ -676,7 +676,7 @@ async fn transparent_one(mut context: RenderTestContext, transparency_option: &s
 
     finish_universe_from_space(&mut universe, space);
 
-    let mut options = unaltered_color_options();
+    let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.transparency = match transparency_option {
         "surf" => TransparencyOption::Surface,
         "vol" => TransparencyOption::Volumetric,
@@ -747,16 +747,6 @@ const TEXT_MAX_DIFF: u8 = 20;
 /// Note: This should really be 1, but 2 was observed when using the non-HDR fallback
 /// rendering.
 const COLOR_ROUNDING_MAX_DIFF: u8 = 2;
-
-/// A set of graphics options that are the defaults but with everything that might tweak
-/// colors turned off: lighting, fog, and tone mapping.
-fn unaltered_color_options() -> GraphicsOptions {
-    let mut options = GraphicsOptions::default();
-    options.fog = FogOption::None;
-    options.lighting_display = LightingOption::None;
-    options.tone_mapping = ToneMappingOperator::Clamp;
-    options
-}
 
 fn one_cube_space() -> Space {
     let bounds = GridAab::from_lower_size([0, 0, 0], [1, 1, 1]);

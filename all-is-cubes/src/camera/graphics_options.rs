@@ -83,6 +83,37 @@ pub struct GraphicsOptions {
 }
 
 impl GraphicsOptions {
+    /// A set of graphics options which differs from [`GraphicsOptions::default()`] in
+    /// that it disables all operations which change colors away from their obvious
+    /// values; that is, the [`Rgba`] colors you get from a rendering will be identical
+    /// (except for quantization error and background colors) to the [`Rgba`] colors
+    /// in the depicted [`Atom`](crate::block::Primitive::Atom)s.
+    ///
+    /// * [`Self::fog`] = [`FogOption::None`]
+    /// * [`Self::lighting_display`] = [`LightingOption::None`]
+    /// * [`Self::tone_mapping`] = [`ToneMappingOperator::Clamp`]
+    ///
+    /// Future versions may set other options as necessary to maintain the intended
+    /// property.
+    pub const UNALTERED_COLORS: Self = Self {
+        fog: FogOption::None,
+        fov_y: notnan!(90.),
+        // TODO: Change tone mapping default once we have a good implementation.
+        tone_mapping: ToneMappingOperator::Clamp,
+        exposure: ExposureOption::Fixed(notnan!(1.)),
+        view_distance: notnan!(200.),
+        lighting_display: LightingOption::None,
+        transparency: TransparencyOption::Volumetric,
+        show_ui: true,
+        antialiasing: AntialiasingOption::None,
+        use_frustum_culling: true,
+        debug_info_text: true,
+        debug_behaviors: false,
+        debug_chunk_boxes: false,
+        debug_collision_boxes: false,
+        debug_light_rays_at_cursor: false,
+    };
+
     /// Constrain fields to valid/practical values.
     #[must_use]
     pub fn repair(mut self) -> Self {
@@ -95,6 +126,10 @@ impl GraphicsOptions {
 }
 
 impl Default for GraphicsOptions {
+    /// Default graphics options broadly have “everything reasonable” turned on
+    /// (they may disable things that are not well-implemented yet).
+    ///
+    /// TODO: Explain exactly what the default is.
     fn default() -> Self {
         Self {
             fog: FogOption::Abrupt,
@@ -276,5 +311,44 @@ impl AntialiasingOption {
             Self::IfCheap => true,
             Self::Always => true,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn default_is_clean() {
+        assert_eq!(
+            GraphicsOptions::default(),
+            GraphicsOptions::default().repair()
+        );
+    }
+
+    #[test]
+    fn unaltered_colors_is_clean() {
+        assert_eq!(
+            GraphicsOptions::UNALTERED_COLORS,
+            GraphicsOptions::UNALTERED_COLORS.repair()
+        );
+    }
+
+    #[test]
+    fn unaltered_colors_differs_from_default_only_as_necessary() {
+        // Note that this assertion will pass whether or not the specified values are
+        // *also* in GraphicsOptions::default(). That's what we want.
+        assert_eq!(
+            GraphicsOptions::UNALTERED_COLORS,
+            GraphicsOptions {
+                fog: FogOption::None,
+                tone_mapping: ToneMappingOperator::Clamp,
+                exposure: ExposureOption::Fixed(NotNan::one()),
+                lighting_display: LightingOption::None,
+                antialiasing: AntialiasingOption::None,
+                ..GraphicsOptions::default()
+            }
+        )
     }
 }
