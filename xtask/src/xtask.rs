@@ -525,6 +525,7 @@ fn ensure_wasm_tools_installed(time_log: &mut Vec<Timing>) -> Result<(), ActionE
             .args([
                 "about",
                 "generate",
+                "--fail",
                 license_template_path.to_str().unwrap(),
                 "-o",
                 license_html_path.to_str().unwrap(),

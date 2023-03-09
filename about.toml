@@ -10,3 +10,5 @@ accepted = [
 ]
 
 private = { ignore = true }
+
+no-clearly-defined = true
