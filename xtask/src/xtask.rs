@@ -378,7 +378,11 @@ fn update_server_static(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
     // Combine the static files and build results in the same way that webpack used to
     // (This will need replacement if we get subdirectories)
     let pkg_path = Path::new("all-is-cubes-wasm/pkg");
-    let pkg_files = dir_file_names(pkg_path)?;
+    let pkg_files = BTreeSet::from([
+        // There are lots of other files in pkg which we do not need
+        OsString::from("all_is_cubes_wasm_bg.wasm"),
+        OsString::from("all_is_cubes_wasm.js"),
+    ]);
     let static_path = &Path::new("all-is-cubes-wasm/static");
     let static_files = dir_file_names(static_path)?;
     let dest_dir: &'static Path = Path::new("all-is-cubes-wasm/dist/");
