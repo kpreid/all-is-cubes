@@ -117,20 +117,13 @@ jobs:
     # spending the CI latency to do both.
     - name: Compile basic tests
       # compile is broken out so we have visibility into compile vs. run times
-      if: ${{ runner.os != 'Windows' }}
       run: cargo xtask test --timings --no-run
     - name: Run basic tests
-      if: ${{ !matrix.primary && runner.os != 'Windows' }}
+      if: ${{ !matrix.primary }}
       run: cargo xtask test --timings
     - name: Run exhaustive tests
       if: ${{ matrix.primary }}
       run: cargo xtask test-more --timings
-    - name: Run Windows test
-      # Temporary kludge because I haven't gotten npm (or xtask invoking npm)
-      # working on Windows. So, we'll run only the desktop + render tests
-      # and avoid mentioning all-is-cubes-wasm or all-is-cubes-server
-      if: ${{ runner.os == 'Windows' }}
-      run: cargo test -p all-is-cubes -p all-is-cubes-content -p all-is-cubes-desktop -p test-renderers
     
     # Save the test-renderers results so we can download and view them
     - name: Save test-renderers output
@@ -144,8 +137,6 @@ jobs:
     # Unlike the tests, we *do* run lint against all versions because future
     # warnings might be interesting.
     - name: Lint
-      # TODO: reenable on Windows when we figure out the npm problem
-      if: ${{ runner.os != 'Windows' }}
       run: cargo xtask lint --timings
     
     # Save timing reports so we can download and view them
