@@ -29,7 +29,7 @@ anyhow = { workspace = true }
 bytemuck = { workspace = true }
 clap = { workspace = true }
 # Note: keep crossterm in sync with tui's crossterm dependency.
-crossterm = "0.25.0"
+crossterm = "0.26.1"
 directories-next = "2.0.0"
 image = { workspace = true, features = ["png"] }
 indicatif = { version = "0.17.0", default-features = false }
