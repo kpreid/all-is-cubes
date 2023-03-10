@@ -63,7 +63,7 @@ tempfile = "3.3.0"
 thiserror = "1.0.22"
 # Tokio is used for async test-running and for certain binaries.
 # The library crates do not require Tokio.
-tokio = { version = "1.18.0", default-features = false }
+tokio = { version = "1.26.0", default-features = false }
 trycmd = "0.14.1"
 wgpu = { version = "0.15.0" }
 
