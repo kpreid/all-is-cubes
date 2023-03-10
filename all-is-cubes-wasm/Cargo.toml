@@ -41,10 +41,7 @@ log = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true, features = ["std", "std_rng"] }
 send_wrapper = "0.6.0"
-# TODO: Temporary version restriction to avoid breakage in web build
-# <https://github.com/kpreid/all-is-cubes/issues/349>
-# (something seems to have changed in the interaction between wasm-bindgen ↔ wasm-pack ↔ webpack)
-wasm-bindgen = "~0.2.70, <0.2.84"
+wasm-bindgen = "0.2.84"
 wasm-bindgen-futures =  "0.4.28"
 wgpu = { version = "0.15.0", features = ["webgl"] }
 
