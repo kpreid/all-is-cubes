@@ -170,6 +170,7 @@ async fn start_game_with_dom(
             universe_progress,
             all_is_cubes_content::TemplateParameters {
                 seed: thread_rng().gen(),
+                size: None,
             },
         )
         .await

@@ -24,9 +24,13 @@ pub fn template_bench(c: &mut Criterion) {
         // TODO: specify a small size for each, where possible
         group.bench_function(&format!("{template}"), |b| {
             b.to_async(FuturesExecutor).iter_with_large_drop(|| {
-                template
-                    .clone()
-                    .build(YieldProgress::noop(), TemplateParameters { seed: Some(0) })
+                template.clone().build(
+                    YieldProgress::noop(),
+                    TemplateParameters {
+                        seed: Some(0),
+                        size: None,
+                    },
+                )
             })
         });
     }

@@ -4,7 +4,7 @@ use macro_rules_attribute::macro_rules_derive;
 use paste::paste;
 
 use all_is_cubes::block::Block;
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point3};
+use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::linking::{BlockProvider, GenError, InGenError};
@@ -227,6 +227,12 @@ pub struct TemplateParameters {
     // Design note: u64 was chosen because both `std::hash::Hasher` and `rand::SeedableRng`
     // agree on this many bits for seeds.
     pub seed: Option<u64>,
+
+    /// Dimensions of the primary space of the universe, if there is such a thing.
+    ///
+    /// If the space cannot be constructed in approximately this size, building the
+    /// template should return an error.
+    pub size: Option<Vector3<GridCoordinate>>,
 }
 
 // -- Specific templates below this point ---
@@ -344,7 +350,7 @@ async fn arbitrary_space(
     mut progress: YieldProgress,
     seed: u64,
 ) -> Result<Space, InGenError> {
-    use all_is_cubes::cgmath::{Vector3, Zero};
+    use all_is_cubes::cgmath::Zero;
     use arbitrary::{Arbitrary, Error, Unstructured};
     use rand::{RngCore, SeedableRng};
 
@@ -422,6 +428,7 @@ mod tests {
                     YieldProgress::noop(),
                     TemplateParameters {
                         seed: Some(0x7f16dfe65954583e),
+                        size: None,
                     },
                 )
                 .await

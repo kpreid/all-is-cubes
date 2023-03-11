@@ -319,14 +319,20 @@ async fn create_universe(
         )
     };
     let universe = match input_source.clone() {
-        UniverseSource::Template(template, TemplateParameters { seed }) => {
+        UniverseSource::Template(template, TemplateParameters { seed, size }) => {
             let seed: u64 = seed.unwrap_or_else(|| {
                 let seed = rand::thread_rng().gen();
                 log::info!("Randomly chosen universe seed: {seed}");
                 seed
             });
             template
-                .build(yield_progress, TemplateParameters { seed: Some(seed) })
+                .build(
+                    yield_progress,
+                    TemplateParameters {
+                        seed: Some(seed),
+                        size,
+                    },
+                )
                 .await
                 .map_err(anyhow::Error::from)
         }

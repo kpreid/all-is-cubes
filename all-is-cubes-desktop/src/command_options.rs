@@ -277,7 +277,7 @@ pub fn determine_record_format(output_path: &Path) -> Result<RecordFormat, &'sta
 ///
 /// TODO: we will eventually want to support new/open while running and this will
 /// no longer be about command line exactly, so it should move.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum UniverseSource {
     Template(UniverseTemplate, TemplateParameters),
     File(PathBuf),
@@ -292,7 +292,7 @@ pub(crate) fn parse_universe_source(
     if let Some(file) = input_file {
         UniverseSource::File(file)
     } else {
-        UniverseSource::Template(template, TemplateParameters { seed })
+        UniverseSource::Template(template, TemplateParameters { seed, size: None })
     }
 }
 
