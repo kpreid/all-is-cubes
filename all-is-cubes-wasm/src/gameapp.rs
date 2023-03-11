@@ -166,7 +166,12 @@ async fn start_game_with_dom(
     static_dom.append_to_loading_log("\nConstructing universe...");
     app_progress.finish().await;
     let universe = template
-        .build(universe_progress, thread_rng().gen())
+        .build(
+            universe_progress,
+            all_is_cubes_content::TemplateParameters {
+                seed: thread_rng().gen(),
+            },
+        )
         .await
         .expect("universe template error");
     root.borrow_mut().session.set_universe(universe);

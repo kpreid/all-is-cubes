@@ -37,9 +37,10 @@
 use std::time::{Duration, Instant};
 
 use all_is_cubes::universe::Universe;
+use all_is_cubes_content::TemplateParameters;
 use clap::{CommandFactory as _, Parser as _};
 use indicatif::{ProgressBar, ProgressStyle};
-use rand::{thread_rng, Rng};
+use rand::Rng;
 
 use all_is_cubes::camera::{GraphicsOptions, Viewport};
 use all_is_cubes::cgmath::{Vector2, Zero as _};
@@ -318,7 +319,13 @@ async fn create_universe(
     };
     let universe = match input_source.clone() {
         UniverseSource::Template(template) => template
-            .build(yield_progress, thread_rng().gen())
+            .build(
+                yield_progress,
+                // TODO: allow specifying seed
+                TemplateParameters {
+                    seed: rand::thread_rng().gen(),
+                },
+            )
             .await
             .map_err(anyhow::Error::from),
         UniverseSource::File(path) => {

@@ -132,13 +132,11 @@ impl UniverseTemplate {
     }
 
     /// Create a new [`Universe`] based on this template's specifications.
-    ///
-    /// The `seed` will be used for any randomization which the template performs.
-    /// Not all templates have random elements.
-    //
-    // Design note: u64 was chosen as that both `std::hash::Hasher` and `rand::SeedableRng`
-    // agree on this many bits.
-    pub async fn build(self, p: YieldProgress, seed: u64) -> Result<Universe, GenError> {
+    pub async fn build(
+        self,
+        p: YieldProgress,
+        params: TemplateParameters,
+    ) -> Result<Universe, GenError> {
         let mut universe = Universe::new();
 
         // TODO: Later we want a "module loading" system that can lazily bring in content.
@@ -157,8 +155,12 @@ impl UniverseTemplate {
             Fail => Some(Err(InGenError::Other(
                 "the Fail template always fails to generate".into(),
             ))),
-            DemoCity => Some(demo_city(&mut universe, p.take().unwrap(), seed).await),
-            Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), seed).await),
+            DemoCity => {
+                Some(demo_city(&mut universe, p.take().unwrap(), params.seed.unwrap_or(0)).await)
+            }
+            Dungeon => {
+                Some(demo_dungeon(&mut universe, p.take().unwrap(), params.seed.unwrap_or(0)).await)
+            }
             Islands => Some(islands(&mut universe, p.take().unwrap(), 1000).await),
             Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
             CornellBox => Some(cornell_box()),
@@ -167,7 +169,9 @@ impl UniverseTemplate {
                 &mut universe,
             )),
             #[cfg(feature = "arbitrary")]
-            Random => Some(arbitrary_space(&mut universe, p.take().unwrap(), seed).await),
+            Random => Some(
+                arbitrary_space(&mut universe, p.take().unwrap(), params.seed.unwrap_or(0)).await,
+            ),
         };
 
         if let Some(p) = p {
@@ -206,6 +210,26 @@ fn insert_generated_space(
         Err(e) => Err(GenError::failure(e, name)),
     }
 }
+
+/// Configuration for exactly what a [`UniverseTemplate`] should produce.
+///
+/// Pass this structure to [`UniverseTemplate::build()`].
+#[derive(Clone, Debug, Default, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
+pub struct TemplateParameters {
+    /// Seed for any randomization which the template performs.
+    /// Not all templates have random elements.
+    ///
+    /// The seed is optional so that user input processing can distinguish whether the
+    /// seed was explicitly specified. If a template receives a seed of `None`, (TODO
+    /// define what should happen. Fail? Treat equal to `Some(0)`?)
+    //---
+    // Design note: u64 was chosen because both `std::hash::Hasher` and `rand::SeedableRng`
+    // agree on this many bits for seeds.
+    pub seed: Option<u64>,
+}
+
+// -- Specific templates below this point ---
 
 async fn islands(
     universe: &mut Universe,
@@ -369,8 +393,9 @@ mod tests {
 
     #[allow(clippy::let_underscore_future)]
     fn _test_build_future_is_send() {
-        let _: BoxFuture<'_, _> =
-            Box::pin(UniverseTemplate::Atrium.build(YieldProgress::noop(), 0));
+        let _: BoxFuture<'_, _> = Box::pin(
+            UniverseTemplate::Atrium.build(YieldProgress::noop(), TemplateParameters::default()),
+        );
     }
 
     pub(super) async fn check_universe_template(template: UniverseTemplate) {
@@ -393,7 +418,12 @@ mod tests {
         } else {
             template
                 .clone()
-                .build(YieldProgress::noop(), 0x7f16dfe65954583e)
+                .build(
+                    YieldProgress::noop(),
+                    TemplateParameters {
+                        seed: Some(0x7f16dfe65954583e),
+                    },
+                )
                 .await
         };
 

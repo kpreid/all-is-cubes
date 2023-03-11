@@ -9,7 +9,7 @@ use instant::Duration;
 use strum::IntoEnumIterator as _;
 
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_content::UniverseTemplate;
+use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 
 pub fn template_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("template");
@@ -21,9 +21,13 @@ pub fn template_bench(c: &mut Criterion) {
     group.confidence_level(0.99);
 
     for template in UniverseTemplate::iter().filter(|t| !matches!(t, UniverseTemplate::Islands)) {
+        // TODO: specify a small size for each, where possible
         group.bench_function(&format!("{template}"), |b| {
-            b.to_async(FuturesExecutor)
-                .iter_with_large_drop(|| template.clone().build(YieldProgress::noop(), 0))
+            b.to_async(FuturesExecutor).iter_with_large_drop(|| {
+                template
+                    .clone()
+                    .build(YieldProgress::noop(), TemplateParameters { seed: Some(0) })
+            })
         });
     }
 
