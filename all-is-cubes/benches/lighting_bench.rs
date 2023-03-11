@@ -1,3 +1,4 @@
+use cgmath::Vector3;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::content::testing::lighting_bench_space;
@@ -11,7 +12,7 @@ pub fn evaluate_light_bench(c: &mut Criterion) {
         b.iter_batched(
             || {
                 let mut u = Universe::new();
-                let space = lighting_bench_space(&mut u).unwrap();
+                let space = lighting_bench_space(&mut u, Vector3::new(54, 16, 54)).unwrap();
                 (u, space)
             },
             |(_u, mut space)| {

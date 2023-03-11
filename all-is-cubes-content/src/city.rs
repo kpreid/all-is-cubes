@@ -42,7 +42,7 @@ use crate::{
 pub(crate) async fn demo_city(
     universe: &mut Universe,
     mut p: YieldProgress,
-    seed: u64,
+    params: crate::TemplateParameters,
 ) -> Result<Space, InGenError> {
     let start_city_time = Instant::now();
 
@@ -74,10 +74,10 @@ pub(crate) async fn demo_city(
     let sky_height = 30;
     let ground_depth = 30; // TODO: wavy_landscape is forcing us to have extra symmetry here
     let underground_floor_y = -5;
-    let radius_xz = 80;
+    let space_size = params.size.unwrap_or(Vector3::new(160, 60, 160));
     let bounds = GridAab::from_lower_upper(
-        (-radius_xz, -ground_depth, -radius_xz),
-        (radius_xz, sky_height, radius_xz),
+        [-space_size.x / 2, -ground_depth, -space_size.z / 2],
+        [space_size.x / 2, sky_height, space_size.z / 2],
     );
 
     let mut planner = CityPlanner::new(bounds);
@@ -138,7 +138,10 @@ pub(crate) async fn demo_city(
             .set_scale(8.0);
         let grass_threshold = 1.2;
         space.fill(
-            GridAab::from_lower_upper((-radius_xz, 1, -radius_xz), (radius_xz, 2, radius_xz)),
+            GridAab::from_lower_upper(
+                [bounds.lower_bounds().x, 1, bounds.lower_bounds().z],
+                [bounds.upper_bounds().x, 2, bounds.upper_bounds().z],
+            ),
             |cube| {
                 if cube.x.abs() <= road_radius || cube.z.abs() <= road_radius {
                     return None;
@@ -246,7 +249,11 @@ pub(crate) async fn demo_city(
     let landscape_progress = p.start_and_cut(0.4, "Landscape").await;
     landscape_progress.progress(0.0).await;
     let landscape_region = GridAab::from_lower_upper(
-        [-radius_xz, -ground_depth * 8 / 10, -radius_xz],
+        [
+            bounds.lower_bounds().x,
+            -ground_depth * 8 / 10,
+            bounds.lower_bounds().z,
+        ],
         [-exhibit_front_radius, sky_height, -exhibit_front_radius],
     );
     space.fill_uniform(landscape_region, AIR)?;
@@ -428,7 +435,7 @@ pub(crate) async fn demo_city(
 
     // Sprinkle some trees around in the remaining space.
     {
-        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(params.seed.unwrap_or(0));
         let possible_tree_origins: GridAab = planner.y_range(1, 2);
         for _ in 0..60 {
             // won't get this many trees, because some will be blocked

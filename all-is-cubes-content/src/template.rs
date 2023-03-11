@@ -155,18 +155,15 @@ impl UniverseTemplate {
             Fail => Some(Err(InGenError::Other(
                 "the Fail template always fails to generate".into(),
             ))),
-            DemoCity => {
-                Some(demo_city(&mut universe, p.take().unwrap(), params.seed.unwrap_or(0)).await)
-            }
-            Dungeon => {
-                Some(demo_dungeon(&mut universe, p.take().unwrap(), params.seed.unwrap_or(0)).await)
-            }
-            Islands => Some(islands(&mut universe, p.take().unwrap(), 1000).await),
+            DemoCity => Some(demo_city(&mut universe, p.take().unwrap(), params).await),
+            Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), params).await),
+            Islands => Some(islands(&mut universe, p.take().unwrap(), params).await),
             Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
             CornellBox => Some(cornell_box()),
             MengerSponge => Some(menger_sponge(&mut universe, 4)),
             LightingBench => Some(all_is_cubes::content::testing::lighting_bench_space(
                 &mut universe,
+                params.size.unwrap_or(Vector3::new(54, 16, 54)),
             )),
             #[cfg(feature = "arbitrary")]
             Random => Some(
@@ -240,19 +237,15 @@ pub struct TemplateParameters {
 async fn islands(
     universe: &mut Universe,
     p: YieldProgress,
-    diameter: GridCoordinate,
+    params: TemplateParameters,
 ) -> Result<Space, InGenError> {
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
 
+    let TemplateParameters { size, seed: _ } = params;
+    let size = size.unwrap_or(Vector3::new(1000, 400, 1000));
+
     // Set up dimensions
-    let bounds = {
-        let height = 400;
-        let low_corner = diameter / -2;
-        GridAab::from_lower_size(
-            [low_corner, height / -2, low_corner],
-            [diameter, height, diameter],
-        )
-    };
+    let bounds = GridAab::from_lower_size([size.x / -2, size.y / -2, size.z], size);
 
     let mut space = Space::builder(bounds)
         .spawn({
@@ -281,8 +274,15 @@ async fn islands(
         .intersection(bounds)
         .expect("island outside space bounds");
         // TODO: randomize island location in cell?
-        let occupied_bounds = cell_bounds.expand(FaceMap::repeat(-10).with(Face6::PY, -25));
-        wavy_landscape(occupied_bounds, &mut space, &landscape_blocks, 0.5)?;
+        let margin = 10;
+        // TODO: non-panicking expand() will be a better solution than this conditional here
+        if cell_bounds.size().x >= margin * 2
+            && cell_bounds.size().y >= margin + 25
+            && cell_bounds.size().z >= margin * 2
+        {
+            let occupied_bounds = cell_bounds.expand(FaceMap::repeat(-10).with(Face6::PY, -25));
+            wavy_landscape(occupied_bounds, &mut space, &landscape_blocks, 0.5)?;
+        }
         p.progress(i as f32 / island_grid.volume() as f32).await;
     }
 
@@ -405,34 +405,22 @@ mod tests {
     }
 
     pub(super) async fn check_universe_template(template: UniverseTemplate) {
-        let result = if let UniverseTemplate::Islands = template {
+        let params = if let UniverseTemplate::Islands = template {
             // Kludge: the islands template is known to be very slow.
             // We should work on making what it does faster, but for now, let's
             // run a much smaller instance of it for the does-it-succeed test.
-            // TODO: This should instead be handled by the template having an official
-            // user-configurable size parameter.
-
-            let mut universe = Universe::new();
-            install_demo_blocks(&mut universe, YieldProgress::noop())
-                .await
-                .unwrap();
-            islands(&mut universe, YieldProgress::noop(), 100)
-                .await
-                .unwrap();
-
-            return; // TODO: skipping final test because we didn't create the character
+            TemplateParameters {
+                seed: Some(0x7f16dfe65954583e),
+                size: Some(Vector3::new(100, 50, 100)),
+            }
         } else {
-            template
-                .clone()
-                .build(
-                    YieldProgress::noop(),
-                    TemplateParameters {
-                        seed: Some(0x7f16dfe65954583e),
-                        size: None,
-                    },
-                )
-                .await
+            TemplateParameters {
+                seed: Some(0x7f16dfe65954583e),
+                size: None,
+            }
         };
+
+        let result = template.clone().build(YieldProgress::noop(), params).await;
 
         if matches!(template, UniverseTemplate::Fail) {
             // The Fail template _should_ return an error

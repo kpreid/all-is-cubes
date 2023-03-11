@@ -6,7 +6,7 @@ use rand::prelude::SliceRandom;
 use rand::{Rng, SeedableRng};
 
 use all_is_cubes::block::{Block, BlockCollision, Resolution::*, RotationPlacementRule, AIR};
-use all_is_cubes::cgmath::{EuclideanSpace as _, Vector3};
+use all_is_cubes::cgmath::{ElementWise, EuclideanSpace as _, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::load_image::space_from_image;
 use all_is_cubes::content::palette;
@@ -24,7 +24,7 @@ use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{include_image, rgb_const};
 
 use crate::dungeon::{build_dungeon, f2d, maze_to_array, DungeonGrid, Theme};
-use crate::{four_walls, tree, DemoBlocks, LandscapeBlocks};
+use crate::{four_walls, tree, DemoBlocks, LandscapeBlocks, TemplateParameters};
 
 const WINDOW_PATTERN: [GridCoordinate; 3] = [-2, 0, 2];
 
@@ -399,8 +399,14 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 pub(crate) async fn demo_dungeon(
     universe: &mut Universe,
     mut progress: YieldProgress,
-    seed: u64,
+    params: TemplateParameters,
 ) -> Result<Space, InGenError> {
+    let TemplateParameters {
+        seed,
+        size: requested_size,
+    } = params;
+    let seed = seed.unwrap_or(0);
+
     let blocks_progress = progress.start_and_cut(0.2, "dungeon blocks").await;
     install_dungeon_blocks(universe, blocks_progress).await?;
 
@@ -411,6 +417,15 @@ pub(crate) async fn demo_dungeon(
         room_wall_thickness: FaceMap::repeat(1),
         gap_between_walls: Vector3::new(1, 1, 1),
     };
+    let perimeter_margin = 30;
+
+    let requested_rooms = requested_size
+        .unwrap_or(Vector3::new(135, 40, 135))
+        .sub_element_wise(Vector3::new(perimeter_margin, 0, perimeter_margin))
+        .div_element_wise(dungeon_grid.room_spacing());
+    if requested_rooms.x == 0 || requested_rooms.z == 0 {
+        return Err(InGenError::Other("Size too small".into()));
+    }
 
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
@@ -431,7 +446,7 @@ pub(crate) async fn demo_dungeon(
         let mut maze_seed = [0; 32];
         maze_seed[0..8].copy_from_slice(&seed.to_le_bytes());
         let maze = maze_generator::ellers_algorithm::EllersGenerator::new(Some(maze_seed))
-            .generate(9, 9)
+            .generate(requested_rooms.x, requested_rooms.z)
             .map_err(|e| InGenError::Other(e.into()))?;
 
         let maze = maze_to_array(&maze);
@@ -534,7 +549,7 @@ pub(crate) async fn demo_dungeon(
         let space_construction_progress = progress.start_and_cut(0.1, "filling the earth").await;
         let space_bounds = dungeon_grid
             .minimum_space_for_rooms(dungeon_map.bounds())
-            .expand(FaceMap::symmetric([30, 1, 30]));
+            .expand(FaceMap::symmetric([perimeter_margin, 1, perimeter_margin]));
         let mut space = Space::builder(space_bounds)
             .sky_color(palette::DAY_SKY_COLOR * 2.0)
             .light_physics(LightPhysics::None) // temporary
