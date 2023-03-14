@@ -1,7 +1,3 @@
-use std::io;
-
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
 use axum::routing::Router;
 
 /// Where to obtain the WebAssembly+JS code for the All is Cubes in-browser game engine.
@@ -31,7 +27,6 @@ impl AicClientSource {
                     env!("CARGO_MANIFEST_DIR"),
                     "/../all-is-cubes-wasm/dist/"
                 )))
-                .handle_error(handle_error)
             }
         };
 
@@ -39,13 +34,6 @@ impl AicClientSource {
             .route("/", static_service.clone())
             .route("/*path", static_service)
     }
-}
-
-async fn handle_error(_err: io::Error) -> impl IntoResponse {
-    (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        "An internal error occurred.",
-    )
 }
 
 #[cfg(feature = "embed")]
