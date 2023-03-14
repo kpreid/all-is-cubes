@@ -23,7 +23,7 @@ use all_is_cubes_gpu::in_wgpu;
 use all_is_cubes_port::file::NonDiskFile;
 use all_is_cubes_ui::apps::{CursorIcon, Key, Session};
 
-use crate::js_bindings::GuiHelpers;
+use crate::js_bindings::{make_all_static_gui_helpers, GuiHelpers};
 use crate::url_params::{options_from_query_string, OptionsInUrl, RendererOption};
 use crate::web_glue::{
     add_event_listener, get_mandatory_element, replace_children_with_one_text_node,
@@ -37,7 +37,7 @@ enum WebRenderer {
 
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
-pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
+pub async fn start_game() -> Result<(), JsValue> {
     // Note: This used to be in a `#[wasm_bindgen(start)]` function, but that stopped working.
     // Rather than stop to figure out what went wrong even though I Didn't Change Anything,
     // I moved it here since this is our sole entry point in practice.
@@ -67,12 +67,11 @@ pub async fn start_game(gui_helpers: GuiHelpers) -> Result<(), JsValue> {
     .unwrap();
     log::set_max_level(log::LevelFilter::Trace);
 
-    let document = web_sys::window()
-        .expect("missing `window`")
-        .document()
-        .expect("missing `document`");
+    let window = web_sys::window().expect("missing `window`");
+    let document = window.document().expect("missing `document`");
 
     // TODO: StaticDom and GuiHelpers are the same kind of thing. Merge them?
+    let gui_helpers = make_all_static_gui_helpers(window, document.clone());
     let static_dom = StaticDom::new(&document)?;
     {
         let list = static_dom.app_root.class_list();

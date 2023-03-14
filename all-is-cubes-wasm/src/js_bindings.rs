@@ -7,8 +7,16 @@ use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::math::FreeCoordinate;
 
-#[wasm_bindgen(raw_module = "gui")]
+// This uses the “JS snippet” feature of wasm-bindgen, to cause gui.js to be embedded in
+// the produced JS bundle.
+#[wasm_bindgen(module = "/src/js/gui.js")]
 extern "C" {
+    #[wasm_bindgen(js_name = "makeAllStaticGuiHelpers")]
+    pub fn make_all_static_gui_helpers(
+        window: web_sys::Window,
+        document: web_sys::Document,
+    ) -> GuiHelpers;
+
     pub type GuiHelpers;
     #[wasm_bindgen(method, getter, js_name = canvasHelper)]
     pub fn canvas_helper(this: &GuiHelpers) -> CanvasHelper;
