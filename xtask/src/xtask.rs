@@ -394,23 +394,24 @@ fn update_server_static(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
     let static_path = &Path::new("all-is-cubes-wasm/static");
     let static_files = directory_tree_contents(static_path, static_path)?;
     let dest_dir: &'static Path = Path::new("all-is-cubes-wasm/dist/");
+    let client_dest_dir = dest_dir.join("client/");
     fs::create_dir_all(dest_dir)?;
-    assert_eq!(
-        BTreeSet::intersection(&pkg_files, &static_files).next(),
-        None,
-        "conflicting files"
-    );
-    for src_file in &pkg_files {
-        copy_file_with_context(&pkg_path.join(src_file), &dest_dir.join(src_file))?;
-    }
     for src_file in &static_files {
         copy_file_with_context(&static_path.join(src_file), &dest_dir.join(src_file))?;
+    }
+    for src_file in &pkg_files {
+        copy_file_with_context(&pkg_path.join(src_file), &client_dest_dir.join(src_file))?;
     }
 
     // Warn of unexpected files.
     // (In the future with more confidence, perhaps we should delete them.)
     let extra_dest_files = directory_tree_contents(dest_dir, dest_dir)?
-        .difference(&pkg_files)
+        .difference(
+            &pkg_files
+                .into_iter()
+                .map(|p| Path::new("client/").join(p))
+                .collect(),
+        )
         .cloned()
         .collect::<BTreeSet<_>>()
         .difference(&static_files)
