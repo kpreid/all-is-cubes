@@ -385,6 +385,7 @@ fn update_server_static(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
             // There are lots of other files in pkg which we do not need
             PathBuf::from("all_is_cubes_wasm_bg.wasm"),
             PathBuf::from("all_is_cubes_wasm.js"),
+            PathBuf::from("snippets"), // note this gets only the dir but not the contents
         ]);
         let snippets = &pkg_path.join("snippets/");
         set.extend(directory_tree_contents(pkg_path, snippets)?);
@@ -399,11 +400,27 @@ fn update_server_static(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
         None,
         "conflicting files"
     );
-    for src_file in pkg_files {
-        copy_file_with_context(&pkg_path.join(&src_file), &dest_dir.join(&src_file))?;
+    for src_file in &pkg_files {
+        copy_file_with_context(&pkg_path.join(src_file), &dest_dir.join(src_file))?;
     }
-    for src_file in static_files {
-        copy_file_with_context(&static_path.join(&src_file), &dest_dir.join(&src_file))?;
+    for src_file in &static_files {
+        copy_file_with_context(&static_path.join(src_file), &dest_dir.join(src_file))?;
+    }
+
+    // Warn of unexpected files.
+    // (In the future with more confidence, perhaps we should delete them.)
+    let extra_dest_files = directory_tree_contents(dest_dir, dest_dir)?
+        .difference(&pkg_files)
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .difference(&static_files)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    if !extra_dest_files.is_empty() {
+        eprintln!(
+            "Warning: possibly stale files in {dest_dir}: {extra_dest_files:#?}",
+            dest_dir = dest_dir.display()
+        );
     }
 
     Ok(())
