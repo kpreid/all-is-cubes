@@ -20,4 +20,5 @@ cargo_metadata = "0.8.2"
 clap = { workspace = true }
 once_cell = { workspace = true }
 toml_edit = { version = "0.19.4" }
+walkdir = "2.3.2"
 xshell = "0.1.17"

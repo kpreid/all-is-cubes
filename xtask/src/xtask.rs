@@ -48,7 +48,6 @@
 
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
-use std::ffi::OsString;
 use std::fmt;
 use std::fs;
 use std::io::Write as _;
@@ -66,7 +65,7 @@ use once_cell::sync::Lazy;
 use xshell::{cmd, pushd, Cmd, Pushd};
 
 mod fs_ops;
-use fs_ops::{dir_file_names, newer_than};
+use fs_ops::{directory_tree_contents, newer_than};
 
 #[derive(Debug, clap::Parser)]
 struct XtaskArgs {
@@ -381,11 +380,11 @@ fn update_server_static(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
     let pkg_path = Path::new("all-is-cubes-wasm/pkg");
     let pkg_files = BTreeSet::from([
         // There are lots of other files in pkg which we do not need
-        OsString::from("all_is_cubes_wasm_bg.wasm"),
-        OsString::from("all_is_cubes_wasm.js"),
+        PathBuf::from("all_is_cubes_wasm_bg.wasm"),
+        PathBuf::from("all_is_cubes_wasm.js"),
     ]);
     let static_path = &Path::new("all-is-cubes-wasm/static");
-    let static_files = dir_file_names(static_path)?;
+    let static_files = directory_tree_contents(static_path)?;
     let dest_dir: &'static Path = Path::new("all-is-cubes-wasm/dist/");
     fs::create_dir_all(dest_dir)?;
     assert_eq!(
