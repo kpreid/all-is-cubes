@@ -67,6 +67,8 @@ use xshell::{cmd, pushd, Cmd, Pushd};
 mod fs_ops;
 use fs_ops::{directory_tree_contents, newer_than};
 
+use crate::fs_ops::copy_file_with_context;
+
 #[derive(Debug, clap::Parser)]
 struct XtaskArgs {
     #[clap(subcommand)]
@@ -378,13 +380,18 @@ fn update_server_static(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
     // Combine the static files and build results in the same way that webpack used to
     // (This will need replacement if we get subdirectories)
     let pkg_path = Path::new("all-is-cubes-wasm/pkg");
-    let pkg_files = BTreeSet::from([
-        // There are lots of other files in pkg which we do not need
-        PathBuf::from("all_is_cubes_wasm_bg.wasm"),
-        PathBuf::from("all_is_cubes_wasm.js"),
-    ]);
+    let pkg_files: BTreeSet<PathBuf> = {
+        let mut set = BTreeSet::from([
+            // There are lots of other files in pkg which we do not need
+            PathBuf::from("all_is_cubes_wasm_bg.wasm"),
+            PathBuf::from("all_is_cubes_wasm.js"),
+        ]);
+        let snippets = &pkg_path.join("snippets/");
+        set.extend(directory_tree_contents(pkg_path, snippets)?);
+        set
+    };
     let static_path = &Path::new("all-is-cubes-wasm/static");
-    let static_files = directory_tree_contents(static_path)?;
+    let static_files = directory_tree_contents(static_path, static_path)?;
     let dest_dir: &'static Path = Path::new("all-is-cubes-wasm/dist/");
     fs::create_dir_all(dest_dir)?;
     assert_eq!(
@@ -400,16 +407,6 @@ fn update_server_static(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
     }
 
     Ok(())
-}
-
-fn copy_file_with_context(src: &Path, dst: &Path) -> Result<u64, ActionError> {
-    fs::copy(src, dst).with_context(|| {
-        format!(
-            "copying {} to {}",
-            src.to_string_lossy(),
-            dst.to_string_lossy()
-        )
-    })
 }
 
 /// Run check or tests for all targets.
