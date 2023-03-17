@@ -25,7 +25,7 @@ resolver = "2"
 [workspace.dependencies]
 anyhow = "1.0"
 # Each use should be { optional = true }.
-arbitrary = { version = "1.1.6", features = ["derive"] }
+arbitrary = { version = "1.3.0", features = ["derive"] }
 async_fn_traits = "0.1.1"
 bitflags = "1.3.2"
 # Note that this excludes the "derive" feature but some crates need it.
