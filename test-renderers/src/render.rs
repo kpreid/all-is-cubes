@@ -24,7 +24,11 @@ impl Scene for StandardCameras {
 
 impl Scene for &Universe {
     fn into_cameras(self) -> StandardCameras {
-        StandardCameras::from_constant_for_test(GraphicsOptions::default(), COMMON_VIEWPORT, self)
+        StandardCameras::from_constant_for_test(
+            GraphicsOptions::UNALTERED_COLORS,
+            COMMON_VIEWPORT,
+            self,
+        )
     }
 }
 

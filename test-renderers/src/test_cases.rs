@@ -110,7 +110,7 @@ fn u(f: impl Future<Output = Arc<Universe>> + Send + Sync + 'static) -> Option<U
 // Listed in alphabetical order.
 
 async fn antialias(mut context: RenderTestContext, antialias_option: AntialiasingOption) {
-    let mut options = GraphicsOptions::default();
+    let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.antialiasing = antialias_option;
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
@@ -186,7 +186,11 @@ async fn cursor_basic(mut context: RenderTestContext) {
     finish_universe_from_space(&mut universe, space);
 
     let cameras = StandardCameras::from_constant_for_test(
-        GraphicsOptions::default(),
+        {
+            let mut options = GraphicsOptions::UNALTERED_COLORS;
+            options.lighting_display = LightingOption::Smooth;
+            options
+        },
         COMMON_VIEWPORT,
         &universe,
     );
@@ -271,7 +275,8 @@ async fn error_character_unavailable(context: RenderTestContext) {
 }
 
 async fn fog(mut context: RenderTestContext, fog: FogOption) {
-    let mut options = GraphicsOptions::default();
+    let mut options = GraphicsOptions::UNALTERED_COLORS;
+    options.lighting_display = LightingOption::Smooth;
     options.view_distance = NotNan::from(50);
     options.fog = fog;
     let scene =
@@ -295,7 +300,7 @@ async fn follow_character_change(context: RenderTestContext) {
     let c2 = character_of_a_color(rgb_const!(0.0, 1.0, 0.0));
     let character_cell = ListenableCell::new(Some(c1));
     let cameras: StandardCameras = StandardCameras::new(
-        ListenableSource::constant(GraphicsOptions::default()),
+        ListenableSource::constant(GraphicsOptions::UNALTERED_COLORS),
         ListenableSource::constant(COMMON_VIEWPORT),
         character_cell.as_source(),
         ListenableSource::constant(UiViewState::default()),
@@ -334,9 +339,10 @@ async fn follow_options_change(mut context: RenderTestContext) {
     finish_universe_from_space(&mut universe, space);
 
     // Two sets of graphics options with various differences
-    let mut options_1 = GraphicsOptions::default();
+    let mut options_1 = GraphicsOptions::UNALTERED_COLORS;
+    options_1.lighting_display = LightingOption::Smooth;
     options_1.fov_y = NotNan::from(90);
-    let mut options_2 = GraphicsOptions::default();
+    let mut options_2 = options_1.clone();
     options_2.fov_y = NotNan::from(70);
     options_2.exposure = ExposureOption::Fixed(notnan!(1.5));
     options_2.transparency = TransparencyOption::Threshold(notnan!(0.1));
@@ -498,7 +504,7 @@ async fn icons(mut context: RenderTestContext) {
     space.evaluate_light(1, |_| {});
     finish_universe_from_space(universe, space);
 
-    let mut options = GraphicsOptions::default();
+    let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.lighting_display = LightingOption::Flat;
     options.fov_y = NotNan::from(45);
     context
@@ -525,7 +531,8 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
     let cube_space = one_cube_space();
     finish_universe_from_space(&mut universe, cube_space);
 
-    let mut options = GraphicsOptions::default();
+    let mut options = GraphicsOptions::UNALTERED_COLORS;
+    options.lighting_display = LightingOption::Flat;
     options.show_ui = show_ui;
     let cameras: StandardCameras = StandardCameras::new(
         ListenableSource::constant(options.clone()),
@@ -575,13 +582,13 @@ async fn layers_none_but_text(mut context: RenderTestContext) {
 async fn layers_ui_only(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     let cameras: StandardCameras = StandardCameras::new(
-        ListenableSource::constant(GraphicsOptions::default()),
+        ListenableSource::constant(GraphicsOptions::UNALTERED_COLORS),
         ListenableSource::constant(COMMON_VIEWPORT),
         ListenableSource::constant(None),
         ListenableSource::constant(UiViewState {
             space: Some(ui_space(&mut universe)),
             view_transform: ViewTransform::one(),
-            graphics_options: GraphicsOptions::default(),
+            graphics_options: GraphicsOptions::UNALTERED_COLORS,
         }),
     );
 
@@ -598,7 +605,7 @@ async fn layers_ui_only(mut context: RenderTestContext) {
 }
 
 async fn light(mut context: RenderTestContext, option: LightingOption) {
-    let mut options = GraphicsOptions::default();
+    let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.fov_y = NotNan::from(45);
     options.lighting_display = option;
     let scene =
@@ -651,13 +658,14 @@ async fn sky_and_info_text(mut context: RenderTestContext) {
 }
 
 async fn tone_mapping(mut context: RenderTestContext, (tmo, exposure): (ToneMappingOperator, f32)) {
-    let mut options = GraphicsOptions::default();
+    let mut options = GraphicsOptions::UNALTERED_COLORS;
+    options.lighting_display = LightingOption::Smooth;
     options.fov_y = NotNan::from(45);
     options.tone_mapping = tmo;
     options.exposure = ExposureOption::Fixed(NotNan::new(exposure).unwrap());
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
-    // TODO: tighten this comparison threshold aftr reconciling smooth-lighting styles
+    // TODO: tighten this comparison threshold after reconciling smooth-lighting styles
     context
         .render_comparison_test(11, scene, Overlays::NONE)
         .await;
