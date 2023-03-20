@@ -425,7 +425,7 @@ impl CustomFormat<StatusText> for CsmUpdateInfo {
         write!(
             fmt,
             indoc! {"
-                Space prep     {prep_time}       Mesh flaws: {flaws:?}
+                Space prep     {prep_time}       Mesh flaws: {flaws}
                 Block mesh gen {block_updates}
                 Chunk scan     {chunk_scan_time}
                       mesh gen {chunk_mesh_generation_times}

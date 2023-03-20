@@ -1,3 +1,5 @@
+use std::fmt;
+
 bitflags::bitflags! {
     /// Deficiencies of a rendering.
     ///
@@ -11,6 +13,7 @@ bitflags::bitflags! {
     /// The [empty](Self::empty) set means no flaws are present.
     ///
     /// [`GraphicsOptions`]: super::GraphicsOptions
+    #[derive(Clone, Copy, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
     pub struct Flaws: u16 {
         /// The rendering is incomplete due to the renderer not having had enough
         /// time to finish initialization or catch up to changes.
@@ -44,5 +47,31 @@ impl Default for Flaws {
     /// Equivalent to [`Self::empty()`].
     fn default() -> Self {
         Self::empty()
+    }
+}
+
+impl fmt::Display for Flaws {
+    /// Displays the flags as text like “`UNFINISHED | NO_FOG`".
+    ///
+    /// TODO: Change this to “English” text like “unfinished, no fog”?
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display() {
+        // TODO: Add something other than the empty string when empty?
+        assert_eq!(Flaws::default().to_string(), "");
+
+        assert_eq!(Flaws::UNFINISHED.to_string(), "UNFINISHED");
+        assert_eq!(
+            (Flaws::UNFINISHED | Flaws::NO_FOG).to_string(),
+            "UNFINISHED | NO_FOG"
+        );
     }
 }

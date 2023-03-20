@@ -132,7 +132,7 @@ impl CustomFormat<StatusText> for RenderInfo {
             draw_spaces.ui.custom_format(StatusText)
         )?;
 
-        write!(fmt, "\nRender flaws: {flaws:?}")?;
+        write!(fmt, "\nRender flaws: {flaws}")?;
         Ok(())
     }
 }
