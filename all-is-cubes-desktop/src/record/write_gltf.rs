@@ -84,12 +84,13 @@ impl MeshRecorder {
 
 /// Data stream sent from the mesh creation stage to the glTF serialization stage.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum MeshRecordMsg {
     AddMesh(
         ChunkPos<32>,
         mesh::SpaceMesh<GltfVertex, GltfTextureRef>,
         MeshIndexCell,
-    ), // TODO: needs more work
+    ),
     FinishFrame(super::FrameNumber, camera::Camera, Vec<MeshIndexCell>),
 }
 
