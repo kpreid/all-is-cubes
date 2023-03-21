@@ -48,6 +48,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         // also test the "if cheap" logic .
         [AntialiasingOption::None, AntialiasingOption::Always],
     );
+    c.insert_variants("bloom", light_test_universe.clone(), bloom, [0.0, 0.25]);
     c.insert("color_srgb_ramp", None, color_srgb_ramp);
     c.insert("cursor_basic", None, cursor_basic);
     c.insert("error_character_gone", None, error_character_gone);
@@ -118,6 +119,16 @@ async fn antialias(mut context: RenderTestContext, antialias_option: Antialiasin
     // different choices of intermediate shades.
     context
         .render_comparison_test(Threshold::new([(5, 1000), (40, 1)]), scene, Overlays::NONE)
+        .await;
+}
+
+async fn bloom(mut context: RenderTestContext, bloom_intensity: f32) {
+    let mut options = light_test_options();
+    options.bloom_intensity = NotNan::new(bloom_intensity).unwrap();
+    let scene =
+        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
+    context
+        .render_comparison_test(12, scene, Overlays::NONE)
         .await;
 }
 
@@ -603,8 +614,7 @@ async fn layers_ui_only(mut context: RenderTestContext) {
 }
 
 async fn light(mut context: RenderTestContext, option: LightingOption) {
-    let mut options = GraphicsOptions::UNALTERED_COLORS;
-    options.fov_y = NotNan::from(45);
+    let mut options = light_test_options();
     options.lighting_display = option;
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
@@ -656,9 +666,7 @@ async fn sky_and_info_text(mut context: RenderTestContext) {
 }
 
 async fn tone_mapping(mut context: RenderTestContext, (tmo, exposure): (ToneMappingOperator, f32)) {
-    let mut options = GraphicsOptions::UNALTERED_COLORS;
-    options.lighting_display = LightingOption::Smooth;
-    options.fov_y = NotNan::from(45);
+    let mut options = light_test_options();
     options.tone_mapping = tmo;
     options.exposure = ExposureOption::Fixed(NotNan::new(exposure).unwrap());
     let scene =
@@ -942,4 +950,12 @@ async fn light_test_universe() -> Arc<Universe> {
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);
     Arc::new(universe)
+}
+
+/// Options to go with [`light_test_universe`].
+fn light_test_options() -> GraphicsOptions {
+    let mut options = GraphicsOptions::UNALTERED_COLORS;
+    options.lighting_display = LightingOption::Smooth;
+    options.fov_y = NotNan::from(45);
+    options
 }
