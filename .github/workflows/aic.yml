@@ -203,10 +203,10 @@ jobs:
           fuzz
 
     - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-          toolchain: nightly
-          override: true
+      # Install exactly what we need: compiler, Cargo, clippy, rustfmt
+      run: |
+          rustup toolchain install nightly --profile=minimal
+          rustup override set nightly
 
     - name: Install cargo-fuzz
       run: cargo install cargo-fuzz
