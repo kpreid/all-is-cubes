@@ -281,9 +281,7 @@ mod tests {
         let mut allocations: Vec<Option<AlloctreeHandle>> = (0..64)
             .map(|i| match t.allocate(GridAab::for_block(R16)) {
                 Some(val) => Some(val),
-                None => panic!(
-                    "free_and_allocate_again initial allocation failure for #{i}"
-                ),
+                None => panic!("free_and_allocate_again initial allocation failure for #{i}"),
             })
             .collect();
 
