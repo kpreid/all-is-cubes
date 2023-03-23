@@ -283,8 +283,9 @@ fn handle_winit_event<Ren: RendererToWinit>(
                 WindowEvent::Focused(has_focus) => {
                     input_processor.key_focus(has_focus);
                 }
-                WindowEvent::Occluded(_) => {
-                    // TODO: disable rendering if occluded
+                WindowEvent::Occluded(occluded) => {
+                    dsession.occluded = occluded;
+                    dsession.window.request_redraw();
                 }
 
                 // File drop
@@ -336,6 +337,13 @@ fn handle_winit_event<Ren: RendererToWinit>(
         }
 
         Event::RedrawRequested(id) if id == dsession.window.id() => {
+            if dsession.occluded
+                || dsession.window.is_visible() == Some(false)
+                || dsession.window.is_minimized() == Some(true)
+            {
+                return;
+            }
+
             dsession.renderer.update_world_camera();
             dsession.session.update_cursor(dsession.renderer.cameras());
             dsession

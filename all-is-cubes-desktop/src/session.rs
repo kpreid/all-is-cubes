@@ -34,6 +34,13 @@ pub(crate) struct DesktopSession<Ren, Win> {
     /// If present, connection to system audio output.
     /// If absent, sound is not produced
     pub(crate) audio: Option<crate::audio::AudioOut>,
+
+    /// winit exposes an 'occluded' state but only as events, so we have to track that.
+    /// If true, this should suppresses redraw, and when it becomes false then we
+    /// should redraw.
+    ///
+    /// TODO: this should really be in winit-specific (i.e. the `window` field) storage.
+    pub(crate) occluded: bool,
 }
 
 impl<Ren, Win> DesktopSession<Ren, Win> {
@@ -51,6 +58,7 @@ impl<Ren, Win> DesktopSession<Ren, Win> {
             clock_source: ClockSource::Instant,
             recorder: None,
             audio: None,
+            occluded: false,
         }
     }
 
