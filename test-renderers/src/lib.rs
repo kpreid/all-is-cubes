@@ -35,6 +35,8 @@ mod diff;
 pub use diff::*;
 mod harness;
 pub use harness::*;
+mod histogram;
+pub use histogram::*;
 mod image_files;
 pub use image_files::*;
 mod render;
@@ -82,7 +84,7 @@ impl ComparisonRecord {
         expected_file_path: &Path,
         actual_file_path: &Path,
         diff_file_path: Option<&Path>,
-        diff_histogram: [usize; 256],
+        diff_histogram: Histogram,
         outcome: ComparisonOutcome,
     ) -> Self {
         ComparisonRecord {
@@ -100,7 +102,7 @@ impl ComparisonRecord {
                 .to_string(),
             diff_file_name: diff_file_path
                 .map(|p| p.file_name().unwrap().to_str().unwrap().to_string()),
-            diff_histogram: diff_histogram.into_iter().collect(),
+            diff_histogram: diff_histogram.0.into_iter().collect(),
             outcome,
         }
     }
@@ -125,7 +127,7 @@ impl ComparisonRecord {
 /// Finish a rendering test by storing/displaying/comparing the output image.
 pub fn compare_rendered_image(
     test: ImageId,
-    allowed_difference: u8,
+    allowed_difference: Threshold,
     actual_image: RgbaImage,
 ) -> ComparisonRecord {
     let actual_file_path = image_path(&test, Version::Actual);
@@ -153,7 +155,7 @@ pub fn compare_rendered_image(
                             &expected_file_path,
                             &actual_file_path,
                             None,
-                            [0; 256],
+                            Histogram::ZERO,
                             ComparisonOutcome::NoExpected,
                         );
                     }
@@ -191,6 +193,7 @@ pub fn compare_rendered_image(
             ComparisonOutcome::Different {
                 amount: diff_result
                     .histogram
+                    .0
                     .iter()
                     .copied()
                     .enumerate()

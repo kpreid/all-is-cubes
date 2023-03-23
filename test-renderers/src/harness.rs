@@ -19,7 +19,7 @@ use all_is_cubes::util::{CustomFormat as _, StatusText};
 
 use crate::{
     results_json_path, write_report_file, ComparisonOutcome, ComparisonRecord, ImageId, Overlays,
-    RendererFactory, RendererId, Scene, TestCaseOutput, TestId,
+    RendererFactory, RendererId, Scene, TestCaseOutput, TestId, Threshold,
 };
 
 /// The Universe parameter is an optional way to receive a pre-configured universe
@@ -64,7 +64,7 @@ impl RenderTestContext {
 
     pub async fn render_comparison_test(
         &mut self,
-        allowed_difference: u8,
+        allowed_difference: impl Into<Threshold>,
         scene: impl Scene,
         overlays: Overlays<'_>,
     ) {
@@ -77,7 +77,7 @@ impl RenderTestContext {
     // #[track_caller] // TODO: should be enabled, but the compiler doesn't support this yet
     pub async fn render_comparison_test_with_renderer(
         &mut self,
-        allowed_difference: u8,
+        allowed_difference: impl Into<Threshold>,
         renderer: &mut Box<dyn HeadlessRenderer + Send>,
         overlays: Overlays<'_>,
     ) {
@@ -96,7 +96,12 @@ impl RenderTestContext {
     /// Perform an image comparison and log the result, without also calling the renderer
     /// ourselves.
     #[track_caller]
-    pub fn compare_image(&mut self, allowed_difference: u8, image: RgbaImage, flaws: Flaws) {
+    pub fn compare_image(
+        &mut self,
+        allowed_difference: impl Into<Threshold>,
+        image: RgbaImage,
+        flaws: Flaws,
+    ) {
         let combo = ImageId {
             test_id: self.id(),
             renderer: self.renderer_factory.id(),
@@ -106,7 +111,7 @@ impl RenderTestContext {
             },
         };
 
-        let mut outcome = crate::compare_rendered_image(combo, allowed_difference, image);
+        let mut outcome = crate::compare_rendered_image(combo, allowed_difference.into(), image);
 
         if matches!(outcome.outcome, ComparisonOutcome::Different { .. })
             && flaws != Flaws::default()

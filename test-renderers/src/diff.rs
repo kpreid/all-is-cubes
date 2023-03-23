@@ -2,26 +2,20 @@
 
 use image::{buffer::ConvertBuffer, GenericImageView as _, GrayImage, Pixel as _, RgbaImage};
 
+use crate::{Histogram, Threshold};
+
 /// Output of [`diff()`], a comparison between two images.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DiffResult {
-    /// A histogram of luminance difference values.
-    ///
-    /// For example, the zero element of this array contains a count of the pixels
-    /// that were considered equal.
-    pub histogram: [usize; 256],
+    pub histogram: Histogram,
     /// An image intended for human viewing of which pixels are different,
     /// or None if the sizes were different.
     pub diff_image: Option<RgbaImage>,
 }
 
 impl DiffResult {
-    pub fn equal_or_different_below_threshold(&self, threshold: u8) -> bool {
-        assert!(threshold < 255, "threshold = 255 will always be different");
-        self.histogram[usize::from(threshold) + 1..]
-            .iter()
-            .sum::<usize>()
-            == 0
+    pub fn equal_or_different_below_threshold(&self, threshold: Threshold) -> bool {
+        threshold.allows(self.histogram)
     }
 }
 
@@ -40,7 +34,7 @@ pub fn diff(expected: &RgbaImage, actual: &RgbaImage) -> DiffResult {
             histogram: {
                 let mut h = [0; 256];
                 h[255] = usize::MAX;
-                h
+                Histogram(h)
             },
             diff_image: None,
         };
@@ -64,7 +58,7 @@ pub fn diff(expected: &RgbaImage, actual: &RgbaImage) -> DiffResult {
     //eprintln!("{:?}", histogram);
 
     DiffResult {
-        histogram,
+        histogram: Histogram(histogram),
         diff_image: Some(combined_diff.convert()),
     }
 }
@@ -159,11 +153,11 @@ mod tests {
 
         let mut expected_histogram = [0; 256];
         expected_histogram[0] = 1;
-        assert_eq!(diff_result.histogram, expected_histogram);
+        assert_eq!(diff_result.histogram, Histogram(expected_histogram));
 
-        assert!(diff_result.equal_or_different_below_threshold(0));
-        assert!(diff_result.equal_or_different_below_threshold(5));
-        assert!(diff_result.equal_or_different_below_threshold(254));
+        assert!(diff_result.equal_or_different_below_threshold(Threshold::no_bigger_than(0)));
+        assert!(diff_result.equal_or_different_below_threshold(Threshold::no_bigger_than(5)));
+        assert!(diff_result.equal_or_different_below_threshold(Threshold::no_bigger_than(254)));
     }
 
     #[test]
@@ -197,15 +191,15 @@ mod tests {
         assert_eq!(
             diff_result,
             DiffResult {
-                histogram: expected_histogram,
+                histogram: Histogram(expected_histogram),
                 diff_image: Some(expected_diff_image)
             }
         );
 
         assert_eq!(
             (
-                diff_result.equal_or_different_below_threshold(dred - 1),
-                diff_result.equal_or_different_below_threshold(dred)
+                diff_result.equal_or_different_below_threshold(Threshold::no_bigger_than(dred - 1)),
+                diff_result.equal_or_different_below_threshold(Threshold::no_bigger_than(dred))
             ),
             (false, true)
         );
@@ -221,7 +215,7 @@ mod tests {
                 histogram: {
                     let mut h = [0; 256];
                     h[255] = usize::MAX;
-                    h
+                    Histogram(h)
                 },
                 diff_image: None
             }
