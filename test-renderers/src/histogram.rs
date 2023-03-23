@@ -76,6 +76,8 @@ impl Threshold {
                 .iter()
                 .sum::<usize>();
             if new_differences > count {
+                // TODO: Instead of failing immediately, buffer this and allow a later-checked
+                // higher-difference entry to also permit lower differences.
                 return false;
             }
             checked_up_to = new_checked_up_to;

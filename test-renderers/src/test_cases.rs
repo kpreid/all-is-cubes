@@ -26,8 +26,8 @@ use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::{make_some_voxel_blocks, palette};
 
 use crate::{
-    finish_universe_from_space, Overlays, RenderTestContext, TestCaseCollector, UniverseFuture,
-    COMMON_VIEWPORT,
+    finish_universe_from_space, Overlays, RenderTestContext, TestCaseCollector, Threshold,
+    UniverseFuture, COMMON_VIEWPORT,
 };
 
 /// Function to be called by the custom test harness to find all tests.
@@ -114,12 +114,10 @@ async fn antialias(mut context: RenderTestContext, antialias_option: Antialiasin
     options.antialiasing = antialias_option;
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
-    // Max diff 28 is from *one pixel* difference we observed in GitHub Actions CI.
-    // TODO: Implement pixel-count thresholds and then make this test stricter.
-    // (But we also theoretically need a better algorithm for comparing antialiased images
-    // which may have various intermediate shades.)
+    // TODO: We need a better algorithm for comparing antialiased images which might make
+    // different choices of intermediate shades.
     context
-        .render_comparison_test(28, scene, Overlays::NONE)
+        .render_comparison_test(Threshold::new([(5, 1000), (40, 1)]), scene, Overlays::NONE)
         .await;
 }
 
@@ -282,7 +280,7 @@ async fn fog(mut context: RenderTestContext, fog: FogOption) {
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
     context
-        .render_comparison_test(15, scene, Overlays::NONE)
+        .render_comparison_test(Threshold::new([(2, 500), (15, 100)]), scene, Overlays::NONE)
         .await;
 }
 
@@ -667,7 +665,11 @@ async fn tone_mapping(mut context: RenderTestContext, (tmo, exposure): (ToneMapp
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
     // TODO: tighten this comparison threshold after reconciling smooth-lighting styles
     context
-        .render_comparison_test(11, scene, Overlays::NONE)
+        .render_comparison_test(
+            Threshold::new([(3, 2000), (12, 100)]),
+            scene,
+            Overlays::NONE,
+        )
         .await;
 }
 
