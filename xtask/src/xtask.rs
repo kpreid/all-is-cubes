@@ -120,7 +120,10 @@ enum XtaskCommand {
     },
 
     /// Update dependency versions.
-    Update,
+    Update {
+        #[arg(default_value = "latest")]
+        to: UpdateTo,
+    },
 
     /// Set the version number of all packages and their dependencies on each other.
     SetVersion {
@@ -133,6 +136,16 @@ enum XtaskCommand {
         #[arg(long = "for-real")]
         for_real: bool,
     },
+}
+
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+enum UpdateTo {
+    /// Don't actually update.
+    Locked,
+    /// Regular `cargo update`.
+    Latest,
+    /// `cargo update -Z minimal-versions --features minvers`.
+    Minimal,
 }
 
 fn main() -> Result<(), ActionError> {
@@ -237,9 +250,20 @@ fn main() -> Result<(), ActionError> {
                 .args(server_args)
                 .run()?;
         }
-        XtaskCommand::Update => {
-            cargo().arg("update").run()?;
-        }
+        XtaskCommand::Update { to } => match to {
+            UpdateTo::Locked => {
+                eprintln!("Doing nothing because update type is {to:?}.");
+            }
+            UpdateTo::Latest => {
+                cargo().arg("update").run()?;
+            }
+            UpdateTo::Minimal => {
+                cmd!("cargo +nightly update -Z minimal-versions").run()?;
+                // This can't be expressed as an entry in the minvers-hack package
+                cmd!("cargo +nightly update --offline --package malloc_buf@0.0.1 --precise 0.0.6")
+                    .run()?;
+            }
+        },
         XtaskCommand::SetVersion { version } => {
             let version_value = toml_edit::value(version.as_str());
             for package in ALL_NONTEST_PACKAGES {

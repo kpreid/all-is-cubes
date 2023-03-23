@@ -6,6 +6,7 @@ members = [
   "all-is-cubes-server",
   "all-is-cubes-ui",
   "all-is-cubes-wasm",
+  "minvers-hack",
   "test-renderers",
   "xtask",
 

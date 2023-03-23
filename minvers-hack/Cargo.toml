@@ -1,0 +1,34 @@
+[package]
+name = "minvers-hack"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Extra dependencies to force version resolution to avoid minimal-version-correctness issues in our dependency graph. This package is only useful for testing with -Z minimal-versions."
+
+[dependencies]
+# error[E0425]: cannot find function `set_file_mtime` in crate `filetime`
+#    --> /Users/kpreid/.cargo/registry/src/github.com-1ecc6299db9ec823/snapbox-0.4.2/src/path.rs:579:15
+#     |
+# 579 |       filetime::set_file_mtime(&dest, src_mtime)?;
+#     |                 ^^^^^^^^^^^^^^ help: a function with a similar name exists: `set_file_times`
+#     |
+#    ::: /Users/kpreid/.cargo/registry/src/github.com-1ecc6299db9ec823/filetime-0.2.0/src/lib.rs:189:1
+filetime = { version = "0.2.20", default-features = false }
+# `wyz` depends on `tap::Pipe` which only exists in `tap 1.0.1`, not `tap 1.0.0`
+tap = { version = "1.0.1", default-features = false }
+# `regex` 1.5.0 is uncompilable
+regex = { version = "1.5.1", default-features = false, features = ["std"] }
+# Not strictly a minimal-versions issue, but binary output differences make our end-to-end tests fail.
+flate2 = { version = "1.0.25", default-features = false }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# minimal `log` and `malloc_buf`←`objc` depend on `libc 0.1.0` which does not compile.
+# updating coreaudio-sys fixes this
+coreaudio-sys = { version = "0.2.11", default-features = false }
+
+[target.'cfg(target_os = "android")'.dependencies]
+# Workaround <https://github.com/rust-lang/cargo/issues/7180>
+ndk-sys = "0.4.1"
+
+# objc_exception 0.1.0 does not compile and is depended on by `objc`
+objc_exception = { version = "0.1.2", default-features = false }
