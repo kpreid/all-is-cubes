@@ -13,11 +13,9 @@ use embedded_graphics::text::Baseline;
 use embedded_graphics::text::Text;
 use embedded_graphics::text::TextStyleBuilder;
 
-use crate::block::{
-    Block, BlockCollision, Resolution, Resolution::R16, RotationPlacementRule, AIR,
-};
+use crate::block::{Block, BlockCollision, Resolution, Resolution::R16, RotationPlacementRule};
 use crate::inv::{Slot, Tool};
-use crate::math::{Face6, FreeCoordinate, GridCoordinate, Rgb, Rgba};
+use crate::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, Rgb, Rgba};
 use crate::raycast::Raycaster;
 use crate::space::{SetCubeError, Space};
 use crate::universe::Universe;
@@ -136,23 +134,28 @@ pub fn make_slab(
     numerator: GridCoordinate,
     denominator: Resolution,
 ) -> Block {
-    let voxels = [
+    let voxel_palette = [
         Block::from(palette::PLANK),
         Block::from(palette::PLANK * 1.06),
     ];
+    let bounds = GridAab::from_lower_size(
+        [0, 0, 0],
+        [denominator.to_grid(), numerator, denominator.to_grid()],
+    );
+
+    let mut space = Space::builder(bounds).build();
+    // Checkerboard pattern
+    space
+        .fill(space.bounds(), |cube| {
+            Some(&voxel_palette[(cube.x + cube.y + cube.z).rem_euclid(2) as usize])
+        })
+        .unwrap();
+
     Block::builder()
         .display_name(format!("Slab {numerator}/{denominator}"))
         .collision(BlockCollision::Recur)
         .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-        .voxels_fn(universe, denominator, |cube| {
-            if cube.y >= numerator {
-                &AIR
-            } else {
-                // Checkerboard pattern
-                &voxels[(cube.x + cube.y + cube.z).rem_euclid(2) as usize]
-            }
-        })
-        .unwrap() // no errors should be possible
+        .voxels_ref(denominator, universe.insert_anonymous(space))
         .build()
 }
 
