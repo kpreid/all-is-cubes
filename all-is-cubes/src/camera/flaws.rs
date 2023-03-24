@@ -28,18 +28,22 @@ bitflags::bitflags! {
         /// despite being requested by the graphics options.
         const NO_ANTIALIASING = 1 << 2;
 
+        /// Bloom has not been rendered,
+        /// despite being requested by the graphics options.
+        const NO_BLOOM = 1 << 3;
+
         /// A cursor has not been rendered, despite one being given.
-        const NO_CURSOR = 1 << 3;
+        const NO_CURSOR = 1 << 4;
 
         /// View-distance fog has not been rendered, despite being requested by the
         /// graphics options.
         ///
         /// This does not refer to explicitly semitransparent objects within the scene.
-        const NO_FOG = 1 << 4;
+        const NO_FOG = 1 << 5;
 
         /// Surfaces that should have textures rather than a solid color don't.
         // TODO: Should this just be one of the things TOO_MUCH means?
-        const MISSING_TEXTURES = 1 << 5;
+        const MISSING_TEXTURES = 1 << 6;
     }
 }
 

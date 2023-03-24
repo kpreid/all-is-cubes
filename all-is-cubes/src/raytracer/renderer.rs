@@ -3,6 +3,7 @@ use std::fmt;
 use cgmath::{ElementWise, Point2, Vector2};
 use futures_core::future::BoxFuture;
 use image::RgbaImage;
+use ordered_float::NotNan;
 
 use crate::camera::{
     AntialiasingOption, Camera, Flaws, FogOption, GraphicsOptions, HeadlessRenderer, Layers,
@@ -229,6 +230,9 @@ impl RtRenderer<()> {
 
         let options = self.cameras.graphics_options();
         let mut flaws = Flaws::empty();
+        if options.bloom_intensity != NotNan::from(0u8) {
+            flaws |= Flaws::NO_BLOOM;
+        }
         if self.had_cursor {
             flaws |= Flaws::NO_CURSOR;
         }
