@@ -144,13 +144,15 @@ mod tmpl {
                 // Show histogram details but only if not flawed
                 diffcount: match &input.outcome {
                     ComparisonOutcome::Flawed(_) => "".into(),
+                    // TODO: make this the `impl Display for Histogram`
                     _ => input
                         .diff_histogram
                         .iter()
                         .copied()
                         .enumerate()
+                        .rev() // list biggest first
                         .filter(|&(delta, count)| count > 0 && delta > 0)
-                        .map(|(delta, count)| format!("Δ{delta} ×{count}"))
+                        .map(|(delta, count)| format!("Δ{delta}\u{00A0}×{count}"))
                         .join(", "),
                 },
                 flawedness: match &input.outcome {

@@ -59,6 +59,11 @@ details.expected-and-diff-details {
     cursor: pointer;
 }
 
+.diffcount {
+    max-width: 200px;
+    white-space: normal; /* override nowrap */
+}
+
 figure {
     display: inline-block;
     margin: 0;
