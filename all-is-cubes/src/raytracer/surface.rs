@@ -326,9 +326,8 @@ pub(crate) enum DepthStep<'a, D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Block, Resolution::*};
+    use crate::block::{Block, Resolution::*, AIR};
     use crate::camera::GraphicsOptions;
-    use crate::content::{make_slab, palette};
     use crate::math::GridAab;
     use crate::space::Space;
     use crate::universe::Universe;
@@ -342,8 +341,23 @@ mod tests {
         let mut space = Space::empty(GridAab::from_lower_size([0, 0, 0], [1, 3, 1]));
 
         let solid_test_color = rgba_const!(1., 0., 0., 1.);
+        let slab_test_color = rgba_const!(1., 1., 0., 1.);
+        let slab_test_color_block = Block::from(slab_test_color);
+
+        // This block has some AIR in it that the iterator will traverse
+        let slab_with_extra_space = Block::builder()
+            .voxels_fn(universe, R4, |cube| {
+                if cube.y >= 2 {
+                    &AIR
+                } else {
+                    &slab_test_color_block
+                }
+            })
+            .unwrap()
+            .build();
+
         space.set([0, 1, 0], Block::from(solid_test_color)).unwrap();
-        space.set([0, 2, 0], make_slab(universe, 2, R4)).unwrap();
+        space.set([0, 2, 0], slab_with_extra_space).unwrap();
 
         let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
 
@@ -363,18 +377,16 @@ mod tests {
                 EnterBlock { t_distance: 2.5 },
                 EnterSurface(Surface {
                     block_data: &(),
-                    diffuse_color: palette::PLANK.with_alpha_one(),
+                    diffuse_color: slab_test_color,
                     cube: GridPoint::new(0, 2, 0),
                     t_distance: 2.5,
                     intersection_point: Point3::new(0.5, 2.0, 0.5),
                     normal: Face7::NY
                 }),
                 // Second layer of slab.
-                // TODO: Make this test not dependent on make_slab's colors,
-                // perhaps by making the color an input to make_slab.
                 EnterSurface(Surface {
                     block_data: &(),
-                    diffuse_color: (palette::PLANK * 1.06).with_alpha_one(),
+                    diffuse_color: slab_test_color,
                     cube: GridPoint::new(0, 2, 0),
                     t_distance: 2.75, // previous surface + 1/4 block of depth
                     intersection_point: Point3::new(0.5, 2.25, 0.5),
