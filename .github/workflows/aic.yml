@@ -61,11 +61,18 @@ jobs:
             depversions: locked
             primary: false
           
-          # Updated dependencies
+          # Dependencies updated
           - os: ubuntu-latest
             toolchain: stable
             depversions: latest
             primary: false
+          
+          # Dependencies reverted to minimal-versions
+          - os: ubuntu-latest
+            toolchain: stable
+            depversions: minimal
+            primary: false
+
 
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ !matrix.primary }}
@@ -80,6 +87,10 @@ jobs:
           rustup target add --toolchain="${{ matrix.toolchain }}" wasm32-unknown-unknown
           rustup override set "${{ matrix.toolchain }}"
 
+    - name: Install nightly too
+      if: ${{ matrix.depversions == 'minimal' }}
+      run: rustup toolchain install nightly --profile=minimal 
+
     - name: Install native libraries
       if: ${{ runner.os == 'Linux' }}
       run: |
@@ -88,12 +99,16 @@ jobs:
       # libxrandr-dev xorg-dev libwayland-dev: needed for windowing
       # Note that `libwayland-dev` provides the library called `wayland-client`
       # libasound2-dev: needed for audio via `kira`
-    
-    - name: Update dependencies
-      if: ${{ matrix.depversions == 'latest' }}
-      run: cargo update
 
+    # Load cache before doing any Rust builds
     - uses: Swatinem/rust-cache@v2.0.2
+
+    # break this out as a separate non-silenced build step
+    - name: Compile xtask
+      run: cargo build --package xtask
+
+    - name: Update dependencies
+      run: cargo xtask update "${{ matrix.depversions }}"
 
     - name: Install wasm-pack
       run: cargo install wasm-pack
