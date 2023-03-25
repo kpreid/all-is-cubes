@@ -2207,6 +2207,7 @@ dependencies = [
  "coreaudio-sys",
  "filetime",
  "flate2",
+ "ndk-sys",
  "objc_exception",
  "regex",
  "tap",
