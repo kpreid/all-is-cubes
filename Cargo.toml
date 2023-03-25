@@ -41,7 +41,7 @@ futures-task = { version = "0.3.17", default-features = false }
 futures-util = { version = "0.3.21", default-features = false, features = ["alloc"] }
 image = { version = "0.24.2", default-features = false }
 indoc = "1.0.3"
-instant = "0.1.9"
+instant = "0.1.12"
 itertools = { version = "0.10.0", default-features = false, features = ["use_alloc"] }
 log = { version = "0.4.14", default-features = false }
 macro_rules_attribute = "0.1.0"
