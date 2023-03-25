@@ -15,7 +15,7 @@ use crate::listen::{Listen, Listener};
 use crate::math::{
     FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba,
 };
-use crate::raycast::{Ray, Raycaster};
+use crate::raycast::Ray;
 use crate::space::{SetCubeError, Space, SpaceChange};
 use crate::universe::URef;
 
@@ -660,8 +660,8 @@ pub const AIR: Block = Block(BlockPtr::Static(&Primitive::Air));
 /// Given the `resolution` of some recursive block occupying `cube`, transform `ray`
 /// into an equivalent ray intersecting the recursive grid.
 ///
-/// See also [`recursive_raycast`] for a raycast built on this.
-// TODO: Decide whether this is good public API
+// TODO: Replace this with the ability to ask a Raycaster to zoom in,
+// for more precision in edge cases
 #[inline]
 pub(crate) fn recursive_ray(ray: Ray, cube: GridPoint, resolution: Resolution) -> Ray {
     Ray {
@@ -670,21 +670,6 @@ pub(crate) fn recursive_ray(ray: Ray, cube: GridPoint, resolution: Resolution) -
         ),
         direction: ray.direction,
     }
-}
-
-/// Given the `resolution` of some recursive block occupying `cube`, transform `ray`
-/// into an equivalent ray intersecting the recursive grid, and start the raycast
-/// through that block. This is equivalent to
-///
-/// ```skip
-/// recursive_ray(ray, cube, resolution).cast().within(GridAab::for_block(resolution))
-/// ```
-// TODO: Decide whether this is good public API
-#[inline]
-pub(crate) fn recursive_raycast(ray: Ray, cube: GridPoint, resolution: Resolution) -> Raycaster {
-    recursive_ray(ray, cube, resolution)
-        .cast()
-        .within(GridAab::for_block(resolution))
 }
 
 /// Notification when an [`EvaluatedBlock`] result changes.

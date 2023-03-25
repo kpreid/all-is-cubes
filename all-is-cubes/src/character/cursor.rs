@@ -6,9 +6,11 @@ use std::fmt;
 
 use cgmath::{EuclideanSpace, InnerSpace as _, Matrix4, Point3, Transform as _};
 
-use crate::block::{recursive_raycast, Block, EvaluatedBlock, Evoxel, Evoxels};
+use crate::block::{recursive_ray, Block, EvaluatedBlock, Evoxel, Evoxels};
 use crate::content::palette;
-use crate::math::{Aab, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridVector};
+use crate::math::{
+    Aab, Face7, FreeCoordinate, Geometry, GridAab, GridCoordinate, GridPoint, GridVector,
+};
 use crate::mesh::LineVertex;
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
@@ -45,7 +47,9 @@ pub fn cursor_raycast(
             }
             Evoxels::Many(resolution, ref voxels) => {
                 let recursive_hit: Option<(GridPoint, &Evoxel)> =
-                    recursive_raycast(ray, step.cube_ahead(), resolution)
+                    recursive_ray(ray, step.cube_ahead(), resolution)
+                        .cast()
+                        .within(GridAab::for_block(resolution)) // TODO: use voxels.bounds()
                         .filter_map(|voxel_step| {
                             voxels
                                 .get(voxel_step.cube_ahead())
