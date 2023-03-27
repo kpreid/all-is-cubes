@@ -1,0 +1,41 @@
+[package]
+name = "all-is-cubes-mesh"
+version = "0.5.0"
+authors = ["Kevin Reid <kpreid@switchb.org>"]
+edition = "2021"
+rust-version = "1.65"
+description = "Mesh generation for the all-is-cubes engine."
+# TODO: add homepage = "..." when we have one
+repository = "https://github.com/kpreid/all-is-cubes"
+license = "MIT OR Apache-2.0"
+categories = ["games", "graphics", "rendering"]
+
+[lib]
+# Disable running as benchmark so that the default doesn't interfere with Criterion usage.
+bench = false
+
+[[bench]]
+name = "mesh_bench"
+harness = false
+
+[features]
+default = []
+arbitrary = ["dep:arbitrary", "ordered-float/arbitrary"]
+
+[dependencies]
+all-is-cubes = { path = "../all-is-cubes", version = "0.5.0" }
+arbitrary = { workspace = true, optional = true }
+bitflags = { workspace = true }
+bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
+bytemuck = { workspace = true }
+fnv = "1.0.7"
+indoc = { workspace = true }
+instant = { workspace = true }
+log = { workspace = true }
+mutants = { workspace = true }
+num-traits = { workspace = true }
+ordered-float = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+pretty_assertions = { workspace = true }

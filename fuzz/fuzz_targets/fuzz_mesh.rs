@@ -3,7 +3,7 @@ use libfuzzer_sys::fuzz_target;
 extern crate all_is_cubes;
 
 use all_is_cubes::block::EvaluatedBlock;
-use all_is_cubes::mesh::{BlockMesh, BlockVertex, MeshOptions, TestTextureAllocator, TtPoint};
+use all_is_cubes_mesh::{BlockMesh, BlockVertex, MeshOptions, TestTextureAllocator, TtPoint};
 
 fuzz_target!(|input: (EvaluatedBlock, MeshOptions)| {
     let (block, options) = input;

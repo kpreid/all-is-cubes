@@ -259,7 +259,8 @@ impl TimeStats {
     /// the previous time value.
     ///
     /// Returns the duration that was recorded.
-    pub(crate) fn record_consecutive_interval(
+    #[doc(hidden)] // for now, not making writing conveniences public
+    pub fn record_consecutive_interval(
         &mut self,
         last_marked_instant: &mut Instant,
         now: Instant,

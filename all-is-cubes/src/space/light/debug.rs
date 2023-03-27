@@ -6,8 +6,7 @@
 
 use cgmath::Vector3;
 
-use crate::math::{Aab, FreeCoordinate, Geometry, GridPoint};
-use crate::mesh::LineVertex;
+use crate::math::{Aab, FreeCoordinate, Geometry, GridPoint, LineVertex};
 use crate::raycast::Ray;
 use crate::space::PackedLight;
 use crate::util::MapExtend;

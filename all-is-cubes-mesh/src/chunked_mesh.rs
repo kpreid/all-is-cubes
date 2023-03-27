@@ -3,29 +3,31 @@ use std::fmt;
 use std::num::NonZeroU32;
 use std::sync::{Arc, Mutex, Weak};
 
-use cgmath::{EuclideanSpace, Point3};
 use fnv::{FnvHashMap, FnvHashSet};
 use indoc::indoc;
 use instant::{Duration, Instant};
 
-use crate::block::{EvaluatedBlock, Resolution};
-use crate::camera::{Camera, Flaws};
-use crate::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
-use crate::listen::{Listen as _, Listener};
-use crate::math::{Aab, FreeCoordinate, Geometry as _, GridCoordinate, GridPoint};
-use crate::mesh::{
-    BlockMesh, BlockMeshProvider, GfxVertex, LineVertex, MeshOptions, SpaceMesh, TextureAllocator,
-    TextureTile,
+use all_is_cubes::block::{EvaluatedBlock, Resolution};
+use all_is_cubes::camera::{Camera, Flaws};
+use all_is_cubes::cgmath::{EuclideanSpace, Point3};
+use all_is_cubes::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
+use all_is_cubes::listen::{Listen as _, Listener};
+use all_is_cubes::math::{
+    Aab, FreeCoordinate, Geometry as _, GridCoordinate, GridPoint, LineVertex,
 };
-use crate::space::{BlockIndex, Space, SpaceChange};
-use crate::universe::URef;
-use crate::util::{ConciseDebug, CustomFormat, StatusText, TimeStats};
+use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
+use all_is_cubes::universe::URef;
+use all_is_cubes::util::{ConciseDebug, CustomFormat, StatusText, TimeStats};
+
+use crate::{
+    BlockMesh, BlockMeshProvider, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator, TextureTile,
+};
 
 /// If true, enables reporting chunk update timing at [`log::trace`] level.
 const LOG_CHUNK_UPDATES: bool = false;
 
 /// The large-scale analogue of [`SpaceMesh`]: subdivides a [`Space`] into
-/// [chunks](crate::chunking) which are individually recomputed as the space changes or
+/// [chunks](all_is_cubes::chunking) which are individually recomputed as the space changes or
 /// its contained blocks do.
 ///
 /// Each chunk, a [`ChunkMesh`], owns a data value of type `D`, which is
@@ -896,17 +898,15 @@ impl ChunkTodo {
 
 #[cfg(test)]
 mod tests {
-    use cgmath::EuclideanSpace as _;
-    use ordered_float::NotNan;
-
     use super::*;
-    use crate::block::Block;
-    use crate::camera::{GraphicsOptions, TransparencyOption, Viewport};
-    use crate::math::{FreeCoordinate, GridAab, GridCoordinate};
-    use crate::mesh::{BlockVertex, NoTexture, NoTextures};
-    use crate::space::SpaceTransaction;
-    use crate::transaction;
-    use crate::universe::Universe;
+    use crate::{BlockVertex, NoTexture, NoTextures};
+    use all_is_cubes::block::Block;
+    use all_is_cubes::camera::{GraphicsOptions, TransparencyOption, Viewport};
+    use all_is_cubes::math::NotNan;
+    use all_is_cubes::math::{FreeCoordinate, GridAab, GridCoordinate};
+    use all_is_cubes::space::SpaceTransaction;
+    use all_is_cubes::universe::Universe;
+    use all_is_cubes::{notnan, rgba_const, transaction};
 
     const CHUNK_SIZE: GridCoordinate = 16;
     const LARGE_VIEW_DISTANCE: f64 = 200.0;
@@ -1043,9 +1043,10 @@ mod tests {
                 space_ref.clone(),
             );
             let camera = Camera::new(
-                GraphicsOptions {
-                    view_distance: NotNan::new(view_distance).unwrap(),
-                    ..GraphicsOptions::default()
+                {
+                    let mut o = GraphicsOptions::default();
+                    o.view_distance = NotNan::new(view_distance).unwrap();
+                    o
                 },
                 Viewport::ARBITRARY,
             );
@@ -1127,11 +1128,10 @@ mod tests {
     #[test]
     fn graphics_options_change() {
         // TODO: This test is fragile because it doesn't think about multiple chunks.
-        let mut options = GraphicsOptions {
-            view_distance: NotNan::from(1),
-            transparency: TransparencyOption::Volumetric,
-            ..Default::default()
-        };
+        let mut options = GraphicsOptions::default();
+        options.view_distance = NotNan::from(1);
+        options.transparency = TransparencyOption::Volumetric;
+
         let mut space = Space::empty_positive(1, 1, 1);
         space
             .set([0, 0, 0], Block::from(rgba_const!(1., 1., 1., 0.25)))

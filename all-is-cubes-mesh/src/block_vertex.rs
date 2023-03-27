@@ -2,10 +2,9 @@
 
 use std::fmt;
 
-use cgmath::{EuclideanSpace as _, Point3, Vector3};
-
-use crate::math::{Face6, FreeCoordinate, GridPoint, Rgba};
-use crate::util::{ConciseDebug, CustomFormat};
+use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
+use all_is_cubes::math::{Face6, FreeCoordinate, GridPoint, Rgba};
+use all_is_cubes::util::{ConciseDebug, CustomFormat};
 
 /// Numeric type used to store texture coordinates in vertices.
 ///
@@ -114,11 +113,11 @@ where
 ///   to become the [`SpaceMesh`]’s vertices, and [`GfxVertex::instantiate_vertex`] is
 ///   called on each copy to position it at the particular block's location.
 ///
-/// [`Block`]: crate::block::Block
-/// [`BlockMesh`]: crate::mesh::BlockMesh
-/// [`BlockMesh::new()`]: crate::mesh::BlockMesh::new()
-/// [`Space`]: crate::space::Space
-/// [`SpaceMesh`]: crate::mesh::SpaceMesh
+/// [`Block`]: all_is_cubes::block::Block
+/// [`BlockMesh`]: crate::BlockMesh
+/// [`BlockMesh::new()`]: crate::BlockMesh::new()
+/// [`Space`]: all_is_cubes::space::Space
+/// [`SpaceMesh`]: crate::SpaceMesh
 pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized {
     /// Whether [`SpaceMesh`]es should provide pre-sorted vertex index slices to allow
     /// back-to-front drawing order based on viewing ranges.
@@ -127,12 +126,12 @@ pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized {
     /// of [`MeshOptions`]. However, we currently have no reason to complicate run-time
     /// data flow that way.
     ///
-    /// [`SpaceMesh`]: crate::mesh::SpaceMesh
-    /// [`MeshOptions`]: crate::mesh::MeshOptions
+    /// [`SpaceMesh`]: crate::SpaceMesh
+    /// [`MeshOptions`]: crate::MeshOptions
     const WANTS_DEPTH_SORTING: bool;
 
     /// Number type for the vertex position coordinates.
-    type Coordinate: cgmath::BaseFloat;
+    type Coordinate: all_is_cubes::cgmath::BaseFloat;
 
     /// Point type identifying a point in the block's texture.
     type TexPoint: Copy;

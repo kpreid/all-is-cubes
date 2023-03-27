@@ -1,10 +1,8 @@
 //! [`GltfVertex`], vertex type for writing to glTF buffers.
 
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3, Vector4};
-use all_is_cubes::{
-    math::GridPoint,
-    mesh::{BlockVertex, Coloring, GfxVertex},
-};
+use all_is_cubes::math::GridPoint;
+use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
 
 use super::glue::Lef32;
 use super::texture::TexPoint;

@@ -215,9 +215,10 @@ impl GridRotation {
     }
 
     // TODO: public? do we want this to be our API? should this also be a From impl?
+    #[doc(hidden)]
     #[inline]
     #[rustfmt::skip] // dense data layout
-    pub(crate) const fn to_basis(self) -> Vector3<Face6> {
+    pub const fn to_basis(self) -> Vector3<Face6> {
         use {Face6::*, GridRotation::*};
         match self {
             RXYZ => Vector3 { x: PX, y: PY, z: PZ },

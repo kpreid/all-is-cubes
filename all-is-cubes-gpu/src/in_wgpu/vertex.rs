@@ -1,6 +1,6 @@
 use all_is_cubes::cgmath::{Point3, Vector3};
 use all_is_cubes::math::{GridPoint, GridVector};
-use all_is_cubes::mesh::{BlockVertex, Coloring, GfxVertex};
+use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
 
 use crate::DebugLineVertex;
 

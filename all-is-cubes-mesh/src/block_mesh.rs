@@ -2,20 +2,21 @@
 //!
 //! This module is internal and reexported by its parent.
 
-use cgmath::{Point2, Point3, Transform as _};
 use std::fmt::Debug;
 
-use crate::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
-use crate::camera::Flaws;
-use crate::math::{
+use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
+use all_is_cubes::camera::Flaws;
+use all_is_cubes::cgmath::{Point2, Point3, Transform as _};
+use all_is_cubes::math::{
     Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, OpacityCategory,
     Rgba,
 };
-use crate::mesh::{
+use all_is_cubes::space::Space;
+
+use crate::{
     copy_voxels_into_existing_texture, copy_voxels_to_texture, push_quad, BlockVertex,
     GreedyMesher, MeshOptions, QuadColoring, QuadTransform, TextureAllocator, TextureTile,
 };
-use crate::space::Space;
 
 /// Part of the triangle mesh calculated for a [`Block`], stored in a [`BlockMesh`] keyed
 /// by [`Face7`].
@@ -86,7 +87,7 @@ impl<V> Default for BlockFaceMesh<V> {
 ///
 /// TODO: Add methods so this can be read out directly if you really want to.
 ///
-/// [`Block`]: crate::block::Block
+/// [`Block`]: all_is_cubes::block::Block
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockMesh<V, T> {
     /// Vertices grouped by which face being obscured would obscure those vertices.
@@ -493,6 +494,7 @@ where
                     block.voxel_opacity_mask.clone()
                 };
             }
+            _ => unreachable!("this match should have been exhaustive"),
         }
     }
 }
@@ -516,7 +518,7 @@ impl<V, T> Default for BlockMesh<V, T> {
 /// Pass the result to [`SpaceMesh::new()`](super::SpaceMesh::new) to use it.
 ///
 /// The resulting array is indexed by the `Space`'s
-/// [`BlockIndex`](crate::space::BlockIndex) values.
+/// [`BlockIndex`](all_is_cubes::space::BlockIndex) values.
 pub fn block_meshes_for_space<V, A>(
     space: &Space,
     texture_allocator: &A,

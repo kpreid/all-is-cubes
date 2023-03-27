@@ -15,8 +15,8 @@ use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport};
 use all_is_cubes::cgmath::{self, One as _, Point3, Vector3, Zero as _};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::{Face6, GridAab, Rgb, Rgba};
-use all_is_cubes::mesh::BlockVertex;
 use all_is_cubes::notnan;
+use all_is_cubes_mesh::{BlockVertex, Coloring};
 
 use crate::in_wgpu::{
     self,
@@ -135,17 +135,17 @@ where
             WgpuBlockVertex::from(BlockVertex {
                 position: Point3::new(0., 0., 0.),
                 face: Face6::PZ,
-                coloring: all_is_cubes::mesh::Coloring::Solid(Rgba::WHITE),
+                coloring: Coloring::Solid(Rgba::WHITE),
             }),
             WgpuBlockVertex::from(BlockVertex {
                 position: Point3::new(1., 0., 0.),
                 face: Face6::PZ,
-                coloring: all_is_cubes::mesh::Coloring::Solid(Rgba::WHITE),
+                coloring: Coloring::Solid(Rgba::WHITE),
             }),
             WgpuBlockVertex::from(BlockVertex {
                 position: Point3::new(0., 1., 0.),
                 face: Face6::PZ,
-                coloring: all_is_cubes::mesh::Coloring::Solid(Rgba::WHITE),
+                coloring: Coloring::Solid(Rgba::WHITE),
             }),
         ]),
         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,

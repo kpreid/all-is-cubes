@@ -160,8 +160,8 @@ impl Block {
     }
 
     /// Construct a [`Block`] from a [`Primitive`] constant.
-    #[cfg(test)] // only used in tests for now
-    pub(crate) const fn from_static_primitive(r: &'static Primitive) -> Self {
+    #[doc(hidden)] // used in mesh tests
+    pub const fn from_static_primitive(r: &'static Primitive) -> Self {
         Block(BlockPtr::Static(r))
     }
 

@@ -17,7 +17,7 @@ use gltf_json::Index;
 
 use all_is_cubes::camera::{Camera, Flaws, ViewTransform};
 use all_is_cubes::cgmath::{One as _, Vector3};
-use all_is_cubes::mesh::SpaceMesh;
+use all_is_cubes_mesh::SpaceMesh;
 
 mod buffer;
 use buffer::create_buffer_and_accessor;
@@ -102,7 +102,7 @@ impl GltfWriter {
         }
     }
 
-    /// Returns a [`TextureAllocator`](all_is_cubes::mesh::TextureAllocator) that writes
+    /// Returns a [`TextureAllocator`](all_is_cubes_mesh::TextureAllocator) that writes
     /// textures into this glTF asset
     pub fn texture_allocator(&self) -> GltfTextureAllocator {
         self.texture_allocator.clone()
@@ -340,9 +340,9 @@ mod tests {
     use all_is_cubes::camera::GraphicsOptions;
     use all_is_cubes::cgmath::Zero as _;
     use all_is_cubes::content::make_some_blocks;
-    use all_is_cubes::mesh::{block_meshes_for_space, MeshOptions, SpaceMesh};
     use all_is_cubes::space::Space;
     use all_is_cubes::universe::Universe;
+    use all_is_cubes_mesh::{block_meshes_for_space, MeshOptions, SpaceMesh};
     use gltf_json::validation::Validate;
 
     /// Test helper to insert one mesh+node

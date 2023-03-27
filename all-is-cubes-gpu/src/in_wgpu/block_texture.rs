@@ -7,7 +7,7 @@ use instant::Instant;
 
 use all_is_cubes::cgmath::{Point3, Vector3};
 use all_is_cubes::math::GridAab;
-use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
+use all_is_cubes_mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
 use crate::in_wgpu::vertex::TexPoint;

@@ -46,14 +46,12 @@ version = "0.5.0"
 dependencies = [
  "arbitrary",
  "bitflags 2.0.2",
- "bitvec",
  "bytemuck",
  "cgmath",
  "criterion",
  "downcast-rs",
  "embedded-graphics",
  "exhaust",
- "fnv",
  "futures-core",
  "image",
  "indoc",
@@ -108,6 +106,7 @@ dependencies = [
  "all-is-cubes",
  "all-is-cubes-content",
  "all-is-cubes-gpu",
+ "all-is-cubes-mesh",
  "all-is-cubes-port",
  "all-is-cubes-ui",
  "anyhow",
@@ -142,6 +141,7 @@ name = "all-is-cubes-gpu"
 version = "0.5.0"
 dependencies = [
  "all-is-cubes",
+ "all-is-cubes-mesh",
  "bytemuck",
  "futures-channel",
  "futures-core",
@@ -159,10 +159,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "all-is-cubes-mesh"
+version = "0.5.0"
+dependencies = [
+ "all-is-cubes",
+ "arbitrary",
+ "bitflags 2.0.2",
+ "bitvec",
+ "bytemuck",
+ "criterion",
+ "fnv",
+ "indoc",
+ "instant",
+ "log",
+ "mutants",
+ "num-traits",
+ "ordered-float",
+ "pretty_assertions",
+]
+
+[[package]]
 name = "all-is-cubes-port"
 version = "0.5.0"
 dependencies = [
  "all-is-cubes",
+ "all-is-cubes-mesh",
  "anyhow",
  "base64 0.13.1",
  "bytemuck",

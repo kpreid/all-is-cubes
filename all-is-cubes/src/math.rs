@@ -103,7 +103,8 @@ pub(crate) fn point_checked_add(p: GridPoint, v: GridVector) -> Option<GridPoint
 
 /// Sort exactly two items; swap them if `a > b`.
 #[inline]
-pub(crate) fn sort_two<T: PartialOrd>(a: &mut T, b: &mut T) {
+#[doc(hidden)]
+pub fn sort_two<T: PartialOrd>(a: &mut T, b: &mut T) {
     if *a > *b {
         std::mem::swap(a, b);
     }
@@ -128,7 +129,38 @@ pub trait Geometry {
     /// will be awkward until `type_alias_impl_trait` is stable.
     fn wireframe_points<E>(&self, output: &mut E)
     where
-        E: Extend<crate::mesh::LineVertex>;
+        E: Extend<LineVertex>;
+}
+
+/// One end of a line to be drawn.
+///
+/// Used for debugging visualizations and not for game content, with the current exception
+/// of [`Cursor`](crate::character::Cursor).
+///
+/// The primary way in which these are used in this crate is
+/// [`Geometry::wireframe_points()`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct LineVertex {
+    /// Position of the vertex.
+    pub position: Point3<FreeCoordinate>,
+
+    /// Color in which to draw the line.
+    ///
+    /// If [`None`], a color set by the context/parent should be used instead.
+    ///
+    /// If the ends of a line are different colors, color should be interpolated along
+    /// the line.
+    pub color: Option<crate::math::Rgba>,
+}
+
+impl From<Point3<FreeCoordinate>> for LineVertex {
+    fn from(position: Point3<FreeCoordinate>) -> Self {
+        Self {
+            position,
+            color: None,
+        }
+    }
 }
 
 #[cfg(test)]

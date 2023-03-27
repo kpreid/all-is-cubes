@@ -1,13 +1,14 @@
 use bitvec::vec::BitVec;
-use cgmath::{EuclideanSpace as _, MetricSpace as _, Point3, Vector3, Zero as _};
 use ordered_float::OrderedFloat;
 use std::fmt::Debug;
 use std::ops::Range;
 
-use crate::camera::Flaws;
-use crate::math::{Face6, GridAab, GridCoordinate, GridPoint, GridRotation};
-use crate::mesh::{BlockMesh, GfxVertex, MeshOptions, TextureTile};
-use crate::space::{BlockIndex, Space};
+use all_is_cubes::camera::Flaws;
+use all_is_cubes::cgmath::{EuclideanSpace as _, MetricSpace as _, Point3, Vector3, Zero as _};
+use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridPoint, GridRotation};
+use all_is_cubes::space::{BlockIndex, Space};
+
+use crate::{BlockMesh, GfxVertex, MeshOptions, TextureTile};
 
 /// A triangle mesh representation of a [`Space`] (or part of it) which may
 /// then be rasterized.
@@ -687,9 +688,9 @@ impl DepthOrdering {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::Block;
-    use crate::math::{GridPoint, Rgba};
-    use crate::mesh::{tests::mesh_blocks_and_space, BlockVertex, TestTextureTile, TtPoint};
+    use crate::{tests::mesh_blocks_and_space, BlockVertex, TestTextureTile, TtPoint};
+    use all_is_cubes::block::Block;
+    use all_is_cubes::math::{GridPoint, Rgba};
     use std::mem;
 
     type TestMesh = SpaceMesh<BlockVertex<TtPoint>, TestTextureTile>;

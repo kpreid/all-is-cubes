@@ -273,7 +273,7 @@ impl TransparencyOption {
     /// Replace a color's alpha value according to the requested threshold,
     /// if any.
     #[inline]
-    pub(crate) fn limit_alpha(&self, color: Rgba) -> Rgba {
+    pub fn limit_alpha(&self, color: Rgba) -> Rgba {
         match *self {
             Self::Threshold(t) => {
                 if color.alpha() > t {

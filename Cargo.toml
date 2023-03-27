@@ -3,6 +3,7 @@ members = [
   "all-is-cubes",
   "all-is-cubes-content",
   "all-is-cubes-desktop",
+  "all-is-cubes-mesh",
   "all-is-cubes-server",
   "all-is-cubes-ui",
   "all-is-cubes-wasm",

@@ -1,19 +1,23 @@
 //! Tests for [`crate::mesh`].
 
-use cgmath::{MetricSpace as _, Point3, Transform as _, Vector3};
 use pretty_assertions::assert_eq;
 
-use super::*;
-use crate::block::{Block, BlockAttributes, Primitive, Resolution::*, AIR};
-use crate::camera::{Flaws, GraphicsOptions, TransparencyOption};
-use crate::content::{make_some_blocks, make_some_voxel_blocks};
-use crate::math::{
+use all_is_cubes::block::{Block, BlockAttributes, Primitive, Resolution::*, AIR};
+use all_is_cubes::camera::{Flaws, GraphicsOptions, TransparencyOption};
+use all_is_cubes::cgmath::{MetricSpace as _, Point3, Transform as _, Vector3};
+use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
+use all_is_cubes::math::{
     Face6::{self, *},
     FaceMap, FreeCoordinate, GridAab, GridPoint, GridRotation, Rgba,
 };
-use crate::mesh::BlockMesh;
-use crate::space::{Space, SpacePhysics};
-use crate::universe::Universe;
+use all_is_cubes::space::{Space, SpacePhysics};
+use all_is_cubes::universe::Universe;
+use all_is_cubes::{notnan, rgba_const};
+
+use crate::{
+    block_meshes_for_space, BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering,
+    MeshOptions, SpaceMesh, TestTextureAllocator, TestTextureTile, TextureCoordinate, TtPoint,
+};
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.
 fn v_c<T>(position: [FreeCoordinate; 3], face: Face6, color: [f32; 4]) -> BlockVertex<T> {

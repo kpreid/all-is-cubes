@@ -76,7 +76,6 @@
 //!   matrix which use the same coordinate system as [`camera`].
 //!   Jumping is also hardcoded to work in the +Y direction.
 //!   Future versions may support arbitrary character orientation.
-//! * [`mesh`] algorithms generate triangles with counterclockwise winding order.
 //!
 //! ## Crate features
 //!
@@ -183,7 +182,6 @@ pub mod intalloc;
 pub mod inv;
 pub mod linking;
 pub mod listen;
-pub mod mesh;
 pub mod physics;
 pub mod raycast;
 pub mod raytracer;

@@ -11,10 +11,10 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, Rgb};
-use all_is_cubes::mesh::chunked_mesh::{ChunkMeshUpdate, ChunkedSpaceMesh};
-use all_is_cubes::mesh::DepthOrdering;
 use all_is_cubes::space::{Space, SpaceChange};
 use all_is_cubes::universe::URef;
+use all_is_cubes_mesh::chunked_mesh::{ChunkMeshUpdate, ChunkedSpaceMesh};
+use all_is_cubes_mesh::DepthOrdering;
 
 use crate::in_wgpu::frame_texture::FramebufferTextures;
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};

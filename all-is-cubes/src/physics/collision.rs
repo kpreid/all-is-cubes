@@ -10,9 +10,8 @@ use crate::block::Evoxels;
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{
     Aab, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridAab, GridArray, GridCoordinate,
-    GridPoint,
+    GridPoint, LineVertex,
 };
-use crate::mesh::LineVertex;
 use crate::raycast::{Ray, Raycaster};
 use crate::space::Space;
 use crate::util::{ConciseDebug, CustomFormat, MapExtend};

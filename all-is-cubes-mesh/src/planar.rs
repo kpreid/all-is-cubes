@@ -2,13 +2,13 @@
 
 use std::ops::Range;
 
-use cgmath::{
+use all_is_cubes::block::Resolution;
+use all_is_cubes::cgmath::{
     ElementWise as _, EuclideanSpace as _, Matrix4, Point2, Point3, Transform as _, Vector2,
 };
+use all_is_cubes::math::{Face6, FreeCoordinate, GridCoordinate, Rgba};
 
-use crate::block::Resolution;
-use crate::math::{Face6, FreeCoordinate, GridCoordinate, Rgba};
-use crate::mesh::{BlockVertex, Coloring, TextureCoordinate, TextureTile};
+use crate::{BlockVertex, Coloring, TextureCoordinate, TextureTile};
 
 /// Data structure for the state and components of the "greedy meshing" algorithm.
 /// <https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/>
@@ -198,7 +198,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: TextureTile>(
 
             // Ensure the transformed clamp range is not inverted.
             for axis in 0..3 {
-                crate::math::sort_two(&mut clamp_min[axis], &mut clamp_max[axis]);
+                all_is_cubes::math::sort_two(&mut clamp_min[axis], &mut clamp_max[axis]);
             }
 
             // Convert to global texture coordinates in the texture tile's format.
@@ -231,8 +231,8 @@ pub(super) struct QuadTransform {
     // TODO: specialize transforms since there are only 6 possible values plus scale,
     // so we don't need as many ops as a full matrix-vector multiplication?
     // Or would the branching needed make it pointless?
-    position_transform: cgmath::Matrix4<FreeCoordinate>,
-    texture_transform: cgmath::Matrix4<TextureCoordinate>,
+    position_transform: Matrix4<FreeCoordinate>,
+    texture_transform: Matrix4<TextureCoordinate>,
 }
 
 impl QuadTransform {

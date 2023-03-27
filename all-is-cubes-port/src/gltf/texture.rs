@@ -2,7 +2,7 @@
 
 use all_is_cubes::cgmath::{Point3, Vector3};
 use all_is_cubes::math::GridAab;
-use all_is_cubes::mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
+use all_is_cubes_mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
 
 use super::GltfDataDestination;
 
@@ -12,7 +12,7 @@ pub(crate) type TexPoint = Vector3<f32>;
 ///
 /// You may use this with [`SpaceMesh`] to create meshes that can be exported.
 ///
-/// [`SpaceMesh`]: all_is_cubes::mesh::SpaceMesh
+/// [`SpaceMesh`]: all_is_cubes_mesh::SpaceMesh
 #[derive(Clone, Debug)]
 pub struct GltfTextureAllocator {
     #[allow(dead_code)] // TODO: work-in-progress code

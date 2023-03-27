@@ -352,9 +352,10 @@ impl Config {
 /// TODO: fetch this list (or at least cross-check it) using `cargo metadata`.
 ///
 /// See also [`do_for_all_workspaces`].
-const ALL_NONTEST_PACKAGES: [&str; 8] = [
+const ALL_NONTEST_PACKAGES: [&str; 9] = [
     "all-is-cubes",
     "all-is-cubes-ui",
+    "all-is-cubes-mesh",
     "all-is-cubes-gpu",
     "all-is-cubes-content",
     "all-is-cubes-port",

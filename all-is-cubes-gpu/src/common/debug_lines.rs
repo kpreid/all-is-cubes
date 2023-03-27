@@ -2,8 +2,7 @@ use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::cgmath::Point3;
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{Aab, FreeCoordinate, Geometry, Rgba};
-use all_is_cubes::mesh::LineVertex;
+use all_is_cubes::math::{Aab, FreeCoordinate, Geometry, LineVertex, Rgba};
 use all_is_cubes::space::Space;
 use all_is_cubes::util::MapExtend;
 

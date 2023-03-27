@@ -7,13 +7,13 @@
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 
-use cgmath::Point3;
+use all_is_cubes::block::{Evoxel, Evoxels};
+use all_is_cubes::cgmath::Point3;
+use all_is_cubes::content::palette;
+use all_is_cubes::math::{GridAab, GridPoint};
+use all_is_cubes::util::{ConciseDebug, CustomFormat};
 
-use crate::block::{Evoxel, Evoxels};
-use crate::content::palette;
-use crate::math::{GridAab, GridPoint};
-use crate::mesh::TextureCoordinate;
-use crate::util::{ConciseDebug, CustomFormat};
+use crate::TextureCoordinate;
 
 /// Color data accepted by [`TextureAllocator`].
 /// The components are sRGB `[R, G, B, A]`.
@@ -257,7 +257,7 @@ pub type TtPoint = Point3<TextureCoordinate>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::Resolution::*;
+    use all_is_cubes::block::Resolution::*;
 
     /// Test the [`TestTextureAllocator`].
     #[test]

@@ -8,10 +8,10 @@ use std::time::{Duration, Instant};
 use all_is_cubes::cgmath::EuclideanSpace as _;
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::math::GridAab;
-use all_is_cubes::mesh;
-use all_is_cubes::mesh::chunked_mesh::ChunkedSpaceMesh;
 use all_is_cubes::space::Space;
 use all_is_cubes::{camera, universe};
+use all_is_cubes_mesh as mesh;
+use all_is_cubes_mesh::chunked_mesh::ChunkedSpaceMesh;
 use all_is_cubes_port::gltf::{
     json as gltf_json, GltfTextureAllocator, GltfTextureRef, GltfVertex, GltfWriter,
 };

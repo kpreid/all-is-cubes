@@ -4,13 +4,14 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use all_is_cubes::block::{Block, Resolution::R16, AIR};
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::math::{GridAab, Rgba};
-use all_is_cubes::mesh::{
-    block_meshes_for_space, BlockMesh, BlockMeshes, BlockVertex, MeshOptions, SpaceMesh,
-    TestTextureAllocator, TestTextureTile, TtPoint,
-};
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
+
+use all_is_cubes_mesh::{
+    block_meshes_for_space, BlockMesh, BlockMeshes, BlockVertex, MeshOptions, SpaceMesh,
+    TestTextureAllocator, TestTextureTile, TtPoint,
+};
 
 criterion_group!(
     benches,

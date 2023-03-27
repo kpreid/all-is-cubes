@@ -7,7 +7,7 @@ use gltf_json::validation::Checked::{self, Valid};
 use gltf_json::Index;
 use once_cell::sync::Lazy;
 
-use all_is_cubes::mesh::SpaceMesh;
+use all_is_cubes_mesh::SpaceMesh;
 
 use super::glue::{create_accessor, push_and_return_index, u32size};
 use super::{GltfTextureRef, GltfVertex, GltfWriter};
@@ -138,7 +138,7 @@ pub(crate) fn add_mesh(
                     format!("{name} opaque index"),
                 ),
                 (
-                    mesh.transparent_range(all_is_cubes::mesh::DepthOrdering::Any),
+                    mesh.transparent_range(all_is_cubes_mesh::DepthOrdering::Any),
                     writer.materials.transparent_vertex_colored,
                     format!("{name} transparent index"),
                 ),

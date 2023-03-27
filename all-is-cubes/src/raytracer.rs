@@ -4,7 +4,7 @@
 //!
 //! The original reason this exists is that I thought “we have [`raycast`](crate::raycast),
 //! and that's nearly all the work, so why not?” Secondarily, it was written before
-//! [the mesh-based renderer](crate::mesh), and was useful as a cross-check since
+//! the mesh-based renderer, and was useful as a cross-check since
 //! it is much simpler. It continues to serve as a “reference implementation” and is used
 //! by the terminal UI and in unit tests via [`print_space`].
 

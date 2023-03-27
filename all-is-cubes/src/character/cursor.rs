@@ -8,8 +8,9 @@ use cgmath::{EuclideanSpace, InnerSpace as _, Matrix4, Point3, Transform as _};
 
 use crate::block::{recursive_ray, Block, EvaluatedBlock, Evoxel, Evoxels};
 use crate::content::palette;
-use crate::math::{Aab, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridVector};
-use crate::mesh::LineVertex;
+use crate::math::{
+    Aab, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridVector, LineVertex,
+};
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
 use crate::universe::URef;
