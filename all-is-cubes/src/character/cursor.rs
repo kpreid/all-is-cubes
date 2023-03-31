@@ -252,11 +252,10 @@ impl Geometry for Cursor {
 
         let face_transform_full =
             Matrix4::from_translation(self.hit().position.map(FreeCoordinate::from).to_vec())
-                * self.face_entered.matrix(1).to_free();
+                * self.face_selected().matrix(1).to_free();
 
         // Frame the selected face with a square.
-        // TODO: Position this frame relative to block_aabb, but only once the cursor
-        // selection behavior reflects that too.
+        // TODO: Position this frame relative to block_aabb.
         let inset = 1. / 128.;
         for &p in [
             Point3::new(inset, inset, -offset_from_surface),
