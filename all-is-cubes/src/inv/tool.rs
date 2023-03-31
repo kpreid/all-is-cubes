@@ -373,7 +373,7 @@ impl ToolInput {
             }
         };
         self.set_cube(
-            cursor.preceding_cube(),
+            cursor.cube() + cursor.face_selected().normal_vector(),
             old_block,
             new_block.rotate(rotation),
         )
