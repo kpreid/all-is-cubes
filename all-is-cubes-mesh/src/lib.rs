@@ -10,6 +10,14 @@
 //!   “watertight” meshes such as 3D printing systems.
 //! * Currently, support for 3D textures is mandatory. This may be changed in the future
 //!   to allow use of only 2D textures.
+//!
+//! # Getting started
+//!
+//! [`BlockMesh`] and [`SpaceMesh`] are the key types; everything else supports their
+//! creation and usage.
+//!
+//! To support a new API/format, you will need to create suitable implementations of the
+//! [`GfxVertex`] and [`TextureAllocator`] traits.
 
 // Basic lint settings, which should be identical across all all-is-cubes project crates.
 // This list is sorted.

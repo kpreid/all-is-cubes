@@ -136,17 +136,19 @@ pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized {
     /// Point type identifying a point in the block's texture.
     type TexPoint: Copy;
 
-    /// Type of the data carried from [`Self::instantiate_block`] to
-    /// [`Self::instantiate_vertex`].
+    /// Type of the data carried from [`Self::instantiate_block()`] to
+    /// [`Self::instantiate_vertex()`].
     type BlockInst: Copy;
 
-    /// Prepare the information needed to instantiate vertices of one block.
+    /// Prepare the information needed by [`Self::instantiate_vertex()`] for one block.
     /// Currently, this constitutes the location of that block, and hence this function
     /// is responsible for any necessary numeric conversion.
     fn instantiate_block(cube: GridPoint) -> Self::BlockInst;
 
     /// Transforms a vertex belonging to a general model of a block to its instantiation
     /// in a specific location in space.
+    ///
+    /// The `block` value should be obtained by calling [`Self::instantiate_block()`].
     fn instantiate_vertex(&mut self, block: Self::BlockInst);
 
     /// Returns the position of this vertex.
