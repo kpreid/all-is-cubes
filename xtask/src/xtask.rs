@@ -496,16 +496,19 @@ fn do_for_all_packages(
         }
     }
 
-    // Check wasm-only code.
-    // (TODO: Re-investigate running JS tests now that we dropped webpack.)
+    // Run wasm tests.
     {
         let _t = CaptureTime::new(time_log, format!("{op:?} all-is-cubes-wasm"));
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
-        cargo()
-            .arg(CHECK_SUBCMD)
-            .args(config.cargo_build_args())
-            .arg(TARGET_WASM)
-            .run()?;
+        match op {
+            TestOrCheck::Test => {
+                // TODO: control over choice of browser
+                cmd!("wasm-pack test --headless --firefox").run()?;
+            }
+            TestOrCheck::BuildTests | TestOrCheck::Lint => {
+                op.cargo_cmd(config).arg(TARGET_WASM).run()?;
+            }
+        }
     }
 
     // Build everything else in the workspace, so non-test targets are checked for compile errors.
