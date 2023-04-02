@@ -92,10 +92,7 @@ pub async fn export_to_path(
             // TODO: async file IO?
             mv::export_dot_vox(progress, source, fs::File::create(destination)?).await
         }
-        ExportFormat::Gltf => Err(ExportError::NotRepresentable {
-            name: None,
-            reason: String::from("glTF export is not yet available via export_to_path()"),
-        }),
+        ExportFormat::Gltf => gltf::export_gltf(progress, source, destination).await,
     }
 }
 
@@ -119,11 +116,19 @@ impl ExportSet {
         }
     }
 
+    /// Construct an [`ExportSet`] specifying exporting only the given [`BlockDef`]s.
+    pub fn from_block_defs(block_defs: Vec<URef<BlockDef>>) -> Self {
+        Self {
+            block_defs,
+            spaces: vec![],
+        }
+    }
+
     /// Construct an [`ExportSet`] specifying exporting only the given [`Space`]s.
     pub fn from_spaces(spaces: Vec<URef<Space>>) -> Self {
         Self {
             block_defs: vec![],
-            spaces: spaces.into_iter().collect(),
+            spaces,
         }
     }
 }

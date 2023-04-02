@@ -1,0 +1,255 @@
+{
+  "accessors": [
+    {
+      "bufferView": 0,
+      "byteOffset": 0,
+      "count": 24,
+      "componentType": 5126,
+      "type": "VEC3",
+      "min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "name": "'block0' position"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 12,
+      "count": 24,
+      "componentType": 5126,
+      "type": "VEC4",
+      "min": [
+        0.008904562331736088,
+        0.00849095918238163,
+        0.010273359715938568,
+        1.0
+      ],
+      "max": [
+        0.008904562331736088,
+        0.00849095918238163,
+        0.010273359715938568,
+        1.0
+      ],
+      "name": "'block0' color"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 0,
+      "count": 36,
+      "componentType": 5125,
+      "type": "SCALAR",
+      "name": "'block0' opaque index"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 0,
+      "count": 24,
+      "componentType": 5126,
+      "type": "VEC3",
+      "min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "name": "'block1' position"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 12,
+      "count": 24,
+      "componentType": 5126,
+      "type": "VEC4",
+      "min": [
+        0.9575070142745972,
+        0.9570935368537903,
+        0.9588758945465088,
+        1.0
+      ],
+      "max": [
+        0.9575070142745972,
+        0.9570935368537903,
+        0.9588758945465088,
+        1.0
+      ],
+      "name": "'block1' color"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 0,
+      "count": 36,
+      "componentType": 5125,
+      "type": "SCALAR",
+      "name": "'block1' opaque index"
+    }
+  ],
+  "asset": {
+    "generator": "all-is-cubes",
+    "version": "2.0"
+  },
+  "buffers": [
+    {
+      "byteLength": 816,
+      "name": "'block0' data",
+      "uri": "data:application/gltf-buffer;base64,AAAAAAAAAAAAAAAAceQRPKodCzyYUSg8AACAPwAAAAAAAAAAAACAP3HkETyqHQs8mFEoPAAAgD8AAAAAAACAPwAAAABx5BE8qh0LPJhRKDwAAIA/AAAAAAAAgD8AAIA/ceQRPKodCzyYUSg8AACAPwAAAAAAAAAAAAAAAHHkETyqHQs8mFEoPAAAgD8AAIA/AAAAAAAAAABx5BE8qh0LPJhRKDwAAIA/AAAAAAAAAAAAAIA/ceQRPKodCzyYUSg8AACAPwAAgD8AAAAAAACAP3HkETyqHQs8mFEoPAAAgD8AAAAAAAAAAAAAAABx5BE8qh0LPJhRKDwAAIA/AAAAAAAAgD8AAAAAceQRPKodCzyYUSg8AACAPwAAgD8AAAAAAAAAAHHkETyqHQs8mFEoPAAAgD8AAIA/AACAPwAAAABx5BE8qh0LPJhRKDwAAIA/AACAPwAAgD8AAAAAceQRPKodCzyYUSg8AACAPwAAgD8AAIA/AACAP3HkETyqHQs8mFEoPAAAgD8AAIA/AAAAAAAAAABx5BE8qh0LPJhRKDwAAIA/AACAPwAAAAAAAIA/ceQRPKodCzyYUSg8AACAPwAAgD8AAIA/AAAAAHHkETyqHQs8mFEoPAAAgD8AAAAAAACAPwAAAABx5BE8qh0LPJhRKDwAAIA/AACAPwAAgD8AAIA/ceQRPKodCzyYUSg8AACAPwAAAAAAAIA/AACAP3HkETyqHQs8mFEoPAAAgD8AAAAAAACAPwAAgD9x5BE8qh0LPJhRKDwAAIA/AAAAAAAAAAAAAIA/ceQRPKodCzyYUSg8AACAPwAAgD8AAIA/AACAP3HkETyqHQs8mFEoPAAAgD8AAIA/AAAAAAAAgD9x5BE8qh0LPJhRKDwAAIA/AAAAAAEAAAACAAAAAgAAAAEAAAADAAAABAAAAAUAAAAGAAAABgAAAAUAAAAHAAAACAAAAAkAAAAKAAAACgAAAAkAAAALAAAADAAAAA0AAAAOAAAADgAAAA0AAAAPAAAAEAAAABEAAAASAAAAEgAAABEAAAATAAAAFAAAABUAAAAWAAAAFgAAABUAAAAXAAAA"
+    },
+    {
+      "byteLength": 816,
+      "name": "'block1' data",
+      "uri": "data:application/gltf-buffer;base64,AAAAAAAAAAAAAAAALh91PxUEdT/keHU/AACAPwAAAAAAAAAAAACAPy4fdT8VBHU/5Hh1PwAAgD8AAAAAAACAPwAAAAAuH3U/FQR1P+R4dT8AAIA/AAAAAAAAgD8AAIA/Lh91PxUEdT/keHU/AACAPwAAAAAAAAAAAAAAAC4fdT8VBHU/5Hh1PwAAgD8AAIA/AAAAAAAAAAAuH3U/FQR1P+R4dT8AAIA/AAAAAAAAAAAAAIA/Lh91PxUEdT/keHU/AACAPwAAgD8AAAAAAACAPy4fdT8VBHU/5Hh1PwAAgD8AAAAAAAAAAAAAAAAuH3U/FQR1P+R4dT8AAIA/AAAAAAAAgD8AAAAALh91PxUEdT/keHU/AACAPwAAgD8AAAAAAAAAAC4fdT8VBHU/5Hh1PwAAgD8AAIA/AACAPwAAAAAuH3U/FQR1P+R4dT8AAIA/AACAPwAAgD8AAAAALh91PxUEdT/keHU/AACAPwAAgD8AAIA/AACAPy4fdT8VBHU/5Hh1PwAAgD8AAIA/AAAAAAAAAAAuH3U/FQR1P+R4dT8AAIA/AACAPwAAAAAAAIA/Lh91PxUEdT/keHU/AACAPwAAgD8AAIA/AAAAAC4fdT8VBHU/5Hh1PwAAgD8AAAAAAACAPwAAAAAuH3U/FQR1P+R4dT8AAIA/AACAPwAAgD8AAIA/Lh91PxUEdT/keHU/AACAPwAAAAAAAIA/AACAPy4fdT8VBHU/5Hh1PwAAgD8AAAAAAACAPwAAgD8uH3U/FQR1P+R4dT8AAIA/AAAAAAAAAAAAAIA/Lh91PxUEdT/keHU/AACAPwAAgD8AAIA/AACAPy4fdT8VBHU/5Hh1PwAAgD8AAIA/AAAAAAAAgD8uH3U/FQR1P+R4dT8AAIA/AAAAAAEAAAACAAAAAgAAAAEAAAADAAAABAAAAAUAAAAGAAAABgAAAAUAAAAHAAAACAAAAAkAAAAKAAAACgAAAAkAAAALAAAADAAAAA0AAAAOAAAADgAAAA0AAAAPAAAAEAAAABEAAAASAAAAEgAAABEAAAATAAAAFAAAABUAAAAWAAAAFgAAABUAAAAXAAAA"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 672,
+      "byteStride": 28,
+      "name": "'block0' vertex",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 144,
+      "byteOffset": 672,
+      "name": "'block0' index",
+      "target": 34963
+    },
+    {
+      "buffer": 1,
+      "byteLength": 672,
+      "byteStride": 28,
+      "name": "'block1' vertex",
+      "target": 34962
+    },
+    {
+      "buffer": 1,
+      "byteLength": 144,
+      "byteOffset": 672,
+      "name": "'block1' index",
+      "target": 34963
+    }
+  ],
+  "extensionsUsed": [
+    "KHR_materials_transmission",
+    "KHR_materials_volume"
+  ],
+  "materials": [
+    {
+      "alphaMode": "OPAQUE",
+      "doubleSided": false,
+      "name": "aic-vertex-opaque",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 1.0
+      },
+      "emissiveFactor": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": false,
+      "name": "aic-vertex-transparent",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 1.0
+      },
+      "emissiveFactor": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "extensions": {
+        "KHR_materials_transmission": {
+          "transmissionFactor": 0.0
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "'block0' mesh",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "COLOR_0": 1
+          },
+          "indices": 2,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "'block1' mesh",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 3,
+            "COLOR_0": 4
+          },
+          "indices": 5,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "'block0'",
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mesh": 1,
+      "name": "'block1'",
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "name": "'block0' display scene",
+      "nodes": [
+        0
+      ]
+    },
+    {
+      "name": "'block1' display scene",
+      "nodes": [
+        1
+      ]
+    }
+  ]
+}

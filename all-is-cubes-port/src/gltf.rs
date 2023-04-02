@@ -7,17 +7,19 @@
 //! TODO: This is not a clean, well-abstracted library API yet.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::io;
+use std::path::PathBuf;
 use std::time::Duration;
+use std::{fs, io};
 
 use all_is_cubes::math::GridCoordinate;
+use all_is_cubes::util::YieldProgress;
 pub use gltf_json as json;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
-use all_is_cubes::camera::{Camera, Flaws, ViewTransform};
-use all_is_cubes::cgmath::{One as _, Vector3};
-use all_is_cubes_mesh::SpaceMesh;
+use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, ViewTransform};
+use all_is_cubes::cgmath::{One as _, Vector3, Zero};
+use all_is_cubes_mesh::{BlockMesh, MeshOptions, SpaceMesh};
 
 mod buffer;
 use buffer::create_buffer_and_accessor;
@@ -32,6 +34,10 @@ mod texture;
 pub use texture::{GltfTextureAllocator, GltfTextureRef};
 mod vertex;
 pub use vertex::GltfVertex;
+
+use crate::{ExportError, ExportSet};
+#[cfg(test)]
+mod tests;
 
 /// Handles the construction of [`gltf_json::Root`] and the writing of supporting files
 /// for a single glTF asset.
@@ -302,15 +308,74 @@ impl GltfWriter {
             }
         }
 
-        self.root.scenes.push(gltf_json::Scene {
-            name: Some("recording".into()),
-            nodes: scene_nodes,
-            extras: Default::default(),
-            extensions: None,
-        });
+        if !scene_nodes.is_empty() {
+            self.root.scenes.push(gltf_json::Scene {
+                name: Some("recording".into()),
+                nodes: scene_nodes,
+                extras: Default::default(),
+                extensions: None,
+            });
+        }
 
         Ok(self.root)
     }
+}
+
+pub(crate) async fn export_gltf(
+    progress: YieldProgress,
+    source: ExportSet,
+    destination: PathBuf,
+) -> Result<(), ExportError> {
+    let ExportSet { block_defs, spaces } = source;
+
+    // If space list is nonempty, fail.
+    if let Some(first) = spaces.get(0) {
+        return Err(ExportError::NotRepresentable {
+            name: Some(first.name()),
+            reason: "Exporting spaces to glTF is not yet supported".into(),
+        });
+    }
+
+    let mut writer = GltfWriter::new(GltfDataDestination::new(Some(destination.clone()), 2000));
+    let mesh_options = MeshOptions::new(&GraphicsOptions::default());
+
+    for (mut p, block_def_ref) in progress.split_evenly(block_defs.len()).zip(block_defs) {
+        let block_def = block_def_ref.read()?;
+        let name = block_def_ref.name();
+        p.set_label(&name);
+        p.progress(0.01).await;
+        let mesh = SpaceMesh::from(&BlockMesh::new(
+            &block_def
+                .evaluate()
+                .map_err(|eve| ExportError::NotRepresentable {
+                    name: Some(name.clone()),
+                    reason: format!("block evaluation failed: {eve}"),
+                })?,
+            &writer.texture_allocator(),
+            &mesh_options,
+        ));
+        let node = writer.add_mesh(name.to_string(), &mesh, Vector3::zero());
+
+        writer.root.scenes.push(json::Scene {
+            name: Some(format!("{name} display scene")),
+            nodes: vec![node],
+            extensions: None,
+            extras: Default::default(),
+        });
+
+        p.finish().await;
+    }
+
+    {
+        let file = fs::File::create(destination)?;
+        writer
+            .into_root(Duration::from_secs(1))?
+            .to_writer_pretty(&file) // TODO: non-pretty option
+            .map_err(|_| -> ExportError { todo!("serialization error conversion") })?;
+        file.sync_all()?;
+    }
+
+    Ok(())
 }
 
 /// Construct gltf camera entity.
@@ -332,6 +397,3 @@ fn convert_camera(name: Option<String>, camera: &Camera) -> gltf_json::Camera {
         extras: Default::default(),
     }
 }
-
-#[cfg(test)]
-mod tests;
