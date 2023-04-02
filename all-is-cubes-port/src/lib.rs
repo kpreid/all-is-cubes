@@ -91,6 +91,10 @@ pub async fn export_to_path(
             // TODO: async file IO?
             mv::export_dot_vox(progress, source, fs::File::create(destination)?).await
         }
+        ExportFormat::Gltf => Err(ExportError::NotRepresentable {
+            name: None,
+            reason: String::from("glTF export is not yet available via export_to_path()"),
+        }),
     }
 }
 
@@ -128,6 +132,17 @@ pub enum ExportFormat {
     ///
     /// TODO: document version details and export limitations
     DotVox,
+
+    /// [glTF 2.0] format (`.gltf` JSON with auxiliary files).
+    ///
+    /// TODO: document capabilities
+    ///
+    /// TODO: document how auxiliary files are handled
+    ///
+    /// TODO: support `.glb` binary format.
+    ///
+    /// [glTF 2.0]: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
+    Gltf,
 }
 
 impl ExportFormat {
@@ -135,6 +150,7 @@ impl ExportFormat {
     pub fn includes_light(self) -> bool {
         match self {
             ExportFormat::DotVox => false,
+            ExportFormat::Gltf => false, // TODO: implement light
         }
     }
 }
@@ -160,7 +176,7 @@ pub enum ExportError {
     #[error("could not convert data to requested format: {reason}")]
     NotRepresentable {
         /// Name of the item being exported.
-        name: universe::Name,
+        name: Option<universe::Name>,
         /// The reason why it cannot be represented.
         reason: String,
     },

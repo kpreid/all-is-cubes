@@ -192,7 +192,7 @@ fn space_to_dot_vox_model(
     let bounds = space.bounds();
     if bounds.size().x > 256 || bounds.size().y > 256 || bounds.size().z > 256 {
         return Err(ExportError::NotRepresentable {
-            name: space_ref.name(),
+            name: Some(space_ref.name()),
             reason: format!(
                 "space of size {} is too large to export to .vox; must be 256 or less in each axis",
                 bounds.size().custom_format(ConciseDebug)
