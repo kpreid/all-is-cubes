@@ -62,6 +62,13 @@ Options:
       --precompute-light
           Fully calculate light before starting the game
 
+      --seed <SEED>
+          Seed value for randomized components of the world template.
+          
+          May be an integer between 0 and 18446744073709551615 (2⁶⁴ - 1).
+          
+          If not specified, a randomly chosen seed will be used.
+
   -t, --template <TEMPLATE>
           Which world template to use.
           

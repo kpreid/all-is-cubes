@@ -12,7 +12,7 @@ use once_cell::sync::Lazy;
 use strum::IntoEnumIterator;
 
 use all_is_cubes::cgmath::Vector2;
-use all_is_cubes_content::UniverseTemplate;
+use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 
 use crate::record::{RecordAnimationOptions, RecordFormat, RecordOptions};
 use crate::TITLE;
@@ -67,6 +67,14 @@ pub(crate) struct AicDesktopArgs {
     )]
     pub(crate) template: UniverseTemplate,
 
+    /// Seed value for randomized components of the world template.
+    ///
+    /// May be an integer between 0 and 18446744073709551615 (2⁶⁴ - 1).
+    ///
+    /// If not specified, a randomly chosen seed will be used.
+    #[arg(long = "seed")]
+    pub(crate) seed: Option<u64>,
+
     /// Fully calculate light before starting the game.
     #[arg(long = "precompute-light")]
     pub(crate) precompute_light: bool,
@@ -115,7 +123,11 @@ pub(crate) struct AicDesktopArgs {
     /// Currently supported formats:
     ///
     /// * MagicaVoxel .vox (partial support)
-    #[arg(conflicts_with = "template", value_name = "FILE")]
+    #[arg(
+        conflicts_with = "template",
+        conflicts_with = "seed",
+        value_name = "FILE"
+    )]
     pub(crate) input_file: Option<PathBuf>,
 }
 
@@ -267,7 +279,7 @@ pub fn determine_record_format(output_path: &Path) -> Result<RecordFormat, &'sta
 /// no longer be about command line exactly, so it should move.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum UniverseSource {
-    Template(UniverseTemplate),
+    Template(UniverseTemplate, TemplateParameters),
     File(PathBuf),
 }
 
@@ -275,11 +287,12 @@ pub(crate) enum UniverseSource {
 pub(crate) fn parse_universe_source(
     input_file: Option<PathBuf>,
     template: UniverseTemplate,
+    seed: Option<u64>,
 ) -> UniverseSource {
     if let Some(file) = input_file {
         UniverseSource::File(file)
     } else {
-        UniverseSource::Template(template)
+        UniverseSource::Template(template, TemplateParameters { seed })
     }
 }
 
@@ -379,17 +392,18 @@ mod tests {
         let AicDesktopArgs {
             template,
             input_file,
+            seed,
             ..
         } = parse(args)?;
         // TODO: make this a method on AicDesktopArgs
-        Ok(parse_universe_source(input_file, template))
+        Ok(parse_universe_source(input_file, template, seed))
     }
 
     #[test]
     fn universe_default() {
         assert_eq!(
             parse_universe_test(&[]).unwrap(),
-            UniverseSource::Template(UniverseTemplate::DemoCity),
+            UniverseSource::Template(UniverseTemplate::DemoCity, TemplateParameters::default()),
         );
     }
 
@@ -397,7 +411,7 @@ mod tests {
     fn universe_from_template() {
         assert_eq!(
             parse_universe_test(&["--template", "cornell-box"]).unwrap(),
-            UniverseSource::Template(UniverseTemplate::CornellBox),
+            UniverseSource::Template(UniverseTemplate::CornellBox, TemplateParameters::default()),
         );
     }
 

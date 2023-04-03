@@ -90,6 +90,7 @@ fn main() -> Result<(), anyhow::Error> {
         display_size: DisplaySizeArg(display_size),
         fullscreen,
         template,
+        seed,
         precompute_light,
         input_file,
         output_file,
@@ -97,7 +98,7 @@ fn main() -> Result<(), anyhow::Error> {
         verbose,
         no_config_files,
     } = options.clone();
-    let input_source = parse_universe_source(input_file, template);
+    let input_source = parse_universe_source(input_file, template, seed);
 
     // Initialize logging -- but only if it won't interfere.
     if graphics_type != GraphicsType::Terminal || verbose {
@@ -318,16 +319,17 @@ async fn create_universe(
         )
     };
     let universe = match input_source.clone() {
-        UniverseSource::Template(template) => template
-            .build(
-                yield_progress,
-                // TODO: allow specifying seed
-                TemplateParameters {
-                    seed: rand::thread_rng().gen(),
-                },
-            )
-            .await
-            .map_err(anyhow::Error::from),
+        UniverseSource::Template(template, TemplateParameters { seed }) => {
+            let seed: u64 = seed.unwrap_or_else(|| {
+                let seed = rand::thread_rng().gen();
+                log::info!("Randomly chosen universe seed: {seed}");
+                seed
+            });
+            template
+                .build(yield_progress, TemplateParameters { seed: Some(seed) })
+                .await
+                .map_err(anyhow::Error::from)
+        }
         UniverseSource::File(path) => {
             all_is_cubes_port::load_universe_from_file(yield_progress, &*path).await
         }

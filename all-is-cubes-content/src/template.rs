@@ -214,7 +214,7 @@ fn insert_generated_space(
 /// Configuration for exactly what a [`UniverseTemplate`] should produce.
 ///
 /// Pass this structure to [`UniverseTemplate::build()`].
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
 pub struct TemplateParameters {
     /// Seed for any randomization which the template performs.
