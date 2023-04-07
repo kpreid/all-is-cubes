@@ -41,7 +41,7 @@ use crate::{
 
 pub(crate) async fn demo_city(
     universe: &mut Universe,
-    p: YieldProgress,
+    mut p: YieldProgress,
     seed: u64,
 ) -> Result<Space, InGenError> {
     let start_city_time = Instant::now();
@@ -54,15 +54,12 @@ pub(crate) async fn demo_city(
     // Also install blocks some exhibits want.
     // We do this once so that if multiple exhibits end up wanting them there are no conflicts.
     // TODO: We want a "module loading" system that allows expressing dependencies.
-    // TODO: Give YieldProgress a nicer interface for this
-    let [mut ui_blocks_progress, p] = p.split(0.05);
-    ui_blocks_progress.set_label("UiBlocks");
+    let ui_blocks_progress = p.start_and_cut(0.05, "UiBlocks").await;
     all_is_cubes_ui::vui::blocks::UiBlocks::new(universe, ui_blocks_progress)
         .await
         .install(universe)
         .unwrap();
-    let [mut icons_blocks_progress, p] = p.split(0.05);
-    icons_blocks_progress.set_label("Icons");
+    let icons_blocks_progress = p.start_and_cut(0.05, "Icons").await;
     all_is_cubes::inv::Icons::new(universe, icons_blocks_progress)
         .await
         .install(universe)
@@ -246,8 +243,7 @@ pub(crate) async fn demo_city(
     );
 
     // Landscape filling one quadrant
-    let [mut landscape_progress, p] = p.split(0.4);
-    landscape_progress.set_label("Landscape");
+    let landscape_progress = p.start_and_cut(0.4, "Landscape").await;
     landscape_progress.progress(0.0).await;
     let landscape_region = GridAab::from_lower_upper(
         [-radius_xz, -ground_depth * 8 / 10, -radius_xz],

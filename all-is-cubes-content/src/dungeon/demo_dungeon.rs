@@ -398,11 +398,10 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 /// This function is called from `UniverseTemplate`.
 pub(crate) async fn demo_dungeon(
     universe: &mut Universe,
-    progress: YieldProgress,
+    mut progress: YieldProgress,
     seed: u64,
 ) -> Result<Space, InGenError> {
-    let [mut blocks_progress, progress] = progress.split(0.2);
-    blocks_progress.set_label("dungeon blocks");
+    let blocks_progress = progress.start_and_cut(0.2, "dungeon blocks").await;
     install_dungeon_blocks(universe, blocks_progress).await?;
 
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
@@ -427,8 +426,7 @@ pub(crate) async fn demo_dungeon(
     };
 
     // Construct dungeon map
-    let [mut maze_progress, progress] = progress.split(0.1);
-    maze_progress.set_label("generating layout");
+    let maze_progress = progress.start_and_cut(0.1, "generating layout").await;
     let dungeon_map = {
         let mut maze_seed = [0; 32];
         maze_seed[0..8].copy_from_slice(&seed.to_le_bytes());
@@ -532,11 +530,8 @@ pub(crate) async fn demo_dungeon(
         dungeon_map
     };
 
-    let [mut space_construction_progress, progress] = progress.split(0.1);
     let mut space = {
-        space_construction_progress.set_label("filling the earth");
-        space_construction_progress.progress(0.0).await;
-
+        let space_construction_progress = progress.start_and_cut(0.1, "filling the earth").await;
         let space_bounds = dungeon_grid
             .minimum_space_for_rooms(dungeon_map.bounds())
             .expand(FaceMap::symmetric([30, 1, 30]));
@@ -568,12 +563,12 @@ pub(crate) async fn demo_dungeon(
         space
     };
 
-    let [mut build_progress, mut light_progress] = progress.split(0.2);
-    build_progress.set_label("building rooms");
-    light_progress.set_label("lighting");
+    let build_progress = progress.start_and_cut(0.2, "building rooms").await;
     build_dungeon(&mut space, &theme, &dungeon_map, build_progress).await?;
 
     // Enable lighting
+    let mut light_progress = progress;
+    light_progress.set_label("lighting");
     light_progress.progress(0.0).await;
     let mut physics = space.physics().clone();
     physics.light = LightPhysics::Rays {
