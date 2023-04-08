@@ -32,6 +32,7 @@ jobs:
         #   all-is-cubes-desktop: insufficient test coverage, unclear if even feasible
         #   all-is-cubes-gpu: mainly tested via test-renderers which won't run directly
         #   all-is-cubes-port: TODO add it
+        #   all-is-cubes-mesh: TODO add it
         #   all-is-cubes-server: TODO write enough tests that this is workable
         #   all-is-cubes-wasm: not relevantly testable
 

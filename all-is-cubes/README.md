@@ -22,6 +22,8 @@ This library is intended to be somewhat reusable for working with block/voxel da
 Related crates
 --------------
 
+*   [`all-is-cubes-mesh`](https://crates.io/crates/all-is-cubes-mesh)
+    generates triangle meshes from `all-is-cubes` voxel data.
 *   [`all-is-cubes-gpu`](https://crates.io/crates/all-is-cubes-gpu)
     renders using GPU functionality rather than CPU-only.
 *   [`all-is-cubes-ui`](https://crates.io/crates/all-is-cubes-ui)
