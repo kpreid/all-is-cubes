@@ -265,12 +265,16 @@ pub fn determine_record_format(output_path: &Path) -> Result<RecordFormat, &'sta
             Some("png" | "PNG") => return Ok(RecordFormat::PngOrApng),
             Some("apng" | "APNG") => return Ok(RecordFormat::PngOrApng),
             Some("gltf" | "GLTF") => return Ok(RecordFormat::Gltf),
+            Some("stl" | "STL") => return Ok(RecordFormat::Export(ExportFormat::Stl)),
             Some("vox" | "VOX") => return Ok(RecordFormat::Export(ExportFormat::DotVox)),
             _ => {}
         }
     }
     // TODO: Have a separate option for choosing file type as a fallback
-    Err("file name must have an extension specifying the type; one of 'png', 'apng', or 'gltf'")
+    Err(
+        "file name must have an extension specifying the type; one of \
+        'png', 'apng', 'gltf', 'stl', or 'vox'",
+    )
 }
 
 /// Source of the universe to create/load

@@ -212,9 +212,11 @@ dependencies = [
  "dot_vox",
  "either",
  "gltf-json",
+ "itertools",
  "log",
  "once_cell",
  "serde_json",
+ "stl_io",
  "tempfile",
  "thiserror",
  "tokio",
@@ -1315,7 +1317,7 @@ dependencies = [
  "az",
  "byteorder",
  "embedded-graphics-core",
- "float-cmp",
+ "float-cmp 0.8.0",
  "micromath",
 ]
 
@@ -1434,6 +1436,15 @@ name = "float-cmp"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1267f4ac4f343772758f7b1bdcbe767c218bbab93bb432acbf5162bbf85a6c4"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "float-cmp"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
 dependencies = [
  "num-traits",
 ]
@@ -3494,6 +3505,16 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "stl_io"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d520eb03e632e666ac32f3c0cf018ac6dcd535ab0be1420937e2d896f44f7cf7"
+dependencies = [
+ "byteorder",
+ "float-cmp 0.9.0",
+]
 
 [[package]]
 name = "strsim"

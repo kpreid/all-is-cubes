@@ -12,6 +12,9 @@
     - `linking::BlockProvider` now has methods `subset()` (replace keys) and `map()` (replace values) to allow using `BlockProvider`s in more ways.
     - `universe::RefVisitor` is now implemented for all `FnMut(&dyn URefErased)`, allowing visitors to simply be functions.
 
+- `all-is-cubes-port` library:
+    - Export to `.stl` meshes (commonly used for 3D printing).
+
 - `all-is-cubes-ui` library:
     - `vui::LayoutTree::Shrink` allows a subtree to be shrunk to only be as big as needed, rather than filling available space, allowing for “shrink wrapped” layouts such as framed dialog boxes.
 

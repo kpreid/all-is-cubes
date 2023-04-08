@@ -46,9 +46,9 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use all_is_cubes::block::BlockDef;
 use anyhow::Context;
 
+use all_is_cubes::block::{self, BlockDef};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{self, URef, Universe, UniverseIndex as _};
 use all_is_cubes::util::YieldProgress;
@@ -57,6 +57,7 @@ pub mod file;
 pub mod gltf;
 mod mv;
 use mv::load_dot_vox;
+mod stl;
 
 /// Load a [`Universe`] described by the given file (of guessed format).
 ///
@@ -94,6 +95,7 @@ pub async fn export_to_path(
             mv::export_dot_vox(progress, source, fs::File::create(destination)?).await
         }
         ExportFormat::Gltf => gltf::export_gltf(progress, source, destination).await,
+        ExportFormat::Stl => stl::export_stl(progress, source, destination).await,
     }
 }
 
@@ -173,9 +175,11 @@ impl ExportSet {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum ExportFormat {
-    /// MagicaVoxel [`.vox`] file.
+    /// [MagicaVoxel `.vox`][vox] file.
     ///
     /// TODO: document version details and export limitations
+    ///
+    /// [vox]: https://github.com/ephtracy/voxel-model/blob/master/MagicaVoxel-file-format-vox.txt
     DotVox,
 
     /// [glTF 2.0] format (`.gltf` JSON with auxiliary files).
@@ -188,6 +192,13 @@ pub enum ExportFormat {
     ///
     /// [glTF 2.0]: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
     Gltf,
+
+    /// [STL] format.
+    ///
+    /// Supports exporting block and space shapes without color.
+    ///
+    /// [STL]: <https://en.wikipedia.org/wiki/STL_(file_format)>
+    Stl,
 }
 
 impl ExportFormat {
@@ -196,6 +207,7 @@ impl ExportFormat {
         match self {
             ExportFormat::DotVox => false,
             ExportFormat::Gltf => false, // TODO: implement light
+            ExportFormat::Stl => false,
         }
     }
 }
@@ -215,6 +227,17 @@ pub enum ExportError {
     /// `RefError` while reading the data to be exported.
     #[error("could not read universe to be exported")]
     Read(#[from] universe::RefError),
+
+    /// `EvalBlockError` while exporting a block definition.
+    #[error("could not evaluate block")]
+    Eval {
+        /// Name of the item being exported.
+        name: universe::Name,
+
+        /// Error that occurred.
+        #[source]
+        error: block::EvalBlockError,
+    },
 
     /// The requested [`ExportSet`] contained data that cannot be represented in the
     /// requested [`ExportFormat`].
