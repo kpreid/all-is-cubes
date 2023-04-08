@@ -108,7 +108,9 @@ jobs:
       run: cargo build --package xtask
 
     - name: Update dependencies
-      run: cargo xtask update "${{ matrix.depversions }}"
+      run: |
+        cargo xtask update "${{ matrix.depversions }}"
+        cargo tree --all-features
 
     - name: Install wasm-pack
       run: cargo install wasm-pack
