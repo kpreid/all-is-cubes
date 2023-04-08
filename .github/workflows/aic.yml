@@ -26,20 +26,20 @@ jobs:
         # changing one of those parameters but not the others.
         include:
           # This is the configuration we use for the wasm build and exhaustive tests.
-          - os: ubuntu-latest
+          - os: ubuntu
             toolchain: stable
             depversions: locked
             primary: true
           # Additional configurations to try:
 
           # Windows
-          - os: windows-latest
+          - os: windows
             toolchain: stable
             depversions: locked
             primary: false
           
           # macOS
-          - os: macos-latest
+          - os: macos
             toolchain: stable
             depversions: locked
             primary: false
@@ -47,7 +47,7 @@ jobs:
           # Nightly Rust
           # We test on this so that we can report new compiler bugs fast.
           # However, by the same premise, it breaks often.
-          - os: ubuntu-latest
+          - os: ubuntu
             toolchain: nightly
             depversions: locked
             primary: false
@@ -56,25 +56,25 @@ jobs:
           # We test on this so that we can report compiler bugs that made it out of
           # nightly and their fixes should be backported, and so that we have signal
           # that is less unstable than nightly.
-          - os: ubuntu-latest
+          - os: ubuntu
             toolchain: beta
             depversions: locked
             primary: false
           
           # Dependencies updated
-          - os: ubuntu-latest
+          - os: ubuntu
             toolchain: stable
             depversions: latest
             primary: false
           
           # Dependencies reverted to minimal-versions
-          - os: ubuntu-latest
+          - os: ubuntu
             toolchain: stable
             depversions: minimal
             primary: false
 
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}-latest
     continue-on-error: ${{ !matrix.primary }}
 
     steps:
