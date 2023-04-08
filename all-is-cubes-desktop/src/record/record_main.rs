@@ -21,11 +21,13 @@ pub(crate) fn create_recording_session(
     session: Session,
     options: &RecordOptions,
     viewport_cell: ListenableCell<Viewport>,
+    runtime_handle: &tokio::runtime::Handle,
 ) -> Result<(DesktopSession<(), ()>, mpsc::Receiver<Status>), anyhow::Error> {
     viewport_cell.set(options.viewport());
     let (recorder, status_receiver) = Recorder::new(
         options.clone(),
         session.create_cameras(viewport_cell.as_source()),
+        runtime_handle,
     )?;
 
     let mut dsession = DesktopSession::new((), (), session, viewport_cell);

@@ -52,6 +52,7 @@ impl Recorder {
     fn new(
         options: RecordOptions,
         cameras: StandardCameras,
+        runtime_handle: &tokio::runtime::Handle,
     ) -> Result<(Self, mpsc::Receiver<Status>), anyhow::Error> {
         let (mut status_sender, status_receiver) = mpsc::channel::<Status>();
 
@@ -123,7 +124,7 @@ impl Recorder {
                 // TODO: Stop doing this inside of record initialization, and give export
                 // its own separate main code path.
                 let path_str = options.output_path.to_string_lossy().to_string();
-                tokio::runtime::Handle::current().block_on(all_is_cubes_port::export_to_path(
+                runtime_handle.block_on(all_is_cubes_port::export_to_path(
                     YieldProgress::noop(),
                     export_format,
                     all_is_cubes_port::ExportSet::from_spaces(vec![cameras

@@ -224,7 +224,12 @@ fn main() -> Result<(), anyhow::Error> {
             let record_options = options
                 .record_options()
                 .map_err(|e| e.format(&mut AicDesktopArgs::command()))?;
-            let (dsession, sr) = create_recording_session(session, &record_options, viewport_cell)?;
+            let (dsession, sr) = create_recording_session(
+                session,
+                &record_options,
+                viewport_cell,
+                runtime.handle(),
+            )?;
             inner_main(
                 inner_params,
                 |dsession| record_main(dsession, record_options, sr),
