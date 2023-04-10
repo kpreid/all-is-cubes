@@ -42,8 +42,9 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+use std::ffi::OsString;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use all_is_cubes::block::BlockDef;
 use anyhow::Context;
@@ -131,6 +132,41 @@ impl ExportSet {
             spaces,
         }
     }
+
+    /// Calculate the file path to use supposing that we want to export one member to one file
+    /// (as opposed to all members into one file).
+    ///
+    /// This has a suffix added for uniqueness (after the name but preserving the existing
+    /// extension), based on the item's [`URef::name()`], if the [`ExportSet`] contains more
+    /// than one item. If it contains only one item, then `base_path` is returned unchanged.
+    pub(crate) fn member_export_path(
+        &self,
+        base_path: &Path,
+        member: &dyn universe::URefErased,
+    ) -> PathBuf {
+        let mut path: PathBuf = base_path.to_owned();
+        if self.count() > 1 {
+            let mut new_file_name: OsString =
+                base_path.file_stem().expect("file name missing").to_owned();
+            new_file_name.push("-");
+            match member.name() {
+                // TODO: validate member name as filename fragment
+                universe::Name::Specific(s) => new_file_name.push(&*s),
+                universe::Name::Anonym(n) => new_file_name.push(n.to_string()),
+                universe::Name::Pending => todo!(),
+            };
+            new_file_name.push(".");
+            new_file_name.push(base_path.extension().expect("extension missing"));
+
+            path.set_file_name(new_file_name);
+        }
+        path
+    }
+
+    fn count(&self) -> usize {
+        let Self { block_defs, spaces } = self;
+        block_defs.len() + spaces.len()
+    }
 }
 
 /// File formats that All is Cubes data can be exported to.
@@ -189,4 +225,31 @@ pub enum ExportError {
         /// The reason why it cannot be represented.
         reason: String,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn member_export_path() {
+        let mut universe = Universe::new();
+        let foo = universe
+            .insert("foo".into(), BlockDef::new(block::AIR))
+            .unwrap();
+        let _bar = universe
+            .insert("bar".into(), BlockDef::new(block::AIR))
+            .unwrap();
+
+        assert_eq!(
+            ExportSet::all_of_universe(&universe)
+                .member_export_path(Path::new("/export/data.ext"), &foo),
+            PathBuf::from("/export/data-foo.ext"),
+        );
+        assert_eq!(
+            ExportSet::from_block_defs(vec![foo.clone()])
+                .member_export_path(Path::new("/export/data.ext"), &foo),
+            PathBuf::from("/export/data.ext"),
+        );
+    }
 }
