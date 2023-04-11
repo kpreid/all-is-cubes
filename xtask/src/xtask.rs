@@ -255,10 +255,18 @@ fn main() -> Result<(), ActionError> {
                 eprintln!("Doing nothing because update type is {to:?}.");
             }
             UpdateTo::Latest => {
-                cargo().arg("update").run()?;
+                do_for_all_workspaces(|| {
+                    // Note: The `fuzz` workspace lock file is ignored in version control.
+                    // But we do want to occasionally update it anyway.
+                    cargo().arg("update").run()?;
+                    Ok(())
+                })?;
             }
             UpdateTo::Minimal => {
-                cmd!("cargo +nightly update -Z minimal-versions").run()?;
+                do_for_all_workspaces(|| {
+                    cmd!("cargo +nightly update -Z minimal-versions").run()?;
+                    Ok(())
+                })?;
                 // This can't be expressed as an entry in the minvers-hack package
                 cmd!("cargo +nightly update --offline --package malloc_buf@0.0.1 --precise 0.0.6")
                     .run()?;
