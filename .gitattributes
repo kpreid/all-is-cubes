@@ -1,0 +1,6 @@
+# .gltf files appearing in the repository are test data which should be preserved as bitwise
+# identical for comparisons, rather than getting CRLF on Windows.
+*.gltf text eol=lf
+
+*.png binary
+*.vox binary
