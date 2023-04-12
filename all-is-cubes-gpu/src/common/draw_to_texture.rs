@@ -99,7 +99,7 @@ impl<In, Out> OriginDimensions for EgFramebuffer<In, Out> {
 /// A [`PixelColor`] that can be converted into data accepted as a GPU texture format.
 ///
 /// The reason this isn't `From` is so that it can be implemented for foreign types.
-trait ToTexel<T>: PixelColor + Copy {
+pub(crate) trait ToTexel<T>: PixelColor + Copy {
     fn to_texel(self) -> T;
 }
 

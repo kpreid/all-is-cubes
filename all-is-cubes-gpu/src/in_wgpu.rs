@@ -3,7 +3,7 @@
 use std::mem;
 use std::sync::Arc;
 
-use all_is_cubes::camera::{info_text_drawable, Layers, StandardCameras};
+use all_is_cubes::camera::{info_text_drawable, Layers, RenderMethod, StandardCameras};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Rgb888, Drawable};
@@ -15,6 +15,7 @@ use all_is_cubes::notnan;
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::time;
 
+use crate::in_wgpu::raytrace_to_texture::RaytraceToTexture;
 use crate::{
     gather_debug_lines,
     in_wgpu::{
@@ -41,6 +42,7 @@ pub mod init;
 mod pipelines;
 mod poll;
 mod postprocess;
+mod raytrace_to_texture;
 #[doc(hidden)] // public for tests/shader_tests.rs
 pub mod shader_testing;
 mod space;
@@ -225,6 +227,9 @@ struct EverythingRenderer<I> {
 
     space_renderers: Layers<SpaceRenderer<I>>,
 
+    /// Raytracer for raytracing mode. If not in use, is not updated.
+    rt: RaytraceToTexture,
+
     /// Cursor and debug lines are written to this buffer.
     lines_buffer: ResizingBuffer,
     /// Number of vertices currently in `lines_buffer`.
@@ -232,6 +237,7 @@ struct EverythingRenderer<I> {
 
     /// Pipeline for the color postprocessing + info text layer drawing.
     postprocess_render_pipeline: wgpu::RenderPipeline,
+    #[allow(clippy::type_complexity)]
     postprocess_bind_group:
         Memo<(wgpu::Id<wgpu::TextureView>, frame_texture::FbtId), wgpu::BindGroup>,
     postprocess_bind_group_layout: wgpu::BindGroupLayout,
@@ -317,6 +323,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 ui: SpaceRenderer::new("ui".into(), &device, &pipelines, block_texture, true)
                     .unwrap(),
             },
+            rt: RaytraceToTexture::new(cameras.clone()),
 
             lines_buffer: ResizingBuffer::default(),
             lines_vertex_count: 0,
@@ -457,23 +464,30 @@ impl<I: time::Instant> EverythingRenderer<I> {
             time::Deadline::At(update_prep_to_space_update_time + frame_budget.update_meshes.world);
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
 
-        let space_infos: Layers<SpaceUpdateInfo> = Layers {
-            world: self.space_renderers.world.update(
-                world_deadline,
-                &self.device,
-                queue,
-                &self.pipelines,
-                &self.cameras.cameras().world,
-                bwp.reborrow(),
-            )?,
-            ui: self.space_renderers.ui.update(
-                ui_deadline,
-                &self.device,
-                queue,
-                &self.pipelines,
-                &self.cameras.cameras().ui,
-                bwp.reborrow(),
-            )?,
+        let space_infos: Layers<SpaceUpdateInfo> = if is_raytracing(&self.cameras) {
+            self.rt.update(cursor_result).unwrap(); // TODO: don't unwrap
+
+            // TODO: convey update info
+            Layers::default()
+        } else {
+            Layers {
+                world: self.space_renderers.world.update(
+                    world_deadline,
+                    &self.device,
+                    queue,
+                    &self.pipelines,
+                    &self.cameras.cameras().world,
+                    bwp.reborrow(),
+                )?,
+                ui: self.space_renderers.ui.update(
+                    ui_deadline,
+                    &self.device,
+                    queue,
+                    &self.pipelines,
+                    &self.cameras.cameras().ui,
+                    bwp.reborrow(),
+                )?,
+            }
         };
 
         let space_update_to_lines_time = I::now();
@@ -524,6 +538,16 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
         let lines_to_submit_time = I::now();
 
+        // Do raytracing
+        if is_raytracing(&self.cameras) {
+            self.rt.prepare_frame(
+                &self.device,
+                queue,
+                &self.pipelines,
+                &self.cameras.cameras().world,
+            )?;
+        }
+
         // TODO: measure time of these
         self.staging_belt.finish();
         queue.submit(std::iter::once(encoder.finish()));
@@ -545,6 +569,8 @@ impl<I: time::Instant> EverythingRenderer<I> {
         &mut self,
         queue: &wgpu::Queue,
     ) -> Result<DrawInfo, GraphicsResourceError> {
+        let start_draw_time = I::now();
+
         let depth_texture_view = &self.fb.depth_texture_view;
         let mut encoder = self
             .device
@@ -557,8 +583,31 @@ impl<I: time::Instant> EverythingRenderer<I> {
         // not read the texture.
         let mut output_needs_clearing = true;
 
-        let start_draw_time = I::now();
-        let world_draw_info = {
+        let world_draw_info: SpaceDrawInfo = if let (true, Some(rt_bind_group)) = (
+            is_raytracing(&self.cameras),
+            self.rt.frame_copy_bind_group(),
+        ) {
+            // Copy the raytracing target texture (incrementally updated) to the linear scene
+            // texture. This is the simplest way to get it fed into both bloom and postprocessing
+            // passes.
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("rt to scene copy"),
+                color_attachments: &[Some(
+                    self.fb
+                        .color_attachment_for_scene(wgpu::LoadOp::Clear(wgpu::Color::BLUE)),
+                )],
+                ..Default::default()
+            });
+            render_pass.set_bind_group(0, rt_bind_group, &[]);
+            render_pass.set_pipeline(&self.pipelines.frame_copy_pipeline);
+            render_pass.draw(0..3, 0..1);
+            drop(render_pass);
+            output_needs_clearing = false;
+
+            SpaceDrawInfo::default()
+        } else {
+            // Not raytracing, so render the meshes
+
             let camera = &self.cameras.cameras().world;
             let sr = &self.space_renderers.world;
             sr.draw(
@@ -629,14 +678,16 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
         // Write the postprocess camera data.
         // Note: this can't use the StagingBelt because it was already finish()ed.
-        queue.write_buffer(
-            &self.postprocess_camera_buffer,
-            0,
-            bytemuck::bytes_of(&PostprocessUniforms::new(
-                self.cameras.graphics_options(),
-                !output_needs_clearing,
-            )),
-        );
+        {
+            queue.write_buffer(
+                &self.postprocess_camera_buffer,
+                0,
+                bytemuck::bytes_of(&PostprocessUniforms::new(
+                    self.cameras.graphics_options(),
+                    !output_needs_clearing,
+                )),
+            );
+        }
 
         if self.cameras.graphics_options().bloom_intensity > notnan!(0.0) {
             if let Some(bloom) = &self.fb.bloom {
@@ -700,6 +751,14 @@ impl<I: time::Instant> EverythingRenderer<I> {
     }
 }
 
+fn is_raytracing(cameras: &StandardCameras) -> bool {
+    match cameras.graphics_options().render_method {
+        RenderMethod::Preferred => false,
+        RenderMethod::Mesh => false,
+        RenderMethod::Reference => true,
+        _ => false,
+    }
+}
 /// Choose the surface format we would prefer from among the supported formats.
 fn choose_surface_format(capabilities: &wgpu::SurfaceCapabilities) -> wgpu::TextureFormat {
     /// A structure whose maximum [`Ord`] value corresponds to the texture format we'd rather use.

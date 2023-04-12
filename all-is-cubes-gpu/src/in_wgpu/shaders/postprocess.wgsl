@@ -61,15 +61,19 @@ fn tone_map(linear_rgb: vec3<f32>) -> vec3<f32> {
 // (It may be absent because there might have been nothing to draw in previous stages.)
 fn scene_pixel(texcoord: vec2<f32>) -> vec4<f32> {
     if camera.scene_texture_valid == 0 {
-        // TODO: make this a checkerboard or something to distinguish from “oops, all black”.
+        // There is no valid scene texture (e.g. because no layers drew anything).
+        // In this case we display a placeholder and do no further processing.
+
+        // TODO: make this a checkerboard or something to distinguish from “oops, all gray”.
         // (And when we do that, also use it for UI-on-top-of-nothing, by reading the alpha.)
         // Note: this color is equal to all_is_cubes::palette::NO_WORLD_TO_SHOW.
+
         return vec4<f32>(0.5, 0.5, 0.5, 1.0);
     }
 
-    var scene_color: vec4<f32> = textureSampleLevel(
+    let scene_color = textureSampleLevel(
         linear_scene_texture,
-        text_sampler,
+        text_sampler, // TODO: wrong sampler
         texcoord,
         0.0
     );

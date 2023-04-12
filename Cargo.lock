@@ -169,6 +169,8 @@ dependencies = [
  "log",
  "once_cell",
  "rand 0.8.5",
+ "rand_xoshiro",
+ "rayon",
  "resource",
  "thiserror",
  "tokio",

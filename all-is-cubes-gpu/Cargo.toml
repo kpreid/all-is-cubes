@@ -36,6 +36,8 @@ rerun = ["all-is-cubes/rerun", "all-is-cubes-mesh/rerun"]
 # (The library is useless without this, but we used to have multiple GPU API support
 # and I don't want to go entirely deleting it quite yet.)
 wgpu = ["dep:wgpu"]
+# Enable use of threads.
+threads = ["dep:rayon"]
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.6.0" }
@@ -44,11 +46,15 @@ bytemuck = { workspace = true, features = ["derive"] }
 futures-channel = { workspace = true, features = ["sink"] }
 futures-core = { workspace = true }
 futures-util = { workspace = true, features = ["sink"] }
+# f16 support for working with floating point textures.
+half = { version = "2.3.1", features = ["bytemuck"] }
 instant = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
+rand_xoshiro = { workspace = true }
+rayon = { workspace = true, optional = true }
 resource = "0.5.0"
 thiserror = { workspace = true }
 wasm-bindgen-futures = { workspace = true }
@@ -72,8 +78,6 @@ wgpu = { workspace = true, optional = true, features = ["webgl"] }
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_tokio"] }
-# f16 support for working with floating point textures in tests.
-half = { version = "2.3.1", features = ["bytemuck"] }
 # Used in shader tests. TODO: Not really necessary
 image = { workspace = true }
 # Using tokio for async test-running.

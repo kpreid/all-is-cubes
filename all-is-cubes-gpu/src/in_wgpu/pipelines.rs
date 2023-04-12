@@ -49,6 +49,15 @@ pub(crate) struct Pipelines {
 
     /// Pipeline for drawing transparent (alpha ≠ 1) blocks.
     pub(crate) transparent_render_pipeline: wgpu::RenderPipeline,
+
+    /// Bind group layout for the `frame-copy` shader's inputs.
+    pub(crate) frame_copy_layout: wgpu::BindGroupLayout,
+
+    /// Pipeline for the `frame-copy` shader.
+    pub(crate) frame_copy_pipeline: wgpu::RenderPipeline,
+
+    /// A sampler configured for linear, non-mipmapped sampling, for use in resampling frames.
+    pub(crate) linear_sampler: wgpu::Sampler,
 }
 
 /// Shader code for rendering `Space` content, and debug lines.
@@ -56,6 +65,9 @@ pub(crate) struct Pipelines {
 /// Public for use in `shader_tests`.
 pub(crate) static BLOCKS_AND_LINES_SHADER: Lazy<Reloadable> =
     Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/blocks-and-lines.wgsl"));
+
+static FRAME_COPY_SHADER: Lazy<Reloadable> =
+    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/frame-copy.wgsl"));
 
 impl Pipelines {
     /// * `device` is used to create pipelines.
@@ -73,11 +85,14 @@ impl Pipelines {
         // place to ensure that no skew occurs.
         let current_graphics_options = graphics_options.get();
 
-        let shader = create_wgsl_module_from_reloadable(
+        let blocks_and_lines_shader = create_wgsl_module_from_reloadable(
             device,
             "blocks-and-lines",
             &BLOCKS_AND_LINES_SHADER,
         );
+
+        let frame_copy_shader =
+            create_wgsl_module_from_reloadable(device, "frame-copy", &FRAME_COPY_SHADER);
 
         let block_texture_entry = |binding| wgpu::BindGroupLayoutEntry {
             binding,
@@ -152,12 +167,12 @@ impl Pipelines {
                 label: Some("Pipelines::opaque_render_pipeline"),
                 layout: Some(&block_render_pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: &shader,
+                    module: &blocks_and_lines_shader,
                     entry_point: "block_vertex_main",
                     buffers: vertex_buffers,
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: &shader,
+                    module: &blocks_and_lines_shader,
                     entry_point: "block_fragment_opaque",
                     targets: &[Some(wgpu::ColorTargetState {
                         format: fb.linear_scene_texture_format(),
@@ -182,12 +197,12 @@ impl Pipelines {
                 label: Some("Pipelines::transparent_render_pipeline"),
                 layout: Some(&block_render_pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: &shader,
+                    module: &blocks_and_lines_shader,
                     entry_point: "block_vertex_main",
                     buffers: vertex_buffers,
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: &shader,
+                    module: &blocks_and_lines_shader,
                     entry_point: match current_graphics_options.transparency {
                         TransparencyOption::Volumetric => "block_fragment_transparent_volumetric",
                         TransparencyOption::Surface | TransparencyOption::Threshold(_) => {
@@ -239,12 +254,12 @@ impl Pipelines {
                 label: Some("Pipelines::lines_render_pipeline"),
                 layout: Some(&lines_render_pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: &shader,
+                    module: &blocks_and_lines_shader,
                     entry_point: "lines_vertex",
                     buffers: &[WgpuLinesVertex::desc()],
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: &shader,
+                    module: &blocks_and_lines_shader,
                     entry_point: "lines_fragment",
                     targets: &[Some(wgpu::ColorTargetState {
                         format: fb.linear_scene_texture_format(),
@@ -267,8 +282,75 @@ impl Pipelines {
                 multiview: None,
             });
 
+        let frame_copy_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Pipelines::frame_copy_layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let frame_copy_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Pipelines::frame_copy_pipeline"),
+            layout: Some(
+                &device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("Pipelines::frame_copy_pipeline_layout"),
+                    bind_group_layouts: &[&frame_copy_layout],
+                    push_constant_ranges: &[],
+                }),
+            ),
+            vertex: wgpu::VertexState {
+                module: &frame_copy_shader,
+                entry_point: "frame_copy_vertex",
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &frame_copy_shader,
+                entry_point: "frame_copy_fragment",
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: wgpu::TextureFormat::Rgba16Float,
+                    blend: None,
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                ..<_>::default()
+            },
+            depth_stencil: None,
+            multisample,
+            multiview: None,
+        });
+
+        let linear_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Pipelines::linear_sampler"),
+            // TODO: evaluate which address mode produces the best appearance
+            address_mode_u: wgpu::AddressMode::MirrorRepeat,
+            address_mode_v: wgpu::AddressMode::MirrorRepeat,
+            address_mode_w: wgpu::AddressMode::MirrorRepeat,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
         let dirty = DirtyFlag::new(false);
         BLOCKS_AND_LINES_SHADER.as_source().listen(dirty.listener());
+        FRAME_COPY_SHADER.as_source().listen(dirty.listener());
         graphics_options.listen(dirty.listener());
 
         Self {
@@ -279,8 +361,10 @@ impl Pipelines {
             block_render_pipeline_layout,
             opaque_render_pipeline,
             transparent_render_pipeline,
-
             lines_render_pipeline,
+            frame_copy_layout,
+            frame_copy_pipeline,
+            linear_sampler,
         }
     }
 
