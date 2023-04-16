@@ -46,8 +46,6 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::Context;
-
 use all_is_cubes::block::{self, BlockDef};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{self, URef, Universe, UniverseIndex as _};
@@ -61,21 +59,21 @@ mod stl;
 
 /// Load a [`Universe`] described by the given file (of guessed format).
 ///
-/// TODO: Define what errors it returns.
 /// TODO: Make a from-bytes version of this.
 pub async fn load_universe_from_file(
     progress: YieldProgress,
     file: impl file::Fileish,
-) -> Result<Universe, anyhow::Error> {
-    let bytes = file
-        .read()
-        .with_context(|| format!("Could not read the file '{}'", file.display_full_path()))?;
-    load_dot_vox(progress, &bytes).await.with_context(|| {
-        format!(
-            "Could not load '{}' as a MagicaVoxel .vox file",
-            file.display_full_path()
-        )
-    })
+) -> Result<Universe, ImportError> {
+    let bytes = file.read().map_err(|error| ImportError {
+        source_path: file.display_full_path().to_string(),
+        detail: ImportErrorKind::Read { path: None, error },
+    })?;
+    load_dot_vox(progress, &bytes)
+        .await
+        .map_err(|error| ImportError {
+            source_path: file.display_full_path().to_string(),
+            detail: ImportErrorKind::Parse(Box::new(error)),
+        })
 }
 
 /// Export data specified by an [`ExportSet`] to a file on disk.
@@ -212,6 +210,50 @@ impl ExportFormat {
     }
 }
 
+/// Fatal errors that may be encountered during an import operation.
+///
+/// TODO: Define non-fatal export flaws reporting, and link to it here.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+#[error("failed to import '{source_path}'")]
+pub struct ImportError {
+    /// The path, as produced by [`file::Fileish::display_full_path()`] or similar,
+    /// of the file being imported. Note that this is the originally specified path
+    /// and may differ from the path of a file the error is about (specified separately),
+    /// in case of multi-file data formats.
+    source_path: String,
+
+    #[source]
+    detail: ImportErrorKind,
+}
+
+/// Specific reason why an import operation failed.
+/// Always contained within an [`ImportError`].
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ImportErrorKind {
+    /// An IO error occurred while reading the data to import.
+    #[non_exhaustive]
+    #[error("failed to read data from {path:?}")] // TODO: Better formatting
+    Read {
+        /// The path, as produced by [`file::Fileish::display_full_path()`] or similar,
+        /// of the file which could not be read, if it is not identical to the
+        /// [`ImportError::source_path`].
+        path: Option<String>,
+
+        /// The IO error that occurred while reading.
+        error: std::io::Error,
+    },
+
+    /// The data did not match the expected format, or was invalid as defined by that format.
+    #[error("failed to parse the data")]
+    Parse(
+        /// Format-specific details of the parse error.
+        #[source]
+        Box<dyn std::error::Error + Send + Sync>,
+    ),
+}
+
 /// Fatal errors that may be encountered during an export operation.
 ///
 /// TODO: Define non-fatal export flaws reporting, and link to it here.
@@ -253,6 +295,13 @@ pub enum ExportError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::util::assert_send_sync;
+
+    #[test]
+    fn errors_are_send_sync() {
+        assert_send_sync::<ImportError>();
+        assert_send_sync::<ExportError>();
+    }
 
     #[test]
     fn member_export_path() {

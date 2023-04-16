@@ -205,7 +205,6 @@ version = "0.5.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-mesh",
- "anyhow",
  "assert_fs",
  "base64 0.13.1",
  "bytemuck",

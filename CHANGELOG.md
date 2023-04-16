@@ -14,6 +14,7 @@
 
 - `all-is-cubes-port` library:
     - Export to `.stl` meshes (commonly used for 3D printing).
+    - `ImportError` type for precise error reporting.
 
 - `all-is-cubes-ui` library:
     - `vui::LayoutTree::Shrink` allows a subtree to be shrunk to only be as big as needed, rather than filling available space, allowing for “shrink wrapped” layouts such as framed dialog boxes.
@@ -36,6 +37,9 @@
       This allows associations between the new member and other objects to be created within the same transaction.
     - Types that previously had a `pub fn listen(&self, impl Listener)` now implement the `listen::Listen` trait instead.
       `listen::DirtyFlag::listening()` now expects `impl Listen` instead of a closure.
+
+- `all-is-cubes-port` library:
+    - `load_universe_from_file` returns its own `ImportError` instead of `anyhow::Error`.
 
 - `all-is-cubes-ui` library:
     - `vui::LayoutGrant` now takes an additional parameter, `enlarge_for_symmetry`. Existing calls should be changed to pass `false` to get the prior behavior.
