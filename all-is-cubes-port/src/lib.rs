@@ -221,7 +221,7 @@ pub struct ImportError {
     /// of the file being imported. Note that this is the originally specified path
     /// and may differ from the path of a file the error is about (specified separately),
     /// in case of multi-file data formats.
-    source_path: String,
+    pub source_path: String,
 
     #[source]
     detail: ImportErrorKind,
