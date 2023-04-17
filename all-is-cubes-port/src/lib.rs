@@ -68,12 +68,19 @@ pub async fn load_universe_from_file(
         source_path: file.display_full_path().to_string(),
         detail: ImportErrorKind::Read { path: None, error },
     })?;
-    load_dot_vox(progress, &bytes)
-        .await
-        .map_err(|error| ImportError {
+    if bytes.starts_with(b"VOX ") {
+        load_dot_vox(progress, &bytes)
+            .await
+            .map_err(|error| ImportError {
+                source_path: file.display_full_path().to_string(),
+                detail: ImportErrorKind::Parse(Box::new(error)),
+            })
+    } else {
+        Err(ImportError {
             source_path: file.display_full_path().to_string(),
-            detail: ImportErrorKind::Parse(Box::new(error)),
+            detail: ImportErrorKind::UnknownFormat {},
         })
+    }
 }
 
 /// Export data specified by an [`ExportSet`] to a file on disk.
@@ -246,12 +253,18 @@ pub enum ImportErrorKind {
     },
 
     /// The data did not match the expected format, or was invalid as defined by that format.
+    #[non_exhaustive]
     #[error("failed to parse the data")]
     Parse(
         /// Format-specific details of the parse error.
         #[source]
         Box<dyn std::error::Error + Send + Sync>,
     ),
+
+    /// The data is not in a supported format.
+    #[non_exhaustive]
+    #[error("the data is not in a recognized format")]
+    UnknownFormat {},
 }
 
 /// Fatal errors that may be encountered during an export operation.
@@ -295,12 +308,30 @@ pub enum ExportError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::file::NonDiskFile;
     use all_is_cubes::util::assert_send_sync;
+    use std::error::Error;
 
     #[test]
     fn errors_are_send_sync() {
         assert_send_sync::<ImportError>();
         assert_send_sync::<ExportError>();
+    }
+
+    #[tokio::test]
+    async fn import_unknown_format() {
+        let error = load_universe_from_file(
+            YieldProgress::noop(),
+            &NonDiskFile::from_name_and_data_source("foo".into(), || Ok(b"nonsense".to_vec())),
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(error.to_string(), "failed to import 'foo'");
+        assert_eq!(
+            error.source().unwrap().to_string(),
+            "the data is not in a recognized format"
+        );
     }
 
     #[test]
