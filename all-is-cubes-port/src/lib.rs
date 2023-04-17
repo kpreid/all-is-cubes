@@ -2,10 +2,13 @@
 //!
 //! Currently supported formats:
 //!
+//! * All is Cubes native format (work in progress; currently import only)
 //! * MagicaVoxel `.vox` voxel scene files (import only)
 //! * [glTF 2.0] (export only)
+//! * [STL] (export only)
 //!
 //! [glTF 2.0]: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
+//! [STL]: <https://en.wikipedia.org/wiki/STL_(file_format)>
 
 // Basic lint settings, which should be identical across all all-is-cubes project crates.
 // This list is sorted.
@@ -43,8 +46,8 @@
 #![warn(missing_docs)]
 
 use std::ffi::OsString;
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use all_is_cubes::block::{self, BlockDef};
 use all_is_cubes::space::Space;
@@ -67,11 +70,25 @@ pub async fn load_universe_from_file(
     progress: YieldProgress,
     file: impl file::Fileish,
 ) -> Result<Universe, ImportError> {
+    // TODO: use extension, if any, for format detection
     let bytes = file.read().map_err(|error| ImportError {
         source_path: file.display_full_path().to_string(),
         detail: ImportErrorKind::Read { path: None, error },
     })?;
-    if bytes.starts_with(b"VOX ") {
+    if bytes.starts_with(b"{") {
+        // Assume it's JSON. Furthermore, assume it's ours.
+        serde_json::from_slice::<Universe>(&bytes).map_err(|error| ImportError {
+            source_path: file.display_full_path().to_string(),
+            detail: if error.is_eof() || error.is_io() {
+                ImportErrorKind::Read {
+                    path: None,
+                    error: io::Error::new(io::ErrorKind::Other, error),
+                }
+            } else {
+                ImportErrorKind::Parse(Box::new(error))
+            },
+        })
+    } else if bytes.starts_with(b"VOX ") {
         load_dot_vox(progress, &bytes)
             .await
             .map_err(|error| ImportError {

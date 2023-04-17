@@ -1,0 +1,16 @@
+{
+    "type": "UniverseV1",
+    "members": [
+        {
+            "name": {
+                "Specific": "foo"
+            },
+            "value": {
+                "type": "BlockV1",
+                "primitive": {
+                    "type": "AirV1"
+                }
+            }
+        }
+    ]
+}

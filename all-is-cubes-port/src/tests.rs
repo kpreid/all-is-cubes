@@ -1,7 +1,7 @@
 use std::error::Error as _;
 
 use all_is_cubes::block;
-use all_is_cubes::universe::UniverseIndex as _;
+use all_is_cubes::universe::{Name, URef, UniverseIndex as _};
 use all_is_cubes::util::assert_send_sync;
 
 use crate::file::NonDiskFile;
@@ -14,6 +14,24 @@ use crate::{
 fn errors_are_send_sync() {
     assert_send_sync::<ImportError>();
     assert_send_sync::<ExportError>();
+}
+
+#[tokio::test]
+async fn import_native_format() {
+    let universe = load_universe_from_file(
+        YieldProgress::noop(),
+        Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/tests/native-test.json"
+        )),
+    )
+    .await
+    .unwrap();
+
+    // This is *not* a thorough test of `Universe` deserialization.
+    // It is just enough to prove that we ran the deserialization code and not something else.
+    let uref: URef<BlockDef> = universe.get(&Name::from("foo")).unwrap();
+    assert_eq!(**uref.read().unwrap(), block::AIR);
 }
 
 #[tokio::test]
