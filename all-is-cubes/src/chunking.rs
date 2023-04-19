@@ -140,6 +140,7 @@ pub struct ChunkChart<const CHUNK_SIZE: GridCoordinate> {
     ///
     /// This vector may contain more than the desired chunks; this is done so that a small
     /// chart can reuse the work to construct a large one.
+    /// TODO: That is not actually implemented.
     octant_chunks: Arc<[GridVector]>,
 
     /// Range of elements of `octant_chunks` to actually use.
@@ -267,17 +268,14 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<
         }
     }
 
-    // Sort by distance, with coordinates for final tiebreakers so the result is
-    // fully specified.
-    octant_chunks.sort_unstable_by_key(|&chunk| {
-        (
-            chunk_distance_squared_for_view(chunk),
-            chunk.x,
-            chunk.y,
-            chunk.z,
-        )
-    });
+    octant_chunks.sort_unstable_by_key(depth_sort_key);
     octant_chunks.into()
+}
+
+/// Builds on [`chunk_distance_squared_for_view`] by breaking ties so the result is
+/// a stable ordering. This is the ordering that `ChunkChart::octant_chunks` contains.
+fn depth_sort_key(&chunk: &Vector3<i32>) -> (Distance, [i32; 3]) {
+    (chunk_distance_squared_for_view(chunk), chunk.into())
 }
 
 fn chunk_distance_squared_for_view(chunk: Vector3<i32>) -> Distance {
