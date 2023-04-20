@@ -243,7 +243,7 @@ fn light_texture_fetch(fragment_position: vec3<f32>) -> vec4<f32> {
     // Implement wrapping (not automatic since we're not using a sampler).
     // Wrapping is used to handle sky light and in the future will be used for
     // circular buffering of the local light in an unbounded world.
-    let size: vec3<i32> = textureDimensions(light_texture, 0);
+    let size: vec3<i32> = vec3<i32>(textureDimensions(light_texture, 0));
     lookup_position = (lookup_position % size + size) % size;
 
     let texel: vec4<u32> = textureLoad(light_texture, lookup_position, 0);

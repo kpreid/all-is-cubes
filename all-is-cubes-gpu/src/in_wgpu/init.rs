@@ -141,9 +141,7 @@ where
                 buffer: &temp_buffer,
                 layout: wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: std::num::NonZeroU32::new(
-                        dimensions.x * u32::try_from(size_of_texel).unwrap(),
-                    ),
+                    bytes_per_row: Some(dimensions.x * u32::try_from(size_of_texel).unwrap()),
                     rows_per_image: None,
                 },
             },

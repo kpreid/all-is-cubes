@@ -1,4 +1,3 @@
-use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use all_is_cubes::listen::{DirtyFlagListener, Listen};
@@ -295,7 +294,7 @@ fn bloom_mip_view(mip_level: u32, bloom_texture: &wgpu::Texture) -> wgpu::Textur
         dimension: None,
         aspect: wgpu::TextureAspect::default(),
         base_mip_level: mip_level,
-        mip_level_count: Some(NonZeroU32::new(1).unwrap()),
+        mip_level_count: Some(1),
         base_array_layer: 0,
         array_layer_count: None,
     })

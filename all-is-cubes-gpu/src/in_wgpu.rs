@@ -894,9 +894,8 @@ fn choose_surface_format(capabilities: &wgpu::SurfaceCapabilities) -> wgpu::Text
         .enumerate()
         .max_by_key(|&(index, format)| {
             use wgpu::TextureFormat::*;
-            let d = format.describe();
             Rank {
-                is_srgb: d.srgb,
+                is_srgb: format.is_srgb(),
                 // Float output is somehow broken on wasm, so don't prefer it.
                 // <https://github.com/kpreid/all-is-cubes/issues/310>
                 // TODO: repro and report to wgpu, supposing that it is a wgpu bug

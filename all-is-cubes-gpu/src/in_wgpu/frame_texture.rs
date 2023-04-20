@@ -101,7 +101,7 @@ impl DrawableTexture {
                     ),
                     wgpu::ImageDataLayout {
                         offset: 0,
-                        bytes_per_row: std::num::NonZeroU32::new(4 * full_width),
+                        bytes_per_row: Some(4 * full_width),
                         rows_per_image: None,
                     },
                     wgpu::Extent3d {
