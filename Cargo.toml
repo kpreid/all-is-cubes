@@ -33,7 +33,7 @@ bitflags = "2.0.2"
 # Note that this excludes the "derive" feature but some crates need it.
 bytemuck = { version = "1.12.1", default-features = false }
 # When upgrading clap, beware text output changes causing integration tests to fail.
-clap = { version = "4.1.1", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
+clap = { version = "4.2.4", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
 criterion = { version = "0.4.0", features = ["cargo_bench_support", "html_reports"] }
 either = "1.8.0"
 exhaust = "0.1.0"
