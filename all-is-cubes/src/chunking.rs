@@ -4,9 +4,10 @@
 //! We will probably want to expose it but clean up the API first, particularly
 //! clarifying the treatment of distances and squared distances.
 
+use std::collections::BTreeMap;
 use std::iter::FusedIterator;
 use std::ops::RangeTo;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
@@ -150,7 +151,7 @@ pub struct ChunkChart<const CHUNK_SIZE: GridCoordinate> {
 impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     pub fn new(view_distance: FreeCoordinate) -> Self {
         let view_distance_in_squared_chunks = Self::sanitize_and_square_distance(view_distance);
-        let octant_chunks = compute_chart_octant(view_distance_in_squared_chunks);
+        let octant_chunks = get_or_compute_chart_octant(view_distance_in_squared_chunks);
         Self {
             view_distance_in_squared_chunks,
             octant_range: ..octant_chunks.len(),
@@ -248,6 +249,42 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     }
 }
 
+fn get_or_compute_chart_octant(
+    view_distance_in_squared_chunks: GridCoordinate,
+) -> Arc<[GridVector]> {
+    let mut cache = match CHUNK_CHART_CACHE.lock() {
+        Ok(cache) => cache,
+        Err(p) => {
+            // If poisoned, clear the cache.
+            let mut cache = p.into_inner();
+            *cache = BTreeMap::new();
+            cache
+        }
+    };
+
+    let len = cache.len();
+
+    use std::collections::btree_map::Entry;
+    match cache.entry(view_distance_in_squared_chunks) {
+        Entry::Occupied(e) => {
+            // eprintln!("cache hit {view_distance_in_squared_chunks}");
+            Arc::clone(e.get())
+        }
+        Entry::Vacant(e) => {
+            // eprintln!("cache miss {view_distance_in_squared_chunks} ({len} in cache)");
+            let value = compute_chart_octant(view_distance_in_squared_chunks);
+
+            // We don't expect this to happen, but don't let the cache grow too big.
+            // TODO: LRU policy instead
+            if len < 20 {
+                e.insert(Arc::clone(&value));
+            }
+
+            value
+        }
+    }
+}
+
 fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<[GridVector]> {
     // We're going to compute in the zero-or-positive octant, which means that the chunk origin
     // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
@@ -294,6 +331,12 @@ fn chunk_distance_squared_for_view(chunk: Vector3<i32>) -> Distance {
         off_plane_count: (chunk.x.signum() + chunk.y.signum() + chunk.z.signum()) as u8,
     }
 }
+
+/// A cache for [`get_or_compute_chart_octant()`].
+///
+/// Keys are `view_distance_in_squared_chunks` and values are `octant_chunks`.
+static CHUNK_CHART_CACHE: Mutex<BTreeMap<GridCoordinate, Arc<[GridVector]>>> =
+    Mutex::new(BTreeMap::new());
 
 /// A specification of which octants to include in [`ChunkChart::chunks()`].
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
