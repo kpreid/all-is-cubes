@@ -26,20 +26,24 @@ pub trait UniverseMember: Sized + 'static {
     fn into_any_ref(r: URef<Self>) -> AnyURef;
 }
 
-/// Trait implemented once for each type of object that can be stored in a [`Universe`]
-/// that internally provides the table for that type. This trait differs from
-/// [`UniverseIndex`] in that it is not public.
+/// For each type `T` that can be a member of a [`Universe`], this trait is implemented,
+/// `impl UniverseIndex<T> for Universe`, in order to provide the collection of members
+/// of that type.
+///
+/// This trait is not public and is used only within the implementation of [`Universe`].
 pub(super) trait UniverseTable<T> {
-    fn table(&self) -> &Storage<T>;
+    type Table;
 
-    fn table_mut(&mut self) -> &mut Storage<T>;
+    fn table(&self) -> &Self::Table;
+
+    fn table_mut(&mut self) -> &mut Self::Table;
 }
 
 // Helper functions to implement UniverseIndex. Can't be trait provided methods
 // because UniverseTable is private
 fn index_get<T>(this: &Universe, name: &Name) -> Option<URef<T>>
 where
-    Universe: UniverseTable<T>,
+    Universe: UniverseTable<T, Table = Storage<T>>,
 {
     this.table().get(name).map(URootRef::downgrade)
 }
@@ -47,7 +51,7 @@ where
 /// Note that the same logic also exists in `UniverseTransaction`.
 fn index_insert<T>(this: &mut Universe, mut name: Name, value: T) -> Result<URef<T>, InsertError>
 where
-    Universe: UniverseTable<T>,
+    Universe: UniverseTable<T, Table = Storage<T>>,
 {
     use std::collections::btree_map::Entry::*;
 
@@ -77,6 +81,8 @@ macro_rules! impl_universe_for_member {
         }
 
         impl UniverseTable<$member_type> for Universe {
+            type Table = Storage<$member_type>;
+
             fn table(&self) -> &Storage<$member_type> {
                 &self.$table
             }
@@ -97,7 +103,7 @@ macro_rules! impl_universe_for_member {
                 index_insert(self, name, value)
             }
             fn iter_by_type(&self) -> UniverseIter<'_, $member_type> {
-                UniverseIter(self.table().iter())
+                UniverseIter(UniverseTable::<$member_type>::table(self).iter())
             }
         }
     };

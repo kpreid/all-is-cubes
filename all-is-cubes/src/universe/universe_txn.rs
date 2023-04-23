@@ -617,7 +617,7 @@ impl MemberTxn {
                 ) -> Result<(), CommitError>
                 where
                     T: 'static,
-                    Universe: UniverseTable<T>,
+                    Universe: UniverseTable<T, Table = super::Storage<T>>,
                 {
                     let new_root_ref = pending_ref.upgrade_pending(universe).map_err(|e| {
                         CommitError::message::<UniverseTransaction>(format!(

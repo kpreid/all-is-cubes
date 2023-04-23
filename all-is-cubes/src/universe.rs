@@ -329,7 +329,7 @@ impl fmt::Debug for Universe {
 }
 fn format_members<T>(universe: &Universe, ds: &mut fmt::DebugStruct<'_, '_>)
 where
-    Universe: UniverseTable<T>,
+    Universe: UniverseTable<T, Table = Storage<T>>,
 {
     for name in universe.table().keys() {
         // match root.strong_ref.try_borrow() {
