@@ -11,14 +11,15 @@ use std::path::PathBuf;
 use std::time::Duration;
 use std::{fs, io};
 
-use all_is_cubes::math::GridCoordinate;
-use all_is_cubes::util::YieldProgress;
 pub use gltf_json as json;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
 use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, ViewTransform};
 use all_is_cubes::cgmath::{One as _, Vector3, Zero};
+use all_is_cubes::math::GridCoordinate;
+use all_is_cubes::universe::PartialUniverse;
+use all_is_cubes::util::YieldProgress;
 use all_is_cubes_mesh::{BlockMesh, MeshOptions, SpaceMesh};
 
 mod buffer;
@@ -326,13 +327,26 @@ pub(crate) async fn export_gltf(
     source: ExportSet,
     destination: PathBuf,
 ) -> Result<(), ExportError> {
-    let ExportSet { block_defs, spaces } = source;
+    let ExportSet {
+        contents:
+            PartialUniverse {
+                blocks: block_defs,
+                spaces,
+                characters,
+            },
+    } = source;
 
-    // If space list is nonempty, fail.
+    // If unsupported list is nonempty, fail.
     if let Some(first) = spaces.get(0) {
         return Err(ExportError::NotRepresentable {
             name: Some(first.name()),
             reason: "Exporting spaces to glTF is not yet supported".into(),
+        });
+    }
+    if let Some(first) = characters.get(0) {
+        return Err(ExportError::NotRepresentable {
+            name: Some(first.name()),
+            reason: "Exporting characters to glTF is not yet supported".into(),
         });
     }
 

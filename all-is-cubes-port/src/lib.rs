@@ -51,7 +51,7 @@ use std::{fs, io};
 
 use all_is_cubes::block::{self, BlockDef};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{self, URef, Universe};
+use all_is_cubes::universe::{self, PartialUniverse, URef, Universe};
 use all_is_cubes::util::YieldProgress;
 
 pub mod file;
@@ -127,8 +127,10 @@ pub async fn export_to_path(
 /// Selection of the data to be exported.
 #[derive(Clone, Debug)]
 pub struct ExportSet {
-    block_defs: Vec<URef<BlockDef>>,
-    spaces: Vec<URef<Space>>,
+    /// `PartialUniverse` is defined in the `all_is_cubes` crate so that it can get access
+    /// to the same serialization helpers as `Universe` and be guaranteed to serialize the
+    /// exact same way.
+    contents: PartialUniverse,
 }
 
 impl ExportSet {
@@ -139,24 +141,21 @@ impl ExportSet {
     /// not be included; removals may cause errors.
     pub fn all_of_universe(universe: &Universe) -> Self {
         Self {
-            block_defs: universe.iter_by_type().map(|(_, r)| r).collect(),
-            spaces: universe.iter_by_type().map(|(_, r)| r).collect(),
+            contents: PartialUniverse::all_of(universe),
         }
     }
 
     /// Construct an [`ExportSet`] specifying exporting only the given [`BlockDef`]s.
     pub fn from_block_defs(block_defs: Vec<URef<BlockDef>>) -> Self {
         Self {
-            block_defs,
-            spaces: vec![],
+            contents: PartialUniverse::from_set(block_defs),
         }
     }
 
     /// Construct an [`ExportSet`] specifying exporting only the given [`Space`]s.
     pub fn from_spaces(spaces: Vec<URef<Space>>) -> Self {
         Self {
-            block_defs: vec![],
-            spaces,
+            contents: PartialUniverse::from_set(spaces),
         }
     }
 
@@ -172,7 +171,7 @@ impl ExportSet {
         member: &dyn universe::URefErased,
     ) -> PathBuf {
         let mut path: PathBuf = base_path.to_owned();
-        if self.count() > 1 {
+        if self.contents.count() > 1 {
             let mut new_file_name: OsString =
                 base_path.file_stem().expect("file name missing").to_owned();
             new_file_name.push("-");
@@ -188,11 +187,6 @@ impl ExportSet {
             path.set_file_name(new_file_name);
         }
         path
-    }
-
-    fn count(&self) -> usize {
-        let Self { block_defs, spaces } = self;
-        block_defs.len() + spaces.len()
     }
 }
 

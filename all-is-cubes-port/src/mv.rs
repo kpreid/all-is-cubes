@@ -7,7 +7,7 @@ use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridRotation, Rgb, Rgba};
 use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
-use all_is_cubes::universe::{self, Name, Universe};
+use all_is_cubes::universe::{self, Name, PartialUniverse, Universe};
 use all_is_cubes::util::{ConciseDebug, CustomFormat, YieldProgress};
 
 use crate::{ExportError, ExportSet};
@@ -91,11 +91,15 @@ pub(crate) async fn dot_vox_data_to_universe(
 ///
 pub(crate) async fn export_to_dot_vox_data(
     p: YieldProgress,
-    source: ExportSet,
+    source: crate::ExportSet,
 ) -> Result<dot_vox::DotVoxData, ExportError> {
-    let ExportSet {
-        block_defs,
-        spaces: to_export,
+    let crate::ExportSet {
+        contents:
+            PartialUniverse {
+                blocks: block_defs,
+                spaces: to_export,
+                characters: _,
+            },
     } = source;
 
     // If block def list is nonempty, fail.

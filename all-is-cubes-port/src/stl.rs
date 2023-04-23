@@ -2,9 +2,11 @@
 
 use std::fs;
 
-use all_is_cubes::block::{self, Block};
 use itertools::Itertools as _;
 use stl_io::Triangle;
+
+use all_is_cubes::block::{self, Block};
+use all_is_cubes::universe::PartialUniverse;
 
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::cgmath::{EuclideanSpace as _, Vector3};
@@ -19,7 +21,14 @@ pub(crate) async fn export_stl(
     source: crate::ExportSet,
     destination: std::path::PathBuf,
 ) -> Result<(), crate::ExportError> {
-    let crate::ExportSet { block_defs, spaces } = &source;
+    let crate::ExportSet {
+        contents:
+            PartialUniverse {
+                blocks: block_defs,
+                spaces,
+                characters: _,
+            },
+    } = &source;
 
     // TODO: give each exported item a distinct filename suffix
 
