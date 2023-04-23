@@ -492,3 +492,49 @@ fn gc_members<T>(table: &mut Storage<T>) {
         table.remove(&name);
     }
 }
+
+/// A subset of the [`URef`]s in one universe.
+///
+/// May be serialized as if it was a [`Universe`].
+///
+/// This structure is not currently exposed because it is a helper for
+/// `all_is_cubes_port::ExportSet` and doesn't play a role in the API itself.
+#[doc(hidden)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
+pub struct PartialUniverse {
+    // TODO: design API that doesn't rely on making these public, but still allows
+    // exports to be statically exhaustive.
+    pub blocks: Vec<URef<BlockDef>>,
+    pub characters: Vec<URef<Character>>,
+    pub spaces: Vec<URef<Space>>,
+}
+
+impl PartialUniverse {
+    pub fn all_of(universe: &Universe) -> Self {
+        Self {
+            blocks: universe.iter_by_type().map(|(_, r)| r).collect(),
+            characters: universe.iter_by_type().map(|(_, r)| r).collect(),
+            spaces: universe.iter_by_type().map(|(_, r)| r).collect(),
+        }
+    }
+
+    /// Select only the given members.
+    pub fn from_set<T>(members: impl IntoIterator<Item = URef<T>>) -> Self
+    where
+        T: UniverseMember,
+        Self: PartialUniverseOps<T>,
+    {
+        <Self as PartialUniverseOps<T>>::from_set(members)
+    }
+
+    #[doc(hidden)]
+    pub fn count(&self) -> usize {
+        let Self {
+            blocks,
+            characters,
+            spaces,
+        } = self;
+        blocks.len() + characters.len() + spaces.len()
+    }
+}

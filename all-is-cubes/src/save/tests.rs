@@ -10,7 +10,7 @@ use crate::character::Character;
 use crate::content::make_some_blocks;
 use crate::math::{GridAab, GridRotation, Rgb, Rgba};
 use crate::space::Space;
-use crate::universe::{Name, URef, Universe};
+use crate::universe::{Name, PartialUniverse, URef, Universe};
 
 #[track_caller]
 /// Serialize and deserialize and assert the value is equal.
@@ -163,8 +163,8 @@ fn space() {
 //------------------------------------------------------------------------------------------------//
 // Tests corresponding to the `universe` module
 
-#[test]
-fn universe_with_one_of_each() {
+/// A universe with one of each type, which we're going to use in a couple tests.
+fn universe_with_one_of_each() -> Universe {
     let mut universe = Universe::new();
 
     // Keep things simple but slightly distinguishable, because this is NOT a test
@@ -186,52 +186,71 @@ fn universe_with_one_of_each() {
     let character = Character::spawn_default(space_ref);
     universe.insert("a_character".into(), character).unwrap();
 
+    universe
+}
+
+/// JSON output for [`universe_with_one_of_each`].
+fn universe_with_one_of_each_json() -> serde_json::Value {
+    json!({
+        "type": "UniverseV1",
+        "members": [
+            {
+                "name": {"Specific": "a_block"},
+                "value": {
+                    "type": "BlockV1",
+                    "primitive": {
+                        "type": "AtomV1",
+                        "color": [0.5, 0.5, 0.5, 1.0],
+                        "display_name": "0",
+                    }
+                }
+            },
+            // TODO: character is missing
+            {
+                "name": {"Specific": "a_space"},
+                "value": {
+                    "type": "SpaceV1",
+                    "bounds": {
+                        "lower": [0, 0, 0],
+                        "upper": [2, 2, 2],
+                    },
+                    "blocks": [
+                        {
+                            "type": "BlockV1",
+                            "primitive": {"type": "AirV1"},
+                        },
+                        {
+                            "type": "BlockV1",
+                            "primitive": {
+                                "type": "IndirectV1",
+                                "definition": {"type": "URefV1", "Specific": "a_block"},
+                            }
+                        }
+                    ],
+                    "contents": [
+                        1, 0, 0, 0, 0, 0, 0, 0,
+                    ],
+                }
+            },
+        ],
+    })
+}
+
+#[test]
+fn universe_with_one_of_each_ser() {
     // TODO: use assert_serdeser; we will need to finish hooking up URefs on deserialization
     assert_eq!(
-        to_value(&universe).unwrap(),
-        json!({
-            "type": "UniverseV1",
-            "members": [
-                {
-                    "name": {"Specific": "a_block"},
-                    "value": {
-                        "type": "BlockV1",
-                        "primitive": {
-                            "type": "AtomV1",
-                            "color": [0.5, 0.5, 0.5, 1.0],
-                            "display_name": "0",
-                        }
-                    }
-                },
-                // TODO: character is missing
-                {
-                    "name": {"Specific": "a_space"},
-                    "value": {
-                        "type": "SpaceV1",
-                        "bounds": {
-                            "lower": [0, 0, 0],
-                            "upper": [2, 2, 2],
-                        },
-                        "blocks": [
-                            {
-                                "type": "BlockV1",
-                                "primitive": {"type": "AirV1"},
-                            },
-                            {
-                                "type": "BlockV1",
-                                "primitive": {
-                                    "type": "IndirectV1",
-                                    "definition": {"type": "URefV1", "Specific": "a_block"},
-                                }
-                            }
-                        ],
-                        "contents": [
-                            1, 0, 0, 0, 0, 0, 0, 0,
-                        ],
-                    }
-                },
-            ],
-        }),
+        to_value(&universe_with_one_of_each()).unwrap(),
+        universe_with_one_of_each_json(),
+    )
+}
+
+#[test]
+fn universe_with_one_of_each_partial_ser() {
+    // TODO: use assert_serdeser; we will need to finish hooking up URefs on deserialization
+    assert_eq!(
+        to_value(PartialUniverse::all_of(&universe_with_one_of_each())).unwrap(),
+        universe_with_one_of_each_json(),
     )
 }
 

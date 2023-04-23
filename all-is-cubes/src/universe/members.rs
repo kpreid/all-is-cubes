@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::Space;
-use crate::universe::{InsertError, Name, URef, URootRef, Universe, UniverseIter};
+use crate::universe::{InsertError, Name, PartialUniverse, URef, URootRef, Universe, UniverseIter};
 
 /// A `BTreeMap` is used to ensure that the iteration order is deterministic across
 /// runs/versions.
@@ -41,8 +41,8 @@ pub(super) trait UniverseTable<T> {
     fn table_mut(&mut self) -> &mut Self::Table;
 }
 
-/// Trait implemented once for each type of object that can be stored in a [`Universe`]
-/// that permits lookups of that type.
+/// Trait implemented by [`Universe`] once for each type of object that can be stored in a
+/// [`Universe`], that permits lookups of that type.
 ///
 /// This trait must be public(-in-private) so it can be a bound on public methods.
 /// It could be just public, but it's cleaner to not require importing it everywhere.
@@ -58,6 +58,21 @@ where
     fn insert(&mut self, name: Name, value: T) -> Result<URef<T>, InsertError>;
 
     fn iter_by_type(&self) -> UniverseIter<'_, T>;
+}
+
+/// Trait implemented by [`PartialUniverse`] once for each type of object that can be
+/// stored in a [`Universe`], that permits lookups of that type.
+///
+/// This trait must be public(-in-private) so it can be a bound on public methods.
+/// It could be just public, but it's cleaner to not require importing it everywhere.
+#[doc(hidden)]
+pub trait PartialUniverseOps<T>
+where
+    T: UniverseMember,
+{
+    fn from_set(members: impl IntoIterator<Item = URef<T>>) -> Self
+    where
+        Self: Sized;
 }
 
 // Helper functions to implement `UniverseOps` without putting everything
@@ -118,6 +133,17 @@ macro_rules! impl_universe_for_member {
             }
         }
 
+        impl UniverseTable<$member_type> for PartialUniverse {
+            type Table = Vec<URef<$member_type>>;
+
+            fn table(&self) -> &Self::Table {
+                &self.$table
+            }
+            fn table_mut(&mut self) -> &mut Self::Table {
+                &mut self.$table
+            }
+        }
+
         impl UniverseOps<$member_type> for Universe {
             fn get(&self, name: &Name) -> Option<URef<$member_type>> {
                 ops_get(self, name)
@@ -131,6 +157,15 @@ macro_rules! impl_universe_for_member {
             }
             fn iter_by_type(&self) -> UniverseIter<'_, $member_type> {
                 UniverseIter(UniverseTable::<$member_type>::table(self).iter())
+            }
+        }
+
+        impl PartialUniverseOps<$member_type> for PartialUniverse {
+            fn from_set(members: impl IntoIterator<Item = URef<$member_type>>) -> Self {
+                // TODO: enforce exactly one universe id
+                let mut new_self = Self::default();
+                UniverseTable::<$member_type>::table_mut(&mut new_self).extend(members);
+                new_self
             }
         }
     };

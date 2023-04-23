@@ -316,7 +316,7 @@ mod universe {
     use crate::block::{Block, BlockDef};
     use crate::save::schema::MemberEntrySer;
     use crate::space::Space;
-    use crate::universe::{Name, UBorrow, URef, Universe};
+    use crate::universe::{Name, PartialUniverse, UBorrow, URef, Universe};
     use schema::{MemberDe, NameSer, URefSer};
 
     impl From<&BlockDef> for schema::MemberSer {
@@ -326,40 +326,47 @@ mod universe {
         }
     }
 
-    impl Serialize for Universe {
+    impl Serialize for PartialUniverse {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            let block_defs =
-                self.iter_by_type()
-                    .map(|(name, member_ref): (Name, URef<BlockDef>)| {
-                        let read_guard: UBorrow<BlockDef> = member_ref.read().map_err(|e| {
-                            serde::ser::Error::custom(format!(
-                                "Failed to read universe member {name}: {e}"
-                            ))
-                        })?;
-                        let member_repr = schema::MemberSer::from(&*read_guard);
-                        Ok(schema::MemberEntrySer {
-                            name,
-                            value: member_repr,
-                        })
-                    });
-            let spaces = self
-                .iter_by_type()
-                .map(|(name, member_ref): (Name, URef<Space>)| {
-                    Ok(schema::MemberEntrySer {
-                        name,
-                        value: schema::MemberSer::Space(schema::SerializeRef(member_ref)),
-                    })
-                });
+            let Self {
+                blocks,
+                characters: _,
+                spaces,
+            } = self;
+
+            let blocks = blocks.iter().map(|member_ref: &URef<BlockDef>| {
+                let name = member_ref.name();
+                let read_guard: UBorrow<BlockDef> = member_ref.read().map_err(|e| {
+                    serde::ser::Error::custom(format!("Failed to read universe member {name}: {e}"))
+                })?;
+                let member_repr = schema::MemberSer::from(&*read_guard);
+                Ok(schema::MemberEntrySer {
+                    name: member_ref.name(),
+                    value: member_repr,
+                })
+            });
+            let spaces = spaces.iter().map(|member_ref: &URef<Space>| {
+                Ok(schema::MemberEntrySer {
+                    name: member_ref.name(),
+                    value: schema::MemberSer::Space(schema::SerializeRef(member_ref.clone())),
+                })
+            });
 
             let characters = [/* TODO: serialize characters */];
 
             schema::UniverseSer::UniverseV1 {
-                members: block_defs
+                members: blocks
                     .chain(spaces)
                     .chain(characters)
                     .collect::<Result<Vec<MemberEntrySer<schema::MemberSer>>, S::Error>>()?,
             }
             .serialize(serializer)
+        }
+    }
+
+    impl Serialize for Universe {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            PartialUniverse::all_of(self).serialize(serializer)
         }
     }
 
