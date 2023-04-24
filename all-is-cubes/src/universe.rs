@@ -28,8 +28,8 @@ use crate::time::Tick;
 use crate::transaction::Transaction as _;
 use crate::util::{CustomFormat, StatusText, TypeName};
 
+// Note: Everything in `members` is either an impl, private, or intentionally public-in-private.
 mod members;
-// pub(crate) because all items are currently internal
 pub(crate) use members::*;
 
 mod universe_txn;

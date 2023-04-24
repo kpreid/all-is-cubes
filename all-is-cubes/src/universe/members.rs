@@ -1,3 +1,9 @@
+//! Module defining various traits and impls relating to [`Universe`] containing different
+//! types of members.
+//!
+//! This module is not public and that is part of the protection of several items
+//! inside it (the public-in-private trick).
+
 use std::collections::BTreeMap;
 
 use crate::block::BlockDef;
@@ -10,8 +16,11 @@ use crate::universe::{InsertError, Name, URef, URootRef, Universe, UniverseIndex
 pub(super) type Storage<T> = BTreeMap<Name, URootRef<T>>;
 
 /// Trait for every type which can be a named member of a universe.
-/// This trait is also public-in-private and serves to “seal” the [`UniverseIndex`]
-/// trait.
+///
+/// This trait is also public-in-private and thus prevents anything bounded by it from
+/// being called or implemented by an unsupported type (“sealing”). However, because of
+/// that, it also cannot mention anything we don't also want to make public or
+/// public-in-private.
 pub trait UniverseMember: Sized + 'static {
     /// Generic constructor for [`AnyURef`].
     fn into_any_ref(r: URef<Self>) -> AnyURef;
@@ -100,6 +109,9 @@ macro_rules! member_enums {
         /// Holds any one of the [`URef`] types that can be in a [`Universe`].
         ///
         /// See also [`URefErased`], which is implemented by `URef`s rather than owning one.
+        ///
+        /// This type is public-in-private because it is mentioned by the [`UniverseMember`]
+        /// public-in-private trait.
         #[derive(Clone, Debug, Eq, Hash, PartialEq)]
         #[doc(hidden)] // actually public-in-private but if we make a mistake, hide it
         pub enum AnyURef {
