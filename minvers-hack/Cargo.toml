@@ -17,7 +17,7 @@ filetime = { version = "0.2.20", default-features = false }
 # `wyz` depends on `tap::Pipe` which only exists in `tap 1.0.1`, not `tap 1.0.0`
 tap = { version = "1.0.1", default-features = false }
 # `regex` 1.5.0 is uncompilable
-regex = { version = "1.5.1", default-features = false, features = ["std"] }
+regex = { version = "1.8.1", default-features = false, features = ["std"] }
 # Not strictly a minimal-versions issue, but binary output differences make our end-to-end tests fail.
 flate2 = { version = "1.0.25", default-features = false }
 # `assert_fs` -> `ignore` -> `rand v0.6.0` -> `rand_isaac v0.1.0` -> `rand_core v0.2.0`
