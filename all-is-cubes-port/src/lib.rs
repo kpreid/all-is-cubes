@@ -46,8 +46,8 @@
 #![warn(missing_docs)]
 
 use std::ffi::OsString;
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::{fs, io};
 
 use all_is_cubes::block::{self, BlockDef};
 use all_is_cubes::space::Space;
@@ -58,6 +58,7 @@ pub mod file;
 pub mod gltf;
 mod mv;
 use mv::load_dot_vox;
+mod native;
 mod stl;
 
 #[cfg(test)]
@@ -77,17 +78,7 @@ pub async fn load_universe_from_file(
     })?;
     if bytes.starts_with(b"{") {
         // Assume it's JSON. Furthermore, assume it's ours.
-        serde_json::from_slice::<Universe>(&bytes).map_err(|error| ImportError {
-            source_path: file.display_full_path().to_string(),
-            detail: if error.is_eof() || error.is_io() {
-                ImportErrorKind::Read {
-                    path: None,
-                    error: io::Error::new(io::ErrorKind::Other, error),
-                }
-            } else {
-                ImportErrorKind::Parse(Box::new(error))
-            },
-        })
+        native::import_native_json(&bytes, &file)
     } else if bytes.starts_with(b"VOX ") {
         load_dot_vox(progress, &bytes)
             .await
@@ -105,7 +96,8 @@ pub async fn load_universe_from_file(
 
 /// Export data specified by an [`ExportSet`] to a file on disk.
 ///
-/// TODO: Define what happens for formats with auxiliary files.
+/// If the format requires multiple files, then they will be named with hyphenated suffixes
+/// before the extension; i.e. "foo.gltf" becomes "foo-bar.gltf".
 ///
 /// TODO: Generalize this or add a parallel function for non-filesystem destinations.
 pub async fn export_to_path(
@@ -115,6 +107,7 @@ pub async fn export_to_path(
     destination: PathBuf,
 ) -> Result<(), crate::ExportError> {
     match format {
+        ExportFormat::AicJson => native::export_native_json(progress, source, destination).await,
         ExportFormat::DotVox => {
             // TODO: async file IO?
             mv::export_dot_vox(progress, source, fs::File::create(destination)?).await
@@ -194,6 +187,9 @@ impl ExportSet {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum ExportFormat {
+    /// Native format: JSON-encoded All is Cubes universe serialization.
+    AicJson,
+
     /// [MagicaVoxel `.vox`][vox] file.
     ///
     /// TODO: document version details and export limitations
@@ -224,6 +220,7 @@ impl ExportFormat {
     /// Whether exporting to this format is capable of including [`Space`] light data.
     pub fn includes_light(self) -> bool {
         match self {
+            ExportFormat::AicJson => true,
             ExportFormat::DotVox => false,
             ExportFormat::Gltf => false, // TODO: implement light
             ExportFormat::Stl => false,

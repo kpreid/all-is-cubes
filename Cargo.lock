@@ -214,6 +214,7 @@ dependencies = [
  "itertools",
  "log",
  "once_cell",
+ "pretty_assertions",
  "serde_json",
  "stl_io",
  "tempfile",

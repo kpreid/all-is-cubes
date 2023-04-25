@@ -83,6 +83,7 @@ pub(crate) struct AicDesktopArgs {
     ///
     /// The file name must have an extension specifying the format to use:
     ///
+    /// * “.alliscubesjson” — All is Cubes native save file format.
     /// * “.png” or “.apng” — export rendered scene.
     /// * “.gltf” — export scene as meshes in glTF format
     ///   (has accompanying “.glbin” data files).
@@ -262,6 +263,9 @@ pub fn determine_record_format(output_path: &Path) -> Result<RecordFormat, &'sta
         match extension.to_str() {
             // When updating this match, also update the docs for output_file!
             // TODO: RecordFormat and ExportFormat should be merged?
+            Some("alliscubesjson" | "ALLISCUBESJSON") => {
+                return Ok(RecordFormat::Export(ExportFormat::AicJson))
+            }
             Some("png" | "PNG") => return Ok(RecordFormat::PngOrApng),
             Some("apng" | "APNG") => return Ok(RecordFormat::PngOrApng),
             Some("gltf" | "GLTF") => return Ok(RecordFormat::Gltf),

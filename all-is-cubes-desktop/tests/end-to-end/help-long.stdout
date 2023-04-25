@@ -54,6 +54,7 @@ Options:
           
           The file name must have an extension specifying the format to use:
           
+          * “.alliscubesjson” — All is Cubes native save file format.
           * “.png” or “.apng” — export rendered scene.
           * “.gltf” — export scene as meshes in glTF format
             (has accompanying “.glbin” data files).

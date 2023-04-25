@@ -13,6 +13,7 @@
     - `universe::RefVisitor` is now implemented for all `FnMut(&dyn URefErased)`, allowing visitors to simply be functions.
 
 - `all-is-cubes-port` library:
+    - Import and export of a “native” file format.
     - Export to `.stl` meshes (commonly used for 3D printing).
     - `ImportError` type for precise error reporting.
 
