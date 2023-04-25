@@ -28,7 +28,7 @@ pub trait UniverseMember: Sized + 'static {
 }
 
 /// For each type `T` that can be a member of a [`Universe`], this trait is implemented,
-/// `impl UniverseIndex<T> for Universe`, in order to provide the collection of members
+/// `impl UniverseTable<T> for Universe`, in order to provide the collection of members
 /// of that type.
 ///
 /// This trait is not public and is used only within the implementation of [`Universe`];
@@ -47,7 +47,7 @@ pub(super) trait UniverseTable<T> {
 /// This trait must be public(-in-private) so it can be a bound on public methods.
 /// It could be just public, but it's cleaner to not require importing it everywhere.
 #[doc(hidden)]
-pub trait UniverseIndex<T>
+pub trait UniverseOps<T>
 where
     T: UniverseMember,
 {
@@ -60,9 +60,9 @@ where
     fn iter_by_type(&self) -> UniverseIter<'_, T>;
 }
 
-// Helper functions to implement `UniverseIndex` without putting everything
+// Helper functions to implement `UniverseOps` without putting everything
 // in the macro body.
-pub(super) fn index_get<T>(this: &Universe, name: &Name) -> Option<URef<T>>
+pub(super) fn ops_get<T>(this: &Universe, name: &Name) -> Option<URef<T>>
 where
     Universe: UniverseTable<T, Table = Storage<T>>,
 {
@@ -72,7 +72,7 @@ where
 }
 /// Implementation of inserting an item in a universe.
 /// Note that the same logic also exists in `UniverseTransaction`.
-pub(super) fn index_insert<T>(
+pub(super) fn ops_insert<T>(
     this: &mut Universe,
     mut name: Name,
     value: T,
@@ -118,16 +118,16 @@ macro_rules! impl_universe_for_member {
             }
         }
 
-        impl UniverseIndex<$member_type> for Universe {
+        impl UniverseOps<$member_type> for Universe {
             fn get(&self, name: &Name) -> Option<URef<$member_type>> {
-                index_get(self, name)
+                ops_get(self, name)
             }
             fn insert(
                 &mut self,
                 name: Name,
                 value: $member_type,
             ) -> Result<URef<$member_type>, InsertError> {
-                index_insert(self, name, value)
+                ops_insert(self, name, value)
             }
             fn iter_by_type(&self) -> UniverseIter<'_, $member_type> {
                 UniverseIter(UniverseTable::<$member_type>::table(self).iter())

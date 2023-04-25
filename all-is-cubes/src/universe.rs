@@ -220,7 +220,7 @@ impl Universe {
     /// a reference to it.
     pub fn insert_anonymous<T>(&mut self, value: T) -> URef<T>
     where
-        Self: UniverseIndex<T>,
+        Self: UniverseOps<T>,
         T: UniverseMember,
     {
         self.insert(Name::Pending, value)
@@ -233,10 +233,10 @@ impl Universe {
     /// Returns [`None`] if no object exists for the name.
     pub fn get<T>(&self, name: &Name) -> Option<URef<T>>
     where
-        Self: UniverseIndex<T>,
+        Self: UniverseOps<T>,
         T: UniverseMember,
     {
-        UniverseIndex::get(self, name)
+        UniverseOps::get(self, name)
     }
 
     /// Inserts a new object with a specific name.
@@ -244,10 +244,10 @@ impl Universe {
     /// Returns an error if the name is already in use.
     pub fn insert<T>(&mut self, name: Name, value: T) -> Result<URef<T>, InsertError>
     where
-        Self: UniverseIndex<T>,
+        Self: UniverseOps<T>,
         T: UniverseMember,
     {
-        UniverseIndex::insert(self, name, value)
+        UniverseOps::insert(self, name, value)
     }
 
     /// Iterate over all of the objects of type `T`.
@@ -276,10 +276,10 @@ impl Universe {
     /// ```
     pub fn iter_by_type<T>(&self) -> UniverseIter<'_, T>
     where
-        Self: UniverseIndex<T>,
+        Self: UniverseOps<T>,
         T: UniverseMember,
     {
-        UniverseIndex::iter_by_type(self)
+        UniverseOps::iter_by_type(self)
     }
 
     /// Convert a possibly-[pending](Name::Pending) [`Name`] into a name that may be an
