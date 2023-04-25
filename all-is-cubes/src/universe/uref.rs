@@ -552,7 +552,7 @@ mod tests {
     use crate::block::{Block, BlockDef};
     use crate::math::Rgba;
     use crate::space::Space;
-    use crate::universe::{Universe, UniverseIndex};
+    use crate::universe::Universe;
     use pretty_assertions::assert_eq;
 
     #[test]

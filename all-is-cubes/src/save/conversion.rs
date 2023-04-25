@@ -316,7 +316,7 @@ mod universe {
     use crate::block::{Block, BlockDef};
     use crate::save::schema::MemberEntrySer;
     use crate::space::Space;
-    use crate::universe::{Name, UBorrow, URef, Universe, UniverseIndex};
+    use crate::universe::{Name, UBorrow, URef, Universe};
     use schema::{MemberDe, NameSer, URefSer};
 
     impl From<&BlockDef> for schema::MemberSer {

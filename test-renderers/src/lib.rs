@@ -29,7 +29,7 @@ use image::RgbaImage;
 
 use all_is_cubes::character::Character;
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{Universe, UniverseIndex};
+use all_is_cubes::universe::Universe;
 
 mod diff;
 pub use diff::*;

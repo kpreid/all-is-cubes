@@ -1,7 +1,7 @@
 use std::error::Error as _;
 
 use all_is_cubes::block;
-use all_is_cubes::universe::{Name, URef, UniverseIndex as _};
+use all_is_cubes::universe::{Name, URef};
 use all_is_cubes::util::assert_send_sync;
 
 use crate::file::NonDiskFile;

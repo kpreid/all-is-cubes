@@ -20,7 +20,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{RefError, URef, Universe, UniverseIndex, UniverseTransaction};
+use all_is_cubes::universe::{RefError, URef, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::{make_some_voxel_blocks, palette};

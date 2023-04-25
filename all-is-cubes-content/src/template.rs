@@ -12,7 +12,7 @@ use all_is_cubes::math::{
     Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb, Rgba,
 };
 use all_is_cubes::space::{LightPhysics, Space};
-use all_is_cubes::universe::{Name, URef, Universe, UniverseIndex};
+use all_is_cubes::universe::{Name, URef, Universe};
 use all_is_cubes::util::YieldProgress;
 
 use crate::fractal::menger_sponge;

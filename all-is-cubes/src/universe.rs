@@ -90,10 +90,8 @@ impl UniverseId {
     }
 }
 
-/// A collection of named objects which can refer to each other via [`URef`]. In the
-/// future, it will enable garbage collection and inter-object invariants.
-///
-/// See also the [`UniverseIndex`] trait for methods for adding and removing objects.
+/// A collection of named objects which can refer to each other via [`URef`],
+/// and which are simulated at the same time steps.
 ///
 /// **Thread-safety caveat:** See the documentation on [avoiding deadlock].
 ///
@@ -131,7 +129,7 @@ impl Universe {
     /// Returns a [`URef`] for the object in this universe with the given name,
     /// regardless of its type, or [`None`] if there is none.
     ///
-    /// This is a dynamically-typed version of [`UniverseIndex::get`].
+    /// This is a dynamically-typed version of [`Universe::get()`].
     //
     // TODO: Find a useful way to implement this which does not require
     // boxing. Perhaps `URootRef` should implement `URefErased`? That would
@@ -227,6 +225,61 @@ impl Universe {
     {
         self.insert(Name::Pending, value)
             .expect("shouldn't happen: insert_anonymous failed")
+    }
+
+    /// Translates a name for an object of type `T` into a [`URef`] for it, which
+    /// allows borrowing the actual object.
+    ///
+    /// Returns [`None`] if no object exists for the name.
+    pub fn get<T>(&self, name: &Name) -> Option<URef<T>>
+    where
+        Self: UniverseIndex<T>,
+        T: UniverseMember,
+    {
+        UniverseIndex::get(self, name)
+    }
+
+    /// Inserts a new object with a specific name.
+    ///
+    /// Returns an error if the name is already in use.
+    pub fn insert<T>(&mut self, name: Name, value: T) -> Result<URef<T>, InsertError>
+    where
+        Self: UniverseIndex<T>,
+        T: UniverseMember,
+    {
+        UniverseIndex::insert(self, name, value)
+    }
+
+    /// Iterate over all of the objects of type `T`.
+    /// Note that this includes anonymous objects.
+    ///
+    /// ```
+    /// use all_is_cubes::block::{Block, BlockDef};
+    /// use all_is_cubes::content::make_some_blocks;
+    /// use all_is_cubes::universe::{Name, Universe, URef};
+    ///
+    /// let mut universe = Universe::new();
+    /// let [block_1, block_2] = make_some_blocks();
+    /// universe.insert(Name::from("b1"), BlockDef::new(block_1.clone()));
+    /// universe.insert(Name::from("b2"), BlockDef::new(block_2.clone()));
+    ///
+    /// let mut found_blocks = universe.iter_by_type()
+    ///     .map(|(name, value): (Name, URef<BlockDef>)| (name, Block::clone(&value.read().unwrap())))
+    ///     .collect::<Vec<_>>();
+    /// found_blocks.sort_by_key(|(name, _)| name.to_string());
+    /// assert_eq!(
+    ///     found_blocks,
+    ///     vec![Name::from("b1"), Name::from("b2")].into_iter()
+    ///         .zip(vec![block_1, block_2])
+    ///         .collect::<Vec<_>>(),
+    /// );
+    /// ```
+    pub fn iter_by_type<T>(&self) -> UniverseIter<'_, T>
+    where
+        Self: UniverseIndex<T>,
+        T: UniverseMember,
+    {
+        UniverseIndex::iter_by_type(self)
     }
 
     /// Convert a possibly-[pending](Name::Pending) [`Name`] into a name that may be an
@@ -340,53 +393,7 @@ where
     }
 }
 
-/// Trait implemented once for each type of object that can be stored in a [`Universe`]
-/// that permits lookups of that type.
-pub trait UniverseIndex<T>
-where
-    T: UniverseMember,
-{
-    // Internal: Implementations of this are in the [`members`] module.
-
-    /// Translates a name for an object of type `T` into a [`URef`] for it, which
-    /// allows borrowing the actual object.
-    ///
-    /// Returns [`None`] if no object exists for the name.
-    fn get(&self, name: &Name) -> Option<URef<T>>;
-
-    /// Inserts a new object with a specific name.
-    ///
-    /// Returns an error if the name is already in use.
-    fn insert(&mut self, name: Name, value: T) -> Result<URef<T>, InsertError>;
-
-    /// Iterate over all of the objects of type `T`.
-    /// Note that this includes anonymous objects.
-    ///
-    /// ```
-    /// use all_is_cubes::block::{Block, BlockDef};
-    /// use all_is_cubes::content::make_some_blocks;
-    /// use all_is_cubes::universe::{Name, Universe, UniverseIndex, URef};
-    ///
-    /// let mut universe = Universe::new();
-    /// let [block_1, block_2] = make_some_blocks();
-    /// universe.insert(Name::from("b1"), BlockDef::new(block_1.clone()));
-    /// universe.insert(Name::from("b2"), BlockDef::new(block_2.clone()));
-    ///
-    /// let mut found_blocks = universe.iter_by_type()
-    ///     .map(|(name, value): (Name, URef<BlockDef>)| (name, Block::clone(&value.read().unwrap())))
-    ///     .collect::<Vec<_>>();
-    /// found_blocks.sort_by_key(|(name, _)| name.to_string());
-    /// assert_eq!(
-    ///     found_blocks,
-    ///     vec![Name::from("b1"), Name::from("b2")].into_iter()
-    ///         .zip(vec![block_1, block_2])
-    ///         .collect::<Vec<_>>(),
-    /// );
-    /// ```
-    fn iter_by_type(&self) -> UniverseIter<'_, T>;
-}
-
-/// Iterator type for [`UniverseIndex::iter_by_type`].
+/// Iterator type for [`Universe::iter_by_type`].
 #[derive(Clone, Debug)]
 pub struct UniverseIter<'u, T>(std::collections::btree_map::Iter<'u, Name, URootRef<T>>);
 impl<'u, T> Iterator for UniverseIter<'u, T> {

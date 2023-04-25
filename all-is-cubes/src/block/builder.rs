@@ -11,7 +11,7 @@ use crate::block::{
 use crate::drawing::VoxelBrush;
 use crate::math::{GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
-use crate::universe::{Name, URef, Universe, UniverseIndex};
+use crate::universe::{Name, URef, Universe};
 
 /// Tool for constructing [`Block`] values conveniently.
 ///

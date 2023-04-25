@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::Space;
-use crate::universe::{InsertError, Name, URef, URootRef, Universe, UniverseIndex, UniverseIter};
+use crate::universe::{InsertError, Name, URef, URootRef, Universe, UniverseIter};
 
 /// A `BTreeMap` is used to ensure that the iteration order is deterministic across
 /// runs/versions.
@@ -21,6 +21,7 @@ pub(super) type Storage<T> = BTreeMap<Name, URootRef<T>>;
 /// being called or implemented by an unsupported type (“sealing”). However, because of
 /// that, it also cannot mention anything we don't also want to make public or
 /// public-in-private.
+#[doc(hidden)]
 pub trait UniverseMember: Sized + 'static {
     /// Generic constructor for [`AnyURef`].
     fn into_any_ref(r: URef<Self>) -> AnyURef;
@@ -30,7 +31,8 @@ pub trait UniverseMember: Sized + 'static {
 /// `impl UniverseIndex<T> for Universe`, in order to provide the collection of members
 /// of that type.
 ///
-/// This trait is not public and is used only within the implementation of [`Universe`].
+/// This trait is not public and is used only within the implementation of [`Universe`];
+/// thus, the `Table` associated type does not need to be a public type.
 pub(super) trait UniverseTable<T> {
     type Table;
 
@@ -39,17 +41,42 @@ pub(super) trait UniverseTable<T> {
     fn table_mut(&mut self) -> &mut Self::Table;
 }
 
-// Helper functions to implement UniverseIndex. Can't be trait provided methods
-// because UniverseTable is private
-fn index_get<T>(this: &Universe, name: &Name) -> Option<URef<T>>
+/// Trait implemented once for each type of object that can be stored in a [`Universe`]
+/// that permits lookups of that type.
+///
+/// This trait must be public(-in-private) so it can be a bound on public methods.
+/// It could be just public, but it's cleaner to not require importing it everywhere.
+#[doc(hidden)]
+pub trait UniverseIndex<T>
+where
+    T: UniverseMember,
+{
+    // Internal: Implementations of this are in the [`members`] module.
+
+    fn get(&self, name: &Name) -> Option<URef<T>>;
+
+    fn insert(&mut self, name: Name, value: T) -> Result<URef<T>, InsertError>;
+
+    fn iter_by_type(&self) -> UniverseIter<'_, T>;
+}
+
+// Helper functions to implement `UniverseIndex` without putting everything
+// in the macro body.
+pub(super) fn index_get<T>(this: &Universe, name: &Name) -> Option<URef<T>>
 where
     Universe: UniverseTable<T, Table = Storage<T>>,
 {
-    this.table().get(name).map(URootRef::downgrade)
+    <Universe as UniverseTable<T>>::table(this)
+        .get(name)
+        .map(URootRef::downgrade)
 }
 /// Implementation of inserting an item in a universe.
 /// Note that the same logic also exists in `UniverseTransaction`.
-fn index_insert<T>(this: &mut Universe, mut name: Name, value: T) -> Result<URef<T>, InsertError>
+pub(super) fn index_insert<T>(
+    this: &mut Universe,
+    mut name: Name,
+    value: T,
+) -> Result<URef<T>, InsertError>
 where
     Universe: UniverseTable<T, Table = Storage<T>>,
 {

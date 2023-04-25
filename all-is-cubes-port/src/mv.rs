@@ -7,7 +7,7 @@ use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridRotation, Rgb, Rgba};
 use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
-use all_is_cubes::universe::{self, Name, Universe, UniverseIndex};
+use all_is_cubes::universe::{self, Name, Universe};
 use all_is_cubes::util::{ConciseDebug, CustomFormat, YieldProgress};
 
 use crate::{ExportError, ExportSet};

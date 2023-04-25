@@ -358,7 +358,7 @@ impl Default for UiViewState {
 mod tests {
     use super::*;
     use crate::space::Space;
-    use crate::universe::{Universe, UniverseIndex};
+    use crate::universe::Universe;
 
     #[test]
     fn cameras_follow_character_and_world() {

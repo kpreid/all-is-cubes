@@ -604,7 +604,7 @@ pub enum CursorIcon {
 mod tests {
     use super::*;
     use all_is_cubes::space::Space;
-    use all_is_cubes::universe::{Name, Universe, UniverseIndex};
+    use all_is_cubes::universe::{Name, Universe};
     use futures_channel::oneshot;
 
     #[tokio::test]
@@ -623,7 +623,7 @@ mod tests {
 
         // Existing universe should still be present.
         session.maybe_step_universe();
-        assert!(UniverseIndex::<Space>::get(session.universe_mut(), &old_marker).is_some());
+        assert!(session.universe_mut().get::<Space>(&old_marker).is_some());
 
         // Deliver new universe.
         let mut new_universe = Universe::new();
@@ -634,8 +634,8 @@ mod tests {
 
         // Receive it.
         session.maybe_step_universe();
-        assert!(UniverseIndex::<Space>::get(session.universe_mut(), &new_marker).is_some());
-        assert!(UniverseIndex::<Space>::get(session.universe_mut(), &old_marker).is_none());
+        assert!(session.universe_mut().get::<Space>(&new_marker).is_some());
+        assert!(session.universe_mut().get::<Space>(&old_marker).is_none());
 
         // Verify cleanup (that the next step can succeed).
         session.maybe_step_universe();

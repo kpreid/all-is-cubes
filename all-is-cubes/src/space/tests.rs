@@ -17,7 +17,7 @@ use crate::space::{
 };
 use crate::time::Tick;
 use crate::transaction;
-use crate::universe::{Name, RefError, Universe, UniverseIndex as _, UniverseTransaction};
+use crate::universe::{Name, RefError, Universe, UniverseTransaction};
 
 // TODO: test consistency between the index and get_* methods
 // TODO: test fill() equivalence and error handling

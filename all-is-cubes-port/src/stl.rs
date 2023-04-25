@@ -111,7 +111,7 @@ mod tests {
     use all_is_cubes::block::BlockDef;
     use all_is_cubes::content::make_some_voxel_blocks;
     use all_is_cubes::content::testing::lighting_bench_space;
-    use all_is_cubes::universe::{Name, URef, Universe, UniverseIndex};
+    use all_is_cubes::universe::{Name, URef, Universe};
     use std::collections::BTreeSet;
     use std::path::PathBuf;
 

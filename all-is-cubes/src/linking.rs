@@ -19,7 +19,7 @@ use exhaust::Exhaust;
 use crate::block::{Block, BlockDef, Primitive};
 use crate::space::SetCubeError;
 use crate::transaction::ExecuteError;
-use crate::universe::{InsertError, Name, URef, Universe, UniverseIndex};
+use crate::universe::{InsertError, Name, URef, Universe};
 use crate::util::YieldProgress;
 
 fn name_in_module<E: BlockModule>(key: &E) -> Name {

@@ -9,8 +9,7 @@ use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::{self, Transaction};
 use crate::universe::{
-    list_refs, InsertError, InsertErrorKind, Name, RefError, URef, Universe, UniverseIndex,
-    UniverseTransaction,
+    list_refs, InsertError, InsertErrorKind, Name, RefError, URef, Universe, UniverseTransaction,
 };
 use crate::util::assert_send_sync;
 
@@ -261,18 +260,18 @@ fn delete_wrong_universe_fails() {
 fn gc_explicit() {
     let mut u = Universe::new();
     u.insert_anonymous(BlockDef::new(AIR));
-    assert_eq!(1, UniverseIndex::<BlockDef>::iter_by_type(&u).count());
+    assert_eq!(1, u.iter_by_type::<BlockDef>().count());
     u.gc();
-    assert_eq!(0, UniverseIndex::<BlockDef>::iter_by_type(&u).count());
+    assert_eq!(0, u.iter_by_type::<BlockDef>().count());
 }
 
 #[test]
 fn gc_implicit() {
     let mut u = Universe::new();
     u.insert_anonymous(BlockDef::new(AIR));
-    assert_eq!(1, UniverseIndex::<BlockDef>::iter_by_type(&u).count());
+    assert_eq!(1, u.iter_by_type::<BlockDef>().count());
     u.step(Tick::arbitrary());
-    assert_eq!(0, UniverseIndex::<BlockDef>::iter_by_type(&u).count());
+    assert_eq!(0, u.iter_by_type::<BlockDef>().count());
 }
 
 #[test]

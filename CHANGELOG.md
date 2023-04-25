@@ -33,6 +33,7 @@
     - `camera::Flaws` now implements `Display`. Use this instead of `Debug` for printing the flaws.
     - `math::Geometry::wireframe_points()` now produces a new type `mesh::LineVertex` instead of a tuple (with the same position and color data).
     - `transaction::Transaction` can now produce any number of `Output`s, delivered through a callback.
+    - `universe::UniverseIndex` is no longer a public trait; the relevant methods are now inherent methods on `Universe`.
     - `universe::UniverseTransaction::insert()` now takes a `URef` created by `URef::new_pending()`, instead of a bare value.
       This allows associations between the new member and other objects to be created within the same transaction.
     - Types that previously had a `pub fn listen(&self, impl Listener)` now implement the `listen::Listen` trait instead.

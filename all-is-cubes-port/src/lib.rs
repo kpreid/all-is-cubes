@@ -51,7 +51,7 @@ use std::{fs, io};
 
 use all_is_cubes::block::{self, BlockDef};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{self, URef, Universe, UniverseIndex as _};
+use all_is_cubes::universe::{self, URef, Universe};
 use all_is_cubes::util::YieldProgress;
 
 pub mod file;

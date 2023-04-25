@@ -10,7 +10,7 @@ use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::cgmath::{Vector3, Zero as _};
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{Name, URef, Universe, UniverseIndex};
+use all_is_cubes::universe::{Name, URef, Universe};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_mesh::{block_meshes_for_space, MeshOptions, SpaceMesh};
 

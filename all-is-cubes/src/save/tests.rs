@@ -10,7 +10,7 @@ use crate::character::Character;
 use crate::content::make_some_blocks;
 use crate::math::{GridAab, GridRotation, Rgb, Rgba};
 use crate::space::Space;
-use crate::universe::{Name, URef, Universe, UniverseIndex};
+use crate::universe::{Name, URef, Universe};
 
 #[track_caller]
 /// Serialize and deserialize and assert the value is equal.

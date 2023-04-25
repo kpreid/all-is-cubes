@@ -720,7 +720,6 @@ mod tests {
     use crate::content::make_some_blocks;
     use crate::space::SpaceTransaction;
     use crate::transaction::{ExecuteError, TransactionTester};
-    use crate::universe::UniverseIndex;
     use indoc::indoc;
     use std::collections::HashMap;
 
