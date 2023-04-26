@@ -144,7 +144,7 @@ enum UpdateTo {
     Locked,
     /// Regular `cargo update`.
     Latest,
-    /// `cargo update -Z minimal-versions --features minvers`.
+    /// `cargo update -Z direct-minimal-versions`.
     Minimal,
 }
 
@@ -264,12 +264,9 @@ fn main() -> Result<(), ActionError> {
             }
             UpdateTo::Minimal => {
                 do_for_all_workspaces(|| {
-                    cmd!("cargo +nightly update -Z minimal-versions").run()?;
+                    cmd!("cargo +nightly update -Z direct-minimal-versions").run()?;
                     Ok(())
                 })?;
-                // This can't be expressed as an entry in the minvers-hack package
-                cmd!("cargo +nightly update --offline --package malloc_buf@0.0.1 --precise 0.0.6")
-                    .run()?;
             }
         },
         XtaskCommand::SetVersion { version } => {
