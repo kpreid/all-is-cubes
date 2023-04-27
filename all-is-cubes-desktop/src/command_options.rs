@@ -237,24 +237,20 @@ pub(crate) struct DisplaySizeArg(pub Option<Vector2<u32>>);
 impl FromStr for DisplaySizeArg {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse_dimensions(s).map(DisplaySizeArg)
-    }
-}
-
-pub fn parse_dimensions(input: &str) -> Result<Option<Vector2<u32>>, String> {
-    if input.to_ascii_lowercase() == "auto" {
-        Ok(None)
-    } else {
-        let dims: [u32; 2] = input
-            .split(&['×', 'x', ',', ';', ' '][..])
-            .map(|s| {
-                s.parse::<u32>()
-                    .map_err(|_| format!("{s:?} not an integer or \"auto\""))
-            })
-            .collect::<Result<Vec<u32>, String>>()?
-            .try_into()
-            .map_err(|_| String::from("must be two integers or \"auto\""))?;
-        Ok(Some(Vector2::from(dims)))
+        if s.to_ascii_lowercase() == "auto" {
+            Ok(DisplaySizeArg(None))
+        } else {
+            let dims: [u32; 2] = s
+                .split(&['×', 'x', ',', ';', ' '][..])
+                .map(|s| {
+                    s.parse::<u32>()
+                        .map_err(|_| format!("{s:?} not an integer or \"auto\""))
+                })
+                .collect::<Result<Vec<u32>, String>>()?
+                .try_into()
+                .map_err(|_| String::from("must be two integers or \"auto\""))?;
+            Ok(DisplaySizeArg(Some(Vector2::from(dims))))
+        }
     }
 }
 
@@ -452,7 +448,9 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_dimensions() {
+    fn display_size_parse() {
+        let parse_dimensions =
+            |s: &str| s.parse::<DisplaySizeArg>().map(|DisplaySizeArg(size)| size);
         let err = |s: &str| Err(s.to_owned());
         assert_eq!(parse_dimensions("1,2"), Ok(Some(Vector2::new(1, 2))));
         assert_eq!(parse_dimensions("30x93"), Ok(Some(Vector2::new(30, 93))));
