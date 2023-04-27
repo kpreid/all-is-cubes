@@ -5,14 +5,15 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
 
-use all_is_cubes_port::ExportFormat;
 use clap::builder::{PathBufValueParser, PossibleValue, PossibleValuesParser};
 use clap::{builder::TypedValueParser, Parser, ValueEnum};
 use once_cell::sync::Lazy;
 use strum::IntoEnumIterator;
 
-use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::cgmath::{Vector2, Vector3};
+use all_is_cubes::math::GridCoordinate;
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
+use all_is_cubes_port::ExportFormat;
 
 use crate::record::{RecordAnimationOptions, RecordFormat, RecordOptions};
 use crate::TITLE;
@@ -75,6 +76,19 @@ pub(crate) struct AicDesktopArgs {
     #[arg(long = "seed")]
     pub(crate) seed: Option<u64>,
 
+    /// Dimensions for the space the template generates.
+    ///
+    /// Not all templates support this option, and some may restrict the size to a
+    /// minimum or multiples.
+    ///
+    /// If not specified, a template-specific default size will be used.
+    #[arg(
+        long = "template-size",
+        value_name = "X,Y,Z",
+        default_value = "default"
+    )]
+    pub(crate) template_size: SpaceSizeArg,
+
     /// Fully calculate light before starting the game.
     #[arg(long = "precompute-light")]
     pub(crate) precompute_light: bool,
@@ -126,6 +140,7 @@ pub(crate) struct AicDesktopArgs {
     /// * MagicaVoxel .vox (partial support)
     #[arg(
         conflicts_with = "template",
+        conflicts_with = "template_size",
         conflicts_with = "seed",
         value_name = "FILE"
     )]
@@ -230,7 +245,8 @@ pub enum GraphicsType {
     Print,
 }
 
-/// This is just to hide the `Option` from `clap` because we don't want it to mean optional-argument.
+/// Window/image size, parseable in a variety of formats, and with `None` referring to
+/// “automatic”, not “optional”.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct DisplaySizeArg(pub Option<Vector2<u32>>);
 
@@ -250,6 +266,35 @@ impl FromStr for DisplaySizeArg {
                 .try_into()
                 .map_err(|_| String::from("must be two integers or \"auto\""))?;
             Ok(DisplaySizeArg(Some(Vector2::from(dims))))
+        }
+    }
+}
+
+/// Template generation size.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SpaceSizeArg(pub Option<Vector3<GridCoordinate>>);
+
+impl FromStr for SpaceSizeArg {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.to_ascii_lowercase() == "default" {
+            Ok(SpaceSizeArg(None))
+        } else {
+            let dims: [GridCoordinate; 3] = s
+                .split(&['×', 'x', ',', ';', ' '][..])
+                .map(|s| {
+                    let i = s
+                        .parse::<GridCoordinate>()
+                        .map_err(|_| format!("{s:?} not an integer or \"default\""))?;
+                    if i < 1 {
+                        return Err(format!("{s:?} not an integer or \"default\""));
+                    }
+                    Ok(i)
+                })
+                .collect::<Result<Vec<GridCoordinate>, String>>()?
+                .try_into()
+                .map_err(|_| String::from("must be three integers or \"default\""))?;
+            Ok(SpaceSizeArg(Some(Vector3::from(dims))))
         }
     }
 }
@@ -291,12 +336,13 @@ pub(crate) enum UniverseSource {
 pub(crate) fn parse_universe_source(
     input_file: Option<PathBuf>,
     template: UniverseTemplate,
+    SpaceSizeArg(size): SpaceSizeArg,
     seed: Option<u64>,
 ) -> UniverseSource {
     if let Some(file) = input_file {
         UniverseSource::File(file)
     } else {
-        UniverseSource::Template(template, TemplateParameters { seed, size: None })
+        UniverseSource::Template(template, TemplateParameters { seed, size })
     }
 }
 
@@ -397,10 +443,11 @@ mod tests {
             template,
             input_file,
             seed,
+            template_size: size,
             ..
         } = parse(args)?;
         // TODO: make this a method on AicDesktopArgs
-        Ok(parse_universe_source(input_file, template, seed))
+        Ok(parse_universe_source(input_file, template, size, seed))
     }
 
     #[test]
@@ -449,36 +496,36 @@ mod tests {
 
     #[test]
     fn display_size_parse() {
-        let parse_dimensions =
-            |s: &str| s.parse::<DisplaySizeArg>().map(|DisplaySizeArg(size)| size);
+        let parse = |s: &str| s.parse::<DisplaySizeArg>().map(|DisplaySizeArg(size)| size);
         let err = |s: &str| Err(s.to_owned());
-        assert_eq!(parse_dimensions("1,2"), Ok(Some(Vector2::new(1, 2))));
-        assert_eq!(parse_dimensions("30x93"), Ok(Some(Vector2::new(30, 93))));
-        assert_eq!(parse_dimensions("30×93"), Ok(Some(Vector2::new(30, 93))));
-        assert_eq!(parse_dimensions(""), err("\"\" not an integer or \"auto\""));
+        assert_eq!(parse("1,2"), Ok(Some(Vector2::new(1, 2))));
+        assert_eq!(parse("30x93"), Ok(Some(Vector2::new(30, 93))));
+        assert_eq!(parse("30×93"), Ok(Some(Vector2::new(30, 93))));
+        assert_eq!(parse(""), err("\"\" not an integer or \"auto\""));
+        assert_eq!(parse("1"), err("must be two integers or \"auto\""));
+        assert_eq!(parse("a"), err("\"a\" not an integer or \"auto\""));
+        assert_eq!(parse("1a1"), err("\"1a1\" not an integer or \"auto\""));
+        assert_eq!(parse("1×1×1"), err("must be two integers or \"auto\""));
+        assert_eq!(parse("a×b"), err("\"a\" not an integer or \"auto\""));
+        assert_eq!(parse("1×b"), err("\"b\" not an integer or \"auto\""));
+    }
+
+    #[test]
+    fn space_size_parse() {
+        let parse = |s: &str| s.parse::<SpaceSizeArg>().map(|SpaceSizeArg(size)| size);
+        let err = |s: &str| Err(s.to_owned());
+        assert_eq!(parse("1,2,3"), Ok(Some(Vector3::new(1, 2, 3))));
+        assert_eq!(parse("10x20x30"), Ok(Some(Vector3::new(10, 20, 30))));
+        assert_eq!(parse("10×20×30"), Ok(Some(Vector3::new(10, 20, 30))));
+        assert_eq!(parse(""), err("\"\" not an integer or \"default\""));
+        assert_eq!(parse("1"), err("must be three integers or \"default\""));
+        assert_eq!(parse("a"), err("\"a\" not an integer or \"default\""));
         assert_eq!(
-            parse_dimensions("1"),
-            err("must be two integers or \"auto\"")
+            parse("1a1a1"),
+            err("\"1a1a1\" not an integer or \"default\"")
         );
-        assert_eq!(
-            parse_dimensions("a"),
-            err("\"a\" not an integer or \"auto\"")
-        );
-        assert_eq!(
-            parse_dimensions("1a1"),
-            err("\"1a1\" not an integer or \"auto\"")
-        );
-        assert_eq!(
-            parse_dimensions("1×1×1"),
-            err("must be two integers or \"auto\"")
-        );
-        assert_eq!(
-            parse_dimensions("a×b"),
-            err("\"a\" not an integer or \"auto\"")
-        );
-        assert_eq!(
-            parse_dimensions("1×b"),
-            err("\"b\" not an integer or \"auto\"")
-        );
+        assert_eq!(parse("1×1"), err("must be three integers or \"default\""));
+        assert_eq!(parse("a×bxc"), err("\"a\" not an integer or \"default\""));
+        assert_eq!(parse("1×b×c"), err("\"b\" not an integer or \"default\""));
     }
 }

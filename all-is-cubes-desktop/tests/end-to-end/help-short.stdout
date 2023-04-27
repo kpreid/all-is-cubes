@@ -9,18 +9,19 @@ Arguments:
   [FILE]  Existing save/document file to load. If not specified, a template will be used instead
 
 Options:
-      --display-size <W×H>   Window size or image size, if applicable to the selected --graphics
-                             mode [default: auto]
-      --duration <SECONDS>   Length of time to simulate.
-      --fullscreen           Make the window fullscreen
-  -g, --graphics <mode>      Graphics/UI mode [default: window]
-  -h, --help                 Print help (see more with '--help')
-      --no-config-files      Ignore all configuration files, using only defaults and command-line
-                             options
-  -o, --output <FILE>        Output file name for 'record' mode.
-      --precompute-light     Fully calculate light before starting the game
-      --seed <SEED>          Seed value for randomized components of the world template
-  -t, --template <TEMPLATE>  Which world template to use [default: demo-city] [possible values:
+      --display-size <W×H>     Window size or image size, if applicable to the selected --graphics
+                               mode [default: auto]
+      --duration <SECONDS>     Length of time to simulate.
+      --fullscreen             Make the window fullscreen
+  -g, --graphics <mode>        Graphics/UI mode [default: window]
+  -h, --help                   Print help (see more with '--help')
+      --no-config-files        Ignore all configuration files, using only defaults and command-line
+                               options
+  -o, --output <FILE>          Output file name for 'record' mode.
+      --precompute-light       Fully calculate light before starting the game
+      --seed <SEED>            Seed value for randomized components of the world template
+  -t, --template <TEMPLATE>    Which world template to use [default: demo-city] [possible values:
 ...
-  -v, --verbose              Additional logging to stderr
-  -V, --version              Print version
+      --template-size <X,Y,Z>  Dimensions for the space the template generates [default: default]
+  -v, --verbose                Additional logging to stderr
+  -V, --version                Print version

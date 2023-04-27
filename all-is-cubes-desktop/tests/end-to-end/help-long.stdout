@@ -79,6 +79,16 @@ Options:
           [possible values: [..]
 ...
 
+      --template-size <X,Y,Z>
+          Dimensions for the space the template generates.
+          
+          Not all templates support this option, and some may restrict the size to a minimum or
+          multiples.
+          
+          If not specified, a template-specific default size will be used.
+          
+          [default: default]
+
   -v, --verbose
           Additional logging to stderr
 

@@ -90,6 +90,7 @@ fn main() -> Result<(), anyhow::Error> {
         display_size: DisplaySizeArg(display_size),
         fullscreen,
         template,
+        template_size,
         seed,
         precompute_light,
         input_file,
@@ -98,7 +99,7 @@ fn main() -> Result<(), anyhow::Error> {
         verbose,
         no_config_files,
     } = options.clone();
-    let input_source = parse_universe_source(input_file, template, seed);
+    let input_source = parse_universe_source(input_file, template, template_size, seed);
 
     // Initialize logging -- but only if it won't interfere.
     if graphics_type != GraphicsType::Terminal || verbose {
