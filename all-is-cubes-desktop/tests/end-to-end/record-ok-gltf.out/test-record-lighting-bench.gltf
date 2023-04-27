@@ -1,0 +1,281 @@
+{
+  "accessors": [
+    {
+      "bufferView": 0,
+      "byteOffset": 0,
+      "count": 1104,
+      "componentType": 5126,
+      "type": "VEC3",
+      "min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "max": [
+        14.0,
+        2.0,
+        14.0
+      ],
+      "name": "chunk [0, 0, 0] position"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 12,
+      "count": 1104,
+      "componentType": 5126,
+      "type": "VEC4",
+      "min": [
+        0.5,
+        0.19272807240486145,
+        0.5,
+        1.0
+      ],
+      "max": [
+        0.854192852973938,
+        0.5,
+        0.9754981994628906,
+        1.0
+      ],
+      "name": "chunk [0, 0, 0] color"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 0,
+      "count": 1656,
+      "componentType": 5125,
+      "type": "SCALAR",
+      "name": "chunk [0, 0, 0] opaque index"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 0,
+      "count": 1680,
+      "componentType": 5126,
+      "type": "VEC3",
+      "min": [
+        0.0,
+        28.0,
+        0.0
+      ],
+      "max": [
+        14.0,
+        32.0,
+        14.0
+      ],
+      "name": "chunk [0, -1, 0] position"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 12,
+      "count": 1680,
+      "componentType": 5126,
+      "type": "VEC4",
+      "min": [
+        0.5,
+        0.5,
+        0.5,
+        1.0
+      ],
+      "max": [
+        0.5,
+        0.5,
+        0.5,
+        1.0
+      ],
+      "name": "chunk [0, -1, 0] color"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 0,
+      "count": 2520,
+      "componentType": 5125,
+      "type": "SCALAR",
+      "name": "chunk [0, -1, 0] opaque index"
+    }
+  ],
+  "asset": {
+    "generator": "all-is-cubes",
+    "version": "2.0"
+  },
+  "buffers": [
+    {
+      "byteLength": 37536,
+      "name": "chunk [0, 0, 0] data",
+      "uri": "test-record-lighting-bench-mesh-0.glbin"
+    },
+    {
+      "byteLength": 57120,
+      "name": "chunk [0, -1, 0] data",
+      "uri": "test-record-lighting-bench-mesh-1.glbin"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 30912,
+      "byteStride": 28,
+      "name": "chunk [0, 0, 0] vertex",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 6624,
+      "byteOffset": 30912,
+      "name": "chunk [0, 0, 0] index",
+      "target": 34963
+    },
+    {
+      "buffer": 1,
+      "byteLength": 47040,
+      "byteStride": 28,
+      "name": "chunk [0, -1, 0] vertex",
+      "target": 34962
+    },
+    {
+      "buffer": 1,
+      "byteLength": 10080,
+      "byteOffset": 47040,
+      "name": "chunk [0, -1, 0] index",
+      "target": 34963
+    }
+  ],
+  "extensionsUsed": [
+    "KHR_materials_transmission",
+    "KHR_materials_volume"
+  ],
+  "cameras": [
+    {
+      "perspective": {
+        "aspectRatio": 1.3333334,
+        "yfov": 1.5707964,
+        "zfar": 200.0,
+        "znear": 0.03125
+      },
+      "type": "perspective"
+    }
+  ],
+  "materials": [
+    {
+      "alphaMode": "OPAQUE",
+      "doubleSided": false,
+      "name": "aic-vertex-opaque",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 1.0
+      },
+      "emissiveFactor": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": false,
+      "name": "aic-vertex-transparent",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 1.0
+      },
+      "emissiveFactor": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "extensions": {
+        "KHR_materials_transmission": {
+          "transmissionFactor": 0.0
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "chunk [0, 0, 0] mesh",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "COLOR_0": 1
+          },
+          "indices": 2,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "chunk [0, -1, 0] mesh",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 3,
+            "COLOR_0": 4
+          },
+          "indices": 5,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "chunk [0, 0, 0]",
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mesh": 1,
+      "name": "chunk [0, -1, 0]",
+      "translation": [
+        0.0,
+        -32.0,
+        0.0
+      ]
+    },
+    {
+      "camera": 0,
+      "rotation": [
+        -0.22975291,
+        0.0,
+        0.0,
+        0.973249
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        7.0,
+        5.26099,
+        19.52198
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "name": "recording",
+      "nodes": [
+        2,
+        0,
+        1
+      ]
+    }
+  ]
+}

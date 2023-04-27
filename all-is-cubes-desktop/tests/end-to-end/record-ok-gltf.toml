@@ -1,4 +1,2 @@
 bin.name = "all-is-cubes"
-# Recording just the empty for now because that will be less exciting and bulky than
-# actual meshes. Maybe revisit this later.
-args = "--no-config-files --template blank --graphics record -o test-record-blank.gltf"
+args = "--no-config-files --template lighting-bench --template-size=16x6x16 --graphics record -o test-record-lighting-bench.gltf"
