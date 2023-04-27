@@ -221,9 +221,35 @@ mod block {
     }
 }
 
+// `character::Character` serialization is inside its module for the sake of private fields.
+
 mod math {
     use super::*;
-    use crate::math::GridAab;
+    use crate::math::{Aab, GridAab};
+
+    impl Serialize for Aab {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            schema::AabSer {
+                lower: self.lower_bounds_p().into(),
+                upper: self.upper_bounds_p().into(),
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Aab {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let schema::AabSer { lower, upper } = schema::AabSer::deserialize(deserializer)?;
+            Aab::checked_from_lower_upper(lower.into(), upper.into())
+                .ok_or_else(|| serde::de::Error::custom("invalid AAB"))
+        }
+    }
 
     impl Serialize for GridAab {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -246,6 +272,101 @@ mod math {
             let schema::GridAabSer { lower, upper } =
                 schema::GridAabSer::deserialize(deserializer)?;
             GridAab::checked_from_lower_upper(lower, upper).map_err(serde::de::Error::custom)
+        }
+    }
+}
+
+mod inv {
+    use super::*;
+    use crate::inv::{EphemeralOpaque, Inventory, Slot, Tool};
+
+    impl Serialize for Inventory {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            schema::InventorySer::InventoryV1 {
+                slots: self
+                    .slots
+                    .iter()
+                    .map(|slot| match *slot {
+                        crate::inv::Slot::Empty => None,
+                        crate::inv::Slot::Stack(count, ref item) => Some(schema::InvStackSer {
+                            count,
+                            item: item.clone(),
+                        }),
+                    })
+                    .collect(),
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Inventory {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            match schema::InventorySer::deserialize(deserializer)? {
+                schema::InventorySer::InventoryV1 { slots } => Ok(Inventory {
+                    slots: slots
+                        .into_iter()
+                        .map(|slot| match slot {
+                            Some(schema::InvStackSer { count, item }) => Slot::Stack(count, item),
+                            None => Slot::Empty,
+                        })
+                        .collect(),
+                }),
+            }
+        }
+    }
+
+    impl Serialize for Tool {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            match *self {
+                Tool::Activate => schema::ToolSer::ActivateV1 {},
+                Tool::RemoveBlock { keep } => schema::ToolSer::RemoveBlockV1 { keep },
+                Tool::Block(ref block) => schema::ToolSer::BlockV1 {
+                    block: block.clone(),
+                },
+                Tool::InfiniteBlocks(ref block) => schema::ToolSer::InfiniteBlocksV1 {
+                    block: block.clone(),
+                },
+                Tool::CopyFromSpace => schema::ToolSer::CopyFromSpaceV1 {},
+                Tool::EditBlock => schema::ToolSer::EditBlockV1 {},
+                Tool::PushPull => schema::ToolSer::PushPullV1 {},
+                Tool::Jetpack { active } => schema::ToolSer::JetpackV1 { active },
+                Tool::ExternalAction {
+                    function: _,
+                    ref icon,
+                } => schema::ToolSer::ExternalActionV1 { icon: icon.clone() },
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Tool {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            Ok(match schema::ToolSer::deserialize(deserializer)? {
+                schema::ToolSer::ActivateV1 {} => Tool::Activate,
+                schema::ToolSer::RemoveBlockV1 { keep } => Tool::RemoveBlock { keep },
+                schema::ToolSer::BlockV1 { block } => Tool::Block(block),
+                schema::ToolSer::InfiniteBlocksV1 { block } => Tool::InfiniteBlocks(block),
+                schema::ToolSer::CopyFromSpaceV1 {} => Tool::CopyFromSpace,
+                schema::ToolSer::EditBlockV1 {} => Tool::EditBlock,
+                schema::ToolSer::PushPullV1 {} => Tool::PushPull,
+                schema::ToolSer::JetpackV1 { active } => Tool::Jetpack { active },
+                schema::ToolSer::ExternalActionV1 { icon } => Tool::ExternalAction {
+                    function: EphemeralOpaque(None),
+                    icon,
+                },
+            })
         }
     }
 }
@@ -314,6 +435,7 @@ mod space {
 mod universe {
     use super::*;
     use crate::block::{Block, BlockDef};
+    use crate::character::Character;
     use crate::save::schema::MemberEntrySer;
     use crate::space::Space;
     use crate::universe::{Name, PartialUniverse, UBorrow, URef, Universe};
@@ -330,7 +452,7 @@ mod universe {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             let Self {
                 blocks,
-                characters: _,
+                characters,
                 spaces,
             } = self;
 
@@ -345,6 +467,12 @@ mod universe {
                     value: member_repr,
                 })
             });
+            let characters = characters.iter().map(|member_ref: &URef<Character>| {
+                Ok(schema::MemberEntrySer {
+                    name: member_ref.name(),
+                    value: schema::MemberSer::Character(schema::SerializeRef(member_ref.clone())),
+                })
+            });
             let spaces = spaces.iter().map(|member_ref: &URef<Space>| {
                 Ok(schema::MemberEntrySer {
                     name: member_ref.name(),
@@ -352,12 +480,10 @@ mod universe {
                 })
             });
 
-            let characters = [/* TODO: serialize characters */];
-
             schema::UniverseSer::UniverseV1 {
                 members: blocks
-                    .chain(spaces)
                     .chain(characters)
+                    .chain(spaces)
                     .collect::<Result<Vec<MemberEntrySer<schema::MemberSer>>, S::Error>>()?,
             }
             .serialize(serializer)
@@ -375,13 +501,14 @@ mod universe {
             let data = schema::UniverseDe::deserialize(deserializer)?;
             let mut universe = Universe::new();
             match data {
-                // TODO: Instead of new_gone(), this needs to be a named ref that can be
-                // hooked up to its definition.
                 schema::UniverseDe::UniverseV1 { members } => {
                     for schema::MemberEntrySer { name, value } in members {
                         match value {
                             MemberDe::BlockDef(block) => {
                                 universe.insert(name, BlockDef::new(block)).map(|_| ())
+                            }
+                            MemberDe::Character(character) => {
+                                universe.insert(name, character).map(|_| ())
                             }
                             MemberDe::Space(space) => universe.insert(name, space).map(|_| ()),
                         }

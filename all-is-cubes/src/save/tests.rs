@@ -8,6 +8,7 @@ use serde_json::{from_value, json, to_value};
 use crate::block::{self, Block, BlockDef, Modifier, Resolution};
 use crate::character::Character;
 use crate::content::make_some_blocks;
+use crate::inv::Tool;
 use crate::math::{GridAab, GridRotation, Rgb, Rgba};
 use crate::space::Space;
 use crate::universe::{Name, PartialUniverse, URef, Universe};
@@ -130,6 +131,62 @@ fn block_with_modifiers() {
 // TODO: test serialization of each modifier
 
 //------------------------------------------------------------------------------------------------//
+// Tests corresponding to the `character` module
+
+#[test]
+fn character() {
+    let mut universe = Universe::new();
+    let space = Space::builder(GridAab::from_lower_upper([1, 2, 3], [4, 5, 6])).build();
+    let mut spawn = space.spawn().clone();
+    let space: URef<Space> = universe.insert("a_space".into(), space).unwrap();
+    spawn.set_inventory(vec![Tool::Activate.into()]);
+    let character = Character::spawn(&spawn, space);
+
+    // TODO: it's weird that `Character::spawn` produces inventory items we didn't ask for
+    // and this test will need to change when that becomes more sensible.
+    assert_serdeser(
+        &character,
+        json!({
+            "type": "CharacterV1",
+            "space": {"type": "URefV1", "Specific": "a_space"},
+            "position": [2.5, 3.75, 26.0],
+            "velocity": [0.0, 0.0, 0.0],
+            "collision_box": {
+                "lower": [-0.35, -1.75, -0.35],
+                "upper": [0.35, 0.15, 0.35],
+            },
+            "flying": false,
+            "noclip": false,
+            "yaw": 0.0,
+            "pitch": -0.0,
+            "selected_slots": [0, 0, 10],
+            "inventory": {
+                "type": "InventoryV1",
+                "slots": [
+                    {
+                        "count": 1,
+                        "item": {"type": "ActivateV1"},
+                    },
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    {
+                        "count": 1,
+                        "item": {"type": "CopyFromSpaceV1"},
+                    }
+                ]
+            }
+        }),
+    );
+}
+
+//------------------------------------------------------------------------------------------------//
 // Tests corresponding to the `space` module
 
 #[test]
@@ -205,7 +262,43 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                     }
                 }
             },
-            // TODO: character is missing
+            {
+                "name": {"Specific": "a_character"},
+                "value": {
+                    "type": "CharacterV1",
+                    "space": {"type": "URefV1", "Specific": "a_space"},
+                    "position": [1.0, 1.75, 22.0],
+                    "velocity": [0.0, 0.0, 0.0],
+                    "collision_box": {
+                        "lower": [-0.35, -1.75, -0.35],
+                        "upper": [0.35, 0.15, 0.35],
+                    },
+                    "flying": false,
+                    "noclip": false,
+                    "yaw": 0.0,
+                    "pitch": -0.0,
+                    "selected_slots": [0, 0, 10],
+                    "inventory": {
+                        "type": "InventoryV1",
+                        "slots": [
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            {
+                                "count": 1,
+                                "item": {"type": "CopyFromSpaceV1"},
+                            }
+                        ]
+                    }
+                }
+            },
             {
                 "name": {"Specific": "a_space"},
                 "value": {

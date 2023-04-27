@@ -78,7 +78,7 @@ impl Aab {
     ///
     /// Returns [`None`] if the points are not in the proper order or if they are NaN.
     // TODO: Make this public but give it an error type?
-    fn checked_from_lower_upper(
+    pub(crate) fn checked_from_lower_upper(
         lower_bounds: Point3<FreeCoordinate>,
         upper_bounds: Point3<FreeCoordinate>,
     ) -> Option<Self> {

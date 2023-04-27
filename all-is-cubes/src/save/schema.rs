@@ -18,9 +18,10 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::math::{Face6, GridAab, GridCoordinate, GridRotation};
+use crate::block::Block;
+use crate::math::{Aab, Face6, GridAab, GridCoordinate, GridRotation};
 use crate::universe::URef;
-use crate::{block, space, universe};
+use crate::{block, character, inv, space, universe};
 
 /// Placeholder type for when we want to serialize the *contents* of a `URef`,
 /// without cloning or referencing those contents immediately.
@@ -112,7 +113,66 @@ pub(crate) enum ModifierSer {
 }
 
 //------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `character` module
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum CharacterSer {
+    CharacterV1 {
+        space: URef<space::Space>,
+        position: [f64; 3],
+        velocity: [f64; 3],
+        collision_box: Aab,
+        flying: bool,
+        noclip: bool,
+        yaw: f64,
+        pitch: f64,
+        inventory: inv::Inventory,
+        selected_slots: [usize; 3],
+    },
+}
+
+//------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `inv` module
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum InventorySer {
+    InventoryV1 { slots: Vec<Option<InvStackSer>> },
+}
+
+/// Schema for a nonempty [`inv::Slot`].
+/// Not tagged since it will only appear inside an [`InventorySer`].
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct InvStackSer {
+    pub(crate) count: std::num::NonZeroU16,
+    pub(crate) item: inv::Tool,
+}
+
+/// Schema for [`inv::Tool`].
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum ToolSer {
+    ActivateV1 {},
+    RemoveBlockV1 { keep: bool },
+    BlockV1 { block: Block },
+    InfiniteBlocksV1 { block: Block },
+    CopyFromSpaceV1 {},
+    EditBlockV1 {},
+    PushPullV1 {},
+    JetpackV1 { active: bool },
+    ExternalActionV1 { icon: Block },
+}
+
+//------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `math` module
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct AabSer {
+    // This one isn't an enum because I expect we'll not need to change it
+    pub(crate) lower: [f64; 3],
+    pub(crate) upper: [f64; 3],
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct GridAabSer {
@@ -147,15 +207,16 @@ pub(crate) enum SpaceSer {
 /// case vs. the deserialization case.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum UniverseSchema<S> {
+pub(crate) enum UniverseSchema<C, S> {
     UniverseV1 {
         /// Note: We are currently targeting JSON output, which cannot use non-string keys.
         /// Therefore, this is not expressed as a map.
-        members: Vec<MemberEntrySer<MemberSchema<S>>>,
+        members: Vec<MemberEntrySer<MemberSchema<C, S>>>,
     },
 }
-pub(crate) type UniverseSer = UniverseSchema<SerializeRef<space::Space>>;
-pub(crate) type UniverseDe = UniverseSchema<space::Space>;
+pub(crate) type UniverseSer =
+    UniverseSchema<SerializeRef<character::Character>, SerializeRef<space::Space>>;
+pub(crate) type UniverseDe = UniverseSchema<character::Character, space::Space>;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct MemberEntrySer<T> {
@@ -165,13 +226,14 @@ pub(crate) struct MemberEntrySer<T> {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)] // The type-and-version tags of each member suffice
-pub(crate) enum MemberSchema<S> {
+pub(crate) enum MemberSchema<C, S> {
     BlockDef(block::Block),
-    // TODO: Character(C)
+    Character(C),
     Space(S),
 }
-pub(crate) type MemberSer = MemberSchema<SerializeRef<space::Space>>;
-pub(crate) type MemberDe = MemberSchema<space::Space>;
+pub(crate) type MemberSer =
+    MemberSchema<SerializeRef<character::Character>, SerializeRef<space::Space>>;
+pub(crate) type MemberDe = MemberSchema<character::Character, space::Space>;
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]

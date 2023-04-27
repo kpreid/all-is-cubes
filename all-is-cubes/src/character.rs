@@ -20,6 +20,7 @@ use crate::listen::{Listen, Listener, Notifier};
 use crate::math::{Aab, Face6, Face7, FreeCoordinate, Rgb};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
 use crate::raycast::Ray;
+use crate::save::schema;
 use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::{
@@ -548,6 +549,107 @@ impl Transactional for Character {
 
 impl crate::behavior::BehaviorHost for Character {
     type Attachment = ();
+}
+
+impl serde::Serialize for Character {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let &Character {
+            body:
+                Body {
+                    position,
+                    velocity,
+                    collision_box,
+                    flying,
+                    noclip,
+                    yaw,
+                    pitch,
+                },
+            ref space,
+            ref inventory,
+            selected_slots,
+            behaviors: _, // TODO: should be persisted
+
+            // Not persisted - run-time connections to other things
+            notifier: _,
+            velocity_input: _,
+
+            // Not persisted - decorative simulation
+            eye_displacement_pos: _,
+            eye_displacement_vel: _,
+            colliding_cubes: _,
+            last_step_info: _,
+            light_samples: _,
+            light_sample_index: _,
+            exposure_log: _,
+        } = self;
+        schema::CharacterSer::CharacterV1 {
+            space: space.clone(),
+
+            position: position.into(),
+            velocity: velocity.into(),
+            collision_box,
+            flying,
+            noclip,
+            yaw,
+            pitch,
+
+            inventory: inventory.clone(),
+            selected_slots,
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Character {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match schema::CharacterSer::deserialize(deserializer)? {
+            schema::CharacterSer::CharacterV1 {
+                space,
+                position,
+                velocity,
+                collision_box,
+                flying,
+                noclip,
+                yaw,
+                pitch,
+                inventory,
+                selected_slots,
+            } => Ok(Character {
+                body: Body {
+                    position: position.into(),
+                    velocity: velocity.into(),
+                    collision_box,
+                    flying,
+                    noclip,
+                    yaw,
+                    pitch,
+                },
+                space,
+                inventory,
+                selected_slots,
+                behaviors: BehaviorSet::new(),
+
+                // Not persisted - run-time connections to other things
+                notifier: Notifier::new(),
+                velocity_input: Vector3::zero(),
+
+                // Not persisted - decorative simulation
+                eye_displacement_pos: Vector3::zero(),
+                eye_displacement_vel: Vector3::zero(),
+                colliding_cubes: HashSet::new(),
+                last_step_info: None,
+                light_samples: [Rgb::ONE; 100],
+                light_sample_index: 0,
+                exposure_log: 0.0,
+            }),
+        }
+    }
 }
 
 /// A [`Transaction`] that modifies a [`Character`].
