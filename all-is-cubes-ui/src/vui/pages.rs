@@ -17,13 +17,13 @@ use all_is_cubes::transaction;
 use all_is_cubes::universe::{URef, Universe};
 
 use crate::logo::logo_text;
-use crate::vui::hud::{about_button, HudInputs};
-use crate::vui::options::pause_toggle_button;
-use crate::vui::widgets;
+use crate::vui::hud::HudInputs;
+use crate::vui::options::{graphics_options_widgets, pause_toggle_button};
 use crate::vui::{
     install_widgets, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest, LayoutTree,
-    Widget, WidgetTree,
+    UiBlocks, Widget, WidgetTree,
 };
+use crate::vui::{widgets, VuiMessage, VuiPageState};
 
 /// Bounds for UI display; a choice of scale and aspect ratio based on the viewport size
 /// and aspect ratio (and maybe in the future, preferences).
@@ -145,6 +145,32 @@ impl PageInst {
     }
 }
 
+/// Make a button that sends [`VuiMessage::Open`].
+pub(crate) fn open_page_button(
+    hud_inputs: &HudInputs,
+    page: VuiPageState,
+    label: Block,
+) -> Arc<dyn Widget> {
+    // TODO: For some purposes this should not be a toggle button, and for some it should,
+    // depending on whether the outcome is still having such a button. Even then, it should
+    // be some button that communicates “pressing again will not turn this off”.
+    widgets::ToggleButton::new(
+        hud_inputs.page_state.clone(),
+        {
+            let page = page.clone();
+            move |page_state| *page_state == page
+        },
+        label,
+        &hud_inputs.hud_blocks.blocks,
+        {
+            let cc = hud_inputs.vui_control_channel.clone();
+            move || {
+                let _ignore_errors = cc.send(VuiMessage::Open(page.clone()));
+            }
+        },
+    )
+}
+
 /// Wrap the given widget tree in a transparent screen-filling background.
 fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
     Arc::new(LayoutTree::Stack {
@@ -165,7 +191,6 @@ fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
         ],
     })
 }
-
 // TODO: Disentangle general UI from the concept of "HUD" — i.e. the input accepted should be
 // not a `HudInputs` should become less specific, since this isn't actually part of the HUD.
 pub(super) fn new_paused_widget_tree(
@@ -180,8 +205,40 @@ pub(super) fn new_paused_widget_tree(
             // TODO: establish standard resolutions for logo etc
             LayoutTree::leaf(shrink(u, R32, LayoutTree::leaf(logo_text()))?),
             LayoutTree::leaf(shrink(u, R32, heading("Paused"))?),
-            LayoutTree::leaf(about_button(hud_inputs)),
+            LayoutTree::leaf(open_page_button(
+                hud_inputs,
+                VuiPageState::AboutText,
+                hud_inputs.hud_blocks.blocks[UiBlocks::AboutButtonLabel].clone(),
+            )),
+            LayoutTree::leaf(open_page_button(
+                hud_inputs,
+                VuiPageState::Options,
+                hud_inputs.hud_blocks.blocks[UiBlocks::OptionsButtonLabel].clone(),
+            )),
             LayoutTree::leaf(pause_toggle_button(hud_inputs)),
+        ],
+    });
+    Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
+        widgets::Frame::for_menu().as_background_of(contents),
+    ))))
+}
+
+pub(super) fn new_options_widget_tree(
+    u: &mut Universe,
+    hud_inputs: &HudInputs,
+) -> Result<WidgetTree, InstallVuiError> {
+    use parts::{heading, shrink};
+
+    let contents = Arc::new(LayoutTree::Stack {
+        direction: Face6::NY,
+        children: vec![
+            LayoutTree::leaf(shrink(u, R32, LayoutTree::leaf(logo_text()))?),
+            LayoutTree::leaf(shrink(u, R32, heading("Options"))?),
+            widgets::back_button(hud_inputs),
+            Arc::new(LayoutTree::Stack {
+                direction: Face6::NY,
+                children: graphics_options_widgets(hud_inputs),
+            }),
         ],
     });
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
@@ -219,13 +276,11 @@ pub(super) fn new_about_widget_tree(
 
     "#}) + env!("CARGO_PKG_VERSION");
 
-    let back_button = widgets::back_button(hud_inputs);
-
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
             LayoutTree::leaf(shrink(u, R8, LayoutTree::leaf(logo_text()))?),
-            back_button,
+            widgets::back_button(hud_inputs),
             LayoutTree::leaf(shrink(u, R32, heading("Controls"))?),
             LayoutTree::leaf(shrink(u, R32, paragraph(controls_text))?),
             LayoutTree::leaf(shrink(u, R32, heading("About"))?),

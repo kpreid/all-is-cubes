@@ -60,6 +60,7 @@ pub(crate) struct Vui {
     hud_page: PageInst,
     paused_page: PageInst,
     about_page: PageInst,
+    options_page: PageInst,
     /// Whatever [`VuiPageState::Dump`] contained.
     dump_page: PageInst,
 
@@ -126,6 +127,8 @@ impl Vui {
         );
 
         let paused_widget_tree = pages::new_paused_widget_tree(&mut universe, &hud_inputs).unwrap();
+        let options_widget_tree =
+            pages::new_options_widget_tree(&mut universe, &hud_inputs).unwrap();
         let about_widget_tree = pages::new_about_widget_tree(&mut universe, &hud_inputs).unwrap();
 
         let mut new_self = Self {
@@ -140,6 +143,7 @@ impl Vui {
 
             hud_page: PageInst::new(hud_widget_tree),
             paused_page: PageInst::new(paused_widget_tree),
+            options_page: PageInst::new(options_widget_tree),
             about_page: PageInst::new(about_widget_tree),
             dump_page: PageInst::new(LayoutTree::empty()),
 
@@ -187,6 +191,7 @@ impl Vui {
         let next_space: Option<URef<Space>> = match &*self.state.get() {
             VuiPageState::Hud => Some(self.hud_page.get_or_create_space(size, universe)),
             VuiPageState::Paused => Some(self.paused_page.get_or_create_space(size, universe)),
+            VuiPageState::Options => Some(self.options_page.get_or_create_space(size, universe)),
             VuiPageState::AboutText => Some(self.about_page.get_or_create_space(size, universe)),
             // Note: checking the `content` is handled in `set_state()`.
             VuiPageState::Dump {
@@ -279,9 +284,9 @@ impl Vui {
                     VuiMessage::Back => {
                         self.back();
                     }
-                    VuiMessage::About => {
+                    VuiMessage::Open(page) => {
                         // TODO: States should be stackable somehow, and this should not totally overwrite the previous state.
-                        self.set_state(VuiPageState::AboutText);
+                        self.set_state(page);
                     }
                 },
                 Err(TryRecvError::Empty) => break,
@@ -378,7 +383,7 @@ impl Vui {
                         .unwrap();
                 }
             }
-            VuiPageState::AboutText => {
+            VuiPageState::AboutText | VuiPageState::Options => {
                 // The next step will decide whether we should be paused or unpaused.
                 // TODO: Instead check right now, but in a reusable fashion.
                 self.set_state(VuiPageState::Hud);
@@ -399,6 +404,8 @@ pub(crate) enum VuiPageState {
     /// Report the paused (or lost-focus) state and offer a button to unpause
     /// and reactivate mouselook.
     Paused,
+    /// Options/settings/preferences menu.
+    Options,
     AboutText,
     /// Arbitrary widgets that have already been computed, and which don't demand
     /// any navigation behavior more complex than “cancellable”. This is to be used for
@@ -419,8 +426,8 @@ pub(crate) enum VuiMessage {
     /// TODO: This is a kludge being used for 'close the current page state' but ideally
     /// it would specify *what* it's closing in case of message race conditions etc.
     Back,
-    /// Open [`VuiPageState::AboutText`].
-    About,
+    /// Transition to the specified [`VuiPageState`].
+    Open(VuiPageState),
 }
 
 /// Channel for broadcasting, from session to widgets, various user interface responses

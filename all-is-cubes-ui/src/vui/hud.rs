@@ -3,6 +3,7 @@ use std::sync::{mpsc, Arc, Mutex};
 
 use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
 use crate::vui::options::{graphics_options_widgets, pause_toggle_button};
+use crate::vui::pages::open_page_button;
 use crate::vui::widgets::{self, Crosshair, TooltipState};
 use crate::vui::{CueNotifier, LayoutTree, UiBlocks, VuiMessage, VuiPageState, Widget, WidgetTree};
 use all_is_cubes::block::Block;
@@ -23,7 +24,8 @@ pub(crate) const TOOLBAR_POSITIONS: usize = 10;
 
 /// Ad-hoc bundle of elements needed to construct HUD UI widgets.
 ///
-/// TODO: Still looking for the right general abstraction here...
+/// TODO: Disentangle general UI from the concept of "HUD" — this is used for lots of things
+/// that aren't HUD
 pub(crate) struct HudInputs {
     pub hud_blocks: Arc<HudBlocks>,
     pub cue_channel: CueNotifier,
@@ -88,7 +90,11 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
                 direction: Face6::NX,
                 children: graphics_options_widgets(hud_inputs),
             }),
-            LayoutTree::leaf(about_button(hud_inputs)),
+            LayoutTree::leaf(open_page_button(
+                hud_inputs,
+                VuiPageState::AboutText,
+                hud_inputs.hud_blocks.blocks[UiBlocks::AboutButtonLabel].clone(),
+            )),
             LayoutTree::leaf(pause_toggle_button(hud_inputs)),
             LayoutTree::leaf(widgets::ToggleButton::new(
                 hud_inputs.mouselook_mode.clone(),
@@ -116,21 +122,6 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
     } else {
         control_bar_widgets
     }
-}
-
-pub(crate) fn about_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
-    widgets::ToggleButton::new(
-        hud_inputs.page_state.clone(),
-        |page_state| matches!(page_state, VuiPageState::AboutText),
-        hud_inputs.hud_blocks.blocks[UiBlocks::AboutButtonLabel].clone(),
-        &hud_inputs.hud_blocks.blocks,
-        {
-            let cc = hud_inputs.vui_control_channel.clone();
-            move || {
-                let _ignore_errors = cc.send(VuiMessage::About);
-            }
-        },
-    )
 }
 
 // TODO: Unclear if HudBlocks should exist; maybe it should be reworked into a BlockProvider for widget graphics instead.
