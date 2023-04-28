@@ -88,18 +88,7 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
                 direction: Face6::NX,
                 children: graphics_options_widgets(hud_inputs),
             }),
-            LayoutTree::leaf(widgets::ToggleButton::new(
-                hud_inputs.page_state.clone(),
-                |page_state| matches!(page_state, VuiPageState::AboutText),
-                hud_inputs.hud_blocks.blocks[UiBlocks::AboutButtonLabel].clone(),
-                &hud_inputs.hud_blocks.blocks,
-                {
-                    let cc = hud_inputs.vui_control_channel.clone();
-                    move || {
-                        let _ignore_errors = cc.send(VuiMessage::About);
-                    }
-                },
-            )),
+            LayoutTree::leaf(about_button(hud_inputs)),
             LayoutTree::leaf(pause_toggle_button(hud_inputs)),
             LayoutTree::leaf(widgets::ToggleButton::new(
                 hud_inputs.mouselook_mode.clone(),
@@ -127,6 +116,21 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
     } else {
         control_bar_widgets
     }
+}
+
+pub(crate) fn about_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
+    widgets::ToggleButton::new(
+        hud_inputs.page_state.clone(),
+        |page_state| matches!(page_state, VuiPageState::AboutText),
+        hud_inputs.hud_blocks.blocks[UiBlocks::AboutButtonLabel].clone(),
+        &hud_inputs.hud_blocks.blocks,
+        {
+            let cc = hud_inputs.vui_control_channel.clone();
+            move || {
+                let _ignore_errors = cc.send(VuiMessage::About);
+            }
+        },
+    )
 }
 
 // TODO: Unclear if HudBlocks should exist; maybe it should be reworked into a BlockProvider for widget graphics instead.

@@ -17,7 +17,7 @@ use all_is_cubes::transaction;
 use all_is_cubes::universe::{URef, Universe};
 
 use crate::logo::logo_text;
-use crate::vui::hud::HudInputs;
+use crate::vui::hud::{about_button, HudInputs};
 use crate::vui::options::pause_toggle_button;
 use crate::vui::widgets;
 use crate::vui::{
@@ -180,6 +180,7 @@ pub(super) fn new_paused_widget_tree(
             // TODO: establish standard resolutions for logo etc
             LayoutTree::leaf(shrink(u, R32, LayoutTree::leaf(logo_text()))?),
             LayoutTree::leaf(shrink(u, R32, heading("Paused"))?),
+            LayoutTree::leaf(about_button(hud_inputs)),
             LayoutTree::leaf(pause_toggle_button(hud_inputs)),
         ],
     });
