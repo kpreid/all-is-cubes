@@ -18,7 +18,7 @@ use all_is_cubes::universe::{URef, Universe};
 
 use crate::logo::logo_text;
 use crate::vui::hud::HudInputs;
-use crate::vui::options::{graphics_options_widgets, pause_toggle_button};
+use crate::vui::options::{graphics_options_widgets, pause_toggle_button, OptionsStyle};
 use crate::vui::{
     install_widgets, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest, LayoutTree,
     UiBlocks, Widget, WidgetTree,
@@ -237,7 +237,7 @@ pub(super) fn new_options_widget_tree(
             widgets::back_button(hud_inputs),
             Arc::new(LayoutTree::Stack {
                 direction: Face6::NY,
-                children: graphics_options_widgets(hud_inputs),
+                children: graphics_options_widgets(hud_inputs, OptionsStyle::LabeledColumn),
             }),
         ],
     });

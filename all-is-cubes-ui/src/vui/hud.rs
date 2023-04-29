@@ -1,11 +1,6 @@
 use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
 
-use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
-use crate::vui::options::{graphics_options_widgets, pause_toggle_button};
-use crate::vui::pages::open_page_button;
-use crate::vui::widgets::{self, Crosshair, TooltipState};
-use crate::vui::{CueNotifier, LayoutTree, UiBlocks, VuiMessage, VuiPageState, Widget, WidgetTree};
 use all_is_cubes::block::Block;
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::character::Character;
@@ -17,6 +12,12 @@ use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::Face6;
 use all_is_cubes::universe::{URef, Universe};
 use all_is_cubes::util::YieldProgress;
+
+use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
+use crate::vui::options::{graphics_options_widgets, pause_toggle_button, OptionsStyle};
+use crate::vui::pages::open_page_button;
+use crate::vui::widgets::{self, Crosshair, TooltipState};
+use crate::vui::{CueNotifier, LayoutTree, UiBlocks, VuiMessage, VuiPageState, Widget, WidgetTree};
 
 pub(crate) use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
@@ -88,7 +89,7 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
         children: vec![
             Arc::new(LayoutTree::Stack {
                 direction: Face6::NX,
-                children: graphics_options_widgets(hud_inputs),
+                children: graphics_options_widgets(hud_inputs, OptionsStyle::CompactRow),
             }),
             LayoutTree::leaf(open_page_button(
                 hud_inputs,
