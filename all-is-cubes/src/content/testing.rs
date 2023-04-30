@@ -6,11 +6,15 @@ use crate::block::{Block, AIR};
 use crate::character::Spawn;
 use crate::content::free_editing_starter_inventory;
 use crate::linking::InGenError;
-use crate::math::{Face6, FaceMap, GridAab, GridCoordinate, Rgb};
+use crate::math::{Face6, FaceMap, GridAab, GridCoordinate, Rgba};
 use crate::space::{LightPhysics, Space, SpacePhysics};
 use crate::universe::Universe;
 
-/// Test space for the `lighting_bench` benchmark.
+/// Test space for the `lighting_bench` benchmark, designed to exercise a variety of
+/// geometric and color circumstances for the lighting algorithm.
+///
+/// (Since being created, it has found uses in many other tests as a fast-to-create yet
+/// nontrivial space).
 ///
 /// TODO: Once we have the ability to write save files, give the benchmark code an option
 /// to do that instead, so this can just live in the benchmark instead of indirect.
@@ -76,10 +80,11 @@ pub fn lighting_bench_space(
                 ],
                 [section_width, yup + ydown, section_width],
             );
-            let color = Block::from(Rgb::new(
+            let color = Block::from(Rgba::new(
                 rng.gen_range(0.0..=1.0),
                 rng.gen_range(0.0..=1.0),
                 rng.gen_range(0.0..=1.0),
+                if rng.gen_bool(0.125) { 0.5 } else { 1.0 },
             ));
             match rng.gen_range(0..3) {
                 0 => {
