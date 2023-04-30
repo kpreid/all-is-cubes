@@ -35,6 +35,10 @@ name = "raycast_bench"
 harness = false
 
 [[bench]]
+name = "raytrace_bench"
+harness = false
+
+[[bench]]
 name = "space_bench"
 harness = false
 
