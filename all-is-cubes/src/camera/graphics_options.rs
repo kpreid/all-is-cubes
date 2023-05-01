@@ -217,6 +217,9 @@ pub enum ExposureOption {
     /// before the tone mapping operator is applied.
     Fixed(NotNan<f32>),
     /// Exposure adjusts to compensate for the actual brightness of the scene.
+    ///
+    /// Note: If [`GraphicsOptions::lighting_display`] is disabled,
+    /// then this currently will act as `Fixed(1.0)`.
     Automatic,
 }
 

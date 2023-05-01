@@ -87,3 +87,33 @@ fn post_process() {
         color.map_rgb(|rgb| rgb * 0.5)
     );
 }
+
+#[test]
+fn exposure_automatic_active() {
+    let mut camera = Camera::new(
+        GraphicsOptions {
+            exposure: ExposureOption::Automatic,
+            lighting_display: LightingOption::Smooth,
+            ..GraphicsOptions::default()
+        },
+        Viewport::ARBITRARY,
+    );
+
+    camera.set_measured_exposure(7.0);
+    assert_eq!(camera.exposure(), notnan!(7.0));
+}
+
+#[test]
+fn exposure_automatic_disabled_when_lighting_is_disabled() {
+    let mut camera = Camera::new(
+        GraphicsOptions {
+            exposure: ExposureOption::Automatic,
+            lighting_display: LightingOption::None,
+            ..GraphicsOptions::default()
+        },
+        Viewport::ARBITRARY,
+    );
+
+    camera.set_measured_exposure(7.0);
+    assert_eq!(camera.exposure(), notnan!(1.0)); // ignoring measured
+}

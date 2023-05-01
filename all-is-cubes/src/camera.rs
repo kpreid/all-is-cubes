@@ -323,9 +323,12 @@ impl Camera {
     /// graphics options.
     pub fn set_measured_exposure(&mut self, value: f32) {
         if let Ok(value) = NotNan::new(value) {
-            match self.options.exposure {
-                ExposureOption::Fixed(_) => { /* nothing to do */ }
-                ExposureOption::Automatic => {
+            match (&self.options.exposure, &self.options.lighting_display) {
+                (ExposureOption::Fixed(_), _) => { /* nothing to do */ }
+                (ExposureOption::Automatic, LightingOption::None) => {
+                    self.exposure_value = NotNan::one();
+                }
+                (ExposureOption::Automatic, _) => {
                     self.exposure_value = value;
                 }
             }
