@@ -20,7 +20,7 @@ harness = false
 
 [features]
 default = []
-arbitrary = ["dep:arbitrary", "ordered-float/arbitrary"]
+arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary", "ordered-float/arbitrary"]
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.5.0" }
