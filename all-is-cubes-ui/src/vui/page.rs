@@ -7,7 +7,7 @@ use all_is_cubes::camera;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{vec2, Vector2D};
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgba};
-use all_is_cubes::space::{Space, SpaceBuilder, SpacePhysics};
+use all_is_cubes::space::{self, Space, SpaceBuilder, SpacePhysics};
 use all_is_cubes::time;
 use all_is_cubes::transaction;
 use all_is_cubes::universe::{URef, Universe};
@@ -63,7 +63,7 @@ impl UiSize {
         let mut space = Space::builder(bounds)
             .physics({
                 let mut physics = SpacePhysics::default();
-                physics.sky_color = palette::HUD_SKY;
+                physics.sky = space::Sky::Uniform(palette::HUD_SKY);
                 physics
             })
             .build();

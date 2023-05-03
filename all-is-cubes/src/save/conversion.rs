@@ -715,7 +715,7 @@ mod space {
     use super::*;
     use crate::math::Vol;
     use crate::save::compress::{GzSerde, Leu16};
-    use crate::space::{self, LightPhysics, Space, SpacePhysics};
+    use crate::space::{self, LightPhysics, Sky, Space, SpacePhysics};
 
     impl Serialize for Space {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -810,12 +810,12 @@ mod space {
         fn from(value: &SpacePhysics) -> Self {
             let &SpacePhysics {
                 gravity,
-                sky_color,
+                ref sky,
                 ref light,
             } = value;
             Self {
                 gravity: gravity.into(),
-                sky_color: sky_color.into(),
+                sky: sky.into(),
                 light: light.into(),
             }
         }
@@ -825,13 +825,33 @@ mod space {
         fn from(value: schema::SpacePhysicsSerV1) -> Self {
             let schema::SpacePhysicsSerV1 {
                 gravity,
-                sky_color,
+                sky,
                 light,
             } = value;
             Self {
                 gravity: gravity.into(),
-                sky_color: sky_color.into(),
+                sky: sky.into(),
                 light: light.into(),
+            }
+        }
+    }
+
+    impl From<&Sky> for schema::SkySer {
+        fn from(value: &Sky) -> Self {
+            use schema::SkySer as S;
+            match value {
+                &Sky::Uniform(color) => S::UniformV1 {
+                    color: color.into(),
+                },
+            }
+        }
+    }
+
+    impl From<schema::SkySer> for Sky {
+        fn from(value: schema::SkySer) -> Self {
+            use schema::SkySer as S;
+            match value {
+                S::UniformV1 { color } => Sky::Uniform(color.into()),
             }
         }
     }

@@ -399,8 +399,14 @@ pub(crate) enum LightStatusSerV1 {
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct SpacePhysicsSerV1 {
     pub gravity: [NotNan<f64>; 3],
-    pub sky_color: RgbSer,
+    pub sky: SkySer,
     pub light: LightPhysicsSerV1,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum SkySer {
+    UniformV1 { color: RgbSer },
 }
 
 #[derive(Debug, Deserialize, Serialize)]

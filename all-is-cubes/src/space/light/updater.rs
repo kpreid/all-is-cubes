@@ -22,8 +22,8 @@ use crate::raycast::{Ray, RaycastStep};
 use crate::space::light::{LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority};
 use crate::space::palette::Palette;
 use crate::space::{
-    BlockIndex, GridAab, LightPhysics, LightStatus, PackedLight, PackedLightScalar, SpaceChange,
-    SpacePhysics,
+    BlockIndex, BlockSky, GridAab, LightPhysics, LightStatus, PackedLight, PackedLightScalar, Sky,
+    SpaceChange, SpacePhysics,
 };
 use crate::time::{Duration, Instant};
 use crate::util::StatusText;
@@ -72,8 +72,8 @@ pub(crate) struct LightStorage {
     /// The Space will keep this updated via  [`Self::reinitialize_for_physics_change()`].
     physics: LightPhysics,
 
-    pub(in crate::space) packed_sky_color: PackedLight,
-    pub(in crate::space) sky_color: Rgb,
+    pub(in crate::space) sky: Sky,
+    pub(in crate::space) block_sky: BlockSky,
 }
 
 /// Methods on Space that specifically implement the lighting algorithm.
@@ -89,8 +89,8 @@ impl LightStorage {
             last_light_updates: Vec::new(),
             light_cost_scale: 1e-6,
             physics: physics.light.clone(),
-            packed_sky_color: physics.sky_color.into(),
-            sky_color: physics.sky_color,
+            sky: physics.sky.clone(),
+            block_sky: physics.sky.for_blocks(),
         }
     }
 
@@ -101,8 +101,8 @@ impl LightStorage {
         opacity: OpacityCategory,
     ) {
         let old_physics = mem::replace(&mut self.physics, physics.light.clone());
-        self.packed_sky_color = physics.sky_color.into();
-        self.sky_color = physics.sky_color;
+        self.sky = physics.sky.clone();
+        self.block_sky = physics.sky.for_blocks();
 
         if self.physics != old_physics {
             // TODO: If the new physics is broadly similar, then reuse the old data as a
@@ -420,7 +420,7 @@ impl LightStorage {
                         break;
                     }
                 }
-                cube_buffer.end_of_ray(&ray_state, self.sky_color);
+                cube_buffer.end_of_ray(&ray_state, &self.sky);
             }
         }
 
@@ -477,7 +477,7 @@ impl LightStorage {
                                 if covered {
                                     PackedLight::UNINITIALIZED_AND_BLACK
                                 } else {
-                                    self.packed_sky_color
+                                    self.block_sky.in_direction(Face6::PY)
                                 }
                             } else {
                                 PackedLight::NO_RAYS
@@ -496,7 +496,7 @@ impl LightStorage {
                 .contents
                 .get(cube)
                 .copied()
-                .unwrap_or(self.packed_sky_color),
+                .unwrap_or_else(|| self.block_sky.light_outside(self.contents.bounds(), cube)),
         }
     }
 
@@ -763,7 +763,7 @@ impl LightBuffer {
 
     /// The raycast exited the world or hit an opaque block; finish up by applying
     /// sky and incrementing the count.
-    fn end_of_ray(&mut self, ray_state: &LightRayState, sky_color: Rgb) {
+    fn end_of_ray(&mut self, ray_state: &LightRayState, sky: &Sky) {
         // TODO: set *info even if we hit the sky
 
         // Note: this condition is key to allowing some cases to
@@ -771,7 +771,10 @@ impl LightBuffer {
         // TODO: clarify signaling flow?
         if ray_state.ray_weight_by_faces > 0. {
             // Note that if ray_state.alpha has reached zero, the sky color has no effect.
-            self.add_weighted_light(sky_color * ray_state.alpha, ray_state.ray_weight_by_faces);
+            self.add_weighted_light(
+                sky.sample(ray_state.translated_ray.direction) * ray_state.alpha,
+                ray_state.ray_weight_by_faces,
+            );
         }
     }
 

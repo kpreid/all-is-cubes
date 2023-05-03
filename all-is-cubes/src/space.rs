@@ -17,14 +17,12 @@ use crate::block::{Block, EvaluatedBlock, Resolution, TickAction, AIR, AIR_EVALU
 #[cfg(doc)]
 use crate::character::Character;
 use crate::character::Spawn;
-use crate::content::palette::DAY_SKY_COLOR;
 use crate::drawing::DrawingPlane;
 use crate::fluff::Fluff;
 use crate::inv::{EphemeralOpaque, InventoryTransaction};
 use crate::listen::{Listen, Listener, Notifier};
 use crate::math::{
-    Cube, FreeCoordinate, GridAab, GridCoordinate, GridRotation, Gridgid, NotNan, Rgb, VectorOps,
-    Vol,
+    Cube, FreeCoordinate, GridAab, GridCoordinate, GridRotation, Gridgid, NotNan, VectorOps, Vol,
 };
 use crate::physics::Acceleration;
 use crate::time;
@@ -45,6 +43,9 @@ pub use light::{LightUpdatesInfo, PackedLight};
 mod palette;
 use palette::Palette;
 pub use palette::{PaletteError, SpaceBlockData};
+
+mod sky;
+pub use sky::*;
 
 mod space_txn;
 pub use space_txn::*;
@@ -883,12 +884,9 @@ pub struct SpacePhysics {
     /// TODO: Expand this to an enum which allows non-uniform gravity patterns.
     pub gravity: Vector3D<NotNan<FreeCoordinate>, Acceleration>,
 
-    /// Color of light arriving from outside the space, used for light calculation
-    /// and rendering.
-    ///
-    /// TODO: Consider replacing this with some sort of cube map, spherical harmonics,
-    /// or some such to allow for non-uniform illumination.
-    pub sky_color: Rgb,
+    /// Light arriving from outside the space, used for light calculation
+    /// and rendering the background.
+    pub sky: Sky,
 
     /// Method used to compute the illumination of individual blocks.
     pub light: LightPhysics,
@@ -897,7 +895,7 @@ pub struct SpacePhysics {
 impl SpacePhysics {
     pub(crate) const DEFAULT: Self = Self {
         gravity: vec3(notnan!(0.), notnan!(-20.), notnan!(0.)),
-        sky_color: DAY_SKY_COLOR,
+        sky: Sky::DEFAULT,
         light: LightPhysics::DEFAULT,
     };
 
@@ -905,7 +903,7 @@ impl SpacePhysics {
     /// In particular, disables light since it will not be used.
     pub const DEFAULT_FOR_BLOCK: Self = Self {
         gravity: vec3(notnan!(0.), notnan!(0.), notnan!(0.)),
-        sky_color: rgb_const!(0.5, 0.5, 0.5),
+        sky: Sky::Uniform(rgb_const!(0.5, 0.5, 0.5)),
         light: LightPhysics::None,
     };
 }
@@ -914,7 +912,7 @@ impl fmt::Debug for SpacePhysics {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             gravity,
-            sky_color,
+            sky,
             light,
         } = self;
         f.debug_struct("SpacePhysics")
@@ -922,7 +920,7 @@ impl fmt::Debug for SpacePhysics {
                 "gravity",
                 &gravity.map(NotNan::into_inner).refmt(&ConciseDebug),
             )
-            .field("sky_color", &sky_color)
+            .field("sky", &sky)
             .field("light", &light)
             .finish()
     }
@@ -940,7 +938,7 @@ impl<'a> arbitrary::Arbitrary<'a> for SpacePhysics {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self {
             gravity: vec3(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
-            sky_color: u.arbitrary()?,
+            sky: u.arbitrary()?,
             light: u.arbitrary()?,
         })
     }
@@ -950,7 +948,7 @@ impl<'a> arbitrary::Arbitrary<'a> for SpacePhysics {
         and_all(&[
             <f64 as Arbitrary>::size_hint(depth),
             <f64 as Arbitrary>::size_hint(depth),
-            <Rgb as Arbitrary>::size_hint(depth),
+            <Sky as Arbitrary>::size_hint(depth),
             <LightPhysics as Arbitrary>::size_hint(depth),
         ])
     }
@@ -962,7 +960,7 @@ impl<'a> arbitrary::Arbitrary<'a> for SpacePhysics {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum LightPhysics {
     /// No light. All surface colors are taken exactly as displayed colors. The
-    /// [`SpacePhysics::sky_color`] is used solely as a background color.
+    /// [`SpacePhysics::sky`] is used solely as a background image.
     None,
     /// Raycast-based light propagation and diffuse reflections.
     ///

@@ -59,7 +59,8 @@ impl<D: RtBlockData> Surface<'_, D> {
         match rt.graphics_options.lighting_display {
             LightingOption::None => Rgb::ONE,
             LightingOption::Flat => {
-                rt.get_lighting(self.cube + self.normal.normal_vector())
+                rt.get_packed_light(self.cube + self.normal.normal_vector())
+                    .value()
                     * fixed_directional_lighting(self.normal)
             }
             LightingOption::Smooth => {

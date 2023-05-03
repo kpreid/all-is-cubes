@@ -35,7 +35,7 @@ use crate::math::{
     Intensity, Rgb, Rgba, VectorOps, Vol,
 };
 use crate::raycast::Ray;
-use crate::space::{BlockIndex, PackedLight, Space, SpaceBlockData};
+use crate::space::{BlockIndex, BlockSky, PackedLight, Sky, Space, SpaceBlockData};
 use crate::util::StatusText;
 
 mod accum;
@@ -58,9 +58,9 @@ pub struct SpaceRaytracer<D: RtBlockData> {
 
     graphics_options: GraphicsOptions,
     custom_options: D::Options,
-    sky_color: Rgb,
+    sky: Sky,
     sky_data: D,
-    packed_sky_color: PackedLight,
+    block_sky: BlockSky,
 }
 
 impl<D: RtBlockData> SpaceRaytracer<D> {
@@ -74,7 +74,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             graphics_options: &graphics_options,
             custom_options: &custom_options,
         };
-        let sky_color = space.physics().sky_color;
+        let sky = space.physics().sky.clone();
         SpaceRaytracer {
             blocks: space
                 .block_data()
@@ -82,9 +82,9 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                 .map(|sbd| TracingBlock::<D>::from_block(options, sbd))
                 .collect(),
             cubes: prepare_cubes(space),
-            sky_color,
+            block_sky: sky.for_blocks(),
+            sky,
             sky_data: D::sky(options),
-            packed_sky_color: sky_color.into(),
 
             graphics_options,
             custom_options,
@@ -93,7 +93,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
     /// Construct a [`SpaceRaytracer`] with nothing to render.
     pub(crate) fn new_empty(
-        sky_color: Rgb,
+        sky: Sky,
         graphics_options: GraphicsOptions,
         custom_options: D::Options,
     ) -> Self {
@@ -104,9 +104,9 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         SpaceRaytracer {
             blocks: Vec::new(),
             cubes: Vol::from_elements(GridAab::ORIGIN_EMPTY, []).unwrap(),
-            sky_color,
+            block_sky: sky.for_blocks(),
+            sky,
             sky_data: D::sky(options),
-            packed_sky_color: sky_color.into(),
 
             graphics_options,
             custom_options,
@@ -171,7 +171,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         }
         state.finish(
             if include_sky {
-                self.sky_color.with_alpha_one()
+                self.sky.sample(ray.direction).with_alpha_one()
             } else {
                 Rgba::TRANSPARENT
             },
@@ -184,15 +184,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         self.cubes
             .get(cube)
             .map(|b| b.lighting)
-            .unwrap_or(self.packed_sky_color)
-    }
-
-    #[inline]
-    fn get_lighting(&self, cube: Cube) -> Rgb {
-        self.cubes
-            .get(cube)
-            .map(|b| b.lighting.value())
-            .unwrap_or(self.sky_color)
+            .unwrap_or_else(|| self.block_sky.light_outside(self.cubes.bounds(), cube))
     }
 
     fn get_interpolated_light(&self, point: FreePoint, face: Face7) -> Rgb {
@@ -240,7 +232,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         // Retrieve light data, again using the half-cube-offset grid (this way we won't have edge artifacts).
         let get_light = |p: FreeVector| match Cube::containing(origin.to_point() + p) {
             Some(cube) => self.get_packed_light(cube),
-            None => self.packed_sky_color,
+            // Numerical overflow case -- shouldn't be terribly relevant.
+            None => self.block_sky.mean(),
         };
         let lin_lo = -0.5;
         let lin_hi = 0.5;
@@ -394,7 +387,7 @@ where
             .field("cubes.bounds", &self.cubes.bounds())
             .field("graphics_options", &self.graphics_options)
             .field("custom_options", &self.custom_options)
-            .field("sky_color", &self.sky_color)
+            .field("sky", &self.sky)
             .finish_non_exhaustive()
     }
 }

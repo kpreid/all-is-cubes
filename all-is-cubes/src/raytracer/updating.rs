@@ -10,7 +10,7 @@ use crate::content::palette;
 use crate::listen::{Listen as _, ListenableSource, Listener};
 use crate::math::Cube;
 use crate::raytracer::{RtBlockData, RtOptionsRef, SpaceRaytracer, TracingBlock, TracingCubeData};
-use crate::space::{BlockIndex, Space, SpaceChange};
+use crate::space::{self, BlockIndex, Space, SpaceChange};
 use crate::universe::{RefError, URef};
 use crate::util::maybe_sync::Mutex;
 
@@ -67,7 +67,8 @@ where
 
         Self {
             state: SpaceRaytracer::new_empty(
-                palette::NO_WORLD_TO_SHOW.to_rgb(),
+                // TODO: checkerboard sky
+                space::Sky::Uniform(palette::NO_WORLD_TO_SHOW.to_rgb()),
                 graphics_options.snapshot(),
                 custom_options.snapshot(),
             ),

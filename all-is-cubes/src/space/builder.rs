@@ -5,7 +5,7 @@ use crate::block::{Block, AIR};
 use crate::character::Spawn;
 use crate::math::{FreePoint, Rgb, Vol};
 use crate::space::{
-    BlockIndex, GridAab, LightPhysics, PackedLight, Palette, PaletteError, Space, SpacePhysics,
+    BlockIndex, GridAab, LightPhysics, PackedLight, Palette, PaletteError, Sky, Space, SpacePhysics,
 };
 
 /// Tool for constructing new [`Space`]s.
@@ -55,10 +55,15 @@ impl<B> SpaceBuilder<B> {
         self
     }
 
-    /// Sets the value of [`SpacePhysics::sky_color`] for the space.
-    pub fn sky_color(mut self, color: Rgb) -> Self {
-        self.physics.sky_color = color;
+    /// Sets the value of [`SpacePhysics::sky`] for the space.
+    pub fn sky(mut self, sky: Sky) -> Self {
+        self.physics.sky = sky;
         self
+    }
+
+    /// Sets the value of [`SpacePhysics::sky`] for the space to a uniform color.
+    pub fn sky_color(self, color: Rgb) -> Self {
+        self.sky(Sky::Uniform(color))
     }
 
     /// Sets the value of [`SpacePhysics::light`] for the space, which determines the

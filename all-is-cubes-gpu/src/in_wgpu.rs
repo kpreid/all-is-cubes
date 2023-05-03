@@ -713,8 +713,9 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 &self.pipelines,
                 camera,
                 if mem::take(&mut output_needs_clearing) {
+                    // TODO: when we start drawing the sky we will need more than clear color
                     wgpu::LoadOp::Clear(to_wgpu_color(
-                        (sr.sky_color * camera.exposure()).with_alpha_one(),
+                        (sr.sky.mean() * camera.exposure()).with_alpha_one(),
                     ))
                 } else {
                     wgpu::LoadOp::Load

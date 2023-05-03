@@ -457,7 +457,8 @@ impl Character {
                     // just take the first valid value, then we'll trivially pick the same cube
                     // every time if our eye is within a cube with valid light.
                     if !bounds.contains_cube(step.cube_ahead()) {
-                        self.light_samples[self.light_sample_index] = space.physics().sky_color;
+                        self.light_samples[self.light_sample_index] =
+                            space.physics().sky.sample(ray.direction);
                         continue 'rays;
                     } else if space.get_evaluated(step.cube_ahead()).visible {
                         let l = space.get_lighting(step.cube_behind());
@@ -468,7 +469,8 @@ impl Character {
                     }
                 }
                 // If we got here, nothing was hit
-                self.light_samples[self.light_sample_index] = space.physics().sky_color;
+                self.light_samples[self.light_sample_index] =
+                    space.physics().sky.sample(ray.direction);
             }
         }
 

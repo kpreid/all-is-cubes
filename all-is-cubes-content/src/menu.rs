@@ -11,7 +11,7 @@ use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{Face6, GridAab};
-use all_is_cubes::space::{Space, SpaceBuilder, SpacePhysics};
+use all_is_cubes::space::{self, Space};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
@@ -32,7 +32,7 @@ pub(crate) async fn template_menu(
     let template_iter = UniverseTemplate::iter().filter(UniverseTemplate::include_in_lists);
 
     let logo_text_space = vui::leaf_widget(logo_text()).to_space(
-        SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
+        space::SpaceBuilder::default().physics(space::SpacePhysics::DEFAULT_FOR_BLOCK),
         Vector3D::new(Align::Center, Align::Center, Align::Low),
     )?;
     let logo_widget = widgets::Voxels::new(
@@ -67,8 +67,8 @@ pub(crate) async fn template_menu(
     // TODO: can't use LayoutTree::to_space here because we want to use the bounds for looking_at_space
     let mut space = Space::builder(bounds)
         .physics({
-            let mut p = SpacePhysics::default();
-            p.sky_color = palette::MENU_BACK.to_rgb();
+            let mut p = space::SpacePhysics::default();
+            p.sky = space::Sky::Uniform(palette::MENU_BACK.to_rgb());
             p.gravity = Vector3D::zero();
             p
         })

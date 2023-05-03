@@ -450,7 +450,6 @@ async fn arbitrary_space(
                 // Patch physics to be reasonable
                 let mut p = space.physics().clone();
                 p.gravity = Vector3D::zero(); // won't be a floor
-                p.sky_color = p.sky_color * (0.5 / p.sky_color.luminance());
                 space.set_physics(p);
 
                 // TODO: These patches are still not enough to get a good result.

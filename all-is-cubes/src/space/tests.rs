@@ -17,7 +17,7 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::fluff::Fluff;
 use crate::listen::{Listen as _, Sink};
-use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, Rgba, Vol};
+use crate::math::{Cube, Face6, GridAab, GridCoordinate, GridPoint, Rgba, Vol};
 use crate::op::Operation;
 use crate::space::{
     CubeTransaction, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpaceFluff,
@@ -486,7 +486,9 @@ fn space_debug() {
                 ]),
                 physics: SpacePhysics {
                     gravity: (+0.000, -20.000, +0.000),
-                    sky_color: Rgb(0.8962694, 0.8962694, 1.0),
+                    sky: Uniform(
+                        Rgb(0.8962694, 0.8962694, 1.0),
+                    ),
                     light: None,
                 },
                 behaviors: BehaviorSet({}),
@@ -537,7 +539,10 @@ fn set_physics_light_rays() {
     });
 
     assert_eq!(space.light.contents.volume(), 2);
-    assert_eq!(space.get_lighting([0, 0, 0]), space.light.packed_sky_color);
+    assert_eq!(
+        space.get_lighting([0, 0, 0]),
+        space.light.block_sky.in_direction(Face6::NX)
+    );
     assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(space.light.light_update_queue.len(), 1);
     // TODO: test what change notifications are sent

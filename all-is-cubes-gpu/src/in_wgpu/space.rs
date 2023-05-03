@@ -11,12 +11,11 @@ use all_is_cubes::content::palette;
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, Rgb,
-    VectorOps,
+    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, VectorOps,
 };
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
-use all_is_cubes::space::{Space, SpaceChange};
+use all_is_cubes::space::{Sky, Space, SpaceChange};
 use all_is_cubes::time;
 use all_is_cubes::universe::{RefError, URef};
 use all_is_cubes::util::Executor;
@@ -57,8 +56,8 @@ pub(crate) struct SpaceRenderer<I: time::Instant> {
     /// Note that `self.csm` has its own todo listener too.
     todo: Arc<Mutex<SpaceRendererTodo>>,
 
-    /// Cached copy of `space.physics.sky_color`.
-    pub(crate) sky_color: Rgb,
+    /// Cached copy of `space.physics.sky`.
+    pub(crate) sky: Sky,
 
     block_texture: AtlasAllocator,
     light_texture: SpaceLightTexture,
@@ -111,7 +110,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             render_pass_label: format!("{space_label} render_pass"),
             instance_buffer_label: format!("{space_label} instances"),
             space_label,
-            sky_color: palette::NO_WORLD_TO_SHOW.to_rgb(),
+            sky: Sky::Uniform(palette::NO_WORLD_TO_SHOW.to_rgb()),
             block_texture,
             light_texture,
             space_bind_group: Memo::new(),
@@ -157,7 +156,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             render_pass_label: _,
             instance_buffer_label: _,
             todo,
-            sky_color,
+            sky,
             block_texture: _,
             light_texture,
             camera_buffer: _,
@@ -207,7 +206,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         *csm = Some(new_csm);
 
-        *sky_color = space_borrowed.physics().sky_color;
+        *sky = space_borrowed.physics().sky.clone();
         // TODO: don't replace light texture if the size is the same
         *light_texture = SpaceLightTexture::new(space_label, device, space_borrowed.bounds());
 
@@ -221,7 +220,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             render_pass_label: _,
             instance_buffer_label: _,
             todo,
-            sky_color,
+            sky,
             block_texture: _,
             light_texture: _,
             camera_buffer: _,
@@ -235,7 +234,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         *todo = Default::default(); // detach from space notifier
         *csm = None;
-        *sky_color = palette::NO_WORLD_TO_SHOW.to_rgb();
+        *sky = Sky::Uniform(palette::NO_WORLD_TO_SHOW.to_rgb());
     }
 
     /// Update renderer internal state from the given [`Camera`] and referenced [`Space`],
@@ -263,7 +262,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
             .map_err(GraphicsResourceError::read_err)?;
 
         // Update sky color (cheap so we don't bother todo-tracking it)
-        self.sky_color = space.physics().sky_color;
+        // TODO: ... potentially not cheap any more
+        self.sky = space.physics().sky.clone();
 
         // Update light texture
         let start_light_update = I::now();
@@ -428,7 +428,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             0,
             bytemuck::bytes_of(&ShaderSpaceCamera::new(
                 camera,
-                self.sky_color,
+                self.sky.mean(), // TODO: create a sky texture
                 self.light_texture.light_lookup_offset(),
             )),
         );

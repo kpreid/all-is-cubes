@@ -5,8 +5,8 @@ use pretty_assertions::assert_eq;
 use super::{data::LightStatus, LightUpdatesInfo, PackedLight, Priority};
 use crate::block::{self, Block, AIR};
 use crate::listen::{Listen as _, Listener, Sink};
-use crate::math::{Cube, FaceMap, GridPoint, Rgb, Rgba};
-use crate::space::{GridAab, LightPhysics, Space, SpaceChange, SpacePhysics};
+use crate::math::{Cube, Face6, FaceMap, GridPoint, Rgb, Rgba};
+use crate::space::{GridAab, LightPhysics, Sky, Space, SpaceChange, SpacePhysics};
 use crate::time;
 
 #[test]
@@ -48,7 +48,7 @@ fn initial_value_initialized_after_creation() {
     // Note: this is pretty specific to the `fast_evaluate_light()` algorithm
     // and will probably break when we improve it.
     assert_eq!(
-        space.light.packed_sky_color,
+        space.light.block_sky.in_direction(Face6::PY),
         space.get_lighting([1, 2, 1]),
         "sky above obstacle"
     );
@@ -63,21 +63,33 @@ fn initial_value_initialized_after_creation() {
 
 #[test]
 fn out_of_bounds_lighting_value() {
-    let space = Space::empty_positive(1, 1, 1);
-    assert_eq!(
-        PackedLight::from(space.physics().sky_color),
-        space.get_lighting([-1, 0, 0])
-    );
+    let space = Space::builder(GridAab::ORIGIN_CUBE)
+        .sky(Sky::Octants([
+            Rgb::ONE * 2.0,
+            Rgb::ONE * 3.0,
+            Rgb::ONE * 5.0,
+            Rgb::ONE * 7.0,
+            Rgb::ONE * 11.0,
+            Rgb::ONE * 13.0,
+            Rgb::ONE * 17.0,
+            Rgb::ONE * 19.0,
+        ]))
+        .build();
+    for face in Face6::ALL {
+        assert_eq!(
+            space.physics().sky.for_blocks().in_direction(face),
+            space.get_lighting(Cube::ORIGIN + face.normal_vector())
+        );
+    }
 }
 
 #[test]
 fn step() {
-    let mut space = Space::empty_positive(3, 1, 1);
-    space.set_physics(SpacePhysics {
-        sky_color: Rgb::new(1.0, 0.0, 0.0),
-        ..SpacePhysics::default()
-    });
-    let sky_light = PackedLight::from(space.physics().sky_color);
+    let color = Rgb::new(1.0, 0.0, 0.0);
+    let mut space = Space::builder(GridAab::from_lower_upper([0, 0, 0], [3, 1, 1]))
+        .sky_color(color)
+        .build();
+    let sky_light = PackedLight::from(color);
 
     space.set([0, 0, 0], Rgb::ONE).unwrap();
     // Not changed yet... except for the now-opaque block
@@ -140,11 +152,9 @@ fn set_cube_opaque_notification() {
 }
 
 fn light_source_test_space(block: Block) -> Space {
-    let mut space = Space::empty_positive(3, 3, 3);
-    space.set_physics(SpacePhysics {
-        sky_color: Rgb::ZERO,
-        ..Default::default()
-    });
+    let mut space = Space::builder(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3]))
+        .sky_color(Rgb::ZERO)
+        .build();
     space.set([1, 1, 1], block).unwrap();
     space.evaluate_light::<time::NoTime>(0, |_| ());
     space

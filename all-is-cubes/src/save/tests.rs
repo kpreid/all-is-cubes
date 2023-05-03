@@ -529,7 +529,10 @@ fn operation_paint() {
 fn dont_care_physics_json() -> serde_json::Value {
     json!({
         "gravity": [0.0, 0.0, 0.0],
-        "sky_color": [1.0, 1.0, 1.0],
+        "sky": {
+            "type": "UniformV1",
+            "color": [1.0, 1.0, 1.0],
+        },
         "light": {
             "type": "RaysV1",
             "maximum_distance": 30,
@@ -558,7 +561,7 @@ fn space_success() {
     let mut space = Space::builder(bounds)
         .physics(SpacePhysics {
             gravity: vec3(notnan!(0.0), notnan!(0.25), notnan!(1.0)),
-            sky_color: Rgb::ONE,
+            sky: space::Sky::Uniform(Rgb::ONE),
             light: LightPhysics::Rays {
                 maximum_distance: 123,
             },
@@ -583,7 +586,10 @@ fn space_success() {
             },
             "physics": {
                 "gravity": [0.0, 0.25, 1.0],
-                "sky_color": [1.0, 1.0, 1.0],
+                "sky": {
+                    "type": "UniformV1",
+                    "color": [1.0, 1.0, 1.0],
+                },
                 "light": {
                     "type": "RaysV1",
                     "maximum_distance": 123,
@@ -824,8 +830,11 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                     },
                     "physics": {
                         "gravity": [0.0, 0.0, 0.0],
-                        "sky_color": [0.5, 0.5, 0.5],
-                        "light": {
+                        "sky": {
+                            "type": "UniformV1",
+                            "color": [0.5, 0.5, 0.5],
+                        },
+                                "light": {
                             "type": "NoneV1",
                         }
                     },
