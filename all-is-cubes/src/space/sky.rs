@@ -1,3 +1,5 @@
+use euclid::point3;
+
 use crate::content::palette;
 use crate::math::{Cube, Face6, FaceMap, FreeVector, GridAab, Rgb};
 use crate::space::PackedLight;
@@ -14,6 +16,8 @@ use crate::space::{Space, SpacePhysics};
 pub enum Sky {
     /// Uniform illumination in all directions.
     Uniform(Rgb),
+    /// Each octant a different color.
+    Octants([Rgb; 8]),
 }
 
 impl Sky {
@@ -25,9 +29,14 @@ impl Sky {
     ///
     /// [luminance]: https://en.wikipedia.org/wiki/Luminance
     /// [voxel light emission]: crate::block::Atom::emission
-    pub fn sample(&self, _direction: FreeVector) -> Rgb {
+    pub fn sample(&self, direction: FreeVector) -> Rgb {
         match *self {
             Sky::Uniform(color) => color,
+            Sky::Octants(colors) => {
+                colors[(usize::from(direction.x >= 0.0) << 2)
+                    + (usize::from(direction.y >= 0.0) << 1)
+                    + usize::from(direction.z >= 0.0)]
+            }
         }
     }
 
@@ -36,13 +45,34 @@ impl Sky {
     pub fn mean(&self) -> Rgb {
         match *self {
             Sky::Uniform(color) => color,
+            Sky::Octants(colors) => colors.iter().copied().sum::<Rgb>() * (1.0 / 8.0),
         }
     }
 
+    /// Resample this sky to present the colors of block faces.
     pub(crate) fn for_blocks(&self) -> BlockSky {
         BlockSky {
             faces: match *self {
                 Sky::Uniform(color) => FaceMap::repeat(PackedLight::from(color)),
+                Sky::Octants(_) => FaceMap::from_fn(|face| {
+                    let transform = face.face_transform(0);
+                    // Take four samples from rays into the correct octants.
+                    // The rays start out exiting the NZ face and are transformed.
+                    // We could calculate which octants to use directly, but that would be more
+                    // error-prone.
+                    PackedLight::from(
+                        [
+                            point3(-1, -1, -1),
+                            point3(-1, 1, -1),
+                            point3(1, -1, -1),
+                            point3(1, 1, -1),
+                        ]
+                        .map(|p| self.sample(transform.transform_point(p).to_vector().to_f64()))
+                        .into_iter()
+                        .sum::<Rgb>()
+                            * 0.25_f32,
+                    )
+                }),
             },
             mean: PackedLight::from(self.mean()),
         }

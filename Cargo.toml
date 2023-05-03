@@ -128,6 +128,7 @@ rust.unused_qualifications = "warn"
 
 clippy.collapsible_else_if = "allow"
 clippy.collapsible_if = "allow"
+clippy.match_ref_pats = "allow"
 clippy.needless_update = "allow"
 clippy.single_match = "allow"
 

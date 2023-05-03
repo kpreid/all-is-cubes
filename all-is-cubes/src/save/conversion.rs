@@ -713,7 +713,7 @@ mod op {
 
 mod space {
     use super::*;
-    use crate::math::Vol;
+    use crate::math::{Rgb, Vol};
     use crate::save::compress::{GzSerde, Leu16};
     use crate::space::{self, LightPhysics, Sky, Space, SpacePhysics};
 
@@ -843,6 +843,9 @@ mod space {
                 &Sky::Uniform(color) => S::UniformV1 {
                     color: color.into(),
                 },
+                &Sky::Octants(colors) => S::OctantsV1 {
+                    colors: colors.map(Rgb::into),
+                },
             }
         }
     }
@@ -852,6 +855,7 @@ mod space {
             use schema::SkySer as S;
             match value {
                 S::UniformV1 { color } => Sky::Uniform(color.into()),
+                S::OctantsV1 { colors } => Sky::Octants(colors.map(Rgb::from)),
             }
         }
     }

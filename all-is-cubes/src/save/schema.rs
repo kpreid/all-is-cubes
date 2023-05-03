@@ -407,6 +407,7 @@ pub(crate) struct SpacePhysicsSerV1 {
 #[serde(tag = "type")]
 pub(crate) enum SkySer {
     UniformV1 { color: RgbSer },
+    OctantsV1 { colors: [RgbSer; 8] },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
