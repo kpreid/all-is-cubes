@@ -91,8 +91,7 @@ fn space_mesh_to_triangles(
 ) -> Vec<Triangle> {
     let vertices = mesh.vertices();
     mesh.indices()
-        .iter()
-        .copied()
+        .iter_u32()
         .tuples()
         .map(|(i1, i2, i3)| {
             let tri = [

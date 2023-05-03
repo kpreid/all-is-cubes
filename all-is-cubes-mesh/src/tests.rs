@@ -16,7 +16,8 @@ use all_is_cubes::{notnan, rgba_const};
 
 use crate::{
     block_meshes_for_space, BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering,
-    MeshOptions, SpaceMesh, TestTextureAllocator, TestTextureTile, TextureCoordinate, TtPoint,
+    IndexSlice, MeshOptions, SpaceMesh, TestTextureAllocator, TestTextureTile, TextureCoordinate,
+    TtPoint,
 };
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.
@@ -545,9 +546,7 @@ fn space_mesh_empty() {
     assert!(t.is_empty());
     assert_eq!(t.flaws(), Flaws::empty());
     assert_eq!(t.vertices(), &[]);
-    // type annotation to prevent spurious inference failures in the presence
-    // of other compiler errors
-    assert_eq!(t.indices(), &[] as &[u32]);
+    assert_eq!(t.indices(), IndexSlice::U16(&[]));
 }
 
 #[test]

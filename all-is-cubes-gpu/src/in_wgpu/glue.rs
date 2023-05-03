@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::ops::Range;
 use std::sync::Arc;
 
+use all_is_cubes_mesh::IndexSlice;
 use bytemuck::Pod;
 use wgpu::util::DeviceExt as _;
 
@@ -57,6 +58,13 @@ pub fn to_wgpu_color(color: Rgba) -> wgpu::Color {
         g: color.green().into_inner().into(),
         b: color.blue().into_inner().into(),
         a: color.alpha().into_inner().into(),
+    }
+}
+
+pub fn to_wgpu_index_format(slice: IndexSlice<'_>) -> wgpu::IndexFormat {
+    match slice {
+        IndexSlice::U16(_) => wgpu::IndexFormat::Uint16,
+        IndexSlice::U32(_) => wgpu::IndexFormat::Uint32,
     }
 }
 

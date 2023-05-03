@@ -173,7 +173,7 @@ pub struct ChunkMeshUpdate<'a, D, V, T, const CHUNK_SIZE: GridCoordinate> {
     pub position: ChunkPos<CHUNK_SIZE>,
     pub mesh: &'a SpaceMesh<V, T>,
     pub render_data: &'a mut D,
-    /// Whether *only* the indices need to be copied (and their length has not changed).
+    /// Whether *only* the indices need to be copied (and their length and type has not changed).
     pub indices_only: bool,
 }
 

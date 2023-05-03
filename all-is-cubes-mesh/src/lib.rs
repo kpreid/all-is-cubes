@@ -62,6 +62,8 @@ mod block_mesh;
 pub use block_mesh::*;
 #[doc(hidden)] // TODO: candidate for being public
 pub mod chunked_mesh;
+mod index_vec;
+pub use index_vec::*;
 mod space_mesh;
 pub use space_mesh::*;
 mod planar;

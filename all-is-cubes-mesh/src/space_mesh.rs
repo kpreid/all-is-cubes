@@ -1,14 +1,15 @@
-use bitvec::vec::BitVec;
-use ordered_float::OrderedFloat;
 use std::fmt::Debug;
 use std::ops::Range;
+
+use bitvec::vec::BitVec;
+use ordered_float::OrderedFloat;
 
 use all_is_cubes::camera::Flaws;
 use all_is_cubes::cgmath::{EuclideanSpace as _, MetricSpace as _, Point3, Vector3, Zero as _};
 use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridPoint, GridRotation};
 use all_is_cubes::space::{BlockIndex, Space};
 
-use crate::{BlockMesh, GfxVertex, MeshOptions, TextureTile};
+use crate::{BlockMesh, GfxVertex, IndexSlice, IndexVec, MeshOptions, TextureTile};
 
 /// A triangle mesh representation of a [`Space`] (or part of it) which may
 /// then be rasterized.
@@ -24,7 +25,7 @@ use crate::{BlockMesh, GfxVertex, MeshOptions, TextureTile};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpaceMesh<V, T> {
     vertices: Vec<V>,
-    indices: Vec<u32>,
+    indices: IndexVec,
 
     /// Where in `indices` the triangles with no partial transparency are arranged.
     opaque_range: Range<usize>,
@@ -86,8 +87,8 @@ impl<V, T> SpaceMesh<V, T> {
     /// draw only one desired set, use [`self.opaque_range()`](Self::opaque_range) and
     /// [`self.transparent_range(…)`](Self::transparent_range) to choose subslices of this.
     #[inline]
-    pub fn indices(&self) -> &[u32] {
-        &self.indices
+    pub fn indices(&self) -> IndexSlice<'_> {
+        self.indices.as_slice(..)
     }
 
     /// Reports any flaws in this mesh: reasons why using it to create a rendering would
@@ -99,7 +100,7 @@ impl<V, T> SpaceMesh<V, T> {
     /// True if there is nothing to draw.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.indices.is_empty()
+        self.indices().is_empty()
     }
 
     /// The range of [`Self::indices`] which contains the triangles with only alpha values
@@ -142,8 +143,8 @@ impl<V, T> SpaceMesh<V, T> {
             );
         }
         assert_eq!(self.opaque_range().end % 3, 0);
-        assert_eq!(self.indices.len() % 3, 0);
-        for index in self.indices.iter().copied() {
+        assert_eq!(self.indices().len() % 3, 0);
+        for index in self.indices().iter_u32() {
             assert!(index < self.vertices.len() as u32);
         }
     }
@@ -163,10 +164,9 @@ impl<V, T> SpaceMesh<V, T> {
             flaws: _,
         } = self;
 
-        // TODO: type alias for index type instead of u32?
         size_of::<Self>()
             + vertices.capacity() * size_of::<V>()
-            + indices.capacity() * size_of::<u32>()
+            + indices.capacity_bytes()
             + block_indices_used.capacity() / 8
             + textures_used.capacity() * size_of::<T>()
     }
@@ -211,7 +211,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
 
         // Use temporary buffer for positioning the transparent indices
         // TODO: Consider reuse
-        let mut transparent_indices = Vec::new();
+        let mut transparent_indices = IndexVec::new();
 
         for cube in bounds.interior_iter() {
             // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
@@ -273,6 +273,8 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     /// ranges which contain each of the orderings in `self.opaque_range` and
     /// `self.transparent_ranges`.
     ///
+    /// The indices of the opaque quads must have already been written into `self.indices`.
+    ///
     /// The orderings are identified by [`GridRotation`] values, in the following way:
     /// each rotation defines three basis vectors which we usually think of as “rotated
     /// X, rotated Y, rotated Z”; we instead treat them as “tertiary sort key, secondary
@@ -293,9 +295,24 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     /// using these sorts.
     ///
     /// [volumetric sort (2006)]: https://iquilezles.org/www/articles/volumesort/volumesort.htm
-    fn sort_and_store_transparent_indices(&mut self, transparent_indices: Vec<u32>) {
-        self.opaque_range = 0..self.indices.len();
+    fn sort_and_store_transparent_indices(&mut self, transparent_indices: IndexVec) {
+        // Set the opaque range to all indices which have already been stored
+        // (which will be the opaque ones ones).
+        self.opaque_range = 0..self.indices().len();
 
+        match transparent_indices {
+            IndexVec::U16(vec) => self.sort_and_store_transparent_indices_impl(vec),
+            IndexVec::U32(vec) => self.sort_and_store_transparent_indices_impl(vec),
+        }
+    }
+
+    // Subcomponent of [`Self::sort_and_store_transparent_indices()`] handling the index
+    // type generically.
+    fn sort_and_store_transparent_indices_impl<I>(&mut self, transparent_indices: Vec<I>)
+    where
+        I: Ord + bytemuck::Pod + num_traits::NumCast,
+        IndexVec: Extend<I>,
+    {
         if !V::WANTS_DEPTH_SORTING || transparent_indices.is_empty() {
             // Either there is nothing to sort (and all ranges will be length 0),
             // or the destination doesn't want sorting anyway. In either case, write the
@@ -306,12 +323,12 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
             // Precompute midpoints (as sort keys) of all of the transparent quads.
             // This does assume that the input `BlockMesh`es contain strictly quads
             // and no other polygons, though.
-            struct QuadWithMid<S> {
-                indices: [u32; 6],
+            struct QuadWithMid<S, I> {
+                indices: [I; 6],
                 midpoint: Point3<S>,
             }
-            let quads = bytemuck::cast_slice::<u32, [u32; 6]>(&transparent_indices);
-            let mut sortable_quads: Vec<QuadWithMid<V::Coordinate>> = quads
+            let quads = bytemuck::cast_slice::<I, [I; 6]>(&transparent_indices);
+            let mut sortable_quads: Vec<QuadWithMid<V::Coordinate, I>> = quads
                 .iter()
                 .map(|&indices| QuadWithMid {
                     indices,
@@ -382,24 +399,39 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
             return false;
         }
 
-        let slice: &mut [u32] = &mut self.indices[range];
-        // We want to sort the triangles, so we reinterpret the slice as groups of 3 indices.
-        let slice: &mut [[u32; 6]] = bytemuck::cast_slice_mut(slice);
+        // We want to sort the quads, so we reinterpret the slice as groups of 6 indices.
         let vertices = &self.vertices; // borrow for closure
-        slice.sort_unstable_by_key(|indices| {
-            -OrderedFloat(view_position.distance2(Self::midpoint(vertices, *indices)))
-        });
+        match &mut self.indices {
+            IndexVec::U16(vec) => {
+                bytemuck::cast_slice_mut::<u16, [u16; 6]>(&mut vec[range]).sort_unstable_by_key(
+                    |indices| {
+                        -OrderedFloat(view_position.distance2(Self::midpoint(vertices, *indices)))
+                    },
+                );
+            }
+            IndexVec::U32(vec) => {
+                bytemuck::cast_slice_mut::<u32, [u32; 6]>(&mut vec[range]).sort_unstable_by_key(
+                    |indices| {
+                        -OrderedFloat(view_position.distance2(Self::midpoint(vertices, *indices)))
+                    },
+                );
+            }
+        }
 
         true
     }
 
     /// Compute quad midpoint from quad vertices, for depth sorting.
     #[inline]
-    fn midpoint(vertices: &[V], indices: [u32; 6]) -> Point3<V::Coordinate> {
-        let one_half = <V::Coordinate as num_traits::NumCast>::from(0.5f32).unwrap();
-        let v0 = vertices[indices[0] as usize].position();
-        let v1 = vertices[indices[1] as usize].position();
-        let v2 = vertices[indices[2] as usize].position();
+    fn midpoint<I>(vertices: &[V], indices: [I; 6]) -> Point3<V::Coordinate>
+    where
+        I: num_traits::NumCast,
+    {
+        let one_half = num_traits::cast::<f32, V::Coordinate>(0.5f32).unwrap();
+        // We only need to look at one of the two triangles,
+        // because they have the same bounding rectangle.
+        let [v0, v1, v2, ..]: [Point3<V::Coordinate>; 6] =
+            indices.map(|i| vertices[num_traits::cast::<I, usize>(i).unwrap()].position());
         let max = v0
             .zip(v1, num_traits::Float::max)
             .zip(v2, num_traits::Float::max);
@@ -424,8 +456,8 @@ fn write_block_mesh_to_space_mesh<V: GfxVertex, T: TextureTile>(
     block_mesh: &BlockMesh<V, T>,
     cube: GridPoint,
     vertices: &mut Vec<V>,
-    opaque_indices: &mut Vec<u32>,
-    transparent_indices: &mut Vec<u32>,
+    opaque_indices: &mut IndexVec,
+    transparent_indices: &mut IndexVec,
     mut neighbor_is_fully_opaque: impl FnMut(Face6) -> bool,
 ) {
     if block_mesh.is_empty() {
@@ -474,7 +506,7 @@ impl<V, T> Default for SpaceMesh<V, T> {
     fn default() -> Self {
         Self {
             vertices: Vec::new(),
-            indices: Vec::new(),
+            indices: IndexVec::new(),
             opaque_range: ZERO_RANGE,
             transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
             block_indices_used: BitVec::new(),
@@ -501,7 +533,7 @@ impl<V: GfxVertex, T: TextureTile> From<&BlockMesh<V, T>> for SpaceMesh<V, T> {
                     .map(|(_, fm)| fm.vertices.len())
                     .sum(),
             ),
-            indices: Vec::with_capacity(
+            indices: IndexVec::with_capacity(
                 block_mesh
                     .all_face_meshes()
                     .map(|(_, fm)| fm.indices_opaque.len())
@@ -514,7 +546,7 @@ impl<V: GfxVertex, T: TextureTile> From<&BlockMesh<V, T>> for SpaceMesh<V, T> {
             flaws: block_mesh.flaws(),
         };
 
-        let mut transparent_indices = Vec::with_capacity(
+        let mut transparent_indices = IndexVec::with_capacity(
             block_mesh
                 .all_face_meshes()
                 .map(|(_, fm)| fm.indices_transparent.len())
@@ -549,12 +581,15 @@ fn bitset_set_and_get(v: &mut BitVec, index: usize) -> bool {
 
 /// `storage.extend(items)` plus reporting the added range of items
 fn extend_giving_range<T>(
-    storage: &mut Vec<T>,
+    storage: &mut IndexVec,
     items: impl IntoIterator<Item = T>,
-) -> Range<usize> {
-    let start = storage.len();
+) -> Range<usize>
+where
+    IndexVec: Extend<T>,
+{
+    let start = storage.as_slice(..).len();
     storage.extend(items);
-    let end = storage.len();
+    let end = storage.as_slice(..).len();
     start..end
 }
 
@@ -700,9 +735,7 @@ mod tests {
         let mesh = TestMesh::default();
         assert!(mesh.is_empty());
         assert_eq!(mesh.vertices(), &[]);
-        // type annotation to prevent spurious inference failures in the presence
-        // of other compiler errors
-        assert_eq!(mesh.indices(), &[] as &[u32]);
+        assert_eq!(mesh.indices(), IndexSlice::U16(&[]));
     }
 
     /// An empty mesh shouldn't allocate anything beyond itself.

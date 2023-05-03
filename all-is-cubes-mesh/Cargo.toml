@@ -28,6 +28,7 @@ arbitrary = { workspace = true, optional = true }
 bitflags = { workspace = true }
 bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
 bytemuck = { workspace = true }
+either = { workspace = true }
 fnv = "1.0.7"
 indoc = { workspace = true }
 instant = { workspace = true }

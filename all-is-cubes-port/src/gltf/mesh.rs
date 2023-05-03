@@ -7,7 +7,7 @@ use gltf_json::validation::Checked::{self, Valid};
 use gltf_json::Index;
 use once_cell::sync::Lazy;
 
-use all_is_cubes_mesh::SpaceMesh;
+use all_is_cubes_mesh::{IndexSlice, SpaceMesh};
 
 use super::glue::{create_accessor, push_and_return_index, u32size};
 use super::{GltfTextureRef, GltfVertex, GltfWriter};
@@ -44,10 +44,10 @@ pub(crate) fn add_mesh(
     mesh: &SpaceMesh<GltfVertex, GltfTextureRef>,
 ) -> Index<gltf_json::Mesh> {
     let vertex_bytes = bytemuck::cast_slice::<GltfVertex, u8>(mesh.vertices());
-    let index_bytes = bytemuck::cast_slice::<u32, u8>(mesh.indices());
-    let index_type = Valid(gltf_json::accessor::GenericComponentType(
-        gltf_json::accessor::ComponentType::U32,
-    ));
+    let index_type = match mesh.indices() {
+        IndexSlice::U16(_) => gltf_json::accessor::ComponentType::U16,
+        IndexSlice::U32(_) => gltf_json::accessor::ComponentType::U32,
+    };
 
     // TODO: use the given name (sanitized) in the file name
     let buffer_entity = writer
@@ -57,8 +57,18 @@ pub(crate) fn add_mesh(
             &format!("mesh-{i}", i = writer.root.buffers.len()),
             |w| {
                 w.write_all(vertex_bytes)?;
-                for index in mesh.indices() {
-                    w.write_all(&index.to_le_bytes())?;
+                // Convert index bytes to little-endian
+                match mesh.indices() {
+                    IndexSlice::U16(slice) => {
+                        for index in slice {
+                            w.write_all(&index.to_le_bytes())?;
+                        }
+                    }
+                    IndexSlice::U32(slice) => {
+                        for index in slice {
+                            w.write_all(&index.to_le_bytes())?;
+                        }
+                    }
                 }
                 Ok(())
             },
@@ -82,7 +92,7 @@ pub(crate) fn add_mesh(
         &mut writer.root.buffer_views,
         gltf_json::buffer::View {
             buffer: buffer_index,
-            byte_length: u32size(index_bytes.len()),
+            byte_length: u32size(mesh.indices().as_bytes().len()),
             // Indexes are packed into the same buffer, so they start at the end of the vertex bytes
             byte_offset: Some(u32size(vertex_bytes.len())),
             byte_stride: None,
@@ -152,9 +162,11 @@ pub(crate) fn add_mesh(
                             &mut writer.root.accessors,
                             gltf_json::Accessor {
                                 buffer_view: Some(index_buffer_view),
-                                byte_offset: u32size(index_range.start * size_of::<u32>()),
+                                byte_offset: u32size(index_range.start * index_type.size()),
                                 count: u32size(index_range.len()),
-                                component_type: index_type,
+                                component_type: Valid(gltf_json::accessor::GenericComponentType(
+                                    index_type,
+                                )),
                                 extensions: Default::default(),
                                 extras: Default::default(),
                                 type_: Valid(gltf_json::accessor::Type::Scalar),
@@ -279,6 +291,7 @@ mod tests {
         let vertex_buffer = root.get(vertex_buffer_view.buffer).unwrap();
         let index_buffer = root.get(index_buffer_view.buffer).unwrap();
 
+        let index_size = index_accessor.component_type.unwrap().0.size();
         dbg!(
             vertex_accessor.count,
             index_accessor.count,
@@ -286,7 +299,7 @@ mod tests {
             &index_buffer,
             size_of::<GltfVertex>(),
             4 * 6 * size_of::<GltfVertex>(),
-            6 * 6 * size_of::<u32>(),
+            6 * 6 * index_size,
         );
         // Six faces each with four vertices and six indices. No extras.
         assert_eq!(vertex_accessor.count, 4 * 6, "vertex count");
@@ -298,7 +311,7 @@ mod tests {
         );
         assert_eq!(
             vertex_buffer.byte_length as usize,
-            6 * 6 * size_of::<u32>() + 4 * 6 * size_of::<GltfVertex>(),
+            6 * 6 * index_size + 4 * 6 * size_of::<GltfVertex>(),
             "buffer size"
         );
     }

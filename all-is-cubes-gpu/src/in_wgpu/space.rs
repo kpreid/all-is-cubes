@@ -14,10 +14,10 @@ use all_is_cubes::math::{Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate
 use all_is_cubes::space::{Space, SpaceChange};
 use all_is_cubes::universe::URef;
 use all_is_cubes_mesh::chunked_mesh::{ChunkMeshUpdate, ChunkedSpaceMesh};
-use all_is_cubes_mesh::DepthOrdering;
+use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
 
 use crate::in_wgpu::frame_texture::FramebufferTextures;
-use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
+use crate::in_wgpu::glue::{size_vector_to_extent, to_wgpu_index_format, write_texture_by_aab};
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::vertex::{WgpuInstanceData, WgpuLinesVertex};
 use crate::in_wgpu::{
@@ -68,8 +68,8 @@ pub(crate) struct SpaceRenderer {
 struct ChunkBuffers {
     vertex_buf: ResizingBuffer,
     index_buf: ResizingBuffer,
+    index_format: wgpu::IndexFormat,
 }
-const INDEX_FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint32;
 
 impl SpaceRenderer {
     /// TODO: Simplify callers by making it possible to create a `SpaceRenderer` without a space.
@@ -211,7 +211,9 @@ impl SpaceRenderer {
                 if u.indices_only {
                     if let Some(index_buf) = u.render_data.as_ref().and_then(|b| b.index_buf.get())
                     {
-                        let index_buf_bytes = bytemuck::cast_slice::<u32, u8>(u.mesh.indices());
+                        // It's OK to ignore which type the indices are because they will
+                        // always be the same type as they were previously.
+                        let index_buf_bytes = u.mesh.indices().as_bytes();
                         if let Some(len) = index_buf_bytes
                             .len()
                             .try_into()
@@ -529,7 +531,7 @@ fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuf
             .get()
             .expect("missing index buffer")
             .slice(..),
-        INDEX_FORMAT,
+        buffers.index_format,
     );
 }
 
@@ -547,7 +549,7 @@ fn update_chunk_buffers(
     let new_vertices_data: &[u8] =
         bytemuck::cast_slice::<WgpuBlockVertex, u8>(update.mesh.vertices());
     // TODO: assert INDEX_FORMAT matches this type
-    let new_indices_data: &[u8] = bytemuck::cast_slice::<u32, u8>(update.mesh.indices());
+    let new_indices: IndexSlice<'_> = update.mesh.indices();
 
     let position: [GridCoordinate; 3] = update.position.0.into();
     let buffers = update.render_data.get_or_insert_with(ChunkBuffers::default);
@@ -564,10 +566,11 @@ fn update_chunk_buffers(
         bwp.reborrow(),
         &wgpu::util::BufferInitDescriptor {
             label: Some(&format!("{space_label} chunk index {position:?}")),
-            contents: new_indices_data,
+            contents: new_indices.as_bytes(),
             usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
         },
     );
+    buffers.index_format = to_wgpu_index_format(new_indices);
 }
 
 /// [`SpaceRenderer`]'s set of things that need recomputing.
