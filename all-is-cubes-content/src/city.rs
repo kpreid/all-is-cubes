@@ -6,29 +6,26 @@ use alloc::{sync::Arc, vec::Vec};
 use itertools::Itertools;
 use rand::{Rng, SeedableRng as _};
 
-use all_is_cubes::{
-    drawing::embedded_graphics::{
-        mono_font::iso_8859_1 as font,
-        text::{Alignment, Baseline, TextStyleBuilder},
-    },
-    universe::UniverseTransaction,
-};
-
 use all_is_cubes::block::{self, Block, BlockAttributes, Resolution::*, AIR};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
+use all_is_cubes::drawing::embedded_graphics::{
+    mono_font::iso_8859_1 as font,
+    text::{Alignment, Baseline, TextStyleBuilder},
+};
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::{Slot, Tool};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector,
-    Gridgid, Rgb,
+    Gridgid,
 };
 use all_is_cubes::raycast::Raycaster;
-use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder, SpacePhysics};
+use all_is_cubes::space::{self, LightPhysics, Space, SpaceBuilder, SpacePhysics};
 use all_is_cubes::time::Instant;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::{logo::logo_text, vui, vui::widgets};
 
@@ -86,9 +83,19 @@ pub(crate) async fn demo_city<I: Instant>(
 
     let mut planner = CityPlanner::new(bounds);
 
+    let sky = {
+        // color of uniformly sky- lit grass
+        let ground = palette::GRASS * palette::DAY_SKY_COLOR;
+        let sky = palette::DAY_SKY_COLOR;
+        space::Sky::Octants([
+            ground, ground, sky, sky, //
+            ground, ground, sky, sky, //
+        ])
+    };
+
     // Construct space.
     let mut space = Space::builder(bounds)
-        .sky_color(Rgb::new(0.9, 0.9, 1.4))
+        .sky(sky)
         .light_physics(LightPhysics::None) // disable until we are done with bulk updates
         .spawn({
             // TODO: Add incremental spawn configuration to SpaceBuilder?
