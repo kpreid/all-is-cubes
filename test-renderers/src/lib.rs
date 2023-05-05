@@ -41,17 +41,14 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use image::RgbaImage;
+use rendiff::{Histogram, Threshold};
 
 use all_is_cubes::character::Character;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
 
-mod diff;
-pub use diff::*;
 mod harness;
 pub use harness::*;
-mod histogram;
-pub use histogram::*;
 mod image_files;
 pub use image_files::*;
 mod render;
@@ -180,7 +177,7 @@ pub fn compare_rendered_image(
         };
 
     // Compare expected and actual images
-    let diff_result = diff::diff(&expected_image, &actual_image);
+    let diff_result = rendiff::diff(&actual_image, &expected_image);
     if let Some(image) = &diff_result.diff_image {
         image
             .save(&diff_file_path)
@@ -203,7 +200,7 @@ pub fn compare_rendered_image(
         &actual_file_path,
         Some(&diff_file_path),
         diff_result.histogram,
-        if diff_result.equal_or_different_below_threshold(allowed_difference) {
+        if allowed_difference.allows(diff_result.histogram) {
             ComparisonOutcome::Equal
         } else {
             ComparisonOutcome::Different {

@@ -38,6 +38,7 @@ futures-core = { workspace = true }
 futures-util = { workspace = true, features = ["std"] }
 image = { workspace = true, features = ["png"] }
 itertools = { workspace = true }
+rendiff = { workspace = true }
 send_wrapper = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

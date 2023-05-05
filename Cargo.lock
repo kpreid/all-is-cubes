@@ -3187,6 +3187,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "216080ab382b992234dda86873c18d4c48358f5cfcb70fd693d7f6f2131b628b"
 
 [[package]]
+name = "rendiff"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c73498aa092adcb87859a578670a5704d510bbde6d2a47ed9d292626966c6224"
+dependencies = [
+ "image",
+ "itertools",
+]
+
+[[package]]
 name = "reqwest"
 version = "0.11.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3667,6 +3677,7 @@ dependencies = [
  "futures-util",
  "image",
  "itertools",
+ "rendiff",
  "send_wrapper",
  "serde",
  "serde_json",
