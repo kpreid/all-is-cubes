@@ -6,6 +6,7 @@ use crate::{Histogram, Threshold};
 
 /// Output of [`diff()`], a comparison between two images.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub struct DiffResult {
     pub histogram: Histogram,
     /// An image intended for human viewing of which pixels are different,

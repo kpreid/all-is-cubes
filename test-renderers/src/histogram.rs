@@ -8,6 +8,7 @@ use itertools::Itertools;
 /// For example, the zero element of the array contains a count of the pixels
 /// that were considered equal.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
 pub struct Histogram(pub [usize; 256]);
 
 impl Histogram {
@@ -35,6 +36,7 @@ impl fmt::Debug for Histogram {
 /// &lt;key&gt; or less”. Lower magnitudes that are accepted by a lower entry don't count
 /// towards the limit at a higher magnitude. Differences of zero are always accepted.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
 pub struct Threshold(pub BTreeMap<u8, usize>);
 
 impl Threshold {

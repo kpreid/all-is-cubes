@@ -534,7 +534,7 @@ async fn layers_all(context: RenderTestContext) {
     layers_all_show_ui(context, true).await;
 }
 
-/// Combined impl for layers_all() and layers_hidden_ui()
+/// Combined impl for [`layers_all()`] and [`layers_hidden_ui()`]
 async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
     let mut universe = Universe::new();
     let cube_space = one_cube_space();
@@ -566,7 +566,7 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
         .await;
 }
 
-/// Render with content in all layers (world, UI, and info text) but the show_ui option off.
+/// Render with content in all layers (world, UI, and info text) but the `show_ui` option off.
 async fn layers_hidden_ui(context: RenderTestContext) {
     layers_all_show_ui(context, false).await;
 }

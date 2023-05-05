@@ -5,6 +5,7 @@ use crate::TestId;
 
 // TODO: better name
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[allow(clippy::exhaustive_structs)]
 pub struct ImageId {
     pub test_id: TestId,
     pub renderer: RendererId,
@@ -12,6 +13,7 @@ pub struct ImageId {
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[allow(clippy::exhaustive_enums)]
 pub enum RendererId {
     /// A single expected output expected to be equal for all renderers.
     All,

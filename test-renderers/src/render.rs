@@ -69,7 +69,7 @@ pub trait RendererFactory: Send + Sync + Debug {
 ///
 /// This size is chosen to be small enough that CPU raytracing tests run in a reasonable
 /// time and output images are small, without being so small as to be unintelligible.
-/// It also needs to match wgpu::COPY_BYTES_PER_ROW_ALIGNMENT.
+/// It also needs to match `wgpu::COPY_BYTES_PER_ROW_ALIGNMENT`.
 pub const COMMON_VIEWPORT: Viewport = Viewport {
     nominal_size: Vector2::new(128., 96.),
     framebuffer_size: Vector2::new(128, 96),

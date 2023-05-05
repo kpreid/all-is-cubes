@@ -10,6 +10,7 @@ use crate::{test_data_dir_path, ComparisonRecord, RendererId, TestId, Version};
 
 /// Record of what happened when a specific test case was run with a specific renderer.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[allow(clippy::exhaustive_structs)]
 pub struct TestCaseOutput {
     pub test_id: TestId,
     pub outcome: Result<(), String>,
