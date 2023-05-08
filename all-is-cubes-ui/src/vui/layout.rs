@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use all_is_cubes::cgmath::{Vector3, Zero as _};
 use all_is_cubes::math::{
-    point_to_enclosing_cube, Face6, GridAab, GridCoordinate, GridPoint, GridVector,
+    point_to_enclosing_cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector,
 };
 use all_is_cubes::space::{Space, SpaceBuilder, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _, Transaction as _};
@@ -184,6 +184,12 @@ pub enum LayoutTree<W> {
     /// An space laid out like a widget but left empty.
     Spacer(LayoutRequest),
 
+    /// Add the specified amount of space around the child.
+    Margin {
+        margin: FaceMap<GridCoordinate>,
+        child: Arc<LayoutTree<W>>,
+    },
+
     /// Fill the available space with the children arranged along an axis.
     Stack {
         /// Which axis of space to arrange on.
@@ -238,6 +244,7 @@ impl<W> LayoutTree<W> {
         match self {
             LayoutTree::Leaf(value) => function(value),
             LayoutTree::Spacer(_) => {}
+            LayoutTree::Margin { margin: _, child } => child.for_each_leaf(function),
             LayoutTree::Stack {
                 direction: _,
                 children,
@@ -279,6 +286,13 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 position: grant,
             }),
             LayoutTree::Spacer(ref r) => LayoutTree::Spacer(r.clone()),
+            LayoutTree::Margin { margin, ref child } => LayoutTree::Margin {
+                margin,
+                child: child.perform_layout(LayoutGrant {
+                    bounds: grant.bounds.expand(margin.map(|_, m| -m)),
+                    gravity: grant.gravity,
+                })?,
+            },
             LayoutTree::Stack {
                 direction,
                 ref children,
@@ -413,6 +427,11 @@ impl<W: Layoutable> Layoutable for LayoutTree<W> {
         match *self {
             LayoutTree::Leaf(ref w) => w.requirements(),
             LayoutTree::Spacer(ref requirements) => requirements.clone(),
+            LayoutTree::Margin { margin, ref child } => {
+                let mut req = child.requirements();
+                req.minimum = req.minimum + margin.negatives() + margin.positives();
+                req
+            }
             LayoutTree::Stack {
                 direction,
                 ref children,
