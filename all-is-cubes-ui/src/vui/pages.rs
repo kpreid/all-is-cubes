@@ -203,7 +203,7 @@ pub(super) fn new_paused_widget_tree(
         direction: Face6::NY,
         children: vec![
             // TODO: establish standard resolutions for logo etc
-            LayoutTree::leaf(shrink(u, R32, LayoutTree::leaf(logo_text()))?),
+            LayoutTree::leaf(shrink(u, R16, LayoutTree::leaf(logo_text()))?),
             LayoutTree::leaf(shrink(u, R32, heading("Paused"))?),
             LayoutTree::leaf(open_page_button(
                 hud_inputs,
@@ -219,7 +219,10 @@ pub(super) fn new_paused_widget_tree(
         ],
     });
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
-        widgets::Frame::for_menu().as_background_of(contents),
+        hud_inputs
+            .hud_blocks
+            .dialog_background()
+            .as_background_of(contents),
     ))))
 }
 
@@ -242,7 +245,10 @@ pub(super) fn new_options_widget_tree(
         ],
     });
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
-        widgets::Frame::for_menu().as_background_of(contents),
+        hud_inputs
+            .hud_blocks
+            .dialog_background()
+            .as_background_of(contents),
     ))))
 }
 
@@ -290,7 +296,10 @@ pub(super) fn new_about_widget_tree(
         ],
     });
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
-        widgets::Frame::for_menu().as_background_of(contents),
+        hud_inputs
+            .hud_blocks
+            .dialog_background()
+            .as_background_of(contents),
     ))))
 }
 

@@ -154,7 +154,17 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
     let tree: vui::WidgetTree = Arc::new(LayoutTree::Stack {
         direction: Face6::PZ,
         children: vec![
-            LayoutTree::leaf(widgets::Frame::for_menu()),
+            LayoutTree::leaf({
+                // TODO: this should be the 'dialog box' background but we don't have access to that from this crate
+                let background = Block::from(palette::MENU_BACK);
+                let frame = Block::from(palette::MENU_FRAME);
+                widgets::Frame::new(widgets::BoxStyle::from_geometric_categories(
+                    None,
+                    Some(background),
+                    Some(frame.clone()),
+                    Some(frame),
+                ))
+            }),
             Arc::new(LayoutTree::Stack {
                 direction: Face6::NY,
                 children: vertical_widgets,

@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use all_is_cubes::block::Block;
-use all_is_cubes::content::palette;
-use all_is_cubes::math::{Face6, GridVector};
+use all_is_cubes::math::{Face6, FaceMap, GridVector};
 
 use crate::vui;
 
@@ -24,17 +23,6 @@ impl Frame {
         Arc::new(Self { style })
     }
 
-    pub fn for_menu() -> Arc<Self> {
-        let background = Block::from(palette::MENU_BACK);
-        let frame = Block::from(palette::MENU_FRAME);
-        Self::new(BoxStyle::from_geometric_categories(
-            None,
-            Some(background),
-            Some(frame.clone()),
-            Some(frame),
-        ))
-    }
-
     /// experimental
     #[doc(hidden)]
     pub fn with_block(block: Block) -> Arc<Self> {
@@ -50,6 +38,19 @@ impl Frame {
     ///
     /// TODO: Allow fully enclosing the widgets (this will require new layout capabilities)
     pub fn as_background_of(self: Arc<Self>, tree: vui::WidgetTree) -> vui::WidgetTree {
+        // Add margins around all 4 sides.
+        let tree = Arc::new(vui::LayoutTree::Margin {
+            margin: FaceMap {
+                nx: 1,
+                ny: 1,
+                nz: 0,
+                px: 1,
+                py: 1,
+                pz: 0,
+            },
+            child: tree,
+        });
+
         Arc::new(vui::LayoutTree::Stack {
             direction: Face6::PZ,
             children: vec![vui::LayoutTree::leaf(self as Arc<dyn vui::Widget>), tree],

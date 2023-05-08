@@ -38,6 +38,9 @@ pub enum UiBlocks {
     /// Each array element is the relationship of this toolbar item to that button index.
     ToolbarPointer([ToolbarButtonState; TOOL_SELECTIONS]),
 
+    /// 4x4x1 multiblock defining a `BoxStyle` for [`widgets::Frame`] dialog box backgrounds.
+    DialogBackground,
+
     // TODO: consider moving these to a separate "WidgetTheme" enum to shift the complexity
     /// Appearance of a [`widgets::ActionButton`] without label.
     ActionButton(ButtonVisualState),
@@ -75,6 +78,7 @@ impl fmt::Display for UiBlocks {
             UiBlocks::ToolbarPointer([b0, b1, b2]) => {
                 write!(f, "toolbar-pointer/{b0}-{b1}-{b2}")
             }
+            UiBlocks::DialogBackground => write!(f, "dialog-background"),
             UiBlocks::ActionButton(state) => write!(f, "action-button/{state}"),
             UiBlocks::ToggleButton(state) => write!(f, "toggle-button/{state}"),
             UiBlocks::BackButtonLabel => write!(f, "back-button"),
@@ -151,6 +155,20 @@ impl UiBlocks {
                         )?),
                     )
                     .build(),
+
+                UiBlocks::DialogBackground => {
+                    Block::builder()
+                        .display_name("Dialog Background")
+                        .voxels_ref(
+                            R64, // 16 res × 4 tiles
+                            universe.insert_anonymous(space_from_image(
+                                include_image!("icons/dialog-background.png"),
+                                GridRotation::IDENTITY,
+                                default_srgb,
+                            )?),
+                        )
+                        .build()
+                }
 
                 UiBlocks::ActionButton(state) => state.button_block(universe)?,
                 UiBlocks::ToggleButton(state) => state.button_block(universe)?,
