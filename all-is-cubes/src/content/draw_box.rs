@@ -20,6 +20,24 @@ pub struct BoxStyle {
 impl BoxStyle {
     // TODO: Figure out a less complex set of constructors. Allow replacing individual parts.
 
+    /// Construct a `BoxStyle` from a row-major 2D array whose elements are arranged in
+    /// the order `[lower, middle, upper, lower & upper]`.
+    /// The Z axis is filled with all the same blocks.
+    // TODO: figure out if this is good public api
+    #[doc(hidden)]
+    pub fn from_nine_and_thin(blocks: [[Block; 4]; 4]) -> Self {
+        use std::array::from_fn;
+        fn twiddle(coord: usize) -> usize {
+            [1, 0, 2, 3][coord]
+        }
+
+        Self {
+            parts: from_fn(|x| {
+                from_fn(|y| from_fn(|_z| Some(blocks[twiddle(y)][twiddle(x)].clone())))
+            }),
+        }
+    }
+
     /// Construct a `BoxStyle` that uses the given blocks for
     /// interior, faces, edges, and corners, never rotated.
     pub fn from_geometric_categories(
