@@ -1,9 +1,9 @@
 use std::collections::{btree_map, BTreeMap};
-use std::fs;
-use std::io::{self, Write};
+use std::io::Write as _;
 use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use std::{fs, io};
 
 use async_fn_traits::{AsyncFn0, AsyncFn1, AsyncFn2};
 use futures_core::future::BoxFuture;
@@ -138,7 +138,18 @@ pub struct HarnessArgs {
     /// harness does.
     #[arg(long)]
     list: bool,
+
+    /// Format in which test results are written to stdout.
+    #[arg(long, default_value = "pretty")]
+    format: Format,
+
     filters: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+enum Format {
+    Pretty,
+    Terse,
 }
 
 /// Return type of [`harness_main()`], to be returned from `main()`.
@@ -163,6 +174,7 @@ where
 {
     let HarnessArgs {
         list: list_only,
+        format,
         filters,
     } = args;
 
@@ -200,6 +212,8 @@ where
             tokio::spawn(Shared::clone(f));
         }
     }
+
+    println!("\nrunning {} tests", filtered_test_table.len());
 
     // Start the tests, in parallel with a concurrency limit imposed by buffer_unordered().
     let suite_start_time = Instant::now();
@@ -240,14 +254,12 @@ where
         })
         .buffer_unordered(4);
 
-    let mut logging = io::stderr();
     let mut per_test_output = BTreeMap::new();
     let mut count_passed = 0;
     let mut count_failed = 0;
     let mut cumulative_time = Duration::ZERO;
 
     // Collect results.
-    writeln!(logging).unwrap();
     while let Some(result) = handles.next().await {
         let TestRunResult {
             name,
@@ -256,10 +268,20 @@ where
         } = result;
 
         // Print out outcome of test
-        write!(logging, "test {name:20} ...").unwrap();
+        match format {
+            Format::Pretty => {
+                print!("test {name:20} ...");
+            }
+            Format::Terse => {}
+        };
         let outcome_for_report = match outcome {
             Ok(case_time) => {
-                writeln!(logging, " ok in {}", case_time.custom_format(StatusText)).unwrap();
+                match format {
+                    Format::Pretty => {
+                        println!(" ok in {}", case_time.custom_format(StatusText))
+                    }
+                    Format::Terse => print!("."),
+                }
                 count_passed += 1;
                 cumulative_time += case_time;
                 Ok(())
@@ -271,14 +293,21 @@ where
                         Ok(boxed_str) => *boxed_str,
                         Err(_) => "<non-string panic>".into(),
                     };
-                    writeln!(logging, " panicked: {panic_str}").unwrap();
+                    match format {
+                        Format::Pretty => println!(" panicked: {panic_str}"),
+                        Format::Terse => print!("E"),
+                    }
                     Err(panic_str)
                 } else {
-                    writeln!(logging, " unknown outcome {e:?}").unwrap();
+                    match format {
+                        Format::Pretty => println!(" unknown outcome {e:?}"),
+                        Format::Terse => print!("E"),
+                    }
                     Err(e.to_string())
                 }
             }
         };
+        io::stdout().flush().unwrap(); // in case of terse format
 
         per_test_output.insert(
             name.clone(),
@@ -293,16 +322,15 @@ where
         );
     }
 
-    // format is imitating the standard test harness
-    writeln!(
-        logging,
+    // format is imitating the standard test harness.
+    // Yes, this is printed even in terse format.
+    println!(
         "\ntest result: {count_passed} passed; {count_failed} failed; \
             {count_filtered} filtered out; \
             finished in {wall_time:.2} s ({cumulative_time:.2} s summed)",
         wall_time = suite_start_time.elapsed().as_secs_f64(),
         cumulative_time = cumulative_time.as_secs_f64()
-    )
-    .unwrap();
+    );
 
     // Write data from this run to a JSON file.
     fs::write(
@@ -313,7 +341,7 @@ where
 
     // Compile this run *and* others into a report file.
     let report_path = write_report_file();
-    writeln!(logging, "report written to {p}", p = report_path.display()).unwrap();
+    eprintln!("report written to {p}", p = report_path.display());
 
     if count_failed == 0 {
         ExitCode::SUCCESS
