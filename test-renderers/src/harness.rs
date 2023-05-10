@@ -134,6 +134,10 @@ impl RenderTestContext {
 #[derive(Debug, clap::Parser)]
 #[command(author, about, version)]
 pub struct HarnessArgs {
+    /// Would run ignored tests, but we have none, so runs no tests.
+    #[arg(long)]
+    ignored: bool,
+
     /// List test names, one per line to stdout, in the same way the standard Rust test
     /// harness does.
     #[arg(long)]
@@ -143,7 +147,15 @@ pub struct HarnessArgs {
     #[arg(long, default_value = "pretty")]
     format: Format,
 
+    /// For compatibility; has no effect.
+    #[arg(long)]
+    nocapture: bool,
+
     filters: Vec<String>,
+
+    /// Match filters by exact equality rather than substring.
+    #[arg(long)]
+    exact: bool,
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -173,9 +185,12 @@ where
     Ff::OutputFuture: Send,
 {
     let HarnessArgs {
+        ignored,
         list: list_only,
         format,
+        nocapture: _, // We never capture
         filters,
+        exact,
     } = args;
 
     // Gather tests (don't run them yet).
@@ -183,8 +198,10 @@ where
     test_suite(&mut TestCaseCollector(&mut test_table));
 
     if list_only {
-        for name in test_table.keys() {
-            println!("{name}: test");
+        if !ignored {
+            for name in test_table.keys() {
+                println!("{name}: test");
+            }
         }
         return ExitCode::SUCCESS;
     }
@@ -196,7 +213,15 @@ where
         .filter(|(name, _)| {
             // Same behavior as the standard rust test harness: if there are any arguments, each
             // is a substring filter on the test name, ANDed together, but no arguments is pass all.
-            let included = filters.is_empty() || filters.iter().any(|filter| name.contains(filter));
+            let included = !ignored
+                && (filters.is_empty()
+                    || filters.iter().any(|filter| {
+                        if exact {
+                            name == filter
+                        } else {
+                            name.contains(filter)
+                        }
+                    }));
             if !included {
                 count_filtered += 1;
             }
