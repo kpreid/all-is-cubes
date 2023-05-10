@@ -134,6 +134,10 @@ impl RenderTestContext {
 #[derive(Debug, clap::Parser)]
 #[command(author, about, version)]
 pub struct HarnessArgs {
+    /// List test names, one per line to stdout, in the same way the standard Rust test
+    /// harness does.
+    #[arg(long)]
+    list: bool,
     filters: Vec<String>,
 }
 
@@ -157,11 +161,21 @@ where
     Ff: AsyncFn0<Output = Factory> + Send + Sync + 'static,
     Ff::OutputFuture: Send,
 {
-    let HarnessArgs { filters } = args;
+    let HarnessArgs {
+        list: list_only,
+        filters,
+    } = args;
 
     // Gather tests (don't run them yet).
     let mut test_table: BTreeMap<String, TestCase> = BTreeMap::new();
     test_suite(&mut TestCaseCollector(&mut test_table));
+
+    if list_only {
+        for name in test_table.keys() {
+            println!("{name}: test");
+        }
+        return ExitCode::SUCCESS;
+    }
 
     // Filter tests, synchronously so we can count them simply.
     let mut count_filtered = 0;
