@@ -41,7 +41,7 @@ futures-core = { version = "0.3.28", default-features = false, features = ["allo
 futures-task = { version = "0.3.28", default-features = false }
 futures-util = { version = "0.3.28", default-features = false, features = ["alloc"] }
 image = { version = "0.24.6", default-features = false }
-indoc = "1.0.3"
+indoc = "2.0.1"
 instant = "0.1.12"
 itertools = { version = "0.10.5", default-features = false, features = ["use_alloc"] }
 log = { version = "0.4.17", default-features = false }
