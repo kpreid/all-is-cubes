@@ -165,6 +165,8 @@ impl SwitchingWriter {
         match self {
             SwitchingWriter::Null { bytes_written } => Ok((None, bytes_written)),
             SwitchingWriter::Memory { buffer, .. } => {
+                use base64::Engine as _;
+
                 let prefix = "data:application/gltf-buffer;base64,";
                 let mut url = String::with_capacity(prefix.len() + buffer.len() * 6 / 8 + 3);
                 url += prefix;
@@ -172,7 +174,7 @@ impl SwitchingWriter {
                 // format for data URLs; standard base64 is correct. The URL safety
                 // in question is for e.g. base64 components within ordinary URLs or
                 // file names.
-                base64::encode_config_buf(&buffer, base64::STANDARD_NO_PAD, &mut url);
+                base64::engine::general_purpose::STANDARD_NO_PAD.encode_string(&buffer, &mut url);
                 Ok((Some(url), buffer.len()))
             }
             SwitchingWriter::File {
