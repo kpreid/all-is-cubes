@@ -1,13 +1,28 @@
 use cgmath::{Basis3, Decomposed, One, Vector3};
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
 use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport};
 use all_is_cubes::cgmath::{Point3, Vector2};
-use all_is_cubes::chunking::{ChunkChart, ChunkPos, OctantMask};
+use all_is_cubes::chunking::{reset_chunk_chart_cache, ChunkChart, ChunkPos, OctantMask};
 use all_is_cubes::math::GridAab;
 
+fn chunk_chart_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("ChunkChart");
+
+    for view_distance in [1u8, 20, 100] {
+        group.bench_function(BenchmarkId::new("new", view_distance), |b| {
+            b.iter_with_large_drop(|| -> ChunkChart<16> {
+                reset_chunk_chart_cache();
+                ChunkChart::new(f64::from(view_distance))
+            });
+        });
+    }
+
+    group.finish();
+}
+
 /// Test the performance of strategies to choose chunks to draw.
-pub fn cull_bench(c: &mut Criterion) {
+fn cull_bench(c: &mut Criterion) {
     let chart = ChunkChart::<16>::new(200.0);
     let bounds = GridAab::from_lower_upper([-100, -30, -100], [100, 30, 100]);
     let chunked_bounds = bounds.divide(16);
@@ -104,5 +119,5 @@ pub fn cull_bench(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, cull_bench);
+criterion_group!(benches, cull_bench, chunk_chart_bench);
 criterion_main!(benches);

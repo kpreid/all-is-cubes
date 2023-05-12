@@ -285,6 +285,16 @@ fn get_or_compute_chart_octant(
     }
 }
 
+#[doc(hidden)] // used for benchmarks
+pub fn reset_chunk_chart_cache() {
+    match CHUNK_CHART_CACHE.lock() {
+        Ok(mut cache) => cache.clear(),
+        Err(_) => {
+            // No action needed; will be cleared on next use
+        }
+    }
+}
+
 fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<[GridVector]> {
     // We're going to compute in the zero-or-positive octant, which means that the chunk origin
     // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
