@@ -752,8 +752,8 @@ mod tests {
             .build();
         let (_, _, mesh) = mesh_blocks_and_space(&space);
 
-        let expected_data_size = mesh.vertices().len() * mem::size_of::<BlockVertex<TtPoint>>()
-            + mesh.indices().len() * mem::size_of::<u32>();
+        let expected_data_size = std::mem::size_of_val::<[BlockVertex<TtPoint>]>(mesh.vertices())
+            + mesh.indices().as_bytes().len();
 
         let actual_size = dbg!(mesh.total_byte_size());
         assert!(actual_size > mem::size_of::<TestMesh>() + expected_data_size);
