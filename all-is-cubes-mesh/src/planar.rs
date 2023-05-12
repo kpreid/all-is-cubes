@@ -8,7 +8,7 @@ use all_is_cubes::cgmath::{
 };
 use all_is_cubes::math::{Face6, FreeCoordinate, GridCoordinate, Rgba};
 
-use crate::{BlockVertex, Coloring, TextureCoordinate, TextureTile};
+use crate::{BlockVertex, Coloring, IndexVec, TextureCoordinate, TextureTile};
 
 /// Data structure for the state and components of the "greedy meshing" algorithm.
 /// <https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/>
@@ -152,7 +152,7 @@ pub(super) enum QuadColoring<'a, T> {
 #[allow(clippy::too_many_arguments)] // TODO: Figure out how to simplify
 pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: TextureTile>(
     vertices: &mut Vec<V>,
-    indices: &mut Vec<u32>,
+    indices: &mut IndexVec,
     transform: &QuadTransform,
     depth: FreeCoordinate,
     low_corner: Point2<FreeCoordinate>,

@@ -487,11 +487,18 @@ fn write_block_mesh_to_space_mesh<V: GfxVertex, T: TextureTile>(
         for vertex in &mut vertices[index_offset_usize..] {
             vertex.instantiate_vertex(inst);
         }
-        opaque_indices.extend(face_mesh.indices_opaque.iter().map(|i| i + index_offset));
+        opaque_indices.extend(
+            face_mesh
+                .indices_opaque
+                .as_slice(..)
+                .iter_u32()
+                .map(|i| i + index_offset),
+        );
         transparent_indices.extend(
             face_mesh
                 .indices_transparent
-                .iter()
+                .as_slice(..)
+                .iter_u32()
                 .map(|i| i + index_offset),
         );
     }
@@ -587,9 +594,9 @@ fn extend_giving_range<T>(
 where
     IndexVec: Extend<T>,
 {
-    let start = storage.as_slice(..).len();
+    let start = storage.len();
     storage.extend(items);
-    let end = storage.as_slice(..).len();
+    let end = storage.len();
     start..end
 }
 

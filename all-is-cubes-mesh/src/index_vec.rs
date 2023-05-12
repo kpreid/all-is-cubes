@@ -50,6 +50,12 @@ impl IndexVec {
         }
     }
 
+    /// As per [`Vec::len()`].
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.as_slice(..).len()
+    }
+
     /// Resets the vector to have zero length and the same capacity.
     /// Note that this preserves the previous index type.
     pub fn clear(&mut self) {
@@ -59,10 +65,19 @@ impl IndexVec {
         }
     }
 
+    #[inline]
     pub(crate) fn capacity_bytes(&self) -> usize {
         match self {
             IndexVec::U16(vec) => vec.capacity() * 2,
             IndexVec::U32(vec) => vec.capacity() * 4,
+        }
+    }
+
+    /// As per [`Vec::reserve_exact()`].
+    pub fn reserve_exact(&mut self, additional: usize) {
+        match self {
+            IndexVec::U16(vec) => vec.reserve_exact(additional),
+            IndexVec::U32(vec) => vec.reserve_exact(additional),
         }
     }
 }

@@ -15,7 +15,8 @@ use all_is_cubes::space::Space;
 
 use crate::{
     copy_voxels_into_existing_texture, copy_voxels_to_texture, push_quad, BlockVertex,
-    GreedyMesher, MeshOptions, QuadColoring, QuadTransform, TextureAllocator, TextureTile,
+    GreedyMesher, IndexVec, MeshOptions, QuadColoring, QuadTransform, TextureAllocator,
+    TextureTile,
 };
 
 /// Part of the triangle mesh calculated for a [`Block`], stored in a [`BlockMesh`] keyed
@@ -37,9 +38,9 @@ pub(super) struct BlockFaceMesh<V> {
     /// Indices into `self.vertices` that form triangles (i.e. length is a multiple of 3)
     /// in counterclockwise order, for vertices whose coloring is fully opaque (or
     /// textured with binary opacity).
-    pub(super) indices_opaque: Vec<u32>,
+    pub(super) indices_opaque: IndexVec,
     /// Indices for partially transparent (alpha neither 0 nor 1) vertices.
-    pub(super) indices_transparent: Vec<u32>,
+    pub(super) indices_transparent: IndexVec,
     /// Whether the graphic entirely fills its cube face, such that nothing can be seen
     /// through it and faces of adjacent blocks may be removed.
     pub(super) fully_opaque: bool,
@@ -68,8 +69,8 @@ impl<V> Default for BlockFaceMesh<V> {
     fn default() -> Self {
         BlockFaceMesh {
             vertices: Vec::new(),
-            indices_opaque: Vec::new(),
-            indices_transparent: Vec::new(),
+            indices_opaque: IndexVec::new(),
+            indices_transparent: IndexVec::new(),
             fully_opaque: false,
         }
     }
