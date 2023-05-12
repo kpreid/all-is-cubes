@@ -125,11 +125,23 @@ pub fn grid_aab_bench(c: &mut Criterion) {
 
     let aab = GridAab::from_lower_size([0, 0, 0], [256, 256, 256]);
     group.throughput(Throughput::Elements(aab.volume() as u64));
-    group.bench_function("GridAab::interior_iter", |b| {
+
+    group.bench_function("iter_next", |b| {
         b.iter(|| {
-            for cube in aab.interior_iter() {
+            let iterator = aab.interior_iter();
+            for cube in iterator {
+                // this loop uses Iterator::next()
                 black_box(cube);
             }
+        })
+    });
+
+    group.bench_function("iter_for_each", |b| {
+        b.iter(|| {
+            let iterator = aab.interior_iter();
+            iterator.for_each(|cube| {
+                black_box(cube);
+            });
         })
     });
 
