@@ -811,8 +811,37 @@ impl Iterator for GridIter {
         }
     }
 
-    // TODO: It might be worth implementing `Iterator::fold` for this, for the
-    // internal-iteration performance benefits. Should benchmark, of course.
+    // Override fold() to achieve greater performance via simpler iteration.
+    fn fold<B, F>(mut self, init: B, mut f: F) -> B
+    where
+        F: FnMut(B, Self::Item) -> B,
+    {
+        let mut state = init;
+
+        // First, if the iterator has already been partly advanced (this is atypical),
+        // advance it until the remaining elements form an AAB.
+        #[cold]
+        #[inline(never)]
+        fn cold_next(i: &mut GridIter) -> Option<GridPoint> {
+            i.next()
+        }
+        while self.cube.y != self.y_range.start || self.cube.z != self.z_range.start {
+            let Some(cube) = cold_next(&mut self) else { return state; };
+            state = f(state, cube);
+        }
+
+        // Now, we can perform iteration over the numeric ranges independently,
+        // with no additional checks.
+        for x in self.cube.x..self.x_range.end {
+            for y in self.y_range.clone() {
+                for z in self.z_range.clone() {
+                    state = f(state, GridPoint::new(x, y, z));
+                }
+            }
+        }
+
+        state
+    }
 }
 
 impl ExactSizeIterator for GridIter {}
@@ -1276,6 +1305,24 @@ mod tests {
         assert_eq!(iter.size_hint(), (0, Some(0)));
         assert!(iter.next().is_none());
         assert_eq!(iter.size_hint(), (0, Some(0)));
+    }
+
+    #[test]
+    fn grid_iter_fold_equivalence() {
+        let b = GridAab::from_lower_size([0, -1, 7], [3, 3, 3]);
+        println!("Aab = {b:?}");
+
+        for start_point in 0..=b.volume() {
+            println!("\nSkipping {start_point}:");
+            let mut iter_to_next = b.interior_iter().skip(start_point);
+            let iter_to_fold = b.interior_iter().skip(start_point);
+            iter_to_fold.fold((), |(), fold_cube| {
+                let next_cube = iter_to_next.next();
+                println!("fold={fold_cube:?} next={next_cube:?}");
+                assert_eq!(fold_cube, next_cube.unwrap());
+            });
+            assert_eq!(iter_to_next.next(), None, "finish");
+        }
     }
 
     #[test]
