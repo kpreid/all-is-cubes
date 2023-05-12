@@ -213,17 +213,17 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
         // TODO: Consider reuse
         let mut transparent_indices = IndexVec::new();
 
-        for cube in bounds.interior_iter() {
+        bounds.interior_iter().for_each(|cube| {
             // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
             // Do we want to make it the caller's responsibility to specify in-bounds?
             let index: BlockIndex = match space.get_block_index(cube) {
                 Some(index) => index,
-                None => continue,
+                None => return, // continue in for_each() loop
             };
             let already_seen_index = bitset_set_and_get(&mut self.block_indices_used, index.into());
             let block_mesh = match block_meshes.get(index) {
                 Some(mesh) => mesh,
-                None => continue,
+                None => return, // continue in for_each() loop
             };
 
             if !already_seen_index {
@@ -260,7 +260,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                     false
                 },
             );
-        }
+        });
 
         self.sort_and_store_transparent_indices(transparent_indices);
 
