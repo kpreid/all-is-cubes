@@ -25,7 +25,10 @@ pub async fn create_instance_and_adapter_for_test(
         "Available adapters (backend filter = {requested_backends:?}):"
     ));
     for adapter in instance.enumerate_adapters(wgpu::Backends::all()) {
-        log(format_args!("  {:?}", adapter.get_info()));
+        log(format_args!(
+            "  {}",
+            shortened_adapter_info(&adapter.get_info())
+        ));
     }
 
     // Pick an adapter.
@@ -49,10 +52,24 @@ pub async fn create_instance_and_adapter_for_test(
     }
 
     if let Some(adapter) = &adapter {
-        log(format_args!("Using: {:?}", adapter.get_info()));
+        log(format_args!(
+            "Using: {}",
+            shortened_adapter_info(&adapter.get_info())
+        ));
     }
 
     (instance, adapter)
+}
+
+#[allow(dead_code)] // conditionally used
+fn shortened_adapter_info(info: &wgpu::AdapterInfo) -> String {
+    // Make the string more concise by deleting empty-valued fields.
+    // TODO: maybe just destructure and do our own formatting
+    format!("{info:?}")
+        .replace("driver: \"\", ", "")
+        .replace("driver_info: \"\", ", "")
+        .replace("vendor: 0, ", "")
+        .replace("device: 0, ", "")
 }
 
 /// Copy the contents of a texture into an [`ImageBuffer`], assuming that its byte layout
