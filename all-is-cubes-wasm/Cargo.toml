@@ -17,6 +17,8 @@ publish = false
 bench = false
 # There are some host-runnable unit tests (but we might move those...)
 test = true
+# Not a published library, so no doctests
+doctest = false
 # Need "cdylib" for the final wasm module, and "lib" for building tests
 crate-type = ["lib", "cdylib"]
 

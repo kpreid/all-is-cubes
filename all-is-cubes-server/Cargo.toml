@@ -14,6 +14,9 @@ categories = ["games"]
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
 bench = false
+# Disable doctest running to reduce total noise in `cargo test` output.
+# Doctests are so slow, and not well applicable here, so we don't currently have any.
+doctest = false
 
 [[bin]]
 name = "aic-server"
