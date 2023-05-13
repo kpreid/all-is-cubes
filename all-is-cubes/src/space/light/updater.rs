@@ -5,6 +5,7 @@ use std::cmp::Ordering;
 use std::fmt;
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3};
+use instant::{Duration, Instant};
 use once_cell::sync::Lazy;
 
 use super::debug::LightComputeOutput;
@@ -26,16 +27,6 @@ const SURFACE_ABSORPTION: f32 = 0.75;
 const RAY_DIRECTION_STEP: isize = 5;
 const RAY_CUBE_EDGE: usize = (RAY_DIRECTION_STEP as usize) * 2 + 1;
 const ALL_RAYS_COUNT: usize = RAY_CUBE_EDGE.pow(3) - (RAY_CUBE_EDGE - 2).pow(3);
-
-/// Limit on light computation per one [`Space::update_lighting_from_queue`] call.
-///
-/// The unit of measure is one raycast step; other operations are arbitrarily assigned
-/// higher cost values. (TODO: Profile to assign more consistent cost values.)
-///
-/// TODO: This should be an option configured for the Universe/Space, so that it is
-/// both adjustable and deterministic/platform-independent.
-/// For now, tweaked in a "works okay on my machine" way.
-const MAXIMUM_LIGHT_COMPUTATION_COST: usize = 100_000;
 
 #[derive(Debug)]
 struct LightRayData {
@@ -89,14 +80,24 @@ impl Space {
     }
 
     /// Do some lighting updates.
-    #[doc(hidden)] // TODO: eliminate
-    pub fn update_lighting_from_queue(&mut self) -> LightUpdatesInfo {
+    #[doc(hidden)] // TODO: eliminate calls outside the crate
+    pub fn update_lighting_from_queue(&mut self, budget: Duration) -> LightUpdatesInfo {
         let mut light_update_count: usize = 0;
         self.last_light_updates.clear();
         let mut max_difference: PackedLightScalar = 0;
-        let mut cost = 0;
 
         if self.physics.light != LightPhysics::None {
+            let t0 = Instant::now();
+            let mut cost = 0;
+            // We convert the time budget to an arbitrary cost value in order to avoid
+            // the overhead of frequently making syscalls to check the clock.
+            //
+            // The unit of measure is one raycast step; other operations are arbitrarily assigned
+            // higher cost values. (TODO: Profile to assign more consistent cost values.)
+            //
+            // TODO: Is this worthwhile?
+            let max_cost = (budget.as_secs_f32() / self.light_cost_scale) as usize;
+
             while let Some(LightUpdateRequest { cube, .. }) = self.light_update_queue.pop() {
                 if false {
                     // Log cubes that were updated for debug visualization.
@@ -106,9 +107,16 @@ impl Space {
                 let (difference, cube_cost) = self.update_lighting_now_on(cube);
                 max_difference = max_difference.max(difference);
                 cost += cube_cost;
-                if cost >= MAXIMUM_LIGHT_COMPUTATION_COST {
+                if cost >= max_cost {
                     break;
                 }
+            }
+
+            let t1 = Instant::now();
+            let cost_scale = (t1 - t0).as_secs_f32() / cost as f32;
+            if cost_scale.is_finite() {
+                // TODO(time-budget): don't let this grow or shrink too fast due to outliers
+                self.light_cost_scale = 0.125 * cost_scale + 0.875 * self.light_cost_scale;
             }
         }
 

@@ -6,7 +6,7 @@ use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
 use crate::math::Rgba;
 use crate::space::Space;
-use crate::time::Tick;
+use crate::time::{practically_infinite_deadline, Tick};
 use crate::transaction::{self, Transaction};
 use crate::universe::{
     list_refs, InsertError, InsertErrorKind, Name, RefError, URef, Universe, UniverseTransaction,
@@ -270,7 +270,7 @@ fn gc_implicit() {
     let mut u = Universe::new();
     u.insert_anonymous(BlockDef::new(AIR));
     assert_eq!(1, u.iter_by_type::<BlockDef>().count());
-    u.step(Tick::arbitrary());
+    u.step(Tick::arbitrary(), practically_infinite_deadline());
     assert_eq!(0, u.iter_by_type::<BlockDef>().count());
 }
 

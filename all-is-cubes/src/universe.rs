@@ -175,7 +175,9 @@ impl Universe {
     }
 
     /// Advance time for all members.
-    pub fn step(&mut self, tick: Tick) -> UniverseStepInfo {
+    ///
+    /// * `deadline` is when to stop computing flexible things such as light transport.
+    pub fn step(&mut self, tick: Tick, deadline: Instant) -> UniverseStepInfo {
         let mut info = UniverseStepInfo::default();
         let start_time = Instant::now();
 
@@ -189,7 +191,11 @@ impl Universe {
         for space_root in self.spaces.values() {
             let space_ref = space_root.downgrade();
             let (space_info, transaction) = space_ref
-                .try_modify(|space| space.step(Some(&space_ref), tick))
+                .try_modify(|space| {
+                    // TODO(time-budget): fairly divide deadline among members that need it.
+                    // This implicitly implements an unfair "first wins" policy.
+                    space.step(Some(&space_ref), tick, deadline)
+                })
                 .expect("space borrowed during universe.step()");
             transactions.push(transaction);
             info.space_step += space_info;

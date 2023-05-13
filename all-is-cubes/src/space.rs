@@ -72,6 +72,8 @@ pub struct Space {
     /// Empty unless this debug function is enabled.
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu
     pub last_light_updates: Vec<GridPoint>,
+    /// Estimated ratio of (wall-time seconds / light update cost units).
+    light_cost_scale: f32,
 
     /// Global characteristics such as the behavior of light and gravity.
     physics: SpacePhysics,
@@ -205,6 +207,7 @@ impl Space {
             packed_sky_color: physics.sky_color.into(),
             light_update_queue: LightUpdateQueue::new(),
             last_light_updates: Vec::new(),
+            light_cost_scale: 1e-6,
 
             physics,
             behaviors: BehaviorSet::new(),
@@ -596,10 +599,14 @@ impl Space {
     }
 
     /// Advance time in the space.
+    ///
+    /// * `tick` is how much time is to pass in the simulation.
+    /// * `deadline` is when to stop computing flexible things such as light transport.
     pub fn step(
         &mut self,
         self_ref: Option<&URef<Space>>,
         tick: Tick,
+        deadline: Instant,
     ) -> (SpaceStepInfo, UniverseTransaction) {
         // Process changed block definitions.
         let mut last_start_time = Instant::now();
@@ -659,7 +666,9 @@ impl Space {
 
         let space_behaviors_to_lighting = Instant::now();
 
-        let light = self.update_lighting_from_queue();
+        let light = self.update_lighting_from_queue(
+            deadline.saturating_duration_since(space_behaviors_to_lighting),
+        );
 
         (
             SpaceStepInfo {
@@ -692,7 +701,7 @@ impl Space {
     ) -> usize {
         let mut total = 0;
         loop {
-            let info = self.update_lighting_from_queue();
+            let info = self.update_lighting_from_queue(Duration::from_secs_f32(0.25));
 
             progress_callback(info);
 
@@ -903,6 +912,7 @@ impl VisitRefs for Space {
             lighting: _,
             light_update_queue: _,
             last_light_updates: _,
+            light_cost_scale: _,
             physics: _,
             packed_sky_color: _,
             behaviors,

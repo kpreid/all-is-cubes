@@ -7,7 +7,7 @@ use crate::block::{AnimationHint, Block, AIR};
 use crate::listen::{Listen as _, Listener, Sink};
 use crate::math::{FaceMap, GridPoint, Rgb, Rgba};
 use crate::space::{GridAab, LightPhysics, Space, SpaceChange, SpacePhysics};
-use crate::time::Tick;
+use crate::time::{practically_infinite_deadline, Tick};
 
 #[test]
 fn initial_lighting_value() {
@@ -39,7 +39,7 @@ fn step() {
     assert_eq!(space.get_lighting((1, 0, 0)), PackedLight::NO_RAYS);
     assert_eq!(space.get_lighting((2, 0, 0)), PackedLight::NO_RAYS);
 
-    let (info, _) = space.step(None, Tick::arbitrary());
+    let (info, _) = space.step(None, Tick::arbitrary(), practically_infinite_deadline());
     assert_eq!(
         info.light,
         LightUpdatesInfo {
@@ -218,7 +218,10 @@ fn disabled_lighting_does_not_update() {
     let mut space = space_with_disabled_light();
     space.light_needs_update(GridPoint::new(0, 0, 0), u8::MAX);
     assert_eq!(
-        space.step(None, Tick::arbitrary()).0.light,
+        space
+            .step(None, Tick::arbitrary(), practically_infinite_deadline())
+            .0
+            .light,
         LightUpdatesInfo::default()
     );
 }

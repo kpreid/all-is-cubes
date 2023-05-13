@@ -75,3 +75,12 @@ impl Tick {
         self.paused
     }
 }
+
+#[doc(hidden)] // test helper
+pub fn practically_infinite_deadline() -> Instant {
+    /// A Duration long enough that it is not interesting in questions of testing, but not
+    /// so long that adding a reasonable number of it to an [`Instant`] will overflow.
+    const VERY_LONG: Duration = Duration::from_secs(86400 * 7);
+
+    Instant::now() + VERY_LONG
+}

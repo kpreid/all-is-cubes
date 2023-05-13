@@ -508,6 +508,7 @@ mod tests {
     use crate::math::{FreeCoordinate, GridAab};
     use crate::physics::BodyTransaction;
     use crate::space::{Space, SpaceBehaviorAttachment};
+    use crate::time::practically_infinite_deadline;
     use crate::universe::Universe;
     use indoc::indoc;
 
@@ -575,8 +576,8 @@ mod tests {
         character.add_behavior(SelfModifyingBehavior { foo: 1 });
         let character = u.insert_anonymous(character);
 
-        u.step(Tick::arbitrary());
-        u.step(Tick::arbitrary());
+        u.step(Tick::arbitrary(), practically_infinite_deadline());
+        u.step(Tick::arbitrary(), practically_infinite_deadline());
 
         // Until we have a way to query the behavior set, the best test we can do is to
         // read its effects.

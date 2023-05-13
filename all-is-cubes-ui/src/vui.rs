@@ -14,7 +14,7 @@ use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier
 use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::math::NotNan;
 use all_is_cubes::space::Space;
-use all_is_cubes::time::Tick;
+use all_is_cubes::time::{Instant, Tick};
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
 use all_is_cubes::util::YieldProgress;
@@ -269,7 +269,7 @@ impl Vui {
         options
     }
 
-    pub fn step(&mut self, tick: Tick) -> UniverseStepInfo {
+    pub fn step(&mut self, tick: Tick, deadline: Instant) -> UniverseStepInfo {
         // TODO: This should possibly be the responsibility of the TooltipState itself?
         if self.changed_character.get_and_clear() {
             if let Some(character_ref) = &*self.character_source.get() {
@@ -318,7 +318,7 @@ impl Vui {
             }
         }
 
-        self.universe.step(tick)
+        self.universe.step(tick, deadline)
     }
 
     /// Present the UI visual response to a click (that has already been handled),

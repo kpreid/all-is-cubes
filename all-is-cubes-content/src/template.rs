@@ -394,7 +394,7 @@ async fn arbitrary_space(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::time::Tick;
+    use all_is_cubes::time::{practically_infinite_deadline, Tick};
     use futures_core::future::BoxFuture;
 
     #[allow(clippy::let_underscore_future)]
@@ -431,7 +431,7 @@ mod tests {
             if template != UniverseTemplate::Blank {
                 let _ = u.get_default_character().unwrap().read().unwrap();
             }
-            u.step(Tick::arbitrary());
+            u.step(Tick::arbitrary(), practically_infinite_deadline());
         }
     }
 }

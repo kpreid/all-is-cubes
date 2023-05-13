@@ -1,9 +1,11 @@
 #![no_main]
 extern crate all_is_cubes;
 
+use std::time::Duration;
+
 use all_is_cubes::character::Character;
 use all_is_cubes::space::Space;
-use all_is_cubes::time::Tick;
+use all_is_cubes::time::{Instant, Tick};
 use all_is_cubes::universe::Universe;
 
 use libfuzzer_sys::{arbitrary::Arbitrary, fuzz_target};
@@ -23,6 +25,9 @@ fuzz_target!(|input: FuzzUniverseTemplate| {
 
     for _ in 1..100 {
         // TODO: give arbitrary "user" inputs to the character and other universe manipulations
-        universe.step(Tick::arbitrary());
+        universe.step(
+            Tick::arbitrary(),
+            Instant::now() + Duration::from_millis(10),
+        );
     }
 });

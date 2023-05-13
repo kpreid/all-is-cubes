@@ -14,6 +14,7 @@ use all_is_cubes::inv::ToolError;
 use all_is_cubes::listen::{
     Listen as _, ListenableCell, ListenableCellWithLocal, ListenableSource, Listener, Notifier,
 };
+use all_is_cubes::time::{Duration, Instant};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
 use all_is_cubes::util::{CustomFormat, StatusText};
@@ -270,10 +271,15 @@ impl Session {
                 }
                 self.input_processor.step(game_tick);
 
-                let mut info = self.game_universe.step(game_tick);
+                // TODO(time-budget): better timing policy that explicitly trades off with time spent
+                // on rendering, event handling, etc.
+                // (That policy should probably live in `frame_clock`.)
+                let deadline = Instant::now() + base_tick.delta_t() / 4;
 
+                // TODO(time-budget): give UI a minimum fraction of budget
+                let mut info = self.game_universe.step(game_tick, deadline);
                 if let Some(ui) = &mut self.ui {
-                    info += ui.step(base_tick);
+                    info += ui.step(base_tick, deadline);
                 }
 
                 if LOG_FIRST_FRAMES && self.tick_counter_for_logging <= 10 {
@@ -385,7 +391,7 @@ impl Session {
                 if let Some(space_ref) = self.cursor_result.as_ref().map(Cursor::space) {
                     // TODO: make this a kind of SpaceTransaction, eliminating this try_modify.
                     let _ = space_ref.try_modify(|space| {
-                        space.update_lighting_from_queue();
+                        space.update_lighting_from_queue(Duration::from_millis(1));
                     });
                 }
 
