@@ -55,7 +55,7 @@ pub(crate) fn record_main(
     dsession
         .session
         .graphics_options_mut()
-        .update_mut(|mut graphics_options| {
+        .update_mut(|graphics_options| {
             graphics_options.show_ui = false;
             graphics_options.debug_info_text = false;
         });
