@@ -53,7 +53,7 @@ bitflags = { workspace = true }
 bytemuck = { workspace = true }
 cgmath = "0.18.0"
 downcast-rs = "1.2.0"
-embedded-graphics = "0.7.0"
+embedded-graphics = "0.8.0"
 exhaust = { workspace = true }
 futures-core = { workspace = true }
 # image is used for its common image data types (for HeadlessRenderer),
