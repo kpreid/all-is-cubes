@@ -194,8 +194,10 @@ fn modulo(a: f32, b: f32) -> f32 {
     return ((a % b) + b) % b;
 }
 
-// Find the smallest positive `t` such that `s + t * ds` is an integer,
-// given that `s` is in the range 0 to 1.
+// Find the smallest positive `t` such that `s + t * ds` is an integer.
+//
+// In the current implementation, `s` must be in the range 0 to 1.
+// (This is why it is called "partial".)
 //
 // If `ds` is zero, returns positive infinity; this is a useful answer because
 // it means that the less-than comparisons in the raycast algorithm will never
@@ -203,7 +205,6 @@ fn modulo(a: f32, b: f32) -> f32 {
 //
 // The canonical version of this algorithm is
 // `all_is_cubes::raycast::scale_to_integer_step`.
-// TODO: Add crosscheck test cases once we have the ability to run shader unit tests.
 fn partial_scale_to_integer_step(s: f32, ds: f32) -> f32 {
     var s = s;
     var ds = ds;

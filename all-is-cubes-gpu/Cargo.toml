@@ -22,7 +22,7 @@ bench = false
 doctest = false
 
 [[test]]
-name = "shader_tests"
+name = "shaders"
 required-features = ["wgpu"]
 
 [features]

@@ -632,7 +632,8 @@ fn signum_101(x: FreeCoordinate) -> GridCoordinate {
 /// If `ds` is zero, returns positive infinity; this is a useful answer because
 /// it means that the less-than comparisons in the raycast algorithm will never pick
 /// the corresponding axis. If any input is NaN, returns NaN.
-fn scale_to_integer_step(mut s: FreeCoordinate, mut ds: FreeCoordinate) -> FreeCoordinate {
+#[doc(hidden)] // public for GPU implementation comparison tests
+pub fn scale_to_integer_step(mut s: FreeCoordinate, mut ds: FreeCoordinate) -> FreeCoordinate {
     if ds == 0.0 && !s.is_nan() {
         // Explicitly handle zero case.
         // This almost could be implicit, but it is possible for the below division to
