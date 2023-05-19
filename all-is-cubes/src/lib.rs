@@ -185,7 +185,7 @@ pub mod listen;
 pub mod physics;
 pub mod raycast;
 pub mod raytracer;
-mod save; // nothing exported; all impls and tests
+pub mod save;
 pub mod space;
 pub mod time;
 pub mod transaction;

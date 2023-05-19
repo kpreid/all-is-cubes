@@ -100,13 +100,22 @@ pub struct Universe {
     tables: UniverseTables,
 
     id: UniverseId,
+
     /// Next number to assign to a [`Name::Anonym`].
     next_anonym: usize,
+
     /// Whether to run a garbage collection on the next step().
     /// This is set to true whenever a new member is inserted, which policy ensures
     /// that repeated insertion and dropping references cannot lead to unbounded growth
     /// as long as steps occur routinely.
     wants_gc: bool,
+
+    /// Where the contents of `self came from, and where they might be able to be written
+    /// back to.
+    ///
+    /// For universes created by [`Universe::new()`], this is equal to `Arc::new(())`.
+    pub whence: Arc<dyn crate::save::WhenceUniverse>,
+
     /// Number of [`step()`]s which have occurred since this [`Universe`] was created.
     ///
     /// Note that this value is not serialized; thus, it is reset whenever “a saved game
@@ -130,6 +139,7 @@ impl Universe {
             id: UniverseId::new(),
             next_anonym: 0,
             wants_gc: false,
+            whence: Arc::new(()),
             session_step_time: 0,
         }
     }
@@ -388,10 +398,14 @@ impl fmt::Debug for Universe {
             id: _,
             next_anonym: _,
             wants_gc: _,
+            whence,
             session_step_time,
         } = self;
 
         let mut ds = fmt.debug_struct("Universe");
+        if whence.downcast_ref::<()>().is_none() {
+            ds.field("whence", &whence);
+        }
         ds.field("session_step_time", &session_step_time);
         tables.fmt_members(&mut ds);
         ds.finish()
