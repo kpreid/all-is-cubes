@@ -7,7 +7,6 @@ use std::sync::Arc;
 
 use all_is_cubes::notnan;
 use instant::Instant;
-use once_cell::sync::Lazy;
 
 use all_is_cubes::camera::{info_text_drawable, Layers, StandardCameras};
 use all_is_cubes::cgmath::Vector2;
@@ -22,15 +21,12 @@ use crate::{
     gather_debug_lines,
     in_wgpu::{
         block_texture::AtlasAllocator,
-        camera::ShaderPostprocessCamera,
         frame_texture::FbtFeatures,
-        glue::{
-            create_wgsl_module_from_reloadable, to_wgpu_color, BeltWritingParts, ResizingBuffer,
-        },
+        glue::{to_wgpu_color, BeltWritingParts, ResizingBuffer},
         pipelines::Pipelines,
+        postprocess::PostprocessUniforms,
         vertex::WgpuLinesVertex,
     },
-    reloadable::{reloadable_str, Reloadable},
     wireframe_vertices, DrawInfo, FrameBudget, GraphicsResourceError, RenderInfo, SpaceDrawInfo,
     SpaceUpdateInfo, UpdateInfo,
 };
@@ -45,6 +41,7 @@ pub mod headless;
 #[doc(hidden)]
 pub mod init;
 mod pipelines;
+mod postprocess;
 #[doc(hidden)] // public for tests/shader_tests.rs
 pub mod shader_testing;
 mod space;
@@ -257,62 +254,7 @@ impl EverythingRenderer {
         );
 
         let postprocess_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[
-                    // Binding for info_text_texture
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        },
-                        count: None,
-                    },
-                    // Binding for info_text_sampler
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: None,
-                    },
-                    // Binding for linear_scene_texture
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        },
-                        count: None,
-                    },
-                    // Binding for camera
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 3,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // Binding for bloom_texture
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 4,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        },
-                        count: None,
-                    },
-                ],
-                label: Some("EverythingRenderer::postprocess_bind_group_layout"),
-            });
+            postprocess::create_postprocess_bind_group_layout(&device);
 
         let pipelines = Pipelines::new(&device, &fb, cameras.graphics_options_source());
 
@@ -339,8 +281,11 @@ impl EverythingRenderer {
             lines_buffer: ResizingBuffer::default(),
             lines_vertex_count: 0,
 
-            postprocess_shader_dirty: DirtyFlag::listening(false, POSTPROCESS_SHADER.as_source()),
-            postprocess_render_pipeline: Self::create_postprocess_pipeline(
+            postprocess_shader_dirty: DirtyFlag::listening(
+                false,
+                postprocess::POSTPROCESS_SHADER.as_source(),
+            ),
+            postprocess_render_pipeline: postprocess::create_postprocess_pipeline(
                 &device,
                 &postprocess_bind_group_layout,
                 config.format,
@@ -349,7 +294,7 @@ impl EverythingRenderer {
             postprocess_bind_group: None,
             postprocess_camera_buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("EverythingRenderer::postprocess_camera_buffer"),
-                size: std::mem::size_of::<ShaderPostprocessCamera>()
+                size: std::mem::size_of::<PostprocessUniforms>()
                     .try_into()
                     .unwrap(),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
@@ -382,57 +327,6 @@ impl EverythingRenderer {
                 .map(|component| (component as u32).max(1)),
         );
         new_self
-    }
-
-    /// Read postprocessing shader and create the postprocessing render pipeline.
-    fn create_postprocess_pipeline(
-        device: &wgpu::Device,
-        postprocess_bind_group_layout: &wgpu::BindGroupLayout,
-        surface_format: wgpu::TextureFormat,
-    ) -> wgpu::RenderPipeline {
-        let postprocess_shader = create_wgsl_module_from_reloadable(
-            device,
-            "EverythingRenderer::postprocess_shader",
-            &POSTPROCESS_SHADER,
-        );
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("EverythingRenderer::postprocess_pipeline_layout"),
-            bind_group_layouts: &[postprocess_bind_group_layout],
-            push_constant_ranges: &[],
-        });
-
-        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("EverythingRenderer::postprocess_render_pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &postprocess_shader,
-                entry_point: "postprocess_vertex",
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &postprocess_shader,
-                entry_point: "postprocess_fragment",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            // default = off. No need for multisampling since we are not drawing triangles here.
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        })
     }
 
     /// Read current scene content, compute meshes, and send updated resources
@@ -481,7 +375,7 @@ impl EverythingRenderer {
 
         // Recompile shaders and pipeline if needed.
         if self.postprocess_shader_dirty.get_and_clear() {
-            self.postprocess_render_pipeline = Self::create_postprocess_pipeline(
+            self.postprocess_render_pipeline = postprocess::create_postprocess_pipeline(
                 &self.device,
                 &self.postprocess_bind_group_layout,
                 self.config.format,
@@ -753,7 +647,7 @@ impl EverythingRenderer {
         queue.write_buffer(
             &self.postprocess_camera_buffer,
             0,
-            bytemuck::bytes_of(&ShaderPostprocessCamera::new(
+            bytemuck::bytes_of(&PostprocessUniforms::new(
                 self.cameras.graphics_options(),
                 !output_needs_clearing,
             )),
@@ -806,70 +700,7 @@ impl EverythingRenderer {
             info_text_texture.upload(queue);
         }
 
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("add_info_text_and_postprocess() encoder"),
-            });
-
-        {
-            let output_view = output.create_view(&wgpu::TextureViewDescriptor::default());
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("add_info_text_and_postprocess() pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &output_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            });
-
-            render_pass.set_pipeline(&self.postprocess_render_pipeline);
-            render_pass.set_bind_group(
-                0,
-                self.postprocess_bind_group.get_or_insert_with(|| {
-                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        layout: &self.postprocess_bind_group_layout,
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: wgpu::BindingResource::TextureView(
-                                    self.info_text_texture.view().unwrap(), // TODO: have a better plan than unwrap
-                                ),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 1,
-                                resource: wgpu::BindingResource::Sampler(&self.info_text_sampler),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 2,
-                                resource: wgpu::BindingResource::TextureView(
-                                    self.fb.scene_for_postprocessing_input(),
-                                ),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 3,
-                                resource: self.postprocess_camera_buffer.as_entire_binding(),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 4,
-                                resource: wgpu::BindingResource::TextureView(
-                                    self.fb.bloom_data_texture(),
-                                ),
-                            },
-                        ],
-                        label: Some("EverythingRenderer::postprocess_bind_group"),
-                    })
-                }),
-                &[],
-            );
-            render_pass.draw(0..3, 0..1);
-        }
-
-        queue.submit(std::iter::once(encoder.finish()));
+        postprocess::postprocess(self, queue, output);
     }
 }
 
@@ -912,6 +743,3 @@ fn choose_surface_format(capabilities: &wgpu::SurfaceCapabilities) -> wgpu::Text
     );
     best
 }
-
-static POSTPROCESS_SHADER: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/postprocess.wgsl"));

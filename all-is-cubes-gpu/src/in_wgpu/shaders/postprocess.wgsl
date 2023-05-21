@@ -1,7 +1,7 @@
 // --- Interface declarations --------------------------------------------------
 
-// Mirrors `struct ShaderPostprocessCamera` on the Rust side.
-struct ShaderPostprocessCamera {
+// Mirrors `struct PostprocessUniforms` on the Rust side.
+struct PostprocessUniforms {
     tone_mapping_id: i32,
     scene_texture_valid: i32,
     bloom_intensity: f32,
@@ -13,7 +13,7 @@ struct ShaderPostprocessCamera {
 @group(0) @binding(0) var text_texture: texture_2d<f32>;
 @group(0) @binding(1) var text_sampler: sampler;
 @group(0) @binding(2) var linear_scene_texture: texture_2d<f32>;
-@group(0) @binding(3) var<uniform> camera: ShaderPostprocessCamera;
+@group(0) @binding(3) var<uniform> camera: PostprocessUniforms;
 @group(0) @binding(4) var bloom_texture: texture_2d<f32>;
 
 // --- Vertex shader -----------------------------------------------------------

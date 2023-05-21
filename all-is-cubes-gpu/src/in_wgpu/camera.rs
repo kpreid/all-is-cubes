@@ -1,6 +1,4 @@
-use all_is_cubes::camera::{
-    Camera, FogOption, GraphicsOptions, LightingOption, ToneMappingOperator,
-};
+use all_is_cubes::camera::{Camera, FogOption, LightingOption};
 use all_is_cubes::cgmath::{EuclideanSpace, Matrix4, Vector3};
 use all_is_cubes::math::Rgb;
 
@@ -90,40 +88,3 @@ const OPENGL_TO_WGPU_PROJECTION: Matrix4<f64> = Matrix4::new(
     0.0, 0.0, 0.5, 0.0, //
     0.0, 0.0, 0.5, 1.0, //
 );
-
-/// Information corresponding to [`Camera`] (or, for the moment, just [`GraphicsOptions`])
-/// but in a form suitable for passing in a uniform buffer to the `postprocess.wgsl`
-/// shader.
-#[repr(C, align(16))] // align triggers bytemuck error if the size doesn't turn out to be a multiple
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct ShaderPostprocessCamera {
-    tone_mapping_id: i32,
-
-    /// 0 or 1 boolean indicating whether or not the `linear_scene_texture` was actually
-    /// written this frame. If zero, the postprocessing shader should display a “no data”
-    /// indication instead of reading the scene texture.
-    texture_is_valid: i32,
-
-    bloom_intensity: f32,
-
-    /// pad out to multiple of vec4<something32>
-    _padding: f32,
-}
-
-impl ShaderPostprocessCamera {
-    pub(crate) fn new(options: &GraphicsOptions, texture_is_valid: bool) -> Self {
-        Self {
-            tone_mapping_id: match options.tone_mapping {
-                ToneMappingOperator::Clamp => 0,
-                ToneMappingOperator::Reinhard => 1,
-                ref tmo => panic!("Missing implementation for tone mapping operator {tmo:?}"),
-            },
-
-            texture_is_valid: i32::from(texture_is_valid),
-
-            bloom_intensity: options.bloom_intensity.into_inner(),
-
-            _padding: Default::default(),
-        }
-    }
-}
