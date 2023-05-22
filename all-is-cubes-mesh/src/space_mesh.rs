@@ -65,7 +65,7 @@ impl<V, T> SpaceMesh<V, T> {
     ) -> SpaceMesh<V, T>
     where
         V: GfxVertex + 'p,
-        P: BlockMeshProvider<'p, V, T>,
+        P: GetBlockMesh<'p, V, T>,
         T: TextureTile + 'p,
     {
         let mut this = Self::default();
@@ -181,7 +181,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     /// (This ensures that large `Space`s do not affect the precision of rendering.)
     ///
     /// `block_meshes` should be the result of [`block_meshes_for_space`] or another
-    /// [`BlockMeshProvider`],
+    /// implementor of [`GetBlockMesh`],
     /// and must be up-to-date with the [`Space`]'s blocks or the result will be inaccurate
     /// and may contain severe lighting errors.
     ///
@@ -198,7 +198,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
         _options: &MeshOptions,
         mut block_meshes: P,
     ) where
-        P: BlockMeshProvider<'p, V, T>,
+        P: GetBlockMesh<'p, V, T>,
         V: 'p,
         T: 'p,
     {
@@ -221,7 +221,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                 None => return, // continue in for_each() loop
             };
             let already_seen_index = bitset_set_and_get(&mut self.block_indices_used, index.into());
-            let block_mesh = match block_meshes.get(index) {
+            let block_mesh = match block_meshes.get_block_mesh(index) {
                 Some(mesh) => mesh,
                 None => return, // continue in for_each() loop
             };
@@ -245,7 +245,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                     let adjacent_cube = cube + face.normal_vector();
                     if let Some(adj_block_index) = space.get_block_index(adjacent_cube) {
                         if block_meshes
-                            .get(adj_block_index)
+                            .get_block_mesh(adj_block_index)
                             .map(|adj_mesh| adj_mesh.face_vertices[face.opposite()].fully_opaque)
                             .unwrap_or(false)
                         {
@@ -607,12 +607,14 @@ where
 ///
 /// TODO: This currently only has one implementation and should be discarded if it is not
 /// a useful abstraction.
-pub trait BlockMeshProvider<'a, V, T> {
+pub trait GetBlockMesh<'a, V, T> {
     /// Obtain a mesh for the given block index, or `None` if the index is out of range.
-    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<V, T>>;
+    fn get_block_mesh(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<V, T>>;
 }
-impl<'a, V, T> BlockMeshProvider<'a, V, T> for &'a [BlockMesh<V, T>] {
-    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<V, T>> {
+
+/// Basic implementation of [`GetBlockMesh`] for any slice of meshes.
+impl<'a, V, T> GetBlockMesh<'a, V, T> for &'a [BlockMesh<V, T>] {
+    fn get_block_mesh(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<V, T>> {
         <[_]>::get(self, usize::from(index))
     }
 }

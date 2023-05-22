@@ -7,7 +7,7 @@ use all_is_cubes::block::{EvaluatedBlock, Resolution};
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::util::{CustomFormat as _, StatusText, TimeStats};
 
-use crate::{BlockMesh, BlockMeshProvider, GfxVertex, MeshOptions, TextureAllocator, TextureTile};
+use crate::{BlockMesh, GetBlockMesh, GfxVertex, MeshOptions, TextureAllocator, TextureTile};
 
 #[derive(Debug)]
 pub(crate) struct VersionedBlockMeshes<Vert, Tile> {
@@ -181,8 +181,8 @@ where
     }
 }
 
-impl<'a, Vert, Tile> BlockMeshProvider<'a, Vert, Tile> for &'a VersionedBlockMeshes<Vert, Tile> {
-    fn get(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<Vert, Tile>> {
+impl<'a, Vert, Tile> GetBlockMesh<'a, Vert, Tile> for &'a VersionedBlockMeshes<Vert, Tile> {
+    fn get_block_mesh(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<Vert, Tile>> {
         Some(&self.meshes.get(usize::from(index))?.mesh)
     }
 }
