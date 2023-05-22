@@ -288,12 +288,10 @@ impl LightUpdateQueue {
 
     #[inline]
     pub fn pop(&mut self) -> Option<LightUpdateRequest> {
-        // This can become self.queue.pop_last() when that's stable
-        let result = self.queue.iter().rev().next().copied();
+        let result = self.queue.pop_last();
         if let Some(request) = result {
-            let removed_queue = self.queue.remove(&request);
-            let removed_table = self.table.remove(&request.cube);
-            debug_assert!(removed_queue && removed_table.is_some());
+            let removed = self.table.remove(&request.cube);
+            debug_assert!(removed.is_some());
         }
         result
     }
@@ -305,14 +303,7 @@ impl LightUpdateQueue {
 
     #[inline]
     pub fn peek_priority(&self) -> PackedLightScalar {
-        // This can become self.queue.last() when that's stable
-        self.queue
-            .iter()
-            .rev()
-            .next()
-            .copied()
-            .map(|r| r.priority)
-            .unwrap_or(0)
+        self.queue.last().copied().map(|r| r.priority).unwrap_or(0)
     }
 
     pub fn clear(&mut self) {
