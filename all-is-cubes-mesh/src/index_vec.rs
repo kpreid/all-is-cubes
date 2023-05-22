@@ -17,7 +17,7 @@ impl IndexVec {
     /// Creates an empty [`IndexVec`].
     ///
     /// This operation does not allocate heap memory and is generally similar to [`Vec::new()`].
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self::U16(Vec::new())
     }
 

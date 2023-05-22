@@ -181,9 +181,14 @@ where
     }
 }
 
-impl<'a, Vert, Tile> GetBlockMesh<'a, Vert, Tile> for &'a VersionedBlockMeshes<Vert, Tile> {
-    fn get_block_mesh(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<Vert, Tile>> {
-        Some(&self.meshes.get(usize::from(index))?.mesh)
+impl<'a, Vert: 'static, Tile: 'static> GetBlockMesh<'a, Vert, Tile>
+    for &'a VersionedBlockMeshes<Vert, Tile>
+{
+    fn get_block_mesh(&mut self, index: BlockIndex) -> &'a BlockMesh<Vert, Tile> {
+        self.meshes
+            .get(usize::from(index))
+            .map(|vbm| &vbm.mesh)
+            .unwrap_or(BlockMesh::<Vert, Tile>::EMPTY_REF)
     }
 }
 

@@ -221,10 +221,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                 None => return, // continue in for_each() loop
             };
             let already_seen_index = bitset_set_and_get(&mut self.block_indices_used, index.into());
-            let block_mesh = match block_meshes.get_block_mesh(index) {
-                Some(mesh) => mesh,
-                None => return, // continue in for_each() loop
-            };
+            let block_mesh = block_meshes.get_block_mesh(index);
 
             if !already_seen_index {
                 // Capture texture handles to ensure that our texture coordinates stay valid.
@@ -244,10 +241,9 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                 |face| {
                     let adjacent_cube = cube + face.normal_vector();
                     if let Some(adj_block_index) = space.get_block_index(adjacent_cube) {
-                        if block_meshes
-                            .get_block_mesh(adj_block_index)
-                            .map(|adj_mesh| adj_mesh.face_vertices[face.opposite()].fully_opaque)
-                            .unwrap_or(false)
+                        if block_meshes.get_block_mesh(adj_block_index).face_vertices
+                            [face.opposite()]
+                        .fully_opaque
                         {
                             // Don't draw obscured faces, but do record that we depended on them.
                             bitset_set_and_get(
@@ -600,22 +596,34 @@ where
     start..end
 }
 
-/// Source of [`BlockMesh`] values for [`SpaceMesh::compute`].
+/// Source of [`BlockMesh`] values to be assembled into a [`SpaceMesh`].
 ///
-/// This trait allows the caller of [`SpaceMesh::compute`] to provide an
-/// implementation which e.g. lazily computes meshes.
-///
-/// TODO: This currently only has one implementation and should be discarded if it is not
-/// a useful abstraction.
+/// This trait allows the caller of [`SpaceMesh::compute`] to provide an implementation
+/// which, for example, lazily computes meshes, or detects which meshes have been used.
 pub trait GetBlockMesh<'a, V, T> {
-    /// Obtain a mesh for the given block index, or `None` if the index is out of range.
-    fn get_block_mesh(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<V, T>>;
+    /// Returns a mesh which depicts the block which is the `index`-th element of
+    /// [`Space::block_data()`] in the relevant [`Space`].
+    ///
+    /// This function should be idempotent, at least within a single invocation of
+    /// [`SpaceMesh::compute()`]; identical input indexes should produce identical meshes.
+    /// If this is not the case, then the [`SpaceMesh`] may have inconsistent properties.
+    ///
+    /// # Errors and panics
+    ///
+    /// If the block index is out of range (which should not happen unless the [`Space`]
+    /// being meshed is inconsistent the state of this [`GetBlockMesh`] implementor),
+    /// then the implementation may at its choice return whatever mesh it wishes to display
+    /// instead, or panic if this suits the particular mesh generation application.
+    ///
+    /// Note that the returned [`BlockMesh`] may have [`Flaws`] which will be incorporated
+    /// into the [`SpaceMesh`]'s flaws.
+    fn get_block_mesh(&mut self, index: BlockIndex) -> &'a BlockMesh<V, T>;
 }
 
 /// Basic implementation of [`GetBlockMesh`] for any slice of meshes.
-impl<'a, V, T> GetBlockMesh<'a, V, T> for &'a [BlockMesh<V, T>] {
-    fn get_block_mesh(&mut self, index: BlockIndex) -> Option<&'a BlockMesh<V, T>> {
-        <[_]>::get(self, usize::from(index))
+impl<'a, V: 'static, T: 'static> GetBlockMesh<'a, V, T> for &'a [BlockMesh<V, T>] {
+    fn get_block_mesh(&mut self, index: BlockIndex) -> &'a BlockMesh<V, T> {
+        <[_]>::get(self, usize::from(index)).unwrap_or(BlockMesh::<V, T>::EMPTY_REF)
     }
 }
 

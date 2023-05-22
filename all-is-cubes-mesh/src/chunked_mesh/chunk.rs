@@ -33,6 +33,7 @@ where
     D: Default, // TODO: This is used for initializing `render_data`, but it might not be ideal.
     Vert: GfxVertex,
     Tex: TextureAllocator,
+    Tex::Tile: 'static,
 {
     pub(crate) fn new(position: ChunkPos<CHUNK_SIZE>) -> Self {
         Self {

@@ -118,7 +118,7 @@ where
 /// [`BlockMesh::new()`]: crate::BlockMesh::new()
 /// [`Space`]: all_is_cubes::space::Space
 /// [`SpaceMesh`]: crate::SpaceMesh
-pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized {
+pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized + 'static {
     /// Whether [`SpaceMesh`]es should provide pre-sorted vertex index slices to allow
     /// back-to-front drawing order based on viewing ranges.
     ///
@@ -158,7 +158,7 @@ pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized {
 }
 
 /// Trivial implementation of [`GfxVertex`] for testing purposes. Discards lighting.
-impl<T: Copy> GfxVertex for BlockVertex<T> {
+impl<T: Copy + 'static> GfxVertex for BlockVertex<T> {
     const WANTS_DEPTH_SORTING: bool = true;
     type Coordinate = FreeCoordinate;
     type TexPoint = T;

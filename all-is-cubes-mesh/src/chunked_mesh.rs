@@ -80,7 +80,7 @@ where
     D: Default,
     Vert: GfxVertex<TexPoint = <<Tex as TextureAllocator>::Tile as TextureTile>::Point> + PartialEq,
     Tex: TextureAllocator,
-    Tex::Tile: PartialEq,
+    Tex::Tile: PartialEq + 'static,
 {
     pub fn new(space: URef<Space>) -> Self {
         let space_borrowed = space.read().unwrap();

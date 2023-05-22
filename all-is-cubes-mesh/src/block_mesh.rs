@@ -47,7 +47,14 @@ pub(super) struct BlockFaceMesh<V> {
 }
 
 impl<V> BlockFaceMesh<V> {
-    fn clear(&mut self) {
+    pub const EMPTY: Self = Self {
+        vertices: Vec::new(),
+        indices_opaque: IndexVec::new(),
+        indices_transparent: IndexVec::new(),
+        fully_opaque: false,
+    };
+
+    pub fn clear(&mut self) {
         let Self {
             vertices,
             indices_opaque,
@@ -67,12 +74,7 @@ impl<V> BlockFaceMesh<V> {
 
 impl<V> Default for BlockFaceMesh<V> {
     fn default() -> Self {
-        BlockFaceMesh {
-            vertices: Vec::new(),
-            indices_opaque: IndexVec::new(),
-            indices_transparent: IndexVec::new(),
-            fully_opaque: false,
-        }
+        Self::EMPTY
     }
 }
 
@@ -121,6 +123,24 @@ pub struct BlockMesh<V, T> {
 }
 
 impl<V, T> BlockMesh<V, T> {
+    /// The mesh with no vertices, which has no effect when drawn.
+    ///
+    /// This is a `const` equivalent to [`Self::default()`].
+    pub const EMPTY: Self = Self {
+        face_vertices: FaceMap {
+            nx: BlockFaceMesh::EMPTY,
+            ny: BlockFaceMesh::EMPTY,
+            nz: BlockFaceMesh::EMPTY,
+            px: BlockFaceMesh::EMPTY,
+            py: BlockFaceMesh::EMPTY,
+            pz: BlockFaceMesh::EMPTY,
+        },
+        interior_vertices: BlockFaceMesh::EMPTY,
+        textures_used: Vec::new(),
+        voxel_opacity_mask: None,
+        flaws: Flaws::empty(),
+    };
+
     /// Iterate over all seven [`BlockFaceMesh`]es, including the interior vertices.
     ///
     /// This function is not public because it is mostly a helper for higher-level
@@ -182,6 +202,11 @@ impl<V, T> BlockMesh<V, T> {
             _ => false,
         }
     }
+}
+
+impl<V: 'static, T: 'static> BlockMesh<V, T> {
+    /// A reference to the mesh with no vertices, which has no effect when drawn.
+    pub const EMPTY_REF: &'static Self = &Self::EMPTY;
 }
 
 impl<V, T> BlockMesh<V, T>
@@ -501,7 +526,9 @@ where
 }
 
 impl<V, T> Default for BlockMesh<V, T> {
-    /// Returns a [`BlockMesh`] that contains no vertices.
+    /// Returns a [`BlockMesh`] that contains no vertices, which has no effect when drawn.
+    ///
+    /// This is equivalent to [`BlockMesh::EMPTY`].
     #[inline]
     fn default() -> Self {
         // This implementation can't be derived since `V` and `T` don't have defaults themselves.
@@ -540,3 +567,38 @@ where
 /// alias for the return type of [`block_meshes_for_space`].
 /// Pass it to [`SpaceMesh::new()`](super::SpaceMesh::new) to use it.
 pub type BlockMeshes<V, A> = Box<[BlockMesh<V, A>]>;
+
+#[cfg(test)]
+mod tests {
+    //! Stand-alone tests of [`BlockMesh`].
+    //! See [`crate::tests`] for additional tests.
+
+    use super::*;
+    use crate::{NoTexture, NoTextures};
+    use all_is_cubes::block::Block;
+    use all_is_cubes::camera::GraphicsOptions;
+
+    type TestMesh = BlockMesh<BlockVertex<NoTexture>, NoTexture>;
+
+    /// Test that `default()` returns an empty mesh and the characteristics of such a mesh.
+    #[test]
+    fn default_is_empty() {
+        let mesh: TestMesh = BlockMesh::default();
+        assert_eq!(mesh, BlockMesh::EMPTY);
+        assert!(mesh.is_empty());
+        assert_eq!(mesh.voxel_opacity_mask, None);
+        assert!(mesh.textures().is_empty());
+    }
+
+    #[test]
+    fn nonempty() {
+        let ev = Block::from(Rgba::WHITE).evaluate().unwrap();
+        let mesh: TestMesh = BlockMesh::new(
+            &ev,
+            &NoTextures,
+            &MeshOptions::new(&GraphicsOptions::default()),
+        );
+
+        assert!(!mesh.is_empty());
+    }
+}
