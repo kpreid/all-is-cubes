@@ -61,7 +61,6 @@ pub(crate) struct SpaceRenderer {
     space_bind_group: wgpu::BindGroup,
 
     csm: ChunkedSpaceMesh<Option<ChunkBuffers>, WgpuBlockVertex, AtlasAllocator, CHUNK_SIZE>,
-    //TODO: debug_chunk_boxes_tess: Option<Tess<Backend, LinesVertex>>,
 }
 
 #[derive(Debug, Default)]
@@ -248,12 +247,6 @@ impl SpaceRenderer {
         // This must happen after `csm.update_blocks_and_some_chunks` so that the newly
         // generated meshes have the texels they expect.
         let texture_info = self.block_texture.flush(queue);
-
-        // if graphics_options.debug_chunk_boxes {
-        //     // TODO
-        // } else {
-        //     //self.debug_chunk_boxes_tess = None;
-        // }
 
         let end_time = Instant::now();
 
