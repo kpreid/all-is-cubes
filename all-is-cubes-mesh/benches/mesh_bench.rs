@@ -102,23 +102,22 @@ fn block_mesh_benches(c: &mut Criterion) {
 fn space_mesh_benches(c: &mut Criterion) {
     let mut g = c.benchmark_group("space");
     let options = MeshOptions::new(&GraphicsOptions::default());
+    // The Space and block meshes are not mutated, so we can construct them once.
+    // This also ensures we're not timing dropping them.
+    let checker_ing = checkerboard_space_bench_setup(options.clone(), false);
 
     g.bench_function("checker-new", |b| {
-        // The Space and block meshes are not mutated, so we can construct them once.
-        // This also ensures we're not timing dropping them.
-        let ing = checkerboard_space_bench_setup(options.clone(), false);
         // This benchmark actually has no use for iter_batched_ref -- it could be
         // iter_with_large_drop -- but I want to make sure any quirks of the measurement
         // are shared between all cases.
-        b.iter_batched_ref(|| (), |()| ing.do_new(), BatchSize::SmallInput);
+        b.iter_batched_ref(|| (), |()| checker_ing.do_new(), BatchSize::SmallInput);
     });
 
     g.bench_function("checker-reused", |b| {
-        let ing = checkerboard_space_bench_setup(options.clone(), false);
         b.iter_batched_ref(
             || {
                 let mut buffer = SpaceMesh::default();
-                ing.do_compute(&mut buffer);
+                checker_ing.do_compute(&mut buffer);
                 // Sanity check that we're actually rendering as much as we expect.
                 assert_eq!(buffer.vertices().len(), 6 * 4 * (16 * 16 * 16) / 2);
                 buffer
@@ -129,7 +128,26 @@ fn space_mesh_benches(c: &mut Criterion) {
                 // able to reuse some work (or at least send only part of the buffer to the GPU),
                 // and so this will become a meaningful benchmark of how much CPU time we're
                 // spending or saving on that.
-                ing.do_compute(buffer)
+                checker_ing.do_compute(buffer)
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    let half_ing = SpaceMeshIngredients::new(options, half_space(Block::from(Rgba::WHITE)));
+    g.bench_function("half-new", |b| {
+        b.iter_batched_ref(|| (), |()| half_ing.do_new(), BatchSize::SmallInput);
+    });
+
+    g.bench_function("half-reused", |b| {
+        b.iter_batched_ref(
+            || {
+                let mut buffer = SpaceMesh::default();
+                half_ing.do_compute(&mut buffer);
+                buffer
+            },
+            |buffer: &mut SpaceMesh<BlockVertex<TtPoint>, TestTextureTile>| {
+                half_ing.do_compute(buffer)
             },
             BatchSize::SmallInput,
         );
@@ -174,6 +192,16 @@ fn checkerboard_space(blocks: [Block; 2]) -> Space {
         .fill(bounds, |p| {
             Some(&blocks[((p.x + p.y + p.z) as usize).rem_euclid(blocks.len())])
         })
+        .unwrap();
+    space
+}
+
+/// Space whose lower half is filled with the block.
+fn half_space(block: Block) -> Space {
+    let bounds = GridAab::from_lower_size([0, 0, 0], [16, 16, 16]);
+    let mut space = Space::empty(bounds);
+    space
+        .fill_uniform(GridAab::from_lower_size([0, 0, 0], [16, 8, 16]), block)
         .unwrap();
     space
 }
