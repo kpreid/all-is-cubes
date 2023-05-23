@@ -1625,6 +1625,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad0a93d233ebf96623465aad4046a8d3aa4da22d4f4beba5388838c8a434bbb4"
 
 [[package]]
+name = "glam"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad83ab008a4fa3b31dfa713dd41b5a9bdea1e94e4cf1e2fc274ffbd49b0271d3"
+dependencies = [
+ "mint",
+]
+
+[[package]]
 name = "glob"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2145,12 +2154,14 @@ dependencies = [
 
 [[package]]
 name = "kira"
-version = "0.7.3"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e53aef6f6ec851da68a0ad6d6283bd99ea1a9164f38fd7ac353e28ccd6f5cda"
+checksum = "8e0742cc19ce7fe8dc72985cf0403156c09e5cbfe364d23f2f064fe93795afb9"
 dependencies = [
  "atomic-arena",
  "cpal",
+ "glam",
+ "mint",
  "ringbuf",
 ]
 
@@ -2363,6 +2374,12 @@ dependencies = [
  "adler",
  "simd-adler32",
 ]
+
+[[package]]
+name = "mint"
+version = "0.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e53debba6bda7a793e5f99b8dacf19e626084f525f7829104ba9898f367d85ff"
 
 [[package]]
 name = "mio"

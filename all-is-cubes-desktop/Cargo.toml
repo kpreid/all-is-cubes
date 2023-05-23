@@ -34,7 +34,7 @@ crossterm = "0.25.0"
 directories-next = "2.0.0"
 image = { workspace = true, features = ["png"] }
 indicatif = { version = "0.17.0", default-features = false }
-kira = { version = "0.7.0", default-features = false, features = ["cpal"] }
+kira = { version = "0.8.0", default-features = false, features = ["cpal"] }
 log = { workspace = true }
 once_cell = { workspace = true }
 png = "0.17.6"
