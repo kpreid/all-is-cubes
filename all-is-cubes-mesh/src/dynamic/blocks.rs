@@ -1,5 +1,6 @@
 use std::num::NonZeroU32;
 
+use all_is_cubes::math::Cube;
 use fnv::FnvHashSet;
 
 use all_is_cubes::block::{EvaluatedBlock, Resolution};
@@ -216,7 +217,12 @@ impl<D, Vert, Tile> Default for VersionedBlockMeshes<D, Vert, Tile> {
 impl<'a, D, Vert: 'static, Tile: 'static> GetBlockMesh<'a, Vert, Tile>
     for &'a VersionedBlockMeshes<D, Vert, Tile>
 {
-    fn get_block_mesh(&mut self, index: BlockIndex) -> &'a BlockMesh<Vert, Tile> {
+    fn get_block_mesh(
+        &mut self,
+        index: BlockIndex,
+        _cube: Cube,
+        _primary: bool,
+    ) -> &'a BlockMesh<Vert, Tile> {
         self.meshes
             .get(usize::from(index))
             .map(|vbm| &vbm.mesh)

@@ -199,7 +199,7 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
                 None => return, // continue in for_each() loop
             };
             let already_seen_index = bitset_set_and_get(&mut self.block_indices_used, index.into());
-            let block_mesh = block_meshes.get_block_mesh(index);
+            let block_mesh = block_meshes.get_block_mesh(index, cube, true);
 
             if !already_seen_index {
                 // Capture texture handles to ensure that our texture coordinates stay valid.
@@ -220,8 +220,9 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
                 |face| {
                     let adjacent_cube = cube + face.normal_vector();
                     if let Some(adj_block_index) = space.get_block_index(adjacent_cube) {
-                        if block_meshes.get_block_mesh(adj_block_index).face_vertices
-                            [face.opposite()]
+                        if block_meshes
+                            .get_block_mesh(adj_block_index, adjacent_cube, false)
+                            .face_vertices[face.opposite()]
                         .fully_opaque
                         {
                             // Don't draw obscured faces, but do record that we depended on them.
@@ -592,25 +593,46 @@ pub trait GetBlockMesh<'a, V, T> {
     /// [`Space::block_data()`] in the relevant [`Space`].
     ///
     /// This function should be idempotent, at least within a single invocation of
-    /// [`SpaceMesh::compute()`]; identical input indexes should produce identical meshes.
-    /// If this is not the case, then the [`SpaceMesh`] may have inconsistent properties.
+    /// [`SpaceMesh::compute()`] to which it was given; identical inputs should
+    /// produce identical meshes. If this is not the case, then the resulting [`SpaceMesh`]
+    /// may have inconsistent properties such as gaps where block faces were presumed to be hidden.
+    ///
+    /// # `primary`
+    ///
+    /// The `primary` parameter will be `true` exactly once per cube in the meshed region,
+    /// per call to [`SpaceMesh::compute()`], and the block mesh returned at that time will be the
+    /// mesh actually included in the produced [`SpaceMesh`]. All other calls will be for consulting
+    /// neighbors' obscuring faces for culling.
+    ///
+    /// Thus, for example, the implementation may choose to record the presence of a particular
+    /// block to perform additional or substitute rendering separate from the computed mesh.
     ///
     /// # Errors and panics
     ///
     /// If the block index is out of range (which should not happen unless the [`Space`]
-    /// being meshed is inconsistent the state of this [`GetBlockMesh`] implementor),
+    /// being meshed is inconsistent with the state of this [`GetBlockMesh`] implementor),
     /// then the implementation may at its choice return whatever mesh it wishes to display
     /// instead, or panic if this suits the particular mesh generation application.
     ///
     /// Note that the returned [`BlockMesh`] may have [`Flaws`] which will be incorporated
     /// into the [`SpaceMesh`]'s flaws.
-    fn get_block_mesh(&mut self, index: BlockIndex) -> &'a BlockMesh<V, T>;
+    fn get_block_mesh(
+        &mut self,
+        index: BlockIndex,
+        cube: Cube,
+        primary: bool,
+    ) -> &'a BlockMesh<V, T>;
 }
 
 /// Basic implementation of [`GetBlockMesh`] for any slice of meshes.
 impl<'a, V: 'static, T: 'static> GetBlockMesh<'a, V, T> for &'a [BlockMesh<V, T>] {
-    fn get_block_mesh(&mut self, index: BlockIndex) -> &'a BlockMesh<V, T> {
-        // TODO: Consider changing this behavior to either panic or return a mesh with
+    fn get_block_mesh(
+        &mut self,
+        index: BlockIndex,
+        #[allow(unused)] cube: Cube,
+        #[allow(unused)] primary: bool,
+    ) -> &'a BlockMesh<V, T> {
+        // TODO: Consider changing this out-of-bounds behavior to either panic or return a mesh with
         // some `Flaws` set.
 
         <[_]>::get(self, usize::from(index)).unwrap_or(BlockMesh::<V, T>::EMPTY_REF)
@@ -863,6 +885,9 @@ mod tests {
     #[test]
     fn slice_get_block_mesh_out_of_bounds() {
         let mut source: &[BlockMesh<BlockVertex<TestPoint>, TestTile>] = &[];
-        assert_eq!(source.get_block_mesh(10), BlockMesh::EMPTY_REF);
+        assert_eq!(
+            source.get_block_mesh(10, Cube::ORIGIN, true),
+            BlockMesh::EMPTY_REF
+        );
     }
 }
