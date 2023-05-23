@@ -623,6 +623,9 @@ pub trait GetBlockMesh<'a, V, T> {
 /// Basic implementation of [`GetBlockMesh`] for any slice of meshes.
 impl<'a, V: 'static, T: 'static> GetBlockMesh<'a, V, T> for &'a [BlockMesh<V, T>] {
     fn get_block_mesh(&mut self, index: BlockIndex) -> &'a BlockMesh<V, T> {
+        // TODO: Consider changing this behavior to either panic or return a mesh with
+        // some `Flaws` set.
+
         <[_]>::get(self, usize::from(index)).unwrap_or(BlockMesh::<V, T>::EMPTY_REF)
     }
 }
@@ -775,5 +778,11 @@ mod tests {
         let actual_size = dbg!(mesh.total_byte_size());
         assert!(actual_size > mem::size_of::<TestMesh>() + expected_data_size);
         assert!(actual_size <= mem::size_of::<TestMesh>() + expected_data_size * 3);
+    }
+
+    #[test]
+    fn slice_get_block_mesh_out_of_bounds() {
+        let mut source: &[BlockMesh<BlockVertex<TtPoint>, TestTextureTile>] = &[];
+        assert_eq!(source.get_block_mesh(10), BlockMesh::EMPTY_REF);
     }
 }
