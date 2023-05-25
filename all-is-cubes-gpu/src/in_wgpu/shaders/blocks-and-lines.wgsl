@@ -151,7 +151,7 @@ fn block_vertex_main(
         case 4u { normal = vec3<f32>(1.0, 0.0, 0.0); }
         case 5u { normal = vec3<f32>(0.0, 1.0, 0.0); }
         case 6u { normal = vec3<f32>(0.0, 0.0, 1.0); }
-        default {}
+        default: {}
     }
     
     // Generate tangents (with always positive components).
@@ -159,7 +159,7 @@ fn block_vertex_main(
     // TODO: Is the always-positive rule actually needed?
     var tangent = vec3<f32>(0.0, 1.0, 0.0);
     var bitangent = vec3<f32>(0.0, 0.0, 1.0);
-    if (normal.x == 0.0) {
+    if normal.x == 0.0 {
         tangent = vec3<f32>(1.0, 0.0, 0.0);
         bitangent = abs(cross(tangent, normal));
     }
@@ -170,10 +170,10 @@ fn block_vertex_main(
     let world_position = vec3<f32>(cube) + position_in_cube + instance_input.translation;
 
     return BlockFragmentInput(
-        /* clip_position = */ combined_matrix * vec4<f32>(world_position, 1.0),
+        combined_matrix * vec4<f32>(world_position, 1.0), // clip_position
         world_position,
         position_in_cube,
-        /* world_cube = */ instance_input.translation + vec3<f32>(cube),
+        instance_input.translation + vec3<f32>(cube),  // world_cube
         tangent,
         bitangent,
         normal,
@@ -183,7 +183,7 @@ fn block_vertex_main(
         compute_fog(world_position),
         // Note that we do not normalize this vector: by keeping things linear, we
         // allow linear interpolation between vertices to get the right answer.
-        /* camera_ray_direction = */ world_position - camera.view_position,
+        world_position - camera.view_position, // camera_ray_direction
     );
 }
 
@@ -209,7 +209,7 @@ fn partial_scale_to_integer_step(s: f32, ds: f32) -> f32 {
     var s = s;
     var ds = ds;
     s = clamp(s, 0.0, 1.0);  // Out of bounds may appear on triangle edges
-    if (sign(ds) < 0.0) {
+    if sign(ds) < 0.0 {
         s = 1.0 - s;
         ds = -ds;
         // Note: This will not act on a negative zero.
@@ -253,9 +253,7 @@ fn light_texture_fetch(fragment_position: vec3<f32>) -> vec4<f32> {
     // Decode logarithmic representation.
     // Exception: A texel value of exactly 0 is taken as 0, not the lowest power of 2.
     let not_zero: vec3<bool> = packed_light > vec3<i32>(0);
-    let unpacked_light: vec3<f32> =
-        pow(vec3<f32>(2.0), vec3<f32>(packed_light - 128) / 16.0)
-        * vec3<f32>(not_zero);
+    let unpacked_light: vec3<f32> = pow(vec3<f32>(2.0), vec3<f32>(packed_light - 128) / 16.0) * vec3<f32>(not_zero);
 
     // See all_is_cubes::space::LightStatus for the value this is interpreting.
     // The enum values are grouped into approximately {0, 128, 255}, so multiplying by 2 and
@@ -270,27 +268,27 @@ fn light_texture_fetch(fragment_position: vec3<f32>) -> vec4<f32> {
 // Simple directional lighting used to give corners extra definition.
 // Note that this algorithm is also implemented in the Rust code.
 fn fixed_directional_lighting(normal: vec3<f32>) -> f32 {
-  let light_1_direction = vec3<f32>(0.4, -0.1, 0.0);
-  let light_2_direction = vec3<f32>(-0.4, 0.35, 0.25);
-  return (1.0 - 1.0 / 16.0) + 0.25 * (max(0.0, dot(light_1_direction, normal)) + max(0.0, dot(light_2_direction, normal)));
+    let light_1_direction = vec3<f32>(0.4, -0.1, 0.0);
+    let light_2_direction = vec3<f32>(-0.4, 0.35, 0.25);
+    return (1.0 - 1.0 / 16.0) + 0.25 * (max(0.0, dot(light_1_direction, normal)) + max(0.0, dot(light_2_direction, normal)));
 }
 
 fn valid_light(light: vec4<f32>) -> bool {
-  return light.a > 0.5;
+    return light.a > 0.5;
 }
 
 // Tweak a light value for ambient occlusion -- and convert the light status 
 // value returned from light_texture_fetch to an interpolation coefficient.
 fn ao_fudge(light_value: vec4<f32>) -> vec4<f32> {
-  // TODO: Make this a (uniform) graphics option
-  let fudge = 0.25;
-  let status = light_value.a;
-  // Fudge applies only to opaque cubes, not to no-rays cubes.
-  // This multiplication provides a branchless calculation:
-  // If status is -1 (no-rays or uninitialized), return 0.
-  // If status is 0 (opaque), return fudge value.
-  // If status is 1 (normal light value), return that.
-  return vec4<f32>(light_value.rgb, f32(status > -0.5) * max(status, fudge));
+    // TODO: Make this a (uniform) graphics option
+    let fudge = 0.25;
+    let status = light_value.a;
+    // Fudge applies only to opaque cubes, not to no-rays cubes.
+    // This multiplication provides a branchless calculation:
+    // If status is -1 (no-rays or uninitialized), return 0.
+    // If status is 0 (opaque), return fudge value.
+    // If status is 1 (normal light value), return that.
+    return vec4<f32>(light_value.rgb, f32(status > -0.5) * max(status, fudge));
 }
 
 // Compute the interpolated ('smooth') light for the surface from light_texture.
@@ -310,11 +308,11 @@ fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
     // Ensure that mix <= 0.5, i.e. the 'near' side below is the side we are on.
     var dir_1: vec3<f32> = in.tangent;
     var dir_2: vec3<f32> = in.bitangent;
-    if (mix_1 > 0.5) {
+    if mix_1 > 0.5 {
         dir_1 = dir_1 * -1.0;
         mix_1 = 1.0 - mix_1;
     }
-    if (mix_2 > 0.5) {
+    if mix_2 > 0.5 {
         dir_2 = dir_2 * -1.0;
         mix_2 = 1.0 - mix_2;
     }
@@ -330,27 +328,27 @@ fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
     // Retrieve texels, again using the half-cube-offset grid (this way we won't have edge artifacts).
     let lin_lo = -0.5;
     let lin_hi = 0.5;
-    var near12    = light_texture_fetch(origin + lin_lo * dir_1 + lin_lo * dir_2);
+    var near12 = light_texture_fetch(origin + lin_lo * dir_1 + lin_lo * dir_2);
     var near1far2 = light_texture_fetch(origin + lin_lo * dir_1 + lin_hi * dir_2);
     var near2far1 = light_texture_fetch(origin + lin_hi * dir_1 + lin_lo * dir_2);
-    var far12     = light_texture_fetch(origin + lin_hi * dir_1 + lin_hi * dir_2);
-    
-    if (!valid_light(near1far2) && !valid_light(near2far1)) {
+    var far12 = light_texture_fetch(origin + lin_hi * dir_1 + lin_hi * dir_2);
+
+    if !valid_light(near1far2) && !valid_light(near2far1) {
         // The far corner is on the other side of a diagonal wall, so should be
         // ignored to prevent light leaks.
         far12 = near12;
     }
 
     // Apply ambient occlusion.
-    near12    = ao_fudge(near12);
+    near12 = ao_fudge(near12);
     near1far2 = ao_fudge(near1far2);
     near2far1 = ao_fudge(near2far1);
-    far12     = ao_fudge(far12);
+    far12 = ao_fudge(far12);
 
     // Perform bilinear interpolation.
     let v = mix(
-        mix(near12,    near1far2, mix_2),
-        mix(near2far1, far12,     mix_2),
+        mix(near12, near1far2, mix_2),
+        mix(near2far1, far12, mix_2),
         mix_1
     );
     // Scale result by sum of valid texels.
@@ -364,7 +362,7 @@ fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
 fn lighting(in: BlockFragmentInput) -> vec3<f32> {
     switch camera.light_lookup_offset_and_option.w {
         // LightingOption::None or fallback: no lighting
-        default {
+        default: {
             return vec3<f32>(1.0);
         }
         
@@ -384,10 +382,9 @@ fn lighting(in: BlockFragmentInput) -> vec3<f32> {
 
 // Get the vertex color or texel value to display
 fn get_diffuse_color(in: BlockFragmentInput) -> vec4<f32> {
-    if (in.color_or_texture[3] < -0.5) {
+    if in.color_or_texture[3] < -0.5 {
         // Texture coordinates.
-        let texcoord: vec3<f32> =
-            clamp(in.color_or_texture.xyz, in.clamp_min, in.clamp_max);
+        let texcoord: vec3<f32> = clamp(in.color_or_texture.xyz, in.clamp_min, in.clamp_max);
         return textureSampleLevel(block_texture, block_sampler, texcoord, 0.0);
 
         // TODO: implement DEBUG_TEXTURE_EDGE
@@ -410,7 +407,7 @@ fn apply_fog_and_exposure(lit_color: vec3<f32>, fog_mix: f32) -> vec3<f32> {
 }
 
 fn volumetric_transparency(in: BlockFragmentInput, starting_alpha: f32) -> f32 {
-    if (starting_alpha < 1.0) {
+    if starting_alpha < 1.0 {
         // Apply volumetric opacity.
         //
         // This is a very crude approximation of future support for more general

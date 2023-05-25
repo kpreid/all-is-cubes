@@ -5,7 +5,7 @@ struct PostprocessUniforms {
     tone_mapping_id: i32,
     scene_texture_valid: i32,
     bloom_intensity: f32,
-    _padding: f32,
+    padding: f32,
 };
 
 
@@ -40,12 +40,12 @@ fn postprocess_vertex(
 // --- Fragment shader; doing the actual postprocessing work -------------------
 
 fn luminance(linear_rgb: vec3<f32>) -> f32 {
-  return dot(linear_rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+    return dot(linear_rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
 }
 
 fn tone_map(linear_rgb: vec3<f32>) -> vec3<f32> {
     switch camera.tone_mapping_id {
-        default { // or case 0
+        default: { // or case 0
             // Clamp (implicitly)
             return linear_rgb;
         }
@@ -60,7 +60,7 @@ fn tone_map(linear_rgb: vec3<f32>) -> vec3<f32> {
 // Fetch scene pixel, if scene texture is present.
 // (It may be absent because there might have been nothing to draw in previous stages.)
 fn scene_pixel(texcoord: vec2<f32>) -> vec4<f32> {
-    if (camera.scene_texture_valid == 0) {
+    if camera.scene_texture_valid == 0 {
         // TODO: make this a checkerboard or something to distinguish from “oops, all black”.
         // (And when we do that, also use it for UI-on-top-of-nothing, by reading the alpha.)
         // Note: this color is equal to all_is_cubes::palette::NO_WORLD_TO_SHOW.
