@@ -1057,7 +1057,6 @@ pub struct SpacePhysics {
 
     /// Method used to compute the illumination of individual blocks.
     pub light: LightPhysics,
-    // When adding a field, don't forget to expand the Debug impl.
 }
 
 impl SpacePhysics {
@@ -1078,16 +1077,18 @@ impl SpacePhysics {
 
 impl fmt::Debug for SpacePhysics {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            gravity,
+            sky_color,
+            light,
+        } = self;
         f.debug_struct("SpacePhysics")
             .field(
                 "gravity",
-                &self
-                    .gravity
-                    .map(NotNan::into_inner)
-                    .custom_format(ConciseDebug),
+                &gravity.map(NotNan::into_inner).custom_format(ConciseDebug),
             )
-            .field("sky_color", &self.sky_color)
-            .field("light", &self.light)
+            .field("sky_color", &sky_color)
+            .field("light", &light)
             .finish()
     }
 }

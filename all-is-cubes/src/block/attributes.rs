@@ -57,8 +57,7 @@ pub struct BlockAttributes {
     /// what rendering strategy to use.
     pub animation_hint: AnimationHint,
     //
-    // Reminder: When adding new fields, add them to the Debug implementation
-    // and BlockBuilder.
+    // Reminder: When adding new fields, add them to BlockBuilder too.
     //
     // TODO: add 'behavior' functionality, if we don't come up with something else
 }
@@ -66,32 +65,42 @@ pub struct BlockAttributes {
 impl fmt::Debug for BlockAttributes {
     /// Only attributes which differ from the default are shown.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self == &Self::default() {
-            // Avoid the braceless formatting used for structs with literally no fields.
+        if self == Self::DEFAULT_REF {
+            // Avoid the braceless formatting that `debug_struct` uses if no fields are given.
             write!(f, "BlockAttributes {{}}")
         } else {
+            let Self {
+                display_name,
+                selectable,
+                collision,
+                rotation_rule,
+                light_emission,
+                tick_action,
+                animation_hint,
+            } = self;
+
             let mut s = f.debug_struct("BlockAttributes");
-            if self.display_name != Self::default().display_name {
+            if *display_name != Self::DEFAULT_REF.display_name {
                 // Unwrap the `Cow` for tidier formatting.
-                s.field("display_name", &&*self.display_name);
+                s.field("display_name", &&**display_name);
             }
-            if self.selectable != Self::default().selectable {
-                s.field("selectable", &self.selectable);
+            if *selectable != Self::DEFAULT_REF.selectable {
+                s.field("selectable", selectable);
             }
-            if self.collision != Self::default().collision {
-                s.field("collision", &self.collision);
+            if *collision != Self::DEFAULT_REF.collision {
+                s.field("collision", collision);
             }
-            if self.rotation_rule != Self::default().rotation_rule {
-                s.field("rotation_rule", &self.rotation_rule);
+            if *rotation_rule != Self::DEFAULT_REF.rotation_rule {
+                s.field("rotation_rule", rotation_rule);
             }
-            if self.light_emission != Self::default().light_emission {
-                s.field("light_emission", &self.light_emission);
+            if *light_emission != Self::DEFAULT_REF.light_emission {
+                s.field("light_emission", light_emission);
             }
-            if self.tick_action != Self::default().tick_action {
-                s.field("tick_action", &self.tick_action);
+            if *tick_action != Self::DEFAULT_REF.tick_action {
+                s.field("tick_action", tick_action);
             }
-            if self.animation_hint != Self::default().animation_hint {
-                s.field("animation_hint", &self.animation_hint);
+            if *animation_hint != Self::DEFAULT_REF.animation_hint {
+                s.field("animation_hint", animation_hint);
             }
             s.finish()
         }
@@ -99,20 +108,23 @@ impl fmt::Debug for BlockAttributes {
 }
 
 impl BlockAttributes {
+    const DEFAULT: Self = BlockAttributes {
+        display_name: Cow::Borrowed(""),
+        selectable: true,
+        collision: BlockCollision::Hard,
+        rotation_rule: RotationPlacementRule::Never,
+        light_emission: Rgb::ZERO,
+        tick_action: None,
+        animation_hint: AnimationHint::UNCHANGING,
+    };
+    const DEFAULT_REF: &Self = &Self::DEFAULT;
+
     /// Block attributes suitable as default values for in-game use.
     ///
     /// This function differs from the [`Default::default`] trait implementation only
     /// in that it is a `const fn`.
     pub const fn default() -> BlockAttributes {
-        BlockAttributes {
-            display_name: Cow::Borrowed(""),
-            selectable: true,
-            collision: BlockCollision::Hard,
-            rotation_rule: RotationPlacementRule::Never,
-            light_emission: Rgb::ZERO,
-            tick_action: None,
-            animation_hint: AnimationHint::UNCHANGING,
-        }
+        Self::DEFAULT
     }
 }
 

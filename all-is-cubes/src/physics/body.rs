@@ -61,19 +61,27 @@ pub struct Body {
     /// This does not affect the behavior of the [`Body`] itself; it has nothing to do with
     /// the direction of the velocity.
     pub pitch: FreeCoordinate,
-    // When adding a field, don't forget to expand the Debug impl.
 }
 
 impl fmt::Debug for Body {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            position,
+            velocity,
+            collision_box,
+            flying,
+            noclip,
+            yaw,
+            pitch,
+        } = self;
         fmt.debug_struct("Body")
-            .field("position", &self.position.custom_format(ConciseDebug))
-            .field("velocity", &self.velocity.custom_format(ConciseDebug))
-            .field("collision_box", &self.collision_box)
-            .field("flying", &self.flying)
-            .field("noclip", &self.noclip)
-            .field("yaw", &self.yaw)
-            .field("pitch", &self.pitch)
+            .field("position", &position.custom_format(ConciseDebug))
+            .field("velocity", &velocity.custom_format(ConciseDebug))
+            .field("collision_box", &collision_box)
+            .field("flying", &flying)
+            .field("noclip", &noclip)
+            .field("yaw", &yaw)
+            .field("pitch", &pitch)
             .finish()
     }
 }
