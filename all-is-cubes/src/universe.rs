@@ -14,7 +14,6 @@
 //! run at the same time.
 
 use std::fmt;
-use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -26,7 +25,7 @@ use crate::character::Character;
 use crate::space::{Space, SpaceStepInfo};
 use crate::time::Tick;
 use crate::transaction::Transaction as _;
-use crate::util::{CustomFormat, StatusText, TypeName};
+use crate::util::{CustomFormat, StatusText};
 
 // Note: Everything in `members` is either an impl, private, or intentionally public-in-private.
 mod members;
@@ -366,24 +365,16 @@ impl Universe {
 
 impl fmt::Debug for Universe {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // TODO: this is missing all the non-member fields
+        let Self {
+            tables,
+            id: _,
+            next_anonym: _,
+            wants_gc: _,
+        } = self;
+
         let mut ds = fmt.debug_struct("Universe");
-        format_members::<BlockDef>(self, &mut ds);
-        format_members::<Character>(self, &mut ds);
-        format_members::<Space>(self, &mut ds);
+        tables.fmt_members(&mut ds);
         ds.finish()
-    }
-}
-fn format_members<T>(universe: &Universe, ds: &mut fmt::DebugStruct<'_, '_>)
-where
-    Universe: UniverseTable<T, Table = Storage<T>>,
-{
-    for name in universe.table().keys() {
-        // match root.strong_ref.try_borrow() {
-        //     Ok(entry) => ds.field(&name.to_string(), &entry.data),
-        //     Err(_) => ds.field(&name.to_string(), &"<in use>"),
-        // };
-        ds.field(&name.to_string(), &PhantomData::<T>.custom_format(TypeName));
     }
 }
 

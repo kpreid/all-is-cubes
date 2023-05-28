@@ -5,11 +5,13 @@
 //! inside it (the public-in-private trick).
 
 use std::collections::BTreeMap;
+use std::fmt;
 
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::Space;
 use crate::universe::{InsertError, Name, PartialUniverse, URef, URootRef, Universe, UniverseIter};
+use crate::util::CustomFormat as _;
 
 /// A `BTreeMap` is used to ensure that the iteration order is deterministic across
 /// runs/versions.
@@ -182,6 +184,13 @@ macro_rules! member_enums_and_impls {
             $( pub(crate) $table_name: Storage<$member_type>, )*
         }
 
+        impl UniverseTables {
+            /// Called by Universe as part of its `Debug`
+            pub(crate) fn fmt_members(&self, ds: &mut fmt::DebugStruct<'_, '_>) {
+                $( fmt_members_of_type::<$member_type>(&self.$table_name, ds); )*
+            }
+        }
+
         /// Holds any one of the [`URef`] types that can be in a [`Universe`].
         ///
         /// See also [`URefErased`], which is implemented by `URef`s rather than owning one.
@@ -231,5 +240,22 @@ impl super::URefErased for AnyURef {
     }
     fn universe_id(&self) -> Option<super::UniverseId> {
         self.as_erased().universe_id()
+    }
+}
+
+/// Helper for `UniverseTable::fmt_members`
+fn fmt_members_of_type<T>(table: &Storage<T>, ds: &mut fmt::DebugStruct<'_, '_>)
+where
+    Universe: UniverseTable<T, Table = Storage<T>>,
+{
+    for name in table.keys() {
+        // match root.strong_ref.try_borrow() {
+        //     Ok(entry) => ds.field(&name.to_string(), &entry.data),
+        //     Err(_) => ds.field(&name.to_string(), &"<in use>"),
+        // };
+        ds.field(
+            &name.to_string(),
+            &std::marker::PhantomData::<T>.custom_format(crate::util::TypeName),
+        );
     }
 }
