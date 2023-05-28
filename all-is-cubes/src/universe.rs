@@ -107,6 +107,19 @@ pub struct Universe {
     /// that repeated insertion and dropping references cannot lead to unbounded growth
     /// as long as steps occur routinely.
     wants_gc: bool,
+    /// Number of [`step()`]s which have occurred since this [`Universe`] was created.
+    ///
+    /// Note that this value is not serialized; thus, it is reset whenever “a saved game
+    /// is loaded”. It should only be used for diagnostics or other non-persistent state.
+    ///
+    /// When a step is in progress, this is updated before stepping any members.
+    ///
+    /// TODO: This is not *currently* used for anything and should be removed if it never
+    /// is. Its current reason to exist is for some not-yet-merged diagnostic logging.
+    /// It may also serve a purpose when I refine the notion of simulation tick rate.
+    ///
+    /// [`step()`]: Universe::step
+    session_step_time: u64,
 }
 
 impl Universe {
@@ -117,6 +130,7 @@ impl Universe {
             id: UniverseId::new(),
             next_anonym: 0,
             wants_gc: false,
+            session_step_time: 0,
         }
     }
 
@@ -176,6 +190,10 @@ impl Universe {
         if self.wants_gc {
             self.gc();
             self.wants_gc = false;
+        }
+
+        if !tick.paused() {
+            self.session_step_time += 1;
         }
 
         let mut transactions = Vec::new();
@@ -370,9 +388,11 @@ impl fmt::Debug for Universe {
             id: _,
             next_anonym: _,
             wants_gc: _,
+            session_step_time,
         } = self;
 
         let mut ds = fmt.debug_struct("Universe");
+        ds.field("session_step_time", &session_step_time);
         tables.fmt_members(&mut ds);
         ds.finish()
     }

@@ -21,8 +21,14 @@ fn thread_safety() {
 
 #[test]
 fn universe_debug_empty() {
-    assert_eq!(format!("{:?}", Universe::new()), "Universe");
-    assert_eq!(format!("{:#?}", Universe::new()), "Universe");
+    assert_eq!(
+        format!("{:?}", Universe::new()),
+        "Universe { session_step_time: 0 }"
+    );
+    assert_eq!(
+        format!("{:#?}", Universe::new()),
+        "Universe {\n    session_step_time: 0,\n}"
+    );
 }
 
 /// Universe does not print contents of members, on the assumption this would be too verbose.
@@ -34,12 +40,15 @@ fn universe_debug_elements() {
     u.insert_anonymous(BlockDef::new(AIR));
     assert_eq!(
         format!("{u:?}"),
-        "Universe { [anonymous #0]: all_is_cubes::block::block_def::BlockDef, 'foo': all_is_cubes::space::Space }"
+        "Universe { session_step_time: 0, \
+        [anonymous #0]: all_is_cubes::block::block_def::BlockDef, \
+        'foo': all_is_cubes::space::Space }"
     );
     assert_eq!(
         format!("{u:#?}"),
         "\
 Universe {
+    session_step_time: 0,
     [anonymous #0]: all_is_cubes::block::block_def::BlockDef,
     'foo': all_is_cubes::space::Space,
 }\
@@ -260,6 +269,16 @@ fn delete_wrong_universe_fails() {
     let txn = UniverseTransaction::delete(uref);
 
     txn.execute(&mut u2, &mut drop).unwrap_err();
+}
+
+#[test]
+fn step_time() {
+    let mut u = Universe::new();
+    assert_eq!(u.session_step_time, 0);
+    u.step(Tick::arbitrary(), practically_infinite_deadline());
+    assert_eq!(u.session_step_time, 1);
+    u.step(Tick::arbitrary().pause(), practically_infinite_deadline());
+    assert_eq!(u.session_step_time, 1);
 }
 
 #[test]
