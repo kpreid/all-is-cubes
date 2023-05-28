@@ -97,9 +97,8 @@ impl UniverseId {
 ///
 /// [avoiding deadlock]: crate::universe#thread-safety
 pub struct Universe {
-    blocks: Storage<BlockDef>,
-    characters: Storage<Character>,
-    spaces: Storage<Space>,
+    /// Storage of the actual members.
+    tables: UniverseTables,
 
     id: UniverseId,
     /// Next number to assign to a [`Name::Anonym`].
@@ -115,11 +114,7 @@ impl Universe {
     /// Constructs an empty [`Universe`].
     pub fn new() -> Self {
         Universe {
-            blocks: Storage::new(),
-            spaces: Storage::new(),
-            // TODO: bodies so body-in-world stepping
-            characters: Storage::new(),
-
+            tables: UniverseTables::default(),
             id: UniverseId::new(),
             next_anonym: 0,
             wants_gc: false,
@@ -136,14 +131,12 @@ impl Universe {
     // change what `URef: Any` means, though. Perhaps `URootRef` should own
     // a prepared `URef` that it can return a reference to.
     pub fn get_any(&self, name: &Name) -> Option<Box<dyn URefErased>> {
-        let Self {
+        // TODO: Make this code macro-generated
+        let UniverseTables {
             blocks,
             characters,
             spaces,
-            id: _,
-            next_anonym: _,
-            wants_gc: _,
-        } = self;
+        } = &self.tables;
 
         if let Some(r) = blocks.get(name) {
             return Some(Box::new(r.downgrade()));
@@ -188,7 +181,7 @@ impl Universe {
 
         let mut transactions = Vec::new();
 
-        for space_root in self.spaces.values() {
+        for space_root in self.tables.spaces.values() {
             let space_ref = space_root.downgrade();
             let (space_info, transaction) = space_ref
                 .try_modify(|space| {
@@ -201,7 +194,7 @@ impl Universe {
             info.space_step += space_info;
         }
 
-        for character_root in self.characters.values() {
+        for character_root in self.tables.characters.values() {
             let character_ref = character_root.downgrade();
             let (_body_step_info, transaction) = character_ref
                 .try_modify(|ch| ch.step(Some(&character_ref), tick))
@@ -335,14 +328,11 @@ impl Universe {
     ///
     /// Returns whether the entry actually existed.
     pub(crate) fn delete(&mut self, name: &Name) -> bool {
-        let Self {
+        let UniverseTables {
             blocks,
             characters,
             spaces,
-            id: _,
-            next_anonym: _,
-            wants_gc: _,
-        } = self;
+        } = &mut self.tables;
 
         blocks.remove(name).is_some()
             || characters.remove(name).is_some()
@@ -354,14 +344,11 @@ impl Universe {
     /// This may happen at any time during operations of the universe; calling this method
     /// merely ensures that it happens now and not earlier.
     pub fn gc(&mut self) {
-        let Self {
+        let UniverseTables {
             blocks,
             characters,
             spaces,
-            id: _,
-            next_anonym: _,
-            wants_gc: _,
-        } = self;
+        } = &mut self.tables;
 
         // TODO: We need a real GC algorithm. For now, let's perform non-cyclic collection by
         // checking reference counts. If an entry has no weak references to its `Arc`, then
@@ -379,6 +366,7 @@ impl Universe {
 
 impl fmt::Debug for Universe {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // TODO: this is missing all the non-member fields
         let mut ds = fmt.debug_struct("Universe");
         format_members::<BlockDef>(self, &mut ds);
         format_members::<Character>(self, &mut ds);

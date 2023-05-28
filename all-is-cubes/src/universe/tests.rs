@@ -172,7 +172,10 @@ fn insert_anonym_prohibited_via_txn() {
 fn insert_pending_becomes_anonym_direct() {
     let mut u = Universe::new();
     u.insert(Name::Pending, BlockDef::new(AIR)).unwrap();
-    assert_eq!(u.blocks.keys().collect::<Vec<_>>(), vec![&Name::Anonym(0)]);
+    assert_eq!(
+        u.tables.blocks.keys().collect::<Vec<_>>(),
+        vec![&Name::Anonym(0)]
+    );
 }
 
 #[test]
@@ -181,7 +184,10 @@ fn insert_pending_becomes_anonym_via_txn() {
     UniverseTransaction::insert(URef::new_pending(Name::Pending, BlockDef::new(AIR)))
         .execute(&mut u, &mut drop)
         .unwrap();
-    assert_eq!(u.blocks.keys().collect::<Vec<_>>(), vec![&Name::Anonym(0)]);
+    assert_eq!(
+        u.tables.blocks.keys().collect::<Vec<_>>(),
+        vec![&Name::Anonym(0)]
+    );
 }
 
 #[test]

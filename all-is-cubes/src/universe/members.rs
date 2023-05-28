@@ -33,6 +33,8 @@ pub trait UniverseMember: Sized + 'static {
 ///
 /// This trait is not public and is used only within the implementation of [`Universe`];
 /// thus, the `Table` associated type does not need to be a public type.
+///
+/// TODO: Implement this on [`UniverseTables`] instead.
 pub(super) trait UniverseTable<T> {
     type Table;
 
@@ -126,10 +128,10 @@ macro_rules! impl_universe_for_member {
             type Table = Storage<$member_type>;
 
             fn table(&self) -> &Storage<$member_type> {
-                &self.$table
+                &self.tables.$table
             }
             fn table_mut(&mut self) -> &mut Storage<$member_type> {
-                &mut self.$table
+                &mut self.tables.$table
             }
         }
 
@@ -171,9 +173,15 @@ macro_rules! impl_universe_for_member {
     };
 }
 
-/// Generates enums which cover all universe types.
-macro_rules! member_enums {
-    ( $( ($member_type:ident), )* ) => {
+/// Generates data structures which cover all universe member types.
+macro_rules! member_enums_and_impls {
+    ( $( ($member_type:ident, $table_name:ident), )* ) => {
+        /// Sub-structure of [`Universe`] that actually stores the members.
+        #[derive(Debug, Default)]
+        pub(super) struct UniverseTables {
+            $( pub(crate) $table_name: Storage<$member_type>, )*
+        }
+
         /// Holds any one of the [`URef`] types that can be in a [`Universe`].
         ///
         /// See also [`URefErased`], which is implemented by `URef`s rather than owning one.
@@ -202,21 +210,20 @@ macro_rules! member_enums {
                 }
             }
         }
+
+        $( impl_universe_for_member!($member_type, $table_name); )*
     }
 }
 
-// This macro only handles trait implementations.
+// This macro does not handle everything.
 // To add another type, it is also necessary to update:
-//    struct Universe
 //    impl Debug for Universe
 //    Universe::get_any
+//    Universe::delete
+//    Universe::gc
 //    Universe::step
 //    transaction::universe_txn::*
-impl_universe_for_member!(BlockDef, blocks);
-impl_universe_for_member!(Character, characters);
-impl_universe_for_member!(Space, spaces);
-
-member_enums!((BlockDef), (Character), (Space),);
+member_enums_and_impls!((BlockDef, blocks), (Character, characters), (Space, spaces),);
 
 impl super::URefErased for AnyURef {
     fn name(&self) -> Name {
