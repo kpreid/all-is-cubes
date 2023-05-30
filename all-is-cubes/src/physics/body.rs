@@ -130,7 +130,10 @@ impl Body {
     /// (constraining possible movement) and `collision_callback` will be called with all
     /// such blocks. It is not guaranteed that `collision_callback` will be called only once
     /// per block.
-    pub fn step<CC>(
+    ///
+    /// This method is private because the exact details of what inputs are required are
+    /// unstable.
+    pub(crate) fn step<CC>(
         &mut self,
         tick: Tick,
         mut colliding_space: Option<&Space>,
