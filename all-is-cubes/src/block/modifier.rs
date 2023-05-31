@@ -81,10 +81,6 @@ impl Modifier {
     ///   current modifier should be applied to.
     /// * `depth` is the current block evaluation recursion depth (which is *not*
     ///   incremented by modifiers; TODO: define a computation limit strategy).
-    ///
-    /// TODO: Arrange some way to not end up re-computing the `voxel_opacity_mask` and other
-    /// derived properties (i.e. we should have some kind of `IncompleteEvaluatedBlock` to pass
-    /// through modifiers)
     pub(crate) fn evaluate(
         &self,
         block: &Block,
