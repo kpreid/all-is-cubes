@@ -1,4 +1,5 @@
 use std::error::Error as _;
+use std::sync::Arc;
 
 use all_is_cubes::block;
 use all_is_cubes::util::assert_send_sync;
@@ -19,7 +20,9 @@ fn errors_are_send_sync() {
 async fn import_unknown_format() {
     let error = load_universe_from_file(
         YieldProgress::noop(),
-        &NonDiskFile::from_name_and_data_source("foo".into(), || Ok(b"nonsense".to_vec())),
+        Arc::new(NonDiskFile::from_name_and_data_source("foo".into(), || {
+            Ok(b"nonsense".to_vec())
+        })),
     )
     .await
     .unwrap_err();

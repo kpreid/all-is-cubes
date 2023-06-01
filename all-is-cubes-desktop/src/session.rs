@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use all_is_cubes::camera::Viewport;
@@ -97,12 +98,15 @@ impl<Ren, Win> DesktopSession<Ren, Win> {
         // TODO: Offer confirmation before replacing the current universe.
         // Also a progress bar and other UI.
         self.session.set_universe_async(async move {
-            all_is_cubes_port::load_universe_from_file(YieldProgress::noop(), &*path)
-                .await
-                .map_err(|e| {
-                    // TODO: show error in user interface
-                    log::error!("Failed to load file '{}':\n{}", path.display(), e);
-                })
+            all_is_cubes_port::load_universe_from_file(
+                YieldProgress::noop(),
+                Arc::new(path.clone()),
+            )
+            .await
+            .map_err(|e| {
+                // TODO: show error in user interface
+                log::error!("Failed to load file '{}':\n{}", path.display(), e);
+            })
         })
     }
 }

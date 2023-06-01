@@ -404,13 +404,15 @@ impl WebGameRoot {
                 spawn_local(async move {
                     match JsFuture::from(found_file.array_buffer()).await {
                         Ok(buffer) => {
-                            let buffer: ArrayBuffer = buffer.dyn_into().unwrap();
+                            let buffer: SendWrapper<ArrayBuffer> =
+                                SendWrapper::new(buffer.dyn_into().unwrap());
                             // TODO: error reporting
                             let universe = all_is_cubes_port::load_universe_from_file(
                                 YieldProgress::noop(),
-                                &NonDiskFile::from_name_and_data_source(found_file.name(), || {
-                                    Ok(Uint8Array::new(&buffer).to_vec())
-                                }),
+                                Arc::new(NonDiskFile::from_name_and_data_source(
+                                    found_file.name(),
+                                    move || Ok(Uint8Array::new(&buffer).to_vec()),
+                                )),
                             )
                             .await
                             .unwrap();

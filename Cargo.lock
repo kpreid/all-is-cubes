@@ -220,6 +220,7 @@ dependencies = [
  "bytemuck",
  "dot_vox",
  "either",
+ "futures-core",
  "gltf-json",
  "itertools",
  "log",

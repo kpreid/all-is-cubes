@@ -1,23 +1,31 @@
 use std::fs;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use all_is_cubes::block;
 use all_is_cubes::universe::{Name, URef};
+use all_is_cubes::util::YieldProgress;
 
-use crate::{export_to_path, load_universe_from_file, BlockDef, ExportSet, Path, YieldProgress};
+use crate::{export_to_path, load_universe_from_file, ExportSet};
 
 #[tokio::test]
 async fn import_export_native_format() {
-    let import_path = Path::new(concat!(
+    let import_path = PathBuf::from(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/src/native/tests/native-test.alliscubesjson"
     ));
-    let universe = load_universe_from_file(YieldProgress::noop(), import_path)
+    let universe = load_universe_from_file(YieldProgress::noop(), Arc::new(import_path.clone()))
         .await
         .unwrap();
 
+    assert_eq!(
+        universe.whence.document_name(),
+        Some(String::from("native-test"))
+    );
+
     // This is *not* a thorough test of `Universe` deserialization.
     // It is just enough to prove that we ran the deserialization code and not something else.
-    let uref: URef<BlockDef> = universe.get(&Name::from("foo")).unwrap();
+    let uref: URef<block::BlockDef> = universe.get(&Name::from("foo")).unwrap();
     assert_eq!(**uref.read().unwrap(), block::AIR);
 
     // Export again.

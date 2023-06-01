@@ -48,6 +48,9 @@
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use futures_core::future::BoxFuture;
 
 use all_is_cubes::block::{self, BlockDef};
 use all_is_cubes::space::Space;
@@ -69,29 +72,40 @@ mod tests;
 /// TODO: Make a from-bytes version of this.
 pub async fn load_universe_from_file(
     progress: YieldProgress,
-    file: impl file::Fileish,
+    file: Arc<dyn file::Fileish>,
 ) -> Result<Universe, ImportError> {
     // TODO: use extension, if any, for format detection
     let bytes = file.read().map_err(|error| ImportError {
-        source_path: file.display_full_path().to_string(),
+        source_path: file.display_full_path(),
         detail: ImportErrorKind::Read { path: None, error },
     })?;
-    if bytes.starts_with(b"{") {
+
+    let (mut universe, save_format) = if bytes.starts_with(b"{") {
         // Assume it's JSON. Furthermore, assume it's ours.
-        native::import_native_json(&bytes, &file)
+        (
+            native::import_native_json(&bytes, &*file)?,
+            Some(ExportFormat::AicJson),
+        )
     } else if bytes.starts_with(b"VOX ") {
-        load_dot_vox(progress, &bytes)
-            .await
-            .map_err(|error| ImportError {
-                source_path: file.display_full_path().to_string(),
-                detail: ImportErrorKind::Parse(Box::new(error)),
-            })
+        (
+            load_dot_vox(progress, &bytes)
+                .await
+                .map_err(|error| ImportError {
+                    source_path: file.display_full_path(),
+                    detail: ImportErrorKind::Parse(Box::new(error)),
+                })?,
+            Some(ExportFormat::DotVox),
+        )
     } else {
-        Err(ImportError {
-            source_path: file.display_full_path().to_string(),
+        return Err(ImportError {
+            source_path: file.display_full_path(),
             detail: ImportErrorKind::UnknownFormat {},
-        })
-    }
+        });
+    };
+
+    universe.whence = Arc::new(PortWhence { file, save_format });
+
+    Ok(universe)
 }
 
 /// Export data specified by an [`ExportSet`] to a file on disk.
@@ -180,6 +194,49 @@ impl ExportSet {
             path.set_file_name(new_file_name);
         }
         path
+    }
+}
+
+/// Implementation of [`WhenceUniverse`] used for this library's formats.
+#[derive(Debug)]
+struct PortWhence {
+    file: Arc<dyn file::Fileish>,
+    save_format: Option<ExportFormat>,
+}
+
+impl all_is_cubes::save::WhenceUniverse for PortWhence {
+    fn document_name(&self) -> Option<String> {
+        Some(self.file.document_name())
+    }
+
+    fn can_load(&self) -> bool {
+        false
+    }
+
+    fn can_save(&self) -> bool {
+        // TODO: implement this along with save()
+        #[allow(unused)]
+        let _ = self.save_format;
+        false
+    }
+
+    fn load(
+        &self,
+        progress: YieldProgress,
+    ) -> BoxFuture<'static, Result<Universe, Box<dyn std::error::Error + Send + Sync>>> {
+        let file = self.file.clone();
+        Box::pin(async move { Ok(load_universe_from_file(progress, file).await?) })
+    }
+
+    fn save(
+        &self,
+        universe: &Universe,
+        progress: YieldProgress,
+    ) -> BoxFuture<'static, Result<(), Box<dyn std::error::Error + Send + Sync>>> {
+        // TODO: in order to implement this we need to be able to write to a `Fileish`
+        // or have an accompanying destination
+        let _ = (universe, progress, self.save_format);
+        todo!();
     }
 }
 

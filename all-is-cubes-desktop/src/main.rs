@@ -34,6 +34,7 @@
 // Crate-specific lint settings.
 // * This crate does not forbid(unsafe_code) because wgpu initialization requires it.
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use all_is_cubes::universe::Universe;
@@ -343,7 +344,7 @@ async fn create_universe(
                 .map_err(anyhow::Error::from)
         }
         UniverseSource::File(path) => {
-            all_is_cubes_port::load_universe_from_file(yield_progress, &*path)
+            all_is_cubes_port::load_universe_from_file(yield_progress, Arc::new(path))
                 .await
                 .map_err(anyhow::Error::from)
         }

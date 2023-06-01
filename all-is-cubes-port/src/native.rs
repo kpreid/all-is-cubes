@@ -12,10 +12,10 @@ mod tests;
 
 pub(crate) fn import_native_json(
     bytes: &[u8],
-    file: &impl Fileish,
+    file: &dyn Fileish,
 ) -> Result<Universe, ImportError> {
     serde_json::from_slice::<Universe>(bytes).map_err(|error| ImportError {
-        source_path: file.display_full_path().to_string(),
+        source_path: file.display_full_path(),
         detail: if error.is_eof() || error.is_io() {
             ImportErrorKind::Read {
                 path: None,

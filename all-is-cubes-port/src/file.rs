@@ -3,16 +3,17 @@
 
 use std::fmt;
 use std::io;
-use std::path;
+use std::path::PathBuf;
 
 /// A “file” that we can load things from and which has a name,
 /// without being tied to the current OS file system.
-pub trait Fileish {
-    /// Type returned by [`Self::display_full_path()`].
-    type Display: fmt::Display;
+pub trait Fileish: fmt::Debug + Send + Sync {
+    /// Path of the file, for display purposes such as in a window title.
+    fn document_name(&self) -> String;
 
-    /// Path of the file, for display purposes.
-    fn display_full_path(&self) -> Self::Display;
+    /// Path of the file, for display purposes such as in an error, not a path that can
+    /// necessarily be opened.
+    fn display_full_path(&self) -> String;
 
     /// Obtains the file contents.
     ///
@@ -23,11 +24,17 @@ pub trait Fileish {
 // TODO: when Rust has generic associated types we will no longer
 // need to implement Fileish for references.
 
-impl<'a> Fileish for &'a path::Path {
-    type Display = path::Display<'a>;
+impl Fileish for PathBuf {
+    fn document_name(&self) -> String {
+        match self.file_stem() {
+            Some(n) => n.to_string_lossy(),
+            None => self.to_string_lossy(),
+        }
+        .into_owned()
+    }
 
-    fn display_full_path(&self) -> Self::Display {
-        self.display()
+    fn display_full_path(&self) -> String {
+        self.display().to_string()
     }
 
     fn read(&self) -> Result<Vec<u8>, io::Error> {
@@ -36,10 +43,18 @@ impl<'a> Fileish for &'a path::Path {
 }
 
 /// General-purpose implementation of [`Fileish`].
-#[derive(Debug)]
 pub struct NonDiskFile<O> {
     name: String,
     opener: O,
+}
+
+impl<O> fmt::Debug for NonDiskFile<O> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { name, opener: _ } = self;
+        f.debug_struct("NonDiskFile")
+            .field("name", name)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<O> NonDiskFile<O> {
@@ -49,14 +64,16 @@ impl<O> NonDiskFile<O> {
     }
 }
 
-impl<'a, O> Fileish for &'a NonDiskFile<O>
+impl<O> Fileish for NonDiskFile<O>
 where
-    O: Fn() -> Result<Vec<u8>, io::Error>,
+    O: Fn() -> Result<Vec<u8>, io::Error> + Send + Sync,
 {
-    type Display = &'a str;
+    fn document_name(&self) -> String {
+        self.name.clone()
+    }
 
-    fn display_full_path(&self) -> Self::Display {
-        &self.name
+    fn display_full_path(&self) -> String {
+        self.name.clone()
     }
 
     fn read(&self) -> Result<Vec<u8>, io::Error> {

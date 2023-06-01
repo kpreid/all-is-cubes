@@ -20,6 +20,7 @@ bench = false
 all-is-cubes = { path = "../all-is-cubes", version = "0.5.0" }
 all-is-cubes-mesh = { path = "../all-is-cubes-mesh", version = "0.5.0" }
 dot_vox = { version = "5.1.1" }
+futures-core = { workspace = true }
 itertools = { workspace = true }
 # TODO: replace logging with explicit reporting data flow
 log = { workspace = true }
