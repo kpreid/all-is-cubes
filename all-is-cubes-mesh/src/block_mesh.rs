@@ -487,13 +487,16 @@ where
                                     // * Compute and use per-face colors in EvaluatedBlock
                                     // * Offer the alternative of generating as much
                                     //   geometry as needed.
-                                    used_any_vertex_colors = true;
                                     *flaws |= Flaws::MISSING_TEXTURES;
                                     QuadColoring::Solid(
                                         options.transparency.limit_alpha(block.color),
                                     )
                                 }
                             };
+
+                            if matches!(coloring, QuadColoring::Solid(_)) {
+                                used_any_vertex_colors = true;
+                            }
 
                             push_quad(
                                 vertices,
@@ -574,9 +577,13 @@ mod tests {
     //! See [`crate::tests`] for additional tests.
 
     use super::*;
-    use crate::{NoTexture, NoTextures};
-    use all_is_cubes::block::Block;
+    use crate::tests::test_block_mesh;
+    use crate::{Coloring, NoTexture, NoTextures};
+    use all_is_cubes::block::{Block, AIR};
     use all_is_cubes::camera::GraphicsOptions;
+    use all_is_cubes::cgmath::EuclideanSpace;
+    use all_is_cubes::math::GridPoint;
+    use all_is_cubes::universe::Universe;
 
     type TestMesh = BlockMesh<BlockVertex<NoTexture>, NoTexture>;
 
@@ -600,5 +607,37 @@ mod tests {
         );
 
         assert!(!mesh.is_empty());
+    }
+
+    #[test]
+    fn voxel_opacity_mask_not_set_with_voxel_colors() {
+        let mut universe = Universe::new();
+        // Define a block which has only solid colored faces, so gets vertex colors
+        let block = Block::builder()
+            .voxels_fn(&mut universe, Resolution::R2, |cube| {
+                if cube == GridPoint::origin() {
+                    AIR
+                } else {
+                    Block::from(Rgba::WHITE)
+                }
+            })
+            .unwrap()
+            .build();
+
+        let mesh = test_block_mesh(block);
+        // Check our setup is correct: the mesh has only vertex colors.
+        assert!(!mesh.is_empty());
+        assert_eq!(
+            mesh.all_face_meshes()
+                .flat_map(|(_, face_mesh)| face_mesh.vertices.iter())
+                .filter(|vertex| matches!(vertex.coloring, Coloring::Texture { .. }))
+                .copied()
+                .collect::<Vec<_>>(),
+            Vec::<BlockVertex<_>>::new(),
+            "expected no textured vertices, only colored ones"
+        );
+
+        // Check what we actually care about: given the vertex colors we must not have a mask.
+        assert!(mesh.voxel_opacity_mask.is_none());
     }
 }

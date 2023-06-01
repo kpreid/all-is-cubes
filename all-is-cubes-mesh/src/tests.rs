@@ -48,7 +48,7 @@ fn v_t(
 }
 
 /// Test helper to create [`BlockMesh`] alone without a `Space`.
-fn test_block_mesh(block: Block) -> BlockMesh<BlockVertex<TtPoint>, TestTextureTile> {
+pub(crate) fn test_block_mesh(block: Block) -> BlockMesh<BlockVertex<TtPoint>, TestTextureTile> {
     BlockMesh::new(
         &block.evaluate().unwrap(),
         &TestTextureAllocator::new(),
