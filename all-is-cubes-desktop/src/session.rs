@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use all_is_cubes::camera::Viewport;
-use all_is_cubes::listen::ListenableCell;
+use all_is_cubes::listen::{DirtyFlag, ListenableCell, Listener};
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::apps::Session;
@@ -42,16 +42,21 @@ pub(crate) struct DesktopSession<Ren, Win> {
     ///
     /// TODO: this should really be in winit-specific (i.e. the `window` field) storage.
     pub(crate) occluded: bool,
+
+    /// Flag for when the `Session` might have changed its `Universe`, or similar changes.
+    ///
+    /// TODO: This ought to be built in to the `Session` itself.
+    session_altered: DirtyFlag,
 }
 
-impl<Ren, Win> DesktopSession<Ren, Win> {
+impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
     pub fn new(
         renderer: Ren,
         window: Win,
         session: Session,
         viewport_cell: ListenableCell<Viewport>,
     ) -> Self {
-        Self {
+        let new_self = Self {
             session,
             renderer,
             window,
@@ -60,7 +65,12 @@ impl<Ren, Win> DesktopSession<Ren, Win> {
             recorder: None,
             audio: None,
             occluded: false,
-        }
+            session_altered: DirtyFlag::new(false),
+        };
+
+        new_self.sync_title();
+
+        new_self
     }
 
     pub fn advance_time_and_maybe_step(&mut self) -> Option<UniverseStepInfo> {
@@ -83,6 +93,10 @@ impl<Ren, Win> DesktopSession<Ren, Win> {
             recorder.capture_frame();
         }
 
+        if self.session_altered.get_and_clear() {
+            self.sync_title();
+        }
+
         step_info
     }
 
@@ -95,10 +109,12 @@ impl<Ren, Win> DesktopSession<Ren, Win> {
     /// command-line behavior as much as is reasonable, and also maybe supports
     /// e.g. importing resources *into* an existing universe.
     pub fn replace_universe_with_file(&mut self, path: PathBuf) {
+        let altered = self.session_altered.listener();
+
         // TODO: Offer confirmation before replacing the current universe.
         // Also a progress bar and other UI.
         self.session.set_universe_async(async move {
-            all_is_cubes_port::load_universe_from_file(
+            let universe = all_is_cubes_port::load_universe_from_file(
                 YieldProgress::noop(),
                 Arc::new(path.clone()),
             )
@@ -106,8 +122,21 @@ impl<Ren, Win> DesktopSession<Ren, Win> {
             .map_err(|e| {
                 // TODO: show error in user interface
                 log::error!("Failed to load file '{}':\n{}", path.display(), e);
-            })
+            })?;
+
+            // TODO: this should be a notification we get from the `Session` instead
+            altered.receive(());
+
+            Ok(universe)
         })
+    }
+
+    fn sync_title(&self) {
+        self.window
+            .set_title(match self.session.universe().whence.document_name() {
+                Some(dn) => format!("{} — {dn}", super::title_and_version()),
+                None => super::title_and_version(),
+            });
     }
 }
 
@@ -137,6 +166,9 @@ mod tests {
             fn drop(&mut self) {
                 self.sender.send(self.message).unwrap();
             }
+        }
+        impl crate::glue::Window for DropLogger {
+            fn set_title(&self, _: String) {}
         }
 
         let (sender, receiver) = std::sync::mpsc::channel();

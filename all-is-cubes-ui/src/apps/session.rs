@@ -150,6 +150,10 @@ impl Session {
         self.game_universe_in_progress = Some(Box::pin(future));
     }
 
+    pub fn universe(&self) -> &Universe {
+        &self.game_universe
+    }
+
     /// Returns a mutable reference to the [`Universe`].
     ///
     /// Note: Replacing the universe will not update the UI and character state.

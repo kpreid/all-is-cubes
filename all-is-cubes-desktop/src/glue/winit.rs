@@ -6,6 +6,12 @@ use all_is_cubes::cgmath::Vector2;
 use all_is_cubes_ui::apps::InputProcessor;
 use winit::window::CursorGrabMode;
 
+impl super::Window for winit::window::Window {
+    fn set_title(&self, title: String) {
+        self.set_title(title.as_str())
+    }
+}
+
 pub fn physical_size_to_viewport(scale_factor: f64, size: PhysicalSize<u32>) -> Viewport {
     let size: Vector2<u32> = Vector2::<u32>::from(<[u32; 2]>::from(size));
     // max(1) because wgpu wants guaranteed nonzero viewports

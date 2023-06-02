@@ -161,6 +161,12 @@ impl Drop for TerminalWindow {
     }
 }
 
+impl crate::glue::Window for TerminalWindow {
+    fn set_title(&self, _: String) {
+        // TODO: add setting title
+    }
+}
+
 fn terminal_thread_loop(output_channel: mpsc::Receiver<OutMsg>, mut state: TerminalState) {
     log::trace!("entering terminal_thread_loop()");
     for command in output_channel {
