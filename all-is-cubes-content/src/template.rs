@@ -1,5 +1,8 @@
 //! First-run game content. (Well, all runs, since we don't have saving yet.)
 
+use std::sync::Arc;
+
+use all_is_cubes::save::WhenceUniverse;
 use macro_rules_attribute::macro_rules_derive;
 use paste::paste;
 
@@ -147,33 +150,39 @@ impl UniverseTemplate {
 
         let default_space_name: Name = "space".into();
 
-        let mut p = Some(p);
-        use UniverseTemplate::*;
-        let maybe_space: Option<Result<Space, InGenError>> = match self {
-            Menu => Some(template_menu(&mut universe)),
-            Blank => None,
-            Fail => Some(Err(InGenError::Other(
-                "the Fail template always fails to generate".into(),
-            ))),
-            DemoCity => Some(demo_city(&mut universe, p.take().unwrap(), params).await),
-            Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), params).await),
-            Islands => Some(islands(&mut universe, p.take().unwrap(), params).await),
-            Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
-            CornellBox => Some(cornell_box()),
-            MengerSponge => Some(menger_sponge(&mut universe, 4)),
-            LightingBench => Some(all_is_cubes::content::testing::lighting_bench_space(
-                &mut universe,
-                params.size.unwrap_or(Vector3::new(54, 16, 54)),
-            )),
-            #[cfg(feature = "arbitrary")]
-            Random => Some(
-                arbitrary_space(&mut universe, p.take().unwrap(), params.seed.unwrap_or(0)).await,
-            ),
-        };
+        let maybe_space = {
+            let params = params.clone();
+            let mut p = Some(p);
+            use UniverseTemplate::*;
+            let maybe_space: Option<Result<Space, InGenError>> = match self {
+                Menu => Some(template_menu(&mut universe)),
+                Blank => None,
+                Fail => Some(Err(InGenError::Other(
+                    "the Fail template always fails to generate".into(),
+                ))),
+                DemoCity => Some(demo_city(&mut universe, p.take().unwrap(), params).await),
+                Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), params).await),
+                Islands => Some(islands(&mut universe, p.take().unwrap(), params).await),
+                Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
+                CornellBox => Some(cornell_box()),
+                MengerSponge => Some(menger_sponge(&mut universe, 4)),
+                LightingBench => Some(all_is_cubes::content::testing::lighting_bench_space(
+                    &mut universe,
+                    params.size.unwrap_or(Vector3::new(54, 16, 54)),
+                )),
+                #[cfg(feature = "arbitrary")]
+                Random => Some(
+                    arbitrary_space(&mut universe, p.take().unwrap(), params.seed.unwrap_or(0))
+                        .await,
+                ),
+            };
 
-        if let Some(p) = p {
-            p.progress(1.0).await;
-        }
+            if let Some(p) = p {
+                p.progress(1.0).await;
+            }
+
+            maybe_space
+        };
 
         // Insert the space and generate the initial character.
         if let Some(space_result) = maybe_space {
@@ -184,6 +193,11 @@ impl UniverseTemplate {
             // player actually uses, and we should replace that or handle it more formally.
             universe.insert("character".into(), Character::spawn_default(space_ref))?;
         }
+
+        universe.whence = Arc::new(TemplateAndParameters {
+            template: self.clone(),
+            parameters: params,
+        });
 
         Ok(universe)
     }
@@ -230,6 +244,55 @@ pub struct TemplateParameters {
     /// If the space cannot be constructed in approximately this size, building the
     /// template should return an error.
     pub size: Option<Vector3<GridCoordinate>>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct TemplateAndParameters {
+    template: UniverseTemplate,
+    parameters: TemplateParameters,
+}
+
+impl WhenceUniverse for TemplateAndParameters {
+    fn document_name(&self) -> Option<String> {
+        Some(self.template.to_string())
+    }
+
+    fn can_load(&self) -> bool {
+        false
+    }
+
+    fn load(
+        &self,
+        progress: YieldProgress,
+    ) -> futures_core::future::BoxFuture<
+        'static,
+        Result<Universe, Box<dyn std::error::Error + Send + Sync>>,
+    > {
+        let ingredients = self.clone();
+        Box::pin(async move {
+            ingredients
+                .template
+                .build(progress, ingredients.parameters)
+                .await
+                .map_err(From::from)
+        })
+    }
+
+    fn can_save(&self) -> bool {
+        false
+    }
+
+    fn save(
+        &self,
+        universe: &Universe,
+        progress: YieldProgress,
+    ) -> futures_core::future::BoxFuture<
+        'static,
+        Result<(), Box<dyn std::error::Error + Send + Sync>>,
+    > {
+        // Delegate to the same error as () would produce. TODO: Have an error enum instead
+        <() as WhenceUniverse>::save(&(), universe, progress)
+    }
 }
 
 // -- Specific templates below this point ---
