@@ -420,7 +420,7 @@ impl Body {
     }
 }
 
-/// Diagnostic data returned by [`Body::step`]. The exact contents of this structure
+/// Diagnostic data returned by `Body::step()`. The exact contents of this structure
 /// are unstable; use only [`Debug`] formatting to examine its contents unless you have
 /// a specific need for one of the values.
 #[derive(Clone, Copy, Debug)]
