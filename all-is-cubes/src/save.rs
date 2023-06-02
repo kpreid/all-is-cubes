@@ -18,8 +18,6 @@ mod tests;
 /// This trait serves as common vocabulary between other high-level components of All is Cubes
 /// (user interface, import/export, and procedural generation); that is why there are no
 /// interesting implementations here in the core crate.
-///
-/// TODO: add ability to request saving
 pub trait WhenceUniverse: fmt::Debug + Send + Sync + downcast_rs::Downcast + 'static {
     /// Returns a string suitable for use as a window title or other user interface element
     /// identifying this universe-document.
