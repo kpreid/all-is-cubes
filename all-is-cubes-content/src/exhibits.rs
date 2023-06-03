@@ -9,7 +9,9 @@ use rand::SeedableRng as _;
 
 use all_is_cubes::block::{
     space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Composite,
-    CompositeOperator, Move, Resolution::*, RotationPlacementRule, Zoom, AIR,
+    CompositeOperator, Move,
+    Resolution::{self, *},
+    RotationPlacementRule, Zoom, AIR,
 };
 use all_is_cubes::cgmath::{
     Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Point3, Rad, Rotation as _,
@@ -33,8 +35,8 @@ use all_is_cubes::drawing::{
 };
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridPoint, GridRotation,
-    GridVector, NotNan, Rgb, Rgba,
+    Aab, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridPoint,
+    GridRotation, GridVector, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -59,6 +61,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     MAKE_SOME_BLOCKS,
     DASHED_BOXES,
     COMPOSITE,
+    DESTRUCTION,
     MOVED_BLOCKS,
     ROTATIONS,
     UI_BLOCKS,
@@ -1206,6 +1209,63 @@ async fn TREES(_: &Exhibit, universe: &mut Universe) {
         space.set(
             [i as GridCoordinate * 2, 0, bounds.lower_bounds().z],
             &landscape_blocks[LandscapeBlocks::Leaves(g)],
+        )?;
+    }
+
+    Ok(space)
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "Block Destruction",
+    subtitle: "Animation prototype",
+)]
+async fn DESTRUCTION(_: &Exhibit, universe: &mut Universe) {
+    let width = 7;
+
+    let footprint = GridAab::from_lower_size([0, 0, 0], [width, 3, 1]);
+    let mut space = Space::empty(footprint);
+
+    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+    let pedestal = &demo_blocks[DemoBlocks::Pedestal];
+    let block_to_destroy = &landscape_blocks[LandscapeBlocks::Grass];
+
+    fn generate_destruction_mask(
+        universe: &mut Universe,
+        resolution: Resolution,
+        fraction: f64,
+    ) -> Result<Block, InGenError> {
+        let solid = Block::from(Rgba::WHITE);
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3887829);
+        let points: [_; 32] = std::array::from_fn(|_| {
+            let free_point = Aab::from_cube(GridPoint::origin()).random_point(&mut rng);
+            (
+                free_point,
+                if free_point.y > fraction {
+                    AIR
+                } else {
+                    solid.clone()
+                },
+            )
+        });
+        let pattern = crate::voronoi_pattern(resolution, false, &points);
+
+        Ok(Block::builder()
+            .voxels_fn(universe, resolution, pattern)?
+            .build())
+    }
+
+    for stage in 0i32..width {
+        let mask = generate_destruction_mask(universe, R16, (stage as f64 + 0.5) / width as f64)?;
+        let destroyed = block_to_destroy
+            .clone()
+            .with_modifier(Composite::new(mask, CompositeOperator::In).reversed());
+
+        stack(
+            &mut space,
+            GridPoint::new(stage, 0, 0),
+            [pedestal, &destroyed],
         )?;
     }
 
