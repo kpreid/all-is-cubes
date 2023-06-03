@@ -624,12 +624,13 @@ async fn COMPOSITE(_: &Exhibit, universe: &mut Universe) {
         &demo_blocks[DemoBlocks::GlassBlock],
         &demo_blocks[DemoBlocks::LamppostBase],
     ];
+    let operators = [CompositeOperator::Over, CompositeOperator::In];
 
     let mut space = Space::empty(GridAab::from_lower_upper(
         [0, 0, 0],
         [
             destinations.len() as GridCoordinate * 2,
-            3,
+            operators.len() as GridCoordinate * 3,
             sources.len() as GridCoordinate * 2,
         ],
     ));
@@ -637,42 +638,48 @@ async fn COMPOSITE(_: &Exhibit, universe: &mut Universe) {
 
     for (di, destination) in destinations.into_iter().enumerate() {
         for (si, source) in sources.into_iter().enumerate() {
-            let composite = destination.clone().with_modifier(Composite::new(
-                source.clone().rotate(GridRotation::CLOCKWISE),
-                CompositeOperator::Over,
-            ));
+            for (oi, operator) in operators.into_iter().enumerate() {
+                let composite = destination.clone().with_modifier(Composite::new(
+                    source.clone().rotate(GridRotation::CLOCKWISE),
+                    operator,
+                ));
 
-            // TODO: stop using draw_to_blocks for these in favor of widgets?
-            // or at least extract this to a function since 3 exhibits have them
-            let label_str = format!(
-                "{s}\nover\n{d}",
-                s = source.evaluate().unwrap().attributes.display_name,
-                d = destination.evaluate().unwrap().attributes.display_name
-            );
-            let label = draw_to_blocks(
-                universe,
-                R64,
-                0,
-                0..1,
-                BlockAttributes {
-                    display_name: label_str.clone().into(),
-                    collision: BlockCollision::None,
-                    ..BlockAttributes::default()
-                },
-                &Text::with_baseline(
-                    &label_str,
-                    Point::new(0, -(1 + 10 * 3)), // 3 lines above the bottom
-                    MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
-                    Baseline::Top,
-                ),
-            )?[GridPoint::origin()]
-            .clone();
+                // TODO: stop using draw_to_blocks for these in favor of widgets?
+                // or at least extract this to a function since 3 exhibits have them
+                let label_str = format!(
+                    "{s}\n{operator:?}\n{d}",
+                    s = source.evaluate().unwrap().attributes.display_name,
+                    d = destination.evaluate().unwrap().attributes.display_name
+                );
+                let label = draw_to_blocks(
+                    universe,
+                    R64,
+                    0,
+                    0..1,
+                    BlockAttributes {
+                        display_name: label_str.clone().into(),
+                        collision: BlockCollision::None,
+                        ..BlockAttributes::default()
+                    },
+                    &Text::with_baseline(
+                        &label_str,
+                        Point::new(0, -(1 + 10 * 3)), // 3 lines above the bottom
+                        MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
+                        Baseline::Top,
+                    ),
+                )?[GridPoint::origin()]
+                .clone();
 
-            stack(
-                &mut space,
-                GridPoint::new(di as GridCoordinate * 2, 0, si as GridCoordinate * 2),
-                [pedestal, &composite, &label],
-            )?;
+                stack(
+                    &mut space,
+                    GridPoint::new(
+                        di as GridCoordinate * 2,
+                        oi as GridCoordinate * 3,
+                        si as GridCoordinate * 2,
+                    ),
+                    [if oi == 0 { pedestal } else { &AIR }, &composite, &label],
+                )?;
+            }
         }
     }
     Ok(space)

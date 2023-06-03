@@ -214,6 +214,12 @@ pub enum CompositeOperator {
     /// Porter-Duff “over”. If both source and destination are opaque, the source is taken;
     /// otherwise the destination is taken.
     Over,
+
+    /// Porter-Duff “in”. If both source and destination are opaque, the source is taken;
+    /// otherwise the result is transparent. Thus the destination acts as a mask constraining
+    /// where the source is present; the source is “in” the destination.
+    /// The destination's color is not used.
+    In,
     // /// Split the volume in half on the plane perpendicular to `[1, 0, 1]`; all voxels
     // /// on the side nearer to the origin are taken from the destination, and all voxels
     // /// on the farther side or exactly on the plane are taken from the source.
@@ -233,6 +239,10 @@ impl CompositeOperator {
                 let rgb = source.to_rgb() * sa + destination.to_rgb() * sa_complement;
                 rgb.with_alpha(sa + sa_complement * destination.alpha())
             }
+
+            Self::In => source
+                .to_rgb()
+                .with_alpha(source.alpha() * destination.alpha()),
         }
     }
 
