@@ -135,7 +135,7 @@ pub async fn install_landscape_blocks(
             scale_color(colors[Stone].clone(), rng.gen_range(0.9..1.1), 0.02),
         )
     });
-    let stone_pattern = voronoi_pattern(resolution, &stone_points);
+    let stone_pattern = voronoi_pattern(resolution, true, &stone_points);
 
     // TODO: give dirt a palette of varying hue and saturation
     let dirt_points: [_; 1024] = std::array::from_fn(|_| {
@@ -144,7 +144,7 @@ pub async fn install_landscape_blocks(
             scale_color(colors[Dirt].clone(), rng.gen_range(0.9..1.1), 0.02),
         )
     });
-    let dirt_pattern = voronoi_pattern(resolution, &dirt_points);
+    let dirt_pattern = voronoi_pattern(resolution, true, &dirt_points);
 
     // TODO: needs a tiling and abruptly-changing pattern -- perhaps a coordinate-streched voronoi noise instead
     let bark_noise = {

@@ -75,7 +75,8 @@ mod tree;
 pub use all_is_cubes::content::*;
 
 /// Create a function to define texture in a block, based on a set of points
-/// to form a _tiled_ 3D Voronoi diagram.
+/// to form a 3D Voronoi diagram, optionally wrapping around the boundaries for
+/// seamless tiling.
 ///
 /// The points' coordinates should be in the range 0 to 1.
 ///
@@ -83,6 +84,7 @@ pub use all_is_cubes::content::*;
 /// each point to refer to a pattern of its own to delegate to.
 pub(crate) fn voronoi_pattern<'a>(
     resolution: Resolution,
+    wrapping: bool,
     // TODO: not a well-founded choice of iterator type, just convenient
     points: impl IntoIterator<Item = &'a (Point3<FreeCoordinate>, Block)> + Clone,
 ) -> impl Fn(GridPoint) -> &'a Block {
@@ -111,6 +113,12 @@ pub(crate) fn voronoi_pattern<'a>(
         while let Some(cube) = flood_fill_todo.iter().next().copied() {
             flood_fill_todo.remove(&cube);
             let cube_wrapped = cube.map(|component| component.rem_euclid(resolution.into()));
+
+            if !wrapping && cube_wrapped != cube {
+                // If we are not wrapping, then stop filling when out of bounds.
+                continue;
+            }
+
             let test_point = cube_to_midpoint(cube);
 
             let offset = test_point - region_point;
