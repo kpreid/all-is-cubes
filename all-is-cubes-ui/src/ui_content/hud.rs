@@ -14,10 +14,11 @@ use all_is_cubes::universe::{URef, Universe};
 use all_is_cubes::util::YieldProgress;
 
 use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
-use crate::vui::options::{graphics_options_widgets, pause_toggle_button, OptionsStyle};
-use crate::vui::pages::open_page_button;
-use crate::vui::widgets::{self, BoxStyle, Crosshair, TooltipState};
-use crate::vui::{CueNotifier, LayoutTree, UiBlocks, VuiMessage, VuiPageState, Widget, WidgetTree};
+use crate::ui_content::options::{graphics_options_widgets, pause_toggle_button, OptionsStyle};
+use crate::ui_content::pages::open_page_button;
+use crate::ui_content::{CueNotifier, VuiMessage, VuiPageState};
+use crate::vui::widgets::{self, BoxStyle, TooltipState};
+use crate::vui::{LayoutTree, UiBlocks, Widget, WidgetTree};
 
 pub(crate) use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
@@ -68,7 +69,7 @@ pub(super) fn new_hud_widget_tree(
         universe,
     );
     let hud_widget_tree: WidgetTree = Arc::new(LayoutTree::Hud {
-        crosshair: LayoutTree::leaf(Crosshair::new(
+        crosshair: LayoutTree::leaf(widgets::Crosshair::new(
             hud_inputs.hud_blocks.blocks[UiBlocks::Crosshair].clone(),
             hud_inputs.mouselook_mode.clone(),
         )),

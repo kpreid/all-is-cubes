@@ -51,4 +51,5 @@
 
 pub mod apps;
 pub mod logo;
+mod ui_content;
 pub mod vui;

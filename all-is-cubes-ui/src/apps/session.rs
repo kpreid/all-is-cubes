@@ -20,7 +20,7 @@ use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
 use all_is_cubes::util::{CustomFormat, StatusText};
 
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
-use crate::vui::Vui;
+use crate::ui_content::Vui;
 
 const LOG_FIRST_FRAMES: bool = false;
 

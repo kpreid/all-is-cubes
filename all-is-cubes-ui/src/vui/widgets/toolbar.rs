@@ -21,11 +21,11 @@ use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge as _;
 use all_is_cubes::universe::{URef, Universe};
 
+use crate::ui_content::{hud::HudBlocks, CueMessage, CueNotifier};
 use crate::vui::blocks::ToolbarButtonState;
-use crate::vui::hud::HudBlocks;
 use crate::vui::{
-    CueMessage, CueNotifier, InstallVuiError, LayoutRequest, Layoutable, UiBlocks, Widget,
-    WidgetController, WidgetTransaction,
+    InstallVuiError, LayoutRequest, Layoutable, UiBlocks, Widget, WidgetController,
+    WidgetTransaction,
 };
 
 /// Widget that displays inventory contents in toolbar format.

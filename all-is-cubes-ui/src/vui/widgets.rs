@@ -43,22 +43,6 @@ impl vui::WidgetController for OneshotController {
     // TODO: Arrange somehow for this controller to be deleted since it doesn't need to be step()ped
 }
 
-/// A one-cube action button which performs the VUI 'back' action.
-pub(crate) fn back_button(hud_inputs: &vui::HudInputs) -> vui::WidgetTree {
-    // TODO: define a narrower set of inputs than HudInputs
-    // TODO: this function should maybe live in a 'UI mid-level components' module?
-    vui::LayoutTree::leaf(ActionButton::new(
-        hud_inputs.hud_blocks.blocks[vui::UiBlocks::BackButtonLabel].clone(),
-        &hud_inputs.hud_blocks.blocks,
-        {
-            let cc = hud_inputs.vui_control_channel.clone();
-            move || {
-                let _ignore_errors = cc.send(vui::VuiMessage::Back);
-            }
-        },
-    ))
-}
-
 /// A block may act as a 1×1×1 non-interactive widget.
 impl vui::Widget for Block {
     fn controller(self: Arc<Self>, grant: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {

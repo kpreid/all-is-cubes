@@ -19,7 +19,7 @@ use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{URef, Universe};
 
-use crate::vui::hud::{HudBlocks, HudFont};
+use crate::ui_content::hud::{HudBlocks, HudFont};
 use crate::vui::{LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction};
 
 static EMPTY_ARC_STR: Lazy<Arc<str>> = Lazy::new(|| "".into());

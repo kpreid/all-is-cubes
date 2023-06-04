@@ -10,7 +10,7 @@ use all_is_cubes::space::{SpaceBuilder, SpacePhysics};
 use all_is_cubes::universe::{Name, URef};
 
 use crate::apps::ControlMessage;
-use crate::vui::hud::HudInputs;
+use crate::ui_content::hud::HudInputs;
 use crate::vui::{self, widgets};
 use crate::vui::{LayoutTree, UiBlocks, Widget, WidgetTree};
 
