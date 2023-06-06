@@ -17,7 +17,7 @@ use crate::space::{
 };
 use crate::time::{practically_infinite_deadline, Tick};
 use crate::transaction;
-use crate::universe::{Name, RefError, Universe, UniverseTransaction};
+use crate::universe::{Name, RefError, URef, Universe, UniverseTransaction};
 
 // TODO: test consistency between the index and get_* methods
 // TODO: test fill() equivalence and error handling
@@ -72,27 +72,19 @@ fn set_failure_out_of_bounds() {
     space.consistency_check(); // bonus testing
 }
 
-/// This test case should also cover `RefError::Gone`.
+/// This test case should also cover `RefError::InUse` and other evaluation errors.
 #[test]
-fn set_failure_borrow() {
-    let mut u = Universe::new();
-    let inner_space_ref = u
-        .insert("bs".into(), Space::empty_positive(1, 1, 1))
-        .unwrap();
+fn set_failure_eval_error_gone() {
+    let inner_space_ref = URef::<Space>::new_gone("bs".into());
     let block = Block::builder()
         .voxels_ref(R1, inner_space_ref.clone())
         .build();
     let mut outer_space = Space::empty_positive(1, 1, 1);
 
-    inner_space_ref
-        .try_modify(|_| {
-            // Try to use `block` while we are allegedly mutating `inner_space`.
-            assert_eq!(
-                outer_space.set((0, 0, 0), &block),
-                Err(SetCubeError::EvalBlock(RefError::InUse("bs".into()).into()))
-            );
-        })
-        .unwrap();
+    assert_eq!(
+        outer_space.set((0, 0, 0), &block),
+        Err(SetCubeError::EvalBlock(RefError::Gone("bs".into()).into()))
+    );
 
     outer_space.consistency_check(); // bonus testing
 }
