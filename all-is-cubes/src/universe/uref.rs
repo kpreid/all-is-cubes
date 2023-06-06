@@ -58,6 +58,13 @@ enum State<T> {
         /// changing the state.
         strong: StrongEntryRef<T>,
     },
+
+    /// Halfway inserted into a [`Universe`], and may not yet have a value, because it
+    /// is a reference that is being deserialized.
+    ///
+    /// May transition to [`State::Member`] when the [`Universe`] is fully deserialized.
+    Deserializing { name: Name, universe_id: UniverseId },
+
     /// In a [`Universe`] (or has been deleted from one).
     Member {
         /// Name of this member within the [`Universe`].
@@ -90,7 +97,7 @@ impl<T: 'static> URef<T> {
     /// TODO: Actually inserting these into a [`Universe`] is not yet implemented.
     pub fn new_pending(name: Name, initial_value: T) -> Self {
         let strong_ref = Arc::new(RwLock::new(UEntry {
-            data: initial_value,
+            data: Some(initial_value),
         }));
         URef {
             weak_ref: Arc::downgrade(&strong_ref),
@@ -123,6 +130,7 @@ impl<T: 'static> URef<T> {
     pub fn name(&self) -> Name {
         match self.state.lock().as_deref() {
             Ok(State::Pending { name, .. }) => name.clone(),
+            Ok(State::Deserializing { name, .. }) => name.clone(),
             Ok(State::Member { name, .. }) => name.clone(),
             Ok(State::Gone { name }) => name.clone(),
             Err(_) => Name::Pending,
@@ -138,6 +146,7 @@ impl<T: 'static> URef<T> {
     pub fn universe_id(&self) -> Option<UniverseId> {
         match *self.state.lock().ok()? {
             State::Pending { .. } => None,
+            State::Deserializing { universe_id, .. } => Some(universe_id),
             State::Member { universe_id, .. } => Some(universe_id),
             State::Gone { .. } => None,
         }
@@ -148,7 +157,13 @@ impl<T: 'static> URef<T> {
     /// TODO: There is not currently any way to block on / wait for read access.
     pub fn read(&self) -> Result<UBorrow<T>, RefError> {
         let inner = UBorrowImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
-            strong.try_read().map_err(|_| RefError::InUse(self.name()))
+            let lock_guard = strong
+                .try_read()
+                .map_err(|_| RefError::InUse(self.name()))?;
+            if lock_guard.data.is_none() {
+                return Err(RefError::NotReady(self.name()));
+            }
+            Ok(lock_guard)
         })?;
         Ok(UBorrow(inner))
     }
@@ -167,10 +182,24 @@ impl<T: 'static> URef<T> {
         F: FnOnce(&mut T) -> Out,
     {
         let strong: Arc<RwLock<UEntry<T>>> = self.upgrade()?;
-        let mut borrow = strong
+        let mut guard = strong
             .try_write()
             .map_err(|_| RefError::InUse(self.name()))?;
-        Ok(function(&mut borrow.data))
+        let data: &mut T = guard
+            .data
+            .as_mut()
+            .ok_or_else(|| RefError::NotReady(self.name()))?;
+        Ok(function(data))
+    }
+
+    pub(crate) fn insert_value_from_deserialization(&self, new_data: T) -> Result<(), RefError> {
+        let strong: Arc<RwLock<UEntry<T>>> = self.upgrade()?;
+        let mut guard = strong
+            .try_write()
+            .map_err(|_| RefError::InUse(self.name()))?;
+        assert!(guard.data.is_none()); // TODO: should this be an error return?
+        guard.data = Some(new_data);
+        Ok(())
     }
 
     /// Gain mutable access but don't use it immediately.
@@ -180,7 +209,13 @@ impl<T: 'static> URef<T> {
     /// purposes.
     pub(crate) fn try_borrow_mut(&self) -> Result<UBorrowMutImpl<T>, RefError> {
         UBorrowMutImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
-            strong.try_write().map_err(|_| RefError::InUse(self.name()))
+            let lock_guard = strong
+                .try_write()
+                .map_err(|_| RefError::InUse(self.name()))?;
+            if lock_guard.data.is_none() {
+                return Err(RefError::NotReady(self.name()));
+            }
+            Ok(lock_guard)
         })
     }
 
@@ -229,7 +264,7 @@ impl<T: 'static> URef<T> {
         match self.state.lock() {
             Ok(state_guard) => match &*state_guard {
                 State::Pending { .. } => {}
-                State::Member { .. } => {
+                State::Member { .. } | State::Deserializing { .. } => {
                     return Err(PreconditionFailed {
                         location: "UniverseTransaction",
                         problem: "insert(): the URef is already in a universe",
@@ -277,6 +312,9 @@ impl<T: 'static> URef<T> {
                     problem: "insert(): the URef is currently being mutated",
                 })
             }
+            Err(RefError::NotReady(_)) => {
+                unreachable!("tried to insert a URef from deserialization via transaction")
+            }
             Err(RefError::Gone(_)) => {
                 return Err(PreconditionFailed {
                     location: "UniverseTransaction",
@@ -303,7 +341,7 @@ impl<T: 'static> URef<T> {
                     kind: InsertErrorKind::Gone,
                 })
             }
-            State::Member { name, .. } => {
+            State::Member { name, .. } | State::Deserializing { name, .. } => {
                 return Err(InsertError {
                     name: name.clone(),
                     kind: InsertErrorKind::AlreadyInserted,
@@ -343,7 +381,10 @@ impl<T: fmt::Debug + 'static> fmt::Debug for URef<T> {
                             // TODO: maybe only do it if we are in alternate/prettyprint format.
                             write!(f, " = ")?;
                             match strong.try_read() {
-                                Ok(uentry) => fmt::Debug::fmt(&uentry.data, f)?,
+                                Ok(uentry_guard) => match &uentry_guard.deref().data {
+                                    Some(data) => fmt::Debug::fmt(&data, f)?,
+                                    None => write!(f, "<data not yet set>")?,
+                                },
                                 Err(e) => write!(f, "<entry lock error: {e}>")?,
                             }
                         }
@@ -414,15 +455,25 @@ impl<'a, T: arbitrary::Arbitrary<'a> + 'static> arbitrary::Arbitrary<'a> for URe
 }
 
 /// Errors resulting from attempting to borrow/dereference a [`URef`].
-#[allow(clippy::exhaustive_enums)] // If this has to change it will be a major semantic change
 #[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
+#[non_exhaustive]
 pub enum RefError {
     /// Target was deleted, or its entire universe was dropped.
     #[error("object was deleted: {0}")]
     Gone(Name),
+
     /// Target is currently incompatibly borrowed.
-    #[error("object was in use at the same time: {0}")]
+    #[error("object is currently in use: {0}")]
     InUse(Name),
+
+    /// Target does not have its data yet, which means that a serialized universe had
+    /// a reference to it but not its definition.
+    ///
+    /// This can only happen during deserialization (and the error text will not actually
+    /// appear because it is adjusted elsewhere)
+    #[doc(hidden)]
+    #[error("object was referenced but not defined: {0}")]
+    NotReady(Name),
 }
 
 /// A wrapper type for an immutably borrowed value from an [`URef`].
@@ -436,7 +487,11 @@ impl<T: fmt::Debug> fmt::Debug for UBorrow<T> {
 impl<T> Deref for UBorrow<T> {
     type Target = T;
     fn deref(&self) -> &T {
-        &self.0.borrow_guard().data
+        self.0
+            .borrow_guard()
+            .data
+            .as_ref()
+            .expect("can't happen: UBorrow lost its data")
     }
 }
 impl<T> AsRef<T> for UBorrow<T> {
@@ -478,16 +533,25 @@ impl<T> UBorrowMutImpl<T> {
     where
         F: FnOnce(&mut T) -> Out,
     {
-        self.with_guard_mut(|entry| function(&mut entry.data))
+        self.with_guard_mut(|entry| {
+            function(
+                entry
+                    .data
+                    .as_mut()
+                    .expect("can't happen: UBorrowMut lost its data"),
+            )
+        })
     }
 }
 
-/// The data of an entry in a `Universe`.
+/// The actual mutable data of a universe member, that can be accessed via [`URef`].
 #[derive(Debug)]
 struct UEntry<T> {
-    // TODO: It might make more sense for data to be a RwLock<T> (instead of the
-    // RwLock containing UEntry), but we don't have enough examples to be certain yet.
-    data: T,
+    /// Actual value of type `T`.
+    ///
+    /// If [`None`], then the universe is being deserialized and the data for this member
+    /// is not yet available.
+    data: Option<T>,
 }
 
 /// The unique reference to an entry in a [`Universe`] from that `Universe`.
@@ -495,7 +559,7 @@ struct UEntry<T> {
 ///
 /// This is essentially a strong-reference version of [`URef`] (which is weak).
 #[derive(Debug)]
-pub(super) struct URootRef<T> {
+pub(crate) struct URootRef<T> {
     strong_ref: StrongEntryRef<T>,
     state: Arc<Mutex<State<T>>>,
 }
@@ -504,9 +568,17 @@ impl<T> URootRef<T> {
     pub(super) fn new(universe_id: UniverseId, name: Name, initial_value: T) -> Self {
         URootRef {
             strong_ref: Arc::new(RwLock::new(UEntry {
-                data: initial_value,
+                data: Some(initial_value),
             })),
             state: Arc::new(Mutex::new(State::Member { name, universe_id })),
+        }
+    }
+
+    /// Construct a root with no value for mid-deserialization states.
+    pub(super) fn new_deserializing(universe_id: UniverseId, name: Name) -> Self {
+        URootRef {
+            strong_ref: Arc::new(RwLock::new(UEntry { data: None })),
+            state: Arc::new(Mutex::new(State::Deserializing { name, universe_id })),
         }
     }
 
@@ -533,8 +605,21 @@ impl<T> URootRef<T> {
 pub trait URefErased: core::any::Any {
     /// Same as [`URef::name()`].
     fn name(&self) -> Name;
+
     /// Same as [`URef::universe_id()`].
     fn universe_id(&self) -> Option<UniverseId>;
+
+    /// If this [`URef`] is the result of deserialization, fix its state to actually
+    /// point to the other member rather than only having the name.
+    ///
+    /// This method is hidden and cannot actually be called from outside the crate;
+    /// it is part of the trait so that it is possible to call this through [`VisitRefs`].
+    #[doc(hidden)]
+    fn fix_deserialized(
+        &self,
+        expected_universe_id: UniverseId,
+        privacy_token: URefErasedInternalToken,
+    ) -> Result<(), RefError>;
 }
 
 impl<T: 'static> URefErased for URef<T> {
@@ -544,7 +629,41 @@ impl<T: 'static> URefErased for URef<T> {
     fn universe_id(&self) -> Option<UniverseId> {
         URef::universe_id(self)
     }
+
+    #[doc(hidden)]
+    fn fix_deserialized(
+        &self,
+        expected_universe_id: UniverseId,
+        _privacy_token: URefErasedInternalToken,
+    ) -> Result<(), RefError> {
+        // TODO: Make this fail if the value hasn't actually been provided
+
+        let mut state_guard: std::sync::MutexGuard<'_, State<T>> =
+            self.state.lock().expect("URef::state lock error");
+
+        match &*state_guard {
+            &State::Deserializing {
+                ref name,
+                universe_id,
+            } => {
+                assert_eq!(universe_id, expected_universe_id);
+                let name = name.clone();
+                *state_guard = State::Member { name, universe_id }
+            }
+            _ => {}
+        }
+
+        Ok(())
+    }
 }
+
+mod private {
+    /// Private type making it impossible to call [`URefErased::connect_deserialized`] outside
+    /// the crate.
+    #[derive(Debug)]
+    pub struct URefErasedInternalToken;
+}
+pub(crate) use private::URefErasedInternalToken;
 
 #[cfg(test)]
 mod tests {
@@ -653,7 +772,7 @@ mod tests {
     fn ref_error_format() {
         assert_eq!(
             RefError::InUse("foo".into()).to_string(),
-            "object was in use at the same time: 'foo'"
+            "object is currently in use: 'foo'"
         );
         assert_eq!(
             RefError::Gone("foo".into()).to_string(),

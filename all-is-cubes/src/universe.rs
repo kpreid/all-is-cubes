@@ -276,6 +276,48 @@ impl Universe {
         UniverseOps::insert(self, name, value)
     }
 
+    /// Returns a `URef` to a member whose referent may or may not be deserialized yet.
+    pub(crate) fn get_or_insert_deserializing<T>(
+        &mut self,
+        name: Name,
+    ) -> Result<URef<T>, InsertError>
+    where
+        Self: UniverseTable<T, Table = Storage<T>>,
+    {
+        let id = self.id;
+        match name {
+            Name::Pending => {
+                return Err(InsertError {
+                    name,
+                    kind: InsertErrorKind::InvalidName,
+                })
+            }
+            Name::Specific(_) | Name::Anonym(_) => {}
+        }
+        match <Universe as UniverseTable<T>>::table_mut(self).entry(name.clone()) {
+            std::collections::btree_map::Entry::Occupied(oe) => Ok(oe.get().downgrade()),
+            std::collections::btree_map::Entry::Vacant(ve) => {
+                let root_ref = URootRef::new_deserializing(id, name);
+                let returned_ref = root_ref.downgrade();
+                ve.insert(root_ref);
+                Ok(returned_ref)
+            }
+        }
+    }
+
+    /// As `insert()`, but for assigning values to names that _might_ have gotten
+    /// [`Self::get_or_insert_deserializing()`] called on them.
+    pub(crate) fn insert_deserialized<T>(&mut self, name: Name, value: T) -> Result<(), InsertError>
+    where
+        Self: UniverseTable<T, Table = Storage<T>>,
+        T: 'static,
+    {
+        self.get_or_insert_deserializing(name)?
+            .insert_value_from_deserialization(value)
+            .unwrap(); // TODO: can error actually happen here?
+        Ok(())
+    }
+
     /// Iterate over all of the objects of type `T`.
     /// Note that this includes anonymous objects.
     ///
@@ -389,6 +431,47 @@ impl Universe {
         gc_members(characters);
         gc_members(spaces);
     }
+
+    /// Traverse all members and find [`URef`]s that were deserialized in disconnected form.
+    /// Each one needs to have its state adjusted and checked that it actually exists.
+    pub(crate) fn fix_deserialized_refs(&mut self) -> Result<(), DeserializeRefsError> {
+        let visitor = &mut |maybe_broken_ref: &dyn URefErased| {
+            let _result = maybe_broken_ref.fix_deserialized(self.id, URefErasedInternalToken);
+            // TODO: propagate errors usefully
+        };
+
+        let UniverseTables {
+            blocks,
+            characters,
+            spaces,
+        } = &self.tables;
+
+        fix_refs_in_members(visitor, blocks)?;
+        fix_refs_in_members(visitor, characters)?;
+        fix_refs_in_members(visitor, spaces)?;
+
+        fn fix_refs_in_members<T: VisitRefs + 'static>(
+            visitor: &mut dyn RefVisitor,
+            storage: &Storage<T>,
+        ) -> Result<(), DeserializeRefsError> {
+            for root in storage.values() {
+                // Besides allowing us to visit the refs, this read() has the side effect
+                // of discovering any missing referents, because they will have been
+                // inserted but not given a value.
+                //
+                // TODO: Gather information from other members to learn which member
+                // contained the bad reference.
+                let member_value = root.downgrade().read().map_err(|e| match e {
+                    RefError::NotReady(name) => DeserializeRefsError { to: name },
+                    _ => unreachable!(),
+                })?;
+                member_value.visit_refs(visitor);
+            }
+            Ok(())
+        }
+
+        Ok(())
+    }
 }
 
 impl fmt::Debug for Universe {
@@ -470,6 +553,13 @@ impl fmt::Display for InsertError {
             InsertErrorKind::AlreadyInserted => write!(f, "the object {name} is already inserted"),
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[error("data contains a reference to {to} that was not defined")]
+pub(crate) struct DeserializeRefsError {
+    /// Name in the bad reference.
+    to: Name,
 }
 
 /// Performance data returned by [`Universe::step`]. The exact contents of this structure

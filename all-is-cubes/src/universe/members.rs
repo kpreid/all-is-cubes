@@ -15,7 +15,7 @@ use crate::util::CustomFormat as _;
 
 /// A `BTreeMap` is used to ensure that the iteration order is deterministic across
 /// runs/versions.
-pub(super) type Storage<T> = BTreeMap<Name, URootRef<T>>;
+pub(crate) type Storage<T> = BTreeMap<Name, URootRef<T>>;
 
 /// Trait for every type which can be a named member of a universe.
 ///
@@ -37,7 +37,7 @@ pub trait UniverseMember: Sized + 'static {
 /// thus, the `Table` associated type does not need to be a public type.
 ///
 /// TODO: Implement this on [`UniverseTables`] instead.
-pub(super) trait UniverseTable<T> {
+pub(crate) trait UniverseTable<T> {
     type Table;
 
     fn table(&self) -> &Self::Table;
@@ -240,6 +240,15 @@ impl super::URefErased for AnyURef {
     }
     fn universe_id(&self) -> Option<super::UniverseId> {
         self.as_erased().universe_id()
+    }
+
+    fn fix_deserialized(
+        &self,
+        universe_id: super::UniverseId,
+        privacy_token: super::URefErasedInternalToken,
+    ) -> Result<(), super::RefError> {
+        self.as_erased()
+            .fix_deserialized(universe_id, privacy_token)
     }
 }
 

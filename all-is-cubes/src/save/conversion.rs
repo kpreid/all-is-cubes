@@ -438,8 +438,9 @@ mod universe {
     use crate::character::Character;
     use crate::save::schema::MemberEntrySer;
     use crate::space::Space;
-    use crate::universe::{Name, PartialUniverse, UBorrow, URef, Universe};
+    use crate::universe::{self, Name, PartialUniverse, UBorrow, URef, Universe};
     use schema::{MemberDe, NameSer, URefSer};
+    use std::cell::RefCell;
 
     impl From<&BlockDef> for schema::MemberSer {
         fn from(block_def: &BlockDef) -> Self {
@@ -498,24 +499,46 @@ mod universe {
 
     impl<'de> Deserialize<'de> for Universe {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            let data = schema::UniverseDe::deserialize(deserializer)?;
-            let mut universe = Universe::new();
+            let (data, mut universe) = {
+                let scope = ContextScope::install(DeContext {
+                    universe: Universe::new(),
+                });
+                let data = schema::UniverseDe::deserialize(deserializer)?;
+                let universe = scope.take().universe;
+                (data, universe)
+            };
+
             match data {
                 schema::UniverseDe::UniverseV1 { members } => {
                     for schema::MemberEntrySer { name, value } in members {
                         match value {
-                            MemberDe::BlockDef(block) => {
-                                universe.insert(name, BlockDef::new(block)).map(|_| ())
-                            }
+                            MemberDe::BlockDef(block) => universe
+                                .insert_deserialized(name, BlockDef::new(block))
+                                .map(|_| ()),
                             MemberDe::Character(character) => {
-                                universe.insert(name, character).map(|_| ())
+                                universe.insert_deserialized(name, character).map(|_| ())
                             }
-                            MemberDe::Space(space) => universe.insert(name, space).map(|_| ()),
+                            MemberDe::Space(space) => {
+                                universe.insert_deserialized(name, space).map(|_| ())
+                            }
                         }
                         .expect("insertion from deserialization failed");
                     }
                 }
             }
+
+            universe
+                .fix_deserialized_refs()
+                .map_err(serde::de::Error::custom)?;
+
+            // Perform a paused step to let things do re-initialization,
+            // such as `Space` block evaluation, without actually causing any in-game time
+            // to pass.
+            universe.step(
+                crate::time::Tick::from_seconds(0.0).pause(),
+                instant::Instant::now(),
+            );
+
             Ok(universe)
         }
     }
@@ -526,13 +549,31 @@ mod universe {
         }
     }
 
-    impl<'de, T: 'static> Deserialize<'de> for URef<T> {
+    impl<'de, T: 'static> Deserialize<'de> for URef<T>
+    where
+        Universe: universe::UniverseTable<T, Table = universe::Storage<T>>,
+    {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            Ok(match URefSer::deserialize(deserializer)? {
-                // TODO: Instead of new_gone(), this needs to be a named ref that can be
-                // hooked up to its definition.
-                URefSer::URefV1 { name } => URef::new_gone(name),
-            })
+            match URefSer::deserialize(deserializer)? {
+                URefSer::URefV1 { name } => {
+                    UREF_DESERIALIZATION_CONTEXT.with(|context| -> Result<Self, D::Error> {
+                        let mut context_refcell_guard = context.borrow_mut();
+
+                        match context_refcell_guard.as_mut() {
+                            Some(context) => context
+                                .universe
+                                .get_or_insert_deserializing(name)
+                                .map_err(serde::de::Error::custom),
+                            None => {
+                                // If there is no `Universe` context, use a “gone” reference.
+                                // I am unsure whether this has any practical application, but it
+                                // is at least useful in deserialization tests.
+                                Ok(URef::new_gone(name))
+                            }
+                        }
+                    })
+                }
+            }
         }
     }
 
@@ -572,6 +613,59 @@ mod universe {
             })?;
             let value: &T = &read_guard;
             value.serialize(serializer)
+        }
+    }
+
+    thread_local! {
+        /// Thread-local state used to communicate from [`Universe`] deserialization to
+        /// [`URef`] deserialization so that the [`URef`] points to a member of that [`Universe`].
+        ///
+        /// If [`None`], no [`Universe`] deserialization is currently occurring.
+        ///
+        /// TODO: Find an alternative not dependent on external state. Perhaps
+        /// serde::DeserializeSeed will do, or if necessary we can modify URef to support
+        /// modification after construction.
+        static UREF_DESERIALIZATION_CONTEXT: RefCell<Option<DeContext>> = RefCell::new(None);
+    }
+
+    struct DeContext {
+        universe: Universe,
+    }
+
+    struct ContextScope;
+
+    impl ContextScope {
+        fn install(new_context: DeContext) -> Self {
+            UREF_DESERIALIZATION_CONTEXT.with(|tl| {
+                let mut tl = tl.borrow_mut();
+                assert!(tl.is_none(), "cannot nest Universe deserialization");
+                *tl = Some(new_context);
+            });
+            Self
+        }
+
+        /// Uninstall and retrieve the context. Panics if none present.
+        fn take(self) -> DeContext {
+            let context = UREF_DESERIALIZATION_CONTEXT.with(|tl| {
+                tl.borrow_mut()
+                    .take()
+                    .expect("something went wrong with UREF_DESERIALIZATION_CONTEXT")
+            });
+            std::mem::forget(self); // don't run Drop
+            context
+        }
+    }
+
+    impl Drop for ContextScope {
+        fn drop(&mut self) {
+            UREF_DESERIALIZATION_CONTEXT.with(|uref_context| {
+                let mut uref_context = uref_context.borrow_mut();
+                assert!(
+                    uref_context.is_some(),
+                    "something went wrong with UREF_DESERIALIZATION_CONTEXT"
+                );
+                *uref_context = None;
+            });
         }
     }
 }

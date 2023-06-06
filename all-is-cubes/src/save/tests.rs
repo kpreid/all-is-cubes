@@ -30,28 +30,30 @@ where
 
 #[track_caller]
 /// Deserialize and serialize and assert the JSON is equal.
-fn assert_round_trip_json<T>(json: serde_json::Value)
+/// Returns the deserialized value.
+fn assert_round_trip_json<T>(json: serde_json::Value) -> T
 where
     T: fmt::Debug + serde::Serialize + serde::de::DeserializeOwned,
 {
     let deserialized = from_value::<T>(json.clone()).expect("failed to deserialize");
-    let round_trip_json = to_value(deserialized).expect("failed to serialize");
+    let round_trip_json = to_value(&deserialized).expect("failed to serialize");
     assert_eq!(json, round_trip_json, "JSON not as expected");
+    deserialized
 }
 
 /// Serialize the value, then deserialize it and serialize that to confirm the JSON is
-/// equal.
+/// equal. Returns the deserialized value.
 ///
 /// This is useful in lieu of [`assert_round_trip_value`] for when the values are
 /// necessarily unequal (anything involving [`URef`]s).
 #[track_caller]
-fn assert_serdeser<T>(value: &T, expected_json: serde_json::Value)
+fn assert_serdeser<T>(value: &T, expected_json: serde_json::Value) -> T
 where
     T: fmt::Debug + serde::Serialize + serde::de::DeserializeOwned,
 {
     let json_value = to_value(value).expect("failed to serialize");
     assert_eq!(json_value, expected_json);
-    assert_round_trip_json::<T>(json_value);
+    assert_round_trip_json::<T>(json_value)
 }
 
 //------------------------------------------------------------------------------------------------//
@@ -330,21 +332,78 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
 }
 
 #[test]
-fn universe_with_one_of_each_ser() {
-    // TODO: use assert_serdeser; we will need to finish hooking up URefs on deserialization
-    assert_eq!(
-        to_value(&universe_with_one_of_each()).unwrap(),
+fn universe_success() {
+    let deserialized_universe = assert_serdeser(
+        &universe_with_one_of_each(),
         universe_with_one_of_each_json(),
-    )
+    );
+
+    // Test that the members and refs are in fact hooked up.
+    let a_block = deserialized_universe
+        .get::<BlockDef>(&"a_block".into())
+        .unwrap()
+        .read()
+        .unwrap();
+    let a_space = deserialized_universe
+        .get::<Space>(&"a_space".into())
+        .unwrap()
+        .read()
+        .unwrap();
+    let a_character = deserialized_universe
+        .get::<Character>(&"a_character".into())
+        .unwrap()
+        .read()
+        .unwrap();
+
+    let a_block_ev = a_block.evaluate().unwrap();
+    assert_eq!(a_block_ev.attributes.display_name, "0");
+
+    assert_eq!(a_space.get_evaluated([0, 0, 0]), &a_block_ev);
+
+    assert_eq!(
+        a_character.space,
+        deserialized_universe
+            .get::<Space>(&"a_space".into())
+            .unwrap()
+    );
 }
 
 #[test]
-fn universe_with_one_of_each_partial_ser() {
-    // TODO: use assert_serdeser; we will need to finish hooking up URefs on deserialization
+fn partial_universe() {
+    // This is not quite assert_serdeser() because the deserialization result is a `Universe`,
+    // not a `PartialUniverse`.
+    let universe = universe_with_one_of_each();
+    let value = PartialUniverse::all_of(&universe);
+    let expected_json = universe_with_one_of_each_json();
+    let json_value = to_value(&value).expect("failed to serialize");
+    assert_eq!(json_value, expected_json);
+    assert_round_trip_json::<Universe>(json_value);
+}
+
+#[test]
+fn universe_de_missing_member() {
+    let error: serde_json::Error = from_value::<Universe>(json!({
+        "type": "UniverseV1",
+        "members": [
+            {
+                "name": {"Specific": "broken_block"},
+                "value": {
+                    "type": "BlockV1",
+                    "primitive": {
+                        "type": "IndirectV1",
+                        "definition": {"type": "URefV1", "Specific": "missing_block"},
+                    }
+                }
+            },
+        ],
+    }))
+    .unwrap_err();
+
+    assert!(error.is_data());
     assert_eq!(
-        to_value(PartialUniverse::all_of(&universe_with_one_of_each())).unwrap(),
-        universe_with_one_of_each_json(),
-    )
+        error.to_string(),
+        "data contains a reference to 'missing_block' that was not defined"
+    );
 }
 
 #[test]
