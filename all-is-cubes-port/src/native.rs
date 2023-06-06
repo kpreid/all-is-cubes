@@ -34,7 +34,11 @@ pub(crate) async fn export_native_json(
 ) -> Result<(), ExportError> {
     // TODO: Spin off a blocking thread to perform this export
     let ExportSet { contents } = source;
-    serde_json::to_writer(fs::File::create(destination)?, &contents).map_err(|error| {
+    serde_json::to_writer(
+        io::BufWriter::new(fs::File::create(destination)?),
+        &contents,
+    )
+    .map_err(|error| {
         // TODO: report non-IO errors distinctly
         ExportError::Write(io::Error::new(io::ErrorKind::Other, error))
     })?;
