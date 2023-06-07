@@ -328,15 +328,10 @@ impl Space {
     ) -> Result<bool, SetCubeError> {
         // Delegate to a monomorphic function.
         // This may reduce compile time and code size.
-        self.set_impl(position.into(), block.into())
+        self.set_impl(position.into(), &block.into())
     }
 
-    fn set_impl(
-        &mut self,
-        position: GridPoint,
-        // TODO: Is the `Cow` actually gaining us any performance, now that `Block` is an Arc-like type?
-        block: Cow<'_, Block>,
-    ) -> Result<bool, SetCubeError> {
+    fn set_impl(&mut self, position: GridPoint, block: &Block) -> Result<bool, SetCubeError> {
         if let Some(contents_index) = self.bounds.index(position) {
             let old_block_index = self.contents[contents_index];
             let old_block = &self.block_data[old_block_index as usize].block;
@@ -346,7 +341,7 @@ impl Space {
             }
 
             if self.block_data[old_block_index as usize].count == 1
-                && !self.block_to_index.contains_key(&*block)
+                && !self.block_to_index.contains_key(block)
             {
                 // Replacing one unique block with a new one.
                 //
@@ -360,7 +355,7 @@ impl Space {
                 // Swap out the block_data entry.
                 let old_block = {
                     let mut data = SpaceBlockData::new(
-                        block.clone().into_owned(),
+                        block.clone(),
                         self.listener_for_block(old_block_index),
                     )?;
                     data.count = 1;
@@ -370,8 +365,7 @@ impl Space {
 
                 // Update block_to_index.
                 self.block_to_index.remove(&old_block);
-                self.block_to_index
-                    .insert(block.into_owned(), old_block_index);
+                self.block_to_index.insert(block.clone(), old_block_index);
 
                 // Side effects.
                 self.notifier.notify(SpaceChange::Number(old_block_index));
@@ -770,8 +764,8 @@ impl Space {
     ///
     /// The caller is responsible for incrementing `self.block_data[index].count`.
     #[inline]
-    fn ensure_block_index(&mut self, block: Cow<'_, Block>) -> Result<BlockIndex, SetCubeError> {
-        if let Some(&old_index) = self.block_to_index.get(&*block) {
+    fn ensure_block_index(&mut self, block: &Block) -> Result<BlockIndex, SetCubeError> {
+        if let Some(&old_index) = self.block_to_index.get(block) {
             Ok(old_index)
         } else {
             // Look for if there is a previously used index to take.
@@ -780,11 +774,11 @@ impl Space {
             for new_index in 0..high_mark {
                 if self.block_data[new_index].count == 0 {
                     self.block_data[new_index] = SpaceBlockData::new(
-                        block.clone().into_owned(),
+                        block.clone(),
                         self.listener_for_block(new_index as BlockIndex),
                     )?;
                     self.block_to_index
-                        .insert(block.into_owned(), new_index as BlockIndex);
+                        .insert(block.clone(), new_index as BlockIndex);
                     self.notifier
                         .notify(SpaceChange::Number(new_index as BlockIndex));
                     return Ok(new_index as BlockIndex);
@@ -795,13 +789,10 @@ impl Space {
             }
             let new_index = high_mark as BlockIndex;
             // Evaluate the new block type. Can fail, but we haven't done any mutation yet.
-            let new_data = SpaceBlockData::new(
-                block.clone().into_owned(),
-                self.listener_for_block(new_index),
-            )?;
+            let new_data = SpaceBlockData::new(block.clone(), self.listener_for_block(new_index))?;
             // Grow the vector.
             self.block_data.push(new_data);
-            self.block_to_index.insert(block.into_owned(), new_index);
+            self.block_to_index.insert(block.clone(), new_index);
             self.notifier.notify(SpaceChange::Number(new_index));
             Ok(new_index)
         }
