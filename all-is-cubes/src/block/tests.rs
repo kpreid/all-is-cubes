@@ -13,11 +13,12 @@ use cgmath::EuclideanSpace as _;
 use pretty_assertions::assert_eq;
 
 use crate::block::{
-    Block, BlockAttributes, BlockCollision, BlockDef, BlockDefTransaction, EvalBlockError, Evoxel,
-    Evoxels, Modifier, Primitive, Resolution, Resolution::*, AIR, AIR_EVALUATED,
+    self, Block, BlockAttributes, BlockChange, BlockCollision, BlockDef, BlockDefTransaction,
+    EvalBlockError, Evoxel, Evoxels, Modifier, Primitive, Resolution, Resolution::*, AIR,
+    AIR_EVALUATED,
 };
 use crate::content::make_some_blocks;
-use crate::listen::{NullListener, Sink};
+use crate::listen::{self, NullListener, Sink};
 use crate::math::{
     Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, GridVector,
     OpacityCategory, Rgb, Rgba,
@@ -25,6 +26,22 @@ use crate::math::{
 use crate::space::{Space, SpaceTransaction};
 use crate::transaction;
 use crate::universe::Universe;
+
+/// Just install a listener and discard the [`EvaluatedBlock`].
+///
+/// TODO: Expand this to, or otherwise create, a helper which checks that the evaluation result
+/// changes only with notification.
+fn listen(
+    block: Block,
+    listener: impl listen::Listener<BlockChange> + Send + Sync + 'static,
+) -> Result<(), EvalBlockError> {
+    block
+        .evaluate2(&block::EvalFilter {
+            skip_eval: true,
+            listener: Some(listener.erased()),
+        })
+        .map(|_| ())
+}
 
 #[test]
 fn block_is_approximately_a_pointer() {
@@ -373,7 +390,7 @@ fn indirect_equivalence() {
 fn listen_atom() {
     let block = Block::from(Rgba::WHITE);
     let sink = Sink::new();
-    block.listen(sink.listener()).unwrap();
+    listen(block, sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
     // No notifications are possible, so nothing more to test.
 }
@@ -384,7 +401,7 @@ fn listen_indirect_atom() {
     let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
     let indirect = Block::from_primitive(Primitive::Indirect(block_def_ref.clone()));
     let sink = Sink::new();
-    indirect.listen(sink.listener()).unwrap();
+    listen(indirect, sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
 
     // Now mutate it and we should see a notification.
@@ -408,7 +425,7 @@ fn listen_indirect_double() {
     )));
     let indirect2 = Block::from_primitive(Primitive::Indirect(block_def_ref2.clone()));
     let sink = Sink::new();
-    indirect2.listen(sink.listener()).unwrap();
+    listen(indirect2, sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
 
     // Now mutate the original block and we should see a notification.
@@ -446,7 +463,7 @@ fn listen_recur() {
     let space_ref = universe.insert_anonymous(Space::empty_positive(2, 1, 1));
     let block = Block::builder().voxels_ref(R1, space_ref.clone()).build();
     let sink = Sink::new();
-    block.listen(sink.listener()).unwrap();
+    listen(block, sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
 
     // Now mutate the space and we should see a notification.
@@ -485,7 +502,7 @@ fn overflow_listen() {
     // TODO: Probably Primitive::Indirect needs a recursion limit inside that so it doesn't
     // fire an infinite cycle of notifications...? Or perhaps we need to make it difficult to
     // create recursion at all.
-    assert_eq!(block.listen(NullListener), Ok(()));
+    assert_eq!(listen(block, NullListener), Ok(()));
 }
 
 /// Helper for overflow_ tests
@@ -516,7 +533,7 @@ mod txn {
         let block_def_ref = universe.insert_anonymous(BlockDef::new(b1));
         let indirect = Block::from_primitive(Primitive::Indirect(block_def_ref.clone()));
         let sink = Sink::new();
-        indirect.listen(sink.listener()).unwrap();
+        listen(indirect, sink.listener()).unwrap();
         assert_eq!(sink.drain(), vec![]);
 
         // Now mutate it and we should see a notification.

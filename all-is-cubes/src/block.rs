@@ -56,10 +56,8 @@ mod tests;
 /// blocks are defined by reference to shared mutable data, and [`Block`] containers such
 /// as [`Space`] must follow those changes.
 ///
-/// To obtain the concrete appearance and behavior of a block, use [`Block::evaluate()`]
-/// to obtain an [`EvaluatedBlock`] value, preferably with caching.
-/// Use [`Block::listen()`] to be informed of possible changes to the result of
-/// evaluation.
+/// To determine the concrete appearance and behavior of a block, use [`Block::evaluate()`]
+/// or [`Block::evaluate_and_listen()`], which will return an [`EvaluatedBlock`] value.
 #[derive(Clone)]
 pub struct Block(BlockPtr);
 
@@ -362,13 +360,41 @@ impl Block {
     /// information needed for rendering and physics, and does not require [`URef`] access
     /// to other objects.
     pub fn evaluate(&self) -> Result<EvaluatedBlock, EvalBlockError> {
-        Ok(EvaluatedBlock::from(self.evaluate_impl(
-            0,
-            &EvalFilter {
-                skip_eval: false,
-                listener: None,
-            },
-        )?))
+        self.evaluate2(&EvalFilter {
+            skip_eval: false,
+            listener: None,
+        })
+    }
+
+    /// As [`Block::evaluate()`], but also installs a listener which will be notified of
+    /// changes in all data sources that might affect the evaluation result.
+    ///
+    /// Note that this does not listen for mutations of the [`Block`] value itself, in the
+    /// sense that none of the methods on [`Block`] will cause this listener to fire.
+    /// Rather, it listens for changes in by-reference-to-interior-mutable-data sources
+    /// such as the [`Space`] referred to by a [`Primitive::Recur`] or the [`BlockDef`]
+    /// referred to by a [`Primitive::Indirect`].
+    ///
+    /// # Errors
+    ///
+    /// If an evaluation error is reported, the [`Listener`] may have been installed
+    /// incompletely or not at all. It should not be relied on.
+    pub fn evaluate_and_listen(
+        &self,
+        listener: impl Listener<BlockChange> + Send + Sync + 'static,
+    ) -> Result<EvaluatedBlock, EvalBlockError> {
+        self.evaluate2(&EvalFilter {
+            skip_eval: false,
+            listener: Some(listener.erased()),
+        })
+    }
+
+    /// Internal general entry point for block evaluation.
+    ///    
+    /// TODO: Placeholder name. At some point we may expose `EvalFilter` directly and make
+    /// this be just `evaluate()`.
+    pub(crate) fn evaluate2(&self, filter: &EvalFilter) -> Result<EvaluatedBlock, EvalBlockError> {
+        Ok(EvaluatedBlock::from(self.evaluate_impl(0, filter)?))
     }
 
     #[inline]
@@ -480,34 +506,6 @@ impl Block {
         Ok(value)
     }
 
-    /// Registers a listener for mutations of any data sources which may affect this
-    /// block's [`Block::evaluate`] result.
-    ///
-    /// Note that this does not listen for mutations of the [`Block`] value itself, in the
-    /// sense that none of the methods on [`Block`] will cause this listener to fire.
-    /// Rather, it listens for changes in by-reference-to-interior-mutable-data sources
-    /// such as the [`Space`] referred to by a [`Primitive::Recur`] or the [`BlockDef`]
-    /// referred to by a [`Primitive::Indirect`].
-    ///
-    /// This may fail under the same conditions as [`Block::evaluate()`]; it returns the
-    /// same error type so that callers which both evaluate and listen don't need to
-    /// handle this separately.
-    ///
-    /// This is not an implementation of [`Listen`] because it can fail.
-    pub fn listen(
-        &self,
-        listener: impl Listener<BlockChange> + Send + Sync + 'static,
-    ) -> Result<(), EvalBlockError> {
-        self.evaluate_impl(
-            0,
-            &EvalFilter {
-                skip_eval: true,
-                listener: Some(listener.erased()),
-            },
-        )
-        .map(|_| ())
-    }
-
     /// Returns the single [`Rgba`] color of this block's [`Primitive::Atom`] or
     /// [`Primitive::Air`], or panics if it has a different kind of primitive.
     /// **Intended for use in tests only.**
@@ -522,18 +520,38 @@ impl Block {
     }
 }
 
-/// Parameters to [`Block::evaluate()`] to choose which information to compute.
-///
-/// TODO: make this public once it is more coherent.
+/// Parameters to [`Block::evaluate2()`] to choose which information to compute.
+#[allow(missing_debug_implementations)] // TODO: Debug for DynListener
+#[allow(clippy::exhaustive_structs)]
+#[derive(Clone)]
 pub(crate) struct EvalFilter {
     /// If true, don't actually evaluate, but return a placeholder value and do listen.
     ///
     /// TODO: All of the use cases where this is useful should actually be replaced with
     /// combined eval+listen, but we will also want to have a "evaluate only this region"
-    /// mode.
-    skip_eval: bool,
+    /// mode which will be somewhat analogous.
+    pub skip_eval: bool,
 
-    listener: Option<listen::DynListener<BlockChange>>,
+    /// A [`Listener`] which will be notified of changes in all data sources that might
+    /// affect the evaluation result.
+    ///
+    /// Note that this does not listen for mutations of the [`Block`] value itself, in the
+    /// sense that none of the methods on [`Block`] will cause this listener to fire.
+    /// Rather, it listens for changes in by-reference-to-interior-mutable-data sources
+    /// such as the [`Space`] referred to by a [`Primitive::Recur`] or the [`BlockDef`]
+    /// referred to by a [`Primitive::Indirect`].
+    pub listener: Option<listen::DynListener<BlockChange>>,
+}
+
+impl Default for EvalFilter {
+    /// Returns a default `EvalFilter` which requests a complete result and installs no
+    /// listener.
+    fn default() -> Self {
+        Self {
+            skip_eval: Default::default(),
+            listener: Default::default(),
+        }
+    }
 }
 
 /// Recursion limiter helper for evaluate.

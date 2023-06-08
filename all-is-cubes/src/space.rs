@@ -10,7 +10,7 @@ use instant::{Duration, Instant};
 
 use crate::behavior::{self, BehaviorSet};
 use crate::block::{
-    Block, BlockChange, EvalBlockError, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED,
+    self, Block, BlockChange, EvalBlockError, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED,
 };
 #[cfg(doc)]
 use crate::character::Character;
@@ -965,11 +965,12 @@ impl SpaceBlockData {
         block: Block,
         listener: impl Listener<BlockChange> + Clone + Send + Sync + 'static,
     ) -> Result<Self, SetCubeError> {
-        // TODO: double ref error check suggests that maybe evaluate() and listen() should be one combined operation.
-        let evaluated = block.evaluate().map_err(SetCubeError::EvalBlock)?;
         let (gate, block_listener) = listener.gate();
-        block
-            .listen(block_listener)
+        let evaluated = block
+            .evaluate2(&block::EvalFilter {
+                skip_eval: false,
+                listener: Some(block_listener.erased()),
+            })
             .map_err(SetCubeError::EvalBlock)?;
         Ok(Self {
             block,

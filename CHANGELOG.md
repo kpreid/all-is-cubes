@@ -28,6 +28,7 @@
     - Renamed: `BlockMeshProvider` is now `GetBlockMesh`. This aligns with the general principle of naming traits for the action that they enable.
 
 - `all-is-cubes` library:
+    - `block::Block::listen()` is now `evaluate_and_listen()` which includes a simultaneous `evaluate()`.
     - `block::Block::unspecialize()` now returns `Vec<Block>`, to allow for cases where a block comes apart into multiple parts, such as with `Modifier::Composite`.
     - `block::EvaluatedBlock` now has a `voxels` field of the new type `Evoxels`, which replaces the previous `resolution` and `voxels` fields.
       This simplifies the data model, in that there is now _always_ a set of `Evoxel`s defining a block's shape, even if there's only one of them, and it is always found in the `voxels` field. This is a breaking change for code that accesses `EvaluatedBlock` data.
@@ -48,6 +49,7 @@
 
 - `all-is-cubes-ui` library:
     - `vui::LayoutGrant` now takes an additional parameter, `enlarge_for_symmetry`. Existing calls should be changed to pass `false` to get the prior behavior.
+
 
 ## 0.5.1 (2022-12-29)
 

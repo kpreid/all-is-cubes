@@ -1,7 +1,7 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::block::{Block, BlockChange, Primitive};
+use crate::block::{self, Block, BlockChange, Primitive};
 use crate::listen::{Gate, Listen, Listener, Notifier};
 use crate::transaction::{self, Transaction};
 use crate::universe::{RefVisitor, VisitRefs};
@@ -29,8 +29,11 @@ impl BlockDef {
     pub fn new(block: Block) -> Self {
         let notifier = Arc::new(Notifier::new());
         let (gate, block_listener) = Notifier::forwarder(Arc::downgrade(&notifier)).gate();
-        // TODO: Consider making it an error if listening fails. BlockDefTransaction::check will need to follow.
-        let _ = block.listen(block_listener);
+        // TODO: Take the evaluation result (if successful) and cache it
+        let _ = block.evaluate2(&block::EvalFilter {
+            skip_eval: true,
+            listener: Some(block_listener.erased()),
+        });
         BlockDef {
             block,
             notifier,
@@ -172,8 +175,11 @@ impl Transaction<BlockDef> for BlockDefTransaction {
             // Swap out the forwarding listener to listen to the new block.
             let (gate, block_listener) =
                 Notifier::forwarder(Arc::downgrade(&target.notifier)).gate();
-            // TODO: Instead of ignoring the error from listen() here, we can fail the transaction by preparing the listener in check().
-            let _ = target.block.listen(block_listener);
+            // TODO: Take the evaluation result (if successful) and cache it
+            let _ = target.block.evaluate2(&block::EvalFilter {
+                skip_eval: true,
+                listener: Some(block_listener.erased()),
+            });
             target.block_listen_gate = gate; // old gate is now dropped
 
             target.notifier.notify(BlockChange::new());
