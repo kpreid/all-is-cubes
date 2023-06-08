@@ -362,14 +362,37 @@ impl Block {
     /// information needed for rendering and physics, and does not require [`URef`] access
     /// to other objects.
     pub fn evaluate(&self) -> Result<EvaluatedBlock, EvalBlockError> {
-        Ok(EvaluatedBlock::from(self.evaluate_impl(0)?))
+        Ok(EvaluatedBlock::from(self.evaluate_impl(
+            0,
+            &EvalFilter {
+                skip_eval: false,
+                listener: None,
+            },
+        )?))
     }
 
     #[inline]
-    fn evaluate_impl(&self, depth: u8) -> Result<MinEval, EvalBlockError> {
+    fn evaluate_impl(&self, depth: u8, filter: &EvalFilter) -> Result<MinEval, EvalBlockError> {
         let mut value: MinEval = match *self.primitive() {
             Primitive::Indirect(ref def_ref) => {
-                def_ref.read()?.evaluate_impl(next_depth(depth)?)?
+                let next = next_depth(depth)?;
+                let def = def_ref.read()?;
+
+                if let Some(listener) = &filter.listener {
+                    <BlockDef as Listen>::listen(&*def, listener.clone());
+                }
+
+                if filter.skip_eval {
+                    AIR_EVALUATED_MIN // placeholder value
+                } else {
+                    def.evaluate_impl(
+                        next,
+                        &EvalFilter {
+                            skip_eval: filter.skip_eval,
+                            listener: None,
+                        },
+                    )?
+                }
             }
 
             Primitive::Atom(ref attributes, color) => MinEval {
@@ -395,28 +418,52 @@ impl Block {
                 let full_resolution_bounds =
                     GridAab::for_block(resolution).translate(offset.to_vec());
 
-                // Intersect that region with the actual bounds of `space`.
-                let voxels: GridArray<Evoxel> =
-                    match full_resolution_bounds.intersection(block_space.bounds()) {
-                        Some(occupied_bounds) => block_space
-                            .extract(
-                                occupied_bounds,
-                                #[inline(always)]
-                                |_index, sub_block_data, _lighting| {
-                                    Evoxel::from_block(sub_block_data.evaluated())
-                                },
-                            )
-                            .translate(-offset.to_vec()),
-                        None => {
-                            // If there is no intersection, then return an empty voxel array,
-                            // with an arbitrary position.
-                            GridArray::from_elements(
-                                GridAab::from_lower_size([0, 0, 0], [0, 0, 0]),
-                                Box::<[Evoxel]>::default(),
-                            )
-                            .unwrap()
+                if let Some(listener) = &filter.listener {
+                    block_space.listen(listener.clone().filter(move |msg| {
+                        match msg {
+                            SpaceChange::Block(cube)
+                                if full_resolution_bounds.contains_cube(cube) =>
+                            {
+                                Some(BlockChange::new())
+                            }
+                            SpaceChange::Block(_) => None,
+                            SpaceChange::EveryBlock => Some(BlockChange::new()),
+
+                            // TODO: It would be nice if the space gave more precise updates
+                            // such that we could conclude e.g. "this is a new/removed block
+                            // in an unaffected area" without needing to store any data.
+                            SpaceChange::BlockValue(_) => Some(BlockChange::new()),
+                            SpaceChange::Lighting(_) => None,
+                            SpaceChange::Number(_) => None,
                         }
-                    };
+                    }));
+                }
+
+                // Intersect that region with the actual bounds of `space`.
+                let voxels: GridArray<Evoxel> = match full_resolution_bounds
+                    .intersection(block_space.bounds())
+                    .filter(|_| !filter.skip_eval)
+                {
+                    Some(occupied_bounds) => block_space
+                        .extract(
+                            occupied_bounds,
+                            #[inline(always)]
+                            |_index, sub_block_data, _lighting| {
+                                Evoxel::from_block(sub_block_data.evaluated())
+                            },
+                        )
+                        .translate(-offset.to_vec()),
+                    None => {
+                        // If there is no intersection, then return an empty voxel array,
+                        // with an arbitrary position.
+                        // Also applies when skip_eval is true
+                        GridArray::from_elements(
+                            GridAab::from_lower_size([0, 0, 0], [0, 0, 0]),
+                            Box::<[Evoxel]>::default(),
+                        )
+                        .unwrap()
+                    }
+                };
 
                 MinEval {
                     attributes: attributes.clone(),
@@ -427,7 +474,7 @@ impl Block {
 
         for (index, modifier) in self.modifiers().iter().enumerate() {
             // TODO: Extend recursion depth model to catch stacking up lots of modifiers
-            value = modifier.evaluate(self, index, value, depth)?;
+            value = modifier.evaluate(self, index, value, depth, filter)?;
         }
 
         Ok(value)
@@ -451,57 +498,14 @@ impl Block {
         &self,
         listener: impl Listener<BlockChange> + Send + Sync + 'static,
     ) -> Result<(), EvalBlockError> {
-        self.listen_impl(&listener.erased(), 0)
-    }
-
-    fn listen_impl(
-        &self,
-        listener: &listen::DynListener<BlockChange>,
-        depth: u8,
-    ) -> Result<(), EvalBlockError> {
-        // Do the modifiers first to avoid a likely-unnecessary clone() of the listener.
-        for modifier in self.modifiers() {
-            modifier.listen_impl(listener, depth)?;
-        }
-
-        match *self.primitive() {
-            Primitive::Indirect(ref def_ref) => {
-                // Note: This does not pass the recursion depth because BlockDef provides
-                // its own internal listening and thus this does not recurse.
-                <BlockDef as Listen>::listen(&*(def_ref.read()?), listener.clone());
-            }
-            Primitive::Atom(_, _) | Primitive::Air => {
-                // Atoms don't refer to anything external and thus cannot change other
-                // than being directly overwritten, which is out of the scope of this
-                // operation.
-            }
-            Primitive::Recur {
-                resolution,
-                offset,
-                space: ref space_ref,
-                ..
-            } => {
-                let relevant_cubes = GridAab::for_block(resolution).translate(offset.to_vec());
-                space_ref
-                    .read()?
-                    .listen(listener.clone().filter(move |msg| {
-                        match msg {
-                            SpaceChange::Block(cube) if relevant_cubes.contains_cube(cube) => {
-                                Some(BlockChange::new())
-                            }
-                            SpaceChange::Block(_) => None,
-                            SpaceChange::EveryBlock => Some(BlockChange::new()),
-
-                            // TODO: It would be nice if the space gave more precise updates such that we could conclude
-                            // e.g. "this is a new/removed block in an unaffected area" without needing to store any data.
-                            SpaceChange::BlockValue(_) => Some(BlockChange::new()),
-                            SpaceChange::Lighting(_) => None,
-                            SpaceChange::Number(_) => None,
-                        }
-                    }));
-            }
-        }
-        Ok(())
+        self.evaluate_impl(
+            0,
+            &EvalFilter {
+                skip_eval: true,
+                listener: Some(listener.erased()),
+            },
+        )
+        .map(|_| ())
     }
 
     /// Returns the single [`Rgba`] color of this block's [`Primitive::Atom`] or
@@ -516,6 +520,20 @@ impl Block {
             }
         }
     }
+}
+
+/// Parameters to [`Block::evaluate()`] to choose which information to compute.
+///
+/// TODO: make this public once it is more coherent.
+pub(crate) struct EvalFilter {
+    /// If true, don't actually evaluate, but return a placeholder value and do listen.
+    ///
+    /// TODO: All of the use cases where this is useful should actually be replaced with
+    /// combined eval+listen, but we will also want to have a "evaluate only this region"
+    /// mode.
+    skip_eval: bool,
+
+    listener: Option<listen::DynListener<BlockChange>>,
 }
 
 /// Recursion limiter helper for evaluate.

@@ -216,7 +216,7 @@ impl EvaluatedBlock {
     }
 }
 
-/// Errors resulting from [`Block::evaluate`].
+/// Errors resulting from [`Block::evaluate()`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum EvalBlockError {

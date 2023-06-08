@@ -111,6 +111,7 @@ impl Composite {
         &self,
         mut dst_evaluated: MinEval,
         depth: u8,
+        filter: &block::EvalFilter,
     ) -> Result<MinEval, block::EvalBlockError> {
         let Composite {
             ref source,
@@ -121,7 +122,12 @@ impl Composite {
 
         // The destination block is already evaluated (it is the input to this
         // modifier), but we need to evaluate the source block.
-        let mut src_evaluated = source.evaluate_impl(block::next_depth(depth)?)?;
+        let mut src_evaluated = source.evaluate_impl(block::next_depth(depth)?, filter)?;
+
+        if filter.skip_eval {
+            return Ok(dst_evaluated);
+        }
+
         // Apply the reverse option by swapping everything.
         if reverse {
             mem::swap(&mut src_evaluated, &mut dst_evaluated);

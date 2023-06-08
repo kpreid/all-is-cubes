@@ -71,6 +71,7 @@ impl Move {
         this_modifier_index: usize,
         mut input: MinEval,
         depth: u8,
+        filter: &block::EvalFilter,
     ) -> Result<MinEval, block::EvalBlockError> {
         let Move {
             direction,
@@ -87,6 +88,7 @@ impl Move {
             this_modifier_index,
             input,
             depth,
+            filter,
         )?;
 
         let (original_bounds, effective_resolution) = match input.voxels {

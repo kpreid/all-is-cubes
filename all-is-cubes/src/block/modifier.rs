@@ -1,5 +1,4 @@
-use crate::block::{Block, BlockChange, EvalBlockError, Evoxels, MinEval};
-use crate::listen;
+use crate::block::{self, Block, Evoxels, MinEval};
 use crate::math::{GridArray, GridRotation, Rgb};
 use crate::universe::{RefVisitor, VisitRefs};
 
@@ -87,7 +86,8 @@ impl Modifier {
         this_modifier_index: usize,
         mut value: MinEval,
         depth: u8,
-    ) -> Result<MinEval, EvalBlockError> {
+        filter: &block::EvalFilter,
+    ) -> Result<MinEval, block::EvalBlockError> {
         Ok(match *self {
             Modifier::Quote(Quote { suppress_ambient }) => {
                 value.attributes.tick_action = None;
@@ -98,7 +98,7 @@ impl Modifier {
             }
 
             Modifier::Rotate(rotation) => {
-                if matches!(value.voxels, Evoxels::One(_)) {
+                if matches!(value.voxels, Evoxels::One(_)) || filter.skip_eval {
                     // Skip computation of transforms
                     value
                 } else {
@@ -127,11 +127,13 @@ impl Modifier {
                 }
             }
 
-            Modifier::Composite(ref c) => c.evaluate(value, depth)?,
+            Modifier::Composite(ref c) => c.evaluate(value, depth, filter)?,
 
             Modifier::Zoom(ref z) => z.evaluate(value)?,
 
-            Modifier::Move(ref m) => m.evaluate(block, this_modifier_index, value, depth)?,
+            Modifier::Move(ref m) => {
+                m.evaluate(block, this_modifier_index, value, depth, filter)?
+            }
         })
     }
 
@@ -155,27 +157,6 @@ impl Modifier {
             // This is essentially a 2-block multiblock situation.
             Modifier::Move(_) => ModifierUnspecialize::Keep,
         }
-    }
-
-    /// Called by [`Block::listen()`]; not designed to be used otherwise.
-    pub(crate) fn listen_impl(
-        &self,
-        listener: &listen::DynListener<BlockChange>,
-        depth: u8,
-    ) -> Result<(), EvalBlockError> {
-        match self {
-            Modifier::Quote { .. } => {}
-            Modifier::Rotate(_) => {}
-            Modifier::Composite(Composite {
-                source,
-                operator: _,
-                reverse: _,
-                disassemblable: _,
-            }) => source.listen_impl(listener, super::next_depth(depth)?)?,
-            Modifier::Zoom(_) => {}
-            Modifier::Move { .. } => {}
-        }
-        Ok(())
     }
 }
 
