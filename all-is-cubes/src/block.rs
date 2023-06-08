@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use cgmath::{EuclideanSpace as _, Point3};
 
-use crate::listen::{Listen, Listener};
+use crate::listen::{self, Listen, Listener};
 use crate::math::{
     FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba,
 };
@@ -449,26 +449,26 @@ impl Block {
     /// This is not an implementation of [`Listen`] because it can fail.
     pub fn listen(
         &self,
-        listener: impl Listener<BlockChange> + Clone + Send + Sync + 'static,
+        listener: impl Listener<BlockChange> + Send + Sync + 'static,
     ) -> Result<(), EvalBlockError> {
-        self.listen_impl(listener, 0)
+        self.listen_impl(&listener.erased(), 0)
     }
 
     fn listen_impl(
         &self,
-        listener: impl Listener<BlockChange> + Clone + Send + Sync + 'static,
+        listener: &listen::DynListener<BlockChange>,
         depth: u8,
     ) -> Result<(), EvalBlockError> {
         // Do the modifiers first to avoid a likely-unnecessary clone() of the listener.
         for modifier in self.modifiers() {
-            modifier.listen_impl(&listener, depth)?;
+            modifier.listen_impl(listener, depth)?;
         }
 
         match *self.primitive() {
             Primitive::Indirect(ref def_ref) => {
                 // Note: This does not pass the recursion depth because BlockDef provides
                 // its own internal listening and thus this does not recurse.
-                <BlockDef as Listen>::listen(&*(def_ref.read()?), listener);
+                <BlockDef as Listen>::listen(&*(def_ref.read()?), listener.clone());
             }
             Primitive::Atom(_, _) | Primitive::Air => {
                 // Atoms don't refer to anything external and thus cannot change other
@@ -482,21 +482,23 @@ impl Block {
                 ..
             } => {
                 let relevant_cubes = GridAab::for_block(resolution).translate(offset.to_vec());
-                space_ref.read()?.listen(listener.filter(move |msg| {
-                    match msg {
-                        SpaceChange::Block(cube) if relevant_cubes.contains_cube(cube) => {
-                            Some(BlockChange::new())
-                        }
-                        SpaceChange::Block(_) => None,
-                        SpaceChange::EveryBlock => Some(BlockChange::new()),
+                space_ref
+                    .read()?
+                    .listen(listener.clone().filter(move |msg| {
+                        match msg {
+                            SpaceChange::Block(cube) if relevant_cubes.contains_cube(cube) => {
+                                Some(BlockChange::new())
+                            }
+                            SpaceChange::Block(_) => None,
+                            SpaceChange::EveryBlock => Some(BlockChange::new()),
 
-                        // TODO: It would be nice if the space gave more precise updates such that we could conclude
-                        // e.g. "this is a new/removed block in an unaffected area" without needing to store any data.
-                        SpaceChange::BlockValue(_) => Some(BlockChange::new()),
-                        SpaceChange::Lighting(_) => None,
-                        SpaceChange::Number(_) => None,
-                    }
-                }));
+                            // TODO: It would be nice if the space gave more precise updates such that we could conclude
+                            // e.g. "this is a new/removed block in an unaffected area" without needing to store any data.
+                            SpaceChange::BlockValue(_) => Some(BlockChange::new()),
+                            SpaceChange::Lighting(_) => None,
+                            SpaceChange::Number(_) => None,
+                        }
+                    }));
             }
         }
         Ok(())

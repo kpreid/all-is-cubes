@@ -1,5 +1,5 @@
 use crate::block::{Block, BlockChange, EvalBlockError, Evoxels, MinEval};
-use crate::listen::Listener;
+use crate::listen;
 use crate::math::{GridArray, GridRotation, Rgb};
 use crate::universe::{RefVisitor, VisitRefs};
 
@@ -160,7 +160,7 @@ impl Modifier {
     /// Called by [`Block::listen()`]; not designed to be used otherwise.
     pub(crate) fn listen_impl(
         &self,
-        listener: &(impl Listener<BlockChange> + Clone + Send + Sync + 'static),
+        listener: &listen::DynListener<BlockChange>,
         depth: u8,
     ) -> Result<(), EvalBlockError> {
         match self {
@@ -171,7 +171,7 @@ impl Modifier {
                 operator: _,
                 reverse: _,
                 disassemblable: _,
-            }) => source.listen_impl(listener.clone(), super::next_depth(depth)?)?,
+            }) => source.listen_impl(listener, super::next_depth(depth)?)?,
             Modifier::Zoom(_) => {}
             Modifier::Move { .. } => {}
         }
