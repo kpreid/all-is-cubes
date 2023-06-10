@@ -312,6 +312,12 @@ impl Space {
     ///
     /// If the position is out of bounds, there is no effect.
     ///
+    /// # Returns
+    ///
+    /// Returns `Ok(true)` if the change was made, `Ok(false)` if the same block was
+    /// already present, and `Err(_)` if the replacement could not be made; see
+    /// [`SetCubeError`] for possible errors.
+    ///
     /// ```
     /// use all_is_cubes::block::*;
     /// use all_is_cubes::math::Rgba;
