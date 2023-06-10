@@ -54,6 +54,33 @@ fn set_success() {
     space.consistency_check(); // bonus testing
 }
 
+/// Test set() with a block that fails evaluation.
+/// This should succeed but leave a placeholder.
+///
+/// This test case should also cover `RefError::InUse` and other evaluation errors.
+#[test]
+fn set_success_despite_eval_error_gone() {
+    let block = Block::builder()
+        .voxels_ref(R1, URef::<Space>::new_gone("bs".into()))
+        .build();
+    let mut space = Space::empty_positive(1, 1, 1);
+
+    assert_eq!(Ok(true), space.set([0, 0, 0], &block));
+
+    // Check for the expected placeholder.
+    assert_eq!(
+        space.get_evaluated([0, 0, 0]),
+        &EvalBlockError::DataRefIs(RefError::Gone("bs".into())).to_placeholder()
+    );
+
+    // TODO: Test that evaluation works the next time around. (It will be tricky to
+    // set up a URef that cooperates with that.)
+    // TODO: The placeholder should be subject to special stepping rules that prevent it
+    // from being interacted with, but that's not implemented yet.
+
+    space.consistency_check(); // bonus testing
+}
+
 #[test]
 fn set_failure_out_of_bounds() {
     let [block] = make_some_blocks();
@@ -70,23 +97,6 @@ fn set_failure_out_of_bounds() {
     assert_eq!(space.set(pt, &AIR), error);
 
     space.consistency_check(); // bonus testing
-}
-
-/// This test case should also cover `RefError::InUse` and other evaluation errors.
-#[test]
-fn set_failure_eval_error_gone() {
-    let inner_space_ref = URef::<Space>::new_gone("bs".into());
-    let block = Block::builder()
-        .voxels_ref(R1, inner_space_ref.clone())
-        .build();
-    let mut outer_space = Space::empty_positive(1, 1, 1);
-
-    assert_eq!(
-        outer_space.set((0, 0, 0), &block),
-        Err(SetCubeError::EvalBlock(RefError::Gone("bs".into()).into()))
-    );
-
-    outer_space.consistency_check(); // bonus testing
 }
 
 #[test]
@@ -114,12 +124,6 @@ fn set_error_format() {
         .to_string(),
         // TODO: simplify the single cube case
         "GridAab(1..2, 2..3, 3..4) is outside of the bounds GridAab(0..2, 0..2, 0..2)"
-    );
-    assert_eq!(
-        SetCubeError::EvalBlock(EvalBlockError::DataRefIs(RefError::Gone("foo".into())))
-            .to_string(),
-        // TODO: This message is a bit "revealing our exact data structure"...
-        "block evaluation failed: block data inaccessible: object was deleted: 'foo'"
     );
     assert_eq!(
         SetCubeError::TooManyBlocks().to_string(),

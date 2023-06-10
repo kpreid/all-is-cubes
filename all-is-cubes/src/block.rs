@@ -731,8 +731,8 @@ impl BlockChange {
 /// The returned [`Space`] contains each of the blocks; its coordinates will correspond to
 /// those of the input, scaled down by `resolution`.
 ///
-/// Returns [`SetCubeError::EvalBlock`] if the `Space` cannot be accessed, and
-/// [`SetCubeError::TooManyBlocks`] if the dimensions would result in too many blocks.
+/// Panics if the `Space` cannot be accessed, and returns
+/// [`SetCubeError::TooManyBlocks`] if the space volume is too large.
 ///
 /// TODO: add doc test for this
 pub fn space_to_blocks(
@@ -743,9 +743,7 @@ pub fn space_to_blocks(
     let resolution_g: GridCoordinate = resolution.into();
     let source_bounds = space_ref
         .read()
-        // TODO: Not really the right error since this isn't actually an eval error.
-        // Or is it close enough?
-        .map_err(EvalBlockError::DataRefIs)?
+        .expect("space_to_blocks() could not read() provided space")
         .bounds();
     let destination_bounds = source_bounds.divide(resolution_g);
 

@@ -9,9 +9,7 @@ use cgmath::Vector3;
 use instant::{Duration, Instant};
 
 use crate::behavior::{self, BehaviorSet};
-use crate::block::{
-    self, Block, BlockChange, EvalBlockError, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED,
-};
+use crate::block::{self, Block, BlockChange, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED};
 #[cfg(doc)]
 use crate::character::Character;
 use crate::character::Spawn;
@@ -611,21 +609,33 @@ impl Space {
         // Process changed block definitions.
         let mut last_start_time = Instant::now();
         let mut evaluations = TimeStats::default();
-        for block_index in self.todo.lock().unwrap().blocks.drain() {
-            self.notifier.notify(SpaceChange::BlockValue(block_index));
-            let data: &mut SpaceBlockData = &mut self.block_data[usize::from(block_index)];
+        {
+            let mut try_eval_again = HashSet::new();
+            let mut todo = self.todo.lock().unwrap();
+            for block_index in todo.blocks.drain() {
+                self.notifier.notify(SpaceChange::BlockValue(block_index));
+                let data: &mut SpaceBlockData = &mut self.block_data[usize::from(block_index)];
 
-            // TODO: We may want to have a higher-level error handling by pausing the Space
-            // and giving the user choices like reverting to save, editing to fix, or
-            // continuing with a partly broken world. Right now, we just continue with the
-            // placeholder, which may have cascading effects despite the placeholder's
-            // design to be innocuous.
-            data.evaluated = data.block.evaluate().unwrap_or_else(|e| e.to_placeholder());
+                // TODO: We may want to have a higher-level error handling by pausing the Space
+                // and giving the user choices like reverting to save, editing to fix, or
+                // continuing with a partly broken world. Right now, we just continue with the
+                // placeholder, which may have cascading effects despite the placeholder's
+                // design to be innocuous.
+                data.evaluated = data.block.evaluate().unwrap_or_else(|e| {
+                    // Trigger retrying evaluation at next step.
+                    try_eval_again.insert(block_index);
 
-            // TODO: Process side effects on individual cubes such as reevaluating the
-            // lighting influenced by the block.
+                    e.to_placeholder()
+                });
 
-            evaluations.record_consecutive_interval(&mut last_start_time, Instant::now());
+                // TODO: Process side effects on individual cubes such as reevaluating the
+                // lighting influenced by the block.
+
+                evaluations.record_consecutive_interval(&mut last_start_time, Instant::now());
+            }
+            if !try_eval_again.is_empty() {
+                todo.blocks = try_eval_again;
+            }
         }
 
         let start_cube_ticks = last_start_time;
@@ -965,13 +975,22 @@ impl SpaceBlockData {
         block: Block,
         listener: impl Listener<BlockChange> + Clone + Send + Sync + 'static,
     ) -> Result<Self, SetCubeError> {
+        // Note: Block evaluation also happens in `Space::step()`.
+
         let (gate, block_listener) = listener.gate();
-        let evaluated = block
-            .evaluate2(&block::EvalFilter {
-                skip_eval: false,
-                listener: Some(block_listener.erased()),
-            })
-            .map_err(SetCubeError::EvalBlock)?;
+        let block_listener = block_listener.erased();
+        let evaluated = match block.evaluate2(&block::EvalFilter {
+            skip_eval: false,
+            listener: Some(block_listener.clone()),
+        }) {
+            Ok(ev) => ev,
+            Err(err) => {
+                // Trigger retrying evaluation at next step.
+                block_listener.receive(BlockChange::new());
+                // Use a placeholder value.
+                err.to_placeholder()
+            }
+        };
         Ok(Self {
             block,
             count: 0,
@@ -1165,9 +1184,6 @@ pub enum SetCubeError {
         /// The bounds of the space.
         space_bounds: GridAab,
     },
-    /// [`Block::evaluate`] failed on a new block type.
-    #[error("block evaluation failed: {0}")]
-    EvalBlock(#[from] EvalBlockError),
     /// More distinct blocks were added than currently supported.
     #[error("more than {} block types is not yet supported", BlockIndex::MAX as usize + 1)]
     TooManyBlocks(),
