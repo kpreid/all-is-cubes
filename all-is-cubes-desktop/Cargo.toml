@@ -42,7 +42,7 @@ rand = { workspace = true, features = ["std", "std_rng"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 simplelog = { workspace = true }
-softbuffer = { version = "0.2.0", default-features = false, features = ["x11"] }
+softbuffer = { version = "0.3.0", default-features = false, features = ["x11"] }
 strum = { workspace = true, features = ["derive", "std"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread"] }
