@@ -86,7 +86,7 @@ impl Space {
         self.last_light_updates.clear();
         let mut max_difference: PackedLightScalar = 0;
 
-        if self.physics.light != LightPhysics::None {
+        if self.physics.light != LightPhysics::None && !budget.is_zero() {
             let t0 = Instant::now();
             let mut cost = 0;
             // We convert the time budget to an arbitrary cost value in order to avoid
