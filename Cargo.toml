@@ -48,7 +48,7 @@ log = { version = "0.4.17", default-features = false }
 macro_rules_attribute = "0.2.0"
 mutants = "0.0.3"
 num-traits = "0.2.15"
-once_cell = "1.17.1"
+once_cell = "1.18.0"
 ordered-float = { version = "3.0.0", features = ["serde"] }
 ouroboros = "0.15.6"
 pretty_assertions = "1.2.0"
