@@ -1,42 +1,15 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::mem::size_of;
 
 use bytemuck::offset_of;
 use gltf_json::extras::Void;
-use gltf_json::validation::Checked::{self, Valid};
+use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
-use once_cell::sync::Lazy;
 
 use all_is_cubes_mesh::{IndexSlice, SpaceMesh};
 
 use super::glue::{create_accessor, push_and_return_index, u32size};
 use super::{GltfTextureRef, GltfVertex, GltfWriter};
-
-/// An instance of [`RandomState`] which has been brute-forced to have a stable ordering
-/// for the keys we expect to use.
-///
-/// This is a workaround for [`gltf_json`] not offering stable output.
-/// A better solution would be to contribute a patch that fixes that
-/// (perhaps by switching to `BTreeMap` though that would be breaking, or a
-/// defaulted type parameter to choose the hasher).
-static STABLE_SEMANTIC_HASH_MAP: Lazy<
-    HashMap<Checked<gltf_json::mesh::Semantic>, Index<gltf_json::Accessor>>,
-> = Lazy::new(|| {
-    // This should almost always succeed quickly, because there are only two possible
-    // permutations.
-    loop {
-        let p = Valid(gltf_json::mesh::Semantic::Positions);
-        let c = Valid(gltf_json::mesh::Semantic::Colors(0));
-        let map: HashMap<Checked<gltf_json::mesh::Semantic>, Index<gltf_json::Accessor>> =
-            HashMap::from([
-                (p.clone(), Index::new(u32::MAX)),
-                (c.clone(), Index::new(u32::MAX)),
-            ]);
-        if map.keys().eq([&p, &c]) {
-            return map;
-        }
-    }
-});
 
 pub(crate) fn add_mesh(
     writer: &mut GltfWriter,
@@ -104,9 +77,7 @@ pub(crate) fn add_mesh(
         },
     );
 
-    let mut vertex_colored_attributes = HashMap::clone(&*STABLE_SEMANTIC_HASH_MAP);
-    vertex_colored_attributes.clear();
-    vertex_colored_attributes.extend([
+    let vertex_colored_attributes = BTreeMap::from([
         (
             Valid(gltf_json::mesh::Semantic::Positions),
             push_and_return_index(
