@@ -425,6 +425,14 @@ impl<'a> From<VoxelBrush<'a>> for SpaceTransaction {
     }
 }
 
+impl crate::universe::VisitRefs for VoxelBrush<'_> {
+    fn visit_refs(&self, visitor: &mut dyn crate::universe::RefVisitor) {
+        for (_, block) in self.0.iter() {
+            block.visit_refs(visitor);
+        }
+    }
+}
+
 /// Converts the return value of [`Space::set`] to the return value of
 /// [`DrawTarget::draw_pixel`], by making out-of-bounds not an error.
 fn ignore_out_of_bounds(result: Result<bool, SetCubeError>) -> Result<(), SetCubeError> {

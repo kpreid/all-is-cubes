@@ -163,6 +163,21 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
     }
 }
 
+impl crate::universe::VisitRefs for BlockAttributes {
+    fn visit_refs(&self, visitor: &mut dyn crate::universe::RefVisitor) {
+        let Self {
+            display_name: _,
+            selectable: _,
+            collision: _,
+            rotation_rule: _,
+            light_emission: _,
+            tick_action,
+            animation_hint: _,
+        } = self;
+        tick_action.visit_refs(visitor);
+    }
+}
+
 /// Specifies the effect on a [`Body`](crate::physics::Body) of colliding with the
 /// [`Block`] this applies to.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

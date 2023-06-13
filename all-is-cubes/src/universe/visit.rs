@@ -31,6 +31,14 @@ where
     }
 }
 
+impl<T: VisitRefs> VisitRefs for Option<T> {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        if let Some(element) = self {
+            element.visit_refs(visitor);
+        }
+    }
+}
+
 impl<T: VisitRefs> VisitRefs for Vec<T> {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
         for element in self {

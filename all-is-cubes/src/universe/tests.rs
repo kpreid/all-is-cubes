@@ -328,6 +328,18 @@ fn visit_refs_block_def_indirect() {
 }
 
 #[test]
+fn visit_refs_block_tick_action() {
+    let b1 = URef::new_pending("foo".into(), BlockDef::new(AIR));
+    let b2 = Block::builder()
+        .color(Rgba::WHITE)
+        .tick_action(Some(crate::drawing::VoxelBrush::single(
+            Block::from_primitive(Primitive::Indirect(b1)),
+        )))
+        .build();
+    assert_eq!(list_refs(&b2), vec!["foo".into()]);
+}
+
+#[test]
 fn visit_refs_character() {
     let mut u = Universe::new();
 

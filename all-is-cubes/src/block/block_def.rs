@@ -84,8 +84,17 @@ impl VisitRefs for Primitive {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
         match self {
             Primitive::Indirect(block_ref) => visitor.visit(block_ref),
-            Primitive::Atom(_, _) | Primitive::Air => {}
-            Primitive::Recur { space, .. } => visitor.visit(space),
+            Primitive::Atom(attributes, _color) => attributes.visit_refs(visitor),
+            Primitive::Air => {}
+            Primitive::Recur {
+                space,
+                attributes,
+                offset: _,
+                resolution: _,
+            } => {
+                visitor.visit(space);
+                attributes.visit_refs(visitor);
+            }
         }
     }
 }
