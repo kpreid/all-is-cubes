@@ -8,6 +8,7 @@
     - Many types, including `Universe` and its components now support serialization via `serde`.
       This serialization support is still a work in progress and long-term save data compatibility is planned but not currently guaranteed.
 
+    - `block::Atom`, a struct for the data of the `Primitive::Atom` enum variant.
     - `block::Modifier::Composite` has a new option `disassemblable`, which causes `Block::unspecialize()` (and its callers such as `Tool::RemoveBlock`) to return the composed blocks separately instead of the composite.
     - `linking::BlockProvider` now has methods `subset()` (replace keys) and `map()` (replace values) to allow using `BlockProvider`s in more ways.
     - `save::WhenceUniverse`, a trait for associating a `Universe` with disk files or other persistent storage. `Universe` now keeps an `Arc<dyn WhenceUniverse>`.
@@ -34,6 +35,7 @@
       This simplifies the data model, in that there is now _always_ a set of `Evoxel`s defining a block's shape, even if there's only one of them, and it is always found in the `voxels` field. This is a breaking change for code that accesses `EvaluatedBlock` data.
     - `block::Modifier::attach()` has been replaced by `block::Block::with_modifier()`.
       This is intended to be more convenient in all cases.
+    - `block::Primitive::Atom` now contains a `struct Atom` instead of individual fields.
     - `block::AIR` now has its own dedicated primitive, `Primitive::Air`. The behavior is unchanged.
     - `camera::Flaws` now implements `Display`. Use this instead of `Debug` for printing the flaws.
     - `math::Geometry::wireframe_points()` now produces a new type `mesh::LineVertex` instead of a tuple (with the same position and color data).

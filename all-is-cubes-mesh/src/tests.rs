@@ -2,7 +2,7 @@
 
 use pretty_assertions::assert_eq;
 
-use all_is_cubes::block::{Block, BlockAttributes, Primitive, Resolution::*, AIR};
+use all_is_cubes::block::{Atom, Block, BlockAttributes, Primitive, Resolution::*, AIR};
 use all_is_cubes::camera::{Flaws, GraphicsOptions, TransparencyOption};
 use all_is_cubes::cgmath::{MetricSpace as _, Point3, Transform as _, Vector3};
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
@@ -91,10 +91,14 @@ pub(crate) fn mesh_blocks_and_space(
 
 fn non_uniform_fill(cube: GridPoint) -> &'static Block {
     // TODO: This should be simple to write, such as by having a simple owned const constructor from colors
-    const C1: &Primitive =
-        &Primitive::Atom(BlockAttributes::default(), rgba_const!(1., 1., 1., 1.));
-    const C2: &Primitive =
-        &Primitive::Atom(BlockAttributes::default(), rgba_const!(0., 0., 0., 1.));
+    const C1: &Primitive = &Primitive::Atom(Atom {
+        attributes: BlockAttributes::default(),
+        color: rgba_const!(1., 1., 1., 1.),
+    });
+    const C2: &Primitive = &Primitive::Atom(Atom {
+        attributes: BlockAttributes::default(),
+        color: rgba_const!(0., 0., 0., 1.),
+    });
     const BLOCKS: &[Block] = &[
         Block::from_static_primitive(C1),
         Block::from_static_primitive(C2),

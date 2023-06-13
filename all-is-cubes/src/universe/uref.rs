@@ -690,7 +690,9 @@ mod tests {
         assert_eq!(
             format!("{r:?}"),
             "URef('foo' in no universe = BlockDef { \
-                block: Block { primitive: Atom(BlockAttributes {}, Rgba(1.0, 1.0, 1.0, 1.0)) }, \
+                block: Block { primitive: Atom { \
+                    attributes: BlockAttributes {}, \
+                    color: Rgba(1.0, 1.0, 1.0, 1.0) } }, \
                 notifier: Notifier(0), \
                 block_listen_gate: Gate })"
         );
@@ -699,10 +701,10 @@ mod tests {
             indoc::indoc! { "\
             URef('foo' in no universe = BlockDef {
                 block: Block {
-                    primitive: Atom(
-                        BlockAttributes {},
-                        Rgba(1.0, 1.0, 1.0, 1.0),
-                    ),
+                    primitive: Atom {
+                        attributes: BlockAttributes {},
+                        color: Rgba(1.0, 1.0, 1.0, 1.0),
+                    },
                 },
                 notifier: Notifier(0),
                 block_listen_gate: Gate,

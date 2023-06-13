@@ -79,7 +79,7 @@ struct BlockParts {
 }
 
 /// The possible fundamental representations of a [`Block`]'s shape.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Primitive {
     /// A block whose definition is stored elsewhere in a
@@ -91,9 +91,8 @@ pub enum Primitive {
     /// free of the effects of modifiers.
     Indirect(URef<BlockDef>),
 
-    /// A block that is a single-colored unit cube. (It may still be be transparent or
-    /// non-solid to physics; in fact, [`AIR`] is such an atom.)
-    Atom(BlockAttributes, Rgba),
+    /// A block of totally uniform properties.
+    Atom(Atom),
 
     /// A block that is composed of smaller blocks, defined by the referenced [`Space`].
     Recur {
@@ -120,6 +119,21 @@ pub enum Primitive {
     /// data model — so that if it is, say, serialized and loaded in a future version,
     /// it is still recognized as [`AIR`]. Additionally, it's cheaper to compare this way.
     Air,
+}
+
+/// Data of [`Primitive::Atom`]. The definition of a single [block](Block) that has uniform
+/// material properties rather than spatially varying ones; a single voxel.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
+pub struct Atom {
+    #[allow(missing_docs)]
+    pub attributes: BlockAttributes,
+
+    /// The color exhibited by diffuse reflection from this block.
+    ///
+    /// If the alpha component is neither 0 nor 1, then this is interpreted as the
+    /// opacity of a unit thickness of the material.
+    pub color: Rgba,
 }
 
 // --- End of type declarations, beginning of impls ---
@@ -268,7 +282,7 @@ impl Block {
     #[must_use]
     pub fn rotate(mut self, rotation: GridRotation) -> Self {
         match (self.primitive(), self.modifiers().is_empty()) {
-            (Primitive::Atom(..) | Primitive::Air, true) => {
+            (Primitive::Atom(_) | Primitive::Air, true) => {
                 // TODO: Just checking for Primitive::Atom doesn't help when the atom
                 // is hidden behind Primitive::Indirect. In general, we need to evaluate()
                 // (which suggests that this perhaps should be at least available
@@ -421,7 +435,10 @@ impl Block {
                 }
             }
 
-            Primitive::Atom(ref attributes, color) => MinEval {
+            Primitive::Atom(Atom {
+                ref attributes,
+                color,
+            }) => MinEval {
                 attributes: attributes.clone(),
                 voxels: Evoxels::One(Evoxel {
                     color,
@@ -511,7 +528,7 @@ impl Block {
     /// **Intended for use in tests only.**
     pub fn color(&self) -> Rgba {
         match *self.primitive() {
-            Primitive::Atom(_, c) => c,
+            Primitive::Atom(Atom { color, .. }) => color,
             Primitive::Air => AIR_EVALUATED.color,
             Primitive::Indirect(_) | Primitive::Recur { .. } => {
                 panic!("Block::color not defined for non-atom blocks")
@@ -594,7 +611,6 @@ impl From<Primitive> for Block {
 // or borrowed `Block`. The motivation for this is to avoid unnecessary cloning
 // (in case an individual block has large data).
 // TODO: Eliminate these given the new Block-is-a-pointer world.
-
 impl From<Block> for Cow<'_, Block> {
     fn from(block: Block) -> Self {
         Cow::Owned(block)
@@ -605,26 +621,29 @@ impl<'a> From<&'a Block> for Cow<'a, Block> {
         Cow::Borrowed(block)
     }
 }
-/// Convert a color to a block with default attributes.
+
+// Converting colors to blocks.
 impl From<Rgb> for Block {
+    /// Convert a color to a block with default attributes.
     fn from(color: Rgb) -> Self {
         Block::from(color.with_alpha_one())
     }
 }
-/// Convert a color to a block with default attributes.
 impl From<Rgba> for Block {
+    /// Convert a color to a block with default attributes.
     fn from(color: Rgba) -> Self {
-        Block::from_primitive(Primitive::Atom(BlockAttributes::default(), color))
+        Block::from_primitive(Primitive::Atom(Atom::from(color)))
     }
 }
-/// Convert a color to a block with default attributes.
+// TODO: Eliminate these Cow impls given the new Block-is-a-pointer world.
 impl From<Rgb> for Cow<'_, Block> {
+    /// Convert a color to a block with default attributes.
     fn from(color: Rgb) -> Self {
         Cow::Owned(Block::from(color))
     }
 }
-/// Convert a color to a block with default attributes.
 impl From<Rgba> for Cow<'_, Block> {
+    /// Convert a color to a block with default attributes.
     fn from(color: Rgba) -> Self {
         Cow::Owned(Block::from(color))
     }
@@ -658,7 +677,10 @@ mod arbitrary_block {
         fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
             Ok(match u.int_in_range(0..=3)? {
                 0 => Primitive::Air,
-                1 => Primitive::Atom(BlockAttributes::arbitrary(u)?, Rgba::arbitrary(u)?),
+                1 => Primitive::Atom(Atom {
+                    attributes: BlockAttributes::arbitrary(u)?,
+                    color: Rgba::arbitrary(u)?,
+                }),
                 2 => Primitive::Indirect(URef::arbitrary(u)?),
                 3 => Primitive::Recur {
                     attributes: BlockAttributes::arbitrary(u)?,
@@ -707,6 +729,60 @@ pub(crate) fn recursive_ray(ray: Ray, cube: GridPoint, resolution: Resolution) -
             (ray.origin - cube.map(FreeCoordinate::from)) * FreeCoordinate::from(resolution),
         ),
         direction: ray.direction,
+    }
+}
+
+impl fmt::Debug for Primitive {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Indirect(def) => f.debug_tuple("Indirect").field(def).finish(),
+            Self::Atom(atom) => atom.fmt(f),
+            Self::Recur {
+                attributes,
+                space,
+                offset,
+                resolution,
+            } => f
+                .debug_struct("Recur")
+                .field("attributes", attributes)
+                .field("space", space)
+                .field("offset", offset)
+                .field("resolution", resolution)
+                .finish(),
+            Self::Air => write!(f, "Air"),
+        }
+    }
+}
+
+mod conversions_for_atom {
+    use super::*;
+
+    impl From<Rgb> for Atom {
+        /// Convert a color to an [`Atom`] with default attributes.
+        fn from(color: Rgb) -> Self {
+            Atom::from(color.with_alpha_one())
+        }
+    }
+    impl From<Rgba> for Atom {
+        /// Convert a color to an [`Atom`] with default attributes.
+        fn from(color: Rgba) -> Self {
+            Atom {
+                attributes: BlockAttributes::default(),
+                color,
+            }
+        }
+    }
+
+    impl From<Atom> for Primitive {
+        fn from(value: Atom) -> Self {
+            Primitive::Atom(value)
+        }
+    }
+
+    impl From<Atom> for Block {
+        fn from(value: Atom) -> Self {
+            Block::from_primitive(Primitive::Atom(value))
+        }
     }
 }
 

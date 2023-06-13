@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use crate::block::{
-    AnimationHint, Block, BlockAttributes, BlockCollision, BlockDef, BlockParts, BlockPtr,
+    AnimationHint, Atom, Block, BlockAttributes, BlockCollision, BlockDef, BlockParts, BlockPtr,
     Modifier, Primitive, Resolution, RotationPlacementRule, AIR,
 };
 use crate::drawing::VoxelBrush;
@@ -276,7 +276,10 @@ impl<T: BuildPrimitiveIndependent> BuildPrimitiveInUniverse for T {
 /// Used by [`BlockBuilder::color`].
 impl BuildPrimitiveIndependent for Rgba {
     fn build_i(self, attributes: BlockAttributes) -> Primitive {
-        Primitive::Atom(attributes, self)
+        Primitive::Atom(Atom {
+            attributes,
+            color: self,
+        })
     }
 }
 
@@ -311,7 +314,10 @@ mod tests {
         let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
         assert_eq!(
             Block::builder().color(color).build(),
-            Block::from_primitive(Primitive::Atom(BlockAttributes::default(), color)),
+            Block::from(Atom {
+                attributes: BlockAttributes::default(),
+                color,
+            }),
         );
     }
 
@@ -333,25 +339,25 @@ mod tests {
             Block::builder()
                 .color(color)
                 .display_name("hello world")
-                .collision(BlockCollision::Recur)
+                .collision(BlockCollision::None)
                 .rotation_rule(rotation_rule)
                 .selectable(false)
                 .light_emission(light_emission)
                 .tick_action(tick_action.clone())
                 .animation_hint(AnimationHint::TEMPORARY)
                 .build(),
-            Block::from_primitive(Primitive::Atom(
-                BlockAttributes {
+            Block::from(Atom {
+                attributes: BlockAttributes {
                     display_name: "hello world".into(),
-                    collision: BlockCollision::Recur,
+                    collision: BlockCollision::None,
                     rotation_rule,
                     selectable: false,
                     light_emission,
                     tick_action,
                     animation_hint: AnimationHint::TEMPORARY,
                 },
-                color
-            )),
+                color,
+            }),
         );
     }
 

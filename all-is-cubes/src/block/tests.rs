@@ -13,7 +13,7 @@ use cgmath::EuclideanSpace as _;
 use pretty_assertions::assert_eq;
 
 use crate::block::{
-    self, Block, BlockAttributes, BlockChange, BlockCollision, BlockDef, BlockDefTransaction,
+    self, Atom, Block, BlockAttributes, BlockChange, BlockCollision, BlockDef, BlockDefTransaction,
     EvalBlockError, Evoxel, Evoxels, Modifier, Primitive, Resolution, Resolution::*, AIR,
     AIR_EVALUATED,
 };
@@ -78,9 +78,9 @@ fn block_debug_with_modifiers() {
                 .build()
         ),
         "Block { \
-            primitive: Atom(\
-                BlockAttributes {}, \
-                Rgba(1.0, 0.5, 0.0, 1.0)), \
+            primitive: Atom { \
+                attributes: BlockAttributes {}, \
+                color: Rgba(1.0, 0.5, 0.0, 1.0) }, \
             modifiers: [Rotate(Rxyz)] \
         }"
     );
@@ -123,7 +123,10 @@ fn evaluate_opaque_atom_and_attributes() {
         light_emission: Rgb::ONE,
         ..BlockAttributes::default()
     };
-    let block = Block::from_primitive(Primitive::Atom(attributes.clone(), color));
+    let block = Block::from(Atom {
+        attributes: attributes.clone(),
+        color,
+    });
     let e = block.evaluate().unwrap();
     assert_eq!(e.attributes, attributes);
     assert_eq!(e.color, block.color());
@@ -140,7 +143,7 @@ fn evaluate_opaque_atom_and_attributes() {
 #[test]
 fn evaluate_transparent_atom() {
     let color = Rgba::new(1.0, 2.0, 3.0, 0.5);
-    let block = Block::from_primitive(Primitive::Atom(BlockAttributes::default(), color));
+    let block = Block::from(color);
     let e = block.evaluate().unwrap();
     assert_eq!(e.color, block.color());
     assert!(matches!(e.voxels, Evoxels::One(_)));
@@ -154,10 +157,7 @@ fn evaluate_transparent_atom() {
 
 #[test]
 fn evaluate_invisible_atom() {
-    let block = Block::from_primitive(Primitive::Atom(
-        BlockAttributes::default(),
-        Rgba::TRANSPARENT,
-    ));
+    let block = Block::from(Rgba::TRANSPARENT);
     let e = block.evaluate().unwrap();
     assert_eq!(e.color, Rgba::TRANSPARENT);
     assert!(matches!(e.voxels, Evoxels::One(_)));

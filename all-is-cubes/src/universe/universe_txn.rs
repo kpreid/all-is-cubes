@@ -752,12 +752,12 @@ mod tests {
                         old: None,
                         new: Some(
                             Block {
-                                primitive: Atom(
-                                    BlockAttributes {
+                                primitive: Atom {
+                                    attributes: BlockAttributes {
                                         display_name: \"0\",
                                     },
-                                    Rgba(0.5, 0.5, 0.5, 1.0),
-                                ),
+                                    color: Rgba(0.5, 0.5, 0.5, 1.0),
+                                },
                             },
                         ),
                         conserved: true,

@@ -38,7 +38,7 @@ macro_rules! impl_serde_via_schema_by_ref {
 mod block {
     use super::*;
     use crate::block::{
-        AnimationChange, AnimationHint, Block, BlockAttributes, BlockCollision, Composite,
+        AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision, Composite,
         Modifier, Move, Primitive, Quote, RotationPlacementRule, Zoom,
     };
     use crate::math::Rgba;
@@ -81,7 +81,10 @@ mod block {
                 Primitive::Indirect(definition) => schema::PrimitiveSer::IndirectV1 {
                     definition: definition.clone(),
                 },
-                &Primitive::Atom(ref attributes, color) => schema::PrimitiveSer::AtomV1 {
+                &Primitive::Atom(Atom {
+                    ref attributes,
+                    color,
+                }) => schema::PrimitiveSer::AtomV1 {
                     color: color.into(),
                     attributes: attributes.into(),
                 },
@@ -105,9 +108,10 @@ mod block {
         fn from(value: schema::PrimitiveSer) -> Self {
             match value {
                 schema::PrimitiveSer::IndirectV1 { definition } => Primitive::Indirect(definition),
-                schema::PrimitiveSer::AtomV1 { attributes, color } => {
-                    Primitive::Atom(BlockAttributes::from(attributes), Rgba::from(color))
-                }
+                schema::PrimitiveSer::AtomV1 { attributes, color } => Primitive::Atom(Atom {
+                    attributes: BlockAttributes::from(attributes),
+                    color: Rgba::from(color),
+                }),
                 schema::PrimitiveSer::RecurV1 {
                     attributes,
                     space,

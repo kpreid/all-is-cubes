@@ -6,7 +6,7 @@ use std::fmt;
 use exhaust::Exhaust;
 
 use all_is_cubes::block::{
-    AnimationHint, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution,
+    AnimationHint, Atom, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution,
     Resolution::*, RotationPlacementRule, AIR,
 };
 use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, InnerSpace, Vector3};
@@ -424,7 +424,7 @@ pub async fn install_demo_blocks(
         if let Primitive::Indirect(block_def_ref) = provider_for_patch[Explosion(i)].primitive() {
             let mut block: Block = (*block_def_ref.read().unwrap()).clone();
 
-            if let Primitive::Atom(attributes, _) = block.primitive_mut() {
+            if let Primitive::Atom(Atom { attributes, .. }) = block.primitive_mut() {
                 attributes.tick_action = if i > 30 {
                     // Expire
                     Some(VoxelBrush::single(AIR))
@@ -492,15 +492,15 @@ pub async fn install_demo_blocks(
 /// block types generated.
 ///
 /// If the computation is NaN or the block is not an atom, it is returned unchanged.
-pub(crate) fn scale_color(block: Block, scalar: f64, quantization: f64) -> Block {
+pub(crate) fn scale_color(mut block: Block, scalar: f64, quantization: f64) -> Block {
     let scalar = (scalar / quantization).round() * quantization;
-    match (block.primitive(), NotNan::new(scalar as f32)) {
-        (Primitive::Atom(attributes, color), Ok(scalar)) => Block::from_primitive(Primitive::Atom(
-            attributes.clone(),
-            (color.to_rgb() * scalar).with_alpha(color.alpha()),
-        )),
-        _ => block,
+    match (block.primitive_mut(), NotNan::new(scalar as f32)) {
+        (Primitive::Atom(Atom { color, .. }), Ok(scalar)) => {
+            *color = (color.to_rgb() * scalar).with_alpha(color.alpha());
+        }
+        _ => {}
     }
+    block
 }
 
 /// Subdivide the range 0.0 to 1.0 into `gradient.len()` parts and return the [`Block`]

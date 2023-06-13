@@ -227,7 +227,7 @@ pub fn free_editing_starter_inventory(flying: bool) -> Vec<Slot> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{BlockAttributes, Primitive};
+    use crate::block::{Atom, BlockAttributes};
 
     #[test]
     fn make_some_blocks_0() {
@@ -239,13 +239,13 @@ mod tests {
         // Should succeed even though the normal range would be division-by-zero.
         assert_eq!(
             make_some_blocks::<1>(),
-            [Block::from_primitive(Primitive::Atom(
-                BlockAttributes {
+            [Block::from(Atom {
+                attributes: BlockAttributes {
                     display_name: "0".into(),
                     ..BlockAttributes::default()
                 },
-                Rgba::new(0.5, 0.5, 0.5, 1.0)
-            ))]
+                color: Rgba::new(0.5, 0.5, 0.5, 1.0),
+            })]
         );
     }
 
@@ -254,20 +254,20 @@ mod tests {
         assert_eq!(
             make_some_blocks::<2>(),
             [
-                Block::from_primitive(Primitive::Atom(
-                    BlockAttributes {
+                Block::from(Atom {
+                    attributes: BlockAttributes {
                         display_name: "0".into(),
                         ..BlockAttributes::default()
                     },
-                    Rgba::new(0.0, 0.0, 0.0, 1.0)
-                )),
-                Block::from_primitive(Primitive::Atom(
-                    BlockAttributes {
+                    color: Rgba::new(0.0, 0.0, 0.0, 1.0),
+                }),
+                Block::from(Atom {
+                    attributes: BlockAttributes {
                         display_name: "1".into(),
                         ..BlockAttributes::default()
                     },
-                    Rgba::new(1.0, 1.0, 1.0, 1.0)
-                ))
+                    color: Rgba::new(1.0, 1.0, 1.0, 1.0),
+                })
             ]
         );
     }
