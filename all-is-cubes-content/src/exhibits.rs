@@ -144,7 +144,6 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
         .build();
 
     let water_surface_block = Block::builder()
-        .collision(BlockCollision::Recur)
         .voxels_fn(universe, R8, |p| match p.y {
             0..=3 => &water_voxel,
             4 => &water_surface_voxel,
@@ -161,7 +160,6 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
         let upper = GridCoordinate::from(window_pane_resolution) - 1;
 
         Block::builder()
-            .collision(BlockCollision::Recur)
             .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
             .voxels_fn(universe, window_pane_resolution, |p| {
                 if p.z >= depth {
@@ -275,7 +273,6 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
         resolution,
         BlockAttributes {
             display_name: this.name.into(),
-            collision: BlockCollision::Recur,
             ..BlockAttributes::default()
         },
         universe.insert_anonymous(drawing_space),
@@ -294,10 +291,7 @@ async fn TEXT(_: &Exhibit, universe: &mut Universe) {
         R16,
         8,
         8..9,
-        BlockAttributes {
-            collision: BlockCollision::Recur,
-            ..Default::default()
-        },
+        BlockAttributes::default(),
         &Text::with_baseline(
             "Hello block world",
             Point::new(0, 0),
@@ -352,7 +346,6 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
         .execute(&mut block_space, &mut transaction::no_outputs)?;
         Block::builder()
             .animation_hint(AnimationHint::CONTINUOUS)
-            .collision(BlockCollision::Recur)
             .voxels_ref(resolution, universe.insert_anonymous(block_space))
             .build()
     };
@@ -361,7 +354,6 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
         let fire_resolution = R8;
         Block::builder()
             .animation_hint(AnimationHint::CONTINUOUS)
-            .collision(BlockCollision::None)
             .light_emission(rgb_const!(1.4, 1.0, 0.8) * 8.0)
             .voxels_ref(fire_resolution, {
                 let fire_bounds = GridAab::for_block(fire_resolution);
@@ -445,7 +437,6 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
             [
                 pedestal,
                 &Block::builder()
-                    .collision(BlockCollision::Recur)
                     .voxels_fn(universe, resolution, |p| {
                         if p.x + p.y + p.z >= GridCoordinate::from(resolution) {
                             return AIR.clone();
@@ -468,13 +459,12 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
                     0..1,
                     BlockAttributes {
                         display_name: resolution.to_string().into(),
-                        collision: BlockCollision::None,
                         ..BlockAttributes::default()
                     },
                     &Text::with_baseline(
                         &resolution.to_string(),
                         Point::new(0, -1),
-                        MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
+                        MonoTextStyle::new(&FONT_6X10, &non_colliding_text_pixel()),
                         Baseline::Bottom,
                     ),
                 )?[GridPoint::origin()],
@@ -509,7 +499,6 @@ async fn SMALLEST(_: &Exhibit, universe: &mut Universe) {
             pedestal,
             &Block::builder()
                 .display_name("World's Smallest Voxel")
-                .collision(BlockCollision::Recur)
                 .voxels_ref(resolution, universe.insert_anonymous(block_space))
                 .build(),
         ],
@@ -544,14 +533,11 @@ async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
                     R32,
                     0,
                     0..1,
-                    BlockAttributes {
-                        collision: BlockCollision::None,
-                        ..BlockAttributes::default()
-                    },
+                    BlockAttributes::default(),
                     &Text::with_baseline(
                         &format!("{rot:?}"),
                         Point::new(0, -1),
-                        MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
+                        MonoTextStyle::new(&FONT_6X10, &non_colliding_text_pixel()),
                         Baseline::Bottom,
                     ),
                 )?[GridPoint::origin()],
@@ -658,13 +644,12 @@ async fn COMPOSITE(_: &Exhibit, universe: &mut Universe) {
                     0..1,
                     BlockAttributes {
                         display_name: label_str.clone().into(),
-                        collision: BlockCollision::None,
                         ..BlockAttributes::default()
                     },
                     &Text::with_baseline(
                         &label_str,
                         Point::new(0, -(1 + 10 * 3)), // 3 lines above the bottom
-                        MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
+                        MonoTextStyle::new(&FONT_6X10, &non_colliding_text_pixel()),
                         Baseline::Top,
                     ),
                 )?[GridPoint::origin()]
@@ -769,13 +754,12 @@ async fn COLORS(_: &Exhibit, universe: &mut Universe) {
                     0..1,
                     BlockAttributes {
                         display_name: description.clone().into(),
-                        collision: BlockCollision::None,
                         ..BlockAttributes::default()
                     },
                     &Text::with_baseline(
                         &description,
                         Point::new(0, -i32::from(resolution)),
-                        MonoTextStyle::new(&FONT_6X10, palette::ALMOST_BLACK),
+                        MonoTextStyle::new(&FONT_6X10, &non_colliding_text_pixel()),
                         Baseline::Top,
                     ),
                 )
@@ -1005,7 +989,6 @@ async fn DASHED_BOXES(_: &Exhibit, universe: &mut Universe) {
     let corner_brush = Block::from(color * 0.6);
     let line_segment = Block::builder()
         .display_name("Dashed Box Segment")
-        .collision(BlockCollision::None)
         .voxels_fn(universe, R16, |p| {
             let zmod = p.z.rem_euclid(4);
             if p.x == 0 && p.y == 0 && zmod > 0 && zmod < 3 {
@@ -1017,7 +1000,6 @@ async fn DASHED_BOXES(_: &Exhibit, universe: &mut Universe) {
         .build();
     let corner = Block::builder()
         .display_name("Dashed Box Corner")
-        .collision(BlockCollision::None)
         .voxels_fn(universe, R16, |p| {
             if p.x < 2 && p.z < 2 && p.y < 2 {
                 &corner_brush
@@ -1094,7 +1076,6 @@ async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
         let image_space = universe
             .insert_anonymous(space_from_image(image, rotation, terrain_map_function).unwrap());
         let block = Block::builder()
-            .collision(BlockCollision::Recur)
             .display_name(format!("{rotation:?}"))
             .voxels_ref(R16, image_space)
             .build();
@@ -1229,6 +1210,16 @@ async fn TREES(_: &Exhibit, universe: &mut Universe) {
     }
 
     Ok(space)
+}
+
+/// TODO: is this really the strategy we want to take?
+/// It is a quick replacement for having discarded `BlockAttributes::collision`
+/// that could override voxel collision.
+fn non_colliding_text_pixel() -> Block {
+    Block::builder()
+        .color(palette::ALMOST_BLACK.with_alpha_one())
+        .collision(BlockCollision::None)
+        .build()
 }
 
 /// Place a series of blocks on top of each other, starting at the specified point.

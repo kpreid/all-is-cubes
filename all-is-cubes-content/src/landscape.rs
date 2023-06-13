@@ -233,11 +233,6 @@ pub async fn install_landscape_blocks(
                             .map_err(InGenError::other)?
                             .attributes,
                     )
-                    .collision(match growth {
-                        tree::TreeGrowth::Block => BlockCollision::Hard,
-                        // TODO: ideal would be a collision mode that says "collide with the bounding box"
-                        _ => BlockCollision::Recur,
-                    })
                     .voxels_fn(universe, resolution, |cube| {
                         if trunk_box.contains_cube(cube) {
                             // TODO: separate bark from inner wood
@@ -256,11 +251,6 @@ pub async fn install_landscape_blocks(
                         .map_err(InGenError::other)?
                         .attributes,
                 )
-                .collision(match growth {
-                    tree::TreeGrowth::Block => BlockCollision::Hard,
-                    // TODO: ideal would be a collision mode that says "collide with the bounding box"
-                    _ => BlockCollision::Recur,
-                })
                 .voxels_fn(universe, resolution, |cube| {
                     // Distance this cube is from the center.
                     // TODO: This is the same computation as done by square_radius() but

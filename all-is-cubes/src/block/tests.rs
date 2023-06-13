@@ -80,7 +80,8 @@ fn block_debug_with_modifiers() {
         "Block { \
             primitive: Atom { \
                 attributes: BlockAttributes {}, \
-                color: Rgba(1.0, 0.5, 0.0, 1.0) }, \
+                color: Rgba(1.0, 0.5, 0.0, 1.0), \
+                collision: Hard }, \
             modifiers: [Rotate(Rxyz)] \
         }"
     );
@@ -127,18 +128,25 @@ fn evaluate_opaque_atom_and_attributes() {
     let attributes = BlockAttributes {
         display_name: Cow::Borrowed("hello world"),
         selectable: false,
-        collision: BlockCollision::None,
         light_emission: Rgb::ONE,
         ..BlockAttributes::default()
     };
     let block = Block::from(Atom {
         attributes: attributes.clone(),
         color,
+        collision: BlockCollision::None,
     });
     let e = block.evaluate().unwrap();
     assert_eq!(e.attributes, attributes);
     assert_eq!(e.color, block.color());
-    assert!(matches!(e.voxels, Evoxels::One(_)));
+    assert_eq!(
+        e.voxels,
+        Evoxels::One(Evoxel {
+            color,
+            selectable: false,
+            collision: BlockCollision::None,
+        })
+    );
     assert_eq!(e.resolution(), R1);
     assert_eq!(e.opaque, FaceMap::repeat(true));
     assert_eq!(e.visible, true);

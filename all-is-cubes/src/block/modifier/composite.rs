@@ -260,7 +260,7 @@ impl CompositeOperator {
             // apply to discrete attributes.
             selectable: src_ev.selectable | dst_ev.selectable,
             collision: match (src_ev.collision, dst_ev.collision) {
-                (Coll::Hard | Coll::Recur, _) | (_, Coll::Hard | Coll::Recur) => Coll::Hard,
+                (Coll::Hard, _) | (_, Coll::Hard) => Coll::Hard,
                 (Coll::None, Coll::None) => Coll::None,
             },
         }

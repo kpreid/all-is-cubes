@@ -4,7 +4,10 @@ use std::fmt;
 
 use cgmath::{Vector4, Zero as _};
 
-use crate::block::{self, BlockAttributes, Resolution, Resolution::R1};
+use crate::block::{
+    self, BlockAttributes, BlockCollision,
+    Resolution::{self, R1},
+};
 use crate::content::palette;
 use crate::math::{FaceMap, GridAab, GridArray, GridPoint, OpacityCategory, Rgb, Rgba};
 use crate::universe::RefError;
@@ -43,6 +46,17 @@ pub struct EvaluatedBlock {
     /// is false if the block is completely transparent.
     pub visible: bool,
 
+    /// If all voxels in the cube have the same collision behavior, then this is that.
+    //
+    // TODO: As currently defined, this is None or Some(BlockCollision::None)
+    // if the voxels don't fill the cube bounds. But "collide with the bounding box"
+    // might be a nice efficient option.
+    //
+    // TODO: This won't generalize properly to having more than 2 states of
+    // BlockCollision in the way that transformation to `Evoxel` needs. We will need to
+    // make this its own enum, or a bitmask of all seen values, or something.
+    pub uniform_collision: Option<BlockCollision>,
+
     /// The opacity of all voxels. This is redundant with the data  [`Self::voxels`],
     /// and is provided as a pre-computed convenience that can be cheaply compared with
     /// other values of the same type.
@@ -62,6 +76,7 @@ impl fmt::Debug for EvaluatedBlock {
             voxels,
             opaque,
             visible,
+            uniform_collision,
             voxel_opacity_mask,
         } = self;
         let mut ds = fmt.debug_struct("EvaluatedBlock");
@@ -69,6 +84,7 @@ impl fmt::Debug for EvaluatedBlock {
         ds.field("color", color);
         ds.field("opaque", opaque);
         ds.field("visible", visible);
+        ds.field("uniform_collision", uniform_collision);
         ds.field("resolution", &self.resolution());
         match voxels {
             Evoxels::One(evoxel) => {
@@ -105,6 +121,7 @@ impl EvaluatedBlock {
                 voxels,
                 opaque: FaceMap::repeat(color.fully_opaque()),
                 visible,
+                uniform_collision: Some(evoxel.collision),
                 // Note an edge case shenanigan:
                 // `AIR_EVALUATED` cannot allocate a mask, and we want this to match the
                 // output of that so that `EvaluatedBlock::consistency_check()` will agree.)
@@ -120,21 +137,47 @@ impl EvaluatedBlock {
 
         let resolution = voxels.resolution();
         let full_block_bounds = GridAab::for_block(resolution);
+        let less_than_full = full_block_bounds != voxels.bounds();
 
         // Compute color sum from voxels
         // TODO: Give GridArray an iter() or something
         // TODO: The color sum actually needs to be weighted by alpha. (Too bad we're not using premultiplied alpha.)
         // TODO: Should not be counting interior voxels for the color, only visible surfaces.
-        let color = {
+        let (color, uniform_collision) = {
             let mut color_sum: Vector4<f32> = Vector4::zero();
+            let mut collision: Option<BlockCollision> = if less_than_full {
+                Some(BlockCollision::None)
+            } else {
+                None
+            };
+            let mut collision_unequal = false;
             for position in voxels.bounds().interior_iter() {
-                color_sum += voxels[position].color.into();
+                let voxel: Evoxel = voxels[position];
+
+                color_sum += voxel.color.into();
+
+                match (collision, collision_unequal) {
+                    // Already unequal
+                    (_, true) => {}
+                    // First voxel
+                    (None, false) => collision = Some(voxel.collision),
+                    // Matching voxel
+                    (Some(prev), false) if prev == voxel.collision => {}
+                    // Non-matching voxel
+                    (Some(_), false) => {
+                        collision = None;
+                        collision_unequal = true;
+                    }
+                }
             }
-            Rgba::try_from(
-                (color_sum.truncate() / (voxels.bounds().volume().max(1) as f32))
-                    .extend(color_sum.w / (full_block_bounds.volume() as f32)),
+            (
+                Rgba::try_from(
+                    (color_sum.truncate() / (voxels.bounds().volume().max(1) as f32))
+                        .extend(color_sum.w / (full_block_bounds.volume() as f32)),
+                )
+                .expect("Recursive block color computation produced NaN"),
+                collision,
             )
-            .expect("Recursive block color computation produced NaN")
         };
 
         let visible = voxels.bounds().interior_iter().any(
@@ -171,6 +214,7 @@ impl EvaluatedBlock {
                 }
             }),
             visible,
+            uniform_collision,
             voxel_opacity_mask,
             voxels,
         }
@@ -249,7 +293,6 @@ impl EvalBlockError {
             BlockAttributes {
                 display_name: format!("Block error: {self}").into(),
                 selectable: false, // TODO: make this selectable but immutable
-                collision: block::BlockCollision::Hard,
                 ..Default::default()
             },
             Evoxels::Many(
@@ -302,21 +345,23 @@ impl Evoxel {
         Self {
             color: block.color,
             selectable: block.attributes.selectable,
-            collision: block.attributes.collision,
+            // TODO: This won't generalize properly to having more than 2 states of
+            // BlockCollision. We need uniform_collision to carry more info.
+            collision: block.uniform_collision.unwrap_or(BlockCollision::Hard),
         }
     }
 
     /// Construct the [`Evoxel`] that would have resulted from evaluating a voxel block
     /// with the given color and default attributes.
     pub const fn from_color(color: Rgba) -> Self {
-        // Use the values from BlockAttributes's default for consistency.
+        // Use the selectable value from BlockAttributes's default for consistency.
         // Force constant promotion so that this doesn't look like a
         // feature(const_precise_live_drops) requirement
         const DA: &BlockAttributes = &BlockAttributes::default();
         Self {
             color,
             selectable: DA.selectable,
-            collision: DA.collision,
+            collision: block::BlockCollision::DEFAULT_FOR_FROM_COLOR,
         }
     }
 }
@@ -449,6 +494,7 @@ pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     voxels: Evoxels::One(Evoxel::AIR),
     opaque: FaceMap::repeat_copy(false),
     visible: false,
+    uniform_collision: Some(BlockCollision::None),
     voxel_opacity_mask: None,
 };
 
@@ -461,7 +507,6 @@ pub(super) const AIR_EVALUATED_MIN: MinEval = MinEval {
 const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
     display_name: std::borrow::Cow::Borrowed("<air>"),
     selectable: false,
-    collision: block::BlockCollision::None,
     rotation_rule: block::RotationPlacementRule::Never,
     light_emission: Rgb::ZERO,
     tick_action: None,
@@ -531,6 +576,7 @@ mod tests {
                 voxels: Evoxels::Many(resolution, GridArray::from_elements(bounds, []).unwrap()),
                 opaque: FaceMap::repeat(false),
                 visible: false,
+                uniform_collision: Some(BlockCollision::None),
                 voxel_opacity_mask: None
             }
         );

@@ -149,7 +149,6 @@ pub async fn install_demo_blocks(
             Lamp => Block::builder()
                 .display_name("Lamp")
                 .light_emission(Rgb::new(20.0, 20.0, 20.0))
-                .collision(BlockCollision::Recur)
                 .voxels_fn(universe, resolution, |p| {
                     if int_magnitude_squared(p * 2 + one_diagonal - center_point_doubled)
                         <= resolution_g.pow(2)
@@ -164,7 +163,6 @@ pub async fn install_demo_blocks(
             LamppostSegment => Block::builder()
                 .display_name("Lamppost")
                 .light_emission(Rgb::new(3.0, 3.0, 3.0))
-                .collision(BlockCollision::Recur)
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |cube| {
                     if int_magnitude_squared(
@@ -181,7 +179,6 @@ pub async fn install_demo_blocks(
 
             LamppostBase => Block::builder()
                 .display_name("Lamppost Base")
-                .collision(BlockCollision::Recur)
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |cube| {
                     let shape: [GridCoordinate; 16] =
@@ -201,7 +198,6 @@ pub async fn install_demo_blocks(
 
             LamppostTop => Block::builder()
                 .display_name("Lamppost Top")
-                .collision(BlockCollision::Recur)
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |cube| {
                     let shape: [GridCoordinate; 16] =
@@ -221,7 +217,6 @@ pub async fn install_demo_blocks(
             Sconce => Block::builder()
                 .display_name("Sconce")
                 .light_emission(Rgb::new(8.0, 7.0, 6.0))
-                .collision(BlockCollision::Recur)
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
                 .voxels_fn(universe, resolution, |p| {
                     // TODO: fancier/tidier appearance; this was just some tinkering from the original `Lamp` sphere
@@ -283,7 +278,6 @@ pub async fn install_demo_blocks(
 
                 Block::builder()
                     .display_name("Arrow")
-                    .collision(BlockCollision::Recur)
                     .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                     .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()
@@ -291,7 +285,6 @@ pub async fn install_demo_blocks(
 
             Curb => Block::builder()
                 .display_name("Curb")
-                .collision(BlockCollision::Recur)
                 // TODO: rotation should specify curb line direction
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, curb_fn)?
@@ -312,7 +305,6 @@ pub async fn install_demo_blocks(
 
             Pedestal => Block::builder()
                 .display_name("Pedestal")
-                .collision(BlockCollision::Recur)
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |cube| {
                     // TODO: fancier shape
@@ -379,7 +371,6 @@ pub async fn install_demo_blocks(
 
                 Block::builder()
                     .display_name("Signboard")
-                    .collision(BlockCollision::Recur)
                     .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                     .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()
@@ -395,7 +386,6 @@ pub async fn install_demo_blocks(
                     .unwrap();
                 Block::builder()
                     .display_name("Clock")
-                    .collision(BlockCollision::None)
                     .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
                     .animation_hint(AnimationHint::CONTINUOUS)
                     .voxels_ref(resolution, universe.insert_anonymous(space))
@@ -406,9 +396,9 @@ pub async fn install_demo_blocks(
                 let decay = (f32::from(timer) * -0.1).exp();
                 Block::builder()
                     .display_name(format!("Explosion {timer}"))
+                    .color(Rgb::ONE.with_alpha(NotNan::new(decay).unwrap()))
                     .collision(BlockCollision::None)
                     .light_emission(Rgb::ONE * decay)
-                    .color(Rgb::ONE.with_alpha(NotNan::new(decay).unwrap()))
                     .build()
             }
         })

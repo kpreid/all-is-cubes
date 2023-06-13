@@ -4,9 +4,7 @@ use std::fmt;
 
 use exhaust::Exhaust;
 
-use all_is_cubes::block::{
-    self, Block, BlockCollision, Resolution, RotationPlacementRule, Zoom, AIR,
-};
+use all_is_cubes::block::{self, Block, Resolution, RotationPlacementRule, Zoom, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace, Point3, Transform, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
@@ -470,7 +468,6 @@ async fn install_atrium_blocks(
             }
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
-                .collision(BlockCollision::Recur)
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |p| {
                     let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
@@ -483,7 +480,6 @@ async fn install_atrium_blocks(
                 .build(),
             AtriumBlocks::SquareColumn => Block::builder()
                 .display_name("Square Atrium Column")
-                .collision(BlockCollision::Recur)
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |p| {
                     let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
@@ -496,7 +492,6 @@ async fn install_atrium_blocks(
                 .build(),
             AtriumBlocks::SmallColumn => Block::builder()
                 .display_name("Round Atrium Column")
-                .collision(BlockCollision::Recur)
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |p| {
                     let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
@@ -509,14 +504,12 @@ async fn install_atrium_blocks(
                 .build(),
             AtriumBlocks::Molding => Block::builder()
                 .display_name("Atrium Top Edge Molding")
-                .collision(BlockCollision::Recur)
                 // TODO: rotation rule
                 .voxels_fn(universe, resolution, molding_fn)?
                 .build(),
             AtriumBlocks::Firepot => Block::builder()
                 .display_name("Firepot")
                 // .light_emission(rgb_const!(1.4, 1.0, 0.8) * 4.0)
-                .collision(BlockCollision::Recur)
                 .voxels_ref(resolution, {
                     let mut space = Space::for_block(resolution).build();
                     // Use a darker color to dampen the effect of interior light
@@ -628,7 +621,6 @@ fn generate_arch<'b>(
     };
     Ok(Block::builder()
         .display_name("Atrium Upper Floor Arch")
-        .collision(BlockCollision::Recur)
         // TODO: multiplication operation on Resolution
         .voxels_ref((resolution * MULTIBLOCK_SCALE).unwrap(), space)
         .build())

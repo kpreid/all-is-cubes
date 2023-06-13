@@ -5,7 +5,7 @@ use maze_generator::prelude::{FieldType, Generator};
 use rand::prelude::SliceRandom;
 use rand::{Rng, SeedableRng};
 
-use all_is_cubes::block::{Block, BlockCollision, Resolution::*, RotationPlacementRule, AIR};
+use all_is_cubes::block::{Block, Resolution::*, RotationPlacementRule, AIR};
 use all_is_cubes::cgmath::{ElementWise, EuclideanSpace as _, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::load_image::space_from_image;
@@ -643,7 +643,6 @@ pub async fn install_dungeon_blocks(
             CorridorLight => Block::builder()
                 .display_name("Corridor Light")
                 .light_emission(Rgb::new(8.0, 7.0, 0.7))
-                .collision(BlockCollision::Recur)
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::PY })
                 .voxels_fn(universe, resolution, |cube| {
                     let centered = cube * 2 - center_point_doubled;
@@ -671,7 +670,6 @@ pub async fn install_dungeon_blocks(
 
             Spikes => Block::builder()
                 .display_name("Spikes")
-                .collision(BlockCollision::None)
                 .voxels_fn(universe, resolution, |GridPoint { x, y, z }| {
                     let resolution = f64::from(resolution);
                     let bsin = |x| (f64::from(x) * TAU / resolution * 2.0).sin();
@@ -693,7 +691,6 @@ pub async fn install_dungeon_blocks(
                     })?;
                 Block::builder()
                     .display_name("Gate")
-                    .collision(BlockCollision::Recur)
                     .voxels_ref(R16, universe.insert_anonymous(space))
                     .build()
             }
@@ -710,7 +707,6 @@ pub async fn install_dungeon_blocks(
                 )?;
                 Block::builder()
                     .display_name("Gate Pocket")
-                    .collision(BlockCollision::Recur)
                     .voxels_ref(R16, universe.insert_anonymous(space))
                     .build()
             }

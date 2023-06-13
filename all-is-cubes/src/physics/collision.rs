@@ -242,12 +242,12 @@ where
                 }),
             };
             let found_end = match Sp::collision(cell) {
-                BlockCollision::None => {
+                Some(BlockCollision::None) => {
                     // No collision for this block
                     continue;
                 }
-                BlockCollision::Hard => full_cube_end,
-                BlockCollision::Recur => {
+                Some(BlockCollision::Hard) => full_cube_end,
+                None /* recursion */ => {
                     if let Some(found_end) = Sp::recurse(
                         full_cube_end.clone(),
                         aab,
@@ -353,8 +353,9 @@ pub(crate) trait CollisionSpace {
     /// Should return a non-colliding value if the point is out of bounds.
     fn get_cell(&self, cube: GridPoint) -> &Self::Cell;
 
-    /// Retrieve a cell's collision behavior option.
-    fn collision(cell: &Self::Cell) -> BlockCollision;
+    /// Retrieve a cell's collision behavior.
+    /// If None, recursion is needed.
+    fn collision(cell: &Self::Cell) -> Option<BlockCollision>;
 
     /// TODO: document
     fn get_voxels(cell: &Self::Cell) -> Option<&Evoxels>;
@@ -384,8 +385,8 @@ impl CollisionSpace for Space {
     }
 
     #[inline]
-    fn collision(cell: &Self::Cell) -> BlockCollision {
-        cell.attributes.collision
+    fn collision(cell: &Self::Cell) -> Option<BlockCollision> {
+        cell.uniform_collision
     }
 
     #[inline]
@@ -456,8 +457,8 @@ impl CollisionSpace for GridArray<Evoxel> {
     }
 
     #[inline]
-    fn collision(cell: &Self::Cell) -> BlockCollision {
-        cell.collision
+    fn collision(cell: &Self::Cell) -> Option<BlockCollision> {
+        Some(cell.collision)
     }
 
     #[inline]

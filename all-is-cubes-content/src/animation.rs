@@ -8,10 +8,10 @@ use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
 use all_is_cubes::behavior::{Behavior, BehaviorContext};
-use all_is_cubes::block::{Block, AIR};
+use all_is_cubes::block::{Block, BlockCollision, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace as _};
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{cube_to_midpoint, GridAab, GridArray, GridPoint, GridVector};
+use all_is_cubes::math::{cube_to_midpoint, GridAab, GridArray, GridPoint, GridVector, Rgba};
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
@@ -117,11 +117,17 @@ pub(crate) struct Fire {
 impl Fire {
     pub(crate) fn new(bounds: GridAab) -> Self {
         let rng = Xoshiro256Plus::seed_from_u64(2385993827);
+        fn fire_color(color: Rgba) -> Block {
+            Block::builder()
+                .color(color)
+                .collision(BlockCollision::None)
+                .build()
+        }
         let blocks = [
             AIR,
-            Block::from(rgba_const!(1.0, 0.5, 0.0, 1.0)),
-            Block::from(rgba_const!(1.0, 0.0, 0.0, 1.0)),
-            Block::from(rgba_const!(1.0, 1.0, 0.0, 1.0)),
+            fire_color(rgba_const!(1.0, 0.5, 0.0, 1.0)),
+            fire_color(rgba_const!(1.0, 0.0, 0.0, 1.0)),
+            fire_color(rgba_const!(1.0, 1.0, 0.0, 1.0)),
         ];
         Self {
             blocks,

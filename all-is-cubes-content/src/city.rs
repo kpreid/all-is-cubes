@@ -13,7 +13,7 @@ use all_is_cubes::drawing::embedded_graphics::{
     text::{Alignment, Baseline, TextStyleBuilder},
 };
 
-use all_is_cubes::block::{self, Block, BlockAttributes, BlockCollision, Resolution::*, AIR};
+use all_is_cubes::block::{self, Block, BlockAttributes, Resolution::*, AIR};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
@@ -371,8 +371,6 @@ pub(crate) async fn demo_city(
                         info_resolution,
                         BlockAttributes {
                             display_name: "Exhibit Name".into(),
-                            // TODO: Change this to Recur after fixing collision performance
-                            collision: BlockCollision::None,
                             ..Default::default()
                         },
                     ))),

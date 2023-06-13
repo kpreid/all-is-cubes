@@ -48,6 +48,8 @@ pub(crate) enum PrimitiveSer {
         color: RgbaSer,
         #[serde(flatten)]
         attributes: BlockAttributesV1Ser,
+        #[serde(default, skip_serializing_if = "is_default")]
+        collision: BlockCollisionSer,
     },
     RecurV1 {
         #[serde(flatten)]
@@ -68,8 +70,6 @@ pub(crate) struct BlockAttributesV1Ser {
     pub display_name: String,
     #[serde(default = "return_true", skip_serializing_if = "is_true")]
     pub selectable: bool,
-    #[serde(default, skip_serializing_if = "is_default")]
-    pub collision: BlockCollisionSer,
     #[serde(default, skip_serializing_if = "is_default")]
     pub rotation_rule: RotationPlacementRuleSer,
     #[serde(default, skip_serializing_if = "is_default")]
@@ -94,7 +94,6 @@ pub(crate) enum BlockCollisionSer {
     #[default]
     HardV1,
     NoneV1,
-    RecurV1,
 }
 
 #[derive(Debug, Default, PartialEq, Deserialize, Serialize)]

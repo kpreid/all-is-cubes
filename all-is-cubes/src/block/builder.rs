@@ -84,12 +84,6 @@ impl<C> BlockBuilder<C> {
         self
     }
 
-    /// Sets the value for [`BlockAttributes::collision`].
-    pub const fn collision(mut self, value: BlockCollision) -> Self {
-        self.attributes.collision = value;
-        self
-    }
-
     /// Sets the value for [`BlockAttributes::rotation_rule`].
     pub const fn rotation_rule(mut self, value: RotationPlacementRule) -> Self {
         self.attributes.rotation_rule = value;
@@ -125,10 +119,13 @@ impl<C> BlockBuilder<C> {
     /// Sets the color value for building a [`Primitive::Atom`].
     ///
     /// This will replace any previous color **or voxels.**
-    pub fn color(self, color: impl Into<Rgba>) -> BlockBuilder<Rgba> {
+    pub fn color(self, color: impl Into<Rgba>) -> BlockBuilder<BlockBuilderAtom> {
         BlockBuilder {
             attributes: self.attributes,
-            primitive_builder: color.into(),
+            primitive_builder: BlockBuilderAtom {
+                color: color.into(),
+                collision: BlockCollision::Hard,
+            },
             modifiers: Vec::new(),
         }
     }
@@ -217,6 +214,15 @@ impl<C> BlockBuilder<C> {
     }
 }
 
+/// Atom-specific builder methods.
+impl BlockBuilder<BlockBuilderAtom> {
+    /// Sets the collision behavior of a [`Primitive::Atom`] block.
+    pub const fn collision(mut self, collision: BlockCollision) -> Self {
+        self.primitive_builder.collision = collision;
+        self
+    }
+}
+
 /// Voxel-specific builder methods.
 impl BlockBuilder<BlockBuilderVoxels> {
     /// Sets the coordinate offset for building a [`Primitive::Recur`]:
@@ -238,13 +244,13 @@ impl<C: BuildPrimitiveIndependent> From<BlockBuilder<C>> for Block {
     }
 }
 /// Equivalent to `Block::builder().color(color)`.
-impl From<Rgba> for BlockBuilder<Rgba> {
+impl From<Rgba> for BlockBuilder<BlockBuilderAtom> {
     fn from(color: Rgba) -> Self {
         Block::builder().color(color)
     }
 }
 /// Equivalent to `Block::builder().color(color.with_alpha_one())`.
-impl From<Rgb> for BlockBuilder<Rgba> {
+impl From<Rgb> for BlockBuilder<BlockBuilderAtom> {
     fn from(color: Rgb) -> Self {
         Block::builder().color(color.with_alpha_one())
     }
@@ -273,17 +279,24 @@ impl<T: BuildPrimitiveIndependent> BuildPrimitiveInUniverse for T {
     }
 }
 
-/// Used by [`BlockBuilder::color`].
-impl BuildPrimitiveIndependent for Rgba {
+/// Parameter type for [`BlockBuilder::color`], building [`Primitive::Atom`].
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct BlockBuilderAtom {
+    color: Rgba,
+    collision: BlockCollision,
+}
+impl BuildPrimitiveIndependent for BlockBuilderAtom {
     fn build_i(self, attributes: BlockAttributes) -> Primitive {
         Primitive::Atom(Atom {
             attributes,
-            color: self,
+            color: self.color,
+            collision: self.collision,
         })
     }
 }
 
-/// Concrete type for a [`BlockBuilder`] that is building a voxel block.
+/// Parameter type for a [`BlockBuilder`] that is building a block with voxels
+/// ([`Primitive::Recur`]).
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct BlockBuilderVoxels {
     space: URef<Space>,
@@ -317,6 +330,7 @@ mod tests {
             Block::from(Atom {
                 attributes: BlockAttributes::default(),
                 color,
+                collision: BlockCollision::Hard,
             }),
         );
     }
@@ -349,7 +363,6 @@ mod tests {
             Block::from(Atom {
                 attributes: BlockAttributes {
                     display_name: "hello world".into(),
-                    collision: BlockCollision::None,
                     rotation_rule,
                     selectable: false,
                     light_emission,
@@ -357,6 +370,7 @@ mod tests {
                     animation_hint: AnimationHint::TEMPORARY,
                 },
                 color,
+                collision: BlockCollision::None,
             }),
         );
     }

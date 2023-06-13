@@ -692,7 +692,8 @@ mod tests {
             "URef('foo' in no universe = BlockDef { \
                 block: Block { primitive: Atom { \
                     attributes: BlockAttributes {}, \
-                    color: Rgba(1.0, 1.0, 1.0, 1.0) } }, \
+                    color: Rgba(1.0, 1.0, 1.0, 1.0), \
+                    collision: Hard } }, \
                 notifier: Notifier(0), \
                 block_listen_gate: Gate })"
         );
@@ -704,6 +705,7 @@ mod tests {
                     primitive: Atom {
                         attributes: BlockAttributes {},
                         color: Rgba(1.0, 1.0, 1.0, 1.0),
+                        collision: Hard,
                     },
                 },
                 notifier: Notifier(0),

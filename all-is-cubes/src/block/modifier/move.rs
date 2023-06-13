@@ -1,8 +1,7 @@
 use cgmath::Zero;
 
 use crate::block::{
-    self, Block, BlockAttributes, BlockCollision, Evoxel, Evoxels, MinEval, Modifier,
-    Resolution::R16, AIR,
+    self, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution::R16, AIR,
 };
 use crate::drawing::VoxelBrush;
 use crate::math::{Face6, GridAab, GridArray, GridCoordinate};
@@ -142,20 +141,6 @@ impl Move {
         };
 
         let attributes = BlockAttributes {
-            // Switch to `Recur` collision so that the displacement collides as expected.
-            // TODO: If the collision was `Hard` then we may need to edit the collision
-            // values of the individual voxels to preserve expected behavior.
-            collision: match input.attributes.collision {
-                BlockCollision::None => BlockCollision::None,
-                BlockCollision::Hard | BlockCollision::Recur => {
-                    if displaced_bounds.is_some() {
-                        BlockCollision::Recur
-                    } else {
-                        // Recur treats no-voxels as Hard, which is not what we want
-                        BlockCollision::None
-                    }
-                }
-            },
             tick_action: animation_action,
             ..input.attributes
         };
@@ -237,10 +222,7 @@ mod tests {
         assert_eq!(
             moved.evaluate().unwrap(),
             EvaluatedBlock {
-                attributes: BlockAttributes {
-                    collision: BlockCollision::Recur,
-                    ..ev_original.attributes.clone()
-                },
+                attributes: ev_original.attributes.clone(),
                 color: color.to_rgb().with_alpha(notnan!(0.5)),
                 voxels: Evoxels::Many(
                     R16,
@@ -248,6 +230,7 @@ mod tests {
                 ),
                 opaque: FaceMap::repeat(false).with(Face6::PY, true),
                 visible: true,
+                uniform_collision: None,
                 voxel_opacity_mask: Some(GridArray::repeat(
                     expected_bounds,
                     OpacityCategory::Opaque
@@ -278,10 +261,7 @@ mod tests {
         assert_eq!(
             moved.evaluate().unwrap(),
             EvaluatedBlock {
-                attributes: BlockAttributes {
-                    collision: BlockCollision::Recur,
-                    ..ev_original.attributes.clone()
-                },
+                attributes: ev_original.attributes.clone(),
                 color: color.to_rgb().with_alpha(notnan!(0.5)),
                 voxels: Evoxels::Many(
                     resolution,
@@ -289,6 +269,7 @@ mod tests {
                 ),
                 opaque: FaceMap::repeat(false).with(Face6::PY, true),
                 visible: true,
+                uniform_collision: None,
                 voxel_opacity_mask: Some(GridArray::repeat(
                     expected_bounds,
                     OpacityCategory::Opaque

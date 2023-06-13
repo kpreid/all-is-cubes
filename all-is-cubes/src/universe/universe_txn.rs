@@ -757,6 +757,7 @@ mod tests {
                                         display_name: \"0\",
                                     },
                                     color: Rgba(0.5, 0.5, 0.5, 1.0),
+                                    collision: Hard,
                                 },
                             },
                         ),

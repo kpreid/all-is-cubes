@@ -24,12 +24,12 @@ pub fn clouds(region: GridAab, space: &mut Space, density: f32) -> Result<(), Se
     fn cloud_block(alpha: f32) -> Block {
         Block::builder()
             .display_name("Cloud")
+            .color(Rgb::ONE.with_alpha(NotNan::new(alpha).unwrap()))
             .collision(if alpha >= 1.0 {
                 BlockCollision::Hard
             } else {
                 BlockCollision::None
             })
-            .color(Rgb::ONE.with_alpha(NotNan::new(alpha).unwrap()))
             .build()
     }
     const LEVELS: usize = 4;

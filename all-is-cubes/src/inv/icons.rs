@@ -6,7 +6,7 @@ use embedded_graphics::prelude::{Drawable, Primitive};
 use embedded_graphics::primitives::{Circle, Line, PrimitiveStyleBuilder};
 use exhaust::Exhaust;
 
-use crate::block::{Block, BlockCollision, Resolution::*, AIR, AIR_EVALUATED};
+use crate::block::{Block, Resolution::*, AIR, AIR_EVALUATED};
 use crate::content::load_image::{default_srgb, include_image, space_from_image};
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
@@ -236,7 +236,6 @@ impl Icons {
                         } else {
                             "Jetpack (off)"
                         })
-                        .collision(BlockCollision::Recur)
                         .light_emission(if active {
                             rgb_const!(1.0, 0.8, 0.8) * 0.5
                         } else {

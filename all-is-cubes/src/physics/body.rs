@@ -368,13 +368,13 @@ impl Body {
                     .translate(adjusted_segment.unit_endpoint().to_vec());
                 for cube in step_aab.round_up_to_grid().interior_iter() {
                     // TODO: refactor to combine this with other collision attribute tests
-                    match space.get_evaluated(cube).attributes.collision {
-                        BlockCollision::Hard => {
+                    match space.get_evaluated(cube).uniform_collision {
+                        Some(BlockCollision::Hard) => {
                             // Not a clear space
                             continue 'raycast;
                         }
-                        BlockCollision::None => {}
-                        BlockCollision::Recur => {
+                        Some(BlockCollision::None) => {}
+                        None => {
                             // TODO: Either check collision, or continue
                             //continue 'raycast;
                         }

@@ -29,6 +29,10 @@
     - Renamed: `BlockMeshProvider` is now `GetBlockMesh`. This aligns with the general principle of naming traits for the action that they enable.
 
 - `all-is-cubes` library:
+    - Block collision control has been redesigned:
+        - `BlockCollision` is now stored in `Atom`s and not in `BlockAttributes`; `Primitive::Recur` blocks always get their collision from their component voxels.
+        - `BlockCollision::Recur` no longer exists and `BlockCollision::Hard` cannot be used to disregard voxels' own collision.
+        This change should be an overall simplification of the semantics and eliminates the common mistake of forgetting to specify `Recur`.
     - `block::Block::listen()` is now `evaluate_and_listen()` which includes a simultaneous `evaluate()`.
     - `block::Block::unspecialize()` now returns `Vec<Block>`, to allow for cases where a block comes apart into multiple parts, such as with `Modifier::Composite`.
     - `block::EvaluatedBlock` now has a `voxels` field of the new type `Evoxels`, which replaces the previous `resolution` and `voxels` fields.
@@ -52,6 +56,9 @@
 - `all-is-cubes-ui` library:
     - `vui::LayoutGrant` now takes an additional parameter, `enlarge_for_symmetry`. Existing calls should be changed to pass `false` to get the prior behavior.
 
+### Removed
+
+- `all-is-cubes::block::BlockCollision::Recur` no longer exists; it is the default behavior.
 
 ## 0.5.1 (2022-12-29)
 

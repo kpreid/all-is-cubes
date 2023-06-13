@@ -84,9 +84,11 @@ mod block {
                 &Primitive::Atom(Atom {
                     ref attributes,
                     color,
+                    collision,
                 }) => schema::PrimitiveSer::AtomV1 {
                     color: color.into(),
                     attributes: attributes.into(),
+                    collision: collision.into(),
                 },
                 &Primitive::Recur {
                     ref attributes,
@@ -108,9 +110,14 @@ mod block {
         fn from(value: schema::PrimitiveSer) -> Self {
             match value {
                 schema::PrimitiveSer::IndirectV1 { definition } => Primitive::Indirect(definition),
-                schema::PrimitiveSer::AtomV1 { attributes, color } => Primitive::Atom(Atom {
+                schema::PrimitiveSer::AtomV1 {
+                    attributes,
+                    color,
+                    collision,
+                } => Primitive::Atom(Atom {
                     attributes: BlockAttributes::from(attributes),
                     color: Rgba::from(color),
+                    collision: collision.into(),
                 }),
                 schema::PrimitiveSer::RecurV1 {
                     attributes,
@@ -133,7 +140,6 @@ mod block {
             let &BlockAttributes {
                 ref display_name,
                 selectable,
-                collision,
                 rotation_rule,
                 light_emission,
                 tick_action: _, // TODO: serialize tick_action once it is cleaner
@@ -142,7 +148,6 @@ mod block {
             schema::BlockAttributesV1Ser {
                 display_name: display_name.to_string(),
                 selectable,
-                collision: collision.into(),
                 rotation_rule: rotation_rule.into(),
                 light_emission: light_emission.into(),
                 animation_hint: animation_hint.into(),
@@ -156,7 +161,6 @@ mod block {
             let schema::BlockAttributesV1Ser {
                 display_name,
                 selectable,
-                collision,
                 rotation_rule,
                 light_emission,
                 animation_hint,
@@ -164,7 +168,6 @@ mod block {
             Self {
                 display_name: display_name.into(),
                 selectable,
-                collision: collision.into(),
                 rotation_rule: rotation_rule.into(),
                 light_emission: light_emission.into(),
                 tick_action: None,
@@ -179,7 +182,6 @@ mod block {
             match value {
                 BlockCollision::None => S::NoneV1,
                 BlockCollision::Hard => S::HardV1,
-                BlockCollision::Recur => S::RecurV1,
             }
         }
     }
@@ -190,7 +192,6 @@ mod block {
             match value {
                 S::NoneV1 => BlockCollision::None,
                 S::HardV1 => BlockCollision::Hard,
-                S::RecurV1 => BlockCollision::Recur,
             }
         }
     }

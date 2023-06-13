@@ -8,7 +8,7 @@ use crate::math::{Face6, Rgb};
 
 #[cfg(doc)]
 use crate::{
-    block::{Block, BlockDef},
+    block::{Block, BlockDef, Primitive},
     space::Space,
 };
 
@@ -29,11 +29,6 @@ pub struct BlockAttributes {
     ///
     /// The default value is `true`.
     pub selectable: bool,
-
-    /// The effect on a [`Body`](crate::physics::Body) of colliding with this block.
-    ///
-    /// The default value is [`BlockCollision::Hard`].
-    pub collision: BlockCollision,
 
     /// Rule about how this block should be rotated, or not, when placed in a [`Space`] by
     /// some agent not otherwise specifying rotation.
@@ -72,7 +67,6 @@ impl fmt::Debug for BlockAttributes {
             let Self {
                 display_name,
                 selectable,
-                collision,
                 rotation_rule,
                 light_emission,
                 tick_action,
@@ -86,9 +80,6 @@ impl fmt::Debug for BlockAttributes {
             }
             if *selectable != Self::DEFAULT_REF.selectable {
                 s.field("selectable", selectable);
-            }
-            if *collision != Self::DEFAULT_REF.collision {
-                s.field("collision", collision);
             }
             if *rotation_rule != Self::DEFAULT_REF.rotation_rule {
                 s.field("rotation_rule", rotation_rule);
@@ -111,7 +102,6 @@ impl BlockAttributes {
     const DEFAULT: Self = BlockAttributes {
         display_name: Cow::Borrowed(""),
         selectable: true,
-        collision: BlockCollision::Hard,
         rotation_rule: RotationPlacementRule::Never,
         light_emission: Rgb::ZERO,
         tick_action: None,
@@ -143,7 +133,6 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
         Ok(BlockAttributes {
             display_name: Cow::Owned(u.arbitrary()?),
             selectable: u.arbitrary()?,
-            collision: u.arbitrary()?,
             rotation_rule: u.arbitrary()?,
             light_emission: u.arbitrary()?,
             tick_action: None, // TODO: need Arbitrary for Block
@@ -155,7 +144,6 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
         arbitrary::size_hint::and_all(&[
             String::size_hint(depth),
             bool::size_hint(depth),
-            BlockCollision::size_hint(depth),
             RotationPlacementRule::size_hint(depth),
             Rgb::size_hint(depth),
             AnimationHint::size_hint(depth),
@@ -168,7 +156,6 @@ impl crate::universe::VisitRefs for BlockAttributes {
         let Self {
             display_name: _,
             selectable: _,
-            collision: _,
             rotation_rule: _,
             light_emission: _,
             tick_action,
@@ -178,25 +165,30 @@ impl crate::universe::VisitRefs for BlockAttributes {
     }
 }
 
-/// Specifies the effect on a [`Body`](crate::physics::Body) of colliding with the
-/// [`Block`] this applies to.
+/// Specifies the effect on a [`Body`](crate::physics::Body) of colliding with a
+/// [`Primitive::Atom`] block or voxel having this property.
+//
+// TODO: This is no longer a part of attributes. Move? Rename?
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum BlockCollision {
-    /// The block can be passed through; it is not an obstacle (though intersecting it
+    /// The atom can be passed through; it is not an obstacle (though intersecting it
     /// might cause other effects not directly part of collision response).
     None,
-    /// The block is a perfectly solid obstacle occupying its entire bounding cube.
+    /// The atom is a perfectly solid obstacle occupying its entire bounding cube.
     ///
-    /// This is the default value used for most blocks. (Caveat: The default might be
-    /// changed to `Recur` if that proves more ergonomic.)
+    /// This is the default value used for most blocks.
     Hard,
-    /// Collide with the block's component voxels individually.
-    ///
-    /// If the block does not have voxels then this is equivalent to [`Hard`](Self::Hard).
-    Recur,
     // Future values might include bouncy solid, water-like resistance, force fields, etc.
+}
+
+impl BlockCollision {
+    /// Value used when we are constructing a block from a color with default other
+    /// characteristics. This is not just a [`Default`] impl so that if we later decide
+    /// that e.g. transparent atoms automatically become non-colliding, we can replace
+    /// uses of this constant with that.
+    pub(crate) const DEFAULT_FOR_FROM_COLOR: Self = Self::Hard;
 }
 
 /// Rule about how this block should be rotated, or not, when placed in a [`Space`] by
@@ -357,13 +349,6 @@ mod tests {
                 ..default()
             }),
             "BlockAttributes { selectable: false }",
-        );
-        assert_eq!(
-            &*debug(BlockAttributes {
-                collision: BlockCollision::None,
-                ..default()
-            }),
-            "BlockAttributes { collision: None }",
         );
         assert_eq!(
             &*debug(BlockAttributes {

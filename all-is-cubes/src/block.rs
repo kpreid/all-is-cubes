@@ -134,6 +134,11 @@ pub struct Atom {
     /// If the alpha component is neither 0 nor 1, then this is interpreted as the
     /// opacity of a unit thickness of the material.
     pub color: Rgba,
+
+    /// The effect on a [`Body`](crate::physics::Body) of colliding with this block.
+    ///
+    /// The default value is [`BlockCollision::Hard`].
+    pub collision: BlockCollision,
 }
 
 // --- End of type declarations, beginning of impls ---
@@ -438,12 +443,13 @@ impl Block {
             Primitive::Atom(Atom {
                 ref attributes,
                 color,
+                collision,
             }) => MinEval {
                 attributes: attributes.clone(),
                 voxels: Evoxels::One(Evoxel {
                     color,
                     selectable: attributes.selectable,
-                    collision: attributes.collision,
+                    collision,
                 }),
             },
 
@@ -680,6 +686,7 @@ mod arbitrary_block {
                 1 => Primitive::Atom(Atom {
                     attributes: BlockAttributes::arbitrary(u)?,
                     color: Rgba::arbitrary(u)?,
+                    collision: BlockCollision::arbitrary(u)?,
                 }),
                 2 => Primitive::Indirect(URef::arbitrary(u)?),
                 3 => Primitive::Recur {
@@ -695,7 +702,11 @@ mod arbitrary_block {
         fn size_hint(depth: usize) -> (usize, Option<usize>) {
             arbitrary::size_hint::recursion_guard(depth, |depth| {
                 size_hint::or_all(&[
-                    size_hint::and(BlockAttributes::size_hint(depth), Rgba::size_hint(depth)),
+                    size_hint::and_all(&[
+                        BlockAttributes::size_hint(depth),
+                        Rgba::size_hint(depth),
+                        BlockCollision::size_hint(depth),
+                    ]),
                     URef::<BlockDef>::size_hint(depth),
                     size_hint::and_all(&[
                         BlockAttributes::size_hint(depth),
@@ -769,6 +780,7 @@ mod conversions_for_atom {
             Atom {
                 attributes: BlockAttributes::default(),
                 color,
+                collision: BlockCollision::DEFAULT_FOR_FROM_COLOR,
             }
         }
     }

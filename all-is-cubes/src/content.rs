@@ -13,7 +13,7 @@ use embedded_graphics::text::Baseline;
 use embedded_graphics::text::Text;
 use embedded_graphics::text::TextStyleBuilder;
 
-use crate::block::{Block, BlockCollision, Resolution, Resolution::R16, RotationPlacementRule};
+use crate::block::{Block, Resolution, Resolution::R16, RotationPlacementRule};
 use crate::inv::{Slot, Tool};
 use crate::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, Rgb, Rgba};
 use crate::raycast::Raycaster;
@@ -153,7 +153,6 @@ pub fn make_slab(
 
     Block::builder()
         .display_name(format!("Slab {numerator}/{denominator}"))
-        .collision(BlockCollision::Recur)
         .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
         .voxels_ref(denominator, universe.insert_anonymous(space))
         .build()
@@ -227,7 +226,7 @@ pub fn free_editing_starter_inventory(flying: bool) -> Vec<Slot> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Atom, BlockAttributes};
+    use crate::block::{Atom, BlockAttributes, BlockCollision};
 
     #[test]
     fn make_some_blocks_0() {
@@ -245,6 +244,7 @@ mod tests {
                     ..BlockAttributes::default()
                 },
                 color: Rgba::new(0.5, 0.5, 0.5, 1.0),
+                collision: BlockCollision::Hard,
             })]
         );
     }
@@ -260,6 +260,7 @@ mod tests {
                         ..BlockAttributes::default()
                     },
                     color: Rgba::new(0.0, 0.0, 0.0, 1.0),
+                    collision: BlockCollision::Hard,
                 }),
                 Block::from(Atom {
                     attributes: BlockAttributes {
@@ -267,6 +268,7 @@ mod tests {
                         ..BlockAttributes::default()
                     },
                     color: Rgba::new(1.0, 1.0, 1.0, 1.0),
+                    collision: BlockCollision::Hard,
                 })
             ]
         );
