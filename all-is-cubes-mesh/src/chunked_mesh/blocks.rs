@@ -61,7 +61,7 @@ where
 
         // Bump version number.
         self.last_version_counter = match self.last_version_counter.get().checked_add(1) {
-            None => NonZeroU32::new(1).unwrap(),
+            None => NonZeroU32::MIN,
             Some(n) => NonZeroU32::new(n).unwrap(),
         };
         let current_version_number = BlockMeshVersion::Numbered(self.last_version_counter);

@@ -147,11 +147,7 @@ pub enum Slot {
 }
 
 impl Slot {
-    const COUNT_ONE: NonZeroU16 = {
-        // Safety: is a constant
-        // TODO: when Option::unwrap is stably const, remove unsafe
-        unsafe { NonZeroU16::new_unchecked(1) }
-    };
+    const COUNT_ONE: NonZeroU16 = NonZeroU16::MIN;
 
     /// Construct a [`Slot`] containing `count` copies of `tool`.
     ///
