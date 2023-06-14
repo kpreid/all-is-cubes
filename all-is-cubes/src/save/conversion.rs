@@ -37,7 +37,10 @@ macro_rules! impl_serde_via_schema_by_ref {
 
 mod block {
     use super::*;
-    use crate::block::{Block, BlockAttributes, Composite, Modifier, Move, Primitive, Quote, Zoom};
+    use crate::block::{
+        AnimationChange, AnimationHint, Block, BlockAttributes, BlockCollision, Composite,
+        Modifier, Move, Primitive, Quote, RotationPlacementRule, Zoom,
+    };
     use crate::math::Rgba;
     use schema::{BlockSer, ModifierSer};
 
@@ -124,19 +127,21 @@ mod block {
     impl From<&BlockAttributes> for schema::BlockAttributesV1Ser {
         fn from(value: &BlockAttributes) -> Self {
             let &BlockAttributes {
-                // TODO: implement serializing all attributes
                 ref display_name,
                 selectable,
-                collision: _,
-                rotation_rule: _,
+                collision,
+                rotation_rule,
                 light_emission,
-                tick_action: _,
-                animation_hint: _,
+                tick_action: _, // TODO: serialize tick_action once it is cleaner
+                animation_hint,
             } = value;
             schema::BlockAttributesV1Ser {
                 display_name: display_name.to_string(),
                 selectable,
+                collision: collision.into(),
+                rotation_rule: rotation_rule.into(),
                 light_emission: light_emission.into(),
+                animation_hint: animation_hint.into(),
             }
         }
     }
@@ -147,13 +152,111 @@ mod block {
             let schema::BlockAttributesV1Ser {
                 display_name,
                 selectable,
+                collision,
+                rotation_rule,
                 light_emission,
+                animation_hint,
             } = value;
             Self {
                 display_name: display_name.into(),
                 selectable,
+                collision: collision.into(),
+                rotation_rule: rotation_rule.into(),
                 light_emission: light_emission.into(),
-                ..Default::default()
+                tick_action: None,
+                animation_hint: animation_hint.into(),
+            }
+        }
+    }
+
+    impl From<BlockCollision> for schema::BlockCollisionSer {
+        fn from(value: BlockCollision) -> Self {
+            use schema::BlockCollisionSer as S;
+            match value {
+                BlockCollision::None => S::NoneV1,
+                BlockCollision::Hard => S::HardV1,
+                BlockCollision::Recur => S::RecurV1,
+            }
+        }
+    }
+
+    impl From<schema::BlockCollisionSer> for BlockCollision {
+        fn from(value: schema::BlockCollisionSer) -> Self {
+            use schema::BlockCollisionSer as S;
+            match value {
+                S::NoneV1 => BlockCollision::None,
+                S::HardV1 => BlockCollision::Hard,
+                S::RecurV1 => BlockCollision::Recur,
+            }
+        }
+    }
+
+    impl From<RotationPlacementRule> for schema::RotationPlacementRuleSer {
+        fn from(value: RotationPlacementRule) -> Self {
+            use schema::RotationPlacementRuleSer as S;
+            match value {
+                RotationPlacementRule::Never => S::NeverV1,
+                RotationPlacementRule::Attach { by } => S::AttachV1 { by },
+            }
+        }
+    }
+
+    impl From<schema::RotationPlacementRuleSer> for RotationPlacementRule {
+        fn from(value: schema::RotationPlacementRuleSer) -> Self {
+            use schema::RotationPlacementRuleSer as S;
+            match value {
+                S::NeverV1 => RotationPlacementRule::Never,
+                S::AttachV1 { by } => RotationPlacementRule::Attach { by },
+            }
+        }
+    }
+
+    impl From<AnimationHint> for schema::AnimationHintSer {
+        fn from(value: AnimationHint) -> Self {
+            let AnimationHint {
+                redefinition,
+                replacement,
+            } = value;
+            schema::AnimationHintSer::AnimationHintV1 {
+                redefinition: redefinition.into(),
+                replacement: replacement.into(),
+            }
+        }
+    }
+
+    impl From<schema::AnimationHintSer> for AnimationHint {
+        fn from(value: schema::AnimationHintSer) -> Self {
+            use schema::AnimationHintSer as S;
+            match value {
+                S::AnimationHintV1 {
+                    redefinition,
+                    replacement,
+                } => AnimationHint {
+                    redefinition: redefinition.into(),
+                    replacement: replacement.into(),
+                },
+            }
+        }
+    }
+
+    impl From<AnimationChange> for schema::AnimationChangeV1Ser {
+        fn from(value: AnimationChange) -> Self {
+            use schema::AnimationChangeV1Ser as S;
+            match value {
+                AnimationChange::None => S::None,
+                AnimationChange::ColorSameCategory => S::ColorSameCategory,
+                AnimationChange::Shape => S::Shape,
+            }
+        }
+    }
+
+    impl From<schema::AnimationChangeV1Ser> for AnimationChange {
+        fn from(value: schema::AnimationChangeV1Ser) -> Self {
+            use schema::AnimationChangeV1Ser as S;
+            match value {
+                S::None => AnimationChange::None,
+                S::ColorSameCategory => AnimationChange::ColorSameCategory,
+                S::Shape => AnimationChange::Shape,
             }
         }
     }

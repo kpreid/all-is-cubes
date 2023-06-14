@@ -5,11 +5,11 @@ use std::fmt;
 use pretty_assertions::assert_eq;
 use serde_json::{from_value, json, to_value};
 
-use crate::block::{self, Block, BlockDef, Modifier, Resolution};
+use crate::block::{self, AnimationChange, AnimationHint, Block, BlockDef, Modifier, Resolution};
 use crate::character::Character;
 use crate::content::make_some_blocks;
 use crate::inv::Tool;
-use crate::math::{GridAab, GridRotation, Rgb, Rgba};
+use crate::math::{Face6, GridAab, GridRotation, Rgb, Rgba};
 use crate::space::Space;
 use crate::universe::{Name, PartialUniverse, URef, Universe};
 
@@ -86,23 +86,38 @@ fn block_atom_default() {
 
 #[test]
 fn block_atom_with_all_attributes() {
-    // TODO: Not all attributes are serialized yet,
-    // so this test tests only the ones that work so far.
+    // TODO: tick_action is not serialized yet,
     assert_round_trip_value(
         &Block::builder()
             .color(Rgba::new(1.0, 0.5, 0.0, 0.5))
+            .collision(block::BlockCollision::None)
             .display_name("foo")
             .selectable(false)
+            .rotation_rule(block::RotationPlacementRule::Attach { by: Face6::PX })
             .light_emission(Rgb::new(1.0, 0.0, 10.0))
+            .animation_hint(AnimationHint {
+                redefinition: AnimationChange::ColorSameCategory,
+                replacement: AnimationChange::Shape,
+            })
             .build(),
         json!({
             "type": "BlockV1",
             "primitive": {
                 "type": "AtomV1",
                 "color": [1.0, 0.5, 0.0, 0.5],
+                "collision": "NoneV1",
                 "display_name": "foo",
                 "selectable": false,
+                "rotation_rule": {
+                    "type": "AttachV1",
+                    "by": "PX",
+                },
                 "light_emission": [1.0, 0.0, 10.0],
+                "animation_hint": {
+                    "type": "AnimationHintV1",
+                    "redefinition": "ColorSameCategory",
+                    "replacement": "Shape",
+                },
             },
         }),
     );

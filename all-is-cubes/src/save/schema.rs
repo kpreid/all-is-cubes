@@ -65,16 +65,19 @@ pub(crate) enum PrimitiveSer {
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct BlockAttributesV1Ser {
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub(crate) display_name: String,
+    pub display_name: String,
     #[serde(default = "return_true", skip_serializing_if = "is_true")]
-    pub(crate) selectable: bool,
-    // TODO: implement all attributes
-    //collision: BlockCollision,
-    //rotation_rule: RotationPlacementRule,
+    pub selectable: bool,
     #[serde(default, skip_serializing_if = "is_default")]
-    pub(crate) light_emission: RgbSer,
-    //tick_action: Option<VoxelBrush<'static>>,
-    //animation_hint: AnimationHint,
+    pub collision: BlockCollisionSer,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub rotation_rule: RotationPlacementRuleSer,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub light_emission: RgbSer,
+    // TODO: tick_action is a kludge but we should serialize it or its replacement
+    // pub(crate) tick_action: Option<VoxelBrush<'static>>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub animation_hint: AnimationHintSer,
 }
 fn return_true() -> bool {
     true
@@ -82,8 +85,50 @@ fn return_true() -> bool {
 fn is_true(value: &bool) -> bool {
     *value
 }
-fn is_default<T: Default + PartialEq + Copy>(value: &T) -> bool {
+fn is_default<T: Default + PartialEq>(value: &T) -> bool {
     *value == T::default()
+}
+
+#[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
+pub(crate) enum BlockCollisionSer {
+    #[default]
+    HardV1,
+    NoneV1,
+    RecurV1,
+}
+
+#[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum RotationPlacementRuleSer {
+    #[default]
+    NeverV1,
+    AttachV1 {
+        by: Face6,
+    },
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum AnimationHintSer {
+    AnimationHintV1 {
+        redefinition: AnimationChangeV1Ser,
+        replacement: AnimationChangeV1Ser,
+    },
+}
+impl Default for AnimationHintSer {
+    fn default() -> Self {
+        Self::AnimationHintV1 {
+            redefinition: AnimationChangeV1Ser::None,
+            replacement: AnimationChangeV1Ser::None,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub(crate) enum AnimationChangeV1Ser {
+    None,
+    ColorSameCategory,
+    Shape,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
