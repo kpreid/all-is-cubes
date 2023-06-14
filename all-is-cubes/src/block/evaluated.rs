@@ -285,9 +285,10 @@ pub struct Evoxel {
 }
 
 impl Evoxel {
-    /// The `Evoxel` value that would have resulted from using [`AIR`] in a recursive block.
+    /// The `Evoxel` value that is contained in [`AIR`].
     ///
-    /// TODO: Write a test for that.
+    /// This also represents the behavior of the empty space outside the bounds of
+    /// an [`EvaluatedBlock::voxels`] that is smaller than the full unit cube.
     pub const AIR: Self = Self {
         color: Rgba::TRANSPARENT,
         selectable: false,
@@ -445,7 +446,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
 pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     attributes: AIR_ATTRIBUTES,
     color: Rgba::TRANSPARENT,
-    voxels: Evoxels::One(AIR_INNER_EVOXEL),
+    voxels: Evoxels::One(Evoxel::AIR),
     opaque: FaceMap::repeat_copy(false),
     visible: false,
     voxel_opacity_mask: None,
@@ -453,12 +454,8 @@ pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
 
 pub(super) const AIR_EVALUATED_MIN: MinEval = MinEval {
     attributes: AIR_ATTRIBUTES,
-    voxels: Evoxels::One(AIR_INNER_EVOXEL),
+    voxels: Evoxels::One(Evoxel::AIR),
 };
-
-/// Note that this voxel is *not* no-collision and unselectable; the block attributes
-/// override it. For now, all atom blocks work this way. TODO: Perhaps we should change that.
-const AIR_INNER_EVOXEL: Evoxel = Evoxel::from_color(Rgba::TRANSPARENT);
 
 /// Used only by [`AIR_EVALUATED`].
 const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {

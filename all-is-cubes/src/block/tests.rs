@@ -100,17 +100,25 @@ fn evaluate_air_consistent_with_constant() {
     );
 }
 
-/// TODO: For now, AIR is processed like an `Atom` block and has selectable and collision
-/// fields that are the default. It would probably be better to arrange so that all
-/// `Evoxel`s end up with the attributes they reasonably should have, but for now, for
-/// consistency with the rest of the architecture (designed before _all_ blocks had
-/// `Evoxel`s rather than just attributes and color), this test is expected to “fail”
-/// (find unequal evoxels).
 #[test]
-#[should_panic = "unequal air"]
-fn evaluate_air_vs_evoxel_air() {
-    let voxel_of_air: Evoxel = AIR.evaluate().unwrap().voxels.single_voxel().unwrap();
-    assert_eq!(voxel_of_air, Evoxel::AIR, "unequal air");
+fn evaluate_air_consistent_with_evoxel_air() {
+    assert_eq!(
+        AIR.evaluate().unwrap().voxels.single_voxel().unwrap(),
+        Evoxel::AIR
+    );
+}
+
+#[test]
+fn evaluate_air_in_recursive_block() {
+    let mut universe = Universe::new();
+    let block = Block::builder()
+        .voxels_fn(&mut universe, R1, |_| AIR)
+        .unwrap()
+        .build();
+    assert_eq!(
+        block.evaluate().unwrap().voxels.single_voxel().unwrap(),
+        Evoxel::AIR
+    );
 }
 
 #[test]
