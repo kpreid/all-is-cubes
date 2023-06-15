@@ -4,7 +4,7 @@ use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
 use all_is_cubes::block::{
-    Block, BlockCollision,
+    Block, BlockCollision, Primitive,
     Resolution::{self, R16},
     AIR,
 };
@@ -116,6 +116,13 @@ pub async fn install_landscape_blocks(
     let colors = BlockProvider::<LandscapeBlocks>::default();
     let rng = &mut rand_xoshiro::Xoshiro256Plus::seed_from_u64(123890483921741);
 
+    let mut grass_blade_atom = colors[GrassBlades { variant: false }].clone();
+    // TODO: easier way to do this?
+    if let Primitive::Atom(ref mut atom) = grass_blade_atom.primitive_mut() {
+        atom.color = atom.color.to_rgb().with_alpha_one();
+        atom.collision = BlockCollision::None;
+    }
+
     let blade_color_noise = {
         let blade_color_noise_v = noise::Value::new(0x2e240365);
         move |p| blade_color_noise_v.at_grid(p) * 0.12 + 1.0
@@ -156,7 +163,7 @@ pub async fn install_landscape_blocks(
         let grass_blades = |universe, index: GridCoordinate| -> Result<Block, InGenError> {
             Ok(Block::builder()
                 .attributes(
-                    colors[GrassBlades { variant: false }]
+                    grass_blade_atom
                         .evaluate()
                         .map_err(InGenError::other)?
                         .attributes,
@@ -170,7 +177,7 @@ pub async fn install_landscape_blocks(
                                 0,
                             ) * index]
                     {
-                        scale_color(colors[Grass].clone(), blade_color_noise(cube), 0.02)
+                        scale_color(grass_blade_atom.clone(), blade_color_noise(cube), 0.02)
                     } else {
                         AIR
                     }
