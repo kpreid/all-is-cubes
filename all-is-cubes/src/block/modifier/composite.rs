@@ -47,6 +47,13 @@ impl Composite {
         }
     }
 
+    /// Toggle the reversed flag, which swaps the roles of the two blocks in the operator.
+    #[must_use]
+    pub fn reversed(mut self) -> Self {
+        self.reverse = !self.reverse;
+        self
+    }
+
     /// Set the disassemblable flag to true.
     ///
     /// This will allow the composite to be taken apart by player action.

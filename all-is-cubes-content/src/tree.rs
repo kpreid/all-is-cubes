@@ -80,13 +80,14 @@ pub(crate) fn make_log(
     );
 
     if let Some(leaves_growth) = leaves {
-        let mut leaves_composite = block::Composite::new(
-            blocks[Leaves(leaves_growth)].clone(),
-            block::CompositeOperator::Over,
-        );
-        leaves_composite.reverse = true; // wood always wins
-        leaves_composite.disassemblable = true;
-        wood.with_modifier(leaves_composite)
+        wood.with_modifier(
+            block::Composite::new(
+                blocks[Leaves(leaves_growth)].clone(),
+                block::CompositeOperator::Over,
+            )
+            .reversed() // wood always wins
+            .with_disassemblable(),
+        )
     } else {
         wood
     }
