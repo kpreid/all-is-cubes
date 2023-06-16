@@ -20,7 +20,10 @@ where
     T: PartialEq + fmt::Debug + serde::Serialize + serde::de::DeserializeOwned,
 {
     let json_value = to_value(value).expect("failed to serialize");
-    assert_eq!(json_value, expected_json, "JSON not as expected");
+    assert_eq!(
+        json_value, expected_json,
+        "serialized json != expected json"
+    );
     assert_eq!(
         &from_value::<T>(json_value).expect("failed to deserialize"),
         value,
@@ -37,7 +40,7 @@ where
 {
     let deserialized = from_value::<T>(json.clone()).expect("failed to deserialize");
     let round_trip_json = to_value(&deserialized).expect("failed to serialize");
-    assert_eq!(json, round_trip_json, "JSON not as expected");
+    assert_eq!(json, round_trip_json, "input json != round trip json");
     deserialized
 }
 
@@ -52,7 +55,7 @@ where
     T: fmt::Debug + serde::Serialize + serde::de::DeserializeOwned,
 {
     let json_value = to_value(value).expect("failed to serialize");
-    assert_eq!(json_value, expected_json);
+    assert_eq!(json_value, expected_json, "json_value != expected_json");
     assert_round_trip_json::<T>(json_value)
 }
 
@@ -402,7 +405,7 @@ fn partial_universe() {
     let value = PartialUniverse::all_of(&universe);
     let expected_json = universe_with_one_of_each_json();
     let json_value = to_value(&value).expect("failed to serialize");
-    assert_eq!(json_value, expected_json);
+    assert_eq!(json_value, expected_json, "json_value != expected_json");
     assert_round_trip_json::<Universe>(json_value);
 }
 
