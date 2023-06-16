@@ -65,6 +65,13 @@ impl From<&str> for Name {
         Self::Specific(value.into())
     }
 }
+
+impl From<String> for Name {
+    fn from(value: String) -> Self {
+        Self::Specific(value.into())
+    }
+}
+
 impl fmt::Display for Name {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

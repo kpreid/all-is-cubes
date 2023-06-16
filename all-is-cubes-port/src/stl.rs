@@ -140,9 +140,8 @@ mod tests {
             .into_iter()
             .enumerate()
             .map(|(i, block)| {
-                // TODO: should be able to construct `Name` better here
                 universe
-                    .insert(Name::from(&*format!("block{i}")), BlockDef::new(block))
+                    .insert(Name::from(format!("block{i}")), BlockDef::new(block))
                     .unwrap()
             })
             .collect();

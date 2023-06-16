@@ -23,7 +23,7 @@ use crate::universe::{InsertError, Name, URef, Universe};
 use crate::util::YieldProgress;
 
 fn name_in_module<E: BlockModule>(key: &E) -> Name {
-    Name::from(format!("{ns}/{key}", ns = E::namespace()).as_str())
+    Name::from(format!("{ns}/{key}", ns = E::namespace()))
 }
 
 /// Allows the use of [`BlockProvider::default`] to construct a [`BlockProvider`]
