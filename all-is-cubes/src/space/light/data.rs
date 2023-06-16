@@ -21,7 +21,6 @@ pub(crate) type PackedLightScalar = u8;
 #[repr(u8)]
 pub(crate) enum LightStatus {
     /// The cube's light value has never been computed.
-    #[allow(unused)]
     Uninitialized = 0,
     /// The cube has no surfaces to catch light and therefore the light value is not tracked.
     NoRays = 1,
@@ -194,6 +193,38 @@ impl From<Rgb> for PackedLight {
     #[inline]
     fn from(value: Rgb) -> Self {
         PackedLight::some(value)
+    }
+}
+
+impl From<PackedLight> for crate::save::schema::LightSerV1 {
+    fn from(p: PackedLight) -> Self {
+        use crate::save::schema::LightStatusSerV1 as S;
+        crate::save::schema::LightSerV1(
+            p.value.x,
+            p.value.y,
+            p.value.z,
+            match p.status {
+                LightStatus::Uninitialized => S::Uninitialized,
+                LightStatus::NoRays => S::NoRays,
+                LightStatus::Opaque => S::Opaque,
+                LightStatus::Visible => S::Visible,
+            },
+        )
+    }
+}
+
+impl From<crate::save::schema::LightSerV1> for PackedLight {
+    fn from(ls: crate::save::schema::LightSerV1) -> Self {
+        use crate::save::schema::LightStatusSerV1 as S;
+        PackedLight {
+            value: Vector3::new(ls.0, ls.1, ls.2),
+            status: match ls.3 {
+                S::Uninitialized => LightStatus::Uninitialized,
+                S::NoRays => LightStatus::NoRays,
+                S::Opaque => LightStatus::Opaque,
+                S::Visible => LightStatus::Visible,
+            },
+        }
     }
 }
 

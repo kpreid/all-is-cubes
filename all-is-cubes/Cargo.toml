@@ -73,6 +73,7 @@ rand_xoshiro = { workspace = true }
 rayon = { workspace = true, optional = true }
 # std and rc features needed because we are [de]serializing `Arc`s
 serde = { workspace = true, features = ["derive", "std", "rc"] }
+serde_repr = { version = "0.1.12", default-features = false }
 thiserror = { workspace = true }
 
 [dev-dependencies]

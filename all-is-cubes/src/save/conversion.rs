@@ -481,7 +481,7 @@ mod inv {
 
 mod space {
     use super::*;
-    use crate::space::Space;
+    use crate::space::{self, LightPhysics, Space, SpacePhysics};
 
     impl Serialize for Space {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -491,6 +491,7 @@ mod space {
             // TODO: more efficient serialization without extract() and with some kind of compression
             schema::SpaceSer::SpaceV1 {
                 bounds: self.bounds(),
+                physics: self.physics().into(),
                 blocks: self
                     .block_data()
                     .iter()
@@ -501,6 +502,14 @@ mod space {
                         index.expect("shouldn't happen: serialization went out of bounds")
                     })
                     .into_elements(),
+                light: if matches!(self.physics().light, space::LightPhysics::None) {
+                    None
+                } else {
+                    Some(
+                        self.extract(self.bounds(), |_, _, light| schema::LightSerV1::from(light))
+                            .into_elements(),
+                    )
+                },
             }
             .serialize(serializer)
         }
@@ -514,11 +523,14 @@ mod space {
             match schema::SpaceSer::deserialize(deserializer)? {
                 schema::SpaceSer::SpaceV1 {
                     bounds,
+                    physics,
                     blocks,
                     contents,
+                    light,
                 } => {
+                    let mut space = Space::builder(bounds).physics(physics.into()).build();
+
                     // TODO: more efficient loading that sets blocks by index rather than value
-                    let mut space = Space::builder(bounds).build();
                     for (cube, &block_index) in bounds.interior_iter().zip(contents.iter()) {
                         space
                             .set(
@@ -533,8 +545,67 @@ mod space {
                             )
                             .unwrap();
                     }
+
+                    // Copy light data in.
+                    // TODO: Think about what behavior we want for the light update queue
+                    if let Some(light) = light {
+                        for (dst, src) in space.lighting.iter_mut().zip(light.iter().copied()) {
+                            *dst = src.into();
+                        }
+                    }
+
                     Ok(space)
                 }
+            }
+        }
+    }
+
+    impl From<&SpacePhysics> for schema::SpacePhysicsSerV1 {
+        fn from(value: &SpacePhysics) -> Self {
+            let &SpacePhysics {
+                gravity,
+                sky_color,
+                ref light,
+            } = value;
+            Self {
+                gravity: gravity.into(),
+                sky_color: sky_color.into(),
+                light: light.into(),
+            }
+        }
+    }
+
+    impl From<schema::SpacePhysicsSerV1> for SpacePhysics {
+        fn from(value: schema::SpacePhysicsSerV1) -> Self {
+            let schema::SpacePhysicsSerV1 {
+                gravity,
+                sky_color,
+                light,
+            } = value;
+            Self {
+                gravity: gravity.into(),
+                sky_color: sky_color.into(),
+                light: light.into(),
+            }
+        }
+    }
+
+    impl From<&LightPhysics> for schema::LightPhysicsSerV1 {
+        fn from(value: &LightPhysics) -> Self {
+            use schema::LightPhysicsSerV1 as S;
+            match value {
+                LightPhysics::None => S::NoneV1,
+                &LightPhysics::Rays { maximum_distance } => S::RaysV1 { maximum_distance },
+            }
+        }
+    }
+
+    impl From<schema::LightPhysicsSerV1> for LightPhysics {
+        fn from(value: schema::LightPhysicsSerV1) -> Self {
+            use schema::LightPhysicsSerV1 as S;
+            match value {
+                S::NoneV1 => LightPhysics::None,
+                S::RaysV1 { maximum_distance } => LightPhysics::Rays { maximum_distance },
             }
         }
     }

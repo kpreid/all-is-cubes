@@ -2,6 +2,7 @@
 
 use std::fmt;
 
+use cgmath::Vector3;
 use pretty_assertions::assert_eq;
 use serde_json::{from_value, json, to_value};
 
@@ -10,7 +11,7 @@ use crate::character::Character;
 use crate::content::make_some_blocks;
 use crate::inv::Tool;
 use crate::math::{Face6, GridAab, GridRotation, Rgb, Rgba};
-use crate::space::Space;
+use crate::space::{LightPhysics, Space, SpacePhysics};
 use crate::universe::{Name, PartialUniverse, URef, Universe};
 
 #[track_caller]
@@ -213,10 +214,23 @@ fn character() {
 fn space() {
     // TODO: set more properties
     let bounds = GridAab::from_lower_upper([1, 2, 3], [4, 5, 6]);
-    let mut space = Space::builder(bounds).build();
+    let mut space = Space::builder(bounds)
+        .physics(SpacePhysics {
+            gravity: Vector3::new(notnan!(0.0), notnan!(0.25), notnan!(1.0)),
+            sky_color: Rgb::ONE,
+            light: LightPhysics::Rays {
+                maximum_distance: 123,
+            },
+        })
+        .build();
+
     let [block] = make_some_blocks();
     space.set([1, 2, 5], block).unwrap();
+    space.evaluate_light(0, |_| {});
 
+    const NL: [u8; 4] = [0, 0, 0, 1];
+    const IN: [u8; 4] = [0, 0, 0, 2];
+    const BS: [u8; 4] = [128, 128, 128, 3];
     assert_serdeser(
         &space,
         json!({
@@ -224,6 +238,14 @@ fn space() {
             "bounds": {
                 "lower": [1, 2, 3],
                 "upper": [4, 5, 6],
+            },
+            "physics": {
+                "gravity": [0.0, 0.25, 1.0],
+                "sky_color": [1.0, 1.0, 1.0],
+                "light": {
+                    "type": "RaysV1",
+                    "maximum_distance": 123,
+                }
             },
             "blocks": [
                 {
@@ -239,11 +261,17 @@ fn space() {
                     },
                 },
             ],
+            // TODO: contents and light should be stored in a compressed form
             "contents": [
                 0, 0, 1, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0,
             ],
+            "light": [
+                NL, BS, IN, NL, NL, BS, NL, NL, NL,
+                NL, NL, BS, NL, NL, NL, NL, NL, NL,
+                NL, NL, NL, NL, NL, NL, NL, NL, NL,
+            ]
         }),
     );
 }
@@ -262,6 +290,7 @@ fn universe_with_one_of_each() -> Universe {
         .insert("a_block".into(), BlockDef::new(block))
         .unwrap();
 
+    // Note: space has no light (which simplifies our work here)
     let mut space = Space::for_block(Resolution::R2).build();
     space
         .set(
@@ -338,6 +367,13 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                         "lower": [0, 0, 0],
                         "upper": [2, 2, 2],
                     },
+                    "physics": {
+                        "gravity": [0.0, 0.0, 0.0],
+                        "sky_color": [0.5, 0.5, 0.5],
+                        "light": {
+                            "type": "NoneV1",
+                        }
+                    },
                     "blocks": [
                         {
                             "type": "BlockV1",
@@ -352,8 +388,10 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                         }
                     ],
                     "contents": [
-                        1, 0, 0, 0, 0, 0, 0, 0,
+                        1, 0, 0, 0,
+                        0, 0, 0, 0,
                     ],
+                    "light": null,
                 }
             },
         ],

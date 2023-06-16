@@ -237,10 +237,40 @@ type RgbaSer = [ordered_float::NotNan<f32>; 4];
 pub(crate) enum SpaceSer {
     SpaceV1 {
         bounds: GridAab,
+        physics: SpacePhysicsSerV1,
         blocks: Vec<block::Block>,
         contents: Box<[space::BlockIndex]>,
-        // TODO: bounds, behaviors, lighting, spawn, physics
+        light: Option<Box<[LightSerV1]>>,
+        // TODO: behaviors, spawn
     },
+}
+
+/// Schema for serializing `PackedLight`.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub(crate) struct LightSerV1(pub u8, pub u8, pub u8, pub LightStatusSerV1);
+
+#[derive(Clone, Copy, Debug, serde_repr::Deserialize_repr, serde_repr::Serialize_repr)]
+#[repr(u8)]
+pub(crate) enum LightStatusSerV1 {
+    Uninitialized = 0,
+    NoRays = 1,
+    Opaque = 2,
+    Visible = 3,
+}
+
+/// Currently identical to `PackedLight`.
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct SpacePhysicsSerV1 {
+    pub gravity: [ordered_float::NotNan<f64>; 3],
+    pub sky_color: RgbSer,
+    pub light: LightPhysicsSerV1,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum LightPhysicsSerV1 {
+    NoneV1,
+    RaysV1 { maximum_distance: u16 },
 }
 
 //------------------------------------------------------------------------------------------------//
