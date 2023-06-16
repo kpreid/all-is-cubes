@@ -49,12 +49,14 @@ threads = ["dep:rayon"]
 
 [dependencies]
 arbitrary = { workspace = true, optional = true }
+base64 = { workspace = true } # used in serialization
 bitflags = { workspace = true }
-bytemuck = { workspace = true }
+bytemuck = { workspace = true, features = ["derive", "extern_crate_std"] } # derive used in serialization
 cgmath = "0.18.0"
 downcast-rs = "1.2.0"
 embedded-graphics = "0.8.0"
 exhaust = { workspace = true }
+flate2 = { version = "1.0.26" }
 futures-core = { workspace = true }
 # image is used for its common image data types (for HeadlessRenderer),
 # and for PNG asset loading.

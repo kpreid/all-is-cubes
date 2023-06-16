@@ -7,6 +7,7 @@ use futures_core::future::BoxFuture;
 use crate::universe::Universe;
 use crate::util::YieldProgress;
 
+mod compress;
 pub(crate) mod conversion;
 pub(crate) mod schema;
 
