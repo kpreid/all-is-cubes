@@ -208,9 +208,12 @@ fn character() {
 
 #[test]
 fn space() {
-    // TODO: set more properties and fill contents
+    // TODO: set more properties
     let bounds = GridAab::from_lower_upper([1, 2, 3], [4, 5, 6]);
-    let space = Space::builder(bounds).build();
+    let mut space = Space::builder(bounds).build();
+    let [block] = make_some_blocks();
+    space.set([1, 2, 5], block).unwrap();
+
     assert_serdeser(
         &space,
         json!({
@@ -223,10 +226,18 @@ fn space() {
                 {
                     "type": "BlockV1",
                     "primitive": {"type": "AirV1"},
-                }
+                },
+                {
+                    "type": "BlockV1",
+                    "primitive": {
+                        "type": "AtomV1",
+                        "color": [0.5, 0.5, 0.5, 1.0],
+                        "display_name": "0",
+                    },
+                },
             ],
             "contents": [
-                0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 1, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0,
             ],
