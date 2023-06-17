@@ -231,7 +231,7 @@ impl Transaction<Space> for SpaceTransaction {
                 if let Some(old) = old {
                     // Raw lookup because we already computed the index for a bounds check
                     // (TODO: Put this in a function, like get_block_index)
-                    if space.block_data[space.contents[cube_index] as usize].block != *old {
+                    if space.palette.entry(space.contents[cube_index]).block() != old {
                         return Err(PreconditionFailed {
                             location: "Space",
                             problem: "existing block not as expected",

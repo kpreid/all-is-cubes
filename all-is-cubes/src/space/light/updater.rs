@@ -250,8 +250,7 @@ impl Space {
                     let cube = GridPoint::new(x, y, z);
                     let index = bounds.index(cube).unwrap();
 
-                    let this_cube_evaluated =
-                        &self.block_data[self.contents[index] as usize].evaluated;
+                    let this_cube_evaluated = &self.palette.entry(self.contents[index]).evaluated;
                     self.lighting[index] = if opaque_for_light_computation(this_cube_evaluated) {
                         covered = true;
                         PackedLight::OPAQUE

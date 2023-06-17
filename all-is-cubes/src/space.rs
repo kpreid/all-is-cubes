@@ -3,20 +3,19 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::sync::{Arc, Mutex, Weak};
 
 use cgmath::Vector3;
 use instant::{Duration, Instant};
 
 use crate::behavior::{self, BehaviorSet};
-use crate::block::{self, Block, BlockChange, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED};
+use crate::block::{Block, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED};
 #[cfg(doc)]
 use crate::character::Character;
 use crate::character::Spawn;
-use crate::content::palette;
+use crate::content::palette::DAY_SKY_COLOR;
 use crate::drawing::DrawingPlane;
 use crate::inv::EphemeralOpaque;
-use crate::listen::{Gate, Listen, Listener, Notifier};
+use crate::listen::{Listen, Listener, Notifier};
 use crate::math::{
     point_checked_add, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix,
     GridPoint, GridRotation, NotNan, Rgb,
@@ -36,6 +35,10 @@ pub use light::LightUpdateCubeInfo;
 use light::{opaque_for_light_computation, LightUpdateQueue, PackedLightScalar};
 pub use light::{LightUpdatesInfo, PackedLight};
 
+mod palette;
+use palette::Palette;
+pub use palette::SpaceBlockData;
+
 mod space_txn;
 pub use space_txn::*;
 
@@ -47,11 +50,7 @@ mod tests;
 pub struct Space {
     bounds: GridAab,
 
-    /// Lookup from `Block` value to the index by which it is represented in
-    /// the array.
-    block_to_index: HashMap<Block, BlockIndex>,
-    /// Lookup from arbitrarily assigned indices (used in `contents`) to data for them.
-    block_data: Vec<SpaceBlockData>,
+    palette: Palette,
 
     /// The blocks in the space, stored compactly:
     ///
@@ -89,24 +88,6 @@ pub struct Space {
     cubes_wanting_ticks: HashSet<GridPoint>,
 
     notifier: Notifier<SpaceChange>,
-
-    /// Storage for incoming change notifications from blocks.
-    todo: Arc<Mutex<SpaceTodo>>,
-}
-
-/// Information about the interpretation of a block index.
-///
-/// Design note: This doubles as an internal data structure for [`Space`]. While we'll
-/// try to keep it available, this interface has a higher risk of needing to change
-/// incompatibility.
-pub struct SpaceBlockData {
-    /// The block itself.
-    block: Block,
-    /// Number of uses of this block in the space.
-    count: usize,
-    evaluated: EvaluatedBlock,
-    #[allow(dead_code)] // Used only for its `Drop`
-    block_listen_gate: Option<Gate>,
 }
 
 impl fmt::Debug for Space {
@@ -114,21 +95,10 @@ impl fmt::Debug for Space {
         // Make the assumption that a Space is too big to print in its entirety.
         fmt.debug_struct("Space")
             .field("bounds", &self.bounds)
-            .field("block_data", &self.block_data)
+            .field("block_data", &self.palette.entries())
             .field("physics", &self.physics)
             .field("behaviors", &self.behaviors)
             .field("cubes_wanting_ticks", &self.cubes_wanting_ticks) // TODO: truncate?
-            .finish_non_exhaustive()
-    }
-}
-
-impl fmt::Debug for SpaceBlockData {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Omit the evaluated data because it is usually redundant.
-        // We may regret this later...
-        fmt.debug_struct("SpaceBlockData")
-            .field("count", &self.count)
-            .field("block", &self.block)
             .finish_non_exhaustive()
     }
 }
@@ -172,33 +142,12 @@ impl Space {
 
         let volume = bounds.volume();
 
-        // Set up initial block state
-        // TODO: make failure to evaluate a reported error rather than panicking
-        let todo = Default::default();
-        let mut block_data = SpaceBlockData::new(
-            initial_fill.clone(),
-            // initial-creation version of listener_for_block()
-            SpaceBlockChangeListener {
-                todo: Arc::downgrade(&todo),
-                index: 0,
-            },
-        )
-        .expect("evaluation of block for newly created space failed");
-        block_data.count = volume;
-
         // TODO: light update queue should not necessarily be empty.
         // TODO: handle the block possibly having a tick_action.
 
         Space {
             bounds,
-            block_data: if volume > 0 { vec![block_data] } else { vec![] },
-            block_to_index: {
-                let mut map = HashMap::new();
-                if volume > 0 {
-                    map.insert(initial_fill, 0);
-                }
-                map
-            },
+            palette: Palette::new(initial_fill, volume),
             contents: vec![0; volume].into_boxed_slice(),
 
             lighting: physics.light.initialize_lighting(bounds),
@@ -212,7 +161,6 @@ impl Space {
             spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(bounds)),
             cubes_wanting_ticks: HashSet::new(),
             notifier: Notifier::new(),
-            todo,
         }
     }
 
@@ -260,7 +208,7 @@ impl Space {
                     let block_index = self.contents[cube_index];
                     extractor(
                         Some(block_index),
-                        &self.block_data[block_index as usize],
+                        self.palette.entry(block_index),
                         match self.physics.light {
                             LightPhysics::None => PackedLight::ONE,
                             LightPhysics::Rays { .. } => self.lighting[cube_index],
@@ -278,7 +226,7 @@ impl Space {
     #[inline(always)]
     pub fn get_evaluated(&self, position: impl Into<GridPoint>) -> &EvaluatedBlock {
         if let Some(index) = self.bounds.index(position) {
-            &self.block_data[self.contents[index] as usize].evaluated
+            self.palette.entry(self.contents[index]).evaluated()
         } else {
             &AIR_EVALUATED
         }
@@ -338,59 +286,34 @@ impl Space {
     fn set_impl(&mut self, position: GridPoint, block: &Block) -> Result<bool, SetCubeError> {
         if let Some(contents_index) = self.bounds.index(position) {
             let old_block_index = self.contents[contents_index];
-            let old_block = &self.block_data[old_block_index as usize].block;
+            let old_block = self.palette.entry(old_block_index).block();
             if *old_block == *block {
                 // No change.
                 return Ok(false);
             }
 
-            if self.block_data[old_block_index as usize].count == 1
-                && !self.block_to_index.contains_key(block)
+            // Replacing one unique block with a new one.
+            //
+            // This special case is worth having because it means that if a block is
+            // *modified* (read-modify-write) then the entry is preserved, and rendering
+            // may be able to optimize that case.
+            //
+            // It also means that the externally observable block index behavior is easier
+            // to characterize and won't create unnecessary holes.
+            if self
+                .palette
+                .try_replace_unique(old_block_index, block, &self.notifier)?
             {
-                // Replacing one unique block with a new one.
-                //
-                // This special case is worth having because it means that if a block is
-                // *modified* (read-modify-write) then the entry is preserved, and rendering
-                // may be able to optimize that case.
-                //
-                // It also means that the externally observable block index behavior is easier
-                // to characterize and won't create unnecessary holes.
-
-                // Swap out the block_data entry.
-                let old_block = {
-                    let mut data = SpaceBlockData::new(
-                        block.clone(),
-                        self.listener_for_block(old_block_index),
-                    )?;
-                    data.count = 1;
-                    std::mem::swap(&mut data, &mut self.block_data[old_block_index as usize]);
-                    data.block
-                };
-
-                // Update block_to_index.
-                self.block_to_index.remove(&old_block);
-                self.block_to_index.insert(block.clone(), old_block_index);
-
-                // Side effects.
-                self.notifier.notify(SpaceChange::Number(old_block_index));
                 self.side_effects_of_set(old_block_index, position, contents_index);
                 return Ok(true);
             }
 
             // Find or allocate index for new block. This must be done before other mutations since it can fail.
-            let new_block_index = self.ensure_block_index(block)?;
+            let new_block_index = self.palette.ensure_index(block, &self.notifier)?;
 
-            // Decrement count of old block.
-            let old_data: &mut SpaceBlockData = &mut self.block_data[old_block_index as usize];
-            old_data.count -= 1;
-            if old_data.count == 0 {
-                // Free data of old entry.
-                self.block_to_index.remove(&old_data.block);
-                *old_data = SpaceBlockData::tombstone();
-            }
-
-            // Increment count of new block.
-            self.block_data[new_block_index as usize].count += 1;
+            // Update counts
+            self.palette.decrement_maybe_free(old_block_index);
+            self.palette.increment(new_block_index);
 
             // Write actual space change.
             self.contents[contents_index] = new_block_index;
@@ -415,7 +338,7 @@ impl Space {
         position: GridPoint,
         contents_index: usize,
     ) {
-        let evaluated = &self.block_data[block_index as usize].evaluated;
+        let evaluated = &self.palette.entry(block_index).evaluated;
 
         if evaluated.attributes.tick_action.is_some() {
             self.cubes_wanting_ticks.insert(position);
@@ -536,24 +459,9 @@ impl Space {
         } else if self.bounds() == region {
             // We're overwriting the entire space, so we might as well re-initialize it.
             let block = block.into();
-            let new_block_index = 0;
-            let new_block_data = SpaceBlockData::new(
-                block.clone().into_owned(),
-                self.listener_for_block(new_block_index),
-            )?;
-
-            self.block_to_index = {
-                let mut map = HashMap::new();
-                map.insert(block.into_owned(), new_block_index);
-                map
-            };
-            self.block_data = vec![SpaceBlockData {
-                count: region.volume(),
-                ..new_block_data
-            }];
-            for i in self.contents.iter_mut() {
-                *i = new_block_index;
-            }
+            let volume = self.bounds().volume();
+            self.palette = Palette::new(block.clone().into_owned(), volume);
+            self.contents.fill(/* block index = */ 0);
             // TODO: also need to reset lighting and activate tick_action.
             // And see if we can share more of the logic of this with new_from_builder().
             self.notifier.notify(SpaceChange::EveryBlock);
@@ -579,9 +487,10 @@ impl Space {
     /// TODO: This was invented for testing the indexing of blocks and should
     /// be replaced with something else *if* it only gets used for testing.
     pub fn distinct_blocks(&self) -> Vec<Block> {
-        let mut blocks = Vec::with_capacity(self.block_data.len());
-        for data in &self.block_data {
-            if data.count > 0 {
+        let d = self.block_data();
+        let mut blocks = Vec::with_capacity(d.len());
+        for data in d {
+            if data.count() > 0 {
                 blocks.push(data.block.clone());
             }
         }
@@ -593,7 +502,7 @@ impl Space {
     ///
     /// The indices of this slice correspond to the results of [`Space::get_block_index`].
     pub fn block_data(&self) -> &[SpaceBlockData] {
-        &self.block_data
+        self.palette.entries()
     }
 
     /// Advance time in the space.
@@ -607,40 +516,10 @@ impl Space {
         deadline: Instant,
     ) -> (SpaceStepInfo, UniverseTransaction) {
         // Process changed block definitions.
-        let mut last_start_time = Instant::now();
-        let mut evaluations = TimeStats::default();
-        {
-            let mut try_eval_again = HashSet::new();
-            let mut todo = self.todo.lock().unwrap();
-            for block_index in todo.blocks.drain() {
-                self.notifier.notify(SpaceChange::BlockValue(block_index));
-                let data: &mut SpaceBlockData = &mut self.block_data[usize::from(block_index)];
-
-                // TODO: We may want to have a higher-level error handling by pausing the Space
-                // and giving the user choices like reverting to save, editing to fix, or
-                // continuing with a partly broken world. Right now, we just continue with the
-                // placeholder, which may have cascading effects despite the placeholder's
-                // design to be innocuous.
-                data.evaluated = data.block.evaluate().unwrap_or_else(|e| {
-                    // Trigger retrying evaluation at next step.
-                    try_eval_again.insert(block_index);
-
-                    e.to_placeholder()
-                });
-
-                // TODO: Process side effects on individual cubes such as reevaluating the
-                // lighting influenced by the block.
-
-                evaluations.record_consecutive_interval(&mut last_start_time, Instant::now());
-            }
-            if !try_eval_again.is_empty() {
-                todo.blocks = try_eval_again;
-            }
-        }
-
-        let start_cube_ticks = last_start_time;
+        let evaluations = self.palette.step(&self.notifier);
 
         // Process cubes_wanting_ticks.
+        let start_cube_ticks = Instant::now();
         let mut tick_txn = SpaceTransaction::default();
         // TODO: don't empty the queue until the transaction succeeds
         let cubes_to_tick = std::mem::take(&mut self.cubes_wanting_ticks);
@@ -776,117 +655,10 @@ impl Space {
         &self.behaviors
     }
 
-    /// Finds or assigns an index to denote the block.
-    ///
-    /// The caller is responsible for incrementing `self.block_data[index].count`.
-    #[inline]
-    fn ensure_block_index(&mut self, block: &Block) -> Result<BlockIndex, SetCubeError> {
-        if let Some(&old_index) = self.block_to_index.get(block) {
-            Ok(old_index)
-        } else {
-            // Look for if there is a previously used index to take.
-            // TODO: more efficient free index finding
-            let high_mark = self.block_data.len();
-            for new_index in 0..high_mark {
-                if self.block_data[new_index].count == 0 {
-                    self.block_data[new_index] = SpaceBlockData::new(
-                        block.clone(),
-                        self.listener_for_block(new_index as BlockIndex),
-                    )?;
-                    self.block_to_index
-                        .insert(block.clone(), new_index as BlockIndex);
-                    self.notifier
-                        .notify(SpaceChange::Number(new_index as BlockIndex));
-                    return Ok(new_index as BlockIndex);
-                }
-            }
-            if high_mark >= BlockIndex::MAX as usize {
-                return Err(SetCubeError::TooManyBlocks());
-            }
-            let new_index = high_mark as BlockIndex;
-            // Evaluate the new block type. Can fail, but we haven't done any mutation yet.
-            let new_data = SpaceBlockData::new(block.clone(), self.listener_for_block(new_index))?;
-            // Grow the vector.
-            self.block_data.push(new_data);
-            self.block_to_index.insert(block.clone(), new_index);
-            self.notifier.notify(SpaceChange::Number(new_index));
-            Ok(new_index)
-        }
-    }
-
-    fn listener_for_block(&self, index: BlockIndex) -> SpaceBlockChangeListener {
-        SpaceBlockChangeListener {
-            todo: Arc::downgrade(&self.todo),
-            index,
-        }
-    }
-
     #[cfg(test)]
     #[track_caller]
     pub(crate) fn consistency_check(&self) {
-        let mut problems = Vec::new();
-
-        let mut actual_counts: HashMap<BlockIndex, usize> = HashMap::new();
-        for index in self.contents.iter().copied() {
-            *actual_counts.entry(index).or_insert(0) += 1;
-        }
-
-        // Check that block_data has only correct counts.
-        for (index, data) in self.block_data.iter().enumerate() {
-            let index = index as BlockIndex;
-
-            let actual_count = actual_counts.remove(&index).unwrap_or(0);
-            if data.count != actual_count {
-                problems.push(format!(
-                    "Index {} appears {} times but {:?}",
-                    index, actual_count, &data
-                ));
-            }
-        }
-
-        // Check that block_data isn't missing any indexes that appeared in contents.
-        // (The previous section should have drained actual_counts).
-        if !actual_counts.is_empty() {
-            problems.push(format!(
-                "Block indexes were not indexed in block_data: {:?}",
-                &actual_counts
-            ));
-        }
-
-        // Check that block_to_index contains all entries it should.
-        for (index, data) in self.block_data.iter().enumerate() {
-            if data.count == 0 {
-                // Zero entries are tombstone entries that should not be expected in the mapping.
-                continue;
-            }
-            let bti_index = self.block_to_index.get(&data.block).copied();
-            if bti_index != Some(index as BlockIndex) {
-                problems.push(format!(
-                    "block_to_index[{:?}] should have been {:?}={:?} but was {:?}={:?}",
-                    &data.block,
-                    index,
-                    data,
-                    bti_index,
-                    bti_index.map(|i| self.block_data.get(usize::from(i))),
-                ));
-            }
-        }
-        // Check that block_to_index contains no incorrect entries.
-        for (block, &index) in self.block_to_index.iter() {
-            let data = self.block_data.get(usize::from(index));
-            if Some(block) != data.map(|data| &data.block) {
-                problems.push(format!(
-                    "block_to_index[{block:?}] points to {index} : {data:?}"
-                ));
-            }
-        }
-
-        if !problems.is_empty() {
-            panic!(
-                "Space consistency check failed:\n • {}\n",
-                problems.join("\n • ")
-            );
-        }
+        self.palette.consistency_check(&self.contents);
     }
 }
 
@@ -902,7 +674,7 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
     #[inline(always)]
     fn index(&self, position: T) -> &Self::Output {
         if let Some(index) = self.bounds.index(position) {
-            &self.block_data[self.contents[index] as usize].block
+            self.palette.entry(self.contents[index]).block()
         } else {
             &AIR
         }
@@ -913,8 +685,7 @@ impl VisitRefs for Space {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
         let Space {
             bounds: _,
-            block_to_index: _,
-            block_data,
+            palette,
             contents: _,
             lighting: _,
             light_update_queue: _,
@@ -926,11 +697,8 @@ impl VisitRefs for Space {
             spawn,
             cubes_wanting_ticks: _,
             notifier: _,
-            todo: _,
         } = self;
-        for SpaceBlockData { block, .. } in block_data {
-            block.visit_refs(visitor);
-        }
+        palette.visit_refs(visitor);
         behaviors.visit_refs(visitor);
         spawn.visit_refs(visitor);
     }
@@ -946,76 +714,6 @@ impl Listen for Space {
 
 impl crate::behavior::BehaviorHost for Space {
     type Attachment = SpaceBehaviorAttachment;
-}
-
-impl SpaceBlockData {
-    /// A `SpaceBlockData` value used to represent out-of-bounds or placeholder
-    /// situations. The block is [`AIR`] and the count is always zero.
-    pub const NOTHING: Self = Self {
-        block: AIR,
-        count: 0,
-        evaluated: AIR_EVALUATED,
-        block_listen_gate: None,
-    };
-
-    /// Value used to fill empty entries in the block data vector.
-    /// This is the same value as [`SpaceBlockData::NOTHING`] but is not merely done
-    /// by `.clone()` because I haven't decided whether providing [`Clone`] for
-    /// `SpaceBlockData` is a good long-term API design decision.
-    fn tombstone() -> Self {
-        Self {
-            block: AIR,
-            count: 0,
-            evaluated: AIR_EVALUATED,
-            block_listen_gate: None,
-        }
-    }
-
-    fn new(
-        block: Block,
-        listener: impl Listener<BlockChange> + Clone + Send + Sync + 'static,
-    ) -> Result<Self, SetCubeError> {
-        // Note: Block evaluation also happens in `Space::step()`.
-
-        let (gate, block_listener) = listener.gate();
-        let block_listener = block_listener.erased();
-        let evaluated = match block.evaluate2(&block::EvalFilter {
-            skip_eval: false,
-            listener: Some(block_listener.clone()),
-        }) {
-            Ok(ev) => ev,
-            Err(err) => {
-                // Trigger retrying evaluation at next step.
-                block_listener.receive(BlockChange::new());
-                // Use a placeholder value.
-                err.to_placeholder()
-            }
-        };
-        Ok(Self {
-            block,
-            count: 0,
-            evaluated,
-            block_listen_gate: Some(gate),
-        })
-    }
-
-    // Public accessors follow. We do this instead of making public fields so that
-    // the data structure can be changed should a need arise.
-
-    /// Returns the [`Block`] this data is about.
-    pub fn block(&self) -> &Block {
-        &self.block
-    }
-
-    /// Returns the [`EvaluatedBlock`] representation of the block.
-    ///
-    /// TODO: Describe when this may be stale.
-    pub fn evaluated(&self) -> &EvaluatedBlock {
-        &self.evaluated
-    }
-
-    // TODO: Expose the count field? It is the most like an internal bookkeeping field,
-    // but might be interesting 'statistics'.
 }
 
 /// Description of where in a [`Space`] a [`Behavior<Space>`](crate::behavior::Behavior)
@@ -1079,7 +777,7 @@ pub struct SpacePhysics {
 impl SpacePhysics {
     pub(crate) const DEFAULT: Self = Self {
         gravity: Vector3::new(notnan!(0.), notnan!(-20.), notnan!(0.)),
-        sky_color: palette::DAY_SKY_COLOR,
+        sky_color: DAY_SKY_COLOR,
         light: LightPhysics::DEFAULT,
     };
 
@@ -1280,37 +978,6 @@ impl CustomFormat<StatusText> for SpaceStepInfo {
         }
 
         Ok(())
-    }
-}
-
-/// [`Space`]'s set of things that need recomputing based on notifications.
-///
-/// Currently this is responsible for counting block changes.
-/// In the future it might be used for side effects in the world, or we might
-/// want to handle that differently.
-#[derive(Debug, Default)]
-struct SpaceTodo {
-    blocks: HashSet<BlockIndex>,
-}
-
-#[derive(Clone, Debug)]
-struct SpaceBlockChangeListener {
-    todo: Weak<Mutex<SpaceTodo>>,
-    index: BlockIndex,
-}
-
-impl Listener<BlockChange> for SpaceBlockChangeListener {
-    fn receive(&self, _: BlockChange) {
-        if let Some(todo_mutex) = self.todo.upgrade() {
-            if let Ok(mut todo) = todo_mutex.lock() {
-                todo.blocks.insert(self.index);
-            }
-            // If the mutex is poisoned, do nothing so we don't propagate failure to the notifier.
-        }
-    }
-
-    fn alive(&self) -> bool {
-        self.todo.strong_count() > 0
     }
 }
 
