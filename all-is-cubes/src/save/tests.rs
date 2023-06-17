@@ -12,7 +12,7 @@ use crate::content::make_some_blocks;
 use crate::inv::Tool;
 use crate::math::{Face6, GridAab, GridRotation, Rgb, Rgba};
 use crate::save::compress::{GzSerde, Leu16};
-use crate::space::{LightPhysics, Space, SpacePhysics};
+use crate::space::{BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::universe::{Name, PartialUniverse, URef, Universe};
 
 #[track_caller]
@@ -59,6 +59,18 @@ where
     let json_value = to_value(value).expect("failed to serialize");
     assert_eq!(json_value, expected_json, "json_value != expected_json");
     assert_round_trip_json::<T>(json_value)
+}
+
+/// Check that a deserialization produces an expected invalid-data error.
+#[track_caller]
+fn assert_de_error<T>(input: serde_json::Value, expected_error: &str)
+where
+    T: fmt::Debug + serde::de::DeserializeOwned,
+{
+    let error: serde_json::Error = from_value::<T>(input).unwrap_err();
+
+    assert!(error.is_data(), "Error {error:?} was not a data error.");
+    assert_eq!(error.to_string(), expected_error);
 }
 
 //------------------------------------------------------------------------------------------------//
@@ -211,8 +223,32 @@ fn character() {
 //------------------------------------------------------------------------------------------------//
 // Tests corresponding to the `space` module
 
+fn dont_care_physics_json() -> serde_json::Value {
+    json!({
+        "gravity": [0.0, 0.0, 0.0],
+        "sky_color": [1.0, 1.0, 1.0],
+        "light": {
+            "type": "RaysV1",
+            "maximum_distance": 30,
+        }
+    })
+}
+
+/// Produce the compressed `GzSerde` serialization of a space contents array.
+fn space_contents_json(contents: impl IntoIterator<Item = BlockIndex>) -> serde_json::Value {
+    serde_json::to_value(GzSerde(contents.into_iter().map(Leu16::from).collect())).unwrap()
+}
+
+/// Produce the compressed `GzSerde` serialization of a space light array.
+///
+/// Note that the elements are `[u8; 4]`, not `PackedLight`, so that tests are written in
+/// as close to the serialized form as is practical.
+fn space_light_json(light: impl IntoIterator<Item = [u8; 4]>) -> serde_json::Value {
+    serde_json::to_value(GzSerde(light.into_iter().collect())).unwrap()
+}
+
 #[test]
-fn space() {
+fn space_success() {
     // TODO: set more properties
     let bounds = GridAab::from_lower_upper([1, 2, 3], [4, 5, 6]);
     let mut space = Space::builder(bounds)
@@ -229,30 +265,9 @@ fn space() {
     space.set([1, 2, 5], block).unwrap();
     space.evaluate_light(0, |_| {});
 
-    let compressed_contents = serde_json::to_value(GzSerde(
-        [
-            0, 0, 1, 0, 0, 0, 0, 0, 0, //
-            0, 0, 0, 0, 0, 0, 0, 0, 0, //
-            0, 0, 0, 0, 0, 0, 0, 0, 0,
-        ]
-        .into_iter()
-        .map(Leu16::from)
-        .collect(),
-    ))
-    .unwrap();
     const NL: [u8; 4] = [0, 0, 0, 1];
     const IN: [u8; 4] = [0, 0, 0, 2];
     const BS: [u8; 4] = [128, 128, 128, 3];
-    let compressed_light = serde_json::to_value(GzSerde(
-        [
-            NL, BS, IN, NL, NL, BS, NL, NL, NL, //
-            NL, NL, BS, NL, NL, NL, NL, NL, NL, //
-            NL, NL, NL, NL, NL, NL, NL, NL, NL,
-        ]
-        .into_iter()
-        .collect(),
-    ))
-    .unwrap();
 
     assert_serdeser(
         &space,
@@ -284,10 +299,51 @@ fn space() {
                     },
                 },
             ],
-            "contents": compressed_contents,
-            "light": compressed_light,
+            "contents": space_contents_json([
+                0, 0, 1, 0, 0, 0, 0, 0, 0, //
+                0, 0, 0, 0, 0, 0, 0, 0, 0, //
+                0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ]),
+            "light": space_light_json([
+                NL, BS, IN, NL, NL, BS, NL, NL, NL, //
+                NL, NL, BS, NL, NL, NL, NL, NL, NL, //
+                NL, NL, NL, NL, NL, NL, NL, NL, NL,
+            ]),
         }),
     );
+
+    // TODO: also assert that the compressed forms are equal, or at least that the
+    // compressed forms we use here _deserialize_ to the expected forms, to avoid silent
+    // compatibility breaks.
+}
+
+#[test]
+fn space_de_invalid_index() {
+    assert_de_error::<Space>(
+        json!({
+            "type": "SpaceV1",
+            "bounds": {
+                "lower": [0, 0, 0],
+                "upper": [3, 1, 1],
+            },
+            "physics": dont_care_physics_json(),
+            "blocks": [
+                {
+                    "type": "BlockV1",
+                    "primitive": {"type": "AirV1"},
+                },
+                {
+                    "type": "BlockV1",
+                    "primitive": {
+                        "type": "AtomV1",
+                        "color": [0.5, 0.5, 0.5, 1.0],
+                    },
+                },
+            ],
+            "contents": space_contents_json([0, 999, 0])
+        }),
+        "Space contents block index 999 out of bounds of block table length 2",
+    )
 }
 
 //------------------------------------------------------------------------------------------------//
@@ -322,16 +378,6 @@ fn universe_with_one_of_each() -> Universe {
 
 /// JSON output for [`universe_with_one_of_each`].
 fn universe_with_one_of_each_json() -> serde_json::Value {
-    let compressed_contents = serde_json::to_value(GzSerde(
-        [
-            1, 0, 0, 0, //
-            0, 0, 0, 0,
-        ]
-        .into_iter()
-        .map(Leu16::from)
-        .collect(),
-    ))
-    .unwrap();
     json!({
         "type": "UniverseV1",
         "members": [
@@ -411,7 +457,10 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                             }
                         }
                     ],
-                    "contents": compressed_contents,
+                    "contents": space_contents_json([
+                        1, 0, 0, 0, //
+                        0, 0, 0, 0,
+                    ]),
                     "light": null,
                 }
             },
@@ -470,27 +519,23 @@ fn partial_universe() {
 
 #[test]
 fn universe_de_missing_member() {
-    let error: serde_json::Error = from_value::<Universe>(json!({
-        "type": "UniverseV1",
-        "members": [
-            {
-                "name": {"Specific": "broken_block"},
-                "value": {
-                    "type": "BlockV1",
-                    "primitive": {
-                        "type": "IndirectV1",
-                        "definition": {"type": "URefV1", "Specific": "missing_block"},
+    assert_de_error::<Universe>(
+        json!({
+            "type": "UniverseV1",
+            "members": [
+                {
+                    "name": {"Specific": "broken_block"},
+                    "value": {
+                        "type": "BlockV1",
+                        "primitive": {
+                            "type": "IndirectV1",
+                            "definition": {"type": "URefV1", "Specific": "missing_block"},
+                        }
                     }
-                }
-            },
-        ],
-    }))
-    .unwrap_err();
-
-    assert!(error.is_data());
-    assert_eq!(
-        error.to_string(),
-        "data contains a reference to 'missing_block' that was not defined"
+                },
+            ],
+        }),
+        "data contains a reference to 'missing_block' that was not defined",
     );
 }
 
