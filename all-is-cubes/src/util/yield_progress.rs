@@ -124,14 +124,24 @@ impl YieldProgress {
     pub fn progress(&self, progress_fraction: f32) -> impl Future<Output = ()> + Send + 'static {
         let location = Location::caller();
         let label = self.label.clone();
+
+        self.progress_without_yield(progress_fraction);
+
+        self.yielding.clone().yield_only(location, label)
+    }
+
+    /// Report the current amount of progress (a number from 0 to 1) without yielding.
+    ///
+    /// Caution: Not yielding may mean that the display of progress to the user does not
+    /// update. This should be used only when necessary for non-async code.
+    #[track_caller]
+    pub fn progress_without_yield(&self, progress_fraction: f32) {
         (self.progressor)(
             self.point_in_range(progress_fraction),
             self.label
                 .as_ref()
                 .map_or("", |arc_str_ref| -> &str { arc_str_ref }),
         );
-
-        self.yielding.clone().yield_only(location, label)
     }
 
     /// Report that 100% of progress has been made.

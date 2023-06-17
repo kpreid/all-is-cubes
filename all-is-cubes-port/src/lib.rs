@@ -83,7 +83,7 @@ pub async fn load_universe_from_file(
     let (mut universe, save_format) = if bytes.starts_with(b"{") {
         // Assume it's JSON. Furthermore, assume it's ours.
         (
-            native::import_native_json(&bytes, &*file)?,
+            native::import_native_json(progress, &bytes, &*file)?,
             Some(ExportFormat::AicJson),
         )
     } else if bytes.starts_with(b"VOX ") {
