@@ -11,6 +11,7 @@ use crate::character::Character;
 use crate::content::make_some_blocks;
 use crate::inv::Tool;
 use crate::math::{Face6, GridAab, GridRotation, Rgb, Rgba};
+use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{LightPhysics, Space, SpacePhysics};
 use crate::universe::{Name, PartialUniverse, URef, Universe};
 
@@ -228,9 +229,31 @@ fn space() {
     space.set([1, 2, 5], block).unwrap();
     space.evaluate_light(0, |_| {});
 
+    let compressed_contents = serde_json::to_value(GzSerde(
+        [
+            0, 0, 1, 0, 0, 0, 0, 0, 0, //
+            0, 0, 0, 0, 0, 0, 0, 0, 0, //
+            0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ]
+        .into_iter()
+        .map(Leu16::from)
+        .collect(),
+    ))
+    .unwrap();
     const NL: [u8; 4] = [0, 0, 0, 1];
     const IN: [u8; 4] = [0, 0, 0, 2];
     const BS: [u8; 4] = [128, 128, 128, 3];
+    let compressed_light = serde_json::to_value(GzSerde(
+        [
+            NL, BS, IN, NL, NL, BS, NL, NL, NL, //
+            NL, NL, BS, NL, NL, NL, NL, NL, NL, //
+            NL, NL, NL, NL, NL, NL, NL, NL, NL,
+        ]
+        .into_iter()
+        .collect(),
+    ))
+    .unwrap();
+
     assert_serdeser(
         &space,
         json!({
@@ -261,17 +284,8 @@ fn space() {
                     },
                 },
             ],
-            // TODO: contents and light should be stored in a compressed form
-            "contents": [
-                0, 0, 1, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0,
-            ],
-            "light": [
-                NL, BS, IN, NL, NL, BS, NL, NL, NL,
-                NL, NL, BS, NL, NL, NL, NL, NL, NL,
-                NL, NL, NL, NL, NL, NL, NL, NL, NL,
-            ]
+            "contents": compressed_contents,
+            "light": compressed_light,
         }),
     );
 }
@@ -308,6 +322,16 @@ fn universe_with_one_of_each() -> Universe {
 
 /// JSON output for [`universe_with_one_of_each`].
 fn universe_with_one_of_each_json() -> serde_json::Value {
+    let compressed_contents = serde_json::to_value(GzSerde(
+        [
+            1, 0, 0, 0, //
+            0, 0, 0, 0,
+        ]
+        .into_iter()
+        .map(Leu16::from)
+        .collect(),
+    ))
+    .unwrap();
     json!({
         "type": "UniverseV1",
         "members": [
@@ -387,10 +411,7 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                             }
                         }
                     ],
-                    "contents": [
-                        1, 0, 0, 0,
-                        0, 0, 0, 0,
-                    ],
+                    "contents": compressed_contents,
                     "light": null,
                 }
             },

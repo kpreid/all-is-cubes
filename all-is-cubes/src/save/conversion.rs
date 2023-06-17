@@ -481,7 +481,9 @@ mod inv {
 
 mod space {
     use super::*;
+    use crate::save::compress::{GzSerde, Leu16};
     use crate::space::{self, LightPhysics, Space, SpacePhysics};
+    use std::borrow::Cow;
 
     impl Serialize for Space {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -497,18 +499,23 @@ mod space {
                     .iter()
                     .map(|bd| bd.block().clone())
                     .collect(),
-                contents: self
-                    .extract(self.bounds(), |index, _, _| {
-                        index.expect("shouldn't happen: serialization went out of bounds")
+                contents: GzSerde(Cow::Owned(
+                    self.extract(self.bounds(), |index, _, _| {
+                        Leu16::from(
+                            index.expect("shouldn't happen: serialization went out of bounds"),
+                        )
                     })
-                    .into_elements(),
+                    .into_elements()
+                    .into(),
+                )),
                 light: if matches!(self.physics().light, space::LightPhysics::None) {
                     None
                 } else {
-                    Some(
+                    Some(GzSerde(Cow::Owned(
                         self.extract(self.bounds(), |_, _, light| schema::LightSerV1::from(light))
-                            .into_elements(),
-                    )
+                            .into_elements()
+                            .into(),
+                    )))
                 },
             }
             .serialize(serializer)
@@ -525,13 +532,14 @@ mod space {
                     bounds,
                     physics,
                     blocks,
-                    contents,
+                    contents: GzSerde(contents),
                     light,
                 } => {
                     let mut space = Space::builder(bounds).physics(physics.into()).build();
 
                     // TODO: more efficient loading that sets blocks by index rather than value
                     for (cube, &block_index) in bounds.interior_iter().zip(contents.iter()) {
+                        let block_index: space::BlockIndex = block_index.into();
                         space
                             .set(
                                 cube,
@@ -548,7 +556,7 @@ mod space {
 
                     // Copy light data in.
                     // TODO: Think about what behavior we want for the light update queue
-                    if let Some(light) = light {
+                    if let Some(GzSerde(light)) = light {
                         for (dst, src) in space.lighting.iter_mut().zip(light.iter().copied()) {
                             *dst = src.into();
                         }

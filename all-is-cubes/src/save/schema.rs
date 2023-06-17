@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::block::Block;
 use crate::math::{Aab, Face6, GridAab, GridCoordinate, GridRotation};
+use crate::save::compress::{GzSerde, Leu16};
 use crate::universe::URef;
 use crate::{block, character, inv, space, universe};
 
@@ -234,22 +235,29 @@ type RgbaSer = [ordered_float::NotNan<f32>; 4];
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum SpaceSer {
+pub(crate) enum SpaceSer<'a> {
     SpaceV1 {
         bounds: GridAab,
         physics: SpacePhysicsSerV1,
         blocks: Vec<block::Block>,
-        contents: Box<[space::BlockIndex]>,
-        light: Option<Box<[LightSerV1]>>,
+        contents: GzSerde<'a, Leu16>,
+        light: Option<GzSerde<'a, LightSerV1>>,
         // TODO: behaviors, spawn
     },
 }
 
 /// Schema for serializing `PackedLight`.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-pub(crate) struct LightSerV1(pub u8, pub u8, pub u8, pub LightStatusSerV1);
+///
+/// Note: This is used inside `GzSerde`, so it must be endiannness-independent.
+/// It accomplishes this by having only `u8`-sized fields.
+#[derive(Clone, Copy, Debug, bytemuck::NoUninit, bytemuck::CheckedBitPattern)]
+#[repr(C)]
+pub(crate) struct LightSerV1 {
+    pub value: [u8; 3],
+    pub status: LightStatusSerV1,
+}
 
-#[derive(Clone, Copy, Debug, serde_repr::Deserialize_repr, serde_repr::Serialize_repr)]
+#[derive(Clone, Copy, Debug, bytemuck::NoUninit, bytemuck::CheckedBitPattern)]
 #[repr(u8)]
 pub(crate) enum LightStatusSerV1 {
     Uninitialized = 0,
