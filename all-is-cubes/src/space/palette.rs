@@ -55,6 +55,40 @@ impl Palette {
         }
     }
 
+    #[allow(clippy::doc_markdown)]
+    /// Constructs a `Palette` with the given blocks and all zero counts.
+    ///
+    /// If the input contains any duplicate entries, then they will be combined, and the
+    /// returned [`HashMap`] will contain the required data remapping.
+    pub(crate) fn from_blocks(
+        blocks: &mut dyn ExactSizeIterator<Item = Block>,
+    ) -> Result<(Self, HashMap<BlockIndex, BlockIndex>), PaletteError> {
+        let dummy_notifier = listen::Notifier::new();
+
+        let len = blocks.len();
+        if len.saturating_sub(1) > (BlockIndex::MAX as usize) {
+            return Err(PaletteError::PaletteTooLarge { len });
+        }
+
+        let mut new_self = Self {
+            entries: Vec::with_capacity(blocks.len()),
+            block_to_index: HashMap::with_capacity(blocks.len()),
+            todo: Default::default(),
+        };
+
+        let mut remapping = HashMap::new();
+        for (original_index, block) in (0..).zip(blocks) {
+            let new_index = new_self
+                .ensure_index(&block, &dummy_notifier, false)
+                .expect("palette iterator lied about its length");
+            if new_index != original_index {
+                remapping.insert(original_index, new_index);
+            }
+        }
+
+        Ok((new_self, remapping))
+    }
+
     pub(crate) fn entries(&self) -> &[SpaceBlockData] {
         &self.entries
     }
@@ -69,11 +103,15 @@ impl Palette {
     /// Finds or creates a new palette entry for the given block, and returns the index.
     ///
     /// The caller is responsible for incrementing the count to indicate usage of the entry.
+    ///
+    /// If `use_zeroed_entries` is true, then zeroed entries will not be considered free
+    /// — every returned index will be either an existing block or extend the palette.
     #[inline]
     pub(super) fn ensure_index(
         &mut self,
         block: &Block,
         notifier: &listen::Notifier<SpaceChange>,
+        use_zeroed_entries: bool,
     ) -> Result<BlockIndex, SetCubeError> {
         if let Some(&old_index) = self.block_to_index.get(block) {
             Ok(old_index)
@@ -81,16 +119,18 @@ impl Palette {
             // Look for if there is a previously used index to take.
             // TODO: more efficient free index finding
             let high_mark = self.entries.len();
-            for new_index in 0..high_mark {
-                if self.entries[new_index].count == 0 {
-                    self.entries[new_index] = SpaceBlockData::new(
-                        block.clone(),
-                        self.listener_for_block(new_index as BlockIndex),
-                    )?;
-                    self.block_to_index
-                        .insert(block.clone(), new_index as BlockIndex);
-                    notifier.notify(SpaceChange::Number(new_index as BlockIndex));
-                    return Ok(new_index as BlockIndex);
+            if use_zeroed_entries {
+                for new_index in 0..high_mark {
+                    if self.entries[new_index].count == 0 {
+                        self.entries[new_index] = SpaceBlockData::new(
+                            block.clone(),
+                            self.listener_for_block(new_index as BlockIndex),
+                        )?;
+                        self.block_to_index
+                            .insert(block.clone(), new_index as BlockIndex);
+                        notifier.notify(SpaceChange::Number(new_index as BlockIndex));
+                        return Ok(new_index as BlockIndex);
+                    }
                 }
             }
             if high_mark >= BlockIndex::MAX as usize {
@@ -153,6 +193,15 @@ impl Palette {
             // Free data of old entry.
             self.block_to_index.remove(&old_data.block);
             *old_data = SpaceBlockData::tombstone();
+        }
+    }
+
+    pub(crate) fn free_all_zero_counts(&mut self) {
+        for data in self.entries.iter_mut() {
+            if data.count == 0 {
+                self.block_to_index.remove(&data.block);
+                *data = SpaceBlockData::tombstone();
+            }
         }
     }
 
@@ -537,4 +586,7 @@ mod tests {
 
         // TODO: also check evaluation and block change tracking
     }
+
+    // TODO: test Palette::from_blocks(), especially around remapping.
+    // It has tests via `SpaceBuilder`, but not much.
 }

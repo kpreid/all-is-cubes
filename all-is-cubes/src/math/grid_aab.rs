@@ -996,6 +996,12 @@ impl<V> GridArray<V> {
         self.bounds.interior_iter().zip(self.contents.iter())
     }
 
+    /// Iterates over all the cubes and values in this array, in the ordering used by
+    /// [`GridAab::interior_iter()`].
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (GridPoint, &mut V)> {
+        self.bounds.interior_iter().zip(self.contents.iter_mut())
+    }
+
     /// Apply `f` to each element of the array, producing a new array of the results.
     pub fn map<T, F>(self, f: F) -> GridArray<T>
     where

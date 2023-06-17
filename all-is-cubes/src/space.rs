@@ -140,44 +140,32 @@ impl Space {
             contents,
         } = builder;
 
-        let (palette, contents_box, lighting) = match contents {
-            builder::Fill::Block(ref block) => {
+        let (palette, contents, lighting) = match contents {
+            builder::Fill::Block(block) => {
                 let volume = bounds.volume();
-                // TODO: light update queue should not necessarily be empty.
-                // TODO: handle the block possibly having a tick_action.
                 (
-                    Palette::new(block.clone(), volume),
+                    Palette::new(block, volume),
                     vec![0; volume].into(),
                     physics.light.initialize_lighting(bounds),
                 )
             }
-
-            // TODO: Actually implement directly copying data into the Space.
-            // This has not been done yet due to the complications of supporting possibly
-            // duplicate blocks in the input even though a `Palette` should never have
-            // duplicates.
             builder::Fill::Data {
-                palette: _,
-                contents: _,
-                ref light,
-            } => {
-                let volume = bounds.volume();
-                (
-                    Palette::new(AIR, volume),
-                    vec![0; volume].into(),
-                    // TODO: remove clone when we do this properly
-                    light
-                        .clone()
-                        .map(GridArray::into_elements)
-                        .unwrap_or_else(|| physics.light.initialize_lighting(bounds)),
-                )
-            }
+                palette,
+                contents,
+                light,
+            } => (
+                palette,
+                contents.into_elements(),
+                light
+                    .map(GridArray::into_elements)
+                    .unwrap_or_else(|| physics.light.initialize_lighting(bounds)),
+            ),
         };
 
-        let mut new_space = Space {
+        Space {
             bounds,
             palette,
-            contents: contents_box,
+            contents,
             lighting,
 
             packed_sky_color: physics.sky_color.into(),
@@ -190,22 +178,7 @@ impl Space {
             spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(bounds)),
             cubes_wanting_ticks: HashSet::new(),
             notifier: Notifier::new(),
-        };
-
-        if let builder::Fill::Data {
-            palette,
-            contents,
-            light: _,
-        } = contents
-        {
-            for (cube, &index) in contents.iter() {
-                new_space
-                    .set(cube, &palette[index as usize])
-                    .expect("shouldn't happen: post-validation SetCube error");
-            }
         }
-
-        new_space
     }
 
     /// Constructs a `Space` that is entirely empty and whose coordinate system
@@ -353,7 +326,7 @@ impl Space {
             }
 
             // Find or allocate index for new block. This must be done before other mutations since it can fail.
-            let new_block_index = self.palette.ensure_index(block, &self.notifier)?;
+            let new_block_index = self.palette.ensure_index(block, &self.notifier, true)?;
 
             // Update counts
             self.palette.decrement_maybe_free(old_block_index);

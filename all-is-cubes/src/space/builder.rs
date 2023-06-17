@@ -4,7 +4,7 @@ use crate::block::{Block, AIR};
 use crate::character::Spawn;
 use crate::math::{FreeCoordinate, GridArray, Rgb};
 use crate::space::{
-    BlockIndex, GridAab, LightPhysics, PackedLight, PaletteError, Space, SpacePhysics,
+    BlockIndex, GridAab, LightPhysics, PackedLight, Palette, PaletteError, Space, SpacePhysics,
 };
 
 /// Tool for constructing new [`Space`]s.
@@ -29,7 +29,8 @@ pub struct SpaceBuilder<B> {
 pub(super) enum Fill {
     Block(Block),
     Data {
-        palette: Vec<Block>,
+        /// Note: this palette has its block counts already set to match contents
+        palette: Palette,
         contents: GridArray<BlockIndex>,
         light: Option<GridArray<PackedLight>>,
     },
@@ -159,9 +160,12 @@ impl SpaceBuilder<GridAab> {
     fn palette_and_contents_impl(
         mut self,
         palette: &mut dyn ExactSizeIterator<Item = Block>,
-        contents: GridArray<BlockIndex>,
+        mut contents: GridArray<BlockIndex>,
         light: Option<GridArray<PackedLight>>,
     ) -> Result<Self, PaletteError> {
+        // Validate palette.
+        let (mut palette, remapping) = Palette::from_blocks(palette)?;
+
         // Validate bounds.
         if contents.bounds() != self.bounds {
             return Err(PaletteError::WrongDataBounds {
@@ -178,22 +182,25 @@ impl SpaceBuilder<GridAab> {
             }
         }
 
-        // Validate palette.
-        let palette = Vec::from_iter(palette);
-        if palette.len() > (BlockIndex::MAX as usize + 1) {
-            return Err(PaletteError::PaletteTooLarge { len: palette.len() });
-        }
-
-        // Validate data
-        for (cube, &block_index) in contents.iter() {
-            if usize::from(block_index) >= palette.len() {
+        // Validate data and update palette contents
+        let palette_len = palette.entries().len();
+        for (cube, contents_block_index) in contents.iter_mut() {
+            if let Some(&new_block_index) = remapping.get(contents_block_index) {
+                // Remap indices in the case where the palette contained duplicates
+                *contents_block_index = new_block_index;
+            } else if usize::from(*contents_block_index) >= palette_len {
+                // If the index was not remapped and is out of range then it's invalid.
                 return Err(PaletteError::Index {
-                    index: block_index,
+                    index: *contents_block_index,
                     cube,
-                    palette_len: palette.len(),
+                    palette_len,
                 });
             }
+
+            palette.increment(*contents_block_index);
         }
+
+        palette.free_all_zero_counts();
 
         // Store data
         self.contents = Fill::Data {
@@ -419,6 +426,30 @@ mod tests {
         assert_eq!(space[[0, 0, 0]], block0);
         assert_eq!(space[[1, 0, 0]], block1);
         assert_eq!(space[[2, 0, 0]], block0);
+    }
+
+    /// Unused entries in a palette should be converted to canonical tombstone entries.
+    #[test]
+    fn palette_with_unused_entries() {
+        let bounds = GridAab::from_lower_size([0, 0, 0], [2, 1, 1]);
+        let blocks = make_some_blocks::<3>();
+        let space = Space::builder(bounds)
+            .palette_and_contents(
+                blocks.clone(),
+                GridArray::from_elements(bounds, [0, 2]).unwrap(),
+                None,
+            )
+            .unwrap()
+            .build();
+
+        space.consistency_check();
+
+        // blocks[1] was not used so it should not be in the palette.
+        let found = space
+            .block_data()
+            .iter()
+            .find(|entry| entry.block == blocks[1]);
+        assert!(found.is_none(), "{found:?}");
     }
 
     // TODO: test and implement initial fill that has a tick_action that needs to be
