@@ -303,15 +303,16 @@ pub(crate) type UniverseDe = UniverseSchema<character::Character, space::Space>;
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct MemberEntrySer<T> {
     pub name: universe::Name,
+    #[serde(flatten)]
     pub value: T,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(untagged)] // The type-and-version tags of each member suffice
+#[serde(tag = "member_type")]
 pub(crate) enum MemberSchema<C, S> {
-    BlockDef(block::Block),
-    Character(C),
-    Space(S),
+    Block { value: block::Block },
+    Character { value: C },
+    Space { value: S },
 }
 pub(crate) type MemberSer =
     MemberSchema<SerializeRef<character::Character>, SerializeRef<space::Space>>;

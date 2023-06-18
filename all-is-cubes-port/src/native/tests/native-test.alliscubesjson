@@ -5,6 +5,7 @@
             "name": {
                 "Specific": "foo"
             },
+            "member_type": "Block",
             "value": {
                 "type": "BlockV1",
                 "primitive": {

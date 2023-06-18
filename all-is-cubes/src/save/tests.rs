@@ -383,6 +383,7 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
         "members": [
             {
                 "name": {"Specific": "a_block"},
+                "member_type": "Block",
                 "value": {
                     "type": "BlockV1",
                     "primitive": {
@@ -394,6 +395,7 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
             },
             {
                 "name": {"Specific": "a_character"},
+                "member_type": "Character",
                 "value": {
                     "type": "CharacterV1",
                     "space": {"type": "URefV1", "Specific": "a_space"},
@@ -431,6 +433,7 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
             },
             {
                 "name": {"Specific": "a_space"},
+                "member_type": "Space",
                 "value": {
                     "type": "SpaceV1",
                     "bounds": {
@@ -525,6 +528,7 @@ fn universe_de_missing_member() {
             "members": [
                 {
                     "name": {"Specific": "broken_block"},
+                    "member_type": "Block",
                     "value": {
                         "type": "BlockV1",
                         "primitive": {
@@ -536,6 +540,27 @@ fn universe_de_missing_member() {
             ],
         }),
         "data contains a reference to 'missing_block' that was not defined",
+    );
+}
+
+/// A format error in an individual member must be propagated.
+/// Concretely: we must not use `serde(untagged)`
+#[test]
+fn universe_de_error_in_member() {
+    assert_de_error::<Universe>(
+        json!({
+            "type": "UniverseV1",
+            "members": [
+                {
+                    "name": {"Specific": "broken_block"},
+                    "member_type": "Block",
+                    "value": {
+                        "type": "BlockV1",
+                    }
+                },
+            ],
+        }),
+        "missing field `primitive`",
     );
 }
 

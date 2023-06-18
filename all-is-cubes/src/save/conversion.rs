@@ -632,7 +632,9 @@ mod universe {
     impl From<&BlockDef> for schema::MemberSer {
         fn from(block_def: &BlockDef) -> Self {
             let block: &Block = block_def;
-            schema::MemberSer::BlockDef(block.clone())
+            schema::MemberSer::Block {
+                value: block.clone(),
+            }
         }
     }
 
@@ -658,13 +660,17 @@ mod universe {
             let characters = characters.iter().map(|member_ref: &URef<Character>| {
                 Ok(schema::MemberEntrySer {
                     name: member_ref.name(),
-                    value: schema::MemberSer::Character(schema::SerializeRef(member_ref.clone())),
+                    value: schema::MemberSer::Character {
+                        value: schema::SerializeRef(member_ref.clone()),
+                    },
                 })
             });
             let spaces = spaces.iter().map(|member_ref: &URef<Space>| {
                 Ok(schema::MemberEntrySer {
                     name: member_ref.name(),
-                    value: schema::MemberSer::Space(schema::SerializeRef(member_ref.clone())),
+                    value: schema::MemberSer::Space {
+                        value: schema::SerializeRef(member_ref.clone()),
+                    },
                 })
             });
 
@@ -699,13 +705,13 @@ mod universe {
                 schema::UniverseDe::UniverseV1 { members } => {
                     for schema::MemberEntrySer { name, value } in members {
                         match value {
-                            MemberDe::BlockDef(block) => universe
+                            MemberDe::Block { value: block } => universe
                                 .insert_deserialized(name, BlockDef::new(block))
                                 .map(|_| ()),
-                            MemberDe::Character(character) => {
+                            MemberDe::Character { value: character } => {
                                 universe.insert_deserialized(name, character).map(|_| ())
                             }
-                            MemberDe::Space(space) => {
+                            MemberDe::Space { value: space } => {
                                 universe.insert_deserialized(name, space).map(|_| ())
                             }
                         }
