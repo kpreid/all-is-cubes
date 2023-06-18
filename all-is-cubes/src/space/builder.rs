@@ -2,8 +2,10 @@ use cgmath::{EuclideanSpace, InnerSpace, Point3};
 
 use crate::block::{Block, AIR};
 use crate::character::Spawn;
-use crate::math::{FreeCoordinate, Rgb};
-use crate::space::{GridAab, LightPhysics, Space, SpacePhysics};
+use crate::math::{FreeCoordinate, GridArray, Rgb};
+use crate::space::{
+    BlockIndex, GridAab, LightPhysics, PackedLight, PaletteError, Space, SpacePhysics,
+};
 
 /// Tool for constructing new [`Space`]s.
 ///
@@ -14,22 +16,32 @@ use crate::space::{GridAab, LightPhysics, Space, SpacePhysics};
 /// # Type parameters
 ///
 /// * `B` is either `()` or `GridAab` according to whether the bounds have been specified.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 #[must_use]
 pub struct SpaceBuilder<B> {
     pub(super) bounds: B,
     pub(super) spawn: Option<Spawn>,
     pub(super) physics: SpacePhysics,
-    pub(super) initial_fill: Block,
+    pub(super) contents: Fill,
+}
+
+#[derive(Clone, Debug)]
+pub(super) enum Fill {
+    Block(Block),
+    Data {
+        palette: Vec<Block>,
+        contents: GridArray<BlockIndex>,
+        light: Option<GridArray<PackedLight>>,
+    },
 }
 
 impl<B> SpaceBuilder<B> {
     /// Sets the [`Block`] that the space's volume will be filled with.
     ///
-    /// Caution: If [evaluating](Block::evaluate) the block fails, constructing the space
-    /// will panic. Future versions may improve on this.
+    /// Calling this method will replace any previous specification of the contents,
+    /// such as [`palette_and_contents()`](Self::palette_and_contents()).
     pub fn filled_with(mut self, block: Block) -> Self {
-        self.initial_fill = block;
+        self.contents = Fill::Block(block);
         self
     }
 
@@ -79,7 +91,7 @@ impl SpaceBuilder<()> {
             bounds: (),
             spawn: None,
             physics: SpacePhysics::DEFAULT,
-            initial_fill: AIR,
+            contents: Fill::Block(AIR),
         }
     }
 
@@ -89,7 +101,7 @@ impl SpaceBuilder<()> {
             bounds,
             spawn: self.spawn,
             physics: self.physics,
-            initial_fill: self.initial_fill,
+            contents: self.contents,
         }
     }
 }
@@ -112,6 +124,85 @@ impl SpaceBuilder<GridAab> {
         spawn.set_eye_position(position);
         self.spawn = Some(spawn);
         self
+    }
+
+    /// Sets the initial contents of the space using a palette (numbered list of blocks)
+    /// and indices into that palette for every in-bounds cube.
+    ///
+    /// The input data must meet all of these requirements, or a [`PaletteError`] will be
+    /// returned:
+    ///
+    /// * `palette` must have no more than `BlockIndex::MAX + 1` elements.
+    /// * `contents` must have the same bounds as were set for this space.
+    /// * `contents` must contain no elements that are out of bounds of the `palette`.
+    /// * `light`, if specified, must have the same bounds as were set for this space.
+    ///
+    /// The `palette` is allowed to contain duplicate elements, but they will be combined.
+    /// In general, the produced [`Space`] will not necessarily have the same indices
+    /// as were provided.
+    ///
+    /// Calling this method will replace any previous specification of the contents,
+    /// such as [`filled_with()`](Self::filled_with()).
+    pub fn palette_and_contents<P>(
+        self,
+        palette: P,
+        contents: GridArray<BlockIndex>,
+        light: Option<GridArray<PackedLight>>,
+    ) -> Result<Self, PaletteError>
+    where
+        P: IntoIterator,
+        P::IntoIter: ExactSizeIterator<Item = Block>,
+    {
+        self.palette_and_contents_impl(&mut palette.into_iter(), contents, light)
+    }
+
+    fn palette_and_contents_impl(
+        mut self,
+        palette: &mut dyn ExactSizeIterator<Item = Block>,
+        contents: GridArray<BlockIndex>,
+        light: Option<GridArray<PackedLight>>,
+    ) -> Result<Self, PaletteError> {
+        // Validate bounds.
+        if contents.bounds() != self.bounds {
+            return Err(PaletteError::WrongDataBounds {
+                expected: self.bounds,
+                actual: contents.bounds(),
+            });
+        }
+        if let Some(light) = light.as_ref() {
+            if light.bounds() != self.bounds {
+                return Err(PaletteError::WrongDataBounds {
+                    expected: self.bounds,
+                    actual: light.bounds(),
+                });
+            }
+        }
+
+        // Validate palette.
+        let palette = Vec::from_iter(palette);
+        if palette.len() > (BlockIndex::MAX as usize + 1) {
+            return Err(PaletteError::PaletteTooLarge { len: palette.len() });
+        }
+
+        // Validate data
+        for (cube, &block_index) in contents.iter() {
+            if usize::from(block_index) >= palette.len() {
+                return Err(PaletteError::Index {
+                    index: block_index,
+                    cube,
+                    palette_len: palette.len(),
+                });
+            }
+        }
+
+        // Store data
+        self.contents = Fill::Data {
+            palette,
+            contents,
+            light,
+        };
+
+        Ok(self)
     }
 
     /// Construct a [`Space`] with the contents and settings from this builder.
@@ -191,6 +282,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
         }
 
         // Fill space with blocks
+        // TODO: use palette mechanism instead now that we have it
         let mut failure = None;
         space
             .fill(space.bounds(), |_| {
@@ -214,7 +306,8 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
 
 #[cfg(test)]
 mod tests {
-    use crate::math::Rgba;
+    use crate::content::make_some_blocks;
+    use crate::math::{GridPoint, Rgba};
 
     use super::*;
 
@@ -261,6 +354,69 @@ mod tests {
                 .bounds(),
             first_bounds
         );
+    }
+
+    #[test]
+    fn palette_err_too_long() {
+        let bounds = GridAab::single_cube(GridPoint::new(0, 0, 0));
+        assert_eq!(
+            Space::builder(bounds)
+                .palette_and_contents(vec![AIR; 65537], GridArray::from_element(2), None,)
+                .unwrap_err(),
+            PaletteError::PaletteTooLarge { len: 65537 }
+        );
+    }
+
+    #[test]
+    fn palette_err_too_short_for_contents() {
+        let bounds = GridAab::single_cube(GridPoint::new(0, 0, 0));
+        assert_eq!(
+            Space::builder(bounds)
+                .palette_and_contents(&mut [AIR].into_iter(), GridArray::from_element(2), None,)
+                .unwrap_err(),
+            PaletteError::Index {
+                index: 2,
+                cube: GridPoint::new(0, 0, 0),
+                palette_len: 1
+            }
+        );
+    }
+
+    #[test]
+    fn palette_err_contents_wrong_bounds() {
+        assert_eq!(
+            Space::builder(GridAab::single_cube(GridPoint::new(1, 0, 0)))
+                .palette_and_contents([AIR], GridArray::from_element(0), None)
+                .unwrap_err(),
+            PaletteError::WrongDataBounds {
+                expected: GridAab::single_cube(GridPoint::new(1, 0, 0)),
+                actual: GridAab::single_cube(GridPoint::new(0, 0, 0)),
+            }
+        );
+    }
+
+    /// Duplicate blocks are permitted in the input palette even though `Space` doesn't
+    /// allow duplicates in its own palette. This is because deserialized/imported input
+    /// might have duplicates it did not intend, once the foreign or old blocks are
+    /// converted into specific [`Block`] instances.
+    #[test]
+    fn palette_with_duplicate_entries() {
+        let bounds = GridAab::from_lower_size([0, 0, 0], [3, 1, 1]);
+        let [block0, block1] = make_some_blocks();
+        let space = Space::builder(bounds)
+            .palette_and_contents(
+                [block0.clone(), block1.clone(), block0.clone()],
+                GridArray::from_elements(bounds, [0, 1, 2]).unwrap(),
+                None,
+            )
+            .unwrap()
+            .build();
+
+        // We do not require the new space to have exactly the same indices as the input,
+        // but the blocks should match.
+        assert_eq!(space[[0, 0, 0]], block0);
+        assert_eq!(space[[1, 0, 0]], block1);
+        assert_eq!(space[[2, 0, 0]], block0);
     }
 
     // TODO: test and implement initial fill that has a tick_action that needs to be

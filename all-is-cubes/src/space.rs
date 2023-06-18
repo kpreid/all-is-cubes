@@ -37,7 +37,7 @@ pub use light::{LightUpdatesInfo, PackedLight};
 
 mod palette;
 use palette::Palette;
-pub use palette::SpaceBlockData;
+pub use palette::{PaletteError, SpaceBlockData};
 
 mod space_txn;
 pub use space_txn::*;
@@ -137,20 +137,49 @@ impl Space {
             bounds,
             spawn,
             physics,
-            initial_fill,
+            contents,
         } = builder;
 
-        let volume = bounds.volume();
+        let (palette, contents_box, lighting) = match contents {
+            builder::Fill::Block(ref block) => {
+                let volume = bounds.volume();
+                // TODO: light update queue should not necessarily be empty.
+                // TODO: handle the block possibly having a tick_action.
+                (
+                    Palette::new(block.clone(), volume),
+                    vec![0; volume].into(),
+                    physics.light.initialize_lighting(bounds),
+                )
+            }
 
-        // TODO: light update queue should not necessarily be empty.
-        // TODO: handle the block possibly having a tick_action.
+            // TODO: Actually implement directly copying data into the Space.
+            // This has not been done yet due to the complications of supporting possibly
+            // duplicate blocks in the input even though a `Palette` should never have
+            // duplicates.
+            builder::Fill::Data {
+                palette: _,
+                contents: _,
+                ref light,
+            } => {
+                let volume = bounds.volume();
+                (
+                    Palette::new(AIR, volume),
+                    vec![0; volume].into(),
+                    // TODO: remove clone when we do this properly
+                    light
+                        .clone()
+                        .map(GridArray::into_elements)
+                        .unwrap_or_else(|| physics.light.initialize_lighting(bounds)),
+                )
+            }
+        };
 
-        Space {
+        let mut new_space = Space {
             bounds,
-            palette: Palette::new(initial_fill, volume),
-            contents: vec![0; volume].into_boxed_slice(),
+            palette,
+            contents: contents_box,
+            lighting,
 
-            lighting: physics.light.initialize_lighting(bounds),
             packed_sky_color: physics.sky_color.into(),
             light_update_queue: LightUpdateQueue::new(),
             last_light_updates: Vec::new(),
@@ -161,7 +190,22 @@ impl Space {
             spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(bounds)),
             cubes_wanting_ticks: HashSet::new(),
             notifier: Notifier::new(),
+        };
+
+        if let builder::Fill::Data {
+            palette,
+            contents,
+            light: _,
+        } = contents
+        {
+            for (cube, &index) in contents.iter() {
+                new_space
+                    .set(cube, &palette[index as usize])
+                    .expect("shouldn't happen: post-validation SetCube error");
+            }
         }
+
+        new_space
     }
 
     /// Constructs a `Space` that is entirely empty and whose coordinate system

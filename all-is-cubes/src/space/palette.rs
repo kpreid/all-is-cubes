@@ -6,6 +6,7 @@ use instant::Instant;
 
 use crate::block::{self, Block, BlockChange, EvaluatedBlock, AIR, AIR_EVALUATED};
 use crate::listen::{self, Listener as _};
+use crate::math;
 use crate::space::{BlockIndex, SetCubeError, SpaceChange};
 use crate::util::TimeStats;
 
@@ -20,8 +21,9 @@ pub(super) struct Palette {
     /// Storage for incoming change notifications from blocks.
     todo: Arc<Mutex<PaletteTodo>>,
 }
+
 impl Palette {
-    /// Construct a new `Palette` with one entry, or zero entries if `count` is zero.
+    /// Constructs a new `Palette` with one entry, or zero entries if `count` is zero.
     pub(crate) fn new(block: Block, count: usize) -> Self {
         let todo = Default::default();
 
@@ -406,4 +408,48 @@ impl listen::Listener<BlockChange> for BlockListener {
     fn alive(&self) -> bool {
         self.todo.strong_count() > 0
     }
+}
+
+/// Errors that can occur in palette-and-indices data, such as that provided to
+/// [`SpaceBuilder::palette_and_contents()`].
+///
+/// [`SpaceBuilder::palette_and_contents()`]: crate::space::SpaceBuilder::palette_and_contents()
+//
+// TODO: `SpaceBuilder` doesn't actually use `Palette` directly yet; this is here because
+// we plan that it *will*, and then `Palette` will be returning some of these errors.
+#[derive(Clone, Debug, PartialEq, thiserror::Error)]
+#[allow(missing_docs)]
+#[non_exhaustive]
+pub enum PaletteError {
+    /// The given palette is larger than the maximum supported length.
+    #[error("a palette of {len} blocks is too large")]
+    PaletteTooLarge { len: usize },
+
+    /// One of the indices in the data was outside the bounds of the palette.
+    #[error(
+        "block index {index} for cube {cube:?} exceeds palette length {palette_len}",
+        cube = Into::<[i32; 3]>::into(*.cube),
+    )]
+    Index {
+        index: BlockIndex,
+        cube: math::GridPoint,
+        palette_len: usize,
+    },
+
+    /// The provided data did not match the bounds of the [`Space`](crate::space::Space).
+    #[error("data bounds {actual:?} is incorrect for space bounds {expected:?}")]
+    WrongDataBounds {
+        expected: math::GridAab,
+        actual: math::GridAab,
+    },
+
+    /// The palette contained duplicate blocks.
+    ///
+    /// Note: in some cases, duplicates are permitted and this error will not be produced.
+    #[error("duplicate block at indices {index_1} and {index_2}: {block:?}")]
+    Duplicate {
+        index_1: BlockIndex,
+        index_2: BlockIndex,
+        block: Block,
+    },
 }
