@@ -37,6 +37,8 @@ pub use universe_txn::*;
 mod uref;
 pub use uref::*;
 
+mod owning_guard;
+
 mod visit;
 pub use visit::*;
 

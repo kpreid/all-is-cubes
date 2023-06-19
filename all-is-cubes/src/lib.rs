@@ -160,8 +160,9 @@
 // #![warn(unused_crate_dependencies)]  // noisy for dev-dependencies; enable sometimes for review
 
 // Crate-specific lint settings.
-// * This crate does not forbid(unsafe_code) for some compile-time unchecked constructors.
-//   No run-time unsafe is used.
+// * This crate contains some unsafe code and therefore does not `forbid(unsafe_code)`.
+//   The majority of it is trivial unchecked constructors that are run at compile time;
+//   `universe::owning_guard` contains the scary part.
 #![warn(missing_docs)]
 
 #[macro_use]

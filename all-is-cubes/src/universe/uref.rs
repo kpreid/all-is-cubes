@@ -546,7 +546,7 @@ impl<T> UBorrowMutImpl<T> {
 
 /// The actual mutable data of a universe member, that can be accessed via [`URef`].
 #[derive(Debug)]
-struct UEntry<T> {
+pub(super) struct UEntry<T> {
     /// Actual value of type `T`.
     ///
     /// If [`None`], then the universe is being deserialized and the data for this member
