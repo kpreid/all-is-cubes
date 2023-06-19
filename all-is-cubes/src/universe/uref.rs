@@ -2,12 +2,12 @@ use std::borrow::Borrow;
 use std::fmt;
 use std::hash;
 use std::ops::Deref;
+use std::ops::DerefMut;
 use std::sync::Mutex;
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
-
-use ouroboros::self_referencing;
+use std::sync::{Arc, RwLock, Weak};
 
 use crate::transaction::{ExecuteError, PreconditionFailed, Transaction, Transactional};
+use crate::universe::owning_guard;
 use crate::universe::InsertError;
 use crate::universe::InsertErrorKind;
 use crate::universe::Universe;
@@ -156,15 +156,11 @@ impl<T: 'static> URef<T> {
     ///
     /// TODO: There is not currently any way to block on / wait for read access.
     pub fn read(&self) -> Result<UBorrow<T>, RefError> {
-        let inner = UBorrowImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
-            let lock_guard = strong
-                .try_read()
-                .map_err(|_| RefError::InUse(self.name()))?;
-            if lock_guard.data.is_none() {
-                return Err(RefError::NotReady(self.name()));
-            }
-            Ok(lock_guard)
-        })?;
+        let inner = owning_guard::UBorrowImpl::new(self.upgrade()?)
+            .map_err(|_| RefError::InUse(self.name()))?;
+        if inner.data.is_none() {
+            return Err(RefError::NotReady(self.name()));
+        }
         Ok(UBorrow(inner))
     }
 
@@ -207,16 +203,13 @@ impl<T: 'static> URef<T> {
     /// This function is not exposed publicly, but only used in transactions to allow
     /// the check-then-commit pattern; use [`URef::try_modify`] instead for other
     /// purposes.
-    pub(crate) fn try_borrow_mut(&self) -> Result<UBorrowMutImpl<T>, RefError> {
-        UBorrowMutImpl::try_new(self.upgrade()?, |strong: &Arc<RwLock<UEntry<T>>>| {
-            let lock_guard = strong
-                .try_write()
-                .map_err(|_| RefError::InUse(self.name()))?;
-            if lock_guard.data.is_none() {
-                return Err(RefError::NotReady(self.name()));
-            }
-            Ok(lock_guard)
-        })
+    pub(crate) fn try_borrow_mut(&self) -> Result<UBorrowMut<T>, RefError> {
+        let inner = owning_guard::UBorrowMutImpl::new(self.upgrade()?)
+            .map_err(|_| RefError::InUse(self.name()))?;
+        if inner.data.is_none() {
+            return Err(RefError::NotReady(self.name()));
+        }
+        Ok(UBorrowMut(inner))
     }
 
     /// Execute the given transaction on the referent.
@@ -477,7 +470,7 @@ pub enum RefError {
 }
 
 /// A wrapper type for an immutably borrowed value from an [`URef`].
-pub struct UBorrow<T: 'static>(UBorrowImpl<T>);
+pub struct UBorrow<T: 'static>(owning_guard::UBorrowImpl<T>);
 
 impl<T: fmt::Debug> fmt::Debug for UBorrow<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -488,7 +481,6 @@ impl<T> Deref for UBorrow<T> {
     type Target = T;
     fn deref(&self) -> &T {
         self.0
-            .borrow_guard()
             .data
             .as_ref()
             .expect("can't happen: UBorrow lost its data")
@@ -505,42 +497,33 @@ impl<T> Borrow<T> for UBorrow<T> {
     }
 }
 
-/// Implementation of [`UBorrow`], split out to hide all `self_referencing` details.
-#[self_referencing]
-struct UBorrowImpl<T: 'static> {
-    strong: StrongEntryRef<T>,
-    #[borrows(strong)]
-    #[covariant]
-    guard: RwLockReadGuard<'this, UEntry<T>>,
-}
-
-/// Parallel to [`UBorrowImpl`], but for mutable access.
-///
+/// Parallel to [`UBorrow`], but for mutable access.
+//
 /// This type is not exposed publicly, but only used in transactions to allow
 /// the check-then-commit pattern; use [`URef::try_modify`] instead for other
 /// purposes.
-#[self_referencing]
-#[derive(Debug)]
-pub(crate) struct UBorrowMutImpl<T: 'static> {
-    strong: StrongEntryRef<T>,
-    #[borrows(strong)]
-    #[not_covariant]
-    guard: RwLockWriteGuard<'this, UEntry<T>>,
+pub(crate) struct UBorrowMut<T: 'static>(owning_guard::UBorrowMutImpl<T>);
+impl<T: 'static> Deref for UBorrowMut<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        self.0
+            .data
+            .as_ref()
+            .expect("can't happen: UBorrowMut lost its data")
+    }
 }
 
-impl<T> UBorrowMutImpl<T> {
-    pub(crate) fn with_data_mut<F, Out>(&mut self, function: F) -> Out
-    where
-        F: FnOnce(&mut T) -> Out,
-    {
-        self.with_guard_mut(|entry| {
-            function(
-                entry
-                    .data
-                    .as_mut()
-                    .expect("can't happen: UBorrowMut lost its data"),
-            )
-        })
+impl<T: fmt::Debug> fmt::Debug for UBorrowMut<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "UBorrowMut({:?})", **self)
+    }
+}
+impl<T: 'static> DerefMut for UBorrowMut<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        self.0
+            .data
+            .as_mut()
+            .expect("can't happen: UBorrowMut lost its data")
     }
 }
 

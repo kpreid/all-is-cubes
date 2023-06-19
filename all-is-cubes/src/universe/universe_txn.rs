@@ -9,7 +9,7 @@ use crate::transaction::{
     self, CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
 use crate::universe::{
-    AnyURef, Name, UBorrowMutImpl, URef, URefErased as _, Universe, UniverseId, UniverseMember,
+    AnyURef, Name, UBorrowMut, URef, URefErased as _, Universe, UniverseId, UniverseMember,
     UniverseTable,
 };
 
@@ -47,29 +47,36 @@ impl<O> Transaction<()> for TransactionInUniverse<O>
 where
     O: Transactional + 'static,
 {
-    type CommitCheck = (
-        UBorrowMutImpl<O>,
-        <O::Transaction as Transaction<O>>::CommitCheck,
-    );
+    type CommitCheck = TransactionInUniverseCheck<O>;
     type Output = <O::Transaction as Transaction<O>>::Output;
 
     fn check(&self, _dummy_target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
-        let mut borrow = self
+        let guard = self
             .target
             .try_borrow_mut()
             .expect("Attempted to execute transaction with target already borrowed");
-        let check = borrow.with_data_mut(|target_data| self.transaction.check(target_data))?;
-        Ok((borrow, check))
+        let check = self.transaction.check(&guard)?;
+        Ok(TransactionInUniverseCheck { guard, check })
     }
 
     fn commit(
         &self,
         _dummy_target: &mut (),
-        (mut borrow, check): Self::CommitCheck,
+        mut tu_check: Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
-        borrow.with_data_mut(|target_data| self.transaction.commit(target_data, check, outputs))
+        self.transaction
+            .commit(&mut tu_check.guard, tu_check.check, outputs)
     }
+}
+
+/// Private to keep the mutable access private.
+struct TransactionInUniverseCheck<O>
+where
+    O: Transactional + 'static,
+{
+    guard: UBorrowMut<O>,
+    check: <O::Transaction as Transaction<O>>::CommitCheck,
 }
 
 impl<O> Merge for TransactionInUniverse<O>
