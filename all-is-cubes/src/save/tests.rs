@@ -6,7 +6,9 @@ use cgmath::Vector3;
 use pretty_assertions::assert_eq;
 use serde_json::{from_value, json, to_value};
 
-use crate::block::{self, AnimationChange, AnimationHint, Block, BlockDef, Modifier, Resolution};
+use crate::block::{
+    self, AnimationChange, AnimationHint, Block, BlockDef, Modifier, Resolution, AIR,
+};
 use crate::character::Character;
 use crate::content::make_some_blocks;
 use crate::inv::Tool;
@@ -344,6 +346,38 @@ fn space_de_invalid_index() {
         }),
         "Space contents block index 999 out of bounds of block table length 2",
     )
+}
+
+#[test]
+fn space_with_sparse_indices() {
+    let [block0, block1, block2] = make_some_blocks();
+    let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [5, 1, 1])).build();
+    space.set([0, 0, 0], &block0).unwrap();
+    space.set([1, 0, 0], &block1).unwrap();
+    space.set([2, 0, 0], &block2).unwrap();
+    // Now overwrite with AIR, resulting in a discontinuity in the indices because
+    // there are no block1s left.
+    space.set([1, 0, 0], AIR).unwrap();
+
+    // Check that we produced the expected sparse indices.
+    // If this assertion fails, then `Space` behavior has changed, which may not be wrong
+    // but will invalidate this particular test.
+    assert_eq!(
+        space
+            .block_data()
+            .iter()
+            .map(|d| d.block())
+            .collect::<Vec<&Block>>(),
+        vec![&AIR, &block0, &AIR, &block2],
+    );
+
+    let space2: Space = from_value(to_value(&space).unwrap()).unwrap();
+
+    // We do not require the new space to have exactly the same indices as the old space,
+    // but the blocks should match.
+    assert_eq!(space2[[0, 0, 0]], block0);
+    assert_eq!(space2[[1, 0, 0]], AIR);
+    assert_eq!(space2[[2, 0, 0]], block2);
 }
 
 //------------------------------------------------------------------------------------------------//
