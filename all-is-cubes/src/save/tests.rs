@@ -344,7 +344,7 @@ fn space_de_invalid_index() {
             ],
             "contents": space_contents_json([0, 999, 0])
         }),
-        "Space contents block index 999 out of bounds of block table length 2",
+        "block index 999 for cube [1, 0, 0] exceeds palette length 2",
     )
 }
 

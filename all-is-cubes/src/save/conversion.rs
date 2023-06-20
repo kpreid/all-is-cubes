@@ -481,6 +481,7 @@ mod inv {
 
 mod space {
     use super::*;
+    use crate::math::GridArray;
     use crate::save::compress::{GzSerde, Leu16};
     use crate::space::{self, LightPhysics, Space, SpacePhysics};
     use std::borrow::Cow;
@@ -535,32 +536,33 @@ mod space {
                     contents: GzSerde(contents),
                     light,
                 } => {
-                    let mut space = Space::builder(bounds).physics(physics.into()).build();
-
-                    // TODO: more efficient loading that sets blocks by index rather than value
-                    for (cube, &block_index) in bounds.interior_iter().zip(contents.iter()) {
-                        let block_index: space::BlockIndex = block_index.into();
-                        space
-                            .set(
-                                cube,
-                                blocks.get(usize::from(block_index)).ok_or_else(|| {
-                                    serde::de::Error::custom(format!(
-                                    "Space contents block index {block_index} out of bounds of \
-                                    block table length {len}",
-                                    len = blocks.len()
-                                ))
-                                })?,
+                    // Convert data representations
+                    let contents = GridArray::from_elements(
+                        bounds,
+                        Vec::from(contents)
+                            .into_iter()
+                            .map(space::BlockIndex::from)
+                            .collect::<Box<[_]>>(),
+                    )
+                    .map_err(serde::de::Error::custom)?;
+                    let light = light
+                        .map(|GzSerde(data)| {
+                            GridArray::from_elements(
+                                bounds,
+                                Vec::from(data)
+                                    .into_iter()
+                                    .map(space::PackedLight::from)
+                                    .collect::<Box<[_]>>(),
                             )
-                            .unwrap();
-                    }
+                        })
+                        .transpose()
+                        .map_err(serde::de::Error::custom)?;
 
-                    // Copy light data in.
-                    // TODO: Think about what behavior we want for the light update queue
-                    if let Some(GzSerde(light)) = light {
-                        for (dst, src) in space.lighting.iter_mut().zip(light.iter().copied()) {
-                            *dst = src.into();
-                        }
-                    }
+                    let space = Space::builder(bounds)
+                        .physics(physics.into())
+                        .palette_and_contents(&mut blocks.into_iter(), contents, light)
+                        .map_err(serde::de::Error::custom)?
+                        .build();
 
                     Ok(space)
                 }
