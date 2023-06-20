@@ -1,5 +1,5 @@
 use std::fmt;
-use std::sync::{atomic, mpsc, Arc};
+use std::sync::{atomic, mpsc};
 
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::listen::Listener;
@@ -50,32 +50,30 @@ fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: Aud
     // TODO: better sound and more sounds
     let beep = StaticSoundData {
         sample_rate: 44100,
-        frames: Arc::new(
-            (0..2205)
-                .map(|i| {
-                    let wave = (i as f32 / 44.1 * 4.0).sin() * 0.1;
-                    kira::dsp::Frame {
-                        left: wave,
-                        right: wave,
-                    }
-                })
-                .collect(),
-        ),
+        frames: (0..2205)
+            .map(|i| {
+                let wave = (i as f32 / 44.1 * 4.0).sin() * 0.1;
+                kira::dsp::Frame {
+                    left: wave,
+                    right: wave,
+                }
+            })
+            .collect(),
+
         settings: kira::sound::static_sound::StaticSoundSettings::default(),
     };
     let happened = StaticSoundData {
         sample_rate: 44100,
-        frames: Arc::new(
-            (0..220)
-                .map(|i| {
-                    let wave = (i as f32 / 44.1 * 2.0).sin() * 0.1;
-                    kira::dsp::Frame {
-                        left: wave,
-                        right: wave,
-                    }
-                })
-                .collect(),
-        ),
+        frames: (0..220)
+            .map(|i| {
+                let wave = (i as f32 / 44.1 * 2.0).sin() * 0.1;
+                kira::dsp::Frame {
+                    left: wave,
+                    right: wave,
+                }
+            })
+            .collect(),
+
         settings: kira::sound::static_sound::StaticSoundSettings::default(),
     };
 
