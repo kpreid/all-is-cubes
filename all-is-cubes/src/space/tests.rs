@@ -406,7 +406,7 @@ fn space_debug() {
                     0..1 (1),
                     0..1 (1),
                 ),
-                block_data: [
+                palette: Palette([
                     SpaceBlockData {
                         count: 1,
                         block: Block {
@@ -414,7 +414,7 @@ fn space_debug() {
                         },
                         ..
                     },
-                ],
+                ]),
                 physics: SpacePhysics {
                     gravity: (+0.000, -20.000, +0.000),
                     sky_color: Rgb(0.8962694, 0.8962694, 1.0),

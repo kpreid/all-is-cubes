@@ -95,7 +95,7 @@ impl fmt::Debug for Space {
         // Make the assumption that a Space is too big to print in its entirety.
         fmt.debug_struct("Space")
             .field("bounds", &self.bounds)
-            .field("block_data", &self.palette.entries())
+            .field("palette", &self.palette)
             .field("physics", &self.physics)
             .field("behaviors", &self.behaviors)
             .field("cubes_wanting_ticks", &self.cubes_wanting_ticks) // TODO: truncate?

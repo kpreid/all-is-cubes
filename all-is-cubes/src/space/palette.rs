@@ -270,6 +270,23 @@ impl Palette {
     }
 }
 
+impl fmt::Debug for Palette {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            entries,
+            block_to_index: _,
+            todo: _,
+        } = self;
+
+        // Inherit the alternate/prettyprint state, but don't put any
+        // prettyprint space between the () and the [].
+        write!(fmt, "Palette(")?;
+        fmt::Debug::fmt(entries, fmt)?;
+        write!(fmt, ")")?;
+        Ok(())
+    }
+}
+
 impl crate::universe::VisitRefs for Palette {
     fn visit_refs(&self, visitor: &mut dyn crate::universe::RefVisitor) {
         for SpaceBlockData { block, .. } in self.entries.iter() {
