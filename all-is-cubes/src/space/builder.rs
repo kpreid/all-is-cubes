@@ -412,6 +412,8 @@ mod tests {
             .unwrap()
             .build();
 
+        space.consistency_check();
+
         // We do not require the new space to have exactly the same indices as the input,
         // but the blocks should match.
         assert_eq!(space[[0, 0, 0]], block0);
