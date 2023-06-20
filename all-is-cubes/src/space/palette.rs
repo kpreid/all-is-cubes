@@ -295,6 +295,35 @@ impl crate::universe::VisitRefs for Palette {
     }
 }
 
+impl Clone for Palette {
+    /// Cloning a [`Palette`] produces a copy which is independently mutable and
+    /// independently tracks block changes, but initially has the same state. It will
+    /// reevaluate on the next step().
+    fn clone(&self) -> Self {
+        // Construct the new set with a full todo so that it establishes listeners.
+        // This will unfortunately also cause a reevaluation, but avoiding that would
+        // be additional complexity.
+        let todo = Arc::new(Mutex::new(PaletteTodo {
+            blocks: HashSet::from_iter((0..self.entries.len()).map(|i| i as BlockIndex)),
+        }));
+
+        Self {
+            entries: self
+                .entries()
+                .iter()
+                .map(|e| SpaceBlockData {
+                    block: e.block.clone(),
+                    count: e.count,
+                    evaluated: e.evaluated.clone(),
+                    block_listen_gate: None,
+                })
+                .collect(),
+            block_to_index: self.block_to_index.clone(),
+            todo,
+        }
+    }
+}
+
 /// Information about the interpretation of a block index.
 ///
 /// Design note: This doubles as an internal data structure for [`Space`]. While we'll
@@ -469,4 +498,43 @@ pub enum PaletteError {
         index_2: BlockIndex,
         block: Block,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::content::make_some_blocks;
+    use crate::math::{GridAab, GridArray};
+    use crate::space::Space;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn clone_palette() {
+        let blocks = make_some_blocks::<2>();
+        // Use a Space to create our starting palette
+        let bounds = GridAab::from_lower_size([0, 0, 0], [3, 1, 1]);
+        let space = Space::builder(bounds)
+            .palette_and_contents(
+                blocks.clone(),
+                GridArray::from_elements(bounds, [0, 1, 0]).unwrap(),
+                None,
+            )
+            .unwrap()
+            .build();
+
+        let cloned = space.palette.clone();
+
+        // The clone should be consistent internally and with the space data.
+        cloned.consistency_check(&space.contents);
+
+        let extract = |p: &Palette| {
+            p.entries()
+                .iter()
+                .map(|e| (e.block.clone(), e.count))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(extract(&cloned), extract(&space.palette));
+
+        // TODO: also check evaluation and block change tracking
+    }
 }
