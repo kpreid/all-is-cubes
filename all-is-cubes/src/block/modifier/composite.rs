@@ -220,6 +220,8 @@ impl universe::VisitRefs for Composite {
 ///
 /// The “source” block is the [`Composite`]'s stored block, and the “destination” block
 /// is the block the modifier is attached to.
+///
+/// TODO: Document behavior of `collision` and `selectable` properties.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
@@ -240,6 +242,33 @@ pub enum CompositeOperator {
 }
 
 impl CompositeOperator {
+    /// Entry point by which [`Composite::evaluate()`] uses [`Self`].
+    fn blend_evoxel(&self, src_ev: Evoxel, dst_ev: Evoxel) -> Evoxel {
+        use BlockCollision as Coll;
+        Evoxel {
+            color: self.blend_color(src_ev.color, dst_ev.color),
+            selectable: self.blend_binary(src_ev.selectable, dst_ev.selectable),
+            collision: {
+                let src_is_something = !matches!(src_ev.collision, Coll::None);
+                let dst_is_something = !matches!(dst_ev.collision, Coll::None);
+                if self.blend_binary(src_is_something, dst_is_something) {
+                    // TODO: this is probably not a sufficient condition and we will
+                    // eventually need some kind of “ranking” of collision types so that
+                    // depending the operator a "soft" collision (e.g. "high viscosity")
+                    // might entirely override a "hard" one or might not.
+                    if src_is_something {
+                        src_ev.collision
+                    } else {
+                        dst_ev.collision
+                    }
+                } else {
+                    Coll::None
+                }
+            },
+        }
+    }
+
+    /// Called by [`Self::blend_evoxel()`] to handle colors.
     fn blend_color(&self, source: Rgba, destination: Rgba) -> Rgba {
         let source = source.clamp();
         let destination = destination.clamp();
@@ -259,17 +288,12 @@ impl CompositeOperator {
         }
     }
 
-    fn blend_evoxel(&self, src_ev: Evoxel, dst_ev: Evoxel) -> Evoxel {
-        use BlockCollision as Coll;
-        Evoxel {
-            color: self.blend_color(src_ev.color, dst_ev.color),
-            // TODO: specific operator should control all of these; we need an idea of what mask to
-            // apply to discrete attributes.
-            selectable: src_ev.selectable | dst_ev.selectable,
-            collision: match (src_ev.collision, dst_ev.collision) {
-                (Coll::Hard, _) | (_, Coll::Hard) => Coll::Hard,
-                (Coll::None, Coll::None) => Coll::None,
-            },
+    /// Called by [`Self::blend_evoxel()`] to handle properties that can be described as
+    /// “present or absent” binary flags.
+    fn blend_binary(&self, source: bool, destination: bool) -> bool {
+        match self {
+            Self::Over => source | destination,
+            Self::In => source & destination,
         }
     }
 }
@@ -279,14 +303,52 @@ mod tests {
     use super::*;
     use crate::content::make_some_blocks;
     use pretty_assertions::assert_eq;
+    use BlockCollision::{Hard, None as CNone};
+    use CompositeOperator::{In, Over};
+
+    // --- Helpers
+
+    /// Check the result of applying an operator to a single `Evoxel`
+    #[track_caller]
+    fn assert_blend(src: Evoxel, operator: CompositeOperator, dst: Evoxel, outcome: Evoxel) {
+        // TODO: Replace this direct call with going through the full block evaluation.
+
+        assert_eq!(operator.blend_evoxel(src, dst), outcome);
+    }
+
+    fn evcoll(collision: BlockCollision) -> Evoxel {
+        Evoxel {
+            color: Rgba::WHITE, // no effect
+            selectable: false,  // no effect
+            collision,
+        }
+    }
+
+    // --- Tests ---
 
     #[test]
-    fn composite_silly_floats() {
+    fn blend_over_silly_floats() {
         // We just want to see this does not panic on NaN.
         CompositeOperator::Over.blend_color(
             Rgba::new(2e25, 2e25, 2e25, 2e25),
             Rgba::new(2e25, 2e25, 2e25, 2e25),
         );
+    }
+
+    #[test]
+    fn blend_over_collision() {
+        assert_blend(evcoll(Hard), Over, evcoll(Hard), evcoll(Hard));
+        assert_blend(evcoll(CNone), Over, evcoll(CNone), evcoll(CNone));
+        assert_blend(evcoll(Hard), Over, evcoll(CNone), evcoll(Hard));
+        assert_blend(evcoll(CNone), Over, evcoll(Hard), evcoll(Hard));
+    }
+
+    #[test]
+    fn blend_in_collision() {
+        assert_blend(evcoll(Hard), In, evcoll(Hard), evcoll(Hard));
+        assert_blend(evcoll(CNone), In, evcoll(CNone), evcoll(CNone));
+        assert_blend(evcoll(Hard), In, evcoll(CNone), evcoll(CNone));
+        assert_blend(evcoll(CNone), In, evcoll(Hard), evcoll(CNone));
     }
 
     #[test]
