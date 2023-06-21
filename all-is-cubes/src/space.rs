@@ -319,7 +319,7 @@ impl Space {
             // to characterize and won't create unnecessary holes.
             if self
                 .palette
-                .try_replace_unique(old_block_index, block, &self.notifier)?
+                .try_replace_unique(old_block_index, block, &self.notifier)
             {
                 self.side_effects_of_set(old_block_index, position, contents_index);
                 return Ok(true);
@@ -899,6 +899,7 @@ pub enum SetCubeError {
         /// The bounds of the space.
         space_bounds: GridAab,
     },
+
     /// More distinct blocks were added than currently supported.
     #[error("more than {} block types is not yet supported", BlockIndex::MAX as usize + 1)]
     TooManyBlocks(),

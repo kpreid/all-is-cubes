@@ -42,9 +42,7 @@ impl Palette {
                 todo: Arc::downgrade(&todo),
                 index: 0,
             },
-        )
-        // TODO: this can't actually fail any more
-        .expect("evaluation of block for newly created space failed");
+        );
 
         block_data.count = count;
 
@@ -112,7 +110,7 @@ impl Palette {
         block: &Block,
         notifier: &listen::Notifier<SpaceChange>,
         use_zeroed_entries: bool,
-    ) -> Result<BlockIndex, SetCubeError> {
+    ) -> Result<BlockIndex, TooManyBlocks> {
         if let Some(&old_index) = self.block_to_index.get(block) {
             Ok(old_index)
         } else {
@@ -125,7 +123,7 @@ impl Palette {
                         self.entries[new_index] = SpaceBlockData::new(
                             block.clone(),
                             self.listener_for_block(new_index as BlockIndex),
-                        )?;
+                        );
                         self.block_to_index
                             .insert(block.clone(), new_index as BlockIndex);
                         notifier.notify(SpaceChange::Number(new_index as BlockIndex));
@@ -134,11 +132,11 @@ impl Palette {
                 }
             }
             if high_mark >= BlockIndex::MAX as usize {
-                return Err(SetCubeError::TooManyBlocks());
+                return Err(TooManyBlocks);
             }
             let new_index = high_mark as BlockIndex;
-            // Evaluate the new block type. Can fail, but we haven't done any mutation yet.
-            let new_data = SpaceBlockData::new(block.clone(), self.listener_for_block(new_index))?;
+            // Evaluate the new block type.
+            let new_data = SpaceBlockData::new(block.clone(), self.listener_for_block(new_index));
             // Grow the vector.
             self.entries.push(new_data);
             self.block_to_index.insert(block.clone(), new_index);
@@ -154,7 +152,7 @@ impl Palette {
         old_block_index: BlockIndex,
         new_block: &Block,
         notifier: &listen::Notifier<SpaceChange>,
-    ) -> Result<bool, SetCubeError> {
+    ) -> bool {
         if self.entries[old_block_index as usize].count == 1
             && !self.block_to_index.contains_key(new_block)
         {
@@ -163,7 +161,7 @@ impl Palette {
                 let mut data = SpaceBlockData::new(
                     new_block.clone(),
                     self.listener_for_block(old_block_index),
-                )?;
+                );
                 data.count = 1;
                 std::mem::swap(&mut data, &mut self.entries[old_block_index as usize]);
                 data.block
@@ -176,9 +174,9 @@ impl Palette {
 
             notifier.notify(SpaceChange::Number(old_block_index));
 
-            Ok(true)
+            true
         } else {
-            Ok(false)
+            false
         }
     }
 
@@ -429,7 +427,7 @@ impl SpaceBlockData {
     fn new(
         block: Block,
         listener: impl listen::Listener<block::BlockChange> + Clone + Send + Sync + 'static,
-    ) -> Result<Self, SetCubeError> {
+    ) -> Self {
         // Note: Block evaluation also happens in `Space::step()`.
 
         let (gate, block_listener) = listener.gate();
@@ -446,12 +444,12 @@ impl SpaceBlockData {
                 err.to_placeholder()
             }
         };
-        Ok(Self {
+        Self {
             block,
             count: 0,
             evaluated,
             block_listen_gate: Some(gate),
-        })
+        }
     }
 
     /// Returns the [`Block`] this data is about.
@@ -547,6 +545,20 @@ pub enum PaletteError {
         index_2: BlockIndex,
         block: Block,
     },
+}
+
+/// Error returned from palette operations that would expand the palette but are out of
+/// indices.
+///
+/// This is not public, because currently all public operations return either
+/// [`SetCubeError::TooManyBlocks`] or [`PaletteError::PaletteTooLarge`].
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) struct TooManyBlocks;
+
+impl From<TooManyBlocks> for SetCubeError {
+    fn from(TooManyBlocks: TooManyBlocks) -> Self {
+        SetCubeError::TooManyBlocks()
+    }
 }
 
 #[cfg(test)]
