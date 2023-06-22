@@ -99,6 +99,8 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
                 hud_inputs.hud_blocks.blocks[UiBlocks::AboutButtonLabel].clone(),
             )),
             LayoutTree::leaf(pause_toggle_button(hud_inputs)),
+            // TODO: Actually saving is not yet implemented.
+            // LayoutTree::leaf(save_button(hud_inputs)),
             LayoutTree::leaf(widgets::ToggleButton::new(
                 hud_inputs.mouselook_mode.clone(),
                 |&value| value,
@@ -125,6 +127,18 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
     } else {
         control_bar_widgets
     }
+}
+
+#[allow(dead_code)] // TODO: use this once saving actually works
+fn save_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
+    let cc = hud_inputs.app_control_channel.clone();
+    widgets::ActionButton::new(
+        hud_inputs.hud_blocks.blocks[UiBlocks::SaveButtonLabel].clone(),
+        &hud_inputs.hud_blocks.blocks,
+        move || {
+            let _ignore_errors = cc.send(ControlMessage::Save);
+        },
+    )
 }
 
 // TODO: Unclear if HudBlocks should exist; maybe it should be reworked into a BlockProvider for widget graphics instead.

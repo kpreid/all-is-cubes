@@ -215,6 +215,12 @@ impl<I: time::Instant> Session<I> {
                             ui.back();
                         }
                     }
+                    ControlMessage::Save => {
+                        todo!("Need to await the future or make saving synchronous");
+                        // let u = &self.game_universe;
+                        // let _fut = u.whence.save(u, YieldProgressBuilder::new().build());
+                        // // TODO: need to await the future
+                    }
                     ControlMessage::TogglePause => {
                         self.paused.set(!*self.paused.get());
                     }
@@ -553,8 +559,17 @@ pub(crate) enum ControlMessage {
     /// * if at the root, return to game
     /// * if in-game, pause and open menu
     Back,
+
+    /// Save the game universe back to its [`WhenceUniverse`].
+    ///
+    /// TODO: This is not yet implemented and its usage in the UI is disabled.
+    #[allow(dead_code)]
+    Save,
+
     TogglePause,
+
     ToggleMouselook,
+
     /// TODO: this should be "modify user preferences", from which graphics options are derived.
     ModifyGraphicsOptions(Box<dyn FnOnce(Arc<GraphicsOptions>) -> Arc<GraphicsOptions> + Send>),
 }
@@ -564,6 +579,7 @@ impl fmt::Debug for ControlMessage {
         // Manual implementation required due to contained function.
         match self {
             Self::Back => write!(f, "Back"),
+            Self::Save => write!(f, "Save"),
             Self::TogglePause => write!(f, "TogglePause"),
             Self::ToggleMouselook => write!(f, "ToggleMouselook"),
             Self::ModifyGraphicsOptions(_f) => f
