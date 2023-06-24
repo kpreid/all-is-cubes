@@ -385,9 +385,16 @@ fn get_diffuse_color(in: BlockFragmentInput) -> vec4<f32> {
     if in.color_or_texture[3] < -0.5 {
         // Texture coordinates.
         let texcoord: vec3<f32> = clamp(in.color_or_texture.xyz, in.clamp_min, in.clamp_max);
+        
+        // If activated, this code will produce an “x-ray” view of all textured surfaces
+        // by cutting out all but the clamped border. Other similar changes could be used to
+        // visualize the clamping itself without adding any transparency.
+        //
+        // if (all(texcoord == in.color_or_texture.xyz)) {
+        //     discard;
+        // }
+        
         return textureSampleLevel(block_texture, block_sampler, texcoord, 0.0);
-
-        // TODO: implement DEBUG_TEXTURE_EDGE
     } else {
         // Solid color.
         return in.color_or_texture;
