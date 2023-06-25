@@ -141,11 +141,11 @@ impl Composite {
         }
         // Unpack blocks.
         let MinEval {
-            attributes,
+            attributes: dst_att,
             voxels: dst_voxels,
         } = dst_evaluated;
         let MinEval {
-            attributes: _, // TODO: merge attributes using the operator, instead of discarding one set
+            attributes: src_att,
             voxels: src_voxels,
         } = src_evaluated;
 
@@ -157,6 +157,17 @@ impl Composite {
         let dst_scale =
             GridCoordinate::from(effective_resolution) / GridCoordinate::from(dst_resolution);
 
+        let attributes = block::BlockAttributes {
+            display_name: dst_att.display_name, // TODO merge
+            selectable: src_att.selectable | dst_att.selectable,
+            rotation_rule: dst_att.rotation_rule, // TODO merge
+            // TODO: summing is kinda correct for "this contains a light source", but isn't
+            // very justifiable; we should probably use per-voxel light emission instead
+            light_emission: src_att.light_emission + dst_att.light_emission,
+            tick_action: dst_att.tick_action,       // TODO: merge
+            animation_hint: dst_att.animation_hint, // TODO: merge
+        };
+
         Ok(if effective_resolution == R1 {
             MinEval {
                 attributes,
@@ -167,7 +178,6 @@ impl Composite {
             }
         } else {
             MinEval {
-                // TODO: merge attributes
                 attributes,
                 // TODO: use narrower array bounds (union of both inputs' bounds)
                 voxels: Evoxels::Many(
@@ -301,6 +311,7 @@ impl CompositeOperator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::EvaluatedBlock;
     use crate::content::make_some_blocks;
     use pretty_assertions::assert_eq;
     use BlockCollision::{Hard, None as CNone};
@@ -322,6 +333,14 @@ mod tests {
             selectable: false,  // no effect
             collision,
         }
+    }
+
+    #[track_caller]
+    fn eval_compose(src: &Block, operator: CompositeOperator, dst: &Block) -> EvaluatedBlock {
+        dst.clone()
+            .with_modifier(Composite::new(src.clone(), operator))
+            .evaluate()
+            .expect("failed to evaluate in eval_compose()")
     }
 
     // --- Tests ---
@@ -349,6 +368,27 @@ mod tests {
         assert_blend(evcoll(CNone), In, evcoll(CNone), evcoll(CNone));
         assert_blend(evcoll(Hard), In, evcoll(CNone), evcoll(CNone));
         assert_blend(evcoll(CNone), In, evcoll(Hard), evcoll(CNone));
+    }
+
+    #[test]
+    fn attribute_selectable_if_either_is_selectable() {
+        // TODO: make this a more thorough test by making the two blocks slabs so that
+        // all four types of voxels are involved. This currently doesn't matter but it may.
+        let is_sel = &Block::builder().color(Rgba::WHITE).selectable(true).build();
+        let not_sel = &Block::builder()
+            .color(Rgba::WHITE)
+            .selectable(false)
+            .build();
+
+        assert!(eval_compose(is_sel, Over, is_sel).attributes.selectable);
+        assert!(eval_compose(is_sel, Over, not_sel).attributes.selectable);
+        assert!(eval_compose(not_sel, Over, is_sel).attributes.selectable);
+        assert!(!eval_compose(not_sel, Over, not_sel).attributes.selectable);
+
+        assert!(eval_compose(is_sel, In, is_sel).attributes.selectable);
+        assert!(eval_compose(is_sel, In, not_sel).attributes.selectable);
+        assert!(eval_compose(not_sel, In, is_sel).attributes.selectable);
+        assert!(!eval_compose(not_sel, In, not_sel).attributes.selectable);
     }
 
     #[test]
