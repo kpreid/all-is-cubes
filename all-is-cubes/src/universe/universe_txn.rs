@@ -614,7 +614,7 @@ mod tests {
     use crate::content::make_some_blocks;
     use crate::space::Space;
     use crate::space::SpaceTransaction;
-    use crate::transaction::{ExecuteError, TransactionTester};
+    use crate::transaction::{ExecuteError, TransactionTester, MapConflict};
     use indoc::indoc;
     use std::collections::HashMap;
 
@@ -684,8 +684,15 @@ mod tests {
         let mut u = Universe::new();
         let s = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block_1)).bind(s.clone());
-        let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block_2)).bind(s);
-        t1.merge(t2).unwrap_err();
+        let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block_2)).bind(s.clone());
+        let error = t1.merge(t2).unwrap_err();
+        let UniverseConflict::Member(MapConflict {
+            key,
+            conflict: TransactionConflict {}
+        }) = error else {
+            panic!("not as expected: {error:?}");
+        };
+        assert_eq!(key, s.name());
     }
 
     #[test]
