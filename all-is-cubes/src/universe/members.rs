@@ -10,7 +10,11 @@ use std::fmt;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::Space;
-use crate::universe::{InsertError, Name, PartialUniverse, URef, URootRef, Universe, UniverseIter};
+use crate::transaction;
+use crate::universe::{
+    universe_txn as ut, InsertError, Name, PartialUniverse, URef, URefErased, URootRef, Universe,
+    UniverseIter,
+};
 use crate::util::CustomFormat as _;
 
 /// A `BTreeMap` is used to ensure that the iteration order is deterministic across
@@ -172,6 +176,17 @@ macro_rules! impl_universe_for_member {
                 new_self
             }
         }
+
+        impl ut::UTransactional for $member_type {
+            fn bind(target: URef<Self>, transaction: Self::Transaction) -> ut::UniverseTransaction {
+                ut::UniverseTransaction::from(AnyTransaction::$member_type(
+                    ut::TransactionInUniverse {
+                        target,
+                        transaction,
+                    },
+                ))
+            }
+        }
     };
 }
 
@@ -204,12 +219,28 @@ macro_rules! member_enums_and_impls {
         }
 
         impl AnyURef {
+            /// Returns whether this [`URef`] does not yet belong to a universe and can start
+            /// doing so. Used by [`MemberTxn::check`].
+            ///
+            /// See [`URef::check_upgrade_pending`] for more information.
             pub(crate) fn check_upgrade_pending(
                 &self,
                 universe_id: $crate::universe::UniverseId,
             ) -> Result<(), $crate::transaction::PreconditionFailed> {
                 match self {
                     $( Self::$member_type(r) => r.check_upgrade_pending(universe_id), )*
+                }
+            }
+
+            /// Used by [`MemberTxn::commit()`] to perform inserts.
+            pub(crate) fn insert_and_upgrade_pending(
+                &self,
+                universe: &mut Universe,
+            ) -> Result<(), transaction::CommitError> {
+                match self {
+                    $( AnyURef::$member_type(pending_ref) => {
+                        ut::anyuref_insert_and_upgrade_pending(universe, pending_ref)
+                    } )*
                 }
             }
 
@@ -221,6 +252,87 @@ macro_rules! member_enums_and_impls {
         }
 
         $( impl_universe_for_member!($member_type, $table_name); )*
+
+        /// Polymorphic container for transactions in a [`UniverseTransaction`].
+        #[derive(Clone, Default, PartialEq)]
+        #[allow(clippy::large_enum_variant)]
+        #[non_exhaustive]
+        pub(in crate::universe) enum AnyTransaction {
+            #[default]
+            Noop,
+            $( $member_type(ut::TransactionInUniverse<$member_type>), )*
+        }
+
+        impl AnyTransaction {
+            pub(in crate::universe) fn target_erased(&self) -> Option<&dyn URefErased> {
+                use AnyTransaction::*;
+                match self {
+                    Noop => None,
+                    $( $member_type(t) => Some(&t.target), )*
+                }
+            }
+
+            /// Returns the transaction out of the [`TransactionInUniverse`] wrapper.
+            pub(in crate::universe) fn transaction_as_debug(&self) -> &dyn fmt::Debug {
+                use AnyTransaction::*;
+                match self {
+                    Noop => &"AnyTransaction::Noop",
+                    $( Self::$member_type(t) => &t.transaction, )*
+                }
+            }
+        }
+
+        impl transaction::Transaction<()> for AnyTransaction {
+            type CommitCheck = ut::AnyTransactionCheck;
+            type Output = transaction::NoOutput;
+
+            fn check(
+                &self,
+                _target: &(),
+            ) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
+                Ok(match self {
+                    Self::Noop => Box::new(()),
+                    $(  Self::$member_type(t) => Box::new(t.check(&())?), )*
+                })
+            }
+
+            fn commit(
+                &self,
+                _target: &mut (),
+                check: Self::CommitCheck,
+                outputs: &mut dyn FnMut(Self::Output),
+            ) -> Result<(), transaction::CommitError> {
+                match self {
+                    Self::Noop => Ok(()),
+                    $( Self::$member_type(t) => ut::anytxn_commit_helper(t, check, outputs), )*
+                }
+            }
+        }
+
+        impl transaction::Merge for AnyTransaction {
+            type MergeCheck = ut::AnyTransactionCheck;
+
+            fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, transaction::TransactionConflict> {
+                match (self, other) {
+                    (Self::Noop, _) => Ok(Box::new(())),
+                    (_, Self::Noop) => Ok(Box::new(())),
+                    $( (Self::$member_type(t1), Self::$member_type(t2)) => Ok(Box::new(t1.check_merge(t2)?)), )*
+                    (_, _) => Err(transaction::TransactionConflict {}),
+                }
+            }
+
+            fn commit_merge(self, other: Self, check: Self::MergeCheck) -> Self {
+                match (self, other) {
+                    (t1, Self::Noop) => t1,
+                    (Self::Noop, t2) => t2,
+                    $( (Self::$member_type(t1), Self::$member_type(t2)) => {
+                        ut::anytxn_merge_helper(t1, t2, Self::$member_type, check)
+                    } )*
+                    (_, _) => panic!("Mismatched transaction target types"),
+                }
+            }
+        }
+
     }
 }
 

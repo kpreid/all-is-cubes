@@ -2,14 +2,11 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
 
-use crate::block::BlockDef;
-use crate::character::Character;
-use crate::space::Space;
 use crate::transaction::{
     self, CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
 };
 use crate::universe::{
-    AnyURef, Name, UBorrowMut, URef, URefErased as _, Universe, UniverseId, UniverseMember,
+    AnyURef, Name, UBorrowMut, URef, URefErased, Universe, UniverseId, UniverseMember,
     UniverseTable,
 };
 
@@ -33,14 +30,11 @@ where
 ///
 /// [`AnyTransaction`] is a singly-typed wrapper around this.
 ///
-/// This type is public out of necessity due to appearing in trait bounds; you should not
-/// need to use it.
-///
 /// TODO: Better name.
 #[derive(Debug, Eq)]
-struct TransactionInUniverse<O: Transactional + 'static> {
-    target: URef<O>,
-    transaction: O::Transaction,
+pub(in crate::universe) struct TransactionInUniverse<O: Transactional + 'static> {
+    pub(crate) target: URef<O>,
+    pub(crate) transaction: O::Transaction,
 }
 
 impl<O> Transaction<()> for TransactionInUniverse<O>
@@ -71,7 +65,7 @@ where
 }
 
 /// Private to keep the mutable access private.
-struct TransactionInUniverseCheck<O>
+pub(in crate::universe) struct TransactionInUniverseCheck<O>
 where
     O: Transactional + 'static,
 {
@@ -122,139 +116,20 @@ where
     }
 }
 
-/// Polymorphic container for transactions in a [`UniverseTransaction`].
-#[derive(Clone, Default, PartialEq)]
-#[allow(clippy::large_enum_variant)]
-#[non_exhaustive]
-enum AnyTransaction {
-    #[default]
-    Noop,
-    BlockDef(TransactionInUniverse<BlockDef>),
-    Character(TransactionInUniverse<Character>),
-    Space(TransactionInUniverse<Space>),
-}
-
 /// Not-an-associated-type alias for check values produced by [`AnyTransaction`].
 /// TODO: Make this a newtype struct since we're bothering to name it.
-type AnyTransactionCheck = Box<dyn Any>;
+pub(in crate::universe) type AnyTransactionCheck = Box<dyn Any>;
+
+// `AnyTransaction` is a macro-generated type but it would belong here if possible
+use super::members::AnyTransaction;
 
 impl AnyTransaction {
     fn target_name(&self) -> Option<Name> {
-        use AnyTransaction::*;
-        match self {
-            Noop => None,
-            BlockDef(t) => Some(t.target.name()),
-            Character(t) => Some(t.target.name()),
-            Space(t) => Some(t.target.name()),
-        }
-    }
-
-    /// Returns the transaction out of the [`TransactionInUniverse`] wrapper.
-    fn transaction_as_debug(&self) -> &dyn Debug {
-        use AnyTransaction::*;
-        match self {
-            Noop => &"AnyTransaction::Noop",
-            BlockDef(t) => &t.transaction,
-            Character(t) => &t.transaction,
-            Space(t) => &t.transaction,
-        }
+        self.target_erased().map(URefErased::name)
     }
 
     fn universe_id(&self) -> Option<UniverseId> {
-        use AnyTransaction::*;
-        match self {
-            Noop => None,
-            BlockDef(t) => t.target.universe_id(),
-            Character(t) => t.target.universe_id(),
-            Space(t) => t.target.universe_id(),
-        }
-    }
-}
-
-impl Transaction<()> for AnyTransaction {
-    type CommitCheck = AnyTransactionCheck;
-    type Output = transaction::NoOutput;
-
-    fn check(&self, _target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
-        use AnyTransaction::*;
-        Ok(match self {
-            Noop => Box::new(()),
-            BlockDef(t) => Box::new(t.check(&())?),
-            Character(t) => Box::new(t.check(&())?),
-            Space(t) => Box::new(t.check(&())?),
-        })
-    }
-
-    fn commit(
-        &self,
-        _target: &mut (),
-        check: Self::CommitCheck,
-        outputs: &mut dyn FnMut(Self::Output),
-    ) -> Result<(), CommitError> {
-        fn commit_helper<O>(
-            transaction: &TransactionInUniverse<O>,
-            check: AnyTransactionCheck,
-            outputs: &mut dyn FnMut(<TransactionInUniverse<O> as Transaction<()>>::Output),
-        ) -> Result<(), CommitError>
-        where
-            O: Transactional,
-            TransactionInUniverse<O>: Transaction<()>,
-        {
-            let check: <TransactionInUniverse<O> as Transaction<()>>::CommitCheck =
-                *(check.downcast().map_err(|_| {
-                    CommitError::message::<AnyTransaction>("type mismatch in check data".into())
-                })?);
-            transaction.commit(&mut (), check, outputs)
-        }
-
-        use AnyTransaction::*;
-        match self {
-            Noop => Ok(()),
-            BlockDef(t) => commit_helper(t, check, outputs),
-            Character(t) => commit_helper(t, check, outputs),
-            Space(t) => commit_helper(t, check, outputs),
-        }
-    }
-}
-
-impl Merge for AnyTransaction {
-    type MergeCheck = AnyTransactionCheck;
-
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
-        use AnyTransaction::*;
-        match (self, other) {
-            (Noop, _) => Ok(Box::new(())),
-            (_, Noop) => Ok(Box::new(())),
-            (BlockDef(t1), BlockDef(t2)) => Ok(Box::new(t1.check_merge(t2)?)),
-            (Character(t1), Character(t2)) => Ok(Box::new(t1.check_merge(t2)?)),
-            (Space(t1), Space(t2)) => Ok(Box::new(t1.check_merge(t2)?)),
-            (_, _) => Err(TransactionConflict {}),
-        }
-    }
-
-    fn commit_merge(self, other: Self, check: Self::MergeCheck) -> Self {
-        fn merge_helper<O>(
-            t1: TransactionInUniverse<O>,
-            t2: TransactionInUniverse<O>,
-            rewrapper: fn(TransactionInUniverse<O>) -> AnyTransaction,
-            check: AnyTransactionCheck, // contains <TransactionInUniverse<O> as Transaction<()>>::MergeCheck,
-        ) -> AnyTransaction
-        where
-            O: Transactional,
-            TransactionInUniverse<O>: Transaction<()>,
-        {
-            rewrapper(t1.commit_merge(t2, *check.downcast().unwrap()))
-        }
-
-        use AnyTransaction::*;
-        match (self, other) {
-            (t1, Noop) => t1,
-            (Noop, t2) => t2,
-            (BlockDef(t1), BlockDef(t2)) => merge_helper(t1, t2, BlockDef, check),
-            (Character(t1), Character(t2)) => merge_helper(t1, t2, Character, check),
-            (Space(t1), Space(t2)) => merge_helper(t1, t2, Space, check),
-            (_, _) => panic!("Mismatched transaction target types"),
-        }
+        self.target_erased().and_then(URefErased::universe_id)
     }
 }
 
@@ -265,33 +140,35 @@ impl Debug for AnyTransaction {
     }
 }
 
-/// Each implementation of [`UTransactional`] corresponds to a variant of [`AnyTransaction`].
-mod any_transaction {
-    use super::*;
-    impl UTransactional for BlockDef {
-        fn bind(target: URef<Self>, transaction: Self::Transaction) -> UniverseTransaction {
-            UniverseTransaction::from(AnyTransaction::BlockDef(TransactionInUniverse {
-                target,
-                transaction,
-            }))
-        }
-    }
-    impl UTransactional for Character {
-        fn bind(target: URef<Self>, transaction: Self::Transaction) -> UniverseTransaction {
-            UniverseTransaction::from(AnyTransaction::Character(TransactionInUniverse {
-                target,
-                transaction,
-            }))
-        }
-    }
-    impl UTransactional for Space {
-        fn bind(target: URef<Self>, transaction: Self::Transaction) -> UniverseTransaction {
-            UniverseTransaction::from(AnyTransaction::Space(TransactionInUniverse {
-                target,
-                transaction,
-            }))
-        }
-    }
+/// Called from `impl Merge for AnyTransaction`
+pub(in crate::universe) fn anytxn_merge_helper<O>(
+    t1: TransactionInUniverse<O>,
+    t2: TransactionInUniverse<O>,
+    rewrapper: fn(TransactionInUniverse<O>) -> AnyTransaction,
+    check: AnyTransactionCheck, // contains <TransactionInUniverse<O> as Transaction<()>>::MergeCheck,
+) -> AnyTransaction
+where
+    O: Transactional,
+    TransactionInUniverse<O>: Transaction<()>,
+{
+    rewrapper(t1.commit_merge(t2, *check.downcast().unwrap()))
+}
+
+/// Called from `impl Commit for AnyTransaction`
+pub(in crate::universe) fn anytxn_commit_helper<O>(
+    transaction: &TransactionInUniverse<O>,
+    check: AnyTransactionCheck,
+    outputs: &mut dyn FnMut(<TransactionInUniverse<O> as Transaction<()>>::Output),
+) -> Result<(), CommitError>
+where
+    O: Transactional,
+    TransactionInUniverse<O>: Transaction<()>,
+{
+    let check: <TransactionInUniverse<O> as Transaction<()>>::CommitCheck =
+        *(check.downcast().map_err(|_| {
+            CommitError::message::<AnyTransaction>("type mismatch in check data".into())
+        })?);
+    transaction.commit(&mut (), check, outputs)
 }
 
 /// A [`Transaction`] which operates on one or more objects in a [`Universe`]
@@ -617,36 +494,9 @@ impl MemberTxn {
                 txn.commit(&mut (), check.expect("missing check value"), outputs)
             }
             MemberTxn::Insert(pending_ref) => {
-                /// Generic helper function to handle each type of ref.
-                fn do_insert<T>(
-                    universe: &mut Universe,
-                    pending_ref: &URef<T>,
-                ) -> Result<(), CommitError>
-                where
-                    T: 'static,
-                    Universe: UniverseTable<T, Table = super::Storage<T>>,
-                {
-                    let new_root_ref = pending_ref.upgrade_pending(universe).map_err(|e| {
-                        CommitError::message::<UniverseTransaction>(format!(
-                            "insert() unable to upgrade: {e}"
-                        ))
-                    })?;
-
-                    UniverseTable::<T>::table_mut(universe)
-                        .insert(pending_ref.name(), new_root_ref);
-                    universe.wants_gc = true;
-
-                    Ok(())
-                }
-
-                // TODO: The check version of this is in the universe member macro code instead.
-                // Decide which style we should use.
-                match pending_ref {
-                    AnyURef::BlockDef(pending_ref) => do_insert(universe, pending_ref),
-                    AnyURef::Character(pending_ref) => do_insert(universe, pending_ref),
-                    AnyURef::Space(pending_ref) => do_insert(universe, pending_ref),
-                }
-                .map_err(CommitError::catch::<Self, _>)?;
+                pending_ref
+                    .insert_and_upgrade_pending(universe)
+                    .map_err(CommitError::catch::<Self, _>)?;
                 Ok(())
             }
             MemberTxn::Delete => {
@@ -674,6 +524,26 @@ impl MemberTxn {
             Noop | Insert(_) | Delete => None,
         }
     }
+}
+
+/// Generic helper function called by macro-generated
+/// [`AnyURef::insert_and_upgrade_pending()`]
+pub(in crate::universe) fn anyuref_insert_and_upgrade_pending<T>(
+    universe: &mut Universe,
+    pending_ref: &URef<T>,
+) -> Result<(), CommitError>
+where
+    T: 'static,
+    Universe: UniverseTable<T, Table = super::Storage<T>>,
+{
+    let new_root_ref = pending_ref.upgrade_pending(universe).map_err(|e| {
+        CommitError::message::<UniverseTransaction>(format!("insert() unable to upgrade: {e}"))
+    })?;
+
+    UniverseTable::<T>::table_mut(universe).insert(pending_ref.name(), new_root_ref);
+    universe.wants_gc = true;
+
+    Ok(())
 }
 
 impl Merge for MemberTxn {
@@ -725,6 +595,7 @@ mod tests {
 
     use super::*;
     use crate::content::make_some_blocks;
+    use crate::space::Space;
     use crate::space::SpaceTransaction;
     use crate::transaction::{ExecuteError, TransactionTester};
     use indoc::indoc;
