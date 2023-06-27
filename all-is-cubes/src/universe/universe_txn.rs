@@ -643,9 +643,11 @@ mod tests {
 
     use super::*;
     use crate::content::make_some_blocks;
+    use crate::math::GridPoint;
+    use crate::space::CubeConflict;
     use crate::space::Space;
     use crate::space::SpaceTransaction;
-    use crate::transaction::TransactionConflict;
+    use crate::space::SpaceTransactionConflict;
     use crate::transaction::{ExecuteError, MapConflict, TransactionTester};
     use indoc::indoc;
     use std::collections::HashMap;
@@ -717,11 +719,19 @@ mod tests {
         let s = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block_1)).bind(s.clone());
         let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block_2)).bind(s.clone());
+
         let error = t1.merge(t2).unwrap_err();
+
         let UniverseConflict::Member(MapConflict {
             key,
             conflict: MemberConflict::Modify(
-                ModifyMemberConflict(AnyTransactionConflict::Space(TransactionConflict {}))
+                ModifyMemberConflict(AnyTransactionConflict::Space(SpaceTransactionConflict::Cube {
+                    cube: GridPoint { x: 0, y: 0, z: 0 },
+                    conflict: CubeConflict {
+                        old: false,
+                        new: true,
+                    },
+                }))
             )
         }) = error else {
             panic!("not as expected: {error:?}");

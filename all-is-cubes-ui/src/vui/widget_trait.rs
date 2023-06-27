@@ -8,7 +8,7 @@ use all_is_cubes::behavior::{Behavior, BehaviorContext, BehaviorSetTransaction};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
-use all_is_cubes::transaction::{self, Merge as _, TransactionConflict};
+use all_is_cubes::transaction::{self, Merge as _};
 use all_is_cubes::universe::{RefVisitor, VisitRefs};
 
 use crate::vui::{validate_widget_transaction, LayoutGrant, Layoutable, Positioned};
@@ -208,7 +208,7 @@ pub enum InstallVuiError {
         // TODO: Include the widget(s) involved, once `Arc<dyn Widget>` is piped around everywhere
         // and not just sometimes Widget or sometimes WidgetController.
         #[source]
-        error: TransactionConflict,
+        error: space::SpaceTransactionConflict,
     },
 
     /// The widget attempted to modify space outside its assigned bounds.

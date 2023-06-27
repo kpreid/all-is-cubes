@@ -59,21 +59,24 @@ impl SpaceTransaction {
         cube: impl Into<GridPoint>,
         old: Option<Block>,
         new: Option<Block>,
-    ) -> Result<(), TransactionConflict> {
+    ) -> Result<(), SpaceTransactionConflict> {
+        let cube: GridPoint = cube.into();
         let ct = CubeTransaction {
             old,
             new,
             conserved: true,
             ..Default::default()
         };
-        match self.cubes.entry(cube.into().into()) {
+        match self.cubes.entry(cube.into()) {
             Vacant(entry) => {
                 entry.insert(ct);
                 Ok(())
             }
             Occupied(mut entry) => {
                 let existing_ref = entry.get_mut();
-                let check = existing_ref.check_merge(&ct)?;
+                let check = existing_ref
+                    .check_merge(&ct)
+                    .map_err(|conflict| SpaceTransactionConflict::Cube { cube, conflict })?;
                 *existing_ref = mem::take(existing_ref).commit_merge(ct, check);
                 Ok(())
             }
@@ -308,7 +311,7 @@ impl Transaction<Space> for SpaceTransaction {
 
 impl Merge for SpaceTransaction {
     type MergeCheck = <BehaviorSetTransaction<Space> as Merge>::MergeCheck;
-    type Conflict = TransactionConflict;
+    type Conflict = SpaceTransactionConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         let mut cubes1 = &self.cubes;
@@ -322,12 +325,19 @@ impl Merge for SpaceTransaction {
             // but unfortunately, does not have an analogue for BTreeMap.
             mem::swap(&mut cubes1, &mut cubes2);
         }
-        for (cube, t1) in cubes1.iter() {
-            if let Some(t2) = cubes2.get(cube) {
-                let CubeMergeCheck {} = t1.check_merge(t2)?;
+        for (&cube, t1) in cubes1.iter() {
+            if let Some(t2) = cubes2.get(&cube) {
+                let CubeMergeCheck {} =
+                    t1.check_merge(t2)
+                        .map_err(|conflict| SpaceTransactionConflict::Cube {
+                            cube: cube.into(),
+                            conflict,
+                        })?;
             }
         }
-        self.behaviors.check_merge(&other.behaviors)
+        self.behaviors
+            .check_merge(&other.behaviors)
+            .map_err(SpaceTransactionConflict::Behaviors)
     }
 
     fn commit_merge(mut self, mut other: Self, check: Self::MergeCheck) -> Self {
@@ -368,6 +378,21 @@ impl fmt::Debug for SpaceTransaction {
     }
 }
 
+/// Transaction conflict error type for a [`SpaceTransaction`].
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[non_exhaustive]
+pub enum SpaceTransactionConflict {
+    #[allow(missing_docs)]
+    #[error("conflict at cube {c}", c = .cube.custom_format(ConciseDebug))]
+    Cube {
+        cube: GridPoint, // TODO: GridAab instead?
+        conflict: CubeConflict,
+    },
+    #[allow(missing_docs)]
+    #[error("conflict in behaviors")]
+    Behaviors(TransactionConflict),
+}
+
 /// Data for a single cube in a [`SpaceTransaction`]. This does not function as a
 /// transaction on its own, though it does implement [`Merge`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -399,19 +424,27 @@ impl CubeTransaction {
 
 impl Merge for CubeTransaction {
     type MergeCheck = CubeMergeCheck;
-    type Conflict = TransactionConflict;
+    type Conflict = CubeConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
-        if matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b) {
+        let conflict = CubeConflict {
             // Incompatible preconditions will always fail.
-            return Err(TransactionConflict {});
-        }
-        if self.new.is_some() && other.new.is_some() && self.conserved {
+            old: matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b),
             // Replacing the same cube twice is not allowed -- even if they're
             // equal, doing so could violate an intended conservation law.
-            return Err(TransactionConflict {});
+            new: self.new.is_some() && other.new.is_some() && self.conserved,
+        };
+
+        if (conflict
+            != CubeConflict {
+                old: false,
+                new: false,
+            })
+        {
+            Err(conflict)
+        } else {
+            Ok(CubeMergeCheck {})
         }
-        Ok(CubeMergeCheck {})
     }
 
     fn commit_merge(self, other: Self, CubeMergeCheck {}: Self::MergeCheck) -> Self
@@ -432,6 +465,39 @@ struct CubeMergeCheck {
     // This might end up having some data later.
     // For now, it's a placeholder to avoid passing () around
     // and getting clippy::let_unit_value warnings
+}
+
+/// Transaction conflict error type for a single cube of a [`SpaceTransaction`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+#[non_exhaustive]
+pub struct CubeConflict {
+    /// The transactions have conflicting preconditions (`old` blocks).
+    pub(crate) old: bool,
+    /// The transactions are attempting to modify the same cube.
+    pub(crate) new: bool,
+}
+
+impl fmt::Display for CubeConflict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            CubeConflict {
+                old: true,
+                new: false,
+            } => write!(f, "different preconditions"),
+            CubeConflict {
+                old: false,
+                new: true,
+            } => write!(f, "cannot write the same cube twice"),
+            CubeConflict {
+                old: true,
+                new: true,
+            } => write!(f, "different preconditions (with write)"),
+            CubeConflict {
+                old: false,
+                new: false,
+            } => unreachable!(),
+        }
+    }
 }
 
 #[cfg(test)]
