@@ -24,7 +24,7 @@ use crate::save::schema;
 use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::{
-    self, CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
+    self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
 };
 use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
 use crate::util::{ConciseDebug, CustomFormat, StatusText};
@@ -734,8 +734,9 @@ impl Merge for CharacterTransaction {
         <InventoryTransaction as Merge>::MergeCheck,
         <BehaviorSetTransaction<Character> as Merge>::MergeCheck,
     );
+    type Conflict = transaction::TransactionConflict;
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         Ok((
             self.body.check_merge(&other.body)?,
             self.inventory.check_merge(&other.inventory)?,

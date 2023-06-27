@@ -425,8 +425,9 @@ impl Transaction<Inventory> for InventoryTransaction {
 
 impl Merge for InventoryTransaction {
     type MergeCheck = ();
+    type Conflict = TransactionConflict;
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         if self
             .replace
             .keys()

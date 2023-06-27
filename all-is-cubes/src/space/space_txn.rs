@@ -308,8 +308,9 @@ impl Transaction<Space> for SpaceTransaction {
 
 impl Merge for SpaceTransaction {
     type MergeCheck = <BehaviorSetTransaction<Space> as Merge>::MergeCheck;
+    type Conflict = TransactionConflict;
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         let mut cubes1 = &self.cubes;
         let mut cubes2 = &other.cubes;
         if cubes1.len() > cubes2.len() {
@@ -398,8 +399,9 @@ impl CubeTransaction {
 
 impl Merge for CubeTransaction {
     type MergeCheck = CubeMergeCheck;
+    type Conflict = TransactionConflict;
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         if matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b) {
             // Incompatible preconditions will always fail.
             return Err(TransactionConflict {});

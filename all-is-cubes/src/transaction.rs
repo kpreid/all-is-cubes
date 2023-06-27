@@ -8,6 +8,7 @@ use std::sync::Arc;
 use crate::universe::{URef, UTransactional, UniverseTransaction};
 
 mod generic;
+pub use generic::MapConflict;
 
 #[cfg(test)]
 mod tester;
@@ -127,6 +128,17 @@ pub trait Merge {
     /// but also makes it difficult to accidentally merge without checking.
     type MergeCheck: 'static;
 
+    /// Error type giving the reason why a merge was not possible.
+    ///
+    /// This type should be cheap to construct and drop (hopefully `Copy`) if at all possible,
+    /// because merges may be attempted very frequently during simulation; not every such
+    /// failure is an error of interest to the user.
+    ///
+    /// Accordingly, it might not describe the _entire_ area of the conflict
+    /// but only one example from it, so as to avoid needing to allocate a
+    /// data structure of arbitrary size.
+    type Conflict: std::error::Error + 'static;
+
     /// Checks whether two transactions can be merged into a single transaction.
     /// If so, returns [`Ok`] containing data which may be passed to [`Self::merge`].
     ///
@@ -137,10 +149,10 @@ pub trait Merge {
     ///
     /// This is not necessarily the same as either ordering of applying the two
     /// transactions sequentially. See [`Self::commit_merge`] for more details.
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict>;
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict>;
 
     /// Combines two transactions into one which has both effects simultaneously.
-    /// This operation must be commutative and have `Default::default` as the identity.
+    /// This operation must be commutative and have [`Default::default()`] as the identity.
     ///
     /// May panic if `check` is not the result of a previous call to
     /// `self.check_merge(&other)` or if either transaction was mutated in the intervening
@@ -154,7 +166,7 @@ pub trait Merge {
     ///
     /// This is a shortcut for calling [`Self::check_merge`] followed by [`Self::commit_merge`].
     /// It should not be necessary to override the provided implementation.
-    fn merge(self, other: Self) -> Result<Self, TransactionConflict>
+    fn merge(self, other: Self) -> Result<Self, Self::Conflict>
     where
         Self: Sized,
     {
@@ -256,7 +268,9 @@ impl CommitError {
     }
 }
 
-/// Error type returned by [`Merge::check_merge`].
+/// Error type used as the `Conflict` type for many [`Merge`] implementations.
+///
+/// TODO: This is an older design and is to be replaced by specific, more helpful types.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[non_exhaustive] // We might want to add further information later

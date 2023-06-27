@@ -382,11 +382,9 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
 
 impl<H: BehaviorHost> transaction::Merge for BehaviorSetTransaction<H> {
     type MergeCheck = ();
+    type Conflict = transaction::TransactionConflict;
 
-    fn check_merge(
-        &self,
-        other: &Self,
-    ) -> Result<Self::MergeCheck, transaction::TransactionConflict> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         // Don't allow any touching the same slot at all.
         if self
             .replace

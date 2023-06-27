@@ -210,11 +210,9 @@ impl Transaction<BlockDef> for BlockDefTransaction {
 
 impl transaction::Merge for BlockDefTransaction {
     type MergeCheck = ();
+    type Conflict = transaction::TransactionConflict;
 
-    fn check_merge(
-        &self,
-        other: &Self,
-    ) -> Result<Self::MergeCheck, crate::transaction::TransactionConflict> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         if matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b) {
             return Err(transaction::TransactionConflict {});
         }

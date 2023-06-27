@@ -320,6 +320,7 @@ macro_rules! member_enums_and_impls {
 
         impl transaction::Merge for AnyTransaction {
             type MergeCheck = ut::AnyTransactionCheck;
+            type Conflict = transaction::TransactionConflict;
 
             fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, transaction::TransactionConflict> {
                 match (self, other) {

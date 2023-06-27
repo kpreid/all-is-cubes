@@ -78,8 +78,9 @@ where
     O: Transactional + 'static,
 {
     type MergeCheck = <O::Transaction as Merge>::MergeCheck;
+    type Conflict = <O::Transaction as Merge>::Conflict;
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         if self.target != other.target {
             // This is a panic because it indicates a programming error.
             panic!("TransactionInUniverse cannot have multiple targets; use UniverseTransaction instead");
@@ -206,6 +207,18 @@ pub struct UniverseMergeCheck(HashMap<Name, MemberMergeCheck>);
 pub struct UniverseCommitCheck {
     members: HashMap<Name, MemberCommitCheck>,
     anonymous_insertions: Vec<MemberCommitCheck>,
+}
+
+/// Transaction conflict error type for [`UniverseTransaction`].
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum UniverseConflict {
+    /// The two transactions modify members of different [`Universe`]s.
+    #[error("cannot merge transactions From different universes")]
+    DifferentUniverse(UniverseId, UniverseId),
+    /// The two transactions attempt to modify a member in conflicting ways.
+    #[error("transaction conflict at member {key:?}", key = .0.key)]
+    Member(#[from] transaction::MapConflict<Name, TransactionConflict>),
 }
 
 impl Transactional for Universe {
@@ -347,15 +360,18 @@ impl Transaction<Universe> for UniverseTransaction {
 
 impl Merge for UniverseTransaction {
     type MergeCheck = UniverseMergeCheck;
+    type Conflict = UniverseConflict;
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         if let (Some(id1), Some(id2)) = (self.universe_id(), other.universe_id()) {
             if id1 != id2 {
-                return Err(TransactionConflict {});
+                return Err(UniverseConflict::DifferentUniverse(id1, id2));
             }
         }
         Ok(UniverseMergeCheck(
-            self.members.check_merge(&other.members)?,
+            self.members
+                .check_merge(&other.members)
+                .map_err(UniverseConflict::Member)?,
         ))
     }
 
@@ -548,8 +564,9 @@ where
 
 impl Merge for MemberTxn {
     type MergeCheck = MemberMergeCheck;
+    type Conflict = transaction::TransactionConflict;
 
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, TransactionConflict> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         use MemberTxn::*;
         match (self, other) {
             // Noop merges with anything
