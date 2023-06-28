@@ -163,23 +163,7 @@ impl Universe {
     // change what `URef: Any` means, though. Perhaps `URootRef` should own
     // a prepared `URef` that it can return a reference to.
     pub fn get_any(&self, name: &Name) -> Option<Box<dyn URefErased>> {
-        // TODO: Make this code macro-generated
-        let UniverseTables {
-            blocks,
-            characters,
-            spaces,
-        } = &self.tables;
-
-        if let Some(r) = blocks.get(name) {
-            return Some(Box::new(r.downgrade()));
-        }
-        if let Some(r) = characters.get(name) {
-            return Some(Box::new(r.downgrade()));
-        }
-        if let Some(r) = spaces.get(name) {
-            return Some(Box::new(r.downgrade()));
-        }
-        None
+        self.tables.get_any(name)
     }
 
     /// Returns the character named `"character"`.

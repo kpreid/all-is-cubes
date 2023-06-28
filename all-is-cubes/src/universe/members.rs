@@ -204,6 +204,15 @@ macro_rules! member_enums_and_impls {
             pub(crate) fn fmt_members(&self, ds: &mut fmt::DebugStruct<'_, '_>) {
                 $( fmt_members_of_type::<$member_type>(&self.$table_name, ds); )*
             }
+
+            pub(crate) fn get_any(&self, name: &Name) -> Option<Box<dyn URefErased>> {
+                $(
+                    if let Some(root_ref) = self.$table_name.get(name) {
+                        return Some(Box::new(root_ref.downgrade()));
+                    }
+                )*
+                None
+            }
         }
 
         /// Holds any one of the [`URef`] types that can be in a [`Universe`].
