@@ -268,14 +268,6 @@ impl CommitError {
     }
 }
 
-/// Error type used as the `Conflict` type for many [`Merge`] implementations.
-///
-/// TODO: This is an older design and is to be replaced by specific, more helpful types.
-#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
-#[non_exhaustive] // We might want to add further information later
-#[error("Conflict between transactions")]
-pub struct TransactionConflict {}
-
 /// Specifies a canonical [`Transaction`] type for the implementing type.
 ///
 /// [`Transaction<T>`](Transaction) may be implemented by multiple types but there can

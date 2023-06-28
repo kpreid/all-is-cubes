@@ -1,3 +1,4 @@
+use std::fmt;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -210,16 +211,24 @@ impl Transaction<BlockDef> for BlockDefTransaction {
 
 impl transaction::Merge for BlockDefTransaction {
     type MergeCheck = ();
-    type Conflict = transaction::TransactionConflict;
+    type Conflict = BlockDefConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
-        if matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b) {
-            return Err(transaction::TransactionConflict {});
+        let conflict = BlockDefConflict {
+            old: matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b),
+            new: matches!((&self.new, &other.new), (Some(a), Some(b)) if a != b),
+        };
+
+        if (conflict
+            != BlockDefConflict {
+                old: false,
+                new: false,
+            })
+        {
+            Err(conflict)
+        } else {
+            Ok(())
         }
-        if matches!((&self.new, &other.new), (Some(a), Some(b)) if a != b) {
-            return Err(transaction::TransactionConflict {});
-        }
-        Ok(())
     }
 
     fn commit_merge(self, other: Self, (): Self::MergeCheck) -> Self
@@ -229,6 +238,41 @@ impl transaction::Merge for BlockDefTransaction {
         Self {
             old: self.old.or(other.old),
             new: self.new.or(other.new),
+        }
+    }
+}
+
+/// Transaction conflict error type for a [`BlockDefTransaction`].
+// ---
+// TODO: this is identical to `CubeConflict` but for the names
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+#[non_exhaustive]
+pub struct BlockDefConflict {
+    /// The transactions have conflicting preconditions (`old` blocks).
+    pub(crate) old: bool,
+    /// The transactions are attempting to replace the same BlockDef with different blocks.
+    pub(crate) new: bool,
+}
+
+impl fmt::Display for BlockDefConflict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            BlockDefConflict {
+                old: true,
+                new: false,
+            } => write!(f, "different preconditions for BlockDef"),
+            BlockDefConflict {
+                old: false,
+                new: true,
+            } => write!(f, "cannot write different blocks to the same BlockDef"),
+            BlockDefConflict {
+                old: true,
+                new: true,
+            } => write!(f, "different preconditions (with write)"),
+            BlockDefConflict {
+                old: false,
+                new: false,
+            } => unreachable!(),
         }
     }
 }
