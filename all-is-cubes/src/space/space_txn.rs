@@ -11,8 +11,7 @@ use crate::drawing::DrawingPlane;
 use crate::math::{GridCoordinate, GridMatrix, GridPoint};
 use crate::space::{ActivatableRegion, GridAab, SetCubeError, Space};
 use crate::transaction::{
-    no_outputs, CommitError, Merge, NoOutput, PreconditionFailed, Transaction, TransactionConflict,
-    Transactional,
+    no_outputs, CommitError, Merge, NoOutput, PreconditionFailed, Transaction, Transactional,
 };
 use crate::util::{ConciseDebug, CustomFormat as _};
 
@@ -390,7 +389,7 @@ pub enum SpaceTransactionConflict {
     },
     #[allow(missing_docs)]
     #[error("conflict in behaviors")]
-    Behaviors(TransactionConflict),
+    Behaviors(behavior::BehaviorTransactionConflict),
 }
 
 /// Data for a single cube in a [`SpaceTransaction`]. This does not function as a

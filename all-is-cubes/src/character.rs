@@ -11,7 +11,7 @@ use cgmath::{
 use num_traits::identities::Zero;
 use ordered_float::NotNan;
 
-use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction};
+use crate::behavior::{self, Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
 use crate::inv::{
     Inventory, InventoryChange, InventoryTransaction, Slot, Tool, ToolError, TOOL_SELECTIONS,
@@ -734,13 +734,18 @@ impl Merge for CharacterTransaction {
         <InventoryTransaction as Merge>::MergeCheck,
         <BehaviorSetTransaction<Character> as Merge>::MergeCheck,
     );
-    type Conflict = transaction::TransactionConflict;
+    type Conflict = CharacterTransactionConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
+        use CharacterTransactionConflict as C;
         Ok((
-            self.body.check_merge(&other.body)?,
-            self.inventory.check_merge(&other.inventory)?,
-            self.behaviors.check_merge(&other.behaviors)?,
+            self.body.check_merge(&other.body).map_err(C::Body)?,
+            self.inventory
+                .check_merge(&other.inventory)
+                .map_err(C::Inventory)?,
+            self.behaviors
+                .check_merge(&other.behaviors)
+                .map_err(C::Behaviors)?,
         ))
     }
 
@@ -759,6 +764,21 @@ impl Merge for CharacterTransaction {
                 .commit_merge(other.behaviors, behaviors_check),
         }
     }
+}
+
+/// Transaction conflict error type for a [`CharacterTransaction`].
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[non_exhaustive]
+pub enum CharacterTransactionConflict {
+    #[allow(missing_docs)]
+    #[error("conflict in character body")]
+    Body(std::convert::Infallible),
+    #[allow(missing_docs)]
+    #[error("conflict in character inventory")]
+    Inventory(transaction::TransactionConflict),
+    #[allow(missing_docs)]
+    #[error("conflict in character behaviors")]
+    Behaviors(behavior::BehaviorTransactionConflict),
 }
 
 /// Description of a change to a [`Character`] for use in listeners.

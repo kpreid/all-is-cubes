@@ -382,16 +382,16 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
 
 impl<H: BehaviorHost> transaction::Merge for BehaviorSetTransaction<H> {
     type MergeCheck = ();
-    type Conflict = transaction::TransactionConflict;
+    type Conflict = BehaviorTransactionConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         // Don't allow any touching the same slot at all.
-        if self
+        if let Some(&slot) = self
             .replace
             .keys()
-            .any(|slot| other.replace.contains_key(slot))
+            .find(|slot| other.replace.contains_key(slot))
         {
-            return Err(transaction::TransactionConflict {});
+            return Err(BehaviorTransactionConflict { slot });
         }
         Ok(())
     }
@@ -464,6 +464,17 @@ impl<H: BehaviorHost> Clone for Replace<H> {
             new: self.new.clone(),
         }
     }
+}
+
+/// Transaction conflict error type for a [`BehaviorSet`].
+//---
+// Currently private internals, because we will probably want to have a better strategy
+// for addressing behaviors than indices.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[non_exhaustive]
+#[error("tried to replace the same behavior slot, {slot}, twice")]
+pub struct BehaviorTransactionConflict {
+    slot: usize,
 }
 
 #[cfg(test)]
