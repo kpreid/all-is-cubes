@@ -3,12 +3,16 @@ use std::collections::HashMap;
 use std::fmt::{self, Debug};
 
 use crate::transaction::{
-    self, CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict, Transactional,
+    self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
 };
 use crate::universe::{
     AnyURef, Name, UBorrowMut, URef, URefErased, Universe, UniverseId, UniverseMember,
     UniverseTable,
 };
+
+// Reëxports for macro-generated types
+#[doc(inline)]
+pub(in crate::universe) use crate::universe::members::{AnyTransaction, AnyTransactionConflict};
 
 /// Conversion from concrete transaction types to [`UniverseTransaction`].
 ///
@@ -121,9 +125,6 @@ where
 /// TODO: Make this a newtype struct since we're bothering to name it.
 pub(in crate::universe) type AnyTransactionCheck = Box<dyn Any>;
 
-// `AnyTransaction` is a macro-generated type but it would belong here if possible
-use super::members::AnyTransaction;
-
 impl AnyTransaction {
     fn target_name(&self) -> Option<Name> {
         self.target_erased().map(URefErased::name)
@@ -217,8 +218,8 @@ pub enum UniverseConflict {
     #[error("cannot merge transactions From different universes")]
     DifferentUniverse(UniverseId, UniverseId),
     /// The two transactions attempt to modify a member in conflicting ways.
-    #[error("transaction conflict at member {key:?}", key = .0.key)]
-    Member(#[from] transaction::MapConflict<Name, TransactionConflict>),
+    #[error("transaction conflict at member {key}", key = .0.key)]
+    Member(#[from] transaction::MapConflict<Name, MemberConflict>),
 }
 
 impl Transactional for Universe {
@@ -564,7 +565,7 @@ where
 
 impl Merge for MemberTxn {
     type MergeCheck = MemberMergeCheck;
-    type Conflict = transaction::TransactionConflict;
+    type Conflict = MemberConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         use MemberTxn::*;
@@ -572,12 +573,17 @@ impl Merge for MemberTxn {
             // Noop merges with anything
             (Noop, _) | (_, Noop) => Ok(MemberMergeCheck(None)),
             // Modify merges by merging the transaction
-            (Modify(t1), Modify(t2)) => Ok(MemberMergeCheck(Some(t1.check_merge(t2)?))),
+            (Modify(t1), Modify(t2)) => {
+                let check = t1
+                    .check_merge(t2)
+                    .map_err(|e| MemberConflict::Modify(ModifyMemberConflict(e)))?;
+                Ok(MemberMergeCheck(Some(check)))
+            }
             // Insert conflicts with everything
-            (Insert(_), _) | (_, Insert(_)) => Err(TransactionConflict {}),
+            (Insert(_), _) | (_, Insert(_)) => Err(MemberConflict::InsertVsOther),
             // Delete merges with itself alone
             (Delete, Delete) => Ok(MemberMergeCheck(None)),
-            (Delete, _) | (_, Delete) => Err(TransactionConflict {}),
+            (Delete, _) | (_, Delete) => Err(MemberConflict::DeleteVsOther),
         }
     }
 
@@ -605,6 +611,31 @@ impl Merge for MemberTxn {
     }
 }
 
+/// Transaction conflict error type for a single member in a [`UniverseTransaction`].
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[non_exhaustive]
+pub enum MemberConflict {
+    /// Tried to insert and simultaneously modify some member.
+    #[error("cannot simultaneously insert and make another change")]
+    InsertVsOther,
+    /// Tried to delete and simultaneously modify some member.
+    #[error("cannot simultaneously delete and make another change")]
+    DeleteVsOther,
+    /// Tried to make incompatible modifications to the data of the member.
+    #[error(transparent)]
+    Modify(ModifyMemberConflict),
+}
+
+/// Transaction conflict error type for modifying a [`Universe`] member (something a
+/// [`URef`] refers to).
+//
+// Public wrapper hiding the details of [`AnyTransactionConflict`] which is an enum.
+// TODO: Probably this should just _be_ that enum, but let's hold off till a use case
+// shows up.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[error(transparent)]
+pub struct ModifyMemberConflict(#[from] AnyTransactionConflict);
+
 #[cfg(test)]
 mod tests {
     //! Additional tests of universe transactions also exist in [`super::tests`]
@@ -614,7 +645,8 @@ mod tests {
     use crate::content::make_some_blocks;
     use crate::space::Space;
     use crate::space::SpaceTransaction;
-    use crate::transaction::{ExecuteError, TransactionTester, MapConflict};
+    use crate::transaction::TransactionConflict;
+    use crate::transaction::{ExecuteError, MapConflict, TransactionTester};
     use indoc::indoc;
     use std::collections::HashMap;
 
@@ -688,7 +720,9 @@ mod tests {
         let error = t1.merge(t2).unwrap_err();
         let UniverseConflict::Member(MapConflict {
             key,
-            conflict: TransactionConflict {}
+            conflict: MemberConflict::Modify(
+                ModifyMemberConflict(AnyTransactionConflict::Space(TransactionConflict {}))
+            )
         }) = error else {
             panic!("not as expected: {error:?}");
         };

@@ -271,8 +271,7 @@ impl CommitError {
 /// Error type used as the `Conflict` type for many [`Merge`] implementations.
 ///
 /// TODO: This is an older design and is to be replaced by specific, more helpful types.
-#[derive(Clone, Debug, PartialEq, thiserror::Error)]
-#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[non_exhaustive] // We might want to add further information later
 #[error("Conflict between transactions")]
 pub struct TransactionConflict {}

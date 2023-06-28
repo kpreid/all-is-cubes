@@ -320,14 +320,19 @@ macro_rules! member_enums_and_impls {
 
         impl transaction::Merge for AnyTransaction {
             type MergeCheck = ut::AnyTransactionCheck;
-            type Conflict = transaction::TransactionConflict;
+            type Conflict = AnyTransactionConflict;
 
-            fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, transaction::TransactionConflict> {
+            fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
                 match (self, other) {
                     (Self::Noop, _) => Ok(Box::new(())),
                     (_, Self::Noop) => Ok(Box::new(())),
-                    $( (Self::$member_type(t1), Self::$member_type(t2)) => Ok(Box::new(t1.check_merge(t2)?)), )*
-                    (_, _) => Err(transaction::TransactionConflict {}),
+                    $( (Self::$member_type(t1), Self::$member_type(t2)) => {
+                        let check =
+                            t1.check_merge(t2)
+                                .map_err(AnyTransactionConflict::$member_type)?;
+                        Ok(Box::new(check))
+                    } )*
+                    (_, _) => Err(AnyTransactionConflict::Mismatch),
                 }
             }
 
@@ -343,6 +348,23 @@ macro_rules! member_enums_and_impls {
             }
         }
 
+        /// [`AnyTransaction`] conflict errors.
+        #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+        #[allow(clippy::large_enum_variant)]
+        #[non_exhaustive]
+        pub(in crate::universe) enum AnyTransactionConflict {
+            #[error("Mismatched transaction target types")]
+            Mismatch,
+            $(
+                #[error(transparent)]
+                $member_type(
+                    <
+                        <$member_type as transaction::Transactional>::Transaction
+                        as transaction::Merge
+                    >::Conflict
+                ),
+            )*
+        }
     }
 }
 
