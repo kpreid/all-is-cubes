@@ -9,9 +9,7 @@ use crate::block::Block;
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::inv::{Icons, Tool, ToolError, ToolInput};
 use crate::linking::BlockProvider;
-use crate::transaction::{
-    CommitError, Merge, PreconditionFailed, Transaction, TransactionConflict,
-};
+use crate::transaction::{CommitError, Merge, PreconditionFailed, Transaction};
 use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
 
 /// A collection of [`Tool`]s (items).
@@ -425,15 +423,15 @@ impl Transaction<Inventory> for InventoryTransaction {
 
 impl Merge for InventoryTransaction {
     type MergeCheck = ();
-    type Conflict = TransactionConflict;
+    type Conflict = InventoryConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
-        if self
+        if let Some(&slot) = self
             .replace
             .keys()
-            .any(|slot| other.replace.contains_key(slot))
+            .find(|slot| other.replace.contains_key(slot))
         {
-            return Err(TransactionConflict {});
+            return Err(InventoryConflict::ReplaceSameSlot { slot });
         }
         Ok(())
     }
@@ -450,6 +448,17 @@ impl Merge for InventoryTransaction {
 pub struct InventoryCheck {
     new: Vec<Slot>,
     change: InventoryChange,
+}
+
+/// Transaction conflict error type for an [`InventoryTransaction`].
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[non_exhaustive]
+pub enum InventoryConflict {
+    /// Tried to replace the same inventory slot.
+    #[error("tried to replace the same inventory slot, {slot}, twice")]
+    #[non_exhaustive]
+    #[allow(missing_docs)]
+    ReplaceSameSlot { slot: usize },
 }
 
 /// Description of a change to an [`Inventory`] for use in listeners.

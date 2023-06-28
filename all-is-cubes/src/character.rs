@@ -13,9 +13,7 @@ use ordered_float::NotNan;
 
 use crate::behavior::{self, Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
-use crate::inv::{
-    Inventory, InventoryChange, InventoryTransaction, Slot, Tool, ToolError, TOOL_SELECTIONS,
-};
+use crate::inv::{self, Inventory, InventoryTransaction, Slot, Tool};
 use crate::listen::{Listen, Listener, Notifier};
 use crate::math::{Aab, Face6, Face7, FreeCoordinate, Rgb};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
@@ -88,7 +86,7 @@ pub struct Character {
     inventory: Inventory,
 
     /// Indices into [`Self::inventory`] slots.
-    selected_slots: [usize; TOOL_SELECTIONS],
+    selected_slots: [usize; inv::TOOL_SELECTIONS],
 
     /// Notifier for modifications.
     notifier: Notifier<CharacterChange>,
@@ -251,7 +249,7 @@ impl Character {
     ///
     /// The indices of this array are buttons (e.g. mouse buttons), and the values are
     /// inventory slot indices.
-    pub fn selected_slots(&self) -> [usize; TOOL_SELECTIONS] {
+    pub fn selected_slots(&self) -> [usize; inv::TOOL_SELECTIONS] {
         self.selected_slots
     }
 
@@ -462,7 +460,7 @@ impl Character {
         this: URef<Character>,
         cursor: Option<&Cursor>,
         button: usize,
-    ) -> Result<UniverseTransaction, ToolError> {
+    ) -> Result<UniverseTransaction, inv::ToolError> {
         let tb = this.read().unwrap();
 
         // Check that this is not a cursor into some other space.
@@ -471,7 +469,7 @@ impl Character {
         if let Some(cursor_space) = cursor.map(Cursor::space) {
             let our_space = &tb.space;
             if cursor_space != our_space {
-                return Err(ToolError::Internal(format!(
+                return Err(inv::ToolError::Internal(format!(
                     "space mismatch: cursor {cursor_space:?} != character {our_space:?}"
                 )));
             }
@@ -775,7 +773,7 @@ pub enum CharacterTransactionConflict {
     Body(std::convert::Infallible),
     #[allow(missing_docs)]
     #[error("conflict in character inventory")]
-    Inventory(transaction::TransactionConflict),
+    Inventory(inv::InventoryConflict),
     #[allow(missing_docs)]
     #[error("conflict in character behaviors")]
     Behaviors(behavior::BehaviorTransactionConflict),
@@ -786,7 +784,7 @@ pub enum CharacterTransactionConflict {
 #[allow(clippy::exhaustive_enums)] // any change will probably be breaking anyway
 pub enum CharacterChange {
     /// Inventory contents.
-    Inventory(InventoryChange),
+    Inventory(inv::InventoryChange),
     /// Which inventory slots are selected.
     Selections,
 }
