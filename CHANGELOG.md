@@ -46,6 +46,7 @@
     - `camera::Flaws` now implements `Display`. Use this instead of `Debug` for printing the flaws.
     - `math::Geometry::wireframe_points()` now produces a new type `mesh::LineVertex` instead of a tuple (with the same position and color data).
     - `transaction::Transaction` can now produce any number of `Output`s, delivered through a callback.
+    - `transaction::Merge` now has an associated type `Conflict` for more informative conflict errors.
     - `universe::UniverseIndex` is no longer a public trait; the relevant methods are now inherent methods on `Universe`.
     - `universe::UniverseTransaction::insert()` now takes a `URef` created by `URef::new_pending()`, instead of a bare value.
       This allows associations between the new member and other objects to be created within the same transaction.
@@ -60,7 +61,8 @@
 
 ### Removed
 
-- `all-is-cubes::block::BlockCollision::Recur` no longer exists; it is the default behavior.
+- `all_is_cubes::block::BlockCollision::Recur` no longer exists; it is the default behavior.
+- `all_is_cubes::transaction::TransactionConflict` no longer exists; the `Transaction` trait has a `Conflict` associated type instead.
 
 ## 0.5.1 (2022-12-29)
 
