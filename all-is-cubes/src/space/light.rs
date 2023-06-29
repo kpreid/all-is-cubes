@@ -1,4 +1,6 @@
 mod data;
+#[cfg(test)]
+pub(crate) use data::LightStatus;
 pub use data::PackedLight;
 pub(crate) use data::{LightUpdateQueue, LightUpdateRequest, PackedLightScalar};
 

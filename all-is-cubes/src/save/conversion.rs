@@ -509,9 +509,15 @@ mod space {
                     None
                 } else {
                     Some(GzSerde(Cow::Owned(
-                        self.extract(self.bounds(), |e| schema::LightSerV1::from(e.light()))
-                            .into_elements()
-                            .into(),
+                        self.extract(self.bounds(), |e| {
+                            let mut light = schema::LightSerV1::from(e.light());
+                            if self.in_light_update_queue(e.cube()) {
+                                light.status = schema::LightStatusSerV1::Uninitialized
+                            }
+                            light
+                        })
+                        .into_elements()
+                        .into(),
                     )))
                 },
             }

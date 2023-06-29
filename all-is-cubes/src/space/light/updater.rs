@@ -79,6 +79,10 @@ impl Space {
         }
     }
 
+    pub(crate) fn in_light_update_queue(&self, cube: GridPoint) -> bool {
+        self.light_update_queue.contains(cube)
+    }
+
     /// Do some lighting updates.
     #[doc(hidden)] // TODO: eliminate calls outside the crate
     pub fn update_lighting_from_queue(&mut self, budget: Duration) -> LightUpdatesInfo {

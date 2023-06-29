@@ -94,7 +94,7 @@ impl PackedLight {
     // TODO: Expose LightStatus once we are more confident in its API stability
     // This call is used just for tests for now
     #[cfg(test)]
-    pub(super) fn status(&self) -> LightStatus {
+    pub(crate) fn status(&self) -> LightStatus {
         self.status
     }
 
@@ -279,6 +279,11 @@ impl LightUpdateQueue {
             queue: BTreeSet::new(),
             table: HashMap::new(),
         }
+    }
+
+    #[inline]
+    pub fn contains(&self, cube: GridPoint) -> bool {
+        self.table.contains_key(&cube)
     }
 
     /// Inserts a queue entry or increases the priority of an existing one.

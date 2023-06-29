@@ -14,7 +14,7 @@ use crate::content::make_some_blocks;
 use crate::inv::Tool;
 use crate::math::{Face6, GridAab, GridRotation, Rgb, Rgba};
 use crate::save::compress::{GzSerde, Leu16};
-use crate::space::{BlockIndex, LightPhysics, Space, SpacePhysics};
+use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::universe::{Name, PartialUniverse, URef, Universe};
 
 #[track_caller]
@@ -378,6 +378,29 @@ fn space_with_sparse_indices() {
     assert_eq!(space2[[0, 0, 0]], block0);
     assert_eq!(space2[[1, 0, 0]], AIR);
     assert_eq!(space2[[2, 0, 0]], block2);
+}
+
+#[test]
+fn space_light_queue_remembered() {
+    use space::LightStatus::{NoRays, Opaque, Uninitialized};
+    let [block0] = make_some_blocks();
+    let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 1, 1])).build();
+    space.set([0, 0, 0], block0).unwrap();
+    // The space now has [1, 0, 0] in its light update queue, but not [2, 0, 0],
+    // and [0, 0, 0] has been updated immediately.
+    assert_eq!(
+        [0, 1, 2].map(|x| space.get_lighting([x, 0, 0]).status()),
+        [Opaque, NoRays, NoRays]
+    );
+
+    let serialized = to_value(&space).unwrap();
+    let space2: Space = from_value(serialized).unwrap();
+
+    // On deserialization, all cubes that were in the queue are marked uninitialized.
+    assert_eq!(
+        [0, 1, 2].map(|x| space2.get_lighting([x, 0, 0]).status()),
+        [Opaque, Uninitialized, NoRays]
+    );
 }
 
 //------------------------------------------------------------------------------------------------//

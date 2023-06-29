@@ -30,6 +30,8 @@ mod builder;
 pub use builder::{SpaceBuilder, SpaceBuilderBounds};
 
 mod light;
+#[cfg(test)]
+pub(crate) use light::LightStatus;
 #[doc(hidden)] // pub only for visualization by all-is-cubes-gpu
 pub use light::LightUpdateCubeInfo;
 use light::{opaque_for_light_computation, LightUpdateQueue, PackedLightScalar};
