@@ -209,33 +209,24 @@ impl Space {
 
     /// Copy data out of a portion of the space in a caller-chosen format.
     ///
-    /// If the provided [`GridAab`] contains portions outside of this space's bounds,
-    /// those positions in the output will be treated as if they are filled with [`AIR`]
-    /// and lit by [`SpacePhysics::sky_color`].
-    pub fn extract<V>(
-        &self,
-        subgrid: GridAab,
-        mut extractor: impl FnMut(Option<BlockIndex>, &SpaceBlockData, PackedLight) -> V,
+    /// The given `bounds` must be fully contained within `self.bounds()`.
+    pub fn extract<'s, V>(
+        &'s self,
+        bounds: GridAab,
+        mut extractor: impl FnMut(Extract<'s>) -> V,
     ) -> GridArray<V> {
-        GridArray::from_fn(subgrid, |cube| {
-            // TODO: Implement an iterator over the indexes (which is not just
-            // interior_iter().enumerate() because it's a sub-region).
-            match self.bounds.index(cube) {
-                Some(cube_index) => {
-                    let block_index = self.contents[cube_index];
-                    extractor(
-                        Some(block_index),
-                        self.palette.entry(block_index),
-                        match self.physics.light {
-                            LightPhysics::None => PackedLight::ONE,
-                            LightPhysics::Rays { .. } => self.lighting[cube_index],
-                        },
-                    )
-                }
-                // The light value would be more consistent if it were PackedLight::NO_RAYS when
-                // there is no interior adjacent block, but probably nobody will actually care.
-                None => extractor(None, &SpaceBlockData::NOTHING, self.packed_sky_color),
-            }
+        assert!(self.bounds.contains_box(bounds));
+
+        // TODO: Implement an iterator over the indexes (which is not just
+        // interior_iter().enumerate() because it's a sub-region) so that we don't
+        // have to run independent self.bounds.index() calculations per cube.
+        // (But before that, we can optimize the case given bounds are the whole space.)
+        GridArray::from_fn(bounds, |cube| {
+            extractor(Extract {
+                space: self,
+                cube_index: self.bounds.index(cube).unwrap(),
+                block_index: Default::default(),
+            })
         })
     }
 
@@ -1036,5 +1027,42 @@ impl behavior::Behavior<Space> for ActivatableRegion {
 impl VisitRefs for ActivatableRegion {
     fn visit_refs(&self, _: &mut dyn RefVisitor) {
         // Our only interesting member is an EphemeralOpaque — which is opaque.
+    }
+}
+
+/// Access to data of a single cube of a [`Space`], provided by [`Space::extract()`].
+///
+/// Methods of this type are optimized to not perform redundant computation between each
+/// other but not if called more than once.
+#[derive(Clone, Debug)]
+pub struct Extract<'s> {
+    space: &'s Space,
+    cube_index: usize,
+    block_index: std::cell::OnceCell<BlockIndex>,
+}
+
+impl<'s> Extract<'s> {
+    /// Returns the block index; the index within [`Space::block_data()`] where the block
+    /// present in this cube can be found.
+    #[inline]
+    pub fn block_index(&self) -> BlockIndex {
+        *self
+            .block_index
+            .get_or_init(|| self.space.contents[self.cube_index])
+    }
+
+    /// Returns the [`SpaceBlockData`] for the block present in this cube.
+    #[inline]
+    pub fn block_data(&self) -> &'s SpaceBlockData {
+        self.space.palette.entry(self.block_index())
+    }
+
+    /// Returns the data for the light present in this cube.
+    #[inline]
+    pub fn light(&self) -> PackedLight {
+        match self.space.physics.light {
+            LightPhysics::None => PackedLight::ONE,
+            LightPhysics::Rays { .. } => self.space.lighting[self.cube_index],
+        }
     }
 }

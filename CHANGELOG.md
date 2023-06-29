@@ -45,6 +45,7 @@
     - `block::AIR` now has its own dedicated primitive, `Primitive::Air`. The behavior is unchanged.
     - `camera::Flaws` now implements `Display`. Use this instead of `Debug` for printing the flaws.
     - `math::Geometry::wireframe_points()` now produces a new type `mesh::LineVertex` instead of a tuple (with the same position and color data).
+    - `space::Space::extract()` now passes one argument instead of three to the callback function; it is of the new type `Extract` which has methods to return all the previously available data. This is intended to be more extensible and potentially more efficient.
     - `transaction::Transaction` can now produce any number of `Output`s, delivered through a callback.
     - `transaction::Merge` now has an associated type `Conflict` for more informative conflict errors.
     - `universe::UniverseIndex` is no longer a public trait; the relevant methods are now inherent methods on `Universe`.

@@ -501,19 +501,15 @@ mod space {
                     .map(|bd| bd.block().clone())
                     .collect(),
                 contents: GzSerde(Cow::Owned(
-                    self.extract(self.bounds(), |index, _, _| {
-                        Leu16::from(
-                            index.expect("shouldn't happen: serialization went out of bounds"),
-                        )
-                    })
-                    .into_elements()
-                    .into(),
+                    self.extract(self.bounds(), |e| Leu16::from(e.block_index()))
+                        .into_elements()
+                        .into(),
                 )),
                 light: if matches!(self.physics().light, space::LightPhysics::None) {
                     None
                 } else {
                     Some(GzSerde(Cow::Owned(
-                        self.extract(self.bounds(), |_, _, light| schema::LightSerV1::from(light))
+                        self.extract(self.bounds(), |e| schema::LightSerV1::from(e.light()))
                             .into_elements()
                             .into(),
                     )))

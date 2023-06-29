@@ -417,12 +417,10 @@ impl CustomFormat<StatusText> for RaytraceInfo {
 /// Get cube data out of [`Space`].
 #[inline]
 fn prepare_cubes(space: &Space) -> GridArray<TracingCubeData> {
-    space.extract(space.bounds(), |index, block_data, lighting| {
-        TracingCubeData {
-            block_index: index.unwrap(),
-            lighting,
-            always_invisible: block_data.block() == &AIR,
-        }
+    space.extract(space.bounds(), |e| TracingCubeData {
+        block_index: e.block_index(),
+        lighting: e.light(),
+        always_invisible: e.block_data().block() == &AIR,
     })
 }
 

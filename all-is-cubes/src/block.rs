@@ -497,9 +497,7 @@ impl Block {
                         .extract(
                             occupied_bounds,
                             #[inline(always)]
-                            |_index, sub_block_data, _lighting| {
-                                Evoxel::from_block(sub_block_data.evaluated())
-                            },
+                            |e| Evoxel::from_block(e.block_data().evaluated()),
                         )
                         .translate(-offset.to_vec()),
                     None => {

@@ -243,23 +243,30 @@ fn change_listener() {
 }
 
 #[test]
-fn extract_out_of_bounds() {
+fn extract() {
     let [block_0, block_1] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
     space.set((0, 0, 0), &block_0).unwrap();
     space.set((1, 0, 0), &block_1).unwrap();
 
-    let extract_bounds = GridAab::from_lower_size([1, 0, 0], [1, 2, 1]);
-    let extracted = space.extract(extract_bounds, |_index, block_data, _lighting| {
+    let extract_bounds = GridAab::from_lower_size([1, 0, 0], [1, 1, 1]);
+    let extracted = space.extract(extract_bounds, |e| {
         // TODO: arrange to sanity check index and lighting
-        let block = block_data.block().clone();
-        assert_eq!(block.evaluate().unwrap(), block_data.evaluated);
+        let block = e.block_data().block().clone();
+        assert_eq!(block.evaluate().unwrap(), e.block_data().evaluated);
         block
     });
 
     assert_eq!(extracted.bounds(), extract_bounds);
     assert_eq!(&extracted[(1, 0, 0)], &block_1);
-    assert_eq!(&extracted[(1, 1, 0)], &AIR);
+}
+
+#[test]
+#[should_panic = "assertion failed: self.bounds.contains_box(bounds)"]
+fn extract_out_of_bounds() {
+    let space = Space::empty_positive(2, 1, 1);
+    let extract_bounds = GridAab::from_lower_size([1, 0, 0], [1, 2, 1]);
+    space.extract(extract_bounds, |_| ());
 }
 
 #[test]
