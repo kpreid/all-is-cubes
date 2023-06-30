@@ -224,6 +224,7 @@ impl Space {
         GridArray::from_fn(bounds, |cube| {
             extractor(Extract {
                 space: self,
+                cube,
                 cube_index: self.bounds.index(cube).unwrap(),
                 block_index: Default::default(),
             })
@@ -1037,11 +1038,17 @@ impl VisitRefs for ActivatableRegion {
 #[derive(Clone, Debug)]
 pub struct Extract<'s> {
     space: &'s Space,
+    cube: GridPoint,
     cube_index: usize,
     block_index: std::cell::OnceCell<BlockIndex>,
 }
 
 impl<'s> Extract<'s> {
+    /// Returns the cube being processed.
+    pub(crate) fn cube(&self) -> GridPoint {
+        self.cube
+    }
+
     /// Returns the block index; the index within [`Space::block_data()`] where the block
     /// present in this cube can be found.
     #[inline]
