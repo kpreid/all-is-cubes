@@ -1,8 +1,6 @@
 mod data;
-#[cfg(test)]
-pub(crate) use data::LightStatus;
 pub use data::PackedLight;
-pub(crate) use data::{LightUpdateQueue, LightUpdateRequest, PackedLightScalar};
+pub(crate) use data::{LightStatus, LightUpdateQueue, LightUpdateRequest, PackedLightScalar};
 
 mod debug;
 #[doc(hidden)] // pub only for visualization by all-is-cubes-gpu

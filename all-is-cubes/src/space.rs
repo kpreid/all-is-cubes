@@ -30,11 +30,10 @@ mod builder;
 pub use builder::{SpaceBuilder, SpaceBuilderBounds};
 
 mod light;
-#[cfg(test)]
-pub(crate) use light::LightStatus;
 #[doc(hidden)] // pub only for visualization by all-is-cubes-gpu
 pub use light::LightUpdateCubeInfo;
 use light::{opaque_for_light_computation, LightUpdateQueue, PackedLightScalar};
+pub(crate) use light::{LightStatus, LightUpdateRequest};
 pub use light::{LightUpdatesInfo, PackedLight};
 
 mod palette;
@@ -142,26 +141,46 @@ impl Space {
             contents,
         } = builder;
 
-        let (palette, contents, lighting) = match contents {
+        let (palette, contents, lighting, light_update_queue) = match contents {
             builder::Fill::Block(block) => {
                 let volume = bounds.volume();
                 (
                     Palette::new(block, volume),
                     vec![0; volume].into(),
                     physics.light.initialize_lighting(bounds),
+                    LightUpdateQueue::new(), // TODO: nonempty if block is transparent
                 )
             }
             builder::Fill::Data {
                 palette,
                 contents,
-                light,
+                light: None,
             } => (
                 palette,
                 contents.into_elements(),
-                light
-                    .map(GridArray::into_elements)
-                    .unwrap_or_else(|| physics.light.initialize_lighting(bounds)),
+                physics.light.initialize_lighting(bounds),
+                LightUpdateQueue::new(),
             ),
+            builder::Fill::Data {
+                palette,
+                contents,
+                light: Some(light),
+            } => {
+                // Fill the light update queue with each block whose light is known invalid.
+                // TODO: Also register a low-priority "update everything" in case data is from an
+                // old version.
+                let mut q = LightUpdateQueue::new();
+                for (cube, light) in light.iter() {
+                    match light.status() {
+                        LightStatus::Uninitialized => q.insert(LightUpdateRequest {
+                            priority: 255,
+                            cube,
+                        }),
+                        LightStatus::NoRays | LightStatus::Opaque | LightStatus::Visible => {}
+                    }
+                }
+                (palette, contents.into_elements(), light.into_elements(), q)
+            }
         };
 
         Space {
@@ -171,7 +190,7 @@ impl Space {
             lighting,
 
             packed_sky_color: physics.sky_color.into(),
-            light_update_queue: LightUpdateQueue::new(),
+            light_update_queue,
             last_light_updates: Vec::new(),
             light_cost_scale: 1e-6,
 

@@ -92,8 +92,6 @@ impl PackedLight {
     }
 
     // TODO: Expose LightStatus once we are more confident in its API stability
-    // This call is used just for tests for now
-    #[cfg(test)]
     pub(crate) fn status(&self) -> LightStatus {
         self.status
     }
