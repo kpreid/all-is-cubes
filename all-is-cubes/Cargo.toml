@@ -39,6 +39,10 @@ name = "raytrace_bench"
 harness = false
 
 [[bench]]
+name = "save_bench"
+harness = false
+
+[[bench]]
 name = "space_bench"
 harness = false
 
