@@ -491,7 +491,6 @@ mod space {
         where
             S: Serializer,
         {
-            // TODO: more efficient serialization without extract() and with some kind of compression
             schema::SpaceSer::SpaceV1 {
                 bounds: self.bounds(),
                 physics: self.physics().into(),
