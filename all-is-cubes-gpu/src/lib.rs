@@ -78,7 +78,7 @@ pub use light_texture::{LightChunk, LightTexture};
 /// [`DynamicMeshTypes`] implementation for this wgpu glue library.
 #[derive(Debug)]
 struct WgpuMt {
-    _not_instantiable: std::convert::Infallible,
+    _not_instantiable: !,
 }
 
 impl all_is_cubes_mesh::MeshTypes for WgpuMt {

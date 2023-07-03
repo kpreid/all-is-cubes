@@ -256,7 +256,7 @@ pub struct InnerMainParams {
     pub recording: Option<record::RecordOptions>,
     #[cfg(not(feature = "record"))]
     /// Only available with `features = ["record"]`.
-    pub recording: Option<std::convert::Infallible>,
+    pub recording: Option<!>,
     /// Will send a message when the `universe_future` completes and its result has been installed.
     pub universe_ready_signal: oneshot::Sender<Result<(), anyhow::Error>>,
     /// Will send a message when the main task completes.
