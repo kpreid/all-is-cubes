@@ -87,7 +87,7 @@ impl<In, Out: Copy + Default> EgFramebuffer<In, Out> {
 
 impl<In: ToTexel<Out>, Out> DrawTarget for EgFramebuffer<In, Out> {
     type Color = In;
-    type Error = std::convert::Infallible;
+    type Error = !;
 
     #[inline]
     fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
