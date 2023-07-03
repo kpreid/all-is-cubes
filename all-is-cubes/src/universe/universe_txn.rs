@@ -639,7 +639,7 @@ impl MemberTxn {
         universe: &mut Universe,
         name: &Name,
         MemberCommitCheck(check): MemberCommitCheck,
-        outputs: &mut dyn FnMut(core::convert::Infallible), // TODO: placeholder for actual Fluff output
+        outputs: &mut dyn FnMut(!), // TODO: placeholder for actual Fluff output
     ) -> Result<(), CommitError> {
         match self {
             MemberTxn::Noop => {

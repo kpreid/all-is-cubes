@@ -369,7 +369,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             String::with_capacity(area_usize(camera.viewport().framebuffer_size).unwrap());
         self.trace_scene_to_text::<P, _, _>(camera, line_ending, |s| {
             out.push_str(s);
-            Ok::<(), core::convert::Infallible>(())
+            Ok::<(), !>(())
         })
         .unwrap();
         out
