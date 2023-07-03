@@ -1,3 +1,4 @@
+#![feature(never_type)]
 #![allow(missing_docs)]
 #![expect(clippy::unwrap_used, reason = "test")]
 
@@ -324,8 +325,8 @@ fn dynamic_benches(c: &mut Criterion) {
         impl mesh::Vertex for PositionOnlyVertex {
             // These choices match `BlockVertex`.
             const WANTS_DEPTH_SORTING: bool = true;
-            type SecondaryData = mesh::Coloring<mesh::texture::NoTexture>;
-            type TexPoint = mesh::texture::NoTexture;
+            type SecondaryData = mesh::Coloring<!>;
+            type TexPoint = !;
             type BlockInst = Cube;
 
             fn from_block_vertex(
@@ -355,7 +356,7 @@ fn dynamic_benches(c: &mut Criterion) {
         impl mesh::MeshTypes for PovMt {
             type Vertex = PositionOnlyVertex;
             type Alloc = mesh::texture::NoTextures;
-            type Tile = mesh::texture::NoTexture;
+            type Tile = !;
         }
         impl dynamic::DynamicMeshTypes for PovMt {
             type RenderData = ();

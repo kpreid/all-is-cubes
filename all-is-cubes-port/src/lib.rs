@@ -1,3 +1,5 @@
+#![feature(never_type)]
+
 //! Data import and export between [`all_is_cubes`] types and other data formats.
 //!
 //! Currently supported formats:
