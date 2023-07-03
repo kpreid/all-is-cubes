@@ -17,6 +17,7 @@
 //!   * Error types do not implement [`std::error::Error`].
 
 #![no_std]
+#![feature(never_type)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 
