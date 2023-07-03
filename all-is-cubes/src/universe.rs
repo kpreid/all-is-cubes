@@ -27,8 +27,10 @@ use crate::time::Tick;
 use crate::transaction::Transaction as _;
 use crate::util::{CustomFormat, StatusText};
 
-// Note: Everything in `members` is either an impl, private, or intentionally public-in-private.
+// Note: Most things in `members` are either an impl, private, or intentionally public-in-private.
+// Therefore, no glob reexport.
 mod members;
+pub use members::AnyURef;
 pub(crate) use members::*;
 
 mod universe_txn;

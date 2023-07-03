@@ -215,14 +215,14 @@ macro_rules! member_enums_and_impls {
             }
         }
 
-        /// Holds any one of the [`URef`] types that can be in a [`Universe`].
+        /// Holds any one of the concrete [`URef<T>`](URef) types that can be in a [`Universe`].
         ///
         /// See also [`URefErased`], which is implemented by `URef`s rather than owning one.
-        ///
-        /// This type is public-in-private because it is mentioned by the [`UniverseMember`]
-        /// public-in-private trait.
+        /// This type dereferences to `dyn URefErased` to provide all the operations that
+        /// trait does.
         #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-        #[doc(hidden)] // actually public-in-private but if we make a mistake, hide it
+        #[non_exhaustive]
+        #[allow(missing_docs)] // variant meanings are obvious from name
         pub enum AnyURef {
             $( $member_type(URef<$member_type>), )*
         }
@@ -252,8 +252,12 @@ macro_rules! member_enums_and_impls {
                     } )*
                 }
             }
+        }
 
-            fn as_erased(&self) -> &dyn $crate::universe::URefErased {
+        impl std::ops::Deref for AnyURef {
+            type Target = dyn URefErased;
+
+            fn deref(&self) -> &Self::Target {
                 match self {
                     $( Self::$member_type(r) => r as &dyn $crate::universe::URefErased, )*
                 }
@@ -378,12 +382,30 @@ macro_rules! member_enums_and_impls {
 //    transaction::universe_txn::*
 member_enums_and_impls!((BlockDef, blocks), (Character, characters), (Space, spaces),);
 
+impl AsRef<dyn URefErased> for AnyURef {
+    fn as_ref(&self) -> &dyn URefErased {
+        &**self
+    }
+}
+impl std::borrow::Borrow<dyn URefErased> for AnyURef {
+    fn borrow(&self) -> &dyn URefErased {
+        &**self
+    }
+}
+
 impl super::URefErased for AnyURef {
     fn name(&self) -> Name {
-        self.as_erased().name()
+        let r: &dyn URefErased = &**self;
+        r.name()
     }
+
     fn universe_id(&self) -> Option<super::UniverseId> {
-        self.as_erased().universe_id()
+        let r: &dyn URefErased = &**self;
+        r.universe_id()
+    }
+
+    fn to_any_uref(&self) -> AnyURef {
+        self.clone()
     }
 
     fn fix_deserialized(
@@ -391,8 +413,8 @@ impl super::URefErased for AnyURef {
         universe_id: super::UniverseId,
         privacy_token: super::URefErasedInternalToken,
     ) -> Result<(), super::RefError> {
-        self.as_erased()
-            .fix_deserialized(universe_id, privacy_token)
+        let r: &dyn URefErased = &**self;
+        r.fix_deserialized(universe_id, privacy_token)
     }
 }
 

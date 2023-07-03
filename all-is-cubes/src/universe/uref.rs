@@ -7,12 +7,10 @@ use std::sync::Mutex;
 use std::sync::{Arc, RwLock, Weak};
 
 use crate::transaction::{ExecuteError, PreconditionFailed, Transaction, Transactional};
-use crate::universe::owning_guard;
-use crate::universe::InsertError;
-use crate::universe::InsertErrorKind;
-use crate::universe::Universe;
-use crate::universe::VisitRefs;
-use crate::universe::{Name, UniverseId};
+use crate::universe::{
+    owning_guard, AnyURef, InsertError, InsertErrorKind, Name, Universe, UniverseId,
+    UniverseMember, VisitRefs,
+};
 
 /// Type of a strong reference to an entry in a [`Universe`]. Defined to make types
 /// parameterized with this somewhat less hairy.
@@ -424,6 +422,17 @@ impl<T> Clone for URef<T> {
     }
 }
 
+impl<T: UniverseMember> AsRef<dyn URefErased> for URef<T> {
+    fn as_ref(&self) -> &dyn URefErased {
+        self
+    }
+}
+impl<T: UniverseMember> std::borrow::Borrow<dyn URefErased> for URef<T> {
+    fn borrow(&self) -> &dyn URefErased {
+        self
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 impl<'a, T: arbitrary::Arbitrary<'a> + 'static> arbitrary::Arbitrary<'a> for URef<T> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
@@ -592,6 +601,9 @@ pub trait URefErased: core::any::Any {
     /// Same as [`URef::universe_id()`].
     fn universe_id(&self) -> Option<UniverseId>;
 
+    /// Clone this into an owned `URef<T>` wrapped in the [`AnyURef`] enum.
+    fn to_any_uref(&self) -> AnyURef;
+
     /// If this [`URef`] is the result of deserialization, fix its state to actually
     /// point to the other member rather than only having the name.
     ///
@@ -605,12 +617,17 @@ pub trait URefErased: core::any::Any {
     ) -> Result<(), RefError>;
 }
 
-impl<T: 'static> URefErased for URef<T> {
+impl<T: UniverseMember> URefErased for URef<T> {
     fn name(&self) -> Name {
         URef::name(self)
     }
+
     fn universe_id(&self) -> Option<UniverseId> {
         URef::universe_id(self)
+    }
+
+    fn to_any_uref(&self) -> AnyURef {
+        <T as UniverseMember>::into_any_ref(self.clone())
     }
 
     #[doc(hidden)]
@@ -637,6 +654,14 @@ impl<T: 'static> URefErased for URef<T> {
         }
 
         Ok(())
+    }
+}
+
+impl ToOwned for dyn URefErased {
+    type Owned = AnyURef;
+
+    fn to_owned(&self) -> Self::Owned {
+        todo!()
     }
 }
 
