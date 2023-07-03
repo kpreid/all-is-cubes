@@ -8,7 +8,6 @@ use all_is_cubes::block::{Evoxel, Evoxels};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{Axis, Cube, GridAab, GridSizeCoord, Rgb, Vol};
-use all_is_cubes::util::{ConciseDebug, Fmt};
 
 /// Numeric type used to calculate texture coordinates and store them in [`BlockVertex`].
 ///
@@ -292,8 +291,8 @@ pub fn copy_voxels_into_xmaj_texture(
 pub struct NoTextures;
 
 impl Allocator for NoTextures {
-    type Tile = NoTexture;
-    type Point = NoTexture;
+    type Tile = !;
+    type Point = !;
 
     fn allocate(&self, bounds: GridAab, _: Channels) -> Option<Self::Tile> {
         assert!(!bounds.is_empty());
@@ -301,22 +300,10 @@ impl Allocator for NoTextures {
     }
 }
 
-/// Uninhabited [`Tile`] type; no instance of this ever exists.
-///
-/// TODO: this can and should be just ! (never) when that's available in stable Rust
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[expect(clippy::exhaustive_enums)]
-#[expect(
-    clippy::module_name_repetitions,
-    reason = "short name would be confusing"
-)]
-pub enum NoTexture {}
-
-impl Tile for NoTexture {
+impl Tile for ! {
     type Point = Self;
     type Plane = Self;
     const REUSABLE: bool = true;
-
     fn bounds(&self) -> GridAab {
         match *self {}
     }
@@ -333,17 +320,10 @@ impl Tile for NoTexture {
         match *self {}
     }
 }
-
-impl Plane for NoTexture {
+impl Plane for ! {
     type Point = Self;
 
     fn grid_to_texcoord(&self, _: Point3D<TextureCoordinate, TexelUnit>) -> Self::Point {
-        match *self {}
-    }
-}
-
-impl Fmt<ConciseDebug> for NoTexture {
-    fn fmt(&self, _: &mut fmt::Formatter<'_>, _: &ConciseDebug) -> fmt::Result {
         match *self {}
     }
 }

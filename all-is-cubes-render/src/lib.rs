@@ -16,6 +16,7 @@
 //!   * [`raytracer::RtRenderer`] does not implement [`headless::HeadlessRenderer`].
 
 #![no_std]
+#![feature(never_type)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 
