@@ -27,6 +27,12 @@ impl<T> Fmt<TypeName> for PhantomData<T> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ConciseDebug;
 
+impl Fmt<ConciseDebug> for ! {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>, _: &ConciseDebug) -> fmt::Result {
+        match *self {}
+    }
+}
+
 impl<T: Fmt<ConciseDebug>, const N: usize> Fmt<ConciseDebug> for [T; N] {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &ConciseDebug) -> fmt::Result {
         fmt.debug_list().entries(self.iter().map(|item| item.refmt(fopt))).finish()
