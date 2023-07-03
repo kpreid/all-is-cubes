@@ -80,6 +80,9 @@
 * `all-is-cubes-content` library:
     * Renamed `UniverseTemplate::LightingBench` to `LightBench`.
 
+* `all-is-cubes-mesh` library:
+    * The associated types of `texture::NoTextures` are now `!` (never) instead of distinct library types.
+
 * `all-is-cubes-port` library:
     * `export_to_path()` takes an additional parameter of type `ExportOptions`.
 
@@ -101,6 +104,9 @@
     * `math::GridMatrix` has been removed.
       Use `Gridgid` (for rigid transformations) or `euclid::Transform3D` (for matrices) instead.
     * `space::PackedLight` no longer implements `From<Rgb>`. There is currently no replacement.
+
+* `all-is-cubes-mesh` library:
+    * `texture::NoTexture` has been removed. Its uses are now the `!` (never) type instead.
 
 * `all-is-cubes-port` library:
     * `ExportSet::from_block_defs()` and `ExportSet::from_spaces()` have been removed.
