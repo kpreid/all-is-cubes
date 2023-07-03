@@ -1,3 +1,5 @@
+#![feature(never_type)]
+
 //! User interface framework and screens for [`all_is_cubes`].
 //!
 //! This crate does not provide any platform bindings, but contains components for

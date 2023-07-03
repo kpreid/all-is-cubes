@@ -449,7 +449,7 @@ pub trait Transactional {
 }
 
 /// Type of `Output` for a [`Transaction`] that never produces any outputs.
-pub type NoOutput = core::convert::Infallible; // TODO: use `!` never type if it stabilizes
+pub type NoOutput = !;
 
 /// Output callback function for committing a [`Transaction`] whose `Output` type is
 /// [`NoOutput`] and therefore cannot produce any outputs.

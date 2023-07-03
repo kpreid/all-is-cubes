@@ -17,6 +17,7 @@
 //!   * [`raytracer::print_space()`] is not available.
 
 #![no_std]
+#![feature(never_type)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 

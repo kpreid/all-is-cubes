@@ -625,7 +625,7 @@ mod eg {
 
     impl<T: Clone> DrawTarget for EgImageTarget<'_, T> {
         type Color = BinaryColor;
-        type Error = core::convert::Infallible;
+        type Error = !;
 
         fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
         where

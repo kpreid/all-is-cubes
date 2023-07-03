@@ -1,3 +1,5 @@
+#![feature(never_type)]
+
 //! This library is an internal component of [`all-is-cubes`],
 //! which defines some core mathematical types and functions.
 //! Do not depend on this library; use only [`all-is-cubes`] instead.
