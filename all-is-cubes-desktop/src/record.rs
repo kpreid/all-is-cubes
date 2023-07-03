@@ -6,8 +6,10 @@ use std::sync::mpsc;
 use all_is_cubes::camera::{Flaws, StandardCameras};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::raytracer::RtRenderer;
+use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
+use all_is_cubes_port::{ExportFormat, ExportSet};
 
 mod options;
 pub(crate) use options::*;
@@ -52,6 +54,7 @@ impl Recorder {
     fn new(
         options: RecordOptions,
         cameras: StandardCameras,
+        universe: &Universe,
         runtime_handle: &tokio::runtime::Handle,
     ) -> Result<(Self, mpsc::Receiver<Status>), anyhow::Error> {
         let (mut status_sender, status_receiver) = mpsc::channel::<Status>();
@@ -116,21 +119,29 @@ impl Recorder {
                 ));
                 let tex = writer.texture_allocator();
 
+                // TODO: implement options.save_all
                 write_gltf::start_gltf_writing(&options, writer, scene_receiver, status_sender)?;
 
                 RecorderInner::Mesh(write_gltf::MeshRecorder::new(cameras, tex, scene_sender))
             }
             RecordFormat::Export(export_format) => {
                 // TODO: Stop doing this inside of record initialization, and give export
-                // its own separate main code path.
+                // its own separate main code path, or at least do it at the *end* of recording.
                 let path_str = options.output_path.to_string_lossy().to_string();
+
+                // TODO: better rule than this special case. AicJson doesn't strictly require
+                // all of the universe, but it does require the transitive closure, and this is the
+                // easiest way to proceed for now.
+                let export_set = if options.save_all || export_format == ExportFormat::AicJson {
+                    ExportSet::all_of_universe(universe)
+                } else {
+                    ExportSet::from_spaces(vec![cameras.world_space().snapshot().unwrap()])
+                };
+
                 runtime_handle.block_on(all_is_cubes_port::export_to_path(
                     YieldProgress::noop(),
                     export_format,
-                    all_is_cubes_port::ExportSet::from_spaces(vec![cameras
-                        .world_space()
-                        .snapshot()
-                        .unwrap()]),
+                    export_set,
                     options.output_path,
                 ))?;
                 eprintln!("\nWrote {path_str}");

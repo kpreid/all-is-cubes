@@ -27,6 +27,7 @@ pub(crate) fn create_recording_session(
     let (recorder, status_receiver) = Recorder::new(
         options.clone(),
         session.create_cameras(viewport_cell.as_source()),
+        session.universe(),
         runtime_handle,
     )?;
 

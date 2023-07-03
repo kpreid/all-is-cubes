@@ -96,6 +96,7 @@ fn main() -> Result<(), anyhow::Error> {
         precompute_light,
         input_file,
         output_file,
+        save_all: _, // used in RecordOptions
         duration,
         verbose,
         no_config_files,

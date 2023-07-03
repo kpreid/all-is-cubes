@@ -14,6 +14,7 @@ use all_is_cubes::cgmath::Vector2;
 pub struct RecordOptions {
     pub output_path: PathBuf,
     pub output_format: RecordFormat,
+    pub save_all: bool,
     pub image_size: Vector2<u32>,
     pub animation: Option<RecordAnimationOptions>,
 }

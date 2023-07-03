@@ -115,6 +115,10 @@ pub(crate) struct AicDesktopArgs {
     )]
     pub(crate) output_file: Option<PathBuf>,
 
+    /// Whether to record/export everything, rather than just the displayed scene.
+    #[arg(long, requires = "output_file")]
+    pub(crate) save_all: bool,
+
     // TODO: Generalize this to "exit after this much time has passed".
     /// Length of time to simulate.
     ///
@@ -167,6 +171,7 @@ impl AicDesktopArgs {
                 .display_size
                 .0
                 .unwrap_or_else(|| Vector2::new(640, 480)),
+            save_all: self.save_all,
             animation: match self.duration {
                 Some(duration) => {
                     let frame_rate = 60.0;
@@ -375,6 +380,7 @@ mod tests {
             RecordOptions {
                 output_path: PathBuf::from("output.png"),
                 output_format: RecordFormat::PngOrApng,
+                save_all: false,
                 image_size: Vector2::new(640, 480),
                 animation: None,
             },
@@ -390,6 +396,7 @@ mod tests {
             RecordOptions {
                 output_path: PathBuf::from("fancy.png"),
                 output_format: RecordFormat::PngOrApng,
+                save_all: false,
                 image_size: Vector2::new(640, 480),
                 animation: Some(RecordAnimationOptions {
                     frame_count: 180,

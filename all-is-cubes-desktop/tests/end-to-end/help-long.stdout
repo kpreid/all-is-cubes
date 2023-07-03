@@ -63,6 +63,9 @@ Options:
       --precompute-light
           Fully calculate light before starting the game
 
+      --save-all
+          Whether to record/export everything, rather than just the displayed scene
+
       --seed <SEED>
           Seed value for randomized components of the world template.
           
@@ -76,8 +79,8 @@ Options:
           Mutually exclusive with specifying an input file.
           
           [default: demo-city]
-          [possible values: [..]
-...
+          [possible values: demo-city, dungeon, islands, atrium, cornell-box, menger-sponge,
+          lighting-bench]
 
       --template-size <X,Y,Z>
           Dimensions for the space the template generates.
