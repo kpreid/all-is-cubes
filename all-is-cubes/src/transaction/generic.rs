@@ -341,8 +341,8 @@ impl Transaction for () {
     type Target = ();
     type Context<'a> = ();
     type CommitCheck = ();
-    type Output = core::convert::Infallible;
-    type Mismatch = core::convert::Infallible;
+    type Output = !;
+    type Mismatch = !;
 
     fn check(&self, (): &(), (): Self::Context<'_>) -> Result<Self::CommitCheck, Self::Mismatch> {
         Ok(())
@@ -363,8 +363,7 @@ impl Transaction for () {
 // Other than that, this is identical to the macro-generated code.
 impl Merge for () {
     type MergeCheck = ();
-
-    type Conflict = core::convert::Infallible;
+    type Conflict = !;
 
     fn check_merge(&self, (): &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         Ok(())
