@@ -1257,7 +1257,8 @@ async fn DESTRUCTION(_: &Exhibit, universe: &mut Universe) {
     }
 
     for stage in 0i32..width {
-        let mask = generate_destruction_mask(universe, R16, (stage as f64 + 0.5) / width as f64)?;
+        let mask =
+            generate_destruction_mask(universe, R16, (f64::from(stage) + 0.5) / f64::from(width))?;
         let destroyed = block_to_destroy
             .clone()
             .with_modifier(Composite::new(mask, CompositeOperator::In).reversed());
