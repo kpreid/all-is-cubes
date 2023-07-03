@@ -47,7 +47,7 @@ pub struct DesktopSession<Ren, Win> {
     #[cfg(feature = "audio")]
     pub(crate) audio: Option<crate::audio::AudioTask>,
     #[cfg(not(feature = "audio"))]
-    pub(crate) audio: Option<std::convert::Infallible>,
+    pub(crate) audio: Option<!>,
 
     /// Portion of window title that describes the application rather than the session's current
     /// universe.
