@@ -1229,7 +1229,7 @@ pub(crate) type QuitResult = Result<QuitSucceeded, QuitCancelled>;
 /// Return type of a [`SessionBuilder::quit()`] callback on successful quit.
 /// This is uninhabited (cannot happen) since the callback should never be observed to
 /// finish if it successfully quits.
-pub type QuitSucceeded = std::convert::Infallible;
+pub type QuitSucceeded = !;
 
 /// Return type of a [`SessionBuilder::quit()`] callback if other considerations cancelled
 /// the quit operation. In this case, the session will return to normal operation.

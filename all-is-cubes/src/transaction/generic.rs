@@ -341,7 +341,7 @@ impl Transaction for () {
     type Target = ();
     type Context<'a> = ();
     type CommitCheck = ();
-    type Output = core::convert::Infallible;
+    type Output = !;
     type Mismatch = core::convert::Infallible;
 
     fn check(&self, (): &(), (): Self::Context<'_>) -> Result<Self::CommitCheck, Self::Mismatch> {
