@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn minmax() {
         assert_eq!(
-            accessor_minmax([[1., 1., -10., -10.,], [2., 0.5, -11., 0.]].into_iter()),
+            accessor_minmax([[1., 1., -10., -10.,], [2., 0.5, -11., 0.]]),
             [
                 Some(json!([1., 0.5, -11., -10.])),
                 Some(json!([2., 1., -10., 0.]))
