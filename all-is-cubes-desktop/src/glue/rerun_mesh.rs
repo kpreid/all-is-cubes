@@ -14,13 +14,12 @@ use all_is_cubes_mesh as mesh;
 use all_is_cubes_render::camera::Camera;
 
 use mesh::dynamic::ChunkedSpaceMesh;
-use mesh::texture::NoTexture;
 
 struct Mt;
 impl mesh::MeshTypes for Mt {
     type Vertex = Vertex;
     type Alloc = mesh::texture::NoTextures;
-    type Tile = NoTexture;
+    type Tile = !;
 }
 impl mesh::dynamic::DynamicMeshTypes for Mt {
     type RenderData = Option<DroppingMesh>;
@@ -43,8 +42,8 @@ struct Vertex {
     color: rg::components::Color,
 }
 
-impl From<mesh::BlockVertex<NoTexture>> for Vertex {
-    fn from(v: mesh::BlockVertex<NoTexture>) -> Self {
+impl From<mesh::BlockVertex<!>> for Vertex {
+    fn from(v: mesh::BlockVertex<!>) -> Self {
         Self {
             position: v.position.to_f32().to_array().into(),
             color: match v.coloring {
@@ -59,7 +58,7 @@ impl mesh::GfxVertex for Vertex {
 
     type Coordinate = f32;
 
-    type TexPoint = NoTexture;
+    type TexPoint = !;
 
     type BlockInst = Vector3D<f32, Cube>;
 
