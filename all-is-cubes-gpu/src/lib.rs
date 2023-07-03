@@ -1,3 +1,5 @@
+#![feature(never_type)]
+
 //! Algorithms for rendering [All is Cubes] content using a GPU, via
 //! the [`wgpu`] graphics library.
 //!
