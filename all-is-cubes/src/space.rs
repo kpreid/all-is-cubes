@@ -154,32 +154,34 @@ impl Space {
             builder::Fill::Data {
                 palette,
                 contents,
-                light: None,
-            } => (
-                palette,
-                contents.into_elements(),
-                physics.light.initialize_lighting(bounds),
-                LightUpdateQueue::new(),
-            ),
-            builder::Fill::Data {
-                palette,
-                contents,
-                light: Some(light),
+                light,
             } => {
-                // Fill the light update queue with each block whose light is known invalid.
-                // TODO: Also register a low-priority "update everything" in case data is from an
-                // old version.
-                let mut q = LightUpdateQueue::new();
-                for (cube, light) in light.iter() {
-                    match light.status() {
-                        LightStatus::Uninitialized => q.insert(LightUpdateRequest {
-                            priority: light::Priority::UNINIT,
-                            cube,
-                        }),
-                        LightStatus::NoRays | LightStatus::Opaque | LightStatus::Visible => {}
+                let (light, queue) = match light {
+                    Some(light) if physics.light != LightPhysics::None => {
+                        // Fill the light update queue with each block whose light is known invalid.
+                        // TODO: Also register a low-priority "update everything" in case data is
+                        // from an old version.
+                        let mut queue = LightUpdateQueue::new();
+                        for (cube, light) in light.iter() {
+                            match light.status() {
+                                LightStatus::Uninitialized => queue.insert(LightUpdateRequest {
+                                    priority: light::Priority::UNINIT,
+                                    cube,
+                                }),
+                                LightStatus::NoRays
+                                | LightStatus::Opaque
+                                | LightStatus::Visible => {}
+                            }
+                        }
+                        (light.into_elements(), queue)
                     }
-                }
-                (palette, contents.into_elements(), light.into_elements(), q)
+                    _ => (
+                        physics.light.initialize_lighting(bounds),
+                        LightUpdateQueue::new(),
+                    ),
+                };
+
+                (palette, contents.into_elements(), light, queue)
             }
         };
 
