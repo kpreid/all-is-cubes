@@ -693,6 +693,19 @@ impl Space {
     #[track_caller]
     pub(crate) fn consistency_check(&self) {
         self.palette.consistency_check(&self.contents);
+
+        assert_eq!(
+            self.lighting.len(),
+            if self.physics.light == LightPhysics::None {
+                0
+            } else {
+                self.bounds().volume()
+            }
+        );
+
+        // TODO: validate light update queue
+        // - consistency with space bounds
+        // - contains all cubes with LightStatus::UNINIT
     }
 }
 
