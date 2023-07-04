@@ -140,6 +140,8 @@ pub struct Universe {
     ///
     /// [`step()`]: Universe::step
     session_step_time: u64,
+
+    spaces_with_work: usize,
 }
 
 impl Universe {
@@ -152,6 +154,7 @@ impl Universe {
             wants_gc: false,
             whence: Arc::new(()),
             session_step_time: 0,
+            spaces_with_work: 0,
         }
     }
 
@@ -201,20 +204,33 @@ impl Universe {
             self.session_step_time += 1;
         }
 
+        // Compute how to divide time among spaces, based on the previous srep
+        let budget_per_space: Duration = deadline.saturating_duration_since(start_time)
+            / u32::try_from(self.spaces_with_work).unwrap_or(1).max(1);
+        self.spaces_with_work = 0;
+
         let mut transactions = Vec::new();
 
         for space_root in self.tables.spaces.values() {
             let space_ref = space_root.downgrade();
             let (space_info, transaction) = space_ref
                 .try_modify(|space| {
-                    // TODO(time-budget): fairly divide deadline among members that need it.
-                    // This implicitly implements an unfair "first wins" policy.
-                    space.step(Some(&space_ref), tick, deadline)
+                    space.step(
+                        Some(&space_ref),
+                        tick,
+                        deadline.min(Instant::now() + budget_per_space),
+                    )
                 })
                 .expect("space borrowed during universe.step()");
             transactions.push(transaction);
+
+            if space_info.light.queue_count > 0 {
+                self.spaces_with_work += 1;
+            }
             info.space_step += space_info;
+            info.total_members += 1;
         }
+        info.active_members += self.spaces_with_work;
 
         for character_root in self.tables.characters.values() {
             let character_ref = character_root.downgrade();
@@ -222,6 +238,7 @@ impl Universe {
                 .try_modify(|ch| ch.step(Some(&character_ref), tick))
                 .expect("character borrowed during universe.step()");
             transactions.push(transaction);
+            info.total_members += 1;
         }
 
         // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
@@ -478,6 +495,7 @@ impl fmt::Debug for Universe {
             wants_gc: _,
             whence,
             session_step_time,
+            spaces_with_work,
         } = self;
 
         let mut ds = fmt.debug_struct("Universe");
@@ -485,6 +503,7 @@ impl fmt::Debug for Universe {
             ds.field("whence", &whence);
         }
         ds.field("session_step_time", &session_step_time);
+        ds.field("spaces_with_work", &spaces_with_work);
         tables.fmt_members(&mut ds);
         ds.finish()
     }
@@ -565,21 +584,34 @@ pub(crate) struct DeserializeRefsError {
 pub struct UniverseStepInfo {
     #[doc(hidden)]
     pub computation_time: Duration,
+    /// Number of members which needed to do something specific.
+    active_members: usize,
+    /// Number of members which were processed at all.
+    total_members: usize,
     space_step: SpaceStepInfo,
 }
 impl std::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
     fn add_assign(&mut self, other: Self) {
+        self.computation_time += other.computation_time;
+        self.active_members += other.active_members;
+        self.total_members += other.total_members;
         self.space_step += other.space_step;
     }
 }
 impl CustomFormat<StatusText> for UniverseStepInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+        let Self {
+            computation_time,
+            active_members,
+            total_members,
+            space_step,
+        } = self;
         writeln!(
             fmt,
-            "Step computation: {}",
-            self.computation_time.custom_format(StatusText),
+            "Step computation: {t} for {active_members} of {total_members}",
+            t = computation_time.custom_format(StatusText),
         )?;
-        write!(fmt, "{}", self.space_step.custom_format(StatusText))?;
+        write!(fmt, "{}", space_step.custom_format(StatusText))?;
         Ok(())
     }
 }

@@ -23,11 +23,11 @@ fn thread_safety() {
 fn universe_debug_empty() {
     assert_eq!(
         format!("{:?}", Universe::new()),
-        "Universe { session_step_time: 0 }"
+        "Universe { session_step_time: 0, spaces_with_work: 0 }"
     );
     assert_eq!(
         format!("{:#?}", Universe::new()),
-        "Universe {\n    session_step_time: 0,\n}"
+        "Universe {\n    session_step_time: 0,\n    spaces_with_work: 0,\n}"
     );
 }
 
@@ -40,15 +40,19 @@ fn universe_debug_elements() {
     u.insert_anonymous(BlockDef::new(AIR));
     assert_eq!(
         format!("{u:?}"),
-        "Universe { session_step_time: 0, \
-        [anonymous #0]: all_is_cubes::block::block_def::BlockDef, \
-        'foo': all_is_cubes::space::Space }"
+        "Universe { \
+            session_step_time: 0, \
+            spaces_with_work: 0, \
+            [anonymous #0]: all_is_cubes::block::block_def::BlockDef, \
+            'foo': all_is_cubes::space::Space \
+        }"
     );
     assert_eq!(
         format!("{u:#?}"),
         "\
 Universe {
     session_step_time: 0,
+    spaces_with_work: 0,
     [anonymous #0]: all_is_cubes::block::block_def::BlockDef,
     'foo': all_is_cubes::space::Space,
 }\
