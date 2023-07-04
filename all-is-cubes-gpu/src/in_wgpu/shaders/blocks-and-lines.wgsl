@@ -261,8 +261,15 @@ fn light_texture_fetch(fragment_position: vec3<f32>) -> vec4<f32> {
     // TODO: Now that we're reading integer values, this is unnecessarily circuitous
     let status: f32 = round((f32(texel.a) / 255.0) * 2.0 - 1.0);
 
-    // TODO: Return a struct instead
-    return vec4<f32>(unpacked_light, status);
+    // TODO: Return a struct instead of an unexplained vec4
+
+    // If the light value is non-zero, it is probably meaningful regardless of what the status
+    // shows.
+    if any(not_zero) {
+        return vec4<f32>(unpacked_light, 1.0);
+    } else {
+        return vec4<f32>(unpacked_light, status);
+    }
 }
 
 // Simple directional lighting used to give corners extra definition.
