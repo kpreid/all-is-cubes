@@ -13,7 +13,7 @@ use super::LightUpdateRequest;
 use crate::block::EvaluatedBlock;
 use crate::math::{Face6, FaceMap, FreeCoordinate, Geometry, GridPoint, NotNan, Rgb};
 use crate::raycast::{Ray, RaycastStep};
-use crate::space::light::LightUpdateRayInfo;
+use crate::space::light::{LightUpdateRayInfo, Priority};
 use crate::space::{GridAab, LightPhysics, PackedLight, PackedLightScalar, Space, SpaceChange};
 use crate::util::{CustomFormat, StatusText};
 
@@ -68,7 +68,7 @@ static LIGHT_RAYS: Lazy<[LightRayData; ALL_RAYS_COUNT]> = Lazy::new(|| {
 
 /// Methods on Space that specifically implement the lighting algorithm.
 impl Space {
-    pub(crate) fn light_needs_update(&mut self, cube: GridPoint, priority: PackedLightScalar) {
+    pub(crate) fn light_needs_update(&mut self, cube: GridPoint, priority: Priority) {
         if self.physics.light == LightPhysics::None {
             return;
         }
@@ -153,8 +153,9 @@ impl Space {
             // is also not perfect at updating everything that theoretically should be,
             // since the rays are not perfectly reciprocal.
             if difference_priority > 1 {
+                let priority = Priority::from_difference(difference_priority);
                 for cube in dependencies {
-                    self.light_needs_update(cube, difference_priority);
+                    self.light_needs_update(cube, priority);
                 }
             }
         }
@@ -269,7 +270,7 @@ impl Space {
                             // so we need to schedule a proper update.
                             // (Bypassing `self.light_needs_update()` to skip bounds checks).
                             self.light_update_queue.insert(LightUpdateRequest {
-                                priority: PackedLightScalar::MAX,
+                                priority: Priority::ESTIMATED,
                                 cube,
                             });
 
@@ -541,7 +542,7 @@ pub struct LightUpdatesInfo {
     pub queue_count: usize,
     /// The largest update priority in the queue (corresponds to the size of
     /// difference that caused the cube to be added).
-    pub max_queue_priority: u8,
+    pub(crate) max_queue_priority: Priority,
 }
 impl std::ops::AddAssign<LightUpdatesInfo> for LightUpdatesInfo {
     fn add_assign(&mut self, other: Self) {
@@ -555,7 +556,7 @@ impl CustomFormat<StatusText> for LightUpdatesInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
         write!(
             fmt,
-            "{:4} (max diff {:3}) of {:4} (max pri {:3})",
+            "{:4} (max diff {:3}) of {:4} (max pri {:3?})",
             self.update_count,
             self.max_update_difference,
             self.queue_count,

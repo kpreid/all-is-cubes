@@ -2,7 +2,7 @@
 
 use pretty_assertions::assert_eq;
 
-use super::{data::LightStatus, LightUpdatesInfo, PackedLight};
+use super::{data::LightStatus, LightUpdatesInfo, PackedLight, Priority};
 use crate::block::{AnimationHint, Block, AIR};
 use crate::listen::{Listen as _, Listener, Sink};
 use crate::math::{FaceMap, GridPoint, Rgb, Rgba};
@@ -46,7 +46,7 @@ fn step() {
             update_count: 1,
             max_update_difference: sky_light.difference_priority(PackedLight::NO_RAYS),
             queue_count: 0,
-            max_queue_priority: 0
+            max_queue_priority: Priority::MIN
         }
     );
 
@@ -216,7 +216,7 @@ fn disabled_lighting_returns_one_always() {
 #[test]
 fn disabled_lighting_does_not_update() {
     let mut space = space_with_disabled_light();
-    space.light_needs_update(GridPoint::new(0, 0, 0), u8::MAX);
+    space.light_needs_update(GridPoint::new(0, 0, 0), Priority::UNINIT);
     assert_eq!(
         space
             .step(None, Tick::arbitrary(), practically_infinite_deadline())

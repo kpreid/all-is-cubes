@@ -173,7 +173,7 @@ impl Space {
                 for (cube, light) in light.iter() {
                     match light.status() {
                         LightStatus::Uninitialized => q.insert(LightUpdateRequest {
-                            priority: 255,
+                            priority: light::Priority::UNINIT,
                             cube,
                         }),
                         LightStatus::NoRays | LightStatus::Opaque | LightStatus::Visible => {}
@@ -392,13 +392,13 @@ impl Space {
 
                 self.notifier.notify(SpaceChange::Lighting(position));
             } else {
-                self.light_needs_update(position, PackedLightScalar::MAX);
+                self.light_needs_update(position, light::Priority::NEWLY_VISIBLE);
             }
             for face in Face6::ALL {
                 if let Some(neighbor) = point_checked_add(position, face.normal_vector()) {
                     // Perform neighbor light updates if they can be affected by us
                     if !self.get_evaluated(neighbor).opaque[face.opposite()] {
-                        self.light_needs_update(neighbor, PackedLightScalar::MAX);
+                        self.light_needs_update(neighbor, light::Priority::NEWLY_VISIBLE);
                     }
                 }
             }
@@ -618,6 +618,8 @@ impl Space {
         epsilon: u8,
         mut progress_callback: impl FnMut(LightUpdatesInfo),
     ) -> usize {
+        let epsilon = light::Priority::from_difference(epsilon);
+
         let mut total = 0;
         loop {
             let info = self.update_lighting_from_queue(Duration::from_secs_f32(0.25));

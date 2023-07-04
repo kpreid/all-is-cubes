@@ -227,7 +227,7 @@ impl From<crate::save::schema::LightSerV1> for PackedLight {
 /// An entry in the queue of cubes that need their light updated.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct LightUpdateRequest {
-    pub(crate) priority: PackedLightScalar,
+    pub(crate) priority: Priority,
     pub(crate) cube: GridPoint,
 }
 impl LightUpdateRequest {
@@ -260,6 +260,46 @@ impl PartialOrd for LightUpdateRequest {
     }
 }
 
+/// Priorities a [`LightUpdateRequest`] can have.
+#[derive(Clone, Copy, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub(crate) struct Priority(PackedLightScalar);
+impl Priority {
+    /// The cube used to be [`LightStatus::Opaque`] or [`LightStatus::NoRays`],
+    /// but now needs its light computed because of a change in the space contents.
+    /// This is the highest priority because a player is likely to be looking at it.
+    pub const NEWLY_VISIBLE: Self = Self(250);
+
+    /// The cube has no light data computed yet.
+    pub const UNINIT: Self = Self(210);
+
+    /// An approximation was used; the value may be adequate but it should be recomputed ASAP.
+    pub const ESTIMATED: Self = Self(200);
+
+    /// Minimum possible priority value, which is used as a value that never actually
+    /// appears in the queue.
+    ///
+    /// TODO: eliminate this entirely / make Priority a "nonzero" type?
+    pub const MIN: Self = Self(0);
+
+    pub fn from_difference(d: PackedLightScalar) -> Self {
+        // Use only the values between 1 and 128 inclusive as priorities based on difference.
+        Self(d / 2 + 1)
+    }
+}
+impl fmt::Debug for Priority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if *self == Self::NEWLY_VISIBLE {
+            write!(f, "NEWLY_VISIBLE")
+        } else if *self == Self::UNINIT {
+            write!(f, "UNINIT")
+        } else if *self == Self::ESTIMATED {
+            write!(f, "ESTIMATED")
+        } else {
+            fmt::Display::fmt(&self.0, f)
+        }
+    }
+}
+
 /// A priority queue for [`LightUpdateRequest`]s which contains cubes
 /// at most once, even when added with different priorities.
 pub(crate) struct LightUpdateQueue {
@@ -268,7 +308,7 @@ pub(crate) struct LightUpdateQueue {
     queue: BTreeSet<LightUpdateRequest>,
     /// Maps GridPoint to priority value. This allows deduplicating entries, including
     /// removing low-priority entries in favor of high-priority ones
-    table: HashMap<GridPoint, PackedLightScalar>,
+    table: HashMap<GridPoint, Priority>,
 }
 
 impl LightUpdateQueue {
@@ -334,8 +374,12 @@ impl LightUpdateQueue {
     }
 
     #[inline]
-    pub fn peek_priority(&self) -> PackedLightScalar {
-        self.queue.last().copied().map(|r| r.priority).unwrap_or(0)
+    pub fn peek_priority(&self) -> Priority {
+        self.queue
+            .last()
+            .copied()
+            .map(|r| r.priority)
+            .unwrap_or(Priority::MIN)
     }
 
     pub fn clear(&mut self) {
@@ -442,8 +486,17 @@ mod tests {
     }
 
     #[test]
+    fn priority_relations() {
+        let least_special_priority = [Priority::ESTIMATED, Priority::NEWLY_VISIBLE, Priority::UNINIT].into_iter().min().unwrap();
+
+        assert!(Priority::MIN < Priority::from_difference(0));
+        assert!(Priority::from_difference(255) < least_special_priority);
+    }
+
+    #[test]
     fn queue_ordering() {
         fn r(cube: [GridCoordinate; 3], priority: PackedLightScalar) -> LightUpdateRequest {
+            let priority = Priority(priority);
             LightUpdateRequest {
                 cube: GridPoint::from(cube),
                 priority,
