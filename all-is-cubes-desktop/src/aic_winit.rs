@@ -34,8 +34,13 @@ pub(crate) struct WinAndState {
     /// Winit gives us no way to query this so we have to remember it.
     occluded: bool,
 
+    /// The last mouse position received, if known and inside the window.
+    mouse_position: Option<winit::dpi::PhysicalPosition<f64>>,
+
     /// The last cursor grab state we set.
     cursor_grab_mode: winit::window::CursorGrabMode,
+
+    ignore_next_mouse_move: bool,
 }
 
 impl WinAndState {
@@ -70,6 +75,24 @@ impl WinAndState {
                 self.cursor_grab_mode = mode;
                 self.window.set_cursor_visible(!wants);
                 input_processor.has_pointer_lock(wants);
+
+                if self.mouse_position.is_none() && !already_grabbed {
+                    // At least on macOS, if we lock and the cursor is outside the window,
+                    // then clicking will miss the window. So, reset it to be inside.
+                    // (And ignore any errors that might occur.)
+                    //
+                    // `&& !already_grabbed` avoids interfering with mouselook behavior
+                    // by resetting every frame.
+                    //
+                    // TODO: Fix race condition if the mouse has moved since the last event
+                    // processing and before it was grabbed, by doing this after the next
+                    // MainEventsCleared
+                    let s = self.window.inner_size();
+                    let pos = winit::dpi::PhysicalPosition::new(s.width / 2, s.height / 2);
+
+                    let _ = self.window.set_cursor_position(pos);
+                    self.ignore_next_mouse_move = true;
+                }
             }
             Err(_) => {
                 // TODO: log error
@@ -148,7 +171,9 @@ pub(crate) fn create_window(
     Ok(WinAndState {
         window,
         occluded: false,
+        mouse_position: None,
         cursor_grab_mode: winit::window::CursorGrabMode::None,
+        ignore_next_mouse_move: false,
     })
 }
 
@@ -319,6 +344,7 @@ fn handle_winit_event<Ren: RendererToWinit>(
 
                 // Mouse input
                 WindowEvent::CursorMoved { position, .. } => {
+                    dsession.window.mouse_position = Some(position);
                     let position: [f64; 2] = position.into();
                     input_processor.mouse_pixel_position(
                         *dsession.viewport_cell.get(),
@@ -332,6 +358,7 @@ fn handle_winit_event<Ren: RendererToWinit>(
                     // CursorEntered doesn't tell us position, so ignore
                 }
                 WindowEvent::CursorLeft { .. } => {
+                    dsession.window.mouse_position = None;
                     input_processor.mouse_pixel_position(
                         *dsession.viewport_cell.get(),
                         None,
@@ -397,7 +424,13 @@ fn handle_winit_event<Ren: RendererToWinit>(
             device_id: _,
             event,
         } => match event {
-            DeviceEvent::MouseMotion { delta } => input_processor.mouselook_delta(delta.into()),
+            DeviceEvent::MouseMotion { delta } => {
+                if dsession.window.ignore_next_mouse_move {
+                    dsession.window.ignore_next_mouse_move = false;
+                    return;
+                }
+                input_processor.mouselook_delta(delta.into())
+            }
 
             // Unused
             DeviceEvent::Added => {}
