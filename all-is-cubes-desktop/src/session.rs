@@ -36,13 +36,6 @@ pub(crate) struct DesktopSession<Ren, Win> {
     /// If absent, sound is not produced
     pub(crate) audio: Option<crate::audio::AudioOut>,
 
-    /// winit exposes an 'occluded' state but only as events, so we have to track that.
-    /// If true, this should suppresses redraw, and when it becomes false then we
-    /// should redraw.
-    ///
-    /// TODO: this should really be in winit-specific (i.e. the `window` field) storage.
-    pub(crate) occluded: bool,
-
     /// Flag for when the `Session` might have changed its `Universe`, or similar changes.
     ///
     /// TODO: This ought to be built in to the `Session` itself.
@@ -64,7 +57,6 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
             clock_source: ClockSource::Instant,
             recorder: None,
             audio: None,
-            occluded: false,
             session_altered: DirtyFlag::new(false),
         };
 

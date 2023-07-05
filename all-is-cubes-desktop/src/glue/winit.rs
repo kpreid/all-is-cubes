@@ -3,14 +3,6 @@ use winit::monitor::MonitorHandle;
 
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
-use all_is_cubes_ui::apps::InputProcessor;
-use winit::window::CursorGrabMode;
-
-impl super::Window for winit::window::Window {
-    fn set_title(&self, title: String) {
-        self.set_title(title.as_str())
-    }
-}
 
 pub fn physical_size_to_viewport(scale_factor: f64, size: PhysicalSize<u32>) -> Viewport {
     let size: Vector2<u32> = Vector2::<u32>::from(<[u32; 2]>::from(size));
@@ -209,25 +201,6 @@ pub fn map_key(key: winit::event::VirtualKeyCode) -> Option<all_is_cubes_ui::app
         V::Paste => return None,
         V::Cut => return None,
     })
-}
-
-pub fn sync_cursor_grab(window: &winit::window::Window, input_processor: &mut InputProcessor) {
-    let wants = input_processor.wants_pointer_lock();
-    let mode = match wants {
-        true => CursorGrabMode::Locked,
-        false => CursorGrabMode::None,
-    };
-    match window.set_cursor_grab(mode) {
-        Ok(()) => {
-            window.set_cursor_visible(!wants);
-            input_processor.has_pointer_lock(wants);
-        }
-        Err(_) => {
-            // TODO: log error
-            window.set_cursor_visible(true);
-            input_processor.has_pointer_lock(false);
-        }
-    }
 }
 
 pub fn cursor_icon_to_winit(icon: &all_is_cubes_ui::apps::CursorIcon) -> winit::window::CursorIcon {
