@@ -149,6 +149,24 @@ where
         self.chunks.get(&position)
     }
 
+    /// Retrieves the render data for the given block index.
+    /// This should be used for instanced rendering of blocks.
+    ///
+    /// TODO(instancing): This may or may not be useful in the final form of instanced
+    /// rendering. It is currently useful for prototyping.
+    pub fn get_render_data_for_block(
+        &self,
+        block_index: BlockIndex,
+    ) -> Option<(&crate::MeshMeta<Tex::Tile>, &D)> {
+        self.block_meshes
+            .meshes
+            .get(usize::from(block_index))
+            .map(|vbm| {
+                let (m, d) = &vbm.instance_data;
+                (m, d)
+            })
+    }
+
     /// Recompute meshes of all blocks that need it, and the nearest chunks that need it.
     ///
     /// * `camera`'s view position is used to choose what to update and for depth
