@@ -341,8 +341,9 @@ impl<I: time::Instant> SpaceRenderer<I> {
             // If there's no buffer then there must also be no instances; no action needed.
         }
 
-        // Helper for the common logic of opaque + transparent drawing
-        fn draw_instance<'pass>(
+        // Helper for the common logic of opaque + transparent drawing of a single instance
+        // that's a chunk mesh (i.e. instance range is length 1).
+        fn draw_chunk_instance<'pass>(
             range: std::ops::Range<usize>,
             render_pass: &mut wgpu::RenderPass<'pass>,
             buffers: &'pass ChunkBuffers,
@@ -368,7 +369,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             chunks_drawn += 1;
 
             if let Some(buffers) = &chunk.render_data {
-                draw_instance(
+                draw_chunk_instance(
                     chunk.mesh().opaque_range(),
                     &mut render_pass,
                     buffers,
@@ -382,13 +383,38 @@ impl<I: time::Instant> SpaceRenderer<I> {
             flaws |= chunk.mesh().flaws();
         }
 
+        // Render opaque parts of instances.
+        //
+        // TODO(instancing): This is inefficient since we don't reuse instance buffer data across frames.
+        // TODO(instancing): Render transparent pass too.
+        for (&block_index, cubes) in csm.block_instances() {
+            // Set buffers for the mesh
+            let Some((mesh_meta, Some(buffers))) = csm.get_render_data_for_block(block_index)
+            else {
+                continue;
+            };
+            set_buffers(&mut render_pass, buffers);
+
+            let first_instance_index = u32::try_from(instance_data.len()).unwrap();
+            for cube in cubes {
+                instance_data.push(WgpuInstanceData::new(cube.lower_bounds().to_vector()));
+            }
+            // Record draw command for all instances using this mesh
+            render_pass.draw_indexed(
+                to_wgpu_index_range(mesh_meta.opaque_range()),
+                0,
+                first_instance_index..(first_instance_index + cubes.len() as u32),
+            );
+            squares_drawn += mesh_meta.opaque_range().len() / 6;
+        }
+
         // Transparent geometry after opaque geometry, in back-to-front order
         let start_draw_transparent_time = I::now();
         if camera.options().transparency.will_output_alpha() {
             render_pass.set_pipeline(&pipelines.transparent_render_pipeline);
             for chunk in csm.iter_in_view(camera).rev() {
                 if let Some(buffers) = &chunk.render_data {
-                    draw_instance(
+                    draw_chunk_instance(
                         chunk
                             .mesh()
                             .transparent_range(DepthOrdering::from_view_direction(
