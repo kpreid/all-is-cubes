@@ -103,7 +103,7 @@ where
                                     &fast_options,
                                 ),
                                 version: BlockMeshVersion::NotReady,
-                                render_data: D::default(),
+                                instance_data: Default::default(),
                             }
                         } else {
                             // If the block does not have voxels, then we can just generate the
@@ -115,7 +115,7 @@ where
                                     mesh_options,
                                 ),
                                 version: current_version_number,
-                                render_data: D::default(),
+                                instance_data: Default::default(),
                             }
                         });
                 }
@@ -168,19 +168,23 @@ where
                     *current_mesh_entry = VersionedBlockMesh {
                         mesh: new_block_mesh,
                         version: current_version_number,
-                        render_data: D::default(),
+                        instance_data: Default::default(), // TODO: reuse old render data
                     };
 
                     // TODO(instancing): Enable this for all blocks that we might want to draw
                     // instances of.
                     if false {
+                        // TODO: wasteful data copy to make the SpaceMesh
+                        let space_mesh = SpaceMesh::from(&current_mesh_entry.mesh);
+
                         render_data_updater(super::ChunkMeshUpdate {
-                            // TODO: wasteful data copy to make the SpaceMesh
-                            mesh: &SpaceMesh::from(&current_mesh_entry.mesh),
-                            render_data: &mut current_mesh_entry.render_data,
+                            mesh: &space_mesh,
+                            render_data: &mut current_mesh_entry.instance_data.1,
                             indices_only: false,
                             mesh_label: super::MeshLabel(super::MeshLabelImpl::Block(index)),
                         });
+
+                        current_mesh_entry.instance_data.0 = space_mesh.into_meta();
                     }
                 } else {
                     // The new mesh is identical to the old one (which might happen because
@@ -233,7 +237,7 @@ pub(crate) struct VersionedBlockMesh<D, Vert, Tile> {
     /// (not part of a larger mesh).
     ///
     /// TODO(instancing): This is not yet used.
-    pub(crate) render_data: D,
+    pub(crate) instance_data: (crate::MeshMeta<Tile>, D),
 }
 
 /// Together with a [`BlockIndex`], uniquely identifies a block mesh.
