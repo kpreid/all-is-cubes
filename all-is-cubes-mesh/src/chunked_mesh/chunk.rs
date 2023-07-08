@@ -1,3 +1,5 @@
+use std::fmt;
+
 use instant::Instant;
 
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3};
@@ -64,6 +66,7 @@ where
             mesh: &self.mesh,
             render_data: &mut self.render_data,
             indices_only,
+            mesh_label: MeshLabel(MeshLabelImpl::Chunk(self.position.0.into())),
         }
     }
 
@@ -168,14 +171,43 @@ where
 ///
 /// This struct is provided to the callbacks of
 /// [`ChunkedSpaceMesh::update_blocks_and_some_chunks()`](super::ChunkedSpaceMesh::update_blocks_and_some_chunks).
+///
+/// TODO: this is being refactored towards being useful for instanced block meshes as well
+/// as chunks. It will eventually be renamed and moved due to that.
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct ChunkMeshUpdate<'a, D, V, T, const CHUNK_SIZE: GridCoordinate> {
     pub position: ChunkPos<CHUNK_SIZE>,
+
+    /// Fresh data source.
     pub mesh: &'a SpaceMesh<V, T>,
+
+    /// Destination to update.
     pub render_data: &'a mut D,
+
     /// Whether *only* the indices need to be copied (and their length and type has not changed).
     pub indices_only: bool,
+
+    /// Diagnostic label for this mesh; is stable across all updates for the same mesh,
+    /// but should not be relied on for equality or anything like that.
+    pub mesh_label: MeshLabel,
+}
+
+/// Debugging label identifying a mesh that is passing through [`ChunkMeshUpdate`].
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub struct MeshLabel(MeshLabelImpl);
+
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+enum MeshLabelImpl {
+    Chunk([i32; 3]),
+}
+
+impl fmt::Debug for MeshLabel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            MeshLabelImpl::Chunk(p) => p.fmt(f),
+        }
+    }
 }
 
 /// What might be dirty about a single chunk.

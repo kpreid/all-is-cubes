@@ -21,7 +21,7 @@ mod blocks;
 use blocks::VersionedBlockMeshes;
 mod chunk;
 use chunk::ChunkTodo;
-pub use chunk::{ChunkMesh, ChunkMeshUpdate};
+pub use chunk::{ChunkMesh, ChunkMeshUpdate, MeshLabel};
 
 #[cfg(test)]
 mod tests;

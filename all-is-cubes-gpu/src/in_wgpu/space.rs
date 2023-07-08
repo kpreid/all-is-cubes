@@ -544,13 +544,12 @@ fn update_chunk_buffers(
     // TODO: assert INDEX_FORMAT matches this type
     let new_indices: IndexSlice<'_> = update.mesh.indices();
 
-    let position: [GridCoordinate; 3] = update.position.0.into();
+    let mesh_label = &update.mesh_label;
     let buffers = update.render_data.get_or_insert_with(ChunkBuffers::default);
     buffers.vertex_buf.write_with_resizing(
         bwp.reborrow(),
         &wgpu::util::BufferInitDescriptor {
-            // TODO: Get the space's label and chunk coordinates here (cheaply)
-            label: Some(&format!("{space_label} chunk vertex {position:?}")),
+            label: Some(&format!("{space_label} vertex {mesh_label:?}")),
             contents: new_vertices_data,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         },
@@ -558,7 +557,7 @@ fn update_chunk_buffers(
     buffers.index_buf.write_with_resizing(
         bwp.reborrow(),
         &wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("{space_label} chunk index {position:?}")),
+            label: Some(&format!("{space_label} index {mesh_label:?}")),
             contents: new_indices.as_bytes(),
             usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
         },
