@@ -6,12 +6,11 @@ use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
 use all_is_cubes::cgmath::EuclideanSpace as _;
-use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::math::{GridAab, GridVector};
 use all_is_cubes::space::Space;
 use all_is_cubes::{camera, universe};
 use all_is_cubes_mesh as mesh;
-use all_is_cubes_mesh::chunked_mesh::ChunkedSpaceMesh;
+use all_is_cubes_mesh::chunked_mesh::{ChunkedSpaceMesh, MeshLabel};
 use all_is_cubes_port::gltf::{
     json as gltf_json, GltfTextureAllocator, GltfTextureRef, GltfVertex, GltfWriter, MeshInstance,
 };
@@ -62,7 +61,7 @@ impl MeshRecorder {
                 let new_cell = MeshIndexCell::default();
                 // Ignore error since finish_frame() will catch it anyway
                 let _ = self.scene_sender.send(MeshRecordMsg::AddMesh(
-                    u.position,
+                    u.mesh_label,
                     u.mesh.clone(),
                     Arc::clone(&new_cell),
                 ));
@@ -92,7 +91,7 @@ impl MeshRecorder {
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum MeshRecordMsg {
     AddMesh(
-        ChunkPos<32>,
+        MeshLabel,
         mesh::SpaceMesh<GltfVertex, GltfTextureRef>,
         MeshIndexCell,
     ),
@@ -127,10 +126,8 @@ pub(super) fn start_gltf_writing(
         .spawn(move || {
             while let Ok(msg) = scene_receiver.recv() {
                 match msg {
-                    MeshRecordMsg::AddMesh(position, mesh, mesh_index_cell) => {
-                        let position_for_name: [i32; 3] = position.0.into();
-                        let mesh_index =
-                            writer.add_mesh(format!("chunk {position_for_name:?}"), &mesh);
+                    MeshRecordMsg::AddMesh(name, mesh, mesh_index_cell) => {
+                        let mesh_index = writer.add_mesh(&format!("{name:?}"), &mesh);
                         *mesh_index_cell.lock().unwrap() = Some(mesh_index);
                     }
                     MeshRecordMsg::FinishFrame(frame_number, camera, meshes) => {

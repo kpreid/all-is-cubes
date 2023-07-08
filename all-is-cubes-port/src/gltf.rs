@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::time::Duration;
-use std::{fs, io};
+use std::{fmt, fs, io};
 
 pub use gltf_json as json;
 use gltf_json::validation::Checked::Valid;
@@ -173,7 +173,7 @@ impl GltfWriter {
     /// The mesh's texture allocator must be [`self.texture_allocator()`].
     pub fn add_mesh(
         &mut self,
-        name: String,
+        name: &dyn fmt::Display,
         mesh: &SpaceMesh<GltfVertex, GltfTextureRef>,
     ) -> Index<gltf_json::Mesh> {
         // TODO: Deduplicate meshes so that we don't have to store the same data twice if
@@ -387,7 +387,7 @@ pub(crate) async fn export_gltf(
             &mesh_options,
         ));
 
-        let mesh_index = writer.add_mesh(name.to_string(), &mesh);
+        let mesh_index = writer.add_mesh(&name, &mesh);
         let mesh_node = push_and_return_index(
             &mut writer.root.nodes,
             gltf_json::Node {

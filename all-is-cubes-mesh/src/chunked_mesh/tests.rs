@@ -166,7 +166,7 @@ impl CsmTester {
     /// Call `csm.update_blocks_and_some_chunks()` with the tester's placeholders
     fn update<F>(&mut self, chunk_render_updater: F) -> CsmUpdateInfo
     where
-        F: FnMut(ChunkMeshUpdate<'_, (), BlockVertex<NoTexture>, NoTexture, CHUNK_SIZE>),
+        F: FnMut(ChunkMeshUpdate<'_, (), BlockVertex<NoTexture>, NoTexture>),
     {
         self.csm.update_blocks_and_some_chunks(
             &self.camera,

@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt;
 use std::mem::size_of;
 
 use bytemuck::offset_of;
@@ -13,7 +14,7 @@ use super::{GltfTextureRef, GltfVertex, GltfWriter};
 
 pub(crate) fn add_mesh(
     writer: &mut GltfWriter,
-    name: String,
+    name: &dyn fmt::Display,
     mesh: &SpaceMesh<GltfVertex, GltfTextureRef>,
 ) -> Index<gltf_json::Mesh> {
     let vertex_bytes = bytemuck::cast_slice::<GltfVertex, u8>(mesh.vertices());

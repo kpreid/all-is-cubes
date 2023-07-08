@@ -30,7 +30,7 @@ pub(crate) fn gltf_mesh(
     let mesh: SpaceMesh<GltfVertex, GltfTextureRef> =
         SpaceMesh::new(space, space.bounds(), options, &*blocks);
 
-    let index = writer.add_mesh("mesh".into(), &mesh);
+    let index = writer.add_mesh(&"mesh", &mesh);
 
     (mesh, index)
 }

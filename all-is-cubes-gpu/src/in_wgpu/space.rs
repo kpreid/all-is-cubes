@@ -531,7 +531,7 @@ fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuf
 /// Copy [`SpaceMesh`] data to GPU buffers.
 fn update_chunk_buffers(
     mut bwp: BeltWritingParts<'_, '_>,
-    update: ChunkMeshUpdate<'_, Option<ChunkBuffers>, WgpuBlockVertex, AtlasTile, CHUNK_SIZE>,
+    update: ChunkMeshUpdate<'_, Option<ChunkBuffers>, WgpuBlockVertex, AtlasTile>,
     space_label: &str,
 ) {
     if update.mesh.is_empty() {

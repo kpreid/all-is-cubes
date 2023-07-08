@@ -60,9 +60,8 @@ where
     pub(crate) fn borrow_for_update(
         &mut self,
         indices_only: bool,
-    ) -> ChunkMeshUpdate<'_, D, Vert, Tex::Tile, CHUNK_SIZE> {
+    ) -> ChunkMeshUpdate<'_, D, Vert, Tex::Tile> {
         ChunkMeshUpdate {
-            position: self.position,
             mesh: &self.mesh,
             render_data: &mut self.render_data,
             indices_only,
@@ -176,9 +175,7 @@ where
 /// as chunks. It will eventually be renamed and moved due to that.
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct ChunkMeshUpdate<'a, D, V, T, const CHUNK_SIZE: GridCoordinate> {
-    pub position: ChunkPos<CHUNK_SIZE>,
-
+pub struct ChunkMeshUpdate<'a, D, V, T> {
     /// Fresh data source.
     pub mesh: &'a SpaceMesh<V, T>,
 
@@ -205,7 +202,7 @@ enum MeshLabelImpl {
 impl fmt::Debug for MeshLabel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
-            MeshLabelImpl::Chunk(p) => p.fmt(f),
+            MeshLabelImpl::Chunk(p) => write!(f, "chunk {p:?}"),
         }
     }
 }

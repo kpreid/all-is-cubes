@@ -174,7 +174,7 @@ where
         mut chunk_render_updater: F,
     ) -> CsmUpdateInfo
     where
-        F: FnMut(ChunkMeshUpdate<'_, D, Vert, Tex::Tile, CHUNK_SIZE>),
+        F: FnMut(ChunkMeshUpdate<'_, D, Vert, Tex::Tile>),
     {
         let update_start_time = Instant::now();
 
