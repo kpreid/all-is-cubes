@@ -221,21 +221,11 @@
   "nodes": [
     {
       "mesh": 0,
-      "name": "'block0'",
-      "translation": [
-        0.0,
-        0.0,
-        0.0
-      ]
+      "name": "'block0'"
     },
     {
       "mesh": 1,
-      "name": "'block1'",
-      "translation": [
-        0.0,
-        0.0,
-        0.0
-      ]
+      "name": "'block1'"
     }
   ],
   "scenes": [

@@ -7,13 +7,13 @@ use std::time::{Duration, Instant};
 
 use all_is_cubes::cgmath::EuclideanSpace as _;
 use all_is_cubes::chunking::ChunkPos;
-use all_is_cubes::math::GridAab;
+use all_is_cubes::math::{GridAab, GridVector};
 use all_is_cubes::space::Space;
 use all_is_cubes::{camera, universe};
 use all_is_cubes_mesh as mesh;
 use all_is_cubes_mesh::chunked_mesh::ChunkedSpaceMesh;
 use all_is_cubes_port::gltf::{
-    json as gltf_json, GltfTextureAllocator, GltfTextureRef, GltfVertex, GltfWriter,
+    json as gltf_json, GltfTextureAllocator, GltfTextureRef, GltfVertex, GltfWriter, MeshInstance,
 };
 
 use crate::record::RecordOptions;
@@ -75,7 +75,12 @@ impl MeshRecorder {
                 self.cameras.cameras().world.clone(),
                 self.csm
                     .iter_chunks()
-                    .map(|c| c.render_data.clone())
+                    .map(|c| {
+                        (
+                            c.render_data.clone(),
+                            c.position().bounds().lower_bounds().to_vec(),
+                        )
+                    })
                     .collect(),
             ))
             .expect("channel closed; recorder render thread died?")
@@ -91,11 +96,15 @@ pub(crate) enum MeshRecordMsg {
         mesh::SpaceMesh<GltfVertex, GltfTextureRef>,
         MeshIndexCell,
     ),
-    FinishFrame(super::FrameNumber, camera::Camera, Vec<MeshIndexCell>),
+    FinishFrame(
+        super::FrameNumber,
+        camera::Camera,
+        Vec<(MeshIndexCell, GridVector)>,
+    ),
 }
 
 /// Storage for an index that may not yet have been assigned, but will be when it is needed.
-type MeshIndexCell = Arc<std::sync::Mutex<Option<gltf_json::Index<gltf_json::Node>>>>;
+type MeshIndexCell = Arc<std::sync::Mutex<Option<gltf_json::Index<gltf_json::Mesh>>>>;
 
 /// Spawn a thread that receives [`MeshRecordMsg`] and writes glTF data.
 pub(super) fn start_gltf_writing(
@@ -120,19 +129,21 @@ pub(super) fn start_gltf_writing(
                 match msg {
                     MeshRecordMsg::AddMesh(position, mesh, mesh_index_cell) => {
                         let position_for_name: [i32; 3] = position.0.into();
-                        let node_index = writer.add_mesh(
-                            format!("chunk {position_for_name:?}"),
-                            &mesh,
-                            position.bounds().lower_bounds().to_vec(),
-                        );
-                        *mesh_index_cell.lock().unwrap() = Some(node_index);
+                        let mesh_index =
+                            writer.add_mesh(format!("chunk {position_for_name:?}"), &mesh);
+                        *mesh_index_cell.lock().unwrap() = Some(mesh_index);
                     }
                     MeshRecordMsg::FinishFrame(frame_number, camera, meshes) => {
                         let flaws = writer.add_frame(
                             Some(&camera),
                             &meshes
                                 .into_iter()
-                                .filter_map(|lock| *lock.lock().unwrap())
+                                .filter_map(|(lock, translation)| {
+                                    Some(MeshInstance {
+                                        mesh: (*lock.lock().unwrap())?,
+                                        translation: translation.into(),
+                                    })
+                                })
                                 .collect::<Vec<_>>(),
                         );
                         status_sender

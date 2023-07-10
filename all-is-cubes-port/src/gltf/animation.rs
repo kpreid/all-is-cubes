@@ -6,17 +6,17 @@ use gltf_json::Index;
 
 use super::buffer::create_buffer_and_accessor;
 use super::glue::{convert_quaternion, push_and_return_index};
-use super::GltfWriter;
+use super::{GltfWriter, MeshInstance};
 
 #[derive(Debug)]
 pub(crate) struct FrameState {
-    /// The set of nodes that should be visible in this frame.
+    /// The set of mesh-instances that should be visible in this frame.
     /// This information will be used to assemble a glTF animation.
     ///
     /// glTF animation doesn't support adding/removing objects explicitly, but
     /// setting the scale to zero is explicitly noted in the specification, and so
     /// that is the animation that is generated.
-    pub visible_nodes: Vec<Index<gltf_json::Node>>,
+    pub visible_mesh_instances: Vec<MeshInstance>,
 
     // The camera's state in this frame.
     pub camera_transform: all_is_cubes::camera::ViewTransform,

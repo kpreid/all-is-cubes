@@ -231,24 +231,6 @@
   ],
   "nodes": [
     {
-      "mesh": 0,
-      "name": "chunk [0, 0, 0]",
-      "translation": [
-        0.0,
-        0.0,
-        0.0
-      ]
-    },
-    {
-      "mesh": 1,
-      "name": "chunk [0, -1, 0]",
-      "translation": [
-        0.0,
-        -32.0,
-        0.0
-      ]
-    },
-    {
       "camera": 0,
       "rotation": [
         -0.22975291,
@@ -266,15 +248,31 @@
         5.26099,
         19.52198
       ]
+    },
+    {
+      "mesh": 0,
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mesh": 1,
+      "translation": [
+        0.0,
+        -32.0,
+        0.0
+      ]
     }
   ],
   "scenes": [
     {
       "name": "recording",
       "nodes": [
-        2,
         0,
-        1
+        1,
+        2
       ]
     }
   ]

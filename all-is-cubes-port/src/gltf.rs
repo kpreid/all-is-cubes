@@ -16,8 +16,7 @@ use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
 use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, ViewTransform};
-use all_is_cubes::cgmath::{One as _, Vector3, Zero};
-use all_is_cubes::math::GridCoordinate;
+use all_is_cubes::cgmath::One as _;
 use all_is_cubes::universe::PartialUniverse;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_mesh::{BlockMesh, MeshOptions, SpaceMesh};
@@ -28,7 +27,7 @@ pub use buffer::GltfDataDestination;
 mod animation;
 use animation::FrameState;
 mod mesh;
-use mesh::{add_mesh, Materials};
+use mesh::Materials;
 mod glue;
 use glue::{convert_quaternion, empty_node, push_and_return_index};
 mod texture;
@@ -39,6 +38,20 @@ pub use vertex::GltfVertex;
 use crate::{ExportError, ExportSet};
 #[cfg(test)]
 mod tests;
+
+/// "This mesh with this translation." A value type that specifies that, in some frame
+/// of the output, the particular mesh should be visible at a particular location.
+///
+/// These are then converted into [`gltf_json::Node`]s with animations controlling when they
+/// are visible.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[allow(clippy::exhaustive_structs)]
+pub struct MeshInstance {
+    /// The mesh to display.
+    pub mesh: Index<gltf_json::Mesh>,
+    /// Translation applied to this instance of the mesh, in integer (whole block) amounts only.
+    pub translation: [i32; 3],
+}
 
 /// Handles the construction of [`gltf_json::Root`] and the writing of supporting files
 /// for a single glTF asset.
@@ -74,9 +87,9 @@ pub struct GltfWriter {
     /// The state of the world in each frame of the animation.
     frame_states: Vec<FrameState>,
 
-    /// Every mesh index appearing anywhere in `frame_states`.
+    /// Every mesh appearing anywhere in `frame_states`.
     /// Using BTreeSet for stable ordering.
-    any_time_visible_mesh_nodes: BTreeSet<Index<gltf_json::Node>>,
+    any_time_visible_mesh_instances: BTreeSet<MeshInstance>,
 
     /// All flaws encountered so far.
     flaws: Flaws,
@@ -104,7 +117,7 @@ impl GltfWriter {
             buffer_dest,
             camera: None,
             frame_states: Vec::new(),
-            any_time_visible_mesh_nodes: BTreeSet::new(),
+            any_time_visible_mesh_instances: BTreeSet::new(),
             flaws: Flaws::empty(),
         }
     }
@@ -120,17 +133,18 @@ impl GltfWriter {
     /// `our_camera` should be the current camera state (its `view_transform`s in
     /// successive frames will be converted into an animation).
     ///
-    /// `visible_nodes` is a list of every node that should be visible in the current scene,
-    /// which should have been produced by previous calls to [`GltfWriter::add_mesh()`].
+    /// `visible_meshes` is a list of [`MeshInstance`]s that should be visible in the
+    /// current frame; the meshes should have been produced by previous calls to
+    /// [`GltfWriter::add_mesh()`].
     ///
-    /// Returns flaws which come from
+    /// Returns flaws which come from \[TODO: explain\].
     ///
     /// TODO: This is not a clean API yet; it was designed around the needs of
     /// `all-is-cubes-desktop`'s recording mode.
     pub fn add_frame(
         &mut self,
         our_camera: Option<&Camera>,
-        visible_nodes: &[Index<gltf_json::Node>],
+        visible_meshes: &[MeshInstance],
     ) -> Flaws {
         // Create camera if and only if one was given and we didn't have one.
         if self.camera.is_none() {
@@ -143,39 +157,29 @@ impl GltfWriter {
         }
 
         self.frame_states.push(FrameState {
-            visible_nodes: visible_nodes.to_vec(),
+            visible_mesh_instances: visible_meshes.to_vec(),
             camera_transform: our_camera
                 .map_or_else(ViewTransform::one, |camera| camera.get_view_transform()),
         });
-        self.any_time_visible_mesh_nodes
-            .extend(visible_nodes.iter());
+        self.any_time_visible_mesh_instances
+            .extend(visible_meshes.iter());
 
         // TODO: report only flaws from this frame
         self.flaws
     }
 
-    /// Add one [`SpaceMesh`], with a containing node, and return its index.
+    /// Add one [`SpaceMesh`] to the output.
     ///
     /// The mesh's texture allocator must be [`self.texture_allocator()`].
     pub fn add_mesh(
         &mut self,
         name: String,
         mesh: &SpaceMesh<GltfVertex, GltfTextureRef>,
-        translation: Vector3<GridCoordinate>,
-    ) -> Index<gltf_json::Node> {
+    ) -> Index<gltf_json::Mesh> {
         // TODO: Deduplicate meshes so that we don't have to store the same data twice if
         // a world change is undone, or in a cyclic animation (or if two chunks have the
         // same contents — once we make chunks in relative coordinates).
-        let mesh_index = add_mesh(self, name.clone(), mesh);
-
-        push_and_return_index(
-            &mut self.root.nodes,
-            gltf_json::Node {
-                mesh: Some(mesh_index),
-                translation: Some(translation.map(|c| c as f32).into()),
-                ..empty_node(Some(name))
-            },
-        )
+        mesh::add_mesh(self, name, mesh)
     }
 
     /// Finish all scene preparation and return the [`gltf_json::Root`] which is to be
@@ -204,32 +208,45 @@ impl GltfWriter {
             }
         }
 
-        // Attach *all* visible nodes to the scene.
-        scene_nodes.extend(self.any_time_visible_mesh_nodes.iter());
+        // For each needed mesh instance, create a node with that translation and that mesh.
+        let mut instance_nodes: BTreeMap<MeshInstance, Index<gltf_json::Node>> = BTreeMap::new();
+        for &instance in self.any_time_visible_mesh_instances.iter() {
+            let MeshInstance { mesh, translation } = instance;
+            let node_index = push_and_return_index(
+                &mut self.root.nodes,
+                gltf_json::Node {
+                    mesh: Some(mesh),
+                    translation: Some(translation.map(|c| c as f32)),
+                    // TODO: give this node a name if we can figure out what a good, cheap one is
+                    ..empty_node(None)
+                },
+            );
+            instance_nodes.insert(instance, node_index);
+            scene_nodes.push(node_index);
+        }
 
         // Add world mesh animations.
         if self.frame_states.len() > 1 {
             // Timeline represented as BTreeMap<node, Vec<(frame number, visibility)>>.
             // The initial state is "visible", so any nonanimated mesh needs no entry.
-            let mut timelines: BTreeMap<Index<gltf_json::Node>, Vec<(usize, bool)>> =
-                BTreeMap::new();
+            let mut timelines: BTreeMap<MeshInstance, Vec<(usize, bool)>> = BTreeMap::new();
             for (frame_number, state) in self.frame_states.iter().enumerate() {
-                for &node_index in &state.visible_nodes {
-                    let timeline = timelines.entry(node_index).or_default();
+                for &instance in &state.visible_mesh_instances {
+                    let timeline = timelines.entry(instance).or_default();
                     if !timeline.last().map_or(true, |&(_, vis)| vis) {
                         // Node needs to be made visible.
                         timeline.push((frame_number, true));
                     }
                 }
-                // Remove invisible meshes (including ones we haven't seen at all yet)
-                for &node_index in self.any_time_visible_mesh_nodes.iter() {
-                    if state.visible_nodes.contains(&node_index) {
+                // Remove invisible instances (including ones we haven't seen at all yet)
+                for &instance in self.any_time_visible_mesh_instances.iter() {
+                    if state.visible_mesh_instances.contains(&instance) {
                         // TODO: do a map lookup instead of linear scan?
                         continue;
                     }
 
                     use std::collections::btree_map::Entry;
-                    match timelines.entry(node_index) {
+                    match timelines.entry(instance) {
                         Entry::Occupied(mut e) => {
                             let timeline = e.get_mut();
                             if timeline.last().map_or(true, |&(_, vis)| vis) {
@@ -250,10 +267,11 @@ impl GltfWriter {
             let mut animation_channels = Vec::new();
             let mut animation_samplers = Vec::new();
 
-            for (node_index, timeline) in timelines {
+            for (instance, timeline) in timelines {
                 if timeline.is_empty() {
                     continue;
                 }
+                let node_index = instance_nodes[&instance];
                 let time_accessor = create_buffer_and_accessor(
                     &mut self.root,
                     &mut self.buffer_dest,
@@ -368,11 +386,19 @@ pub(crate) async fn export_gltf(
             &writer.texture_allocator(),
             &mesh_options,
         ));
-        let node = writer.add_mesh(name.to_string(), &mesh, Vector3::zero());
+
+        let mesh_index = writer.add_mesh(name.to_string(), &mesh);
+        let mesh_node = push_and_return_index(
+            &mut writer.root.nodes,
+            gltf_json::Node {
+                mesh: Some(mesh_index),
+                ..empty_node(Some(name.to_string()))
+            },
+        );
 
         writer.root.scenes.push(json::Scene {
             name: Some(format!("{name} display scene")),
-            nodes: vec![node],
+            nodes: vec![mesh_node],
             extensions: None,
             extras: Default::default(),
         });

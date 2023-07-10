@@ -7,7 +7,6 @@ use gltf_json::Index;
 
 use all_is_cubes::block::{Block, BlockDef, Resolution, AIR};
 use all_is_cubes::camera::GraphicsOptions;
-use all_is_cubes::cgmath::{Vector3, Zero as _};
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Name, URef, Universe};
@@ -16,22 +15,22 @@ use all_is_cubes_mesh::{block_meshes_for_space, MeshOptions, SpaceMesh};
 
 use crate::{ExportError, ExportFormat, ExportSet};
 
-use super::{GltfDataDestination, GltfTextureRef, GltfVertex, GltfWriter};
+use super::{GltfDataDestination, GltfTextureRef, GltfVertex, GltfWriter, MeshInstance};
 
-/// Test helper to insert one mesh+node
+/// Test helper to insert one mesh
 pub(crate) fn gltf_mesh(
     space: &Space,
     writer: &mut GltfWriter,
 ) -> (
     SpaceMesh<GltfVertex, GltfTextureRef>,
-    Index<gltf_json::Node>,
+    Index<gltf_json::Mesh>,
 ) {
     let options = &MeshOptions::new(&GraphicsOptions::default());
     let blocks = block_meshes_for_space(space, &writer.texture_allocator(), options);
     let mesh: SpaceMesh<GltfVertex, GltfTextureRef> =
         SpaceMesh::new(space, space.bounds(), options, &*blocks);
 
-    let index = writer.add_mesh("mesh".into(), &mesh, Vector3::zero());
+    let index = writer.add_mesh("mesh".into(), &mesh);
 
     (mesh, index)
 }
@@ -54,7 +53,13 @@ fn gltf_smoke_test() {
 
     let mut writer = GltfWriter::new(GltfDataDestination::null());
     let (_, mesh_index) = gltf_mesh(&outer_space, &mut writer);
-    writer.add_frame(None, &[mesh_index]);
+    writer.add_frame(
+        None,
+        &[MeshInstance {
+            mesh: mesh_index,
+            translation: [0, 0, 0],
+        }],
+    );
 
     let root = writer.into_root(Duration::ZERO).unwrap();
 
