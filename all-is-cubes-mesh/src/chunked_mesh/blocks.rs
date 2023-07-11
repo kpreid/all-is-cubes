@@ -17,11 +17,7 @@ pub(crate) struct VersionedBlockMeshes<Vert, Tile> {
     last_version_counter: NonZeroU32,
 }
 
-impl<Vert, Tile> VersionedBlockMeshes<Vert, Tile>
-where
-    Vert: GfxVertex<TexPoint = <Tile as TextureTile>::Point> + PartialEq,
-    Tile: TextureTile + PartialEq,
-{
+impl<Vert, Tile> VersionedBlockMeshes<Vert, Tile> {
     pub fn new() -> Self {
         Self {
             meshes: Vec::new(),
@@ -35,7 +31,13 @@ where
     pub fn clear(&mut self) {
         self.meshes.clear();
     }
+}
 
+impl<Vert, Tile> VersionedBlockMeshes<Vert, Tile>
+where
+    Vert: GfxVertex<TexPoint = <Tile as TextureTile>::Point> + PartialEq,
+    Tile: TextureTile + PartialEq,
+{
     /// Update block meshes based on the given [`Space`].
     ///
     /// After this method returns, `self.meshes.len()` will
@@ -178,6 +180,12 @@ where
         }
 
         stats
+    }
+}
+
+impl<Vert, Tile> Default for VersionedBlockMeshes<Vert, Tile> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
