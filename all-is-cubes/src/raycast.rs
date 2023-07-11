@@ -1,9 +1,9 @@
 //! Algorithm for raycasting through voxel grids.
 //!
-//! This deals purely with the question "which cubes does this ray intersect",
-//! and does not concern itself with what might occupy those cubes. If you're
-//! looking for *raytracing*, forming an image from many rays, that's
-//! `all_is_cubes::raytracer`.
+//! This deals purely with the question “which cubes does this ray intersect”,
+//! and does not concern itself with what might occupy those cubes. If you’re
+//! looking for *raytracing*, forming an image from many rays, that’s
+//! [`all_is_cubes::raytracer`](crate::raytracer).
 
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
@@ -116,41 +116,52 @@ impl Geometry for Ray {
 /// their most negative corners, the same definition used by [`Space`] and [`GridAab`].
 ///
 /// [`Space`]: crate::space::Space
+//
+//---
+//
+// Implementation notes:
+//
+// From "A Fast Voxel Traversal Algorithm for Ray Tracing"
+// by John Amanatides and Andrew Woo, 1987
+// <http://www.cse.yorku.ca/~amana/research/grid.pdf>
+// <https://citeseer.ist.psu.edu/viewdoc/summary?doi=10.1.1.42.3443>
+// Extensions to the described algorithm:
+//   • The face passed through to reach the current cube is reported.
+//
+// The foundation of this algorithm is a parameterized representation of
+// the provided ray,
+//                    origin + t * direction,
+// except that t is not actually stored; rather, at any given point in the
+// traversal, we keep track of the *greater* t values which we would have
+// if we took a step sufficient to cross a cube boundary along that axis
+// (i.e. change the integer part of the coordinate) in the components of
+// t_max.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Raycaster {
-    // Implementation notes:
-    //
-    // From "A Fast Voxel Traversal Algorithm for Ray Tracing"
-    // by John Amanatides and Andrew Woo, 1987
-    // <http://www.cse.yorku.ca/~amana/research/grid.pdf>
-    // <https://citeseer.ist.psu.edu/viewdoc/summary?doi=10.1.1.42.3443>
-    // Extensions to the described algorithm:
-    //   • The face passed through to reach the current cube is reported.
-    //
-    // The foundation of this algorithm is a parameterized representation of
-    // the provided ray,
-    //                    origin + t * direction,
-    // except that t is not actually stored; rather, at any given point in the
-    // traversal, we keep track of the *greater* t values which we would have
-    // if we took a step sufficient to cross a cube boundary along that axis
-    // (i.e. change the integer part of the coordinate) in the components of
-    // t_max.
+    /// The ray being cast.
     ray: Ray,
+
     /// Have we not yet produced the origin cube itself?
     emit_current: bool,
+
     /// Cube we're in; always the next cube to return from the iterator.
     cube: GridPoint,
+
     /// Which way to increment `cube` when stepping; signum of `direction`.
     step: Vector3<GridCoordinate>,
+
     /// t_max stores the t-value at which we would next cross a cube boundary,
     /// for each axis in which we could move. Thus, the least element of t_max
     /// is the next intersection between the grid and the ray.
     t_max: Vector3<FreeCoordinate>,
+
     /// The change in t when taking a full grid step along a given axis.
     /// Always positive; partially infinite if axis-aligned.
     t_delta: Vector3<FreeCoordinate>,
+
     /// Last face we passed through.
     last_face: Face7,
+
     /// The t_max value used in the previous step; thus, the position along the
     /// ray where we passed through last_face.
     last_t_distance: FreeCoordinate,
@@ -276,7 +287,6 @@ impl Raycaster {
     /// intervening `next()` is not currently guaranteed.
     ///
     /// TODO: This function was added for the needs of the raytracer. Think about API design more.
-
     pub(crate) fn remove_bound(&mut self) {
         self.bounds = None;
     }
