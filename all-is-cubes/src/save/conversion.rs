@@ -821,7 +821,9 @@ mod universe {
         /// TODO: Find an alternative not dependent on external state. Perhaps
         /// serde::DeserializeSeed will do, or if necessary we can modify URef to support
         /// modification after construction.
-        static UREF_DESERIALIZATION_CONTEXT: RefCell<Option<DeContext>> = RefCell::new(None);
+        static UREF_DESERIALIZATION_CONTEXT: RefCell<Option<DeContext>> = const {
+            RefCell::new(None)
+        };
     }
 
     struct DeContext {
