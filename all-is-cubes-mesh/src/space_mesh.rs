@@ -27,27 +27,10 @@ pub struct SpaceMesh<V, T> {
     vertices: Vec<V>,
     indices: IndexVec,
 
-    /// Where in `indices` the triangles with no partial transparency are arranged.
-    opaque_range: Range<usize>,
-
-    /// Ranges of `indices` for all partially-transparent triangles, sorted by depth
-    /// as documented in [`Self::transparent_range()`].
-    ///
-    /// The indices of this array are those produced by [`DepthOrdering::to_index()`].
-    transparent_ranges: [Range<usize>; DepthOrdering::COUNT],
+    meta: MeshMeta<T>,
 
     /// Set of all [`BlockIndex`]es whose meshes were incorporated into this mesh.
     block_indices_used: BitVec,
-
-    /// Texture tiles used by the vertices; holding these objects is intended to ensure
-    /// the texture coordinates stay valid.
-    textures_used: Vec<T>,
-
-    /// Flaws in this mesh, that should be reported as flaws in any rendering containing it.
-    //
-    // TODO: evaluate whether we should have a dedicated `MeshFlaws`, once we have seen how
-    // this works out.
-    flaws: Flaws,
 }
 
 impl<V, T> SpaceMesh<V, T> {
@@ -74,7 +57,7 @@ impl<V, T> SpaceMesh<V, T> {
     }
 
     /// The vertices of the mesh, in an arbitrary order. Use [`indices()`](`Self::indices`)
-    /// and the range methods to determine how to use them.
+    /// and the [`MeshMeta`] range methods to determine how to use them.
     #[inline]
     pub fn vertices(&self) -> &[V] {
         &self.vertices
@@ -84,40 +67,32 @@ impl<V, T> SpaceMesh<V, T> {
     /// whose vertices are in the specified positions in [`vertices()`](Self::vertices).
     /// Note that all triangles containing any partial transparency are repeated
     /// several times to enable selection of a desired draw ordering; in order to
-    /// draw only one desired set, use [`self.opaque_range()`](Self::opaque_range) and
-    /// [`self.transparent_range(…)`](Self::transparent_range) to choose subslices of this.
+    /// draw only one desired set, use [`MeshMeta::opaque_range()`] and
+    /// [`MeshMeta::transparent_range()`] to choose subslices of this.
     #[inline]
     pub fn indices(&self) -> IndexSlice<'_> {
         self.indices.as_slice(..)
     }
 
-    /// Reports any flaws in this mesh: reasons why using it to create a rendering would
-    /// fail to accurately represent the scene.
-    pub fn flaws(&self) -> Flaws {
-        self.flaws
+    /// The metadata of the mesh, which describes how to use the indices for drawing,
+    /// but does not own them or the vertices.
+    #[inline]
+    pub fn meta(&self) -> &MeshMeta<T> {
+        &self.meta
+    }
+
+    /// Discard the data (vertices and indices) and return the metadata.
+    /// This is appropriate for use when the data has been copied to a GPU or data file
+    /// and is no longer needed in CPU memory.
+    #[inline]
+    pub fn into_meta(self) -> MeshMeta<T> {
+        self.meta
     }
 
     /// True if there is nothing to draw.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.indices().is_empty()
-    }
-
-    /// The range of [`Self::indices`] which contains the triangles with only alpha values
-    /// of 0 or 1 and therefore may be drawn using a depth buffer rather than sorting.
-    #[inline]
-    pub fn opaque_range(&self) -> Range<usize> {
-        self.opaque_range.clone()
-    }
-
-    /// A range of [`Self::indices`] which contains the triangles with alpha values other
-    /// than 0 and 1 which therefore must be drawn with consideration for ordering.
-    /// There are multiple such ranges providing different depth-sort orderings.
-    /// Notably, [`DepthOrdering::Within`] is reserved for dynamic (frame-by-frame)
-    /// sorting, invoked by [`Self::depth_sort_for_view`].
-    #[inline]
-    pub fn transparent_range(&self, ordering: DepthOrdering) -> Range<usize> {
-        self.transparent_ranges[ordering.to_index()].clone()
     }
 
     /// Returns an iterator over all of the block indices in the [`Space`] that occurred
@@ -157,11 +132,14 @@ impl<V, T> SpaceMesh<V, T> {
         let SpaceMesh {
             vertices,
             indices,
-            opaque_range: _,
-            transparent_ranges: _,
+            meta:
+                MeshMeta {
+                    opaque_range: _,
+                    transparent_ranges: _,
+                    textures_used,
+                    flaws: _,
+                },
             block_indices_used,
-            textures_used,
-            flaws: _,
         } = self;
 
         size_of::<Self>()
@@ -205,9 +183,8 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
         // use the buffer but not the existing data
         self.vertices.clear();
         self.indices.clear();
+        self.meta.clear();
         self.block_indices_used.clear();
-        self.textures_used.clear();
-        self.flaws = Flaws::empty();
 
         // Use temporary buffer for positioning the transparent indices
         // TODO: Consider reuse
@@ -225,10 +202,11 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
 
             if !already_seen_index {
                 // Capture texture handles to ensure that our texture coordinates stay valid.
-                self.textures_used
+                self.meta
+                    .textures_used
                     .extend(block_mesh.textures().iter().cloned());
                 // Record flaws
-                self.flaws |= block_mesh.flaws();
+                self.meta.flaws |= block_mesh.flaws();
             }
 
             write_block_mesh_to_space_mesh(
@@ -294,7 +272,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     fn sort_and_store_transparent_indices(&mut self, transparent_indices: IndexVec) {
         // Set the opaque range to all indices which have already been stored
         // (which will be the opaque ones ones).
-        self.opaque_range = 0..self.indices().len();
+        self.meta.opaque_range = 0..self.indices().len();
 
         match transparent_indices {
             IndexVec::U16(vec) => self.sort_and_store_transparent_indices_impl(vec),
@@ -314,7 +292,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
             // or the destination doesn't want sorting anyway. In either case, write the
             // indices once and fill out transparent_ranges with copies of that range.
             let range = extend_giving_range(&mut self.indices, transparent_indices);
-            self.transparent_ranges.fill(range);
+            self.meta.transparent_ranges.fill(range);
         } else {
             // Precompute midpoints (as sort keys) of all of the transparent quads.
             // This does assume that the input `BlockMesh`es contain strictly quads
@@ -333,7 +311,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                 .collect();
 
             // Copy unsorted indices into the main array, for later dynamic sorting.
-            self.transparent_ranges[DepthOrdering::Within.to_index()] =
+            self.meta.transparent_ranges[DepthOrdering::Within.to_index()] =
                 extend_giving_range(&mut self.indices, transparent_indices);
 
             // Perform sorting by each possible ordering.
@@ -358,7 +336,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
 
                 // Copy the sorted indices into the main array, and set the corresponding
                 // range.
-                self.transparent_ranges[ordering.to_index()] = extend_giving_range(
+                self.meta.transparent_ranges[ordering.to_index()] = extend_giving_range(
                     &mut self.indices,
                     sortable_quads.iter().flat_map(|tri| tri.indices),
                 );
@@ -367,7 +345,7 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
                 // (We could save some memory by reusing the coinciding last quad which is
                 // this ordering's first quad, but that doesn't currently feel worth
                 // implementing.)
-                self.transparent_ranges[ordering.rev().to_index()] = extend_giving_range(
+                self.meta.transparent_ranges[ordering.rev().to_index()] = extend_giving_range(
                     &mut self.indices,
                     sortable_quads.iter().rev().flat_map(|tri| tri.indices),
                 );
@@ -438,6 +416,14 @@ impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
     }
 }
 
+impl<V, T> std::ops::Deref for SpaceMesh<V, T> {
+    type Target = MeshMeta<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.meta
+    }
+}
+
 /// Copy and adjust vertices from a [`BlockMesh`] into the storage of a [`SpaceMesh`].
 ///
 /// This does not perform depth sorting and does not account for mesh or texture dependencies.
@@ -500,9 +486,6 @@ fn write_block_mesh_to_space_mesh<V: GfxVertex, T: TextureTile>(
     }
 }
 
-/// We need a Range constant to be able to initialize arrays.
-const ZERO_RANGE: Range<usize> = 0..0;
-
 impl<V, T> Default for SpaceMesh<V, T> {
     /// Construct an empty [`SpaceMesh`] which draws nothing.
     #[inline]
@@ -510,11 +493,8 @@ impl<V, T> Default for SpaceMesh<V, T> {
         Self {
             vertices: Vec::new(),
             indices: IndexVec::new(),
-            opaque_range: ZERO_RANGE,
-            transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
+            meta: MeshMeta::default(),
             block_indices_used: BitVec::new(),
-            textures_used: Vec::new(),
-            flaws: Flaws::empty(),
         }
     }
 }
@@ -542,11 +522,13 @@ impl<V: GfxVertex, T: TextureTile> From<&BlockMesh<V, T>> for SpaceMesh<V, T> {
                     .map(|(_, fm)| fm.indices_opaque.len())
                     .sum(),
             ),
-            opaque_range: 0..0,
-            transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
+            meta: MeshMeta {
+                opaque_range: 0..0,
+                transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
+                textures_used: block_mesh.textures_used.clone(),
+                flaws: block_mesh.flaws(),
+            },
             block_indices_used,
-            textures_used: block_mesh.textures_used.clone(),
-            flaws: block_mesh.flaws(),
         };
 
         let mut transparent_indices = IndexVec::with_capacity(
@@ -627,6 +609,92 @@ impl<'a, V: 'static, T: 'static> GetBlockMesh<'a, V, T> for &'a [BlockMesh<V, T>
         // some `Flaws` set.
 
         <[_]>::get(self, usize::from(index)).unwrap_or(BlockMesh::<V, T>::EMPTY_REF)
+    }
+}
+
+/// Index ranges and other metadata about a [`SpaceMesh`], excluding the vertices and indices
+/// themselves.
+///
+/// This type may be used to store the required information to render a mesh that has been
+/// copied to GPU memory, without storing an extra copy of the vertex and index data.
+///
+/// In addition to index data, it contains the [`TextureTile`]s of type `T` for the mesh,
+/// so as to keep them allocated. (Therefore, this type is not [`Copy`].)
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MeshMeta<T> {
+    /// Where in the index vector the triangles with no partial transparency are arranged.
+    opaque_range: Range<usize>,
+
+    /// Ranges of index data for all partially-transparent triangles, sorted by depth
+    /// as documented in [`Self::transparent_range()`].
+    ///
+    /// The indices of this array are those produced by [`DepthOrdering::to_index()`].
+    transparent_ranges: [Range<usize>; DepthOrdering::COUNT],
+
+    /// Texture tiles used by the vertices; holding these objects is intended to ensure
+    /// the texture coordinates remain allocated to the intended texels.
+    textures_used: Vec<T>,
+
+    /// Flaws in this mesh, that should be reported as flaws in any rendering containing it.
+    //
+    // TODO: evaluate whether we should have a dedicated `MeshFlaws`, once we have seen how
+    // this works out.
+    flaws: Flaws,
+}
+
+impl<T> MeshMeta<T> {
+    /// Reports any flaws in this mesh: reasons why using it to create a rendering would
+    /// fail to accurately represent the scene.
+    pub fn flaws(&self) -> Flaws {
+        self.flaws
+    }
+
+    /// The range of index data which contains the triangles with only alpha values
+    /// of 0 or 1 and therefore may be drawn using a depth buffer rather than sorting.
+    #[inline]
+    pub fn opaque_range(&self) -> Range<usize> {
+        self.opaque_range.clone()
+    }
+
+    /// A range of index data which contains the triangles with alpha values other
+    /// than 0 and 1 which therefore must be drawn with consideration for ordering.
+    /// There are multiple such ranges providing different depth-sort orderings.
+    /// Notably, [`DepthOrdering::Within`] is reserved for dynamic (frame-by-frame)
+    /// sorting, invoked by [`SpaceMesh::depth_sort_for_view()`].
+    #[inline]
+    pub fn transparent_range(&self, ordering: DepthOrdering) -> Range<usize> {
+        self.transparent_ranges[ordering.to_index()].clone()
+    }
+
+    /// Overwrite `self` with [`MeshMeta::default()`].
+    fn clear(&mut self) {
+        let Self {
+            opaque_range,
+            transparent_ranges,
+            textures_used,
+            flaws,
+        } = self;
+        *opaque_range = ZERO_RANGE;
+        *transparent_ranges = [ZERO_RANGE; DepthOrdering::COUNT];
+        textures_used.clear();
+        *flaws = Flaws::empty();
+    }
+}
+
+/// We need a Range constant to be able to initialize arrays.
+const ZERO_RANGE: Range<usize> = 0..0;
+
+impl<T> Default for MeshMeta<T> {
+    /// Construct an empty [`MeshMeta`] which designates nothing (using the index range `0..0`).
+    #[inline]
+    fn default() -> Self {
+        // Note that this must be consistent with `Self::clear()`.
+        Self {
+            opaque_range: ZERO_RANGE,
+            transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
+            textures_used: Vec::new(),
+            flaws: Flaws::empty(),
+        }
     }
 }
 
