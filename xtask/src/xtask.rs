@@ -186,10 +186,7 @@ fn main() -> Result<(), ActionError> {
             // Build docs to verify that there are no broken doc links.
             {
                 let _t = CaptureTime::new(&mut time_log, "doc");
-                // `--no-deps` skips building our dependencies' docs, which saves some time.
-                // If their docs have already been built, the old copies will still be linked,
-                // so running this does not make local development worse.
-                cargo().arg("doc").arg("--no-deps").run()?;
+                cargo().arg("doc").run()?;
             }
         }
         XtaskCommand::Fmt => {
