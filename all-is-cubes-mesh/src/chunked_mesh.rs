@@ -20,8 +20,8 @@ use crate::{GfxVertex, MeshOptions, TextureAllocator, TextureTile};
 mod blocks;
 use blocks::VersionedBlockMeshes;
 mod chunk;
-use chunk::ChunkTodo;
 pub use chunk::{ChunkMesh, ChunkMeshUpdate, MeshLabel};
+use chunk::{ChunkTodo, MeshLabelImpl};
 
 #[cfg(test)]
 mod tests;
@@ -48,7 +48,7 @@ where
     /// Dirty flags listening to `space`.
     todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>>,
 
-    block_meshes: VersionedBlockMeshes<Vert, Tex::Tile>,
+    block_meshes: VersionedBlockMeshes<D, Vert, Tex::Tile>,
 
     /// Invariant: the set of present chunks (keys here) is the same as the set of keys
     /// in `todo.read().unwrap().chunks`.
@@ -160,7 +160,7 @@ where
     /// * `camera`'s view position is used to choose what to update and for depth
     ///    ordering; its graphics options are used for triangulation and view distance.
     /// * `deadline` is the approximate time at which this should stop.
-    /// * `chunk_render_updater` is called for every re-meshed or depth-sorted chunk.
+    /// * `render_data_updater` is called for every re-meshed or depth-sorted chunk.
     ///
     /// Returns performance information and the chunk the camera is located in.
     ///
@@ -171,7 +171,7 @@ where
         camera: &Camera,
         block_texture_allocator: &Tex,
         deadline: Instant,
-        mut chunk_render_updater: F,
+        mut render_data_updater: F,
     ) -> CsmUpdateInfo
     where
         F: FnMut(ChunkMeshUpdate<'_, D, Vert, Tex::Tile>),
@@ -227,6 +227,7 @@ where
             mesh_options,
             // TODO: don't hardcode this figure here, let the caller specify it
             deadline.checked_sub(Duration::from_micros(500)).unwrap(),
+            &mut render_data_updater,
         );
         let all_done_with_blocks = todo.blocks.is_empty();
 
@@ -295,7 +296,7 @@ where
                     &self.block_meshes,
                 );
                 let compute_end_update_start = Instant::now();
-                chunk_render_updater(chunk.borrow_for_update(false));
+                render_data_updater(chunk.borrow_for_update(false));
 
                 chunk_mesh_generation_times +=
                     TimeStats::one(compute_end_update_start.duration_since(this_chunk_start_time));
@@ -309,7 +310,7 @@ where
         // Update the drawing order of transparent parts of the chunk the camera is in.
         let depth_sort_end_time = if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
             if chunk.depth_sort_for_view(view_point.cast::<Vert::Coordinate>().unwrap()) {
-                chunk_render_updater(chunk.borrow_for_update(true));
+                render_data_updater(chunk.borrow_for_update(true));
                 Some(Instant::now())
             } else {
                 None

@@ -74,7 +74,7 @@ where
         chunk_todo: &mut ChunkTodo,
         space: &Space,
         options: &MeshOptions,
-        block_meshes: &VersionedBlockMeshes<Vert, Tex::Tile>,
+        block_meshes: &VersionedBlockMeshes<D, Vert, Tex::Tile>,
     ) {
         let compute_start: Option<Instant> = LOG_CHUNK_UPDATES.then(Instant::now);
         let bounds = self.position.bounds();
@@ -141,7 +141,7 @@ where
 
     pub(crate) fn stale_blocks(
         &self,
-        block_meshes: &VersionedBlockMeshes<Vert, Tex::Tile>,
+        block_meshes: &VersionedBlockMeshes<D, Vert, Tex::Tile>,
     ) -> bool {
         self.block_dependencies
             .iter()
@@ -192,17 +192,19 @@ pub struct ChunkMeshUpdate<'a, D, V, T> {
 
 /// Debugging label identifying a mesh that is passing through [`ChunkMeshUpdate`].
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct MeshLabel(MeshLabelImpl);
+pub struct MeshLabel(pub(crate) MeshLabelImpl);
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-enum MeshLabelImpl {
+pub(crate) enum MeshLabelImpl {
     Chunk([i32; 3]),
+    Block(BlockIndex),
 }
 
 impl fmt::Debug for MeshLabel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             MeshLabelImpl::Chunk(p) => write!(f, "chunk {p:?}"),
+            MeshLabelImpl::Block(i) => write!(f, "block {i:?}"),
         }
     }
 }

@@ -7,17 +7,19 @@ use all_is_cubes::block::{EvaluatedBlock, Resolution};
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::util::{CustomFormat as _, StatusText, TimeStats};
 
-use crate::{BlockMesh, GetBlockMesh, GfxVertex, MeshOptions, TextureAllocator, TextureTile};
+use crate::{
+    BlockMesh, GetBlockMesh, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator, TextureTile,
+};
 
 #[derive(Debug)]
-pub(crate) struct VersionedBlockMeshes<Vert, Tile> {
+pub(crate) struct VersionedBlockMeshes<D, Vert, Tile> {
     /// Indices of this vector are block IDs in the Space.
-    pub(crate) meshes: Vec<VersionedBlockMesh<Vert, Tile>>,
+    pub(crate) meshes: Vec<VersionedBlockMesh<D, Vert, Tile>>,
 
     last_version_counter: NonZeroU32,
 }
 
-impl<Vert, Tile> VersionedBlockMeshes<Vert, Tile> {
+impl<D, Vert, Tile> VersionedBlockMeshes<D, Vert, Tile> {
     pub fn new() -> Self {
         Self {
             meshes: Vec::new(),
@@ -33,8 +35,9 @@ impl<Vert, Tile> VersionedBlockMeshes<Vert, Tile> {
     }
 }
 
-impl<Vert, Tile> VersionedBlockMeshes<Vert, Tile>
+impl<D, Vert, Tile> VersionedBlockMeshes<D, Vert, Tile>
 where
+    D: Default,
     Vert: GfxVertex<TexPoint = <Tile as TextureTile>::Point> + PartialEq,
     Tile: TextureTile + PartialEq,
 {
@@ -45,16 +48,18 @@ where
     /// it will be the correct length.
     ///
     /// TODO: Missing handling for `mesh_options` changing.
-    pub(crate) fn update<A>(
+    pub(crate) fn update<A, F>(
         &mut self,
         todo: &mut FnvHashSet<BlockIndex>,
         space: &Space,
         block_texture_allocator: &A,
         mesh_options: &MeshOptions,
         deadline: Instant,
+        mut render_data_updater: F,
     ) -> TimeStats
     where
         A: TextureAllocator<Tile = Tile>,
+        F: FnMut(super::ChunkMeshUpdate<'_, D, Vert, Tile>),
     {
         if todo.is_empty() {
             // Don't increment the version counter if we don't need to.
@@ -98,6 +103,7 @@ where
                                     &fast_options,
                                 ),
                                 version: BlockMeshVersion::NotReady,
+                                render_data: D::default(),
                             }
                         } else {
                             // If the block does not have voxels, then we can just generate the
@@ -109,6 +115,7 @@ where
                                     mesh_options,
                                 ),
                                 version: current_version_number,
+                                render_data: D::default(),
                             }
                         });
                 }
@@ -121,11 +128,11 @@ where
         while last_start_time < deadline && !todo.is_empty() {
             let index: BlockIndex = todo.iter().next().copied().unwrap();
             todo.remove(&index);
-            let index: usize = index.into();
+            let uindex: usize = index.into();
 
-            let bd = &block_data[index];
+            let bd = &block_data[uindex];
             let new_evaluated_block: &EvaluatedBlock = bd.evaluated();
-            let current_mesh_entry: &mut VersionedBlockMesh<_, _> = &mut self.meshes[index];
+            let current_mesh_entry: &mut VersionedBlockMesh<_, _, _> = &mut self.meshes[uindex];
 
             // TODO: Consider re-introducing approximate cost measurement
             // to hit the deadline better.
@@ -161,7 +168,20 @@ where
                     *current_mesh_entry = VersionedBlockMesh {
                         mesh: new_block_mesh,
                         version: current_version_number,
+                        render_data: D::default(),
                     };
+
+                    // TODO(instancing): Enable this for all blocks that we might want to draw
+                    // instances of.
+                    if false {
+                        render_data_updater(super::ChunkMeshUpdate {
+                            // TODO: wasteful data copy to make the SpaceMesh
+                            mesh: &SpaceMesh::from(&current_mesh_entry.mesh),
+                            render_data: &mut current_mesh_entry.render_data,
+                            indices_only: false,
+                            mesh_label: super::MeshLabel(super::MeshLabelImpl::Block(index)),
+                        });
+                    }
                 } else {
                     // The new mesh is identical to the old one (which might happen because
                     // interior voxels or non-rendered attributes were changed), so don't invalidate
@@ -183,14 +203,14 @@ where
     }
 }
 
-impl<Vert, Tile> Default for VersionedBlockMeshes<Vert, Tile> {
+impl<D, Vert, Tile> Default for VersionedBlockMeshes<D, Vert, Tile> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a, Vert: 'static, Tile: 'static> GetBlockMesh<'a, Vert, Tile>
-    for &'a VersionedBlockMeshes<Vert, Tile>
+impl<'a, D, Vert: 'static, Tile: 'static> GetBlockMesh<'a, Vert, Tile>
+    for &'a VersionedBlockMeshes<D, Vert, Tile>
 {
     fn get_block_mesh(&mut self, index: BlockIndex) -> &'a BlockMesh<Vert, Tile> {
         self.meshes
@@ -202,11 +222,18 @@ impl<'a, Vert: 'static, Tile: 'static> GetBlockMesh<'a, Vert, Tile>
 
 /// Entry in [`VersionedBlockMeshes`].
 #[derive(Debug)]
-pub(crate) struct VersionedBlockMesh<Vert, Tile> {
+pub(crate) struct VersionedBlockMesh<D, Vert, Tile> {
     pub(crate) mesh: BlockMesh<Vert, Tile>,
+
     /// Version ID used to track whether chunks have stale block meshes (ones that don't
     /// match the current definition of that block-index in the space).
     pub(crate) version: BlockMeshVersion,
+
+    /// Arbitrary data used for rendering the block in standalone/instanced form
+    /// (not part of a larger mesh).
+    ///
+    /// TODO(instancing): This is not yet used.
+    pub(crate) render_data: D,
 }
 
 /// Together with a [`BlockIndex`], uniquely identifies a block mesh.

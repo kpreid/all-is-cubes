@@ -164,7 +164,7 @@ impl CsmTester {
     }
 
     /// Call `csm.update_blocks_and_some_chunks()` with the tester's placeholders
-    fn update<F>(&mut self, chunk_render_updater: F) -> CsmUpdateInfo
+    fn update<F>(&mut self, render_data_updater: F) -> CsmUpdateInfo
     where
         F: FnMut(ChunkMeshUpdate<'_, (), BlockVertex<NoTexture>, NoTexture>),
     {
@@ -174,7 +174,7 @@ impl CsmTester {
             // In theory we should have a “fake time source” for testing purposes,
             // but this will do until we have tests of the actual timing logic.
             Instant::now() + Duration::from_secs(1_000_000),
-            chunk_render_updater,
+            render_data_updater,
         )
     }
 
