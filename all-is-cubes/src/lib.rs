@@ -172,7 +172,6 @@ pub mod behavior;
 pub mod block;
 pub mod camera;
 pub mod character;
-#[doc(hidden)] // Exported only for test visualization by all_is_cubes_content
 pub mod chunking;
 #[doc(hidden)] // Exported only for use by all_is_cubes_content
 pub mod content;

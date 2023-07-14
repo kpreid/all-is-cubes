@@ -15,19 +15,11 @@ use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
 use all_is_cubes::universe::URef;
 use all_is_cubes::util::{CustomFormat, StatusText, TimeStats};
 
+use crate::dynamic::{self, ChunkMesh, ChunkTodo};
 use crate::{GfxVertex, MeshOptions, TextureAllocator, TextureTile};
-
-mod blocks;
-use blocks::VersionedBlockMeshes;
-mod chunk;
-pub use chunk::{ChunkMesh, ChunkMeshUpdate, MeshLabel};
-use chunk::{ChunkTodo, MeshLabelImpl};
 
 #[cfg(test)]
 mod tests;
-
-/// If true, enables reporting chunk update timing at [`log::trace`] level.
-const LOG_CHUNK_UPDATES: bool = false;
 
 /// The large-scale analogue of [`SpaceMesh`]: subdivides a [`Space`] into
 /// [chunks](all_is_cubes::chunking) which are individually recomputed as the space changes or
@@ -48,7 +40,7 @@ where
     /// Dirty flags listening to `space`.
     todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>>,
 
-    block_meshes: VersionedBlockMeshes<D, Vert, Tex::Tile>,
+    block_meshes: dynamic::VersionedBlockMeshes<D, Vert, Tex::Tile>,
 
     /// Invariant: the set of present chunks (keys here) is the same as the set of keys
     /// in `todo.read().unwrap().chunks`.
@@ -64,7 +56,7 @@ where
     ///
     /// If so, then we prioritize adding new chunks over updating existing ones,
     /// because blank world is a worse outcome than slightly stale world.
-    did_not_finish_chunks: bool,
+    pub(in crate::dynamic) did_not_finish_chunks: bool,
 
     /// The [`MeshOptions`] specified by the last [`Camera`] provided.
     last_mesh_options: Option<MeshOptions>,
@@ -82,6 +74,9 @@ where
     Tex: TextureAllocator,
     Tex::Tile: PartialEq + 'static,
 {
+    /// Constructs a new [`ChunkedSpaceMesh`] that will maintain a mesh representation of
+    /// the contents of the given space, within a requested viewing distance (specified
+    /// later).
     pub fn new(space: URef<Space>) -> Self {
         let space_borrowed = space.read().unwrap();
         let todo = CsmTodo::initially_dirty();
@@ -91,7 +86,7 @@ where
         Self {
             space,
             todo: todo_rc,
-            block_meshes: VersionedBlockMeshes::new(),
+            block_meshes: dynamic::VersionedBlockMeshes::new(),
             chunks: FnvHashMap::default(),
             chunk_chart: ChunkChart::new(0.0),
             view_chunk: ChunkPos(Point3::new(0, 0, 0)),
@@ -113,17 +108,16 @@ where
         &self.chunk_chart
     }
 
-    /// Iterate over the [`ChunkMesh`]es of all chunks, in arbitrary order.
+    /// Iterates over the [`ChunkMesh`]es of all chunks that currently exist, in arbitrary
+    /// order.
     ///
     /// Empty chunks are included; in particular, this will iterate over every `D` value
     /// owned by this [`ChunkedSpaceMesh`].
-    ///
-    /// TODO: Define the order
     pub fn iter_chunks(&self) -> impl Iterator<Item = &ChunkMesh<D, Vert, Tex, CHUNK_SIZE>> {
         self.chunks.values()
     }
 
-    /// Iterate over the [`ChunkMesh`]es that are in view from the given camera,
+    /// Iterates over the [`ChunkMesh`]es that are in view from the given camera,
     /// in front-to-back order. (Use `.rev()` to iterate in back-to-front order.)
     ///
     /// Uses `camera`'s position, rotation, and options to decide which chunks to return.
@@ -163,9 +157,6 @@ where
     /// * `render_data_updater` is called for every re-meshed or depth-sorted chunk.
     ///
     /// Returns performance information and the chunk the camera is located in.
-    ///
-    /// TODO: The updaters should be changed to be one value instead of two, so that
-    /// they can share mutable state if needed. This will benefit the wgpu renderer.
     pub fn update_blocks_and_some_chunks<F>(
         &mut self,
         camera: &Camera,
@@ -174,7 +165,7 @@ where
         mut render_data_updater: F,
     ) -> CsmUpdateInfo
     where
-        F: FnMut(ChunkMeshUpdate<'_, D, Vert, Tex::Tile>),
+        F: FnMut(dynamic::RenderDataUpdate<'_, D, Vert, Tex::Tile>),
     {
         let update_start_time = Instant::now();
 
@@ -385,6 +376,7 @@ pub struct CsmUpdateInfo {
     /// Note that this does not include mesh flaws; the caller must gather those when
     /// drawing the chunks.
     pub flaws: Flaws,
+    /// Total time spent on the update.
     pub total_time: Duration,
     /// Time spent on gathering information before starting the chunk scan.
     pub prep_time: Duration,

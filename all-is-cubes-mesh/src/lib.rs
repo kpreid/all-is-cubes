@@ -60,8 +60,7 @@ mod block_vertex;
 pub use block_vertex::*;
 mod block_mesh;
 pub use block_mesh::*;
-#[doc(hidden)] // TODO: candidate for being public
-pub mod chunked_mesh;
+pub mod dynamic;
 mod index_vec;
 pub use index_vec::*;
 mod space_mesh;

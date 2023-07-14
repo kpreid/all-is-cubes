@@ -29,6 +29,7 @@
 - New crate `all-is-cubes-mesh` contains the former contents of `all_is_cubes::mesh`, except for `LineVertex` which is now in `all_is_cubes::math`.
     - `SpaceMesh` indices are now either `u16` or `u32` depending on the size of the mesh, rather than always `u32`. The new enum `all_is_cubes_mesh::IndexSlice` is used to work with them.
     - `SpaceMesh` index ranges and other metadata are now kept in a sub-struct `MeshMeta`.
+    - Newly public/documented module `dynamic` provides support for incrementally updated meshes for interactive rendering.
     - Renamed: `BlockMeshProvider` is now `GetBlockMesh`. This aligns with the general principle of naming traits for the action that they enable.
 
 - `all-is-cubes` library:

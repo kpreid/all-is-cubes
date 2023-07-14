@@ -10,7 +10,7 @@ use all_is_cubes::math::{GridAab, GridVector};
 use all_is_cubes::space::Space;
 use all_is_cubes::{camera, universe};
 use all_is_cubes_mesh as mesh;
-use all_is_cubes_mesh::chunked_mesh::{ChunkedSpaceMesh, MeshLabel};
+use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, MeshLabel};
 use all_is_cubes_port::gltf::{
     json as gltf_json, GltfTextureAllocator, GltfTextureRef, GltfVertex, GltfWriter, MeshInstance,
 };

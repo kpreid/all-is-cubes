@@ -1,8 +1,4 @@
 //! Algorithms for grouping cubes into cubical batches (chunks).
-//!
-//! Note: this module is currently private and a little crufty.
-//! We will probably want to expose it but clean up the API first, particularly
-//! clarifying the treatment of distances and squared distances.
 
 use std::collections::BTreeMap;
 use std::iter::FusedIterator;
@@ -32,8 +28,6 @@ impl<const CHUNK_SIZE: GridCoordinate> std::fmt::Debug for ChunkPos<CHUNK_SIZE> 
 }
 
 impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
-    pub const ZERO: Self = Self(GridPoint::new(0, 0, 0));
-
     /// Construct a [`ChunkPos`] from chunk coordinates
     /// (i.e. successive numbers indicate adjacent chunks).
     pub const fn new(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate) -> Self {
@@ -41,10 +35,14 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     }
 
     /// Returns the bounds of this chunk as a [`GridAab`].
+    ///
+    /// TODO: specify what happens if the result would overflow.
     pub fn bounds(self) -> GridAab {
         GridAab::from_lower_size(self.0 * CHUNK_SIZE, [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE])
     }
 
+    /// Returns the distance between the two given chunks. See the [`Distance`] for an
+    /// explanation of what that means.
     pub fn distance(self, other: Self) -> Distance {
         chunk_distance_squared_for_view(self.0 - other.0)
     }
@@ -83,9 +81,8 @@ pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(
 /// * It matches [`ChunkChart`]'s concept of view distance: the minimum Euclidean distance
 ///   from any point of two chunks, so that if nothing farther away than D can be seen
 ///   then this chunk cannot be seen from any point within the origin chunk.
-/// * It is usable as a depth sort: chunks sorted by this distance from the chunk with
-///   [`ChunkPos`] coordinates `[0, 0, 0]` will be sorted in back-to-front or front-to-back
-///   order.
+/// * It is usable as a depth sort: chunks sorted by this distance from the chunk containing
+///   the eye position will be sorted in back-to-front or front-to-back order.
 #[derive(Copy, Clone, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Distance {
     /// The squared Euclidean distance between the nearest two chunk corners.
@@ -149,6 +146,9 @@ pub struct ChunkChart<const CHUNK_SIZE: GridCoordinate> {
 }
 
 impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
+    /// Constructs a new chart with the given view radius (in blocks).
+    ///
+    /// This function may reuse the calculations from previous calls.
     pub fn new(view_distance: FreeCoordinate) -> Self {
         let view_distance_in_squared_chunks = Self::sanitize_and_square_distance(view_distance);
         let octant_chunks = get_or_compute_chart_octant(view_distance_in_squared_chunks);

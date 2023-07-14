@@ -13,7 +13,7 @@ use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, Rgb};
 use all_is_cubes::space::{Space, SpaceChange};
 use all_is_cubes::universe::URef;
-use all_is_cubes_mesh::chunked_mesh::{ChunkMeshUpdate, ChunkedSpaceMesh};
+use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, RenderDataUpdate};
 use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
 
 use crate::in_wgpu::frame_texture::FramebufferTextures;
@@ -531,7 +531,7 @@ fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuf
 /// Copy [`SpaceMesh`] data to GPU buffers.
 fn update_chunk_buffers(
     mut bwp: BeltWritingParts<'_, '_>,
-    update: ChunkMeshUpdate<'_, Option<ChunkBuffers>, WgpuBlockVertex, AtlasTile>,
+    update: RenderDataUpdate<'_, Option<ChunkBuffers>, WgpuBlockVertex, AtlasTile>,
     space_label: &str,
 ) {
     if update.mesh.is_empty() {

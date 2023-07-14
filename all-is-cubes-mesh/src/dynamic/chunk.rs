@@ -1,5 +1,3 @@
-use std::fmt;
-
 use instant::Instant;
 
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3};
@@ -8,13 +6,13 @@ use all_is_cubes::math::{Aab, Geometry, GridCoordinate, LineVertex};
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::util::{ConciseDebug, CustomFormat};
 
-use crate::{GfxVertex, MeshOptions, SpaceMesh, TextureAllocator};
+use crate::{dynamic, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator};
 
-use super::blocks::{BlockMeshVersion, VersionedBlockMeshes};
-use super::LOG_CHUNK_UPDATES;
+#[cfg(doc)]
+use crate::dynamic::ChunkedSpaceMesh;
 
-/// Stores a [`SpaceMesh`] covering one chunk of a [`Space`], caller-provided rendering
-/// data, and incidentals.
+/// Stores a [`SpaceMesh`] covering one [chunk](all_is_cubes::chunking) of a [`Space`],
+/// caller-provided rendering data, and incidentals.
 #[derive(Debug, Eq, PartialEq)]
 pub struct ChunkMesh<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
 where
@@ -22,8 +20,11 @@ where
 {
     pub(super) position: ChunkPos<CHUNK_SIZE>,
     mesh: SpaceMesh<Vert, Tex::Tile>,
+    block_dependencies: Vec<(BlockIndex, dynamic::BlockMeshVersion)>,
+
+    /// Per-chunk data the owner of the [`ChunkedSpaceMesh`]
+    /// may use for whatever purpose suits it, such as handles to GPU buffers.
     pub render_data: D,
-    block_dependencies: Vec<(BlockIndex, BlockMeshVersion)>,
 
     /// Toggled whenever the mesh is updated. Value is arbitrary (this is a looping
     /// 2-state counter).
@@ -47,11 +48,13 @@ where
         }
     }
 
+    /// Returns the current mesh for this chunk.
     #[inline]
     pub fn mesh(&self) -> &SpaceMesh<Vert, Tex::Tile> {
         &self.mesh
     }
 
+    /// Returns the position of this chunk within the [`Space`].
     #[inline]
     pub fn position(&self) -> ChunkPos<CHUNK_SIZE> {
         self.position
@@ -60,12 +63,12 @@ where
     pub(crate) fn borrow_for_update(
         &mut self,
         indices_only: bool,
-    ) -> ChunkMeshUpdate<'_, D, Vert, Tex::Tile> {
-        ChunkMeshUpdate {
+    ) -> dynamic::RenderDataUpdate<'_, D, Vert, Tex::Tile> {
+        dynamic::RenderDataUpdate {
             mesh: &self.mesh,
             render_data: &mut self.render_data,
             indices_only,
-            mesh_label: MeshLabel(MeshLabelImpl::Chunk(self.position.0.into())),
+            mesh_label: dynamic::MeshLabel(dynamic::MeshLabelImpl::Chunk(self.position.0.into())),
         }
     }
 
@@ -74,9 +77,9 @@ where
         chunk_todo: &mut ChunkTodo,
         space: &Space,
         options: &MeshOptions,
-        block_meshes: &VersionedBlockMeshes<D, Vert, Tex::Tile>,
+        block_meshes: &dynamic::VersionedBlockMeshes<D, Vert, Tex::Tile>,
     ) {
-        let compute_start: Option<Instant> = LOG_CHUNK_UPDATES.then(Instant::now);
+        let compute_start: Option<Instant> = dynamic::LOG_CHUNK_UPDATES.then(Instant::now);
         let bounds = self.position.bounds();
         self.mesh.compute(space, bounds, options, block_meshes);
 
@@ -141,7 +144,7 @@ where
 
     pub(crate) fn stale_blocks(
         &self,
-        block_meshes: &VersionedBlockMeshes<D, Vert, Tex::Tile>,
+        block_meshes: &dynamic::VersionedBlockMeshes<D, Vert, Tex::Tile>,
     ) -> bool {
         self.block_dependencies
             .iter()
@@ -162,49 +165,6 @@ where
             // Additional border that wiggles when updates happen.
             aab.expand(if self.update_debug { -0.05 } else { -0.02 })
                 .wireframe_points(output)
-        }
-    }
-}
-
-/// Provides mutable access to the render data of type `D` in a [`ChunkMesh`].
-///
-/// This struct is provided to the callbacks of
-/// [`ChunkedSpaceMesh::update_blocks_and_some_chunks()`](super::ChunkedSpaceMesh::update_blocks_and_some_chunks).
-///
-/// TODO: this is being refactored towards being useful for instanced block meshes as well
-/// as chunks. It will eventually be renamed and moved due to that.
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct ChunkMeshUpdate<'a, D, V, T> {
-    /// Fresh data source.
-    pub mesh: &'a SpaceMesh<V, T>,
-
-    /// Destination to update.
-    pub render_data: &'a mut D,
-
-    /// Whether *only* the indices need to be copied (and their length and type has not changed).
-    pub indices_only: bool,
-
-    /// Diagnostic label for this mesh; is stable across all updates for the same mesh,
-    /// but should not be relied on for equality or anything like that.
-    pub mesh_label: MeshLabel,
-}
-
-/// Debugging label identifying a mesh that is passing through [`ChunkMeshUpdate`].
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct MeshLabel(pub(crate) MeshLabelImpl);
-
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub(crate) enum MeshLabelImpl {
-    Chunk([i32; 3]),
-    Block(BlockIndex),
-}
-
-impl fmt::Debug for MeshLabel {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0 {
-            MeshLabelImpl::Chunk(p) => write!(f, "chunk {p:?}"),
-            MeshLabelImpl::Block(i) => write!(f, "block {i:?}"),
         }
     }
 }

@@ -59,7 +59,7 @@ where
     ) -> TimeStats
     where
         A: TextureAllocator<Tile = Tile>,
-        F: FnMut(super::ChunkMeshUpdate<'_, D, Vert, Tile>),
+        F: FnMut(super::RenderDataUpdate<'_, D, Vert, Tile>),
     {
         if todo.is_empty() {
             // Don't increment the version counter if we don't need to.
@@ -177,7 +177,7 @@ where
                         // TODO: wasteful data copy to make the SpaceMesh
                         let space_mesh = SpaceMesh::from(&current_mesh_entry.mesh);
 
-                        render_data_updater(super::ChunkMeshUpdate {
+                        render_data_updater(super::RenderDataUpdate {
                             mesh: &space_mesh,
                             render_data: &mut current_mesh_entry.instance_data.1,
                             indices_only: false,

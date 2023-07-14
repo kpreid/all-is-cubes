@@ -13,9 +13,10 @@ use all_is_cubes::space::{Space, SpaceChange, SpaceTransaction};
 use all_is_cubes::universe::{URef, Universe};
 use all_is_cubes::{notnan, rgba_const, transaction};
 
+use crate::dynamic;
 use crate::{BlockVertex, NoTexture, NoTextures};
 
-use super::{ChunkMeshUpdate, ChunkTodo, ChunkedSpaceMesh, CsmTodo, CsmUpdateInfo, TodoListener};
+use super::{ChunkTodo, ChunkedSpaceMesh, CsmTodo, CsmUpdateInfo, TodoListener};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 const LARGE_VIEW_DISTANCE: f64 = 200.0;
@@ -166,7 +167,7 @@ impl CsmTester {
     /// Call `csm.update_blocks_and_some_chunks()` with the tester's placeholders
     fn update<F>(&mut self, render_data_updater: F) -> CsmUpdateInfo
     where
-        F: FnMut(ChunkMeshUpdate<'_, (), BlockVertex<NoTexture>, NoTexture>),
+        F: FnMut(dynamic::RenderDataUpdate<'_, (), BlockVertex<NoTexture>, NoTexture>),
     {
         self.csm.update_blocks_and_some_chunks(
             &self.camera,

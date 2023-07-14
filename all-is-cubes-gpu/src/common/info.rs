@@ -4,7 +4,7 @@ use instant::Duration;
 
 use all_is_cubes::camera::{Flaws, Layers};
 use all_is_cubes::util::{CustomFormat, StatusText};
-use all_is_cubes_mesh::chunked_mesh::CsmUpdateInfo;
+use all_is_cubes_mesh::dynamic::CsmUpdateInfo;
 
 /// Performance info about drawing an entire scene.
 ///
