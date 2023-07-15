@@ -23,8 +23,7 @@ harness = false
 
 [features]
 # Enables `UniverseTemplate::Random`.
-# rand features are for `rand::thread_rng()`.
-arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary", "rand/std", "rand/std_rng"]
+arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary"]
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.5.0" }
