@@ -12,7 +12,7 @@ use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::math::NotNan;
 use all_is_cubes_ui::apps::Session;
 
-use crate::record::{RecordOptions, Recorder, Status};
+use crate::record::{RecordOptions, Status};
 use crate::session::{ClockSource, DesktopSession};
 
 // TODO: the status_receiver passing is awkward. Maybe Recorder should just provide it as a broadcast output?
@@ -24,19 +24,14 @@ pub(crate) fn create_recording_session(
     runtime_handle: &tokio::runtime::Handle,
 ) -> Result<(DesktopSession<(), ()>, mpsc::Receiver<Status>), anyhow::Error> {
     viewport_cell.set(options.viewport());
-    let (recorder, status_receiver) = Recorder::new(
-        options.clone(),
-        session.create_cameras(viewport_cell.as_source()),
-        session.universe(),
-        runtime_handle,
-    )?;
 
     let mut dsession = DesktopSession::new((), (), session, viewport_cell);
     dsession.clock_source = ClockSource::Fixed(match &options.animation {
         Some(anim) => anim.frame_period,
         None => Duration::ZERO,
     });
-    dsession.recorder = Some(recorder);
+
+    let status_receiver = dsession.start_recording(runtime_handle, options)?;
 
     Ok((dsession, status_receiver))
 }

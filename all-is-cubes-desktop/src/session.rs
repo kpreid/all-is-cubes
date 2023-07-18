@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
 use all_is_cubes::camera::Viewport;
@@ -7,6 +7,8 @@ use all_is_cubes::listen::{DirtyFlag, ListenableCell, Listener};
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::apps::Session;
+
+use crate::record;
 
 /// Wraps a basic [`Session`] to add functionality that is common within
 /// all-is-cubes-desktop's scope of supported usage (such as loading a universe
@@ -90,6 +92,26 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         }
 
         step_info
+    }
+
+    /// Add recording to this session.
+    ///
+    /// This overwrites its previous recorder, if any.
+    pub(crate) fn start_recording(
+        &mut self,
+        runtime_handle: &tokio::runtime::Handle,
+        options: &record::RecordOptions,
+    ) -> Result<mpsc::Receiver<record::Status>, anyhow::Error> {
+        let (recorder, status_receiver) = record::Recorder::new(
+            options.clone(),
+            self.session.create_cameras(self.viewport_cell.as_source()),
+            self.session.universe(),
+            runtime_handle,
+        )?;
+
+        self.recorder = Some(recorder);
+
+        Ok(status_receiver)
     }
 
     /// Replace the session's universe with one whose contents are the given file.

@@ -51,7 +51,7 @@ pub struct Status {
 impl Recorder {
     /// TODO: This is only implementing part of the [`RecordOptions`] (not the frame timing);
     /// refactor.
-    fn new(
+    pub fn new(
         options: RecordOptions,
         cameras: StandardCameras,
         universe: &Universe,
