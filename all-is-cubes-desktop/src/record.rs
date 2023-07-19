@@ -3,6 +3,8 @@
 use std::fs::File;
 use std::sync::mpsc;
 
+use anyhow::Context;
+
 use all_is_cubes::camera::{Flaws, StandardCameras};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::raytracer::RtRenderer;
@@ -86,7 +88,8 @@ impl Recorder {
                                     .unwrap();
                             }
                         }
-                    })?;
+                    })
+                    .context("failed to create recording renderer thread")?;
 
                 // Image encoding and writing thread.
                 std::thread::Builder::new()
@@ -102,7 +105,8 @@ impl Recorder {
                             )
                             .expect("writing PNG file failed");
                         }
-                    })?;
+                    })
+                    .context("failed to create recording encoder/writer thread")?;
 
                 RecorderInner::Raytrace(RtRecorder {
                     cameras,
@@ -120,7 +124,8 @@ impl Recorder {
                 let tex = writer.texture_allocator();
 
                 // TODO: implement options.save_all
-                write_gltf::start_gltf_writing(&options, writer, scene_receiver, status_sender)?;
+                write_gltf::start_gltf_writing(&options, writer, scene_receiver, status_sender)
+                    .context("failed to start glTF writer")?;
 
                 RecorderInner::Mesh(write_gltf::MeshRecorder::new(cameras, tex, scene_sender))
             }
@@ -138,12 +143,14 @@ impl Recorder {
                     ExportSet::from_spaces(vec![cameras.world_space().snapshot().unwrap()])
                 };
 
-                runtime_handle.block_on(all_is_cubes_port::export_to_path(
-                    YieldProgress::noop(),
-                    export_format,
-                    export_set,
-                    options.output_path,
-                ))?;
+                runtime_handle
+                    .block_on(all_is_cubes_port::export_to_path(
+                        YieldProgress::noop(),
+                        export_format,
+                        export_set,
+                        options.output_path,
+                    ))
+                    .context("failed to perform export operation")?;
                 eprintln!("\nWrote {path_str}");
                 log::trace!("shenanigan: exiting out of record initialization");
                 std::process::exit(0);

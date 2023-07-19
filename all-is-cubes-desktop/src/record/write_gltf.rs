@@ -5,6 +5,8 @@ use std::fs;
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
+use anyhow::Context;
+
 use all_is_cubes::cgmath::EuclideanSpace as _;
 use all_is_cubes::math::{GridAab, GridVector};
 use all_is_cubes::space::Space;
@@ -162,6 +164,7 @@ pub(super) fn start_gltf_writing(
             file.sync_all().unwrap();
             drop(file);
             // TODO: communicate "successfully completed" or errors on the status channel
-        })?;
+        })
+        .context("failed to create glTF encoder thread")?;
     Ok(())
 }

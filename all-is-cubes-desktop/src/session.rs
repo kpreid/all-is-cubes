@@ -97,6 +97,8 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
     /// Add recording to this session.
     ///
     /// This overwrites its previous recorder, if any.
+    ///
+    /// Errors: Returns errors directly from `Recorder::new()`.
     pub(crate) fn start_recording(
         &mut self,
         runtime_handle: &tokio::runtime::Handle,
