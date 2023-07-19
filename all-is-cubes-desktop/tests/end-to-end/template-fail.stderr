@@ -1,5 +1,7 @@
 ...
-Error: An error occurred while generating object 'space'
+Error: failed to create universe from requested template or file
 
 Caused by:
-    the Fail template always fails to generate
+    0: failed while constructing universe from template Fail
+    1: An error occurred while generating object 'space'
+    2: the Fail template always fails to generate

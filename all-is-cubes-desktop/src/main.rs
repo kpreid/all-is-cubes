@@ -37,8 +37,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use all_is_cubes::universe::Universe;
-use all_is_cubes_content::TemplateParameters;
+use anyhow::Context;
 use clap::{CommandFactory as _, Parser as _};
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::Rng;
@@ -47,7 +46,9 @@ use all_is_cubes::camera::{GraphicsOptions, Viewport};
 use all_is_cubes::cgmath::{Vector2, Zero as _};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
+use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
+use all_is_cubes_content::TemplateParameters;
 use all_is_cubes_ui::apps::Session;
 
 mod aic_winit;
@@ -124,7 +125,8 @@ fn main() -> Result<(), anyhow::Error> {
                 .build(),
             simplelog::TerminalMode::Stderr,
             simplelog::ColorChoice::Auto,
-        )?;
+        )
+        .context("failed to initialize logging")?;
     }
 
     let graphics_options = if no_config_files {
@@ -159,7 +161,9 @@ fn main() -> Result<(), anyhow::Error> {
             && output_file.as_ref().map_or(false, |file| {
                 determine_record_format(file).map_or(false, |fmt| fmt.includes_light())
             }));
-    let universe = runtime.block_on(create_universe(input_source, precompute_light))?;
+    let universe = runtime
+        .block_on(create_universe(input_source, precompute_light))
+        .context("failed to create universe from requested template or file")?;
     session.set_universe(universe);
 
     // Bundle of inputs to `inner_main()`, which — unlike this function — is generic over
@@ -182,16 +186,19 @@ fn main() -> Result<(), anyhow::Error> {
     match graphics_type {
         GraphicsType::Window => {
             let event_loop = winit::event_loop::EventLoop::new();
-            let dsession = runtime.block_on(create_winit_wgpu_desktop_session(
-                session,
-                aic_winit::create_window(
-                    &event_loop,
-                    &title_and_version(),
-                    display_size,
-                    fullscreen,
-                )?,
-                viewport_cell,
-            ))?;
+            let dsession = runtime
+                .block_on(create_winit_wgpu_desktop_session(
+                    session,
+                    aic_winit::create_window(
+                        &event_loop,
+                        &title_and_version(),
+                        display_size,
+                        fullscreen,
+                    )
+                    .context("failed to create window")?,
+                    viewport_cell,
+                ))
+                .context("failed to create session")?;
             inner_main(
                 inner_params,
                 move |dsession| winit_main_loop(event_loop, dsession),
@@ -207,9 +214,11 @@ fn main() -> Result<(), anyhow::Error> {
                     &title_and_version(),
                     display_size,
                     fullscreen,
-                )?,
+                )
+                .context("failed to create window")?,
                 viewport_cell,
-            )?;
+            )
+            .context("failed to create session")?;
             inner_main(
                 inner_params,
                 move |dsession| winit_main_loop(event_loop, dsession),
@@ -218,7 +227,8 @@ fn main() -> Result<(), anyhow::Error> {
         }
         GraphicsType::Terminal => {
             let dsession =
-                create_terminal_session(session, TerminalOptions::default(), viewport_cell)?;
+                create_terminal_session(session, TerminalOptions::default(), viewport_cell)
+                    .context("failed to create session")?;
             inner_main(inner_params, terminal_main_loop, dsession)
         }
         GraphicsType::Record => {
@@ -227,12 +237,9 @@ fn main() -> Result<(), anyhow::Error> {
             let record_options = options
                 .record_options()
                 .map_err(|e| e.format(&mut AicDesktopArgs::command()))?;
-            let (dsession, sr) = create_recording_session(
-                session,
-                &record_options,
-                viewport_cell,
-                runtime.handle(),
-            )?;
+            let (dsession, sr) =
+                create_recording_session(session, &record_options, viewport_cell, runtime.handle())
+                    .context("failed to create recording session")?;
             inner_main(
                 inner_params,
                 |dsession| record_main(dsession, record_options, sr),
@@ -241,7 +248,8 @@ fn main() -> Result<(), anyhow::Error> {
         }
         GraphicsType::Print => {
             let dsession =
-                create_terminal_session(session, TerminalOptions::default(), viewport_cell)?;
+                create_terminal_session(session, TerminalOptions::default(), viewport_cell)
+                    .context("failed to create session")?;
             inner_main(
                 inner_params,
                 |dsession| {
@@ -334,6 +342,7 @@ async fn create_universe(
                 seed
             });
             template
+                .clone()
                 .build(
                     yield_progress,
                     TemplateParameters {
@@ -342,12 +351,15 @@ async fn create_universe(
                     },
                 )
                 .await
-                .map_err(anyhow::Error::from)
+                .with_context(|| {
+                    format!("failed while constructing universe from template {template:?}")
+                })
         }
         UniverseSource::File(path) => {
-            all_is_cubes_port::load_universe_from_file(yield_progress, Arc::new(path))
+            let path = Arc::new(path);
+            all_is_cubes_port::load_universe_from_file(yield_progress, path.clone())
                 .await
-                .map_err(anyhow::Error::from)
+                .with_context(|| format!("could not load universe from file {path:?}"))
         }
     }?;
     universe_progress_bar.finish();
