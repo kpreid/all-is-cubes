@@ -250,15 +250,23 @@ impl TerminalState {
     }
 
     /// Reset terminal state, as before exiting.
-    /// This will also be run on drop but errors will not be reported in that case.
     fn clean_up_terminal(&mut self) -> crossterm::Result<()> {
         if self.terminal_state_dirty {
+            fn log_if_fails<T, E: std::error::Error>(r: Result<T, E>) {
+                match r {
+                    Ok(_) => {}
+                    Err(e) => {
+                        log::error!("error detected while cleaning up terminal state: {e}");
+                    }
+                }
+            }
+
             let out = self.tui.backend_mut();
-            out.queue(SetAttribute(Attribute::Reset))?;
-            out.queue(SetColors(Colors::new(Color::Reset, Color::Reset)))?;
-            out.queue(cursor::Show)?;
-            out.queue(crossterm::event::DisableMouseCapture)?;
-            crossterm::terminal::disable_raw_mode()?;
+            log_if_fails(out.queue(SetAttribute(Attribute::Reset)));
+            log_if_fails(out.queue(SetColors(Colors::new(Color::Reset, Color::Reset))));
+            log_if_fails(out.queue(cursor::Show));
+            log_if_fails(out.queue(crossterm::event::DisableMouseCapture));
+            log_if_fails(crossterm::terminal::disable_raw_mode());
             self.terminal_state_dirty = false;
         }
         Ok(())
