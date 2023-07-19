@@ -193,6 +193,7 @@ const BRAILLE_TABLE: [&str; 256] = [
 
 pub(crate) fn write_colored_and_measure<B: tui::backend::Backend + io::Write>(
     backend: &mut B,
+    has_terminal_stdin: bool,
     width_table: &mut HashMap<String, u16>,
     current_color: &mut Option<Colors>,
     wanted_color: Colors,
@@ -203,7 +204,7 @@ pub(crate) fn write_colored_and_measure<B: tui::backend::Backend + io::Write>(
         *current_color = Some(wanted_color);
         backend.queue(SetColors(wanted_color))?;
     }
-    write_and_measure(backend, width_table, text, max_width)
+    write_and_measure(backend, has_terminal_stdin, width_table, text, max_width)
 }
 
 /// Write a string and report how far this advanced the cursor,
@@ -216,6 +217,7 @@ pub(crate) fn write_colored_and_measure<B: tui::backend::Backend + io::Write>(
 /// measuring the width, returns an estimate instead.
 fn write_and_measure<B: tui::backend::Backend + io::Write>(
     backend: &mut B,
+    has_terminal_stdin: bool,
     width_table: &mut HashMap<String, u16>,
     text: &str,
     max_width: u16,
@@ -232,6 +234,9 @@ fn write_and_measure<B: tui::backend::Backend + io::Write>(
             backend.write_all(text.as_bytes())?;
         }
         Ok(w)
+    } else if !has_terminal_stdin {
+        backend.write_all(text.as_bytes())?;
+        Ok(fallback_measure_str(text))
     } else {
         let before = backend.get_cursor();
         backend.write_all(text.as_bytes())?;

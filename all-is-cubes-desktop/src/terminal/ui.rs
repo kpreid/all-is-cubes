@@ -64,6 +64,9 @@ struct TerminalState {
     tui: tui::Terminal<CrosstermBackend<io::Stdout>>,
     in_sender: mpsc::SyncSender<InMsg>,
 
+    /// True if stdin is a terminal and we are allowed to use things that query it.
+    has_terminal_stdin: bool,
+
     /// True if we should clean up on drop.
     terminal_state_dirty: bool,
 
@@ -84,6 +87,7 @@ impl TerminalWindow {
         let state = TerminalState {
             tui: Terminal::new(CrosstermBackend::new(io::stdout()))?,
             in_sender,
+            has_terminal_stdin: std::io::IsTerminal::is_terminal(&io::stdin()),
             viewport_position: Rect::default(),
             terminal_state_dirty: true,
             widths: HashMap::new(),
@@ -274,6 +278,7 @@ impl TerminalState {
 
                 let width = write_colored_and_measure(
                     backend,
+                    self.has_terminal_stdin,
                     &mut self.widths,
                     &mut current_color,
                     color,
