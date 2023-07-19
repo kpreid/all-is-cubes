@@ -4,6 +4,7 @@ use std::convert::TryInto;
 use std::io::{self, Write as _};
 use std::sync::mpsc;
 
+use anyhow::Context as _;
 use crossterm::cursor::{self, MoveTo};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
 use crossterm::QueueableCommand as _;
@@ -81,11 +82,12 @@ struct TerminalState {
 }
 
 impl TerminalWindow {
-    pub(super) fn new() -> crossterm::Result<Self> {
+    pub(super) fn new() -> Result<Self, anyhow::Error> {
         let (out_sender, out_receiver) = mpsc::sync_channel(3); // TODO: tune capacity
         let (in_sender, in_receiver) = mpsc::sync_channel(50);
         let state = TerminalState {
-            tui: Terminal::new(CrosstermBackend::new(io::stdout()))?,
+            tui: Terminal::new(CrosstermBackend::new(io::stdout()))
+                .context("failed at tui::Terminal::new()")?,
             in_sender,
             has_terminal_stdin: std::io::IsTerminal::is_terminal(&io::stdin()),
             viewport_position: Rect::default(),
@@ -95,7 +97,7 @@ impl TerminalWindow {
         let thread = std::thread::Builder::new()
             .name("all-is-cubes terminal output".into())
             .spawn(move || terminal_thread_loop(out_receiver, state))
-            .unwrap();
+            .context("failed to create terminal output thread")?;
         Ok(TerminalWindow {
             out_sender: Some(out_sender),
             in_receiver,
