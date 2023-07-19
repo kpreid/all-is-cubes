@@ -156,15 +156,16 @@ impl AicDesktopArgs {
     ///
     /// Returns an error if options were inconsistent with each other.
     ///
-    /// Panics if `output_path` is not set or validated (this should have been checked at parse time).
-    pub fn record_options(&self) -> clap::error::Result<RecordOptions> {
-        let output_path = self
-            .output_file
-            .clone()
-            .expect("output_file should be present");
+    /// Returns `Ok(None)` if recording was not requested (`output_file` not set).
+    ///
+    /// Panics if `output_path` is not validated (this should have been checked at parse time).
+    pub fn record_options(&self) -> clap::error::Result<Option<RecordOptions>> {
+        let Some(output_path) = self.output_file.clone() else {
+            return Ok(None);
+        };
         let output_format = determine_record_format(&output_path)
             .expect("output_file should have been validated to specify a format");
-        Ok(RecordOptions {
+        let options = RecordOptions {
             output_path: self.output_file.clone().unwrap(),
             output_format,
             image_size: self
@@ -182,7 +183,9 @@ impl AicDesktopArgs {
                 }
                 None => None,
             },
-        })
+        };
+
+        Ok(Some(options))
     }
 
     /// Whether the command arguments requested “headless” (no real-time UI) operation.
@@ -376,6 +379,7 @@ mod tests {
             parse(&["-g", "record", "-o", "output.png"])
                 .unwrap()
                 .record_options()
+                .unwrap()
                 .unwrap(),
             RecordOptions {
                 output_path: PathBuf::from("output.png"),
@@ -392,6 +396,7 @@ mod tests {
             parse(&["-g", "record", "-o", "fancy.png", "--duration", "3"])
                 .unwrap()
                 .record_options()
+                .unwrap()
                 .unwrap(),
             RecordOptions {
                 output_path: PathBuf::from("fancy.png"),

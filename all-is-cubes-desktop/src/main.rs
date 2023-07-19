@@ -103,6 +103,12 @@ fn main() -> Result<(), anyhow::Error> {
     } = options.clone();
     let input_source = parse_universe_source(input_file, template, template_size, seed);
 
+    // TODO: record_options validation should just be part of the regular arg parsing
+    // (will need a wrapper type)
+    let record_options: Option<record::RecordOptions> = options
+        .record_options()
+        .map_err(|e| e.format(&mut AicDesktopArgs::command()))?;
+
     // Initialize logging -- but only if it won't interfere.
     if graphics_type != GraphicsType::Terminal || verbose {
         // Note: Something like this log configuration also appears in other binaries.
@@ -231,11 +237,8 @@ fn main() -> Result<(), anyhow::Error> {
             inner_main(inner_params, terminal_main_loop, dsession)
         }
         GraphicsType::Record => {
-            // TODO: record_options validation should just be part of the regular arg parsing
-            // (will need a wrapper type)
-            let record_options = options
-                .record_options()
-                .map_err(|e| e.format(&mut AicDesktopArgs::command()))?;
+            let record_options =
+                record_options.expect("arg validation did not require output with -g record");
 
             let mut dsession = DesktopSession::new((), (), session, viewport_cell);
             record::configure_session_for_recording(
