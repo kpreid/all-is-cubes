@@ -67,7 +67,6 @@ use crate::aic_winit::{create_winit_rt_desktop_session, create_winit_wgpu_deskto
 use crate::command_options::{
     determine_record_format, parse_universe_source, AicDesktopArgs, DisplaySizeArg, UniverseSource,
 };
-use crate::record::create_recording_session;
 use crate::session::DesktopSession;
 use crate::terminal::{
     create_terminal_session, terminal_main_loop, terminal_print_once, TerminalOptions,
@@ -237,9 +236,15 @@ fn main() -> Result<(), anyhow::Error> {
             let record_options = options
                 .record_options()
                 .map_err(|e| e.format(&mut AicDesktopArgs::command()))?;
-            let dsession =
-                create_recording_session(session, &record_options, viewport_cell, runtime.handle())
-                    .context("failed to create recording session")?;
+
+            let mut dsession = DesktopSession::new((), (), session, viewport_cell);
+            record::configure_session_for_recording(
+                &mut dsession,
+                &record_options,
+                runtime.handle(),
+            )
+            .context("failed to configure session for recording")?;
+
             inner_main(
                 inner_params,
                 |dsession| record_main(dsession, record_options),

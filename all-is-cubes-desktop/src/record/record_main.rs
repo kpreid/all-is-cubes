@@ -6,40 +6,30 @@ use all_is_cubes::time::Tick;
 use all_is_cubes::{behavior, listen, universe};
 use indicatif::{ProgressBar, ProgressStyle};
 
-use all_is_cubes::camera::{Flaws, Viewport};
-use all_is_cubes::listen::{Listen as _, ListenableCell};
+use all_is_cubes::camera::Flaws;
+use all_is_cubes::listen::Listen as _;
 use all_is_cubes::math::NotNan;
-use all_is_cubes_ui::apps::Session;
 
 use crate::record::{RecordOptions, Status};
 use crate::session::{ClockSource, DesktopSession};
 
-pub(crate) fn create_recording_session(
-    session: Session,
+/// Opinionated version of [`DesktopSession::start_recording`] that applies [`RecordOptions`]
+/// to the session.
+pub(crate) fn configure_session_for_recording<Ren, Win>(
+    dsession: &mut DesktopSession<Ren, Win>,
     options: &RecordOptions,
-    viewport_cell: ListenableCell<Viewport>,
     runtime_handle: &tokio::runtime::Handle,
-) -> Result<DesktopSession<(), ()>, anyhow::Error> {
-    viewport_cell.set(options.viewport());
+) -> Result<(), anyhow::Error>
+where
+    Win: crate::glue::Window,
+{
+    dsession.viewport_cell.set(options.viewport());
 
-    let mut dsession = DesktopSession::new((), (), session, viewport_cell);
+    // Use fixed clock source.
     dsession.clock_source = ClockSource::Fixed(match &options.animation {
         Some(anim) => anim.frame_period,
         None => Duration::ZERO,
     });
-
-    dsession.start_recording(runtime_handle, options)?;
-
-    Ok(dsession)
-}
-
-pub(crate) fn record_main(
-    mut dsession: DesktopSession<(), ()>,
-    options: RecordOptions,
-) -> Result<(), anyhow::Error> {
-    let progress_style = ProgressStyle::default_bar()
-        .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
-        .unwrap();
 
     // Modify graphics options to suit recording
     // TODO: Find a better place to put this policy, and in particular allow the user to
@@ -52,9 +42,10 @@ pub(crate) fn record_main(
             graphics_options.debug_info_text = false;
         });
 
+    // Add some motion to animation recordings.
+    // TODO: replace this with a general camera scripting mechanism
     if let Some(anim) = &options.animation {
         if let Some(character_ref) = dsession.session.character().snapshot() {
-            // TODO: replace this with a general camera scripting mechanism
             character_ref.try_modify(|c| {
                 c.add_behavior(AutoRotate {
                     rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
@@ -62,6 +53,19 @@ pub(crate) fn record_main(
             })?;
         }
     }
+
+    dsession.start_recording(runtime_handle, options)?;
+
+    Ok(())
+}
+
+pub(crate) fn record_main(
+    mut dsession: DesktopSession<(), ()>,
+    options: RecordOptions,
+) -> Result<(), anyhow::Error> {
+    let progress_style = ProgressStyle::default_bar()
+        .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
+        .unwrap();
 
     let (status_tx, mut status_receiver) = tokio::sync::mpsc::unbounded_channel::<Status>();
     dsession

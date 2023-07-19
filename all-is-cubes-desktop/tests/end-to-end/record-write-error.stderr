@@ -1,6 +1,6 @@
 [..] Initialized session ([..] s)
 [..] Initialized game state with Template(LightingBench, TemplateParameters { seed: Some(0), size: None }) ([..] s)
-Error: failed to create recording session
+Error: failed to configure session for recording
 
 Caused by:
     [..]
