@@ -10,7 +10,7 @@ use anyhow::Context;
 use all_is_cubes::cgmath::EuclideanSpace as _;
 use all_is_cubes::math::{GridAab, GridVector};
 use all_is_cubes::space::Space;
-use all_is_cubes::{camera, universe};
+use all_is_cubes::{camera, listen, universe};
 use all_is_cubes_mesh as mesh;
 use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, MeshLabel};
 use all_is_cubes_port::gltf::{
@@ -112,7 +112,7 @@ pub(super) fn start_gltf_writing(
     options: &RecordOptions,
     mut writer: GltfWriter,
     scene_receiver: mpsc::Receiver<MeshRecordMsg>,
-    status_sender: mpsc::Sender<super::Status>,
+    status_notifier: Arc<listen::Notifier<super::Status>>,
 ) -> Result<(), anyhow::Error> {
     // Create file early so we get a prompt error.
     // Currently this path should always have a .gltf extension.
@@ -145,12 +145,10 @@ pub(super) fn start_gltf_writing(
                                 })
                                 .collect::<Vec<_>>(),
                         );
-                        status_sender
-                            .send(super::Status {
-                                frame_number,
-                                flaws,
-                            })
-                            .unwrap();
+                        status_notifier.notify(super::Status {
+                            frame_number,
+                            flaws,
+                        });
                     }
                 }
             }

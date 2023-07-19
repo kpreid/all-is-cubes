@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use all_is_cubes::camera::Viewport;
@@ -103,8 +103,8 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         &mut self,
         runtime_handle: &tokio::runtime::Handle,
         options: &record::RecordOptions,
-    ) -> Result<mpsc::Receiver<record::Status>, anyhow::Error> {
-        let (recorder, status_receiver) = record::Recorder::new(
+    ) -> Result<(), anyhow::Error> {
+        let recorder = record::Recorder::new(
             options.clone(),
             self.session.create_cameras(self.viewport_cell.as_source()),
             self.session.universe(),
@@ -113,7 +113,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
 
         self.recorder = Some(recorder);
 
-        Ok(status_receiver)
+        Ok(())
     }
 
     /// Replace the session's universe with one whose contents are the given file.

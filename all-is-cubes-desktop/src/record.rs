@@ -2,11 +2,12 @@
 
 use std::fs::File;
 use std::sync::mpsc;
+use std::sync::{Arc, Weak};
 
 use anyhow::Context;
 
 use all_is_cubes::camera::{Flaws, StandardCameras};
-use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::listen::{self, ListenableSource};
 use all_is_cubes::raytracer::RtRenderer;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
@@ -29,6 +30,9 @@ pub(crate) struct Recorder {
     sending_frame_number: FrameNumber,
 
     inner: RecorderInner,
+
+    /// Using a `Weak` here allows prompt dropping of listeners.
+    status_notifier: Weak<listen::Notifier<Status>>,
 }
 
 // TODO: should this be a trait? It's also an awful lot like HeadlessRenderer, except without the image output...
@@ -58,8 +62,8 @@ impl Recorder {
         cameras: StandardCameras,
         universe: &Universe,
         runtime_handle: &tokio::runtime::Handle,
-    ) -> Result<(Self, mpsc::Receiver<Status>), anyhow::Error> {
-        let (mut status_sender, status_receiver) = mpsc::channel::<Status>();
+    ) -> Result<Self, anyhow::Error> {
+        let status_notifier = Arc::new(listen::Notifier::new());
 
         let inner = match options.output_format {
             RecordFormat::PngOrApng => {
@@ -96,12 +100,13 @@ impl Recorder {
                     .name("image encoder".to_string())
                     .spawn({
                         let file = File::create(&options.output_path)?;
+                        let status_notifier = status_notifier.clone();
                         move || {
                             write_png::threaded_write_frames(
                                 file,
                                 options,
                                 image_data_receiver,
-                                &mut status_sender,
+                                status_notifier,
                             )
                             .expect("writing PNG file failed");
                         }
@@ -124,8 +129,13 @@ impl Recorder {
                 let tex = writer.texture_allocator();
 
                 // TODO: implement options.save_all
-                write_gltf::start_gltf_writing(&options, writer, scene_receiver, status_sender)
-                    .context("failed to start glTF writer")?;
+                write_gltf::start_gltf_writing(
+                    &options,
+                    writer,
+                    scene_receiver,
+                    status_notifier.clone(),
+                )
+                .context("failed to start glTF writer")?;
 
                 RecorderInner::Mesh(write_gltf::MeshRecorder::new(cameras, tex, scene_sender))
             }
@@ -157,13 +167,11 @@ impl Recorder {
             }
         };
 
-        Ok((
-            Recorder {
-                inner,
-                sending_frame_number: 0,
-            },
-            status_receiver,
-        ))
+        Ok(Recorder {
+            inner,
+            sending_frame_number: 0,
+            status_notifier: Arc::downgrade(&status_notifier),
+        })
     }
 
     pub fn capture_frame(&mut self) {
@@ -192,6 +200,16 @@ impl Recorder {
 
     pub fn no_more_frames(&mut self) {
         self.inner = RecorderInner::Shutdown;
+    }
+}
+
+impl listen::Listen for Recorder {
+    type Msg = Status;
+
+    fn listen<L: listen::Listener<Self::Msg> + Send + Sync + 'static>(&self, listener: L) {
+        if let Some(notifier) = self.status_notifier.upgrade() {
+            notifier.listen(listener)
+        }
     }
 }
 

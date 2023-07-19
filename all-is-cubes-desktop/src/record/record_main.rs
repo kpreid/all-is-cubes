@@ -1,28 +1,25 @@
-use std::sync::mpsc;
 use std::time::Duration;
 
 use all_is_cubes::character::{self, Character};
 use all_is_cubes::physics::BodyTransaction;
 use all_is_cubes::time::Tick;
-use all_is_cubes::{behavior, universe};
+use all_is_cubes::{behavior, listen, universe};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use all_is_cubes::camera::{Flaws, Viewport};
-use all_is_cubes::listen::ListenableCell;
+use all_is_cubes::listen::{Listen as _, ListenableCell};
 use all_is_cubes::math::NotNan;
 use all_is_cubes_ui::apps::Session;
 
 use crate::record::{RecordOptions, Status};
 use crate::session::{ClockSource, DesktopSession};
 
-// TODO: the status_receiver passing is awkward. Maybe Recorder should just provide it as a broadcast output?
-
 pub(crate) fn create_recording_session(
     session: Session,
     options: &RecordOptions,
     viewport_cell: ListenableCell<Viewport>,
     runtime_handle: &tokio::runtime::Handle,
-) -> Result<(DesktopSession<(), ()>, mpsc::Receiver<Status>), anyhow::Error> {
+) -> Result<DesktopSession<(), ()>, anyhow::Error> {
     viewport_cell.set(options.viewport());
 
     let mut dsession = DesktopSession::new((), (), session, viewport_cell);
@@ -31,15 +28,14 @@ pub(crate) fn create_recording_session(
         None => Duration::ZERO,
     });
 
-    let status_receiver = dsession.start_recording(runtime_handle, options)?;
+    dsession.start_recording(runtime_handle, options)?;
 
-    Ok((dsession, status_receiver))
+    Ok(dsession)
 }
 
 pub(crate) fn record_main(
     mut dsession: DesktopSession<(), ()>,
     options: RecordOptions,
-    status_receiver: mpsc::Receiver<Status>,
 ) -> Result<(), anyhow::Error> {
     let progress_style = ProgressStyle::default_bar()
         .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
@@ -66,6 +62,13 @@ pub(crate) fn record_main(
             })?;
         }
     }
+
+    let (status_tx, mut status_receiver) = tokio::sync::mpsc::unbounded_channel::<Status>();
+    dsession
+        .recorder
+        .as_ref()
+        .expect("record_main() requires a recorder present")
+        .listen(ChannelListener::new(status_tx));
 
     // Use main thread for universe stepping, raytracer snapshotting, and progress updating.
     // (We could move the universe stepping to another thread to get more precise progress updates,
@@ -95,10 +98,10 @@ pub(crate) fn record_main(
 
         // We've completed sending frames; now block on their completion.
         // TODO: deduplicate receiving logic
-        while let Ok(Status {
+        while let Some(Status {
             frame_number,
             flaws,
-        }) = status_receiver.recv()
+        }) = status_receiver.blocking_recv()
         {
             drawing_progress_bar.set_position((frame_number + 1) as u64);
             flaws_total |= flaws;
@@ -152,4 +155,26 @@ impl behavior::Behavior<character::Character> for AutoRotate {
 impl universe::VisitRefs for AutoRotate {
     // No references
     fn visit_refs(&self, _visitor: &mut dyn universe::RefVisitor) {}
+}
+
+/// Adapt [`tokio::sync::mpsc::UnboundedSender`] to `Listener`.
+///
+/// Caution: If you care about when the channel is closed, check how long this listener
+/// is going to live.
+struct ChannelListener<M> {
+    sender: tokio::sync::mpsc::UnboundedSender<M>,
+}
+impl<M: Send> ChannelListener<M> {
+    fn new(sender: tokio::sync::mpsc::UnboundedSender<M>) -> Self {
+        Self { sender }
+    }
+}
+impl<M> listen::Listener<M> for ChannelListener<M> {
+    fn receive(&self, message: M) {
+        _ = self.sender.send(message);
+    }
+
+    fn alive(&self) -> bool {
+        !self.sender.is_closed()
+    }
 }
