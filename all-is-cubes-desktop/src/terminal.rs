@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
 
+use anyhow::Context;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use tui::layout::Rect;
 
@@ -48,7 +49,10 @@ pub(crate) fn terminal_print_once(
         .expect("Internal error in rendering");
     dsession.window.send(OutMsg::WriteFrameOnly(frame));
 
-    dsession.window.stop()?;
+    dsession
+        .window
+        .stop()
+        .context("failed to stop TerminalWindow after printing")?;
     Ok(())
 }
 
@@ -80,7 +84,7 @@ pub(crate) fn create_terminal_session(
     session: Session,
     options: TerminalOptions,
     viewport_cell: ListenableCell<Viewport>,
-) -> crossterm::Result<DesktopSession<TerminalRenderer, TerminalWindow>> {
+) -> Result<DesktopSession<TerminalRenderer, TerminalWindow>, anyhow::Error> {
     viewport_cell.set(options.viewport_from_terminal_size(rect_size(Rect::default())));
     let cameras = session.create_cameras(viewport_cell.as_source());
 
@@ -130,7 +134,8 @@ pub(crate) fn create_terminal_session(
                     let _ = buffer_reuse_in.send(scene);
                 }
             }
-        })?;
+        })
+        .context("failed to create terminal raytracer thread")?;
 
     Ok(DesktopSession::new(
         TerminalRenderer {
@@ -140,7 +145,7 @@ pub(crate) fn create_terminal_session(
             render_pipe_in,
             render_pipe_out,
         },
-        TerminalWindow::new()?,
+        TerminalWindow::new().context("failed to create TerminalWindow")?,
         session,
         viewport_cell,
     ))
@@ -151,18 +156,25 @@ pub(crate) fn terminal_main_loop(
     mut dsession: DesktopSession<TerminalRenderer, TerminalWindow>,
 ) -> Result<(), anyhow::Error> {
     run(&mut dsession)?;
-    dsession.window.stop()?;
+    dsession
+        .window
+        .stop()
+        .context("failed to stop TerminalWindow after main loop")?;
     Ok(())
 }
 
 /// Run the simulation and interactive UI. Returns after user's quit command.
 /// Caller is responsible for `clean_up_terminal()`.
-fn run(dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>) -> crossterm::Result<()> {
+fn run(
+    dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>,
+) -> Result<(), anyhow::Error> {
     dsession.window.send(OutMsg::BeginFullscreen);
 
     loop {
-        'input: while crossterm::event::poll(Duration::ZERO)? {
-            let event = crossterm::event::read()?;
+        'input: while crossterm::event::poll(Duration::ZERO)
+            .context("crossterm input poll() failed")?
+        {
+            let event = crossterm::event::read().context("crossterm input read() failed")?;
             if let Some(aic_event) = event_to_key(&event) {
                 if dsession.session.input_processor.key_momentary(aic_event) {
                     // Handled by input_processor
