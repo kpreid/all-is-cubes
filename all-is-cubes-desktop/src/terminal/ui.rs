@@ -62,7 +62,7 @@ pub(super) struct UiFrame {
 
 /// Inner state of the UI and terminal IO thread.
 struct TerminalState {
-    tui: tui::Terminal<CrosstermBackend<io::Stdout>>,
+    tui: MaybeTui,
     in_sender: mpsc::SyncSender<InMsg>,
 
     /// True if stdin is a terminal and we are allowed to use things that query it.
@@ -80,24 +80,38 @@ struct TerminalState {
     /// position.
     widths: HashMap<String, u16>,
 }
+enum MaybeTui {
+    Tui(tui::Terminal<CrosstermBackend<io::Stdout>>),
+    NoTui(CrosstermBackend<io::Stdout>),
+}
 
 impl TerminalWindow {
     pub(super) fn new() -> Result<Self, anyhow::Error> {
+        let tui = match Terminal::new(CrosstermBackend::new(io::stdout())) {
+            Ok(tui) => MaybeTui::Tui(tui),
+            Err(io_error) => {
+                log::debug!("Terminal::new() failed ({io_error}); falling back to non-TUI output");
+                MaybeTui::NoTui(CrosstermBackend::new(io::stdout()))
+            }
+        };
+
         let (out_sender, out_receiver) = mpsc::sync_channel(3); // TODO: tune capacity
         let (in_sender, in_receiver) = mpsc::sync_channel(50);
+
         let state = TerminalState {
-            tui: Terminal::new(CrosstermBackend::new(io::stdout()))
-                .context("failed at tui::Terminal::new()")?,
+            tui,
             in_sender,
             has_terminal_stdin: std::io::IsTerminal::is_terminal(&io::stdin()),
             viewport_position: Rect::default(),
             terminal_state_dirty: true,
             widths: HashMap::new(),
         };
+
         let thread = std::thread::Builder::new()
             .name("all-is-cubes terminal output".into())
             .spawn(move || terminal_thread_loop(out_receiver, state))
             .context("failed to create terminal output thread")?;
+
         Ok(TerminalWindow {
             out_sender: Some(out_sender),
             in_receiver,
@@ -182,6 +196,15 @@ impl crate::glue::Window for TerminalWindow {
     }
 }
 
+impl MaybeTui {
+    fn backend_mut(&mut self) -> &mut CrosstermBackend<io::Stdout> {
+        match self {
+            MaybeTui::Tui(terminal) => terminal.backend_mut(),
+            MaybeTui::NoTui(backend) => backend,
+        }
+    }
+}
+
 fn terminal_thread_loop(output_channel: mpsc::Receiver<OutMsg>, mut state: TerminalState) {
     log::trace!("entering terminal_thread_loop()");
     for command in output_channel {
@@ -209,14 +232,21 @@ fn terminal_thread_loop(output_channel: mpsc::Receiver<OutMsg>, mut state: Termi
 }
 
 impl TerminalState {
-    fn begin_fullscreen(&mut self) -> crossterm::Result<()> {
-        self.terminal_state_dirty = true;
-        crossterm::terminal::enable_raw_mode()?;
-        self.tui
-            .backend_mut()
-            .queue(crossterm::event::EnableMouseCapture)?;
-        self.tui.clear()?;
-        Ok(())
+    fn begin_fullscreen(&mut self) -> anyhow::Result<()> {
+        match &mut self.tui {
+            MaybeTui::Tui(terminal) => {
+                self.terminal_state_dirty = true;
+                if self.has_terminal_stdin {
+                    crossterm::terminal::enable_raw_mode()?;
+                }
+                terminal
+                    .backend_mut()
+                    .queue(crossterm::event::EnableMouseCapture)?;
+                terminal.clear()?;
+                Ok(())
+            }
+            MaybeTui::NoTui(_) => Err(anyhow::anyhow!("cannot fullscreen without terminal")),
+        }
     }
 
     /// Reset terminal state, as before exiting.
@@ -310,10 +340,18 @@ impl TerminalState {
     /// the raytraced scene.
     ///
     /// This function also stores the current scene viewport for future frames.
-    fn write_ui(&mut self, ui_frame: &UiFrame) -> crossterm::Result<()> {
+    fn write_ui(&mut self, ui_frame: &UiFrame) -> anyhow::Result<()> {
+        let terminal = match &mut self.tui {
+            MaybeTui::Tui(terminal) => terminal,
+            MaybeTui::NoTui(_) => {
+                return Err(anyhow::anyhow!(
+                    "cannot draw terminal UI when not attached to a terminal"
+                ));
+            }
+        };
         let TextRayImage { info, .. } = ui_frame.frame;
         let mut viewport_rect = None;
-        self.tui.draw(|f| {
+        terminal.draw(|f| {
             const HELP_TEXT: &str = "\
                 Move: WS AD EC  Turn: ←→ ↑↓\n\
                 Term color: N   Term chars: M\n\
