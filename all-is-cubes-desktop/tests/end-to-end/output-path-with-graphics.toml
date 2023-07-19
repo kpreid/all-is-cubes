@@ -1,0 +1,6 @@
+# Tests what happens if `-o` *and* a graphics option are set.
+# TODO: We want this to succeed, but it currently does not, in the form of
+# ignoring the output file option.
+bin.name = "all-is-cubes"
+args = "--no-config-files --template lighting-bench --seed 0 --graphics print -o test.png --display-size 40x40"
+status.code = 0
