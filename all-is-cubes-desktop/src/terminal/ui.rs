@@ -89,7 +89,7 @@ impl TerminalWindow {
             widths: HashMap::new(),
         };
         let thread = std::thread::Builder::new()
-            .name("all-is-cubes terminal IO".into())
+            .name("all-is-cubes terminal output".into())
             .spawn(move || terminal_thread_loop(out_receiver, state))
             .unwrap();
         Ok(TerminalWindow {
@@ -100,14 +100,23 @@ impl TerminalWindow {
         })
     }
 
+    /// Send an [`OutMsg`] (pertaining to what should be written to stdout) to the thread
+    /// that is responsible for that.
+    #[track_caller]
     pub(super) fn send(&self, msg: OutMsg) {
         // TODO: handle error — don't return it to the caller here, to keep things write-only,
         // but signal that we should be shutting down.
-        self.out_sender
+        match self
+            .out_sender
             .as_ref()
             .expect("TerminalWindow already shut down")
             .send(msg)
-            .unwrap();
+        {
+            Ok(()) => {}
+            Err(mpsc::SendError(msg)) => {
+                log::trace!("TerminalWindow output thread not listening; message = {msg:?}");
+            }
+        }
     }
 
     pub fn wait_for_sync(&self) {
