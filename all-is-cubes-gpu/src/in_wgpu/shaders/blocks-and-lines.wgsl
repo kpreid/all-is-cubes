@@ -205,9 +205,9 @@ fn modulo(a: f32, b: f32) -> f32 {
 //
 // The canonical version of this algorithm is
 // `all_is_cubes::raycast::scale_to_integer_step`.
-fn partial_scale_to_integer_step(s: f32, ds: f32) -> f32 {
-    var s = s;
-    var ds = ds;
+fn partial_scale_to_integer_step(s_in: f32, ds_in: f32) -> f32 {
+    var s = s_in;
+    var ds = ds_in;
     s = clamp(s, 0.0, 1.0);  // Out of bounds may appear on triangle edges
     if sign(ds) < 0.0 {
         s = 1.0 - s;
