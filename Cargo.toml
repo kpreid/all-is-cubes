@@ -68,7 +68,7 @@ thiserror = "1.0.40"
 tokio = { version = "1.28.0", default-features = false }
 trycmd = "0.14.1"
 wasm-bindgen-futures = "0.4.34"
-wgpu = { version = "0.16.0" }
+wgpu = { version = "0.17.0" }
 
 [profile.dev]
 # Enable some optimization to improve interactive performance in manual testing/experimenting.

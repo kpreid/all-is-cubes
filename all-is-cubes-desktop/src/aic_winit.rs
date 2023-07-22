@@ -202,7 +202,7 @@ pub(crate) async fn create_winit_wgpu_desktop_session(
 
     // Pick an adapter.
     let mut adapter: Option<wgpu::Adapter> =
-        wgpu::util::initialize_adapter_from_env(&instance, wgpu::Backends::all());
+        wgpu::util::initialize_adapter_from_env(&instance, Some(&surface));
     if adapter.is_none() {
         adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {

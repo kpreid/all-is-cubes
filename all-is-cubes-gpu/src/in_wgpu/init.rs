@@ -36,7 +36,7 @@ pub async fn create_instance_and_adapter_for_test(
     //   wgpu::util::initialize_adapter_from_env_or_default(&instance, wgpu::Backends::all(), None)
     // (which defaults to low-power) or even better, test on *all* available adapters?
     let mut adapter: Option<wgpu::Adapter> =
-        wgpu::util::initialize_adapter_from_env(&instance, wgpu::Backends::all());
+        wgpu::util::initialize_adapter_from_env(&instance, None);
     if adapter.is_none() {
         log(format_args!(
             "No adapter specified via WGPU_ADAPTER_NAME; picking automatically."
