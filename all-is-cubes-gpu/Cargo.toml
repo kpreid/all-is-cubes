@@ -35,9 +35,9 @@ wgpu = ["dep:wgpu"]
 all-is-cubes = { path = "../all-is-cubes", version = "0.5.0" }
 all-is-cubes-mesh = { path = "../all-is-cubes-mesh", version = "0.5.0" }
 bytemuck = { workspace = true, features = ["derive"] }
-futures-channel = { workspace = true }
+futures-channel = { workspace = true, features = ["sink"] }
 futures-core = { workspace = true }
-futures-util = { workspace = true }
+futures-util = { workspace = true, features = ["sink"] }
 # Using `image` for headless renderer output.
 image = { workspace = true }
 instant = { workspace = true }
@@ -46,6 +46,7 @@ once_cell = { workspace = true }
 rand = { workspace = true }
 resource = "0.5.0"
 thiserror = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
 wgpu = { workspace = true, optional = true }
 
 [target.'cfg(target_family = "wasm")'.dependencies]

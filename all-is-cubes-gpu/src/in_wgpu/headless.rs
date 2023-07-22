@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use futures_channel::oneshot;
 use futures_core::future::BoxFuture;
 
 use all_is_cubes::camera::{self, Flaws, HeadlessRenderer, StandardCameras, Viewport};
@@ -46,7 +47,7 @@ impl Builder {
         let viewport = viewport_source.snapshot();
         let color_texture = create_color_texture(&self.device, viewport);
 
-        Renderer {
+        Renderer::wrap(RendererImpl {
             device: self.device.clone(),
             queue: self.queue.clone(),
             color_texture,
@@ -54,7 +55,7 @@ impl Builder {
             viewport_source,
             viewport_dirty,
             flaws: Flaws::UNFINISHED, // unfinished because no update() yet
-        }
+        })
     }
 }
 
@@ -64,6 +65,20 @@ impl Builder {
 /// and may then be used once or repeatedly to produce images of what those cameras see.
 #[derive(Debug)]
 pub struct Renderer {
+    /// `wgpu` is currently entirely `!Send` on Wasm.
+    /// Use SendWrapper to safely work around that.
+    ///
+    /// TODO: Make this an “actor pattern” situation instead of panicking if used from
+    /// a different thread.
+    #[cfg(target_family = "wasm")]
+    inner: futures_channel::mpsc::Sender<RenderMsg>,
+    #[cfg(not(target_family = "wasm"))]
+    inner: RendererImpl,
+}
+
+/// Internals of [`Renderer`] to actually do the rendering.
+#[derive(Debug)]
+struct RendererImpl {
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
     color_texture: wgpu::Texture,
@@ -73,18 +88,68 @@ pub struct Renderer {
     flaws: Flaws,
 }
 
+/// Messages from [`Renderer`] to [`RendererImpl`].
+pub(super) enum RenderMsg {
+    Update(
+        Option<Cursor>,
+        oneshot::Sender<Result<(), camera::RenderError>>,
+    ),
+    Render(
+        String,
+        oneshot::Sender<Result<(image::RgbaImage, Flaws), camera::RenderError>>,
+    ),
+}
+
+impl Renderer {
+    fn wrap(inner: RendererImpl) -> Renderer {
+        Self {
+            #[cfg(target_family = "wasm")]
+            inner: {
+                // On Wasm, wgpu objects are not Send. Therefore, spawn an actor which
+                // explicitly runs on the main thread to own all of them.
+
+                let (tx, mut rx) = futures_channel::mpsc::channel(1);
+                wasm_bindgen_futures::spawn_local(async move {
+                    use futures_util::stream::StreamExt as _;
+                    let mut inner = inner;
+                    while let Some(msg) = rx.next().await {
+                        inner.handle(msg).await;
+                    }
+                });
+
+                tx
+            },
+            #[cfg(not(target_family = "wasm"))]
+            inner,
+        }
+    }
+
+    async fn send_maybe_wait(&mut self, msg: RenderMsg) {
+        #[cfg(target_family = "wasm")]
+        {
+            use futures_util::sink::SinkExt as _;
+            self.inner
+                .send(msg)
+                .await
+                .expect("Renderer actor unexpectedly disconnected");
+        }
+        #[cfg(not(target_family = "wasm"))]
+        {
+            self.inner.handle(msg).await;
+        }
+    }
+}
+
 impl HeadlessRenderer for Renderer {
     fn update<'a>(
         &'a mut self,
         cursor: Option<&'a Cursor>,
     ) -> BoxFuture<'a, Result<(), camera::RenderError>> {
+        let (tx, rx) = oneshot::channel();
         Box::pin(async move {
-            let info = self
-                .everything
-                .update(&self.queue, cursor, &FrameBudget::PRACTICALLY_INFINITE)
-                .map_err(GraphicsResourceError::into_render_error_or_panic)?;
-            self.flaws = info.flaws();
-            Ok(())
+            self.send_maybe_wait(RenderMsg::Update(cursor.cloned(), tx))
+                .await;
+            rx.await.unwrap()
         })
     }
 
@@ -92,27 +157,57 @@ impl HeadlessRenderer for Renderer {
         &'a mut self,
         info_text: &'a str,
     ) -> BoxFuture<'a, Result<(image::RgbaImage, Flaws), camera::RenderError>> {
+        let (tx, rx) = oneshot::channel();
+        Box::pin(async move {
+            self.send_maybe_wait(RenderMsg::Render(info_text.to_owned(), tx))
+                .await;
+            rx.await.unwrap()
+        })
+    }
+}
+
+impl RendererImpl {
+    async fn handle(&mut self, msg: RenderMsg) {
+        match msg {
+            RenderMsg::Update(cursor, reply) => {
+                _ = reply.send(self.update(cursor.as_ref()).await);
+            }
+            RenderMsg::Render(info_text, reply) => {
+                _ = reply.send(self.draw(&info_text).await);
+            }
+        }
+    }
+
+    async fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), camera::RenderError> {
+        let info = self
+            .everything
+            .update(&self.queue, cursor, &FrameBudget::PRACTICALLY_INFINITE)
+            .map_err(GraphicsResourceError::into_render_error_or_panic)?;
+        self.flaws = info.flaws();
+        Ok(())
+    }
+
+    async fn draw(
+        &mut self,
+        info_text: &str,
+    ) -> Result<(image::RgbaImage, Flaws), camera::RenderError> {
+        // TODO: refactor so that this viewport read is done synchronously, outside the RendererImpl
         let viewport = self.viewport_source.snapshot();
         if self.viewport_dirty.get_and_clear() {
             self.color_texture = create_color_texture(&self.device, viewport);
         }
 
-        Box::pin(async move {
-            let _draw_info = self.everything.draw_frame_linear(&self.queue).unwrap();
-            self.everything.add_info_text_and_postprocess(
-                &self.queue,
-                &self.color_texture,
-                info_text,
-            );
-            let image = init::get_image_from_gpu(
-                &self.device,
-                &self.queue,
-                &self.color_texture,
-                viewport.framebuffer_size,
-            )
-            .await;
-            Ok((image, self.flaws))
-        })
+        let _draw_info = self.everything.draw_frame_linear(&self.queue).unwrap();
+        self.everything
+            .add_info_text_and_postprocess(&self.queue, &self.color_texture, info_text);
+        let image = init::get_image_from_gpu(
+            &self.device,
+            &self.queue,
+            &self.color_texture,
+            viewport.framebuffer_size,
+        )
+        .await;
+        Ok((image, self.flaws))
     }
 }
 

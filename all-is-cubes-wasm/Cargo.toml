@@ -45,7 +45,7 @@ once_cell = { workspace = true }
 rand = { workspace = true, features = ["std", "std_rng"] }
 send_wrapper = "0.6.0"
 wasm-bindgen = "0.2.84"
-wasm-bindgen-futures =  "0.4.34"
+wasm-bindgen-futures = { workspace = true }
 wgpu = { workspace = true, features = ["webgl"] }
 
 [dependencies.web-sys]
