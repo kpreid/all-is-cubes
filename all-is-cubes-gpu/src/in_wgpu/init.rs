@@ -9,7 +9,6 @@
 /// `log` receives whole lines with no trailing newlines, as suitable for logging or
 /// printing using [`println!()`].
 #[doc(hidden)]
-#[cfg(not(target_family = "wasm"))] // enumerate_adapters and environment not available
 pub async fn create_instance_and_adapter_for_test(
     mut log: impl FnMut(std::fmt::Arguments<'_>),
 ) -> (wgpu::Instance, Option<wgpu::Adapter>) {
@@ -19,6 +18,20 @@ pub async fn create_instance_and_adapter_for_test(
         backends: requested_backends,
         ..Default::default()
     });
+
+    // For WebGL we need a Surface.
+    #[cfg(target_family = "wasm")]
+    let surface = {
+        // size shouldn't matter; use a funny noticeable number in case it turns out to
+        let canvas = web_sys::OffscreenCanvas::new(143, 217).unwrap();
+        Some(
+            instance
+                .create_surface_from_offscreen_canvas(canvas)
+                .unwrap(),
+        )
+    };
+    #[cfg(not(target_family = "wasm"))]
+    let surface = None;
 
     // Report adapters that we *could* pick
     log(format_args!(
@@ -36,7 +49,7 @@ pub async fn create_instance_and_adapter_for_test(
     //   wgpu::util::initialize_adapter_from_env_or_default(&instance, wgpu::Backends::all(), None)
     // (which defaults to low-power) or even better, test on *all* available adapters?
     let mut adapter: Option<wgpu::Adapter> =
-        wgpu::util::initialize_adapter_from_env(&instance, None);
+        wgpu::util::initialize_adapter_from_env(&instance, surface.as_ref());
     if adapter.is_none() {
         log(format_args!(
             "No adapter specified via WGPU_ADAPTER_NAME; picking automatically."
@@ -45,7 +58,7 @@ pub async fn create_instance_and_adapter_for_test(
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::util::power_preference_from_env()
                     .unwrap_or(wgpu::PowerPreference::HighPerformance),
-                compatible_surface: None,
+                compatible_surface: surface.as_ref(),
                 force_fallback_adapter: false,
             })
             .await;

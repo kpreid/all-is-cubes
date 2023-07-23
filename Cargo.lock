@@ -166,7 +166,9 @@ dependencies = [
  "resource",
  "thiserror",
  "tokio",
+ "wasm-bindgen",
  "wasm-bindgen-futures",
+ "web-sys",
  "wgpu",
 ]
 

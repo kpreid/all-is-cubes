@@ -50,13 +50,20 @@ wasm-bindgen-futures = { workspace = true }
 wgpu = { workspace = true, optional = true }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
-wgpu = { workspace = true, optional = true, features = ["webgl"] }
 # If we don't set this feature, it will try to access files at run time and fail
 # since web wasm has no std::fs.
 resource = { version = "0.5.0", features = ["force-static"] }
+wasm-bindgen = "0.2.84"
+# For initializing tests on web.
+# Okay that this is a non-dev dependency because wgpu will have the same dep.
+web-sys = { version = "0.3.61", features = ["OffscreenCanvas"]}
+# Enable WebGL compatibility.
+wgpu = { workspace = true, optional = true, features = ["webgl"] }
 
 [dev-dependencies]
 # f16 support for working with floating point textures in tests. Using older version 1.8 because that's already indirectly in our dev-dependencies.
 half = { version = "1.8.2", features = ["bytemuck"] }
 # Using tokio for async test-running.
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
+
+[target.'cfg(target_family = "wasm")'.dev-dependencies]

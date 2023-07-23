@@ -64,6 +64,7 @@ features = [
   "EventTarget",
   "File",  # file drag-and-drop - DataTransferItem.getAsFile()
   "FocusEvent",
+  "HtmlCanvasElement",
   "HtmlElement",
   "HtmlProgressElement",
   "KeyboardEvent",
