@@ -39,17 +39,17 @@ getrandom = { version = "0.2.3", features = ["js"] }
 getrandom_old = { package = "getrandom", version = "0.1.16", features = ["wasm-bindgen"] }
 # Feature enabling for indirect dependency all-is-cubes → instant
 instant = { workspace = true, features = ["wasm-bindgen"] }
-js-sys = "0.3.61"
+js-sys = "0.3.64"
 log = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true, features = ["std", "std_rng"] }
 send_wrapper = "0.6.0"
-wasm-bindgen = "0.2.84"
+wasm-bindgen = "0.2.87"
 wasm-bindgen-futures = { workspace = true }
 wgpu = { workspace = true, features = ["webgl"] }
 
 [dependencies.web-sys]
-version = "0.3.61"
+version = "0.3.64"
 features = [
   "console",
   "AddEventListenerOptions",
