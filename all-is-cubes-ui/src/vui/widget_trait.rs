@@ -4,7 +4,7 @@ use std::error::Error;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
-use all_is_cubes::behavior::{Behavior, BehaviorContext, BehaviorSetTransaction};
+use all_is_cubes::behavior::{self, Behavior};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
@@ -71,7 +71,7 @@ pub trait Widget: Layoutable + Debug + Send + Sync {
 /// In most cases, [`Widget`] implementations have corresponding [`WidgetController`]
 /// implementations, though there are common utilities such as [`OneshotController`].
 ///
-/// Currently, [`WidgetController`]s are expected to manager their state and todo by being
+/// Currently, [`WidgetController`]s are expected to manage their state and todo by being
 /// mutable — unlike the normal [`Behavior`] contract. This has been chosen as an acceptable
 /// compromise for convenience because controllers are required not to operate outside
 /// their assigned regions of space and therefore will not experience transaction conflicts.
@@ -136,7 +136,7 @@ impl WidgetBehavior {
                 });
             }
         };
-        let add_txn = BehaviorSetTransaction::insert(
+        let add_txn = behavior::BehaviorSetTransaction::insert(
             // TODO: widgets should be rotatable and that should go here
             space::SpaceBehaviorAttachment::new(widget.position.bounds),
             Arc::new(WidgetBehavior {
@@ -159,7 +159,7 @@ impl VisitRefs for WidgetBehavior {
 impl Behavior<Space> for WidgetBehavior {
     fn step(
         &self,
-        context: &BehaviorContext<'_, Space>,
+        context: &behavior::BehaviorContext<'_, Space>,
         tick: Tick,
     ) -> all_is_cubes::universe::UniverseTransaction {
         let txn = self
@@ -174,12 +174,12 @@ impl Behavior<Space> for WidgetBehavior {
         context.bind_host(txn)
     }
 
-    fn alive(&self, _: &BehaviorContext<'_, Space>) -> bool {
+    fn alive(&self, _: &behavior::BehaviorContext<'_, Space>) -> bool {
         true
     }
 
-    fn ephemeral(&self) -> bool {
-        true
+    fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+        None
     }
 }
 

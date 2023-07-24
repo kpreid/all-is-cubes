@@ -1,11 +1,13 @@
 //! Tests of serialization and deserialization.
 
 use std::fmt;
+use std::sync::Arc;
 
 use cgmath::Vector3;
 use pretty_assertions::assert_eq;
 use serde_json::{from_value, json, to_value};
 
+use crate::behavior;
 use crate::block::{
     self, AnimationChange, AnimationHint, Block, BlockDef, Modifier, Resolution, AIR,
 };
@@ -16,6 +18,7 @@ use crate::math::{Face6, GridAab, GridRotation, Rgb, Rgba};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::time::{practically_infinite_deadline, Tick};
+use crate::transaction::Transaction as _;
 use crate::universe::{Name, PartialUniverse, URef, Universe};
 
 #[track_caller]
@@ -74,6 +77,56 @@ where
 
     assert!(error.is_data(), "Error {error:?} was not a data error.");
     assert_eq!(error.to_string(), expected_error);
+}
+
+//------------------------------------------------------------------------------------------------//
+// Tests corresponding to the `behavior` module
+
+#[test]
+fn behavior_not_persistent() {
+    let mut set = behavior::BehaviorSet::new();
+    // ActivatableRegion is an example of a non-persistent behavior.
+    behavior::BehaviorSetTransaction::insert(
+        space::SpaceBehaviorAttachment::new(GridAab::ORIGIN_CUBE),
+        Arc::new(space::ActivatableRegion {
+            effect: (Arc::new(|| {}) as Arc<dyn Fn() + Send + Sync>).into(),
+        }),
+    )
+    .execute(&mut set, &mut drop)
+    .unwrap();
+
+    assert_serdeser(
+        &set,
+        json!({
+            "type": "BehaviorSetV1",
+            "behaviors": []
+        }),
+    );
+}
+
+#[test]
+#[ignore = "no persistent behaviors exist yet"]
+fn behavior_persistent() {
+    let set = behavior::BehaviorSet::<Space>::new();
+    // TODO: insert behavior
+
+    assert_serdeser(
+        &set,
+        json!({
+            "type": "BehaviorSetV1",
+            "behaviors": [
+                {
+                    "attachment": {
+                        "bounds": {
+                            "lower": [0, 0, 0],
+                            "upper": [1, 1, 1],
+                        }
+                    },
+                    "behavior": "TODO: need an actual behavior here",
+                }
+            ]
+        }),
+    );
 }
 
 //------------------------------------------------------------------------------------------------//

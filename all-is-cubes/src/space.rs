@@ -765,7 +765,9 @@ impl crate::behavior::BehaviorHost for Space {
 
 /// Description of where in a [`Space`] a [`Behavior<Space>`](crate::behavior::Behavior)
 /// exists.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+// ---
+// TODO: This shouldn't directly implement Serialize
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SpaceBehaviorAttachment {
     bounds: GridAab,
     rotation: GridRotation,
@@ -1058,8 +1060,9 @@ impl behavior::Behavior<Space> for ActivatableRegion {
         true
     }
 
-    fn ephemeral(&self) -> bool {
-        true
+    fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+        // Not useful to serialize since `EphemeralOpaque` can't be.
+        None
     }
 }
 

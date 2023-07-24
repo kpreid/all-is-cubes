@@ -29,6 +29,30 @@ use crate::{block, character, inv, space, universe};
 pub(crate) struct SerializeRef<T>(pub(crate) URef<T>);
 
 //------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `behavior` module
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum BehaviorSetSer<A> {
+    BehaviorSetV1 {
+        behaviors: Vec<BehaviorSetEntryV1Ser<A>>,
+    },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct BehaviorSetEntryV1Ser<A> {
+    pub behavior: BehaviorV1Ser,
+    pub attachment: A,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum BehaviorV1Ser {
+    // TODO: This is empty because we don't actually have any specifically serializable
+    // behaviors yet.
+}
+
+//------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `block` module
 
 #[derive(Debug, Deserialize, Serialize)]

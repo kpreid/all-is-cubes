@@ -7,7 +7,7 @@ use instant::Duration;
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
-use all_is_cubes::behavior::{Behavior, BehaviorContext};
+use all_is_cubes::behavior;
 use all_is_cubes::block::{Block, BlockCollision, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace as _};
 use all_is_cubes::content::palette;
@@ -57,10 +57,14 @@ impl<F: Fn(GridPoint, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
     }
 }
 
-impl<F: Fn(GridPoint, u64) -> Block + Clone + Send + Sync + 'static> Behavior<Space>
+impl<F: Fn(GridPoint, u64) -> Block + Clone + Send + Sync + 'static> behavior::Behavior<Space>
     for AnimatedVoxels<F>
 {
-    fn step(&self, context: &BehaviorContext<'_, Space>, tick: Tick) -> UniverseTransaction {
+    fn step(
+        &self,
+        context: &behavior::BehaviorContext<'_, Space>,
+        tick: Tick,
+    ) -> UniverseTransaction {
         let mut mut_self: AnimatedVoxels<F> = self.clone();
         mut_self.accumulator += tick.delta_t();
         if mut_self.accumulator >= mut_self.frame_period {
@@ -78,12 +82,13 @@ impl<F: Fn(GridPoint, u64) -> Block + Clone + Send + Sync + 'static> Behavior<Sp
         }
     }
 
-    fn alive(&self, _context: &BehaviorContext<'_, Space>) -> bool {
+    fn alive(&self, _context: &behavior::BehaviorContext<'_, Space>) -> bool {
         true
     }
 
-    fn ephemeral(&self) -> bool {
-        false
+    fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+        // TODO: serialize
+        None
     }
 }
 
@@ -182,8 +187,12 @@ impl Fire {
     }
 }
 
-impl Behavior<Space> for Fire {
-    fn step(&self, context: &BehaviorContext<'_, Space>, tick: Tick) -> UniverseTransaction {
+impl behavior::Behavior<Space> for Fire {
+    fn step(
+        &self,
+        context: &behavior::BehaviorContext<'_, Space>,
+        tick: Tick,
+    ) -> UniverseTransaction {
         let mut mut_self = self.clone();
         if mut_self.tick_state(tick) {
             let paint_txn = mut_self.paint();
@@ -196,12 +205,13 @@ impl Behavior<Space> for Fire {
         }
     }
 
-    fn alive(&self, _context: &BehaviorContext<'_, Space>) -> bool {
+    fn alive(&self, _context: &behavior::BehaviorContext<'_, Space>) -> bool {
         true
     }
 
-    fn ephemeral(&self) -> bool {
-        false
+    fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+        // TODO: serialize
+        None
     }
 }
 
@@ -288,8 +298,12 @@ impl Clock {
     }
 }
 
-impl Behavior<Space> for Clock {
-    fn step(&self, context: &BehaviorContext<'_, Space>, _tick: Tick) -> UniverseTransaction {
+impl behavior::Behavior<Space> for Clock {
+    fn step(
+        &self,
+        context: &behavior::BehaviorContext<'_, Space>,
+        _tick: Tick,
+    ) -> UniverseTransaction {
         let mut mut_self = self.clone();
         mut_self.ticks += 1;
         context
@@ -298,12 +312,13 @@ impl Behavior<Space> for Clock {
             .unwrap()
     }
 
-    fn alive(&self, _context: &BehaviorContext<'_, Space>) -> bool {
+    fn alive(&self, _context: &behavior::BehaviorContext<'_, Space>) -> bool {
         true
     }
 
-    fn ephemeral(&self) -> bool {
-        false
+    fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+        // TODO: serialize
+        None
     }
 }
 

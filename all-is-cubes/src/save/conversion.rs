@@ -5,6 +5,71 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::schema;
 
+mod behavior {
+    use super::*;
+    use crate::behavior::{
+        Behavior, BehaviorHost, BehaviorPersistence, BehaviorSet, BehaviorSetTransaction,
+    };
+    use crate::transaction::{Merge as _, Transaction as _};
+    use std::sync::Arc;
+
+    // TODO: Stop serializing H::Attachment directly or document that it has to be stable.
+
+    impl<H: BehaviorHost> Serialize for BehaviorSet<H>
+    where
+        H::Attachment: Serialize,
+    {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            schema::BehaviorSetSer::BehaviorSetV1 {
+                behaviors: self
+                    .iter()
+                    .filter_map(|entry| {
+                        let BehaviorPersistence(behavior) = entry.behavior.persistence()?;
+                        Some(schema::BehaviorSetEntryV1Ser {
+                            attachment: entry.attachment.clone(),
+                            behavior,
+                        })
+                    })
+                    .collect::<Vec<schema::BehaviorSetEntryV1Ser<H::Attachment>>>(),
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de, H: BehaviorHost> Deserialize<'de> for BehaviorSet<H>
+    where
+        H::Attachment: serde::de::DeserializeOwned,
+    {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            match schema::BehaviorSetSer::<H::Attachment>::deserialize(deserializer)? {
+                schema::BehaviorSetSer::BehaviorSetV1 { behaviors } => {
+                    let mut txn = BehaviorSetTransaction::default();
+                    for schema::BehaviorSetEntryV1Ser {
+                        behavior,
+                        attachment,
+                    } in behaviors
+                    {
+                        txn = txn
+                            .merge(BehaviorSetTransaction::insert(attachment, behavior.into()))
+                            .expect("BehaviorSet merge failure");
+                    }
+
+                    let mut set = BehaviorSet::new();
+                    txn.execute(&mut set, &mut drop)
+                        .expect("BehaviorSet execute failure");
+                    Ok(set)
+                }
+            }
+        }
+    }
+
+    impl<A> From<schema::BehaviorV1Ser> for Arc<dyn Behavior<A>> {
+        fn from(value: schema::BehaviorV1Ser) -> Self {
+            match value {}
+        }
+    }
+}
+
 mod block {
     use super::*;
     use crate::block::{

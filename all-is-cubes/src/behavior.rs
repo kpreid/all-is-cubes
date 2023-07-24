@@ -26,14 +26,16 @@ pub trait Behavior<H: BehaviorHost>: Debug + Send + Sync + Downcast + VisitRefs 
     /// which it is useful no longer apply.
     fn alive(&self, context: &BehaviorContext<'_, H>) -> bool;
 
-    /// Whether the behavior should never be persisted/saved to disk, because it will be
+    /// If `None`, then the behavior should not be persisted/saved to disk, because it will be
     /// reconstructed as needed (e.g. collision, occupancy, user interaction, particles).
     ///
-    /// If a behavior changes its answer over its lifetime, which outcome will occur is
-    /// unspecified.
-    fn ephemeral(&self) -> bool;
+    /// If `Some`, then the representation that should be serialized, which must specify not
+    /// just the state of the behavior but _which_ behavior to recreate.
+    ///
+    /// TODO: Return type isn't a clean public API, nor extensible.
+    fn persistence(&self) -> Option<BehaviorPersistence>;
 
-    // TODO: serialization, quiescence, incoming events...
+    // TODO: quiescence, incoming events...
 }
 
 impl_downcast!(Behavior<H> where H: BehaviorHost);
@@ -176,6 +178,10 @@ impl<H: BehaviorHost> BehaviorSet<H> {
             .reduce(|a, b| a.merge(b).expect("TODO: handle merge failure"));
         transaction.unwrap_or_default()
     }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &BehaviorSetEntry<H>> + '_ {
+        self.items.iter()
+    }
 }
 
 impl<H: BehaviorHost> std::fmt::Debug for BehaviorSet<H> {
@@ -200,9 +206,9 @@ impl<H: BehaviorHost> transaction::Transactional for BehaviorSet<H> {
     type Transaction = BehaviorSetTransaction<H>;
 }
 
-struct BehaviorSetEntry<H: BehaviorHost> {
-    attachment: H::Attachment,
-    behavior: Arc<dyn Behavior<H>>,
+pub(crate) struct BehaviorSetEntry<H: BehaviorHost> {
+    pub(crate) attachment: H::Attachment,
+    pub(crate) behavior: Arc<dyn Behavior<H>>,
 }
 
 impl<H: BehaviorHost> Clone for BehaviorSetEntry<H> {
@@ -500,8 +506,8 @@ mod testing {
         fn alive(&self, _context: &BehaviorContext<'_, H>) -> bool {
             true
         }
-        fn ephemeral(&self) -> bool {
-            false
+        fn persistence(&self) -> Option<BehaviorPersistence> {
+            None
         }
     }
 
@@ -509,6 +515,14 @@ mod testing {
         fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
     }
 }
+
+/// Placeholder for the representation of serializable behaviors.
+///
+/// This type is opaque and cannot be constructed. Future versions of `all-is-cubes` will
+/// offer some means to access this functionality or replace the [`Behavior`] system
+/// entirely.
+#[derive(Debug)]
+pub struct BehaviorPersistence(pub(crate) crate::save::schema::BehaviorV1Ser);
 
 #[cfg(test)]
 mod tests {
@@ -566,8 +580,8 @@ mod tests {
             true
         }
 
-        fn ephemeral(&self) -> bool {
-            false
+        fn persistence(&self) -> Option<BehaviorPersistence> {
+            None
         }
     }
 
@@ -607,8 +621,8 @@ mod tests {
             fn alive(&self, _context: &BehaviorContext<'_, Character>) -> bool {
                 true
             }
-            fn ephemeral(&self) -> bool {
-                false
+            fn persistence(&self) -> Option<BehaviorPersistence> {
+                None
             }
         }
         impl<T> VisitRefs for Q<T> {

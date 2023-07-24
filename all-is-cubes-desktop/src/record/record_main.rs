@@ -151,8 +151,8 @@ impl behavior::Behavior<character::Character> for AutoRotate {
         true
     }
 
-    fn ephemeral(&self) -> bool {
-        false
+    fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+        None
     }
 }
 
