@@ -1,5 +1,6 @@
 //! Player-character stuff.
 
+use std::borrow::Cow::Borrowed;
 use std::collections::HashSet;
 use std::fmt;
 use std::sync::Arc;
@@ -568,7 +569,7 @@ impl serde::Serialize for Character {
             ref space,
             ref inventory,
             selected_slots,
-            behaviors: _, // TODO: should be persisted
+            ref behaviors,
 
             // Not persisted - run-time connections to other things
             notifier: _,
@@ -594,8 +595,9 @@ impl serde::Serialize for Character {
             yaw,
             pitch,
 
-            inventory: inventory.clone(),
+            inventory: Borrowed(inventory),
             selected_slots,
+            behaviors: Borrowed(behaviors),
         }
         .serialize(serializer)
     }
@@ -618,6 +620,7 @@ impl<'de> serde::Deserialize<'de> for Character {
                 pitch,
                 inventory,
                 selected_slots,
+                behaviors,
             } => Ok(Character {
                 body: Body {
                     position: position.into(),
@@ -629,9 +632,9 @@ impl<'de> serde::Deserialize<'de> for Character {
                     pitch,
                 },
                 space,
-                inventory,
+                inventory: inventory.into_owned(),
                 selected_slots,
-                behaviors: BehaviorSet::new(),
+                behaviors: behaviors.into_owned(),
 
                 // Not persisted - run-time connections to other things
                 notifier: Notifier::new(),

@@ -13,7 +13,9 @@
 //!
 //! * 3D vectors/points are represented as 3-element arrays
 //!   (and not, say, as structures with named fields).
+//! * [`Cow`] is sometimes used to avoid unnecessary clones during serialization.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -22,7 +24,7 @@ use crate::block::Block;
 use crate::math::{Aab, Face6, GridAab, GridCoordinate, GridRotation};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::universe::URef;
-use crate::{block, character, inv, space, universe};
+use crate::{behavior, block, character, inv, space, universe};
 
 /// Placeholder type for when we want to serialize the *contents* of a `URef`,
 /// without cloning or referencing those contents immediately.
@@ -186,7 +188,7 @@ pub(crate) enum ModifierSer {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum CharacterSer {
+pub(crate) enum CharacterSer<'a> {
     CharacterV1 {
         space: URef<space::Space>,
         position: [f64; 3],
@@ -196,8 +198,10 @@ pub(crate) enum CharacterSer {
         noclip: bool,
         yaw: f64,
         pitch: f64,
-        inventory: inv::Inventory,
+        inventory: Cow<'a, inv::Inventory>,
         selected_slots: [usize; 3],
+        #[serde(default, skip_serializing_if = "behavior::BehaviorSet::is_empty")]
+        behaviors: Cow<'a, behavior::BehaviorSet<character::Character>>,
     },
 }
 
@@ -266,7 +270,9 @@ pub(crate) enum SpaceSer<'a> {
         blocks: Vec<block::Block>,
         contents: GzSerde<'a, Leu16>,
         light: Option<GzSerde<'a, LightSerV1>>,
-        // TODO: behaviors, spawn
+        #[serde(default, skip_serializing_if = "behavior::BehaviorSet::is_empty")]
+        behaviors: Cow<'a, behavior::BehaviorSet<space::Space>>,
+        // TODO: spawn
     },
 }
 

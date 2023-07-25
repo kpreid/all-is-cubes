@@ -554,6 +554,7 @@ mod space {
                         .into(),
                     )))
                 },
+                behaviors: Cow::Borrowed(self.behaviors()),
             }
             .serialize(serializer)
         }
@@ -571,6 +572,7 @@ mod space {
                     blocks,
                     contents: GzSerde(contents),
                     light,
+                    behaviors,
                 } => {
                     // Convert data representations
                     let contents = GridArray::from_elements(
@@ -598,6 +600,7 @@ mod space {
                         .physics(physics.into())
                         .palette_and_contents(&mut blocks.into_iter(), contents, light)
                         .map_err(serde::de::Error::custom)?
+                        .behaviors(behaviors.into_owned())
                         .build();
 
                     Ok(space)

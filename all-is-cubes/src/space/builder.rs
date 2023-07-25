@@ -1,5 +1,6 @@
 use cgmath::{EuclideanSpace, InnerSpace, Point3};
 
+use crate::behavior::BehaviorSet;
 use crate::block::{Block, AIR};
 use crate::character::Spawn;
 use crate::math::{FreeCoordinate, GridArray, Rgb};
@@ -22,6 +23,7 @@ pub struct SpaceBuilder<B> {
     pub(super) bounds: B,
     pub(super) spawn: Option<Spawn>,
     pub(super) physics: SpacePhysics,
+    pub(super) behaviors: BehaviorSet<Space>,
     pub(super) contents: Fill,
 }
 
@@ -75,6 +77,12 @@ impl<B> SpaceBuilder<B> {
         self.spawn = Some(spawn);
         self
     }
+
+    /// TODO: not sure if this is good public API
+    pub(crate) fn behaviors(mut self, behaviors: BehaviorSet<Space>) -> Self {
+        self.behaviors = behaviors;
+        self
+    }
 }
 
 impl<B: SpaceBuilderBounds> SpaceBuilder<B> {
@@ -92,6 +100,7 @@ impl SpaceBuilder<()> {
             bounds: (),
             spawn: None,
             physics: SpacePhysics::DEFAULT,
+            behaviors: BehaviorSet::new(),
             contents: Fill::Block(AIR),
         }
     }
@@ -102,6 +111,7 @@ impl SpaceBuilder<()> {
             bounds,
             spawn: self.spawn,
             physics: self.physics,
+            behaviors: self.behaviors,
             contents: self.contents,
         }
     }

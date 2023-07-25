@@ -138,6 +138,7 @@ impl Space {
             bounds,
             spawn,
             physics,
+            behaviors,
             contents,
         } = builder;
 
@@ -197,7 +198,7 @@ impl Space {
             light_cost_scale: 1e-6,
 
             physics,
-            behaviors: BehaviorSet::new(),
+            behaviors,
             spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(bounds)),
             cubes_wanting_ticks: HashSet::new(),
             notifier: Notifier::new(),

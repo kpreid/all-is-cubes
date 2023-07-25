@@ -97,7 +97,8 @@ pub struct BehaviorSet<H: BehaviorHost> {
 }
 
 impl<H: BehaviorHost> BehaviorSet<H> {
-    pub(crate) fn new() -> Self {
+    /// Constructs an empty [`BehaviorSet`].
+    pub const fn new() -> Self {
         BehaviorSet { items: Vec::new() }
     }
 
@@ -181,6 +182,24 @@ impl<H: BehaviorHost> BehaviorSet<H> {
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = &BehaviorSetEntry<H>> + '_ {
         self.items.iter()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+}
+
+impl<H: BehaviorHost> Clone for BehaviorSet<H> {
+    fn clone(&self) -> Self {
+        Self {
+            items: self.items.clone(),
+        }
+    }
+}
+
+impl<H: BehaviorHost> Default for BehaviorSet<H> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
