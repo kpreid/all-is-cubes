@@ -18,6 +18,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 
 use crate::block::Block;
@@ -205,6 +206,16 @@ pub(crate) enum CharacterSer<'a> {
     },
 }
 
+#[derive(Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum SpawnSer {
+    SpawnV1 {
+        bounds: GridAab,
+        eye_position: Option<[NotNan<f64>; 3]>,
+        look_direction: [NotNan<f64>; 3],
+        inventory: Vec<Option<InvStackSer>>,
+    },
+}
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `inv` module
 
@@ -254,9 +265,9 @@ pub(crate) struct GridAabSer {
     pub(crate) upper: [GridCoordinate; 3],
 }
 
-type RgbSer = [ordered_float::NotNan<f32>; 3];
+type RgbSer = [NotNan<f32>; 3];
 
-type RgbaSer = [ordered_float::NotNan<f32>; 4];
+type RgbaSer = [NotNan<f32>; 4];
 
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `space` module
@@ -272,7 +283,7 @@ pub(crate) enum SpaceSer<'a> {
         light: Option<GzSerde<'a, LightSerV1>>,
         #[serde(default, skip_serializing_if = "behavior::BehaviorSet::is_empty")]
         behaviors: Cow<'a, behavior::BehaviorSet<space::Space>>,
-        // TODO: spawn
+        spawn: Cow<'a, character::Spawn>,
     },
 }
 
@@ -299,7 +310,7 @@ pub(crate) enum LightStatusSerV1 {
 /// Currently identical to `PackedLight`.
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct SpacePhysicsSerV1 {
-    pub gravity: [ordered_float::NotNan<f64>; 3],
+    pub gravity: [NotNan<f64>; 3],
     pub sky_color: RgbSer,
     pub light: LightPhysicsSerV1,
 }

@@ -1,6 +1,8 @@
 //! Conversion between the types in [`super::schema`] and those used in
 //! normal operation.
 
+use std::borrow::Cow;
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::schema;
@@ -364,7 +366,8 @@ mod block {
     }
 }
 
-// `character::Character` serialization is inside its module for the sake of private fields.
+// `character::Character` and `character::SPawn` serialization are inside their module
+// for the sake of private fields.
 
 mod math {
     use super::*;
@@ -452,13 +455,28 @@ mod inv {
         {
             match schema::InventorySer::deserialize(deserializer)? {
                 schema::InventorySer::InventoryV1 { slots } => Ok(Inventory {
-                    slots: slots
-                        .into_iter()
-                        .map(|slot| match slot {
-                            Some(schema::InvStackSer { count, item }) => Slot::Stack(count, item),
-                            None => Slot::Empty,
-                        })
-                        .collect(),
+                    slots: slots.into_iter().map(|s| s.into()).collect(),
+                }),
+            }
+        }
+    }
+
+    impl From<Option<schema::InvStackSer>> for Slot {
+        fn from(slot: Option<schema::InvStackSer>) -> Self {
+            match slot {
+                Some(schema::InvStackSer { count, item }) => Slot::Stack(count, item),
+                None => Slot::Empty,
+            }
+        }
+    }
+
+    impl From<&Slot> for Option<schema::InvStackSer> {
+        fn from(slot: &Slot) -> Self {
+            match *slot {
+                crate::inv::Slot::Empty => None,
+                crate::inv::Slot::Stack(count, ref item) => Some(schema::InvStackSer {
+                    count,
+                    item: item.clone(),
                 }),
             }
         }
@@ -519,7 +537,6 @@ mod space {
     use crate::math::GridArray;
     use crate::save::compress::{GzSerde, Leu16};
     use crate::space::{self, LightPhysics, Space, SpacePhysics};
-    use std::borrow::Cow;
 
     impl Serialize for Space {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -555,6 +572,7 @@ mod space {
                     )))
                 },
                 behaviors: Cow::Borrowed(self.behaviors()),
+                spawn: Cow::Borrowed(self.spawn()),
             }
             .serialize(serializer)
         }
@@ -573,6 +591,7 @@ mod space {
                     contents: GzSerde(contents),
                     light,
                     behaviors,
+                    spawn,
                 } => {
                     // Convert data representations
                     let contents = GridArray::from_elements(
@@ -601,6 +620,7 @@ mod space {
                         .palette_and_contents(&mut blocks.into_iter(), contents, light)
                         .map_err(serde::de::Error::custom)?
                         .behaviors(behaviors.into_owned())
+                        .spawn(spawn.into_owned())
                         .build();
 
                     Ok(space)

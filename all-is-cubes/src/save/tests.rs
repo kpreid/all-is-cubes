@@ -11,7 +11,7 @@ use crate::behavior;
 use crate::block::{
     self, AnimationChange, AnimationHint, Block, BlockDef, Modifier, Resolution, AIR,
 };
-use crate::character::Character;
+use crate::character::{Character, Spawn};
 use crate::content::make_some_blocks;
 use crate::inv::Tool;
 use crate::math::{Face6, GridAab, GridRotation, Rgb, Rgba};
@@ -276,6 +276,25 @@ fn character() {
     );
 }
 
+#[test]
+fn spawn() {
+    let spawn = Spawn::default_for_new_space(GridAab::ORIGIN_CUBE);
+
+    assert_round_trip_value(
+        &spawn,
+        json!({
+            "type": "SpawnV1",
+            "bounds": {
+                "lower": [0, 0, 1],
+                "upper": [1, 1, 41],
+            },
+            "eye_position": null,
+            "inventory": [],
+            "look_direction": [0.0, 0.0, -1.0],
+        }),
+    );
+}
+
 //------------------------------------------------------------------------------------------------//
 // Tests corresponding to the `space` module
 
@@ -306,6 +325,7 @@ fn space_light_json(light: impl IntoIterator<Item = [u8; 4]>) -> serde_json::Val
 #[test]
 fn space_success() {
     // TODO: set more properties
+    // TODO: Specify spawn explicitly, so these tests do not rely on the default spawn value
     let bounds = GridAab::from_lower_upper([1, 2, 3], [4, 5, 6]);
     let mut space = Space::builder(bounds)
         .physics(SpacePhysics {
@@ -340,6 +360,16 @@ fn space_success() {
                     "type": "RaysV1",
                     "maximum_distance": 123,
                 }
+            },
+            "spawn": {
+                "type": "SpawnV1",
+                "bounds": {
+                    "lower": [1, 2, 6],
+                    "upper": [4, 5, 46],
+                },
+                "eye_position": null,
+                "inventory": [],
+                "look_direction": [0.0, 0.0, -1.0],
             },
             "blocks": [
                 {
@@ -383,6 +413,16 @@ fn space_de_invalid_index() {
                 "upper": [3, 1, 1],
             },
             "physics": dont_care_physics_json(),
+            "spawn": {
+                "type": "SpawnV1",
+                "bounds": {
+                    "lower": [0, 0, 2],
+                    "upper": [2, 2, 42],
+                },
+                "eye_position": null,
+                "inventory": [],
+                "look_direction": [0.0, 0.0, -1.0],
+            },
             "blocks": [
                 {
                     "type": "BlockV1",
@@ -479,6 +519,7 @@ fn universe_with_one_of_each() -> Universe {
         .unwrap();
 
     // Note: space has no light (which simplifies our work here)
+    // TODO: Specify spawn explicitly, so these tests do not rely on the default spawn value
     let mut space = Space::for_block(Resolution::R2).build();
     space
         .set(
@@ -564,6 +605,16 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                         "light": {
                             "type": "NoneV1",
                         }
+                    },
+                    "spawn": {
+                        "type": "SpawnV1",
+                        "bounds": {
+                            "lower": [0, 0, 2],
+                            "upper": [2, 2, 42],
+                        },
+                        "eye_position": null,
+                        "inventory": [],
+                        "look_direction": [0.0, 0.0, -1.0],
                     },
                     "blocks": [
                         {

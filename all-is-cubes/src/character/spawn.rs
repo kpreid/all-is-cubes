@@ -3,6 +3,7 @@ use cgmath::{Point3, Vector3};
 use crate::camera::eye_for_look_at;
 use crate::inv::Slot;
 use crate::math::{Face6, FreeCoordinate, GridAab, NotNan};
+use crate::save::schema;
 use crate::universe::{RefVisitor, VisitRefs};
 
 /// Defines the initial state of a [`Character`] that is being created or moved into a [`Space`].
@@ -112,6 +113,49 @@ impl VisitRefs for Spawn {
             look_direction: _,
         } = self;
         inventory.visit_refs(visitor);
+    }
+}
+
+impl serde::Serialize for Spawn {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let Spawn {
+            bounds,
+            eye_position,
+            look_direction,
+            ref inventory,
+        } = *self;
+
+        schema::SpawnSer::SpawnV1 {
+            bounds,
+            eye_position: eye_position.map(|p| p.into()),
+            look_direction: look_direction.into(),
+            inventory: inventory.iter().map(|slot| slot.into()).collect(),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Spawn {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match schema::SpawnSer::deserialize(deserializer)? {
+            schema::SpawnSer::SpawnV1 {
+                bounds,
+                eye_position,
+                look_direction,
+                inventory,
+            } => Ok(Spawn {
+                bounds,
+                eye_position: eye_position.map(|p| p.into()),
+                look_direction: look_direction.into(),
+                inventory: inventory.into_iter().map(|slot| slot.into()).collect(),
+            }),
+        }
     }
 }
 
