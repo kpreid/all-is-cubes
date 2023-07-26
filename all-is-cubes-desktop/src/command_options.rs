@@ -132,6 +132,13 @@ pub(crate) struct AicDesktopArgs {
     #[arg(long = "verbose", short = 'v')]
     pub(crate) verbose: bool,
 
+    /// Remove timestamps from logs so that they are closer to deterministic.
+    /// (Note that some logs will still contain timing data.)
+    ///
+    /// This option is intended for internal tests only.
+    #[arg(long = "simplify-log-format", hide = true)]
+    pub(crate) simplify_log_format: bool,
+
     /// Ignore all configuration files, using only defaults and command-line options.
     #[arg(long = "no-config-files")]
     pub(crate) no_config_files: bool,

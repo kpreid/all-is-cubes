@@ -1,4 +1,5 @@
-...
+[DEBUG] (1) Initialized session [..]
+[INFO] Randomly chosen universe seed: [..]
 Error: failed to create universe from requested template or file
 
 Caused by:
