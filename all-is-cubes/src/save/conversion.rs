@@ -366,7 +366,7 @@ mod block {
     }
 }
 
-// `character::Character` and `character::SPawn` serialization are inside their module
+// `character::Character` and `character::Spawn` serialization are inside their module
 // for the sake of private fields.
 
 mod math {
