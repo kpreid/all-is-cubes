@@ -142,7 +142,7 @@ impl Body {
     where
         CC: FnMut(Contact),
     {
-        let dt = tick.delta_t.as_secs_f64();
+        let dt = tick.delta_t().as_secs_f64();
         let mut move_segments = [MoveSegment::default(); 3];
         let mut already_colliding = None;
 

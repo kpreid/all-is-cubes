@@ -284,7 +284,7 @@ impl Character {
         let flying = find_jetpacks(&self.inventory).any(|(_slot_index, active)| active);
         self.body.flying = flying;
 
-        let dt = tick.delta_t.as_secs_f64();
+        let dt = tick.delta_t().as_secs_f64();
         let control_orientation: Matrix3<FreeCoordinate> =
             Matrix3::from_angle_y(-Deg(self.body.yaw));
         // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)

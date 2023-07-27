@@ -1,12 +1,14 @@
 use std::any::TypeId;
 
+use indoc::indoc;
+
 use crate::block::{Block, BlockDef, BlockDefTransaction, Primitive, Resolution, AIR};
 use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
 use crate::math::Rgba;
 use crate::space::Space;
-use crate::time::{practically_infinite_deadline, Tick};
+use crate::time::practically_infinite_deadline;
 use crate::transaction::{self, Transaction};
 use crate::universe::{
     list_refs, InsertError, InsertErrorKind, Name, RefError, URef, Universe, UniverseTransaction,
@@ -23,11 +25,17 @@ fn thread_safety() {
 fn universe_debug_empty() {
     assert_eq!(
         format!("{:?}", Universe::new()),
-        "Universe { session_step_time: 0, spaces_with_work: 0 }"
+        "Universe { clock: Clock(0/60 of 1s), session_step_time: 0, spaces_with_work: 0 }"
     );
     assert_eq!(
         format!("{:#?}", Universe::new()),
-        "Universe {\n    session_step_time: 0,\n    spaces_with_work: 0,\n}"
+        indoc! {"
+            Universe {
+                clock: Clock(0/60 of 1s),
+                session_step_time: 0,
+                spaces_with_work: 0,
+            }\
+        "}
     );
 }
 
@@ -41,6 +49,7 @@ fn universe_debug_elements() {
     assert_eq!(
         format!("{u:?}"),
         "Universe { \
+            clock: Clock(0/60 of 1s), \
             session_step_time: 0, \
             spaces_with_work: 0, \
             [anonymous #0]: all_is_cubes::block::block_def::BlockDef, \
@@ -49,14 +58,15 @@ fn universe_debug_elements() {
     );
     assert_eq!(
         format!("{u:#?}"),
-        "\
-Universe {
-    session_step_time: 0,
-    spaces_with_work: 0,
-    [anonymous #0]: all_is_cubes::block::block_def::BlockDef,
-    'foo': all_is_cubes::space::Space,
-}\
-            "
+        indoc! {"
+            Universe {
+                clock: Clock(0/60 of 1s),
+                session_step_time: 0,
+                spaces_with_work: 0,
+                [anonymous #0]: all_is_cubes::block::block_def::BlockDef,
+                'foo': all_is_cubes::space::Space,
+            }\
+        "}
     );
 }
 
@@ -279,9 +289,9 @@ fn delete_wrong_universe_fails() {
 fn step_time() {
     let mut u = Universe::new();
     assert_eq!(u.session_step_time, 0);
-    u.step(Tick::arbitrary(), practically_infinite_deadline());
+    u.step(false, practically_infinite_deadline());
     assert_eq!(u.session_step_time, 1);
-    u.step(Tick::arbitrary().pause(), practically_infinite_deadline());
+    u.step(true, practically_infinite_deadline());
     assert_eq!(u.session_step_time, 1);
 }
 
@@ -299,7 +309,7 @@ fn gc_implicit() {
     let mut u = Universe::new();
     u.insert_anonymous(BlockDef::new(AIR));
     assert_eq!(1, u.iter_by_type::<BlockDef>().count());
-    u.step(Tick::arbitrary(), practically_infinite_deadline());
+    u.step(false, practically_infinite_deadline());
     assert_eq!(0, u.iter_by_type::<BlockDef>().count());
 }
 

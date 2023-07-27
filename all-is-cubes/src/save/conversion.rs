@@ -788,10 +788,7 @@ mod universe {
             // Perform a paused step to let things do re-initialization,
             // such as `Space` block evaluation, without actually causing any in-game time
             // to pass.
-            universe.step(
-                crate::time::Tick::from_seconds(0.0).pause(),
-                instant::Instant::now(),
-            );
+            universe.step(true, instant::Instant::now());
 
             Ok(universe)
         }

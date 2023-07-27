@@ -1,7 +1,7 @@
 use instant::{Duration, Instant};
 
 use all_is_cubes::math::NotNan;
-use all_is_cubes::time::Tick;
+use all_is_cubes::time::TickSchedule;
 #[cfg(doc)]
 use all_is_cubes::universe::Universe;
 
@@ -10,30 +10,31 @@ use all_is_cubes::universe::Universe;
 /// given the provided information.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FrameClock {
+    schedule: TickSchedule,
+
     last_absolute_time: Option<Instant>,
+
     /// Whether there was a step and we should therefore draw a frame.
     /// TODO: This might go away in favor of actual dirty-notifications.
     render_dirty: bool,
+
     accumulated_step_time: Duration,
 
     draw_fps_counter: FpsCounter,
 }
 
 impl FrameClock {
-    const STEP_LENGTH_MICROS: u64 = 1_000_000 / 60;
-    const STEP_LENGTH: Duration = Duration::from_micros(Self::STEP_LENGTH_MICROS);
     /// Number of steps per frame to permit.
-    /// This sets how low the frame rate can go below [`STEP_LENGTH`] before game time
+    /// This sets how low the frame rate can go below the step length before game time
     /// slows down.
-    pub(crate) const CATCH_UP_STEPS: u8 = 2;
-    const ACCUMULATOR_CAP: Duration =
-        Duration::from_micros(Self::STEP_LENGTH_MICROS * Self::CATCH_UP_STEPS as u64);
+    pub(crate) const CATCH_UP_STEPS: u32 = 2;
 
     /// Constructs a new [`FrameClock`].
     ///
     /// This operation is independent of the system clock.
-    pub fn new() -> Self {
+    pub fn new(schedule: TickSchedule) -> Self {
         Self {
+            schedule,
             last_absolute_time: None,
             render_dirty: true,
             accumulated_step_time: Duration::ZERO,
@@ -84,7 +85,7 @@ impl FrameClock {
     /// [`FrameClock::advance_to()`] must have previously been called to give an absolute
     /// time reference.
     pub fn next_step_or_draw_time(&self) -> Option<Instant> {
-        Some(self.last_absolute_time? + Self::STEP_LENGTH)
+        Some(self.last_absolute_time? + self.step_length())
     }
 
     /// Indicates whether a new frame should be drawn, given the amount of time that this
@@ -108,20 +109,16 @@ impl FrameClock {
     /// When a step *is* performd, [`FrameClock::did_step`] must be called; otherwise, this
     /// will always return true.
     pub fn should_step(&self) -> bool {
-        self.accumulated_step_time >= Self::STEP_LENGTH
+        self.accumulated_step_time >= self.step_length()
     }
 
     /// Informs the [`FrameClock`] that a step was just performed.
-    pub fn did_step(&mut self) {
-        self.accumulated_step_time -= Self::STEP_LENGTH;
+    ///
+    /// The caller must also provide an updated schedule, in case it has changed.
+    pub fn did_step(&mut self, schedule: TickSchedule) {
+        self.accumulated_step_time -= self.step_length();
         self.render_dirty = true;
-    }
-
-    /// The timestep value that should be passed to [`Universe::step()`]
-    /// when stepping in response to [`FrameClock::should_step`] returning true.
-    #[must_use] // avoid confusion with side-effecting methods
-    pub fn tick(&self) -> Tick {
-        Tick::from_duration(Self::STEP_LENGTH)
+        self.schedule = schedule;
     }
 
     #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
@@ -129,16 +126,15 @@ impl FrameClock {
         &self.draw_fps_counter
     }
 
-    fn cap_step_time(&mut self) {
-        if self.accumulated_step_time > Self::ACCUMULATOR_CAP {
-            self.accumulated_step_time = Self::ACCUMULATOR_CAP;
-        }
+    fn step_length(&self) -> Duration {
+        self.schedule.delta_t()
     }
-}
 
-impl Default for FrameClock {
-    fn default() -> Self {
-        Self::new()
+    fn cap_step_time(&mut self) {
+        let cap = self.step_length() * Self::CATCH_UP_STEPS;
+        if self.accumulated_step_time > cap {
+            self.accumulated_step_time = cap;
+        }
     }
 }
 

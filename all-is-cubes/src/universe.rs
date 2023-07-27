@@ -23,7 +23,7 @@ use instant::Instant;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::{Space, SpaceStepInfo};
-use crate::time::Tick;
+use crate::time;
 use crate::transaction::Transaction as _;
 use crate::util::{CustomFormat, StatusText};
 
@@ -127,6 +127,11 @@ pub struct Universe {
     /// For universes created by [`Universe::new()`], this is equal to `Arc::new(())`.
     pub whence: Arc<dyn crate::save::WhenceUniverse>,
 
+    /// State and schedule of in-game time passing.
+    //
+    // TODO: this is not serialized, and fixing that will require refactoring.
+    clock: time::Clock,
+
     /// Number of [`step()`]s which have occurred since this [`Universe`] was created.
     ///
     /// Note that this value is not serialized; thus, it is reset whenever “a saved game
@@ -153,6 +158,8 @@ impl Universe {
             next_anonym: 0,
             wants_gc: false,
             whence: Arc::new(()),
+            // TODO: allow nondefault schedules
+            clock: time::Clock::new(time::TickSchedule::per_second(60), 0),
             session_step_time: 0,
             spaces_with_work: 0,
         }
@@ -191,9 +198,11 @@ impl Universe {
     /// Advance time for all members.
     ///
     /// * `deadline` is when to stop computing flexible things such as light transport.
-    pub fn step(&mut self, tick: Tick, deadline: Instant) -> UniverseStepInfo {
+    pub fn step(&mut self, paused: bool, deadline: Instant) -> UniverseStepInfo {
         let mut info = UniverseStepInfo::default();
         let start_time = Instant::now();
+
+        let tick = self.clock.advance(paused);
 
         if self.wants_gc {
             self.gc();
@@ -252,6 +261,12 @@ impl Universe {
 
         info.computation_time = Instant::now().duration_since(start_time);
         info
+    }
+
+    /// Returns the [`time::Clock`] that is used to advance time when [`step()`](Self::step)
+    /// is called.
+    pub fn clock(&self) -> time::Clock {
+        self.clock
     }
 
     /// Inserts a new object without giving it a specific name, and returns
@@ -494,6 +509,7 @@ impl fmt::Debug for Universe {
             next_anonym: _,
             wants_gc: _,
             whence,
+            clock,
             session_step_time,
             spaces_with_work,
         } = self;
@@ -502,6 +518,7 @@ impl fmt::Debug for Universe {
         if whence.downcast_ref::<()>().is_none() {
             ds.field("whence", &whence);
         }
+        ds.field("clock", &clock);
         ds.field("session_step_time", &session_step_time);
         ds.field("spaces_with_work", &spaces_with_work);
         tables.fmt_members(&mut ds);

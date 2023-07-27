@@ -253,13 +253,12 @@ impl Session {
         // TODO: Catch-up implementation should probably live in FrameClock.
         for _ in 0..FrameClock::CATCH_UP_STEPS {
             if self.frame_clock.should_step() {
-                let base_tick = self.frame_clock.tick();
-                let game_tick = if *self.paused.get() {
-                    base_tick.pause()
-                } else {
-                    base_tick
-                };
-                self.frame_clock.did_step();
+                let u_clock = self.game_universe.clock();
+                let paused = *self.paused.get();
+                let ui_tick = u_clock.next_tick(false);
+                let game_tick = u_clock.next_tick(paused);
+
+                self.frame_clock.did_step(u_clock.schedule());
 
                 if let Some(character_ref) = self.game_character.borrow() {
                     self.input_processor.apply_input(
@@ -273,17 +272,18 @@ impl Session {
                         game_tick,
                     );
                 }
+                // TODO: switch from FrameClock tick to asking the universe for its tick
                 self.input_processor.step(game_tick);
 
                 // TODO(time-budget): better timing policy that explicitly trades off with time spent
                 // on rendering, event handling, etc.
                 // (That policy should probably live in `frame_clock`.)
-                let deadline = Instant::now() + base_tick.delta_t() / 4;
+                let deadline = Instant::now() + game_tick.delta_t() / 4;
 
                 // TODO(time-budget): give UI a minimum fraction of budget
-                let mut info = self.game_universe.step(game_tick, deadline);
+                let mut info = self.game_universe.step(paused, deadline);
                 if let Some(ui) = &mut self.ui {
-                    info += ui.step(base_tick, deadline);
+                    info += ui.step(ui_tick, deadline);
                 }
 
                 if LOG_FIRST_FRAMES && self.tick_counter_for_logging <= 10 {
@@ -486,7 +486,7 @@ impl SessionBuilder {
                 ),
                 None => None,
             },
-            frame_clock: FrameClock::new(),
+            frame_clock: FrameClock::new(game_universe.clock().schedule()),
             input_processor,
             graphics_options,
             game_character,

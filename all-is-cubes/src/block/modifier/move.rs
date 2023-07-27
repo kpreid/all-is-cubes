@@ -201,7 +201,7 @@ mod tests {
     use crate::content::make_some_blocks;
     use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgba};
     use crate::space::Space;
-    use crate::time::{practically_infinite_deadline, Tick};
+    use crate::time::practically_infinite_deadline;
     use crate::universe::Universe;
 
     use super::*;
@@ -314,7 +314,7 @@ mod tests {
         // TODO: We need a "step until idle" function, or for the UniverseStepInfo to convey how many blocks were updated / are waiting
         // TODO: Some tests will want to look at the partial results
         for _ in 0..257 {
-            universe.step(Tick::arbitrary(), practically_infinite_deadline());
+            universe.step(false, practically_infinite_deadline());
         }
         checker(&space.read().unwrap(), &block);
     }

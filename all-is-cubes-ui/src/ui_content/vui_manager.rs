@@ -256,6 +256,8 @@ impl Vui {
         options
     }
 
+    // TODO: This should stop taking a `Tick` and instead expose what it needs to be stepped on
+    // a schedule independent of the game
     pub fn step(&mut self, tick: Tick, deadline: Instant) -> UniverseStepInfo {
         // TODO: This should possibly be the responsibility of the TooltipState itself?
         if self.changed_character.get_and_clear() {
@@ -305,7 +307,7 @@ impl Vui {
             }
         }
 
-        self.universe.step(tick, deadline)
+        self.universe.step(tick.paused(), deadline)
     }
 
     /// Present the UI visual response to a click (that has already been handled),
