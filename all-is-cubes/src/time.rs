@@ -16,7 +16,7 @@ pub struct Tick {
     schedule: TickSchedule,
 
     /// The phase of the clock *before* this tick happens.
-    /// (After this tick happens, the phase is this value plus 1).
+    /// (After this tick happens, the phase is this value plus 1.)
     prev_phase: u16,
 
     /// Whether game time is paused, and `delta_t` should not be considered
@@ -60,6 +60,12 @@ impl Tick {
     /// Return the amount of time passed as a [`Duration`].
     pub fn delta_t(self) -> Duration {
         self.schedule.delta_t()
+    }
+
+    /// Returns the phase of the originating clock *before* this tick happens.
+    /// (After this tick happens, the phase is this value plus 1.)
+    pub fn prev_phase(self) -> u16 {
+        self.prev_phase
     }
 
     /// Set the paused flag. See [`Tick::paused`] for more information.
@@ -226,6 +232,17 @@ mod tests {
         assert_eq!(format!("{clock:?}"), "Clock(0/25 of 1s)");
         clock.advance(false);
         assert_eq!(format!("{clock:?}"), "Clock(1/25 of 1s)");
+    }
+
+    #[test]
+    fn clock_phase_advance() {
+        let mut clock = Clock::new(TickSchedule::per_second(3), 0);
+        assert_eq!(
+            (0..10)
+                .map(|_| clock.advance(false).prev_phase())
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 0, 1, 2, 0, 1, 2, 0],
+        );
     }
 
     #[test]
