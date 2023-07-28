@@ -12,9 +12,12 @@ use crate::universe::Universe;
 ///
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Tick {
-    /// Duration of this tick. This should be used in simulation/animation calculations
-    /// and not assumed to have any relationship to “wall” time.
-    delta_t: Duration,
+    /// Schedule from which this tick was derived, which also determines its lenfth.
+    schedule: TickSchedule,
+
+    /// The phase of the clock *before* this tick happens.
+    /// (After this tick happens, the phase is this value plus 1).
+    prev_phase: u16,
 
     /// Whether game time is paused, and `delta_t` should not be considered
     /// as an amount of game time passing. See [`Self::paused()`] for details.
@@ -22,33 +25,41 @@ pub struct Tick {
 }
 
 impl Tick {
+    fn new(schedule: TickSchedule, prev_phase: u16) -> Self {
+        Self {
+            schedule,
+            prev_phase,
+            paused: false,
+        }
+    }
+
     /// A tick of arbitrary length, for testing purposes. Do not use this for actual gameplay.
     pub const fn arbitrary() -> Self {
         Self {
-            delta_t: Duration::from_secs(1),
+            schedule: TickSchedule::per_second(1),
+            prev_phase: 0,
             paused: false,
         }
     }
 
-    /// Construct a [`Tick`] of the specified length.
-    pub const fn from_duration(delta_t: Duration) -> Self {
-        Self {
-            delta_t,
-            paused: false,
-        }
-    }
-
-    /// Construct a non-paused [`Tick`] from a duration expressed in fractional seconds.
+    /// Construct a non-paused [`Tick`] from a duration expressed in fractional seconds,
+    /// and phase 0 as if it were the first tick in a universe.
+    ///
+    /// This should only be used for tests.
     pub fn from_seconds(dt: f64) -> Self {
         Self {
-            delta_t: Duration::from_micros((dt * 1e6) as u64),
+            schedule: TickSchedule {
+                base_duration: Duration::from_micros((dt * 1e6) as u64),
+                divisor: 1,
+            },
+            prev_phase: 0,
             paused: false,
         }
     }
 
     /// Return the amount of time passed as a [`Duration`].
     pub fn delta_t(self) -> Duration {
-        self.delta_t
+        self.schedule.delta_t()
     }
 
     /// Set the paused flag. See [`Tick::paused`] for more information.
@@ -172,7 +183,7 @@ impl Clock {
     /// Returns the tick that will happen the next time [`Self::advance()`] is called,
     /// if the schedule is not changed before then.
     pub fn next_tick(&self, paused: bool) -> Tick {
-        let mut tick = Tick::from_duration(self.schedule.delta_t());
+        let mut tick = Tick::new(self.schedule, self.phase);
 
         if paused {
             tick = tick.pause();
