@@ -61,6 +61,8 @@ pub(crate) struct SpaceRenderer {
     space_bind_group: wgpu::BindGroup,
 
     csm: ChunkedSpaceMesh<Option<ChunkBuffers>, WgpuBlockVertex, AtlasAllocator, CHUNK_SIZE>,
+
+    interactive: bool,
 }
 
 #[derive(Debug, Default)]
@@ -80,6 +82,7 @@ impl SpaceRenderer {
         device: &wgpu::Device,
         pipelines: &Pipelines,
         block_texture: Arc<AtlasAllocator>,
+        interactive: bool,
     ) -> Result<Self, GraphicsResourceError> {
         let space_borrowed = space.read().map_err(GraphicsResourceError::read_err)?;
 
@@ -109,7 +112,8 @@ impl SpaceRenderer {
             space_bind_group,
             camera_buffer,
             instance_buffer: ResizingBuffer::default(),
-            csm: ChunkedSpaceMesh::new(space),
+            csm: ChunkedSpaceMesh::new(space, interactive),
+            interactive,
         })
     }
 
@@ -141,6 +145,7 @@ impl SpaceRenderer {
             instance_buffer: _,
             space_bind_group,
             csm,
+            interactive,
         } = self;
 
         let space_borrowed = space.read().unwrap();
@@ -151,7 +156,7 @@ impl SpaceRenderer {
             todo
         };
         // TODO: rescue ChunkChart and maybe block meshes from the old `csm`.
-        *csm = ChunkedSpaceMesh::new(space.clone());
+        *csm = ChunkedSpaceMesh::new(space.clone(), *interactive);
         *sky_color = space_borrowed.physics().sky_color;
         // TODO: don't replace light texture if the size is the same
         *light_texture = SpaceLightTexture::new(space_label, device, space_borrowed.bounds());

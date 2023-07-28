@@ -540,6 +540,7 @@ impl EverythingRenderer {
                     device,
                     pipelines,
                     Arc::clone(block_texture),
+                    true,
                 )?);
             }
             (Some(r), Some(space)) => {

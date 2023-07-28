@@ -147,6 +147,7 @@ impl CsmTester {
         let space_ref = universe.insert_anonymous(space);
         let csm = ChunkedSpaceMesh::<(), BlockVertex<NoTexture>, NoTextures, CHUNK_SIZE>::new(
             space_ref.clone(),
+            true,
         );
         let camera = Camera::new(
             {

@@ -58,6 +58,11 @@ where
     /// because blank world is a worse outcome than slightly stale world.
     pub(in crate::dynamic) did_not_finish_chunks: bool,
 
+    /// True until we have meshed all chunks at least once.
+    /// During this period, we prioritize chunks (with placeholder block meshes) over
+    /// block meshes, to get a sketch of the world up faster.
+    startup_chunks_only: bool,
+
     /// The [`MeshOptions`] specified by the last [`Camera`] provided.
     last_mesh_options: Option<MeshOptions>,
 
@@ -77,7 +82,10 @@ where
     /// Constructs a new [`ChunkedSpaceMesh`] that will maintain a mesh representation of
     /// the contents of the given space, within a requested viewing distance (specified
     /// later).
-    pub fn new(space: URef<Space>) -> Self {
+    ///
+    /// If `interactive` is true, will prioritize getting a rough view of the world over
+    /// a fully detailed one, by using placeholder block meshes on the first pass.
+    pub fn new(space: URef<Space>, interactive: bool) -> Self {
         let space_borrowed = space.read().unwrap();
         let todo = CsmTodo::initially_dirty();
         let todo_rc = Arc::new(Mutex::new(todo));
@@ -91,6 +99,7 @@ where
             chunk_chart: ChunkChart::new(0.0),
             view_chunk: ChunkPos(Point3::new(0, 0, 0)),
             did_not_finish_chunks: true,
+            startup_chunks_only: interactive,
             last_mesh_options: None,
             zero_time: Instant::now(),
             complete_time: None,
@@ -185,6 +194,44 @@ where
     where
         F: FnMut(dynamic::RenderDataUpdate<'_, D, Vert, Tex::Tile>),
     {
+        let was_startup_chunks_only = self.startup_chunks_only;
+        let (mut info1, timed_out) = self.update_once(
+            camera,
+            block_texture_allocator,
+            deadline,
+            &mut render_data_updater,
+        );
+
+        // If the first pass did not finish and was startup_chunks_only, try again.
+        if was_startup_chunks_only && !timed_out && info1.flaws.contains(Flaws::UNFINISHED) {
+            let (info2, _) = self.update_once(
+                camera,
+                block_texture_allocator,
+                deadline,
+                &mut render_data_updater,
+            );
+            info1.add_second_pass(info2);
+
+            info1
+        } else {
+            info1
+        }
+    }
+
+    /// Internal part of [`Self::update_blocks_and_some_chunks()`].
+    ///
+    /// Boolean return indicates whether it exited early due to timeout rather than
+    /// finishing its work.
+    fn update_once<F>(
+        &mut self,
+        camera: &Camera,
+        block_texture_allocator: &Tex,
+        deadline: Instant,
+        mut render_data_updater: F,
+    ) -> (CsmUpdateInfo, bool)
+    where
+        F: FnMut(dynamic::RenderDataUpdate<'_, D, Vert, Tex::Tile>),
+    {
         let update_start_time = Instant::now();
 
         let graphics_options = camera.options();
@@ -200,10 +247,13 @@ where
             space
         } else {
             // TODO: report error
-            return CsmUpdateInfo {
-                prep_time: Instant::now().duration_since(update_start_time),
-                ..CsmUpdateInfo::default()
-            };
+            return (
+                CsmUpdateInfo {
+                    prep_time: Instant::now().duration_since(update_start_time),
+                    ..CsmUpdateInfo::default()
+                },
+                false,
+            );
         };
 
         // Check for mesh options changes that would invalidate the meshes.
@@ -238,8 +288,12 @@ where
             space,
             block_texture_allocator,
             mesh_options,
-            // TODO: don't hardcode this figure here, let the caller specify it
-            deadline.checked_sub(Duration::from_micros(500)).unwrap(),
+            if self.startup_chunks_only {
+                update_start_time // a past time stands in for "spend zero time on this"
+            } else {
+                // TODO: don't hardcode this figure here, let the caller specify it
+                deadline.checked_sub(Duration::from_micros(500)).unwrap()
+            },
             &mut render_data_updater,
         );
         let all_done_with_blocks = todo.blocks.is_empty();
@@ -318,6 +372,9 @@ where
             }
         }
         self.did_not_finish_chunks = did_not_finish;
+        if !did_not_finish {
+            self.startup_chunks_only = false;
+        }
         let chunk_scan_end_time = Instant::now();
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
@@ -332,15 +389,19 @@ where
             None
         };
 
+        // Instant at which we finished all processing
+        let end_all_time = depth_sort_end_time.unwrap_or(chunk_scan_end_time);
+
         let complete = all_done_with_blocks && !did_not_finish;
         if complete && self.complete_time.is_none() {
-            let t = Instant::now();
             log::debug!(
                 "SpaceRenderer({space}): all meshes done in {time}",
                 space = self.space().name(),
-                time = t.duration_since(self.zero_time).custom_format(StatusText)
+                time = end_all_time
+                    .duration_since(self.zero_time)
+                    .custom_format(StatusText)
             );
-            self.complete_time = Some(t);
+            self.complete_time = Some(end_all_time);
         }
 
         let mut flaws = Flaws::empty();
@@ -350,28 +411,31 @@ where
             flaws |= Flaws::UNFINISHED;
         }
 
-        CsmUpdateInfo {
-            flaws,
-            total_time: depth_sort_end_time
-                .unwrap_or(chunk_scan_end_time)
-                .duration_since(update_start_time),
-            prep_time: prep_to_update_meshes_time.duration_since(update_start_time),
-            chunk_scan_time: chunk_scan_end_time
-                .saturating_duration_since(block_update_to_chunk_scan_time)
-                .saturating_sub(chunk_mesh_generation_times.sum + chunk_mesh_callback_times.sum),
-            chunk_mesh_generation_times,
-            chunk_mesh_callback_times,
-            depth_sort_time: depth_sort_end_time.map(|t| t.duration_since(chunk_scan_end_time)),
-            block_updates,
+        (
+            CsmUpdateInfo {
+                flaws,
+                total_time: end_all_time.duration_since(update_start_time),
+                prep_time: prep_to_update_meshes_time.duration_since(update_start_time),
+                chunk_scan_time: chunk_scan_end_time
+                    .saturating_duration_since(block_update_to_chunk_scan_time)
+                    .saturating_sub(
+                        chunk_mesh_generation_times.sum + chunk_mesh_callback_times.sum,
+                    ),
+                chunk_mesh_generation_times,
+                chunk_mesh_callback_times,
+                depth_sort_time: depth_sort_end_time.map(|t| t.duration_since(chunk_scan_end_time)),
+                block_updates,
 
-            // TODO: remember this rather than computing it
-            chunk_count: self.chunks.len(),
-            chunk_total_cpu_byte_size: self
-                .chunks
-                .values()
-                .map(|chunk| chunk.mesh().total_byte_size())
-                .sum(),
-        }
+                // TODO: remember this rather than computing it
+                chunk_count: self.chunks.len(),
+                chunk_total_cpu_byte_size: self
+                    .chunks
+                    .values()
+                    .map(|chunk| chunk.mesh().total_byte_size())
+                    .sum(),
+            },
+            end_all_time > deadline,
+        )
     }
 
     /// Returns the chunk in which the camera from the most recent
@@ -456,6 +520,40 @@ impl CustomFormat<StatusText> for CsmUpdateInfo {
             chunk_mib = chunk_total_cpu_byte_size / (1024 * 1024),
             chunk_count = chunk_count,
         )
+    }
+}
+
+impl CsmUpdateInfo {
+    /// Combine two updates for the *same* [`ChunkedSpaceMesh`] (not double-counting counts),
+    /// where `self` is the first and `other` is the second.
+    ///
+    /// Times are summed, but flaws are replaced and counts are kept.
+    fn add_second_pass(&mut self, other: Self) {
+        let Self {
+            flaws,
+            total_time,
+            prep_time,
+            chunk_scan_time,
+            chunk_mesh_generation_times,
+            chunk_mesh_callback_times,
+            depth_sort_time,
+            block_updates,
+            chunk_count,
+            chunk_total_cpu_byte_size,
+        } = self;
+        *flaws = other.flaws; // replace!
+        *total_time += other.total_time;
+        *prep_time += other.prep_time;
+        *chunk_scan_time += other.chunk_scan_time;
+        *chunk_mesh_generation_times += other.chunk_mesh_generation_times;
+        *chunk_mesh_callback_times += other.chunk_mesh_callback_times;
+        *depth_sort_time = [*depth_sort_time, other.depth_sort_time]
+            .into_iter()
+            .flatten()
+            .reduce(std::ops::Add::add);
+        *block_updates += other.block_updates;
+        *chunk_count = other.chunk_count; // replace!
+        *chunk_total_cpu_byte_size = other.chunk_total_cpu_byte_size; // replace!
     }
 }
 

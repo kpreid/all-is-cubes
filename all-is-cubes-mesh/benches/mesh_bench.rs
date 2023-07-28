@@ -185,7 +185,7 @@ fn dynamic_benches(c: &mut Criterion) {
                     BlockVertex<TtPoint>,
                     TestTextureAllocator,
                     16,
-                > = dynamic::ChunkedSpaceMesh::new(space_ref.clone());
+                > = dynamic::ChunkedSpaceMesh::new(space_ref.clone(), true);
                 let tex = TestTextureAllocator::new();
                 (tex, csm)
             },
