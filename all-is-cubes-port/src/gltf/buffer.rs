@@ -13,6 +13,9 @@ use super::glue::{create_accessor, push_and_return_index, u32size, Lef32};
 /// Designates the location where glTF buffer data (meshes, textures) should be written
 /// (either to disk files or inline in the glTF JSON).
 ///
+/// If cloned, the clone will provide equivalent access to the same destination and may be
+/// used interchangeably.
+///
 /// TODO: Add support for `.glb` combined files.
 #[derive(Clone, Debug, PartialEq)]
 #[allow(clippy::derive_partial_eq_without_eq)]

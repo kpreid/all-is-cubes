@@ -206,6 +206,7 @@ dependencies = [
  "either",
  "futures-core",
  "gltf-json",
+ "image",
  "itertools",
  "log",
  "once_cell",

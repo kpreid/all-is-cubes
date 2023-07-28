@@ -111,7 +111,7 @@ impl GltfWriter {
 
         Self {
             materials: Materials::new(&mut root.materials),
-            texture_allocator: GltfTextureAllocator::new(buffer_dest.clone()),
+            texture_allocator: GltfTextureAllocator::new(buffer_dest.clone(), false),
 
             root,
             buffer_dest,
