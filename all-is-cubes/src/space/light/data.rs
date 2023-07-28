@@ -487,7 +487,14 @@ mod tests {
 
     #[test]
     fn priority_relations() {
-        let least_special_priority = [Priority::ESTIMATED, Priority::NEWLY_VISIBLE, Priority::UNINIT].into_iter().min().unwrap();
+        let least_special_priority = [
+            Priority::ESTIMATED,
+            Priority::NEWLY_VISIBLE,
+            Priority::UNINIT,
+        ]
+        .into_iter()
+        .min()
+        .unwrap();
 
         assert!(Priority::MIN < Priority::from_difference(0));
         assert!(Priority::from_difference(255) < least_special_priority);
