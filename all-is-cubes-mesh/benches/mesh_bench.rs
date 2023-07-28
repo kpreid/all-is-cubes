@@ -1,15 +1,17 @@
-use all_is_cubes::content::make_some_voxel_blocks;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::{Block, Resolution::R16, AIR};
-use all_is_cubes::camera::GraphicsOptions;
+use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, Viewport};
+use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::content::make_some_voxel_blocks;
 use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::Universe;
+use all_is_cubes::time::practically_infinite_deadline;
+use all_is_cubes::universe::{Name, URef, Universe};
 
 use all_is_cubes_mesh::{
-    block_meshes_for_space, BlockMesh, BlockMeshes, BlockVertex, MeshOptions, SpaceMesh,
+    block_meshes_for_space, dynamic, BlockMesh, BlockMeshes, BlockVertex, MeshOptions, SpaceMesh,
     TestTextureAllocator, TestTextureTile, TtPoint,
 };
 
@@ -17,7 +19,8 @@ criterion_group!(
     benches,
     block_mesh_benches,
     space_mesh_benches,
-    slow_mesh_benches
+    slow_mesh_benches,
+    dynamic_benches,
 );
 criterion_main!(benches);
 
@@ -164,6 +167,45 @@ fn slow_mesh_benches(c: &mut Criterion) {
         b.iter_batched_ref(|| (), |()| ing.do_new(), BatchSize::SmallInput);
     });
 }
+
+fn dynamic_benches(c: &mut Criterion) {
+    let mut g = c.benchmark_group("dynamic");
+    let graphics_options = GraphicsOptions::default();
+    let camera = Camera::new(
+        graphics_options,
+        Viewport::with_scale(1.0, Vector2::new(100, 100)),
+    );
+
+    g.bench_function("initial-update", |b| {
+        let space_ref = URef::new_pending(Name::Pending, half_space(Block::from(Rgba::WHITE)));
+        b.iter_batched_ref(
+            || {
+                let csm: dynamic::ChunkedSpaceMesh<
+                    (),
+                    BlockVertex<TtPoint>,
+                    TestTextureAllocator,
+                    16,
+                > = dynamic::ChunkedSpaceMesh::new(space_ref.clone());
+                let tex = TestTextureAllocator::new();
+                (tex, csm)
+            },
+            |(tex, csm)| {
+                let info = csm.update_blocks_and_some_chunks(
+                    &camera,
+                    tex,
+                    practically_infinite_deadline(),
+                    |_| {},
+                );
+                assert_eq!(info.flaws, Flaws::empty()); // should not be unfinished
+            },
+            BatchSize::LargeInput,
+        );
+    });
+
+    // TODO: Add a test for updates past the initial one
+}
+
+// --- End of benches, beginning helpers ---
 
 fn checkerboard_space_bench_setup(options: MeshOptions, transparent: bool) -> SpaceMeshIngredients {
     SpaceMeshIngredients::new(
