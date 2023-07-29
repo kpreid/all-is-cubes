@@ -78,7 +78,11 @@ jobs:
     continue-on-error: ${{ !matrix.primary }}
 
     steps:
+    - run: df -h .
+
     - uses: actions/checkout@v3.1.0
+
+    - run: df -h .
 
     - name: Install Rust toolchain
       # Install exactly what we need: compiler, Cargo, clippy, rustfmt
@@ -100,8 +104,12 @@ jobs:
       # Note that `libwayland-dev` provides the library called `wayland-client`
       # libasound2-dev: needed for audio via `kira`
 
+    - run: df -h .
+
     # Load cache before doing any Rust builds
     - uses: Swatinem/rust-cache@v2.0.2
+
+    - run: df -h .
 
     # break this out as a separate non-silenced build step
     - name: Compile xtask
@@ -111,6 +119,8 @@ jobs:
       run: |
         cargo xtask update "${{ matrix.depversions }}"
         cargo tree --all-features
+
+    - run: df -h .
 
     - name: Install wasm-pack
       run: cargo install wasm-pack@0.11.1
@@ -123,6 +133,8 @@ jobs:
       # Use workspace target dir for cargo install's build, so that the build will be cached.
       env:
         CARGO_TARGET_DIR: target/
+
+    - run: df -h .
 
     # Run tests in `test-more` mode in the "primary" matrix configuration, and
     # run them in the faster mode (which does not try disabling/enabling
@@ -138,6 +150,9 @@ jobs:
     - name: Run basic tests
       if: ${{ !matrix.primary }}
       run: cargo xtask test --timings
+
+    - run: df -h .
+
     - name: Run exhaustive tests
       if: ${{ matrix.primary }}
       run: cargo xtask test-more --timings
@@ -150,6 +165,8 @@ jobs:
         name: test-renderers-output ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
           target/test-renderers-output/
+
+    - run: df -h .
 
     # Unlike the tests, we *do* run lint against all versions because future
     # warnings might be interesting.
@@ -174,6 +191,8 @@ jobs:
       with:
         name: wasm-dist
         path: all-is-cubes-wasm/dist
+
+    - run: df -h .
 
   deploy:
     needs: build
