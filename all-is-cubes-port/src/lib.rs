@@ -2,10 +2,12 @@
 //!
 //! Currently supported formats:
 //!
-//! * All is Cubes native format (work in progress; currently import only)
-//! * MagicaVoxel `.vox` voxel scene files (import only)
-//! * [glTF 2.0] (export only)
-//! * [STL] (export only)
+//! | Format              | Extension         | Import  | Export  | Caveats |
+//! |---------------------|-------------------|:-------:|:-------:|---------|
+//! | All is Cubes native | `.alliscubesjson` | **Yes** | **Yes** | Version compatibility not yet guaranteed. |
+//! | MagicaVoxel `.vox`  | `.vox`            | **Yes** | **Yes** | Materials, scenes, and layers are ignored. |
+//! | [glTF 2.0]          | `.gltf`           | —       | **Yes** | Textures are not yet implemented. Output is suitable for rendering but not necessarily editing due to combined meshes. |
+//! | [STL]               | `.stl`            | —       | **Yes** | Meshes are not necessarily “manifold”/“watertight”. |
 //!
 //! [glTF 2.0]: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
 //! [STL]: <https://en.wikipedia.org/wiki/STL_(file_format)>
