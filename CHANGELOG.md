@@ -4,27 +4,39 @@
 
 ### Added
 
+- Command line application (crate `all-is-cubes-desktop`) functionality:
+    - Exporting universes to files; see below section on `all-is-cubes-port` for supported formats.
+    - Option `--template-size` allows controlling the size of spaces produced by universe templates.
+    - Window titles name the data source (file or template) for the contained universe.
+
 - `all-is-cubes` library:
-    - Many types, including `Universe` and its components now support serialization via `serde`.
+    - Many types, including `Universe` and its components, now support serialization via `serde`.
       This serialization support is still a work in progress and long-term save data compatibility is planned but not currently guaranteed.
 
     - `block::Atom`, a struct for the data of the `Primitive::Atom` enum variant.
+    - `block::CompositeOperator::In` allows masking one block shape by another.
     - `block::Modifier::Composite` has a new option `disassemblable`, which causes `Block::unspecialize()` (and its callers such as `Tool::RemoveBlock`) to return the composed blocks separately instead of the composite.
     - `linking::BlockProvider` now has methods `subset()` (replace keys) and `map()` (replace values) to allow using `BlockProvider`s in more ways.
     - `math::GridAab::iter()` to iterate over `(cube, &item)`.
     - `save::WhenceUniverse`, a trait for associating a `Universe` with disk files or other persistent storage. `Universe` now keeps an `Arc<dyn WhenceUniverse>`.
     - `space::SpaceBuilder::palette_and_contents()` allows efficiently specifying arbitrary contents for a newly created `Space`.
     - `universe::RefVisitor` is now implemented for all `FnMut(&dyn URefErased)`, allowing visitors to simply be functions.
+    - `universe::Universe::universe_id()` returns a unique identifier for this `Universe`.
 
 - `all-is-cubes-port` library:
-    - Import and export of a “native” file format.
+    - Import and export of a “native” file format (serialized `Universe`s).
     - Export to `.stl` meshes (commonly used for 3D printing).
+    - Export to MagicaVoxel `.vox` files.
     - `ImportError` type for precise error reporting.
 
 - `all-is-cubes-ui` library:
     - `vui::LayoutTree::Shrink` allows a subtree to be shrunk to only be as big as needed, rather than filling available space, allowing for “shrink wrapped” layouts such as framed dialog boxes.
+    - `vui::widgets::Frame::as_background_of()` allows conveniently making dialog frames.
 
 ### Changed
+
+- Graphics:
+    - `Space` light propagation no longer updates deterministically, but as much as possible given available time for the computation.
 
 - New crate `all-is-cubes-mesh` contains the former contents of `all_is_cubes::mesh`, except for `LineVertex` which is now in `all_is_cubes::math`.
     - `SpaceMesh` indices are now either `u16` or `u32` depending on the size of the mesh, rather than always `u32`. The new enum `all_is_cubes_mesh::IndexSlice` is used to work with them.
@@ -37,6 +49,13 @@
         - `BlockCollision` is now stored in `Atom`s and not in `BlockAttributes`; `Primitive::Recur` blocks always get their collision from their component voxels.
         - `BlockCollision::Recur` no longer exists and `BlockCollision::Hard` cannot be used to disregard voxels' own collision.
         This change should be an overall simplification of the semantics and eliminates the common mistake of forgetting to specify `Recur`.
+    
+    - Universes are now considered to have an inherent, fixed time step.
+        - This time step cannot yet be changed; it is currently always 1/60 second.
+        - Within a single second, instants and `Tick`s have a “phase” value which cycles from 0 to 59.
+          This will enable simulations to run on an intentionally slow but consistent schedule by skipping some ticks.
+        - The `time` module contains new types `TickSchedule` and `Clock` to support this.
+
     - `block::Block::listen()` is now `evaluate_and_listen()` which includes a simultaneous `evaluate()`.
     - `block::Block::unspecialize()` now returns `Vec<Block>`, to allow for cases where a block comes apart into multiple parts, such as with `Modifier::Composite`.
     - `block::EvaluatedBlock` now has a `voxels` field of the new type `Evoxels`, which replaces the previous `resolution` and `voxels` fields.
@@ -50,6 +69,8 @@
     - `space::Space::extract()` now passes one argument instead of three to the callback function; it is of the new type `Extract` which has methods to return all the previously available data. This is intended to be more extensible and potentially more efficient.
     - `transaction::Transaction` can now produce any number of `Output`s, delivered through a callback.
     - `transaction::Merge` now has an associated type `Conflict` for more informative conflict errors.
+    - `universe::Name` now has a variant `Pending` for not-yet-assigned names.
+    - `universe::URef::name()` now returns an owned instead of borrowed `Name`.
     - `universe::UniverseIndex` is no longer a public trait; the relevant methods are now inherent methods on `Universe`.
     - `universe::UniverseTransaction::insert()` now takes a `URef` created by `URef::new_pending()`, instead of a bare value.
       This allows associations between the new member and other objects to be created within the same transaction.
