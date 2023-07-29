@@ -58,6 +58,8 @@ mod tests;
 ///
 /// To determine the concrete appearance and behavior of a block, use [`Block::evaluate()`]
 /// or [`Block::evaluate_and_listen()`], which will return an [`EvaluatedBlock`] value.
+///
+#[doc = include_str!("save/serde-warning.md")]
 #[derive(Clone)]
 pub struct Block(BlockPtr);
 
@@ -79,6 +81,8 @@ struct BlockParts {
 }
 
 /// The possible fundamental representations of a [`Block`]'s shape.
+///
+#[doc = include_str!("save/serde-warning.md")]
 #[derive(Clone, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Primitive {

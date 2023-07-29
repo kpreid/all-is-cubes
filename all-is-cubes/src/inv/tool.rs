@@ -20,6 +20,8 @@ use crate::universe::{RefError, RefVisitor, URef, UniverseTransaction, VisitRefs
 ///
 /// Currently, `Tool`s also play the role of “inventory items”. This may change in the
 /// future.
+///
+#[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Tool {

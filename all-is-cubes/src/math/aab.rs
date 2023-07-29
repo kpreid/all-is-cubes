@@ -12,6 +12,8 @@ use crate::math::{
 ///
 /// Note that this has continuous coordinates, and a discrete analogue exists as
 /// [`GridAab`].
+///
+#[doc = include_str!("../save/serde-warning.md")]
 #[derive(Copy, Clone, PartialEq)]
 pub struct Aab {
     // TODO: Should we be using NotNan coordinates?

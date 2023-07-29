@@ -20,6 +20,8 @@ use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
 /// [`InventoryTransaction`]'s output) which the owner is responsible for forwarding
 /// appropriately. This design choice allows an [`Inventory`] to be placed inside
 /// other objects directly rather than via [`URef`].
+///
+#[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct Inventory {

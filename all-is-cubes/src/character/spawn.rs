@@ -10,6 +10,8 @@ use crate::universe::{RefVisitor, VisitRefs};
 ///
 /// TODO: This is lacking a full set of accessor methods to be viewable+editable.
 ///
+#[doc = include_str!("../save/serde-warning.md")]
+///
 /// [`Character`]: super::Character
 /// [`Space`]: crate::space::Space
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -8,6 +8,8 @@ use crate::math::{FreeCoordinate, Rgb, Rgba};
 /// Some options may be ignored by some renderers, such as when they request a particular
 /// implementation approach or debug visualization. Renderers should make an effort to
 /// report such failings via [`Flaws`](crate::camera::Flaws).
+///
+#[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 #[non_exhaustive]
@@ -161,6 +163,8 @@ impl Default for GraphicsOptions {
 }
 
 /// Choices for [`GraphicsOptions::fog`].
+///
+#[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 pub enum FogOption {
@@ -175,6 +179,8 @@ pub enum FogOption {
 }
 
 /// Choices for [`GraphicsOptions::tone_mapping`].
+///
+#[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 pub enum ToneMappingOperator {
@@ -210,6 +216,8 @@ impl ToneMappingOperator {
 ///
 /// Note that the exact interpretation of this value also depends on on the chosen
 /// [`ToneMappingOperator`].
+///
+#[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 pub enum ExposureOption {
@@ -240,6 +248,8 @@ impl Default for ExposureOption {
 
 /// How to display light in a [`Space`]; part of a [`GraphicsOptions`].
 ///
+#[doc = include_str!("../save/serde-warning.md")]
+///
 /// [`Space`]: crate::space::Space
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
@@ -258,6 +268,8 @@ pub enum LightingOption {
 /// Note: There is not yet a consistent interpretation of alpha between the `Surface`
 /// and `Volumetric` options; this will probably be changed in the future in favor
 /// of the volumetric interpretation.
+///
+#[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
@@ -297,6 +309,8 @@ impl TransparencyOption {
 }
 
 /// Choices for [`GraphicsOptions::antialiasing`].
+///
+#[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]

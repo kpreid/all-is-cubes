@@ -90,6 +90,8 @@ impl<'a, H: BehaviorHost + Debug> Debug for BehaviorContext<'a, H> {
 /// are currently subject to change.
 ///
 /// To modify the set, use a [`BehaviorSetTransaction`].
+///
+#[doc = include_str!("save/serde-warning.md")]
 pub struct BehaviorSet<H: BehaviorHost> {
     /// Behaviors are stored in [`Arc`] so that they can be used in transactions in ways
     /// that would otherwise require `Clone + PartialEq`.

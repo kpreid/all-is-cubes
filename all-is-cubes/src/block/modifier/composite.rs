@@ -232,6 +232,8 @@ impl universe::VisitRefs for Composite {
 /// is the block the modifier is attached to.
 ///
 /// TODO: Document behavior of `collision` and `selectable` properties.
+///
+#[doc = include_str!("../../save/serde-warning.md")]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]

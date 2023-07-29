@@ -12,6 +12,8 @@ use crate::math::*;
 ///
 /// See also the similar type [`Face7`], which adds a “zero” or “within the cube”
 /// variant. The two enums use the same discriminant numbering.
+///
+#[doc = include_str!("../save/serde-warning.md")]
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::exhaustive_enums)]
 #[derive(
@@ -39,6 +41,8 @@ pub enum Face6 {
 ///
 /// This is essentially `Option<`[`Face6`]`>`, except with `Face`-specific methods
 /// provided. The two enums use the same discriminant numbering.
+///
+#[doc = include_str!("../save/serde-warning.md")]
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::exhaustive_enums)]
 #[derive(

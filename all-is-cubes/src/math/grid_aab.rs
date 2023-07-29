@@ -25,6 +25,8 @@ use crate::math::{
 /// A [`GridAab`] may have a zero-size range in any direction, thus making its total volume zero.
 /// The different possibilities are not considered equal; thus, points, lines, and planes may be
 /// represented, which may be useful for procedural-generation purposes.
+///
+#[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct GridAab {
     lower_bounds: GridPoint,

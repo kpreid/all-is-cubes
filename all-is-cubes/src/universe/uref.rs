@@ -24,6 +24,8 @@ type StrongEntryRef<T> = Arc<RwLock<UEntry<T>>>;
 ///
 /// **Thread-safety caveat:** See the documentation on [avoiding deadlock].
 ///
+#[doc = include_str!("../save/serde-warning.md")]
+///
 /// [avoiding deadlock]: crate::universe#thread-safety
 pub struct URef<T> {
     /// Reference to the object. Weak because we don't want to create reference cycles;

@@ -49,6 +49,8 @@ const JUMP_SPEED: FreeCoordinate = 8.0;
 ///   steps, and
 /// * handles the parts of input management that are associated with universe state
 ///   (controlling velocity, holding tools).
+///
+#[doc = include_str!("save/serde-warning.md")]
 pub struct Character {
     /// Position, collision, and look direction.
     pub body: Body,

@@ -50,6 +50,8 @@ mod tests;
 /// Name/key of an object in a [`Universe`].
 ///
 /// Internally uses [`Arc`] to be cheap to clone. Might be interned in future versions.
+///
+#[doc = include_str!("save/serde-warning.md")]
 #[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -104,6 +106,8 @@ impl UniverseId {
 /// and which are simulated at the same time steps.
 ///
 /// **Thread-safety caveat:** See the documentation on [avoiding deadlock].
+///
+#[doc = include_str!("save/serde-warning.md")]
 ///
 /// [avoiding deadlock]: crate::universe#thread-safety
 pub struct Universe {

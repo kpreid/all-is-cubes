@@ -48,6 +48,8 @@ mod tests;
 
 /// Container for [`Block`]s arranged in three-dimensional space. The main “game world”
 /// data structure.
+///
+#[doc = include_str!("save/serde-warning.md")]
 pub struct Space {
     bounds: GridAab,
 
