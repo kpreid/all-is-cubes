@@ -62,7 +62,7 @@ wgpu = { workspace = true, optional = true, features = ["webgl"] }
 
 [dev-dependencies]
 # f16 support for working with floating point textures in tests. Using older version 1.8 because that's already indirectly in our dev-dependencies.
-half = { version = "1.8.2", features = ["bytemuck"] }
+half = { version = "2.3.1", features = ["bytemuck"] }
 # Using tokio for async test-running.
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
 

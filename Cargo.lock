@@ -67,7 +67,7 @@ dependencies = [
  "image",
  "indoc",
  "instant",
- "itertools",
+ "itertools 0.11.0",
  "log",
  "mutants",
  "num-traits",
@@ -96,7 +96,7 @@ dependencies = [
  "futures-core",
  "image",
  "instant",
- "itertools",
+ "itertools 0.11.0",
  "log",
  "macro_rules_attribute",
  "maze_generator",
@@ -157,7 +157,7 @@ dependencies = [
  "futures-channel",
  "futures-core",
  "futures-util",
- "half",
+ "half 2.3.1",
  "image",
  "instant",
  "log",
@@ -207,7 +207,7 @@ dependencies = [
  "futures-core",
  "gltf-json",
  "image",
- "itertools",
+ "itertools 0.11.0",
  "log",
  "once_cell",
  "pretty_assertions",
@@ -791,7 +791,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "defaa24ecc093c77630e6c15e17c51f5e187bf35ee514f4e2d67baaa96dae22b"
 dependencies = [
  "ciborium-io",
- "half",
+ "half 1.8.2",
 ]
 
 [[package]]
@@ -1070,7 +1070,7 @@ dependencies = [
  "criterion-plot",
  "futures",
  "is-terminal",
- "itertools",
+ "itertools 0.10.5",
  "num-traits",
  "once_cell",
  "oorandom",
@@ -1091,7 +1091,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
 dependencies = [
  "cast",
- "itertools",
+ "itertools 0.10.5",
 ]
 
 [[package]]
@@ -1161,6 +1161,12 @@ checksum = "acdd7c62a3665c7f6830a51635d9ac9b23ed385797f70a83bb8bafe9c572ab2b"
 dependencies = [
  "winapi",
 ]
+
+[[package]]
+name = "crunchy"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
 name = "d3d12"
@@ -1270,9 +1276,9 @@ checksum = "56ce8c6da7551ec6c462cbaf3bfbc75131ebbfa1c944aeaa9dab51ca1c5f0c3b"
 
 [[package]]
 name = "either"
-version = "1.8.1"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
+checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
 
 [[package]]
 name = "embedded-graphics"
@@ -1346,7 +1352,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba10f1843d67206bab864e012ab9d487210ced1faee97874b01fb067b9bbc2b4"
 dependencies = [
  "exhaust-macros",
- "itertools",
+ "itertools 0.10.5",
  "paste",
 ]
 
@@ -1356,7 +1362,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5efef8bd869b75de6b8a65c530a33fa34f33520a3c904ad82d163f6b06ad5ae1"
 dependencies = [
- "itertools",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn 2.0.25",
@@ -1770,8 +1776,16 @@ name = "half"
 version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eabb4a44450da02c90444cf74558da904edde8fb4e9035a9a6a4e15445af0bd7"
+
+[[package]]
+name = "half"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc52e53916c08643f1b56ec082790d1e86a32e58dc5268f897f313fbae7b4872"
 dependencies = [
  "bytemuck",
+ "cfg-if",
+ "crunchy",
 ]
 
 [[package]]
@@ -2052,6 +2066,15 @@ name = "itertools"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
 dependencies = [
  "either",
 ]
@@ -2853,7 +2876,7 @@ checksum = "09963355b9f467184c04017ced4a2ba2d75cbcb4e7462690d388233253d4b1a9"
 dependencies = [
  "anstyle",
  "difflib",
- "itertools",
+ "itertools 0.10.5",
  "predicates-core",
 ]
 
@@ -3119,7 +3142,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c73498aa092adcb87859a578670a5704d510bbde6d2a47ed9d292626966c6224"
 dependencies = [
  "image",
- "itertools",
+ "itertools 0.10.5",
 ]
 
 [[package]]
@@ -3628,7 +3651,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "image",
- "itertools",
+ "itertools 0.11.0",
  "rendiff",
  "send_wrapper",
  "serde",

@@ -44,7 +44,7 @@ futures-util = { version = "0.3.28", default-features = false, features = ["allo
 image = { version = "0.24.6", default-features = false }
 indoc = "2.0.1"
 instant = "0.1.12"
-itertools = { version = "0.10.5", default-features = false, features = ["use_alloc"] }
+itertools = { version = "0.11.0", default-features = false, features = ["use_alloc"] }
 log = { version = "0.4.17", default-features = false }
 macro_rules_attribute = "0.2.0"
 mutants = "0.0.3"
