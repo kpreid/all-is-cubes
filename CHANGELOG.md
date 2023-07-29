@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.6.0 (2023-07-29)
+
 ### Added
 
 - Command line application (crate `all-is-cubes-desktop`) functionality:
