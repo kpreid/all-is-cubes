@@ -1,10 +1,12 @@
 //! Helper for writing glTF buffer data, either to disk or to memory for testing.
 
+use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fs::File;
 use std::io;
 use std::mem::size_of;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use gltf_json::Index;
 
@@ -17,9 +19,11 @@ use super::glue::{create_accessor, push_and_return_index, u32size, Lef32};
 /// used interchangeably.
 ///
 /// TODO: Add support for `.glb` combined files.
-#[derive(Clone, Debug, PartialEq)]
-#[allow(clippy::derive_partial_eq_without_eq)]
-pub struct GltfDataDestination {
+#[derive(Clone, Debug)]
+pub struct GltfDataDestination(Arc<Inner>);
+
+#[derive(Debug)]
+struct Inner {
     /// If true, all data is unconditionally discarded. For testing only.
     discard: bool,
 
@@ -32,16 +36,21 @@ pub struct GltfDataDestination {
     /// If this is `None` and `maximum_inline_length` does not permit inlining, an error will be
     /// reported on any attempt to write a buffer.
     file_base_path: Option<PathBuf>,
+
+    /// Filename suffixes (the 'bar' in `foo-bar.glbin`) that have already been used,
+    /// tracked to ensure uniqueness.
+    suffix_uses: Mutex<HashSet<String>>,
 }
 
 impl GltfDataDestination {
     #[cfg(test)]
-    pub const fn null() -> GltfDataDestination {
-        Self {
+    pub fn null() -> GltfDataDestination {
+        Self(Arc::new(Inner {
             discard: true,
             maximum_inline_length: 0,
             file_base_path: None,
-        }
+            suffix_uses: Mutex::new(HashSet::new()),
+        }))
     }
 
     /// `maximum_inline_length` is the maximum length of data which will be stored inline in the
@@ -52,43 +61,70 @@ impl GltfDataDestination {
     /// `foo/bar.gltf`, then buffer files will be written to paths like `foo/bar-buffername.glbin`.
     /// If it is `None`, then buffers may not exceed `maximum_inline_length`.
     pub fn new(file_base_path: Option<PathBuf>, maximum_inline_length: usize) -> Self {
-        Self {
+        Self(Arc::new(Inner {
             discard: false,
             maximum_inline_length,
             file_base_path,
-        }
+            suffix_uses: Mutex::new(HashSet::new()),
+        }))
     }
 
-    /// Call the given function with a destination for buffer data,
-    /// then return the (possibly relative) URL to it which should be embedded in the glTF data.
+    /// Write glTF buffer data, then return a [`gltf_json::Buffer`] pointing to it by
+    /// one of the permitted means.
     ///
-    /// The [`io::Write`] implementation provided to `contents_fn` will be buffered.
-    /// The outcome is not specified if its IO errors are ignored rather than propagated.
+    /// * `contents_fn` will be called with a buffered writer to write the data to.
+    /// * `buffer_entity_name` is the `name` that will be in the returned [`gltf_json::Buffer`]
+    ///   entity.
+    /// * `proposed_file_name` will be included in the name of the generated data file,
+    ///   if there is one; for example, `foo.gltf` will have data files named like
+    ///   `foo-{proposed_file_name}-20.glbin`.
     ///
-    /// Returns `Err` on IO errors or if the file path constructed using `suffix` is not UTF-8.
+    /// # Errors
     ///
-    /// TODO: Add context (filename) to the IO error
+    /// Returns `Err` if:
+    ///
+    /// * An IO error occurs while writing.
+    /// * The data file path constructed using `self`'s base file path is not UTF-8.
+    ///
+    /// The outcome is not specified if IO errors from the writer given to `contents_fn`
+    /// are ignored rather than propagated.
+    //
+    // ---
+    // TODO: Add context (filename) to the IO error
     pub fn write<F>(
         &self,
         buffer_entity_name: String,
-        file_suffix: &str,
+        proposed_file_name: &str,
         contents_fn: F,
     ) -> io::Result<gltf_json::Buffer>
     where
         F: FnOnce(&mut dyn io::Write) -> io::Result<()>,
     {
         // Refuse characters which could change the interpretation of the path.
+        // TODO: filter them out instead
         assert!(
-            !file_suffix.contains(['/', '\0', '%']),
-            "Invalid character in buffer file name {file_suffix:?}"
+            !proposed_file_name.contains(['/', '\0', '%']),
+            "Invalid character in buffer file name {proposed_file_name:?}"
         );
 
-        let mut implementation = if self.discard {
+        let mut implementation = if self.0.discard {
             SwitchingWriter::Null { bytes_written: 0 }
-        } else if let Some(file_base_path) = &self.file_base_path {
+        } else if let Some(file_base_path) = &self.0.file_base_path {
+            // Ensure uniqueness of the file suffix.
+            // TODO: Only do this if we exceed the in-memory limit?
+            let unique_file_suffix: String = {
+                let mut suffix_uses = self.0.suffix_uses.lock().map_err(|_| {
+                    io::Error::new(
+                        io::ErrorKind::Other,
+                        "previous panic while using GltfDataDestination",
+                    )
+                })?;
+                make_unique_name(proposed_file_name, &mut suffix_uses)
+            };
+
             // Construct the file name (which is also the _relative_ path from gltf to data file).
             let mut buffer_file_name: OsString = file_base_path.file_stem().unwrap().to_owned();
-            buffer_file_name.push(format!("-{file_suffix}.glbin"));
+            buffer_file_name.push(format!("-{unique_file_suffix}.glbin"));
 
             // Construct the relative URL the glTF file will contain.
             // TODO: this path needs URL-encoding (excepting slashes)
@@ -111,14 +147,14 @@ impl GltfDataDestination {
 
             SwitchingWriter::Memory {
                 buffer: Vec::new(),
-                limit: self.maximum_inline_length,
+                limit: self.0.maximum_inline_length,
                 path: Some(buffer_file_path),
                 future_file_uri: Some(relative_url),
             }
         } else {
             SwitchingWriter::Memory {
                 buffer: Vec::new(),
-                limit: self.maximum_inline_length,
+                limit: self.0.maximum_inline_length,
                 path: None,
                 future_file_uri: None,
             }
@@ -135,6 +171,12 @@ impl GltfDataDestination {
             extensions: Default::default(),
             extras: Default::default(),
         })
+    }
+}
+
+impl PartialEq for GltfDataDestination {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
     }
 }
 
@@ -303,6 +345,24 @@ where
     Ok(accessor_index)
 }
 
+fn make_unique_name(proposed: &str, used: &mut HashSet<String>) -> String {
+    let chosen = if used.contains(proposed) {
+        let mut i = 2;
+        loop {
+            let new_suffix = format!("{proposed}-{i}");
+            if !used.contains(&new_suffix) {
+                break new_suffix;
+            } else {
+                i += 1;
+            }
+        }
+    } else {
+        proposed.to_owned()
+    };
+    used.insert(chosen.clone());
+    chosen
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -349,7 +409,6 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let mut file_base_path = temp_dir.path().to_owned();
         file_base_path.push("basepath.gltf");
-
         println!("Base path: {}", file_base_path.display());
 
         let d = GltfDataDestination::new(Some(file_base_path), 3);
@@ -364,5 +423,26 @@ mod tests {
         // Note that the URL is relative, not including the temp dir.
         assert_eq!(buffer_entity.uri.as_deref(), Some("basepath-bar.glbin"));
         assert_eq!(buffer_entity.byte_length, 6);
+    }
+
+    #[test]
+    fn non_unique_suffixes() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let mut file_base_path = temp_dir.path().to_owned();
+        file_base_path.push("basepath.gltf");
+        println!("Base path: {}", file_base_path.display());
+
+        let d = GltfDataDestination::new(Some(file_base_path), 0);
+        let e1 = d.write("foo".into(), "bar", write1).unwrap();
+        let e2 = d.write("foo".into(), "bar", write1).unwrap();
+
+        // These two file names must be distinct.
+        assert_eq!(e1.uri.as_deref(), Some("basepath-bar.glbin"));
+        assert_eq!(e2.uri.as_deref(), Some("basepath-bar-2.glbin"));
+    }
+
+    /// Write one byte to make the buffer nonempty.
+    fn write1(w: &mut dyn io::Write) -> io::Result<()> {
+        w.write_all(&[0])
     }
 }
