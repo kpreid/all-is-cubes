@@ -47,7 +47,7 @@ where
     /// always equal `space.block_data().len()`. It may not be fully updated yet, but
     /// it will be the correct length.
     ///
-    /// TODO: Missing handling for `mesh_options` changing.
+    /// Relies on the caller to check if `mesh_options` has changed and fill `todo`.
     pub(crate) fn update<A, F>(
         &mut self,
         todo: &mut FnvHashSet<BlockIndex>,

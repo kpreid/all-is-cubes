@@ -188,7 +188,6 @@ where
         let update_start_time = Instant::now();
 
         let graphics_options = camera.options();
-        let mesh_options = MeshOptions::new(graphics_options);
         let view_point = camera.view_position();
 
         let view_chunk = point_to_chunk(view_point);
@@ -207,12 +206,17 @@ where
             };
         };
 
-        if Some(&mesh_options) != self.last_mesh_options.as_ref() {
-            todo.all_blocks_and_chunks = true;
-            self.last_mesh_options = Some(mesh_options);
-        }
-        let mesh_options = self.last_mesh_options.as_ref().unwrap();
+        // Check for mesh options changes that would invalidate the meshes.
+        let mesh_options = {
+            let current_mesh_options = MeshOptions::new(graphics_options);
+            if Some(&current_mesh_options) != self.last_mesh_options.as_ref() {
+                todo.all_blocks_and_chunks = true;
+                self.last_mesh_options = Some(current_mesh_options);
+            }
+            self.last_mesh_options.as_ref().unwrap()
+        };
 
+        // If we need to redo everything, then clear all the old blocks.
         if todo.all_blocks_and_chunks {
             todo.all_blocks_and_chunks = false;
             todo.blocks
