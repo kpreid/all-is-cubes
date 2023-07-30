@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+### Changed
+
+### Removed
+
+- `all-is-cubes` library:
+    - `math::GridAab::index()` and `contains_cube()` no longer accept `impl Into<GridPoint>`.
+      Call sites should be changed to pass only `GridPoint`.
+
+
 ## 0.6.0 (2023-07-29)
 
 ### Added

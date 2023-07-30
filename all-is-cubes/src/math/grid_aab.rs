@@ -247,30 +247,47 @@ impl GridAab {
     ///
     /// ```
     /// let bounds = all_is_cubes::math::GridAab::from_lower_size([0, 0, 0], [10, 10, 10]);
-    /// assert_eq!(bounds.index((0, 0, 0)), Some(0));
-    /// assert_eq!(bounds.index((1, 2, 3)), Some(123));
-    /// assert_eq!(bounds.index((9, 9, 9)), Some(999));
-    /// assert_eq!(bounds.index((0, 0, -1)), None);
-    /// assert_eq!(bounds.index((0, 0, 10)), None);
+    /// assert_eq!(bounds.index([0, 0, 0].into()), Some(0));
+    /// assert_eq!(bounds.index([1, 2, 3].into()), Some(123));
+    /// assert_eq!(bounds.index([9, 9, 9].into()), Some(999));
+    /// assert_eq!(bounds.index([0, 0, -1].into()), None);
+    /// assert_eq!(bounds.index([0, 0, 10].into()), None);
     /// ```
     #[inline(always)] // very hot code
-    pub fn index(&self, point: impl Into<GridPoint>) -> Option<usize> {
-        let point = point.into();
-        let mut deoffsetted: Vector3<usize> = Vector3 { x: 0, y: 0, z: 0 };
-        for i in 0..3 {
-            let deoffsetted_component = point[i].checked_sub(self.lower_bounds[i])?;
-            if deoffsetted_component < 0 || deoffsetted_component >= self.sizes[i] {
-                return None;
-            }
-            // This cannot overflow because:
-            // * We just checked it is not negative
-            // * We just checked it is not greater than `self.sizes[i]`, which is an `i32`
-            // * We don't support platforms with `usize` smaller than 32 bits
-            deoffsetted[i] = usize::try_from(deoffsetted_component).unwrap();
+    pub fn index(&self, cube: GridPoint) -> Option<usize> {
+        let sizes = self.sizes;
+
+        // This might overflow and wrap, but if it does, the result will still be out
+        // of bounds, just in the other direction, because wrapping subtraction is an
+        // injective mapping of integers, and every in-bounds maps to in-bounds, so
+        // every out-of-bounds must also map to out-of-bounds.
+        let deoffsetted: Point3<GridCoordinate> =
+            cube.zip(self.lower_bounds, GridCoordinate::wrapping_sub);
+
+        // Bounds check, expressed as a single unsigned comparison.
+        if (deoffsetted.x as u32 >= sizes.x as u32)
+            | (deoffsetted.y as u32 >= sizes.y as u32)
+            | (deoffsetted.z as u32 >= sizes.z as u32)
+        {
+            return None;
         }
+
+        // Convert to usize for indexing.
+        // This cannot overflow because:
+        // * We just checked it is not negative
+        // * We just checked it is not greater than `self.sizes[i]`, which is an `i32`
+        // * We don't support platforms with `usize` smaller than 32 bits
+        let ixvec: Point3<usize> = deoffsetted.map(|c| c as usize);
+
+        let usizes: Vector3<usize> = sizes.map(|c| c as usize);
+
+        // Compute index.
+        // Always use wrapping (rather than maybe-checked) arithmetic, because we
+        // checked the criteria for it to not overflow.
         Some(
-            (deoffsetted[0] * self.sizes[1] as usize + deoffsetted[1]) * self.sizes[2] as usize
-                + deoffsetted[2],
+            (ixvec.x.wrapping_mul(usizes.y).wrapping_add(ixvec.y))
+                .wrapping_mul(usizes.z)
+                .wrapping_add(ixvec.z),
         )
     }
 
@@ -376,14 +393,14 @@ impl GridAab {
     ///
     /// ```
     /// let b = all_is_cubes::math::GridAab::from_lower_size([4, 4, 4], [6, 6, 6]);
-    /// assert!(!b.contains_cube([3, 5, 5]));
-    /// assert!(b.contains_cube([4, 5, 5]));
-    /// assert!(b.contains_cube([9, 5, 5]));
-    /// assert!(!b.contains_cube([10, 5, 5]));
+    /// assert!(!b.contains_cube([3, 5, 5].into()));
+    /// assert!(b.contains_cube([4, 5, 5].into()));
+    /// assert!(b.contains_cube([9, 5, 5].into()));
+    /// assert!(!b.contains_cube([10, 5, 5].into()));
     /// ```
     #[inline]
-    pub fn contains_cube(&self, point: impl Into<GridPoint>) -> bool {
-        self.index(point).is_some()
+    pub fn contains_cube(&self, cube: GridPoint) -> bool {
+        self.index(cube).is_some()
     }
 
     /// Returns whether this box includes every cube in the other box.
@@ -961,7 +978,7 @@ impl<V> GridArray<V> {
     #[inline]
     pub fn get(&self, position: impl Into<GridPoint>) -> Option<&V> {
         self.bounds
-            .index(position)
+            .index(position.into())
             .map(|index| &self.contents[index])
     }
 
@@ -970,7 +987,7 @@ impl<V> GridArray<V> {
     #[inline]
     pub fn get_mut(&mut self, position: impl Into<GridPoint>) -> Option<&mut V> {
         self.bounds
-            .index(position)
+            .index(position.into())
             .map(|index| &mut self.contents[index])
     }
 
@@ -1115,6 +1132,7 @@ impl fmt::Debug for RangeWithLength {
 mod tests {
     use super::*;
     use crate::block::Resolution::*;
+    use cgmath::point3;
     use indoc::indoc;
 
     #[test]
@@ -1148,21 +1166,21 @@ mod tests {
         // Indexing calculates (point - lower_bounds), so this would overflow in the negative direction if the overflow weren't checked.
         // Note that MAX - 1 is the highest allowed lower bound since the exclusive upper bound must be representable.
         let low = GridAab::from_lower_size([GridCoordinate::MAX - 1, 0, 0], [1, 1, 1]);
-        assert_eq!(low.index([0, 0, 0]), None);
-        assert_eq!(low.index([-1, 0, 0]), None);
-        assert_eq!(low.index([-2, 0, 0]), None);
-        assert_eq!(low.index([GridCoordinate::MIN, 0, 0]), None);
+        assert_eq!(low.index(point3(0, 0, 0)), None);
+        assert_eq!(low.index(point3(-1, 0, 0)), None);
+        assert_eq!(low.index(point3(-2, 0, 0)), None);
+        assert_eq!(low.index(point3(GridCoordinate::MIN, 0, 0)), None);
         // But, an actually in-bounds cube should still work.
-        assert_eq!(low.index([GridCoordinate::MAX - 1, 0, 0]), Some(0));
+        assert_eq!(low.index(point3(GridCoordinate::MAX - 1, 0, 0)), Some(0));
     }
 
     #[test]
     fn index_overflow_high() {
         let high = GridAab::from_lower_size([GridCoordinate::MAX - 1, 0, 0], [1, 1, 1]);
-        assert_eq!(high.index([0, 0, 0]), None);
-        assert_eq!(high.index([1, 0, 0]), None);
-        assert_eq!(high.index([2, 0, 0]), None);
-        assert_eq!(high.index([GridCoordinate::MAX - 1, 0, 0]), Some(0));
+        assert_eq!(high.index(point3(0, 0, 0)), None);
+        assert_eq!(high.index(point3(1, 0, 0)), None);
+        assert_eq!(high.index(point3(2, 0, 0)), None);
+        assert_eq!(high.index(point3(GridCoordinate::MAX - 1, 0, 0)), Some(0));
     }
 
     #[test]
@@ -1171,7 +1189,7 @@ mod tests {
         // This value fits in a 32-bit `usize` and is therefore a valid index,
         // but it does not fit in a `GridCoordinate` = `i32`.
         assert_eq!(
-            aab.index([1500, 1500, 1500]),
+            aab.index(point3(1500, 1500, 1500)),
             Some(((1500 * 2000) + 1500) * 2000 + 1500)
         );
     }

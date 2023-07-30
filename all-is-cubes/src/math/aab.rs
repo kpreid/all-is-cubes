@@ -294,8 +294,8 @@ impl Aab {
     ///     .round_up_to_grid();
     /// assert_eq!(grid_aab, GridAab::from_lower_upper([3, 0, 0], [5, 2, 1]));
     ///
-    /// assert!(grid_aab.contains_cube([4, 1, 0]));
-    /// assert!(!grid_aab.contains_cube([5, 1, 0]));
+    /// assert!(grid_aab.contains_cube([4, 1, 0].into()));
+    /// assert!(!grid_aab.contains_cube([5, 1, 0].into()));
     /// ```
     ///
     /// If the floating-point coordinates are out of [`GridCoordinate`]'s numeric range,

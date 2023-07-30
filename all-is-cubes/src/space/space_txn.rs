@@ -229,7 +229,7 @@ impl Transaction<Space> for SpaceTransaction {
             },
         ) in &self.cubes
         {
-            if let Some(cube_index) = space.bounds().index(cube) {
+            if let Some(cube_index) = space.bounds().index(cube.into()) {
                 if let Some(old) = old {
                     // Raw lookup because we already computed the index for a bounds check
                     // (TODO: Put this in a function, like get_block_index)
@@ -297,7 +297,7 @@ impl Transaction<Space> for SpaceTransaction {
                 // TODO: error return from the function? error report for nonexistence?
                 for cube in to_activate.iter().copied() {
                     // TODO: this should be part of the query instead, to allow efficient search
-                    if query_item.attachment.bounds.contains_cube(cube) {
+                    if query_item.attachment.bounds.contains_cube(cube.into()) {
                         query_item.behavior.activate();
                         continue 'b;
                     }

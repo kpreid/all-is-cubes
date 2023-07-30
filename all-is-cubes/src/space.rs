@@ -260,7 +260,7 @@ impl Space {
     /// Gets the [`EvaluatedBlock`] of the block in this space at the given position.
     #[inline(always)]
     pub fn get_evaluated(&self, position: impl Into<GridPoint>) -> &EvaluatedBlock {
-        if let Some(index) = self.bounds.index(position) {
+        if let Some(index) = self.bounds.index(position.into()) {
             self.palette.entry(self.contents[index]).evaluated()
         } else {
             &AIR_EVALUATED
@@ -723,7 +723,7 @@ impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
     /// use [`Space::set`] or [`Space::fill`] to modify blocks.
     #[inline(always)]
     fn index(&self, position: T) -> &Self::Output {
-        if let Some(index) = self.bounds.index(position) {
+        if let Some(index) = self.bounds.index(position.into()) {
             self.palette.entry(self.contents[index]).block()
         } else {
             &AIR
