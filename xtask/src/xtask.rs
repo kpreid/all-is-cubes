@@ -315,13 +315,6 @@ fn main() -> Result<(), ActionError> {
                 }
 
                 let _pushd: Pushd = pushd(package)?;
-                if for_real {
-                    // Let crates.io pick up the new all-is-cubes version,
-                    // or publishing dependents will fail.
-                    // TODO: This will stop being necessary in Rust 1.66:
-                    // <https://github.com/rust-lang/cargo/issues/9507>
-                    std::thread::sleep(Duration::from_secs(10));
-                }
                 cargo()
                     .arg("publish")
                     .args(maybe_dry.iter().copied())
