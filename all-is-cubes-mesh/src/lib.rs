@@ -1,5 +1,5 @@
 //! Data structures and algorithms for converting [`all_is_cubes`] voxel data to triangle
-//! meshes for rendering.
+//! meshes for rendering or export.
 //!
 //! All of the algorithms here are independent of graphics API, but they require providing
 //! vertex and texture data types suitable for the API or data format you wish to use.
