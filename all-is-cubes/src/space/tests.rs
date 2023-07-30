@@ -7,12 +7,14 @@ use alloc::string::ToString;
 use indoc::indoc;
 
 use crate::block::{
-    Atom, Block, BlockDef, BlockDefTransaction, EvalBlockError, Primitive, Resolution::*, AIR,
+    Atom, Block, BlockDef, BlockDefTransaction, EvalBlockError, Primitive, Resolution::*,
+    TickAction, AIR,
 };
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::listen::{Listen as _, Sink};
 use crate::math::{Cube, GridArray, GridCoordinate, GridPoint, Rgba};
+use crate::op::Operation;
 use crate::space::{
     GridAab, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpacePhysics,
 };
@@ -485,7 +487,9 @@ fn set_physics_light_rays() {
 fn block_tick_action() {
     let [mut block1, block2] = make_some_blocks();
     if let Primitive::Atom(Atom { attributes, .. }) = block1.primitive_mut() {
-        attributes.tick_action = Some(VoxelBrush::single(block2.clone()));
+        attributes.tick_action = Some(TickAction::from(Operation::Paint(VoxelBrush::single(
+            block2.clone(),
+        ))));
     } else {
         panic!();
     }

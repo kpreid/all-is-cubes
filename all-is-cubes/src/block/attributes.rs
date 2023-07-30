@@ -3,8 +3,9 @@
 use alloc::borrow::Cow;
 use core::fmt;
 
-use crate::drawing::VoxelBrush;
 use crate::math::Face6;
+use crate::op::Operation;
+use crate::universe::VisitRefs;
 
 #[cfg(doc)]
 use crate::{
@@ -37,11 +38,7 @@ pub struct BlockAttributes {
     pub rotation_rule: RotationPlacementRule,
 
     /// Something this block does when time passes.
-    ///
-    /// Currently the only possibility is “turn into another block”.
-    ///
-    /// TODO: Very placeholder. This needs more possible effects and also time/probability options.
-    pub tick_action: Option<VoxelBrush<'static>>,
+    pub tick_action: Option<TickAction>,
 
     /// Advice to the renderer about how to expect this block to change, and hence
     /// what rendering strategy to use.
@@ -300,6 +297,27 @@ impl AnimationChange {
             AnimationChange::ColorSameCategory => false,
             AnimationChange::Shape => true,
         }
+    }
+}
+
+/// Something a block does when time passes.
+///
+/// Currently, this is an [`Operation`], but in the future it will have timing controls.
+///
+/// Stored in [`BlockAttributes`].
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[allow(clippy::exhaustive_structs)] // will deliberately break
+pub struct TickAction(pub Operation);
+
+impl From<Operation> for TickAction {
+    fn from(op: Operation) -> Self {
+        Self(op)
+    }
+}
+
+impl VisitRefs for TickAction {
+    fn visit_refs(&self, visitor: &mut dyn crate::universe::RefVisitor) {
+        self.0.visit_refs(visitor);
     }
 }
 

@@ -4,12 +4,13 @@
 use core::fmt;
 
 use all_is_cubes::euclid::Vector3D;
+use all_is_cubes::op::Operation;
 use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
 use all_is_cubes::block::{
     AnimationHint, Atom, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution::*,
-    RotationPlacementRule, AIR,
+    RotationPlacementRule, TickAction, AIR,
 };
 use all_is_cubes::drawing::embedded_graphics::{
     prelude::Point,
@@ -438,16 +439,16 @@ pub async fn install_demo_blocks(
             let mut block: Block = (*block_def_ref.read().unwrap()).clone();
 
             if let Primitive::Atom(Atom { attributes, .. }) = block.primitive_mut() {
-                attributes.tick_action = if i > 30 {
+                attributes.tick_action = Some(TickAction::from(Operation::Paint(if i > 30 {
                     // Expire
-                    Some(VoxelBrush::single(AIR))
+                    VoxelBrush::single(AIR)
                 } else {
                     let next = &provider_for_patch[Explosion(i + 1)];
                     if i < 15 {
                         // Expand for the first 0.25 seconds out to ~5 blocks
                         if i % 3 == 0 {
                             if i % 6 == 0 {
-                                Some(VoxelBrush::new([
+                                VoxelBrush::new([
                                     ([0, 0, 0], next.clone()),
                                     ([1, 0, 0], next.clone()),
                                     ([-1, 0, 0], next.clone()),
@@ -455,9 +456,9 @@ pub async fn install_demo_blocks(
                                     ([0, -1, 0], next.clone()),
                                     ([0, 0, 1], next.clone()),
                                     ([0, 0, -1], next.clone()),
-                                ]))
+                                ])
                             } else {
-                                Some(VoxelBrush::new([
+                                VoxelBrush::new([
                                     ([0, 0, 0], next.clone()),
                                     ([1, 1, 0], next.clone()),
                                     ([-1, 1, 0], next.clone()),
@@ -471,16 +472,16 @@ pub async fn install_demo_blocks(
                                     ([0, -1, -1], next.clone()),
                                     ([-1, 0, 1], next.clone()),
                                     ([-1, 0, -1], next.clone()),
-                                ]))
+                                ])
                             }
                         } else {
-                            Some(VoxelBrush::new([([0, 0, 0], next.clone())]))
+                            VoxelBrush::new([([0, 0, 0], next.clone())])
                         }
                     } else {
                         // Just fade
-                        Some(VoxelBrush::new([([0, 0, 0], next.clone())]))
+                        VoxelBrush::new([([0, 0, 0], next.clone())])
                     }
-                };
+                })));
             } else {
                 panic!("not atom");
             }

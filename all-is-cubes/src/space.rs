@@ -12,6 +12,7 @@ use euclid::{vec3, Vector3D};
 use hashbrown::HashSet as HbHashSet;
 
 use crate::behavior::{self, BehaviorSet};
+use crate::block::TickAction;
 use crate::block::{Block, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED};
 #[cfg(doc)]
 use crate::character::Character;
@@ -19,6 +20,7 @@ use crate::character::Spawn;
 use crate::content::palette::DAY_SKY_COLOR;
 use crate::drawing::DrawingPlane;
 use crate::inv::EphemeralOpaque;
+use crate::inv::InventoryTransaction;
 use crate::listen::{Listen, Listener, Notifier};
 use crate::math::Vol;
 use crate::math::{
@@ -568,11 +570,24 @@ impl Space {
         let cubes_to_tick = mem::take(&mut self.cubes_wanting_ticks);
         let count_cubes_ticked = cubes_to_tick.len();
         for position in cubes_to_tick {
-            if let Some(brush) = self.get_evaluated(position).attributes.tick_action.as_ref() {
-                // TODO: nonconserved should be at the block's choice
-                tick_txn = tick_txn
-                    .merge(brush.paint_transaction(position).nonconserved())
-                    .expect("TODO: don't panic on tick conflict");
+            if let Some(TickAction(operation)) =
+                self.get_evaluated(position).attributes.tick_action.as_ref()
+            {
+                match operation.apply(
+                    self,
+                    None,
+                    Gridgid::from_translation(position.lower_bounds().to_vector()),
+                ) {
+                    Ok((space_txn, inventory_txn)) => {
+                        assert_eq!(inventory_txn, InventoryTransaction::default());
+                        tick_txn = tick_txn
+                            .merge(space_txn)
+                            .expect("TODO: don't panic on tick conflict");
+                    }
+                    Err(_) => {
+                        // TODO: emit fluff and other error logging if applicable
+                    }
+                }
             }
         }
         // TODO: We need a strategy for, if this transaction fails, trying again while finding

@@ -1,8 +1,10 @@
+use crate::block::TickAction;
 use crate::block::{
     self, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution::R16, AIR,
 };
 use crate::drawing::VoxelBrush;
 use crate::math::{Face6, GridAab, GridCoordinate, GridVector, Vol};
+use crate::op::Operation;
 use crate::universe;
 
 /// Data for [`Modifier::Move`]; displaces the block out of the grid, cropping it.
@@ -105,9 +107,9 @@ impl Move {
             .translate(translation_in_res)
             .intersection(GridAab::for_block(effective_resolution));
 
-        let animation_action = if displaced_bounds.is_none() && velocity >= 0 {
+        let animation_action: Option<TickAction> = if displaced_bounds.is_none() && velocity >= 0 {
             // Displaced to invisibility; turn into just plain air.
-            Some(VoxelBrush::single(AIR))
+            Some(TickAction::from(Operation::Paint(VoxelBrush::single(AIR))))
         } else if translation_in_res == GridVector::zero() && velocity == 0
             || distance == 0 && velocity < 0
         {
@@ -117,7 +119,9 @@ impl Move {
             );
             let mut new_block = block.clone();
             new_block.modifiers_mut().remove(this_modifier_index); // TODO: What if other modifiers want to do things?
-            Some(VoxelBrush::single(new_block))
+            Some(TickAction::from(Operation::Paint(VoxelBrush::single(
+                new_block,
+            ))))
         } else if velocity != 0 {
             // Movement in progress.
             assert!(
@@ -134,7 +138,9 @@ impl Move {
                             .try_into()
                             .unwrap(/* clamped to range */);
             }
-            Some(VoxelBrush::single(new_block))
+            Some(TickAction::from(Operation::Paint(VoxelBrush::single(
+                new_block,
+            ))))
         } else {
             // Stationary displacement; take no action
             None
@@ -276,7 +282,9 @@ mod tests {
     fn move_also_quotes() {
         let original = Block::builder()
             .color(Rgba::WHITE)
-            .tick_action(Some(VoxelBrush::single(AIR)))
+            .tick_action(Some(TickAction::from(Operation::Paint(
+                VoxelBrush::single(AIR),
+            ))))
             .build();
         let moved = original.with_modifier(Move {
             direction: Face6::PY,
@@ -361,7 +369,9 @@ mod tests {
 
         assert_eq!(
             block.evaluate().unwrap().attributes.tick_action,
-            Some(VoxelBrush::single(expected_after_tick))
+            Some(TickAction::from(Operation::Paint(VoxelBrush::single(
+                expected_after_tick
+            ))))
         );
     }
 
@@ -394,7 +404,9 @@ mod tests {
             // This is what we want to happen
             assert_eq!(
                 block.evaluate().unwrap().attributes.tick_action,
-                Some(VoxelBrush::single(expected_after_tick))
+                Some(TickAction::from(Operation::Paint(VoxelBrush::single(
+                    expected_after_tick
+                ))))
             );
         } else {
             // Placeholder to fail if the current behavior changes

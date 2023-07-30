@@ -4,11 +4,12 @@ use core::any::TypeId;
 
 use indoc::indoc;
 
-use crate::block::{Block, BlockDef, BlockDefTransaction, Primitive, Resolution, AIR};
+use crate::block::{Block, BlockDef, BlockDefTransaction, Primitive, Resolution, TickAction, AIR};
 use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
 use crate::math::Rgba;
+use crate::op::Operation;
 use crate::space::Space;
 use crate::time;
 use crate::transaction::{self, Transaction};
@@ -360,9 +361,9 @@ fn visit_refs_block_tick_action() {
     let b1 = URef::new_pending("foo".into(), BlockDef::new(AIR));
     let b2 = Block::builder()
         .color(Rgba::WHITE)
-        .tick_action(Some(crate::drawing::VoxelBrush::single(
-            Block::from_primitive(Primitive::Indirect(b1)),
-        )))
+        .tick_action(Some(TickAction::from(Operation::Paint(
+            crate::drawing::VoxelBrush::single(Block::from_primitive(Primitive::Indirect(b1))),
+        ))))
         .build();
     assert_eq!(list_refs(&b2), vec!["foo".into()]);
 }

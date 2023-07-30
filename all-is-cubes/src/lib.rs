@@ -200,6 +200,7 @@ pub mod intalloc;
 pub mod inv;
 pub mod linking;
 pub mod listen;
+pub mod op;
 pub mod physics;
 pub mod raycast;
 pub mod raytracer;

@@ -8,7 +8,6 @@ use crate::block::{
     AnimationHint, Atom, Block, BlockAttributes, BlockCollision, BlockDef, BlockParts, BlockPtr,
     Modifier, Primitive, Resolution, RotationPlacementRule, AIR,
 };
-use crate::drawing::VoxelBrush;
 use crate::math::{Cube, GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
 use crate::universe::{Name, URef, Universe};
@@ -91,8 +90,8 @@ impl<C> BlockBuilder<C> {
     }
 
     /// Sets the value for [`BlockAttributes::tick_action`].
-    pub fn tick_action(mut self, value: Option<VoxelBrush<'static>>) -> Self {
-        self.attributes.tick_action = value;
+    pub fn tick_action(mut self, value: impl Into<Option<super::TickAction>>) -> Self {
+        self.attributes.tick_action = value.into();
         self
     }
 
@@ -327,8 +326,10 @@ impl BuildPrimitiveIndependent for BlockBuilderVoxels {
 
 #[cfg(test)]
 mod tests {
-    use crate::block::{Resolution::*, AIR};
+    use crate::block::{Resolution::*, TickAction, AIR};
+    use crate::drawing::VoxelBrush;
     use crate::math::{Face6, GridAab};
+    use crate::op::Operation;
     use crate::space::SpacePhysics;
 
     use super::*;
@@ -360,7 +361,7 @@ mod tests {
         let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
         let emission = Rgb::new(0.1, 3.0, 0.1);
         let rotation_rule = RotationPlacementRule::Attach { by: Face6::NZ };
-        let tick_action = Some(VoxelBrush::single(AIR));
+        let tick_action = Some(TickAction::from(Operation::Paint(VoxelBrush::single(AIR))));
         assert_eq!(
             Block::builder()
                 .color(color)
