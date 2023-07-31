@@ -19,6 +19,8 @@ mod face;
 pub use face::*;
 mod grid_aab;
 pub use grid_aab::*;
+mod rigid;
+pub use rigid::*;
 mod matrix;
 pub use matrix::*;
 mod rotation;

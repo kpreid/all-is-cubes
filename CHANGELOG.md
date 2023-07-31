@@ -4,6 +4,9 @@
 
 ### Added
 
+- `all-is-cubes` library:
+    - `math::Gridgid` represents rigid transformations, a useful subset of what `GridMatrix` already could do.
+
 ### Changed
 
 ### Removed

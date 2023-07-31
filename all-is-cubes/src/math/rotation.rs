@@ -346,6 +346,19 @@ impl GridRotation {
         }
     }
 
+    /// Rotate the vector by this rotation.
+    ///
+    /// May panic or wrap if `vector` has any components equal to [`GridCoordinate::MIN`].
+    // TODO: add tests
+    #[inline]
+    pub fn transform_vector(self, vector: GridVector) -> GridVector {
+        let basis = self.to_basis();
+
+        basis.x.normal_vector() * vector.x
+            + basis.y.normal_vector() * vector.y
+            + basis.z.normal_vector() * vector.z
+    }
+
     /// Returns whether this is a reflection.
     ///
     /// ```
