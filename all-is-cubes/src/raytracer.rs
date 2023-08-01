@@ -19,8 +19,8 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use crate::block::{Evoxels, AIR};
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 use crate::math::{
-    point_to_enclosing_cube, smoothstep, Face7, FreeCoordinate, GridAab, GridArray, GridPoint, Rgb,
-    Rgba,
+    point_to_enclosing_cube, smoothstep, Face6, Face7, FreeCoordinate, GridAab, GridArray,
+    GridMatrix, GridPoint, Rgb, Rgba,
 };
 use crate::raycast::Ray;
 use crate::space::{BlockIndex, PackedLight, Space, SpaceBlockData};
@@ -183,7 +183,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     }
 
     fn get_interpolated_light(&self, point: Point3<FreeCoordinate>, face: Face7) -> Rgb {
-        // This implementation is duplicated in GLSL at all-is-cubes-gpu/src/shaders/fragment.glsl
+        // This implementation is duplicated in WGSL in interpolated_space_light()
+        // in all-is-cubes-gpu/src/in_wgpu/shaders/blocks-and-lines.wgsl.
 
         // About half the size of the smallest permissible voxel.
         let above_surface_epsilon = 0.5 / 256.0;
@@ -193,7 +194,11 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
         // Find linear interpolation coefficients based on where we are relative to
         // a half-cube-offset grid.
-        let reference_frame = face.matrix(0).to_free();
+        let reference_frame = match Face6::try_from(face) {
+            Ok(face) => face.matrix(0),
+            Err(_) => GridMatrix::ZERO,
+        }
+        .to_free();
         let mut mix_1 = (origin.dot(reference_frame.x.truncate()) - 0.5).rem_euclid(1.0);
         let mut mix_2 = (origin.dot(reference_frame.y.truncate()) - 0.5).rem_euclid(1.0);
 

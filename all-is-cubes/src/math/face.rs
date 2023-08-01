@@ -205,14 +205,28 @@ impl Face6 {
     /// with x ∈ [0, scale], y ∈ [0, scale] and z = 0, converts them to points that lie
     /// on the faces of the cube with x ∈ [0, scale], y ∈ [0, scale], and z ∈ [0, scale].
     ///
-    /// Specifically, `Face6::NZ.gmatrix()` is the identity matrix and all others are
+    /// Specifically, `Face6::NZ.matrix()` is the identity matrix and all others are
     /// consistent with that. Note that there are arbitrary choices in the rotation
     /// of all other faces. (TODO: Document those choices and test them.)
     ///
     /// To work with floating-point coordinates, use `.matrix(1).to_free()`.
     #[must_use]
     pub const fn matrix(self, scale: GridCoordinate) -> GridMatrix {
-        self.into7().matrix(scale)
+        match self {
+            Face6::NX => GridMatrix::new(0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0),
+            Face6::NY => GridMatrix::new(0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0),
+            Face6::NZ => GridMatrix::new(
+                // Z face leaves X and Y unchanged!
+                1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+            ),
+            // Positives are same as negatives but with translation and an arbitrary choice of rotation.
+            // PX rotates about Y.
+            Face6::PX => GridMatrix::new(0, -1, 0, 0, 0, 1, -1, 0, 0, scale, scale, 0),
+            // PY rotates about X.
+            Face6::PY => GridMatrix::new(0, 0, 1, -1, 0, 0, 0, -1, 0, scale, scale, 0),
+            // PZ rotates about Y.
+            Face6::PZ => GridMatrix::new(1, 0, 0, 0, -1, 0, 0, 0, -1, 0, scale, scale),
+        }
     }
 
     /// Helper to convert in const context; equivalent to `.into()`.
@@ -434,64 +448,6 @@ impl Face7 {
             Face7::PX => vector.x,
             Face7::PY => vector.y,
             Face7::PZ => vector.z,
-        }
-    }
-
-    /// Returns a homogeneous transformation matrix which, if given points on the square
-    /// with x ∈ [0, scale], y ∈ [0, scale] and z = 0, converts them to points that lie
-    /// on the faces of the cube with x ∈ [0, scale], y ∈ [0, scale], and z ∈ [0, scale].
-    ///
-    /// Specifically, `Face7::NZ.gmatrix()` is the identity matrix and all others are
-    /// consistent with that. Note that there are arbitrary choices in the rotation
-    /// of all other faces. (TODO: Document those choices and test them.)
-    ///
-    /// To work with floating-point coordinates, use `.matrix(1).to_free()`.
-    #[rustfmt::skip]
-    #[must_use]
-    pub const fn matrix(self, scale: GridCoordinate) -> GridMatrix {
-        match self {
-            Face7::Within => GridMatrix::ZERO,
-            Face7::NX => GridMatrix::new(
-                0, 1, 0,
-                0, 0, 1,
-                1, 0, 0,
-                0, 0, 0,
-            ),
-            Face7::NY => GridMatrix::new(
-                0, 0, 1,
-                1, 0, 0,
-                0, 1, 0,
-                0, 0, 0,
-            ),
-            Face7::NZ => GridMatrix::new(
-                // Z face leaves X and Y unchanged!
-                1, 0, 0,
-                0, 1, 0,
-                0, 0, 1,
-                0, 0, 0,
-            ),
-            // Positives are same as negatives but with translation and an arbitrary choice of rotation.
-            // PX rotates about Y.
-            Face7::PX => GridMatrix::new(
-                0, -1, 0,
-                0, 0, 1,
-                -1, 0, 0,
-                scale, scale, 0,
-            ),
-            // PY rotates about X.
-            Face7::PY => GridMatrix::new(
-                0, 0, 1,
-                -1, 0, 0,
-                0, -1, 0,
-                scale, scale, 0,
-            ),
-            // PZ rotates about Y.
-            Face7::PZ => GridMatrix::new(
-                1, 0, 0,
-                0, -1, 0,
-                0, 0, -1,
-                0, scale, scale,
-            ),
         }
     }
 }
@@ -865,22 +821,24 @@ impl Geometry for CubeFace {
         aab.wireframe_points(output);
 
         // Draw an X on the face.
-        let face_matrix = self.face.matrix(1);
-        const X_POINTS: [GridPoint; 4] = [
-            Point3::new(0, 0, 0),
-            Point3::new(1, 1, 0),
-            Point3::new(1, 0, 0),
-            Point3::new(0, 1, 0),
-        ];
-        // TODO: this is a messy kludge and really we should be stealing corner points
-        // from the AAB instead, but there isn't yet a good way to do that.
-        output.extend(X_POINTS.into_iter().map(|p| {
-            LineVertex::from(
-                (face_matrix.transform_point(p))
-                    .map(|c| (FreeCoordinate::from(c) - 0.5) * (1. + expansion * 2.) + 0.5)
-                    + self.cube.to_vec().map(FreeCoordinate::from),
-            )
-        }));
+        if let Ok(face) = Face6::try_from(self.face) {
+            let face_matrix = face.matrix(1);
+            const X_POINTS: [GridPoint; 4] = [
+                Point3::new(0, 0, 0),
+                Point3::new(1, 1, 0),
+                Point3::new(1, 0, 0),
+                Point3::new(0, 1, 0),
+            ];
+            // TODO: this is a messy kludge and really we should be stealing corner points
+            // from the AAB instead, but there isn't yet a good way to do that.
+            output.extend(X_POINTS.into_iter().map(|p| {
+                LineVertex::from(
+                    (face_matrix.transform_point(p))
+                        .map(|c| (FreeCoordinate::from(c) - 0.5) * (1. + expansion * 2.) + 0.5)
+                        + self.cube.to_vec().map(FreeCoordinate::from),
+                )
+            }));
+        }
     }
 }
 
@@ -893,7 +851,6 @@ mod tests {
     fn face_matrix_does_not_scale_or_reflect() {
         for face in Face6::ALL {
             assert_eq!(1.0, face.matrix(7).to_free().determinant());
-            assert_eq!(1.0, Face7::from(face).matrix(7).to_free().determinant());
         }
     }
 

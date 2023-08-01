@@ -9,7 +9,7 @@ use cgmath::{EuclideanSpace, InnerSpace as _, Matrix4, Point3, Transform as _};
 use crate::block::{recursive_ray, Block, EvaluatedBlock, Evoxel, Evoxels};
 use crate::content::palette;
 use crate::math::{
-    Aab, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridVector, LineVertex,
+    Aab, Face6, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridVector, LineVertex,
 };
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
@@ -250,45 +250,49 @@ impl Geometry for Cursor {
                 v
             }));
 
-        let face_transform_full =
-            Matrix4::from_translation(self.hit().position.map(FreeCoordinate::from).to_vec())
-                * self.face_selected().matrix(1).to_free();
-
         // Frame the selected face with a square.
         // TODO: Position this frame relative to block_aabb.
-        let inset = 1. / 128.;
-        for &p in [
-            Point3::new(inset, inset, -offset_from_surface),
-            Point3::new(inset, 1. - inset, -offset_from_surface),
-            Point3::new(1. - inset, 1. - inset, -offset_from_surface),
-            Point3::new(1. - inset, inset, -offset_from_surface),
-            Point3::new(inset, inset, -offset_from_surface),
-        ]
-        .windows(2)
-        .flatten()
-        {
-            let position = face_transform_full.transform_point(p);
-            output.extend([LineVertex {
-                position,
-                color: Some(palette::CURSOR_OUTLINE),
-            }]);
+        if let Ok(face) = Face6::try_from(self.face_selected()) {
+            let face_transform_full =
+                Matrix4::from_translation(self.hit().position.map(FreeCoordinate::from).to_vec())
+                    * face.matrix(1).to_free();
+
+            let inset = 1. / 128.;
+            for &p in [
+                Point3::new(inset, inset, -offset_from_surface),
+                Point3::new(inset, 1. - inset, -offset_from_surface),
+                Point3::new(1. - inset, 1. - inset, -offset_from_surface),
+                Point3::new(1. - inset, inset, -offset_from_surface),
+                Point3::new(inset, inset, -offset_from_surface),
+            ]
+            .windows(2)
+            .flatten()
+            {
+                let position = face_transform_full.transform_point(p);
+                output.extend([LineVertex {
+                    position,
+                    color: Some(palette::CURSOR_OUTLINE),
+                }]);
+            }
         }
 
         // Frame the cursor intersection point with a diamond.
         // TODO: This addition is experimental and we may or may not want to keep it.
         // For now, it visualizes the intersection and face information.
-        let face_transform_axes_only = self.face_entered.matrix(0).to_free();
-        for f in [Face7::PX, Face7::PY, Face7::NX, Face7::NY, Face7::PX]
-            .windows(2)
-            .flatten()
-        {
-            let position = self.point_entered
-                + self.face_entered.normal_vector() * offset_from_surface
-                + face_transform_axes_only.transform_vector(f.normal_vector() * (1.0 / 32.0));
-            output.extend([LineVertex {
-                position,
-                color: Some(palette::CURSOR_OUTLINE),
-            }]);
+        if let Ok(face) = Face6::try_from(self.face_entered) {
+            let face_transform_axes_only = face.matrix(0).to_free();
+            for f in [Face7::PX, Face7::PY, Face7::NX, Face7::NY, Face7::PX]
+                .windows(2)
+                .flatten()
+            {
+                let position = self.point_entered
+                    + self.face_entered.normal_vector() * offset_from_surface
+                    + face_transform_axes_only.transform_vector(f.normal_vector() * (1.0 / 32.0));
+                output.extend([LineVertex {
+                    position,
+                    color: Some(palette::CURSOR_OUTLINE),
+                }]);
+            }
         }
     }
 }
