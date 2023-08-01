@@ -57,9 +57,11 @@ use crate::universe::Universe;
 /// TODO: Handling zero-area rectangles is not implemented
 pub fn rectangle_to_aab(
     rectangle: Rectangle,
-    transform: GridMatrix,
+    transform: impl Into<GridMatrix>,
     max_brush: GridAab,
 ) -> GridAab {
+    let transform = transform.into();
+
     // Note that embedded_graphics uses the convention that coordinates *identify pixels*,
     // not the boundaries between pixels. Thus, a rectangle whose bottom_right corner is
     // 1, 1 includes the pixel with coordinates 1, 1. This is consistent with our “cube”

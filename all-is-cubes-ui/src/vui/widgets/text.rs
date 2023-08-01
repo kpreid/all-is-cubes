@@ -1,18 +1,15 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use all_is_cubes::drawing::embedded_graphics::{
+    mono_font::{MonoFont, MonoTextStyle},
+    prelude::{Dimensions, Point},
+    text::{Text, TextStyle},
+    Drawable,
+};
 use all_is_cubes::drawing::{rectangle_to_aab, VoxelBrush};
 use all_is_cubes::math::{GridAab, Gridgid};
 use all_is_cubes::space::SpaceTransaction;
-use all_is_cubes::{
-    drawing::embedded_graphics::{
-        mono_font::{MonoFont, MonoTextStyle},
-        prelude::{Dimensions, Point},
-        text::{Text, TextStyle},
-        Drawable,
-    },
-    math::GridMatrix,
-};
 
 use crate::vui::{widgets, LayoutGrant, LayoutRequest, Layoutable, Widget, WidgetController};
 
@@ -45,7 +42,7 @@ impl LargeText {
         // TODO: this conversion should be less fiddly
         rectangle_to_aab(
             self.drawable().bounding_box(),
-            GridMatrix::FLIP_Y,
+            Gridgid::FLIP_Y,
             self.brush.bounds().unwrap_or(GridAab::ORIGIN_CUBE),
         )
     }

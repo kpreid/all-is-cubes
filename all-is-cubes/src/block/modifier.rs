@@ -104,10 +104,10 @@ impl Modifier {
                 } else {
                     // TODO: Add a shuffle-in-place rotation operation to GridArray and try implementing this using that, which should have less arithmetic involved than these matrix ops
                     let resolution = value.resolution();
-                    let inner_to_outer = rotation.to_positive_octant_matrix(resolution.into());
+                    let inner_to_outer = rotation.to_positive_octant_transform(resolution.into());
                     let outer_to_inner = rotation
                         .inverse()
-                        .to_positive_octant_matrix(resolution.into());
+                        .to_positive_octant_transform(resolution.into());
 
                     MinEval {
                         voxels: Evoxels::Many(
@@ -210,7 +210,7 @@ mod tests {
         let rotated_color_fn = |cube: GridPoint| {
             color_fn(
                 rotation
-                    .to_positive_octant_matrix(resolution.into())
+                    .to_positive_octant_transform(resolution.into())
                     .transform_cube(cube),
             )
         };
