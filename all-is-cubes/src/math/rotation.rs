@@ -329,7 +329,13 @@ impl GridRotation {
     /// Expresses this rotation as a matrix without any translation.
     // TODO: add tests
     pub fn to_rotation_matrix(self) -> GridMatrix {
-        self.to_positive_octant_matrix(0)
+        let basis = self.to_basis();
+        GridMatrix {
+            x: basis.x.normal_vector(),
+            y: basis.y.normal_vector(),
+            z: basis.z.normal_vector(),
+            w: Vector3::zero(),
+        }
     }
 
     /// Rotate the face by this rotation.
@@ -484,9 +490,9 @@ impl Mul<Self> for GridRotation {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
     use super::*;
+    use cgmath::Transform as _;
+    use std::collections::HashSet;
     use Face6::*;
 
     #[test]
@@ -546,6 +552,17 @@ mod tests {
             GridRotation::ALL.len(),
             GridRotation::ALL_BUT_REFLECTIONS.len() * 2,
         );
+    }
+
+    #[test]
+    fn equivalent_rotation_matrix() {
+        for rot in GridRotation::ALL {
+            let point = GridPoint::new(1, 20, 300);
+            assert_eq!(
+                GridPoint::from_vec(rot.transform_vector(point.to_vec())),
+                rot.to_rotation_matrix().transform_point(point),
+            );
+        }
     }
 
     /// The set of possible inputs is small enough to test its properties exhaustively
