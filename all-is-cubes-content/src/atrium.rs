@@ -310,9 +310,10 @@ fn fill_space_transformed(
 ) -> Result<(), SetCubeError> {
     // TODO: don't panic
     let dst_to_src_transform = src_to_dst_transform.inverse_transform().unwrap();
-    let (block_rotation, _) = src_to_dst_transform
+    let block_rotation = src_to_dst_transform
         .decompose()
-        .expect("could not decompose transform");
+        .expect("could not decompose transform")
+        .rotation;
     for cube in src_bounds
         .transform(src_to_dst_transform)
         .unwrap()

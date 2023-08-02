@@ -9,6 +9,10 @@
 
 ### Changed
 
+- `all-is-cubes` library:
+    - The following functions have changed signature to use the new type `math::Gridgid`:
+        - `math::GridMatrix::decompose`
+
 ### Removed
 
 - `all-is-cubes` library:

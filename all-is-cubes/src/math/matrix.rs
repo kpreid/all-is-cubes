@@ -10,7 +10,8 @@ use cgmath::{
 pub use ordered_float::{FloatIsNan, NotNan};
 
 use crate::math::{
-    Face6, Face7, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Point3,
+    Face6, Face7, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid,
+    Point3,
 };
 
 /// A 4×3 affine transformation matrix in [`GridCoordinate`]s, rather than floats as
@@ -170,11 +171,11 @@ impl GridMatrix {
             .zip(self.transform_point(cube), |a, b| a.min(b))
     }
 
-    /// Decomposes a matrix into its rotation and translation components.
-    /// Returns `None` if the matrix has any scaling or skew.
+    /// Decomposes a matrix into its rotation and translation components, stored in a
+    /// [`Gridgid`]. Returns `None` if the matrix has any scaling or skew.
     ///
     /// ```
-    /// use all_is_cubes::math::{Face6::*, GridMatrix, GridRotation, GridVector};
+    /// use all_is_cubes::math::{Face6::*, Gridgid, GridMatrix, GridRotation, GridVector};
     ///
     /// assert_eq!(
     ///     GridMatrix::new(
@@ -183,21 +184,21 @@ impl GridMatrix {
     ///         0,  0,  1,
     ///         7,  3, -8,
     ///     ).decompose(),
-    ///     Some((
-    ///         GridRotation::from_basis([NY, PX, PZ]),
-    ///         GridVector::new(7, 3, -8),
-    ///     )),
+    ///     Some(Gridgid {
+    ///         rotation: GridRotation::from_basis([NY, PX, PZ]),
+    ///         translation: GridVector::new(7, 3, -8),
+    ///     }),
     /// );
     /// ```
-    pub fn decompose(self) -> Option<(GridRotation, GridVector)> {
-        Some((
-            GridRotation::from_basis([
+    pub fn decompose(self) -> Option<Gridgid> {
+        Some(Gridgid {
+            rotation: GridRotation::from_basis([
                 Face6::try_from(self.x).ok()?,
                 Face6::try_from(self.y).ok()?,
                 Face6::try_from(self.z).ok()?,
             ]),
-            self.w,
-        ))
+            translation: self.w,
+        })
     }
 }
 

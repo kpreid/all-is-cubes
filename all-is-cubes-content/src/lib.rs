@@ -195,9 +195,10 @@ fn space_to_space_copy(
 ) -> Result<(), SetCubeError> {
     // TODO: don't panic
     let dst_to_src_transform = src_to_dst_transform.inverse_transform().unwrap();
-    let (block_rotation, _) = src_to_dst_transform
+    let block_rotation = src_to_dst_transform
         .decompose()
-        .expect("could not decompose transform");
+        .expect("could not decompose transform")
+        .rotation;
     dst.fill(src_bounds.transform(src_to_dst_transform).unwrap(), |p| {
         Some(
             src[dst_to_src_transform.transform_cube(p)]
@@ -214,9 +215,10 @@ pub(crate) fn space_to_transaction_copy(
     src_to_dst_transform: GridMatrix,
 ) -> SpaceTransaction {
     // TODO: don't panic
-    let (block_rotation, _) = src_to_dst_transform
+    let block_rotation = src_to_dst_transform
         .decompose()
-        .expect("could not decompose transform");
+        .expect("could not decompose transform")
+        .rotation;
 
     let mut txn = SpaceTransaction::default();
     for cube in src_bounds.interior_iter() {
