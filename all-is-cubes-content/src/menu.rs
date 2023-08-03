@@ -20,7 +20,7 @@ use all_is_cubes::{
     },
     inv::Tool,
     linking::InGenError,
-    math::{Face6, GridAab, GridMatrix, GridVector},
+    math::{Face6, GridAab, GridVector, Gridgid},
     space::{Space, SpaceBuilder, SpacePhysics, SpaceTransaction},
     transaction::{self, Merge, Transaction as _},
     universe::Universe,
@@ -119,7 +119,7 @@ impl vui::WidgetController for TemplateButtonController {
             .merge(crate::space_to_transaction_copy(
                 &self.definition.text_blocks,
                 text_bounds.translate(-text_dest_origin),
-                GridMatrix::from_translation(text_dest_origin),
+                Gridgid::from_translation(text_dest_origin),
             ))
             .unwrap();
 

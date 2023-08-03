@@ -7,7 +7,7 @@ use futures_core::future::BoxFuture;
 use instant::Instant;
 use rand::{Rng, SeedableRng as _};
 
-use all_is_cubes::cgmath::{One as _, Vector3};
+use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::iso_8859_1 as font,
     text::{Alignment, Baseline, TextStyleBuilder},
@@ -21,8 +21,7 @@ use all_is_cubes::inv::Slot;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridRotation, GridVector,
-    Rgb,
+    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector, Gridgid, Rgb,
 };
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder, SpacePhysics};
@@ -396,7 +395,7 @@ pub(crate) async fn demo_city(
                 }
             };
             let sign_transform =
-                plot_transform * GridMatrix::from_translation(sign_position_in_plot_coordinates);
+                plot_transform * Gridgid::from_translation(sign_position_in_plot_coordinates);
 
             // Copy the signboard into the main space.
             // (TODO: We do this indirection because the widget system does not currently
@@ -560,7 +559,7 @@ impl CityPlanner {
         }
     }
 
-    pub fn find_plot(&mut self, plot_shape: GridAab) -> Option<GridMatrix> {
+    pub fn find_plot(&mut self, plot_shape: GridAab) -> Option<Gridgid> {
         // TODO: We'd like to resume the search from _when we left off_, but that's tricky since a
         // smaller plot might fit where a large one didn't. So, quadratic search it is for now.
         for d in 0..=self.city_radius {
@@ -573,7 +572,7 @@ impl CityPlanner {
                     // The rotations are about the origin cube (GridAab::ORIGIN_CUBE), so
                     // they are done with .to_positive_octant_matrix(1).
 
-                    let mut transform = GridMatrix::from_translation(GridVector::new(
+                    let mut transform = Gridgid::from_translation(GridVector::new(
                         d,
                         1,
                         if left_side {
@@ -582,13 +581,13 @@ impl CityPlanner {
                             Self::PLOT_FRONT_RADIUS + plot_shape.upper_bounds().z
                         },
                     )) * if left_side {
-                        GridMatrix::one()
+                        Gridgid::IDENTITY
                     } else {
                         (GridRotation::COUNTERCLOCKWISE * GridRotation::COUNTERCLOCKWISE)
-                            .to_positive_octant_matrix(1)
+                            .to_positive_octant_transform(1)
                     };
                     // Rotate to match street
-                    transform = street_axis.to_positive_octant_matrix(1) * transform;
+                    transform = street_axis.to_positive_octant_transform(1) * transform;
 
                     let transformed = plot_shape
                         .transform(transform)

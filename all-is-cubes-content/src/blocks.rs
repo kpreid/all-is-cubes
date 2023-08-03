@@ -17,8 +17,8 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    cube_to_midpoint, Face6, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridPoint,
-    GridRotation, GridVector, NotNan, Rgb, Rgba,
+    cube_to_midpoint, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
+    GridVector, Gridgid, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -341,8 +341,9 @@ pub async fn install_demo_blocks(
 
                 // Sign board
                 {
-                    let mut plane =
-                        space.draw_target(GridMatrix::from_translation([0, 0, resolution_g - 1]));
+                    let mut plane = space.draw_target(
+                        Gridgid::from_translation([0, 0, resolution_g - 1]).to_matrix(),
+                    );
                     Rectangle::with_corners(
                         Point::new(0, bottom_edge),
                         Point::new(resolution_g - 1, top_edge),
@@ -353,8 +354,11 @@ pub async fn install_demo_blocks(
                 // Support posts
                 let mut post = |x| -> Result<(), InGenError> {
                     let mut plane = space.draw_target(
-                        GridMatrix::from_translation([x, 0, 0])
-                            * GridRotation::RZYX.to_rotation_matrix(),
+                        Gridgid {
+                            rotation: GridRotation::RZYX,
+                            translation: GridVector { x, y: 0, z: 0 },
+                        }
+                        .to_matrix(),
                     );
                     let style = &PrimitiveStyle::with_stroke(&sign_post, 2);
                     let z = resolution_g - 3;

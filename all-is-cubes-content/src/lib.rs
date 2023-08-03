@@ -45,10 +45,10 @@
 use std::collections::HashSet;
 
 use all_is_cubes::block::{Block, Resolution, AIR};
-use all_is_cubes::cgmath::{ElementWise, InnerSpace, Point3, Transform as _, Vector3};
+use all_is_cubes::cgmath::{ElementWise, InnerSpace, Point3, Vector3};
 use all_is_cubes::math::{
     cube_to_midpoint, point_to_enclosing_cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray,
-    GridCoordinate, GridMatrix, GridPoint, GridVector,
+    GridCoordinate, GridPoint, GridVector, Gridgid,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpaceTransaction};
 
@@ -191,14 +191,10 @@ fn space_to_space_copy(
     src: &Space,
     src_bounds: GridAab,
     dst: &mut Space,
-    src_to_dst_transform: GridMatrix,
+    src_to_dst_transform: Gridgid,
 ) -> Result<(), SetCubeError> {
-    // TODO: don't panic
-    let dst_to_src_transform = src_to_dst_transform.inverse_transform().unwrap();
-    let block_rotation = src_to_dst_transform
-        .decompose()
-        .expect("could not decompose transform")
-        .rotation;
+    let dst_to_src_transform = src_to_dst_transform.inverse();
+    let block_rotation = src_to_dst_transform.rotation;
     dst.fill(src_bounds.transform(src_to_dst_transform).unwrap(), |p| {
         Some(
             src[dst_to_src_transform.transform_cube(p)]
@@ -212,13 +208,9 @@ fn space_to_space_copy(
 pub(crate) fn space_to_transaction_copy(
     src: &Space,
     src_bounds: GridAab,
-    src_to_dst_transform: GridMatrix,
+    src_to_dst_transform: Gridgid,
 ) -> SpaceTransaction {
-    // TODO: don't panic
-    let block_rotation = src_to_dst_transform
-        .decompose()
-        .expect("could not decompose transform")
-        .rotation;
+    let block_rotation = src_to_dst_transform.rotation;
 
     let mut txn = SpaceTransaction::default();
     for cube in src_bounds.interior_iter() {

@@ -7,12 +7,6 @@ use std::f64::consts::PI;
 use exhaust::Exhaust as _;
 use rand::SeedableRng as _;
 
-use all_is_cubes::block::{
-    space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Composite,
-    CompositeOperator, Move,
-    Resolution::{self, *},
-    RotationPlacementRule, Zoom, AIR,
-};
 use all_is_cubes::cgmath::{
     Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Point3, Rad, Rotation as _,
     Rotation2, Vector2, Vector3,
@@ -35,12 +29,21 @@ use all_is_cubes::drawing::{
 };
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Aab, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridMatrix, GridPoint,
-    GridRotation, GridVector, NotNan, Rgb, Rgba,
+    Aab, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
+    GridVector, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::Universe;
+use all_is_cubes::{
+    block::{
+        space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Composite,
+        CompositeOperator, Move,
+        Resolution::{self, *},
+        RotationPlacementRule, Zoom, AIR,
+    },
+    math::Gridgid,
+};
 use all_is_cubes::{include_image, rgb_const, rgba_const};
 
 use crate::{
@@ -112,7 +115,7 @@ async fn TRANSPARENCY_LARGE(_: &Exhibit, _universe: &mut Universe) {
             GridAab::from_lower_upper([-1, 0, 3], [2, alphas.len() as GridCoordinate, 4]);
         space.fill(
             windowpane
-                .transform(rot.to_positive_octant_matrix(1))
+                .transform(rot.to_positive_octant_transform(1))
                 .unwrap(),
             |GridPoint { y, .. }| {
                 Some(Block::from(
@@ -832,8 +835,9 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
             GridRotation::COUNTERCLOCKWISE,
         ] {
             let mut plane = wall_block_space.draw_target(
-                rotation.to_positive_octant_matrix(GridCoordinate::from(wall_resolution) - 1)
-                    * GridMatrix::from_translation([4, 4, 15]),
+                (rotation.to_positive_octant_transform(GridCoordinate::from(wall_resolution) - 1)
+                    * Gridgid::from_translation([4, 4, 15]))
+                .to_matrix(),
             );
             for (i, swatch_block) in colors_as_blocks.iter().enumerate() {
                 let i = i as GridCoordinate;

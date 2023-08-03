@@ -5,13 +5,13 @@ use std::fmt;
 use exhaust::Exhaust;
 
 use all_is_cubes::block::{self, Block, Resolution, RotationPlacementRule, Zoom, AIR};
-use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace, Point3, Transform, Vector3};
+use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace, Point3, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix, GridPoint,
-    GridRotation, GridVector, Rgb, Rgba,
+    Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation,
+    GridVector, Gridgid, Rgb, Rgba,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -294,8 +294,8 @@ fn arch_row(
             |p, block| map_text_block(pattern[p], blocks, p, block),
             pattern.bounds(),
             space,
-            GridMatrix::from_translation(column_base.to_vec())
-                * rotation.to_positive_octant_matrix(1),
+            Gridgid::from_translation(column_base.to_vec())
+                * rotation.to_positive_octant_transform(1),
         )?;
     }
     Ok::<(), InGenError>(())
@@ -306,14 +306,11 @@ fn fill_space_transformed(
     src: impl Fn(GridPoint, Block) -> Block,
     src_bounds: GridAab,
     dst: &mut Space,
-    src_to_dst_transform: GridMatrix,
+    src_to_dst_transform: Gridgid,
 ) -> Result<(), SetCubeError> {
     // TODO: don't panic
-    let dst_to_src_transform = src_to_dst_transform.inverse_transform().unwrap();
-    let block_rotation = src_to_dst_transform
-        .decompose()
-        .expect("could not decompose transform")
-        .rotation;
+    let dst_to_src_transform = src_to_dst_transform.inverse();
+    let block_rotation = src_to_dst_transform.rotation;
     for cube in src_bounds
         .transform(src_to_dst_transform)
         .unwrap()
