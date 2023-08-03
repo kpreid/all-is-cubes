@@ -3,7 +3,7 @@
 
 use std::ops::{Index, IndexMut};
 
-use cgmath::{BaseNum, Transform, Vector3};
+use cgmath::{BaseNum, Vector3};
 pub use ordered_float::{FloatIsNan, NotNan};
 
 use crate::math::*;
@@ -235,34 +235,6 @@ impl Face6 {
                 rotation: RXyz,
                 translation: GridVector::new(0, scale, scale),
             },
-        }
-    }
-
-    /// Returns a homogeneous transformation matrix which, if given points on the square
-    /// with x ∈ [0, scale], y ∈ [0, scale] and z = 0, converts them to points that lie
-    /// on the faces of the cube with x ∈ [0, scale], y ∈ [0, scale], and z ∈ [0, scale].
-    ///
-    /// Specifically, `Face6::NZ.matrix()` is the identity matrix and all others are
-    /// consistent with that. Note that there are arbitrary choices in the rotation
-    /// of all other faces. (TODO: Document those choices and test them.)
-    ///
-    /// To work with floating-point coordinates, use `.matrix(1).to_free()`.
-    #[must_use]
-    pub const fn matrix(self, scale: GridCoordinate) -> GridMatrix {
-        match self {
-            Face6::NX => GridMatrix::new(0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0),
-            Face6::NY => GridMatrix::new(0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0),
-            Face6::NZ => GridMatrix::new(
-                // Z face leaves X and Y unchanged!
-                1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
-            ),
-            // Positives are same as negatives but with translation and an arbitrary choice of rotation.
-            // PX rotates about Y.
-            Face6::PX => GridMatrix::new(0, -1, 0, 0, 0, 1, -1, 0, 0, scale, scale, 0),
-            // PY rotates about X.
-            Face6::PY => GridMatrix::new(0, 0, 1, -1, 0, 0, 0, -1, 0, scale, scale, 0),
-            // PZ rotates about Y.
-            Face6::PZ => GridMatrix::new(1, 0, 0, 0, -1, 0, 0, 0, -1, 0, scale, scale),
         }
     }
 
@@ -859,7 +831,7 @@ impl Geometry for CubeFace {
 
         // Draw an X on the face.
         if let Ok(face) = Face6::try_from(self.face) {
-            let face_matrix = face.matrix(1);
+            let face_transform = face.face_transform(1);
             const X_POINTS: [GridPoint; 4] = [
                 Point3::new(0, 0, 0),
                 Point3::new(1, 1, 0),
@@ -870,7 +842,7 @@ impl Geometry for CubeFace {
             // from the AAB instead, but there isn't yet a good way to do that.
             output.extend(X_POINTS.into_iter().map(|p| {
                 LineVertex::from(
-                    (face_matrix.transform_point(p))
+                    (face_transform.transform_point(p))
                         .map(|c| (FreeCoordinate::from(c) - 0.5) * (1. + expansion * 2.) + 0.5)
                         + self.cube.to_vec().map(FreeCoordinate::from),
                 )
@@ -882,16 +854,15 @@ impl Geometry for CubeFace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cgmath::SquareMatrix as _;
 
     #[test]
-    fn face_matrix_does_not_scale_or_reflect() {
+    fn face_transform_does_not_reflect() {
         for face in Face6::ALL {
-            assert_eq!(1.0, face.matrix(7).to_free().determinant());
+            assert!(!face.face_transform(7).rotation.is_reflection());
         }
     }
 
-    // TODO: More tests of face.matrix()
+    // TODO: More tests of face.face_transform()
 
     /// Test the ordering of all [`FaceMap`] methods that explicitly produce an ordered result.
     #[test]

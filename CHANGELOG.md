@@ -21,7 +21,7 @@
 ### Removed
 
 - `all-is-cubes` library:
-    - `math::Face7::matrix()` no longer exists. Use `Face6::matrix()` instead.`
+    - `math::Face7::matrix()` no longer exists. Use `Face6::face_transform()` instead.
     - `math::GridAab::index()` and `contains_cube()` no longer accept `impl Into<GridPoint>`.
       Call sites should be changed to pass only `GridPoint`.
 
