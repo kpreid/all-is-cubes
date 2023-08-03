@@ -24,6 +24,19 @@ pub struct Gridgid {
 }
 
 impl Gridgid {
+    /// The identity transform, which leaves points unchanged.
+    pub const IDENTITY: Self = Self {
+        rotation: GridRotation::IDENTITY,
+        translation: GridVector { x: 0, y: 0, z: 0 },
+    };
+
+    /// For Y-down drawing
+    #[doc(hidden)] // used by all-is-cubes-content - TODO: public?
+    pub const FLIP_Y: Self = Self {
+        rotation: GridRotation::RXyZ,
+        translation: GridVector { x: 0, y: 0, z: 0 },
+    };
+
     /// Constructs a [`Gridgid`] that only performs rotation.
     ///
     /// Note that this is a rotation about the origin _point_ `[0, 0, 0]`, not the _cube_
