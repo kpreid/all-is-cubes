@@ -1,11 +1,11 @@
 //! Import and export of MagicaVoxel `.vox` files.
 
 use all_is_cubes::block::{self, Block};
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Transform as _, Vector3};
+use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridRotation, Rgb, Rgba};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridRotation, GridVector, Gridgid, Rgb, Rgba};
 use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
 use all_is_cubes::universe::{self, Name, PartialUniverse, Universe};
 use all_is_cubes::util::{ConciseDebug, CustomFormat, YieldProgress};
@@ -166,7 +166,7 @@ fn dot_vox_model_to_space(
             model.size.z as i32,
         ],
     )
-    .transform(transform)
+    .transform(transform.to_matrix())
     .expect("TODO: return error");
 
     let mut space = Space::builder(bounds)
@@ -257,6 +257,7 @@ fn space_to_dot_vox_model(
     Ok(dot_vox::Model {
         size: {
             let Vector3 { x, y, z } = transform
+                .rotation
                 .transform_vector(space.bounds().size())
                 .map(i32::abs) // vector rotation might make it negative
                 .cast::<u32>()
@@ -291,31 +292,32 @@ impl From<DotVoxConversionError> for InGenError {
 /// direction conventional for MagicaVoxel to the one conventional for All is Cubes.
 ///
 /// The input size should be in the original MagicaVoxel coordinate system.
-fn mv_to_aic_coordinate_transform(mv_size: dot_vox::Size) -> GridMatrix {
+fn mv_to_aic_coordinate_transform(mv_size: dot_vox::Size) -> Gridgid {
     // Coordinates are Z-up right-handed compared to our Y-up right-handed,
     // so swap Z into Y and invert Y as Z.
     // (This is not a `GridRotation::to_positive_octant_matrix()` because the `sizes` are
     // not necessarily equal.)
-    GridMatrix::from_translation([0, 0, mv_size.y as i32]) * GridRotation::RXzY.to_rotation_matrix()
+    Gridgid {
+        translation: GridVector::new(0, 0, mv_size.y as i32),
+        rotation: GridRotation::RXzY,
+    }
 }
 
 /// Inverse of [`mv_to_aic_coordinate_transform`].
 ///
 /// Also translates coordinates so that the lower bounds are zero, since the dot-vox format
 /// does not support arbitrary lower bounds.
-fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> GridMatrix {
+fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
     let aic_size = aic_bounds.size().cast::<u32>().expect("negative sizes");
     let mv_size = dot_vox::Size {
-        // Note axis swap! We can't just delegate this to the matrix because the matrix doesn't exist.
+        // Note axis swap! We can't just delegate this to the transform because the transform doesn't exist yet.
         // (TODO: But we could delegate it to the GridRotation)
         x: aic_size.x,
         y: aic_size.z,
         z: aic_size.y,
     };
-    mv_to_aic_coordinate_transform(mv_size)
-        .inverse_transform()
-        .unwrap()
-        * GridMatrix::from_translation(-aic_bounds.lower_bounds().to_vec())
+    mv_to_aic_coordinate_transform(mv_size).inverse()
+        * Gridgid::from_translation(-aic_bounds.lower_bounds().to_vec())
 }
 
 #[cfg(test)]
@@ -354,7 +356,7 @@ mod tests {
         );
 
         assert_eq!(
-            t.inverse_transform().unwrap(),
+            t.inverse(),
             aic_to_mv_coordinate_transform(GridAab::from_lower_size([0, 0, 0], [100, 300, 200]))
         );
     }
