@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, Weak};
 use instant::Instant;
 
 use all_is_cubes::camera::{Camera, Flaws};
-use all_is_cubes::cgmath::{EuclideanSpace, Point3, Transform, Vector3};
+use all_is_cubes::cgmath::{EuclideanSpace, Point3, Vector3};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{Listen as _, Listener};
@@ -426,11 +426,11 @@ impl SpaceRenderer {
                 .lower_bounds()
                 .map(FreeCoordinate::from);
             for face in Face6::ALL {
-                let m = face.matrix(CHUNK_SIZE);
+                let ft = face.face_transform(CHUNK_SIZE);
                 for i in 1..CHUNK_SIZE {
                     let mut push = |p| {
                         v.push(WgpuLinesVertex::from_position_color(
-                            m.transform_point(p).map(FreeCoordinate::from) + chunk_origin.to_vec(),
+                            ft.transform_point(p).map(FreeCoordinate::from) + chunk_origin.to_vec(),
                             palette::DEBUG_CHUNK_MINOR,
                         ));
                     };

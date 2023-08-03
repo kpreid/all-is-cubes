@@ -255,7 +255,7 @@ impl Geometry for Cursor {
         if let Ok(face) = Face6::try_from(self.face_selected()) {
             let face_transform_full =
                 Matrix4::from_translation(self.hit().position.map(FreeCoordinate::from).to_vec())
-                    * face.matrix(1).to_free();
+                    * face.face_transform(1).to_matrix().to_free();
 
             let inset = 1. / 128.;
             for &p in [
@@ -280,7 +280,7 @@ impl Geometry for Cursor {
         // TODO: This addition is experimental and we may or may not want to keep it.
         // For now, it visualizes the intersection and face information.
         if let Ok(face) = Face6::try_from(self.face_entered) {
-            let face_transform_axes_only = face.matrix(0).to_free();
+            let face_transform_axes_only = face.face_transform(0).to_matrix().to_free();
             for f in [Face7::PX, Face7::PY, Face7::NX, Face7::NY, Face7::PX]
                 .windows(2)
                 .flatten()

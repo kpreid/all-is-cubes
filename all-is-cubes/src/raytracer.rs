@@ -195,7 +195,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         // Find linear interpolation coefficients based on where we are relative to
         // a half-cube-offset grid.
         let reference_frame = match Face6::try_from(face) {
-            Ok(face) => face.matrix(0),
+            Ok(face) => face.face_transform(0).to_matrix(),
             Err(_) => GridMatrix::ZERO,
         }
         .to_free();
