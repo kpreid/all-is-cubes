@@ -6,7 +6,7 @@ use std::fmt::Debug;
 
 use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
 use all_is_cubes::camera::Flaws;
-use all_is_cubes::cgmath::{Point2, Point3, Transform as _};
+use all_is_cubes::cgmath::{Point2, Point3};
 use all_is_cubes::math::{
     Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, OpacityCategory,
     Rgba,
@@ -331,7 +331,7 @@ where
                 // Walk through the planes (layers) of the block, figuring out what geometry to
                 // generate for each layer and whether it needs a texture.
                 for face in Face6::ALL {
-                    let voxel_transform = face.matrix(block_resolution - 1);
+                    let voxel_transform = face.face_transform(block_resolution - 1);
                     let quad_transform = QuadTransform::new(face, resolution);
                     let face_mesh = &mut self.face_vertices[face];
 
@@ -341,7 +341,7 @@ where
                     // TODO: Intersect the input voxels.bounds() with the block bounds so we don't scan *more* than we should.
                     let rotated_voxel_range = voxels_array
                         .bounds()
-                        .transform(face.matrix(block_resolution).inverse_transform().unwrap())
+                        .transform(face.face_transform(block_resolution).inverse().to_matrix())
                         .unwrap();
 
                     // Check the case where the block's voxels don't meet its front face, or don't fill that face.

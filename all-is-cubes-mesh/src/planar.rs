@@ -240,10 +240,11 @@ impl QuadTransform {
         let voxel_to_block_scale = FreeCoordinate::from(resolution).recip();
         Self {
             face,
-            position_transform: face.matrix(1).to_free()
+            position_transform: face.face_transform(1).to_matrix().to_free()
                 * Matrix4::from_scale(voxel_to_block_scale),
             texture_transform: face
-                .matrix(resolution.to_grid())
+                .face_transform(resolution.to_grid())
+                .to_matrix()
                 .to_free()
                 .cast::<TextureCoordinate>()
                 .unwrap(/* infallible float-to-float conversion */),
