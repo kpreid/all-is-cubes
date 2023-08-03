@@ -11,8 +11,8 @@ use crate::content::load_image::{default_srgb, include_image, space_from_image};
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{
-    cube_to_midpoint, Face7, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint, GridRotation,
-    GridVector, Rgb, Rgba,
+    cube_to_midpoint, Face6, FreeCoordinate, GridCoordinate, GridRotation, GridVector, Gridgid,
+    Rgb, Rgba,
 };
 use crate::space::Space;
 use crate::universe::Universe;
@@ -115,12 +115,11 @@ impl Icons {
                         .build();
 
                     let mut space = Space::for_block(resolution).build();
-                    let display = &mut space.draw_target(GridMatrix::from_origin(
-                        GridPoint::new(1, 1, 1) * (GridCoordinate::from(resolution) / 2),
-                        Face7::PX,
-                        Face7::NY,
-                        Face7::PZ,
-                    ));
+                    let display = &mut space.draw_target(Gridgid {
+                        translation: GridVector::new(1, 1, 1)
+                            * (GridCoordinate::from(resolution) / 2),
+                        rotation: GridRotation::from_basis([Face6::PX, Face6::NY, Face6::PZ]),
+                    });
 
                     // Draw X on circle
                     Circle::with_center(Point::new(0, 0), u32::from(resolution) - 4)

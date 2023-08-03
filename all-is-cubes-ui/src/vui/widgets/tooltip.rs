@@ -14,7 +14,7 @@ use all_is_cubes::drawing::embedded_graphics::{
     Drawable as _,
 };
 use all_is_cubes::listen::{FnListener, Gate, Listen, Listener};
-use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridVector, Gridgid};
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{URef, Universe};
@@ -300,7 +300,7 @@ impl WidgetController for TooltipController {
                         .alignment(Alignment::Center)
                         .build(),
                 );
-                text_obj.draw(&mut text_space.draw_target(GridMatrix::FLIP_Y))?;
+                text_obj.draw(&mut text_space.draw_target(Gridgid::FLIP_Y))?;
                 Ok::<(), Box<dyn Error + Send + Sync>>(())
             })??;
         }

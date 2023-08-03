@@ -341,9 +341,8 @@ pub async fn install_demo_blocks(
 
                 // Sign board
                 {
-                    let mut plane = space.draw_target(
-                        Gridgid::from_translation([0, 0, resolution_g - 1]).to_matrix(),
-                    );
+                    let mut plane =
+                        space.draw_target(Gridgid::from_translation([0, 0, resolution_g - 1]));
                     Rectangle::with_corners(
                         Point::new(0, bottom_edge),
                         Point::new(resolution_g - 1, top_edge),
@@ -353,13 +352,10 @@ pub async fn install_demo_blocks(
 
                 // Support posts
                 let mut post = |x| -> Result<(), InGenError> {
-                    let mut plane = space.draw_target(
-                        Gridgid {
-                            rotation: GridRotation::RZYX,
-                            translation: GridVector { x, y: 0, z: 0 },
-                        }
-                        .to_matrix(),
-                    );
+                    let mut plane = space.draw_target(Gridgid {
+                        rotation: GridRotation::RZYX,
+                        translation: GridVector { x, y: 0, z: 0 },
+                    });
                     let style = &PrimitiveStyle::with_stroke(&sign_post, 2);
                     let z = resolution_g - 3;
                     // Vertical post

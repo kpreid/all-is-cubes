@@ -29,7 +29,7 @@ use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking::{self, InGenError};
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use all_is_cubes::math::{
-    Face6, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
+    Face6, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid, Rgb, Rgba,
 };
 use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time::Tick;
@@ -336,8 +336,8 @@ pub(crate) fn draw_target_for_button_label<C: PixelColor>(
     space: &mut Space,
 ) -> DrawingPlane<'_, Space, C> {
     space.draw_target(
-        GridMatrix::from_translation([theme::RESOLUTION_G / 2, theme::RESOLUTION_G / 2 - 1, 0])
-            * GridMatrix::FLIP_Y,
+        Gridgid::from_translation([theme::RESOLUTION_G / 2, theme::RESOLUTION_G / 2 - 1, 0])
+            * Gridgid::FLIP_Y,
     )
 }
 
@@ -468,7 +468,7 @@ impl ButtonBase for ButtonVisualState {
 
         let mut space = theme::create_space(label_z);
         let draw_target = &mut space.draw_target(
-            GridMatrix::from_translation([0, theme::RESOLUTION_G - 1, 0]) * GridMatrix::FLIP_Y,
+            Gridgid::from_translation([0, theme::RESOLUTION_G - 1, 0]) * Gridgid::FLIP_Y,
         );
 
         circle(0)
@@ -538,7 +538,7 @@ impl ButtonBase for ToggleButtonVisualState {
 
         let mut space = theme::create_space(label_z);
         let draw_target = &mut space.draw_target(
-            GridMatrix::from_translation([0, theme::RESOLUTION_G - 1, 0]) * GridMatrix::FLIP_Y,
+            Gridgid::from_translation([0, theme::RESOLUTION_G - 1, 0]) * Gridgid::FLIP_Y,
         );
 
         // unwrap()s because if this drawing fails, tests will catch that — no parameters

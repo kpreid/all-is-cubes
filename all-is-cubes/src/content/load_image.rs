@@ -128,7 +128,7 @@ where
 {
     // TODO: let caller control the transform offsets (not necessarily positive-octant)
     let transform =
-        rotation.to_positive_octant_matrix(image.width().max(image.height()) as i32 - 1);
+        rotation.to_positive_octant_transform(image.width().max(image.height()) as i32 - 1);
 
     let ia = &ImageAdapter::adapt(image, pixel_function);
     let eg_image = embedded_graphics::image::Image::new(&ia, Point::zero());
@@ -137,7 +137,8 @@ where
     // Note: This strategy will overestimate the size in case a brush has X/Y size but is
     // never used near the edge. To fix that, we could use a dynamically resized Space
     // instead of this pessimistic choice.
-    let bounds: GridAab = rectangle_to_aab(eg_image.bounding_box(), transform, ia.max_brush);
+    let bounds: GridAab =
+        rectangle_to_aab(eg_image.bounding_box(), transform.to_matrix(), ia.max_brush);
 
     let mut space = Space::builder(bounds)
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)

@@ -835,9 +835,8 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
             GridRotation::COUNTERCLOCKWISE,
         ] {
             let mut plane = wall_block_space.draw_target(
-                (rotation.to_positive_octant_transform(GridCoordinate::from(wall_resolution) - 1)
-                    * Gridgid::from_translation([4, 4, 15]))
-                .to_matrix(),
+                rotation.to_positive_octant_transform(GridCoordinate::from(wall_resolution) - 1)
+                    * Gridgid::from_translation([4, 4, 15]),
             );
             for (i, swatch_block) in colors_as_blocks.iter().enumerate() {
                 let i = i as GridCoordinate;

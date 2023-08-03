@@ -1,15 +1,18 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use all_is_cubes::drawing::embedded_graphics::{
-    mono_font::{MonoFont, MonoTextStyle},
-    prelude::{Dimensions, Point},
-    text::{Text, TextStyle},
-    Drawable,
-};
 use all_is_cubes::drawing::{rectangle_to_aab, VoxelBrush};
-use all_is_cubes::math::{GridAab, GridMatrix};
+use all_is_cubes::math::{GridAab, Gridgid};
 use all_is_cubes::space::SpaceTransaction;
+use all_is_cubes::{
+    drawing::embedded_graphics::{
+        mono_font::{MonoFont, MonoTextStyle},
+        prelude::{Dimensions, Point},
+        text::{Text, TextStyle},
+        Drawable,
+    },
+    math::GridMatrix,
+};
 
 use crate::vui::{widgets, LayoutGrant, LayoutRequest, Layoutable, Widget, WidgetController};
 
@@ -64,13 +67,13 @@ impl Widget for LargeText {
         drawable
             .draw(
                 &mut txn.draw_target(
-                    GridMatrix::from_translation(
+                    Gridgid::from_translation(
                         position
                             .shrink_to(draw_bounds.size(), false)
                             .bounds
                             .lower_bounds()
                             - draw_bounds.lower_bounds(),
-                    ) * GridMatrix::FLIP_Y,
+                    ) * Gridgid::FLIP_Y,
                 ),
             )
             .unwrap();

@@ -95,7 +95,8 @@ pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [B
                         .build(),
                 )
                 .draw(
-                    &mut block_space.draw_target(face.matrix(GridCoordinate::from(resolution) - 1)),
+                    &mut block_space
+                        .draw_target(face.face_transform(GridCoordinate::from(resolution) - 1)),
                 )
                 .unwrap();
             }

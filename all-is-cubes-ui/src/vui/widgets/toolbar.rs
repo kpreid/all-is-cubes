@@ -15,7 +15,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 };
 use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
 use all_is_cubes::listen::{DirtyFlag, Gate, Listen as _, ListenableSource, Listener};
-use all_is_cubes::math::{FaceMap, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
+use all_is_cubes::math::{FaceMap, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid};
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge as _;
@@ -166,7 +166,7 @@ impl ToolbarController {
             // Maybe we should have a text-updating abstraction for this *and* the tooltip?
             text_space.fill_uniform(text_space.bounds(), &AIR).unwrap();
 
-            let plane = &mut text_space.draw_target(GridMatrix::FLIP_Y);
+            let plane = &mut text_space.draw_target(Gridgid::FLIP_Y);
             for index in 0..self.definition.slot_count {
                 Text::with_text_style(
                     &match slots.get(index).unwrap_or(&Slot::Empty).count() {
