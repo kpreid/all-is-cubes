@@ -201,6 +201,43 @@ impl Face6 {
         self.into7().dot(vector)
     }
 
+    /// Returns a [`Gridgid`] transformation which, if given points on the square
+    /// with x ∈ [0, scale], y ∈ [0, scale], and z = 0, converts them to points that lie
+    /// on the faces of the cube with x ∈ [0, scale], y ∈ [0, scale], and z ∈ [0, scale].
+    ///
+    /// Specifically, `Face6::NZ.face_transform()` is the identity and all others are
+    /// consistent with that. Note that there are arbitrary choices in the rotation
+    /// of all other faces. (TODO: Document those choices and test them.)
+    ///
+    /// To work with floating-point coordinates, use `.face_transform().to_matrix().to_free()`.
+    #[must_use]
+    #[rustfmt::skip]
+    pub const fn face_transform(self, scale: GridCoordinate) -> Gridgid {
+        use GridRotation::*;
+        match self {
+            Face6::NX => Gridgid::from_rotation_about_origin(RYZX),
+            Face6::NY => Gridgid::from_rotation_about_origin(RZXY),
+            Face6::NZ => Gridgid::from_rotation_about_origin(RXYZ),
+            
+            // Positives are same as negatives but with translation and an arbitrary choice of rotation.
+            // PX rotates about Y.
+            Face6::PX => Gridgid {
+                rotation: RyZx,
+                translation: GridVector::new(scale, scale, 0),
+            },
+            // PY rotates about X.
+            Face6::PY => Gridgid {
+                rotation: RZxy,
+                translation: GridVector::new(scale, scale, 0),
+            },
+            // PZ rotates about Y.
+            Face6::PZ => Gridgid {
+                rotation: RXyz,
+                translation: GridVector::new(0, scale, scale),
+            },
+        }
+    }
+
     /// Returns a homogeneous transformation matrix which, if given points on the square
     /// with x ∈ [0, scale], y ∈ [0, scale] and z = 0, converts them to points that lie
     /// on the faces of the cube with x ∈ [0, scale], y ∈ [0, scale], and z ∈ [0, scale].

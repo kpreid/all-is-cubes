@@ -41,6 +41,8 @@ impl Gridgid {
     ///
     /// Note that this is a rotation about the origin _point_ `[0, 0, 0]`, not the _cube_
     /// that is identified by that point (that is, not the center of [`GridAab::ORIGIN_CUBE`]).
+    ///
+    /// For more general rotations about a center, see [`GridRotation::to_positive_octant_transform()`].
     #[inline]
     pub const fn from_rotation_about_origin(rotation: GridRotation) -> Self {
         Self {

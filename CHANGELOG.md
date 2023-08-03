@@ -7,6 +7,11 @@
 - `all-is-cubes` library:
     - `math::Gridgid` represents rigid transformations, a useful subset of what `GridMatrix` already could do.
 
+        The following new functions return `Gridgid`:
+        
+        - `math::Face6::face_transform()`
+        - `math::GridRotation::to_positive_octant_transform()`
+
 ### Changed
 
 - `all-is-cubes` library:

@@ -281,6 +281,49 @@ impl GridRotation {
         }
     }
 
+    /// Expresses this rotation as a [`Gridgid`] transform which rotates “in place” the
+    /// points within the volume defined by coordinates in the range [0, size].
+    ///
+    /// That is, a [`GridAab`] of that volume will be unchanged by rotation:
+    ///
+    /// ```
+    /// use all_is_cubes::block::Resolution;
+    /// use all_is_cubes::math::{GridAab, GridRotation};
+    ///
+    /// let b = GridAab::for_block(Resolution::R8);
+    /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_transform(8);
+    /// assert_eq!(b.transform(rotation.to_matrix()), Some(b));
+    /// ```
+    ///
+    /// Such matrices are suitable for rotating the voxels of a block, provided
+    /// that the voxel coordinates are then transformed with [`GridMatrix::transform_cube`],
+    /// *not* [`GridMatrix::transform_point`](cgmath::Transform::transform_point)
+    /// (due to the lower-corner format of cube coordinates).
+    /// ```
+    /// # use all_is_cubes::math::{GridAab, GridPoint, GridRotation};
+    /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_transform(4);
+    /// assert_eq!(rotation.transform_cube(GridPoint::new(0, 0, 0)), GridPoint::new(3, 0, 0));
+    /// assert_eq!(rotation.transform_cube(GridPoint::new(3, 0, 0)), GridPoint::new(3, 0, 3));
+    /// assert_eq!(rotation.transform_cube(GridPoint::new(3, 0, 3)), GridPoint::new(0, 0, 3));
+    /// assert_eq!(rotation.transform_cube(GridPoint::new(0, 0, 3)), GridPoint::new(0, 0, 0));
+    /// ```
+    //
+    // TODO: add tests
+    pub fn to_positive_octant_transform(self, size: GridCoordinate) -> Gridgid {
+        fn offset(face: Face6, size: GridCoordinate) -> GridVector {
+            if face.is_positive() {
+                GridVector::zero()
+            } else {
+                face.normal_vector() * -size
+            }
+        }
+        let basis = self.to_basis();
+        Gridgid {
+            rotation: self,
+            translation: offset(basis.x, size) + offset(basis.y, size) + offset(basis.z, size),
+        }
+    }
+
     /// Expresses this rotation as a matrix which rotates “in place” the
     /// points within the volume defined by coordinates in the range [0, size].
     ///
