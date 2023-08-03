@@ -555,8 +555,11 @@ impl GridAab {
     ///
     /// TODO: Fail nicely on numeric overflow.
     /// The `Option` return is not currently used.
+    ///
+    /// TODO: the `Into<GridMatrix>` is temporary while we migrate to `Gridgid`
     #[must_use]
-    pub fn transform(self, transform: GridMatrix) -> Option<Self> {
+    pub fn transform(self, transform: impl Into<GridMatrix>) -> Option<Self> {
+        let transform = transform.into();
         let mut p1 = transform.transform_point(self.lower_bounds());
         let mut p2 = transform.transform_point(self.upper_bounds());
 

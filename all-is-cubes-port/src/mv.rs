@@ -166,7 +166,7 @@ fn dot_vox_model_to_space(
             model.size.z as i32,
         ],
     )
-    .transform(transform.to_matrix())
+    .transform(transform)
     .expect("TODO: return error");
 
     let mut space = Space::builder(bounds)

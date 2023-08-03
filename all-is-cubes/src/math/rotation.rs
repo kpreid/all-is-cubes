@@ -292,7 +292,7 @@ impl GridRotation {
     ///
     /// let b = GridAab::for_block(Resolution::R8);
     /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_transform(8);
-    /// assert_eq!(b.transform(rotation.to_matrix()), Some(b));
+    /// assert_eq!(b.transform(rotation), Some(b));
     /// ```
     ///
     /// Such matrices are suitable for rotating the voxels of a block, provided

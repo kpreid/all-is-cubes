@@ -341,7 +341,7 @@ where
                     // TODO: Intersect the input voxels.bounds() with the block bounds so we don't scan *more* than we should.
                     let rotated_voxel_range = voxels_array
                         .bounds()
-                        .transform(face.face_transform(block_resolution).inverse().to_matrix())
+                        .transform(face.face_transform(block_resolution).inverse())
                         .unwrap();
 
                     // Check the case where the block's voxels don't meet its front face, or don't fill that face.
