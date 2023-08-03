@@ -513,8 +513,11 @@ impl Space {
     ///
     /// For more information on how to use this, see
     /// [`all_is_cubes::drawing`](crate::drawing).
-    pub fn draw_target<C>(&mut self, transform: GridMatrix) -> DrawingPlane<'_, Space, C> {
-        DrawingPlane::new(self, transform)
+    pub fn draw_target<C>(
+        &mut self,
+        transform: impl Into<GridMatrix>,
+    ) -> DrawingPlane<'_, Space, C> {
+        DrawingPlane::new(self, transform.into())
     }
 
     /// Returns all distinct block types found in the space.

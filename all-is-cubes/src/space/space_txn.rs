@@ -107,8 +107,11 @@ impl SpaceTransaction {
     ///
     /// For more information on how to use this, see
     /// [`all_is_cubes::drawing`](crate::drawing).
-    pub fn draw_target<C>(&mut self, transform: GridMatrix) -> DrawingPlane<'_, Self, C> {
-        DrawingPlane::new(self, transform)
+    pub fn draw_target<C>(
+        &mut self,
+        transform: impl Into<GridMatrix>,
+    ) -> DrawingPlane<'_, Self, C> {
+        DrawingPlane::new(self, transform.into())
     }
 
     /// Marks all cube modifications in this transaction as [non-conservative].
