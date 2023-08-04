@@ -17,8 +17,8 @@ use crate::drawing::DrawingPlane;
 use crate::inv::EphemeralOpaque;
 use crate::listen::{Listen, Listener, Notifier};
 use crate::math::{
-    point_checked_add, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridMatrix,
-    GridPoint, GridRotation, NotNan, Rgb,
+    point_checked_add, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint,
+    GridRotation, Gridgid, NotNan, Rgb,
 };
 use crate::time::Tick;
 use crate::transaction::{Merge, Transaction as _};
@@ -513,11 +513,8 @@ impl Space {
     ///
     /// For more information on how to use this, see
     /// [`all_is_cubes::drawing`](crate::drawing).
-    pub fn draw_target<C>(
-        &mut self,
-        transform: impl Into<GridMatrix>,
-    ) -> DrawingPlane<'_, Space, C> {
-        DrawingPlane::new(self, transform.into())
+    pub fn draw_target<C>(&mut self, transform: Gridgid) -> DrawingPlane<'_, Space, C> {
+        DrawingPlane::new(self, transform)
     }
 
     /// Returns all distinct block types found in the space.

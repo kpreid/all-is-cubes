@@ -8,7 +8,7 @@ use std::{fmt, mem};
 use crate::behavior::{self, BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::drawing::DrawingPlane;
-use crate::math::{GridCoordinate, GridMatrix, GridPoint};
+use crate::math::{GridCoordinate, GridPoint, Gridgid};
 use crate::space::{ActivatableRegion, GridAab, SetCubeError, Space};
 use crate::transaction::{
     no_outputs, CommitError, Merge, NoOutput, PreconditionFailed, Transaction, Transactional,
@@ -107,11 +107,8 @@ impl SpaceTransaction {
     ///
     /// For more information on how to use this, see
     /// [`all_is_cubes::drawing`](crate::drawing).
-    pub fn draw_target<C>(
-        &mut self,
-        transform: impl Into<GridMatrix>,
-    ) -> DrawingPlane<'_, Self, C> {
-        DrawingPlane::new(self, transform.into())
+    pub fn draw_target<C>(&mut self, transform: Gridgid) -> DrawingPlane<'_, Self, C> {
+        DrawingPlane::new(self, transform)
     }
 
     /// Marks all cube modifications in this transaction as [non-conservative].

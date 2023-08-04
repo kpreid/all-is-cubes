@@ -29,7 +29,8 @@ pub use embedded_graphics;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution};
 use crate::math::{
-    Face7, FaceMap, GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, Rgb, Rgba,
+    Face6, FaceMap, GridAab, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
+    Gridgid, Rgb, Rgba,
 };
 use crate::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
@@ -55,13 +56,7 @@ use crate::universe::Universe;
 /// TODO: This function needs a better name
 ///
 /// TODO: Handling zero-area rectangles is not implemented
-pub fn rectangle_to_aab(
-    rectangle: Rectangle,
-    transform: impl Into<GridMatrix>,
-    max_brush: GridAab,
-) -> GridAab {
-    let transform = transform.into();
-
+pub fn rectangle_to_aab(rectangle: Rectangle, transform: Gridgid, max_brush: GridAab) -> GridAab {
     // Note that embedded_graphics uses the convention that coordinates *identify pixels*,
     // not the boundaries between pixels. Thus, a rectangle whose bottom_right corner is
     // 1, 1 includes the pixel with coordinates 1, 1. This is consistent with our “cube”
@@ -102,12 +97,12 @@ pub fn rectangle_to_aab(
 pub struct DrawingPlane<'s, T, C> {
     space: &'s mut T,
     /// Defines the coordinate transformation from 2D graphics to the [`Space`].
-    transform: GridMatrix,
+    transform: Gridgid,
     _color: PhantomData<fn(C)>,
 }
 
 impl<'s, T, C> DrawingPlane<'s, T, C> {
-    pub(crate) fn new(space: &'s mut T, transform: GridMatrix) -> Self {
+    pub(crate) fn new(space: &'s mut T, transform: Gridgid) -> Self {
         Self {
             space,
             transform,
@@ -175,17 +170,12 @@ where
 impl<C> Dimensions for DrawingPlane<'_, Space, C> {
     fn bounding_box(&self) -> Rectangle {
         // Invert our coordinate transform to bring the space's bounds into the drawing
-        // coordinate system. If the transform fails, return a 1×1×1 placeholder rather
-        // than panic.
+        // coordinate system.
         let bounds = self
-            .transform
-            .inverse_transform()
-            .and_then(|t| {
-                self.space
-                    .bounds()
-                    .expand(FaceMap::from_fn(|f| if f.is_positive() { -1 } else { 0 }))
-                    .transform(t)
-            })
+            .space
+            .bounds()
+            .expand(FaceMap::from_fn(|f| if f.is_positive() { -1 } else { 0 }))
+            .transform(self.transform.inverse())
             .unwrap_or(GridAab::ORIGIN_CUBE);
 
         let size = bounds.unsigned_size();
@@ -486,12 +476,10 @@ where
     let mut drawing_space = Space::builder(drawing_bounds)
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build();
-    object.draw(&mut drawing_space.draw_target(GridMatrix::from_origin(
-        [0, 0, z],
-        Face7::PX,
-        Face7::NY,
-        Face7::PZ,
-    )))?;
+    object.draw(&mut drawing_space.draw_target(Gridgid {
+        translation: GridVector::new(0, 0, z),
+        rotation: GridRotation::from_basis([Face6::PX, Face6::NY, Face6::PZ]),
+    }))?;
 
     Ok(space_to_blocks(
         resolution,
@@ -510,7 +498,7 @@ mod tests {
     use crate::math::{GridRotation, Rgba};
     use crate::raytracer::print_space;
     use crate::universe::Universe;
-    use cgmath::{One, Zero};
+    use cgmath::Zero;
     use embedded_graphics::primitives::{Primitive, PrimitiveStyle};
 
     /// With identity transform, `rectangle_to_aab`'s output matches exactly as one might
@@ -520,7 +508,7 @@ mod tests {
         assert_eq!(
             rectangle_to_aab(
                 Rectangle::new(Point::new(3, 4), Size::new(10, 20)),
-                GridMatrix::one(),
+                Gridgid::IDENTITY,
                 GridAab::ORIGIN_CUBE
             ),
             GridAab::from_lower_size([3, 4, 0], [10, 20, 1])
@@ -532,7 +520,7 @@ mod tests {
         assert_eq!(
             rectangle_to_aab(
                 Rectangle::new(Point::new(3, 4), Size::new(10, 20)),
-                GridMatrix::FLIP_Y,
+                Gridgid::FLIP_Y,
                 GridAab::ORIGIN_CUBE
             ),
             GridAab::from_lower_size([3, -4 - 20 + 1, 0], [10, 20, 1])
@@ -544,7 +532,7 @@ mod tests {
         assert_eq!(
             rectangle_to_aab(
                 Rectangle::new(Point::new(10, 10), Size::new(10, 10)),
-                GridMatrix::one(),
+                Gridgid::IDENTITY,
                 GridAab::from_lower_size([0, 0, 0], [2, 1, 2])
             ),
             GridAab::from_lower_upper([10, 10, 0], [21, 20, 2])
@@ -557,7 +545,7 @@ mod tests {
         assert_eq!(
             rectangle_to_aab(
                 Rectangle::new(Point::new(3, 4), Size::new(0, 10)),
-                GridMatrix::one(),
+                Gridgid::IDENTITY,
                 GridAab::ORIGIN_CUBE
             ),
             GridAab::from_lower_size([3, 4, 0], [0, 10, 1])
@@ -565,7 +553,7 @@ mod tests {
         assert_eq!(
             rectangle_to_aab(
                 Rectangle::new(Point::new(3, 4), Size::new(10, 0)),
-                GridMatrix::one(),
+                Gridgid::IDENTITY,
                 GridAab::ORIGIN_CUBE
             ),
             GridAab::from_lower_size([3, 4, 0], [0, 10, 1])
@@ -598,8 +586,10 @@ mod tests {
             // Note: these translations must not cause the depth axis to exit the space_bounds.
             for translation in [GridVector::zero(), GridVector::new(10, 5, 0)] {
                 // The transform we're testing with.
-                let transform =
-                    GridMatrix::from_translation(translation) * rotation.to_rotation_matrix();
+                let transform = Gridgid {
+                    translation,
+                    rotation,
+                };
 
                 // Fetch what DrawingPlane thinks the nominal bounding box is.
                 let plane: DrawingPlane<'_, _, VoxelBrush<'static>> = space.draw_target(transform);
@@ -638,7 +628,7 @@ mod tests {
         C: VoxelColor<'c>,
     {
         let mut space = Space::empty_positive(100, 100, 100);
-        let mut display = space.draw_target(GridMatrix::from_translation([1, 2, 4]));
+        let mut display = space.draw_target(Gridgid::from_translation([1, 2, 4]));
         Pixel(Point::new(2, 3), color_value)
             .draw(&mut display)
             .unwrap();
@@ -679,7 +669,7 @@ mod tests {
 
         let brush = VoxelBrush::new([([0, 0, 0], &block_0), ([0, 1, 1], &block_1)]);
         Pixel(Point::new(2, 3), &brush)
-            .draw(&mut space.draw_target(GridMatrix::from_translation([0, 0, 4])))?;
+            .draw(&mut space.draw_target(Gridgid::from_translation([0, 0, 4])))?;
 
         assert_eq!(&space[[2, 3, 4]], &block_0);
         assert_eq!(&space[[2, 4, 5]], &block_1);
@@ -692,7 +682,7 @@ mod tests {
 
         // This should not fail with SetCubeError::OutOfBounds
         Pixel(Point::new(-10, 0), Rgb888::new(0, 127, 255))
-            .draw(&mut space.draw_target(GridMatrix::from_translation([0, 0, 4])))?;
+            .draw(&mut space.draw_target(Gridgid::from_translation([0, 0, 4])))?;
         Ok(())
     }
 
@@ -709,7 +699,7 @@ mod tests {
         // This should fail with SetCubeError::EvalBlock since the block has no valid definition
         assert_eq!(
             Pixel(Point::new(0, 0), &dead_block)
-                .draw(&mut space.draw_target(GridMatrix::one()))
+                .draw(&mut space.draw_target(Gridgid::IDENTITY))
                 .unwrap_err(),
             SetCubeError::EvalBlock(EvalBlockError::DataRefIs(RefError::Gone(name)))
         );
