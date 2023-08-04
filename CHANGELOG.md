@@ -20,6 +20,8 @@
         - `math::GridMatrix::decompose()`
         - `space::Space::draw_target()`
         - `space::SpaceTransaction::draw_target()`
+    - `drawing::VoxelBrush::transform()` is renamed to `rotate()` and only accepts a rotation.
+      This avoids confusion between points in space and cube-identifying coordinates.
 
 ### Removed
 

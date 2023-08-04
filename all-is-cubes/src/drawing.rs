@@ -15,7 +15,7 @@
 //!     and rectangles have inclusive upper bounds (whereas our [`GridAab`]s have
 //!     exclusive upper bounds).
 
-use cgmath::{EuclideanSpace as _, Transform as _};
+use cgmath::EuclideanSpace as _;
 use embedded_graphics::geometry::{Dimensions, Point, Size};
 use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
 use embedded_graphics::prelude::{DrawTarget, Drawable, Pixel};
@@ -29,8 +29,8 @@ pub use embedded_graphics;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution};
 use crate::math::{
-    Face6, FaceMap, GridAab, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector,
-    Gridgid, Rgb, Rgba,
+    Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid, Rgb,
+    Rgba,
 };
 use crate::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
@@ -365,12 +365,11 @@ impl<'a> VoxelBrush<'a> {
         self
     }
 
-    /// Apply the given transform to the position of each block.
+    /// Apply the given rotation (about the no-offset block) to the position of each block.
     #[must_use]
-    pub fn transform(mut self, transform: GridMatrix) -> Self {
+    pub fn rotate(mut self, rotation: GridRotation) -> Self {
         for (block_offset, _) in self.0.iter_mut() {
-            // TODO: shouldn't this be transform_cube?
-            *block_offset = transform.transform_point(*block_offset);
+            *block_offset = GridPoint::from_vec(rotation.transform_vector(block_offset.to_vec()));
         }
         self
     }

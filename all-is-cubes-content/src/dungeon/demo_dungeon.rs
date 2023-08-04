@@ -660,7 +660,7 @@ pub async fn install_dungeon_blocks(
                     space_from_image(include_image!("floor.png"), GridRotation::RXZY, |pixel| {
                         let block = Block::from(Rgba::from_srgb8(pixel.0));
                         VoxelBrush::with_thickness(block, 0..resolution.into())
-                            .transform(GridRotation::RXZY.to_rotation_matrix())
+                            .rotate(GridRotation::RXZY)
                     })?;
                 Block::builder()
                     .display_name("Floor Tile")

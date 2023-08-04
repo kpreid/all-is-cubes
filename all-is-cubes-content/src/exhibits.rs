@@ -1072,7 +1072,7 @@ async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
             let image::Rgba([r, g, b, a]) = pixel;
             if (r > b || g > b) && a > 0 {
                 let block = Block::from(Rgba::from_srgb8(pixel.0));
-                VoxelBrush::with_thickness(block, 0..2).transform(rotation.to_rotation_matrix())
+                VoxelBrush::with_thickness(block, 0..2).rotate(rotation)
             } else {
                 default_srgb(pixel)
             }
