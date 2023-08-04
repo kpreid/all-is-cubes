@@ -46,7 +46,7 @@ use crate::universe::Universe;
 /// Please note that coordinate behavior may be surprising. [`embedded_graphics`]
 /// considers coordinates to refer to pixel centers, which is similar but not identical
 /// to our use of [`GridPoint`] to identify a cube by its low corner. The `transform` is
-/// then applied to those coordinates. So, for example, applying [`GridMatrix::FLIP_Y`]
+/// then applied to those coordinates. So, for example, applying [`Gridgid::FLIP_Y`]
 /// to a [`Rectangle`] whose top-left corner is `[0, 0]` will result in a [`GridAab`]
 /// which *includes* the <var>y</var> = 0 row — not one which abuts it and is strictly in
 /// the negative y range.

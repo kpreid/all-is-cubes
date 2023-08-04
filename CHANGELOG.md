@@ -16,7 +16,10 @@
 
 - `all-is-cubes` library:
     - The following functions have changed signature to use the new type `math::Gridgid`:
-        - `math::GridMatrix::decompose`
+        - `math::GridAab::transform()`
+        - `math::GridMatrix::decompose()`
+        - `space::Space::draw_target()`
+        - `space::SpaceTransaction::draw_target()`
 
 ### Removed
 
@@ -24,6 +27,7 @@
     - `math::Face7::matrix()` no longer exists. Use `Face6::face_transform()` instead.
     - `math::GridAab::index()` and `contains_cube()` no longer accept `impl Into<GridPoint>`.
       Call sites should be changed to pass only `GridPoint`.
+    - `math::GridRotation::to_positive_octant_matrix()` no longer exists. Use `to_positive_octant_transform()` instead.
 
 
 ## 0.6.0 (2023-07-29)

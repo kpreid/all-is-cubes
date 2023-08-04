@@ -548,10 +548,7 @@ impl CityPlanner {
             [Self::LAMP_POSITION_RADIUS + 1, 2, city_radius + 1],
         );
         occupied_plots.push(road);
-        occupied_plots.push(
-            road.transform(GridRotation::CLOCKWISE.to_rotation_matrix())
-                .unwrap(),
-        );
+        occupied_plots.push(road.transform(GridRotation::CLOCKWISE.into()).unwrap());
         Self {
             space_bounds,
             city_radius,

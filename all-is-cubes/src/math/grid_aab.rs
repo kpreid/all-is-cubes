@@ -5,12 +5,11 @@ use std::fmt;
 use std::iter::FusedIterator;
 use std::ops::Range;
 
-use cgmath::{EuclideanSpace, Point3, Transform, Vector3};
+use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
 use crate::block::Resolution;
 use crate::math::{
-    sort_two, Aab, Face6, FaceMap, FreeCoordinate, GridCoordinate, GridMatrix, GridPoint,
-    GridVector,
+    sort_two, Aab, Face6, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Gridgid,
 };
 
 /// An axis-aligned box with integer coordinates, whose volume is no larger than [`usize::MAX`].
@@ -546,20 +545,12 @@ impl GridAab {
         Self::from_lower_upper(new_lb, new_ub)
     }
 
-    /// Transforms the box.
-    ///
-    /// Caution: The results are undefined if the matrix mixes axes
-    /// rather than only swapping and scaling them.
-    /// TODO: Find the proper mathematical concept to explain that.
-    /// TODO: Check and error in that case.
+    /// Translate and rotate the box according to the given transform.
     ///
     /// TODO: Fail nicely on numeric overflow.
     /// The `Option` return is not currently used.
-    ///
-    /// TODO: the `Into<GridMatrix>` is temporary while we migrate to `Gridgid`
     #[must_use]
-    pub fn transform(self, transform: impl Into<GridMatrix>) -> Option<Self> {
-        let transform = transform.into();
+    pub fn transform(self, transform: Gridgid) -> Option<Self> {
         let mut p1 = transform.transform_point(self.lower_bounds());
         let mut p2 = transform.transform_point(self.upper_bounds());
 
@@ -1135,6 +1126,7 @@ impl fmt::Debug for RangeWithLength {
 mod tests {
     use super::*;
     use crate::block::Resolution::*;
+    use crate::math::{GridRotation, Gridgid};
     use cgmath::point3;
     use indoc::indoc;
 
@@ -1220,30 +1212,15 @@ mod tests {
     #[test]
     fn transform_general() {
         assert_eq!(
-            GridAab::from_lower_size([1, 2, 3], [10, 20, 30]).transform(GridMatrix::new(
-                0, 1, 0, //
-                2, 0, 0, //
-                0, 0, -1, //
-                100, 100, 100,
-            )),
-            Some(GridAab::from_lower_size([104, 101, 67], [40, 10, 30]))
+            GridAab::from_lower_size([1, 2, 3], [10, 20, 30]).transform(Gridgid {
+                rotation: GridRotation::RYXz,
+                translation: GridVector::new(100, 100, 100),
+            }),
+            Some(GridAab::from_lower_size([102, 101, 67], [20, 10, 30]))
         );
     }
 
-    #[test]
-    fn transform_degenerate() {
-        assert_eq!(
-            GridAab::from_lower_size([1, 2, 3], [10, 20, 30]).transform(GridMatrix::new(
-                1, 0, 0, //
-                0, 0, 0, //
-                0, 0, 1, //
-                3, 4, 5
-            )),
-            Some(GridAab::from_lower_size([4, 4, 8], [10, 0, 30]))
-        );
-    }
-
-    // TODO: test and improve transform() on matrices with skew / other non-axis-swaps
+    // TODO: test transform() on more cases
 
     /// Translation overflowing to partially outside of the numeric range
     /// clips the box's size to the range.
