@@ -41,6 +41,7 @@ pub mod headless;
 #[doc(hidden)]
 pub mod init;
 mod pipelines;
+mod poll;
 mod postprocess;
 #[doc(hidden)] // public for tests/shader_tests.rs
 pub mod shader_testing;

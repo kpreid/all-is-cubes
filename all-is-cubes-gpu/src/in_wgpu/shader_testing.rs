@@ -8,9 +8,11 @@
 //! The code in this module is located here so that we do not need to make many pieces
 //! of the infrastructure, like `FramebufferTextures`, `pub`, but only this module.
 
-use all_is_cubes::block::Resolution;
+use std::sync::Arc;
+
 use wgpu::util::DeviceExt;
 
+use all_is_cubes::block::Resolution;
 use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport};
 use all_is_cubes::cgmath::{self, One as _, Point3, Vector3, Zero as _};
 use all_is_cubes::listen::ListenableSource;
@@ -41,6 +43,7 @@ where
         .request_device(&in_wgpu::EverythingRenderer::device_descriptor(), None)
         .await
         .unwrap();
+    let device = Arc::new(device);
 
     let test_shader_source: String = in_wgpu::pipelines::BLOCKS_AND_LINES_SHADER
         .as_source()
@@ -205,7 +208,7 @@ where
     queue.submit(std::iter::once(encoder.finish()));
 
     get_texels_from_gpu(
-        &device,
+        device.clone(),
         &queue,
         fbt.scene_for_test_copy(),
         output_viewport.framebuffer_size,

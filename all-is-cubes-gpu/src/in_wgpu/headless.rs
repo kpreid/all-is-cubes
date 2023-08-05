@@ -65,11 +65,7 @@ impl Builder {
 /// and may then be used once or repeatedly to produce images of what those cameras see.
 #[derive(Debug)]
 pub struct Renderer {
-    /// `wgpu` is currently entirely `!Send` on Wasm.
-    /// Use SendWrapper to safely work around that.
-    ///
-    /// TODO: Make this an “actor pattern” situation instead of panicking if used from
-    /// a different thread.
+    /// `wgpu` is currently entirely `!Send` on Wasm; use a channel and actor to handle that.
     #[cfg(target_family = "wasm")]
     inner: futures_channel::mpsc::Sender<RenderMsg>,
     #[cfg(not(target_family = "wasm"))]
@@ -201,7 +197,7 @@ impl RendererImpl {
         self.everything
             .add_info_text_and_postprocess(&self.queue, &self.color_texture, info_text);
         let image = init::get_image_from_gpu(
-            &self.device,
+            self.device.clone(),
             &self.queue,
             &self.color_texture,
             viewport.framebuffer_size,

@@ -3,6 +3,8 @@
 //! These are appropriate for the all-is-cubes project's tests, but may not be appropriate
 //! for downstream users of the libraries.
 
+use std::sync::Arc;
+
 /// Create a [`wgpu::Instance`] and [`wgpu::Adapter`] controlled by environment variables,
 /// and print information about the decision made.
 ///
@@ -94,7 +96,7 @@ fn shortened_adapter_info(info: &wgpu::AdapterInfo) -> String {
 /// It should be fixed not to.
 #[doc(hidden)]
 pub async fn get_image_from_gpu<P>(
-    device: &wgpu::Device,
+    device: Arc<wgpu::Device>,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     size: all_is_cubes::cgmath::Vector2<u32>,
@@ -119,7 +121,7 @@ where
 /// It should be fixed not to.
 #[doc(hidden)]
 pub async fn get_texels_from_gpu<C>(
-    device: &wgpu::Device,
+    device: Arc<wgpu::Device>,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     dimensions: all_is_cubes::cgmath::Vector2<u32>,
@@ -191,7 +193,7 @@ where
             .map_async(wgpu::MapMode::Read, |result| {
                 let _ = sender.send(result);
             });
-        device.poll(wgpu::Maintain::Wait); // TODO: poll in the background instead of blocking
+        super::poll::ensure_polled(Arc::downgrade(&device));
         receiver
             .await
             .expect("communication failed")

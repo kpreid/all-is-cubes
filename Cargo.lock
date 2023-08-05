@@ -154,6 +154,7 @@ dependencies = [
  "all-is-cubes",
  "all-is-cubes-mesh",
  "bytemuck",
+ "crossbeam-channel",
  "futures-channel",
  "futures-core",
  "futures-util",

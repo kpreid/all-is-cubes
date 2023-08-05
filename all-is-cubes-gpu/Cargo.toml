@@ -49,6 +49,10 @@ thiserror = { workspace = true }
 wasm-bindgen-futures = { workspace = true }
 wgpu = { workspace = true, optional = true }
 
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+# Used to implement ensure_polled() on non-Wasm targets.
+crossbeam-channel = { workspace = true }
+
 [target.'cfg(target_family = "wasm")'.dependencies]
 # If we don't set this feature, it will try to access files at run time and fail
 # since web wasm has no std::fs.
