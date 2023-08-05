@@ -42,6 +42,14 @@ enum RecorderInner {
     Shutdown,
     Raytrace(RtRecorder),
     Mesh(write_gltf::MeshRecorder),
+    Export {
+        runtime_handle: tokio::runtime::Handle,
+        export_format: ExportFormat,
+        /// Becomes `None` when export has been performed
+        export_set: Option<ExportSet>,
+        options: RecordOptions,
+        status_notifier: Arc<listen::Notifier<Status>>,
+    },
 }
 
 /// Per-frame status reports from [`Recorder`].
@@ -140,10 +148,6 @@ impl Recorder {
                 RecorderInner::Mesh(write_gltf::MeshRecorder::new(cameras, tex, scene_sender))
             }
             RecordFormat::Export(export_format) => {
-                // TODO: Stop doing this inside of record initialization, and give export
-                // its own separate main code path, or at least do it at the *end* of recording.
-                let path_str = options.output_path.to_string_lossy().to_string();
-
                 // TODO: better rule than this special case. AicJson doesn't strictly require
                 // all of the universe, but it does require the transitive closure, and this is the
                 // easiest way to proceed for now.
@@ -153,17 +157,13 @@ impl Recorder {
                     ExportSet::from_spaces(vec![cameras.world_space().snapshot().unwrap()])
                 };
 
-                runtime_handle
-                    .block_on(all_is_cubes_port::export_to_path(
-                        YieldProgress::noop(),
-                        export_format,
-                        export_set,
-                        options.output_path,
-                    ))
-                    .context("failed to perform export operation")?;
-                eprintln!("\nWrote {path_str}");
-                log::trace!("shenanigan: exiting out of record initialization");
-                std::process::exit(0);
+                RecorderInner::Export {
+                    runtime_handle: runtime_handle.clone(),
+                    status_notifier: status_notifier.clone(),
+                    export_format,
+                    export_set: Some(export_set),
+                    options,
+                }
             }
         };
 
@@ -193,7 +193,40 @@ impl Recorder {
                     .send((this_frame_number, renderer))
                     .expect("channel closed; recorder render thread died?");
             }
+
             RecorderInner::Mesh(rec) => rec.capture_frame(this_frame_number),
+
+            &mut RecorderInner::Export {
+                ref runtime_handle,
+                ref status_notifier,
+                export_format,
+                ref mut export_set,
+                ref options,
+            } => {
+                // TODO: This should probably be done at the *end* of any specified recording
+                // period, the last frame, not the first frame.
+                if let Some(export_set) = export_set.take() {
+                    // TODO: Stop using block_on(), and instead be able to ask the main loop to
+                    // suspend stepping until we're done with this operation that is both async
+                    // and reading the universe.
+                    runtime_handle
+                        .block_on(all_is_cubes_port::export_to_path(
+                            // TODO: hook up a progress bar
+                            YieldProgress::noop(),
+                            export_format,
+                            export_set,
+                            options.output_path.clone(),
+                        ))
+                        .expect("failed to perform export operation");
+                } else {
+                    // Ignore other frames
+                }
+                status_notifier.notify(Status {
+                    frame_number: this_frame_number,
+                    flaws: Flaws::empty(), // TODO: should have a concept of export flaws
+                });
+            }
+
             RecorderInner::Shutdown => unreachable!(),
         }
     }
