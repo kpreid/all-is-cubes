@@ -1,5 +1,6 @@
-[..] Initialized session ([..] s)
-[..] Initialized game state with Template(LightingBench, TemplateParameters { seed: Some(0), size: None }) ([..] s)
+[DEBUG] (1) Initialized session ([..] s)
+[DEBUG] (1) Initialized graphics ([..] s)
+[DEBUG] (1) Initialized game state with Template(LightingBench, TemplateParameters { seed: Some(0), size: None }) ([..] s)
 Error: failed to configure session for recording
 
 Caused by:

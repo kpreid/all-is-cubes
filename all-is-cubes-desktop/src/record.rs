@@ -17,7 +17,7 @@ use all_is_cubes_port::{ExportFormat, ExportSet};
 mod options;
 pub(crate) use options::*;
 mod record_main;
-pub(crate) use record_main::{configure_session_for_recording, record_main};
+pub(crate) use record_main::record_main;
 mod write_gltf;
 mod write_png;
 

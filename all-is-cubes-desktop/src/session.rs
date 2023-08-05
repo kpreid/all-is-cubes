@@ -98,6 +98,8 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
     ///
     /// This overwrites its previous recorder, if any.
     ///
+    /// If the universe is changed then the recorder will not follow it.
+    ///
     /// Errors: Returns errors directly from `Recorder::new()`.
     pub(crate) fn start_recording(
         &mut self,

@@ -3,5 +3,5 @@
 # This isn't strongly an "end-to-end" test; we're just taking advantage
 # of trycmd's ability to set up input and output files.
 bin.name = "all-is-cubes"
-args = "--no-config-files --template lighting-bench --seed 0 --graphics record -o obstacle.png --display-size 120x90"
+args = "--no-config-files --simplify-log-format --template lighting-bench --seed 0 --graphics record -o obstacle.png --display-size 120x90"
 status.code = 1

@@ -1,5 +1,5 @@
-[DEBUG] (1) Initialized session [..]
-[INFO] Randomly chosen universe seed: [..]
+[DEBUG] (1) Initialized session ([..] s)
+[DEBUG] (1) Initialized graphics ([..] s)
 Error: failed to create universe from requested template or file
 
 Caused by:

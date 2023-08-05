@@ -1,3 +1,3 @@
 bin.name = "all-is-cubes"
-args = "--no-config-files --simplify-log-format --template fail --graphics headless"
+args = "--no-config-files --simplify-log-format --template fail --seed 0 --graphics headless"
 status.code = 1

@@ -4,6 +4,7 @@ use all_is_cubes::character::{self, Character};
 use all_is_cubes::physics::BodyTransaction;
 use all_is_cubes::time::Tick;
 use all_is_cubes::{behavior, listen, universe};
+use anyhow::Context;
 use indicatif::{ProgressBar, ProgressStyle};
 
 use all_is_cubes::camera::Flaws;
@@ -62,10 +63,15 @@ where
 pub(crate) fn record_main(
     mut dsession: DesktopSession<(), ()>,
     options: RecordOptions,
+    runtime_handle: &tokio::runtime::Handle,
 ) -> Result<(), anyhow::Error> {
     let progress_style = ProgressStyle::default_bar()
         .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
         .unwrap();
+
+    // TODO: We should start recording independent of the main loop type being used
+    configure_session_for_recording(&mut dsession, &options, runtime_handle)
+        .context("failed to configure session for recording")?;
 
     let (status_tx, mut status_receiver) = tokio::sync::mpsc::unbounded_channel::<Status>();
     dsession

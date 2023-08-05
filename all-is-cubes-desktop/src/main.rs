@@ -34,6 +34,7 @@
 // Crate-specific lint settings.
 // * This crate does not forbid(unsafe_code) because wgpu initialization requires it.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -55,11 +56,10 @@ mod aic_winit;
 use aic_winit::winit_main_loop;
 mod command_options;
 use command_options::GraphicsType;
+mod audio;
 mod config_files;
 mod glue;
 mod record;
-use record::record_main;
-mod audio;
 mod session;
 mod terminal;
 
@@ -102,13 +102,6 @@ fn main() -> Result<(), anyhow::Error> {
         simplify_log_format,
         no_config_files,
     } = options.clone();
-    let input_source = parse_universe_source(input_file, template, template_size, seed);
-
-    // TODO: record_options validation should just be part of the regular arg parsing
-    // (will need a wrapper type)
-    let record_options: Option<record::RecordOptions> = options
-        .record_options()
-        .map_err(|e| e.format(&mut AicDesktopArgs::command()))?;
 
     // Initialize logging -- but only if it won't interfere.
     if graphics_type != GraphicsType::Terminal || verbose {
@@ -140,11 +133,23 @@ fn main() -> Result<(), anyhow::Error> {
         .context("failed to initialize logging")?;
     }
 
+    // After setting up logging, do other option interpretation steps.
+
+    let input_source = parse_universe_source(input_file, template, template_size, seed);
+
+    // TODO: record_options validation should just be part of the regular arg parsing
+    // (will need a wrapper type)
+    let record_options: Option<record::RecordOptions> = options
+        .record_options()
+        .map_err(|e| e.format(&mut AicDesktopArgs::command()))?;
+
     let graphics_options = if no_config_files {
         GraphicsOptions::default()
     } else {
         config_files::load_config().expect("Error loading configuration files")
     };
+
+    // Done with options; now start creating the session.
 
     // This cell will be moved into the session after (possibly) being reset to the actual
     // window size. This is a kludge because the `Session`'s `Vui` wants to be able to track
@@ -156,7 +161,7 @@ fn main() -> Result<(), anyhow::Error> {
     ));
 
     let start_session_time = Instant::now();
-    let mut session = runtime.block_on(Session::builder().ui(viewport_cell.as_source()).build());
+    let session = runtime.block_on(Session::builder().ui(viewport_cell.as_source()).build());
     session.graphics_options_mut().set(graphics_options);
     let session_done_time = Instant::now();
     log::debug!(
@@ -166,21 +171,15 @@ fn main() -> Result<(), anyhow::Error> {
             .as_secs_f32()
     );
 
-    // TODO: refactor this to work through RecordOptions
-    let precompute_light = precompute_light
-        || (graphics_type == GraphicsType::Record
-            && output_file.as_ref().map_or(false, |file| {
-                determine_record_format(file).map_or(false, |fmt| fmt.includes_light())
-            }));
-    let universe = runtime
-        .block_on(create_universe(input_source, precompute_light))
-        .context("failed to create universe from requested template or file")?;
-    session.set_universe(universe);
-
     // Bundle of inputs to `inner_main()`, which — unlike this function — is generic over
     // the kind of window system we're using.
     let inner_params = InnerMainParams {
+        runtime,
         before_loop_time: Instant::now(),
+        graphics_type,
+        input_source,
+        output_file,
+        precompute_light,
         headless: options.is_headless(),
     };
 
@@ -197,7 +196,8 @@ fn main() -> Result<(), anyhow::Error> {
     match graphics_type {
         GraphicsType::Window => {
             let event_loop = winit::event_loop::EventLoop::new();
-            let dsession = runtime
+            let dsession = inner_params
+                .runtime
                 .block_on(create_winit_wgpu_desktop_session(
                     session,
                     aic_winit::create_window(
@@ -246,17 +246,12 @@ fn main() -> Result<(), anyhow::Error> {
             let record_options =
                 record_options.expect("arg validation did not require output with -g record");
 
-            let mut dsession = DesktopSession::new((), (), session, viewport_cell);
-            record::configure_session_for_recording(
-                &mut dsession,
-                &record_options,
-                runtime.handle(),
-            )
-            .context("failed to configure session for recording")?;
+            let dsession = DesktopSession::new((), (), session, viewport_cell);
+            let handle = inner_params.runtime.handle().clone();
 
             inner_main(
                 inner_params,
-                |dsession| record_main(dsession, record_options),
+                move |dsession| record::record_main(dsession, record_options, &handle),
                 dsession,
             )
         }
@@ -296,7 +291,27 @@ fn inner_main<Ren, Win>(
     looper: impl FnOnce(DesktopSession<Ren, Win>) -> Result<(), anyhow::Error>,
     mut dsession: DesktopSession<Ren, Win>,
 ) -> Result<(), anyhow::Error> {
-    if !params.headless {
+    let InnerMainParams {
+        runtime,
+        before_loop_time,
+        graphics_type,
+        input_source,
+        output_file,
+        headless,
+        precompute_light,
+    } = params;
+
+    // At this point we have just finished whatever the GraphicsType did before calling
+    // inner_main().
+    let entered_inner_time = Instant::now();
+    log::debug!(
+        "Initialized graphics ({:.3} s)",
+        entered_inner_time
+            .duration_since(before_loop_time)
+            .as_secs_f64()
+    );
+
+    if !headless {
         match audio::init_sound(&dsession.session) {
             Ok(audio_out) => dsession.audio = Some(audio_out),
             Err(e) => log::error!(
@@ -307,21 +322,31 @@ fn inner_main<Ren, Win>(
         };
     }
 
-    log::debug!(
-        "Initialized desktop-session ({:.3} s); entering event loop",
-        Instant::now()
-            .duration_since(params.before_loop_time)
-            .as_secs_f64()
-    );
+    // TODO: refactor this to work through RecordOptions
+    let precompute_light = precompute_light
+        || (graphics_type == GraphicsType::Record
+            && output_file.as_ref().map_or(false, |file| {
+                determine_record_format(file).map_or(false, |fmt| fmt.includes_light())
+            }));
+    let universe = runtime
+        .block_on(create_universe(input_source, precompute_light))
+        .context("failed to create universe from requested template or file")?;
+    dsession.session.set_universe(universe);
+
+    log::trace!("Entering event loop.");
 
     looper(dsession)
 }
 
 /// Ad-hoc struct of arguments to [`inner_main`] that can be constructed beforehand.
-/// TODO: If this doesn't grow more parameters, get rid of it.
 struct InnerMainParams {
+    runtime: tokio::runtime::Runtime,
     before_loop_time: Instant,
+    graphics_type: GraphicsType,
+    input_source: UniverseSource,
+    output_file: Option<PathBuf>,
     headless: bool,
+    precompute_light: bool,
 }
 
 /// Perform and log the creation of the universe.
