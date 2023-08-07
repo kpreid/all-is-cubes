@@ -83,6 +83,13 @@ overflow-checks = true
 # TODO: Disabled for <https://github.com/rust-lang/rust/issues/103976> in CI
 # split-debuginfo = "unpacked"
 
+# For packages whose code is not as performance-critical, spend less time optimizing
+package.all-is-cubes-content.opt-level = 1
+package.all-is-cubes-port.opt-level = 1
+package.all-is-cubes-server.opt-level = 1
+package.all-is-cubes-ui.opt-level = 1
+package.test-renderers.opt-level = 1
+
 [profile.release]
 # TODO: review recommended options for wasm releases
 overflow-checks = true
