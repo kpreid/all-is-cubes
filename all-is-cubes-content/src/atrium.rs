@@ -1,10 +1,11 @@
 //! A voxel reinterpretation of the famous Sponza Atrium test scene.
 
+use std::f64::consts::TAU;
 use std::fmt;
 
 use exhaust::Exhaust;
 
-use all_is_cubes::block::{self, Block, Resolution, RotationPlacementRule, Zoom, AIR};
+use all_is_cubes::block::{self, Block, Composite, Resolution, RotationPlacementRule, Zoom, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace, Point3, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
@@ -148,10 +149,10 @@ pub(crate) async fn atrium(
         *br"########",
         *br"##AAAAA#", // balcony floor height
         *br"AAAA AAA",
-        *br"AAA   AA",
-        *br"AA     A",
-        *br"G       ",
-        *br"G       ", 
+        *br"AAbbbbbA",
+        *br"AAbbbbbA",
+        *br"G bbbbb ",
+        *br"G BBBBB ", 
         *br"G       ",
     ], [
         *br"TTTTTTTT", // roof edge height
@@ -221,6 +222,7 @@ fn map_text_block(
     blocks: &BlockProvider<AtriumBlocks>,
     cube: GridPoint,
     existing_block: Block,
+    banner_color: Option<BannerColor>,
 ) -> Block {
     match ascii {
         b' ' => existing_block,
@@ -285,6 +287,27 @@ fn map_text_block(
         )
         .with_disassemblable()
         .compose_or_replace(existing_block),
+
+        b'b' => {
+            if let Some(banner_color) = banner_color {
+                blocks[AtriumBlocks::Banner(banner_color)].clone()
+            } else {
+                AIR
+            }
+        }
+        b'B' => {
+            // Banner with bottom edge accent
+            if let Some(banner_color) = banner_color {
+                Composite::new(
+                    blocks[AtriumBlocks::BannerBottomAccent].clone(),
+                    block::CompositeOperator::Atop,
+                )
+                .compose_or_replace(blocks[AtriumBlocks::Banner(banner_color)].clone())
+            } else {
+                AIR
+            }
+        }
+
         // TODO: These are supposed to be planters
         b'P' => blocks[AtriumBlocks::Firepot].clone(),
         b'f' => lookup_multiblock_2d(blocks, AtriumBlocks::Pole, [cube.z - 1, 0]),
@@ -310,8 +333,18 @@ fn arch_row(
     for i in 0..section_count {
         let column_base = first_column_base + offset * (i + 1);
 
+        let banner_color = if parallel.axis_number() == 2 {
+            match i.rem_euclid(3) {
+                0 => Some(BannerColor::Red),
+                1 => Some(BannerColor::Green),
+                _ => Some(BannerColor::Blue),
+            }
+        } else {
+            None
+        };
+
         fill_space_transformed(
-            |p, block| map_text_block(pattern[p], blocks, p, block),
+            |p, block| map_text_block(pattern[p], blocks, p, block, banner_color),
             pattern.bounds(),
             space,
             Gridgid::from_translation(column_base.to_vec())
@@ -348,6 +381,8 @@ fn fill_space_transformed(
 #[non_exhaustive]
 enum AtriumBlocks {
     Sun,
+
+    // Stone
     GroundFloor,
     UpperFloor,
     SolidBricks,
@@ -357,8 +392,21 @@ enum AtriumBlocks {
     SquareColumn,
     SmallColumn,
     Molding,
+
+    /// Base banner color and shape
+    Banner(BannerColor),
+    /// Accent color to be composited atop the banner
+    BannerBottomAccent,
+
+    // Decorations
     Pole,
     Firepot,
+}
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+enum BannerColor {
+    Red,
+    Green,
+    Blue,
 }
 impl BlockModule for AtriumBlocks {
     fn namespace() -> &'static str {
@@ -370,6 +418,7 @@ impl fmt::Display for AtriumBlocks {
         // TODO: We need a better pattern than writing these out manually
         match self {
             AtriumBlocks::Sun => write!(f, "sun"),
+
             AtriumBlocks::GroundFloor => write!(f, "ground-floor"),
             AtriumBlocks::UpperFloor => write!(f, "upper-floor"),
             AtriumBlocks::SolidBricks => write!(f, "solid-bricks"),
@@ -379,8 +428,35 @@ impl fmt::Display for AtriumBlocks {
             AtriumBlocks::SquareColumn => write!(f, "square-column"),
             AtriumBlocks::SmallColumn => write!(f, "small-column"),
             AtriumBlocks::Molding => write!(f, "molding"),
+
+            AtriumBlocks::Banner(c) => write!(f, "banner/{c}"),
+            AtriumBlocks::BannerBottomAccent => write!(f, "banner/bottom-accent"),
+
             AtriumBlocks::Pole => write!(f, "pole"),
             AtriumBlocks::Firepot => write!(f, "firepot"),
+        }
+    }
+}
+impl fmt::Display for BannerColor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                BannerColor::Red => "red",
+                BannerColor::Green => "green",
+                BannerColor::Blue => "blue",
+            }
+        )
+    }
+}
+
+impl BannerColor {
+    fn color(self) -> Rgb {
+        match self {
+            BannerColor::Red => palette::UNIFORM_LUMINANCE_RED,
+            BannerColor::Green => palette::UNIFORM_LUMINANCE_GREEN,
+            BannerColor::Blue => palette::UNIFORM_LUMINANCE_BLUE,
         }
     }
 }
@@ -566,6 +642,33 @@ async fn install_atrium_blocks(
                 // TODO: rotation rule
                 .voxels_fn(universe, resolution, molding_fn)?
                 .build(),
+
+            AtriumBlocks::Banner(color) => Block::builder()
+                .display_name(format!("Atrium Banner {color}"))
+                .voxels_fn(universe, resolution, |p| {
+                    // wavy banner shape
+                    let wave = (f64::from(p.x) * (TAU / f64::from(resolution))).sin() * 2.2;
+                    if p.z == i32::from(resolution) / 2 + wave as i32 {
+                        Block::from(color.color())
+                    } else {
+                        AIR
+                    }
+                })?
+                .build(),
+            AtriumBlocks::BannerBottomAccent => {
+                let accent_color = Block::from(rgba_const!(0.95, 0.89, 0.05, 1.0));
+                Block::builder()
+                    .display_name("Banner Accent")
+                    .voxels_fn(universe, resolution, |p| {
+                        if [0, 1, 2, 6, 8].contains(&p.y) {
+                            &accent_color
+                        } else {
+                            &AIR
+                        }
+                    })?
+                    .build()
+            }
+
             AtriumBlocks::Pole => Block::builder()
                 .display_name("Pole")
                 .voxels_fn(
