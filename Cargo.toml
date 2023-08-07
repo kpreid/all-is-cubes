@@ -8,7 +8,7 @@ members = [
   "all-is-cubes-ui",
   "all-is-cubes-wasm",
   "test-renderers",
-  "xtask",
+  "tools/xtask",
 
   # Including this makes the fuzz targets automatically built so we know they aren't broken.
   # But, `cargo test` sometimes ignores `[[bin]] test = false` directives,

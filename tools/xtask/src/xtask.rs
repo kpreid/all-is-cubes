@@ -47,12 +47,10 @@
 #![forbid(unsafe_code)]
 
 use std::collections::BTreeSet;
-use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
 use std::io::Write as _;
 use std::mem;
-use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -665,12 +663,10 @@ static PROJECT_DIR: Lazy<PathBuf> = Lazy::new(|| {
     );
     // Sanity check
     assert!(path.is_absolute());
+    assert!(path.ends_with("tools/xtask"), "{path:?}");
     // Since we are the xtask binary, we'll be given the path to the xtask package.
-    assert_eq!(
-        path.components().last(),
-        Some(Component::Normal(OsStr::new("xtask")))
-    );
-    // Pop the xtask directory to become the path to the main project directory.
+    // Pop `tools/xtask` to become the path to the main project directory.
+    path.pop();
     path.pop();
     path
 });
