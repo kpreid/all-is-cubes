@@ -247,6 +247,12 @@ pub enum CompositeOperator {
     /// where the source is present; the source is “in” the destination.
     /// The destination's color is not used.
     In,
+
+    /// Porter-Duff “atop”. If both source and destination are opaque, the source is taken;
+    /// otherwise the destination is taken. Thus the source is painted onto the destination's
+    /// substance.
+    Atop,
+    //
     // /// Split the volume in half on the plane perpendicular to `[1, 0, 1]`; all voxels
     // /// on the side nearer to the origin are taken from the destination, and all voxels
     // /// on the farther side or exactly on the plane are taken from the source.
@@ -297,6 +303,20 @@ impl CompositeOperator {
             Self::In => source
                 .to_rgb()
                 .with_alpha(source.alpha() * destination.alpha()),
+
+            Self::Atop => {
+                let sa = source.alpha();
+                let sa_complement = NotNan::new(1. - sa.into_inner()).unwrap();
+                let rgb = source.to_rgb() * sa + destination.to_rgb() * sa_complement;
+
+                let out_alpha = destination.alpha();
+                if out_alpha == 0.0 {
+                    // we wouldn't have to do this if we used premultiplied alpha :/
+                    Rgba::TRANSPARENT
+                } else {
+                    rgb.with_alpha(out_alpha)
+                }
+            }
         }
     }
 
@@ -306,6 +326,7 @@ impl CompositeOperator {
         match self {
             Self::Over => source | destination,
             Self::In => source & destination,
+            Self::Atop => destination,
         }
     }
 }
@@ -317,7 +338,7 @@ mod tests {
     use crate::content::make_some_blocks;
     use pretty_assertions::assert_eq;
     use BlockCollision::{Hard, None as CNone};
-    use CompositeOperator::{In, Over};
+    use CompositeOperator::{Atop, In, Over};
 
     // --- Helpers
 
@@ -327,6 +348,14 @@ mod tests {
         // TODO: Replace this direct call with going through the full block evaluation.
 
         assert_eq!(operator.blend_evoxel(src, dst), outcome);
+    }
+
+    fn evcolor(color: Rgba) -> Evoxel {
+        Evoxel {
+            color,
+            selectable: true,
+            collision: Hard,
+        }
     }
 
     fn evcoll(collision: BlockCollision) -> Evoxel {
@@ -370,6 +399,28 @@ mod tests {
         assert_blend(evcoll(CNone), In, evcoll(CNone), evcoll(CNone));
         assert_blend(evcoll(Hard), In, evcoll(CNone), evcoll(CNone));
         assert_blend(evcoll(CNone), In, evcoll(Hard), evcoll(CNone));
+    }
+
+    #[test]
+    fn blend_atop_color() {
+        let opaque1 = evcolor(Rgba::new(1.0, 0.0, 0.0, 1.0));
+        let opaque2 = evcolor(Rgba::new(0.0, 1.0, 0.0, 1.0));
+        let half_red = evcolor(Rgba::new(1.0, 0.0, 0.0, 0.5));
+        let clear = evcolor(Rgba::TRANSPARENT);
+
+        assert_blend(opaque1, Atop, opaque2, opaque1);
+        assert_blend(half_red, Atop, opaque2, evcolor(Rgba::new(0.5, 0.5, 0.0, 1.0)));
+        assert_blend(opaque1, Atop, clear, clear);
+        assert_blend(clear, Atop, opaque2, opaque2);
+        assert_blend(clear, Atop, clear, clear);
+    }
+
+    #[test]
+    fn blend_atop_collision() {
+        assert_blend(evcoll(Hard), Atop, evcoll(Hard), evcoll(Hard));
+        assert_blend(evcoll(CNone), Atop, evcoll(CNone), evcoll(CNone));
+        assert_blend(evcoll(Hard), Atop, evcoll(CNone), evcoll(CNone));
+        assert_blend(evcoll(CNone), Atop, evcoll(Hard), evcoll(Hard));
     }
 
     #[test]
