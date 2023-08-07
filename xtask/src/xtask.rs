@@ -602,7 +602,8 @@ fn ensure_wasm_tools_installed(time_log: &mut Vec<Timing>) -> Result<(), ActionE
 
     // Generate combined license file.
     let license_html_path = PROJECT_DIR.join("all-is-cubes-wasm/static/third-party-licenses.html");
-    let license_template_path = PROJECT_DIR.join("about.hbs");
+    let license_template_path = PROJECT_DIR.join("tools/about.hbs");
+    let config_path = PROJECT_DIR.join("tools/about.toml");
     if newer_than(
         [&PROJECT_DIR.join("Cargo.lock"), &license_template_path],
         [&license_html_path],
@@ -614,6 +615,8 @@ fn ensure_wasm_tools_installed(time_log: &mut Vec<Timing>) -> Result<(), ActionE
                 "about",
                 "generate",
                 "--fail",
+                "--config",
+                config_path.to_str().unwrap(),
                 license_template_path.to_str().unwrap(),
                 "-o",
                 license_html_path.to_str().unwrap(),
