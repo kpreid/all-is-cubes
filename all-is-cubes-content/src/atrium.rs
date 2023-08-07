@@ -174,6 +174,27 @@ pub(crate) async fn atrium(
         *br"        ",
         *br"        ", 
         *br"P       ",
+    ], [
+        *br"        ", // roof edge height
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"    f   ", // top floor height
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"        ", // balcony floor height
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"        ",
+        *br"        ", 
+        *br"        ",
     ]]);
     four_walls(
         arches_footprint.translate([0, WALL, 0]),
@@ -266,8 +287,7 @@ fn map_text_block(
         .compose_or_replace(existing_block),
         // TODO: These are supposed to be planters
         b'P' => blocks[AtriumBlocks::Firepot].clone(),
-        // Not-yet-implemented decoration placeholder blocks
-        b'f' => Block::from(rgba_const!(1.0, 0.5, 0.5, 1.0)),
+        b'f' => lookup_multiblock_2d(blocks, AtriumBlocks::Pole, [cube.z - 1, 0]),
         _ => panic!(
             "Unrecognized block character {:?}",
             std::str::from_utf8(&[ascii])
@@ -337,6 +357,7 @@ enum AtriumBlocks {
     SquareColumn,
     SmallColumn,
     Molding,
+    Pole,
     Firepot,
 }
 impl BlockModule for AtriumBlocks {
@@ -358,6 +379,7 @@ impl fmt::Display for AtriumBlocks {
             AtriumBlocks::SquareColumn => write!(f, "square-column"),
             AtriumBlocks::SmallColumn => write!(f, "small-column"),
             AtriumBlocks::Molding => write!(f, "molding"),
+            AtriumBlocks::Pole => write!(f, "pole"),
             AtriumBlocks::Firepot => write!(f, "firepot"),
         }
     }
@@ -373,6 +395,7 @@ async fn install_atrium_blocks(
     let heavy_grout_base = Block::from(rgba_const!(0.1, 0.1, 0.1, 1.0));
     let grout_base = Block::from(rgba_const!(0.32, 0.30, 0.28, 1.0));
     let ceiling_paint = Block::from(rgba_const!(0.975, 0.975, 0.975, 1.0));
+    let pole_color = Block::from(rgba_const!(0.27, 0.20, 0.18, 1.0));
 
     // TODO: This whole section is about having noise pick from a fixed set of pregenerated shades.
     // We should abstract it out if we like this style
@@ -419,6 +442,44 @@ async fn install_atrium_blocks(
         } else {
             &AIR
         }
+    };
+    let pole_shape = GridArray::from_y_flipped_array([
+        [
+            *br"                           #####",
+            *br"                      ##########",
+            *br"                ############    ",
+            *br"           ############         ",
+            *br"#     ############              ",
+            *br"#############                   ",
+            *br"########                        ",
+            *br"#                               ",
+        ],
+        [
+            *br"                                ",
+            *br"                         ###### ",
+            *br"                    ######      ",
+            *br"               ######           ",
+            *br"          ######                ",
+            *br"     ######                     ",
+            *br"######                          ",
+            *br"                                ",
+        ],
+    ]);
+    let pole_fn = |p: GridPoint| match pole_shape
+        .get(GridPoint {
+            x: p.z,
+            y: p.y,
+            z: match p.x - 8 {
+                // remap ..-2 -1 0 1.. to ..1 0 0 1..
+                z @ 0.. => z,
+                z => (-1) - z,
+            },
+        })
+        .copied()
+        .unwrap_or(b' ')
+    {
+        b'#' => &pole_color,
+        _ => &AIR,
     };
 
     // TODO: duplicated procgen code — figure out a good toolkit of math helpers
@@ -504,6 +565,14 @@ async fn install_atrium_blocks(
                 .display_name("Atrium Top Edge Molding")
                 // TODO: rotation rule
                 .voxels_fn(universe, resolution, molding_fn)?
+                .build(),
+            AtriumBlocks::Pole => Block::builder()
+                .display_name("Pole")
+                .voxels_fn(
+                    universe,
+                    (Resolution::R16 * MULTIBLOCK_SCALE).unwrap(),
+                    &pole_fn,
+                )?
                 .build(),
             AtriumBlocks::Firepot => Block::builder()
                 .display_name("Firepot")
@@ -624,6 +693,7 @@ fn generate_arch<'b>(
         .build())
 }
 
+#[track_caller] // for Zoom range panics
 fn lookup_multiblock_2d(
     blocks: &BlockProvider<AtriumBlocks>,
     ctor: AtriumBlocks,
