@@ -1,0 +1,154 @@
+# This version of the CI workflow is for the `unstable-rust` branch that uses Rust
+# nightly exclusively, for the sake of testing unstable features in the Rust compiler.
+#
+# It is stored in the main branch because only the main branch gets *scheduled* runs.
+# Scheduled runs are performed so that code is regularly re-tested on new nightlies.
+#
+# Differences from `ci.yml`:
+# 
+# * matrix is 100% nightly
+# * no fuzzing
+# * no deployment
+# * no testing of multiple feature configurations
+# * no concept of a "primary" matrix configuration
+
+name: Unstable Rust Features
+
+permissions: {}
+
+on:
+  pull_request:
+    branches:
+      - unstable-rust
+  workflow_dispatch:
+  schedule:
+    - cron: '43 14 * * 1'
+  push:
+    branches:
+      - unstable-rust
+      - ci
+
+env:
+  CARGO_TERM_COLOR: always
+  # Disable incremental compilation because we aren't caching incremental compilation
+  # artifacts, so they won't be useful for anything (other than maybe the exhaustive
+  # builds with different features).
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          # Linux
+          - os: ubuntu
+            toolchain: nightly
+            depversions: locked
+
+          # Windows
+          - os: windows
+            toolchain: nightly
+            depversions: locked
+          
+          # macOS
+          - os: macos
+            toolchain: nightly
+            depversions: locked
+
+    runs-on: ${{ matrix.os }}-latest
+    continue-on-error: true
+
+    steps:
+    - uses: actions/checkout@v3.1.0
+      with:
+        ref: unstable-rust
+
+    - name: Install Rust toolchain
+      # Install exactly what we need: compiler, Cargo, clippy, rustfmt
+      run: |
+          rustup toolchain install "${{ matrix.toolchain }}" --profile=minimal --component=clippy --component=rustfmt
+          rustup target add --toolchain="${{ matrix.toolchain }}" wasm32-unknown-unknown
+          rustup override set "${{ matrix.toolchain }}"
+
+    - name: Install nightly too
+      if: ${{ matrix.depversions == 'minimal' }}
+      run: rustup toolchain install nightly --profile=minimal 
+
+    - name: Install native libraries
+      if: ${{ runner.os == 'Linux' }}
+      run: |
+          sudo apt update
+          sudo apt-get -y install libxrandr-dev xorg-dev libwayland-dev libasound2-dev
+      # libxrandr-dev xorg-dev libwayland-dev: needed for windowing
+      # Note that `libwayland-dev` provides the library called `wayland-client`
+      # libasound2-dev: needed for audio via `kira`
+
+    # Load cache before doing any Rust builds
+    - uses: Swatinem/rust-cache@v2.0.2
+
+    # break this out as a separate non-silenced build step
+    - name: Compile xtask
+      run: cargo build --package xtask
+
+    - name: Update dependencies
+      run: |
+        cargo xtask update "${{ matrix.depversions }}"
+        cargo tree --all-features
+
+    - name: Install wasm-pack
+      run: cargo install wasm-pack@0.11.1
+      # Use workspace target dir for cargo install's build, so that the build will be cached.
+      env:
+        CARGO_TARGET_DIR: target/
+
+    - name: Install cargo-about
+      run: cargo install cargo-about@0.5.6
+      # Use workspace target dir for cargo install's build, so that the build will be cached.
+      env:
+        CARGO_TARGET_DIR: target/
+
+    - name: Compile basic tests
+      # compile is broken out so we have visibility into compile vs. run times
+      run: cargo xtask test --timings --no-run
+    - name: Run basic tests
+      run: cargo xtask test --timings
+    
+    # Save the test-renderers results so we can download and view them
+    - name: Save test-renderers output
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-renderers-output ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
+        path: |
+          target/test-renderers-output/
+
+    - name: Lint
+      run: cargo xtask lint --timings
+    
+    # Save timing reports so we can download and view them
+    # (for understanding build performance in CI)
+    - name: Save cargo --timings output
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: cargo-timings ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
+        path: |
+          target/cargo-timings/cargo-timing-*.html
+
+  miri:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3.1.0
+
+    - uses: Swatinem/rust-cache@v2.0.2
+    
+    - name: Install Rust toolchain
+      run: |
+        rustup toolchain install nightly --component miri
+    
+    - name: Run Miri tests
+      # `universe::owning_guard` is the only module that contains nontrivial unsafe code,
+      # and the tests in `universe` are those most worth running to exercise it.
+      run: |
+        cargo +nightly miri test --no-default-features -p all-is-cubes universe::
