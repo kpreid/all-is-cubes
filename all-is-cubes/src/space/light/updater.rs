@@ -198,7 +198,7 @@ impl Space {
                         break;
                     }
                 }
-                cube_buffer.end_of_ray(&mut ray_state, self);
+                cube_buffer.end_of_ray(&ray_state, self);
             }
         }
 
@@ -470,7 +470,7 @@ impl LightBuffer {
 
     /// The raycast exited the world or hit an opaque block; finish up by applying
     /// sky and incrementing the count.
-    fn end_of_ray(&mut self, ray_state: &mut LightRayState, space: &Space) {
+    fn end_of_ray(&mut self, ray_state: &LightRayState, space: &Space) {
         // TODO: set *info even if we hit the sky
 
         // Note: this condition is key to allowing some cases to
