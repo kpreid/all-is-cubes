@@ -38,7 +38,9 @@ pub struct AtlasAllocator {
 /// This is public out of necessity but should not generally need to be used.
 #[derive(Clone, Debug)]
 pub struct AtlasTile {
-    /// Translation of the requested grid to the actual region within the texture.
+    /// Original bounds as requested (not texture coordinates).
+    requested_bounds: GridAab,
+    /// Translation of the requested bounds to the actual region within the texture.
     /// (This is always integer but will always be used in a float computation.)
     offset: Vector3<f32>,
     /// Scale factor to convert from texel grid coordinates to GPU texture coordinates
@@ -53,6 +55,16 @@ pub struct AtlasTile {
     /// lock is held.
     backing: Arc<Mutex<TileBacking>>,
 }
+
+/// Texture plane handle used by [`AtlasAllocator`].
+///
+/// This is public out of necessity but should not generally need to be used.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AtlasPlane {
+    tile: AtlasTile,
+    requested_bounds: GridAab,
+}
+
 #[derive(Debug)]
 struct TileBacking {
     /// Allocator information, and the region of the atlas texture which this tile owns.
@@ -186,6 +198,7 @@ impl texture::Allocator for AtlasAllocator {
         let mut allocator_backing = self.backing.lock().unwrap();
         let handle = allocator_backing.alloctree.allocate(requested_bounds)?;
         let result = AtlasTile {
+            requested_bounds,
             offset: handle.offset.map(|c| c as f32),
             scale: (allocator_backing.alloctree.bounds().size().x as f32).recip(),
             backing: Arc::new(Mutex::new(TileBacking {
@@ -204,13 +217,18 @@ impl texture::Allocator for AtlasAllocator {
 
 impl texture::Tile for AtlasTile {
     type Point = TexPoint;
+    type Plane = AtlasPlane;
 
     fn bounds(&self) -> GridAab {
-        todo!()
+        self.requested_bounds
     }
 
-    fn grid_to_texcoord(&self, in_tile_grid: Point3<f32>) -> TexPoint {
-        (in_tile_grid + self.offset) * self.scale
+    fn slice(&self, requested_bounds: GridAab) -> Self::Plane {
+        assert!(self.requested_bounds.contains_box(requested_bounds));
+        AtlasPlane {
+            tile: self.clone(),
+            requested_bounds,
+        }
     }
 
     fn write(&mut self, data: &[texture::Texel]) {
@@ -247,6 +265,15 @@ impl PartialEq for AtlasTile {
     }
 }
 impl Eq for AtlasTile {}
+
+impl texture::Plane for AtlasPlane {
+    type Point = TexPoint;
+
+    fn grid_to_texcoord(&self, in_tile_grid: Point3<f32>) -> Self::Point {
+        // TODO: assert in bounds, just in case
+        (in_tile_grid + self.tile.offset) * self.tile.scale
+    }
+}
 
 impl Drop for TileBacking {
     fn drop(&mut self) {

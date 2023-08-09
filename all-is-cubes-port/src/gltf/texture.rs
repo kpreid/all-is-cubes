@@ -64,6 +64,7 @@ pub struct GltfTextureRef {
 
 impl texture::Tile for GltfTextureRef {
     type Point = TexPoint;
+    type Plane = GltfTexturePlane;
 
     fn write(&mut self, data: &[texture::Texel]) {
         assert_eq!(data.len(), self.bounds.volume());
@@ -105,14 +106,32 @@ impl texture::Tile for GltfTextureRef {
         self.bounds
     }
 
-    fn grid_to_texcoord(&self, in_tile_grid: Point3<f32>) -> TexPoint {
+    fn slice(&self, bounds: GridAab) -> Self::Plane {
+        assert!(self.bounds.contains_box(bounds));
+        GltfTexturePlane { bounds }
+    }
+}
+
+/// [`Plane`] produced by [`GltfTextureAllocator`].
+///
+/// You should not generally need to refer to this type.
+#[derive(Clone, Debug, PartialEq)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+pub struct GltfTexturePlane {
+    bounds: GridAab,
+}
+
+impl texture::Plane for GltfTexturePlane {
+    type Point = TexPoint;
+
+    fn grid_to_texcoord(&self, in_tile_grid: Point3<f32>) -> Self::Point {
         // TODO: these coordinates will, no matter what, need to be adjusted to be
         // within the atlas once we know what the atlas contents are. At this point,
         // we need to include information about which tile is being used, so that we can
         // transform them into the atlas position as a post-processing of the vertices.
         // (So, `TexPoint` will become some sort of enum-ish type.)
         let relative = in_tile_grid - self.bounds.lower_bounds().cast().unwrap();
-        relative.div_element_wise(self.bounds().size().cast().unwrap())
+        relative.div_element_wise(self.bounds.size().cast().unwrap())
     }
 }
 

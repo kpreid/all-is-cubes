@@ -305,7 +305,7 @@ where
                             Point2 { x: 0., y: 0. },
                             Point2 { x: 1., y: 1. },
                             // TODO: Respect the prefer_textures option.
-                            QuadColoring::<A::Tile>::Solid(block_color),
+                            QuadColoring::<T::Plane>::Solid(block_color),
                         );
                     }
                     face_mesh.fully_opaque = block_color.fully_opaque();
@@ -343,17 +343,24 @@ where
                 // Walk through the planes (layers) of the block, figuring out what geometry to
                 // generate for each layer and whether it needs a texture.
                 for face in Face6::ALL {
+                    // TODO: subtracting 1 is a sign we're doing things wrong
                     let voxel_transform = face.face_transform(block_resolution - 1);
                     let quad_transform = QuadTransform::new(face, resolution);
                     let face_mesh = &mut self.face_vertices[face];
 
                     // Rotate the voxel array's extent into our local coordinate system, so we can find
                     // out what range to iterate over.
-                    // TODO: Avoid using a matrix inversion
-                    // TODO: Intersect the input voxels.bounds() with the block bounds so we don't scan *more* than we should.
                     let rotated_voxel_range = voxels_array
                         .bounds()
                         .transform(face.face_transform(block_resolution).inverse())
+                        .unwrap();
+
+                    // Also compute the bounds in the array's coordinate system, which we
+                    // will use for texturing.
+                    // TODO: It would be better if this were shrunk to the visible voxels
+                    // in this specific layer.
+                    let voxel_range = rotated_voxel_range
+                        .transform(face.face_transform(block_resolution))
                         .unwrap();
 
                     // Check the case where the block's voxels don't meet its front face, or don't fill that face.
@@ -383,6 +390,8 @@ where
                             rotated_voxel_range.x_range().len()
                                 * rotated_voxel_range.y_range().len(),
                         );
+
+                        let mut texture_plane_if_needed: Option<T::Plane> = None;
 
                         for t in rotated_voxel_range.y_range() {
                             for s in rotated_voxel_range.x_range() {
@@ -483,15 +492,22 @@ where
                             {
                                 // The quad we're going to draw has identical texels, so we might as
                                 // well use a solid color and skip needing a texture.
-                                QuadColoring::<A::Tile>::Solid(single_color)
+                                QuadColoring::<T::Plane>::Solid(single_color)
                             } else {
-                                if texture_if_needed.is_none() {
-                                    // Try to compute texture
-                                    texture_if_needed =
-                                        texture::copy_voxels_to_texture(texture_allocator, voxels);
+                                if texture_plane_if_needed.is_none() {
+                                    if texture_if_needed.is_none() {
+                                        // Try to compute texture (might fail)
+                                        texture_if_needed = texture::copy_voxels_to_texture(
+                                            texture_allocator,
+                                            voxels,
+                                        );
+                                    }
+                                    if let Some(ref texture) = texture_if_needed {
+                                        texture_plane_if_needed = Some(texture.slice(voxel_range));
+                                    }
                                 }
-                                if let Some(ref texture) = texture_if_needed {
-                                    QuadColoring::Texture(texture)
+                                if let Some(ref plane) = texture_plane_if_needed {
+                                    QuadColoring::<T::Plane>::Texture(plane)
                                 } else {
                                     // Texture allocation failure.
                                     // Report the flaw and use block color as a fallback.
@@ -500,7 +516,7 @@ where
                                     // * Offer the alternative of generating as much
                                     //   geometry as needed.
                                     *flaws |= Flaws::MISSING_TEXTURES;
-                                    QuadColoring::Solid(
+                                    QuadColoring::<T::Plane>::Solid(
                                         options.transparency.limit_alpha(block.color),
                                     )
                                 }

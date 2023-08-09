@@ -42,26 +42,49 @@ pub trait Allocator {
 }
 
 /// 3D texture volume provided by an [`Allocator`] to paint a block's voxels in.
-///
-/// When all clones of this value are dropped, the texture allocation will be released and
-/// the texture coordinates may be reused for different data.
 pub trait Tile: Clone {
+    /// Return type of [`Self::slice()`].
+    type Plane: Plane<Point = Self::Point>;
+
     /// Type of points within the texture, that vertices store.
-    type Point: Copy;
+    type Point;
 
     /// Returns the [`GridAab`] originally passed to the texture allocator for this tile.
     fn bounds(&self) -> GridAab;
 
-    /// Transform a point in the coordinate system of, and within, [`Self::bounds()`]
-    /// (that is, where 1 unit = 1 texel) into texture coordinates suitable for the
-    /// target [`GfxVertex`](super::GfxVertex) type.
-    fn grid_to_texcoord(&self, in_tile_grid: Point3<TextureCoordinate>) -> Self::Point;
+    /// Returns a [`Plane`] instance referring to some 2D slice of this 3D texture volume.
+    ///
+    /// `bounds` specifies the region to be sliced and must have a size of 1 in at least
+    /// one axis. If it is not completely within [`Self::bounds()`], this function may panic.
+    ///
+    /// Depending on the texture implementation, this may be merely a coordinate system
+    /// helper (for 3D texturing) or it may actually allocate a region of 2D texture.
+    fn slice(&self, bounds: GridAab) -> Self::Plane;
 
     /// Write texture data as RGBA color.
     ///
     /// `data` must be of length `self.bounds().volume()`.
     // TODO: Replace it with a GridArray (requires changing the ordering).
     fn write(&mut self, data: &[Texel]);
+}
+
+/// 2D texture slice to use for texturing the surface of a voxel mesh.
+///
+/// When all clones of this value are dropped, the texture allocation may be released and
+/// the texture coordinate region may be reused for different data. (Implementations which
+/// are natively 3D may accomplish that by having this type simply contain a [`Tile`] rather
+/// than tracking each plane on its own.)
+pub trait Plane: Clone {
+    /// Type of points within this texture, that are to be used in vertices.
+    type Point: Copy;
+
+    /// Transform a point in the coordinate system of, and within, the `bounds` given to
+    /// create this plane (that is, 1 unit = 1 texel) into texture coordinates suitable for
+    /// the target [`GfxVertex`](super::GfxVertex) type.
+    ///
+    /// The returned texture coordinates are guaranteed to be valid only as long as
+    /// `self` (or a clone of it) has not been dropped.
+    fn grid_to_texcoord(&self, in_tile_grid: Point3<TextureCoordinate>) -> Self::Point;
 }
 
 impl<T: Allocator> Allocator for &T {
@@ -148,16 +171,25 @@ pub enum NoTexture {}
 
 impl Tile for NoTexture {
     type Point = Self;
+    type Plane = Self;
 
     fn bounds(&self) -> GridAab {
         match *self {}
     }
 
-    fn grid_to_texcoord(&self, _in_tile: Point3<TextureCoordinate>) -> NoTexture {
+    fn slice(&self, _: GridAab) -> Self::Plane {
         match *self {}
     }
 
     fn write(&mut self, _data: &[Texel]) {
+        match *self {}
+    }
+}
+
+impl Plane for NoTexture {
+    type Point = Self;
+
+    fn grid_to_texcoord(&self, _: Point3<TextureCoordinate>) -> Self::Point {
         match *self {}
     }
 }
@@ -234,13 +266,14 @@ pub struct TestTile {
 
 impl Tile for TestTile {
     type Point = TestPoint;
+    type Plane = TestTile;
 
     fn bounds(&self) -> GridAab {
         self.bounds
     }
 
-    fn grid_to_texcoord(&self, in_tile: Point3<TextureCoordinate>) -> Self::Point {
-        in_tile
+    fn slice(&self, _bounds: GridAab) -> Self::Plane {
+        self.clone()
     }
 
     fn write(&mut self, data: &[Texel]) {
@@ -250,6 +283,13 @@ impl Tile for TestTile {
             self.bounds.volume(),
             "tile data did not match resolution"
         );
+    }
+}
+impl Plane for TestTile {
+    type Point = TestPoint;
+
+    fn grid_to_texcoord(&self, in_tile: Point3<TextureCoordinate>) -> Self::Point {
+        in_tile
     }
 }
 

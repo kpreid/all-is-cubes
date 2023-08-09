@@ -8,8 +8,6 @@
 //! * The algorithms always generate triangles with counterclockwise winding order.
 //! * The generated meshes are designed for rendering and not for purposes which require
 //!   “watertight” meshes such as 3D printing systems.
-//! * Currently, support for 3D textures is mandatory. This may be changed in the future
-//!   to allow use of only 2D textures.
 //!
 //! # Getting started
 //!
