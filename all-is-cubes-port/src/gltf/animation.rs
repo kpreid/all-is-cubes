@@ -32,7 +32,7 @@ pub(crate) fn add_camera_animation(
 
     let time_accessor = create_buffer_and_accessor(
         &mut writer.root,
-        &mut writer.buffer_dest,
+        &writer.buffer_dest,
         "camera animation time".into(),
         "camera-time",
         writer
@@ -51,7 +51,7 @@ pub(crate) fn add_camera_animation(
                 interpolation: Valid(gltf_json::animation::Interpolation::Linear),
                 output: create_buffer_and_accessor(
                     &mut writer.root,
-                    &mut writer.buffer_dest,
+                    &writer.buffer_dest,
                     "camera animation translation".into(),
                     "camera-pos",
                     writer
@@ -81,7 +81,7 @@ pub(crate) fn add_camera_animation(
                 interpolation: Valid(gltf_json::animation::Interpolation::Linear),
                 output: create_buffer_and_accessor(
                     &mut writer.root,
-                    &mut writer.buffer_dest,
+                    &writer.buffer_dest,
                     "camera animation rotation".into(),
                     "camera-rot",
                     writer

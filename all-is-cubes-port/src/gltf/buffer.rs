@@ -304,7 +304,7 @@ impl io::Write for SwitchingWriter {
 /// and does not set the `target`, so it is not suitable for vertices.
 pub(crate) fn create_buffer_and_accessor<I, const COMPONENTS: usize>(
     root: &mut gltf_json::Root,
-    dest: &mut GltfDataDestination,
+    dest: &GltfDataDestination,
     name: String,
     file_suffix: &str,
     data_source: I,

@@ -274,7 +274,7 @@ impl GltfWriter {
                 let node_index = instance_nodes[&instance];
                 let time_accessor = create_buffer_and_accessor(
                     &mut self.root,
-                    &mut self.buffer_dest,
+                    &self.buffer_dest,
                     format!("node {node_index} animation time"),
                     &format!("node-{node_index}-time"),
                     timeline
@@ -283,7 +283,7 @@ impl GltfWriter {
                 )?;
                 let scale_accessor = create_buffer_and_accessor(
                     &mut self.root,
-                    &mut self.buffer_dest,
+                    &self.buffer_dest,
                     format!("node {node_index} visibility"),
                     &format!("node-{node_index}-vis"),
                     timeline
