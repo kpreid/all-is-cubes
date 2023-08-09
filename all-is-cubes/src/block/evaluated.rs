@@ -408,7 +408,7 @@ impl Evoxels {
     pub fn single_voxel(&self) -> Option<Evoxel> {
         match *self {
             Evoxels::One(v) => Some(v),
-            Evoxels::Many(resolution, ref voxels) if resolution == R1 => {
+            Evoxels::Many(Resolution::R1, ref voxels) => {
                 Some(voxels.get([0, 0, 0]).copied().unwrap_or(Evoxel::AIR))
             }
             Evoxels::Many(_, _) => None,
