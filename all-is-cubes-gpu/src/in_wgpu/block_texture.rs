@@ -7,7 +7,7 @@ use instant::Instant;
 
 use all_is_cubes::cgmath::{Point3, Vector3};
 use all_is_cubes::math::GridAab;
-use all_is_cubes_mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
+use all_is_cubes_mesh::{Texel, TextureAllocator, TextureTile};
 
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
 use crate::in_wgpu::vertex::TexPoint;
@@ -40,12 +40,12 @@ pub struct AtlasAllocator {
 pub struct AtlasTile {
     /// Translation of the requested grid to the actual region within the texture.
     /// (This is always integer but will always be used in a float computation.)
-    offset: Vector3<TextureCoordinate>,
+    offset: Vector3<f32>,
     /// Scale factor to convert from texel grid coordinates to GPU texture coordinates
     /// where 0.0 and 1.0 are the final size.
     /// In other words, the reciprocal of the overall texture size. This does not
     /// vary per-tile but is stored here for convenience of implementing [`TextureTile`].
-    scale: TextureCoordinate,
+    scale: f32,
     /// Actual storage and metadata about the tile; may be updated as needed by the
     /// allocator to grow the texture.
     ///
@@ -186,8 +186,8 @@ impl TextureAllocator for AtlasAllocator {
         let mut allocator_backing = self.backing.lock().unwrap();
         let handle = allocator_backing.alloctree.allocate(requested_bounds)?;
         let result = AtlasTile {
-            offset: handle.offset.map(|c| c as TextureCoordinate),
-            scale: (allocator_backing.alloctree.bounds().size().x as TextureCoordinate).recip(),
+            offset: handle.offset.map(|c| c as f32),
+            scale: (allocator_backing.alloctree.bounds().size().x as f32).recip(),
             backing: Arc::new(Mutex::new(TileBacking {
                 handle: Some(handle),
                 data: None,
@@ -209,7 +209,7 @@ impl TextureTile for AtlasTile {
         todo!()
     }
 
-    fn grid_to_texcoord(&self, in_tile_grid: Point3<TextureCoordinate>) -> TexPoint {
+    fn grid_to_texcoord(&self, in_tile_grid: Point3<f32>) -> TexPoint {
         (in_tile_grid + self.offset) * self.scale
     }
 

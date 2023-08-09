@@ -6,11 +6,6 @@ use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
 use all_is_cubes::math::{Face6, FreeCoordinate, GridPoint, Rgba};
 use all_is_cubes::util::{ConciseDebug, CustomFormat};
 
-/// Numeric type used to store texture coordinates in vertices.
-///
-/// TODO: Delete this type alias now that we're generic over texture coordinates.
-pub type TextureCoordinate = f32;
-
 /// Basic vertex data type for a [`BlockMesh`].
 /// Implement <code>[`From`]&lt;[`BlockVertex`]&gt;</code> (and usually [`GfxVertex`])
 /// to provide a specialized version fit for the target graphics API.

@@ -4,7 +4,7 @@ use std::io;
 
 use all_is_cubes::cgmath::{ElementWise, Point3, Vector3};
 use all_is_cubes::math::GridAab;
-use all_is_cubes_mesh::{Texel, TextureAllocator, TextureCoordinate, TextureTile};
+use all_is_cubes_mesh::{Texel, TextureAllocator, TextureTile};
 
 use super::GltfDataDestination;
 
@@ -105,7 +105,7 @@ impl TextureTile for GltfTextureRef {
         self.bounds
     }
 
-    fn grid_to_texcoord(&self, in_tile_grid: Point3<TextureCoordinate>) -> TexPoint {
+    fn grid_to_texcoord(&self, in_tile_grid: Point3<f32>) -> TexPoint {
         // TODO: these coordinates will, no matter what, need to be adjusted to be
         // within the atlas once we know what the atlas contents are. At this point,
         // we need to include information about which tile is being used, so that we can

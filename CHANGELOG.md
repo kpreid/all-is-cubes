@@ -31,6 +31,9 @@
       Call sites should be changed to pass only `GridPoint`.
     - `math::GridRotation::to_positive_octant_matrix()` no longer exists. Use `to_positive_octant_transform()` instead.
 
+- `all-is-cubes-mesh` library:
+    - `TextureCoordinate` type alias no longer exists.
+      Its only use was when implementing `TextureTile`; simply use `f32` instead.
 
 ## 0.6.0 (2023-07-29)
 

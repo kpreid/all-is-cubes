@@ -13,7 +13,11 @@ use all_is_cubes::content::palette;
 use all_is_cubes::math::{GridAab, GridPoint};
 use all_is_cubes::util::{ConciseDebug, CustomFormat};
 
-use crate::TextureCoordinate;
+/// Numeric type used to calculate texture coordinates and store them in [`BlockVertex`].
+///
+/// Note that this type is only exposed publicly within [`TextureTile::grid_to_texcoord()`];
+/// dependents’ texture coordinates are not required to be f32.
+pub(crate) type TextureCoordinate = f32;
 
 /// Color data accepted by [`TextureAllocator`].
 /// The components are sRGB `[R, G, B, A]`.

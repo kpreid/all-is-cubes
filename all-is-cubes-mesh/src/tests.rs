@@ -18,8 +18,7 @@ use all_is_cubes::{notnan, rgba_const};
 
 use crate::{
     block_meshes_for_space, BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering,
-    IndexSlice, MeshOptions, SpaceMesh, TestTextureAllocator, TestTextureTile, TextureCoordinate,
-    TtPoint,
+    IndexSlice, MeshOptions, SpaceMesh, TestTextureAllocator, TestTextureTile, TtPoint,
 };
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.
@@ -32,11 +31,7 @@ fn v_c<T>(position: [FreeCoordinate; 3], face: Face6, color: [f32; 4]) -> BlockV
 }
 
 /// Shorthand for writing out an entire [`BlockVertex`] with texturing.
-fn v_t(
-    position: [FreeCoordinate; 3],
-    face: Face6,
-    texture: [TextureCoordinate; 3],
-) -> BlockVertex<TtPoint> {
+fn v_t(position: [FreeCoordinate; 3], face: Face6, texture: [f32; 3]) -> BlockVertex<TtPoint> {
     let texture = texture.into();
     BlockVertex {
         position: position.into(),
