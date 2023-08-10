@@ -122,7 +122,7 @@ impl GltfWriter {
         }
     }
 
-    /// Returns a [`TextureAllocator`](all_is_cubes_mesh::TextureAllocator) that writes
+    /// Returns a texture [`Allocator`](all_is_cubes_mesh::texture::Allocator) that writes
     /// textures into this glTF asset
     pub fn texture_allocator(&self) -> GltfTextureAllocator {
         self.texture_allocator.clone()

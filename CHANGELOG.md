@@ -23,6 +23,13 @@
     - `drawing::VoxelBrush::transform()` is renamed to `rotate()` and only accepts a rotation.
       This avoids confusion between points in space and cube-identifying coordinates.
 
+- `all-is-cubes-mesh` library:
+    - Renamed `TextureAllocator` to `texture::Allocator`.
+    - Renamed `TextureTile` to `texture::Tile`.
+    - Renamed `Texel` to `texture::Texel`.
+    - Renamed `NoTexture` to `texture::NoTexture`.
+    - Renamed `NoTextures` to `texture::NoTextures`.
+
 ### Removed
 
 - `all-is-cubes` library:

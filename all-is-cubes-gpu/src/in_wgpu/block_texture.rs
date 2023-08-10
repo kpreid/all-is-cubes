@@ -1,5 +1,5 @@
 //! Block texture atlas management: provides [`AtlasAllocator`], the
-//! [`TextureAllocator`] implementation for use with [`wgpu`].
+//! [`texture::Allocator`] implementation for use with [`wgpu`].
 
 use std::sync::{Arc, Mutex, Weak};
 
@@ -7,7 +7,7 @@ use instant::Instant;
 
 use all_is_cubes::cgmath::{Point3, Vector3};
 use all_is_cubes::math::GridAab;
-use all_is_cubes_mesh::{Texel, TextureAllocator, TextureTile};
+use all_is_cubes_mesh::texture;
 
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
 use crate::in_wgpu::vertex::TexPoint;
@@ -17,7 +17,7 @@ use crate::{BlockTextureInfo, GraphicsResourceError};
 /// Alias for the concrete type of the block texture.
 type BlockTexture = wgpu::Texture;
 
-/// Implementation of [`TextureAllocator`] for [`wgpu`].
+/// Implementation of [`texture::Allocator`] for [`wgpu`].
 ///
 /// After any allocations, you must call [`AtlasAllocator::flush`] to write the
 /// updates to the actual GPU texture for drawing.
@@ -44,7 +44,7 @@ pub struct AtlasTile {
     /// Scale factor to convert from texel grid coordinates to GPU texture coordinates
     /// where 0.0 and 1.0 are the final size.
     /// In other words, the reciprocal of the overall texture size. This does not
-    /// vary per-tile but is stored here for convenience of implementing [`TextureTile`].
+    /// vary per-tile but is stored here for convenience of implementing [`texture::Tile`].
     scale: f32,
     /// Actual storage and metadata about the tile; may be updated as needed by the
     /// allocator to grow the texture.
@@ -60,7 +60,7 @@ struct TileBacking {
     /// Property: `self.handle.unwrap().allocation.volume() == self.data.len()`.
     handle: Option<AlloctreeHandle>,
     /// Texture data (that might not be sent to the GPU yet).
-    data: Option<Box<[Texel]>>,
+    data: Option<Box<[texture::Texel]>>,
     /// Whether the data has changed so that we need to send it to the GPU on next
     /// [`AtlasAllocator::flush`].
     dirty: bool,
@@ -178,7 +178,7 @@ impl AtlasAllocator {
     }
 }
 
-impl TextureAllocator for AtlasAllocator {
+impl texture::Allocator for AtlasAllocator {
     type Tile = AtlasTile;
     type Point = TexPoint;
 
@@ -202,7 +202,7 @@ impl TextureAllocator for AtlasAllocator {
     }
 }
 
-impl TextureTile for AtlasTile {
+impl texture::Tile for AtlasTile {
     type Point = TexPoint;
 
     fn bounds(&self) -> GridAab {
@@ -213,7 +213,7 @@ impl TextureTile for AtlasTile {
         (in_tile_grid + self.offset) * self.scale
     }
 
-    fn write(&mut self, data: &[Texel]) {
+    fn write(&mut self, data: &[texture::Texel]) {
         // Note: acquiring the two locks separately to avoid possible deadlock
         // with another thread trying to flush() (which acquires allocator and
         // then tile locks). I believe that in all possible interleavings, the

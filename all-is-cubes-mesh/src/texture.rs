@@ -1,8 +1,4 @@
-//! Traits for texture atlas/array allocator for block textures.
-
-// TODO: Look at this module together with the concrete implementation
-// module `all_is_cubes_gpu::block_texture` and figure out better names for
-// both of them.
+//! Traits for textures used by the meshes this library generates.
 
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
@@ -15,39 +11,42 @@ use all_is_cubes::util::{ConciseDebug, CustomFormat};
 
 /// Numeric type used to calculate texture coordinates and store them in [`BlockVertex`].
 ///
-/// Note that this type is only exposed publicly within [`TextureTile::grid_to_texcoord()`];
+/// Note that this type is only exposed publicly within [`texture::Tile::grid_to_texcoord()`];
 /// dependents’ texture coordinates are not required to be f32.
 pub(crate) type TextureCoordinate = f32;
 
-/// Color data accepted by [`TextureAllocator`].
+/// Color data accepted by [`Allocator`].
 /// The components are sRGB `[R, G, B, A]`.
 pub type Texel = [u8; 4];
 
-/// Allocator of 3D regions ("tiles") in a texture atlas to paint block voxels into.
+/// Allocator of 3D regions (“tiles”) in a texture atlas to paint block voxels into.
 /// Implement this trait using the target graphics API's 3D texture type.
-pub trait TextureAllocator {
-    /// Tile handles produced by this allocator.
-    type Tile: TextureTile<Point = Self::Point>;
+///
+/// Allocations may be deallocated for reuse by dropping the returned [`Tile`]s.
+pub trait Allocator {
+    /// Allocation handles produced by this allocator.
+    type Tile: Tile<Point = Self::Point>;
 
-    /// Type of points within the texture.
+    /// Type of points within the texture, that vertices store.
     type Point;
 
     /// Allocate a tile, whose range of texels will be reserved for use as long as the
-    /// `Tile` value, and its clones, are not dropped.
+    /// [`Tile`] value, and its clones, are not dropped.
     ///
     /// The given [`GridAab`] specifies the desired size of the allocation;
     /// its translation does not affect the size but may be used to make the resulting
     /// texture coordinate transformation convenient for the caller.
     ///
-    /// Returns [`None`] if no space is available for another tile.
+    /// Returns [`None`] if no space is available for another region.
     fn allocate(&self, bounds: GridAab) -> Option<Self::Tile>;
 }
 
-/// 3D texture slice to paint a block's voxels in. When all clones of this value are
-/// dropped, the texture allocation will be released and the texture coordinates may
-/// be reused for different data.
-pub trait TextureTile: Clone {
-    /// Type of points within the texture.
+/// 3D texture volume provided by an [`Allocator`] to paint a block's voxels in.
+///
+/// When all clones of this value are dropped, the texture allocation will be released and
+/// the texture coordinates may be reused for different data.
+pub trait Tile: Clone {
+    /// Type of points within the texture, that vertices store.
     type Point: Copy;
 
     /// Returns the [`GridAab`] originally passed to the texture allocator for this tile.
@@ -65,32 +64,32 @@ pub trait TextureTile: Clone {
     fn write(&mut self, data: &[Texel]);
 }
 
-impl<T: TextureAllocator> TextureAllocator for &T {
+impl<T: Allocator> Allocator for &T {
     type Tile = T::Tile;
     type Point = T::Point;
     #[mutants::skip] // trivial
     fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
-        <T as TextureAllocator>::allocate(self, bounds)
+        <T as Allocator>::allocate(self, bounds)
     }
 }
-impl<T: TextureAllocator> TextureAllocator for std::sync::Arc<T> {
+impl<T: Allocator> Allocator for std::sync::Arc<T> {
     type Tile = T::Tile;
     type Point = T::Point;
     #[mutants::skip] // trivial
     fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
-        <T as TextureAllocator>::allocate(self, bounds)
+        <T as Allocator>::allocate(self, bounds)
     }
 }
-impl<T: TextureAllocator> TextureAllocator for std::rc::Rc<T> {
+impl<T: Allocator> Allocator for std::rc::Rc<T> {
     type Tile = T::Tile;
     type Point = T::Point;
     #[mutants::skip] // trivial
     fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
-        <T as TextureAllocator>::allocate(self, bounds)
+        <T as Allocator>::allocate(self, bounds)
     }
 }
 
-pub(super) fn copy_voxels_to_texture<A: TextureAllocator>(
+pub(super) fn copy_voxels_to_texture<A: Allocator>(
     texture_allocator: &A,
     voxels: &Evoxels,
 ) -> Option<A::Tile> {
@@ -102,7 +101,7 @@ pub(super) fn copy_voxels_to_texture<A: TextureAllocator>(
         })
 }
 
-pub(super) fn copy_voxels_into_existing_texture<T: TextureTile>(voxels: &Evoxels, texture: &mut T) {
+pub(super) fn copy_voxels_into_existing_texture<T: Tile>(voxels: &Evoxels, texture: &mut T) {
     let bounds = voxels.bounds();
     let mut texels: Vec<Texel> = Vec::with_capacity(bounds.volume());
     // TODO: Teach GridArray about alternate array orderings so that we can express
@@ -123,7 +122,7 @@ pub(super) fn copy_voxels_into_existing_texture<T: TextureTile>(voxels: &Evoxels
     texture.write(&texels);
 }
 
-/// Null [`TextureAllocator`]; rejects all allocations.
+/// Null [`Allocator`]; rejects all allocations.
 ///
 /// Used for generating textureless meshes. TODO: Modify triangulator to actually
 /// generate separate triangles when textures are unavailable.
@@ -131,7 +130,7 @@ pub(super) fn copy_voxels_into_existing_texture<T: TextureTile>(voxels: &Evoxels
 #[allow(clippy::exhaustive_structs)]
 pub struct NoTextures;
 
-impl TextureAllocator for NoTextures {
+impl Allocator for NoTextures {
     type Tile = NoTexture;
     type Point = NoTexture;
 
@@ -140,14 +139,14 @@ impl TextureAllocator for NoTextures {
     }
 }
 
-/// Uninhabited [`TextureTile`] type; no instance of this ever exists.
+/// Uninhabited [`Tile`] type; no instance of this ever exists.
 ///
 /// TODO: this can and should be just ! (never) when that's available in stable Rust
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[allow(clippy::exhaustive_enums)]
 pub enum NoTexture {}
 
-impl TextureTile for NoTexture {
+impl Tile for NoTexture {
     type Point = Self;
 
     fn bounds(&self) -> GridAab {
@@ -169,18 +168,18 @@ impl CustomFormat<ConciseDebug> for NoTexture {
     }
 }
 
-/// [`TextureAllocator`] which discards all input except for counting calls; for testing.
+/// [`Allocator`] which discards all input except for counting calls; for testing.
 ///
 /// This type is public so that it may be used in benchmarks and such, but not intended to be used
 /// outside of All is Cubes itself.
 #[doc(hidden)]
 #[derive(Debug)]
-pub struct TestTextureAllocator {
+pub struct TestAllocator {
     capacity: usize,
     count_allocated: AtomicUsize,
 }
 
-impl TestTextureAllocator {
+impl TestAllocator {
     pub const fn new() -> Self {
         Self {
             capacity: usize::MAX,
@@ -199,15 +198,15 @@ impl TestTextureAllocator {
     }
 }
 
-impl Default for TestTextureAllocator {
+impl Default for TestAllocator {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl TextureAllocator for TestTextureAllocator {
-    type Tile = TestTextureTile;
-    type Point = TtPoint;
+impl Allocator for TestAllocator {
+    type Tile = TestTile;
+    type Point = TestPoint;
 
     fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
         self.count_allocated
@@ -220,21 +219,21 @@ impl TextureAllocator for TestTextureAllocator {
             })
             .ok()
             .map(|_| ())?;
-        Some(TestTextureTile { bounds })
+        Some(TestTile { bounds })
     }
 }
 
-/// Tile type for [`TestTextureAllocator`].
+/// Tile type for [`TestAllocator`].
 ///
 /// This type is public so that it may be used in benchmarks and such.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[doc(hidden)]
-pub struct TestTextureTile {
+pub struct TestTile {
     bounds: GridAab,
 }
 
-impl TextureTile for TestTextureTile {
-    type Point = TtPoint;
+impl Tile for TestTile {
+    type Point = TestPoint;
 
     fn bounds(&self) -> GridAab {
         self.bounds
@@ -254,20 +253,20 @@ impl TextureTile for TestTextureTile {
     }
 }
 
-/// Texture point for [`TestTextureAllocator`]
+/// Texture point for [`TestAllocator`]
 #[doc(hidden)]
-pub type TtPoint = Point3<TextureCoordinate>;
+pub type TestPoint = Point3<TextureCoordinate>;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use all_is_cubes::block::Resolution::*;
 
-    /// Test the [`TestTextureAllocator`].
+    /// Test the [`TestAllocator`].
     #[test]
     fn test_texture_allocator() {
         let bounds = GridAab::for_block(R8);
-        let mut allocator = TestTextureAllocator::new();
+        let mut allocator = TestAllocator::new();
         assert_eq!(allocator.count_allocated(), 0);
         assert!(allocator.allocate(bounds).is_some());
         assert!(allocator.allocate(bounds).is_some());

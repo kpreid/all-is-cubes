@@ -13,10 +13,9 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::Space;
 
+use crate::texture;
 use crate::{
-    copy_voxels_into_existing_texture, copy_voxels_to_texture, push_quad, BlockVertex,
-    GreedyMesher, IndexVec, MeshOptions, QuadColoring, QuadTransform, TextureAllocator,
-    TextureTile,
+    push_quad, BlockVertex, GreedyMesher, IndexVec, MeshOptions, QuadColoring, QuadTransform,
 };
 
 /// Part of the triangle mesh calculated for a [`Block`], stored in a [`BlockMesh`] keyed
@@ -86,7 +85,7 @@ impl<V> Default for BlockFaceMesh<V> {
 ///
 /// The type parameters allow adaptation to the target graphics API:
 /// * `V` is the type of vertices.
-/// * `T` is the type of textures, which come from a [`TextureAllocator`].
+/// * `T` is the type of textures, which come from a [`texture::Allocator`].
 ///
 /// TODO: Add methods so this can be read out directly if you really want to.
 ///
@@ -192,7 +191,7 @@ impl<V, T> BlockMesh<V, T> {
     #[mutants::skip] // optimization, doesn't change things if it fails
     pub(crate) fn try_update_texture_only(&mut self, block: &EvaluatedBlock) -> bool
     where
-        T: TextureTile,
+        T: texture::Tile,
     {
         // Need to deref the Vec in self.textures_used before matching
         match (
@@ -209,7 +208,7 @@ impl<V, T> BlockMesh<V, T> {
                     ..
                 },
             ) if old_mask == new_mask => {
-                copy_voxels_into_existing_texture(voxels, existing_texture);
+                texture::copy_voxels_into_existing_texture(voxels, existing_texture);
                 true
             }
             _ => false,
@@ -224,15 +223,15 @@ impl<V: 'static, T: 'static> BlockMesh<V, T> {
 
 impl<V, T> BlockMesh<V, T>
 where
-    V: From<BlockVertex<<T as TextureTile>::Point>>,
-    T: TextureTile,
+    V: From<BlockVertex<<T as texture::Tile>::Point>>,
+    T: texture::Tile,
 {
     /// Generate the [`BlockMesh`] for a block's current appearance.
     ///
     /// This may then be may be used as input to [`SpaceMesh::new`](super::SpaceMesh::new).
     pub fn new<A>(block: &EvaluatedBlock, texture_allocator: &A, options: &MeshOptions) -> Self
     where
-        A: TextureAllocator<Tile = T>,
+        A: texture::Allocator<Tile = T>,
     {
         let mut new_self = Self::default();
         new_self.compute(block, texture_allocator, options);
@@ -268,7 +267,7 @@ where
         texture_allocator: &A,
         options: &MeshOptions,
     ) where
-        A: TextureAllocator<Tile = T>,
+        A: texture::Allocator<Tile = T>,
     {
         self.clear();
 
@@ -489,7 +488,7 @@ where
                                 if texture_if_needed.is_none() {
                                     // Try to compute texture
                                     texture_if_needed =
-                                        copy_voxels_to_texture(texture_allocator, voxels);
+                                        texture::copy_voxels_to_texture(texture_allocator, voxels);
                                 }
                                 if let Some(ref texture) = texture_if_needed {
                                     QuadColoring::Texture(texture)
@@ -569,8 +568,8 @@ pub fn block_meshes_for_space<V, A>(
     options: &MeshOptions,
 ) -> BlockMeshes<V, A::Tile>
 where
-    V: From<BlockVertex<<<A as TextureAllocator>::Tile as TextureTile>::Point>>,
-    A: TextureAllocator,
+    V: From<BlockVertex<<<A as texture::Allocator>::Tile as texture::Tile>::Point>>,
+    A: texture::Allocator,
 {
     space
         .block_data()
@@ -591,7 +590,8 @@ mod tests {
 
     use super::*;
     use crate::tests::test_block_mesh;
-    use crate::{Coloring, NoTexture, NoTextures};
+    use crate::texture::{NoTexture, NoTextures};
+    use crate::Coloring;
     use all_is_cubes::block::{Block, AIR};
     use all_is_cubes::camera::GraphicsOptions;
     use all_is_cubes::cgmath::EuclideanSpace;

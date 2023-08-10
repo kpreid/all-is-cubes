@@ -8,7 +8,8 @@ use all_is_cubes::cgmath::{
 };
 use all_is_cubes::math::{Face6, FreeCoordinate, GridCoordinate, Rgba};
 
-use crate::{BlockVertex, Coloring, IndexVec, TextureCoordinate, TextureTile};
+use crate::texture::{self, TextureCoordinate};
+use crate::{BlockVertex, Coloring, IndexVec};
 
 /// Data structure for the state and components of the "greedy meshing" algorithm.
 /// <https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/>
@@ -150,7 +151,7 @@ pub(super) enum QuadColoring<'a, T> {
 /// `depth`, `low_corner`, and `high_corner` are in units of 1 texel.
 #[inline]
 #[allow(clippy::too_many_arguments)] // TODO: Figure out how to simplify
-pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: TextureTile>(
+pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Tile>(
     vertices: &mut Vec<V>,
     indices: &mut IndexVec,
     transform: &QuadTransform,
@@ -257,7 +258,7 @@ impl QuadTransform {
     }
 
     /// Transform a point from quad U-V-depth coordinates with a scale of
-    /// 1 unit = 1 texel/voxel, to 0-to-1 coordinates within the 3D `TextureTile` space.
+    /// 1 unit = 1 texel/voxel, to 0-to-1 coordinates within the 3D `texture::Tile` space.
     ///
     /// The depth value is offset by +0.5 texel (into the depth of the voxel being
     /// drawn), to move it from edge coordinates to mid-texel coordinates.

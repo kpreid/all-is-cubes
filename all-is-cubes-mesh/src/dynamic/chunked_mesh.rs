@@ -16,7 +16,8 @@ use all_is_cubes::universe::URef;
 use all_is_cubes::util::{CustomFormat, StatusText, TimeStats};
 
 use crate::dynamic::{self, ChunkMesh, ChunkTodo};
-use crate::{GfxVertex, MeshOptions, TextureAllocator, TextureTile};
+use crate::texture;
+use crate::{GfxVertex, MeshOptions};
 
 #[cfg(test)]
 mod tests;
@@ -33,7 +34,7 @@ mod tests;
 #[derive(Debug)]
 pub struct ChunkedSpaceMesh<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
 where
-    Tex: TextureAllocator,
+    Tex: texture::Allocator,
 {
     space: URef<Space>,
 
@@ -75,8 +76,9 @@ where
 impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate> ChunkedSpaceMesh<D, Vert, Tex, CHUNK_SIZE>
 where
     D: Default,
-    Vert: GfxVertex<TexPoint = <<Tex as TextureAllocator>::Tile as TextureTile>::Point> + PartialEq,
-    Tex: TextureAllocator,
+    Vert: GfxVertex<TexPoint = <<Tex as texture::Allocator>::Tile as texture::Tile>::Point>
+        + PartialEq,
+    Tex: texture::Allocator,
     Tex::Tile: PartialEq + 'static,
 {
     /// Constructs a new [`ChunkedSpaceMesh`] that will maintain a mesh representation of

@@ -4,13 +4,13 @@ use std::io;
 
 use all_is_cubes::cgmath::{ElementWise, Point3, Vector3};
 use all_is_cubes::math::GridAab;
-use all_is_cubes_mesh::{Texel, TextureAllocator, TextureTile};
+use all_is_cubes_mesh::texture;
 
 use super::GltfDataDestination;
 
 pub(crate) type TexPoint = Vector3<f32>;
 
-/// [`TextureAllocator`] implementation for glTF exports.
+/// [`texture::Allocator`] implementation for glTF exports.
 ///
 /// You may use this with [`SpaceMesh`] to create textured meshes that can be exported.
 ///
@@ -36,7 +36,7 @@ impl GltfTextureAllocator {
     }
 }
 
-impl TextureAllocator for GltfTextureAllocator {
+impl texture::Allocator for GltfTextureAllocator {
     type Tile = GltfTextureRef;
     type Point = TexPoint;
 
@@ -52,7 +52,7 @@ impl TextureAllocator for GltfTextureAllocator {
     }
 }
 
-/// [`TextureTile`] produced by [`GltfTextureAllocator`].
+/// [`texture::Tile`] produced by [`GltfTextureAllocator`].
 ///
 /// You should not generally need to refer to this type.
 #[derive(Clone, Debug, PartialEq)]
@@ -62,10 +62,10 @@ pub struct GltfTextureRef {
     destination: GltfDataDestination,
 }
 
-impl TextureTile for GltfTextureRef {
+impl texture::Tile for GltfTextureRef {
     type Point = TexPoint;
 
-    fn write(&mut self, data: &[Texel]) {
+    fn write(&mut self, data: &[texture::Texel]) {
         assert_eq!(data.len(), self.bounds.volume());
 
         // TODO: don't allow more than 1 write per tile (TextureAllocator API change)
@@ -119,6 +119,7 @@ impl TextureTile for GltfTextureRef {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes_mesh::texture::{Allocator, Tile};
     use std::fs;
 
     #[test]

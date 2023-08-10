@@ -54,7 +54,7 @@ impl<T: Clone> BlockVertex<T> {
 pub enum Coloring<T> {
     /// Solid color.
     Solid(Rgba),
-    /// Texture coordinates provided by the [`TextureAllocator`](super::TextureAllocator)
+    /// Texture coordinates provided by the [`Allocator`](super::texture::Allocator)
     /// for this vertex.
     Texture {
         /// Texture coordinates for this vertex.

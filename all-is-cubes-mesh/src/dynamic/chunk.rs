@@ -6,7 +6,7 @@ use all_is_cubes::math::{Aab, Geometry, GridCoordinate, LineVertex};
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::util::{ConciseDebug, CustomFormat};
 
-use crate::{dynamic, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator};
+use crate::{dynamic, texture, GfxVertex, MeshOptions, SpaceMesh};
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
@@ -16,7 +16,7 @@ use crate::dynamic::ChunkedSpaceMesh;
 #[derive(Debug, Eq, PartialEq)]
 pub struct ChunkMesh<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
 where
-    Tex: TextureAllocator,
+    Tex: texture::Allocator,
 {
     pub(super) position: ChunkPos<CHUNK_SIZE>,
     mesh: SpaceMesh<Vert, Tex::Tile>,
@@ -35,7 +35,7 @@ impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate> ChunkMesh<D, Vert, Tex, CHU
 where
     D: Default, // TODO: This is used for initializing `render_data`, but it might not be ideal.
     Vert: GfxVertex,
-    Tex: TextureAllocator,
+    Tex: texture::Allocator,
     Tex::Tile: 'static,
 {
     pub(crate) fn new(position: ChunkPos<CHUNK_SIZE>) -> Self {

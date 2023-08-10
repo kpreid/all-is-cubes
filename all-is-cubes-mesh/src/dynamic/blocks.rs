@@ -7,9 +7,8 @@ use all_is_cubes::block::{EvaluatedBlock, Resolution};
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::util::{CustomFormat as _, StatusText, TimeStats};
 
-use crate::{
-    BlockMesh, GetBlockMesh, GfxVertex, MeshOptions, SpaceMesh, TextureAllocator, TextureTile,
-};
+use crate::texture;
+use crate::{BlockMesh, GetBlockMesh, GfxVertex, MeshOptions, SpaceMesh};
 
 #[derive(Debug)]
 pub(crate) struct VersionedBlockMeshes<D, Vert, Tile> {
@@ -38,8 +37,8 @@ impl<D, Vert, Tile> VersionedBlockMeshes<D, Vert, Tile> {
 impl<D, Vert, Tile> VersionedBlockMeshes<D, Vert, Tile>
 where
     D: Default,
-    Vert: GfxVertex<TexPoint = <Tile as TextureTile>::Point> + PartialEq,
-    Tile: TextureTile + PartialEq,
+    Vert: GfxVertex<TexPoint = <Tile as texture::Tile>::Point> + PartialEq,
+    Tile: texture::Tile + PartialEq,
 {
     /// Update block meshes based on the given [`Space`].
     ///
@@ -58,7 +57,7 @@ where
         mut render_data_updater: F,
     ) -> TimeStats
     where
-        A: TextureAllocator<Tile = Tile>,
+        A: texture::Allocator<Tile = Tile>,
         F: FnMut(super::RenderDataUpdate<'_, D, Vert, Tile>),
     {
         if todo.is_empty() {

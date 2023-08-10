@@ -10,9 +10,9 @@ use all_is_cubes::space::Space;
 use all_is_cubes::time::practically_infinite_deadline;
 use all_is_cubes::universe::{Name, URef, Universe};
 
+use all_is_cubes_mesh::texture::{TestAllocator, TestPoint, TestTile};
 use all_is_cubes_mesh::{
     block_meshes_for_space, dynamic, BlockMesh, BlockMeshes, BlockVertex, MeshOptions, SpaceMesh,
-    TestTextureAllocator, TestTextureTile, TtPoint,
 };
 
 criterion_group!(
@@ -35,13 +35,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 
         b.iter_batched_ref(
             || (),
-            |()| {
-                BlockMesh::<BlockVertex<TtPoint>, _>::new(
-                    &ev,
-                    &TestTextureAllocator::new(),
-                    options,
-                )
-            },
+            |()| BlockMesh::<BlockVertex<TestPoint>, _>::new(&ev, &TestAllocator::new(), options),
             BatchSize::SmallInput,
         );
     });
@@ -51,11 +45,11 @@ fn block_mesh_benches(c: &mut Criterion) {
         let block = checkerboard_block(&mut universe, [AIR, Block::from(Rgba::WHITE)]);
         let ev = block.evaluate().unwrap();
 
-        let mut shared_mesh = BlockMesh::<BlockVertex<TtPoint>, _>::default();
+        let mut shared_mesh = BlockMesh::<BlockVertex<TestPoint>, _>::default();
 
         b.iter_batched_ref(
             || (),
-            |()| shared_mesh.compute(&ev, &TestTextureAllocator::new(), options),
+            |()| shared_mesh.compute(&ev, &TestAllocator::new(), options),
             BatchSize::SmallInput,
         );
     });
@@ -70,13 +64,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 
         b.iter_batched_ref(
             || (),
-            |()| {
-                BlockMesh::<BlockVertex<TtPoint>, _>::new(
-                    &ev,
-                    &TestTextureAllocator::new(),
-                    options,
-                )
-            },
+            |()| BlockMesh::<BlockVertex<TestPoint>, _>::new(&ev, &TestAllocator::new(), options),
             BatchSize::SmallInput,
         );
     });
@@ -88,13 +76,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 
         b.iter_batched_ref(
             || (),
-            |()| {
-                BlockMesh::<BlockVertex<TtPoint>, _>::new(
-                    &ev,
-                    &TestTextureAllocator::new(),
-                    options,
-                )
-            },
+            |()| BlockMesh::<BlockVertex<TestPoint>, _>::new(&ev, &TestAllocator::new(), options),
             BatchSize::SmallInput,
         );
     });
@@ -125,7 +107,7 @@ fn space_mesh_benches(c: &mut Criterion) {
                 assert_eq!(buffer.vertices().len(), 6 * 4 * (16 * 16 * 16) / 2);
                 buffer
             },
-            |buffer: &mut SpaceMesh<BlockVertex<TtPoint>, TestTextureTile>| {
+            |buffer: &mut SpaceMesh<BlockVertex<TestPoint>, TestTile>| {
                 // As of this writing, this benchmark is really just "what if we don't allocate
                 // a new Vec". Later, the buffers will hopefully become cleverer and we'll be
                 // able to reuse some work (or at least send only part of the buffer to the GPU),
@@ -149,9 +131,7 @@ fn space_mesh_benches(c: &mut Criterion) {
                 half_ing.do_compute(&mut buffer);
                 buffer
             },
-            |buffer: &mut SpaceMesh<BlockVertex<TtPoint>, TestTextureTile>| {
-                half_ing.do_compute(buffer)
-            },
+            |buffer: &mut SpaceMesh<BlockVertex<TestPoint>, TestTile>| half_ing.do_compute(buffer),
             BatchSize::SmallInput,
         );
     });
@@ -180,13 +160,9 @@ fn dynamic_benches(c: &mut Criterion) {
         let space_ref = URef::new_pending(Name::Pending, half_space(Block::from(Rgba::WHITE)));
         b.iter_batched_ref(
             || {
-                let csm: dynamic::ChunkedSpaceMesh<
-                    (),
-                    BlockVertex<TtPoint>,
-                    TestTextureAllocator,
-                    16,
-                > = dynamic::ChunkedSpaceMesh::new(space_ref.clone(), true);
-                let tex = TestTextureAllocator::new();
+                let csm: dynamic::ChunkedSpaceMesh<(), BlockVertex<TestPoint>, TestAllocator, 16> =
+                    dynamic::ChunkedSpaceMesh::new(space_ref.clone(), true);
+                let tex = TestAllocator::new();
                 (tex, csm)
             },
             |(tex, csm)| {
@@ -251,13 +227,13 @@ fn half_space(block: Block) -> Space {
 /// Data prepared for a benchmark of [`SpaceMesh::new`] or [`SpaceMesh::compute`].
 struct SpaceMeshIngredients {
     space: Space,
-    block_meshes: BlockMeshes<BlockVertex<TtPoint>, TestTextureTile>,
+    block_meshes: BlockMeshes<BlockVertex<TestPoint>, TestTile>,
     options: MeshOptions,
 }
 
 impl SpaceMeshIngredients {
     fn new(options: MeshOptions, space: Space) -> Self {
-        let block_meshes = block_meshes_for_space(&space, &TestTextureAllocator::new(), &options);
+        let block_meshes = block_meshes_for_space(&space, &TestAllocator::new(), &options);
 
         SpaceMeshIngredients {
             space,
@@ -266,7 +242,7 @@ impl SpaceMeshIngredients {
         }
     }
 
-    fn do_new(&self) -> SpaceMesh<BlockVertex<TtPoint>, TestTextureTile> {
+    fn do_new(&self) -> SpaceMesh<BlockVertex<TestPoint>, TestTile> {
         SpaceMesh::new(
             &self.space,
             self.space.bounds(),
@@ -275,7 +251,7 @@ impl SpaceMeshIngredients {
         )
     }
 
-    fn do_compute(&self, mesh: &mut SpaceMesh<BlockVertex<TtPoint>, TestTextureTile>) {
+    fn do_compute(&self, mesh: &mut SpaceMesh<BlockVertex<TestPoint>, TestTile>) {
         SpaceMesh::compute(
             mesh,
             &self.space,

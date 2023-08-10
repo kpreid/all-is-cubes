@@ -14,7 +14,8 @@ use all_is_cubes::universe::{URef, Universe};
 use all_is_cubes::{notnan, rgba_const, transaction};
 
 use crate::dynamic;
-use crate::{BlockVertex, NoTexture, NoTextures};
+use crate::texture::{NoTexture, NoTextures};
+use crate::BlockVertex;
 
 use super::{ChunkTodo, ChunkedSpaceMesh, CsmTodo, CsmUpdateInfo, TodoListener};
 

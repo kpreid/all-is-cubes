@@ -17,7 +17,7 @@
 //! creation and usage.
 //!
 //! To support a new API/format, you will need to create suitable implementations of the
-//! [`GfxVertex`] and [`TextureAllocator`] traits.
+//! [`GfxVertex`] and [`texture::Allocator`] traits.
 
 // Basic lint settings, which should be identical across all all-is-cubes project crates.
 // This list is sorted.
@@ -67,8 +67,7 @@ mod space_mesh;
 pub use space_mesh::*;
 mod planar;
 use planar::*;
-mod texture;
-pub use texture::*;
+pub mod texture;
 
 #[cfg(test)]
 mod tests;

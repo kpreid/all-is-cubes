@@ -14,7 +14,11 @@ use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::notnan;
 use all_is_cubes::space::Space;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_mesh::{self as mesh, BlockVertex};
+use all_is_cubes_mesh::{
+    self as mesh,
+    texture::{NoTexture, NoTextures},
+    BlockVertex,
+};
 
 pub(crate) async fn export_stl(
     progress: YieldProgress,
@@ -60,7 +64,7 @@ pub(crate) async fn export_stl(
 pub(crate) fn space_to_stl_triangles(space: &Space) -> Vec<Triangle> {
     let mesh_options = mesh_options_for_stl();
     let block_meshes: Box<[mesh::BlockMesh<BlockVertex<_>, _>]> =
-        mesh::block_meshes_for_space(space, &mesh::NoTextures, &mesh_options);
+        mesh::block_meshes_for_space(space, &NoTextures, &mesh_options);
     space_mesh_to_triangles(&mesh::SpaceMesh::new(
         space,
         space.bounds(),
@@ -72,11 +76,8 @@ pub(crate) fn space_to_stl_triangles(space: &Space) -> Vec<Triangle> {
 pub(crate) fn block_to_stl_triangles(
     block: &Block,
 ) -> Result<Vec<Triangle>, block::EvalBlockError> {
-    let block_mesh: mesh::BlockMesh<BlockVertex<_>, _> = mesh::BlockMesh::new(
-        &block.evaluate()?,
-        &mesh::NoTextures,
-        &mesh_options_for_stl(),
-    );
+    let block_mesh: mesh::BlockMesh<BlockVertex<_>, _> =
+        mesh::BlockMesh::new(&block.evaluate()?, &NoTextures, &mesh_options_for_stl());
     Ok(space_mesh_to_triangles(&mesh::SpaceMesh::from(&block_mesh)))
 }
 
@@ -87,7 +88,7 @@ fn mesh_options_for_stl() -> mesh::MeshOptions {
 }
 
 fn space_mesh_to_triangles(
-    mesh: &mesh::SpaceMesh<BlockVertex<mesh::NoTexture>, mesh::NoTexture>,
+    mesh: &mesh::SpaceMesh<BlockVertex<NoTexture>, NoTexture>,
 ) -> Vec<Triangle> {
     let vertices = mesh.vertices();
     mesh.indices()

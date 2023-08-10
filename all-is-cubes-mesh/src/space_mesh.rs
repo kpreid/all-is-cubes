@@ -9,7 +9,8 @@ use all_is_cubes::cgmath::{EuclideanSpace as _, MetricSpace as _, Point3, Vector
 use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridPoint, GridRotation};
 use all_is_cubes::space::{BlockIndex, Space};
 
-use crate::{BlockMesh, GfxVertex, IndexSlice, IndexVec, MeshOptions, TextureTile};
+use crate::texture;
+use crate::{BlockMesh, GfxVertex, IndexSlice, IndexVec, MeshOptions};
 
 /// A triangle mesh representation of a [`Space`] (or part of it) which may
 /// then be rasterized.
@@ -19,9 +20,7 @@ use crate::{BlockMesh, GfxVertex, IndexSlice, IndexVec, MeshOptions, TextureTile
 ///
 /// The type parameters allow adaptation to the target graphics API:
 /// * `V` is the type of vertices.
-/// * `T` is the type of textures, which come from a [`TextureAllocator`].
-///
-/// [`TextureAllocator`]: super::TextureAllocator
+/// * `T` is the type of textures, which come from a [`texture::Allocator`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpaceMesh<V, T> {
     vertices: Vec<V>,
@@ -49,7 +48,7 @@ impl<V, T> SpaceMesh<V, T> {
     where
         V: GfxVertex + 'p,
         P: GetBlockMesh<'p, V, T>,
-        T: TextureTile + 'p,
+        T: texture::Tile + 'p,
     {
         let mut this = Self::default();
         this.compute(space, bounds, options, block_meshes);
@@ -150,7 +149,7 @@ impl<V, T> SpaceMesh<V, T> {
     }
 }
 
-impl<V: GfxVertex, T: TextureTile> SpaceMesh<V, T> {
+impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
     /// Computes triangles for the contents of `space` within `bounds` and stores them
     /// in `self`.
     ///
@@ -434,7 +433,7 @@ impl<V, T> std::ops::Deref for SpaceMesh<V, T> {
 /// * `neighbor_is_fully_opaque` is called to determine whether this block's faces are
 ///   obscured. It is a function so that lookups can be skipped if their answer would
 ///   make no difference.
-fn write_block_mesh_to_space_mesh<V: GfxVertex, T: TextureTile>(
+fn write_block_mesh_to_space_mesh<V: GfxVertex, T: texture::Tile>(
     block_mesh: &BlockMesh<V, T>,
     cube: GridPoint,
     vertices: &mut Vec<V>,
@@ -499,7 +498,7 @@ impl<V, T> Default for SpaceMesh<V, T> {
     }
 }
 
-impl<V: GfxVertex, T: TextureTile> From<&BlockMesh<V, T>> for SpaceMesh<V, T> {
+impl<V: GfxVertex, T: texture::Tile> From<&BlockMesh<V, T>> for SpaceMesh<V, T> {
     /// Construct a `SpaceMesh` containing the given `BlockMesh`.
     ///
     /// The result will be identical to creating a [`Space`] with bounds
@@ -618,7 +617,7 @@ impl<'a, V: 'static, T: 'static> GetBlockMesh<'a, V, T> for &'a [BlockMesh<V, T>
 /// This type may be used to store the required information to render a mesh that has been
 /// copied to GPU memory, without storing an extra copy of the vertex and index data.
 ///
-/// In addition to index data, it contains the [`TextureTile`]s of type `T` for the mesh,
+/// In addition to index data, it contains the [`texture::Tile`]s of type `T` for the mesh,
 /// so as to keep them allocated. (Therefore, this type is not [`Copy`].)
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MeshMeta<T> {
@@ -819,12 +818,13 @@ impl DepthOrdering {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{tests::mesh_blocks_and_space, BlockVertex, TestTextureTile, TtPoint};
+    use crate::texture::{TestPoint, TestTile};
+    use crate::{tests::mesh_blocks_and_space, BlockVertex};
     use all_is_cubes::block::Block;
     use all_is_cubes::math::{GridPoint, Rgba};
     use std::mem;
 
-    type TestMesh = SpaceMesh<BlockVertex<TtPoint>, TestTextureTile>;
+    type TestMesh = SpaceMesh<BlockVertex<TestPoint>, TestTile>;
 
     /// Test that `default()` returns an empty mesh and the characteristics of such a mesh.
     #[test]
@@ -846,7 +846,7 @@ mod tests {
 
         assert_eq!(mesh.count_indices(), 6 /* faces */ * 6 /* vertices */);
 
-        let expected_data_size = std::mem::size_of_val::<[BlockVertex<TtPoint>]>(mesh.vertices())
+        let expected_data_size = std::mem::size_of_val::<[BlockVertex<TestPoint>]>(mesh.vertices())
             + mesh.indices().as_bytes().len();
 
         let actual_size = dbg!(mesh.total_byte_size());
@@ -856,7 +856,7 @@ mod tests {
 
     #[test]
     fn slice_get_block_mesh_out_of_bounds() {
-        let mut source: &[BlockMesh<BlockVertex<TtPoint>, TestTextureTile>] = &[];
+        let mut source: &[BlockMesh<BlockVertex<TestPoint>, TestTile>] = &[];
         assert_eq!(source.get_block_mesh(10), BlockMesh::EMPTY_REF);
     }
 }
