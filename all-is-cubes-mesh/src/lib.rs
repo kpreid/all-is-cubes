@@ -67,8 +67,8 @@ mod space_mesh;
 pub use space_mesh::*;
 mod planar;
 use planar::*;
-mod texalloc;
-pub use texalloc::*;
+mod texture;
+pub use texture::*;
 
 #[cfg(test)]
 mod tests;
