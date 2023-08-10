@@ -2,10 +2,13 @@
 
 use std::io;
 
+use gltf_json::validation::Checked::Valid;
+
 use all_is_cubes::cgmath::{ElementWise, Point3, Vector3};
-use all_is_cubes::math::GridAab;
+use all_is_cubes::math::{GridAab, GridRotation};
 use all_is_cubes_mesh::texture;
 
+use super::glue::push_and_return_index;
 use super::GltfDataDestination;
 
 pub(crate) type TexPoint = Vector3<f32>;
@@ -14,12 +17,17 @@ pub(crate) type TexPoint = Vector3<f32>;
 ///
 /// You may use this with [`SpaceMesh`] to create textured meshes that can be exported.
 ///
-/// TODO: This doesn't actually work yet.
+/// This allocator does not perform deallocation, on the assumption that as the glTF asset
+/// is constructed, the meshes going into it are created and dropped rather than kept to
+/// the end.
+///
+/// TODO: This allocator does not actually produce a usable texture atlas yet.
 ///
 /// [`SpaceMesh`]: all_is_cubes_mesh::SpaceMesh
 #[derive(Clone, Debug)]
 pub struct GltfTextureAllocator {
     destination: GltfDataDestination,
+    gatherer: internal::Gatherer,
     enable: bool,
 }
 
@@ -31,8 +39,28 @@ impl GltfTextureAllocator {
     pub(crate) fn new(destination: GltfDataDestination, enable_wip: bool) -> Self {
         Self {
             destination,
+            gatherer: internal::Gatherer::default(),
             enable: enable_wip,
         }
+    }
+
+    #[allow(dead_code)] // TODO: not yet used outside of tests
+    pub(crate) fn write_png_atlas(&self) -> Result<gltf_json::Buffer, io::Error> {
+        // TODO: refuse to write more than once. Perhaps take self by value? Or just take the destination.
+        let image: image::RgbaImage = self.gatherer.build_atlas();
+        let buffer = self
+            .destination
+            .write(String::from("texture"), "texture", "png", |w| {
+                // `image` wants `Write + Seek` but `w` is not currently `Seek`
+                let mut tmp = io::Cursor::new(Vec::new());
+                image
+                    .write_to(&mut tmp, image::ImageOutputFormat::Png)
+                    .expect("failed to write image to in-memory buffer");
+                w.write_all(tmp.into_inner().as_slice())?;
+                Ok(())
+            })
+            .expect("TODO: propagate IO errors to later instead of panicking");
+        Ok(buffer)
     }
 }
 
@@ -44,7 +72,8 @@ impl texture::Allocator for GltfTextureAllocator {
         if self.enable {
             Some(GltfTile {
                 bounds,
-                destination: self.destination.clone(),
+                texels: internal::TexelsCell::default(),
+                gatherer: self.gatherer.clone(),
             })
         } else {
             None
@@ -55,11 +84,16 @@ impl texture::Allocator for GltfTextureAllocator {
 /// [`texture::Tile`] produced by [`GltfTextureAllocator`].
 ///
 /// You should not generally need to refer to this type.
+//
+// Implementation notes: Since glTF does not support 3D textures, we must slice the provided
+// texels into 2D sections. Therefore, this is just a container for the texels, not a handle
+// to the actual atlas.
 #[derive(Clone, Debug, PartialEq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 pub struct GltfTile {
     bounds: GridAab,
-    destination: GltfDataDestination,
+    gatherer: internal::Gatherer,
+    texels: internal::TexelsCell,
 }
 
 impl texture::Tile for GltfTile {
@@ -69,46 +103,36 @@ impl texture::Tile for GltfTile {
     fn write(&mut self, data: &[texture::Texel]) {
         assert_eq!(data.len(), self.bounds.volume());
 
-        // TODO: don't allow more than 1 write per tile (TextureAllocator API change)
+        // TODO: change trait signature so it is possible to express "we do not support multiple writes"
 
-        // TODO: This code is totally wrong for the end goal; we need to construct a
-        // texture atlas so that a SpaceMesh can have just one texture for all its blocks.
-        // Its purpose in existing is merely to be a step along the road; the image writing
-        // code will be moved to post-processing.
-
-        // TODO: instead of writing all the 3d data as one blob, we need to dynamically
-        // generate the wanted 2d slices of it.
-        let buffer = self
-            .destination
-            .write(String::from("texture"), "texture", "png", |w| {
-                // `image` wants `Write + Seek` but `w` is not currently `Seek`
-                let mut tmp = io::Cursor::new(Vec::new());
-
-                image::write_buffer_with_format(
-                    &mut tmp,
-                    bytemuck::cast_slice::<[u8; 4], u8>(data),
-                    self.bounds.size().x as u32,
-                    self.bounds.size().y as u32 * self.bounds.size().z as u32,
-                    image::ColorType::Rgba8,
-                    image::ImageOutputFormat::Png,
-                )
-                .expect("failed to write image to in-memory buffer");
-
-                w.write_all(tmp.into_inner().as_slice())?;
-                Ok(())
-            })
-            .expect("TODO: propagate IO errors to later instead of panicking");
-
-        dbg!(buffer);
+        self.texels
+            .set(data.to_owned())
+            .expect("cannot overwrite glTF textures")
     }
 
     fn bounds(&self) -> GridAab {
         self.bounds
     }
 
-    fn slice(&self, bounds: GridAab) -> Self::Plane {
-        texture::validate_slice(self.bounds, bounds);
-        GltfTexturePlane { bounds }
+    fn slice(&self, sliced_bounds: GridAab) -> Self::Plane {
+        let axis = texture::validate_slice(self.bounds, sliced_bounds);
+
+        self.gatherer.insert(internal::AtlasEntry {
+            source_texels: self.texels.clone(),
+            source_bounds: self.bounds,
+            sliced_bounds,
+            rotation: match axis {
+                // TODO: decide which exact rotations to use
+                0 => GridRotation::RZYx, // X is flat, so rotate about Y
+                1 => GridRotation::RXZy, // Y is flat, so rotate about X
+                2 => GridRotation::IDENTITY,
+                _ => unreachable!(),
+            },
+        });
+
+        GltfTexturePlane {
+            bounds: sliced_bounds,
+        }
     }
 }
 
@@ -135,12 +159,113 @@ impl texture::Plane for GltfTexturePlane {
     }
 }
 
+#[allow(dead_code)] // TODO: not yet used
+pub(super) fn insert_block_texture_atlas(
+    root: &mut gltf_json::Root,
+    allocator: &GltfTextureAllocator,
+) -> Result<gltf_json::Index<gltf_json::Texture>, io::Error> {
+    let block_texture_buffer = allocator.write_png_atlas()?;
+    let block_texture_len = block_texture_buffer.byte_length;
+    let block_texture_buffer = push_and_return_index(&mut root.buffers, block_texture_buffer);
+    let block_texture_buffer_view = push_and_return_index(
+        &mut root.buffer_views,
+        gltf_json::buffer::View {
+            buffer: block_texture_buffer,
+            byte_length: block_texture_len,
+            byte_offset: None,
+            byte_stride: None,
+            name: Some("block texture".into()),
+            target: None,
+            extensions: None,
+            extras: Default::default(),
+        },
+    );
+    let block_texture_sampler = push_and_return_index(
+        &mut root.samplers,
+        gltf_json::texture::Sampler {
+            mag_filter: Some(Valid(gltf_json::texture::MagFilter::Nearest)),
+            min_filter: Some(Valid(gltf_json::texture::MinFilter::Linear)),
+            name: Some("block texture".into()),
+            wrap_s: Valid(gltf_json::texture::WrappingMode::ClampToEdge),
+            wrap_t: Valid(gltf_json::texture::WrappingMode::ClampToEdge),
+            extensions: None,
+            extras: Default::default(),
+        },
+    );
+    let block_texture_image = push_and_return_index(
+        &mut root.images,
+        gltf_json::Image {
+            buffer_view: Some(block_texture_buffer_view),
+            mime_type: Some(gltf_json::image::MimeType("image/png".into())),
+            name: Some("block texture".into()),
+            uri: None,
+            extensions: None,
+            extras: Default::default(),
+        },
+    );
+    let block_texture = push_and_return_index(
+        &mut root.textures,
+        gltf_json::Texture {
+            name: None,
+            sampler: Some(block_texture_sampler),
+            source: block_texture_image,
+            extensions: None,
+            extras: Default::default(),
+        },
+    );
+    Ok(block_texture)
+}
+
+mod internal {
+    use super::*;
+    use std::sync::{Arc, Mutex, OnceLock};
+
+    /// Texels are written here through tiles and read through planes.
+    pub(super) type TexelsCell = Arc<OnceLock<Vec<texture::Texel>>>;
+
+    /// Interior-mutable accumulator of textures to put in the atlas.
+    #[derive(Clone, Debug, Default)]
+    pub(super) struct Gatherer(Arc<Mutex<Vec<AtlasEntry>>>);
+
+    impl Gatherer {
+        pub fn insert(&self, entry: AtlasEntry) {
+            self.0.lock().expect("mutex in atlas gatherer").push(entry);
+        }
+
+        pub(crate) fn build_atlas(&self) -> image::RgbaImage {
+            log::warn!("TODO: glTF texture atlas not yet implemented");
+            image::RgbaImage::new(1, 1)
+        }
+    }
+
+    impl PartialEq for Gatherer {
+        fn eq(&self, other: &Self) -> bool {
+            Arc::ptr_eq(&self.0, &other.0)
+        }
+    }
+
+    /// Details of one piece of texture that must be included in the generated texture atlas.
+    #[derive(Debug)]
+    #[allow(dead_code)] // TODO: not yet used
+    pub(super) struct AtlasEntry {
+        /// Texels to extract.
+        pub(super) source_texels: TexelsCell,
+        /// Bounds of the 3D region containing `source_texels`.
+        pub(super) source_bounds: GridAab,
+        /// Bounds of the 2D region sliced out of `source_bounds`. Must have at least one axis of size 1.
+        pub(super) sliced_bounds: GridAab,
+        /// Rotation that will rotate `sliced_bounds` to be flat in the atlas.
+        pub(super) rotation: GridRotation,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use all_is_cubes_mesh::texture::{Allocator, Tile};
     use std::fs;
 
+    /// TODO: this is just a smoke-test; add more rigorous tests.
     #[test]
     fn allocator_creates_file() {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -154,7 +279,9 @@ mod tests {
             .expect("allocation");
         tile.write(&[[0, 1, 2, 3]]);
         drop(tile);
-        drop(allocator);
+
+        allocator.write_png_atlas().unwrap();
+
         assert_eq!(
             fs::read_dir(temp_dir.path())
                 .unwrap()
