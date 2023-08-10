@@ -9,6 +9,9 @@ use all_is_cubes::content::palette;
 use all_is_cubes::math::{GridAab, GridPoint};
 use all_is_cubes::util::{ConciseDebug, CustomFormat};
 
+#[cfg(doc)]
+use all_is_cubes::math::GridArray;
+
 /// Numeric type used to calculate texture coordinates and store them in [`BlockVertex`].
 ///
 /// Note that this type is only exposed publicly within [`texture::Tile::grid_to_texcoord()`];
@@ -63,8 +66,12 @@ pub trait Tile: Clone {
 
     /// Write texture data as RGBA color.
     ///
-    /// `data` must be of length `self.bounds().volume()`.
-    // TODO: Replace it with a GridArray (requires changing the ordering).
+    /// `data` must be of length `self.bounds().volume()`, and ordered “X-major”, that is,
+    /// the coordinates of the texels follow the pattern
+    /// `[[0, 0, 0], [1, 0, 0], ..., [0, 1, 0], [1, 1, 0], ..., [0, 0, 1], [1, 0, 1], ...]`.
+    /// Note that this is not the same as the ordering built into [`GridArray`].
+    //---
+    // TODO: Replace it with a GridArray (requires changing the ordering of one or the other).
     fn write(&mut self, data: &[Texel]);
 }
 
