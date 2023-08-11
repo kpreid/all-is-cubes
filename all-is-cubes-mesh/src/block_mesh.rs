@@ -355,14 +355,6 @@ where
                         .transform(face.face_transform(block_resolution).inverse())
                         .unwrap();
 
-                    // Also compute the bounds in the array's coordinate system, which we
-                    // will use for texturing.
-                    // TODO: It would be better if this were shrunk to the visible voxels
-                    // in this specific layer.
-                    let voxel_range = rotated_voxel_range
-                        .transform(face.face_transform(block_resolution))
-                        .unwrap();
-
                     // Check the case where the block's voxels don't meet its front face, or don't fill that face.
                     if !rotated_voxel_range.z_range().contains(&0)
                         || rotated_voxel_range.x_range() != (0..block_resolution)
@@ -503,7 +495,19 @@ where
                                         );
                                     }
                                     if let Some(ref texture) = texture_if_needed {
-                                        texture_plane_if_needed = Some(texture.slice(voxel_range));
+                                        // Compute the exact texture slice we will be accessing.
+                                        // TODO: It would be better if this were shrunk to the visible voxels
+                                        // in this specific layer, not just all voxels.
+                                        let rx = rotated_voxel_range.x_range();
+                                        let ry = rotated_voxel_range.y_range();
+                                        let slice_range = GridAab::from_lower_upper(
+                                            [rx.start, ry.start, layer],
+                                            [rx.end, ry.end, layer + 1],
+                                        )
+                                        .transform(face.face_transform(block_resolution))
+                                        .unwrap();
+
+                                        texture_plane_if_needed = Some(texture.slice(slice_range));
                                     }
                                 }
                                 if let Some(ref plane) = texture_plane_if_needed {
