@@ -119,6 +119,32 @@ impl<T: Allocator> Allocator for std::rc::Rc<T> {
     }
 }
 
+/// Validate that the argument to [`Tile::slice()`] is within bounds, and thickness
+/// 1 on some axis.
+///
+/// * If valid, return the axis (`0`, `1`, or `2`).
+///     * If there are multiple axes on which the size is 1, the highest one is returned
+///       (i.e. Z is preferred).
+/// * If invalid, panic.
+///
+/// This function may be useful to [`Tile`] implementors.
+// --
+// TODO: more evidence we need an Axis enum. Or, we should be accepting the slice as a type
+// that doesn't need axis validation (but we would still need bounds validation)
+#[track_caller]
+pub fn validate_slice(tile_bounds: GridAab, slice_bounds: GridAab) -> usize {
+    assert!(
+        tile_bounds.contains_box(slice_bounds),
+        "Tile::slice() bounds {slice_bounds:?} are not within the tile bounds {tile_bounds:?}"
+    );
+    match Into::<[i32; 3]>::into(slice_bounds.size()) {
+        [_, _, 1] => 2,
+        [_, 1, _] => 1,
+        [1, _, _] => 0,
+        _ => panic!("Tile::slice() bounds {slice_bounds:?} are not flat enough"),
+    }
+}
+
 pub(super) fn copy_voxels_to_texture<A: Allocator>(
     texture_allocator: &A,
     voxels: &Evoxels,
@@ -279,7 +305,8 @@ impl Tile for TestTile {
         self.bounds
     }
 
-    fn slice(&self, _bounds: GridAab) -> Self::Plane {
+    fn slice(&self, bounds: GridAab) -> Self::Plane {
+        validate_slice(self.bounds, bounds);
         self.clone()
     }
 

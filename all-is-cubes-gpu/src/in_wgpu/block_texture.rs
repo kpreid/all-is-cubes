@@ -224,7 +224,7 @@ impl texture::Tile for AtlasTile {
     }
 
     fn slice(&self, requested_bounds: GridAab) -> Self::Plane {
-        assert!(self.requested_bounds.contains_box(requested_bounds));
+        texture::validate_slice(self.requested_bounds, requested_bounds);
         AtlasPlane {
             tile: self.clone(),
             requested_bounds,

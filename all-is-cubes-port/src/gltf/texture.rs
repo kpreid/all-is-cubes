@@ -107,7 +107,7 @@ impl texture::Tile for GltfTile {
     }
 
     fn slice(&self, bounds: GridAab) -> Self::Plane {
-        assert!(self.bounds.contains_box(bounds));
+        texture::validate_slice(self.bounds, bounds);
         GltfTexturePlane { bounds }
     }
 }
