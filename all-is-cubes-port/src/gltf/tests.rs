@@ -1,7 +1,6 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use assert_fs::prelude::PathAssert;
 use gltf_json::validation::Validate;
 use gltf_json::Index;
 
@@ -88,18 +87,22 @@ async fn export_block_defs() {
                 .unwrap()
         })
         .collect();
-    let destination = assert_fs::NamedTempFile::new("foo.gltf").unwrap();
+    let destination_dir = tempfile::tempdir().unwrap();
+    let destination: PathBuf = destination_dir.path().join("export_block_defs.gltf");
 
     crate::export_to_path(
         YieldProgress::noop(),
         ExportFormat::Gltf,
         ExportSet::from_block_defs(block_defs),
-        PathBuf::from(destination.path()),
+        PathBuf::from(&destination),
     )
     .await
     .unwrap();
 
-    destination.assert(include_str!("tests/export_block_defs.gltf"));
+    snapbox::Assert::new().action_env("AICSNAP").subset_eq(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("src/gltf/tests/"),
+        destination_dir.path(),
+    );
 }
 
 #[tokio::test]
@@ -108,13 +111,14 @@ async fn export_space_not_supported() {
     universe
         .insert("x".into(), Space::empty_positive(1, 1, 1))
         .unwrap();
-    let destination = assert_fs::NamedTempFile::new("foo.gltf").unwrap();
+    let destination_dir = tempfile::tempdir().unwrap();
+    let destination: PathBuf = destination_dir.path().join("foo.gltf");
 
     let error = crate::export_to_path(
         YieldProgress::noop(),
         ExportFormat::Gltf,
         ExportSet::all_of_universe(&universe),
-        PathBuf::from(destination.path()),
+        destination,
     )
     .await
     .unwrap_err();

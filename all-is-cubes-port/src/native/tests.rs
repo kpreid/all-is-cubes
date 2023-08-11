@@ -29,7 +29,8 @@ async fn import_export_native_format() {
     assert_eq!(**uref.read().unwrap(), block::AIR);
 
     // Export again.
-    let destination = assert_fs::NamedTempFile::new("foo.alliscubesjson").unwrap();
+    let destination_dir = tempfile::tempdir().unwrap();
+    let destination: PathBuf = destination_dir.path().join("foo.alliscubesjson");
     export_to_path(
         YieldProgress::noop(),
         crate::ExportFormat::AicJson,

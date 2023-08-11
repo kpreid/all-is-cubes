@@ -146,19 +146,20 @@ mod tests {
                     .unwrap()
             })
             .collect();
-        let destination = assert_fs::NamedTempFile::new("foo.stl").unwrap();
+        let destination_dir = tempfile::tempdir().unwrap();
+        let destination: PathBuf = destination_dir.path().join("foo.stl");
 
         crate::export_to_path(
             YieldProgress::noop(),
             ExportFormat::Stl,
             ExportSet::from_block_defs(block_defs),
-            PathBuf::from(destination.path()),
+            destination,
         )
         .await
         .unwrap();
 
         assert_eq!(
-            fs::read_dir(destination.parent().unwrap())
+            fs::read_dir(&destination_dir)
                 .unwrap()
                 .map(|entry_res| entry_res
                     .unwrap()
