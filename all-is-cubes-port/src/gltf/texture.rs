@@ -80,7 +80,7 @@ impl texture::Tile for GltfTextureRef {
         // generate the wanted 2d slices of it.
         let buffer = self
             .destination
-            .write(String::from("texture"), "texture", |w| {
+            .write(String::from("texture"), "texture", "png", |w| {
                 // `image` wants `Write + Seek` but `w` is not currently `Seek`
                 let mut tmp = io::Cursor::new(Vec::new());
 
@@ -160,7 +160,7 @@ mod tests {
                 .unwrap()
                 .map(|e| e.unwrap().file_name().into_string().unwrap())
                 .collect::<Vec<String>>(),
-            vec!["filetest-texture.glbin"], // TODO: should be .png if it's a file
+            vec!["filetest-texture.png"],
         );
     }
 }

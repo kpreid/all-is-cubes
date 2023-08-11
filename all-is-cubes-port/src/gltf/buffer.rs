@@ -77,7 +77,8 @@ impl GltfDataDestination {
     ///   entity.
     /// * `proposed_file_name` will be included in the name of the generated data file,
     ///   if there is one; for example, `foo.gltf` will have data files named like
-    ///   `foo-{proposed_file_name}-20.glbin`.
+    ///   `foo-{proposed_file_name}-20.{proposed_file_extension}`.
+    /// * `proposed_file_extension` should be `glbin` or an image format.
     ///
     /// # Errors
     ///
@@ -95,6 +96,7 @@ impl GltfDataDestination {
         &self,
         buffer_entity_name: String,
         proposed_file_name: &str,
+        proposed_file_extension: &str,
         contents_fn: F,
     ) -> io::Result<gltf_json::Buffer>
     where
@@ -124,7 +126,7 @@ impl GltfDataDestination {
 
             // Construct the file name (which is also the _relative_ path from gltf to data file).
             let mut buffer_file_name: OsString = file_base_path.file_stem().unwrap().to_owned();
-            buffer_file_name.push(format!("-{unique_file_suffix}.glbin"));
+            buffer_file_name.push(format!("-{unique_file_suffix}.{proposed_file_extension}"));
 
             // Construct the relative URL the glTF file will contain.
             // TODO: this path needs URL-encoding (excepting slashes)
@@ -315,7 +317,7 @@ where
     [Lef32; COMPONENTS]: bytemuck::Pod,
 {
     let length = data_source.clone().into_iter().len();
-    let buffer = dest.write(name.clone(), file_suffix, |w| {
+    let buffer = dest.write(name.clone(), file_suffix, "glbin", |w| {
         for item in data_source.clone() {
             w.write_all(bytemuck::bytes_of(&item.map(Lef32::from)))?;
         }
@@ -371,7 +373,7 @@ mod tests {
     fn discard() {
         let d = GltfDataDestination::null();
         let buffer_entity = d
-            .write("foo".into(), "bar", |w| w.write_all(&[1, 2, 3]))
+            .write("foo".into(), "bar", "glbin", |w| w.write_all(&[1, 2, 3]))
             .unwrap();
         assert_eq!(buffer_entity.name, Some("foo".into()));
         assert_eq!(buffer_entity.uri, None);
@@ -382,7 +384,7 @@ mod tests {
     fn inline_only_success() {
         let d = GltfDataDestination::new(None, usize::MAX);
         let buffer_entity = d
-            .write("foo".into(), "bar", |w| w.write_all(&[1, 2, 255]))
+            .write("foo".into(), "bar", "glbin", |w| w.write_all(&[1, 2, 255]))
             .unwrap();
         assert_eq!(buffer_entity.name, Some("foo".into()));
         assert_eq!(
@@ -396,7 +398,7 @@ mod tests {
     fn inline_only_failure() {
         let d = GltfDataDestination::new(None, 1);
         let error = d
-            .write("foo".into(), "bar", |w| w.write_all(&[1, 2, 255]))
+            .write("foo".into(), "bar", "glbin", |w| w.write_all(&[1, 2, 255]))
             .unwrap_err();
         assert_eq!(
             error.to_string(),
@@ -413,7 +415,7 @@ mod tests {
 
         let d = GltfDataDestination::new(Some(file_base_path), 3);
         let buffer_entity = d
-            .write("foo".into(), "bar", |w| {
+            .write("foo".into(), "bar", "glbin", |w| {
                 w.write_all(&[1, 2, 3])?;
                 w.write_all(&[4, 5, 6])?;
                 Ok(())
@@ -433,8 +435,8 @@ mod tests {
         println!("Base path: {}", file_base_path.display());
 
         let d = GltfDataDestination::new(Some(file_base_path), 0);
-        let e1 = d.write("foo".into(), "bar", write1).unwrap();
-        let e2 = d.write("foo".into(), "bar", write1).unwrap();
+        let e1 = d.write("foo".into(), "bar", "glbin", write1).unwrap();
+        let e2 = d.write("foo".into(), "bar", "glbin", write1).unwrap();
 
         // These two file names must be distinct.
         assert_eq!(e1.uri.as_deref(), Some("basepath-bar.glbin"));

@@ -29,6 +29,7 @@ pub(crate) fn add_mesh(
         .write(
             format!("{name} data"),
             &format!("mesh-{i}", i = writer.root.buffers.len()),
+            "glbin",
             |w| {
                 w.write_all(vertex_bytes)?;
                 // Convert index bytes to little-endian
