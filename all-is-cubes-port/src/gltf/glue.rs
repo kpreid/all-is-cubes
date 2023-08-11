@@ -122,6 +122,7 @@ pub(crate) fn empty_node(name: Option<String>) -> gltf_json::Node {
 /// Create an Accessor and compute the min and max from the data, which must be consistent with the buffer.
 ///
 /// Currently the elements must be vectors (or scalars) of f32s.
+#[track_caller]
 pub(crate) fn create_accessor<I, const COMPONENTS: usize>(
     name: String,
     buffer_view: Index<gltf_json::buffer::View>,
@@ -139,7 +140,7 @@ where
     // Catch bug early rather than generating bad data
     assert!(
         count > 0,
-        "glTF accessor {name} must have a size greater than 0"
+        "glTF accessor {name:?} must have a size greater than 0"
     );
 
     gltf_json::Accessor {
@@ -154,7 +155,9 @@ where
             2 => gltf_json::accessor::Type::Vec2,
             3 => gltf_json::accessor::Type::Vec3,
             4 => gltf_json::accessor::Type::Vec4,
-            _ => panic!("Invalid component count"),
+            _ => panic!(
+                "glTF accessor {name:?} must have a component count of 1 to 4, not {COMPONENTS}"
+            ),
         }),
         min,
         max,
