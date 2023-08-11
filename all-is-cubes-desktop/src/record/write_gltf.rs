@@ -108,7 +108,10 @@ pub(crate) enum MeshRecordMsg {
 }
 
 /// Storage for an index that may not yet have been assigned, but will be when it is needed.
-type MeshIndexCell = Arc<std::sync::Mutex<Option<gltf_json::Index<gltf_json::Mesh>>>>;
+///
+/// If the inner `Option` is `None`, then the original input mesh was empty, so there is
+/// no glTF mesh.
+type MeshIndexCell = Arc<std::sync::OnceLock<Option<gltf_json::Index<gltf_json::Mesh>>>>;
 
 /// Spawn a thread that receives [`MeshRecordMsg`] and writes glTF data.
 pub(super) fn start_gltf_writing(
@@ -133,16 +136,23 @@ pub(super) fn start_gltf_writing(
                 match msg {
                     MeshRecordMsg::AddMesh(name, mesh, mesh_index_cell) => {
                         let mesh_index = writer.add_mesh(&format!("{name:?}"), &mesh);
-                        *mesh_index_cell.lock().unwrap() = Some(mesh_index);
+                        mesh_index_cell
+                            .set(mesh_index)
+                            .expect("mesh index cell used more than once");
                     }
                     MeshRecordMsg::FinishFrame(frame_number, camera, meshes) => {
                         let flaws = writer.add_frame(
                             Some(&camera),
                             &meshes
                                 .into_iter()
-                                .filter_map(|(lock, translation)| {
+                                .filter_map(|(index_cell, translation)| {
+                                    let opt_mesh =
+                                        *index_cell.get().expect("mesh index cell not set");
+                                    // If there is no mesh index then the original mesh was empty.
+                                    // Just filter it out.
+                                    let mesh = opt_mesh?;
                                     Some(MeshInstance {
-                                        mesh: (*lock.lock().unwrap())?,
+                                        mesh,
                                         translation: translation.into(),
                                     })
                                 })

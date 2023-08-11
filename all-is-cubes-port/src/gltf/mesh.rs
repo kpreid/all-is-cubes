@@ -12,11 +12,18 @@ use all_is_cubes_mesh::{IndexSlice, SpaceMesh};
 use super::glue::{create_accessor, push_and_return_index, u32size};
 use super::{GltfTextureRef, GltfVertex, GltfWriter};
 
+/// Create [`gltf_json::Mesh`] and all its parts (accessors, buffers) from a [`SpaceMesh`].
+///
+/// If the input is empty, does nothing and returns `None`.
 pub(crate) fn add_mesh(
     writer: &mut GltfWriter,
     name: &dyn fmt::Display,
     mesh: &SpaceMesh<GltfVertex, GltfTextureRef>,
-) -> Index<gltf_json::Mesh> {
+) -> Option<Index<gltf_json::Mesh>> {
+    if mesh.is_empty() {
+        return None;
+    }
+
     let vertex_bytes = bytemuck::cast_slice::<GltfVertex, u8>(mesh.vertices());
     let index_type = match mesh.indices() {
         IndexSlice::U16(_) => gltf_json::accessor::ComponentType::U16,
@@ -110,7 +117,7 @@ pub(crate) fn add_mesh(
 
     writer.flaws |= mesh.flaws();
 
-    push_and_return_index(
+    let mesh_index = push_and_return_index(
         &mut writer.root.meshes,
         gltf_json::Mesh {
             name: Some(format!("{name} mesh")),
@@ -165,7 +172,9 @@ pub(crate) fn add_mesh(
             extensions: Default::default(),
             extras: Default::default(),
         },
-    )
+    );
+
+    Some(mesh_index)
 }
 
 /// Collection of materials used in the glTF.
@@ -251,6 +260,7 @@ mod tests {
 
         let mut writer = GltfWriter::new(GltfDataDestination::null());
         let (_, mesh_index) = gltf_mesh(&space, &mut writer);
+        let mesh_index = mesh_index.unwrap();
         let root = writer.into_root(Duration::ZERO).unwrap();
 
         let mesh = root.get(mesh_index).unwrap();
@@ -286,5 +296,16 @@ mod tests {
             6 * 6 * index_size + 4 * 6 * size_of::<GltfVertex>(),
             "buffer size"
         );
+    }
+
+    /// [`SpaceMesh`]es are allowed to be empty. glTF meshes are not.
+    #[test]
+    fn empty_mesh() {
+        let space = Space::empty_positive(1, 1, 1);
+
+        let mut writer = GltfWriter::new(GltfDataDestination::null());
+        let (_, mesh_index) = gltf_mesh(&space, &mut writer);
+
+        assert!(mesh_index.is_none());
     }
 }

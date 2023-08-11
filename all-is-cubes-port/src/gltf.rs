@@ -175,7 +175,7 @@ impl GltfWriter {
         &mut self,
         name: &dyn fmt::Display,
         mesh: &SpaceMesh<GltfVertex, GltfTextureRef>,
-    ) -> Index<gltf_json::Mesh> {
+    ) -> Option<Index<gltf_json::Mesh>> {
         // TODO: Deduplicate meshes so that we don't have to store the same data twice if
         // a world change is undone, or in a cyclic animation (or if two chunks have the
         // same contents — once we make chunks in relative coordinates).
@@ -388,10 +388,11 @@ pub(crate) async fn export_gltf(
         ));
 
         let mesh_index = writer.add_mesh(&name, &mesh);
+        // TODO: if the mesh is empty/None, should we include the node anyway or not?
         let mesh_node = push_and_return_index(
             &mut writer.root.nodes,
             gltf_json::Node {
-                mesh: Some(mesh_index),
+                mesh: mesh_index,
                 ..empty_node(Some(name.to_string()))
             },
         );

@@ -22,7 +22,7 @@ pub(crate) fn gltf_mesh(
     writer: &mut GltfWriter,
 ) -> (
     SpaceMesh<GltfVertex, GltfTextureRef>,
-    Index<gltf_json::Mesh>,
+    Option<Index<gltf_json::Mesh>>,
 ) {
     let options = &MeshOptions::new(&GraphicsOptions::default());
     let blocks = block_meshes_for_space(space, &writer.texture_allocator(), options);
@@ -52,6 +52,7 @@ fn gltf_smoke_test() {
 
     let mut writer = GltfWriter::new(GltfDataDestination::null());
     let (_, mesh_index) = gltf_mesh(&outer_space, &mut writer);
+    let mesh_index = mesh_index.unwrap();
     writer.add_frame(
         None,
         &[MeshInstance {
