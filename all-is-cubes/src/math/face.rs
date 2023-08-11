@@ -218,7 +218,7 @@ impl Face6 {
             Face6::NX => Gridgid::from_rotation_about_origin(RYZX),
             Face6::NY => Gridgid::from_rotation_about_origin(RZXY),
             Face6::NZ => Gridgid::from_rotation_about_origin(RXYZ),
-            
+
             // Positives are same as negatives but with translation and an arbitrary choice of rotation.
             // PX rotates about Y.
             Face6::PX => Gridgid {

@@ -409,7 +409,12 @@ mod tests {
         let clear = evcolor(Rgba::TRANSPARENT);
 
         assert_blend(opaque1, Atop, opaque2, opaque1);
-        assert_blend(half_red, Atop, opaque2, evcolor(Rgba::new(0.5, 0.5, 0.0, 1.0)));
+        assert_blend(
+            half_red,
+            Atop,
+            opaque2,
+            evcolor(Rgba::new(0.5, 0.5, 0.0, 1.0)),
+        );
         assert_blend(opaque1, Atop, clear, clear);
         assert_blend(clear, Atop, opaque2, opaque2);
         assert_blend(clear, Atop, clear, clear);
