@@ -37,12 +37,12 @@ impl GltfTextureAllocator {
 }
 
 impl texture::Allocator for GltfTextureAllocator {
-    type Tile = GltfTextureRef;
+    type Tile = GltfTile;
     type Point = TexPoint;
 
-    fn allocate(&self, bounds: GridAab) -> Option<GltfTextureRef> {
+    fn allocate(&self, bounds: GridAab) -> Option<GltfTile> {
         if self.enable {
-            Some(GltfTextureRef {
+            Some(GltfTile {
                 bounds,
                 destination: self.destination.clone(),
             })
@@ -57,12 +57,12 @@ impl texture::Allocator for GltfTextureAllocator {
 /// You should not generally need to refer to this type.
 #[derive(Clone, Debug, PartialEq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
-pub struct GltfTextureRef {
+pub struct GltfTile {
     bounds: GridAab,
     destination: GltfDataDestination,
 }
 
-impl texture::Tile for GltfTextureRef {
+impl texture::Tile for GltfTile {
     type Point = TexPoint;
     type Plane = GltfTexturePlane;
 

@@ -14,7 +14,7 @@ use all_is_cubes::{camera, listen, universe};
 use all_is_cubes_mesh as mesh;
 use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, MeshLabel};
 use all_is_cubes_port::gltf::{
-    json as gltf_json, GltfTextureAllocator, GltfTextureRef, GltfVertex, GltfWriter, MeshInstance,
+    json as gltf_json, GltfTextureAllocator, GltfTile, GltfVertex, GltfWriter, MeshInstance,
 };
 
 use crate::record::RecordOptions;
@@ -97,7 +97,7 @@ impl MeshRecorder {
 pub(crate) enum MeshRecordMsg {
     AddMesh(
         MeshLabel,
-        mesh::SpaceMesh<GltfVertex, GltfTextureRef>,
+        mesh::SpaceMesh<GltfVertex, GltfTile>,
         MeshIndexCell,
     ),
     FinishFrame(

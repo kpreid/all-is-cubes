@@ -31,7 +31,7 @@ use mesh::Materials;
 mod glue;
 use glue::{convert_quaternion, empty_node, push_and_return_index};
 mod texture;
-pub use texture::{GltfTextureAllocator, GltfTextureRef};
+pub use texture::{GltfTextureAllocator, GltfTile};
 mod vertex;
 pub use vertex::GltfVertex;
 
@@ -174,7 +174,7 @@ impl GltfWriter {
     pub fn add_mesh(
         &mut self,
         name: &dyn fmt::Display,
-        mesh: &SpaceMesh<GltfVertex, GltfTextureRef>,
+        mesh: &SpaceMesh<GltfVertex, GltfTile>,
     ) -> Option<Index<gltf_json::Mesh>> {
         // TODO: Deduplicate meshes so that we don't have to store the same data twice if
         // a world change is undone, or in a cyclic animation (or if two chunks have the

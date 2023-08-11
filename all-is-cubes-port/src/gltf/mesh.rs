@@ -10,7 +10,7 @@ use gltf_json::Index;
 use all_is_cubes_mesh::{IndexSlice, SpaceMesh};
 
 use super::glue::{create_accessor, push_and_return_index, u32size};
-use super::{GltfTextureRef, GltfVertex, GltfWriter};
+use super::{GltfTile, GltfVertex, GltfWriter};
 
 /// Create [`gltf_json::Mesh`] and all its parts (accessors, buffers) from a [`SpaceMesh`].
 ///
@@ -18,7 +18,7 @@ use super::{GltfTextureRef, GltfVertex, GltfWriter};
 pub(crate) fn add_mesh(
     writer: &mut GltfWriter,
     name: &dyn fmt::Display,
-    mesh: &SpaceMesh<GltfVertex, GltfTextureRef>,
+    mesh: &SpaceMesh<GltfVertex, GltfTile>,
 ) -> Option<Index<gltf_json::Mesh>> {
     if mesh.is_empty() {
         return None;

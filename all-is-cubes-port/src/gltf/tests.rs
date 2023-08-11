@@ -14,19 +14,19 @@ use all_is_cubes_mesh::{block_meshes_for_space, MeshOptions, SpaceMesh};
 
 use crate::{ExportError, ExportFormat, ExportSet};
 
-use super::{GltfDataDestination, GltfTextureRef, GltfVertex, GltfWriter, MeshInstance};
+use super::{GltfDataDestination, GltfTile, GltfVertex, GltfWriter, MeshInstance};
 
 /// Test helper to insert one mesh
 pub(crate) fn gltf_mesh(
     space: &Space,
     writer: &mut GltfWriter,
 ) -> (
-    SpaceMesh<GltfVertex, GltfTextureRef>,
+    SpaceMesh<GltfVertex, GltfTile>,
     Option<Index<gltf_json::Mesh>>,
 ) {
     let options = &MeshOptions::new(&GraphicsOptions::default());
     let blocks = block_meshes_for_space(space, &writer.texture_allocator(), options);
-    let mesh: SpaceMesh<GltfVertex, GltfTextureRef> =
+    let mesh: SpaceMesh<GltfVertex, GltfTile> =
         SpaceMesh::new(space, space.bounds(), options, &*blocks);
 
     let index = writer.add_mesh(&"mesh", &mesh);
