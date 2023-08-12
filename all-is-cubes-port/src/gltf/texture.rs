@@ -218,6 +218,9 @@ pub(super) fn insert_block_texture_atlas(
 
 mod internal {
     use super::*;
+    use all_is_cubes::cgmath::EuclideanSpace as _;
+    use std::collections::BTreeMap;
+    use std::mem;
     use std::sync::{Arc, Mutex, OnceLock};
 
     /// Texels are written here through tiles and read through planes.
@@ -233,8 +236,115 @@ mod internal {
         }
 
         pub(crate) fn build_atlas(&self) -> image::RgbaImage {
-            log::warn!("TODO: glTF texture atlas not yet implemented");
-            image::RgbaImage::new(1, 1)
+            use rectangle_pack as rp;
+
+            let entries: Vec<AtlasEntry> =
+                mem::take(&mut self.0.lock().expect("mutex in atlas gatherer"));
+            // TODO: exit early if vec is empty
+
+            // TODO: add anti-bleed borders to atlas
+            let mut rects_to_place: rp::GroupedRectsToPlace<usize, ()> =
+                rp::GroupedRectsToPlace::new();
+            for (
+                i,
+                &AtlasEntry {
+                    source_texels: _,
+                    source_bounds: _,
+                    sliced_bounds,
+                    rotation,
+                },
+            ) in entries.iter().enumerate()
+            {
+                let size = sliced_bounds
+                    .transform(rotation.into())
+                    .unwrap(/* cannot overflow? */)
+                    .size()
+                    .cast::<u32>()
+                    .unwrap(/* cannot overflow */);
+                assert_eq!(
+                    size.z, 1,
+                    "failed to rotate slice {sliced_bounds:?} into the XY plane with {rotation:?}: {size:?}"
+                );
+                rects_to_place.push_rect(i, None, rp::RectToInsert::new(size.x, size.y, size.z));
+            }
+
+            let mut texture_size = 1;
+            let placements = loop {
+                // "Bins" correspond to multiple textures. We will use one bin,
+                // because our goal is to fit everything into one texture rather than
+                // requiring multiple meshes.
+                let mut bins =
+                    BTreeMap::from([((), rp::TargetBin::new(texture_size, texture_size, 1))]);
+
+                match rp::pack_rects(
+                    &rects_to_place,
+                    &mut bins,
+                    &rp::volume_heuristic,
+                    &rp::contains_smallest_box,
+                ) {
+                    Ok(placements) => {
+                        break placements;
+                    }
+                    Err(rp::RectanglePackError::NotEnoughBinSpace) => {
+                        texture_size = texture_size.checked_mul(2).unwrap();
+                    }
+                }
+            };
+
+            let mut atlas_image = image::RgbaImage::new(texture_size, texture_size);
+
+            for (&index, &((), slice_location_in_atlas)) in placements.packed_locations() {
+                let entry = &entries[index];
+
+                let rotated_slice_bounds = entry.rotated_slice_bounds();
+                let rotated_size = rotated_slice_bounds.size().cast::<u32>().unwrap(); // cannot overflow because nonnegative
+                let unrotate = entry.rotation.inverse();
+                let texels_size = entry.source_bounds.size();
+                let texels = entry
+                    .source_texels
+                    .get()
+                    .expect("image texels not set -- TODO propagate error");
+
+                // Copy slice from 3D `texels` into 2D atlas image.
+                // TODO: Something is wrong in this code causing skewed outputs; not yet diagnosed.
+                for y in 0..rotated_size.y {
+                    for x in 0..rotated_size.x {
+                        // Zero-offset position in the rotated-to-flat slice.
+                        let pixel_position = Point3::new(x, y, 0).cast::<i32>().unwrap();
+                        // Position in the rotated-to-flat slice's coordinates.
+                        let position_in_rotated_slice =
+                            pixel_position + rotated_slice_bounds.lower_bounds().to_vec();
+                        // TODO: this single cube is a kludge to simplify off-by-1 problems with rotation
+                        // We should have transform helpers instead of computing twice as many coordinates.
+                        let cube_in_rotated_slice = GridAab::single_cube(position_in_rotated_slice);
+
+                        // Position in the original requested slice's coordinates.
+                        let unrotated = cube_in_rotated_slice.transform(unrotate.into()).unwrap();
+                        assert!(
+                            entry.sliced_bounds.contains_box(unrotated),
+                            "{pixel_position:?} in {rotated_size:?} -> {unrotated:?} in {sliced_bounds:?}",
+                            sliced_bounds = entry.sliced_bounds
+                        );
+
+                        // Position within tile bounds.
+                        let position_in_texels =
+                            unrotated.lower_bounds() - entry.source_bounds.lower_bounds();
+                        // Index into the `texels` array at that position.
+                        let index_in_texels = (position_in_texels.x
+                            + texels_size.x * position_in_texels.y)
+                            + texels_size.y * position_in_texels.z;
+
+                        let texel = texels[usize::try_from(index_in_texels).unwrap()];
+                        atlas_image.put_pixel(
+                            slice_location_in_atlas.x() + x,
+                            slice_location_in_atlas.y() + y,
+                            image::Rgba(texel),
+                        );
+                    }
+                }
+            }
+
+            atlas_image
         }
     }
 
@@ -246,7 +356,6 @@ mod internal {
 
     /// Details of one piece of texture that must be included in the generated texture atlas.
     #[derive(Debug)]
-    #[allow(dead_code)] // TODO: not yet used
     pub(super) struct AtlasEntry {
         /// Texels to extract.
         pub(super) source_texels: TexelsCell,
@@ -256,6 +365,15 @@ mod internal {
         pub(super) sliced_bounds: GridAab,
         /// Rotation that will rotate `sliced_bounds` to be flat in the atlas.
         pub(super) rotation: GridRotation,
+    }
+
+    impl AtlasEntry {
+        pub fn rotated_slice_bounds(&self) -> GridAab {
+            self
+                .sliced_bounds
+                .transform(self.rotation.into())
+                .unwrap(/* cannot overflow because block sizes are limited */)
+        }
     }
 }
 
