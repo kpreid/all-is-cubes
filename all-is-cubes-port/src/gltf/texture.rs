@@ -99,6 +99,7 @@ pub struct GltfTile {
 impl texture::Tile for GltfTile {
     type Point = TexPoint;
     type Plane = GltfTexturePlane;
+    const REUSABLE: bool = false;
 
     fn write(&mut self, data: &[texture::Texel]) {
         assert_eq!(data.len(), self.bounds.volume());

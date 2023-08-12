@@ -52,6 +52,9 @@ pub trait Tile: Clone {
     /// Type of points within the texture, that vertices store.
     type Point;
 
+    /// Whether `write()` may be called more than once.
+    const REUSABLE: bool;
+
     /// Returns the [`GridAab`] originally passed to the texture allocator for this tile.
     fn bounds(&self) -> GridAab;
 
@@ -70,8 +73,11 @@ pub trait Tile: Clone {
     /// the coordinates of the texels follow the pattern
     /// `[[0, 0, 0], [1, 0, 0], ..., [0, 1, 0], [1, 1, 0], ..., [0, 0, 1], [1, 0, 1], ...]`.
     /// Note that this is not the same as the ordering built into [`GridArray`].
+    ///
+    /// If `Self::REUSABLE` is false, this must not be called more than once.
     //---
-    // TODO: Replace it with a GridArray (requires changing the ordering of one or the other).
+    // TODO: Replace slice with a GridArray (requires changing the ordering of one or the other).
+    // TODO: `REUSABLE` is a lousy API because it isn't statically checked
     fn write(&mut self, data: &[Texel]);
 }
 
@@ -205,6 +211,7 @@ pub enum NoTexture {}
 impl Tile for NoTexture {
     type Point = Self;
     type Plane = Self;
+    const REUSABLE: bool = true;
 
     fn bounds(&self) -> GridAab {
         match *self {}
@@ -300,6 +307,7 @@ pub struct TestTile {
 impl Tile for TestTile {
     type Point = TestPoint;
     type Plane = TestTile;
+    const REUSABLE: bool = true;
 
     fn bounds(&self) -> GridAab {
         self.bounds

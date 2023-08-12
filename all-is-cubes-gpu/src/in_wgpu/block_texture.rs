@@ -218,6 +218,7 @@ impl texture::Allocator for AtlasAllocator {
 impl texture::Tile for AtlasTile {
     type Point = TexPoint;
     type Plane = AtlasPlane;
+    const REUSABLE: bool = true;
 
     fn bounds(&self) -> GridAab {
         self.requested_bounds

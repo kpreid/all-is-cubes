@@ -193,6 +193,10 @@ impl<V, T> BlockMesh<V, T> {
     where
         T: texture::Tile,
     {
+        if !T::REUSABLE {
+            return false;
+        }
+
         // Need to deref the Vec in self.textures_used before matching
         match (
             &self.voxel_opacity_mask,
