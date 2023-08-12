@@ -28,10 +28,10 @@ use embedded_graphics::primitives::Rectangle;
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
 
-use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution};
+use crate::block::{self, space_to_blocks, Block, BlockAttributes, Resolution};
 use crate::math::{
     Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid,
-    Rgb, Rgba,
+    Rgb, Rgba, Vol,
 };
 use crate::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
@@ -186,30 +186,60 @@ where
     }
 }
 
-impl<C> Dimensions for DrawingPlane<'_, Space, C> {
-    fn bounding_box(&self) -> Rectangle {
-        // Invert our coordinate transform to bring the space's bounds into the drawing
-        // coordinate system.
-        let bounds = self
-            .space
-            .bounds()
-            .expand(FaceMap::from_fn(|f| if f.is_positive() { -1 } else { 0 }))
-            .transform(self.transform.inverse())
-            .unwrap_or(GridAab::ORIGIN_CUBE);
+impl<Container, Color> DrawTarget for DrawingPlane<'_, Vol<Container>, Color>
+where
+    Container: core::ops::DerefMut<Target = [Color]>,
+    Color: PixelColor,
+{
+    type Color = Color;
+    type Error = core::convert::Infallible;
 
-        let size = bounds.unsigned_size();
-        Rectangle {
-            top_left: Point {
-                x: bounds.lower_bounds().x,
-                y: bounds.lower_bounds().y,
-            },
-            size: Size {
-                width: size.x + 1,
-                height: size.y + 1,
-            },
+    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+    where
+        I: IntoIterator<Item = Pixel<Self::Color>>,
+    {
+        for Pixel(point, color) in pixels.into_iter() {
+            let point3d = self.convert_point(point);
+            if let Some(vox) = self.space.get_mut(point3d) {
+                *vox = color;
+            }
         }
+        Ok(())
     }
 }
+
+impl<C> Dimensions for DrawingPlane<'_, Space, C> {
+    fn bounding_box(&self) -> Rectangle {
+        rectangle_from_bounds(self.transform, self.space.bounds())
+    }
+}
+impl<Container, Color> Dimensions for DrawingPlane<'_, Vol<Container>, Color> {
+    fn bounding_box(&self) -> Rectangle {
+        rectangle_from_bounds(self.transform, self.space.bounds())
+    }
+}
+fn rectangle_from_bounds(transform: Gridgid, bounds: GridAab) -> Rectangle {
+    // Invert our coordinate transform to bring the bounds into the drawing
+    // coordinate system.
+    // TODO: duplicated code with the `Space` impl
+    let bounds = bounds
+        .expand(FaceMap::from_fn(|f| if f.is_positive() { -1 } else { 0 }))
+        .transform(transform.inverse())
+        .unwrap_or(GridAab::ORIGIN_CUBE);
+
+    let size = bounds.unsigned_size();
+    Rectangle {
+        top_left: Point {
+            x: bounds.lower_bounds().x,
+            y: bounds.lower_bounds().y,
+        },
+        size: Size {
+            width: size.x + 1,
+            height: size.y + 1,
+        },
+    }
+}
+
 impl<C> Dimensions for DrawingPlane<'_, SpaceTransaction, C> {
     fn bounding_box(&self) -> Rectangle {
         Rectangle {
@@ -224,6 +254,7 @@ impl<C> Dimensions for DrawingPlane<'_, SpaceTransaction, C> {
         }
     }
 }
+
 /// Adapt [`embedded_graphics`]'s most general color type to ours.
 // TODO: Also adapt the other types, so that if someone wants to use them they can.
 impl From<Rgb888> for Rgb {
@@ -269,6 +300,10 @@ impl<'a> VoxelColor<'a> for Rgba {
     fn into_blocks(self) -> VoxelBrush<'a> {
         VoxelBrush::single(Block::from(self))
     }
+}
+
+impl PixelColor for block::Evoxel {
+    type Raw = ();
 }
 
 /// Adapt [`embedded_graphics`]'s most general color type to ours.
