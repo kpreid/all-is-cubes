@@ -111,6 +111,8 @@ impl GltfWriter {
 
         Self {
             materials: Materials::new(&mut root.materials),
+
+            // TODO: Once texturing actually works, enable allocation here.
             texture_allocator: GltfTextureAllocator::new(buffer_dest.clone(), false),
 
             root,
@@ -185,6 +187,14 @@ impl GltfWriter {
     /// Finish all scene preparation and return the [`gltf_json::Root`] which is to be
     /// written to a JSON file.
     pub fn into_root(mut self, frame_pace: Duration) -> io::Result<gltf_json::Root> {
+        if !self.texture_allocator.is_empty() {
+            let _block_texture_index =
+                texture::insert_block_texture_atlas(&mut self.root, &self.texture_allocator)?;
+
+            // TODO: Rewrite meshes to have texture coordinates and materials to designate
+            // the texture. Otherwise it's useless.
+        }
+
         let mut scene_nodes: Vec<Index<gltf_json::Node>> = Vec::new();
 
         // If we have a camera entity, create a node for it.

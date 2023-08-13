@@ -44,7 +44,10 @@ impl GltfTextureAllocator {
         }
     }
 
-    #[allow(dead_code)] // TODO: not yet used outside of tests
+    pub(crate) fn is_empty(&self) -> bool {
+        self.gatherer.is_empty()
+    }
+
     pub(crate) fn write_png_atlas(&self) -> Result<gltf_json::Buffer, io::Error> {
         let image: image::RgbaImage = self.gatherer.build_atlas();
         let buffer = self
@@ -158,7 +161,7 @@ impl texture::Plane for GltfTexturePlane {
     }
 }
 
-#[allow(dead_code)] // TODO: not yet used
+/// Generate the atlas texture and necessary glTF entities.
 pub(super) fn insert_block_texture_atlas(
     root: &mut gltf_json::Root,
     allocator: &GltfTextureAllocator,
@@ -230,6 +233,10 @@ mod internal {
     pub(super) struct Gatherer(Arc<Mutex<Vec<AtlasEntry>>>);
 
     impl Gatherer {
+        pub(crate) fn is_empty(&self) -> bool {
+            self.0.lock().expect("mutex in atlas gatherer").is_empty()
+        }
+
         pub fn insert(&self, entry: AtlasEntry) {
             self.0.lock().expect("mutex in atlas gatherer").push(entry);
         }
