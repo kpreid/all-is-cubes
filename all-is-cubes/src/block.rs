@@ -127,7 +127,7 @@ pub enum Primitive {
 
 /// Data of [`Primitive::Atom`]. The definition of a single [block](Block) that has uniform
 /// material properties rather than spatially varying ones; a single voxel.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
 pub struct Atom {
     #[allow(missing_docs)]
@@ -764,6 +764,23 @@ impl fmt::Debug for Primitive {
                 .finish(),
             Self::Air => write!(f, "Air"),
         }
+    }
+}
+
+impl fmt::Debug for Atom {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let &Self {
+            ref attributes,
+            color,
+            collision,
+        } = self;
+        let mut s = f.debug_struct("Atom");
+        if attributes != &BlockAttributes::default() {
+            s.field("attributes", &attributes);
+        }
+        s.field("color", &color);
+        s.field("collision", &collision);
+        s.finish()
     }
 }
 

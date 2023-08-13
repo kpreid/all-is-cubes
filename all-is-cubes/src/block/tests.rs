@@ -79,7 +79,6 @@ fn block_debug_with_modifiers() {
         ),
         "Block { \
             primitive: Atom { \
-                attributes: BlockAttributes {}, \
                 color: Rgba(1.0, 0.5, 0.0, 1.0), \
                 collision: Hard }, \
             modifiers: [Rotate(Rxyz)] \

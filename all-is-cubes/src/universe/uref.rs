@@ -701,7 +701,6 @@ mod tests {
             format!("{r:?}"),
             "URef('foo' in no universe = BlockDef { \
                 block: Block { primitive: Atom { \
-                    attributes: BlockAttributes {}, \
                     color: Rgba(1.0, 1.0, 1.0, 1.0), \
                     collision: Hard } }, \
                 notifier: Notifier(0), \
@@ -713,7 +712,6 @@ mod tests {
             URef('foo' in no universe = BlockDef {
                 block: Block {
                     primitive: Atom {
-                        attributes: BlockAttributes {},
                         color: Rgba(1.0, 1.0, 1.0, 1.0),
                         collision: Hard,
                     },
