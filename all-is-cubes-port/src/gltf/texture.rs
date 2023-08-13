@@ -46,7 +46,6 @@ impl GltfTextureAllocator {
 
     #[allow(dead_code)] // TODO: not yet used outside of tests
     pub(crate) fn write_png_atlas(&self) -> Result<gltf_json::Buffer, io::Error> {
-        // TODO: refuse to write more than once. Perhaps take self by value? Or just take the destination.
         let image: image::RgbaImage = self.gatherer.build_atlas();
         let buffer = self
             .destination
@@ -104,8 +103,7 @@ impl texture::Tile for GltfTile {
     fn write(&mut self, data: &[texture::Texel]) {
         assert_eq!(data.len(), self.bounds.volume());
 
-        // TODO: change trait signature so it is possible to express "we do not support multiple writes"
-
+        // OK to panic on failure because if we do, the caller ignored Self::REUSABLE.
         self.texels
             .set(data.to_owned())
             .expect("cannot overwrite glTF textures")
