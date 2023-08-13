@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use cgmath::{Vector4, Zero as _};
+use cgmath::{Vector3, Vector4, Zero as _};
 
 use crate::block::{
     self, BlockAttributes, BlockCollision,
@@ -34,6 +34,13 @@ pub struct EvaluatedBlock {
     /// The block's color; if made of multiple voxels, then an average or representative
     /// color.
     pub color: Rgba,
+
+    /// The overall light emission aggregated from individual voxels.
+    /// This should be interpreted in the same way as the emission field of
+    /// [`block::Primitive::Atom`].
+    ///
+    /// TODO: Add *some* directionality to this.
+    pub light_emission: Rgb,
 
     /// Whether the block is known to be completely opaque to light passing in or out of
     /// each face.
@@ -75,6 +82,7 @@ impl fmt::Debug for EvaluatedBlock {
         let Self {
             attributes,
             color,
+            light_emission,
             voxels,
             opaque,
             visible,
@@ -84,6 +92,7 @@ impl fmt::Debug for EvaluatedBlock {
         let mut ds = fmt.debug_struct("EvaluatedBlock");
         ds.field("attributes", attributes);
         ds.field("color", color);
+        ds.field("light_emission", light_emission);
         ds.field("opaque", opaque);
         ds.field("visible", visible);
         ds.field("uniform_collision", uniform_collision);
@@ -114,16 +123,22 @@ impl EvaluatedBlock {
     pub(crate) fn from_voxels(attributes: BlockAttributes, voxels: Evoxels) -> EvaluatedBlock {
         // Optimization for single voxels:
         // don't allocate any `GridArray`s or perform any generalized scans.
-        if let Some(evoxel) = voxels.single_voxel() {
-            let color = evoxel.color;
+        if let Some(Evoxel {
+            color,
+            emission,
+            selectable: _,
+            collision,
+        }) = voxels.single_voxel()
+        {
             let visible = !color.fully_transparent();
             return EvaluatedBlock {
                 attributes,
                 color,
+                light_emission: emission,
                 voxels,
                 opaque: FaceMap::repeat(color.fully_opaque()),
                 visible,
-                uniform_collision: Some(evoxel.collision),
+                uniform_collision: Some(collision),
                 // Note an edge case shenanigan:
                 // `AIR_EVALUATED` cannot allocate a mask, and we want this to match the
                 // output of that so that `EvaluatedBlock::consistency_check()` will agree.)
@@ -145,8 +160,9 @@ impl EvaluatedBlock {
         // This is actually a sort of mini-raytracer, in that it computes the appearance
         // of all six faces by tracing in from the edges, and then averages them.
         // TODO: Account for reduced bounds being smaller
-        let color: Rgba = {
+        let (color, emission): (Rgba, Rgb) = {
             let mut color_sum: Vector4<f32> = Vector4::zero();
+            let mut emission_sum: Vector3<f32> = Vector3::zero();
             let mut count = 0;
             // Loop over all face voxels.
             // (This is a similar structure to the algorithm we use for mesh generation.)
@@ -163,27 +179,28 @@ impl EvaluatedBlock {
                         ));
                         debug_assert!(voxels.bounds().contains_cube(cube));
 
-                        let buf = raytracer::trace_axis_aligned::<raytracer::ColorBuf>(
-                            &voxels,
-                            cube,
-                            face.opposite(),
-                            resolution,
-                        );
-                        color_sum += Rgba::from(buf).into();
+                        let raytracer::EvalTrace { color, emission } =
+                            raytracer::trace_for_eval(&voxels, cube, face.opposite(), resolution);
+                        color_sum += color.into();
+                        emission_sum += emission;
                         count += 1;
                     }
                 }
             }
             if count == 0 {
-                Rgba::TRANSPARENT
+                (Rgba::TRANSPARENT, Rgb::ZERO)
             } else {
                 // Note the divisors —- this adds transparency to compensate for when the
                 // voxel data doesn't cover the full_block_bounds.
-                Rgba::try_from(
-                    (color_sum.truncate() / (count as f32))
-                        .extend(color_sum.w / (full_block_bounds.surface_area() as f32)),
+                (
+                    Rgba::try_from(
+                        (color_sum.truncate() / (count as f32))
+                            .extend(color_sum.w / (full_block_bounds.surface_area() as f32)),
+                    )
+                    .expect("Recursive block color computation produced NaN"),
+                    Rgb::try_from(emission_sum / full_block_bounds.surface_area() as f32)
+                        .expect("Recursive block emission computation produced NaN"),
                 )
-                .expect("Recursive block color computation produced NaN")
             }
         };
 
@@ -236,6 +253,7 @@ impl EvaluatedBlock {
         EvaluatedBlock {
             attributes,
             color,
+            light_emission: emission,
             opaque: FaceMap::from_fn(|face| {
                 // TODO: This test should be refined by flood-filling in from the face,
                 // so that we can also consider a face opaque if it has hollows/engravings.
@@ -356,6 +374,17 @@ pub struct Evoxel {
     // These are frequently going to be copied into 32-bit texture color anyway.
     pub color: Rgba,
 
+    /// Light emitted (not reflected) by the voxel.
+    ///
+    /// This quantity is the [_luminance_](https://en.wikipedia.org/wiki/Luminance) of
+    /// the block surface, in unspecified units where 1.0 is the display white level
+    /// (except for the effects of tone mapping).
+    /// In the future this may be redefined in terms of a physical unit, but with the same
+    /// dimensions.
+    ///
+    /// TODO: Define the interpretation for non-opaque voxels.
+    pub emission: Rgb,
+
     /// Whether players' [cursors](crate::character::Cursor) target this voxel's containing
     /// block or pass through it.
     pub selectable: bool,
@@ -371,6 +400,7 @@ impl Evoxel {
     /// an [`EvaluatedBlock::voxels`] that is smaller than the full unit cube.
     pub const AIR: Self = Self {
         color: Rgba::TRANSPARENT,
+        emission: Rgb::ZERO,
         selectable: false,
         collision: block::BlockCollision::None,
     };
@@ -381,6 +411,7 @@ impl Evoxel {
     pub fn from_block(block: &EvaluatedBlock) -> Self {
         Self {
             color: block.color,
+            emission: block.light_emission,
             selectable: block.attributes.selectable,
             // TODO: This won't generalize properly to having more than 2 states of
             // BlockCollision. We need uniform_collision to carry more info.
@@ -397,6 +428,7 @@ impl Evoxel {
         const DA: &BlockAttributes = &BlockAttributes::default();
         Self {
             color,
+            emission: Rgb::ZERO,
             selectable: DA.selectable,
             collision: block::BlockCollision::DEFAULT_FOR_FROM_COLOR,
         }
@@ -468,6 +500,14 @@ impl Evoxels {
         }
     }
 
+    // TODO: make public?
+    pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &'_ mut Evoxel> {
+        match self {
+            Evoxels::One(v) => std::slice::from_mut(v).iter_mut(),
+            Evoxels::Many(_, voxels) => voxels.elements_mut().iter_mut(),
+        }
+    }
+
     /// Returns the bounds of the voxel data.
     #[inline]
     pub fn bounds(&self) -> GridAab {
@@ -528,6 +568,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
 pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     attributes: AIR_ATTRIBUTES,
     color: Rgba::TRANSPARENT,
+    light_emission: Rgb::ZERO,
     voxels: Evoxels::One(Evoxel::AIR),
     opaque: FaceMap::repeat_copy(false),
     visible: false,
@@ -545,7 +586,6 @@ const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
     display_name: std::borrow::Cow::Borrowed("<air>"),
     selectable: false,
     rotation_rule: block::RotationPlacementRule::Never,
-    light_emission: Rgb::ZERO,
     tick_action: None,
     animation_hint: block::AnimationHint::UNCHANGING,
 };
@@ -610,6 +650,7 @@ mod tests {
             EvaluatedBlock {
                 attributes,
                 color: Rgba::TRANSPARENT,
+                light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(resolution, GridArray::from_elements(bounds, []).unwrap()),
                 opaque: FaceMap::repeat(false),
                 visible: false,

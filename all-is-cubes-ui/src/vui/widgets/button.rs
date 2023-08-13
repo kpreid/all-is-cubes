@@ -28,9 +28,7 @@ use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
 use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking::{self, InGenError};
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
-use all_is_cubes::math::{
-    Face6, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid, Rgb, Rgba,
-};
+use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid, Rgba};
 use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge;
@@ -410,14 +408,9 @@ mod theme {
     }
 
     /// Build a [`Block`] for [`ButtonBase`].
-    pub fn common_block(space: URef<Space>, active: bool, name: &str) -> Block {
+    pub fn common_block(space: URef<Space>, name: &str) -> Block {
         Block::builder()
             .display_name(name.to_string())
-            .light_emission(if active {
-                palette::BUTTON_ACTIVATED_GLOW
-            } else {
-                Rgb::ZERO
-            })
             .voxels_ref(RESOLUTION, space)
             .build()
     }
@@ -493,7 +486,6 @@ impl ButtonBase for ButtonVisualState {
 
         Ok(theme::common_block(
             universe.insert_anonymous(space),
-            false,
             "Action Button",
         ))
     }
@@ -508,11 +500,14 @@ impl ButtonBase for ToggleButtonVisualState {
     fn button_block(&self, universe: &mut Universe) -> Result<Block, InGenError> {
         let label_z = self.button_label_z();
         let active = self.value;
-        let back_block = Block::from(if active {
-            palette::BUTTON_ACTIVATED_BACK
+        let back_block = if active {
+            Block::builder()
+                .color(palette::BUTTON_ACTIVATED_BACK)
+                .light_emission(palette::BUTTON_ACTIVATED_GLOW)
+                .build()
         } else {
-            palette::BUTTON_BACK
-        });
+            Block::from(palette::BUTTON_BACK)
+        };
         let frame_brush = VoxelBrush::single(Block::from(palette::BUTTON_FRAME));
         let back_brush = VoxelBrush::with_thickness(back_block, 0..label_z);
         let cap_rim_brush = VoxelBrush::new([(
@@ -564,7 +559,6 @@ impl ButtonBase for ToggleButtonVisualState {
 
         Ok(theme::common_block(
             universe.insert_anonymous(space),
-            active,
             &format!("Toggle Button {self}"),
         ))
     }

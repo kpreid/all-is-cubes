@@ -139,6 +139,17 @@ pub struct Atom {
     /// opacity of a unit thickness of the material.
     pub color: Rgba,
 
+    /// Light emitted (not reflected) by the block.
+    ///
+    /// This quantity is the [_luminance_](https://en.wikipedia.org/wiki/Luminance) of
+    /// the block surface, in unspecified units where 1.0 is the display white level
+    /// (except for the effects of tone mapping).
+    /// In the future this may be redefined in terms of a physical unit, but with the same
+    /// dimensions.
+    ///
+    /// TODO: Define the interpretation for non-opaque blocks.
+    pub emission: Rgb,
+
     /// The effect on a [`Body`](crate::physics::Body) of colliding with this block.
     ///
     /// The default value is [`BlockCollision::Hard`].
@@ -447,11 +458,13 @@ impl Block {
             Primitive::Atom(Atom {
                 ref attributes,
                 color,
+                emission,
                 collision,
             }) => MinEval {
                 attributes: attributes.clone(),
                 voxels: Evoxels::One(Evoxel {
                     color,
+                    emission,
                     selectable: attributes.selectable,
                     collision,
                 }),
@@ -688,6 +701,7 @@ mod arbitrary_block {
                 1 => Primitive::Atom(Atom {
                     attributes: BlockAttributes::arbitrary(u)?,
                     color: Rgba::arbitrary(u)?,
+                    emission: Rgb::arbitrary(u)?,
                     collision: BlockCollision::arbitrary(u)?,
                 }),
                 2 => Primitive::Indirect(URef::arbitrary(u)?),
@@ -707,6 +721,7 @@ mod arbitrary_block {
                     size_hint::and_all(&[
                         BlockAttributes::size_hint(depth),
                         Rgba::size_hint(depth),
+                        Rgb::size_hint(depth),
                         BlockCollision::size_hint(depth),
                     ]),
                     URef::<BlockDef>::size_hint(depth),
@@ -772,6 +787,7 @@ impl fmt::Debug for Atom {
         let &Self {
             ref attributes,
             color,
+            emission,
             collision,
         } = self;
         let mut s = f.debug_struct("Atom");
@@ -779,6 +795,9 @@ impl fmt::Debug for Atom {
             s.field("attributes", &attributes);
         }
         s.field("color", &color);
+        if emission != Rgb::ZERO {
+            s.field("emission", &emission);
+        }
         s.field("collision", &collision);
         s.finish()
     }
@@ -799,6 +818,7 @@ mod conversions_for_atom {
             Atom {
                 attributes: BlockAttributes::default(),
                 color,
+                emission: Rgb::ZERO,
                 collision: BlockCollision::DEFAULT_FOR_FROM_COLOR,
             }
         }

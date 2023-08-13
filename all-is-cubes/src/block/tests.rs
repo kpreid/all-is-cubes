@@ -127,12 +127,12 @@ fn evaluate_opaque_atom_and_attributes() {
     let attributes = BlockAttributes {
         display_name: Cow::Borrowed("hello world"),
         selectable: false,
-        light_emission: Rgb::ONE,
         ..BlockAttributes::default()
     };
     let block = Block::from(Atom {
         attributes: attributes.clone(),
         color,
+        emission: Rgb::ONE,
         collision: BlockCollision::None,
     });
     let e = block.evaluate().unwrap();
@@ -142,6 +142,7 @@ fn evaluate_opaque_atom_and_attributes() {
         e.voxels,
         Evoxels::One(Evoxel {
             color,
+            emission: Rgb::ONE,
             selectable: false,
             collision: BlockCollision::None,
         })
@@ -209,6 +210,7 @@ fn evaluate_voxels_checked_individually() {
                 let point = point.cast::<f32>().unwrap();
                 Evoxel {
                     color: Rgba::new(point.x, point.y, point.z, 1.0),
+                    emission: Rgb::ZERO,
                     selectable: true,
                     collision: BlockCollision::Hard,
                 }
@@ -360,6 +362,7 @@ fn recur_with_offset() {
                 let point = (point + offset).cast::<f32>().unwrap();
                 Evoxel {
                     color: Rgba::new(point.x, point.y, point.z, 1.0),
+                    emission: Rgb::ZERO,
                     selectable: true,
                     collision: BlockCollision::Hard,
                 }

@@ -7,16 +7,15 @@ use instant::Duration;
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
-use all_is_cubes::behavior;
 use all_is_cubes::block::{Block, BlockCollision, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace as _};
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{cube_to_midpoint, GridAab, GridArray, GridPoint, GridVector, Rgba};
-use all_is_cubes::rgba_const;
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{RefVisitor, UniverseTransaction, VisitRefs};
+use all_is_cubes::{behavior, rgba_const};
 
 /// A [`Behavior`] which animates a recursive block by periodically recomputing all of its
 /// voxels.
@@ -125,6 +124,7 @@ impl Fire {
         fn fire_color(color: Rgba) -> Block {
             Block::builder()
                 .color(color)
+                .light_emission(color.to_rgb() * 20.0)
                 .collision(BlockCollision::None)
                 .build()
         }

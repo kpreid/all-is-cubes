@@ -200,7 +200,7 @@ mod tests {
 
     use crate::block::{Block, Composite, EvaluatedBlock, Evoxel, Resolution::*};
     use crate::content::make_some_blocks;
-    use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgba};
+    use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgb, Rgba};
     use crate::space::Space;
     use crate::time::practically_infinite_deadline;
     use crate::universe::Universe;
@@ -225,6 +225,7 @@ mod tests {
             EvaluatedBlock {
                 attributes: ev_original.attributes.clone(),
                 color: color.to_rgb().with_alpha(NotNan::new(2. / 3.).unwrap()),
+                light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(
                     R16,
                     GridArray::repeat(expected_bounds, Evoxel::from_block(&ev_original))
@@ -264,6 +265,7 @@ mod tests {
             EvaluatedBlock {
                 attributes: ev_original.attributes.clone(),
                 color: color.to_rgb().with_alpha(NotNan::new(2. / 3.).unwrap()),
+                light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(
                     resolution,
                     GridArray::repeat(expected_bounds, Evoxel::from_block(&ev_original))

@@ -92,7 +92,9 @@ impl Modifier {
             Modifier::Quote(Quote { suppress_ambient }) => {
                 value.attributes.tick_action = None;
                 if suppress_ambient {
-                    value.attributes.light_emission = Rgb::ZERO;
+                    for voxel in value.voxels.iter_mut() {
+                        voxel.emission = Rgb::ZERO;
+                    }
                 }
                 value
             }
@@ -234,11 +236,13 @@ mod tests {
             EvaluatedBlock {
                 attributes: oe.attributes,
                 color: Rgba::new(1. / 3., 0., 1. / 3., 2. / 3.),
+                light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(
                     R2,
                     GridArray::from_fn(block_bounds, |cube| {
                         Evoxel {
                             color: rotated_color_fn(cube),
+                            emission: Rgb::ZERO,
                             selectable: true,
                             collision: BlockCollision::Hard,
                         }

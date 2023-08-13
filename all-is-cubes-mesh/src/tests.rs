@@ -1,5 +1,6 @@
 //! Tests for [`crate::mesh`].
 
+use all_is_cubes::math::Rgb;
 use pretty_assertions::assert_eq;
 
 use all_is_cubes::block::{
@@ -92,11 +93,13 @@ fn non_uniform_fill(cube: GridPoint) -> &'static Block {
     const C1: &Primitive = &Primitive::Atom(Atom {
         attributes: BlockAttributes::default(),
         color: rgba_const!(1., 1., 1., 1.),
+        emission: Rgb::ZERO,
         collision: BlockCollision::Hard,
     });
     const C2: &Primitive = &Primitive::Atom(Atom {
         attributes: BlockAttributes::default(),
         color: rgba_const!(0., 0., 0., 1.),
+        emission: Rgb::ZERO,
         collision: BlockCollision::Hard,
     });
     const BLOCKS: &[Block] = &[

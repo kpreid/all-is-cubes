@@ -74,6 +74,8 @@ pub(crate) enum PrimitiveSer {
     AirV1,
     AtomV1 {
         color: RgbaSer,
+        #[serde(default, skip_serializing_if = "is_default")]
+        light_emission: RgbSer,
         #[serde(flatten)]
         attributes: BlockAttributesV1Ser,
         #[serde(default, skip_serializing_if = "is_default")]
@@ -100,8 +102,6 @@ pub(crate) struct BlockAttributesV1Ser {
     pub selectable: bool,
     #[serde(default, skip_serializing_if = "is_default")]
     pub rotation_rule: RotationPlacementRuleSer,
-    #[serde(default, skip_serializing_if = "is_default")]
-    pub light_emission: RgbSer,
     // TODO: tick_action is a kludge but we should serialize it or its replacement
     // pub(crate) tick_action: Option<VoxelBrush<'static>>,
     #[serde(default, skip_serializing_if = "is_default")]

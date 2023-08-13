@@ -47,15 +47,30 @@ mod tests {
     fn quote_evaluation() {
         let l = Rgb::new(1.0, 2.0, 3.0);
         let mut block = Block::builder()
-            .light_emission(l)
             .color(Rgba::WHITE)
+            .light_emission(l)
             .build();
-        assert_eq!(block.evaluate().unwrap().attributes.light_emission, l);
+        assert_eq!(
+            block
+                .evaluate()
+                .unwrap()
+                .voxels
+                .single_voxel()
+                .unwrap()
+                .emission,
+            l
+        );
         block.modifiers_mut().push(Modifier::Quote(Quote {
             suppress_ambient: true,
         }));
         assert_eq!(
-            block.evaluate().unwrap().attributes.light_emission,
+            block
+                .evaluate()
+                .unwrap()
+                .voxels
+                .single_voxel()
+                .unwrap()
+                .emission,
             Rgb::ZERO
         );
     }

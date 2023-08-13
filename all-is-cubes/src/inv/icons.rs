@@ -12,7 +12,7 @@ use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{
     cube_to_midpoint, Face6, FreeCoordinate, GridCoordinate, GridRotation, GridVector, Gridgid,
-    Rgb, Rgba,
+    Rgba,
 };
 use crate::space::Space;
 use crate::universe::Universe;
@@ -202,7 +202,10 @@ impl Icons {
                     let shell_block = Block::from(rgb_const!(0.5, 0.5, 0.5));
                     let stripe_block = Block::from(rgb_const!(0.9, 0.1, 0.1));
                     let exhaust = if active {
-                        Block::from(rgba_const!(1.0, 1.0, 1.0, 0.1))
+                        Block::builder()
+                            .color(rgba_const!(1.0, 1.0, 1.0, 0.1))
+                            .light_emission(rgb_const!(1.0, 0.8, 0.8) * 10.0)
+                            .build()
                     } else {
                         AIR
                     };
@@ -234,11 +237,6 @@ impl Icons {
                             "Jetpack (on)"
                         } else {
                             "Jetpack (off)"
-                        })
-                        .light_emission(if active {
-                            rgb_const!(1.0, 0.8, 0.8) * 0.5
-                        } else {
-                            Rgb::ZERO
                         })
                         .voxels_fn(universe, resolution, |p| {
                             let (shape_radius, block) =

@@ -360,7 +360,6 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
         let fire_resolution = R8;
         Block::builder()
             .animation_hint(AnimationHint::CONTINUOUS)
-            .light_emission(rgb_const!(1.4, 1.0, 0.8) * 8.0)
             .voxels_ref(fire_resolution, {
                 let fire_bounds = GridAab::for_block(fire_resolution);
                 let mut space = Space::for_block(fire_resolution).build();

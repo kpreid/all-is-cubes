@@ -203,8 +203,8 @@ pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
                 step.cube_ahead(),
                 Block::builder()
                     .display_name(display_name)
-                    .light_emission(axis_color * 3.0)
                     .color(color.with_alpha_one())
+                    .light_emission(axis_color * 3.0)
                     .build(),
             )?;
         }
@@ -245,6 +245,7 @@ mod tests {
                     ..BlockAttributes::default()
                 },
                 color: Rgba::new(0.5, 0.5, 0.5, 1.0),
+                emission: Rgb::ZERO,
                 collision: BlockCollision::Hard,
             })]
         );
@@ -261,6 +262,7 @@ mod tests {
                         ..BlockAttributes::default()
                     },
                     color: Rgba::new(0.0, 0.0, 0.0, 1.0),
+                    emission: Rgb::ZERO,
                     collision: BlockCollision::Hard,
                 }),
                 Block::from(Atom {
@@ -269,6 +271,7 @@ mod tests {
                         ..BlockAttributes::default()
                     },
                     color: Rgba::new(1.0, 1.0, 1.0, 1.0),
+                    emission: Rgb::ZERO,
                     collision: BlockCollision::Hard,
                 })
             ]

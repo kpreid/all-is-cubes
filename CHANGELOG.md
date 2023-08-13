@@ -15,6 +15,10 @@
 ### Changed
 
 - `all-is-cubes` library:
+    - Block schema and behavior changes:
+        - Light emission is now a property of `Atom` blocks instead of `BlockAttributes`.
+        - `EvaluatedBlock`’s `color` field is computed more accurately, ignoring voxels hidden by other voxels.
+
     - The following functions have changed signature to use the new type `math::Gridgid`:
         - `math::GridAab::transform()`
         - `math::GridMatrix::decompose()`

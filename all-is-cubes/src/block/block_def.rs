@@ -105,6 +105,7 @@ impl VisitRefs for block::Atom {
         let Self {
             attributes,
             color: _,
+            emission: _,
             collision: _,
         } = self;
         attributes.visit_refs(visitor);

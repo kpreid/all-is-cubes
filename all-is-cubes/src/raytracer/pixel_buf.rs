@@ -134,7 +134,7 @@ pub struct ColorBuf {
 
     /// Fraction of the color value that is to be determined by future, rather than past,
     /// tracing; starts at 1.0 and decreases as surfaces are encountered.
-    ray_alpha: f32,
+    pub(super) ray_alpha: f32,
 }
 
 impl PixelBuf for ColorBuf {

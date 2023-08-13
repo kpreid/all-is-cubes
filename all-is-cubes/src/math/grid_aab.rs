@@ -1022,6 +1022,14 @@ impl<V> GridArray<V> {
         self.bounds.interior_iter().zip(self.contents.iter_mut())
     }
 
+    /// Returns mutable access to the contents. They are ordered in the same order that
+    /// [`GridArray::from_elements()`] expects.
+    pub(crate) fn elements_mut(&mut self) -> &mut [V] {
+        // Note that since we only return a reference to the _slice_, providing this access
+        // cannot break the length invariant.
+        &mut self.contents
+    }
+
     /// Apply `f` to each element of the array, producing a new array of the results.
     pub fn map<T, F>(self, f: F) -> GridArray<T>
     where
@@ -1034,7 +1042,7 @@ impl<V> GridArray<V> {
     }
 
     /// Returns the contents without copying. They are ordered in the same order that
-    /// [`GridArray::from_elements()`] expects
+    /// [`GridArray::from_elements()`] expects.
     pub(crate) fn into_elements(self) -> Box<[V]> {
         self.contents
     }

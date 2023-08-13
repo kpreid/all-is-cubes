@@ -106,8 +106,8 @@ fn light_source_self_illumination_transparent() {
     let light = Rgb::new(0.5, 1.0, 2.0);
     let alpha = 0.125;
     let block = Block::builder()
-        .light_emission(light)
         .color(Rgba::new(1.0, 0.0, 0.0, alpha)) // irrelevant except for alpha
+        .light_emission(light)
         .build();
 
     let space = light_source_test_space(block);
@@ -120,8 +120,8 @@ fn light_source_self_illumination_transparent() {
 fn light_source_self_illumination_opaque() {
     let light = Rgb::new(0.5, 1.0, 2.0);
     let block = Block::builder()
-        .light_emission(light)
         .color(Rgba::new(1.0, 1.0, 1.0, 1.0)) // irrelevant except for alpha
+        .light_emission(light)
         .build();
 
     let space = light_source_test_space(block);

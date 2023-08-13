@@ -10,7 +10,9 @@
 
 use std::fmt;
 
-use cgmath::{EuclideanSpace as _, InnerSpace as _, Point2, Vector2, Vector3, VectorSpace as _};
+use cgmath::{
+    EuclideanSpace as _, InnerSpace as _, Point2, Vector2, Vector3, VectorSpace as _, Zero as _,
+};
 use cgmath::{Point3, Vector4};
 use ordered_float::NotNan;
 #[cfg(feature = "threads")]
@@ -580,26 +582,38 @@ fn apply_transmittance(color: Rgba, thickness: f32) -> Rgba {
 /// * Follows an axis-aligned ray only.
 ///
 /// `origin` should be the first cube to trace through *within* the grid.
-pub(crate) fn trace_axis_aligned<P: PixelBuf<BlockData = ()>>(
+pub(crate) fn trace_for_eval(
     voxels: &Evoxels,
     origin: GridPoint,
     direction: Face6,
     resolution: Resolution,
-) -> P {
+) -> EvalTrace {
     let thickness = f32::from(resolution).recip();
     let step = direction.normal_vector();
 
     let mut cube = origin;
-    let mut buf = P::default();
+    let mut color_buf = ColorBuf::default();
+    let mut emission = Vector3::zero();
 
     while let Some(voxel) = voxels.get(cube) {
-        buf.add(apply_transmittance(voxel.color, thickness), &());
-        if buf.opaque() {
+        emission += Vector3::<f32>::from(voxel.emission) * color_buf.ray_alpha;
+        color_buf.add(apply_transmittance(voxel.color, thickness), &());
+
+        if color_buf.opaque() {
             break;
         }
         cube += step;
     }
-    buf
+    EvalTrace {
+        color: color_buf.into(),
+        emission,
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct EvalTrace {
+    pub color: Rgba,
+    pub emission: Vector3<f32>,
 }
 
 #[cfg(feature = "threads")]

@@ -634,7 +634,10 @@ pub async fn install_dungeon_blocks(
     let one_diagonal = GridVector::new(1, 1, 1);
     let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);
 
-    let light_voxel = Block::from(Rgb::new(0.7, 0.7, 0.0));
+    let light_voxel = Block::builder()
+        .color(Rgba::new(0.7, 0.7, 0.0, 1.0))
+        .light_emission(Rgb::new(8.0, 7.0, 0.7))
+        .build();
     let spike_metal = Block::from(palette::STEEL);
 
     use DungeonBlocks::*;
@@ -642,7 +645,6 @@ pub async fn install_dungeon_blocks(
         Ok(match key {
             CorridorLight => Block::builder()
                 .display_name("Corridor Light")
-                .light_emission(Rgb::new(8.0, 7.0, 0.7))
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::PY })
                 .voxels_fn(universe, resolution, |cube| {
                     let centered = cube * 2 - center_point_doubled;

@@ -105,8 +105,13 @@ pub async fn install_demo_blocks(
         }
     };
 
-    let lamp_globe = Block::from(Rgba::WHITE);
-    let lamppost_metal = Block::from(palette::ALMOST_BLACK);
+    let lamp_globe = Block::builder()
+        .color(Rgba::WHITE)
+        .light_emission(Rgb::ONE * 20.0)
+        .build();
+    let lamppost_metal = Block::builder()
+        .color(palette::ALMOST_BLACK.with_alpha_one())
+        .build();
     let lamppost_edge = Block::from(palette::ALMOST_BLACK * 1.12);
 
     let pedestal_voxel = Block::from(palette::STONE);
@@ -148,7 +153,6 @@ pub async fn install_demo_blocks(
 
             Lamp => Block::builder()
                 .display_name("Lamp")
-                .light_emission(Rgb::new(20.0, 20.0, 20.0))
                 .voxels_fn(universe, resolution, |p| {
                     if int_magnitude_squared(p * 2 + one_diagonal - center_point_doubled)
                         <= resolution_g.pow(2)
@@ -162,7 +166,6 @@ pub async fn install_demo_blocks(
 
             LamppostSegment => Block::builder()
                 .display_name("Lamppost")
-                .light_emission(Rgb::new(3.0, 3.0, 3.0))
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |cube| {
                     if int_magnitude_squared(
@@ -216,7 +219,6 @@ pub async fn install_demo_blocks(
 
             Sconce => Block::builder()
                 .display_name("Sconce")
-                .light_emission(Rgb::new(8.0, 7.0, 6.0))
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
                 .voxels_fn(universe, resolution, |p| {
                     // TODO: fancier/tidier appearance; this was just some tinkering from the original `Lamp` sphere

@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::fmt;
 
 use crate::drawing::VoxelBrush;
-use crate::math::{Face6, Rgb};
+use crate::math::Face6;
 
 #[cfg(doc)]
 use crate::{
@@ -36,11 +36,6 @@ pub struct BlockAttributes {
     /// The default value is [`RotationPlacementRule::Never`].
     pub rotation_rule: RotationPlacementRule,
 
-    /// Light emitted by the block.
-    ///
-    /// The default value is [`Rgb::ZERO`].
-    pub light_emission: Rgb,
-
     /// Something this block does when time passes.
     ///
     /// Currently the only possibility is “turn into another block”.
@@ -68,7 +63,6 @@ impl fmt::Debug for BlockAttributes {
                 display_name,
                 selectable,
                 rotation_rule,
-                light_emission,
                 tick_action,
                 animation_hint,
             } = self;
@@ -83,9 +77,6 @@ impl fmt::Debug for BlockAttributes {
             }
             if *rotation_rule != Self::DEFAULT_REF.rotation_rule {
                 s.field("rotation_rule", rotation_rule);
-            }
-            if *light_emission != Self::DEFAULT_REF.light_emission {
-                s.field("light_emission", light_emission);
             }
             if *tick_action != Self::DEFAULT_REF.tick_action {
                 s.field("tick_action", tick_action);
@@ -103,7 +94,6 @@ impl BlockAttributes {
         display_name: Cow::Borrowed(""),
         selectable: true,
         rotation_rule: RotationPlacementRule::Never,
-        light_emission: Rgb::ZERO,
         tick_action: None,
         animation_hint: AnimationHint::UNCHANGING,
     };
@@ -134,7 +124,6 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
             display_name: Cow::Owned(u.arbitrary()?),
             selectable: u.arbitrary()?,
             rotation_rule: u.arbitrary()?,
-            light_emission: u.arbitrary()?,
             tick_action: None, // TODO: need Arbitrary for Block
             animation_hint: u.arbitrary()?,
         })
@@ -145,7 +134,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
             String::size_hint(depth),
             bool::size_hint(depth),
             RotationPlacementRule::size_hint(depth),
-            Rgb::size_hint(depth),
+            crate::math::Rgb::size_hint(depth),
             AnimationHint::size_hint(depth),
         ])
     }
@@ -157,7 +146,6 @@ impl crate::universe::VisitRefs for BlockAttributes {
             display_name: _,
             selectable: _,
             rotation_rule: _,
-            light_emission: _,
             tick_action,
             animation_hint: _,
         } = self;
@@ -349,13 +337,6 @@ mod tests {
                 ..default()
             }),
             "BlockAttributes { selectable: false }",
-        );
-        assert_eq!(
-            &*debug(BlockAttributes {
-                light_emission: Rgb::new(1.0, 2.0, 3.0),
-                ..default()
-            }),
-            "BlockAttributes { light_emission: Rgb(1.0, 2.0, 3.0) }",
         );
         assert_eq!(
             &*debug(BlockAttributes {

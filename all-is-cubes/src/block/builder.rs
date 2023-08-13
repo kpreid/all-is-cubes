@@ -90,12 +90,6 @@ impl<C> BlockBuilder<C> {
         self
     }
 
-    /// Sets the value for [`BlockAttributes::light_emission`].
-    pub fn light_emission(mut self, value: impl Into<Rgb>) -> Self {
-        self.attributes.light_emission = value.into();
-        self
-    }
-
     /// Sets the value for [`BlockAttributes::tick_action`].
     pub fn tick_action(mut self, value: Option<VoxelBrush<'static>>) -> Self {
         self.attributes.tick_action = value;
@@ -124,6 +118,7 @@ impl<C> BlockBuilder<C> {
             attributes: self.attributes,
             primitive_builder: BlockBuilderAtom {
                 color: color.into(),
+                emission: Rgb::ZERO,
                 collision: BlockCollision::Hard,
             },
             modifiers: Vec::new(),
@@ -221,6 +216,20 @@ impl BlockBuilder<BlockBuilderAtom> {
         self.primitive_builder.collision = collision;
         self
     }
+
+    /// Sets the light emission of a [`Primitive::Atom`] block.
+    ///
+    /// This quantity is the [_luminance_](https://en.wikipedia.org/wiki/Luminance) of
+    /// the block surface, in unspecified units where 1.0 is the display white level
+    /// (except for the effects of tone mapping).
+    /// In the future this may be redefined in terms of a physical unit, but with the same
+    /// dimensions.
+    ///
+    /// TODO: Define the interpretation for non-opaque blocks.
+    pub fn light_emission(mut self, value: impl Into<Rgb>) -> Self {
+        self.primitive_builder.emission = value.into();
+        self
+    }
 }
 
 /// Voxel-specific builder methods.
@@ -283,6 +292,7 @@ impl<T: BuildPrimitiveIndependent> BuildPrimitiveInUniverse for T {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct BlockBuilderAtom {
     color: Rgba,
+    emission: Rgb,
     collision: BlockCollision,
 }
 impl BuildPrimitiveIndependent for BlockBuilderAtom {
@@ -290,6 +300,7 @@ impl BuildPrimitiveIndependent for BlockBuilderAtom {
         Primitive::Atom(Atom {
             attributes,
             color: self.color,
+            emission: self.emission,
             collision: self.collision,
         })
     }
@@ -330,6 +341,7 @@ mod tests {
             Block::from(Atom {
                 attributes: BlockAttributes::default(),
                 color,
+                emission: Rgb::ZERO,
                 collision: BlockCollision::Hard,
             }),
         );
@@ -346,7 +358,7 @@ mod tests {
     #[test]
     fn every_field_nondefault() {
         let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
-        let light_emission = Rgb::new(0.1, 3.0, 0.1);
+        let emission = Rgb::new(0.1, 3.0, 0.1);
         let rotation_rule = RotationPlacementRule::Attach { by: Face6::NZ };
         let tick_action = Some(VoxelBrush::single(AIR));
         assert_eq!(
@@ -356,7 +368,7 @@ mod tests {
                 .collision(BlockCollision::None)
                 .rotation_rule(rotation_rule)
                 .selectable(false)
-                .light_emission(light_emission)
+                .light_emission(emission)
                 .tick_action(tick_action.clone())
                 .animation_hint(AnimationHint::TEMPORARY)
                 .build(),
@@ -365,11 +377,11 @@ mod tests {
                     display_name: "hello world".into(),
                     rotation_rule,
                     selectable: false,
-                    light_emission,
                     tick_action,
                     animation_hint: AnimationHint::TEMPORARY,
                 },
                 color,
+                emission,
                 collision: BlockCollision::None,
             }),
         );

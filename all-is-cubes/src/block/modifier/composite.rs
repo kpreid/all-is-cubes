@@ -5,7 +5,7 @@ use ordered_float::NotNan;
 use crate::block::{
     self, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, Resolution::R1, AIR,
 };
-use crate::math::{GridAab, GridArray, GridCoordinate, GridRotation, Rgba};
+use crate::math::{GridAab, GridArray, GridCoordinate, GridRotation, Rgb};
 use crate::universe;
 
 /// Data for [`Modifier::Composite`], describing how to combine the voxels of another
@@ -163,7 +163,6 @@ impl Composite {
             rotation_rule: dst_att.rotation_rule, // TODO merge
             // TODO: summing is kinda correct for "this contains a light source", but isn't
             // very justifiable; we should probably use per-voxel light emission instead
-            light_emission: src_att.light_emission + dst_att.light_emission,
             tick_action: dst_att.tick_action,       // TODO: merge
             animation_hint: dst_att.animation_hint, // TODO: merge
         };
@@ -264,8 +263,35 @@ impl CompositeOperator {
     fn blend_evoxel(&self, src_ev: Evoxel, dst_ev: Evoxel) -> Evoxel {
         use BlockCollision as Coll;
         Evoxel {
-            color: self.blend_color(src_ev.color, dst_ev.color),
+            color: {
+                // Clamp to avoid silly outcomes of the arithmetic.
+                let source = src_ev.color.clamp();
+                let destination = dst_ev.color.clamp();
+                let (rgb, a) = self.alpha_blend(
+                    source.to_rgb(),
+                    source.alpha(),
+                    destination.to_rgb(),
+                    destination.alpha(),
+                );
+                rgb.with_alpha(a)
+            },
+
+            // TODO: This doesn't work correctly when something is transparent and emissive.
+            // We need to define the semantics of that in terms of volumetric rendering.
+            emission: {
+                let (color_blend, alpha) = self.alpha_blend(
+                    src_ev.emission,
+                    src_ev.color.clamp().alpha(),
+                    dst_ev.emission,
+                    dst_ev.color.clamp().alpha(),
+                );
+                // effectively “premultiplying” in order to apply the intended effect of
+                // alpha on the intensity
+                color_blend * alpha
+            },
+
             selectable: self.blend_binary(src_ev.selectable, dst_ev.selectable),
+
             collision: {
                 let src_is_something = !matches!(src_ev.collision, Coll::None);
                 let dst_is_something = !matches!(dst_ev.collision, Coll::None);
@@ -286,35 +312,38 @@ impl CompositeOperator {
         }
     }
 
-    /// Called by [`Self::blend_evoxel()`] to handle colors.
-    fn blend_color(&self, source: Rgba, destination: Rgba) -> Rgba {
-        let source = source.clamp();
-        let destination = destination.clamp();
+    /// Called by [`Self::blend_evoxel()`] to handle diffuse and emissive colors.
+    ///
+    /// Note that this does not accept and return `Rgba` because the output is not necessarily
+    /// in the 0-1 range; it might work but that's not an intended use of the type.
+    fn alpha_blend(
+        &self,
+        source: Rgb,
+        sa: NotNan<f32>,
+        destination: Rgb,
+        da: NotNan<f32>,
+    ) -> (Rgb, NotNan<f32>) {
         match self {
             Self::Over => {
                 // TODO: Surely this is not the only place we have implemented rgba blending?
                 // Note that this math would be simpler if we used premultiplied alpha.
-                let sa = source.alpha();
                 let sa_complement = NotNan::new(1. - sa.into_inner()).unwrap();
-                let rgb = source.to_rgb() * sa + destination.to_rgb() * sa_complement;
-                rgb.with_alpha(sa + sa_complement * destination.alpha())
+                let rgb = source * sa + destination * sa_complement;
+                (rgb, sa + sa_complement * da)
             }
 
-            Self::In => source
-                .to_rgb()
-                .with_alpha(source.alpha() * destination.alpha()),
+            Self::In => (source, sa * da),
 
             Self::Atop => {
-                let sa = source.alpha();
                 let sa_complement = NotNan::new(1. - sa.into_inner()).unwrap();
-                let rgb = source.to_rgb() * sa + destination.to_rgb() * sa_complement;
+                let rgb = source * sa + destination * sa_complement;
 
-                let out_alpha = destination.alpha();
+                let out_alpha = da;
                 if out_alpha == 0.0 {
                     // we wouldn't have to do this if we used premultiplied alpha :/
-                    Rgba::TRANSPARENT
+                    (Rgb::ZERO, out_alpha)
                 } else {
-                    rgb.with_alpha(out_alpha)
+                    (rgb, out_alpha)
                 }
             }
         }
@@ -336,6 +365,7 @@ mod tests {
     use super::*;
     use crate::block::EvaluatedBlock;
     use crate::content::make_some_blocks;
+    use crate::math::{Rgb, Rgba};
     use pretty_assertions::assert_eq;
     use BlockCollision::{Hard, None as CNone};
     use CompositeOperator::{Atop, In, Over};
@@ -347,12 +377,30 @@ mod tests {
     fn assert_blend(src: Evoxel, operator: CompositeOperator, dst: Evoxel, outcome: Evoxel) {
         // TODO: Replace this direct call with going through the full block evaluation.
 
-        assert_eq!(operator.blend_evoxel(src, dst), outcome);
+        assert_eq!(
+            operator.blend_evoxel(src, dst),
+            outcome,
+            "\nexpecting {operator:?}.blend(\n  {src:?},\n  {dst:?}\n) == {outcome:?}"
+        );
     }
 
     fn evcolor(color: Rgba) -> Evoxel {
         Evoxel {
             color,
+            emission: Rgb::ZERO,
+            selectable: true,
+            collision: Hard,
+        }
+    }
+
+    /// Construct a voxel with light emission.
+    /// Alpha is taken too, because alpha is used to control blending.
+    fn evemit(emission: Rgb, alpha: f32) -> Evoxel {
+        Evoxel {
+            // color doesn't matter, except that at zero alpha it should be the canonical zero
+            // for convenience of testing. (TODO: maybe `Rgba` should enforce that or be premultiplied.)
+            color: Rgb::ZERO.with_alpha(NotNan::new(alpha).unwrap()),
+            emission,
             selectable: true,
             collision: Hard,
         }
@@ -361,7 +409,8 @@ mod tests {
     fn evcoll(collision: BlockCollision) -> Evoxel {
         Evoxel {
             color: Rgba::WHITE, // no effect
-            selectable: false,  // no effect
+            emission: Rgb::ZERO,
+            selectable: false, // no effect
             collision,
         }
     }
@@ -379,10 +428,44 @@ mod tests {
     #[test]
     fn blend_over_silly_floats() {
         // We just want to see this does not panic on NaN.
-        CompositeOperator::Over.blend_color(
-            Rgba::new(2e25, 2e25, 2e25, 2e25),
-            Rgba::new(2e25, 2e25, 2e25, 2e25),
+        CompositeOperator::Over.blend_evoxel(
+            evcolor(Rgba::new(2e25, 2e25, 2e25, 2e25)),
+            evcolor(Rgba::new(2e25, 2e25, 2e25, 2e25)),
         );
+    }
+
+    #[test]
+    fn blend_over_emission() {
+        let red_1 = evemit(Rgb::new(1., 0., 0.), 1.0);
+        let green_0 = evemit(Rgb::new(0., 1., 0.), 0.0);
+        let green_05 = evemit(Rgb::new(0., 1., 0.), 0.5);
+        let none_1 = evemit(Rgb::ZERO, 1.0);
+        let none_0 = evemit(Rgb::ZERO, 0.0);
+
+        // Simple 100% blending cases
+        assert_blend(red_1, Over, none_1, red_1);
+        assert_blend(none_1, Over, red_1, none_1);
+        assert_blend(none_1, Over, none_1, none_1);
+        assert_blend(red_1, Over, red_1, red_1);
+        assert_blend(red_1, Over, none_0, red_1);
+        assert_blend(none_0, Over, red_1, red_1);
+
+        // Partial alpha
+        assert_blend(red_1, Over, green_05, red_1);
+        assert_blend(green_05, Over, red_1, evemit(Rgb::new(0.5, 0.5, 0.0), 1.0));
+        assert_blend(
+            green_05,
+            Over,
+            green_05,
+            evemit(Rgb::new(0.0, 0.75, 0.0), 0.75),
+        );
+        // assert_blend(green_05, Over, none_0, green_05); // TODO: broken, too dim
+
+        // What if emission with zero alpha is blended in?
+        assert_blend(green_0, Over, none_1, none_1);
+        // assert_blend(green_0, Over, none_0, green_0); // TODO
+        assert_blend(none_1, Over, green_0, none_1);
+        // assert_blend(green_0, Over, green_0, green_0); // TODO: goes to zero
     }
 
     #[test]
@@ -391,6 +474,43 @@ mod tests {
         assert_blend(evcoll(CNone), Over, evcoll(CNone), evcoll(CNone));
         assert_blend(evcoll(Hard), Over, evcoll(CNone), evcoll(Hard));
         assert_blend(evcoll(CNone), Over, evcoll(Hard), evcoll(Hard));
+    }
+
+    #[test]
+    fn blend_in_emission() {
+        let red_1 = evemit(Rgb::new(1., 0., 0.), 1.0);
+        let green_1 = evemit(Rgb::new(0., 1., 0.), 1.0);
+        let green_0 = evemit(Rgb::new(0., 1., 0.), 0.0);
+        let green_05 = evemit(Rgb::new(0., 1., 0.), 0.5);
+        let none_1 = evemit(Rgb::ZERO, 1.0);
+        let none_0 = evemit(Rgb::ZERO, 0.0);
+
+        // Simple 100% blending cases
+        assert_blend(red_1, In, none_1, red_1);
+        assert_blend(red_1, In, red_1, red_1);
+        assert_blend(red_1, In, green_1, red_1);
+        assert_blend(red_1, In, none_0, none_0);
+        assert_blend(none_1, In, red_1, none_1);
+        assert_blend(none_0, In, red_1, none_0);
+        assert_blend(none_1, In, none_1, none_1);
+        assert_blend(none_0, In, none_1, none_0);
+
+        // Partial alpha
+        assert_blend(red_1, In, green_05, evemit(Rgb::new(0.5, 0.0, 0.0), 0.5));
+        assert_blend(green_05, In, red_1, evemit(Rgb::new(0.0, 0.5, 0.0), 0.5));
+        assert_blend(
+            green_05,
+            In,
+            green_05,
+            evemit(Rgb::new(0.0, 0.25, 0.0), 0.25),
+        );
+        assert_blend(green_05, In, none_0, none_0); // TODO: broken, too dim
+
+        // What if emission with zero alpha is blended in?
+        assert_blend(green_0, In, none_1, none_0);
+        assert_blend(green_0, In, none_0, none_0);
+        assert_blend(none_1, In, green_0, none_0);
+        assert_blend(green_0, In, green_0, none_0); // TODO: this should plausibly stay
     }
 
     #[test]
@@ -418,6 +538,43 @@ mod tests {
         assert_blend(opaque1, Atop, clear, clear);
         assert_blend(clear, Atop, opaque2, opaque2);
         assert_blend(clear, Atop, clear, clear);
+    }
+
+    #[test]
+    fn blend_atop_emission() {
+        let red_1 = evemit(Rgb::new(1., 0., 0.), 1.0);
+        let green_1 = evemit(Rgb::new(0., 1., 0.), 1.0);
+        let green_0 = evemit(Rgb::new(0., 1., 0.), 0.0);
+        let green_05 = evemit(Rgb::new(0., 1., 0.), 0.5);
+        let none_1 = evemit(Rgb::ZERO, 1.0);
+        let none_0 = evemit(Rgb::ZERO, 0.0);
+
+        // Simple 100% blending cases
+        assert_blend(red_1, Atop, none_1, red_1);
+        assert_blend(red_1, Atop, red_1, red_1);
+        assert_blend(red_1, Atop, green_1, red_1);
+        assert_blend(red_1, Atop, none_0, none_0);
+        assert_blend(none_1, Atop, red_1, none_1);
+        assert_blend(none_0, Atop, red_1, red_1);
+        assert_blend(none_1, Atop, none_1, none_1);
+        assert_blend(none_0, Atop, none_1, none_1);
+
+        // Partial alpha
+        assert_blend(red_1, Atop, green_05, evemit(Rgb::new(0.5, 0.0, 0.0), 0.5));
+        assert_blend(green_05, Atop, red_1, evemit(Rgb::new(0.5, 0.5, 0.0), 1.0));
+        assert_blend(
+            green_05,
+            Atop,
+            green_05,
+            evemit(Rgb::new(0.0, 0.5, 0.0), 0.5),
+        );
+        assert_blend(green_05, Atop, none_0, none_0);
+
+        // What if emission with zero alpha is blended in?
+        assert_blend(green_0, Atop, none_1, none_1);
+        assert_blend(green_0, Atop, none_0, none_0);
+        assert_blend(none_1, Atop, green_0, none_0);
+        assert_blend(green_0, Atop, green_0, none_0); // TODO: this should plausibly stay
     }
 
     #[test]

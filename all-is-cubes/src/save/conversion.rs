@@ -78,7 +78,7 @@ mod block {
         AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision, Composite,
         Modifier, Move, Primitive, Quote, RotationPlacementRule, Zoom,
     };
-    use crate::math::Rgba;
+    use crate::math::{Rgb, Rgba};
     use schema::{BlockSer, ModifierSer};
 
     impl Serialize for Block {
@@ -121,9 +121,11 @@ mod block {
                 &Primitive::Atom(Atom {
                     ref attributes,
                     color,
+                    emission,
                     collision,
                 }) => schema::PrimitiveSer::AtomV1 {
                     color: color.into(),
+                    light_emission: emission.into(),
                     attributes: attributes.into(),
                     collision: collision.into(),
                 },
@@ -150,10 +152,12 @@ mod block {
                 schema::PrimitiveSer::AtomV1 {
                     attributes,
                     color,
+                    light_emission: emission,
                     collision,
                 } => Primitive::Atom(Atom {
                     attributes: BlockAttributes::from(attributes),
                     color: Rgba::from(color),
+                    emission: Rgb::from(emission),
                     collision: collision.into(),
                 }),
                 schema::PrimitiveSer::RecurV1 {
@@ -178,7 +182,6 @@ mod block {
                 ref display_name,
                 selectable,
                 rotation_rule,
-                light_emission,
                 tick_action: _, // TODO: serialize tick_action once it is cleaner
                 animation_hint,
             } = value;
@@ -186,7 +189,6 @@ mod block {
                 display_name: display_name.to_string(),
                 selectable,
                 rotation_rule: rotation_rule.into(),
-                light_emission: light_emission.into(),
                 animation_hint: animation_hint.into(),
             }
         }
@@ -199,14 +201,12 @@ mod block {
                 display_name,
                 selectable,
                 rotation_rule,
-                light_emission,
                 animation_hint,
             } = value;
             Self {
                 display_name: display_name.into(),
                 selectable,
                 rotation_rule: rotation_rule.into(),
-                light_emission: light_emission.into(),
                 tick_action: None,
                 animation_hint: animation_hint.into(),
             }
