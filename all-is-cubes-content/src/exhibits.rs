@@ -616,7 +616,11 @@ async fn COMPOSITE(_: &Exhibit, universe: &mut Universe) {
         &demo_blocks[DemoBlocks::GlassBlock],
         &demo_blocks[DemoBlocks::LamppostBase],
     ];
-    let operators = [CompositeOperator::Over, CompositeOperator::In];
+    let operators = [
+        CompositeOperator::Over,
+        CompositeOperator::In,
+        CompositeOperator::Atop,
+    ];
 
     let mut space = Space::empty(GridAab::from_lower_upper(
         [0, 0, 0],
