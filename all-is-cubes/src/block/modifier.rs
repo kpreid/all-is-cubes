@@ -233,7 +233,7 @@ mod tests {
             re,
             EvaluatedBlock {
                 attributes: oe.attributes,
-                color: rgba_const!(0.5, 0.5, 0.5, 0.5),
+                color: Rgba::new(1. / 3., 0., 1. / 3., 2. / 3.),
                 voxels: Evoxels::Many(
                     R2,
                     GridArray::from_fn(block_bounds, |cube| {

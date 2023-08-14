@@ -232,14 +232,15 @@ fn evaluate_voxels_checked_individually() {
 fn evaluate_transparent_voxels() {
     let mut universe = Universe::new();
     let resolution = R4;
+    let alpha = 0.5;
     let block = Block::builder()
         .voxels_fn(&mut universe, resolution, |point| {
             Block::from(Rgba::new(
                 0.0,
                 0.0,
                 0.0,
-                if point == GridPoint::new(0, 0, 0) {
-                    0.5
+                if point.x == 0 && point.z == 0 {
+                    alpha
                 } else {
                     1.0
                 },
@@ -249,9 +250,17 @@ fn evaluate_transparent_voxels() {
         .build();
 
     let e = block.evaluate().unwrap();
+    // Transparency is (currently) computed by an orthographic view through all six
+    // faces, and only two out of six faces in this test block don't fully cover
+    // the light paths with opaque surfaces.
     assert_eq!(
         e.color,
-        Rgba::new(0.0, 0.0, 0.0, 1.0 - (0.5 / f32::from(resolution).powi(3)))
+        Rgba::new(
+            0.0,
+            0.0,
+            0.0,
+            1.0 - (alpha / (f32::from(resolution).powi(2) * 3.0))
+        )
     );
     assert_eq!(
         e.opaque,
@@ -260,7 +269,7 @@ fn evaluate_transparent_voxels() {
             ny: false,
             nz: false,
             px: true,
-            py: true,
+            py: false,
             pz: true,
         }
     );
@@ -268,7 +277,7 @@ fn evaluate_transparent_voxels() {
 }
 
 #[test]
-fn evaluate_voxels_not_filling_block() {
+fn evaluate_voxels_full_but_transparent() {
     let resolution = R4;
     let mut universe = Universe::new();
     let block = Block::builder()
@@ -290,7 +299,7 @@ fn evaluate_voxels_not_filling_block() {
     let e = block.evaluate().unwrap();
     assert_eq!(
         e.color,
-        Rgba::new(0.0, 0.0, 0.0, 1.0 / f32::from(resolution).powi(3))
+        Rgba::new(0.0, 0.0, 0.0, 1.0 / f32::from(resolution).powi(2))
     );
     assert_eq!(e.resolution(), resolution);
     assert_eq!(e.opaque, FaceMap::repeat(false));
@@ -313,7 +322,8 @@ fn evaluate_voxels_partial_not_filling() {
         .build();
 
     let e = block.evaluate().unwrap();
-    assert_eq!(e.color, Rgba::new(1.0, 1.0, 1.0, 0.5));
+    // of 6 faces, 2 are opaque and 2 are half-transparent, thus there are 8 opaque half-faces.
+    assert_eq!(e.color, Rgba::new(1.0, 1.0, 1.0, 8./12.));
     assert_eq!(e.resolution(), resolution);
     assert_eq!(e.opaque, FaceMap::repeat(false).with(Face6::NX, true));
     assert_eq!(e.visible, true);

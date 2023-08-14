@@ -9,7 +9,9 @@ use crate::block::{
     Resolution::{self, R1},
 };
 use crate::content::palette;
+use crate::math::Face6;
 use crate::math::{FaceMap, GridAab, GridArray, GridPoint, OpacityCategory, Rgb, Rgba};
+use crate::raytracer;
 use crate::universe::RefError;
 
 // Things mentioned in doc comments only
@@ -139,22 +141,63 @@ impl EvaluatedBlock {
         let full_block_bounds = GridAab::for_block(resolution);
         let less_than_full = full_block_bounds != voxels.bounds();
 
-        // Compute color sum from voxels
-        // TODO: Give GridArray an iter() or something
-        // TODO: The color sum actually needs to be weighted by alpha. (Too bad we're not using premultiplied alpha.)
-        // TODO: Should not be counting interior voxels for the color, only visible surfaces.
-        let (color, uniform_collision) = {
+        // Compute color sum from voxels.
+        // This is actually a sort of mini-raytracer, in that it computes the appearance
+        // of all six faces by tracing in from the edges, and then averages them.
+        // TODO: Account for reduced bounds being smaller
+        let color: Rgba = {
             let mut color_sum: Vector4<f32> = Vector4::zero();
+            let mut count = 0;
+            // Loop over all face voxels.
+            // (This is a similar structure to the algorithm we use for mesh generation.)
+            for face in Face6::ALL {
+                let transform = face.face_transform(resolution.into());
+                let rotated_voxel_range = voxels.bounds().transform(transform.inverse()).unwrap();
+
+                for v in rotated_voxel_range.y_range() {
+                    for u in rotated_voxel_range.x_range() {
+                        let cube: GridPoint = transform.transform_cube(GridPoint::new(
+                            u,
+                            v,
+                            rotated_voxel_range.z_range().start,
+                        ));
+                        debug_assert!(voxels.bounds().contains_cube(cube));
+
+                        let buf = raytracer::trace_axis_aligned::<raytracer::ColorBuf>(
+                            &voxels,
+                            cube,
+                            face.opposite(),
+                            resolution,
+                        );
+                        color_sum += Rgba::from(buf).into();
+                        count += 1;
+                    }
+                }
+            }
+            if count == 0 {
+                Rgba::TRANSPARENT
+            } else {
+                // Note the divisors —- this adds transparency to compensate for when the
+                // voxel data doesn't cover the full_block_bounds.
+                Rgba::try_from(
+                    (color_sum.truncate() / (count as f32))
+                        .extend(color_sum.w / (full_block_bounds.surface_area() as f32)),
+                )
+                .expect("Recursive block color computation produced NaN")
+            }
+        };
+
+        // Compute if the collision is uniform in all voxels.
+        let uniform_collision = {
             let mut collision: Option<BlockCollision> = if less_than_full {
                 Some(BlockCollision::None)
             } else {
                 None
             };
             let mut collision_unequal = false;
+            // TODO: use GridArray iter
             for position in voxels.bounds().interior_iter() {
                 let voxel: Evoxel = voxels[position];
-
-                color_sum += voxel.color.into();
 
                 match (collision, collision_unequal) {
                     // Already unequal
@@ -170,14 +213,8 @@ impl EvaluatedBlock {
                     }
                 }
             }
-            (
-                Rgba::try_from(
-                    (color_sum.truncate() / (voxels.bounds().volume().max(1) as f32))
-                        .extend(color_sum.w / (full_block_bounds.volume() as f32)),
-                )
-                .expect("Recursive block color computation produced NaN"),
-                collision,
-            )
+
+            collision
         };
 
         let visible = voxels.bounds().interior_iter().any(
@@ -198,11 +235,11 @@ impl EvaluatedBlock {
 
         EvaluatedBlock {
             attributes,
-            // The single color is the mean of the actual block colors.
             color,
             opaque: FaceMap::from_fn(|face| {
                 // TODO: This test should be refined by flood-filling in from the face,
                 // so that we can also consider a face opaque if it has hollows/engravings.
+                // Merge this with the raytracer above.
                 let surface_volume = full_block_bounds.abut(face, -1).unwrap();
                 if surface_volume.intersection(voxels.bounds()) == Some(surface_volume) {
                     surface_volume.interior_iter().all(
@@ -607,8 +644,38 @@ mod tests {
                     voxel_opacity_mask: ev_one.voxel_opacity_mask.clone(),
                     ..ev_many
                 },
-                ev_one
+                ev_one,
+                "Input color {color:?}"
             );
         }
+    }
+
+    /// Test that interior color is hidden by surface color.
+    ///
+    /// TODO: This test is irregular because it bypasses constructing a `Block`, but
+    /// this is convenient, but it doesn't match other tests in `crate::block`. What style
+    /// should we use?
+    #[test]
+    fn overall_color_ignores_interior() {
+        let resolution = Resolution::R8;
+        let outer_bounds = GridAab::for_block(resolution);
+        let inner_bounds = outer_bounds.expand(FaceMap::repeat(-1));
+        let outer_color = Rgba::new(1.0, 0.0, 0.0, 1.0);
+        let inner_color = Rgba::new(0.0, 1.0, 0.0, 1.0);
+        let voxels = Evoxels::Many(
+            resolution,
+            GridArray::from_fn(outer_bounds, |p| {
+                Evoxel::from_color(if inner_bounds.contains_cube(p) {
+                    inner_color
+                } else {
+                    outer_color
+                })
+            }),
+        );
+
+        // The inner_color should be ignored because it is not visible.
+        let ev = EvaluatedBlock::from_voxels(BlockAttributes::default(), voxels);
+
+        assert_eq!(ev.color, outer_color);
     }
 }

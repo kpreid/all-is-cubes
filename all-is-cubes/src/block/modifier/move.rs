@@ -196,6 +196,7 @@ impl universe::VisitRefs for Move {
 #[cfg(test)]
 mod tests {
     use cgmath::EuclideanSpace;
+    use ordered_float::NotNan;
 
     use crate::block::{Block, Composite, EvaluatedBlock, Evoxel, Resolution::*};
     use crate::content::make_some_blocks;
@@ -223,7 +224,7 @@ mod tests {
             moved.evaluate().unwrap(),
             EvaluatedBlock {
                 attributes: ev_original.attributes.clone(),
-                color: color.to_rgb().with_alpha(notnan!(0.5)),
+                color: color.to_rgb().with_alpha(NotNan::new(2. / 3.).unwrap()),
                 voxels: Evoxels::Many(
                     R16,
                     GridArray::repeat(expected_bounds, Evoxel::from_block(&ev_original))
@@ -262,7 +263,7 @@ mod tests {
             moved.evaluate().unwrap(),
             EvaluatedBlock {
                 attributes: ev_original.attributes.clone(),
-                color: color.to_rgb().with_alpha(notnan!(0.5)),
+                color: color.to_rgb().with_alpha(NotNan::new(2. / 3.).unwrap()),
                 voxels: Evoxels::Many(
                     resolution,
                     GridArray::repeat(expected_bounds, Evoxel::from_block(&ev_original))

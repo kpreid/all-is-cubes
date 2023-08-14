@@ -16,7 +16,7 @@ use ordered_float::NotNan;
 #[cfg(feature = "threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
-use crate::block::{Evoxels, AIR};
+use crate::block::{Evoxels, Resolution, AIR};
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 use crate::math::{
     point_to_enclosing_cube, smoothstep, Face6, Face7, FreeCoordinate, GridAab, GridArray,
@@ -571,6 +571,35 @@ fn apply_transmittance(color: Rgba, thickness: f32) -> Rgba {
     let alpha = NotNan::new(1.0 - depth_transmittance).unwrap();
 
     color.to_rgb().with_alpha(alpha)
+}
+
+/// Minimal raytracing helper used by block evaluation to compute aggregate properties
+/// of voxel blocks. Compared to the regular raytracer, it:
+///
+/// * Traces through `Evoxel`s instead of a `SpaceRaytracer`.
+/// * Follows an axis-aligned ray only.
+///
+/// `origin` should be the first cube to trace through *within* the grid.
+pub(crate) fn trace_axis_aligned<P: PixelBuf<BlockData = ()>>(
+    voxels: &Evoxels,
+    origin: GridPoint,
+    direction: Face6,
+    resolution: Resolution,
+) -> P {
+    let thickness = f32::from(resolution).recip();
+    let step = direction.normal_vector();
+
+    let mut cube = origin;
+    let mut buf = P::default();
+
+    while let Some(voxel) = voxels.get(cube) {
+        buf.add(apply_transmittance(voxel.color, thickness), &());
+        if buf.opaque() {
+            break;
+        }
+        cube += step;
+    }
+    buf
 }
 
 #[cfg(feature = "threads")]

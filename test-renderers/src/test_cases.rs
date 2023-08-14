@@ -518,7 +518,8 @@ async fn icons(mut context: RenderTestContext) {
     options.fov_y = NotNan::from(45);
     context
         .render_comparison_test(
-            20, // Fairly sloppy because this test is looking for "Does this icon look right"
+            // Fairly sloppy because this test is looking for "Does this icon look right"
+            Threshold::new([(8, 2000), (20, 100), (40, 20)]),
             StandardCameras::from_constant_for_test(
                 options,
                 Viewport::with_scale(1.0, [256, (256.0 * aspect_ratio) as u32].into()),

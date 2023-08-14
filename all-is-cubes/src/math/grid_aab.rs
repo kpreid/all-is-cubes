@@ -231,6 +231,13 @@ impl GridAab {
         Self::checked_volume_helper(self.sizes).unwrap()
     }
 
+    pub(crate) fn surface_area(&self) -> usize {
+        // can't fail because it would fail the volume check
+        let size = self.sizes.cast::<usize>().unwrap();
+
+        size.x * size.y * 2 + size.x * size.z * 2 + size.y * size.z * 2
+    }
+
     /// Returns whether the box contains no cubes (its volume is zero).
     #[inline]
     pub fn is_empty(&self) -> bool {
