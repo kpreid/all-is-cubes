@@ -1,4 +1,4 @@
-//! [`PixelBuf`] and output formats of the raytracer.
+//! [`Accumulate`] and output formats of the raytracer.
 
 use std::convert::TryFrom as _;
 
@@ -26,7 +26,7 @@ impl<'a, C> Clone for RtOptionsRef<'a, C> {
     }
 }
 
-/// Implementations of [`PixelBuf`] define output formats of the raytracer, by being
+/// Implementations of [`Accumulate`] define output formats of the raytracer, by being
 /// responsible for accumulating the color (and/or other information) for each image
 /// pixel.
 ///
@@ -39,7 +39,7 @@ impl<'a, C> Clone for RtOptionsRef<'a, C> {
 ///
 /// Each implementation should provide its own conversion to a final output format,
 /// if any (e.g. an inherent method or an [`impl From`](From)).
-pub trait PixelBuf: Default {
+pub trait Accumulate: Default {
     /// Data precomputed for each distinct block or other type of visible object.
     ///
     /// If no data beyond color is needed, this may be `()`.
@@ -63,7 +63,7 @@ pub trait PixelBuf: Default {
     /// disable the effects of future [`Self::add`] calls.
     fn hit_nothing(&mut self) {}
 
-    /// Creates a [`PixelBuf`] already containing the given color.
+    /// Creates an accumulator already containing the given color.
     ///
     /// This may be useful when content that is not strictly raytraced is passing through
     /// an image buffer otherwise being used with the raytracer, such as a text overlay.
@@ -86,7 +86,7 @@ pub trait PixelBuf: Default {
     fn mean<const N: usize>(items: [Self; N]) -> Self;
 }
 
-/// Precomputed data about a [`Space`]'s blocks that may be used by a [`PixelBuf`].
+/// Precomputed data about a [`Space`]'s blocks that may be used by [`Accumulate`] implementations.
 ///
 /// Design note: This is a trait of the data type itself so as to require that there
 /// cannot be more than one way to construct a given data type (other than explicit
@@ -99,14 +99,14 @@ pub trait RtBlockData: Send + Sync {
     type Options: Send + Sync;
 
     /// Returns the data that should be stored for a particular block and passed
-    /// to [`PixelBuf::add`] when that block is traced onto/through.
+    /// to [`Accumulate::add()`] when that block is traced onto/through.
     fn from_block(options: RtOptionsRef<'_, Self::Options>, block: &SpaceBlockData) -> Self;
 
-    /// Returns what should be passed to [`PixelBuf::add`] when the raytracer
+    /// Returns what should be passed to [`Accumulate::add()`] when the raytracer
     /// encounters an error.
     fn error(options: RtOptionsRef<'_, Self::Options>) -> Self;
 
-    /// Returns what should be passed to [`PixelBuf::add`] when the raytracer
+    /// Returns what should be passed to [`Accumulate::add()`] when the raytracer
     /// encounters the sky (background behind all blocks).
     fn sky(options: RtOptionsRef<'_, Self::Options>) -> Self;
 }
@@ -119,7 +119,7 @@ impl RtBlockData for () {
     fn sky(_: RtOptionsRef<'_, Self::Options>) -> Self {}
 }
 
-/// Implements [`PixelBuf`] for RGB(A) color with [`f32`] components,
+/// Implements [`Accumulate`] for RGB(A) color with [`f32`] components,
 /// and conversion to [`Rgba`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ColorBuf {
@@ -137,7 +137,7 @@ pub struct ColorBuf {
     pub(super) ray_alpha: f32,
 }
 
-impl PixelBuf for ColorBuf {
+impl Accumulate for ColorBuf {
     type BlockData = ();
 
     #[inline]

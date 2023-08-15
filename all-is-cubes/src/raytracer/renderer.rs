@@ -14,7 +14,7 @@ use crate::content::palette;
 use crate::listen::ListenableSource;
 use crate::math::Rgba;
 use crate::raytracer::{
-    ColorBuf, PixelBuf, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer,
+    Accumulate, ColorBuf, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer,
     UpdatingSpaceRaytracer,
 };
 use crate::space::Space;
@@ -136,13 +136,13 @@ where
     /// called while the [`Universe`] is being stepped, etc.
     ///
     /// This method is equivalent to [`HeadlessRenderer::draw()`] except that it works
-    /// with any [`PixelBuf`] instead of requiring [`ColorBuf`] and [`Rgba`] output,
+    /// with any [`Accumulate`] instead of requiring [`ColorBuf`] and [`Rgba`] output,
     /// is not async, and does not require `&mut self`.
     ///
     /// [`Universe`]: crate::universe::Universe
     pub fn draw<P, E, O, IF>(&self, info_text_fn: IF, encoder: E, output: &mut [O]) -> RaytraceInfo
     where
-        P: PixelBuf<BlockData = D>,
+        P: Accumulate<BlockData = D>,
         E: Fn(P) -> O + Send + Sync,
         O: Clone + Send + Sync, // Clone is used in the no-data case
         IF: FnOnce(&RaytraceInfo) -> String,
@@ -283,21 +283,21 @@ impl HeadlessRenderer for RtRenderer<()> {
 /// are assembled into an image. Differs from [`SpaceRaytracer::trace_ray`]
 /// in that it includes the cameras (thus accepting screen-space coordinates
 /// rather than a lay) and [`Layers`] rather than one space.
-struct RtScene<'a, P: PixelBuf> {
+struct RtScene<'a, P: Accumulate> {
     rts: Layers<Option<&'a SpaceRaytracer<P::BlockData>>>,
     /// Cameras *with* size_policy applied.
     cameras: &'a Layers<Camera>,
     options: RtOptionsRef<'a, <P::BlockData as RtBlockData>::Options>,
 }
 
-impl<'a, P: PixelBuf> Clone for RtScene<'a, P> {
+impl<'a, P: Accumulate> Clone for RtScene<'a, P> {
     fn clone(&self) -> Self {
         *self
     }
 }
-impl<P: PixelBuf> Copy for RtScene<'_, P> {}
+impl<P: Accumulate> Copy for RtScene<'_, P> {}
 
-impl<P: PixelBuf> RtScene<'_, P> {
+impl<P: Accumulate> RtScene<'_, P> {
     /// Called from threaded or non-threaded `trace_scene_to_image()` implementations
     /// to produce a single image pixel.
     #[inline]
@@ -307,7 +307,7 @@ impl<P: PixelBuf> RtScene<'_, P> {
                 trace_patch_in_one_space(ui, &self.cameras.ui, patch, false);
             if pixel.opaque() {
                 // TODO: We should be doing alpha blending, but doing that requires
-                // having control over the PixelBuf that trace_ray starts with.
+                // having control over the `Accumulate` that trace_ray starts with.
                 return (pixel, info);
             }
         }
@@ -321,8 +321,8 @@ impl<P: PixelBuf> RtScene<'_, P> {
     }
 }
 
-fn trace_patch_in_one_space<P: PixelBuf>(
-    space: &SpaceRaytracer<<P as PixelBuf>::BlockData>,
+fn trace_patch_in_one_space<P: Accumulate>(
+    space: &SpaceRaytracer<<P as Accumulate>::BlockData>,
     camera: &Camera,
     patch: NdcRect,
     include_sky: bool,
@@ -374,7 +374,7 @@ impl NdcRect {
 /// when `trace_scene_to_image()` was a public interface. Revisit them.
 mod trace_image {
     use super::*;
-    use crate::raytracer::{PixelBuf, RaytraceInfo};
+    use crate::raytracer::{Accumulate, RaytraceInfo};
     use cgmath::Point2;
 
     /// Compute a full image, writing it into `output`.
@@ -382,7 +382,7 @@ mod trace_image {
     /// The produced data is in the usual left-right then top-bottom raster order;
     /// its dimensions are `camera.framebuffer_size`.
     ///
-    /// `encoder` may be used to transform the output of the `PixelBuf` into the stored
+    /// `encoder` may be used to transform the output of the [`Accumulate`] into the stored
     /// representation.
     ///
     /// Panics if `output`'s length does not match the area of `camera.framebuffer_size`.
@@ -396,7 +396,7 @@ mod trace_image {
         output: &mut [O],
     ) -> RaytraceInfo
     where
-        P: PixelBuf,
+        P: Accumulate,
         E: Fn(P) -> O + Send + Sync,
         O: Send + Sync,
     {
@@ -442,7 +442,7 @@ mod trace_image {
     /// The produced data is in the usual left-right then top-bottom raster order;
     /// its dimensions are `camera.framebuffer_size`.
     ///
-    /// `encoder` may be used to transform the output of the `PixelBuf` into the stored
+    /// `encoder` may be used to transform the output of the [`Accumulate`] into the stored
     /// representation.
     ///
     /// Panics if `output`'s length does not match the area of `camera.framebuffer_size`.
@@ -456,7 +456,7 @@ mod trace_image {
         output: &mut [O],
     ) -> RaytraceInfo
     where
-        P: PixelBuf,
+        P: Accumulate,
         E: Fn(P) -> O + Send + Sync,
         O: Send + Sync,
     {

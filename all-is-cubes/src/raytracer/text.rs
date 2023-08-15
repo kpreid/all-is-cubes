@@ -6,7 +6,7 @@ use cgmath::{Decomposed, Transform, Vector2, Vector3};
 
 use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, Viewport};
 use crate::math::{FreeCoordinate, Rgba};
-use crate::raytracer::{PixelBuf, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer};
+use crate::raytracer::{Accumulate, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer};
 use crate::space::{Space, SpaceBlockData};
 
 /// TODO: better name, docs
@@ -40,7 +40,7 @@ impl RtBlockData for CharacterRtData {
     }
 }
 
-/// Implements [`PixelBuf`] for text output: captures the first characters of block names
+/// Implements [`Accumulate`] for text output: captures the first characters of block names
 /// rather than colors.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -49,7 +49,7 @@ pub struct CharacterBuf {
     hit_text: Option<String>,
 }
 
-impl PixelBuf for CharacterBuf {
+impl Accumulate for CharacterBuf {
     type BlockData = CharacterRtData;
 
     #[inline]

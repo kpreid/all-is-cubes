@@ -28,8 +28,8 @@ use crate::raycast::Ray;
 use crate::space::{BlockIndex, PackedLight, Space, SpaceBlockData};
 use crate::util::{CustomFormat, StatusText};
 
-mod pixel_buf;
-pub use pixel_buf::*;
+mod accum;
+pub use accum::*;
 mod renderer;
 pub use renderer::*;
 mod surface;
@@ -105,7 +105,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     }
 
     /// Computes a single image pixel from the given ray.
-    pub fn trace_ray<P: PixelBuf<BlockData = D>>(
+    pub fn trace_ray<P: Accumulate<BlockData = D>>(
         &self,
         ray: Ray,
         include_sky: bool,
@@ -118,7 +118,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let mut state: TracingState<P> = TracingState {
             t_to_absolute_distance: ray.direction.magnitude(),
             cubes_traced: 0,
-            pixel_buf: P::default(),
+            accumulator: P::default(),
         };
         let surface_iter = SurfaceIter::new(self, ray);
 
@@ -268,7 +268,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
 /// Text-specific methods.
 impl<D: RtBlockData> SpaceRaytracer<D> {
-    /// Raytrace to text, using any [`PixelBuf`] whose output can be [`String`].
+    /// Raytrace to text, using any [`Accumulate`] whose output can be [`String`].
     ///
     /// `F` is the function accepting the output, and `E` is the type of error it may
     /// produce. This function-based interface is intended to abstract over the
@@ -282,7 +282,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         write: F,
     ) -> Result<RaytraceInfo, E>
     where
-        P: PixelBuf<BlockData = D> + Into<String>,
+        P: Accumulate<BlockData = D> + Into<String>,
         F: FnMut(&str) -> Result<(), E>,
     {
         // This wrapper function ensures that the two implementations have consistent
@@ -298,7 +298,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         mut write: F,
     ) -> Result<RaytraceInfo, E>
     where
-        P: PixelBuf<BlockData = D> + Into<String>,
+        P: Accumulate<BlockData = D> + Into<String>,
         F: FnMut(&str) -> Result<(), E>,
     {
         let viewport = camera.viewport();
@@ -334,7 +334,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         mut write: F,
     ) -> Result<RaytraceInfo, E>
     where
-        P: PixelBuf<BlockData = D> + Into<String>,
+        P: Accumulate<BlockData = D> + Into<String>,
         F: FnMut(&str) -> Result<(), E>,
     {
         let mut total_info = RaytraceInfo::default();
@@ -359,7 +359,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     /// As [`Self::trace_scene_to_text()`], but returning a string.
     pub fn trace_scene_to_string<P>(&self, camera: &Camera, line_ending: &str) -> String
     where
-        P: PixelBuf<BlockData = D> + Into<String>,
+        P: Accumulate<BlockData = D> + Into<String>,
     {
         let mut out = String::with_capacity(
             camera.viewport().framebuffer_size.dot(Vector2::new(1, 1)) as usize,
@@ -466,10 +466,10 @@ impl<D: RtBlockData> TracingBlock<D> {
     }
 }
 
-/// Holds a [`PixelBuf`] and other per-ray state, and updates it
+/// Holds an [`Accumulate`] and other per-ray state, and updates it
 /// according to the things it encounters.
 #[derive(Clone, Debug, Default)]
-struct TracingState<P: PixelBuf> {
+struct TracingState<P: Accumulate> {
     /// Conversion factor from raycaster `t` values to “true” [`Space`] distance values
     /// where 1 unit = 1 block thickness.
     t_to_absolute_distance: f64,
@@ -478,9 +478,9 @@ struct TracingState<P: PixelBuf> {
     /// equal to the number of calls to [`Self::trace_through_surface()`].
     cubes_traced: usize,
 
-    pixel_buf: P,
+    accumulator: P,
 }
-impl<P: PixelBuf> TracingState<P> {
+impl<P: Accumulate> TracingState<P> {
     #[inline]
     fn count_step_should_stop(
         &mut self,
@@ -489,38 +489,38 @@ impl<P: PixelBuf> TracingState<P> {
         self.cubes_traced += 1;
         if self.cubes_traced > 1000 {
             // Abort excessively long traces.
-            self.pixel_buf = Default::default();
-            self.pixel_buf
+            self.accumulator = Default::default();
+            self.accumulator
                 .add(Rgba::new(1.0, 1.0, 1.0, 1.0), &P::BlockData::error(options));
             true
         } else {
-            self.pixel_buf.opaque()
+            self.accumulator.opaque()
         }
     }
 
     fn finish(mut self, sky_color: Rgba, sky_data: &P::BlockData) -> (P, RaytraceInfo) {
         if self.cubes_traced == 0 {
             // Didn't intersect the world at all.
-            // Inform the PixelBuf of this in case it wants to do something different.
-            self.pixel_buf.hit_nothing();
+            // Inform the accumulator of this in case it wants to do something different.
+            self.accumulator.hit_nothing();
         }
 
-        self.pixel_buf.add(sky_color, sky_data);
+        self.accumulator.add(sky_color, sky_data);
 
         // Debug visualization of number of raytracing steps.
         // TODO: Make this togglable and less of a kludge — we'd like to be able to mix with
-        // the regular color view, but PixelBuf doesn't make that easy.
+        // the regular color view, but Accumulate doesn't make that easy.
         const DEBUG_STEPS: bool = false;
-        if DEBUG_STEPS && self.pixel_buf.opaque() {
-            self.pixel_buf = Default::default();
-            self.pixel_buf.add(
+        if DEBUG_STEPS && self.accumulator.opaque() {
+            self.accumulator = Default::default();
+            self.accumulator.add(
                 (rgb_const!(0.02, 0.002, 0.0) * self.cubes_traced as f32).with_alpha_one(),
                 sky_data,
             );
         }
 
         (
-            self.pixel_buf,
+            self.accumulator,
             RaytraceInfo {
                 cubes_traced: self.cubes_traced,
             },
@@ -535,7 +535,7 @@ impl<P: PixelBuf> TracingState<P> {
         rt: &SpaceRaytracer<P::BlockData>,
     ) {
         if let Some(color) = surface.to_lit_color(rt) {
-            self.pixel_buf.add(color, surface.block_data);
+            self.accumulator.add(color, surface.block_data);
         }
     }
 

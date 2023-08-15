@@ -12,7 +12,7 @@ use all_is_cubes::camera::{Camera, StandardCameras, Viewport};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::Rgba;
-use all_is_cubes::raytracer::{CharacterBuf, CharacterRtData, ColorBuf, PixelBuf, RtRenderer};
+use all_is_cubes::raytracer::{Accumulate, CharacterBuf, CharacterRtData, ColorBuf, RtRenderer};
 use all_is_cubes_ui::apps::Session;
 
 use crate::glue::crossterm::{event_to_key, map_mouse_button};
@@ -312,7 +312,7 @@ fn sync_viewport(dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>
 /// Output of [`ColorCharacterBuf`]
 type TextAndColor = (String, Option<Rgba>);
 
-/// Implements `PixelBuf` for colored text output.
+/// Implements [`Accumulate`] for colored text output.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct ColorCharacterBuf {
     color: ColorBuf,
@@ -336,8 +336,8 @@ impl ColorCharacterBuf {
     }
 }
 
-impl PixelBuf for ColorCharacterBuf {
-    type BlockData = <CharacterBuf as PixelBuf>::BlockData;
+impl Accumulate for ColorCharacterBuf {
+    type BlockData = <CharacterBuf as Accumulate>::BlockData;
 
     #[inline]
     fn opaque(&self) -> bool {

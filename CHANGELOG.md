@@ -26,6 +26,7 @@
         - `space::SpaceTransaction::draw_target()`
     - `drawing::VoxelBrush::transform()` is renamed to `rotate()` and only accepts a rotation.
       This avoids confusion between points in space and cube-identifying coordinates.
+    - Renamed `raytracer::PixelBuf` trait to `Accumulate`.
 
 - `all-is-cubes-mesh` library:
     - Renamed `TextureAllocator` to `texture::Allocator`.
