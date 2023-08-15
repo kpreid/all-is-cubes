@@ -35,6 +35,8 @@ use surface::{DepthIter, DepthStep, Span, Surface, SurfaceIter, TraceStep};
 // TODO: pub use surface::*;
 mod text;
 pub use text::*;
+pub use updating::*;
+mod updating;
 
 /// Precomputed data for raytracing a single frame of a single [`Space`], and bearer of
 /// the methods for actually performing raytracing.
@@ -549,24 +551,27 @@ impl<P: PixelBuf> TracingState<P> {
         let thickness =
             ((exit_t_distance - surface.t_distance) * self.t_to_absolute_distance) as f32;
 
-        // Convert alpha to transmittance (light transmitted / light received).
-        let unit_transmittance = 1.0 - surface.diffuse_color.alpha().into_inner();
-        // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
-        let depth_transmittance = unit_transmittance.powf(thickness);
-        // Convert back to alpha.
-        // TODO: skip NaN check ... this may require refactoring Surface usage.
-        // We might also benefit from an "UncheckedRgba" concept.
-        surface.diffuse_color = surface
-            .diffuse_color
-            .to_rgb()
-            .with_alpha(NotNan::new(1.0 - depth_transmittance).unwrap());
+        surface.diffuse_color = apply_transmittance(surface.diffuse_color, thickness);
 
         self.trace_through_surface(surface, rt);
     }
 }
 
-pub use updating::*;
-mod updating;
+/// Given the alpha of a voxel color, and the thickness of that material passed through,
+/// return the alpha that should be used for blending.
+#[inline]
+fn apply_transmittance(color: Rgba, thickness: f32) -> Rgba {
+    // Convert alpha to transmittance (light transmitted / light received).
+    let unit_transmittance = 1.0 - color.alpha().into_inner();
+    // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
+    let depth_transmittance = unit_transmittance.powf(thickness);
+    // Convert back to alpha.
+    // TODO: skip NaN check ... this may require refactoring Surface usage.
+    // We might also benefit from an "UncheckedRgba" concept.
+    let alpha = NotNan::new(1.0 - depth_transmittance).unwrap();
+
+    color.to_rgb().with_alpha(alpha)
+}
 
 #[cfg(feature = "threads")]
 mod rayon_helper {
