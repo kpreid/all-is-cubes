@@ -6,7 +6,7 @@ use std::sync::Arc;
 use futures_core::future::BoxFuture;
 use futures_util::FutureExt;
 
-use all_is_cubes::block::{Block, Resolution::R2};
+use all_is_cubes::block::{Block, Resolution::*};
 use all_is_cubes::camera::{
     AntialiasingOption, ExposureOption, FogOption, GraphicsOptions, LightingOption, RenderError,
     StandardCameras, ToneMappingOperator, TransparencyOption, UiViewState, ViewTransform, Viewport,
@@ -15,8 +15,8 @@ use all_is_cubes::cgmath::{EuclideanSpace as _, One, Point2, Point3, Vector2, Ve
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
-    Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, NotNan,
-    Rgb,
+    Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, GridVector,
+    NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -51,6 +51,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert_variants("bloom", light_test_universe.clone(), bloom, [0.0, 0.25]);
     c.insert("color_srgb_ramp", None, color_srgb_ramp);
     c.insert("cursor_basic", None, cursor_basic);
+    c.insert("emission", None, emission);
     c.insert("error_character_gone", None, error_character_gone);
     c.insert(
         "error_character_unavailable",
@@ -213,6 +214,57 @@ async fn cursor_basic(mut context: RenderTestContext) {
     // but everything else should be exact.
     context
         .render_comparison_test(COLOR_ROUNDING_MAX_DIFF, cameras, overlays)
+        .await;
+}
+
+/// Test rendering of emitted light.
+async fn emission(mut context: RenderTestContext) {
+    let mut universe = Universe::new();
+    let mut space = one_cube_space(); // TODO: also test with surrounding light
+
+    let has_emission_and_reflectance = Block::builder()
+        .color(Rgba::from_srgb8([200, 0, 0, 255]))
+        .light_emission(Rgb::from_srgb8([0, 200, 0]))
+        .build();
+    let has_emission_only = Block::builder()
+        .color(Rgba::BLACK)
+        .light_emission(Rgb::from_srgb8([0, 200, 0]))
+        .build();
+    let white = Block::builder().color(Rgba::WHITE).build();
+
+    #[rustfmt::skip]
+    let block_shape = GridArray::from_y_flipped_array([[
+        *b"....",
+        *b".E..",
+        *b"..e.",
+        *b"....",
+    ]]);
+    let block = Block::builder()
+        .voxels_fn(&mut universe, R4, |mut p| {
+            p.z = 0;
+            match block_shape[p] {
+                b'.' => &white,
+                b'E' => &has_emission_and_reflectance,
+                b'e' => &has_emission_only,
+                _ => unreachable!(),
+            }
+        })
+        .unwrap()
+        .build();
+
+    // TODO: use voxels
+    space.set([0, 0, 0], block).unwrap();
+
+    finish_universe_from_space(&mut universe, space);
+
+    let cameras = StandardCameras::from_constant_for_test(
+        GraphicsOptions::UNALTERED_COLORS,
+        COMMON_VIEWPORT,
+        &universe,
+    );
+
+    context
+        .render_comparison_test(0, cameras, Overlays::NONE)
         .await;
 }
 
