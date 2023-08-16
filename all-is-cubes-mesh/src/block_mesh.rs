@@ -347,8 +347,7 @@ where
                 // Walk through the planes (layers) of the block, figuring out what geometry to
                 // generate for each layer and whether it needs a texture.
                 for face in Face6::ALL {
-                    // TODO: subtracting 1 is a sign we're doing things wrong
-                    let voxel_transform = face.face_transform(block_resolution - 1);
+                    let voxel_transform = face.face_transform(block_resolution);
                     let quad_transform = QuadTransform::new(face, resolution);
                     let face_mesh = &mut self.face_vertices[face];
 
@@ -356,7 +355,7 @@ where
                     // out what range to iterate over.
                     let rotated_voxel_range = voxels_array
                         .bounds()
-                        .transform(face.face_transform(block_resolution).inverse())
+                        .transform(voxel_transform.inverse())
                         .unwrap();
 
                     // Check the case where the block's voxels don't meet its front face, or don't fill that face.
@@ -392,7 +391,7 @@ where
                         for t in rotated_voxel_range.y_range() {
                             for s in rotated_voxel_range.x_range() {
                                 let cube: Point3<GridCoordinate> =
-                                    voxel_transform.transform_point(Point3::new(s, t, layer));
+                                    voxel_transform.transform_cube(Point3::new(s, t, layer));
 
                                 let color = options.transparency.limit_alpha(
                                     voxels_array.get(cube).unwrap_or(&Evoxel::AIR).color,
