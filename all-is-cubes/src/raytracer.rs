@@ -553,7 +553,13 @@ impl<P: Accumulate> TracingState<P> {
         let thickness =
             ((exit_t_distance - surface.t_distance) * self.t_to_absolute_distance) as f32;
 
+        // Adjust colors for the thickness
         surface.diffuse_color = apply_transmittance(surface.diffuse_color, thickness);
+        // TODO: This abrupt change is not actually appropriate, but it's not clear what is.
+        // Define rules for volumetric emission.
+        if surface.diffuse_color.alpha() != 1.0 {
+            surface.emission = surface.emission * thickness;
+        }
 
         self.trace_through_surface(surface, rt);
     }

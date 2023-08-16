@@ -12,15 +12,21 @@ use crate::raytracer::{RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeDat
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Surface<'a, D> {
     pub block_data: &'a D,
-    // pub voxel_data: ...?,
+
     pub diffuse_color: Rgba,
+
+    pub emission: Rgb,
+
     /// The cube of the [`Space`] which contains the block this surface belongs to.
     cube: GridPoint,
+
     /// The distance along the ray, in units of the ray's direction vector,
     /// where it intersected the surface.
     pub t_distance: FreeCoordinate,
+
     /// The point in the [`Space`]'s coordinate system where the ray intersected the surface.
     intersection_point: Point3<FreeCoordinate>,
+
     pub normal: Face7,
 }
 
@@ -28,8 +34,8 @@ impl<D: RtBlockData> Surface<'_, D> {
     /// Convert the surface and its lighting to a single RGBA value as determined by
     /// the given graphics options, or [`None`] if it is invisible.
     ///
-    /// Note this is not true volumetric ray tracing: we're considering each
-    /// voxel surface to be discrete.
+    /// Note that this is completely unaware of volume/thickness; that is handled by
+    /// `TracingState::trace_through_span()` tweaking the data before this is called.
     #[inline]
     pub(crate) fn to_lit_color(&self, rt: &SpaceRaytracer<D>) -> Option<Rgba> {
         let diffuse_color = rt
@@ -37,10 +43,17 @@ impl<D: RtBlockData> Surface<'_, D> {
             .transparency
             .limit_alpha(self.diffuse_color);
         if diffuse_color.fully_transparent() {
+            // Short-circuit if the surface has no effect.
             return None;
         }
-        let adjusted_rgb = diffuse_color.to_rgb() * self.compute_illumination(rt);
-        Some(adjusted_rgb.with_alpha(diffuse_color.alpha()))
+
+        let illumination = self.compute_illumination(rt);
+        // Combine reflected and emitted light to produce the outgoing light.
+        // TODO: Light emission is not yet implemented in all renderers and we are
+        // holding off on it here until then, for consistency.
+        let outgoing_rgb = diffuse_color.to_rgb() * illumination /* + self.emission */;
+
+        Some(outgoing_rgb.with_alpha(diffuse_color.alpha()))
     }
 
     fn compute_illumination(&self, rt: &SpaceRaytracer<D>) -> Rgb {
@@ -186,7 +199,9 @@ impl<'a, D> Iterator for SurfaceIter<'a, D> {
 
         let tb: &TracingBlock<D> = &self.blocks[cube_data.block_index as usize];
         Some(match tb.voxels {
-            Evoxels::One(Evoxel { color, .. }) => {
+            Evoxels::One(Evoxel {
+                color, emission, ..
+            }) => {
                 if color.fully_transparent() {
                     // The caller could generically skip transparent, but if we do it then
                     // we can skip some math too.
@@ -197,6 +212,7 @@ impl<'a, D> Iterator for SurfaceIter<'a, D> {
                     TraceStep::EnterSurface(Surface {
                         block_data: &tb.block_data,
                         diffuse_color: color,
+                        emission,
                         cube: rc_step.cube_ahead(),
                         t_distance: rc_step.t_distance(),
                         intersection_point: rc_step.intersection_point(self.ray),
@@ -258,6 +274,7 @@ impl<'a, D> VoxelSurfaceIter<'a, D> {
         Some(TraceStep::EnterSurface(Surface {
             block_data: self.block_data,
             diffuse_color: voxel.color,
+            emission: voxel.emission,
             cube: self.block_cube,
             // Note: The proper scaling here depends on the direction vector scale, that
             // recursive_ray() _doesn't_ change.
@@ -369,6 +386,7 @@ mod tests {
                 EnterSurface(Surface {
                     block_data: &(),
                     diffuse_color: solid_test_color,
+                    emission: Rgb::ZERO,
                     cube: GridPoint::new(0, 1, 0),
                     t_distance: 1.5, // half-block starting point + 1 empty block
                     intersection_point: Point3::new(0.5, 1.0, 0.5),
@@ -378,6 +396,7 @@ mod tests {
                 EnterSurface(Surface {
                     block_data: &(),
                     diffuse_color: slab_test_color,
+                    emission: Rgb::ZERO,
                     cube: GridPoint::new(0, 2, 0),
                     t_distance: 2.5,
                     intersection_point: Point3::new(0.5, 2.0, 0.5),
@@ -387,6 +406,7 @@ mod tests {
                 EnterSurface(Surface {
                     block_data: &(),
                     diffuse_color: slab_test_color,
+                    emission: Rgb::ZERO,
                     cube: GridPoint::new(0, 2, 0),
                     t_distance: 2.75, // previous surface + 1/4 block of depth
                     intersection_point: Point3::new(0.5, 2.25, 0.5),
@@ -420,6 +440,7 @@ mod tests {
                 EnterSurface(Surface {
                     block_data: &(),
                     diffuse_color: solid_test_color,
+                    emission: Rgb::ZERO,
                     cube: GridPoint::new(0, 0, 0),
                     t_distance: 0.5, // half-block starting point
                     intersection_point: Point3::new(0.0, 0.5, 0.5),
