@@ -4,14 +4,14 @@ use std::io;
 
 use gltf_json::validation::Checked::Valid;
 
-use all_is_cubes::cgmath::{ElementWise, Point3, Vector3};
+use all_is_cubes::cgmath::{ElementWise, Point3};
 use all_is_cubes::math::{GridAab, GridRotation};
 use all_is_cubes_mesh::texture;
 
 use super::glue::push_and_return_index;
 use super::GltfDataDestination;
 
-pub(crate) type TexPoint = Vector3<f32>;
+pub(crate) type TexPoint = all_is_cubes::cgmath::Vector2<f32>;
 
 /// [`texture::Allocator`] implementation for glTF exports.
 ///
@@ -155,9 +155,11 @@ impl texture::Plane for GltfTexturePlane {
         // within the atlas once we know what the atlas contents are. At this point,
         // we need to include information about which tile is being used, so that we can
         // transform them into the atlas position as a post-processing of the vertices.
-        // (So, `TexPoint` will become some sort of enum-ish type.)
+        // (So, `TexPoint` will become some sort of structure type or have some encoding of values.)
         let relative = in_tile_grid - self.bounds.lower_bounds().cast().unwrap();
-        relative.div_element_wise(self.bounds.size().cast().unwrap())
+        relative
+            .div_element_wise(self.bounds.size().cast().unwrap())
+            .truncate()
     }
 }
 

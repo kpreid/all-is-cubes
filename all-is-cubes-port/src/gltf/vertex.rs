@@ -1,6 +1,6 @@
 //! [`GltfVertex`], vertex type for writing to glTF buffers.
 
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3, Vector4};
+use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
 use all_is_cubes::math::GridPoint;
 use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
 
@@ -17,15 +17,24 @@ use super::texture::TexPoint;
 #[derive(Clone, Copy, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub struct GltfVertex {
+    /// glTF semantic `POSITION`
     pub(crate) position: [Lef32; 3],
-    pub(crate) color_or_texture: [Lef32; 4],
+    /// glTF semantic `COLOR_0`.
+    /// Should be interpreted using the glTF `pbrMetallicRoughness` model.
+    /// Per glTF 2.0 § 3.9.2, this will be multiplied by the texture color.
+    pub(crate) base_color: [Lef32; 4],
+    /// glTF semantic `TEXCOORD_0`.
+    /// The texel obtained with these coordinates should be interpreted using the glTF
+    /// `pbrMetallicRoughness` model.
+    pub(crate) base_color_tc: [Lef32; 2],
 }
 
 impl GltfVertex {
     /// Placeholder constant value for [`bytemuck::offset_of`] calculations.
     pub(crate) const DUMMY: GltfVertex = GltfVertex {
         position: [Lef32::ZERO; 3],
-        color_or_texture: [Lef32::ZERO; 4],
+        base_color: [Lef32::ZERO; 4],
+        base_color_tc: [Lef32::ZERO; 2],
     };
 }
 
@@ -35,13 +44,11 @@ impl From<BlockVertex<TexPoint>> for GltfVertex {
         let position = Lef32::from_vec3(vertex.position.cast::<f32>().unwrap().to_vec());
         match vertex.coloring {
             Coloring::Solid(color) => {
-                let mut color_attribute: Vector4<f32> = color.into();
-                // Clamp out-of-range alpha values so they fit into the
-                // VertexColorOrTexture protocol (not less than zero).
-                color_attribute.w = color_attribute.w.clamp(0., 1.);
                 Self {
                     position,
-                    color_or_texture: Lef32::from_vec4(color_attribute),
+                    base_color: Lef32::from_vec4(color.clamp().into()),
+                    // TODO: We need to ensure that the texture, if present, has white allocated here.
+                    base_color_tc: [Lef32::ZERO; 2],
                 }
             }
             Coloring::Texture {
@@ -50,7 +57,11 @@ impl From<BlockVertex<TexPoint>> for GltfVertex {
                 clamp_max: _,
             } => Self {
                 position,
-                color_or_texture: Lef32::from_vec4(tc.extend(-1.0)),
+                // TODO: We need to later rewrite these texture coordinates
+                // (possibly with the help of data stashed in the color field)
+                // to point into the actual tile coordinates in the generated texture atlas.
+                base_color: [Lef32::ONE; 4],
+                base_color_tc: Lef32::from_vec2(tc),
             },
         }
     }

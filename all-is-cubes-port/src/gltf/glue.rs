@@ -7,9 +7,6 @@ use all_is_cubes::cgmath;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
-use all_is_cubes::cgmath::Vector3;
-use all_is_cubes::cgmath::Vector4;
-
 // TODO: contribute this to gltf_json
 pub(crate) fn push_and_return_index<T>(vec: &mut Vec<T>, value: T) -> Index<T> {
     let index: u32 = vec.len().try_into().expect("Too many items");
@@ -57,13 +54,18 @@ where
 pub(crate) struct Lef32([u8; 4]);
 
 impl Lef32 {
-    // All bits zero is also the value 'positive zero'
+    /// All bits zero is also the value 'positive zero'.
     pub const ZERO: Self = Lef32([0, 0, 0, 0]);
+    /// The value 1.0.
+    pub const ONE: Self = Lef32([0, 0, 128, 63]);
 
-    pub(crate) fn from_vec3(vector: Vector3<f32>) -> [Self; 3] {
+    pub(crate) fn from_vec2(vector: cgmath::Vector2<f32>) -> [Self; 2] {
         vector.map(Lef32::from).into()
     }
-    pub(crate) fn from_vec4(vector: Vector4<f32>) -> [Self; 4] {
+    pub(crate) fn from_vec3(vector: cgmath::Vector3<f32>) -> [Self; 3] {
+        vector.map(Lef32::from).into()
+    }
+    pub(crate) fn from_vec4(vector: cgmath::Vector4<f32>) -> [Self; 4] {
         vector.map(Lef32::from).into()
     }
 }
@@ -178,6 +180,12 @@ mod tests {
     fn lef32_zero() {
         assert_eq!(Lef32::default(), bytemuck::Zeroable::zeroed());
         assert_eq!(Lef32::default(), Lef32::from(0.0));
+        assert_eq!(Lef32::ZERO, Lef32::from(0.0));
+    }
+
+    #[test]
+    fn lef32_one() {
+        assert_eq!(Lef32::ONE, Lef32::from(1.0));
     }
 
     #[test]

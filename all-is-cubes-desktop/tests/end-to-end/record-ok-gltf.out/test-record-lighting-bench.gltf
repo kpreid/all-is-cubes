@@ -36,7 +36,23 @@
         0.9754981994628906,
         1.0
       ],
-      "name": "chunk [0, 0, 0] color"
+      "name": "chunk [0, 0, 0] base color"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 28,
+      "count": 1104,
+      "componentType": 5126,
+      "type": "VEC2",
+      "min": [
+        0.0,
+        0.0
+      ],
+      "max": [
+        0.0,
+        0.0
+      ],
+      "name": "chunk [0, 0, 0] base color texcoords"
     },
     {
       "bufferView": 1,
@@ -82,7 +98,23 @@
         0.5,
         1.0
       ],
-      "name": "chunk [0, -1, 0] color"
+      "name": "chunk [0, -1, 0] base color"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 28,
+      "count": 1680,
+      "componentType": 5126,
+      "type": "VEC2",
+      "min": [
+        0.0,
+        0.0
+      ],
+      "max": [
+        0.0,
+        0.0
+      ],
+      "name": "chunk [0, -1, 0] base color texcoords"
     },
     {
       "bufferView": 3,
@@ -99,12 +131,12 @@
   },
   "buffers": [
     {
-      "byteLength": 34224,
+      "byteLength": 43056,
       "name": "chunk [0, 0, 0] data",
       "uri": "test-record-lighting-bench-mesh-0.glbin"
     },
     {
-      "byteLength": 52080,
+      "byteLength": 65520,
       "name": "chunk [0, -1, 0] data",
       "uri": "test-record-lighting-bench-mesh-1.glbin"
     }
@@ -112,29 +144,29 @@
   "bufferViews": [
     {
       "buffer": 0,
-      "byteLength": 30912,
-      "byteStride": 28,
+      "byteLength": 39744,
+      "byteStride": 36,
       "name": "chunk [0, 0, 0] vertex",
       "target": 34962
     },
     {
       "buffer": 0,
       "byteLength": 3312,
-      "byteOffset": 30912,
+      "byteOffset": 39744,
       "name": "chunk [0, 0, 0] index",
       "target": 34963
     },
     {
       "buffer": 1,
-      "byteLength": 47040,
-      "byteStride": 28,
+      "byteLength": 60480,
+      "byteStride": 36,
       "name": "chunk [0, -1, 0] vertex",
       "target": 34962
     },
     {
       "buffer": 1,
       "byteLength": 5040,
-      "byteOffset": 47040,
+      "byteOffset": 60480,
       "name": "chunk [0, -1, 0] index",
       "target": 34963
     }
@@ -208,9 +240,10 @@
         {
           "attributes": {
             "POSITION": 0,
-            "COLOR_0": 1
+            "COLOR_0": 1,
+            "TEXCOORD_0": 2
           },
-          "indices": 2,
+          "indices": 3,
           "material": 0
         }
       ]
@@ -220,10 +253,11 @@
       "primitives": [
         {
           "attributes": {
-            "POSITION": 3,
-            "COLOR_0": 4
+            "POSITION": 4,
+            "COLOR_0": 5,
+            "TEXCOORD_0": 6
           },
-          "indices": 5,
+          "indices": 7,
           "material": 0
         }
       ]

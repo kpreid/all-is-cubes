@@ -104,12 +104,24 @@ pub(crate) fn add_mesh(
             push_and_return_index(
                 &mut writer.root.accessors,
                 create_accessor(
-                    format!("{name} color"),
+                    format!("{name} base color"),
                     vertex_buffer_view,
-                    offset_of!(GltfVertex::DUMMY, GltfVertex, color_or_texture),
+                    offset_of!(GltfVertex::DUMMY, GltfVertex, base_color),
+                    mesh.vertices().iter().map(|v| v.base_color.map(f32::from)),
+                ),
+            ),
+        ),
+        (
+            Valid(gltf_json::mesh::Semantic::TexCoords(0)),
+            push_and_return_index(
+                &mut writer.root.accessors,
+                create_accessor(
+                    format!("{name} base color texcoords"),
+                    vertex_buffer_view,
+                    offset_of!(GltfVertex::DUMMY, GltfVertex, base_color_tc),
                     mesh.vertices()
                         .iter()
-                        .map(|v| v.color_or_texture.map(f32::from)),
+                        .map(|v| v.base_color_tc.map(f32::from)),
                 ),
             ),
         ),
