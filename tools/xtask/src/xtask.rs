@@ -511,18 +511,18 @@ fn do_for_all_packages(
     {
         let _t = CaptureTime::new(time_log, "check --all-targets");
         cargo()
-            .arg(CHECK_SUBCMD)
+            .arg(op.non_build_check_subcmd())
             .args(config.cargo_build_args())
             .arg("--all-targets")
             .run()?;
     }
 
-    // Build fuzz targets that are not in the workspace
+    // Check fuzz targets that are not in the workspace
     {
         let _t = CaptureTime::new(time_log, "check fuzz");
         let _pushd: Pushd = pushd("fuzz")?;
         cargo()
-            .arg(CHECK_SUBCMD)
+            .arg(op.non_build_check_subcmd())
             .args(config.cargo_build_args())
             .run()?;
     }
@@ -641,6 +641,21 @@ impl TestOrCheck {
                 Self::Lint => vec![CHECK_SUBCMD],
             })
             .args(config.cargo_build_args())
+    }
+
+    /// Return the cargo subcommand to use for the targets that we are *not* planning or able
+    /// to run.
+    fn non_build_check_subcmd(&self) -> &'static str {
+        match self {
+            // In place of testing, we use check instead of clippy.
+            // This is so that in CI, when a rustc beta release has a broken clippy lint,
+            // it doesn't block us running our tests.
+            // It also aligns with the behavior of actual testing — a `cargo build` or
+            // `cargo test` doesn't run clippy.
+            TestOrCheck::Test => "check",
+            TestOrCheck::BuildTests => "check",
+            TestOrCheck::Lint => CHECK_SUBCMD,
+        }
     }
 }
 
