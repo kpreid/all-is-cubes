@@ -5,7 +5,7 @@ use all_is_cubes::math::GridPoint;
 use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
 
 use super::glue::Lef32;
-use super::texture::TexPoint;
+use super::texture::GltfAtlasPoint;
 
 /// [`GfxVertex`] type for glTF exports.
 ///
@@ -38,9 +38,9 @@ impl GltfVertex {
     };
 }
 
-impl From<BlockVertex<TexPoint>> for GltfVertex {
+impl From<BlockVertex<GltfAtlasPoint>> for GltfVertex {
     #[inline]
-    fn from(vertex: BlockVertex<TexPoint>) -> Self {
+    fn from(vertex: BlockVertex<GltfAtlasPoint>) -> Self {
         let position = Lef32::from_vec3(vertex.position.cast::<f32>().unwrap().to_vec());
         match vertex.coloring {
             Coloring::Solid(color) => {
@@ -55,14 +55,29 @@ impl From<BlockVertex<TexPoint>> for GltfVertex {
                 pos: tc,
                 clamp_min: _,
                 clamp_max: _,
-            } => Self {
-                position,
-                // TODO: We need to later rewrite these texture coordinates
-                // (possibly with the help of data stashed in the color field)
-                // to point into the actual tile coordinates in the generated texture atlas.
-                base_color: [Lef32::ONE; 4],
-                base_color_tc: Lef32::from_vec2(tc),
-            },
+            } => {
+                // Temporarily pack the contents of the texture allocation info into our
+                // vertex fields. TODO: Not actually sufficient yet.
+                let GltfAtlasPoint {
+                    plane_id,
+                    point_within,
+                } = tc;
+
+                // Encode the plane ID in the color field as a value that is unambiguously
+                // not a real color, because the blue and alpha components are negative.
+                let base_color = [
+                    Lef32::from(f32::from_bits(plane_id as u32)),
+                    Lef32::from(f32::from_bits((plane_id >> 32) as u32)),
+                    Lef32::from(-1.0),
+                    Lef32::from(-1.0),
+                ];
+
+                Self {
+                    position,
+                    base_color,
+                    base_color_tc: Lef32::from_vec2(point_within.to_vec()),
+                }
+            }
         }
     }
 }
@@ -71,7 +86,7 @@ impl GfxVertex for GltfVertex {
     const WANTS_DEPTH_SORTING: bool = false;
     type Coordinate = f32;
     type BlockInst = Vector3<f32>;
-    type TexPoint = TexPoint;
+    type TexPoint = GltfAtlasPoint;
 
     #[inline]
     fn instantiate_block(cube: GridPoint) -> Self::BlockInst {

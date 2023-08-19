@@ -4,14 +4,12 @@ use std::io;
 
 use gltf_json::validation::Checked::Valid;
 
-use all_is_cubes::cgmath::{ElementWise, Point3};
+use all_is_cubes::cgmath::{EuclideanSpace, Point2, Point3, Transform};
 use all_is_cubes::math::{GridAab, GridRotation};
 use all_is_cubes_mesh::texture;
 
 use super::glue::push_and_return_index;
 use super::GltfDataDestination;
-
-pub(crate) type TexPoint = all_is_cubes::cgmath::Vector2<f32>;
 
 /// [`texture::Allocator`] implementation for glTF exports.
 ///
@@ -68,7 +66,7 @@ impl GltfTextureAllocator {
 
 impl texture::Allocator for GltfTextureAllocator {
     type Tile = GltfTile;
-    type Point = TexPoint;
+    type Point = GltfAtlasPoint;
 
     fn allocate(&self, bounds: GridAab) -> Option<GltfTile> {
         if self.enable {
@@ -99,7 +97,7 @@ pub struct GltfTile {
 }
 
 impl texture::Tile for GltfTile {
-    type Point = TexPoint;
+    type Point = GltfAtlasPoint;
     type Plane = GltfTexturePlane;
     const REUSABLE: bool = false;
 
@@ -119,21 +117,25 @@ impl texture::Tile for GltfTile {
     fn slice(&self, sliced_bounds: GridAab) -> Self::Plane {
         let axis = texture::validate_slice(self.bounds, sliced_bounds);
 
-        self.gatherer.insert(internal::AtlasEntry {
+        let rotation = match axis {
+            // TODO: decide which exact rotations to use
+            0 => GridRotation::RZYx, // X is flat, so rotate about Y
+            1 => GridRotation::RXZy, // Y is flat, so rotate about X
+            2 => GridRotation::IDENTITY,
+            _ => unreachable!(),
+        };
+
+        let plane_id = self.gatherer.insert(internal::AtlasEntry {
             source_texels: self.texels.clone(),
             source_bounds: self.bounds,
             sliced_bounds,
-            rotation: match axis {
-                // TODO: decide which exact rotations to use
-                0 => GridRotation::RZYx, // X is flat, so rotate about Y
-                1 => GridRotation::RXZy, // Y is flat, so rotate about X
-                2 => GridRotation::IDENTITY,
-                _ => unreachable!(),
-            },
+            rotation,
         });
 
         GltfTexturePlane {
+            plane_id,
             bounds: sliced_bounds,
+            rotation,
         }
     }
 }
@@ -144,23 +146,50 @@ impl texture::Tile for GltfTile {
 #[derive(Clone, Debug, PartialEq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 pub struct GltfTexturePlane {
+    plane_id: u64,
     bounds: GridAab,
+    rotation: GridRotation,
 }
 
 impl texture::Plane for GltfTexturePlane {
-    type Point = TexPoint;
+    type Point = GltfAtlasPoint;
 
-    fn grid_to_texcoord(&self, in_tile_grid: Point3<f32>) -> Self::Point {
-        // TODO: these coordinates will, no matter what, need to be adjusted to be
-        // within the atlas once we know what the atlas contents are. At this point,
-        // we need to include information about which tile is being used, so that we can
-        // transform them into the atlas position as a post-processing of the vertices.
-        // (So, `TexPoint` will become some sort of structure type or have some encoding of values.)
-        let relative = in_tile_grid - self.bounds.lower_bounds().cast().unwrap();
-        relative
-            .div_element_wise(self.bounds.size().cast().unwrap())
-            .truncate()
+    fn grid_to_texcoord(&self, tc_in_tile: Point3<f32>) -> Self::Point {
+        // TODO: precompute more of this
+        let rot_tc = self
+            .rotation
+            .to_rotation_matrix()
+            .to_free()
+            .transform_point(tc_in_tile.map(f64::from))
+            .map(|c| c as f32);
+        let rot_bounds = self.bounds.transform(self.rotation.into()).unwrap();
+
+        // Translate to get coordinates within the rotated-to-XY plane.
+        let point_within = rot_tc - rot_bounds.lower_bounds().cast::<f32>().unwrap();
+        debug_assert!(
+            point_within.z >= 0.0 && point_within.z <= 1.0,
+            "{tc_in_tile:?} -> {point_within:?}"
+        );
+        let point_within = Point2::from_vec(point_within.truncate());
+
+        GltfAtlasPoint {
+            plane_id: self.plane_id,
+            point_within,
+        }
     }
+}
+
+/// Type of points produced by [`GltfTextureAllocator`], identifying a [`GltfTexturePlane`]
+/// and position within the plane.
+///
+/// These are not directly usable as texture coordinates; they must first be rewritten into
+/// coordinates within a generated texture atlas. TODO: Document how to do that.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GltfAtlasPoint {
+    /// Unique ID of the plane.
+    pub(crate) plane_id: u64,
+    /// Point within the plane, still with 1 unit = 1 texel coordinates.
+    pub(crate) point_within: Point2<f32>,
 }
 
 /// Generate the atlas texture and necessary glTF entities.
@@ -222,7 +251,6 @@ pub(super) fn insert_block_texture_atlas(
 
 mod internal {
     use super::*;
-    use all_is_cubes::cgmath::EuclideanSpace as _;
     use std::collections::BTreeMap;
     use std::mem;
     use std::sync::{Arc, Mutex, OnceLock};
@@ -239,8 +267,11 @@ mod internal {
             self.0.lock().expect("mutex in atlas gatherer").is_empty()
         }
 
-        pub fn insert(&self, entry: AtlasEntry) {
-            self.0.lock().expect("mutex in atlas gatherer").push(entry);
+        pub fn insert(&self, entry: AtlasEntry) -> u64 {
+            let mut data = self.0.lock().expect("mutex in atlas gatherer");
+            let plane_id = u64::try_from(data.len()).unwrap();
+            data.push(entry);
+            plane_id
         }
 
         pub(crate) fn build_atlas(&self) -> image::RgbaImage {
