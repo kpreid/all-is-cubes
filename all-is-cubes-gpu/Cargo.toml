@@ -25,6 +25,10 @@ doctest = false
 name = "shaders"
 required-features = ["wgpu"]
 
+[[bench]]
+name = "wgpu_bench"
+harness = false
+
 [features]
 # Enable wgpu support.
 # (The library is useless without this, but we used to have multiple GPU API support
@@ -65,9 +69,9 @@ web-sys = { version = "0.3.64", features = ["OffscreenCanvas"]}
 wgpu = { workspace = true, optional = true, features = ["webgl"] }
 
 [dev-dependencies]
-# f16 support for working with floating point textures in tests. Using older version 1.8 because that's already indirectly in our dev-dependencies.
+criterion = { workspace = true, features = ["async_tokio"] }
+# f16 support for working with floating point textures in tests.
 half = { version = "2.3.1", features = ["bytemuck"] }
 # Using tokio for async test-running.
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
 
-[target.'cfg(target_family = "wasm")'.dev-dependencies]

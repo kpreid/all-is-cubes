@@ -154,6 +154,7 @@ dependencies = [
  "all-is-cubes",
  "all-is-cubes-mesh",
  "bytemuck",
+ "criterion",
  "crossbeam-channel",
  "futures-channel",
  "futures-core",
@@ -1058,6 +1059,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "tinytemplate",
+ "tokio",
  "walkdir",
 ]
 
