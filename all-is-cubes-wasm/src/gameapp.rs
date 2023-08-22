@@ -16,7 +16,7 @@ use web_sys::{
 use all_is_cubes::camera::{GraphicsOptions, StandardCameras, Viewport};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::ListenableCell;
-use all_is_cubes::universe::UniverseStepInfo;
+use all_is_cubes::universe::{Universe, UniverseStepInfo};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_gpu::in_wgpu;
 use all_is_cubes_port::file::NonDiskFile;
@@ -33,29 +33,32 @@ pub(crate) enum WebRenderer {
     Wgpu(in_wgpu::SurfaceRenderer),
 }
 
-pub(crate) struct WebGameRoot {
-    /// In order to be able to set up callbacks to ourselves, we need to live in a mutable
-    /// heap-allocated location, and we need to have a reference to that location. In
-    /// order to not be a guaranteed memory leak, we need that reference to be weak.
-    ///
-    /// This technique taken from [this example of how to build a requestAnimationFrame
-    /// loop](https://rustwasm.github.io/docs/wasm-bindgen/examples/request-animation-frame.html).
-    self_ref: Weak<RefCell<WebGameRoot>>,
-
+/// The interior-mutable state of an All is Cubes session in a web page, owning a
+/// [`Session`].
+///
+/// This type is normally owned by an `Rc`, and weakly referenced by event handlers
+/// to avoid JS/Rust reference cycles that cannot be collected.
+pub(crate) struct WebSession {
     gui_helpers: GuiHelpers,
     static_dom: StaticDom,
-    pub(crate) session: Session,
-    renderer: WebRenderer,
     viewport_cell: ListenableCell<Viewport>,
     fullscreen_cell: ListenableCell<Option<bool>>,
     raf_callback: Closure<dyn FnMut(f64)>,
     step_callback: Closure<dyn FnMut()>,
+
+    // Parts of the state that need to be mutable
+    inner_cell: RefCell<Inner>,
+}
+
+struct Inner {
+    pub(crate) session: Session,
+    renderer: WebRenderer,
     step_callback_scheduled: bool,
     last_raf_timestamp: f64,
     last_step_info: UniverseStepInfo,
 }
 
-impl WebGameRoot {
+impl WebSession {
     pub fn new(
         gui_helpers: GuiHelpers,
         static_dom: StaticDom,
@@ -63,55 +66,56 @@ impl WebGameRoot {
         renderer: WebRenderer,
         viewport_cell: ListenableCell<Viewport>,
         fullscreen_cell: ListenableCell<Option<bool>>,
-    ) -> Rc<RefCell<WebGameRoot>> {
-        // Construct a non-self-referential initial mutable object.
-        let self_cell_ref = Rc::new(RefCell::new(Self {
-            self_ref: Weak::new(),
+    ) -> Rc<Self> {
+        let self_rc = Rc::new_cyclic(|weak_self| {
+            let new_self = Self {
+                gui_helpers,
+                static_dom,
+                viewport_cell,
+                fullscreen_cell,
+                raf_callback: {
+                    let weak_self = weak_self.clone();
+                    Closure::wrap(Box::new(move |dom_timestamp: f64| {
+                        Self::upgrade_in_callback(&weak_self, move |this, inner| {
+                            this.raf_callback_impl(inner, dom_timestamp)
+                        })
+                    }))
+                },
+                step_callback: {
+                    let weak_self = weak_self.clone();
+                    Closure::wrap(Box::new(move || {
+                        Self::upgrade_in_callback(&weak_self, |_this, inner| {
+                            inner.step_callback_impl()
+                        })
+                    }))
+                },
 
-            gui_helpers,
-            static_dom,
-            session,
-            renderer,
-            viewport_cell,
-            fullscreen_cell,
-            raf_callback: Closure::wrap(Box::new(|_| { /* dummy no-op for initialization */ })),
-            step_callback: Closure::wrap(Box::new(|| { /* dummy no-op for initialization */ })),
-            step_callback_scheduled: false,
-            last_raf_timestamp: 0.0, // TODO better initial value or special case
-            last_step_info: UniverseStepInfo::default(),
-        }));
+                inner_cell: RefCell::new(Inner {
+                    session,
+                    renderer,
+                    step_callback_scheduled: false,
+                    last_raf_timestamp: 0.0, // TODO better initial value or special case
+                    last_step_info: UniverseStepInfo::default(),
+                }),
+            };
 
-        // Add the self-references.
-        {
-            let mut self_mut = (*self_cell_ref).borrow_mut();
-            self_mut.self_ref = Rc::downgrade(&self_cell_ref);
+            new_self
+        });
 
-            let weak_self_ref = self_mut.self_ref.clone();
-            self_mut.raf_callback = Closure::wrap(Box::new(move |dom_timestamp: f64| {
-                Self::upgrade_in_callback(&weak_self_ref, move |this| {
-                    this.raf_callback_impl(dom_timestamp)
-                })
-            }));
+        self_rc.clone().init_dom();
 
-            let weak_self_ref = self_mut.self_ref.clone();
-            self_mut.step_callback = Closure::wrap(Box::new(move || {
-                Self::upgrade_in_callback(&weak_self_ref, |this| this.step_callback_impl())
-            }));
-        }
-        // Other initialization.
-        (*self_cell_ref).borrow().init_dom();
-
-        self_cell_ref
+        self_rc
     }
 
     /// This method is broken out of new() so we can just use `self`. Well, some of the time.
-    fn init_dom(&self) {
+    /// TODO: reconsider
+    fn init_dom(self: Rc<Self>) {
         self.add_canvas_to_self_event_listener(
             "keydown",
             false,
-            move |this, event: KeyboardEvent| {
+            move |_this, inner, event: KeyboardEvent| {
                 if let Some(key) = map_keyboard_event(&event) {
-                    this.session.input_processor.key_down(key);
+                    inner.session.input_processor.key_down(key);
 
                     // TODO: return for keys we don't bind
                     let event: &Event = event.as_ref();
@@ -124,9 +128,9 @@ impl WebGameRoot {
         self.add_canvas_to_self_event_listener(
             "keyup",
             false,
-            move |this, event: KeyboardEvent| {
+            move |_this, inner, event: KeyboardEvent| {
                 if let Some(key) = map_keyboard_event(&event) {
-                    this.session.input_processor.key_up(key);
+                    inner.session.input_processor.key_up(key);
 
                     // TODO: return for keys we don't bind
                     let event: &Event = event.as_ref();
@@ -136,40 +140,48 @@ impl WebGameRoot {
             },
         );
 
-        self.add_canvas_to_self_event_listener("focus", true, move |this, _: FocusEvent| {
-            this.session.input_processor.key_focus(true);
-        });
+        self.add_canvas_to_self_event_listener(
+            "focus",
+            true,
+            move |_this, inner, _: FocusEvent| {
+                inner.session.input_processor.key_focus(true);
+            },
+        );
 
-        self.add_canvas_to_self_event_listener("blur", true, move |this, _: FocusEvent| {
-            this.session.input_processor.key_focus(false);
-            this.session.input_processor.mouse_ndc_position(None);
+        self.add_canvas_to_self_event_listener("blur", true, move |_this, inner, _: FocusEvent| {
+            inner.session.input_processor.key_focus(false);
+            inner.session.input_processor.mouse_ndc_position(None);
         });
 
         self.add_canvas_to_self_event_listener(
             "mousemove",
             true,
-            move |this, event: MouseEvent| {
-                this.update_mouse_position(&event);
+            move |this, inner, event: MouseEvent| {
+                this.update_mouse_position(inner, &event);
             },
         );
 
         self.add_canvas_to_self_event_listener(
             "mouseover",
             true,
-            move |this, event: MouseEvent| {
-                this.update_mouse_position(&event);
+            move |this, inner, event: MouseEvent| {
+                this.update_mouse_position(inner, &event);
             },
         );
 
-        self.add_canvas_to_self_event_listener("mouseout", true, move |this, _: MouseEvent| {
-            this.session.input_processor.mouse_ndc_position(None);
-        });
+        self.add_canvas_to_self_event_listener(
+            "mouseout",
+            true,
+            move |_this, inner, _: MouseEvent| {
+                inner.session.input_processor.mouse_ndc_position(None);
+            },
+        );
 
         self.add_canvas_to_self_event_listener(
             "mousedown",
             true,
-            move |this, event: MouseEvent| {
-                this.update_mouse_position(&event);
+            move |this, inner, event: MouseEvent| {
+                this.update_mouse_position(inner, &event);
                 // MouseEvent button numbering is sequential for a three button mouse, instead of
                 // counting the middle/wheel button as the third button.
                 let mapped_button: usize = match event.button() {
@@ -178,7 +190,7 @@ impl WebGameRoot {
                     1 => 2,
                     x => x as usize,
                 };
-                this.session.click(mapped_button);
+                inner.session.click(mapped_button);
             },
         );
 
@@ -194,11 +206,11 @@ impl WebGameRoot {
 
         // Fullscreen event listener, which goes on the document, not the canvas
         {
-            let weak_self_ref = self.self_ref.clone();
+            let weak_self_ref: Weak<Self> = Rc::downgrade(&self);
             let ch = self.gui_helpers.canvas_helper();
             let target = &ch.canvas().owner_document().unwrap();
             let listener = move |_event: Event| {
-                Self::upgrade_in_callback(&weak_self_ref, |this| {
+                Self::upgrade_in_callback(&weak_self_ref, |this, _inner| {
                     let state = Some(ch.is_fullscreen());
                     log::warn!("got fullscreenchange {state:?}");
                     this.fullscreen_cell.set(state);
@@ -214,88 +226,98 @@ impl WebGameRoot {
         // File drop listener.
         // TODO: This code does not ever run. Probably need some additional handlers to
         // register as being a drop target.
-        self.add_canvas_to_self_event_listener("drop", false, move |this, event: DragEvent| {
-            let mut found_file = None;
-            if let Some(data_transfer) = event.data_transfer() {
-                let items = data_transfer.items();
-                for i in 0..items.length() {
-                    let item: DataTransferItem = items.get(i).unwrap();
-                    match item.kind().as_str() {
-                        "string" => {}
-                        "file" => {
-                            if let Ok(Some(file)) = item.get_as_file() {
-                                found_file = Some(file);
+        self.add_canvas_to_self_event_listener(
+            "drop",
+            false,
+            move |this, _inner, event: DragEvent| {
+                let mut found_file = None;
+                if let Some(data_transfer) = event.data_transfer() {
+                    let items = data_transfer.items();
+                    for i in 0..items.length() {
+                        let item: DataTransferItem = items.get(i).unwrap();
+                        match item.kind().as_str() {
+                            "string" => {}
+                            "file" => {
+                                if let Ok(Some(file)) = item.get_as_file() {
+                                    found_file = Some(file);
+                                }
                             }
-                        }
-                        other_kind => {
-                            console::warn_1(&JsValue::from(format!(
-                                "unrecognized drag item kind: {other_kind:?}"
-                            )));
+                            other_kind => {
+                                console::warn_1(&JsValue::from(format!(
+                                    "unrecognized drag item kind: {other_kind:?}"
+                                )));
+                            }
                         }
                     }
                 }
-            }
 
-            if let Some(found_file) = found_file {
-                // We've found a file to use. Further steps must be async.
-                event.prevent_default();
+                if let Some(found_file) = found_file {
+                    // We've found a file to use. Further steps must be async.
+                    event.prevent_default();
 
-                let this = this.self_ref.upgrade().unwrap();
-                spawn_local(async move {
-                    match JsFuture::from(found_file.array_buffer()).await {
-                        Ok(buffer) => {
-                            let buffer: SendWrapper<ArrayBuffer> =
-                                SendWrapper::new(buffer.dyn_into().unwrap());
-                            // TODO: error reporting
-                            let universe = all_is_cubes_port::load_universe_from_file(
-                                YieldProgress::noop(),
-                                Arc::new(NonDiskFile::from_name_and_data_source(
-                                    found_file.name(),
-                                    move || Ok(Uint8Array::new(&buffer).to_vec()),
-                                )),
-                            )
-                            .await
-                            .unwrap();
-                            this.borrow_mut().session.set_universe(universe);
+                    let this: Rc<WebSession> = Rc::clone(this);
+                    spawn_local(async move {
+                        match JsFuture::from(found_file.array_buffer()).await {
+                            Ok(buffer) => {
+                                let buffer: SendWrapper<ArrayBuffer> =
+                                    SendWrapper::new(buffer.dyn_into().unwrap());
+                                // TODO: error reporting
+                                let universe = all_is_cubes_port::load_universe_from_file(
+                                    YieldProgress::noop(),
+                                    Arc::new(NonDiskFile::from_name_and_data_source(
+                                        found_file.name(),
+                                        move || Ok(Uint8Array::new(&buffer).to_vec()),
+                                    )),
+                                )
+                                .await
+                                .unwrap();
+                                this.set_universe(universe);
+                            }
+                            Err(e) => {
+                                // TODO: present error to UI
+                                console::error_2(&JsValue::from_str("failed to load file"), &e);
+                            }
                         }
-                        Err(e) => {
-                            // TODO: present error to UI
-                            console::error_2(&JsValue::from_str("failed to load file"), &e);
-                        }
-                    }
-                });
-            }
-        });
+                    });
+                }
+            },
+        );
     }
 
-    fn add_canvas_to_self_event_listener<E, F>(&self, event_name: &str, passive: bool, callback: F)
-    where
+    fn add_canvas_to_self_event_listener<E, F>(
+        self: &Rc<Self>,
+        event_name: &str,
+        passive: bool,
+        callback: F,
+    ) where
         E: JsCast,
-        F: Fn(&mut Self, E) + 'static,
+        F: Fn(&Rc<Self>, &mut Inner, E) + 'static,
     {
-        let weak_self_ref = self.self_ref.clone();
+        let weak_self_ref = Rc::downgrade(self);
         add_event_listener(
             &self.gui_helpers.canvas_helper().canvas(),
             event_name,
             move |event: E| {
-                Self::upgrade_in_callback(&weak_self_ref, |this| callback(&mut *this, event))
+                Self::upgrade_in_callback(&weak_self_ref, |this, inner| {
+                    callback(this, inner, event)
+                })
             },
             AddEventListenerOptions::new().passive(passive),
         );
     }
 
-    fn upgrade_in_callback<F>(weak_self_ref: &Weak<RefCell<WebGameRoot>>, body: F)
+    fn upgrade_in_callback<F>(weak_self_ref: &Weak<Self>, body: F)
     where
-        F: FnOnce(&mut Self),
+        F: FnOnce(&Rc<Self>, &mut Inner),
     {
         if let Some(strong_self_ref) = weak_self_ref.upgrade() {
-            match strong_self_ref.try_borrow_mut() {
-                Ok(mut this) => body(&mut this),
+            match strong_self_ref.inner_cell.try_borrow_mut() {
+                Ok(mut inner) => body(&strong_self_ref, &mut *inner),
                 Err(BorrowMutError { .. }) => {
                     // We probably left the cell borrowed in a previous panic.
                     // Log, but don't panic again because it will only create log spam.
                     console::warn_1(&JsValue::from_str(
-                        "WebGameRoot is borrowed at event handler (check previous errors)",
+                        "WebSession is borrowed at event handler (check previous errors)",
                     ));
                 }
             }
@@ -307,27 +329,31 @@ impl WebGameRoot {
     }
 
     pub fn start_loop(&self) {
-        // This strategy from https://rustwasm.github.io/docs/wasm-bindgen/examples/request-animation-frame.html
+        // TODO: enforce this is only called once
         web_sys::window()
             .unwrap()
             .request_animation_frame(self.raf_callback.as_ref().unchecked_ref())
             .unwrap();
     }
 
-    fn raf_callback_impl(&mut self, dom_timestamp: f64) {
-        let delta = Duration::from_secs_f64((dom_timestamp - self.last_raf_timestamp) / 1000.0);
-        self.last_raf_timestamp = dom_timestamp;
-        let should_draw = self.session.frame_clock.request_frame(delta);
+    pub fn set_universe(&self, universe: Universe) {
+        self.inner_cell.borrow_mut().session.set_universe(universe)
+    }
+
+    fn raf_callback_impl(&self, inner: &mut Inner, dom_timestamp: f64) {
+        let delta = Duration::from_secs_f64((dom_timestamp - inner.last_raf_timestamp) / 1000.0);
+        inner.last_raf_timestamp = dom_timestamp;
+        let should_draw = inner.session.frame_clock.request_frame(delta);
 
         if should_draw {
             let viewport = self.gui_helpers.canvas_helper().viewport();
             if viewport != *self.viewport_cell.get() {
                 self.viewport_cell.set(viewport);
             }
-            match &mut self.renderer {
+            match &mut inner.renderer {
                 WebRenderer::Wgpu(renderer) => {
                     renderer.update_world_camera();
-                    self.session.update_cursor(renderer.cameras());
+                    inner.session.update_cursor(renderer.cameras());
                 }
             }
             let _: Result<_, _> = self
@@ -337,7 +363,7 @@ impl WebGameRoot {
                 .style()
                 .set_property(
                     "cursor",
-                    match self.session.cursor_icon() {
+                    match inner.session.cursor_icon() {
                         CursorIcon::Crosshair => "crosshair",
                         CursorIcon::PointingHand => "pointer",
                         /* CursorIcon::Normal | */ _ => "default",
@@ -345,30 +371,30 @@ impl WebGameRoot {
                 );
 
             // Do graphics
-            let render_info = match &mut self.renderer {
+            let render_info = match &mut inner.renderer {
                 WebRenderer::Wgpu(renderer) => {
                     // note: info text is HTML on web, so no string passed here
                     renderer
-                        .render_frame(self.session.cursor_result(), |_| String::new())
+                        .render_frame(inner.session.cursor_result(), |_| String::new())
                         .expect("error in render_frame")
                 }
             };
 
             // Update info text
-            let cameras: &StandardCameras = match &self.renderer {
+            let cameras: &StandardCameras = match &inner.renderer {
                 WebRenderer::Wgpu(renderer) => renderer.cameras(),
             };
             if cameras.cameras().world.options().debug_info_text {
                 self.static_dom
                     .scene_info_text_node
-                    .set_data(&format!("{}", self.session.info_text(render_info)));
+                    .set_data(&format!("{}", inner.session.info_text(render_info)));
             } else {
                 self.static_dom.scene_info_text_node.set_data("");
             }
         }
 
-        if self.session.frame_clock.should_step() && !self.step_callback_scheduled {
-            self.step_callback_scheduled = true;
+        if inner.session.frame_clock.should_step() && !inner.step_callback_scheduled {
+            inner.step_callback_scheduled = true;
             web_sys::window()
                 .unwrap()
                 .set_timeout_with_callback_and_timeout_and_arguments_0(
@@ -379,7 +405,7 @@ impl WebGameRoot {
         }
 
         // Sync pointer lock state
-        let wants = self.session.input_processor.wants_pointer_lock();
+        let wants = inner.session.input_processor.wants_pointer_lock();
         let has = self.check_pointer_lock();
         if wants != has {
             let canvas = self.gui_helpers.canvas_helper().canvas();
@@ -394,17 +420,10 @@ impl WebGameRoot {
         self.start_loop();
     }
 
-    fn step_callback_impl(&mut self) {
-        self.step_callback_scheduled = false;
-        if let Some(universe_step_info) = self.session.maybe_step_universe() {
-            self.last_step_info = universe_step_info;
-        }
-    }
-
-    fn update_mouse_position(&mut self, event: &MouseEvent) {
+    fn update_mouse_position(&self, inner: &mut Inner, event: &MouseEvent) {
         let lock = self.check_pointer_lock();
 
-        let i = &mut self.session.input_processor;
+        let i = &mut inner.session.input_processor;
         i.mouselook_delta(Vector2::new(
             event.movement_x().into(),
             event.movement_y().into(),
@@ -421,11 +440,21 @@ impl WebGameRoot {
     }
 
     fn check_pointer_lock(&self) -> bool {
+        // TODO: should this be a method on CanvasHelper?
         let canvas = self.gui_helpers.canvas_helper().canvas(); // TODO: less indirection?
         canvas
             .owner_document()
             .and_then(|d| d.pointer_lock_element())
             == canvas.dyn_into::<Element>().ok()
+    }
+}
+
+impl Inner {
+    fn step_callback_impl(&mut self) {
+        self.step_callback_scheduled = false;
+        if let Some(universe_step_info) = self.session.maybe_step_universe() {
+            self.last_step_info = universe_step_info;
+        }
     }
 }
 

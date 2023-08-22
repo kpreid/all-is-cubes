@@ -10,7 +10,7 @@ use web_sys::{console, Document};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_gpu::in_wgpu;
 
-use crate::gameapp::{create_session, StaticDom, WebGameRoot, WebRenderer};
+use crate::gameapp::{create_session, StaticDom, WebRenderer, WebSession};
 use crate::js_bindings::{make_all_static_gui_helpers, GuiHelpers};
 use crate::url_params::{options_from_query_string, OptionsInUrl, RendererOption};
 use crate::web_glue::yield_to_event_loop;
@@ -133,7 +133,7 @@ async fn start_game_with_dom(
 
     static_dom.append_to_loading_log("\nStarting game loop...");
     app_progress.progress(0.8).await;
-    let root = WebGameRoot::new(
+    let root = WebSession::new(
         gui_helpers,
         static_dom.clone(),
         session,
@@ -141,7 +141,7 @@ async fn start_game_with_dom(
         viewport_cell,
         fullscreen_cell,
     );
-    root.borrow().start_loop();
+    root.start_loop();
 
     static_dom.append_to_loading_log("\nConstructing universe...");
     app_progress.finish().await;
@@ -155,7 +155,7 @@ async fn start_game_with_dom(
         )
         .await
         .expect("universe template error");
-    root.borrow_mut().session.set_universe(universe);
+    root.set_universe(universe);
 
     // Explicitly keep the game loop alive.
     Box::leak(Box::new(root));
@@ -163,7 +163,7 @@ async fn start_game_with_dom(
     // Do the final UI cleanup going from "loading" to "running".
     post_universe_progress.finish().await;
     {
-        // TODO: make this part the WebGameRoot's responsibility? Move the class list manip to StaticDom?
+        // TODO: make this part the WebSession's responsibility? Move the class list manip to StaticDom?
         let list = static_dom.app_root.class_list();
         list.remove_1("state-loading").unwrap();
         list.add_1("state-fully-loaded").unwrap();
