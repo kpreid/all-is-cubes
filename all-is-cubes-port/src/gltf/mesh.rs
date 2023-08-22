@@ -154,7 +154,7 @@ pub(crate) fn add_mesh(
                             &mut writer.root.accessors,
                             gltf_json::Accessor {
                                 buffer_view: Some(index_buffer_view),
-                                byte_offset: u32size(index_range.start * index_type.size()),
+                                byte_offset: Some(u32size(index_range.start * index_type.size())),
                                 count: u32size(index_range.len()),
                                 component_type: Valid(gltf_json::accessor::GenericComponentType(
                                     index_type,

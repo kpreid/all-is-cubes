@@ -145,7 +145,7 @@ where
 
     gltf_json::Accessor {
         buffer_view: Some(buffer_view),
-        byte_offset: u32size(byte_offset),
+        byte_offset: Some(u32size(byte_offset)),
         count,
         component_type: Valid(gltf_json::accessor::GenericComponentType(
             gltf_json::accessor::ComponentType::F32,
