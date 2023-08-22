@@ -12,7 +12,7 @@ use instant::{Duration, Instant};
 /// These go together because the rate at which it makes sense to yield (to avoid event
 /// loop hangs) is similar to the rate at which it makes sense to report progress.
 ///
-/// Note that while a [`YieldProgress`] is `Send` and `Sync`, it does not currently
+/// Note that while a [`YieldProgress`] is [`Send`] and [`Sync`], it does not currently
 /// support meaningfully being used from multiple threads or futures at once — only
 /// reporting the progress of, and yielding periodically within, a fully sequential
 /// operation. This might change in the future, but for now, it will just output
@@ -98,9 +98,13 @@ impl YieldProgress {
         Self::new(|| std::future::ready(()), |_, _| {})
     }
 
-    /// Add a name for the portion of work this [`YieldProgress`] covers.
+    /// Add a name for the portion of work this [`YieldProgress`] covers, which will be
+    /// used by all future progress updates.
     ///
     /// If there is already a label, it will be overwritten.
+    ///
+    /// This does not immediately report progress; that is, the label will not be visible
+    /// anywhere until the next operation that does. Future versions may report it immediately.
     pub fn set_label(&mut self, label: impl fmt::Display) {
         self.label = Some(Arc::from(label.to_string()))
     }
@@ -120,6 +124,8 @@ impl YieldProgress {
     }
 
     /// Report the current amount of progress (a number from 0 to 1) and yield.
+    ///
+    /// The value *may* be less than previously given values.
     #[track_caller] // This is not an `async fn` because `track_caller` is not compatible
     pub fn progress(&self, progress_fraction: f32) -> impl Future<Output = ()> + Send + 'static {
         let location = Location::caller();
@@ -240,7 +246,7 @@ impl<F: ?Sized + Fn() -> BoxFuture<'static, ()> + Send + Sync> Yielding<F> {
     ) {
         // Note that we avoid holding the lock while calling yielder().
         // The worst outcome of an inconsistency is that we will output a meaningless
-        // "between {location} and {location} message", but none should occur because
+        // "between {location} and {location}" message, but none should occur because
         // [`YieldProgress`] is intended to be used in a sequential manner.
         let previous_state: YieldState = { self.state.lock().unwrap().clone() };
 
