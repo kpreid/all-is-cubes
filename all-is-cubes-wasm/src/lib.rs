@@ -39,7 +39,9 @@
 #![forbid(unsafe_code)]
 
 #[cfg(target_family = "wasm")]
-pub mod gameapp;
+mod gameapp;
+#[cfg(target_family = "wasm")]
+mod init;
 #[cfg(target_family = "wasm")]
 #[doc(hidden)] // public for testing
 pub mod js_bindings;
