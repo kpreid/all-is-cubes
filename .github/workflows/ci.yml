@@ -92,7 +92,7 @@ jobs:
           rustup target add --toolchain="${{ matrix.toolchain }}" wasm32-unknown-unknown
           rustup override set "${{ matrix.toolchain }}"
 
-    - name: Install nightly too
+    - name: Install nightly for -Z direct-minimal-versions
       if: ${{ matrix.depversions == 'minimal' }}
       run: rustup toolchain install nightly --profile=minimal 
 
@@ -147,16 +147,16 @@ jobs:
     # spending the CI latency to do both.
     - name: Compile basic tests
       # compile is broken out so we have visibility into compile vs. run times
-      run: cargo xtask test --timings --no-run
+      run: cargo xtask --scope=only-normal test --timings --no-run
     - name: Run basic tests
       if: ${{ !matrix.primary }}
-      run: cargo xtask test --timings
+      run: cargo xtask --scope=only-normal test --timings
 
     - run: df -h .
 
     - name: Run exhaustive tests
       if: ${{ matrix.primary }}
-      run: cargo xtask test-more --timings
+      run: cargo xtask --scope=only-normal test-more --timings
     
     # Save the test-renderers results so we can download and view them
     - name: Save test-renderers output
@@ -169,10 +169,9 @@ jobs:
 
     - run: df -h .
 
-    # Unlike the tests, we *do* run lint against all versions because future
-    # warnings might be interesting.
+    # Run clippy and docs to get warnings.
     - name: Lint
-      run: cargo xtask lint --timings
+      run: cargo xtask --scope=only-normal lint --timings
     
     # Save timing reports so we can download and view them
     # (for understanding build performance in CI)
@@ -260,7 +259,7 @@ jobs:
 
     - name: Install Rust toolchain
       run: |
-          rustup toolchain install nightly --profile=minimal
+          rustup toolchain install nightly --profile=minimal --component=clippy --component=rustfmt
           rustup override set nightly
 
     - name: Install cargo-fuzz
@@ -273,10 +272,14 @@ jobs:
         path: |
           fuzz/corpus
 
+    - name: Lint
+      # We run lint because otherwise the fuzz code won't get linted.
+      run: cargo xtask --scope=only-fuzz lint
+
     - name: Fuzz
       # Note: The specified timeout value is per-fuzz-target; as of this writing
       # there are 6 fuzz targets and so the total time will be 720 seconds = 12 minutes.
-      run: cargo xtask fuzz 120
+      run: cargo xtask --scope=only-fuzz fuzz 120
 
     # Save the fuzz artifacts so we can repro elsewhere
     - name: Save fuzz artifacts

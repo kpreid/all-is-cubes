@@ -109,9 +109,9 @@ jobs:
 
     - name: Compile basic tests
       # compile is broken out so we have visibility into compile vs. run times
-      run: cargo xtask test --timings --no-run
+      run: cargo xtask --scope=only-normal test --timings --no-run
     - name: Run basic tests
-      run: cargo xtask test --timings
+      run: cargo xtask --scope=only-normal test --timings
     
     # Save the test-renderers results so we can download and view them
     - name: Save test-renderers output
@@ -123,7 +123,7 @@ jobs:
           target/test-renderers-output/
 
     - name: Lint
-      run: cargo xtask lint --timings
+      run: cargo xtask --scope=only-normal lint --timings
     
     # Save timing reports so we can download and view them
     # (for understanding build performance in CI)
