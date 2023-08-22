@@ -150,6 +150,15 @@ impl YieldProgress {
         );
     }
 
+    /// Yield only; that is, call the yield function contained within this [`YieldProgress`].
+    #[track_caller] // This is not an `async fn` because `track_caller` is not compatible
+    pub fn yield_without_progress(&self) -> impl Future<Output = ()> + Send + 'static {
+        let location = Location::caller();
+        let label = self.label.clone();
+
+        self.yielding.clone().yield_only(location, label)
+    }
+
     /// Report that 100% of progress has been made.
     ///
     /// This is identical to `.progress(1.0)` but consumes the `YieldProgress` object.
@@ -344,6 +353,26 @@ mod tests {
         let progress_future = p.progress(0.25);
         assert_eq!(r.drain(), vec![Progress(0.25, "".into())]);
         progress_future.await;
+        assert_eq!(r.drain(), vec![Yielded]);
+    }
+
+    #[tokio::test]
+    async fn progress_without_yield() {
+        let (p, mut r) = logging_yield_progress();
+        assert_eq!(r.drain(), vec![]);
+
+        p.progress_without_yield(0.25);
+        assert_eq!(r.drain(), vec![Progress(0.25, "".into())]);
+    }
+
+    #[tokio::test]
+    async fn yield_without_progress() {
+        let (p, mut r) = logging_yield_progress();
+        assert_eq!(r.drain(), vec![]);
+
+        let future = p.yield_without_progress();
+        assert_eq!(r.drain(), vec![]);
+        future.await;
         assert_eq!(r.drain(), vec![Yielded]);
     }
 
