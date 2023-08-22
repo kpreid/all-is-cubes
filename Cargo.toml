@@ -29,7 +29,7 @@ anyhow = "1.0.70"
 arbitrary = { version = "1.1.6", features = ["derive"] }
 async_fn_traits = "0.1.1"
 base64 = "0.21.0"
-bitflags = "2.0.2"
+bitflags = "2.4.0"
 # Note that this excludes the "derive" feature but some crates need it.
 bytemuck = { version = "1.13.1", default-features = false }
 # When upgrading clap, beware text output changes causing integration tests to fail.
