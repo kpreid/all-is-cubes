@@ -20,6 +20,7 @@ pub struct Builder {
 
 impl Builder {
     /// Create a [`Builder`] by obtaining a new [`wgpu::Device`] from the given adapter.
+    #[cfg_attr(target_family = "wasm", allow(clippy::arc_with_non_send_sync))]
     pub async fn from_adapter(
         adapter: Arc<wgpu::Adapter>,
     ) -> Result<Self, wgpu::RequestDeviceError> {

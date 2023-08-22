@@ -43,6 +43,7 @@ where
         .request_device(&in_wgpu::EverythingRenderer::device_descriptor(), None)
         .await
         .unwrap();
+    #[cfg_attr(target_family = "wasm", allow(clippy::arc_with_non_send_sync))]
     let device = Arc::new(device);
 
     let test_shader_source: String = in_wgpu::pipelines::BLOCKS_AND_LINES_SHADER

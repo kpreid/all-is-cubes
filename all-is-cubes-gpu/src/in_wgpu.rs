@@ -79,6 +79,7 @@ impl SurfaceRenderer {
                     e,
                 )
             })?;
+        #[cfg_attr(target_family = "wasm", allow(clippy::arc_with_non_send_sync))]
         let device = Arc::new(device);
 
         let viewport_source = cameras.viewport_source();
