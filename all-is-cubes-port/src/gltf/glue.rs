@@ -56,8 +56,6 @@ pub(crate) struct Lef32([u8; 4]);
 impl Lef32 {
     /// All bits zero is also the value 'positive zero'.
     pub const ZERO: Self = Lef32([0, 0, 0, 0]);
-    /// The value 1.0.
-    pub const ONE: Self = Lef32([0, 0, 128, 63]);
 
     pub(crate) fn from_vec2(vector: cgmath::Vector2<f32>) -> [Self; 2] {
         vector.map(Lef32::from).into()
@@ -181,11 +179,6 @@ mod tests {
         assert_eq!(Lef32::default(), bytemuck::Zeroable::zeroed());
         assert_eq!(Lef32::default(), Lef32::from(0.0));
         assert_eq!(Lef32::ZERO, Lef32::from(0.0));
-    }
-
-    #[test]
-    fn lef32_one() {
-        assert_eq!(Lef32::ONE, Lef32::from(1.0));
     }
 
     #[test]
