@@ -72,6 +72,10 @@ struct XtaskArgs {
     #[clap(subcommand)]
     command: XtaskCommand,
 
+    /// Control which workspaces and target triples are built.
+    #[arg(long = "scope", default_value = "all")]
+    scope: Scope,
+
     /// Pass the `--timings` flag to all `cargo` build invocations, producing
     /// HTML files reporting the time taken.
     ///
@@ -136,6 +140,7 @@ enum XtaskCommand {
     },
 }
 
+/// Mode for [`XtaskCommand::Update`]
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
 enum UpdateTo {
     /// Don't actually update.
@@ -146,11 +151,30 @@ enum UpdateTo {
     Minimal,
 }
 
+/// Which (workspace × target) combination(s) to build/check/test.
+///
+/// This is used to allow splitting the work to different CI jobs, and not having them
+/// duplicate each other's work and cache data.
+#[derive(Clone, Copy, Debug, PartialEq, clap::ValueEnum)]
+enum Scope {
+    /// Default for interactive use — build/check/test everything.
+    All,
+    /// Build only the main workspace, not the fuzz workspace.
+    OnlyNormal,
+    /// Build only the fuzz workspace.
+    OnlyFuzz,
+}
+
 fn main() -> Result<(), ActionError> {
     let (config, command) = {
-        let XtaskArgs { command, timings } = <XtaskArgs as clap::Parser>::parse();
+        let XtaskArgs {
+            command,
+            scope,
+            timings,
+        } = <XtaskArgs as clap::Parser>::parse();
         let config = Config {
             cargo_timings: timings,
+            scope,
         };
         (config, command)
     };
@@ -160,8 +184,10 @@ fn main() -> Result<(), ActionError> {
 
     match command {
         XtaskCommand::Init => {
-            write_development_files()?;
-            update_server_static(&mut time_log)?; // includes installing wasm tools
+            write_development_files(&config)?;
+            if config.scope.includes_main_workspace() {
+                update_server_static(&config, &mut time_log)?; // includes installing wasm tools
+            }
         }
         XtaskCommand::Test { no_run } => {
             do_for_all_packages(
@@ -182,18 +208,22 @@ fn main() -> Result<(), ActionError> {
             do_for_all_packages(&config, TestOrCheck::Lint, Features::Default, &mut time_log)?;
 
             // Build docs to verify that there are no broken doc links.
-            {
+            // This applies to the main workspace & target only, because there are no
+            // libraries with docs elsewhere.
+            if config.scope.includes_main_workspace() {
                 let _t = CaptureTime::new(&mut time_log, "doc");
                 cargo().arg("doc").run()?;
             }
         }
         XtaskCommand::Fmt => {
-            do_for_all_workspaces(|| {
+            config.do_for_all_workspaces(|| {
                 cargo().arg("fmt").run()?;
                 Ok(())
             })?;
         }
         XtaskCommand::Fuzz { duration } => {
+            assert!(config.scope.includes_fuzz_workspace());
+
             let metadata = cargo_metadata::MetadataCommand::new()
                 .manifest_path("fuzz/Cargo.toml")
                 .exec()
@@ -237,7 +267,7 @@ fn main() -> Result<(), ActionError> {
                 .run()?;
         }
         XtaskCommand::RunGameServer { server_args } => {
-            update_server_static(&mut time_log)?;
+            update_server_static(&config, &mut time_log)?;
 
             cargo()
                 .arg("run")
@@ -253,7 +283,7 @@ fn main() -> Result<(), ActionError> {
                 eprintln!("Doing nothing because update type is {to:?}.");
             }
             UpdateTo::Latest => {
-                do_for_all_workspaces(|| {
+                config.do_for_all_workspaces(|| {
                     // Note: The `fuzz` workspace lock file is ignored in version control.
                     // But we do want to occasionally update it anyway.
                     cargo().arg("update").run()?;
@@ -261,13 +291,15 @@ fn main() -> Result<(), ActionError> {
                 })?;
             }
             UpdateTo::Minimal => {
-                do_for_all_workspaces(|| {
+                config.do_for_all_workspaces(|| {
                     cmd!("cargo +nightly update -Z direct-minimal-versions").run()?;
                     Ok(())
                 })?;
             }
         },
         XtaskCommand::SetVersion { version } => {
+            assert_eq!(config.scope, Scope::All);
+
             let version_value = toml_edit::value(version.as_str());
             for package in ALL_NONTEST_PACKAGES {
                 let manifest_path = format!("{package}/Cargo.toml");
@@ -303,6 +335,8 @@ fn main() -> Result<(), ActionError> {
             );
         }
         XtaskCommand::PublishAll { for_real } => {
+            assert_eq!(config.scope, Scope::All);
+
             exhaustive_test(&config, &mut time_log)?;
 
             let maybe_dry = if for_real { vec![] } else { vec!["--dry-run"] };
@@ -328,9 +362,11 @@ fn main() -> Result<(), ActionError> {
     Ok(())
 }
 
+/// Configuration which is passed down through everything.
 #[derive(Debug)]
 struct Config {
     cargo_timings: bool,
+    scope: Scope,
 }
 
 impl Config {
@@ -343,11 +379,48 @@ impl Config {
         }
         args
     }
+
+    /// cd into each in-scope workspace and do something.
+    ///
+    /// [`do_for_all_packages`] doesn't use this because it has more specialized handling
+    fn do_for_all_workspaces<F>(&self, mut f: F) -> Result<(), ActionError>
+    where
+        F: FnMut() -> Result<(), ActionError>,
+    {
+        // main workspace
+        if self.scope.includes_main_workspace() {
+            f()?;
+        }
+
+        if self.scope.includes_fuzz_workspace() {
+            let _pushd: Pushd = pushd("fuzz")?;
+            f()?;
+        }
+        Ok(())
+    }
+}
+
+impl Scope {
+    fn includes_main_workspace(&self) -> bool {
+        match self {
+            Scope::All => true,
+            Scope::OnlyNormal => true,
+            Scope::OnlyFuzz => false,
+        }
+    }
+
+    fn includes_fuzz_workspace(&self) -> bool {
+        match self {
+            Scope::All => true,
+            Scope::OnlyNormal => false,
+            Scope::OnlyFuzz => true,
+        }
+    }
 }
 
 /// TODO: fetch this list (or at least cross-check it) using `cargo metadata`.
 ///
-/// See also [`do_for_all_workspaces`].
+/// See also [`Config::do_for_all_workspaces`].
 const ALL_NONTEST_PACKAGES: [&str; 9] = [
     "all-is-cubes",
     "all-is-cubes-ui",
@@ -366,8 +439,9 @@ const TARGET_WASM: &str = "--target=wasm32-unknown-unknown";
 // Test all combinations of situations (that we've bothered to program test
 // setup for).
 fn exhaustive_test(config: &Config, time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
-    // building server with `--feature embed` requires static files
-    update_server_static(time_log)?;
+    assert!(config.scope.includes_main_workspace());
+
+    update_server_static(config, time_log)?;
 
     do_for_all_packages(config, TestOrCheck::Test, Features::AllAndNothing, time_log)?;
     Ok(())
@@ -376,11 +450,13 @@ fn exhaustive_test(config: &Config, time_log: &mut Vec<Timing>) -> Result<(), Ac
 /// Build the WASM and other 'client' files that the web server might need.
 /// Needed for build whenever `all-is-cubes-server` is being tested/run with
 /// the `embed` feature; needed for run regardless.
-fn update_server_static(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
-    ensure_wasm_tools_installed(time_log)?;
+fn update_server_static(config: &Config, time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
+    assert!(config.scope.includes_main_workspace());
+
+    ensure_wasm_tools_installed(config, time_log)?;
 
     // Run the compilation if needed, which ensures that the wasm binary is fresh.
-    // Note: This must use the same profile as the wasm-pack command is! (Both are dev for now)
+    // Note: This must use the same profile as thfe wasm-pack command is! (Both are dev for now)
     cargo()
         .arg("build")
         .arg("--package=all-is-cubes-wasm")
@@ -455,19 +531,21 @@ fn do_for_all_packages(
     features: Features,
     time_log: &mut Vec<Timing>,
 ) -> Result<(), ActionError> {
-    ensure_wasm_tools_installed(time_log)?;
+    if config.scope.includes_main_workspace() {
+        ensure_wasm_tools_installed(config, time_log)?;
+    }
 
     // Ensure all-is-cubes-server build that might be looking for the files will succeed.
     // Note that this is only an “exists” check not a “up-to-date” check, on the assumption
     // that running server tests will not depend on the specific file contents.
     // TODO: That's a fragile assumption.
-    if !Path::new("all-is-cubes-wasm/dist/").exists() {
-        update_server_static(time_log)?;
+    if config.scope.includes_main_workspace() && !Path::new("all-is-cubes-wasm/dist/").exists() {
+        update_server_static(config, time_log)?;
     }
 
     // Test everything we can with default features and target.
     // But if we're linting, then the below --all-targets run will handle that.
-    if op != TestOrCheck::Lint {
+    if op != TestOrCheck::Lint && config.scope.includes_main_workspace() {
         match features {
             Features::Default => {
                 let _t = CaptureTime::new(time_log, format!("{op:?}"));
@@ -493,7 +571,7 @@ fn do_for_all_packages(
     }
 
     // Run wasm tests.
-    {
+    if config.scope.includes_main_workspace() {
         let _t = CaptureTime::new(time_log, format!("{op:?} all-is-cubes-wasm"));
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
         match op {
@@ -507,8 +585,8 @@ fn do_for_all_packages(
         }
     }
 
-    // Build everything else in the workspace, so non-test targets are checked for compile errors.
-    {
+    // Check everything else in the workspace, so non-test targets are checked for compile errors.
+    if config.scope.includes_main_workspace() {
         let _t = CaptureTime::new(time_log, "check --all-targets");
         cargo()
             .arg(op.non_build_check_subcmd())
@@ -517,8 +595,8 @@ fn do_for_all_packages(
             .run()?;
     }
 
-    // Check fuzz targets that are not in the workspace
-    {
+    // Check fuzz targets that are not in the main workspace
+    if config.scope.includes_fuzz_workspace() {
         let _t = CaptureTime::new(time_log, "check fuzz");
         let _pushd: Pushd = pushd("fuzz")?;
         cargo()
@@ -532,7 +610,7 @@ fn do_for_all_packages(
 
 /// Create files which may be useful for development in the workspace but which cannot
 /// simply have constant contents.
-fn write_development_files() -> Result<(), ActionError> {
+fn write_development_files(_config: &Config) -> Result<(), ActionError> {
     // .desktop file, used by Linux desktop application launchers to describe how to run
     // our executable. It needs to have an absolute path to the file.
     // The file is also required to be encoded in UTF-8, so non-UTF-8 paths cannot be
@@ -578,27 +656,15 @@ SingleMainWindow=true
     Ok(())
 }
 
-/// cd into each workspace and do something.
-///
-/// [`do_for_all_packages`] doesn't use this because it has more specialized handling
-fn do_for_all_workspaces<F>(mut f: F) -> Result<(), ActionError>
-where
-    F: FnMut() -> Result<(), ActionError>,
-{
-    // main workspace
-    f()?;
+fn ensure_wasm_tools_installed(
+    config: &Config,
+    time_log: &mut Vec<Timing>,
+) -> Result<(), ActionError> {
+    assert!(config.scope.includes_main_workspace());
 
-    {
-        let _pushd: Pushd = pushd("fuzz")?;
-        f()?;
-    }
-    Ok(())
-}
-
-fn ensure_wasm_tools_installed(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
     // TODO: check that wasm-pack is installed
 
-    // Generate combined license file.
+    // Generate combined license file for the wasm build.
     let license_html_path = PROJECT_DIR.join("all-is-cubes-wasm/static/third-party-licenses.html");
     let license_template_path = PROJECT_DIR.join("tools/about.hbs");
     let config_path = PROJECT_DIR.join("tools/about.toml");
