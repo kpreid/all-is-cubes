@@ -9,8 +9,7 @@ use std::time::Duration;
 use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
 use instant::Instant;
 
-mod yield_progress;
-pub use yield_progress::*;
+pub use yield_progress::YieldProgress;
 
 /// Generic extension to [`std::fmt`'s set of formatting traits](std::fmt#formatting-traits).
 ///

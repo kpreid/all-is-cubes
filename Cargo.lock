@@ -82,6 +82,7 @@ dependencies = [
  "serde_repr",
  "thiserror",
  "tokio",
+ "yield-progress",
 ]
 
 [[package]]
@@ -4473,3 +4474,13 @@ name = "yansi"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09041cd90cf85f7f8b2df60c646f853b7f535ce68f85244eb6731cf89fa498ec"
+
+[[package]]
+name = "yield-progress"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45480863e3e4f7476754c865b97fc228664fc3e94e9f3947514d6434665c1628"
+dependencies = [
+ "instant",
+ "log",
+]
