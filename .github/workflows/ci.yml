@@ -16,6 +16,7 @@ env:
   # artifacts, so they won't be useful for anything (other than maybe the exhaustive
   # builds with different features).
   CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
 
 jobs:
   build:
