@@ -26,7 +26,6 @@ pub struct AtlasAllocator {
     // GPU resources
     texture: BlockTexture,
     pub texture_view: wgpu::TextureView,
-    pub sampler: wgpu::Sampler,
 
     // CPU allocation tracking
     /// Note on lock ordering: Do not attempt to acquire this lock while a tile's lock is held.
@@ -121,21 +120,9 @@ impl AtlasAllocator {
 
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some(&format!("{label_prefix} block sampler")),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
-
         Ok(Self {
             texture,
             texture_view,
-            sampler,
             backing: Arc::new(Mutex::new(AllocatorBacking {
                 alloctree,
                 dirty: false,

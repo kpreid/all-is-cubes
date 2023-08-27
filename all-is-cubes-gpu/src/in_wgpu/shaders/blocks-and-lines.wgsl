@@ -39,7 +39,6 @@ struct WgpuLinesVertex {
 
 // This group is named space_texture_bind_group_layout in the code.
 @group(1) @binding(0) var block_texture: texture_3d<f32>;
-@group(1) @binding(1) var block_sampler: sampler;
 @group(1) @binding(2) var light_texture: texture_3d<u32>;
 
 // --- Fog computation --------------------------------------------------------

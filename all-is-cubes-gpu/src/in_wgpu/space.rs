@@ -502,10 +502,6 @@ pub(in crate::in_wgpu) fn create_space_bind_group(
                 resource: wgpu::BindingResource::TextureView(&block_texture.texture_view),
             },
             wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::Sampler(&block_texture.sampler),
-            },
-            wgpu::BindGroupEntry {
                 binding: 2,
                 resource: wgpu::BindingResource::TextureView(&light_texture.texture_view),
             },
