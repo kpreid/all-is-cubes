@@ -13,6 +13,9 @@ pub struct Alloctree {
 }
 
 impl Alloctree {
+    /// Temporary node for swapping
+    const PLACEHOLDER: Alloctree = Self::new(0);
+
     /// Largest allowed size of [`Alloctree`].
     ///
     /// This number is chosen to avoid overflowing [`usize`] indexing on 32-bit platforms;
@@ -34,7 +37,7 @@ impl Alloctree {
         }
     }
 
-    /// Allocates a region of the given size, if possible.
+    /// Allocates a region of the given size, if possible without growing.
     ///
     /// The returned handle **does not deallocate on drop**, because this tree does not
     /// implement interior mutability; it is the caller's responsibility to provide such
@@ -51,6 +54,54 @@ impl Alloctree {
         Some(handle)
     }
 
+    /// Allocates a region of the given size, growing the overall bounds if needed.
+    ///
+    /// Returns `None` if the tree cannot grow further.
+    pub fn allocate_with_growth(&mut self, request: GridAab) -> Option<AlloctreeHandle> {
+        if !fits(request, Self::MAX_SIZE_EXPONENT) {
+            // Too big, can never fit even with growth.
+            return None;
+        }
+
+        if let Some(handle) = self.allocate(request) {
+            return Some(handle);
+        }
+
+        let requested_size_exponent: u8 = max_edge_length_exponent(request.size());
+
+        let initial_size_exponent = self.size_exponent;
+        // Given that allocation failed, we must grow the octree to be big enough
+        // to simultaneously contain the new allocation and all old allocations.
+        // (If we used a different packing strategy where single allocations span
+        // multiple child nodes, then this might be overkill, but currently it is not.)
+        let new_size_exponent = initial_size_exponent
+            .max(requested_size_exponent)
+            .checked_add(1)?;
+
+        if new_size_exponent <= Alloctree::MAX_SIZE_EXPONENT {
+            // Grow the allocatable region and try again.
+            self.grow_to(new_size_exponent);
+
+            self.allocate(request)
+
+            // Under extreme conditions of large negative `request.lower_bounds()` we can
+            // fail to allocate (see comment in `AlloctreeNode::allocate`). This shouldn't
+            // ever come up in reality, but it would be nice if we could cleanly handle it...
+            //
+            // .or_else(|| {
+            //     panic!(
+            //         "allocation second try for {request:?} with size {req_size:?} \
+            //         after growing from 2^{initial_size_exponent} to \
+            //         2^{new_size_exponent} = {new_size:?} should not have failed",
+            //         req_size = request.size(),
+            //         new_size = self.bounds().size()
+            //     )
+            // })
+        } else {
+            None
+        }
+    }
+
     /// Deallocates the given previously allocated region.
     ///
     /// If the handle does not exactly match a previous allocation from this allocator,
@@ -59,6 +110,30 @@ impl Alloctree {
         self.root
             .free(self.size_exponent, handle.allocation.lower_bounds());
         self.occupied_volume -= handle.allocation.volume();
+    }
+
+    /// Enlarge the bounds to be as if this tree had been allocated with
+    /// `Alloctree::new(new_size_exponent)`.
+    /// If the current size is equal or greater, this has no effect.
+    ///
+    /// Existing allocations remain valid.
+    fn grow_to(&mut self, new_size_exponent: u8) {
+        assert!(
+            new_size_exponent <= Self::MAX_SIZE_EXPONENT,
+            "Alloctree new_size_exponent too large",
+        );
+        while new_size_exponent > self.size_exponent {
+            let old = std::mem::replace(self, Self::PLACEHOLDER);
+            *self = Alloctree {
+                size_exponent: old.size_exponent + 1,
+                root: old.root.wrap_in_oct(),
+                occupied_volume: old.occupied_volume, // we're only adding unoccupied volume
+            };
+        }
+    }
+
+    pub fn size_exponent(&self) -> u8 {
+        self.size_exponent
     }
 
     /// Returns the region that could be allocated within.
@@ -226,6 +301,29 @@ fn max_edge_length(size: GridVector) -> GridCoordinate {
     size.x.max(size.y).max(size.z).max(0)
 }
 
+fn max_edge_length_exponent(size: GridVector) -> u8 {
+    let max_edge_length = max_edge_length(size);
+
+    if max_edge_length == 0 {
+        return 0;
+    }
+
+    // Compute exponent.
+    // unwrap cannot fail since the maximum possible value is ilog2(i32::MAX) + 1,
+    // which is 32, which is < u8::MAX.
+    let mut exp = max_edge_length.ilog2().try_into().unwrap();
+    if max_edge_length > expsize(exp) {
+        // Round up instead of down
+        exp += 1;
+    }
+    debug_assert!(
+        max_edge_length <= expsize(exp),
+        "max_edge_length {max_edge_length} <= expsize({exp})"
+    );
+
+    exp
+}
+
 /// Convert `size_exponent` to actual size.
 fn expsize(size_exponent: u8) -> GridCoordinate {
     if size_exponent >= (GridCoordinate::BITS - 1) as u8 {
@@ -316,6 +414,21 @@ mod tests {
                 GridAab::for_block(R16),
             ],
         );
+    }
+
+    #[test]
+    fn growth() {
+        let mut t = Alloctree::new(3);
+        assert_eq!(t.bounds(), GridAab::for_block(R8));
+        let _initial_allocation = t.allocate(GridAab::for_block(R8)).unwrap();
+
+        // Allocation without growth fails
+        assert_eq!(t.allocate(GridAab::ORIGIN_CUBE), None, "initially full");
+
+        // Allocation with growth succeeds
+        t.allocate_with_growth(GridAab::ORIGIN_CUBE)
+            .expect("second allocation should succeed");
+        assert_eq!(t.bounds(), GridAab::for_block(R16));
     }
 
     #[test]
