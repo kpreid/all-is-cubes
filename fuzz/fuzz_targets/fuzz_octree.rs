@@ -19,11 +19,7 @@ enum Operation {
 }
 
 fuzz_target!(|input: FuzzOctree| {
-    let mut t = Alloctree::new(
-        input
-            .size_exponent
-            .rem_euclid(Alloctree::MAX_SIZE_EXPONENT + 1),
-    );
+    let mut t = Alloctree::new(clean_exponent(input.size_exponent));
     let mut handles = Vec::new();
 
     for operation in input.operations {
@@ -64,4 +60,8 @@ fn validate(tree: &Alloctree, handles: &[AlloctreeHandle]) {
             }
         }
     }
+}
+
+fn clean_exponent(input: u8) -> u8 {
+    input.rem_euclid(Alloctree::MAX_SIZE_EXPONENT + 1)
 }

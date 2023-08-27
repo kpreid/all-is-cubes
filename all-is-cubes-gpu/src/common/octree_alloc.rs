@@ -90,6 +90,20 @@ enum AlloctreeNode {
 }
 
 impl AlloctreeNode {
+    /// Construct a node with this child in the low corner.
+    fn wrap_in_oct(self) -> Self {
+        AlloctreeNode::Oct(Box::new([
+            self,
+            AlloctreeNode::Empty,
+            AlloctreeNode::Empty,
+            AlloctreeNode::Empty,
+            AlloctreeNode::Empty,
+            AlloctreeNode::Empty,
+            AlloctreeNode::Empty,
+            AlloctreeNode::Empty,
+        ]))
+    }
+
     fn allocate(
         &mut self,
         size_exponent: u8,
@@ -120,16 +134,7 @@ impl AlloctreeNode {
                     // to low_corner is needed.
                     let handle = child.allocate(size_exponent - 1, low_corner, request)?;
                     // Note this mutation is made only after a successful allocation in the child.
-                    *self = AlloctreeNode::Oct(Box::new([
-                        child,
-                        AlloctreeNode::Empty,
-                        AlloctreeNode::Empty,
-                        AlloctreeNode::Empty,
-                        AlloctreeNode::Empty,
-                        AlloctreeNode::Empty,
-                        AlloctreeNode::Empty,
-                        AlloctreeNode::Empty,
-                    ]));
+                    *self = child.wrap_in_oct();
                     Some(handle)
                 } else {
                     // Occupy this node with the allocation.
@@ -214,14 +219,23 @@ pub struct AlloctreeHandle {
 
 /// Test if the given [`GridAab`] fits in a cube of the given size.
 fn fits(request: GridAab, size_exponent: u8) -> bool {
-    let size = request.size();
-    let max_edge_length = size.x.max(size.y).max(size.z);
-    max_edge_length <= expsize(size_exponent)
+    max_edge_length(request.size()) <= expsize(size_exponent)
+}
+
+fn max_edge_length(size: GridVector) -> GridCoordinate {
+    size.x.max(size.y).max(size.z).max(0)
 }
 
 /// Convert `size_exponent` to actual size.
 fn expsize(size_exponent: u8) -> GridCoordinate {
-    1 << GridCoordinate::from(size_exponent)
+    if size_exponent >= (GridCoordinate::BITS - 1) as u8 {
+        // This case will never be hit in allocations that will succeed, but it makes the
+        // math have fewer edge cases.
+        GridCoordinate::MAX
+    } else {
+        // Using pow() instead of bit shift because it isn't defined to overflow to zero
+        2i32.pow(size_exponent.into())
+    }
 }
 
 #[cfg(test)]
@@ -302,5 +316,15 @@ mod tests {
                 GridAab::for_block(R16),
             ],
         );
+    }
+
+    #[test]
+    fn expsize_edge_cases() {
+        assert_eq!(expsize(0), 1);
+        assert_eq!(expsize(30), 1 << 30);
+        // expsize(31) would be equal to i32::MAX + 1 if that were representable
+        assert_eq!(expsize(31), i32::MAX);
+        assert_eq!(expsize(32), i32::MAX);
+        assert_eq!(expsize(33), i32::MAX);
     }
 }
