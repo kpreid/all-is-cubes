@@ -276,6 +276,7 @@ impl EverythingRenderer {
             fb,
 
             space_renderers: Default::default(),
+            #[allow(clippy::arc_with_non_send_sync)]
             block_texture: Arc::new(
                 AtlasAllocator::new("EverythingRenderer", &device).unwrap(/* TODO */),
             ),
