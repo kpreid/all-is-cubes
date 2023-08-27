@@ -401,7 +401,11 @@ fn get_diffuse_color(in: BlockFragmentInput) -> vec4<f32> {
         //     discard;
         // }
         
-        return textureSampleLevel(block_texture, block_sampler, texcoord, 0.0);
+        // Read texture; using textureLoad because our coordinates are in units of texels
+        // and we don't want any filtering or wrapping, so using a sampler gives no benefit.
+        // Note that coordinate rounding towards zero is effectively floor() since the
+        // input is nonnegative.
+        return textureLoad(block_texture, vec3<i32>(texcoord), 0);
     } else {
         // Solid color.
         return in.color_or_texture;

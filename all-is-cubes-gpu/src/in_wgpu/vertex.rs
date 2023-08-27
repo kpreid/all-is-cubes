@@ -4,6 +4,10 @@ use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
 
 use crate::DebugLineVertex;
 
+/// Texture coordinates in the 3D atlas texture, in units of texels (i.e. the range is
+/// 0..256 or similar, not 0..1).
+///
+/// TODO: Convert these to fixed-point and save some size
 pub(crate) type TexPoint = Point3<f32>;
 
 /// Triangle mesh vertex type that is used for rendering [blocks].
@@ -18,6 +22,7 @@ pub(crate) struct WgpuBlockVertex {
     /// Note that this is not the same as floor() of the final coordinates, since a
     /// block's mesh coordinates range from 0 to 1 inclusive.
     cube_packed: u32,
+
     /// Vertex position within the cube, fixed point; and vertex normal in [`Face7`] format.
     ///
     /// * The first u32 is a bitwise combination of two u16s:
@@ -34,12 +39,18 @@ pub(crate) struct WgpuBlockVertex {
     /// convenience and making efficient use of `u32` bits. (`u32` is the minimum size
     /// of integer that WGSL allows.)
     position_in_cube_and_normal_packed: [u32; 2],
+
     /// Packed format:
     /// * If `[3]` is in the range 0.0 to 1.0, then the attribute is a linear RGBA color.
-    /// * If `[3]` is -1.0, then the first three components are 3D texture coordinates.
+    /// * If `[3]` is -1.0, then the first three components are 3D texture coordinates,
+    ///   stored in texel units not normalized 0-1 units.
     color_or_texture: [f32; 4],
+
     /// Interpolated texture coordinates are clamped to be ≥ this value, to avoid bleeding.
+    ///
+    /// TODO: pack these into u16s and save some memory.
     clamp_min: [f32; 3],
+
     /// Interpolated texture coordinates are clamped to be ≤ this value, to avoid bleeding.
     clamp_max: [f32; 3],
 }

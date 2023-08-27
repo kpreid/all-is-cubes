@@ -41,13 +41,7 @@ pub struct AtlasTile {
     /// Original bounds as requested (not texture coordinates).
     requested_bounds: GridAab,
     /// Translation of the requested bounds to the actual region within the texture.
-    /// (This is always integer but will always be used in a float computation.)
-    offset: Vector3<f32>,
-    /// Scale factor to convert from texel grid coordinates to GPU texture coordinates
-    /// where 0.0 and 1.0 are the final size.
-    /// In other words, the reciprocal of the overall texture size. This does not
-    /// vary per-tile but is stored here for convenience of implementing [`texture::Tile`].
-    scale: f32,
+    offset: Vector3<i32>,
     /// Actual storage and metadata about the tile; may be updated as needed by the
     /// allocator to grow the texture.
     ///
@@ -199,8 +193,7 @@ impl texture::Allocator for AtlasAllocator {
         let handle = allocator_backing.alloctree.allocate(requested_bounds)?;
         let result = AtlasTile {
             requested_bounds,
-            offset: handle.offset.map(|c| c as f32),
-            scale: (allocator_backing.alloctree.bounds().size().x as f32).recip(),
+            offset: handle.offset,
             backing: Arc::new(Mutex::new(TileBacking {
                 handle: Some(handle),
                 data: None,
@@ -272,7 +265,7 @@ impl texture::Plane for AtlasPlane {
 
     fn grid_to_texcoord(&self, in_tile_grid: Point3<f32>) -> Self::Point {
         // TODO: assert in bounds, just in case
-        (in_tile_grid + self.tile.offset) * self.tile.scale
+        in_tile_grid + self.tile.offset.map(|c| c as f32)
     }
 }
 
