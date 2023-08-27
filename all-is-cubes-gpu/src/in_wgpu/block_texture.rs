@@ -95,9 +95,8 @@ struct AllocatorBacking {
 
 impl AtlasAllocator {
     pub fn new(label_prefix: &str) -> Self {
-        // TODO: When we have reallocation implemented, be willing to use
-        // a smaller size to start, to save GPU memory.
-        let alloctree = Alloctree::new(8);
+        // Default size of 2⁵ = 32 holding up to 8 × 16³ block textures.
+        let alloctree = Alloctree::new(5);
 
         Self {
             backing: Arc::new(Mutex::new(AllocatorBacking {
@@ -132,6 +131,11 @@ impl AtlasAllocator {
             None
         };
 
+        // TODO: On WebGL, copying from the old texture silently does nothing. We should
+        // report a `wgpu` bug, but for now, avoid it by re-writing everything
+        // instead of copying. When the bug is fixed, delete this variable entirely.
+        let copy_everything_anyway = cfg!(target_family = "wasm") && old_texture.is_some();
+
         // Allocate a texture if needed.
         let (texture, texture_view) = backing.texture.get_or_insert_with(|| {
             // TODO: Add an error scope so we can detect and recover from errors,
@@ -149,7 +153,11 @@ impl AtlasAllocator {
                 label: Some(&backing.texture_label),
             });
 
-            if let Some(old_texture) = old_texture {
+            // Copy the old texture into the low corner of the new texture, so existing
+            // data is preserved. (Note that this assumes that the new texture is larger,
+            // which is currently always true. Shrinking the texture would require also
+            // defragmenting it.)
+            if let Some(old_texture) = old_texture.filter(|_| !copy_everything_anyway) {
                 let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some(&format!(
                         "{} copy old to new texture",
@@ -186,7 +194,7 @@ impl AtlasAllocator {
                 // Process the non-dropped weak references
                 weak_backing.upgrade().map_or(false, |strong_backing| {
                     let backing: &mut TileBacking = &mut strong_backing.lock().unwrap();
-                    if backing.dirty {
+                    if backing.dirty || copy_everything_anyway {
                         if let Some(data) = backing.data.as_ref() {
                             let region: GridAab = backing
                                 .handle
@@ -235,7 +243,12 @@ impl texture::Allocator for AtlasAllocator {
 
     fn allocate(&self, requested_bounds: GridAab) -> Option<AtlasTile> {
         let mut allocator_backing = self.backing.lock().unwrap();
-        let handle = allocator_backing.alloctree.allocate(requested_bounds)?;
+
+        // If alloctree grows, the next flush() will take care of reallocating the texture.
+        let handle = allocator_backing
+            .alloctree
+            .allocate_with_growth(requested_bounds)?;
+
         let result = AtlasTile {
             requested_bounds,
             offset: handle.offset,
