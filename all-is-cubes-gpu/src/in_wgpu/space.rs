@@ -26,7 +26,7 @@ use crate::in_wgpu::{
     glue::{to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
     vertex::WgpuBlockVertex,
 };
-use crate::{DebugLineVertex, GraphicsResourceError, SpaceDrawInfo, SpaceUpdateInfo};
+use crate::{DebugLineVertex, GraphicsResourceError, Memo, SpaceDrawInfo, SpaceUpdateInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -47,7 +47,7 @@ pub(crate) struct SpaceRenderer {
     /// Cached copy of `space.physics.sky_color`.
     pub(crate) sky_color: Rgb,
 
-    block_texture: Arc<AtlasAllocator>,
+    block_texture: AtlasAllocator,
     light_texture: SpaceLightTexture,
 
     /// Buffer containing the [`ShaderSpaceCamera`] configured for this Space.
@@ -57,8 +57,9 @@ pub(crate) struct SpaceRenderer {
     /// Rewritten every frame, but reused to save reallocation.
     instance_buffer: ResizingBuffer,
 
-    /// Bind group containing our block texture and light texture.
-    space_bind_group: wgpu::BindGroup,
+    /// Bind group containing our block texture and light texture,
+    space_bind_group:
+        Memo<(wgpu::Id<wgpu::TextureView>, wgpu::Id<wgpu::TextureView>), wgpu::BindGroup>,
 
     csm: ChunkedSpaceMesh<Option<ChunkBuffers>, WgpuBlockVertex, AtlasAllocator, CHUNK_SIZE>,
 
@@ -81,20 +82,12 @@ impl SpaceRenderer {
         space_label: String,
         device: &wgpu::Device,
         pipelines: &Pipelines,
-        block_texture: Arc<AtlasAllocator>,
+        block_texture: AtlasAllocator,
         interactive: bool,
     ) -> Result<Self, GraphicsResourceError> {
         let space_borrowed = space.read().map_err(GraphicsResourceError::read_err)?;
 
         let light_texture = SpaceLightTexture::new(&space_label, device, space_borrowed.bounds());
-
-        let space_bind_group = create_space_bind_group(
-            &space_label,
-            device,
-            pipelines,
-            &block_texture,
-            &light_texture,
-        );
 
         let camera_buffer = SpaceCameraBuffer::new(&space_label, device, pipelines);
 
@@ -109,7 +102,7 @@ impl SpaceRenderer {
             sky_color: space_borrowed.physics().sky_color,
             block_texture,
             light_texture,
-            space_bind_group,
+            space_bind_group: Memo::new(),
             camera_buffer,
             instance_buffer: ResizingBuffer::default(),
             csm: ChunkedSpaceMesh::new(space, interactive),
@@ -125,7 +118,7 @@ impl SpaceRenderer {
     pub(crate) fn set_space(
         &mut self,
         device: &wgpu::Device,
-        pipelines: &Pipelines,
+        _pipelines: &Pipelines,
         space: &URef<Space>,
     ) {
         if self.csm.space() == space {
@@ -139,11 +132,11 @@ impl SpaceRenderer {
             instance_buffer_label: _,
             todo,
             sky_color,
-            block_texture,
+            block_texture: _,
             light_texture,
             camera_buffer: _,
             instance_buffer: _,
-            space_bind_group,
+            space_bind_group: _, // will be updated later
             csm,
             interactive,
         } = self;
@@ -160,9 +153,6 @@ impl SpaceRenderer {
         *sky_color = space_borrowed.physics().sky_color;
         // TODO: don't replace light texture if the size is the same
         *light_texture = SpaceLightTexture::new(space_label, device, space_borrowed.bounds());
-        // bind group must be recreated for new light texture
-        *space_bind_group =
-            create_space_bind_group(space_label, device, pipelines, block_texture, light_texture);
     }
 
     /// Update renderer internal state from the given [`Camera`] and referenced [`Space`],
@@ -171,7 +161,9 @@ impl SpaceRenderer {
     pub(crate) fn update(
         &mut self,
         deadline: Instant,
+        device: &wgpu::Device,
         queue: &wgpu::Queue,
+        pipelines: &Pipelines,
         camera: &Camera,
         mut bwp: BeltWritingParts<'_, '_>,
     ) -> Result<SpaceUpdateInfo, GraphicsResourceError> {
@@ -251,7 +243,24 @@ impl SpaceRenderer {
         // Flush all texture updates to GPU.
         // This must happen after `csm.update_blocks_and_some_chunks` so that the newly
         // generated meshes have the texels they expect.
-        let texture_info = self.block_texture.flush(queue);
+        let (block_texture_view, texture_info) = self.block_texture.flush(device, queue);
+
+        // Update space bind group if needed.
+        self.space_bind_group.get_or_insert(
+            (
+                block_texture_view.global_id(),
+                self.light_texture.texture_view.global_id(),
+            ),
+            || {
+                create_space_bind_group(
+                    &self.space_label,
+                    device,
+                    pipelines,
+                    &self.block_texture,
+                    &self.light_texture,
+                )
+            },
+        );
 
         let end_time = Instant::now();
 
@@ -318,7 +327,13 @@ impl SpaceRenderer {
             }),
         });
         render_pass.set_bind_group(0, &self.camera_buffer.bind_group, &[]);
-        render_pass.set_bind_group(1, &self.space_bind_group, &[]);
+        if let Some(space_bind_group) = self.space_bind_group.get() {
+            render_pass.set_bind_group(1, space_bind_group, &[]);
+        } else {
+            // If there's no bind group then update() must not have been called, so there's
+            // nothing to draw.
+            flaws |= Flaws::UNFINISHED;
+        }
         if let Some(buffer) = self.instance_buffer.get() {
             render_pass.set_vertex_buffer(1, buffer.slice(..));
         } else {
@@ -487,6 +502,7 @@ impl SpaceCameraBuffer {
 /// Create the bind group to be used with [`Pipelines::space_texture_bind_group_layout`].
 ///
 /// Public for use in `shader_tests`.
+/// Must be called after `block_texture.flush()`.
 pub(in crate::in_wgpu) fn create_space_bind_group(
     space_label: &str,
     device: &wgpu::Device,
@@ -499,7 +515,10 @@ pub(in crate::in_wgpu) fn create_space_bind_group(
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::TextureView(&block_texture.texture_view),
+                // TODO: when resizing we will need to track rebuilding this
+                resource: wgpu::BindingResource::TextureView(
+                    &block_texture.current_texture_view().unwrap(),
+                ),
             },
             wgpu::BindGroupEntry {
                 binding: 2,

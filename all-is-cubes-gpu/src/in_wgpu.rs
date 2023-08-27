@@ -197,7 +197,7 @@ pub struct EverythingRenderer {
 
     space_renderers: Layers<Option<SpaceRenderer>>,
     /// Texture atlas shared between all space renderers.
-    block_texture: Arc<AtlasAllocator>,
+    block_texture: AtlasAllocator,
 
     /// Cursor and debug lines are written to this buffer.
     lines_buffer: ResizingBuffer,
@@ -277,9 +277,7 @@ impl EverythingRenderer {
 
             space_renderers: Default::default(),
             #[allow(clippy::arc_with_non_send_sync)]
-            block_texture: Arc::new(
-                AtlasAllocator::new("EverythingRenderer", &device).unwrap(/* TODO */),
-            ),
+            block_texture: AtlasAllocator::new("EverythingRenderer"),
 
             lines_buffer: ResizingBuffer::default(),
             lines_vertex_count: 0,
@@ -438,7 +436,9 @@ impl EverythingRenderer {
                 .map(|sr| {
                     sr.update(
                         world_deadline,
+                        &self.device,
                         queue,
+                        &self.pipelines,
                         &self.cameras.cameras().world,
                         bwp.reborrow(),
                     )
@@ -452,7 +452,9 @@ impl EverythingRenderer {
                 .map(|sr| {
                     sr.update(
                         ui_deadline,
+                        &self.device,
                         queue,
+                        &self.pipelines,
                         &self.cameras.cameras().ui,
                         bwp.reborrow(),
                     )
@@ -531,7 +533,7 @@ impl EverythingRenderer {
         space: Option<&URef<Space>>,
         device: &wgpu::Device,
         pipelines: &Pipelines,
-        block_texture: &Arc<AtlasAllocator>,
+        block_texture: &AtlasAllocator,
     ) -> Result<(), GraphicsResourceError> {
         match (renderer, space) {
             (None, None) => {}
@@ -541,7 +543,7 @@ impl EverythingRenderer {
                     String::from(label),
                     device,
                     pipelines,
-                    Arc::clone(block_texture),
+                    block_texture.clone(),
                     true,
                 )?);
             }

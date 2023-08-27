@@ -119,11 +119,13 @@ where
     });
 
     // Placeholder space data for the bind group
+    let texture_allocator = in_wgpu::block_texture::AtlasAllocator::new("shader test space");
+    texture_allocator.flush(&device, &queue);
     let space_bind_group = in_wgpu::space::create_space_bind_group(
         "shader test space",
         &device,
         &pipelines,
-        &in_wgpu::block_texture::AtlasAllocator::new("shader test space", &device).unwrap(),
+        &texture_allocator,
         &in_wgpu::space::SpaceLightTexture::new(
             "shader_test_space",
             &device,

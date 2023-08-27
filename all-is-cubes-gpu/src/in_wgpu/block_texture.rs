@@ -1,6 +1,8 @@
 //! Block texture atlas management: provides [`AtlasAllocator`], the
 //! [`texture::Allocator`] implementation for use with [`wgpu`].
 
+#![allow(clippy::arc_with_non_send_sync)] // wgpu on wasm
+
 use std::sync::{Arc, Mutex, Weak};
 
 use instant::Instant;
@@ -12,23 +14,15 @@ use all_is_cubes_mesh::texture;
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
 use crate::in_wgpu::vertex::TexPoint;
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};
-use crate::{BlockTextureInfo, GraphicsResourceError};
-
-/// Alias for the concrete type of the block texture.
-type BlockTexture = wgpu::Texture;
+use crate::BlockTextureInfo;
 
 /// Implementation of [`texture::Allocator`] for [`wgpu`].
 ///
-/// After any allocations, you must call [`AtlasAllocator::flush`] to write the
-/// updates to the actual GPU texture for drawing.
-#[derive(Debug)]
+/// After any allocations, you must call [`AtlasAllocator::flush()`] to write the
+/// new texels to the actual GPU texture for drawing. Existing allocations will remain
+/// valid regardless.
+#[derive(Clone, Debug)]
 pub struct AtlasAllocator {
-    // GPU resources
-    texture: BlockTexture,
-    pub texture_view: wgpu::TextureView,
-
-    // CPU allocation tracking
-    /// Note on lock ordering: Do not attempt to acquire this lock while a tile's lock is held.
     backing: Arc<Mutex<AllocatorBacking>>,
 }
 
@@ -73,6 +67,7 @@ struct TileBacking {
     /// Weak because if the allocator is dropped, nobody cares.
     allocator: Weak<Mutex<AllocatorBacking>>,
 }
+
 /// Data shared by [`AtlasAllocator`] and all its [`AtlasTile`]s.
 #[derive(Debug)]
 struct AllocatorBacking {
@@ -86,59 +81,78 @@ struct AllocatorBacking {
     /// This is used to gather all data that needs to be flushed (written to the GPU
     /// texture).
     in_use: Vec<Weak<Mutex<TileBacking>>>,
+
+    /// Debug label for the GPU texture resource.
+    texture_label: String,
+
+    /// GPU texture. [`None`] if no texture has yet been created.
+    ///
+    /// The texture view is wrapped in [`Arc`] so that it can be used by drawing code
+    /// without holding the lock around this.
+    texture: Option<(wgpu::Texture, Arc<wgpu::TextureView>)>,
 }
 
 impl AtlasAllocator {
-    pub fn new(label_prefix: &str, device: &wgpu::Device) -> Result<Self, GraphicsResourceError> {
+    pub fn new(label_prefix: &str) -> Self {
         // TODO: When we have reallocation implemented, be willing to use
-        // a smaller texture to start, to save GPU memory.
+        // a smaller size to start, to save GPU memory.
         let alloctree = Alloctree::new(8);
 
-        // TODO: How do we check for insufficient memory?
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: size_vector_to_extent(alloctree.bounds().size()),
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D3,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            view_formats: &[],
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            label: Some(&format!("{label_prefix} block texture")),
-        });
-
-        // TODO: schedule this write lazily
-        // // Fill texture with a marker color, so it isn't transparent.
-        // // (If we didn't, wgpu would leave it as [0, 0, 0, 0].)
-        // // This is mostly useful for debugging since the texture allocation
-        // // procedure should never actually let unwritten texels appear.
-        // write_texture_by_aab(
-        //     queue,
-        //     &texture,
-        //     alloctree.bounds(),
-        //     &vec![palette::UNPAINTED_TEXTURE_FALLBACK.to_srgb8(); alloctree.bounds().volume()],
-        // );
-
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        Ok(Self {
-            texture,
-            texture_view,
+        Self {
             backing: Arc::new(Mutex::new(AllocatorBacking {
                 alloctree,
                 dirty: false,
                 in_use: Vec::new(),
+                texture_label: format!("{label_prefix} block texture"),
+                texture: None,
             })),
-        })
+        }
     }
 
     /// Copy the texels of all modified and still-referenced tiles to the GPU's texture.
-    pub fn flush(&self, queue: &wgpu::Queue) -> BlockTextureInfo {
+    pub fn flush(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) -> (Arc<wgpu::TextureView>, BlockTextureInfo) {
         let start_time = Instant::now();
-        let mut allocator_backing = self.backing.lock().unwrap();
+        let backing = &mut *self.backing.lock().unwrap();
+
+        let needed_texture_size = size_vector_to_extent(backing.alloctree.bounds().size());
+
+        // If we have a texture, check if it is the right size.
+        if matches!(
+            backing.texture,
+            Some((ref texture, _))
+            if texture.size() != needed_texture_size
+        ) {
+            backing.texture = None;
+        }
+
+        // Allocate a texture if needed.
+        let (texture, texture_view) = backing.texture.get_or_insert_with(|| {
+            // TODO: Add an error scope so we can detect and recover from errors,
+            // including out-of-memory.
+            let texture = device.create_texture(&wgpu::TextureDescriptor {
+                size: needed_texture_size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D3,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                view_formats: &[],
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                label: Some(&backing.texture_label),
+            });
+
+            let texture_view =
+                Arc::new(texture.create_view(&wgpu::TextureViewDescriptor::default()));
+
+            (texture, texture_view)
+        });
 
         let mut count_written = 0;
-        if allocator_backing.dirty {
-            allocator_backing.in_use.retain(|weak_backing| {
+        if backing.dirty {
+            backing.in_use.retain(|weak_backing| {
                 // Process the non-dropped weak references
                 weak_backing.upgrade().map_or(false, |strong_backing| {
                     let backing: &mut TileBacking = &mut strong_backing.lock().unwrap();
@@ -150,7 +164,7 @@ impl AtlasAllocator {
                                 .expect("can't happen: dead TileBacking")
                                 .allocation;
 
-                            write_texture_by_aab(queue, &self.texture, region, data);
+                            write_texture_by_aab(queue, texture, region, data);
                             backing.dirty = false;
                             count_written += 1;
                         }
@@ -160,14 +174,28 @@ impl AtlasAllocator {
             });
         }
 
-        allocator_backing.dirty = false;
-        BlockTextureInfo {
-            flushed: count_written,
-            flush_time: Instant::now().duration_since(start_time),
-            in_use_tiles: allocator_backing.in_use.len(),
-            in_use_texels: allocator_backing.alloctree.occupied_volume(),
-            capacity_texels: allocator_backing.alloctree.bounds().volume(),
-        }
+        backing.dirty = false;
+        (
+            texture_view.clone(),
+            BlockTextureInfo {
+                flushed: count_written,
+                flush_time: Instant::now().duration_since(start_time),
+                in_use_tiles: backing.in_use.len(),
+                in_use_texels: backing.alloctree.occupied_volume(),
+                capacity_texels: backing.alloctree.bounds().volume(),
+            },
+        )
+    }
+
+    /// Returns a `wgpu::TextureView` that is current as of the last `flush()`, or
+    /// `None` if `flush()` has not been called.
+    pub fn current_texture_view(&self) -> Option<Arc<wgpu::TextureView>> {
+        self.backing
+            .lock()
+            .unwrap()
+            .texture
+            .as_ref()
+            .map(|(_, texture_view)| texture_view.clone())
     }
 }
 

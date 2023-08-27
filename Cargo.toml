@@ -72,7 +72,8 @@ thiserror = "1.0.40"
 tokio = { version = "1.28.0", default-features = false }
 trycmd = "0.14.1" # keep in sync with `snapbox`
 wasm-bindgen-futures = "0.4.34"
-wgpu = { version = "0.17.0" }
+# Note: "expose_ids" feature is not needed globally but is enabled to avoid compiling two versions
+wgpu = { version = "0.17.0", features = ["expose-ids"] }
 
 [profile.dev]
 # Enable some optimization to improve interactive performance in manual testing/experimenting.
