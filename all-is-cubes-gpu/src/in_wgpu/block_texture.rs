@@ -23,6 +23,7 @@ use crate::BlockTextureInfo;
 /// valid regardless.
 #[derive(Clone, Debug)]
 pub struct AtlasAllocator {
+    /// Note on lock ordering: Do not attempt to acquire this lock while a tile's lock is held.
     backing: Arc<Mutex<AllocatorBacking>>,
 }
 
