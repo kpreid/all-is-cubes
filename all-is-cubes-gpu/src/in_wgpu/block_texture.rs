@@ -287,10 +287,23 @@ impl texture::Plane for AtlasPlane {
 
 impl Drop for TileBacking {
     fn drop(&mut self) {
-        if let Some(ab) = self.allocator.upgrade() {
-            if let Some(handle) = self.handle.take() {
-                ab.lock().unwrap().alloctree.free(handle);
-            }
-        }
+        let Some(backing_lock) = self.allocator.upgrade() else {
+            // Texture is gone, so nothing to do
+            return;
+        };
+
+        // Take allocation handle out of self.
+        let Some(handle) = self.handle.take() else {
+            // Shouldn't happen but if it does, don't panic
+            return;
+        };
+
+        let Ok(mut backing) = backing_lock.lock() else {
+            // Mutex is poisoned, which means the allocator state is corrupt,
+            // so give up.
+            return;
+        };
+
+        backing.alloctree.free(handle);
     }
 }
