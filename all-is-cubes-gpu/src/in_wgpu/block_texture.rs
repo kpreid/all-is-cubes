@@ -122,13 +122,15 @@ impl AtlasAllocator {
         let needed_texture_size = size_vector_to_extent(backing.alloctree.bounds().size());
 
         // If we have a texture, check if it is the right size.
-        if matches!(
+        let old_texture: Option<wgpu::Texture> = if matches!(
             backing.texture,
             Some((ref texture, _))
             if texture.size() != needed_texture_size
         ) {
-            backing.texture = None;
-        }
+            backing.texture.take().map(|(texture, _)| texture)
+        } else {
+            None
+        };
 
         // Allocate a texture if needed.
         let (texture, texture_view) = backing.texture.get_or_insert_with(|| {
@@ -141,9 +143,36 @@ impl AtlasAllocator {
                 dimension: wgpu::TextureDimension::D3,
                 format: wgpu::TextureFormat::Rgba8UnormSrgb,
                 view_formats: &[],
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::COPY_SRC
+                    | wgpu::TextureUsages::COPY_DST,
                 label: Some(&backing.texture_label),
             });
+
+            if let Some(old_texture) = old_texture {
+                let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some(&format!(
+                        "{} copy old to new texture",
+                        backing.texture_label
+                    )),
+                });
+                encoder.copy_texture_to_texture(
+                    wgpu::ImageCopyTexture {
+                        texture: &old_texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::default(),
+                    },
+                    wgpu::ImageCopyTexture {
+                        texture: &texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::default(),
+                    },
+                    old_texture.size(),
+                );
+                queue.submit([encoder.finish()]);
+            }
 
             let texture_view =
                 Arc::new(texture.create_view(&wgpu::TextureViewDescriptor::default()));
