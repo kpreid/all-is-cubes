@@ -273,10 +273,11 @@ impl CustomFormat<StatusText> for BlockTextureInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: StatusText) -> fmt::Result {
         write!(
             fmt,
-            "Textures: {} tiles, {} texels ({}%) used, {:2} flushed in {}",
+            "Textures: {} tiles, {} texels ({}% of {}) used, {:2} flushed in {}",
             self.in_use_tiles,
             self.in_use_texels,
             (self.in_use_texels as f32 / self.capacity_texels as f32 * 100.0).ceil() as usize,
+            self.capacity_texels,
             self.flushed,
             self.flush_time.custom_format(format_type)
         )
