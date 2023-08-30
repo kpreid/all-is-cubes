@@ -4,7 +4,7 @@ use crate::block::{
     self, Evoxel, Evoxels, MinEval, Modifier,
     Resolution::{self, R1},
 };
-use crate::math::{GridAab, GridArray, GridCoordinate, GridPoint};
+use crate::math::{Cube, GridAab, GridArray, GridCoordinate, GridPoint};
 use crate::universe;
 
 /// Data for [`Modifier::Zoom`], describing a portion of the original block that is scaled
@@ -36,7 +36,7 @@ impl Zoom {
     /// greater than `scale - 1`.
     #[track_caller]
     pub fn new(scale: Resolution, offset: GridPoint) -> Self {
-        if !GridAab::for_block(scale).contains_cube(offset) {
+        if !GridAab::for_block(scale).contains_cube(Cube::from(offset)) {
             panic!("Zoom offset {offset:?} out of bounds for {scale}");
         }
 

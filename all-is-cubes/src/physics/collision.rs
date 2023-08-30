@@ -9,8 +9,8 @@ use super::POSITION_EPSILON;
 use crate::block::Evoxels;
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{
-    Aab, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridAab, GridArray, GridCoordinate,
-    GridPoint, LineVertex,
+    Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridAab, GridArray,
+    GridCoordinate, LineVertex,
 };
 use crate::raycast::{Ray, Raycaster};
 use crate::space::Space;
@@ -29,7 +29,7 @@ pub enum Contact {
     /// Contact with one voxel of a block with a potentially complex shape.
     Voxel {
         /// The “outer” cube in the [`Space`].
-        cube: GridPoint,
+        cube: Cube,
         /// The voxel resolution of the block; that is, the factor by which voxel
         /// coordinates are smaller than `cube` coordinates.
         resolution: Resolution,
@@ -42,7 +42,7 @@ pub enum Contact {
 
 impl Contact {
     /// Returns the cube that was collided with or within.
-    pub fn cube(&self) -> GridPoint {
+    pub fn cube(&self) -> Cube {
         match *self {
             Contact::Block(CubeFace { cube, .. }) => cube,
             Contact::Voxel { cube, .. } => cube,
@@ -132,8 +132,7 @@ impl Geometry for Contact {
             } => {
                 let resolution: FreeCoordinate = (*resolution).into();
                 voxel.wireframe_points(&mut MapExtend::new(output, |mut vert: LineVertex| {
-                    vert.position =
-                        vert.position / resolution + cube.to_vec().map(FreeCoordinate::from);
+                    vert.position = vert.position / resolution + cube.aab().lower_bounds_v();
                     vert
                 }))
             }
@@ -322,7 +321,7 @@ where
 
 /// Returns an iterator over all blocks in `space` which intersect `aab`, accounting for
 /// collision options.
-pub(crate) fn find_colliding_cubes<Sp>(space: &Sp, aab: Aab) -> impl Iterator<Item = GridPoint> + '_
+pub(crate) fn find_colliding_cubes<Sp>(space: &Sp, aab: Aab) -> impl Iterator<Item = Cube> + '_
 where
     Sp: CollisionSpace,
 {
@@ -351,7 +350,7 @@ pub(crate) trait CollisionSpace {
 
     /// Retrieve a cell value from the grid.
     /// Should return a non-colliding value if the point is out of bounds.
-    fn get_cell(&self, cube: GridPoint) -> &Self::Cell;
+    fn get_cell(&self, cube: Cube) -> &Self::Cell;
 
     /// Retrieve a cell's collision behavior.
     /// If None, recursion is needed.
@@ -380,7 +379,7 @@ impl CollisionSpace for Space {
     }
 
     #[inline]
-    fn get_cell(&self, cube: GridPoint) -> &Self::Cell {
+    fn get_cell(&self, cube: Cube) -> &Self::Cell {
         self.get_evaluated(cube)
     }
 
@@ -409,6 +408,7 @@ impl CollisionSpace for Space {
                 let cube_translation = entry_end
                     .contact
                     .cube()
+                    .lower_bounds()
                     .to_vec()
                     .map(|s| -FreeCoordinate::from(s));
                 let scale = FreeCoordinate::from(resolution);
@@ -452,7 +452,7 @@ impl CollisionSpace for GridArray<Evoxel> {
     }
 
     #[inline]
-    fn get_cell(&self, cube: GridPoint) -> &Self::Cell {
+    fn get_cell(&self, cube: Cube) -> &Self::Cell {
         self.get(cube).unwrap_or(&Evoxel::AIR)
     }
 
@@ -565,7 +565,6 @@ mod tests {
     use crate::block::Resolution::*;
     use crate::block::{Block, AIR};
     use crate::content::{make_slab, make_some_blocks};
-    use crate::math::{point_to_enclosing_cube, GridAab};
     use crate::raytracer::print_space;
     use crate::universe::Universe;
 
@@ -594,7 +593,7 @@ mod tests {
             Some(CollisionRayEnd {
                 t_distance: 0.5, // half of a ray with magnitude 2
                 contact: Contact::Voxel {
-                    cube: GridPoint::new(1, 0, 0),
+                    cube: Cube::new(1, 0, 0),
                     resolution: R2,
                     // TODO: the voxel reported here is arbitrary, so this test is fragile
                     voxel: CubeFace::new([0, 0, 0], Face7::PY),
@@ -611,7 +610,7 @@ mod tests {
             Some(CollisionRayEnd {
                 t_distance: 0.125,
                 contact: Contact::Voxel {
-                    cube: GridPoint::new(1, 0, 0),
+                    cube: Cube::new(1, 0, 0),
                     resolution: R2,
                     // TODO: the voxel reported here is arbitrary, so this test is fragile
                     voxel: CubeFace::new([0, 0, 0], Face7::PY),
@@ -630,7 +629,7 @@ mod tests {
             Some(CollisionRayEnd {
                 t_distance: 0.125,
                 contact: Contact::Voxel {
-                    cube: GridPoint::new(1, 0, 0), // second of 2 blocks is taller
+                    cube: Cube::new(1, 0, 0), // second of 2 blocks is taller
                     resolution: R2,
                     voxel: CubeFace::new([0, 0, 0], Face7::PY),
                 },
@@ -643,7 +642,7 @@ mod tests {
             Some(CollisionRayEnd {
                 t_distance: 0.125,
                 contact: Contact::Voxel {
-                    cube: GridPoint::new(0, 0, 0), // first of 2 blocks is taller
+                    cube: Cube::new(0, 0, 0), // first of 2 blocks is taller
                     resolution: R2,
                     voxel: CubeFace::new([1, 0, 0], Face7::PY),
                 },
@@ -669,7 +668,7 @@ mod tests {
         // with lower corner [0.5, 1.5, 0] so it should contact the "left" half of
         // the `block` after moving a distance of 0.5 plus whatever penetration
         // depth into a recursive block applies.
-        let aab = Aab::from_cube(GridPoint::new(0, 0, 0));
+        let aab = Cube::ORIGIN.aab();
         let ray = Ray::new([0.5, initial_y, 0.], [0., -2., 0.]);
 
         let result = collide_along_ray(&space, ray, aab, |_| {}, StopAt::NotAlreadyColliding);
@@ -705,7 +704,7 @@ mod tests {
                 vec![
                     Contact::Block(CubeFace::new([0, 0, 0], Face7::Within)),
                     Contact::Voxel {
-                        cube: GridPoint::new(1, 0, 0),
+                        cube: Cube::new(1, 0, 0),
                         resolution: R2,
                         // TODO: the voxel reported here is arbitrary, so this test is fragile
                         voxel: CubeFace::new([0, 0, 0], Face7::Within),
@@ -775,9 +774,9 @@ mod tests {
 
                 let enclosing = nudged_aab.round_up_to_grid();
                 if backward {
-                    let expected_enclosing = GridAab::single_cube(
-                        point_to_enclosing_cube(segment.unit_endpoint()).unwrap(),
-                    );
+                    let expected_enclosing = Cube::containing(segment.unit_endpoint())
+                        .unwrap()
+                        .grid_aab();
                     assert_eq!(
                         enclosing.axis_range(axis),
                         expected_enclosing.axis_range(axis),

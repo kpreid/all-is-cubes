@@ -7,7 +7,7 @@ use all_is_cubes::block::{self, Block, AIR};
 use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, GridVector,
+    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridRotation, GridVector,
 };
 use all_is_cubes::space::SpaceTransaction;
 
@@ -69,7 +69,9 @@ pub(crate) fn make_log(
         directions
             .iter()
             .map(|(face, &growth)| {
-                let Some(growth) = growth else { return AIR; };
+                let Some(growth) = growth else {
+                    return AIR;
+                };
                 blocks[Log(growth)].clone().rotate(
                     GridRotation::from_to(Face6::NY, face, Face6::PX)
                         .or_else(|| GridRotation::from_to(Face6::NY, face, Face6::PZ))
@@ -98,7 +100,7 @@ pub(crate) fn make_log(
 pub(crate) fn make_tree(
     blocks: &BlockProvider<LandscapeBlocks>,
     rng: &mut impl rand::Rng,
-    root: GridPoint,
+    root: Cube,
     bounds: GridAab,
 ) -> Result<SpaceTransaction, InGenError> {
     // Graph of which blocks are to be connected by logs.
@@ -226,7 +228,7 @@ mod graph {
             self.data.bounds()
         }
 
-        pub fn edge(&self, cube: GridPoint, neighbor_face: Face6) -> Option<Option<TreeGrowth>> {
+        pub fn edge(&self, cube: Cube, neighbor_face: Face6) -> Option<Option<TreeGrowth>> {
             if neighbor_face.is_negative() {
                 // For any pair, data is stored in the cell with the lower coordinates.
                 // TODO: could, theoretically, numeric overflow
@@ -242,7 +244,7 @@ mod graph {
 
         pub fn edge_mut(
             &mut self,
-            cube: GridPoint,
+            cube: Cube,
             neighbor_face: Face6,
         ) -> Option<&mut Option<TreeGrowth>> {
             if neighbor_face.is_negative() {
@@ -261,22 +263,22 @@ mod graph {
 
         /// Return all the neighbor connections of this cube.
         /// Doesn't care if `cube` is out of bounds.
-        pub fn neighbor_edges(&self, cube: GridPoint) -> FaceMap<Option<TreeGrowth>> {
+        pub fn neighbor_edges(&self, cube: Cube) -> FaceMap<Option<TreeGrowth>> {
             FaceMap::from_fn(|face| self.edge(cube, face).flatten())
         }
 
-        pub fn leaves(&self, cube: GridPoint) -> Option<Option<TreeGrowth>> {
+        pub fn leaves(&self, cube: Cube) -> Option<Option<TreeGrowth>> {
             self.data.get(cube).map(|cell| cell.leaves)
         }
 
-        pub fn leaves_mut(&mut self, cube: GridPoint) -> Option<&mut Option<TreeGrowth>> {
+        pub fn leaves_mut(&mut self, cube: Cube) -> Option<&mut Option<TreeGrowth>> {
             self.data.get_mut(cube).map(|cell| &mut cell.leaves)
         }
 
         pub fn logs<'a>(
             &'a self,
             blocks: &'a BlockProvider<LandscapeBlocks>,
-        ) -> impl Iterator<Item = (GridPoint, Block)> + 'a {
+        ) -> impl Iterator<Item = (Cube, Block)> + 'a {
             self.bounds().interior_iter().map(|cube| {
                 (
                     cube,
@@ -307,8 +309,8 @@ mod graph {
     }
 
     impl petgraph::visit::GraphBase for Growph {
-        type NodeId = GridPoint;
-        type EdgeId = (GridPoint, usize); // TODO: this is evidence for wanting an axis-ID enum
+        type NodeId = Cube;
+        type EdgeId = (Cube, usize); // TODO: this is evidence for wanting an axis-ID enum
     }
     impl petgraph::visit::Data for Growph {
         type NodeWeight = Option<TreeGrowth>;
@@ -326,7 +328,7 @@ mod graph {
     impl<'g> petgraph::visit::IntoEdges for &'g Growph {
         type Edges = Box<dyn Iterator<Item = GrowphEdgeRef> + 'g>; // TODO custom type
 
-        fn edges(self, cube: GridPoint) -> Self::Edges {
+        fn edges(self, cube: Cube) -> Self::Edges {
             Box::new(
                 self.neighbor_edges(cube)
                     .map(|face, growth| GrowphEdgeRef::from_face(cube, face, growth))
@@ -341,7 +343,7 @@ mod graph {
         }
     }
     impl<'g> petgraph::visit::IntoNeighbors for &'g Growph {
-        type Neighbors = Box<dyn Iterator<Item = GridPoint> + 'g>;
+        type Neighbors = Box<dyn Iterator<Item = Cube> + 'g>;
 
         fn neighbors(self, _node: Self::NodeId) -> Self::Neighbors {
             todo!()
@@ -363,18 +365,18 @@ mod graph {
     /// Note that this is and must be a directed edge, even though the graph itself is undirected.
     #[derive(Clone, Copy, Debug)]
     pub struct GrowphEdgeRef {
-        cube: GridPoint,
+        cube: Cube,
         face: Face6,
         pub growth: Option<TreeGrowth>,
     }
     impl GrowphEdgeRef {
-        fn from_face(cube: GridPoint, face: Face6, growth: Option<TreeGrowth>) -> Self {
+        fn from_face(cube: Cube, face: Face6, growth: Option<TreeGrowth>) -> Self {
             Self { cube, face, growth }
         }
     }
     impl petgraph::visit::EdgeRef for GrowphEdgeRef {
-        type NodeId = GridPoint;
-        type EdgeId = (GridPoint, usize);
+        type NodeId = Cube;
+        type EdgeId = (Cube, usize);
         type Weight = Option<TreeGrowth>;
 
         fn source(&self) -> Self::NodeId {
@@ -407,15 +409,15 @@ mod graph {
             Self(GridArray::from_fn(bounds, |_| false))
         }
     }
-    impl petgraph::visit::VisitMap<GridPoint> for VisitMap {
-        fn visit(&mut self, node: GridPoint) -> bool {
+    impl petgraph::visit::VisitMap<Cube> for VisitMap {
+        fn visit(&mut self, node: Cube) -> bool {
             !std::mem::replace(
                 self.0.get_mut(node).expect("node coordinates out of range"),
                 true,
             )
         }
 
-        fn is_visited(&self, &node: &GridPoint) -> bool {
+        fn is_visited(&self, &node: &Cube) -> bool {
             self.0[node]
         }
     }

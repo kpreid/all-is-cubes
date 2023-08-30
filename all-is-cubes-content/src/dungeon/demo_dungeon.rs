@@ -14,8 +14,8 @@ use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    point_to_enclosing_cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint,
-    GridRotation, GridVector, Rgb, Rgba,
+    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, GridVector,
+    Rgb, Rgba,
 };
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -112,7 +112,7 @@ impl DemoTheme {
         &self,
         space: &mut Space,
         map: &GridArray<Option<DemoRoom>>,
-        room_position: GridPoint,
+        room_position: Cube,
         face: Face6,
         has_gate: bool,
     ) -> Result<(), InGenError> {
@@ -198,7 +198,7 @@ impl DemoTheme {
     /// Box of the room, in space coordinates, that might be smaller or bigger than the
     /// [`DungeonGrid`]'s box.
     /// TODO: Should we teach `DungeonGrid` to help with this?
-    fn actual_room_box(&self, room_position: GridPoint, room_data: &DemoRoom) -> GridAab {
+    fn actual_room_box(&self, room_position: Cube, room_data: &DemoRoom) -> GridAab {
         if room_data.corridor_only {
             self.corridor_box
                 .translate(self.dungeon_grid.room_translation(room_position))
@@ -228,7 +228,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
         space: &mut Space,
         pass_index: usize,
         map: &GridArray<Option<DemoRoom>>,
-        room_position: GridPoint,
+        room_position: Cube,
         room_data: &Option<DemoRoom>,
     ) -> Result<(), InGenError> {
         let room_data = match room_data.as_ref() {
@@ -272,10 +272,10 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     }
                     FloorKind::Chasm => { /* TODO: little platforms */ }
                     FloorKind::Bridge => {
-                        let midpoint = point_to_enclosing_cube(floor_layer.center()).unwrap();
+                        let midpoint = Cube::containing(floor_layer.center()).unwrap();
                         for direction in [Face6::NX, Face6::NZ, Face6::PX, Face6::PZ] {
                             if room_data.wall_features[direction] != WallFeature::Blank {
-                                let wall_cube = point_to_enclosing_cube(
+                                let wall_cube = Cube::containing(
                                     floor_layer.abut(direction, -1).unwrap().center(),
                                 )
                                 .unwrap();
@@ -293,8 +293,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 
                 if room_data.lit {
                     let top_middle =
-                        point_to_enclosing_cube(interior.abut(Face6::PY, -1).unwrap().center())
-                            .unwrap();
+                        Cube::containing(interior.abut(Face6::PY, -1).unwrap().center()).unwrap();
                     space.set(
                         top_middle,
                         if room_data.corridor_only {
@@ -337,8 +336,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 // Ceiling light port (not handled by four_walls above)
                 if let WallFeature::Window = room_data.wall_features[Face6::PY] {
                     let midpoint =
-                        point_to_enclosing_cube(interior.abut(Face6::PY, 1).unwrap().center())
-                            .unwrap();
+                        Cube::containing(interior.abut(Face6::PY, 1).unwrap().center()).unwrap();
                     for x in WINDOW_PATTERN {
                         for z in WINDOW_PATTERN {
                             space.set(
@@ -360,8 +358,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 if let Some(block) = &room_data.grants_item {
                     // note that this is the nominal floor, not the possibly extended downward floor
                     let floor_middle =
-                        point_to_enclosing_cube(floor_layer.abut(Face6::PY, 1).unwrap().center())
-                            .unwrap();
+                        Cube::containing(floor_layer.abut(Face6::PY, 1).unwrap().center()).unwrap();
                     space.set(floor_middle, &self.item_pedestal)?;
                     // TODO: This should be in pick-up-able form as opposed to placed,
                     // once such a distinction is actually implemented
@@ -647,7 +644,7 @@ pub async fn install_dungeon_blocks(
                 .display_name("Corridor Light")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::PY })
                 .voxels_fn(universe, resolution, |cube| {
-                    let centered = cube * 2 - center_point_doubled;
+                    let centered = cube.lower_bounds() * 2 - center_point_doubled;
                     if centered.y > centered.x.abs() && centered.y > centered.z.abs() {
                         &light_voxel
                     } else {
@@ -672,7 +669,7 @@ pub async fn install_dungeon_blocks(
 
             Spikes => Block::builder()
                 .display_name("Spikes")
-                .voxels_fn(universe, resolution, |GridPoint { x, y, z }| {
+                .voxels_fn(universe, resolution, |Cube { x, y, z }| {
                     let resolution = f64::from(resolution);
                     let bsin = |x| (f64::from(x) * TAU / resolution * 2.0).sin();
                     if f64::from(y) / resolution < bsin(x) * bsin(z) {

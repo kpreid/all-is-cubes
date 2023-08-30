@@ -5,6 +5,8 @@
 ### Added
 
 - `all-is-cubes` library:
+    - `math::Cube` represents a unit cube on the grid; it replaces many previous uses of `GridPoint` to identify cubes.
+
     - `math::Gridgid` represents rigid transformations, a useful subset of what `GridMatrix` already could do.
 
         The following new functions return `Gridgid`:
@@ -18,6 +20,8 @@
     - Block schema and behavior changes:
         - Light emission is now a property of `Atom` blocks instead of `BlockAttributes`.
         - `EvaluatedBlock`’s `color` field is computed more accurately, ignoring voxels hidden by other voxels.
+
+    - All functions manipulating volume data in `Space`, `GridArray`, `Evoxels`, etc. have changed signature to use the new type `math::Cube` instead of `math::GridPoint`.
 
     - The following functions have changed signature to use the new type `math::Gridgid`:
         - `math::GridAab::transform()`
@@ -38,10 +42,13 @@
 ### Removed
 
 - `all-is-cubes` library:
+    - `math::Aab::from_cube()` no longer exists. Use `Cube::aab()` instead.
     - `math::Face7::matrix()` no longer exists. Use `Face6::face_transform()` instead.
     - `math::GridAab::index()` and `contains_cube()` no longer accept `impl Into<GridPoint>`.
-      Call sites should be changed to pass only `GridPoint`.
+      Call sites should be changed to pass only `Cube`.
     - `math::GridRotation::to_positive_octant_matrix()` no longer exists. Use `to_positive_octant_transform()` instead.
+    - `math::cube_to_midpoint()` no longer exists. Use `Cube::midpoint()` instead.
+    - `math::point_to_enclosing_cube()` no longer exists. Use `Cube::containing()` instead.
 
 - `all-is-cubes-mesh` library:
     - `TextureCoordinate` type alias no longer exists.

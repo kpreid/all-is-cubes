@@ -17,8 +17,8 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    cube_to_midpoint, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
-    GridVector, Gridgid, NotNan, Rgb, Rgba,
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector,
+    Gridgid, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -91,12 +91,12 @@ pub async fn install_demo_blocks(
     let road_color: Block = Rgba::new(0.157, 0.130, 0.154, 1.0).into();
     let curb_color: Block = Rgba::new(0.788, 0.765, 0.741, 1.0).into();
     let road_noise_v = noise::Value::new(0x52b19f6a);
-    let road_noise = move |cube| road_noise_v.at_grid(cube) * 0.12 + 1.0;
+    let road_noise = move |cube: Cube| road_noise_v.at_grid(cube.lower_bounds()) * 0.12 + 1.0;
 
-    let curb_fn = |cube: GridPoint| {
+    let curb_fn = |cube: Cube| {
         let width = resolution_g / 3;
         if int_magnitude_squared(
-            (cube - GridPoint::new(width / 2 + 2, 0, 0)).mul_element_wise(GridVector::new(1, 2, 0)),
+            (cube - Cube::new(width / 2 + 2, 0, 0)).mul_element_wise(GridVector::new(1, 2, 0)),
         ) < width.pow(2)
         {
             scale_color(curb_color.clone(), road_noise(cube), 0.02)
@@ -132,7 +132,8 @@ pub async fn install_demo_blocks(
                 Block::builder()
                     .display_name("Glass Block")
                     .voxels_fn(universe, resolution, |cube| {
-                        let unit_radius_point = cube_to_midpoint(cube)
+                        let unit_radius_point = cube
+                            .midpoint()
                             .map(|c| c / (FreeCoordinate::from(resolution_g) / 2.0) - 1.0);
                         let power = 7.;
                         let r = unit_radius_point
@@ -153,9 +154,10 @@ pub async fn install_demo_blocks(
 
             Lamp => Block::builder()
                 .display_name("Lamp")
-                .voxels_fn(universe, resolution, |p| {
-                    if int_magnitude_squared(p * 2 + one_diagonal - center_point_doubled)
-                        <= resolution_g.pow(2)
+                .voxels_fn(universe, resolution, |cube| {
+                    if int_magnitude_squared(
+                        cube.lower_bounds() * 2 + one_diagonal - center_point_doubled,
+                    ) <= resolution_g.pow(2)
                     {
                         &lamp_globe
                     } else {
@@ -169,7 +171,7 @@ pub async fn install_demo_blocks(
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |cube| {
                     if int_magnitude_squared(
-                        (cube * 2 + one_diagonal - center_point_doubled)
+                        (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
                             .mul_element_wise(GridVector::new(1, 0, 1)),
                     ) <= 4i32.pow(2)
                     {
@@ -206,7 +208,7 @@ pub async fn install_demo_blocks(
                     let shape: [GridCoordinate; 16] =
                         [4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 7, 8];
                     let r2 = int_magnitude_squared(
-                        (cube * 2 + one_diagonal - center_point_doubled)
+                        (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
                             .mul_element_wise(GridVector::new(1, 0, 1)),
                     );
                     if r2 < shape.get(cube.y as usize).copied().unwrap_or(0).pow(2) {
@@ -220,16 +222,16 @@ pub async fn install_demo_blocks(
             Sconce => Block::builder()
                 .display_name("Sconce")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
-                .voxels_fn(universe, resolution, |p| {
+                .voxels_fn(universe, resolution, |cube| {
                     // TODO: fancier/tidier appearance; this was just some tinkering from the original `Lamp` sphere
                     let r2 = int_magnitude_squared(
-                        (p * 2 + one_diagonal
+                        (cube.lower_bounds() * 2 + one_diagonal
                             - center_point_doubled.mul_element_wise(GridPoint::new(1, 1, 0)))
                         .mul_element_wise(GridVector::new(3, 1, 1)),
                     );
                     if r2 <= (resolution_g - 2).pow(2) {
                         &lamp_globe
-                    } else if r2 <= (resolution_g + 4).pow(2) && p.z == 0 {
+                    } else if r2 <= (resolution_g + 4).pow(2) && cube.z == 0 {
                         &lamppost_metal
                     } else {
                         &AIR
@@ -254,7 +256,7 @@ pub async fn install_demo_blocks(
                 let base_body_color = rgb_const!(0.5, 0.5, 0.5);
                 space.fill(space.bounds(), |p| {
                     // TODO: We really need better procgen tools
-                    let p2 = p * 2 + one_diagonal - center_point_doubled;
+                    let p2 = p.lower_bounds() * 2 + one_diagonal - center_point_doubled;
                     let r = p2
                         .mul_element_wise(Vector3::new(1, 1, 0))
                         .map(|c| f64::from(c) / 2.0)
@@ -511,8 +513,10 @@ pub(crate) fn gradient_lookup(gradient: &[Block], value: f32) -> &Block {
 /// The first returned number is the "radius" value and the second is the distance
 /// on the lesser axis, which may be used for distance from the center or corner along
 /// the surface.
-fn square_radius(resolution: Resolution, cube: GridPoint) -> [GridCoordinate; 2] {
-    let distances_vec = cube.map(|c| (c * 2 + 1 - GridCoordinate::from(resolution)).abs() / 2 + 1);
+fn square_radius(resolution: Resolution, cube: Cube) -> [GridCoordinate; 2] {
+    let distances_vec = cube
+        .lower_bounds()
+        .map(|c| (c * 2 + 1 - GridCoordinate::from(resolution)).abs() / 2 + 1);
     if distances_vec.x > distances_vec.z {
         [distances_vec.x, distances_vec.z]
     } else {
@@ -564,7 +568,7 @@ mod tests {
     #[test]
     fn square_radius_cases() {
         assert_eq!(
-            [6, 7, 8, 9].map(|x| square_radius(R16, GridPoint::new(x, 2, 8))[0]),
+            [6, 7, 8, 9].map(|x| square_radius(R16, Cube::new(x, 2, 8))[0]),
             [2, 1, 1, 2]
         );
     }

@@ -94,7 +94,9 @@ impl vui::Widget for Voxels {
                 cube,
                 Block::from_primitive(Primitive::Recur {
                     attributes: self.block_attributes.clone(),
-                    offset: block_to_voxels_transform.transform_cube(cube),
+                    offset: block_to_voxels_transform
+                        .transform_cube(cube)
+                        .lower_bounds(),
                     resolution: self.scale,
                     space: self.space.clone(),
                 }),
@@ -110,6 +112,7 @@ mod tests {
     use crate::vui::{instantiate_widget, Align};
     use all_is_cubes::block::Resolution::*;
     use all_is_cubes::cgmath::{Point3, Vector3};
+    use all_is_cubes::math::Cube;
     use all_is_cubes::universe::Universe;
 
     fn test_voxels_widget(
@@ -133,7 +136,7 @@ mod tests {
     #[test]
     fn voxels_in_too_small_grant_succeeds() {
         let v_space_bounds = GridAab::from_lower_upper([0, 0, 0], [7, 8, 9]);
-        let output_origin = GridPoint::new(100, 100, 100);
+        let output_origin = Cube::new(100, 100, 100);
         let _output = test_voxels_widget(
             v_space_bounds,
             vui::LayoutGrant::new(GridAab::single_cube(output_origin)),

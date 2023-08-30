@@ -51,8 +51,8 @@ impl UiSize {
     /// TODO: depth should be up to the choice of the individual pages.
     pub(crate) fn space_bounds(&self) -> GridAab {
         GridAab::from_lower_upper(
-            (0, 0, -Self::DEPTH_BEHIND_VIEW_PLANE),
-            (self.size.x, self.size.y, 5),
+            [0, 0, -Self::DEPTH_BEHIND_VIEW_PLANE],
+            [self.size.x, self.size.y, 5],
         )
     }
 

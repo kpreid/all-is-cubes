@@ -10,10 +10,7 @@ use crate::block::{Block, Resolution::*, AIR, AIR_EVALUATED};
 use crate::content::load_image::{default_srgb, include_image, space_from_image};
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
-use crate::math::{
-    cube_to_midpoint, Face6, FreeCoordinate, GridCoordinate, GridRotation, GridVector, Gridgid,
-    Rgba,
-};
+use crate::math::{Face6, FreeCoordinate, GridCoordinate, GridRotation, GridVector, Gridgid, Rgba};
 use crate::space::Space;
 use crate::universe::Universe;
 
@@ -101,11 +98,11 @@ impl Icons {
                     let background_block_1: Block = Rgba::new(1.0, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
                     let background_block_2: Block = Rgba::new(0.8, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
                     let background_brush = VoxelBrush::new([
-                        ((0, 0, 1), &background_block_1),
-                        ((1, 0, 0), &background_block_2),
-                        ((-1, 0, 0), &background_block_2),
-                        ((0, 1, 0), &background_block_2),
-                        ((0, -1, 0), &background_block_2),
+                        ([0, 0, 1], &background_block_1),
+                        ([1, 0, 0], &background_block_2),
+                        ([-1, 0, 0], &background_block_2),
+                        ([0, 1, 0], &background_block_2),
+                        ([0, -1, 0], &background_block_2),
                     ]);
                     let line_brush = VoxelBrush::single(Block::from(Rgba::BLACK))
                         .translate(GridVector::new(0, 0, 2));
@@ -238,11 +235,11 @@ impl Icons {
                         } else {
                             "Jetpack (off)"
                         })
-                        .voxels_fn(universe, resolution, |p| {
+                        .voxels_fn(universe, resolution, |cube| {
                             let (shape_radius, block) =
-                                shape[((GridCoordinate::from(resolution) - 1) - p.y) as usize];
+                                shape[((GridCoordinate::from(resolution) - 1) - cube.y) as usize];
                             let centered_p =
-                                cube_to_midpoint(p).map(|c| c - f64::from(resolution) / 2.0);
+                                cube.midpoint().map(|c| c - f64::from(resolution) / 2.0);
                             let r4 = centered_p
                                 .to_vec()
                                 .mul_element_wise(Vector3::new(1., 0., 1.))

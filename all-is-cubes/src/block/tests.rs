@@ -20,7 +20,7 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::listen::{self, NullListener, Sink};
 use crate::math::{
-    Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, GridVector,
+    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, GridVector,
     OpacityCategory, Rgb, Rgba,
 };
 use crate::space::{Space, SpaceTransaction};
@@ -194,7 +194,7 @@ fn evaluate_voxels_checked_individually() {
     let block = Block::builder()
         .attributes(attributes.clone())
         .voxels_fn(&mut universe, resolution, |point| {
-            let point = point.cast::<f32>().unwrap();
+            let point = point.lower_bounds().cast::<f32>().unwrap();
             Block::from(Rgba::new(point.x, point.y, point.z, 1.0))
         })
         .unwrap()
@@ -207,7 +207,7 @@ fn evaluate_voxels_checked_individually() {
         Evoxels::Many(
             resolution,
             GridArray::from_fn(GridAab::for_block(resolution), |point| {
-                let point = point.cast::<f32>().unwrap();
+                let point = point.lower_bounds().cast::<f32>().unwrap();
                 Evoxel {
                     color: Rgba::new(point.x, point.y, point.z, 1.0),
                     emission: Rgb::ZERO,
@@ -283,16 +283,12 @@ fn evaluate_voxels_full_but_transparent() {
     let resolution = R4;
     let mut universe = Universe::new();
     let block = Block::builder()
-        .voxels_fn(&mut universe, resolution, |point| {
+        .voxels_fn(&mut universe, resolution, |cube| {
             Block::from(Rgba::new(
                 0.0,
                 0.0,
                 0.0,
-                if point == GridPoint::new(1, 1, 1) {
-                    1.0
-                } else {
-                    0.0
-                },
+                if cube == Cube::new(1, 1, 1) { 1.0 } else { 0.0 },
             ))
         })
         .unwrap()
@@ -325,7 +321,7 @@ fn evaluate_voxels_partial_not_filling() {
 
     let e = block.evaluate().unwrap();
     // of 6 faces, 2 are opaque and 2 are half-transparent, thus there are 8 opaque half-faces.
-    assert_eq!(e.color, Rgba::new(1.0, 1.0, 1.0, 8./12.));
+    assert_eq!(e.color, Rgba::new(1.0, 1.0, 1.0, 8. / 12.));
     assert_eq!(e.resolution(), resolution);
     assert_eq!(e.opaque, FaceMap::repeat(false).with(Face6::NX, true));
     assert_eq!(e.visible, true);
@@ -341,7 +337,7 @@ fn recur_with_offset() {
     let mut space = Space::empty_positive(resolution_g * 2, resolution_g, resolution_g);
     space
         .fill(space.bounds(), |point| {
-            let point = point.cast::<f32>().unwrap();
+            let point = point.lower_bounds().cast::<f32>().unwrap();
             Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
         })
         .unwrap();
@@ -359,7 +355,7 @@ fn recur_with_offset() {
         Evoxels::Many(
             resolution,
             GridArray::from_fn(GridAab::for_block(resolution as Resolution), |point| {
-                let point = (point + offset).cast::<f32>().unwrap();
+                let point = (point.lower_bounds() + offset).cast::<f32>().unwrap();
                 Evoxel {
                     color: Rgba::new(point.x, point.y, point.z, 1.0),
                     emission: Rgb::ZERO,
@@ -400,7 +396,7 @@ fn indirect_equivalence() {
     // and we can use the more concise version
     space
         .fill(space.bounds(), |point| {
-            let point = point.cast::<f32>().unwrap();
+            let point = point.lower_bounds().cast::<f32>().unwrap();
             Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
         })
         .unwrap();

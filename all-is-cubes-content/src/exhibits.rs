@@ -29,7 +29,7 @@ use all_is_cubes::drawing::{
 };
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Aab, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
+    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
     GridVector, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
@@ -117,7 +117,7 @@ async fn TRANSPARENCY_LARGE(_: &Exhibit, _universe: &mut Universe) {
             windowpane
                 .transform(rot.to_positive_octant_transform(1))
                 .unwrap(),
-            |GridPoint { y, .. }| {
+            |Cube { y, .. }| {
                 Some(Block::from(
                     color.with_alpha(NotNan::new(alphas[y as usize]).unwrap()),
                 ))
@@ -236,7 +236,7 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
         // Measure from midpoint of odd dimension space
         let p = p - Vector3::new(1, 1, 1) * (GridCoordinate::from(resolution) / 2);
         // Work in floating point
-        let p = p.map(FreeCoordinate::from);
+        let p = p.lower_bounds().map(FreeCoordinate::from);
 
         let cylindrical = Vector2::new((p.x.powi(2) + p.y.powi(2)).sqrt(), p.z);
         let torus_cross_section = cylindrical - Vector2::new(toroidal_radius, 0.);
@@ -447,7 +447,7 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
                             return AIR.clone();
                         }
                         let rescale = if resolution > R8 { 4 } else { 1 };
-                        let color = Rgb::from(p.to_vec().map(|s| {
+                        let color = Rgb::from(p.lower_bounds().to_vec().map(|s| {
                             NotNan::new(
                                 (s / GridCoordinate::from(rescale)) as f32
                                     / f32::from(u16::from(resolution) / rescale - 1).max(1.),
@@ -582,7 +582,7 @@ async fn ZOOM(_: &Exhibit, universe: &mut Universe) {
                 let mut zoom_block = specimen.clone();
                 zoom_block
                     .modifiers_mut()
-                    .push(Zoom::new(scale, cube.cast().unwrap()).into());
+                    .push(Zoom::new(scale, cube.lower_bounds().cast().unwrap()).into());
                 zoom_block
             })
             .unwrap();
@@ -730,8 +730,9 @@ async fn COLORS(_: &Exhibit, universe: &mut Universe) {
     ));
 
     space.fill(space.bounds(), |p| {
-        let color_point = p / 2;
-        let part_of_grid: [GridCoordinate; 3] = p.to_vec().map(|s| s.rem_euclid(2)).into();
+        let color_point = p.lower_bounds() / 2;
+        let part_of_grid: [GridCoordinate; 3] =
+            p.lower_bounds().to_vec().map(|s| s.rem_euclid(2)).into();
         let color = Rgb::from(
             color_point
                 .to_vec()
@@ -1192,7 +1193,7 @@ async fn TREES(_: &Exhibit, universe: &mut Universe) {
 
     for ix in 0..n_x {
         for iz in 0..n_z {
-            let origin = GridPoint::new(ix * spacing_x, 0, iz * spacing_z);
+            let origin = Cube::new(ix * spacing_x, 0, iz * spacing_z);
             tree::make_tree(
                 &landscape_blocks,
                 &mut rng,
@@ -1245,7 +1246,7 @@ async fn DESTRUCTION(_: &Exhibit, universe: &mut Universe) {
         let solid = Block::from(Rgba::WHITE);
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3887829);
         let points: [_; 32] = std::array::from_fn(|_| {
-            let free_point = Aab::from_cube(GridPoint::origin()).random_point(&mut rng);
+            let free_point = Cube::ORIGIN.aab().random_point(&mut rng);
             (
                 free_point,
                 if free_point.y > fraction {
@@ -1294,7 +1295,7 @@ fn non_colliding_text_pixel() -> Block {
 /// TODO: think about whether this should be instead returning a `VoxelBrush` or a `SpaceTransaction` or something, for the future of composable worldgen
 fn stack<'b, B>(
     space: &mut Space,
-    origin: impl Into<GridPoint>,
+    origin: impl Into<Cube>,
     blocks: impl IntoIterator<Item = B>,
 ) -> Result<(), SetCubeError>
 where

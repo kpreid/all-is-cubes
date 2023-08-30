@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use all_is_cubes::block::{Block, AIR};
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
-use all_is_cubes::math::{GridPoint, GridVector};
+use all_is_cubes::math::{Cube, GridVector};
 use all_is_cubes::space::SpaceTransaction;
 use all_is_cubes::time::Tick;
 
@@ -34,11 +34,9 @@ impl vui::Layoutable for Crosshair {
 
 impl vui::Widget for Crosshair {
     fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
-        assert!(position
-            .bounds
-            .contains_cube(position.bounds.lower_bounds()));
+        let position = position.shrink_to_cube().unwrap();
         Box::new(CrosshairController {
-            position: position.bounds.lower_bounds(),
+            position,
             todo: DirtyFlag::listening(false, &self.mouselook_mode),
             definition: self,
         })
@@ -49,7 +47,7 @@ impl vui::Widget for Crosshair {
 #[derive(Debug)]
 pub(crate) struct CrosshairController {
     definition: Arc<Crosshair>,
-    position: GridPoint,
+    position: Cube,
     todo: DirtyFlag,
 }
 

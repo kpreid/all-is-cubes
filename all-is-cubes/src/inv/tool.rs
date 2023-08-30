@@ -9,7 +9,7 @@ use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::fluff::Fluff;
 use crate::inv::{self, Icons, InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
-use crate::math::{Face6, GridPoint, GridRotation};
+use crate::math::{Cube, Face6, GridRotation};
 use crate::space::{Space, SpaceTransaction};
 use crate::transaction::{Merge, Transaction};
 use crate::universe::{RefError, RefVisitor, URef, UniverseTransaction, VisitRefs};
@@ -330,7 +330,7 @@ impl ToolInput {
     /// `SpaceTransaction::check` anyway.
     fn set_cube(
         &self,
-        cube: GridPoint,
+        cube: Cube,
         old_block: Block,
         new_block: Block,
     ) -> Result<UniverseTransaction, ToolError> {
@@ -635,12 +635,11 @@ mod tests {
     fn use_activate() {
         let [existing] = make_some_blocks();
         let tester = ToolTester::new(|space| {
-            space.set((1, 0, 0), &existing).unwrap();
+            space.set([1, 0, 0], &existing).unwrap();
         });
         assert_eq!(
             tester.equip_and_use_tool(Tool::Activate),
-            Ok(SpaceTransaction::activate_block(GridPoint::new(1, 0, 0))
-                .bind(tester.space_ref.clone()))
+            Ok(SpaceTransaction::activate_block(Cube::new(1, 0, 0)).bind(tester.space_ref.clone()))
         );
 
         // Tool::Activate currently has no cases where it fails
@@ -661,7 +660,7 @@ mod tests {
         for keep in [false, true] {
             let [existing] = make_some_blocks();
             let mut tester = ToolTester::new(|space| {
-                space.set((1, 0, 0), &existing).unwrap();
+                space.set([1, 0, 0], &existing).unwrap();
             });
             let actual_transaction = tester
                 .equip_and_use_tool(Tool::RemoveBlock { keep })
@@ -689,8 +688,8 @@ mod tests {
             actual_transaction
                 .execute(&mut tester.universe, &mut drop)
                 .unwrap();
-            print_space(&tester.space(), (-1., 1., 1.));
-            assert_eq!(&tester.space()[(1, 0, 0)], &AIR);
+            print_space(&tester.space(), [-1., 1., 1.]);
+            assert_eq!(&tester.space()[[1, 0, 0]], &AIR);
         }
     }
 
@@ -723,7 +722,7 @@ mod tests {
             (Tool::InfiniteBlocks(tool_block.clone()), false),
         ] {
             let mut tester = ToolTester::new(|space| {
-                space.set((1, 0, 0), &existing).unwrap();
+                space.set([1, 0, 0], &existing).unwrap();
             });
             let transaction = tester.equip_and_use_tool(tool.clone()).unwrap();
 
@@ -751,9 +750,9 @@ mod tests {
             transaction
                 .execute(&mut tester.universe, &mut drop)
                 .unwrap();
-            print_space(&tester.space(), (-1., 1., 1.));
-            assert_eq!(&tester.space()[(1, 0, 0)], &existing);
-            assert_eq!(&tester.space()[(0, 0, 0)], &tool_block);
+            print_space(&tester.space(), [-1., 1., 1.]);
+            assert_eq!(&tester.space()[[1, 0, 0]], &existing);
+            assert_eq!(&tester.space()[[0, 0, 0]], &tool_block);
         }
     }
 
@@ -762,7 +761,7 @@ mod tests {
     fn use_block_automatic_rotation() {
         let [existing] = make_some_blocks();
         let mut tester = ToolTester::new(|space| {
-            space.set((1, 0, 0), &existing).unwrap();
+            space.set([1, 0, 0], &existing).unwrap();
         });
 
         // Make a block with a rotation rule
@@ -801,7 +800,7 @@ mod tests {
 
         let mut tester = ToolTester::new(|space| {
             // This must be far enough along +X for the blocks we're placing to not run out of space.
-            space.set((4, 0, 0), &existing).unwrap();
+            space.set([4, 0, 0], &existing).unwrap();
         });
         tester.equip_use_commit(stack_2).expect("tool failure 1");
         assert_eq!(tester.character().inventory().slots[0], stack_1);
@@ -817,7 +816,7 @@ mod tests {
             Tool::InfiniteBlocks(tool_block.clone()),
         ] {
             let tester = ToolTester::new(|space| {
-                space.set((1, 0, 0), &existing).unwrap();
+                space.set([1, 0, 0], &existing).unwrap();
             });
             // Place the obstacle after the raycast
             tester
@@ -828,9 +827,9 @@ mod tests {
                 )
                 .unwrap();
             assert_eq!(tester.equip_and_use_tool(tool), Err(ToolError::Obstacle));
-            print_space(&tester.space(), (-1., 1., 1.));
-            assert_eq!(&tester.space()[(1, 0, 0)], &existing);
-            assert_eq!(&tester.space()[(0, 0, 0)], &obstacle);
+            print_space(&tester.space(), [-1., 1., 1.]);
+            assert_eq!(&tester.space()[[1, 0, 0]], &existing);
+            assert_eq!(&tester.space()[[0, 0, 0]], &obstacle);
         }
     }
 
@@ -853,7 +852,7 @@ mod tests {
     fn use_copy_from_space() {
         let [existing] = make_some_blocks();
         let mut tester = ToolTester::new(|space| {
-            space.set((1, 0, 0), &existing).unwrap();
+            space.set([1, 0, 0], &existing).unwrap();
         });
         let transaction = tester.equip_and_use_tool(Tool::CopyFromSpace).unwrap();
         assert_eq!(
@@ -867,7 +866,7 @@ mod tests {
             .execute(&mut tester.universe, &mut drop)
             .unwrap();
         // Space is unmodified
-        assert_eq!(&tester.space()[(1, 0, 0)], &existing);
+        assert_eq!(&tester.space()[[1, 0, 0]], &existing);
     }
 
     #[test]

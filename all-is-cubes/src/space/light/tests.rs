@@ -5,14 +5,14 @@ use pretty_assertions::assert_eq;
 use super::{data::LightStatus, LightUpdatesInfo, PackedLight, Priority};
 use crate::block::{AnimationHint, Block, AIR};
 use crate::listen::{Listen as _, Listener, Sink};
-use crate::math::{FaceMap, GridPoint, Rgb, Rgba};
+use crate::math::{Cube, FaceMap, GridPoint, Rgb, Rgba};
 use crate::space::{GridAab, LightPhysics, Space, SpaceChange, SpacePhysics};
 use crate::time::{practically_infinite_deadline, Tick};
 
 #[test]
 fn initial_lighting_value() {
     let space = Space::empty_positive(1, 1, 1);
-    assert_eq!(PackedLight::NO_RAYS, space.get_lighting((0, 0, 0)));
+    assert_eq!(PackedLight::NO_RAYS, space.get_lighting([0, 0, 0]));
 }
 
 #[test]
@@ -20,7 +20,7 @@ fn out_of_bounds_lighting_value() {
     let space = Space::empty_positive(1, 1, 1);
     assert_eq!(
         PackedLight::from(space.physics().sky_color),
-        space.get_lighting((-1, 0, 0))
+        space.get_lighting([-1, 0, 0])
     );
 }
 
@@ -33,11 +33,11 @@ fn step() {
     });
     let sky_light = PackedLight::from(space.physics().sky_color);
 
-    space.set((0, 0, 0), Rgb::ONE).unwrap();
+    space.set([0, 0, 0], Rgb::ONE).unwrap();
     // Not changed yet... except for the now-opaque block
-    assert_eq!(space.get_lighting((0, 0, 0)), PackedLight::OPAQUE);
-    assert_eq!(space.get_lighting((1, 0, 0)), PackedLight::NO_RAYS);
-    assert_eq!(space.get_lighting((2, 0, 0)), PackedLight::NO_RAYS);
+    assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
+    assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::NO_RAYS);
+    assert_eq!(space.get_lighting([2, 0, 0]), PackedLight::NO_RAYS);
 
     let (info, _) = space.step(None, Tick::arbitrary(), practically_infinite_deadline());
     assert_eq!(
@@ -50,9 +50,9 @@ fn step() {
         }
     );
 
-    assert_eq!(space.get_lighting((0, 0, 0)), PackedLight::OPAQUE); // opaque
-    assert_eq!(space.get_lighting((1, 0, 0)), sky_light); // updated
-    assert_eq!(space.get_lighting((2, 0, 0)), PackedLight::NO_RAYS); // not updated/not relevant
+    assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE); // opaque
+    assert_eq!(space.get_lighting([1, 0, 0]), sky_light); // updated
+    assert_eq!(space.get_lighting([2, 0, 0]), PackedLight::NO_RAYS); // not updated/not relevant
 }
 
 #[test]
@@ -86,7 +86,7 @@ fn set_cube_opaque_notification() {
     assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(
         sink.drain(),
-        vec![SpaceChange::Lighting(GridPoint::new(0, 0, 0))]
+        vec![SpaceChange::Lighting(Cube::new(0, 0, 0))]
     );
 }
 
@@ -216,7 +216,7 @@ fn disabled_lighting_returns_one_always() {
 #[test]
 fn disabled_lighting_does_not_update() {
     let mut space = space_with_disabled_light();
-    space.light_needs_update(GridPoint::new(0, 0, 0), Priority::UNINIT);
+    space.light_needs_update(Cube::new(0, 0, 0), Priority::UNINIT);
     assert_eq!(
         space
             .step(None, Tick::arbitrary(), practically_infinite_deadline())

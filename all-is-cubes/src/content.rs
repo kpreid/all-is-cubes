@@ -186,10 +186,10 @@ pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
             palette::UNIFORM_LUMINANCE_BLUE,
         ][axis];
         let direction = face.normal_vector::<GridCoordinate>()[axis];
-        let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
+        let raycaster = Raycaster::new([0.5, 0.5, 0.5], face.normal_vector::<FreeCoordinate>())
             .within(space.bounds());
         for step in raycaster {
-            let i = step.cube_ahead()[axis] * direction; // always positive
+            let i = step.cube_ahead().lower_bounds()[axis] * direction; // always positive
             let (color, display_name): (Rgb, Cow<'static, str>) = if i.rem_euclid(2) == 0 {
                 (axis_color, i.rem_euclid(10).to_string().into())
             } else {

@@ -525,7 +525,7 @@ pub enum PaletteError {
     )]
     Index {
         index: BlockIndex,
-        cube: math::GridPoint,
+        cube: math::Cube,
         palette_len: usize,
     },
 

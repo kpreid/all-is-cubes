@@ -28,13 +28,13 @@ use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
 use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking::{self, InGenError};
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
-use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid, Rgba};
+use all_is_cubes::math::{Cube, Face6, GridAab, GridCoordinate, GridVector, Gridgid, Rgba};
 use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{URef, Universe};
 
-use crate::vui::{self, Layoutable as _, UiBlocks};
+use crate::vui::{self, UiBlocks};
 
 type Action = EphemeralOpaque<dyn Fn() + Send + Sync>;
 
@@ -77,10 +77,7 @@ impl vui::Layoutable for ActionButton {
 impl vui::Widget for ActionButton {
     fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         Box::new(ActionButtonController {
-            position: position
-                .shrink_to(self.requirements().minimum, false)
-                .bounds
-                .lower_bounds(),
+            position: position.shrink_to_cube().unwrap(),
             definition: self,
         })
     }
@@ -112,7 +109,7 @@ impl fmt::Display for ButtonVisualState {
 #[derive(Debug)]
 struct ActionButtonController {
     definition: Arc<ActionButton>,
-    position: GridPoint,
+    position: Cube,
 }
 
 impl vui::WidgetController for ActionButtonController {
@@ -186,10 +183,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton
     fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         Box::new(ToggleButtonController {
             todo: DirtyFlag::listening(true, &self.data_source),
-            position: position
-                .shrink_to(self.requirements().minimum, false)
-                .bounds
-                .lower_bounds(),
+            position: position.shrink_to_cube().unwrap(),
             definition: self,
             recently_pressed: Arc::new(AtomicU8::new(0)),
         })
@@ -238,7 +232,7 @@ impl ToggleButtonVisualState {
 #[derive(Debug)]
 struct ToggleButtonController<D: Clone + Send + Sync> {
     definition: Arc<ToggleButton<D>>,
-    position: GridPoint,
+    position: Cube,
     todo: DirtyFlag,
     recently_pressed: Arc<AtomicU8>,
 }
@@ -269,7 +263,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
 {
     fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
-            SpaceBehaviorAttachment::new(GridAab::single_cube(self.position)),
+            SpaceBehaviorAttachment::new(self.position.grid_aab()),
             Arc::new(space::ActivatableRegion {
                 effect: {
                     let action = self.definition.action.clone();

@@ -83,10 +83,10 @@ pub(crate) async fn demo_city(
 
     // Prepare brushes.
     let lamp_brush = VoxelBrush::new([
-        ((0, 0, 0), &demo_blocks[LamppostBase]),
-        ((0, 1, 0), &demo_blocks[LamppostSegment]),
-        ((0, 2, 0), &demo_blocks[LamppostTop]),
-        ((0, 3, 0), &demo_blocks[Lamp]),
+        ([0, 0, 0], &demo_blocks[LamppostBase]),
+        ([0, 1, 0], &demo_blocks[LamppostSegment]),
+        ([0, 2, 0], &demo_blocks[LamppostTop]),
+        ([0, 3, 0], &demo_blocks[Lamp]),
     ]);
 
     // Construct space.
@@ -164,7 +164,7 @@ pub(crate) async fn demo_city(
         let other_side_of_road =
             GridRotation::from_basis([Face6::NX, Face6::PY, Face6::NZ]) * road_aligned_rotation;
         let rotations = [other_side_of_road, road_aligned_rotation];
-        let raycaster = Raycaster::new((0.5, 0.5, 0.5), face.normal_vector::<FreeCoordinate>())
+        let raycaster = Raycaster::new([0.5, 0.5, 0.5], face.normal_vector::<FreeCoordinate>())
             .within(space.bounds());
         let curb_y = GridVector::unit_y();
         for (i, step) in raycaster.enumerate() {

@@ -8,8 +8,7 @@
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
 use crate::math::{
-    point_to_enclosing_cube, CubeFace, Face7, FreeCoordinate, Geometry, GridAab, GridCoordinate,
-    GridPoint, LineVertex,
+    Cube, CubeFace, Face7, FreeCoordinate, Geometry, GridAab, GridCoordinate, GridPoint, LineVertex,
 };
 
 /// A ray; a half-infinite line segment (sometimes used as finite by the length of the
@@ -145,6 +144,7 @@ pub struct Raycaster {
     emit_current: bool,
 
     /// Cube we're in; always the next cube to return from the iterator.
+    /// This is stored as a `GridPoint` for easier arithmetic on it.
     cube: GridPoint,
 
     /// Which way to increment `cube` when stepping; signum of `direction`.
@@ -184,17 +184,17 @@ impl Raycaster {
     /// to restrict it.
     ///
     /// ```
-    /// use all_is_cubes::math::GridPoint;
+    /// use all_is_cubes::math::Cube;
     /// use all_is_cubes::raycast::Raycaster;
     ///
     /// let mut r = Raycaster::new((0.5, 0.5, 0.5), (1.0, 0.5, 0.0));
     /// let mut next = || r.next().unwrap();
     ///
     /// // The cube containing the origin point is always the first cube reported.
-    /// assert_eq!(next().cube_ahead(), GridPoint::new(0, 0, 0));
-    /// assert_eq!(next().cube_ahead(), GridPoint::new(1, 0, 0));
-    /// assert_eq!(next().cube_ahead(), GridPoint::new(1, 1, 0));
-    /// assert_eq!(next().cube_ahead(), GridPoint::new(2, 1, 0));
+    /// assert_eq!(next().cube_ahead(), Cube::new(0, 0, 0));
+    /// assert_eq!(next().cube_ahead(), Cube::new(1, 0, 0));
+    /// assert_eq!(next().cube_ahead(), Cube::new(1, 1, 0));
+    /// assert_eq!(next().cube_ahead(), Cube::new(2, 1, 0));
     /// ```
     #[must_use]
     pub fn new(
@@ -222,8 +222,8 @@ impl Raycaster {
         // If there is no enclosing cube then the current cube is undefined so we cannot make
         // meaningful progress. (In the event of within(), we could in theory have a
         // suitably bounded interpretation, but that is not of practical interest.)
-        let cube = match point_to_enclosing_cube(origin) {
-            Some(cube) => cube,
+        let cube = match Cube::containing(origin) {
+            Some(cube) => cube.lower_bounds(),
             None => {
                 // Return a raycaster which emits no cubes.
                 return Self {
@@ -474,7 +474,7 @@ impl Iterator for Raycaster {
 
             return Some(RaycastStep {
                 cube_face: CubeFace {
-                    cube: self.cube,
+                    cube: Cube::from(self.cube),
                     face: self.last_face,
                 },
                 t_distance: self.last_t_distance,
@@ -509,7 +509,7 @@ impl RaycastStep {
     /// Note that the cube containing the origin of the ray, if any, will be included. In
     /// that case and only that case, `self.cube_ahead() == self.cube_behind()`.
     #[inline]
-    pub fn cube_ahead(&self) -> GridPoint {
+    pub fn cube_ahead(&self) -> Cube {
         self.cube_face.cube
     }
 
@@ -548,19 +548,19 @@ impl RaycastStep {
     /// `self.cube_ahead() == self.cube_behind()`.
     ///
     /// ```
-    /// use all_is_cubes::math::GridPoint;
+    /// use all_is_cubes::math::Cube;
     /// use all_is_cubes::raycast::Raycaster;
     ///
-    /// let mut r = Raycaster::new((0.5, 0.5, 0.5), (1.0, 0.0, 0.0));
+    /// let mut r = Raycaster::new([0.5, 0.5, 0.5], [1.0, 0.0, 0.0]);
     /// let mut next = || r.next().unwrap();
     ///
-    /// assert_eq!(next().cube_behind(), GridPoint::new(0, 0, 0));  // started here
-    /// assert_eq!(next().cube_behind(), GridPoint::new(0, 0, 0));  // moved to (1, 0, 0)
-    /// assert_eq!(next().cube_behind(), GridPoint::new(1, 0, 0));  // which is now behind...
-    /// assert_eq!(next().cube_behind(), GridPoint::new(2, 0, 0));
+    /// assert_eq!(next().cube_behind(), Cube::new(0, 0, 0));  // started here
+    /// assert_eq!(next().cube_behind(), Cube::new(0, 0, 0));  // moved to (1, 0, 0)
+    /// assert_eq!(next().cube_behind(), Cube::new(1, 0, 0));  // which is now behind...
+    /// assert_eq!(next().cube_behind(), Cube::new(2, 0, 0));
     /// ```
     #[inline]
-    pub fn cube_behind(&self) -> GridPoint {
+    pub fn cube_behind(&self) -> Cube {
         self.cube_face.adjacent()
     }
 
@@ -600,7 +600,8 @@ impl RaycastStep {
         if current_face_axis.is_none() {
             ray.origin
         } else {
-            let mut intersection_point = self.cube_face.cube.map(FreeCoordinate::from);
+            let mut intersection_point =
+                self.cube_face.cube.lower_bounds().map(FreeCoordinate::from);
             for axis in 0..3 {
                 let step_direction = signum_101(ray.direction[axis]);
                 if Some(axis) == current_face_axis {
@@ -692,7 +693,7 @@ mod tests {
     /// can be written, and contains 'final' values rather than ones used for calculation.
     #[derive(Clone, Copy, Debug, PartialEq)]
     struct TestStep {
-        cube: GridPoint,
+        cube: Cube,
         face: Face7,
         t_distance: Option<FreeCoordinate>,
         intersection_point: Option<Point3<FreeCoordinate>>,
@@ -762,7 +763,7 @@ mod tests {
         t_distance: FreeCoordinate,
     ) -> TestStep {
         TestStep {
-            cube: Point3::new(x, y, z),
+            cube: Cube::new(x, y, z),
             face,
             t_distance: Some(t_distance),
             intersection_point: None,
@@ -1124,7 +1125,7 @@ mod tests {
 
     #[test]
     fn intersection_point_positive_face() {
-        let ray = Ray::new((0.5, 0.5, 0.5), (-1.0, 0.0, 0.0));
+        let ray = Ray::new([0.5, 0.5, 0.5], [-1.0, 0.0, 0.0]);
         let mut raycaster = ray.cast();
         let mut next = || raycaster.next().unwrap().intersection_point(ray);
 

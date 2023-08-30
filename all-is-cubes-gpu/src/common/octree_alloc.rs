@@ -1,5 +1,5 @@
 use all_is_cubes::cgmath::EuclideanSpace;
-use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector};
 
 /// An octree that knows how to allocate box regions of itself. It stores no other data.
 #[derive(Clone, Debug)]
@@ -244,7 +244,7 @@ impl AlloctreeNode {
                     .filter_map(|(child, child_position)| {
                         child.allocate(
                             size_exponent - 1,
-                            low_corner + child_position.to_vec() * child_size,
+                            low_corner + child_position.lower_bounds().to_vec() * child_size,
                             request,
                         )
                     })
@@ -267,7 +267,7 @@ impl AlloctreeNode {
                 let child_size = expsize(size_exponent - 1);
                 let which_child = relative_low_corner.map(|c| c.div_euclid(child_size));
                 let child_index = GridAab::from_lower_size([0, 0, 0], [2, 2, 2])
-                    .index(which_child)
+                    .index(Cube::from(which_child))
                     .expect("Alloctree::free: out of bounds");
                 children[child_index].free(
                     size_exponent - 1,

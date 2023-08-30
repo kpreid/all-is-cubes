@@ -11,7 +11,7 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::listen::{Listen as _, Sink};
-use crate::math::{GridCoordinate, GridPoint, Rgba};
+use crate::math::{Cube, GridCoordinate, GridPoint, Rgba};
 use crate::space::{
     GridAab, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpacePhysics,
 };
@@ -84,17 +84,16 @@ fn set_success_despite_eval_error_gone() {
 #[test]
 fn set_failure_out_of_bounds() {
     let [block] = make_some_blocks();
-    let pt = GridPoint::new(1, 0, 0);
-    let ptg = GridAab::single_cube(pt);
+    let cube = Cube::new(1, 0, 0);
     let space_bounds = GridAab::from_lower_size([0, 0, 0], [1, 1, 1]);
     let mut space = Space::empty(space_bounds);
 
     let error = Err(SetCubeError::OutOfBounds {
-        modification: ptg,
+        modification: cube.grid_aab(),
         space_bounds,
     });
-    assert_eq!(space.set(pt, &block), error);
-    assert_eq!(space.set(pt, &AIR), error);
+    assert_eq!(space.set(cube, &block), error);
+    assert_eq!(space.set(cube, &AIR), error);
 
     space.consistency_check(); // bonus testing
 }
@@ -118,7 +117,7 @@ fn set_failure_too_many() {
 fn set_error_format() {
     assert_eq!(
         SetCubeError::OutOfBounds {
-            modification: GridAab::single_cube(GridPoint::new(1, 2, 3)),
+            modification: Cube::new(1, 2, 3).grid_aab(),
             space_bounds: GridAab::from_lower_size([0, 0, 0], [2, 2, 2])
         }
         .to_string(),
@@ -136,12 +135,12 @@ fn set_error_format() {
 fn set_updates_evaluated_on_added_block() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
-    space.set((0, 0, 0), &block).unwrap();
+    space.set([0, 0, 0], &block).unwrap();
     // Confirm the expected indices
-    assert_eq!(Some(1), space.get_block_index((0, 0, 0)));
-    assert_eq!(Some(0), space.get_block_index((1, 0, 0)));
+    assert_eq!(Some(1), space.get_block_index([0, 0, 0]));
+    assert_eq!(Some(0), space.get_block_index([1, 0, 0]));
     // Confirm the data is correct
-    assert_eq!(space.get_evaluated((0, 0, 0)), &block.evaluate().unwrap());
+    assert_eq!(space.get_evaluated([0, 0, 0]), &block.evaluate().unwrap());
     space.consistency_check(); // bonus testing
 }
 
@@ -150,11 +149,11 @@ fn set_updates_evaluated_on_added_block() {
 fn set_updates_evaluated_on_replaced_block() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(1, 1, 1);
-    space.set((0, 0, 0), &block).unwrap();
+    space.set([0, 0, 0], &block).unwrap();
     // Confirm the expected indices
-    assert_eq!(Some(0), space.get_block_index((0, 0, 0)));
+    assert_eq!(Some(0), space.get_block_index([0, 0, 0]));
     // Confirm the data is correct
-    assert_eq!(space.get_evaluated((0, 0, 0)), &block.evaluate().unwrap());
+    assert_eq!(space.get_evaluated([0, 0, 0]), &block.evaluate().unwrap());
     space.consistency_check(); // bonus testing
 }
 
@@ -227,18 +226,18 @@ fn change_listener() {
     let sink = Sink::new();
     space.listen(sink.listener());
 
-    assert_eq!(Ok(true), space.set((0, 0, 0), &block));
+    assert_eq!(Ok(true), space.set([0, 0, 0], &block));
     assert_eq!(
         sink.drain(),
         vec![
             SpaceChange::Number(1),
-            SpaceChange::Lighting(GridPoint::new(0, 0, 0)),
-            SpaceChange::Block(GridPoint::new(0, 0, 0)),
+            SpaceChange::Lighting(Cube::new(0, 0, 0)),
+            SpaceChange::Block(Cube::new(0, 0, 0)),
         ],
     );
 
     // No change, no notification
-    assert_eq!(Ok(false), space.set((0, 0, 0), &block));
+    assert_eq!(Ok(false), space.set([0, 0, 0], &block));
     assert_eq!(sink.drain(), vec![]);
 }
 
@@ -246,8 +245,8 @@ fn change_listener() {
 fn extract() {
     let [block_0, block_1] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
-    space.set((0, 0, 0), &block_0).unwrap();
-    space.set((1, 0, 0), &block_1).unwrap();
+    space.set([0, 0, 0], &block_0).unwrap();
+    space.set([1, 0, 0], &block_1).unwrap();
 
     let extract_bounds = GridAab::from_lower_size([1, 0, 0], [1, 1, 1]);
     let extracted = space.extract(extract_bounds, |e| {
@@ -258,7 +257,7 @@ fn extract() {
     });
 
     assert_eq!(extracted.bounds(), extract_bounds);
-    assert_eq!(&extracted[(1, 0, 0)], &block_1);
+    assert_eq!(&extracted[[1, 0, 0]], &block_1);
 }
 
 #[test]
@@ -287,7 +286,7 @@ fn fill_out_of_bounds() {
 #[test]
 fn fill_entire_space() {
     let [block] = make_some_blocks();
-    let bounds = GridAab::from_lower_size((0, 3, 0), (25 * 16, 16, 2));
+    let bounds = GridAab::from_lower_size([0, 3, 0], [25 * 16, 16, 2]);
     let mut space = Space::empty(bounds);
     space.fill(bounds, |_| Some(&block)).unwrap();
     space.consistency_check();
@@ -338,7 +337,7 @@ fn listens_to_block_changes() {
 
     // Set up space and listener
     let mut space = Space::empty_positive(1, 1, 1);
-    space.set((0, 0, 0), indirect).unwrap();
+    space.set([0, 0, 0], indirect).unwrap();
     let sink = Sink::new();
     space.listen(sink.listener());
     assert_eq!(sink.drain(), vec![]);
@@ -359,7 +358,7 @@ fn listens_to_block_changes() {
     let (_, _) = space.step(None, Tick::arbitrary(), practically_infinite_deadline());
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(sink.drain(), vec![SpaceChange::BlockValue(0)]);
-    assert_eq!(space.get_evaluated((0, 0, 0)), &new_evaluated);
+    assert_eq!(space.get_evaluated([0, 0, 0]), &new_evaluated);
 }
 
 #[test]
@@ -376,7 +375,7 @@ fn indirect_becomes_evaluation_error() {
 
     // Set up space and listener
     let mut space = Space::empty_positive(1, 1, 1);
-    space.set((0, 0, 0), &block).unwrap();
+    space.set([0, 0, 0], &block).unwrap();
     let sink = Sink::new();
     space.listen(sink.listener());
 
@@ -391,7 +390,7 @@ fn indirect_becomes_evaluation_error() {
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(sink.drain(), vec![SpaceChange::BlockValue(0)]);
     assert_eq!(
-        space.get_evaluated((0, 0, 0)),
+        space.get_evaluated([0, 0, 0]),
         &block.evaluate().unwrap_err().to_placeholder()
     );
 }

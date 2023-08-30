@@ -17,8 +17,8 @@ use crate::drawing::DrawingPlane;
 use crate::inv::EphemeralOpaque;
 use crate::listen::{Listen, Listener, Notifier};
 use crate::math::{
-    point_checked_add, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint,
-    GridRotation, Gridgid, NotNan, Rgb,
+    Cube, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridRotation, Gridgid, NotNan,
+    Rgb,
 };
 use crate::time::Tick;
 use crate::transaction::{Merge, Transaction as _};
@@ -71,7 +71,7 @@ pub struct Space {
     /// Debug log of the updated cubes from last frame.
     /// Empty unless this debug function is enabled.
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu
-    pub last_light_updates: Vec<GridPoint>,
+    pub last_light_updates: Vec<Cube>,
     /// Estimated ratio of (wall-time seconds / light update cost units).
     light_cost_scale: f32,
 
@@ -88,7 +88,7 @@ pub struct Space {
     spawn: Spawn,
 
     /// Cubes that should be checked on the next call to step()
-    cubes_wanting_ticks: HashSet<GridPoint>,
+    cubes_wanting_ticks: HashSet<Cube>,
 
     notifier: Notifier<SpaceChange>,
 }
@@ -227,7 +227,7 @@ impl Space {
     /// These IDs may be used to perform efficient processing of many blocks, but they
     /// may be renumbered after any mutation.
     #[inline(always)]
-    pub fn get_block_index(&self, position: impl Into<GridPoint>) -> Option<BlockIndex> {
+    pub fn get_block_index(&self, position: impl Into<Cube>) -> Option<BlockIndex> {
         self.bounds
             .index(position.into())
             .map(|contents_index| self.contents[contents_index])
@@ -259,7 +259,7 @@ impl Space {
 
     /// Gets the [`EvaluatedBlock`] of the block in this space at the given position.
     #[inline(always)]
-    pub fn get_evaluated(&self, position: impl Into<GridPoint>) -> &EvaluatedBlock {
+    pub fn get_evaluated(&self, position: impl Into<Cube>) -> &EvaluatedBlock {
         if let Some(index) = self.bounds.index(position.into()) {
             self.palette.entry(self.contents[index]).evaluated()
         } else {
@@ -278,7 +278,7 @@ impl Space {
     /// the meaning of this value are actually “will eventually be, if no more changes are
     /// made”.
     #[inline(always)]
-    pub fn get_lighting(&self, position: impl Into<GridPoint>) -> PackedLight {
+    pub fn get_lighting(&self, position: impl Into<Cube>) -> PackedLight {
         match self.physics.light {
             LightPhysics::None => PackedLight::ONE,
             _ => self
@@ -305,12 +305,12 @@ impl Space {
     /// use all_is_cubes::space::Space;
     /// let mut space = Space::empty_positive(1, 1, 1);
     /// let a_block = Block::builder().color(Rgba::new(1.0, 0.0, 0.0, 1.0)).build();
-    /// space.set((0, 0, 0), &a_block);
-    /// assert_eq!(space[(0, 0, 0)], a_block);
+    /// space.set([0, 0, 0], &a_block);
+    /// assert_eq!(space[[0, 0, 0]], a_block);
     /// ```
     pub fn set<'a>(
         &mut self,
-        position: impl Into<GridPoint>,
+        position: impl Into<Cube>,
         block: impl Into<Cow<'a, Block>>,
     ) -> Result<bool, SetCubeError> {
         // Delegate to a monomorphic function.
@@ -318,7 +318,7 @@ impl Space {
         self.set_impl(position.into(), &block.into())
     }
 
-    fn set_impl(&mut self, position: GridPoint, block: &Block) -> Result<bool, SetCubeError> {
+    fn set_impl(&mut self, position: Cube, block: &Block) -> Result<bool, SetCubeError> {
         if let Some(contents_index) = self.bounds.index(position) {
             let old_block_index = self.contents[contents_index];
             let old_block = self.palette.entry(old_block_index).block();
@@ -370,7 +370,7 @@ impl Space {
     fn side_effects_of_set(
         &mut self,
         block_index: BlockIndex,
-        position: GridPoint,
+        position: Cube,
         contents_index: usize,
     ) {
         let evaluated = &self.palette.entry(block_index).evaluated;
@@ -400,7 +400,7 @@ impl Space {
                 self.light_needs_update(position, light::Priority::NEWLY_VISIBLE);
             }
             for face in Face6::ALL {
-                if let Some(neighbor) = point_checked_add(position, face.normal_vector()) {
+                if let Some(neighbor) = position.checked_add(face.normal_vector()) {
                     // Perform neighbor light updates if they can be affected by us
                     if !self.get_evaluated(neighbor).opaque[face.opposite()] {
                         self.light_needs_update(neighbor, light::Priority::NEWLY_VISIBLE);
@@ -432,9 +432,9 @@ impl Space {
     ///
     /// space.fill(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]), |_point| Some(&a_block)).unwrap();
     ///
-    /// assert_eq!(space[(0, 0, 0)], a_block);
-    /// assert_eq!(space[(1, 0, 0)], a_block);
-    /// assert_eq!(space[(0, 1, 0)], AIR);
+    /// assert_eq!(space[[0, 0, 0]], a_block);
+    /// assert_eq!(space[[1, 0, 0]], a_block);
+    /// assert_eq!(space[[0, 1, 0]], AIR);
     /// ```
     ///
     /// TODO: Support providing the previous block as a parameter (take cues from `extract`).
@@ -442,7 +442,7 @@ impl Space {
     /// See also [`Space::fill_uniform`] for filling a region with one block.
     pub fn fill<F, B>(&mut self, region: GridAab, mut function: F) -> Result<(), SetCubeError>
     where
-        F: FnMut(GridPoint) -> Option<B>,
+        F: FnMut(Cube) -> Option<B>,
         B: std::borrow::Borrow<Block>,
     {
         if !self.bounds.contains_box(region) {
@@ -475,9 +475,9 @@ impl Space {
     ///
     /// space.fill_uniform(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]), &a_block).unwrap();
     ///
-    /// assert_eq!(&space[(0, 0, 0)], &a_block);
-    /// assert_eq!(&space[(1, 0, 0)], &a_block);
-    /// assert_eq!(&space[(0, 1, 0)], &AIR);
+    /// assert_eq!(&space[[0, 0, 0]], &a_block);
+    /// assert_eq!(&space[[1, 0, 0]], &a_block);
+    /// assert_eq!(&space[[0, 1, 0]], &AIR);
     /// ```
     ///
     /// See also [`Space::fill`] for non-uniform fill and bulk copies.
@@ -712,7 +712,7 @@ impl Space {
     }
 }
 
-impl<T: Into<GridPoint>> std::ops::Index<T> for Space {
+impl<T: Into<Cube>> std::ops::Index<T> for Space {
     type Output = Block;
 
     /// Gets a reference to the block in this space at the given position.
@@ -946,9 +946,9 @@ pub enum SetCubeError {
 pub enum SpaceChange {
     // TODO: This set of names is not very clear and self-consistent.
     /// The block at the given location was replaced.
-    Block(GridPoint),
+    Block(Cube),
     /// The light level value at the given location changed.
-    Lighting(GridPoint),
+    Lighting(Cube),
     /// The given block index number was reassigned and now refers to a different
     /// [`Block`] value.
     Number(BlockIndex),
@@ -1082,14 +1082,14 @@ impl VisitRefs for ActivatableRegion {
 #[derive(Clone, Debug)]
 pub struct Extract<'s> {
     space: &'s Space,
-    cube: GridPoint,
+    cube: Cube,
     cube_index: usize,
     block_index: std::cell::OnceCell<BlockIndex>,
 }
 
 impl<'s> Extract<'s> {
     /// Returns the cube being processed.
-    pub(crate) fn cube(&self) -> GridPoint {
+    pub(crate) fn cube(&self) -> Cube {
         self.cube
     }
 

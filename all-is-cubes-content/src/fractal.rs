@@ -4,7 +4,7 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector};
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
@@ -58,16 +58,19 @@ fn visit_menger_sponge_points<E, F>(
     function: &mut F,
 ) -> Result<(), E>
 where
-    F: FnMut(GridPoint) -> Result<(), E>,
+    F: FnMut(Cube) -> Result<(), E>,
 {
     if level == 0 {
-        function(lower_corner)?;
+        function(Cube::from(lower_corner))?;
     } else {
         let size_of_next_level: GridCoordinate = 3_i32.pow((level - 1).into());
         for which_section in pow3aab(1).interior_iter() {
-            let Point3 { x, y, z } = which_section.map(|c| u8::from(c.rem_euclid(2) == 1));
+            let Point3 { x, y, z } = which_section
+                .lower_bounds()
+                .map(|c| u8::from(c.rem_euclid(2) == 1));
             if x + y + z <= 1 {
-                let section_corner = lower_corner + which_section.to_vec() * size_of_next_level;
+                let section_corner =
+                    lower_corner + which_section.lower_bounds().to_vec() * size_of_next_level;
                 visit_menger_sponge_points(level - 1, section_corner, function)?;
             }
         }

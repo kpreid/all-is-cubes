@@ -11,7 +11,7 @@ use once_cell::sync::Lazy;
 use super::debug::LightComputeOutput;
 use super::LightUpdateRequest;
 use crate::block::EvaluatedBlock;
-use crate::math::{Face6, FaceMap, FreeCoordinate, Geometry, GridPoint, NotNan, Rgb};
+use crate::math::{Cube, Face6, FaceMap, FreeCoordinate, Geometry, NotNan, Rgb};
 use crate::raycast::{Ray, RaycastStep};
 use crate::space::light::{LightUpdateRayInfo, Priority};
 use crate::space::{GridAab, LightPhysics, PackedLight, PackedLightScalar, Space, SpaceChange};
@@ -68,7 +68,7 @@ static LIGHT_RAYS: Lazy<[LightRayData; ALL_RAYS_COUNT]> = Lazy::new(|| {
 
 /// Methods on Space that specifically implement the lighting algorithm.
 impl Space {
-    pub(crate) fn light_needs_update(&mut self, cube: GridPoint, priority: Priority) {
+    pub(crate) fn light_needs_update(&mut self, cube: Cube, priority: Priority) {
         if self.physics.light == LightPhysics::None {
             return;
         }
@@ -79,7 +79,7 @@ impl Space {
         }
     }
 
-    pub(crate) fn in_light_update_queue(&self, cube: GridPoint) -> bool {
+    pub(crate) fn in_light_update_queue(&self, cube: Cube) -> bool {
         self.light_update_queue.contains(cube)
     }
 
@@ -133,7 +133,7 @@ impl Space {
     }
 
     #[inline]
-    fn update_lighting_now_on(&mut self, cube: GridPoint) -> (PackedLightScalar, usize) {
+    fn update_lighting_now_on(&mut self, cube: Cube) -> (PackedLightScalar, usize) {
         let (new_light_value, dependencies, mut cost, ()) = self.compute_lighting(cube);
         let old_light_value: PackedLight = self.get_lighting(cube);
         // Compare and set new value. Note that we MUST compare only the packed value so
@@ -168,7 +168,7 @@ impl Space {
     /// (imprecisely; empty cubes passed through are not listed).
     #[inline]
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu for debugging
-    pub fn compute_lighting<D>(&self, cube: GridPoint) -> (PackedLight, Vec<GridPoint>, usize, D)
+    pub fn compute_lighting<D>(&self, cube: Cube) -> (PackedLight, Vec<Cube>, usize, D)
     where
         D: LightComputeOutput,
     {
@@ -252,7 +252,7 @@ impl Space {
             for z in bounds.z_range() {
                 let mut covered = false;
                 for y in bounds.y_range().rev() {
-                    let cube = GridPoint::new(x, y, z);
+                    let cube = Cube::new(x, y, z);
                     let index = bounds.index(cube).unwrap();
 
                     let this_cube_evaluated = &self.palette.entry(self.contents[index]).evaluated;
@@ -337,7 +337,7 @@ struct LightBuffer {
     /// Number of rays, weighted by the ray angle versus local cube faces.
     total_ray_weight: f32,
     /// Cubes whose lighting value contributed to the incoming_light value.
-    dependencies: Vec<GridPoint>,
+    dependencies: Vec<Cube>,
     /// Approximation of CPU cost of doing the calculation, with one unit defined as
     /// one raycast step.
     cost: usize,
@@ -353,7 +353,7 @@ struct LightRayState {
     /// If zero, this will not be counted as a ray at all.
     ray_weight_by_faces: f32,
     /// The cube we're lighting; remembered to check for loopbacks
-    origin_cube: GridPoint,
+    origin_cube: Cube,
     /// The ray we're casting; remembered for debugging only. (TODO: avoid this?)
     translated_ray: Ray,
 }
@@ -363,9 +363,13 @@ impl LightRayState {
     /// * `abstract_ray`: ray as if we were lighting the [0, 0, 0] cube
     /// * `ray_weight_by_faces`: how much influence this ray should have on the
     ///   total illumination
-    fn new(origin_cube: GridPoint, abstract_ray: Ray, ray_weight_by_faces: f32) -> Self {
-        let translated_ray =
-            abstract_ray.translate(origin_cube.cast::<FreeCoordinate>().unwrap().to_vec());
+    fn new(origin_cube: Cube, abstract_ray: Ray, ray_weight_by_faces: f32) -> Self {
+        let translated_ray = abstract_ray.translate(
+            origin_cube
+                .lower_bounds()
+                .map(FreeCoordinate::from)
+                .to_vec(),
+        );
         LightRayState {
             alpha: 1.0,
             ray_weight_by_faces,

@@ -10,8 +10,8 @@ use cgmath::{
 pub use ordered_float::{FloatIsNan, NotNan};
 
 use crate::math::{
-    Face6, Face7, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid,
-    Point3,
+    Cube, Face6, Face7, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector,
+    Gridgid, Point3,
 };
 
 /// A 4×3 affine transformation matrix in [`GridCoordinate`]s, rather than floats as
@@ -150,25 +150,27 @@ impl GridMatrix {
     /// that cube.
     ///
     /// ```
-    /// use all_is_cubes::math::{Face7::*, GridMatrix, GridPoint};
+    /// use all_is_cubes::math::{Cube, Face7::*, GridMatrix, GridPoint};
     /// use cgmath::Transform; // for transform_point
     ///
     /// // Translation without rotation has the usual definition.
     /// let matrix = GridMatrix::from_translation([10, 0, 0]);
-    /// assert_eq!(matrix.transform_cube(GridPoint::new(1, 1, 1)), GridPoint::new(11, 1, 1));
+    /// assert_eq!(matrix.transform_cube(Cube::new(1, 1, 1)), Cube::new(11, 1, 1));
     ///
     /// // With a rotation or reflection, the results are different.
     /// // TODO: Come up with a better example and explanation.
     /// let reflected = GridMatrix::from_origin([10, 0, 0], NX, PY, PZ);
     /// assert_eq!(reflected.transform_point(GridPoint::new(1, 5, 5)), GridPoint::new(9, 5, 5));
-    /// assert_eq!(reflected.transform_cube(GridPoint::new(1, 5, 5)), GridPoint::new(8, 5, 5));
+    /// assert_eq!(reflected.transform_cube(Cube::new(1, 5, 5)), Cube::new(8, 5, 5));
     /// ```
     ///
     /// [`GridAab::single_cube`]: crate::math::GridAab::single_cube
     #[inline]
-    pub fn transform_cube(&self, cube: GridPoint) -> GridPoint {
-        self.transform_point(cube + Vector3::new(1, 1, 1))
-            .zip(self.transform_point(cube), |a, b| a.min(b))
+    pub fn transform_cube(&self, cube: Cube) -> Cube {
+        Cube::from(
+            self.transform_point(cube.lower_bounds())
+                .zip(self.transform_point(cube.upper_bounds()), |a, b| a.min(b)),
+        )
     }
 
     /// Decomposes a matrix into its rotation and translation components, stored in a

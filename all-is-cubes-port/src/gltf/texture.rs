@@ -250,6 +250,8 @@ pub(super) fn insert_block_texture_atlas(
 }
 
 mod internal {
+    use all_is_cubes::math::Cube;
+
     use super::*;
     use std::collections::BTreeMap;
     use std::mem;
@@ -351,11 +353,12 @@ mod internal {
                         // Zero-offset position in the rotated-to-flat slice.
                         let pixel_position = Point3::new(x, y, 0).cast::<i32>().unwrap();
                         // Position in the rotated-to-flat slice's coordinates.
-                        let position_in_rotated_slice =
-                            pixel_position + rotated_slice_bounds.lower_bounds().to_vec();
+                        let position_in_rotated_slice = Cube::from(
+                            pixel_position + rotated_slice_bounds.lower_bounds().to_vec(),
+                        );
                         // TODO: this single cube is a kludge to simplify off-by-1 problems with rotation
                         // We should have transform helpers instead of computing twice as many coordinates.
-                        let cube_in_rotated_slice = GridAab::single_cube(position_in_rotated_slice);
+                        let cube_in_rotated_slice = position_in_rotated_slice.grid_aab();
 
                         // Position in the original requested slice's coordinates.
                         let unrotated = cube_in_rotated_slice.transform(unrotate.into()).unwrap();

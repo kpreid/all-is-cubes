@@ -6,7 +6,7 @@ use ordered_float::OrderedFloat;
 
 use all_is_cubes::camera::Flaws;
 use all_is_cubes::cgmath::{EuclideanSpace as _, MetricSpace as _, Point3, Vector3, Zero as _};
-use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridPoint, GridRotation};
+use all_is_cubes::math::{Cube, Face6, GridAab, GridCoordinate, GridRotation};
 use all_is_cubes::space::{BlockIndex, Space};
 
 use crate::texture;
@@ -435,7 +435,7 @@ impl<V, T> std::ops::Deref for SpaceMesh<V, T> {
 ///   make no difference.
 fn write_block_mesh_to_space_mesh<V: GfxVertex, T: texture::Tile>(
     block_mesh: &BlockMesh<V, T>,
-    cube: GridPoint,
+    cube: Cube,
     vertices: &mut Vec<V>,
     opaque_indices: &mut IndexVec,
     transparent_indices: &mut IndexVec,
@@ -538,7 +538,7 @@ impl<V: GfxVertex, T: texture::Tile> From<&BlockMesh<V, T>> for SpaceMesh<V, T> 
         );
         write_block_mesh_to_space_mesh(
             block_mesh,
-            GridPoint::origin(),
+            Cube::ORIGIN,
             &mut space_mesh.vertices,
             &mut space_mesh.indices,
             &mut transparent_indices,
@@ -821,7 +821,7 @@ mod tests {
     use crate::texture::{TestPoint, TestTile};
     use crate::{tests::mesh_blocks_and_space, BlockVertex};
     use all_is_cubes::block::Block;
-    use all_is_cubes::math::{GridPoint, Rgba};
+    use all_is_cubes::math::Rgba;
     use std::mem;
 
     type TestMesh = SpaceMesh<BlockVertex<TestPoint>, TestTile>;
@@ -839,7 +839,7 @@ mod tests {
 
     #[test]
     fn nonempty_properties() {
-        let space = Space::builder(GridAab::single_cube(GridPoint::origin()))
+        let space = Space::builder(GridAab::ORIGIN_CUBE)
             .filled_with(Block::from(Rgba::WHITE))
             .build();
         let (_, _, mesh) = mesh_blocks_and_space(&space);

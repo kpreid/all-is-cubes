@@ -6,7 +6,7 @@
 
 use cgmath::Vector3;
 
-use crate::math::{Aab, FreeCoordinate, Geometry, GridPoint, LineVertex};
+use crate::math::{Cube, FreeCoordinate, Geometry, LineVertex};
 use crate::raycast::Ray;
 use crate::space::PackedLight;
 use crate::util::MapExtend;
@@ -15,21 +15,21 @@ use crate::util::MapExtend;
 /// of the lighting algorithm.
 pub trait LightComputeOutput {
     type RayInfoBuffer: Default;
-    fn new(cube: GridPoint, result: PackedLight, rays: Self::RayInfoBuffer) -> Self;
+    fn new(cube: Cube, result: PackedLight, rays: Self::RayInfoBuffer) -> Self;
     fn push_ray(buffer: &mut Self::RayInfoBuffer, ray_info: LightUpdateRayInfo);
 }
 
 impl LightComputeOutput for () {
     type RayInfoBuffer = ();
     #[inline(always)]
-    fn new(_: GridPoint, _: PackedLight, _: Self::RayInfoBuffer) {}
+    fn new(_: Cube, _: PackedLight, _: Self::RayInfoBuffer) {}
     #[inline(always)]
     fn push_ray(_: &mut Self::RayInfoBuffer, _: LightUpdateRayInfo) {}
 }
 
 impl LightComputeOutput for LightUpdateCubeInfo {
     type RayInfoBuffer = Vec<LightUpdateRayInfo>;
-    fn new(cube: GridPoint, result: PackedLight, rays: Self::RayInfoBuffer) -> Self {
+    fn new(cube: Cube, result: PackedLight, rays: Self::RayInfoBuffer) -> Self {
         Self { cube, result, rays }
     }
     fn push_ray(buffer: &mut Self::RayInfoBuffer, ray_info: LightUpdateRayInfo) {
@@ -42,7 +42,7 @@ impl LightComputeOutput for LightUpdateCubeInfo {
 #[non_exhaustive]
 #[allow(dead_code)] // fields used for Debug printing
 pub struct LightUpdateCubeInfo {
-    pub(crate) cube: GridPoint,
+    pub(crate) cube: Cube,
     pub(crate) result: PackedLight,
     pub(crate) rays: Vec<LightUpdateRayInfo>,
 }
@@ -59,9 +59,7 @@ impl Geometry for LightUpdateCubeInfo {
         E: Extend<LineVertex>,
     {
         // Draw output cube
-        Aab::from_cube(self.cube)
-            .expand(0.1)
-            .wireframe_points(output);
+        self.cube.aab().expand(0.1).wireframe_points(output);
         // Draw rays
         for ray_info in self.rays.iter() {
             ray_info.wireframe_points(output);
@@ -73,8 +71,8 @@ impl Geometry for LightUpdateCubeInfo {
 pub struct LightUpdateRayInfo {
     pub(crate) ray: Ray,
     #[allow(dead_code)] // field used for Debug printing but not visualized yet
-    pub(crate) trigger_cube: GridPoint,
-    pub(crate) value_cube: GridPoint,
+    pub(crate) trigger_cube: Cube,
+    pub(crate) value_cube: Cube,
     pub(crate) value: PackedLight,
 }
 
@@ -89,9 +87,7 @@ impl Geometry for LightUpdateRayInfo {
     where
         E: Extend<LineVertex>,
     {
-        Aab::from_cube(self.value_cube)
-            .expand(0.01)
-            .wireframe_points(output);
+        self.value_cube.aab().expand(0.01).wireframe_points(output);
         self.ray
             .wireframe_points(&mut MapExtend::new(output, |mut v: LineVertex| {
                 v.color = Some(self.value.value().with_alpha_one());

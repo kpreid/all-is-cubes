@@ -7,10 +7,9 @@ use indoc::indoc;
 use instant::{Duration, Instant};
 
 use all_is_cubes::camera::{Camera, Flaws};
-use all_is_cubes::cgmath::Point3;
 use all_is_cubes::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
 use all_is_cubes::listen::{Listen as _, Listener};
-use all_is_cubes::math::{FreeCoordinate, GridCoordinate, GridPoint, LineVertex};
+use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex};
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
 use all_is_cubes::universe::URef;
 use all_is_cubes::util::{CustomFormat, StatusText, TimeStats};
@@ -99,7 +98,7 @@ where
             block_meshes: dynamic::VersionedBlockMeshes::new(),
             chunks: FnvHashMap::default(),
             chunk_chart: ChunkChart::new(0.0),
-            view_chunk: ChunkPos(Point3::new(0, 0, 0)),
+            view_chunk: ChunkPos(Cube::new(0, 0, 0)),
             did_not_finish_chunks: true,
             startup_chunks_only: interactive,
             last_mesh_options: None,
@@ -579,7 +578,7 @@ impl<const CHUNK_SIZE: GridCoordinate> CsmTodo<CHUNK_SIZE> {
         }
     }
 
-    fn modify_block_and_adjacent<F>(&mut self, cube: GridPoint, mut f: F)
+    fn modify_block_and_adjacent<F>(&mut self, cube: Cube, mut f: F)
     where
         F: FnMut(&mut ChunkTodo),
     {
@@ -587,13 +586,12 @@ impl<const CHUNK_SIZE: GridCoordinate> CsmTodo<CHUNK_SIZE> {
         // blocks' faces. We don't need to bother with the current block since
         // the adjacent chunks will always include it (presuming that the chunk
         // size is greater than 1).
-        for axis in 0..3 {
-            for offset in &[-1, 1] {
-                let mut adjacent = cube;
-                adjacent[axis] += offset;
-                if let Some(chunk) = self.chunks.get_mut(&cube_to_chunk(adjacent)) {
-                    f(chunk);
-                }
+        for direction in Face6::ALL {
+            if let Some(chunk) = self
+                .chunks
+                .get_mut(&cube_to_chunk(cube + direction.normal_vector()))
+            {
+                f(chunk);
             }
         }
     }

@@ -46,11 +46,7 @@ impl vui::WidgetController for OneshotController {
 /// A block may act as a 1×1×1 non-interactive widget.
 impl vui::Widget for Block {
     fn controller(self: Arc<Self>, grant: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
-        let cube = grant
-            .shrink_to(GridVector::new(1, 1, 1), false)
-            .bounds
-            .lower_bounds();
-        OneshotController::new(if grant.bounds.contains_cube(cube) {
+        OneshotController::new(if let Some(cube) = grant.shrink_to_cube() {
             SpaceTransaction::set_cube(cube, None, Some(Block::clone(&self)))
         } else {
             SpaceTransaction::default()

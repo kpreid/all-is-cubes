@@ -228,7 +228,7 @@ impl From<crate::save::schema::LightSerV1> for PackedLight {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct LightUpdateRequest {
     pub(crate) priority: Priority,
-    pub(crate) cube: GridPoint,
+    pub(crate) cube: Cube,
 }
 impl LightUpdateRequest {
     /// A priority comparison for entries with equal specified priority:
@@ -236,8 +236,7 @@ impl LightUpdateRequest {
     /// assuming the viewpoint starts close to the origin it will see good nearby
     /// lighting sooner.)
     fn fallback_priority(&self) -> GridCoordinate {
-        let GridPoint { x, y, z } = self
-            .cube
+        let GridPoint { x, y, z } = GridPoint::from(self.cube)
             .map(|c| if c > 0 { -c } else { c } + GridCoordinate::MAX / 3);
         x.saturating_add(y).saturating_add(z)
     }
@@ -306,9 +305,9 @@ pub(crate) struct LightUpdateQueue {
     /// Sorted storage of queue elements.
     /// This is a BTreeSet rather than a BinaryHeap so that items can be removed.
     queue: BTreeSet<LightUpdateRequest>,
-    /// Maps GridPoint to priority value. This allows deduplicating entries, including
+    /// Maps Cube to priority value. This allows deduplicating entries, including
     /// removing low-priority entries in favor of high-priority ones
-    table: HashMap<GridPoint, Priority>,
+    table: HashMap<Cube, Priority>,
 }
 
 impl LightUpdateQueue {
@@ -320,7 +319,7 @@ impl LightUpdateQueue {
     }
 
     #[inline]
-    pub fn contains(&self, cube: GridPoint) -> bool {
+    pub fn contains(&self, cube: Cube) -> bool {
         self.table.contains_key(&cube)
     }
 
@@ -348,7 +347,7 @@ impl LightUpdateQueue {
     }
 
     /// Removes the specified queue entry and returns whether it was present.
-    pub fn remove(&mut self, cube: GridPoint) -> bool {
+    pub fn remove(&mut self, cube: Cube) -> bool {
         if let Some(priority) = self.table.remove(&cube) {
             let q_removed = self.queue.remove(&LightUpdateRequest { cube, priority });
             debug_assert!(q_removed);
@@ -505,7 +504,7 @@ mod tests {
         fn r(cube: [GridCoordinate; 3], priority: PackedLightScalar) -> LightUpdateRequest {
             let priority = Priority(priority);
             LightUpdateRequest {
-                cube: GridPoint::from(cube),
+                cube: Cube::from(cube),
                 priority,
             }
         }

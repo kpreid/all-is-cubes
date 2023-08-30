@@ -9,8 +9,7 @@ use crate::block::{
     Resolution::{self, R1},
 };
 use crate::content::palette;
-use crate::math::Face6;
-use crate::math::{FaceMap, GridAab, GridArray, GridPoint, OpacityCategory, Rgb, Rgba};
+use crate::math::{Cube, Face6, FaceMap, GridAab, GridArray, OpacityCategory, Rgb, Rgba};
 use crate::raytracer;
 use crate::universe::RefError;
 
@@ -172,7 +171,7 @@ impl EvaluatedBlock {
 
                 for v in rotated_voxel_range.y_range() {
                     for u in rotated_voxel_range.x_range() {
-                        let cube: GridPoint = transform.transform_cube(GridPoint::new(
+                        let cube: Cube = transform.transform_cube(Cube::new(
                             u,
                             v,
                             rotated_voxel_range.z_range().start,
@@ -492,9 +491,9 @@ impl Evoxels {
     ///
     /// TODO: Should we inherently return AIR instead of None?
     #[inline]
-    pub fn get(&self, position: GridPoint) -> Option<Evoxel> {
+    pub fn get(&self, position: Cube) -> Option<Evoxel> {
         match (self, position) {
-            (&Evoxels::One(voxel), GridPoint { x: 0, y: 0, z: 0 }) => Some(voxel),
+            (&Evoxels::One(voxel), Cube::ORIGIN) => Some(voxel),
             (Evoxels::One(_), _) => None,
             (Evoxels::Many(_, ref voxels), position) => voxels.get(position).copied(),
         }
@@ -518,14 +517,14 @@ impl Evoxels {
     }
 }
 
-impl std::ops::Index<GridPoint> for Evoxels {
+impl std::ops::Index<Cube> for Evoxels {
     type Output = Evoxel;
 
     #[inline]
     #[track_caller]
-    fn index(&self, position: GridPoint) -> &Self::Output {
+    fn index(&self, position: Cube) -> &Self::Output {
         match (self, position) {
-            (Evoxels::One(voxel), GridPoint { x: 0, y: 0, z: 0 }) => voxel,
+            (Evoxels::One(voxel), Cube::ORIGIN) => voxel,
             (Evoxels::One(_), _) => panic!("out of bounds of Evoxels::One"),
             (Evoxels::Many(_, voxels), position) => &voxels[position],
         }

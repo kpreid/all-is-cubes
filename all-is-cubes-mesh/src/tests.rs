@@ -1,6 +1,6 @@
 //! Tests for [`crate::mesh`].
 
-use all_is_cubes::math::Rgb;
+use all_is_cubes::math::{Cube, Rgb};
 use pretty_assertions::assert_eq;
 
 use all_is_cubes::block::{
@@ -11,7 +11,7 @@ use all_is_cubes::cgmath::{MetricSpace as _, Point3, Transform as _, Vector3};
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::math::{
     Face6::{self, *},
-    FaceMap, FreeCoordinate, GridAab, GridPoint, GridRotation, Rgba,
+    FaceMap, FreeCoordinate, GridAab, GridRotation, Rgba,
 };
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
@@ -88,7 +88,7 @@ pub(crate) fn mesh_blocks_and_space(
     (tex, block_meshes, space_mesh)
 }
 
-fn non_uniform_fill(cube: GridPoint) -> &'static Block {
+fn non_uniform_fill(cube: Cube) -> &'static Block {
     // TODO: This should be simple to write, such as by having a simple owned const constructor from colors
     const C1: &Primitive = &Primitive::Atom(Atom {
         attributes: BlockAttributes::default(),
@@ -149,7 +149,7 @@ fn no_panic_on_missing_blocks() {
     );
     assert_eq!(block_meshes.len(), 1); // check our assumption
 
-    space.set((0, 0, 0), &block).unwrap(); // render data does not know about this
+    space.set([0, 0, 0], &block).unwrap(); // render data does not know about this
 
     // This should not panic; visual glitches are preferable to failure.
     let space_mesh = SpaceMesh::new(
@@ -177,12 +177,12 @@ fn trivial_voxels_equals_atom() {
 
     let (_, _, space_rendered_a) = mesh_blocks_and_space(&{
         let mut space = Space::empty_positive(1, 1, 1);
-        space.set((0, 0, 0), &atom_block).unwrap();
+        space.set([0, 0, 0], &atom_block).unwrap();
         space
     });
     let (tex, _, space_rendered_r) = mesh_blocks_and_space(&{
         let mut space = Space::empty_positive(1, 1, 1);
-        space.set((0, 0, 0), &trivial_recursive_block).unwrap();
+        space.set([0, 0, 0], &trivial_recursive_block).unwrap();
         space
     });
 
@@ -211,7 +211,7 @@ fn space_mesh_equals_block_mesh() {
         .unwrap()
         .build();
     let mut outer_space = Space::empty_positive(1, 1, 1);
-    outer_space.set((0, 0, 0), &recursive_block).unwrap();
+    outer_space.set([0, 0, 0], &recursive_block).unwrap();
 
     let (tex, block_meshes, space_rendered) = mesh_blocks_and_space(&outer_space);
 
@@ -243,7 +243,7 @@ fn block_resolution_greater_than_tile() {
         .unwrap()
         .build();
     let mut outer_space = Space::empty_positive(1, 1, 1);
-    outer_space.set((0, 0, 0), &block).unwrap();
+    outer_space.set([0, 0, 0], &block).unwrap();
 
     let (_, _, _) = mesh_blocks_and_space(&outer_space);
     // TODO: Figure out how to make a useful assert. At least this is "it doesn't panic".
@@ -268,7 +268,7 @@ fn shrunken_box_has_no_extras() {
         .unwrap()
         .build();
     let mut outer_space = Space::empty_positive(1, 1, 1);
-    outer_space.set((0, 0, 0), &less_than_full_block).unwrap();
+    outer_space.set([0, 0, 0], &less_than_full_block).unwrap();
 
     let (tex, _, space_rendered) = mesh_blocks_and_space(&outer_space);
 
@@ -330,7 +330,7 @@ fn shrunken_box_uniform_color() {
         .unwrap()
         .build();
     let mut outer_space = Space::empty_positive(1, 1, 1);
-    outer_space.set((0, 0, 0), &less_than_full_block).unwrap();
+    outer_space.set([0, 0, 0], &less_than_full_block).unwrap();
 
     let (tex, _, space_rendered) = mesh_blocks_and_space(&outer_space);
 
@@ -516,7 +516,7 @@ fn handling_allocation_failure() {
     let block_derived_color = complex_block.evaluate().unwrap().color;
 
     let mut space = Space::empty_positive(1, 1, 1);
-    space.set((0, 0, 0), &complex_block).unwrap();
+    space.set([0, 0, 0], &complex_block).unwrap();
 
     let mut tex = TestAllocator::new();
     tex.set_capacity(0);

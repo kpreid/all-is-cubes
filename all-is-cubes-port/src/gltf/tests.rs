@@ -48,7 +48,7 @@ fn gltf_smoke_test() {
         .unwrap()
         .build();
     let mut outer_space = Space::empty_positive(1, 1, 1);
-    outer_space.set((0, 0, 0), &recursive_block).unwrap();
+    outer_space.set([0, 0, 0], &recursive_block).unwrap();
 
     let mut writer = GltfWriter::new(GltfDataDestination::null());
     let (_, mesh_index) = gltf_mesh(&outer_space, &mut writer);

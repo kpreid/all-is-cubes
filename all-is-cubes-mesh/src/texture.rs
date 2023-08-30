@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 use all_is_cubes::block::{Evoxel, Evoxels};
 use all_is_cubes::cgmath::Point3;
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{GridAab, GridPoint};
+use all_is_cubes::math::{Cube, GridAab};
 use all_is_cubes::util::{ConciseDebug, CustomFormat};
 
 #[cfg(doc)]
@@ -173,7 +173,7 @@ pub(super) fn copy_voxels_into_existing_texture<T: Tile>(voxels: &Evoxels, textu
             for x in bounds.x_range() {
                 texels.push(
                     voxels
-                        .get(GridPoint { x, y, z })
+                        .get(Cube { x, y, z })
                         .unwrap_or(Evoxel::from_color(palette::MISSING_VOXEL_FALLBACK))
                         .color
                         .to_srgb8(),

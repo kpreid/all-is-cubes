@@ -9,7 +9,7 @@ use cgmath::{EuclideanSpace, InnerSpace as _, Matrix4, Point3, Transform as _};
 use crate::block::{recursive_ray, Block, EvaluatedBlock, Evoxel, Evoxels};
 use crate::content::palette;
 use crate::math::{
-    Aab, Face6, Face7, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridVector, LineVertex,
+    Aab, Cube, Face6, Face7, FreeCoordinate, Geometry, GridCoordinate, GridVector, LineVertex,
 };
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
@@ -47,7 +47,7 @@ pub fn cursor_raycast(
                 face_selected = Some(step.face());
             }
             Evoxels::Many(resolution, ref voxels) => {
-                let recursive_hit: Option<(GridPoint, &Evoxel)> =
+                let recursive_hit: Option<(Cube, &Evoxel)> =
                     recursive_ray(ray, step.cube_ahead(), resolution)
                         .cast()
                         .within(voxels.bounds())
@@ -137,7 +137,7 @@ pub struct Cursor {
 #[non_exhaustive]
 #[allow(missing_docs)] // TODO
 pub struct CubeSnapshot {
-    pub position: GridPoint,
+    pub position: Cube,
     pub block: Block,
     pub evaluated: EvaluatedBlock,
     pub light: PackedLight,
@@ -151,14 +151,14 @@ impl Cursor {
     }
 
     /// Which cube of the space that the cursor ray selected/hit.
-    pub fn cube(&self) -> GridPoint {
+    pub fn cube(&self) -> Cube {
         self.hit.position
     }
 
     /// The cube the ray passed through immediately before the selected cube.
     ///
     /// This may be the same cube if the ray started there.
-    pub fn preceding_cube(&self) -> GridPoint {
+    pub fn preceding_cube(&self) -> Cube {
         self.cube() + self.face_entered.normal_vector()
     }
 
@@ -240,7 +240,12 @@ impl Geometry for Cursor {
         // (Perhaps a better box would be the bounds of all `selectable` voxels?)
         let block_aabb = Aab::from(evaluated.voxels_bounds())
             .scale(FreeCoordinate::from(evaluated.resolution()).recip())
-            .translate(self.cube().to_vec().map(FreeCoordinate::from));
+            .translate(
+                self.cube()
+                    .lower_bounds()
+                    .map(FreeCoordinate::from)
+                    .to_vec(),
+            );
 
         // Add wireframe of the block.
         block_aabb
@@ -253,9 +258,13 @@ impl Geometry for Cursor {
         // Frame the selected face with a square.
         // TODO: Position this frame relative to block_aabb.
         if let Ok(face) = Face6::try_from(self.face_selected()) {
-            let face_transform_full =
-                Matrix4::from_translation(self.hit().position.map(FreeCoordinate::from).to_vec())
-                    * face.face_transform(1).to_matrix().to_free();
+            let face_transform_full = Matrix4::from_translation(
+                self.hit()
+                    .position
+                    .lower_bounds()
+                    .map(FreeCoordinate::from)
+                    .to_vec(),
+            ) * face.face_transform(1).to_matrix().to_free();
 
             let inset = 1. / 128.;
             for &p in [
@@ -333,7 +342,7 @@ mod tests {
 
         let cursor = cursor_raycast(X_RAY, &space_ref, f64::INFINITY).unwrap();
         assert_eq!(cursor.hit().block, block);
-        assert_eq!(cursor.cube(), GridPoint::new(1, 0, 0));
+        assert_eq!(cursor.cube(), Cube::new(1, 0, 0));
         assert_eq!(cursor.face_selected(), Face7::NX);
     }
 
@@ -358,7 +367,7 @@ mod tests {
 
         let cursor = cursor_raycast(X_RAY, &space_ref, f64::INFINITY).unwrap();
         // If the non-selectable block was hit, this would be [0, 0, 0]
-        assert_eq!(cursor.cube(), GridPoint::new(1, 0, 0));
+        assert_eq!(cursor.cube(), Cube::new(1, 0, 0));
         assert_eq!(cursor.hit().block, block);
     }
 
@@ -370,7 +379,7 @@ mod tests {
         let space_ref = test_space(universe, [&not_selectable, &block]);
 
         let cursor = cursor_raycast(X_RAY, &space_ref, f64::INFINITY).unwrap();
-        assert_eq!(cursor.cube(), GridPoint::new(1, 0, 0));
+        assert_eq!(cursor.cube(), Cube::new(1, 0, 0));
         assert_eq!(cursor.hit().block, block);
     }
 
@@ -382,7 +391,7 @@ mod tests {
         let space_ref = test_space(universe, [&AIR, &selectable_voxels, &other_block]);
 
         let cursor = cursor_raycast(X_RAY, &space_ref, f64::INFINITY).unwrap();
-        assert_eq!(cursor.cube(), GridPoint::new(1, 0, 0));
+        assert_eq!(cursor.cube(), Cube::new(1, 0, 0));
         assert_eq!(cursor.hit().block, selectable_voxels);
     }
 

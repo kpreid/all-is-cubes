@@ -3,20 +3,20 @@ use std::fmt;
 use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
-use all_is_cubes::block::{
-    Block, BlockCollision, Primitive,
-    Resolution::{self, R16},
-    AIR,
-};
-use all_is_cubes::cgmath::EuclideanSpace;
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
-use all_is_cubes::math::{
-    Aab, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, Rgb,
-};
+use all_is_cubes::math::{FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb};
 use all_is_cubes::notnan;
 use all_is_cubes::space::{SetCubeError, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
+use all_is_cubes::{
+    block::{
+        Block, BlockCollision, Primitive,
+        Resolution::{self, R16},
+        AIR,
+    },
+    math::Cube,
+};
 
 use crate::blocks::scale_color;
 use crate::noise::{array_of_noise, NoiseFnExt};
@@ -125,7 +125,7 @@ pub async fn install_landscape_blocks(
 
     let blade_color_noise = {
         let blade_color_noise_v = noise::Value::new(0x2e240365);
-        move |p| blade_color_noise_v.at_grid(p) * 0.12 + 1.0
+        move |cube: Cube| blade_color_noise_v.at_grid(cube.lower_bounds()) * 0.12 + 1.0
     };
     let overhang_noise = array_of_noise(resolution, &noise::Value::new(0), |value| {
         value * 2.5 + f64::from(resolution) * 0.75
@@ -138,7 +138,7 @@ pub async fn install_landscape_blocks(
 
     let stone_points: [_; 240] = std::array::from_fn(|_| {
         (
-            Aab::from_cube(GridPoint::origin()).random_point(rng),
+            Cube::ORIGIN.aab().random_point(rng),
             scale_color(colors[Stone].clone(), rng.gen_range(0.9..1.1), 0.02),
         )
     });
@@ -147,7 +147,7 @@ pub async fn install_landscape_blocks(
     // TODO: give dirt a palette of varying hue and saturation
     let dirt_points: [_; 1024] = std::array::from_fn(|_| {
         (
-            Aab::from_cube(GridPoint::origin()).random_point(rng),
+            Cube::ORIGIN.aab().random_point(rng),
             scale_color(colors[Dirt].clone(), rng.gen_range(0.9..1.1), 0.02),
         )
     });
@@ -156,7 +156,7 @@ pub async fn install_landscape_blocks(
     // TODO: needs a tiling and abruptly-changing pattern -- perhaps a coordinate-streched voronoi noise instead
     let bark_noise = {
         let noise = noise::ScalePoint::new(noise::Value::new(0x28711937)).set_y_scale(1. / 4.);
-        move |p| noise.at_grid(p) * 0.4 + 0.7
+        move |cube: Cube| noise.at_grid(cube.lower_bounds()) * 0.4 + 0.7
     };
 
     BlockProvider::<LandscapeBlocks>::new(progress, |key| {
@@ -336,7 +336,7 @@ pub fn wavy_landscape(
             for y in region.y_range() {
                 let altitude = y - surface_y;
                 use LandscapeBlocks::*;
-                let cube = GridPoint::new(x, y, z);
+                let cube = Cube::new(x, y, z);
                 let block: &Block = if altitude > 1 {
                     continue;
                 } else if altitude == 1 {

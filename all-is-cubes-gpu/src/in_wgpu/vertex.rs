@@ -1,5 +1,5 @@
 use all_is_cubes::cgmath::{Point3, Vector3};
-use all_is_cubes::math::{GridPoint, GridVector};
+use all_is_cubes::math::{Cube, GridVector};
 use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
 
 use crate::DebugLineVertex;
@@ -125,8 +125,8 @@ impl GfxVertex for WgpuBlockVertex {
     type TexPoint = TexPoint;
 
     #[inline]
-    fn instantiate_block(cube: GridPoint) -> Self::BlockInst {
-        let cube = cube.map(|c| c as u32);
+    fn instantiate_block(cube: Cube) -> Self::BlockInst {
+        let cube = cube.lower_bounds().map(|c| c as u32);
         cube.x | (cube.y << 8) | (cube.z << 16)
     }
 
@@ -246,7 +246,7 @@ mod tests {
             face: Face6::PX,
             coloring: Coloring::Solid(Rgba::new(0.0, 0.5, 1.0, 0.5)),
         });
-        vertex.instantiate_vertex(WgpuBlockVertex::instantiate_block(Point3::new(100, 50, 7)));
+        vertex.instantiate_vertex(WgpuBlockVertex::instantiate_block(Cube::new(100, 50, 7)));
         assert_eq!(GfxVertex::position(&vertex), Point3::new(100.25, 50.0, 8.0));
     }
 }
