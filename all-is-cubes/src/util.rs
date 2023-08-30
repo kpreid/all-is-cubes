@@ -99,7 +99,8 @@ impl<T: CustomFormat<ConciseDebug>, const N: usize> CustomFormat<ConciseDebug> f
 // TODO: Macro time?
 impl<S: Debug> CustomFormat<ConciseDebug> for Point3<S> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
-        write!(fmt, "({:+.3?}, {:+.3?}, {:+.3?})", self.x, self.y, self.z)
+        let Self { x, y, z } = self;
+        write!(fmt, "({x:+.3?}, {y:+.3?}, {z:+.3?})")
     }
 }
 

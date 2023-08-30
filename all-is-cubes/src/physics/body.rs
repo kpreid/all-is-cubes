@@ -560,33 +560,33 @@ mod tests {
         Body {
             flying: false,
             noclip: false,
-            ..Body::new_minimal((0., 2., 0.), Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5))
+            ..Body::new_minimal([0., 2., 0.], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5))
         }
     }
 
     #[test]
     fn look_at() {
         let do_test = |direction, yaw, pitch| {
-            let mut body = Body::new_minimal((10., 0., 0.), Aab::ZERO);
+            let mut body = Body::new_minimal([10., 0., 0.], Aab::ZERO);
             body.look_at(Point3::new(10., 0., 0.) + Vector3::from(direction));
             println!("{direction:?} {yaw} {pitch}");
             assert_eq!(body.yaw, yaw);
             assert_eq!(body.pitch, pitch);
         };
 
-        do_test((0., 0., -1.), 0., 0.);
-        do_test((1., 0., -1.), 45., 0.);
-        do_test((1., 0., 0.), 90., 0.);
-        do_test((0., 0., 1.), 180., 0.);
-        do_test((-1., 0., 0.), 270., 0.);
+        do_test([0., 0., -1.], 0., 0.);
+        do_test([1., 0., -1.], 45., 0.);
+        do_test([1., 0., 0.], 90., 0.);
+        do_test([0., 0., 1.], 180., 0.);
+        do_test([-1., 0., 0.], 270., 0.);
 
         // TODO: would be tidier if this is 0 instead; revisit the math
         let exactly_vertical_yaw = 180.;
-        do_test((0., 1., 0.), exactly_vertical_yaw, -90.);
-        do_test((0., 1., -1.), 0., -45.);
-        do_test((0., 0., -1.), 0., 0.);
-        do_test((0., -1., -1.), 0., 45.);
-        do_test((0., -1., 0.), exactly_vertical_yaw, 90.);
+        do_test([0., 1., 0.], exactly_vertical_yaw, -90.);
+        do_test([0., 1., -1.], 0., -45.);
+        do_test([0., 0., -1.], 0., 0.);
+        do_test([0., -1., -1.], 0., 45.);
+        do_test([0., -1., 0.], exactly_vertical_yaw, 90.);
     }
 
     #[test]

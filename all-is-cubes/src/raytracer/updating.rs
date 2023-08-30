@@ -7,7 +7,7 @@ use crate::block::AIR;
 use crate::camera::GraphicsOptions;
 use crate::content::palette;
 use crate::listen::{Listen as _, ListenableSource, Listener};
-use crate::math::GridPoint;
+use crate::math::Cube;
 use crate::raytracer::{RtBlockData, RtOptionsRef, SpaceRaytracer, TracingBlock, TracingCubeData};
 use crate::space::{BlockIndex, Space, SpaceChange};
 use crate::universe::{RefError, URef};
@@ -166,7 +166,7 @@ struct SrtTodo {
 
     // TODO: Benchmark using a BitVec instead.
     blocks: HashSet<BlockIndex>,
-    cubes: HashSet<GridPoint>,
+    cubes: HashSet<Cube>,
 }
 
 /// [`Listener`] adapter for [`SpaceRendererTodo`].

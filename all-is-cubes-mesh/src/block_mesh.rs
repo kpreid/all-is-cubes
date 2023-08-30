@@ -6,10 +6,10 @@ use std::fmt::Debug;
 
 use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
 use all_is_cubes::camera::Flaws;
-use all_is_cubes::cgmath::{Point2, Point3};
+use all_is_cubes::cgmath::Point2;
 use all_is_cubes::math::{
-    Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, OpacityCategory,
-    Rgba,
+    Cube, Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate,
+    OpacityCategory, Rgba,
 };
 use all_is_cubes::space::Space;
 
@@ -390,8 +390,8 @@ where
 
                         for t in rotated_voxel_range.y_range() {
                             for s in rotated_voxel_range.x_range() {
-                                let cube: Point3<GridCoordinate> =
-                                    voxel_transform.transform_cube(Point3::new(s, t, layer));
+                                let cube: Cube =
+                                    voxel_transform.transform_cube(Cube::new(s, t, layer));
 
                                 let color = options.transparency.limit_alpha(
                                     voxels_array.get(cube).unwrap_or(&Evoxel::AIR).color,
@@ -617,8 +617,6 @@ mod tests {
     use crate::Coloring;
     use all_is_cubes::block::{Block, AIR};
     use all_is_cubes::camera::GraphicsOptions;
-    use all_is_cubes::cgmath::EuclideanSpace;
-    use all_is_cubes::math::GridPoint;
     use all_is_cubes::universe::Universe;
 
     type TestMesh = BlockMesh<BlockVertex<NoTexture>, NoTexture>;
@@ -653,7 +651,7 @@ mod tests {
         // Define a block which has only solid colored faces, so gets vertex colors
         let block = Block::builder()
             .voxels_fn(&mut universe, Resolution::R2, |cube| {
-                if cube == GridPoint::origin() {
+                if cube == Cube::ORIGIN {
                     AIR
                 } else {
                     Block::from(Rgba::WHITE)

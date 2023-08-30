@@ -24,11 +24,11 @@ pub fn logo_text() -> Arc<dyn vui::Widget> {
         font: || &FONT_9X15_BOLD,
         brush: {
             VoxelBrush::new([
-                ((0, 0, 1), foreground_text_block),
-                ((1, 0, 0), background_text_block.clone()),
-                ((-1, 0, 0), background_text_block.clone()),
-                ((0, 1, 0), background_text_block.clone()),
-                ((0, -1, 0), background_text_block),
+                ([0, 0, 1], foreground_text_block),
+                ([1, 0, 0], background_text_block.clone()),
+                ([-1, 0, 0], background_text_block.clone()),
+                ([0, 1, 0], background_text_block.clone()),
+                ([0, -1, 0], background_text_block),
             ])
         },
         text_style: TextStyleBuilder::new()

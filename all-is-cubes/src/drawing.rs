@@ -29,8 +29,8 @@ pub use embedded_graphics;
 
 use crate::block::{space_to_blocks, Block, BlockAttributes, Resolution};
 use crate::math::{
-    Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid, Rgb,
-    Rgba,
+    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid,
+    Rgb, Rgba,
 };
 use crate::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
@@ -45,11 +45,13 @@ use crate::universe::Universe;
 ///
 /// Please note that coordinate behavior may be surprising. [`embedded_graphics`]
 /// considers coordinates to refer to pixel centers, which is similar but not identical
-/// to our use of [`GridPoint`] to identify a cube by its low corner. The `transform` is
+/// to our identifying [`Cube`]s by their low corner. The `transform` is
 /// then applied to those coordinates. So, for example, applying [`Gridgid::FLIP_Y`]
 /// to a [`Rectangle`] whose top-left corner is `[0, 0]` will result in a [`GridAab`]
 /// which *includes* the <var>y</var> = 0 row — not one which abuts it and is strictly in
 /// the negative y range.
+///
+/// TODO: The above text is either wrong or describes a bad idea. Fix.
 ///
 /// TODO: This function still has some bugs to work out
 ///
@@ -112,10 +114,14 @@ impl<'s, T, C> DrawingPlane<'s, T, C> {
 
     // TODO: We should probably have ways to stack more transforms
 
-    /// Converts 2D point to 3D point. Helper for multiple `impl DrawTarget`s.
-    fn convert_point(&self, point: Point) -> GridPoint {
-        self.transform
-            .transform_point(GridPoint::new(point.x, point.y, 0))
+    /// Converts 2D e-g [`Point`] to 3D [`Cube`]. Helper for multiple `impl DrawTarget`s.
+    fn convert_point(&self, point: Point) -> Cube {
+        // TODO: This should, now obviously, be `transform_cube` but changing that will
+        // break other things.
+        Cube::from(
+            self.transform
+                .transform_point(GridPoint::new(point.x, point.y, 0)),
+        )
     }
 }
 
@@ -265,15 +271,15 @@ impl<'a> VoxelColor<'a> for Rgb888 {
 /// Note that only `&VoxelBrush` implements [`PixelColor`]; this is because `PixelColor`
 /// requires a value implementing [`Copy`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct VoxelBrush<'a>(Vec<(GridPoint, Cow<'a, Block>)>);
+pub struct VoxelBrush<'a>(Vec<(GridVector, Cow<'a, Block>)>);
 
 impl<'a> VoxelBrush<'a> {
     /// Makes a [`VoxelBrush`] which paints the specified blocks at the specified offsets
-    /// from each pixel position.
+    /// from each pixel position. (`Cube::ORIGIN` is zero offset.)
     // TODO: revisit what generics the parameter types have.
     pub fn new<V, B>(blocks: impl IntoIterator<Item = (V, B)>) -> Self
     where
-        V: Into<GridPoint>,
+        V: Into<GridVector>,
         B: Into<Cow<'a, Block>>,
     {
         Self(
@@ -298,7 +304,7 @@ impl<'a> VoxelBrush<'a> {
         B: Into<Cow<'a, Block>>,
     {
         let block = block.into();
-        Self::new(range.map(|z| (GridPoint::new(0, 0, z), block.clone())))
+        Self::new(range.map(|z| (GridVector::new(0, 0, z), block.clone())))
     }
 
     /// Copies each of the brush's blocks into the `Space` relative to the given origin
@@ -306,9 +312,9 @@ impl<'a> VoxelBrush<'a> {
     ///
     /// Unlike [`Space::set`], it is not considered an error if any of the affected cubes
     /// fall outside of the `Space`'s bounds.
-    pub fn paint(&self, space: &mut Space, origin: GridPoint) -> Result<(), SetCubeError> {
-        for (offset, block) in &self.0 {
-            ignore_out_of_bounds(space.set(origin + offset.to_vec(), Cow::borrow(block)))?;
+    pub fn paint(&self, space: &mut Space, origin: Cube) -> Result<(), SetCubeError> {
+        for &(offset, ref block) in &self.0 {
+            ignore_out_of_bounds(space.set(origin + offset, Cow::borrow(block)))?;
         }
         Ok(())
     }
@@ -317,7 +323,7 @@ impl<'a> VoxelBrush<'a> {
     ///
     /// Note that [`VoxelBrush::paint`] or using it in a [`DrawTarget`] ignores
     /// out-of-bounds drawing, but transactions do not support this and will fail instead.
-    pub fn paint_transaction(&self, origin: GridPoint) -> SpaceTransaction {
+    pub fn paint_transaction(&self, origin: Cube) -> SpaceTransaction {
         let mut txn = SpaceTransaction::default();
         self.paint_transaction_mut(&mut txn, origin);
         txn
@@ -328,9 +334,9 @@ impl<'a> VoxelBrush<'a> {
     ///
     /// Note that [`VoxelBrush::paint`] or using it in a [`DrawTarget`] ignores
     /// out-of-bounds drawing, but transactions do not support this and will fail instead.
-    pub fn paint_transaction_mut(&self, transaction: &mut SpaceTransaction, origin: GridPoint) {
-        for (offset, block) in &self.0 {
-            transaction.set_overwrite(origin + offset.to_vec(), Block::clone(block));
+    pub fn paint_transaction_mut(&self, transaction: &mut SpaceTransaction, origin: Cube) {
+        for &(offset, ref block) in &self.0 {
+            transaction.set_overwrite(origin + offset, Block::clone(block));
         }
     }
 
@@ -369,7 +375,7 @@ impl<'a> VoxelBrush<'a> {
     #[must_use]
     pub fn rotate(mut self, rotation: GridRotation) -> Self {
         for (block_offset, _) in self.0.iter_mut() {
-            *block_offset = GridPoint::from_vec(rotation.transform_vector(block_offset.to_vec()));
+            *block_offset = rotation.transform_vector(*block_offset);
         }
         self
     }
@@ -379,8 +385,8 @@ impl<'a> VoxelBrush<'a> {
     /// Returns [`None`] if the brush is empty.
     pub fn bounds(&self) -> Option<GridAab> {
         let mut bounds: Option<GridAab> = None;
-        for &(cube, _) in self.0.iter() {
-            let cube = GridAab::single_cube(cube);
+        for &(offset, _) in self.0.iter() {
+            let cube = Cube::from(GridPoint::from_vec(offset)).grid_aab();
             if let Some(bounds) = &mut bounds {
                 // TODO: don't panic?
                 *bounds = (*bounds).union(cube).unwrap();
@@ -405,7 +411,7 @@ impl<'a> From<&'a VoxelBrush<'a>> for SpaceTransaction {
     /// Converts the brush into an equivalent transaction, as by
     /// [`VoxelBrush::paint_transaction`] at the origin.
     fn from(brush: &'a VoxelBrush<'a>) -> Self {
-        brush.paint_transaction(GridPoint::origin())
+        brush.paint_transaction(Cube::ORIGIN)
     }
 }
 impl<'a> From<VoxelBrush<'a>> for SpaceTransaction {
@@ -631,7 +637,7 @@ mod tests {
         Pixel(Point::new(2, 3), color_value)
             .draw(&mut display)
             .unwrap();
-        assert_eq!(space[(3, 5, 4)], *expected_block);
+        assert_eq!(space[[3, 5, 4]], *expected_block);
     }
 
     #[test]
@@ -737,7 +743,7 @@ mod tests {
             space: ref block_space_ref,
             offset,
             ..
-        } = space[(0, -1, 0)].primitive()
+        } = space[[0, -1, 0]].primitive()
         {
             print_space(&block_space_ref.read().unwrap(), [0., 1., -1.]);
             assert_eq!(
@@ -745,7 +751,7 @@ mod tests {
                 GridPoint::new(0, -GridCoordinate::from(resolution), 0)
             );
             assert_eq!(
-                block_space_ref.read().unwrap()[(0, -2, z)].color(),
+                block_space_ref.read().unwrap()[[0, -2, z]].color(),
                 a_primitive_color()
             );
         } else {
@@ -778,7 +784,7 @@ mod tests {
             space: block_space_ref,
             offset,
             ..
-        } = space[(-1, 0, 0)].primitive()
+        } = space[[-1, 0, 0]].primitive()
         {
             print_space(&block_space_ref.read().unwrap(), [0., 1., -1.]);
             assert_eq!(
@@ -786,7 +792,7 @@ mod tests {
                 GridPoint::new(-GridCoordinate::from(resolution), 0, 0)
             );
             assert_eq!(
-                block_space_ref.read().unwrap()[(-2, 1, z)].color(),
+                block_space_ref.read().unwrap()[[-2, 1, z]].color(),
                 a_primitive_color()
             );
         } else {
@@ -799,7 +805,7 @@ mod tests {
         let [block] = make_some_blocks();
         assert_eq!(
             VoxelBrush::single(&block),
-            VoxelBrush::new([((0, 0, 0), &block)]),
+            VoxelBrush::new([([0, 0, 0], &block)]),
         );
     }
 
@@ -807,8 +813,8 @@ mod tests {
     fn voxel_brush_translate() {
         let [block] = make_some_blocks();
         assert_eq!(
-            VoxelBrush::new([((1, 2, 3), &block)]).translate((10, 20, 30)),
-            VoxelBrush::new([((11, 22, 33), &block)]),
+            VoxelBrush::new([([1, 2, 3], &block)]).translate([10, 20, 30]),
+            VoxelBrush::new([([11, 22, 33], &block)]),
         );
     }
 
@@ -824,7 +830,7 @@ mod tests {
             let brush: VoxelBrush<'static> = VoxelBrush::new(brush_vec);
             assert_eq!(
                 brush.bounds(),
-                brush.paint_transaction(GridPoint::origin()).bounds()
+                brush.paint_transaction(Cube::ORIGIN).bounds()
             );
         }
     }

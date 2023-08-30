@@ -4,9 +4,7 @@ use std::iter::FusedIterator;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero as _};
 
-use crate::math::{
-    Face6, FreeCoordinate, Geometry, GridAab, GridCoordinate, GridPoint, LineVertex,
-};
+use crate::math::{Face6, FreeCoordinate, Geometry, GridAab, GridCoordinate, LineVertex};
 
 /// Axis-Aligned Box data type.
 ///
@@ -97,23 +95,6 @@ impl Aab {
         } else {
             None
         }
-    }
-
-    /// Returns the AAB of a given cube in the interpretation used by [`GridAab`] and
-    /// [`Space`](crate::space::Space); that is, a unit cube extending in the positive
-    /// directions from the given point.
-    ///
-    /// ```
-    /// use all_is_cubes::math::{Aab, GridPoint};
-    ///
-    /// assert_eq!(
-    ///     Aab::from_cube(GridPoint::new(10, 20, -30)),
-    ///     Aab::new(10.0, 11.0, 20.0, 21.0, -30.0, -29.0)
-    /// );
-    /// ```
-    pub fn from_cube(cube: GridPoint) -> Self {
-        let lower = cube.cast::<FreeCoordinate>().unwrap();
-        Self::from_lower_upper(lower, lower + Vector3::new(1.0, 1.0, 1.0))
     }
 
     /// The most negative corner of the box, as a [`Point3`].
@@ -386,6 +367,8 @@ impl Geometry for Aab {
 
 #[cfg(test)]
 mod tests {
+    use crate::math::Cube;
+
     use super::*;
 
     #[test]
@@ -478,7 +461,7 @@ mod tests {
 
     #[test]
     fn wireframe_smoke_test() {
-        let aab = Aab::from_cube(Point3::new(1, 2, 3));
+        let aab: Aab = Cube::new(1, 2, 3).aab();
         let mut wireframe: Vec<LineVertex> = Vec::new();
         aab.wireframe_points(&mut wireframe);
         for LineVertex { position, color } in wireframe {
@@ -495,7 +478,7 @@ mod tests {
         for direction in (-1..=1)
             .zip(-1..=1)
             .zip(-1..=1)
-            .map(|((x, y), z)| Vector3::new(x, y, z).cast::<FreeCoordinate>().unwrap())
+            .map(|((x, y), z)| Vector3::new(x, y, z).map(FreeCoordinate::from))
         {
             let leading_corner = aab.leading_corner(direction);
 
@@ -512,10 +495,11 @@ mod tests {
     #[test]
     fn corner_points() {
         // use all_is_cubes::cgmath::Point3;
-        // use all_is_cubes::math::{Aab, GridPoint};
+        // use all_is_cubes::math::{Aab, Cube};
 
         assert_eq!(
-            Aab::from_cube(GridPoint::new(10, 20, 30))
+            Cube::new(10, 20, 30)
+                .aab()
                 .corner_points()
                 .collect::<Vec<_>>(),
             vec![

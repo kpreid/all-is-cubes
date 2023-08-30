@@ -9,7 +9,8 @@ use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
 use crate::block::Resolution;
 use crate::math::{
-    sort_two, Aab, Face6, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, GridVector, Gridgid,
+    sort_two, Aab, Cube, Face6, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, GridVector,
+    Gridgid,
 };
 
 /// An axis-aligned box with integer coordinates, whose volume is no larger than [`usize::MAX`].
@@ -17,9 +18,7 @@ use crate::math::{
 /// regions within them.
 ///
 /// When we refer to “a cube” in a [`GridAab`], that is a unit cube which is identified by the
-/// integer coordinates of its most negative corner. Hence, coordinate bounds are always
-/// half-open intervals: lower inclusive and upper exclusive. There are functions to help with
-/// this such as [`cube_to_midpoint`](super::cube_to_midpoint).
+/// integer coordinates of its most negative corner, in the fashion of [`Cube`].
 ///
 /// A [`GridAab`] may have a zero-size range in any direction, thus making its total volume zero.
 /// The different possibilities are not considered equal; thus, points, lines, and planes may be
@@ -42,14 +41,14 @@ impl GridAab {
     ///
     /// ```
     /// use all_is_cubes::block::Resolution;
-    /// use all_is_cubes::math::{GridAab, GridPoint};
+    /// use all_is_cubes::math::{GridAab, Cube};
     ///
     /// assert_eq!(GridAab::ORIGIN_CUBE, GridAab::from_lower_upper([0, 0, 0], [1, 1, 1]));
     ///
     /// // Note that GridAab::for_block() is const too.
     /// assert_eq!(GridAab::ORIGIN_CUBE, GridAab::for_block(Resolution::R1));
     ///
-    /// assert_eq!(GridAab::ORIGIN_CUBE, GridAab::single_cube(GridPoint::new(0, 0, 0)));
+    /// assert_eq!(GridAab::ORIGIN_CUBE, GridAab::single_cube(Cube::ORIGIN));
     /// ```
     ///
     pub const ORIGIN_CUBE: GridAab = GridAab::for_block(Resolution::R1);
@@ -140,11 +139,13 @@ impl GridAab {
 
     /// Constructs a [`GridAab`] with a volume of 1, containing the specified cube.
     ///
-    /// Panics if `cube` has any coordinates equal to [`GridCoordinate::MAX`](i32::MAX)
-    /// since that is not valid, as per [`GridAab::from_lower_size`].
+    /// Panics if `cube` has any coordinates equal to [`GridCoordinate::MAX`]
+    /// since that is not valid, as per [`GridAab::from_lower_size()`].
+    ///
+    /// This function is identical to [`Cube::grid_aab()`].
     #[inline]
-    pub fn single_cube(cube: GridPoint) -> GridAab {
-        GridAab::from_lower_size(cube, [1, 1, 1])
+    pub fn single_cube(cube: Cube) -> GridAab {
+        cube.grid_aab()
     }
 
     /// Constructs a [`GridAab`] with a cubical volume in the positive octant, as is used
@@ -260,7 +261,7 @@ impl GridAab {
     /// assert_eq!(bounds.index([0, 0, 10].into()), None);
     /// ```
     #[inline(always)] // very hot code
-    pub fn index(&self, cube: GridPoint) -> Option<usize> {
+    pub fn index(&self, cube: Cube) -> Option<usize> {
         let sizes = self.sizes;
 
         // This might overflow and wrap, but if it does, the result will still be out
@@ -268,7 +269,7 @@ impl GridAab {
         // injective mapping of integers, and every in-bounds maps to in-bounds, so
         // every out-of-bounds must also map to out-of-bounds.
         let deoffsetted: Point3<GridCoordinate> =
-            cube.zip(self.lower_bounds, GridCoordinate::wrapping_sub);
+            Point3::from(cube).zip(self.lower_bounds, GridCoordinate::wrapping_sub);
 
         // Bounds check, expressed as a single unsigned comparison.
         if (deoffsetted.x as u32 >= sizes.x as u32)
@@ -373,21 +374,21 @@ impl GridAab {
         self.lower_bounds.map(FreeCoordinate::from) + self.sizes.map(FreeCoordinate::from) / 2.0
     }
 
-    /// Iterate over all cubes.
+    /// Iterate over all cubes that this contains.
     ///
     /// ```
-    /// use all_is_cubes::math::{GridAab, GridPoint};
+    /// use all_is_cubes::math::{GridAab, Cube};
     ///
     /// let b = GridAab::from_lower_size([10, 20, 30], [1, 2, 3]);
     /// assert_eq!(
-    ///     b.interior_iter().collect::<Vec<GridPoint>>(),
+    ///     b.interior_iter().collect::<Vec<Cube>>(),
     ///     &[
-    ///         GridPoint::new(10, 20, 30),
-    ///         GridPoint::new(10, 20, 31),
-    ///         GridPoint::new(10, 20, 32),
-    ///         GridPoint::new(10, 21, 30),
-    ///         GridPoint::new(10, 21, 31),
-    ///         GridPoint::new(10, 21, 32),
+    ///         Cube::new(10, 20, 30),
+    ///         Cube::new(10, 20, 31),
+    ///         Cube::new(10, 20, 32),
+    ///         Cube::new(10, 21, 30),
+    ///         Cube::new(10, 21, 31),
+    ///         Cube::new(10, 21, 32),
     ///     ])
     /// ```
     pub fn interior_iter(self) -> GridIter {
@@ -405,7 +406,7 @@ impl GridAab {
     /// assert!(!b.contains_cube([10, 5, 5].into()));
     /// ```
     #[inline]
-    pub fn contains_cube(&self, cube: GridPoint) -> bool {
+    pub fn contains_cube(&self, cube: Cube) -> bool {
         self.index(cube).is_some()
     }
 
@@ -516,12 +517,12 @@ impl GridAab {
     /// let empty = GridAab::from_lower_size([1, 2, 3], [0, 9, 9]);
     /// assert_eq!(empty.random_cube(rng), None);
     /// ```
-    pub fn random_cube(&self, rng: &mut impl rand::Rng) -> Option<GridPoint> {
+    pub fn random_cube(&self, rng: &mut impl rand::Rng) -> Option<Cube> {
         if self.is_empty() {
             None
         } else {
             let upper_bounds = self.upper_bounds();
-            Some(GridPoint::new(
+            Some(Cube::new(
                 rng.gen_range(self.lower_bounds[0]..upper_bounds[0]),
                 rng.gen_range(self.lower_bounds[1]..upper_bounds[1]),
                 rng.gen_range(self.lower_bounds[2]..upper_bounds[2]),
@@ -600,16 +601,16 @@ impl GridAab {
         );
         let upper_bounds = self.upper_bounds();
         Self::from_lower_upper(
-            (
+            [
                 self.lower_bounds.x.div_euclid(divisor),
                 self.lower_bounds.y.div_euclid(divisor),
                 self.lower_bounds.z.div_euclid(divisor),
-            ),
-            (
+            ],
+            [
                 (upper_bounds.x + divisor - 1).div_euclid(divisor),
                 (upper_bounds.y + divisor - 1).div_euclid(divisor),
                 (upper_bounds.z + divisor - 1).div_euclid(divisor),
-            ),
+            ],
         )
     }
 
@@ -793,7 +794,7 @@ impl GridIter {
 }
 
 impl Iterator for GridIter {
-    type Item = GridPoint;
+    type Item = Cube;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -811,7 +812,7 @@ impl Iterator for GridIter {
                 // When x becomes out of bounds, that signals the end.
             }
         }
-        Some(result)
+        Some(result.into())
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -842,11 +843,13 @@ impl Iterator for GridIter {
         // advance it until the remaining elements form an AAB.
         #[cold]
         #[inline(never)]
-        fn cold_next(i: &mut GridIter) -> Option<GridPoint> {
+        fn cold_next(i: &mut GridIter) -> Option<Cube> {
             i.next()
         }
         while self.cube.y != self.y_range.start || self.cube.z != self.z_range.start {
-            let Some(cube) = cold_next(&mut self) else { return state; };
+            let Some(cube) = cold_next(&mut self) else {
+                return state;
+            };
             state = f(state, cube);
         }
 
@@ -855,7 +858,7 @@ impl Iterator for GridIter {
         for x in self.cube.x..self.x_range.end {
             for y in self.y_range.clone() {
                 for z in self.z_range.clone() {
-                    state = f(state, GridPoint::new(x, y, z));
+                    state = f(state, Cube::new(x, y, z));
                 }
             }
         }
@@ -867,9 +870,8 @@ impl Iterator for GridIter {
 impl ExactSizeIterator for GridIter {}
 impl FusedIterator for GridIter {}
 
-/// Error when a [`GridAab`] cannot be constructed from the given input.
+/// Error when a [`GridAab`] or [`Cube`] cannot be constructed from the given input.
 // TODO: Make this an enum
-// TODO: Give this a more specific name since `Grid` was renamed to `GridAab`.
 #[derive(Clone, Debug, thiserror::Error, Eq, PartialEq)]
 #[error("{0}")]
 pub struct GridOverflowError(String);
@@ -889,7 +891,7 @@ impl<V> GridArray<V> {
     /// for each point.
     pub fn from_fn<F>(bounds: GridAab, f: F) -> Self
     where
-        F: FnMut(GridPoint) -> V,
+        F: FnMut(Cube) -> V,
     {
         GridArray {
             bounds,
@@ -977,7 +979,7 @@ impl<V> GridArray<V> {
     /// Returns the element at `position` of this array, or [`None`] if `position` is out
     /// of bounds.
     #[inline]
-    pub fn get(&self, position: impl Into<GridPoint>) -> Option<&V> {
+    pub fn get(&self, position: impl Into<Cube>) -> Option<&V> {
         self.bounds
             .index(position.into())
             .map(|index| &self.contents[index])
@@ -986,7 +988,7 @@ impl<V> GridArray<V> {
     /// Returns a mutable reference to the element at `position` of this array,
     /// or [`None`] if `position` is out of bounds.
     #[inline]
-    pub fn get_mut(&mut self, position: impl Into<GridPoint>) -> Option<&mut V> {
+    pub fn get_mut(&mut self, position: impl Into<Cube>) -> Option<&mut V> {
         self.bounds
             .index(position.into())
             .map(|index| &mut self.contents[index])
@@ -1012,13 +1014,13 @@ impl<V> GridArray<V> {
 
     /// Iterates over all the cubes and values in this array, in the ordering used by
     /// [`GridAab::interior_iter()`].
-    pub fn iter(&self) -> impl Iterator<Item = (GridPoint, &V)> {
+    pub fn iter(&self) -> impl Iterator<Item = (Cube, &V)> {
         self.bounds.interior_iter().zip(self.contents.iter())
     }
 
     /// Iterates over all the cubes and values in this array, in the ordering used by
     /// [`GridAab::interior_iter()`].
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (GridPoint, &mut V)> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Cube, &mut V)> {
         self.bounds.interior_iter().zip(self.contents.iter_mut())
     }
 
@@ -1048,7 +1050,7 @@ impl<V> GridArray<V> {
     }
 }
 
-impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
+impl<P: Into<Cube>, V> std::ops::Index<P> for GridArray<V> {
     type Output = V;
 
     /// Returns the element at `position` of this array, or panics if `position` is out of
@@ -1057,7 +1059,7 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
     /// Use [`GridArray::get`] for a non-panicing alternative.
     #[inline(always)] // measured faster on wasm32 in worldgen
     fn index(&self, position: P) -> &Self::Output {
-        let position: GridPoint = position.into();
+        let position: Cube = position.into();
         if let Some(index) = self.bounds.index(position) {
             &self.contents[index]
         } else {
@@ -1068,12 +1070,12 @@ impl<P: Into<GridPoint>, V> std::ops::Index<P> for GridArray<V> {
         }
     }
 }
-impl<P: Into<GridPoint>, V> std::ops::IndexMut<P> for GridArray<V> {
+impl<P: Into<Cube>, V> std::ops::IndexMut<P> for GridArray<V> {
     /// Returns the element at `position` of this array, or panics if `position` is out of
     /// bounds.
     #[inline(always)]
     fn index_mut(&mut self, position: P) -> &mut Self::Output {
-        let position: GridPoint = position.into();
+        let position: Cube = position.into();
         if let Some(index) = self.bounds.index(position) {
             &mut self.contents[index]
         } else {
@@ -1142,8 +1144,11 @@ mod tests {
     use super::*;
     use crate::block::Resolution::*;
     use crate::math::{GridRotation, Gridgid};
-    use cgmath::point3;
     use indoc::indoc;
+
+    fn cube(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate) -> Cube {
+        Cube::new(x, y, z)
+    }
 
     #[test]
     fn zero_is_valid() {
@@ -1176,21 +1181,21 @@ mod tests {
         // Indexing calculates (point - lower_bounds), so this would overflow in the negative direction if the overflow weren't checked.
         // Note that MAX - 1 is the highest allowed lower bound since the exclusive upper bound must be representable.
         let low = GridAab::from_lower_size([GridCoordinate::MAX - 1, 0, 0], [1, 1, 1]);
-        assert_eq!(low.index(point3(0, 0, 0)), None);
-        assert_eq!(low.index(point3(-1, 0, 0)), None);
-        assert_eq!(low.index(point3(-2, 0, 0)), None);
-        assert_eq!(low.index(point3(GridCoordinate::MIN, 0, 0)), None);
+        assert_eq!(low.index(cube(0, 0, 0)), None);
+        assert_eq!(low.index(cube(-1, 0, 0)), None);
+        assert_eq!(low.index(cube(-2, 0, 0)), None);
+        assert_eq!(low.index(cube(GridCoordinate::MIN, 0, 0)), None);
         // But, an actually in-bounds cube should still work.
-        assert_eq!(low.index(point3(GridCoordinate::MAX - 1, 0, 0)), Some(0));
+        assert_eq!(low.index(cube(GridCoordinate::MAX - 1, 0, 0)), Some(0));
     }
 
     #[test]
     fn index_overflow_high() {
         let high = GridAab::from_lower_size([GridCoordinate::MAX - 1, 0, 0], [1, 1, 1]);
-        assert_eq!(high.index(point3(0, 0, 0)), None);
-        assert_eq!(high.index(point3(1, 0, 0)), None);
-        assert_eq!(high.index(point3(2, 0, 0)), None);
-        assert_eq!(high.index(point3(GridCoordinate::MAX - 1, 0, 0)), Some(0));
+        assert_eq!(high.index(cube(0, 0, 0)), None);
+        assert_eq!(high.index(cube(1, 0, 0)), None);
+        assert_eq!(high.index(cube(2, 0, 0)), None);
+        assert_eq!(high.index(cube(GridCoordinate::MAX - 1, 0, 0)), Some(0));
     }
 
     #[test]
@@ -1199,7 +1204,7 @@ mod tests {
         // This value fits in a 32-bit `usize` and is therefore a valid index,
         // but it does not fit in a `GridCoordinate` = `i32`.
         assert_eq!(
-            aab.index(point3(1500, 1500, 1500)),
+            aab.index(cube(1500, 1500, 1500)),
             Some(((1500 * 2000) + 1500) * 2000 + 1500)
         );
     }
@@ -1207,21 +1212,21 @@ mod tests {
     #[test]
     fn divide_to_one_cube() {
         assert_eq!(
-            GridAab::from_lower_size((11, 22, 33), (1, 1, 1)).divide(10),
-            GridAab::from_lower_size((1, 2, 3), (1, 1, 1)),
+            GridAab::from_lower_size([11, 22, 33], [1, 1, 1]).divide(10),
+            GridAab::from_lower_size([1, 2, 3], [1, 1, 1]),
         );
     }
 
     #[test]
     #[should_panic(expected = "GridAab::divide: divisor must be > 0, not 0")]
     fn divide_by_zero() {
-        let _ = GridAab::from_lower_size((-10, -10, -10), (20, 20, 20)).divide(0);
+        let _ = GridAab::from_lower_size([-10, -10, -10], [20, 20, 20]).divide(0);
     }
 
     #[test]
     #[should_panic(expected = "GridAab::divide: divisor must be > 0, not -10")]
     fn divide_by_negative() {
-        let _ = GridAab::from_lower_size((-10, -10, -10), (20, 20, 20)).divide(-10);
+        let _ = GridAab::from_lower_size([-10, -10, -10], [20, 20, 20]).divide(-10);
     }
 
     #[test]

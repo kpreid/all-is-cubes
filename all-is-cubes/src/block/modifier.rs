@@ -191,7 +191,7 @@ mod tests {
     use super::*;
     use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Primitive, Resolution::R2};
     use crate::content::make_some_voxel_blocks;
-    use crate::math::{Face6, FaceMap, GridAab, GridPoint, OpacityCategory, Rgba};
+    use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgba};
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
 
@@ -201,7 +201,7 @@ mod tests {
         let block_bounds = GridAab::for_block(resolution);
         let rotation = GridRotation::RYXZ;
         let mut universe = Universe::new();
-        let color_fn = |cube: GridPoint| {
+        let color_fn = |cube: Cube| {
             Rgba::new(
                 cube.x as f32,
                 cube.y as f32,
@@ -209,7 +209,7 @@ mod tests {
                 if cube.y == 0 { 1.0 } else { 0.0 },
             )
         };
-        let rotated_color_fn = |cube: GridPoint| {
+        let rotated_color_fn = |cube: Cube| {
             color_fn(
                 rotation
                     .to_positive_octant_transform(resolution.into())

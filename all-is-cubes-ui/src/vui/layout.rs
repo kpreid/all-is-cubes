@@ -2,9 +2,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use all_is_cubes::cgmath::{Vector3, Zero as _};
-use all_is_cubes::math::{
-    point_to_enclosing_cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector,
-};
+use all_is_cubes::math::{Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector};
 use all_is_cubes::space::{Space, SpaceBuilder, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _, Transaction as _};
 
@@ -120,6 +118,16 @@ impl LayoutGrant {
             bounds: GridAab::from_lower_size(origin, sizes),
             gravity: self.gravity,
         }
+    }
+
+    /// As `shrink_to()` but returning a single cube, as long as the grant is nonempty.
+    ///
+    /// This is a common pattern but I'm not sure it should be, so this isn't public.
+    pub(crate) fn shrink_to_cube(&self) -> Option<Cube> {
+        self.shrink_to(GridVector::new(1, 1, 1), false)
+            .bounds
+            .interior_iter()
+            .next()
     }
 }
 
@@ -336,9 +344,9 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 ref control_bar,
             } => {
                 let mut crosshair_pos =
-                    point_to_enclosing_cube(grant.bounds.center()).unwrap(/* TODO: not unwrap */);
+                    Cube::containing(grant.bounds.center()).unwrap(/* TODO: not unwrap */);
                 crosshair_pos.z = 0;
-                let crosshair_bounds = GridAab::single_cube(crosshair_pos);
+                let crosshair_bounds = crosshair_pos.grid_aab();
                 // TODO: bounds of toolbar and control_bar should be just small enough to miss the crosshair. Also figure out exactly what their Z range should be
                 LayoutTree::Hud {
                     crosshair: crosshair.perform_layout(LayoutGrant {

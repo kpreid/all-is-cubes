@@ -302,12 +302,13 @@ impl GridRotation {
     /// *not* [`GridMatrix::transform_point`](cgmath::Transform::transform_point)
     /// (due to the lower-corner format of cube coordinates).
     /// ```
-    /// # use all_is_cubes::math::{GridAab, GridPoint, GridRotation};
+    /// use all_is_cubes::math::{GridAab, Cube, GridRotation};
+    ///
     /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_transform(4);
-    /// assert_eq!(rotation.transform_cube(GridPoint::new(0, 0, 0)), GridPoint::new(3, 0, 0));
-    /// assert_eq!(rotation.transform_cube(GridPoint::new(3, 0, 0)), GridPoint::new(3, 0, 3));
-    /// assert_eq!(rotation.transform_cube(GridPoint::new(3, 0, 3)), GridPoint::new(0, 0, 3));
-    /// assert_eq!(rotation.transform_cube(GridPoint::new(0, 0, 3)), GridPoint::new(0, 0, 0));
+    /// assert_eq!(rotation.transform_cube(Cube::new(0, 0, 0)), Cube::new(3, 0, 0));
+    /// assert_eq!(rotation.transform_cube(Cube::new(3, 0, 0)), Cube::new(3, 0, 3));
+    /// assert_eq!(rotation.transform_cube(Cube::new(3, 0, 3)), Cube::new(0, 0, 3));
+    /// assert_eq!(rotation.transform_cube(Cube::new(0, 0, 3)), Cube::new(0, 0, 0));
     /// ```
     //
     // TODO: add tests
@@ -491,7 +492,7 @@ impl Mul<Self> for GridRotation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cgmath::Transform as _;
+    use cgmath::{EuclideanSpace as _, Transform as _};
     use std::collections::HashSet;
     use Face6::*;
 

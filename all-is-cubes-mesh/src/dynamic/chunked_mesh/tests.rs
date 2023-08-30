@@ -7,7 +7,7 @@ use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, TransparencyOption, V
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::listen::Listener as _;
-use all_is_cubes::math::{FreeCoordinate, GridAab, GridCoordinate};
+use all_is_cubes::math::{Cube, FreeCoordinate, GridAab, GridCoordinate};
 use all_is_cubes::math::{GridPoint, NotNan};
 use all_is_cubes::space::{Space, SpaceChange, SpaceTransaction};
 use all_is_cubes::universe::{URef, Universe};
@@ -43,7 +43,7 @@ fn update_adjacent_chunk_positive() {
         (ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN),
         (ChunkPos::new(1, 0, 0), ChunkTodo::CLEAN),
     ]);
-    listener.receive(SpaceChange::Block(GridPoint::new(
+    listener.receive(SpaceChange::Block(Cube::new(
         CHUNK_SIZE - 1,
         CHUNK_SIZE / 2,
         CHUNK_SIZE / 2,
@@ -79,7 +79,7 @@ fn update_adjacent_chunk_negative() {
         (ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN),
         (ChunkPos::new(1, 0, 0), ChunkTodo::CLEAN),
     ]);
-    listener.receive(SpaceChange::Block(GridPoint::new(
+    listener.receive(SpaceChange::Block(Cube::new(
         0,
         CHUNK_SIZE / 2,
         CHUNK_SIZE / 2,
@@ -111,7 +111,7 @@ fn todo_ignores_absent_chunks() {
     let todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>> = Default::default();
     let listener = TodoListener(Arc::downgrade(&todo));
 
-    let p = GridPoint::new(1, 1, 1) * (CHUNK_SIZE / 2);
+    let p = Cube::from(GridPoint::new(1, 1, 1) * (CHUNK_SIZE / 2));
     // Nothing happens...
     listener.receive(SpaceChange::Block(p));
     assert_eq!(read_todo_chunks(&todo), vec![]);

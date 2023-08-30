@@ -267,7 +267,7 @@ mod tests {
     fn no_extra_indices_when_transparent() {
         let mut space = Space::empty_positive(1, 1, 1);
         space
-            .set((0, 0, 0), &Block::from(Rgba::new(0., 0., 0., 0.5)))
+            .set([0, 0, 0], &Block::from(Rgba::new(0., 0., 0., 0.5)))
             .unwrap();
 
         let mut writer = GltfWriter::new(GltfDataDestination::null());

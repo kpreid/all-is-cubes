@@ -47,8 +47,8 @@ use std::collections::HashSet;
 use all_is_cubes::block::{Block, Resolution, AIR};
 use all_is_cubes::cgmath::{ElementWise, InnerSpace, Point3, Vector3};
 use all_is_cubes::math::{
-    cube_to_midpoint, point_to_enclosing_cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray,
-    GridCoordinate, GridPoint, GridVector, Gridgid,
+    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint,
+    GridVector, Gridgid,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpaceTransaction};
 
@@ -80,14 +80,14 @@ pub use all_is_cubes::content::*;
 ///
 /// The points' coordinates should be in the range 0 to 1.
 ///
-/// TODO: Once we have better composable tools than `impl Fn(GridPoint)`, allow
+/// TODO: Once we have better composable tools than `impl Fn(Cube)`, allow
 /// each point to refer to a pattern of its own to delegate to.
 pub(crate) fn voronoi_pattern<'a>(
     resolution: Resolution,
     wrapping: bool,
     // TODO: not a well-founded choice of iterator type, just convenient
     points: impl IntoIterator<Item = &'a (Point3<FreeCoordinate>, Block)> + Clone,
-) -> impl Fn(GridPoint) -> &'a Block {
+) -> impl Fn(Cube) -> &'a Block {
     // We use the strategy of flood-filling each point up front, because for
     // large numbers of points that's much cheaper than evaluating every cube
     // against every point. (An alternative would be to build a spatial index
@@ -102,10 +102,10 @@ pub(crate) fn voronoi_pattern<'a>(
 
     let mut pattern: GridArray<(FreeCoordinate, &Block)> =
         GridArray::from_fn(GridAab::for_block(resolution), |_| (f64::INFINITY, &AIR));
-    let mut flood_fill_todo = HashSet::new();
+    let mut flood_fill_todo = HashSet::<Cube>::new();
     for &(region_point, ref block) in points {
         let region_point = region_point * FreeCoordinate::from(resolution);
-        let starting_cube: GridPoint = match point_to_enclosing_cube(region_point) {
+        let starting_cube: Cube = match Cube::containing(region_point) {
             Some(p) => p,
             None => continue, // TODO: panic? this can only happen when the inputs are not in 0 to 1
         };
@@ -119,7 +119,7 @@ pub(crate) fn voronoi_pattern<'a>(
                 continue;
             }
 
-            let test_point = cube_to_midpoint(cube);
+            let test_point = cube.midpoint();
 
             let offset = test_point - region_point;
             // TODO: add ability to muck with the distance metric in custom ways

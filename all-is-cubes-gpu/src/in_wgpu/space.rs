@@ -10,7 +10,7 @@ use all_is_cubes::cgmath::{EuclideanSpace, Point3, Vector3};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{Listen as _, Listener};
-use all_is_cubes::math::{Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, Rgb};
+use all_is_cubes::math::{Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, Rgb};
 use all_is_cubes::space::{Space, SpaceChange};
 use all_is_cubes::universe::URef;
 use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, RenderDataUpdate};
@@ -592,7 +592,7 @@ struct SpaceRendererTodo {
     /// None means do a full space reupload.
     ///
     /// TODO: experiment with different granularities of light invalidation (chunks, dirty rects, etc.)
-    light: Option<HashSet<GridPoint>>,
+    light: Option<HashSet<Cube>>,
 }
 
 /// [`Listener`] adapter for [`SpaceRendererTodo`].

@@ -10,7 +10,7 @@ use rand_xoshiro::Xoshiro256Plus;
 use all_is_cubes::block::{Block, BlockCollision, AIR};
 use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace as _};
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{cube_to_midpoint, GridAab, GridArray, GridPoint, GridVector, Rgba};
+use all_is_cubes::math::{Cube, GridAab, GridArray, GridPoint, GridVector, Rgba};
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge;
@@ -35,7 +35,7 @@ pub(crate) struct AnimatedVoxels<F> {
     accumulator: Duration,
 }
 
-impl<F: Fn(GridPoint, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
+impl<F: Fn(Cube, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
     pub(crate) fn new(function: F) -> Self {
         let frame_period = Duration::from_nanos(1_000_000_000 / 16);
         Self {
@@ -56,7 +56,7 @@ impl<F: Fn(GridPoint, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
     }
 }
 
-impl<F: Fn(GridPoint, u64) -> Block + Clone + Send + Sync + 'static> behavior::Behavior<Space>
+impl<F: Fn(Cube, u64) -> Block + Clone + Send + Sync + 'static> behavior::Behavior<Space>
     for AnimatedVoxels<F>
 {
     fn step(
@@ -257,8 +257,8 @@ impl Clock {
         let mut txn = SpaceTransaction::default();
         for x in 0..16 {
             for y in 0..16 {
-                let cube = GridPoint::new(x, y, 0);
-                let centered_point = cube_to_midpoint(cube - GridVector::new(8, 8, 0));
+                let cube = Cube::new(x, y, 0);
+                let centered_point = (cube - GridVector::new(8, 8, 0)).midpoint();
                 let r = centered_point.to_vec().magnitude();
                 let block = {
                     let base_angle = centered_point.x.atan2(centered_point.y) / TAU;

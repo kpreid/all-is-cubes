@@ -21,8 +21,7 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use crate::block::{Evoxels, Resolution, AIR};
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 use crate::math::{
-    point_to_enclosing_cube, smoothstep, Face6, Face7, FreeCoordinate, GridAab, GridArray,
-    GridMatrix, GridPoint, Rgb, Rgba,
+    smoothstep, Cube, Face6, Face7, FreeCoordinate, GridAab, GridArray, GridMatrix, Rgb, Rgba,
 };
 use crate::raycast::Ray;
 use crate::space::{BlockIndex, PackedLight, Space, SpaceBlockData};
@@ -171,7 +170,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     }
 
     #[inline]
-    fn get_packed_light(&self, cube: GridPoint) -> PackedLight {
+    fn get_packed_light(&self, cube: Cube) -> PackedLight {
         self.cubes
             .get(cube)
             .map(|b| b.lighting)
@@ -179,7 +178,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     }
 
     #[inline]
-    fn get_lighting(&self, cube: GridPoint) -> Rgb {
+    fn get_lighting(&self, cube: Cube) -> Rgb {
         self.cubes
             .get(cube)
             .map(|b| b.lighting.value())
@@ -230,12 +229,11 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let mix_2 = smoothstep(mix_2);
 
         // Retrieve light data, again using the half-cube-offset grid (this way we won't have edge artifacts).
-        let get_light = |p: Vector3<FreeCoordinate>| match point_to_enclosing_cube(
-            Point3::from_vec(origin) + p,
-        ) {
-            Some(cube) => self.get_packed_light(cube),
-            None => self.packed_sky_color,
-        };
+        let get_light =
+            |p: Vector3<FreeCoordinate>| match Cube::containing(Point3::from_vec(origin) + p) {
+                Some(cube) => self.get_packed_light(cube),
+                None => self.packed_sky_color,
+            };
         let lin_lo = -0.5;
         let lin_hi = 0.5;
         let near12 = get_light(lin_lo * dir_1 + lin_lo * dir_2);
@@ -590,7 +588,7 @@ fn apply_transmittance(color: Rgba, thickness: f32) -> Rgba {
 /// `origin` should be the first cube to trace through *within* the grid.
 pub(crate) fn trace_for_eval(
     voxels: &Evoxels,
-    origin: GridPoint,
+    origin: Cube,
     direction: Face6,
     resolution: Resolution,
 ) -> EvalTrace {

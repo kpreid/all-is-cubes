@@ -5,7 +5,7 @@ use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{GridAab, GridCoordinate, GridRotation, GridVector, Gridgid, Rgb, Rgba};
+use all_is_cubes::math::{Cube, GridAab, GridRotation, GridVector, Gridgid, Rgb, Rgba};
 use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
 use all_is_cubes::universe::{self, Name, PartialUniverse, Universe};
 use all_is_cubes::util::{ConciseDebug, CustomFormat, YieldProgress};
@@ -182,12 +182,14 @@ fn dot_vox_model_to_space(
         .build();
 
     for v in model.voxels.iter() {
-        let converted_cube: Point3<GridCoordinate> = Point3 {
-            x: v.x,
-            y: v.y,
-            z: v.z,
-        }
-        .map(i32::from);
+        let converted_cube: Cube = Cube::from(
+            Point3 {
+                x: v.x,
+                y: v.y,
+                z: v.z,
+            }
+            .map(i32::from),
+        );
         let transformed_cube = transform.transform_cube(converted_cube);
 
         #[allow(clippy::unnecessary_lazy_evaluations)] // dubious positive
@@ -324,7 +326,6 @@ fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
 mod tests {
     use super::*;
     use all_is_cubes::block::BlockDef;
-    use all_is_cubes::math::GridPoint;
     use all_is_cubes::raytracer::print_space;
     use all_is_cubes::universe::URef;
     use either::Either;
@@ -351,8 +352,8 @@ mod tests {
         });
 
         assert_eq!(
-            t.transform_cube(GridPoint::new(10, 20, 30)),
-            GridPoint::new(10, 30, 179)
+            t.transform_cube(Cube::new(10, 20, 30)),
+            Cube::new(10, 30, 179)
         );
 
         assert_eq!(

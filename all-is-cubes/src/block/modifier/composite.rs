@@ -5,7 +5,7 @@ use ordered_float::NotNan;
 use crate::block::{
     self, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, Resolution::R1, AIR,
 };
-use crate::math::{GridAab, GridArray, GridCoordinate, GridRotation, Rgb};
+use crate::math::{Cube, GridAab, GridArray, GridCoordinate, GridRotation, Rgb};
 use crate::universe;
 
 /// Data for [`Modifier::Composite`], describing how to combine the voxels of another
@@ -181,10 +181,15 @@ impl Composite {
                 // TODO: use narrower array bounds (union of both inputs' bounds)
                 voxels: Evoxels::Many(
                     effective_resolution,
-                    GridArray::from_fn(GridAab::for_block(effective_resolution), |p| {
+                    GridArray::from_fn(GridAab::for_block(effective_resolution), |cube| {
+                        let p = cube.lower_bounds();
                         operator.blend_evoxel(
-                            src_voxels.get(p / src_scale).unwrap_or(Evoxel::AIR),
-                            dst_voxels.get(p / dst_scale).unwrap_or(Evoxel::AIR),
+                            src_voxels
+                                .get(Cube::from(p / src_scale))
+                                .unwrap_or(Evoxel::AIR),
+                            dst_voxels
+                                .get(Cube::from(p / dst_scale))
+                                .unwrap_or(Evoxel::AIR),
                         )
                     }),
                 ),

@@ -1,7 +1,7 @@
 //! [`GltfVertex`], vertex type for writing to glTF buffers.
 
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
-use all_is_cubes::math::GridPoint;
+use all_is_cubes::math::Cube;
 use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
 
 use super::glue::Lef32;
@@ -89,8 +89,8 @@ impl GfxVertex for GltfVertex {
     type TexPoint = GltfAtlasPoint;
 
     #[inline]
-    fn instantiate_block(cube: GridPoint) -> Self::BlockInst {
-        cube.to_vec().map(|s| s as f32)
+    fn instantiate_block(cube: Cube) -> Self::BlockInst {
+        cube.lower_bounds().to_vec().map(|s| s as f32)
     }
 
     #[inline]

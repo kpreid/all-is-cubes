@@ -1,8 +1,8 @@
 use cgmath::EuclideanSpace as _;
 
+use crate::math::{Cube, GridMatrix, GridPoint, GridRotation, GridVector};
 #[cfg(doc)]
 use crate::math::{GridAab, GridCoordinate};
-use crate::math::{GridMatrix, GridPoint, GridRotation, GridVector};
 
 /// A [rigid transformation] that is composed of a [`GridRotation`] followed by an
 /// integer-valued translation.
@@ -76,19 +76,18 @@ impl Gridgid {
     }
 
     /// Equivalent to temporarily applying an offset of `[0.5, 0.5, 0.5]` while
-    /// transforming `cube` as per [`Gridgid::transform_point()`], despite the fact that
-    /// integer arithmetic is being used.
+    /// transforming `cube`'s coordinates as per [`Gridgid::transform_point()`], despite
+    /// the fact that integer arithmetic is being used.
     ///
-    /// This operation thus transforms the standard positive-octant unit cube identified
-    /// by its most negative corner the same way as the [`GridAab::single_cube`] containing
-    /// that cube.
+    /// This operation thus transforms the [`Cube`] considered as a solid object
+    /// the same as a [`GridAab::single_cube`] containing that cube.
     ///
     /// ```
-    /// use all_is_cubes::math::{Gridgid, GridPoint, GridRotation, GridVector};
+    /// use all_is_cubes::math::{Cube, Gridgid, GridPoint, GridRotation, GridVector};
     ///
     /// // Translation without rotation has the usual definition.
     /// let t = Gridgid::from_translation([10, 0, 0]);
-    /// assert_eq!(t.transform_cube(GridPoint::new(1, 1, 1)), GridPoint::new(11, 1, 1));
+    /// assert_eq!(t.transform_cube(Cube::new(1, 1, 1)), Cube::new(11, 1, 1));
     ///
     /// // With a rotation or reflection, the results are different.
     /// // TODO: Come up with a better example and explanation.
@@ -97,14 +96,16 @@ impl Gridgid {
     ///     rotation: GridRotation::RxYZ,
     /// };
     /// assert_eq!(reflected.transform_point(GridPoint::new(1, 5, 5)), GridPoint::new(9, 5, 5));
-    /// assert_eq!(reflected.transform_cube(GridPoint::new(1, 5, 5)), GridPoint::new(8, 5, 5));
+    /// assert_eq!(reflected.transform_cube(Cube::new(1, 5, 5)), Cube::new(8, 5, 5));
     /// ```
     ///
     /// [`GridAab::single_cube`]: crate::math::GridAab::single_cube
     #[inline]
-    pub fn transform_cube(&self, cube: GridPoint) -> GridPoint {
-        self.transform_point(cube + GridVector::new(1, 1, 1))
-            .zip(self.transform_point(cube), |a, b| a.min(b))
+    pub fn transform_cube(&self, cube: Cube) -> Cube {
+        Cube::from(
+            self.transform_point(cube.lower_bounds())
+                .zip(self.transform_point(cube.upper_bounds()), |a, b| a.min(b)),
+        )
     }
 
     /// Returns the transform which maps the outputs of this one to the inputs of this one.

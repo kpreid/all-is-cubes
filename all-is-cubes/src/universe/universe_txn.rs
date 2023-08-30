@@ -643,7 +643,7 @@ mod tests {
 
     use super::*;
     use crate::content::make_some_blocks;
-    use crate::math::GridPoint;
+    use crate::math::Cube;
     use crate::space::CubeConflict;
     use crate::space::Space;
     use crate::space::SpaceTransaction;
@@ -724,16 +724,19 @@ mod tests {
 
         let UniverseConflict::Member(MapConflict {
             key,
-            conflict: MemberConflict::Modify(
-                ModifyMemberConflict(AnyTransactionConflict::Space(SpaceTransactionConflict::Cube {
-                    cube: GridPoint { x: 0, y: 0, z: 0 },
-                    conflict: CubeConflict {
-                        old: false,
-                        new: true,
+            conflict:
+                MemberConflict::Modify(ModifyMemberConflict(AnyTransactionConflict::Space(
+                    SpaceTransactionConflict::Cube {
+                        cube: Cube { x: 0, y: 0, z: 0 },
+                        conflict:
+                            CubeConflict {
+                                old: false,
+                                new: true,
+                            },
                     },
-                }))
-            )
-        }) = error else {
+                ))),
+        }) = error
+        else {
             panic!("not as expected: {error:?}");
         };
         assert_eq!(key, s.name());

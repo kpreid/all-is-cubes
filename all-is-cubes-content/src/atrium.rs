@@ -11,8 +11,8 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation,
-    GridVector, Gridgid, Rgb, Rgba,
+    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint,
+    GridRotation, GridVector, Gridgid, Rgb, Rgba,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -58,9 +58,9 @@ pub(crate) async fn atrium(
     let space_bounds = outer_walls_footprint
         .expand(FaceMap::default().with(Face6::PY, ceiling_height * floor_count + sun_height));
 
-    let floor_with_cutout = |mut p: GridPoint| {
-        p.y = 0;
-        if atrium_footprint.contains_cube(p) {
+    let floor_with_cutout = |mut cube: Cube| {
+        cube.y = 0;
+        if atrium_footprint.contains_cube(cube) {
             None
         } else {
             Some(&blocks[AtriumBlocks::UpperFloor])
@@ -220,7 +220,7 @@ pub(crate) async fn atrium(
 fn map_text_block(
     ascii: u8,
     blocks: &BlockProvider<AtriumBlocks>,
-    cube: GridPoint,
+    cube: Cube,
     existing_block: Block,
     banner_color: Option<BannerColor>,
 ) -> Block {
@@ -356,7 +356,7 @@ fn arch_row(
 
 // TODO: figure out what the general version of this is and move it elsewhere
 fn fill_space_transformed(
-    src: impl Fn(GridPoint, Block) -> Block,
+    src: impl Fn(Cube, Block) -> Block,
     src_bounds: GridAab,
     dst: &mut Space,
     src_to_dst_transform: Gridgid,
@@ -488,7 +488,7 @@ async fn install_atrium_blocks(
         |value| &stone_range[(value * 8.0 + 2.5).round().clamp(0.0, 4.0) as usize],
     );
 
-    let brick_pattern = |mut p: GridPoint| {
+    let brick_pattern = |mut p: Cube| {
         if (p.x.rem_euclid(resolution_g) > resolution_g / 2)
             ^ (p.y.rem_euclid(resolution_g) > resolution_g / 2)
         {
@@ -501,17 +501,17 @@ async fn install_atrium_blocks(
         if bricking == 0 {
             &grout_base
         } else {
-            stone_base_array[p.map(|c| c.rem_euclid(resolution_g))]
+            stone_base_array[p.lower_bounds().map(|c| c.rem_euclid(resolution_g))]
         }
     };
-    let bottom_grout_pattern = |p: GridPoint| {
+    let bottom_grout_pattern = |p: Cube| {
         if p.y == 0 {
             &grout_base
         } else {
             stone_base_array[p]
         }
     };
-    let molding_fn = |p: GridPoint| {
+    let molding_fn = |p: Cube| {
         let shape: [GridCoordinate; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 2, 3, 4, 4, 3];
         if p.x < shape[p.y as usize] {
             brick_pattern(p)
@@ -541,8 +541,8 @@ async fn install_atrium_blocks(
             *br"                                ",
         ],
     ]);
-    let pole_fn = |p: GridPoint| match pole_shape
-        .get(GridPoint {
+    let pole_fn = |p: Cube| match pole_shape
+        .get(Cube {
             x: p.z,
             y: p.y,
             z: match p.x - 8 {
@@ -605,7 +605,7 @@ async fn install_atrium_blocks(
                 .display_name("Large Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |p| {
-                    let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
+                    let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x + mid.z < resolution_g * 6 / 4 {
                         bottom_grout_pattern(p)
                     } else {
@@ -617,7 +617,7 @@ async fn install_atrium_blocks(
                 .display_name("Square Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |p| {
-                    let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
+                    let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x.max(p.z) < resolution_g * 6 / 4 {
                         bottom_grout_pattern(p)
                     } else {
@@ -629,7 +629,7 @@ async fn install_atrium_blocks(
                 .display_name("Round Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |p| {
-                    let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
+                    let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x.pow(2) + mid.z.pow(2) < (resolution_g * 3 / 4).pow(2) {
                         bottom_grout_pattern(p)
                     } else {
@@ -690,7 +690,8 @@ async fn install_atrium_blocks(
                             [resolution_g, resolution_g / 2, resolution_g],
                         ),
                         |p| {
-                            let mid = (p * 2 - center_point_doubled).map(|c| c.abs());
+                            let mid =
+                                (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
                             if mid.x.max(mid.z) + (mid.y / 2) < resolution_g + 4 {
                                 Some(&body_block)
                             } else {
@@ -729,7 +730,7 @@ const MULTIBLOCK_SCALE: Resolution = Resolution::R8;
 fn generate_arch<'b>(
     universe: &mut Universe,
     stone_range: &[Block], // TODO: clarify
-    brick_pattern: impl Fn(GridPoint) -> &'b Block,
+    brick_pattern: impl Fn(Cube) -> &'b Block,
     resolution: Resolution,
     width_blocks: GridCoordinate,
     height_blocks: GridCoordinate,

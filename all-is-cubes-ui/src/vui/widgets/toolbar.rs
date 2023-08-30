@@ -15,7 +15,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 };
 use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
 use all_is_cubes::listen::{DirtyFlag, Gate, Listen as _, ListenableSource, Listener};
-use all_is_cubes::math::{FaceMap, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid};
+use all_is_cubes::math::{Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid};
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge as _;
@@ -119,7 +119,7 @@ impl Widget for Toolbar {
             character,
             character_listener_gate,
             // TODO: obey gravity when positioning within the grant
-            first_slot_position: GridPoint::new(
+            first_slot_position: Cube::new(
                 (bounds.lower_bounds().x + bounds.upper_bounds().x) / 2
                     - (self.slot_count as GridCoordinate) * Toolbar::TOOLBAR_STEP / 2
                     + 1,
@@ -142,11 +142,11 @@ struct ToolbarController {
     /// TODO: Generalize to noncharacters
     character: Option<URef<Character>>,
     character_listener_gate: Gate,
-    first_slot_position: GridPoint,
+    first_slot_position: Cube,
 }
 
 impl ToolbarController {
-    fn slot_position(&self, slot_index: usize) -> GridPoint {
+    fn slot_position(&self, slot_index: usize) -> Cube {
         self.first_slot_position + GridVector::unit_x() * 2 * slot_index as GridCoordinate
     }
 

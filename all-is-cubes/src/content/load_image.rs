@@ -212,7 +212,7 @@ mod tests {
             space.bounds(),
             GridAab::from_lower_upper([0, 0, 0], [2, 2, 1])
         );
-        assert_eq!(space[(1, 0, 0)], Block::from(Rgb::new(1., 0., 0.)));
+        assert_eq!(space[[1, 0, 0]], Block::from(Rgb::new(1., 0., 0.)));
     }
 
     #[test]
@@ -224,10 +224,10 @@ mod tests {
             GridAab::from_lower_upper([0, 0, 0], [2, 1, 2])
         );
         // X is flipped
-        assert_eq!(space[(1, 0, 0)], Block::from(Rgb::new(0., 0., 0.)));
-        assert_eq!(space[(0, 0, 0)], Block::from(Rgb::new(1., 0., 0.)));
+        assert_eq!(space[[1, 0, 0]], Block::from(Rgb::new(0., 0., 0.)));
+        assert_eq!(space[[0, 0, 0]], Block::from(Rgb::new(1., 0., 0.)));
         // and Y becomes Z
-        assert_eq!(space[(0, 0, 1)], Block::from(Rgb::new(1., 1., 0.)));
+        assert_eq!(space[[0, 0, 1]], Block::from(Rgb::new(1., 1., 0.)));
     }
 
     #[test]
@@ -253,6 +253,6 @@ mod tests {
             space.bounds(),
             GridAab::from_lower_upper([10, 0, 0], [12, 2, 1])
         );
-        assert_eq!(space[(11, 0, 0)], Block::from(Rgb::new(1., 0., 0.)));
+        assert_eq!(space[[11, 0, 0]], Block::from(Rgb::new(1., 0., 0.)));
     }
 }

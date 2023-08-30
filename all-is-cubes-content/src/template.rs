@@ -331,7 +331,7 @@ async fn islands(
 
     for (i, island_pos) in island_grid.interior_iter().enumerate() {
         let cell_bounds = GridAab::from_lower_size(
-            Point3::from_vec(island_pos.to_vec() * island_stride),
+            Point3::from_vec(island_pos.lower_bounds().to_vec() * island_stride),
             [island_stride, island_stride, island_stride],
         )
         .intersection(bounds)

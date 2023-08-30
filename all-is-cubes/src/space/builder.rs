@@ -324,7 +324,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
 #[cfg(test)]
 mod tests {
     use crate::content::make_some_blocks;
-    use crate::math::{GridPoint, Rgba};
+    use crate::math::{Cube, Rgba};
 
     use super::*;
 
@@ -375,7 +375,7 @@ mod tests {
 
     #[test]
     fn palette_err_too_long() {
-        let bounds = GridAab::single_cube(GridPoint::new(0, 0, 0));
+        let bounds = GridAab::ORIGIN_CUBE;
         assert_eq!(
             Space::builder(bounds)
                 .palette_and_contents(vec![AIR; 65537], GridArray::from_element(2), None,)
@@ -386,14 +386,14 @@ mod tests {
 
     #[test]
     fn palette_err_too_short_for_contents() {
-        let bounds = GridAab::single_cube(GridPoint::new(0, 0, 0));
+        let bounds = GridAab::ORIGIN_CUBE;
         assert_eq!(
             Space::builder(bounds)
                 .palette_and_contents(&mut [AIR].into_iter(), GridArray::from_element(2), None,)
                 .unwrap_err(),
             PaletteError::Index {
                 index: 2,
-                cube: GridPoint::new(0, 0, 0),
+                cube: Cube::new(0, 0, 0),
                 palette_len: 1
             }
         );
@@ -402,12 +402,12 @@ mod tests {
     #[test]
     fn palette_err_contents_wrong_bounds() {
         assert_eq!(
-            Space::builder(GridAab::single_cube(GridPoint::new(1, 0, 0)))
+            Space::builder(GridAab::single_cube(Cube::new(1, 0, 0)))
                 .palette_and_contents([AIR], GridArray::from_element(0), None)
                 .unwrap_err(),
             PaletteError::WrongDataBounds {
-                expected: GridAab::single_cube(GridPoint::new(1, 0, 0)),
-                actual: GridAab::single_cube(GridPoint::new(0, 0, 0)),
+                expected: GridAab::single_cube(Cube::new(1, 0, 0)),
+                actual: GridAab::ORIGIN_CUBE,
             }
         );
     }

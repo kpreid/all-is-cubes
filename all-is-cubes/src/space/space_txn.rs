@@ -8,7 +8,7 @@ use std::{fmt, mem};
 use crate::behavior::{self, BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::drawing::DrawingPlane;
-use crate::math::{GridCoordinate, GridPoint, Gridgid};
+use crate::math::{Cube, GridCoordinate, GridPoint, Gridgid};
 use crate::space::{ActivatableRegion, GridAab, SetCubeError, Space};
 use crate::transaction::{
     no_outputs, CommitError, Merge, NoOutput, PreconditionFailed, Transaction, Transactional,
@@ -35,9 +35,9 @@ impl SpaceTransaction {
     /// If `new` is not [`None`], replaces the existing block with `new`.
     ///
     /// TODO: This name is a poor name now that [`Self::set`] exists.
-    pub fn set_cube(cube: impl Into<GridPoint>, old: Option<Block>, new: Option<Block>) -> Self {
+    pub fn set_cube(cube: impl Into<Cube>, old: Option<Block>, new: Option<Block>) -> Self {
         Self::single(
-            cube,
+            cube.into(),
             CubeTransaction {
                 old,
                 new,
@@ -55,11 +55,11 @@ impl SpaceTransaction {
     /// If `new` is not [`None`], replaces the existing block with `new`.
     pub fn set(
         &mut self,
-        cube: impl Into<GridPoint>,
+        cube: impl Into<Cube>,
         old: Option<Block>,
         new: Option<Block>,
     ) -> Result<(), SpaceTransactionConflict> {
-        let cube: GridPoint = cube.into();
+        let cube: Cube = cube.into();
         let ct = CubeTransaction {
             old,
             new,
@@ -129,8 +129,8 @@ impl SpaceTransaction {
         self
     }
 
-    fn single(cube: impl Into<GridPoint>, transaction: CubeTransaction) -> Self {
-        let cube: GridPoint = cube.into();
+    fn single(cube: impl Into<Cube>, transaction: CubeTransaction) -> Self {
+        let cube: Cube = cube.into();
         let mut cubes = BTreeMap::new();
         cubes.insert(cube.into(/* array */), transaction);
         SpaceTransaction {
@@ -159,7 +159,7 @@ impl SpaceTransaction {
         ))
     }
 
-    pub(crate) fn activate_block(cube: GridPoint) -> Self {
+    pub(crate) fn activate_block(cube: Cube) -> Self {
         Self::single(cube, CubeTransaction::ACTIVATE)
     }
 
@@ -179,7 +179,7 @@ impl SpaceTransaction {
         let mut bounds: Option<GridAab> = None;
 
         for &cube_array in cubes.keys() {
-            let cube = GridPoint::from(cube_array);
+            let cube = Cube::from(cube_array);
             if let Some(bounds) = &mut bounds {
                 *bounds = (*bounds).union(GridAab::single_cube(cube)).unwrap();
             } else {
@@ -364,9 +364,7 @@ impl fmt::Debug for SpaceTransaction {
         let mut ds = fmt.debug_struct("SpaceTransaction");
         for (cube, txn) in &self.cubes {
             ds.field(
-                &GridPoint::from(*cube)
-                    .custom_format(ConciseDebug)
-                    .to_string(),
+                &Cube::from(*cube).custom_format(ConciseDebug).to_string(),
                 txn,
             );
         }
@@ -384,7 +382,7 @@ pub enum SpaceTransactionConflict {
     #[allow(missing_docs)]
     #[error("conflict at cube {c}", c = .cube.custom_format(ConciseDebug))]
     Cube {
-        cube: GridPoint, // TODO: GridAab instead?
+        cube: Cube, // TODO: GridAab instead?
         conflict: CubeConflict,
     },
     #[allow(missing_docs)]
@@ -658,7 +656,7 @@ mod tests {
     #[test]
     fn activate() {
         let mut space = Space::empty_positive(1, 1, 1);
-        let cube = GridPoint::new(0, 0, 0);
+        let cube = Cube::new(0, 0, 0);
 
         let signal = Arc::new(AtomicU32::new(0));
         SpaceTransaction::add_behavior(
@@ -723,12 +721,12 @@ mod tests {
                 |_, _| Ok(()),
             )
             .transaction(
-                SpaceTransaction::activate_block(GridPoint::new(0, 0, 0)),
+                SpaceTransaction::activate_block(Cube::new(0, 0, 0)),
                 // TODO: Add a test that activation happened once that's possible
                 |_, _| Ok(()),
             )
             .transaction(
-                SpaceTransaction::activate_block(GridPoint::new(1, 0, 0)),
+                SpaceTransaction::activate_block(Cube::new(1, 0, 0)),
                 // TODO: Add a test that activation happened once that's possible
                 |_, _| Ok(()),
             )
@@ -760,7 +758,7 @@ mod tests {
     fn bounds_single_cube() {
         assert_eq!(
             SpaceTransaction::set_cube([-7, 3, 5], None, Some(AIR)).bounds(),
-            Some(GridAab::single_cube(GridPoint::new(-7, 3, 5)))
+            Some(GridAab::single_cube(Cube::new(-7, 3, 5)))
         );
     }
 

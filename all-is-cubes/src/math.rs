@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use cgmath::{EuclideanSpace as _, Point3, Vector3};
+use cgmath::{Point3, Vector3};
 use num_traits::identities::Zero;
 pub use ordered_float::{FloatIsNan, NotNan};
 
@@ -15,6 +15,8 @@ mod color;
 pub use color::*;
 mod coord;
 pub use coord::*;
+mod cube;
+pub use cube::Cube;
 mod face;
 pub use face::*;
 mod grid_aab;
@@ -92,15 +94,6 @@ macro_rules! notnan {
 pub(crate) fn smoothstep(x: f64) -> f64 {
     let x = x.clamp(0.0, 1.0);
     3. * x.powi(2) - 2. * x.powi(3)
-}
-
-#[inline]
-pub(crate) fn point_checked_add(p: GridPoint, v: GridVector) -> Option<GridPoint> {
-    Some(GridPoint {
-        x: p.x.checked_add(v.x)?,
-        y: p.y.checked_add(v.y)?,
-        z: p.z.checked_add(v.z)?,
-    })
 }
 
 /// Sort exactly two items; swap them if `a > b`.

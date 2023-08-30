@@ -772,20 +772,20 @@ impl<V> IndexMut<Face6> for FaceMap<V> {
     }
 }
 
-/// The combination of a [`GridPoint`] identifying a unit cube and a [`Face7`] identifying
-/// one face of it. This pattern recurs in selection and collision detection.
+/// The combination of a [`Cube`] and [`Face7`] identifying one face of it or the interior.
+/// This pattern appears in cursor selection and collision detection.
 #[derive(Clone, Copy, Hash, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
 #[allow(missing_docs)]
 pub struct CubeFace {
-    pub cube: GridPoint,
+    pub cube: Cube,
     pub face: Face7,
 }
 
 impl CubeFace {
     #[allow(missing_docs)]
     #[inline]
-    pub fn new(cube: impl Into<GridPoint>, face: Face7) -> Self {
+    pub fn new(cube: impl Into<Cube>, face: Face7) -> Self {
         Self {
             cube: cube.into(),
             face,
@@ -794,8 +794,10 @@ impl CubeFace {
 
     /// Computes the cube that is adjacent in the direction of [`self.face`](Self::face).
     /// Equal to [`self.cube`](Self::cube) if the face is [`Face7::Within`].
+    ///
+    /// May panic if the cube coordinates overflow.
     #[inline]
-    pub fn adjacent(self) -> GridPoint {
+    pub fn adjacent(self) -> Cube {
         self.cube + self.face.normal_vector()
     }
 }
@@ -826,7 +828,7 @@ impl Geometry for CubeFace {
     {
         // TODO: How much to offset the lines should be a parameter of the wireframe_points process.
         let expansion = 0.005;
-        let aab = Aab::from_cube(self.cube).expand(expansion);
+        let aab = self.cube.aab().expand(expansion);
         aab.wireframe_points(output);
 
         // Draw an X on the face.
@@ -844,7 +846,7 @@ impl Geometry for CubeFace {
                 LineVertex::from(
                     (face_transform.transform_point(p))
                         .map(|c| (FreeCoordinate::from(c) - 0.5) * (1. + expansion * 2.) + 0.5)
-                        + self.cube.to_vec().map(FreeCoordinate::from),
+                        + self.cube.aab().lower_bounds_v(),
                 )
             }));
         }
@@ -920,7 +922,7 @@ mod tests {
     #[test]
     fn cubeface_format() {
         let cube_face = CubeFace {
-            cube: GridPoint::new(1, 2, 3),
+            cube: Cube::new(1, 2, 3),
             face: Face7::NY,
         };
         assert_eq!(&format!("{cube_face:#?}"), "CubeFace((+1, +2, +3), NY)");

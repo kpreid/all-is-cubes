@@ -13,7 +13,7 @@ use cgmath::{EuclideanSpace as _, Point3};
 
 use crate::listen::{self, Listen, Listener};
 use crate::math::{
-    FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba,
+    Cube, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba,
 };
 use crate::raycast::Ray;
 use crate::space::{SetCubeError, Space, SpaceChange};
@@ -751,10 +751,11 @@ pub const AIR: Block = Block(BlockPtr::Static(&Primitive::Air));
 // TODO: Replace this with the ability to ask a Raycaster to zoom in,
 // for more precision in edge cases
 #[inline]
-pub(crate) fn recursive_ray(ray: Ray, cube: GridPoint, resolution: Resolution) -> Ray {
+pub(crate) fn recursive_ray(ray: Ray, cube: Cube, resolution: Resolution) -> Ray {
     Ray {
         origin: Point3::from_vec(
-            (ray.origin - cube.map(FreeCoordinate::from)) * FreeCoordinate::from(resolution),
+            (ray.origin - cube.lower_bounds().map(FreeCoordinate::from))
+                * FreeCoordinate::from(resolution),
         ),
         direction: ray.direction,
     }
@@ -878,7 +879,7 @@ pub fn space_to_blocks(
     destination_space.fill(destination_bounds, move |cube| {
         Some(Block::from_primitive(Primitive::Recur {
             attributes: attributes.clone(),
-            offset: GridPoint::from_vec(cube.to_vec() * resolution_g),
+            offset: GridPoint::from_vec(cube.lower_bounds().to_vec() * resolution_g),
             resolution,
             space: space_ref.clone(),
         }))

@@ -3,7 +3,7 @@
 use std::fmt;
 
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
-use all_is_cubes::math::{Face6, FreeCoordinate, GridPoint, Rgba};
+use all_is_cubes::math::{Cube, Face6, FreeCoordinate, Rgba};
 use all_is_cubes::util::{ConciseDebug, CustomFormat};
 
 /// Basic vertex data type for a [`BlockMesh`].
@@ -138,7 +138,7 @@ pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized + 'static 
     /// Prepare the information needed by [`Self::instantiate_vertex()`] for one block.
     /// Currently, this constitutes the location of that block, and hence this function
     /// is responsible for any necessary numeric conversion.
-    fn instantiate_block(cube: GridPoint) -> Self::BlockInst;
+    fn instantiate_block(cube: Cube) -> Self::BlockInst;
 
     /// Transforms a vertex belonging to a general model of a block to its instantiation
     /// in a specific location in space.
@@ -164,8 +164,8 @@ impl<T: Copy + 'static> GfxVertex for BlockVertex<T> {
     }
 
     #[inline]
-    fn instantiate_block(cube: GridPoint) -> Self::BlockInst {
-        cube.to_vec().map(FreeCoordinate::from)
+    fn instantiate_block(cube: Cube) -> Self::BlockInst {
+        cube.lower_bounds().to_vec().map(FreeCoordinate::from)
     }
 
     #[inline]

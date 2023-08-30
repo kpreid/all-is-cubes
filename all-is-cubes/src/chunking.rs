@@ -8,21 +8,25 @@ use std::sync::{Arc, Mutex};
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
 use crate::math::{
-    int_magnitude_squared, point_to_enclosing_cube, FreeCoordinate, GridAab, GridCoordinate,
-    GridPoint, GridVector,
+    int_magnitude_squared, Cube, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector,
 };
 
 /// Type to distinguish chunk coordinates from cube coordinates.
 ///
-/// Parameter `CHUNK_SIZE` is the number of cubes along the edge of a chunk.
-/// The consequences are unspecified if it is not positive.
+/// Chunk math is generally just like cube math (hence the type of the field), but we
+/// don't want to confuse the two and forget to multiply or divide.
+/// A `ChunkPos([x, y, z])` identifies the chunk which contains the cubes with `x` coordinates
+/// in the half-open range `x * CHUNK_SIZE..(x + 1) * CHUNK_SIZE`, and similarly for the
+/// `y` and `z` axes.
+///
+/// The consequences are unspecified if `CHUNK_SIZE` is not positive.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
-pub struct ChunkPos<const CHUNK_SIZE: GridCoordinate>(pub GridPoint);
+pub struct ChunkPos<const CHUNK_SIZE: GridCoordinate>(pub Cube);
 
 impl<const CHUNK_SIZE: GridCoordinate> std::fmt::Debug for ChunkPos<CHUNK_SIZE> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self(Point3 { x, y, z }) = *self;
+        let Self(Cube { x, y, z }) = *self;
         write!(f, "ChunkPos<{CHUNK_SIZE}>({x}, {y}, {z})")
     }
 }
@@ -31,14 +35,17 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     /// Construct a [`ChunkPos`] from chunk coordinates
     /// (i.e. successive numbers indicate adjacent chunks).
     pub const fn new(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate) -> Self {
-        Self(GridPoint::new(x, y, z))
+        Self(Cube::new(x, y, z))
     }
 
     /// Returns the bounds of this chunk as a [`GridAab`].
     ///
     /// TODO: specify what happens if the result would overflow.
     pub fn bounds(self) -> GridAab {
-        GridAab::from_lower_size(self.0 * CHUNK_SIZE, [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE])
+        GridAab::from_lower_size(
+            self.0.lower_bounds() * CHUNK_SIZE,
+            [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE],
+        )
     }
 
     /// Returns the distance between the two given chunks. See the [`Distance`] for an
@@ -60,16 +67,18 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
 }
 
 /// Scale a cube position to obtain the containing chunk.
-pub fn cube_to_chunk<const CHUNK_SIZE: GridCoordinate>(cube: GridPoint) -> ChunkPos<CHUNK_SIZE> {
-    ChunkPos(cube.map(|c| c.div_euclid(CHUNK_SIZE)))
+pub fn cube_to_chunk<const CHUNK_SIZE: GridCoordinate>(cube: Cube) -> ChunkPos<CHUNK_SIZE> {
+    ChunkPos(Cube::from(
+        cube.lower_bounds().map(|c| c.div_euclid(CHUNK_SIZE)),
+    ))
 }
 /// Scale an arbitrary point to obtain the containing chunk.
 pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(
-    cube: Point3<FreeCoordinate>,
+    point: Point3<FreeCoordinate>,
 ) -> ChunkPos<CHUNK_SIZE> {
     ChunkPos(
-        point_to_enclosing_cube(
-        cube.map(|c| c.div_euclid(FreeCoordinate::from(CHUNK_SIZE))),
+        Cube::containing(
+        point.map(|c| c.div_euclid(FreeCoordinate::from(CHUNK_SIZE))),
     ).unwrap(/* TODO */),
     )
 }
@@ -306,8 +315,8 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<
     );
     let mut octant_chunks: Vec<GridVector> = Vec::with_capacity(candidates.volume());
     // (This for loop has been measured as slightly faster than a .filter().collect().)
-    for chunk in candidates.interior_iter() {
-        let chunk = chunk.to_vec();
+    for chunk_cube in candidates.interior_iter() {
+        let chunk = chunk_cube.lower_bounds().to_vec();
         if chunk_distance_squared_for_view(chunk).nearest_approach_squared
             <= view_distance_in_squared_chunks
         {
@@ -535,11 +544,11 @@ mod tests {
     fn min_distance_squared_cases() {
         fn test(pos: [GridCoordinate; 3]) -> GridCoordinate {
             // Arbitrary offset to exercise the subtraction
-            let origin_point = Point3::new(100, 200, 300);
+            let origin_cube = Cube::new(100, 200, 300);
             // Arbitrary chunk size
             const CS: GridCoordinate = 32;
-            let grid_distance = ChunkPos::<CS>(origin_point + Vector3::from(pos))
-                .min_distance_squared_from(ChunkPos(origin_point));
+            let grid_distance = ChunkPos::<CS>(origin_cube + Vector3::from(pos))
+                .min_distance_squared_from(ChunkPos(origin_cube));
             assert_eq!(grid_distance.rem_euclid(CS.pow(2)), 0);
             grid_distance / CS.pow(2)
         }
@@ -668,7 +677,7 @@ mod tests {
             let chart = ChunkChart::<16>::new(distance_in_chunks * 16.);
 
             println!("distance {distance_in_chunks}, expected count {count}");
-            print_space(&chart.visualization(), (1., 1., 1.));
+            print_space(&chart.visualization(), [1., 1., 1.]);
 
             let chunks: Vec<_> = chart
                 .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
@@ -711,12 +720,12 @@ mod tests {
         let chart = ChunkChart::<16>::new(4.0 * 16.);
         println!("{chart:?}");
 
-        let mut seen: HashSet<GridPoint> = HashSet::new();
+        let mut seen: HashSet<Cube> = HashSet::new();
         for ChunkPos(p) in chart.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL) {
             for &q in &seen {
                 assert!(
                     // Either it's the same point mirrored,
-                    p.map(|s| s.abs()) == q.map(|s| s.abs())
+                    p.lower_bounds().map(|s| s.abs()) == q.lower_bounds().map(|s| s.abs())
                         // or it has at least one greater coordinate.
                         || p.x.abs() > q.x.abs()
                         || p.y.abs() > q.y.abs()

@@ -141,12 +141,12 @@ mod tests {
     fn print_space_test() {
         let mut space = Space::empty_positive(3, 1, 1);
         let [b0, b1, b2] = make_some_blocks();
-        space.set((0, 0, 0), &b0).unwrap();
-        space.set((1, 0, 0), &b1).unwrap();
-        space.set((2, 0, 0), &b2).unwrap();
+        space.set([0, 0, 0], &b0).unwrap();
+        space.set([1, 0, 0], &b1).unwrap();
+        space.set([2, 0, 0], &b2).unwrap();
 
         let mut output = String::new();
-        print_space_impl(&space, (1., 1., 1.), |s| output += s);
+        print_space_impl(&space, [1., 1., 1.], |s| output += s);
         print!("{output}");
         pretty_assertions::assert_eq!(
             output,
@@ -216,7 +216,7 @@ mod tests {
         space.set([1, 0, 0], &partial_block).unwrap();
 
         let mut output = String::new();
-        print_space_impl(&space, (1., 1., 1.), |s| output += s);
+        print_space_impl(&space, [1., 1., 1.], |s| output += s);
         print!("{output}");
         pretty_assertions::assert_eq!(
             output,

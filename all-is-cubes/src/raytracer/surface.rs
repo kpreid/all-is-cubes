@@ -2,7 +2,7 @@ use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
 use crate::block::{recursive_ray, Evoxel, Evoxels};
 use crate::camera::LightingOption;
-use crate::math::{Face7, FaceMap, FreeCoordinate, GridArray, GridPoint, Rgb, Rgba};
+use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, GridArray, Rgb, Rgba};
 use crate::raycast::{Ray, Raycaster};
 use crate::raytracer::{RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData};
 
@@ -18,7 +18,7 @@ pub(crate) struct Surface<'a, D> {
     pub emission: Rgb,
 
     /// The cube of the [`Space`] which contains the block this surface belongs to.
-    cube: GridPoint,
+    cube: Cube,
 
     /// The distance along the ray, in units of the ray's direction vector,
     /// where it intersected the surface.
@@ -255,7 +255,7 @@ struct VoxelSurfaceIter<'a, D> {
     array: &'a GridArray<Evoxel>,
 
     /// Cube these voxels are located in, for lighting lookups.
-    block_cube: GridPoint,
+    block_cube: Cube,
 }
 impl<'a, D> VoxelSurfaceIter<'a, D> {
     /// This is not an  implementation of `Iterator` because it doesn't need to be — it's
@@ -280,7 +280,11 @@ impl<'a, D> VoxelSurfaceIter<'a, D> {
             // recursive_ray() _doesn't_ change.
             t_distance: rc_step.t_distance() * self.antiscale,
             intersection_point: rc_step.intersection_point(self.voxel_ray) * self.antiscale
-                + self.block_cube.map(FreeCoordinate::from).to_vec(),
+                + self
+                    .block_cube
+                    .lower_bounds()
+                    .map(FreeCoordinate::from)
+                    .to_vec(),
             normal: rc_step.face(),
         }))
     }
@@ -387,7 +391,7 @@ mod tests {
                     block_data: &(),
                     diffuse_color: solid_test_color,
                     emission: Rgb::ZERO,
-                    cube: GridPoint::new(0, 1, 0),
+                    cube: Cube::new(0, 1, 0),
                     t_distance: 1.5, // half-block starting point + 1 empty block
                     intersection_point: Point3::new(0.5, 1.0, 0.5),
                     normal: Face7::NY
@@ -397,7 +401,7 @@ mod tests {
                     block_data: &(),
                     diffuse_color: slab_test_color,
                     emission: Rgb::ZERO,
-                    cube: GridPoint::new(0, 2, 0),
+                    cube: Cube::new(0, 2, 0),
                     t_distance: 2.5,
                     intersection_point: Point3::new(0.5, 2.0, 0.5),
                     normal: Face7::NY
@@ -407,7 +411,7 @@ mod tests {
                     block_data: &(),
                     diffuse_color: slab_test_color,
                     emission: Rgb::ZERO,
-                    cube: GridPoint::new(0, 2, 0),
+                    cube: Cube::new(0, 2, 0),
                     t_distance: 2.75, // previous surface + 1/4 block of depth
                     intersection_point: Point3::new(0.5, 2.25, 0.5),
                     normal: Face7::NY
@@ -441,7 +445,7 @@ mod tests {
                     block_data: &(),
                     diffuse_color: solid_test_color,
                     emission: Rgb::ZERO,
-                    cube: GridPoint::new(0, 0, 0),
+                    cube: Cube::new(0, 0, 0),
                     t_distance: 0.5, // half-block starting point
                     intersection_point: Point3::new(0.0, 0.5, 0.5),
                     normal: Face7::NX

@@ -2,9 +2,9 @@ use cgmath::{Basis3, Decomposed, One, Vector3};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
 use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport};
-use all_is_cubes::cgmath::{Point3, Vector2};
+use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::chunking::{reset_chunk_chart_cache, ChunkChart, ChunkPos, OctantMask};
-use all_is_cubes::math::GridAab;
+use all_is_cubes::math::{Cube, GridAab};
 
 fn chunk_chart_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("ChunkChart");
@@ -42,7 +42,7 @@ fn cull_bench(c: &mut Criterion) {
         b.iter(|| {
             let mut matched = 0;
             for p in chart
-                .chunks(ChunkPos(Point3::new(0, 0, 0)), OctantMask::ALL)
+                .chunks(ChunkPos(Cube::new(0, 0, 0)), OctantMask::ALL)
                 .rev()
             {
                 if chunked_bounds.contains_cube(p.0) {
@@ -57,10 +57,7 @@ fn cull_bench(c: &mut Criterion) {
     c.bench_function("frustum-bounds", |b| {
         b.iter(|| {
             let mut matched = 0;
-            for p in chart
-                .chunks(ChunkPos(Point3::new(0, 0, 0)), OctantMask::ALL)
-                .rev()
-            {
+            for p in chart.chunks(ChunkPos(Cube::ORIGIN), OctantMask::ALL).rev() {
                 if camera.aab_in_view(p.bounds().into()) && chunked_bounds.contains_cube(p.0) {
                     matched += 1;
                 }
@@ -73,10 +70,7 @@ fn cull_bench(c: &mut Criterion) {
     c.bench_function("bounds-frustum", |b| {
         b.iter(|| {
             let mut matched = 0;
-            for p in chart
-                .chunks(ChunkPos(Point3::new(0, 0, 0)), OctantMask::ALL)
-                .rev()
-            {
+            for p in chart.chunks(ChunkPos(Cube::ORIGIN), OctantMask::ALL).rev() {
                 if chunked_bounds.contains_cube(p.0) && camera.aab_in_view(p.bounds().into()) {
                     matched += 1;
                 }
@@ -90,7 +84,7 @@ fn cull_bench(c: &mut Criterion) {
         b.iter(|| {
             let mut matched = 0;
             for p in chart
-                .chunks(ChunkPos(Point3::new(0, 0, 0)), camera.view_direction_mask())
+                .chunks(ChunkPos(Cube::ORIGIN), camera.view_direction_mask())
                 .rev()
             {
                 if camera.aab_in_view(p.bounds().into()) && chunked_bounds.contains_cube(p.0) {
@@ -106,7 +100,7 @@ fn cull_bench(c: &mut Criterion) {
         b.iter(|| {
             let mut matched = 0;
             for p in chart
-                .chunks(ChunkPos(Point3::new(0, 0, 0)), camera.view_direction_mask())
+                .chunks(ChunkPos(Cube::ORIGIN), camera.view_direction_mask())
                 .rev()
             {
                 if chunked_bounds.contains_cube(p.0) && camera.aab_in_view(p.bounds().into()) {

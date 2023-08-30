@@ -15,7 +15,7 @@ mod tests {
     use super::*;
     use crate::block::{Resolution, AIR};
     use crate::content::{make_slab, make_some_blocks};
-    use crate::math::{Aab, CubeFace, Face7, Geometry, GridAab, GridPoint};
+    use crate::math::{Aab, Cube, CubeFace, Face7, Geometry, GridAab};
     use crate::space::{Space, SpacePhysics};
     use crate::time::Tick;
     use crate::universe::Universe;
@@ -31,7 +31,7 @@ mod tests {
         Body {
             flying: false,
             noclip: false,
-            ..Body::new_minimal((0., 2., 0.), Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5))
+            ..Body::new_minimal([0., 2., 0.], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5))
         }
     }
 
@@ -81,7 +81,7 @@ mod tests {
     fn falling_collision() {
         let [block] = make_some_blocks();
         let mut space = Space::empty_positive(1, 1, 1);
-        space.set((0, 0, 0), &block).unwrap();
+        space.set([0, 0, 0], &block).unwrap();
         let mut body = Body {
             velocity: Vector3::new(2.0, 0.0, 0.0),
             flying: false,
@@ -96,7 +96,7 @@ mod tests {
         assert!((body.position.y - 1.5).abs() < 1e-6, "{:?}", body.position);
         assert_eq!(
             contacts,
-            vec![Contact::Block(CubeFace::new((0, 0, 0), Face7::PY))]
+            vec![Contact::Block(CubeFace::new([0, 0, 0], Face7::PY))]
         );
     }
 
@@ -109,7 +109,7 @@ mod tests {
         let block = make_slab(u, i32::from(RES) / 2, RES);
 
         let mut space = Space::empty_positive(1, 1, 1);
-        space.set((0, 0, 0), &block).unwrap();
+        space.set([0, 0, 0], &block).unwrap();
         let mut body = Body {
             velocity: Vector3::new(x_velocity, 0.0, 0.0),
             flying: false,
@@ -132,7 +132,7 @@ mod tests {
             matches!(
                 contacts[0],
                 Contact::Voxel {
-                    cube: GridPoint { x: 0, y: 0, z: 0 },
+                    cube: Cube::ORIGIN,
                     resolution: RES,
                     voxel: CubeFace {
                         cube: _,
@@ -163,7 +163,7 @@ mod tests {
     fn push_out_simple() {
         let [block] = make_some_blocks();
         let mut space = Space::empty_positive(1, 1, 1);
-        space.set((0, 0, 0), &block).unwrap();
+        space.set([0, 0, 0], &block).unwrap();
         let mut body = Body {
             position: Point3::new(1.25, 0.5, 0.5), // intersection of 0.25
             velocity: Vector3::zero(),

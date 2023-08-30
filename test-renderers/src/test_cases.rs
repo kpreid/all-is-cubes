@@ -15,7 +15,7 @@ use all_is_cubes::cgmath::{EuclideanSpace as _, One, Point2, Point3, Vector2, Ve
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
-    Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, GridVector,
+    Cube, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridRotation, GridVector,
     NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder};
@@ -870,15 +870,15 @@ async fn antialias_test_universe() -> Arc<Universe> {
     let [voxel_block_2] = make_some_voxel_blocks(&mut universe);
     let voxel_block_2 = voxel_block_2.rotate(GridRotation::RZyX);
 
-    let solid_block_pattern = |p: GridPoint| -> Option<&Block> {
-        Some(if (p.x + p.y + p.z).rem_euclid(2) == 0 {
+    let solid_block_pattern = |cube: Cube| -> Option<&Block> {
+        Some(if (cube.x + cube.y + cube.z).rem_euclid(2) == 0 {
             &large_block
         } else {
             &neutral
         })
     };
-    let voxel_block_pattern = |p: GridPoint| -> Option<&Block> {
-        let mod3 = p.to_vec().map(|c| c.rem_euclid(3));
+    let voxel_block_pattern = |cube: Cube| -> Option<&Block> {
+        let mod3 = cube.lower_bounds().map(|c| c.rem_euclid(3));
         Some(if mod3.x == 0 && mod3.z == 2 {
             &voxel_block_2
         } else {

@@ -9,7 +9,7 @@ use crate::block::{
     Modifier, Primitive, Resolution, RotationPlacementRule, AIR,
 };
 use crate::drawing::VoxelBrush;
-use crate::math::{GridPoint, Rgb, Rgba};
+use crate::math::{Cube, GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
 use crate::universe::{Name, URef, Universe};
 
@@ -160,7 +160,7 @@ impl<C> BlockBuilder<C> {
         mut function: F,
     ) -> Result<BlockBuilder<BlockBuilderVoxels>, SetCubeError>
     where
-        F: FnMut(GridPoint) -> B,
+        F: FnMut(Cube) -> B,
         B: std::borrow::Borrow<Block>,
     {
         let mut space = Space::for_block(resolution).build();
