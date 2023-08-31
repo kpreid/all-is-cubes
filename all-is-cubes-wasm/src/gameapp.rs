@@ -68,7 +68,7 @@ impl WebSession {
         fullscreen_cell: ListenableCell<Option<bool>>,
     ) -> Rc<Self> {
         let self_rc = Rc::new_cyclic(|weak_self| {
-            let new_self = Self {
+            Self {
                 gui_helpers,
                 static_dom,
                 viewport_cell,
@@ -97,9 +97,7 @@ impl WebSession {
                     last_raf_timestamp: 0.0, // TODO better initial value or special case
                     last_step_info: UniverseStepInfo::default(),
                 }),
-            };
-
-            new_self
+            }
         });
 
         self_rc.clone().init_dom();
@@ -312,7 +310,7 @@ impl WebSession {
     {
         if let Some(strong_self_ref) = weak_self_ref.upgrade() {
             match strong_self_ref.inner_cell.try_borrow_mut() {
-                Ok(mut inner) => body(&strong_self_ref, &mut *inner),
+                Ok(mut inner) => body(&strong_self_ref, &mut inner),
                 Err(BorrowMutError { .. }) => {
                     // We probably left the cell borrowed in a previous panic.
                     // Log, but don't panic again because it will only create log spam.
