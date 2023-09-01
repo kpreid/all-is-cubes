@@ -1,6 +1,6 @@
-use std::cmp::Ordering;
-use std::fmt;
-use std::iter::FusedIterator;
+use core::cmp::Ordering;
+use core::fmt;
+use core::iter::FusedIterator;
 
 use euclid::{Point3D, Vector3D};
 

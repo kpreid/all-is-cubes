@@ -1,8 +1,8 @@
 //! Player-character stuff.
 
+use alloc::sync::Arc;
+use core::fmt;
 use std::collections::HashSet;
-use std::fmt;
-use std::sync::Arc;
 
 use euclid::{Angle, Point3D, Rotation3D, Vector3D};
 use ordered_float::NotNan;
@@ -595,9 +595,9 @@ impl serde::Serialize for Character {
             yaw,
             pitch,
 
-            inventory: std::borrow::Cow::Borrowed(inventory),
+            inventory: alloc::borrow::Cow::Borrowed(inventory),
             selected_slots,
-            behaviors: std::borrow::Cow::Borrowed(behaviors),
+            behaviors: alloc::borrow::Cow::Borrowed(behaviors),
         }
         .serialize(serializer)
     }
@@ -774,7 +774,7 @@ impl Merge for CharacterTransaction {
 pub enum CharacterTransactionConflict {
     #[allow(missing_docs)]
     #[error("conflict in character body")]
-    Body(std::convert::Infallible),
+    Body(core::convert::Infallible),
     #[allow(missing_docs)]
     #[error("conflict in character inventory")]
     Inventory(inv::InventoryConflict),

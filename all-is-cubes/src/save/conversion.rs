@@ -1,7 +1,7 @@
 //! Conversion between the types in [`super::schema`] and those used in
 //! normal operation.
 
-use std::borrow::Cow;
+use alloc::borrow::Cow;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -13,7 +13,7 @@ mod behavior {
         Behavior, BehaviorHost, BehaviorPersistence, BehaviorSet, BehaviorSetTransaction,
     };
     use crate::transaction::{Merge as _, Transaction as _};
-    use std::sync::Arc;
+    use alloc::sync::Arc;
 
     // TODO: Stop serializing H::Attachment directly or document that it has to be stable.
 
@@ -688,8 +688,8 @@ mod universe {
     use crate::space::Space;
     use crate::time;
     use crate::universe::{self, Name, PartialUniverse, UBorrow, URef, Universe};
+    use core::cell::RefCell;
     use schema::{MemberDe, NameSer, URefSer};
-    use std::cell::RefCell;
 
     impl From<&BlockDef> for schema::MemberSer {
         fn from(block_def: &BlockDef) -> Self {
@@ -905,7 +905,7 @@ mod universe {
                     .take()
                     .expect("something went wrong with UREF_DESERIALIZATION_CONTEXT")
             });
-            std::mem::forget(self); // don't run Drop
+            core::mem::forget(self); // don't run Drop
             context
         }
     }

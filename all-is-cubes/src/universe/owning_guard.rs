@@ -21,8 +21,9 @@
 //! Further discussion of this code:
 //! <https://users.rust-lang.org/t/unsafe-code-review-semi-owning-weak-rwlock-t-guard/95706>
 
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use std::{mem, ptr};
+use alloc::sync::Arc;
+use core::{mem, ptr};
+use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use super::uref::UEntry;
 
@@ -97,21 +98,21 @@ impl<T: 'static> UBorrowMutImpl<T> {
     }
 }
 
-impl<T: 'static> std::ops::Deref for UBorrowImpl<T> {
+impl<T: 'static> core::ops::Deref for UBorrowImpl<T> {
     type Target = UEntry<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.guard
     }
 }
-impl<T: 'static> std::ops::Deref for UBorrowMutImpl<T> {
+impl<T: 'static> core::ops::Deref for UBorrowMutImpl<T> {
     type Target = UEntry<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.guard
     }
 }
-impl<T: 'static> std::ops::DerefMut for UBorrowMutImpl<T> {
+impl<T: 'static> core::ops::DerefMut for UBorrowMutImpl<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.guard
     }
@@ -147,7 +148,7 @@ impl<T> MaybeDangling<T> {
     }
 }
 
-impl<T> std::ops::Deref for MaybeDangling<T> {
+impl<T> core::ops::Deref for MaybeDangling<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -159,7 +160,7 @@ impl<T> std::ops::Deref for MaybeDangling<T> {
     }
 }
 
-impl<T> std::ops::DerefMut for MaybeDangling<T> {
+impl<T> core::ops::DerefMut for MaybeDangling<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         // SAFETY:
         // The `MaybeUninit` is never actually uninitialized. It might be dangling, but

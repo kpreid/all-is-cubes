@@ -1,8 +1,8 @@
 //! [`Tool`] and related.
 
-use std::borrow::Cow;
-use std::sync::Arc;
-use std::{fmt, hash};
+use alloc::borrow::Cow;
+use alloc::sync::Arc;
+use core::{fmt, hash};
 
 use crate::block::{self, Block, Primitive, RotationPlacementRule, AIR};
 use crate::character::{Character, CharacterTransaction, Cursor};
@@ -442,7 +442,7 @@ impl ToolError {
     /// TODO: This should have spatial information (located at the cursor target or the
     /// character's "hand" or other).
     pub fn fluff(&self) -> impl Iterator<Item = Fluff> {
-        std::iter::once(Fluff::Beep)
+        core::iter::once(Fluff::Beep)
     }
 }
 
@@ -871,7 +871,7 @@ mod tests {
 
     #[test]
     fn use_external_action() {
-        use std::sync::atomic::{AtomicU32, Ordering};
+        use core::sync::atomic::{AtomicU32, Ordering};
 
         let called = Arc::new(AtomicU32::new(0));
         let tool = Tool::external_action(AIR, {

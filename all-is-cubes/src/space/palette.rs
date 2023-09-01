@@ -1,6 +1,7 @@
+use alloc::sync::{Arc, Weak};
+use core::fmt;
 use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::Mutex;
 
 use crate::block::{self, Block, BlockChange, EvaluatedBlock, AIR, AIR_EVALUATED};
 use crate::listen::{self, Listener as _};
@@ -162,7 +163,7 @@ impl Palette {
                     self.listener_for_block(old_block_index),
                 );
                 data.count = 1;
-                std::mem::swap(&mut data, &mut self.entries[old_block_index as usize]);
+                core::mem::swap(&mut data, &mut self.entries[old_block_index as usize]);
                 data.block
             };
 

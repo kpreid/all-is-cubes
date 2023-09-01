@@ -1,10 +1,9 @@
-use std::borrow::Borrow;
-use std::fmt;
-use std::hash;
-use std::ops::Deref;
-use std::ops::DerefMut;
-use std::sync::Mutex;
-use std::sync::{Arc, RwLock, Weak};
+use alloc::sync::{Arc, Weak};
+use core::borrow::Borrow;
+use core::fmt;
+use core::hash;
+use core::ops::{Deref, DerefMut};
+use std::sync::{Mutex, RwLock};
 
 use crate::transaction::{ExecuteError, PreconditionFailed, Transaction, Transactional};
 use crate::universe::{
@@ -447,7 +446,7 @@ impl<T: UniverseMember> AsRef<dyn URefErased> for URef<T> {
         self
     }
 }
-impl<T: UniverseMember> std::borrow::Borrow<dyn URefErased> for URef<T> {
+impl<T: UniverseMember> core::borrow::Borrow<dyn URefErased> for URef<T> {
     fn borrow(&self) -> &dyn URefErased {
         self
     }

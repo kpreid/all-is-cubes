@@ -1,9 +1,9 @@
 //! Dynamic add-ons to game objects; we might also have called them “components”.
 
-use std::any::TypeId;
-use std::collections::BTreeMap;
-use std::fmt::{self, Debug};
-use std::sync::Arc;
+use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
+use core::any::TypeId;
+use core::fmt::{self, Debug};
 
 use downcast_rs::{impl_downcast, Downcast};
 
@@ -207,7 +207,7 @@ impl<H: BehaviorHost> Default for BehaviorSet<H> {
     }
 }
 
-impl<H: BehaviorHost> std::fmt::Debug for BehaviorSet<H> {
+impl<H: BehaviorHost> core::fmt::Debug for BehaviorSet<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "BehaviorSet(")?;
         f.debug_list().entries(&*self.items).finish()?;

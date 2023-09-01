@@ -2,6 +2,7 @@
 //!
 //! TODO: stuff in this module is kind of duplicative of [`crate::drawing`]...
 
+use alloc::vec::Vec;
 use std::collections::HashMap;
 
 use embedded_graphics::image::ImageDrawable;
@@ -196,7 +197,7 @@ mod tests {
                 filter_method: png_decoder::FilterMethod::Adaptive,
                 interlace_method: png_decoder::InterlaceMethod::None,
             },
-            vec![
+            alloc::vec![
                 0, 0, 0, 255, //
                 255, 0, 0, 255, //
                 0, 255, 0, 255, //

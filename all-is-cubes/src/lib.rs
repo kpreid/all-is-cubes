@@ -163,6 +163,13 @@
 //   The majority of it is trivial unchecked constructors that are run at compile time;
 //   `universe::owning_guard` contains the scary part.
 #![warn(missing_docs)]
+#![cfg_attr(
+    not(any(test, feature = "arbitrary")),
+    warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)
+)]
+
+extern crate alloc;
+//extern crate std;
 
 #[macro_use]
 pub mod math;

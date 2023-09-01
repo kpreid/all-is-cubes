@@ -1,6 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
-use std::hash::Hash;
-use std::{fmt, mem};
+use alloc::collections::BTreeMap;
+use core::hash::Hash;
+use core::{fmt, mem};
+use std::collections::HashMap;
 
 use crate::transaction::Merge;
 
@@ -37,7 +38,7 @@ where
             // the smaller map rather than the larger.
             // TODO: We can improve further by taking advantage of sortedness, using the
             // first and last of one set to iterate over a range of the other.
-            // std::collections::btree_set::Intersection implements something like this,
+            // alloc::collections::btree_set::Intersection implements something like this,
             // but unfortunately, does not have an analogue for BTreeMap.
             mem::swap(&mut map1, &mut map2);
         }
@@ -61,7 +62,7 @@ where
             mem::swap(&mut self, &mut other);
         }
         for (k, v2) in other {
-            use std::collections::btree_map::Entry::*;
+            use alloc::collections::btree_map::Entry::*;
             match self.entry(k) {
                 Occupied(mut entry) => {
                     let v1 = mem::take(entry.get_mut());

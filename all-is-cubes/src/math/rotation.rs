@@ -436,7 +436,7 @@ impl GridRotation {
     /// ```
     pub fn iterate(self) -> impl Iterator<Item = Self> {
         let mut item = Self::IDENTITY;
-        std::iter::once(Self::IDENTITY).chain(std::iter::from_fn(move || {
+        core::iter::once(Self::IDENTITY).chain(core::iter::from_fn(move || {
             item = item * self;
             if item == Self::IDENTITY {
                 // Cycled back to start; time to stop

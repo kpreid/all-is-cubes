@@ -15,8 +15,8 @@
 //!   (and not, say, as structures with named fields).
 //! * [`Cow`] is sometimes used to avoid unnecessary clones during serialization.
 
-use std::borrow::Cow;
-use std::sync::Arc;
+use alloc::borrow::Cow;
+use alloc::sync::Arc;
 
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
@@ -229,7 +229,7 @@ pub(crate) enum InventorySer {
 /// Not tagged since it will only appear inside an [`InventorySer`].
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct InvStackSer {
-    pub(crate) count: std::num::NonZeroU16,
+    pub(crate) count: core::num::NonZeroU16,
     pub(crate) item: inv::Tool,
 }
 

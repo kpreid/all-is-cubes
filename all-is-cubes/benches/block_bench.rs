@@ -14,7 +14,7 @@ pub fn evaluate_bench(c: &mut Criterion) {
         let blocks = make_some_blocks::<N>();
 
         b.iter_with_large_drop(|| -> [EvaluatedBlock; N] {
-            std::array::from_fn(|i| blocks[i].evaluate().unwrap())
+            core::array::from_fn(|i| blocks[i].evaluate().unwrap())
         })
     });
 
@@ -25,7 +25,7 @@ pub fn evaluate_bench(c: &mut Criterion) {
         let blocks = make_some_voxel_blocks::<N>(&mut universe);
 
         b.iter_with_large_drop(|| -> [EvaluatedBlock; N] {
-            std::array::from_fn(|i| blocks[i].evaluate().unwrap())
+            core::array::from_fn(|i| blocks[i].evaluate().unwrap())
         })
     });
 

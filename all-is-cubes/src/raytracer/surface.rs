@@ -319,7 +319,7 @@ impl<'a, D> Iterator for DepthIter<'a, D> {
         Some(match self.surface_iter.next()? {
             TraceStep::EnterSurface(this_surface) => {
                 let exit_t_distance = this_surface.t_distance;
-                match std::mem::replace(&mut self.last_surface, Some(this_surface)) {
+                match core::mem::replace(&mut self.last_surface, Some(this_surface)) {
                     Some(last_surface) => DepthStep::Span(Span {
                         surface: last_surface,
                         exit_t_distance,

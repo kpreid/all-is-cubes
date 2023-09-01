@@ -1,6 +1,6 @@
 //! Serialization/persistence/saved games.
 
-use std::fmt;
+use core::fmt;
 
 use futures_core::future::BoxFuture;
 
@@ -89,7 +89,7 @@ impl WhenceUniverse for () {
         &self,
         _: YieldProgress,
     ) -> BoxFuture<'static, Result<Universe, Box<dyn std::error::Error + Send + Sync>>> {
-        Box::pin(std::future::ready(Err(
+        Box::pin(core::future::ready(Err(
             "this universe cannot be reloaded because it has no source".into(),
         )))
     }
@@ -99,7 +99,7 @@ impl WhenceUniverse for () {
         _universe: &Universe,
         _progress: YieldProgress,
     ) -> BoxFuture<'static, Result<(), Box<dyn std::error::Error + Send + Sync>>> {
-        Box::pin(std::future::ready(Err(
+        Box::pin(core::future::ready(Err(
             "this universe cannot be saved because a destination has not been specified".into(),
         )))
     }

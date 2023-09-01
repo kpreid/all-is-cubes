@@ -1,9 +1,9 @@
 //! Axis-aligned integer-coordinate box volumes ([`GridAab`]), arrays bounded by them
 //! ([`GridArray`]), and related.
 
-use std::fmt;
-use std::iter::FusedIterator;
-use std::ops::Range;
+use core::fmt;
+use core::iter::FusedIterator;
+use core::ops::Range;
 
 use euclid::{Point3D, Vector3D};
 
@@ -201,7 +201,7 @@ impl GridAab {
         // 6 bounding coordinates plus one permutation selection.
         // Depending on the volume we could *maybe* end up consuming only 1 byte each
         // for the sizes.
-        let gc = std::mem::size_of::<GridCoordinate>();
+        let gc = core::mem::size_of::<GridCoordinate>();
         ((gc + 1) * 3 + 1, Some(gc * 6 + 1))
     };
 
@@ -1047,7 +1047,7 @@ impl<V> GridArray<V> {
     }
 }
 
-impl<P: Into<Cube>, V> std::ops::Index<P> for GridArray<V> {
+impl<P: Into<Cube>, V> core::ops::Index<P> for GridArray<V> {
     type Output = V;
 
     /// Returns the element at `position` of this array, or panics if `position` is out of
@@ -1067,7 +1067,7 @@ impl<P: Into<Cube>, V> std::ops::Index<P> for GridArray<V> {
         }
     }
 }
-impl<P: Into<Cube>, V> std::ops::IndexMut<P> for GridArray<V> {
+impl<P: Into<Cube>, V> core::ops::IndexMut<P> for GridArray<V> {
     /// Returns the element at `position` of this array, or panics if `position` is out of
     /// bounds.
     #[inline(always)]

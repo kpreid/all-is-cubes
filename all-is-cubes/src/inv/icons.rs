@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Primitive};

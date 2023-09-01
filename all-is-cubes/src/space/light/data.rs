@@ -1,8 +1,9 @@
 //! Data structures for light storage and algorithms.
 
+use alloc::collections::BTreeSet;
+use core::fmt;
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeSet, HashMap};
-use std::fmt;
+use std::collections::HashMap;
 
 use euclid::default::Vector3D;
 
@@ -248,7 +249,7 @@ impl LightUpdateRequest {
     }
 }
 impl Ord for LightUpdateRequest {
-    fn cmp(&self, other: &LightUpdateRequest) -> std::cmp::Ordering {
+    fn cmp(&self, other: &LightUpdateRequest) -> core::cmp::Ordering {
         self.priority
             .cmp(&other.priority)
             .then_with(|| self.fallback_priority().cmp(&other.fallback_priority()))
@@ -260,7 +261,7 @@ impl Ord for LightUpdateRequest {
     }
 }
 impl PartialOrd for LightUpdateRequest {
-    fn partial_cmp(&self, other: &LightUpdateRequest) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &LightUpdateRequest) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
@@ -396,7 +397,7 @@ impl LightUpdateQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::iter::once;
+    use core::iter::once;
 
     fn packed_light_test_values() -> impl Iterator<Item = PackedLight> {
         (PackedLightScalar::MIN..PackedLightScalar::MAX)
@@ -459,7 +460,7 @@ mod tests {
     #[test]
     fn packed_light_is_packed() {
         // Technically this is not guaranteed by the compiler, but if it's false something probably went wrong.
-        assert_eq!(std::mem::size_of::<PackedLight>(), 4);
+        assert_eq!(core::mem::size_of::<PackedLight>(), 4);
     }
 
     /// Demonstrate what range and step sizes we get out of the encoding.

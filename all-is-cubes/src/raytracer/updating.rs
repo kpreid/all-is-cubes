@@ -1,7 +1,8 @@
+use alloc::sync::{Arc, Weak};
+use core::fmt;
+use core::mem;
 use std::collections::HashSet;
-use std::fmt;
-use std::mem;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::Mutex;
 
 use crate::block::AIR;
 use crate::camera::GraphicsOptions;

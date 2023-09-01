@@ -10,8 +10,9 @@
 //! `Weak<Mutex<...>>` or similar multiply-owned mutable structure to aggregate incoming
 //! messages, which will then be read and cleared by a later task.
 
-use std::fmt;
-use std::sync::{Arc, RwLock, Weak};
+use alloc::sync::{Arc, Weak};
+use core::fmt;
+use std::sync::RwLock;
 
 mod cell;
 pub use cell::*;

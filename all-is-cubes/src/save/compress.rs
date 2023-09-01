@@ -1,5 +1,5 @@
-use std::borrow::Cow;
-use std::fmt;
+use alloc::borrow::Cow;
+use core::fmt;
 use std::io::{self, Write as _};
 
 use serde::de::Error as _;
@@ -131,7 +131,7 @@ mod tests {
     #[track_caller]
     fn assert_round_trip<T>(value: &[T], expected_base64: &str)
     where
-        T: bytemuck::Pod + Eq + std::fmt::Debug,
+        T: bytemuck::Pod + Eq + core::fmt::Debug,
     {
         let json_value =
             serde_json::to_value(GzSerde(Cow::Borrowed(value))).expect("failed to serialize");

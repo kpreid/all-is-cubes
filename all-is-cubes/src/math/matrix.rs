@@ -1,8 +1,8 @@
 //! Integer-coordinate matrices.
 //! This module is private but reexported by its parent.
 
-use std::cmp::Ordering;
-use std::ops::{self, Mul};
+use core::cmp::Ordering;
+use core::ops::{self, Mul};
 
 use euclid::Vector3D;
 use num_traits::One;

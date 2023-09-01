@@ -1,7 +1,7 @@
 //! Algorithms for collision detection with [`Space`](crate::space::Space)s.
 
+use core::fmt;
 use std::collections::HashSet;
-use std::fmt;
 
 use euclid::Vector3D;
 

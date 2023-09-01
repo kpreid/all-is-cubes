@@ -8,11 +8,11 @@
 //! by becoming aware of dependencies between “modules”. For now, it's just enough to
 //! solve bootstrapping needs.
 
+use core::fmt;
+use core::hash::Hash;
+use core::ops::Index;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt;
-use std::hash::Hash;
-use std::ops::Index;
 
 use exhaust::Exhaust;
 

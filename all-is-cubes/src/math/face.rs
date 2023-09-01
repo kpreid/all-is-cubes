@@ -159,7 +159,7 @@ impl Face6 {
     #[must_use]
     pub fn normal_vector<S, U>(self) -> Vector3D<S, U>
     where
-        S: num_traits::Zero + num_traits::One + std::ops::Neg<Output = S>,
+        S: num_traits::Zero + num_traits::One + core::ops::Neg<Output = S>,
     {
         self.into7().normal_vector()
     }
@@ -179,7 +179,7 @@ impl Face6 {
     #[must_use]
     pub fn dot<S, U>(self, vector: Vector3D<S, U>) -> S
     where
-        S: Zero + std::ops::Neg<Output = S>,
+        S: Zero + core::ops::Neg<Output = S>,
     {
         self.into7().dot(vector)
     }
@@ -384,7 +384,7 @@ impl Face7 {
     #[must_use]
     pub fn normal_vector<S, U>(self) -> Vector3D<S, U>
     where
-        S: num_traits::Zero + num_traits::One + std::ops::Neg<Output = S>,
+        S: num_traits::Zero + num_traits::One + core::ops::Neg<Output = S>,
     {
         match self {
             Face7::Within => Vector3D::new(S::zero(), S::zero(), S::zero()),
@@ -412,7 +412,7 @@ impl Face7 {
     #[must_use]
     pub fn dot<S, U>(self, vector: Vector3D<S, U>) -> S
     where
-        S: Zero + std::ops::Neg<Output = S>,
+        S: Zero + core::ops::Neg<Output = S>,
     {
         match self {
             Face7::Within => S::zero(),

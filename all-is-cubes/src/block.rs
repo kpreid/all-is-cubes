@@ -4,10 +4,10 @@
 //! The types of most interest in this module are [`Block`], [`Primitive`],
 //! [`BlockAttributes`], and [`Modifier`].
 
-use std::borrow::Cow;
-use std::collections::VecDeque;
-use std::fmt;
-use std::sync::Arc;
+use alloc::borrow::Cow;
+use alloc::collections::VecDeque;
+use alloc::sync::Arc;
+use core::fmt;
 
 use crate::listen::{self, Listen, Listener};
 use crate::math::{
@@ -608,8 +608,8 @@ impl PartialEq for Block {
     }
 }
 impl Eq for Block {}
-impl std::hash::Hash for Block {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl core::hash::Hash for Block {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.primitive().hash(state);
         self.modifiers().hash(state);
     }

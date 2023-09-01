@@ -1,5 +1,5 @@
-use std::fmt;
-use std::sync::{Arc, Weak};
+use alloc::sync::{Arc, Weak};
+use core::fmt;
 
 use crate::listen::{Listener, Notifier};
 

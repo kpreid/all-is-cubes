@@ -1,6 +1,6 @@
-use std::fmt;
-use std::ops::Deref;
-use std::sync::Arc;
+use alloc::sync::Arc;
+use core::fmt;
+use core::ops::Deref;
 
 use crate::block::{self, Block, BlockChange, Primitive};
 use crate::listen::{Gate, Listen, Listener, Notifier};

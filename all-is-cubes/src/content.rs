@@ -3,7 +3,7 @@
 //! This module is private; the public interface to this stuff is the separate
 //! `all-is-cubes-content` crate.
 
-use std::borrow::Cow;
+use alloc::borrow::Cow;
 
 use embedded_graphics::mono_font::iso_8859_1::FONT_9X15_BOLD;
 use embedded_graphics::mono_font::MonoTextStyle;

@@ -1,7 +1,7 @@
 //! Tests of serialization and deserialization.
 
-use std::fmt;
-use std::sync::Arc;
+use alloc::sync::Arc;
+use core::fmt;
 
 use euclid::vec3;
 use pretty_assertions::assert_eq;

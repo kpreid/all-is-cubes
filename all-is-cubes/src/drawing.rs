@@ -15,13 +15,14 @@
 //!     and rectangles have inclusive upper bounds (whereas our [`GridAab`]s have
 //!     exclusive upper bounds).
 
+use alloc::borrow::{Borrow, Cow};
+use core::marker::PhantomData;
+use core::ops::Range;
+
 use embedded_graphics::geometry::{Dimensions, Point, Size};
 use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
 use embedded_graphics::prelude::{DrawTarget, Drawable, Pixel};
 use embedded_graphics::primitives::Rectangle;
-use std::borrow::{Borrow, Cow};
-use std::marker::PhantomData;
-use std::ops::Range;
 
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;

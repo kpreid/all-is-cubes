@@ -13,9 +13,9 @@
 //! bring your own synchronization mechanisms to ensure that readers and writers do not
 //! run at the same time.
 
-use std::fmt;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use alloc::sync::Arc;
+use core::fmt;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::block::BlockDef;
 use crate::character::Character;
@@ -332,8 +332,8 @@ impl Universe {
             Name::Specific(_) | Name::Anonym(_) => {}
         }
         match <Universe as UniverseTable<T>>::table_mut(self).entry(name.clone()) {
-            std::collections::btree_map::Entry::Occupied(oe) => Ok(oe.get().downgrade()),
-            std::collections::btree_map::Entry::Vacant(ve) => {
+            alloc::collections::btree_map::Entry::Occupied(oe) => Ok(oe.get().downgrade()),
+            alloc::collections::btree_map::Entry::Vacant(ve) => {
                 let root_ref = URootRef::new_deserializing(id, name);
                 let returned_ref = root_ref.downgrade();
                 ve.insert(root_ref);
@@ -540,7 +540,7 @@ impl fmt::Debug for Universe {
 
 /// Iterator type for [`Universe::iter_by_type`].
 #[derive(Clone, Debug)]
-pub struct UniverseIter<'u, T>(std::collections::btree_map::Iter<'u, Name, URootRef<T>>);
+pub struct UniverseIter<'u, T>(alloc::collections::btree_map::Iter<'u, Name, URootRef<T>>);
 impl<'u, T> Iterator for UniverseIter<'u, T> {
     type Item = (Name, URef<T>);
     fn next(&mut self) -> Option<Self::Item> {
@@ -619,7 +619,7 @@ pub struct UniverseStepInfo {
     total_members: usize,
     space_step: SpaceStepInfo,
 }
-impl std::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
+impl core::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
     fn add_assign(&mut self, other: Self) {
         self.computation_time += other.computation_time;
         self.active_members += other.active_members;

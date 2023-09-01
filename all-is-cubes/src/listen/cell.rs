@@ -1,4 +1,5 @@
-use std::sync::{Arc, Mutex};
+use alloc::sync::Arc;
+use std::sync::Mutex;
 
 use crate::listen::{Listen, Listener, Notifier};
 

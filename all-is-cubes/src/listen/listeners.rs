@@ -1,7 +1,8 @@
-use std::collections::VecDeque;
-use std::fmt;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, RwLock, Weak};
+use alloc::collections::VecDeque;
+use alloc::sync::{Arc, Weak};
+use core::fmt;
+use core::sync::atomic::{AtomicBool, Ordering};
+use std::sync::RwLock;
 
 use crate::listen::{Listen, Listener};
 

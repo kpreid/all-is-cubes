@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 
 use euclid::Vector3D;
 use ordered_float::NotNan;
@@ -536,7 +536,7 @@ impl Transaction<Body> for BodyTransaction {
 
 impl transaction::Merge for BodyTransaction {
     type MergeCheck = ();
-    type Conflict = std::convert::Infallible;
+    type Conflict = core::convert::Infallible;
 
     fn check_merge(&self, _other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         Ok(())

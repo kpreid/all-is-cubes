@@ -1,8 +1,8 @@
 //! Color data types. This module is private but reexported by its parent.
 
-use std::fmt;
-use std::iter::Sum;
-use std::ops::{Add, AddAssign, Mul, Sub};
+use core::fmt;
+use core::iter::Sum;
+use core::ops::{Add, AddAssign, Mul, Sub};
 
 use euclid::{vec3, Vector3D};
 pub use ordered_float::{FloatIsNan, NotNan};

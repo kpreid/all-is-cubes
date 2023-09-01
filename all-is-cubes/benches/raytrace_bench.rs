@@ -39,7 +39,7 @@ impl TestData {
                 ListenableSource::constant(Some(self.character.clone())),
                 ListenableSource::constant(UiViewState::default()),
             ),
-            Box::new(std::convert::identity),
+            Box::new(core::convert::identity),
             ListenableSource::constant(()),
         );
         renderer.update(None).unwrap();

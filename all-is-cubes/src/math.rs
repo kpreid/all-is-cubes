@@ -101,7 +101,7 @@ pub(crate) fn smoothstep(x: f64) -> f64 {
 #[doc(hidden)]
 pub fn sort_two<T: PartialOrd>(a: &mut T, b: &mut T) {
     if *a > *b {
-        std::mem::swap(a, b);
+        core::mem::swap(a, b);
     }
 }
 

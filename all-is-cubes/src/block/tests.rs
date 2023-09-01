@@ -7,7 +7,7 @@
 
 #![allow(clippy::bool_assert_comparison)]
 
-use std::borrow::Cow;
+use alloc::borrow::Cow;
 
 use pretty_assertions::assert_eq;
 
@@ -44,8 +44,8 @@ fn listen(
 
 #[test]
 fn block_is_approximately_a_pointer() {
-    let block_size = std::mem::size_of::<Block>();
-    let ptr_size = std::mem::size_of::<*const ()>();
+    let block_size = core::mem::size_of::<Block>();
+    let ptr_size = core::mem::size_of::<*const ()>();
     assert!(
         ptr_size < block_size && block_size <= 2 * ptr_size,
         "unexpected size: {block_size}",

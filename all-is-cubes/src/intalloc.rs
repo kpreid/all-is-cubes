@@ -1,8 +1,8 @@
 //! “Integer allocation”: algorithms for finding small integers not currently in use
 //! for the same purpose.
 
+use core::fmt::Debug;
 use num_traits::int::PrimInt;
-use std::fmt::Debug;
 
 /// An integer allocator; that is, an algorithm for solving the problem
 /// “give me an integer that nobody else is currently using”, as tracked

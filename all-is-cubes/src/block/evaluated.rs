@@ -1,6 +1,6 @@
 //! [`EvaluatedBlock`] and [`Evoxel`].
 
-use std::fmt;
+use core::fmt;
 
 use euclid::Vector3D;
 use ordered_float::NotNan;
@@ -509,7 +509,7 @@ impl Evoxels {
     // TODO: make public?
     pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &'_ mut Evoxel> {
         match self {
-            Evoxels::One(v) => std::slice::from_mut(v).iter_mut(),
+            Evoxels::One(v) => core::slice::from_mut(v).iter_mut(),
             Evoxels::Many(_, voxels) => voxels.elements_mut().iter_mut(),
         }
     }
@@ -524,7 +524,7 @@ impl Evoxels {
     }
 }
 
-impl std::ops::Index<Cube> for Evoxels {
+impl core::ops::Index<Cube> for Evoxels {
     type Output = Evoxel;
 
     #[inline]
@@ -589,7 +589,7 @@ pub(super) const AIR_EVALUATED_MIN: MinEval = MinEval {
 
 /// Used only by [`AIR_EVALUATED`].
 const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
-    display_name: std::borrow::Cow::Borrowed("<air>"),
+    display_name: alloc::borrow::Cow::Borrowed("<air>"),
     selectable: false,
     rotation_rule: block::RotationPlacementRule::Never,
     tick_action: None,

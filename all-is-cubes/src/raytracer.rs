@@ -8,7 +8,7 @@
 //! it is much simpler. It continues to serve as a “reference implementation” and is used
 //! by the terminal UI and in unit tests via [`print_space`].
 
-use std::fmt;
+use core::fmt;
 
 use euclid::{vec3, Vector2D, Vector3D};
 use ordered_float::NotNan;
@@ -268,7 +268,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     ///
     /// `F` is the function accepting the output, and `E` is the type of error it may
     /// produce. This function-based interface is intended to abstract over the
-    /// inconvenient difference between [`std::io::Write`] and [`std::fmt::Write`].
+    /// inconvenient difference between [`std::io::Write`] and [`core::fmt::Write`].
     ///
     /// After each line (row) of the image, `write(line_ending)` will be called.
     pub fn trace_scene_to_text<P, F, E>(
@@ -363,7 +363,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             String::with_capacity(camera.viewport().framebuffer_size.dot(Vector2D::one()) as usize);
         self.trace_scene_to_text::<P, _, _>(camera, line_ending, |s| {
             out.push_str(s);
-            Ok::<(), std::convert::Infallible>(())
+            Ok::<(), core::convert::Infallible>(())
         })
         .unwrap();
         out
@@ -403,12 +403,12 @@ fn mix4(a: [f32; 4], b: [f32; 4], amount: f32) -> [f32; 4] {
 pub struct RaytraceInfo {
     cubes_traced: usize,
 }
-impl std::ops::AddAssign<RaytraceInfo> for RaytraceInfo {
+impl core::ops::AddAssign<RaytraceInfo> for RaytraceInfo {
     fn add_assign(&mut self, other: Self) {
         self.cubes_traced += other.cubes_traced;
     }
 }
-impl std::iter::Sum for RaytraceInfo {
+impl core::iter::Sum for RaytraceInfo {
     fn sum<I>(iter: I) -> Self
     where
         I: Iterator<Item = Self>,
@@ -629,8 +629,8 @@ pub(crate) struct EvalTrace {
 
 #[cfg(feature = "threads")]
 mod rayon_helper {
+    use core::iter::{empty, once, Sum};
     use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator as _};
-    use std::iter::{empty, once, Sum};
 
     /// Implements [`ParallelExtend`] to just sum things, so that
     /// [`ParallelIterator::unzip`] can produce a sum.

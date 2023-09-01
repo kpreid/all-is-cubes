@@ -1,6 +1,6 @@
 use super::*;
+use alloc::rc::Rc;
 use std::error::Error;
-use std::rc::Rc;
 
 /// Tool for testing that a type of transaction obeys the rules:
 ///
@@ -110,7 +110,7 @@ where
         &'b self,
     ) -> impl Iterator<Item = TransactionAndPredicate<'a, Tr, Ta>> + 'b {
         self.transactions.iter().flat_map(move |t1| {
-            std::iter::once(t1.clone()).chain(
+            core::iter::once(t1.clone()).chain(
                 self.transactions
                     .iter()
                     .flat_map(move |t2| t1.clone().try_merge(t2.clone())),

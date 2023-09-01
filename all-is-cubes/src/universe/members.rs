@@ -4,8 +4,8 @@
 //! This module is not public and that is part of the protection of several items
 //! inside it (the public-in-private trick).
 
-use std::collections::BTreeMap;
-use std::fmt;
+use alloc::collections::BTreeMap;
+use core::fmt;
 
 use crate::block::BlockDef;
 use crate::character::Character;
@@ -103,7 +103,7 @@ pub(super) fn ops_insert<T>(
 where
     Universe: UniverseTable<T, Table = Storage<T>>,
 {
-    use std::collections::btree_map::Entry::*;
+    use alloc::collections::btree_map::Entry::*;
 
     name = this.allocate_name(&name)?;
 
@@ -254,7 +254,7 @@ macro_rules! member_enums_and_impls {
             }
         }
 
-        impl std::ops::Deref for AnyURef {
+        impl core::ops::Deref for AnyURef {
             type Target = dyn URefErased;
 
             fn deref(&self) -> &Self::Target {
@@ -387,7 +387,7 @@ impl AsRef<dyn URefErased> for AnyURef {
         &**self
     }
 }
-impl std::borrow::Borrow<dyn URefErased> for AnyURef {
+impl core::borrow::Borrow<dyn URefErased> for AnyURef {
     fn borrow(&self) -> &dyn URefErased {
         &**self
     }
@@ -431,7 +431,7 @@ where
         // };
         ds.field(
             &name.to_string(),
-            &std::marker::PhantomData::<T>.custom_format(crate::util::TypeName),
+            &core::marker::PhantomData::<T>.custom_format(crate::util::TypeName),
         );
     }
 }

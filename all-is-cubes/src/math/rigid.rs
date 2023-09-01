@@ -120,7 +120,7 @@ impl Gridgid {
     }
 }
 
-impl std::ops::Mul for Gridgid {
+impl core::ops::Mul for Gridgid {
     type Output = Self;
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {

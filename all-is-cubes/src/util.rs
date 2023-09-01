@@ -22,7 +22,7 @@ pub fn yield_progress_for_testing() -> YieldProgress {
 /// Formatting wrapper which prints an [`Error`] together with its
 /// `source()` chain, with at least one newline between each.
 ///
-/// The text begins with the [`std::fmt::Display`] format of the error.
+/// The text begins with the [`core::fmt::Display`] format of the error.
 ///
 /// Design note: This is not a [`CustomFormat`] because that has a blanket implementation
 /// which interferes with this one for [`Error`].

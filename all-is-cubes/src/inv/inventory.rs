@@ -1,9 +1,9 @@
 //! [`Inventory`] for storing items.
 
-use std::borrow::Cow;
-use std::collections::BTreeMap;
-use std::num::NonZeroU16;
-use std::sync::Arc;
+use alloc::borrow::Cow;
+use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
+use core::num::NonZeroU16;
 
 use crate::block::Block;
 use crate::character::{Character, CharacterTransaction, Cursor};
@@ -211,7 +211,7 @@ impl Slot {
             }
             (source @ Slot::Stack(_, _), destination @ Slot::Empty) => {
                 // Destination is empty (and source isn't); just swap.
-                std::mem::swap(source, destination);
+                core::mem::swap(source, destination);
                 return true;
             }
             (Slot::Stack(s_count, source_item), Slot::Stack(d_count, destination_item)) => {

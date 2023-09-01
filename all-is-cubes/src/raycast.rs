@@ -173,7 +173,7 @@ pub struct Raycaster {
     ///
     /// Stored as ranges rather than [`GridAab`] because we need to work with only the
     /// upper bound and not the size. (TODO: Maybe `GridAab` should do that too?)
-    bounds: Option<Vector3D<std::ops::Range<GridCoordinate>, Cube>>,
+    bounds: Option<Vector3D<core::ops::Range<GridCoordinate>, Cube>>,
 }
 
 impl Raycaster {
@@ -213,7 +213,7 @@ impl Raycaster {
         // reported `t` outputs.)
         // TODO: Define better threshold value.
         if !vec_iter(direction)
-            .all(|d| d.abs().partial_cmp(&1e100) == Some(std::cmp::Ordering::Less))
+            .all(|d| d.abs().partial_cmp(&1e100) == Some(core::cmp::Ordering::Less))
         {
             direction = Vector3D::zero();
         }
@@ -518,7 +518,7 @@ impl Iterator for Raycaster {
     // count, last (requires precise version of size_hint algorithm)
 }
 
-impl std::iter::FusedIterator for Raycaster {}
+impl core::iter::FusedIterator for Raycaster {}
 
 /// Describes a ray crossing into a cube as defined by [`Raycaster`].
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -26,7 +26,7 @@ impl BoxStyle {
     // TODO: figure out if this is good public api
     #[doc(hidden)]
     pub fn from_nine_and_thin(blocks: [[Block; 4]; 4]) -> Self {
-        use std::array::from_fn;
+        use core::array::from_fn;
         fn twiddle(coord: usize) -> usize {
             [1, 0, 2, 3][coord]
         }
@@ -213,7 +213,7 @@ impl BoxStyle {
         let line_z_Xy = line_z_XY.clone().rotate(GridRotation::RXyZ);
         let line_z_xy = line_z_XY.clone().rotate(GridRotation::RxyZ);
 
-        use std::array::from_fn;
+        use core::array::from_fn;
         Self {
             parts: from_fn(|x| {
                 from_fn(|y| {

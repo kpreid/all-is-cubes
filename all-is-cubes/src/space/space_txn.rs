@@ -1,9 +1,9 @@
 //! TODO: Maybe this file is too small
 
-use std::collections::btree_map::Entry::*;
-use std::collections::BTreeMap;
-use std::sync::Arc;
-use std::{fmt, mem};
+use alloc::collections::btree_map::Entry::*;
+use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
+use core::{fmt, mem};
 
 use crate::behavior::{self, BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
@@ -320,7 +320,7 @@ impl Merge for SpaceTransaction {
             // the smaller map rather than the larger.
             // TODO: We can improve further by taking advantage of sortedness, using the
             // first and last of one set to iterate over a range of the other.
-            // std::collections::btree_set::Intersection implements something like this,
+            // alloc::collections::btree_set::Intersection implements something like this,
             // but unfortunately, does not have an analogue for BTreeMap.
             mem::swap(&mut cubes1, &mut cubes2);
         }
@@ -499,8 +499,8 @@ impl fmt::Display for CubeConflict {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicU32, Ordering};
-    use std::sync::Arc;
+    use alloc::sync::Arc;
+    use core::sync::atomic::{AtomicU32, Ordering};
 
     use pretty_assertions::assert_eq;
 

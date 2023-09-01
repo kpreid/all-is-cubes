@@ -66,7 +66,7 @@ impl CustomFormat<Unquote> for &'_ str {
 pub(crate) struct TypeName;
 impl<T> CustomFormat<TypeName> for PhantomData<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: TypeName) -> fmt::Result {
-        write!(fmt, "{}", std::any::type_name::<T>())
+        write!(fmt, "{}", core::any::type_name::<T>())
     }
 }
 

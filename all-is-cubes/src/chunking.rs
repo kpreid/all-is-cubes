@@ -1,9 +1,10 @@
 //! Algorithms for grouping cubes into cubical batches (chunks).
 
-use std::collections::BTreeMap;
-use std::iter::FusedIterator;
-use std::ops::RangeTo;
-use std::sync::{Arc, Mutex};
+use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
+use core::iter::FusedIterator;
+use core::ops::RangeTo;
+use std::sync::Mutex;
 
 use euclid::{vec3, Vector3D};
 
@@ -32,8 +33,8 @@ type Ccv = Vector3D<i32, WholeChunk>;
 #[allow(clippy::exhaustive_structs)]
 pub struct ChunkPos<const CHUNK_SIZE: GridCoordinate>(pub Cube);
 
-impl<const CHUNK_SIZE: GridCoordinate> std::fmt::Debug for ChunkPos<CHUNK_SIZE> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<const CHUNK_SIZE: GridCoordinate> core::fmt::Debug for ChunkPos<CHUNK_SIZE> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(Cube { x, y, z }) = *self;
         write!(f, "ChunkPos<{CHUNK_SIZE}>({x}, {y}, {z})")
     }
@@ -116,8 +117,8 @@ pub struct Distance {
     off_plane_count: u8,
 }
 
-impl std::fmt::Debug for Distance {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for Distance {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Distance {
             nearest_approach_squared,
             off_plane_count,
@@ -277,7 +278,7 @@ fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) 
 
     let len = cache.len();
 
-    use std::collections::btree_map::Entry;
+    use alloc::collections::btree_map::Entry;
     match cache.entry(view_distance_in_squared_chunks) {
         Entry::Occupied(e) => {
             // eprintln!("cache hit {view_distance_in_squared_chunks}");
@@ -369,8 +370,8 @@ pub struct OctantMask {
     flags: u8,
 }
 
-impl std::fmt::Debug for OctantMask {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for OctantMask {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "OctantMask[")?;
         let mut first = true;
         for i in 0..8 {

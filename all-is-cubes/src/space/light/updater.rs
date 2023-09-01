@@ -522,7 +522,7 @@ pub struct LightUpdatesInfo {
     /// difference that caused the cube to be added).
     pub(crate) max_queue_priority: Priority,
 }
-impl std::ops::AddAssign<LightUpdatesInfo> for LightUpdatesInfo {
+impl core::ops::AddAssign<LightUpdatesInfo> for LightUpdatesInfo {
     fn add_assign(&mut self, other: Self) {
         self.update_count += other.update_count;
         self.max_update_difference = self.max_update_difference.max(other.max_update_difference);

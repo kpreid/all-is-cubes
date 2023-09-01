@@ -1,7 +1,7 @@
 //! Lesser-used helpers for [`BlockBuilder`].
 
-use std::borrow::Cow;
-use std::sync::Arc;
+use alloc::borrow::Cow;
+use alloc::sync::Arc;
 
 use crate::block::{
     AnimationHint, Atom, Block, BlockAttributes, BlockCollision, BlockDef, BlockParts, BlockPtr,
@@ -160,7 +160,7 @@ impl<C> BlockBuilder<C> {
     ) -> Result<BlockBuilder<BlockBuilderVoxels>, SetCubeError>
     where
         F: FnMut(Cube) -> B,
-        B: std::borrow::Borrow<Block>,
+        B: core::borrow::Borrow<Block>,
     {
         let mut space = Space::for_block(resolution).build();
         // TODO: Teach the SpaceBuilder to accept a function in the same way?

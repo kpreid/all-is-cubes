@@ -1,7 +1,7 @@
 //! [`BlockAttributes`] and closely related types.
 
-use std::borrow::Cow;
-use std::fmt;
+use alloc::borrow::Cow;
+use core::fmt;
 
 use crate::drawing::VoxelBrush;
 use crate::math::Face6;

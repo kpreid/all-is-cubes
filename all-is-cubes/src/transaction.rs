@@ -1,9 +1,9 @@
 //! The [`Transaction`] trait, for modifying game objects.
 
-use std::any::type_name;
+use alloc::sync::Arc;
+use core::any::type_name;
+use core::fmt::Debug;
 use std::error::Error;
-use std::fmt::Debug;
-use std::sync::Arc;
 
 use crate::universe::{URef, UTransactional, UniverseTransaction};
 
@@ -278,7 +278,7 @@ pub trait Transactional {
 }
 
 /// Type of `Output` for a [`Transaction`] that never produces any outputs.
-pub type NoOutput = std::convert::Infallible; // TODO: use `!` never type if it stabilizes
+pub type NoOutput = core::convert::Infallible; // TODO: use `!` never type if it stabilizes
 
 /// Output callback function for committing a [`Transaction`] whose `Output` type is
 /// [`NoOutput`] and therefore cannot produce any outputs.

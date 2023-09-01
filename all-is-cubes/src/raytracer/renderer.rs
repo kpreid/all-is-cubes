@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 
 use euclid::{point2, vec2};
 use futures_core::future::BoxFuture;
@@ -332,7 +332,7 @@ fn trace_patch_in_one_space<P: Accumulate>(
                 vec2(7. / 8., 3. / 8.),
             ];
             let mut info = RaytraceInfo::default();
-            let samples: [P; N] = std::array::from_fn(|i| {
+            let samples: [P; N] = core::array::from_fn(|i| {
                 let (p, i) = space.trace_ray(
                     camera.project_ndc_into_world(patch.point_within(SAMPLE_POINTS[i])),
                     include_sky,
@@ -532,7 +532,7 @@ mod eg {
 
     impl<T: Clone> DrawTarget for EgImageTarget<'_, T> {
         type Color = BinaryColor;
-        type Error = std::convert::Infallible;
+        type Error = core::convert::Infallible;
 
         fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
         where

@@ -2,7 +2,7 @@
 //!
 //! TODO: It's unclear what the scope of this module should be.
 
-use std::fmt;
+use core::fmt;
 
 use euclid::point3;
 

@@ -1,6 +1,6 @@
 //! Text-based raytracing output.
 
-use std::borrow::Cow;
+use alloc::borrow::Cow;
 
 use euclid::vec2;
 

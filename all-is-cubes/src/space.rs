@@ -1,9 +1,10 @@
 //! That which contains many blocks.
 
-use std::borrow::Cow;
+use alloc::borrow::Cow;
+use core::fmt;
+use core::mem;
+use core::time::Duration;
 use std::collections::HashSet;
-use std::fmt;
-use std::time::Duration;
 
 use euclid::{vec3, Vector3D};
 
@@ -222,7 +223,7 @@ impl Space {
     /// Returns the internal unstable numeric ID for the block at the given position,
     /// which may be mapped to a [`Block`] by [`Space::block_data`].
     /// If you are looking for *simple* access, use `space[position]` (the
-    /// [`std::ops::Index`] trait) instead.
+    /// [`core::ops::Index`] trait) instead.
     ///
     /// These IDs may be used to perform efficient processing of many blocks, but they
     /// may be renumbered after any mutation.
@@ -443,7 +444,7 @@ impl Space {
     pub fn fill<F, B>(&mut self, region: GridAab, mut function: F) -> Result<(), SetCubeError>
     where
         F: FnMut(Cube) -> Option<B>,
-        B: std::borrow::Borrow<Block>,
+        B: core::borrow::Borrow<Block>,
     {
         if !self.bounds.contains_box(region) {
             return Err(SetCubeError::OutOfBounds {
@@ -557,7 +558,7 @@ impl Space {
         let start_cube_ticks = I::now();
         let mut tick_txn = SpaceTransaction::default();
         // TODO: don't empty the queue until the transaction succeeds
-        let cubes_to_tick = std::mem::take(&mut self.cubes_wanting_ticks);
+        let cubes_to_tick = mem::take(&mut self.cubes_wanting_ticks);
         let count_cubes_ticked = cubes_to_tick.len();
         for position in cubes_to_tick {
             if let Some(brush) = self.get_evaluated(position).attributes.tick_action.as_ref() {
@@ -655,7 +656,7 @@ impl Space {
     /// This may cause recomputation of lighting.
     pub fn set_physics(&mut self, physics: SpacePhysics) {
         self.packed_sky_color = physics.sky_color.into();
-        let old_physics = std::mem::replace(&mut self.physics, physics);
+        let old_physics = mem::replace(&mut self.physics, physics);
         if self.physics.light != old_physics.light {
             // TODO: == comparison is too broad once there are parameters -- might be a minor change of color etc.
             self.lighting = self.physics.light.initialize_lighting(self.bounds);
@@ -711,14 +712,14 @@ impl Space {
     }
 }
 
-impl<T: Into<Cube>> std::ops::Index<T> for Space {
+impl<T: Into<Cube>> core::ops::Index<T> for Space {
     type Output = Block;
 
     /// Gets a reference to the block in this space at the given position.
     ///
     /// If the position is out of bounds, returns [`AIR`].
     ///
-    /// Note that [`Space`] does not implement [`IndexMut`](std::ops::IndexMut);
+    /// Note that [`Space`] does not implement [`IndexMut`](core::ops::IndexMut);
     /// use [`Space::set`] or [`Space::fill`] to modify blocks.
     #[inline(always)]
     fn index(&self, position: T) -> &Self::Output {
@@ -988,7 +989,7 @@ pub struct SpaceStepInfo {
     /// Performance data about light updates within the space.
     pub light: LightUpdatesInfo,
 }
-impl std::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
+impl core::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
     fn add_assign(&mut self, other: Self) {
         if other == Self::default() {
             // Specifically don't count those that did nothing.
@@ -1084,7 +1085,7 @@ pub struct Extract<'s> {
     space: &'s Space,
     cube: Cube,
     cube_index: usize,
-    block_index: std::cell::OnceCell<BlockIndex>,
+    block_index: core::cell::OnceCell<BlockIndex>,
 }
 
 impl<'s> Extract<'s> {

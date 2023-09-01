@@ -1,4 +1,4 @@
-use std::ops;
+use core::ops;
 
 #[cfg(doc)]
 use crate::block::{EvaluatedBlock, Modifier, Primitive};
@@ -38,7 +38,7 @@ pub enum Resolution {
     R64 = 6,
     R128 = 7,
 }
-use std::fmt;
+use core::fmt;
 
 use crate::math::GridCoordinate;
 

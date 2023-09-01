@@ -70,7 +70,7 @@ impl Cube {
     /// ```
     #[inline]
     pub fn containing(point: FreePoint) -> Option<Self> {
-        const RANGE: std::ops::Range<FreeCoordinate> =
+        const RANGE: core::ops::Range<FreeCoordinate> =
             (GridCoordinate::MIN as FreeCoordinate)..(GridCoordinate::MAX as FreeCoordinate + 1.0);
 
         if RANGE.contains(&point.x) && RANGE.contains(&point.y) && RANGE.contains(&point.z) {
@@ -179,7 +179,7 @@ impl crate::util::CustomFormat<ConciseDebug> for Cube {
 
 mod arithmetic {
     use super::*;
-    use std::ops;
+    use core::ops;
 
     impl ops::Add<GridVector> for Cube {
         type Output = Self;
@@ -233,13 +233,13 @@ mod conversion {
             bytemuck::cast_mut(self)
         }
     }
-    impl std::borrow::Borrow<[GridCoordinate; 3]> for Cube {
+    impl core::borrow::Borrow<[GridCoordinate; 3]> for Cube {
         #[inline]
         fn borrow(&self) -> &[GridCoordinate; 3] {
             bytemuck::cast_ref(self)
         }
     }
-    impl std::borrow::BorrowMut<[GridCoordinate; 3]> for Cube {
+    impl core::borrow::BorrowMut<[GridCoordinate; 3]> for Cube {
         #[inline]
         fn borrow_mut(&mut self) -> &mut [GridCoordinate; 3] {
             bytemuck::cast_mut(self)
