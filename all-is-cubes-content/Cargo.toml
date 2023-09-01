@@ -22,7 +22,7 @@ name = "gen_bench"
 harness = false
 
 [features]
-# Enables `UniverseTemplate::Random`.
+# Adds `UniverseTemplate::Random`.
 arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary"]
 
 [dependencies]

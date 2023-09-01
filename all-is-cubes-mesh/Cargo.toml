@@ -23,6 +23,7 @@ harness = false
 
 [features]
 default = []
+# Adds `impl arbitrary::Arbitrary for ...`
 arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary", "ordered-float/arbitrary"]
 
 [dependencies]
