@@ -47,7 +47,13 @@ name = "space_bench"
 harness = false
 
 [features]
-default = []
+default = ["std"]
+# Adds std-dependent functionality such as thread safety.
+# Caution: This is a work in progress. Disabling this feature does not yet remove all
+# `std` dependencies, and may result in a broken build. Furthermore, this feature will have
+# non-additive effects; it may require certain callback types to be `Sync` when they would
+# not without the feature. This is unfortunate, but necessary.
+std = ["yield-progress/sync"]
 # Adds `impl arbitrary::Arbitrary for ...`
 # Note: Not using euclid/arbitrary because it's broken
 arbitrary = ["dep:arbitrary", "ordered-float/arbitrary"]
@@ -61,7 +67,7 @@ save = [
     "ordered-float/serde",
 ]
 # Adds automatic parallelism to some algorithms such as raytracing.
-threads = ["dep:rayon"]
+threads = ["std", "dep:rayon"]
 
 [dependencies]
 arbitrary = { workspace = true, optional = true }
