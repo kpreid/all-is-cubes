@@ -5,11 +5,11 @@ use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::prelude::{PixelColor, Point};
 use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
-use futures_core::future::BoxFuture;
 
 use crate::camera::{Flaws, ImageSize};
 use crate::character::Cursor;
 use crate::universe::RefError;
+use crate::util::maybe_sync::BoxFuture;
 
 /// Rendering a previously-specified scene to an in-memory image.
 pub trait HeadlessRenderer {

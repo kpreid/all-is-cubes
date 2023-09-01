@@ -3,13 +3,13 @@ use core::borrow::Borrow;
 use core::fmt;
 use core::hash;
 use core::ops::{Deref, DerefMut};
-use std::sync::{Mutex, RwLock};
 
 use crate::transaction::{ExecuteError, PreconditionFailed, Transaction, Transactional};
 use crate::universe::{
     owning_guard, AnyURef, InsertError, InsertErrorKind, Name, Universe, UniverseId,
     UniverseMember, VisitRefs,
 };
+use crate::util::maybe_sync::{Mutex, MutexGuard, RwLock};
 
 /// Type of a strong reference to an entry in a [`Universe`]. Defined to make types
 /// parameterized with this somewhat less hairy.
@@ -154,7 +154,8 @@ impl<T: 'static> URef<T> {
         }
     }
 
-    /// Acquire temporary read access the value, in the sense of [`RwLock::try_read()`].
+    /// Acquire temporary read access to the value, in the sense of
+    /// [`std::sync::RwLock::try_read()`].
     ///
     /// TODO: There is not currently any way to block on / wait for read access.
     pub fn read(&self) -> Result<UBorrow<T>, RefError> {
@@ -334,7 +335,7 @@ impl<T: 'static> URef<T> {
         &self,
         universe: &mut Universe,
     ) -> Result<URootRef<T>, InsertError> {
-        let mut state_guard: std::sync::MutexGuard<'_, State<T>> =
+        let mut state_guard: MutexGuard<'_, State<T>> =
             self.state.lock().expect("URef::state lock error");
 
         let (strong_ref, name) = match &*state_guard {
@@ -663,7 +664,7 @@ impl<T: UniverseMember> URefErased for URef<T> {
     ) -> Result<(), RefError> {
         // TODO: Make this fail if the value hasn't actually been provided
 
-        let mut state_guard: std::sync::MutexGuard<'_, State<T>> =
+        let mut state_guard: MutexGuard<'_, State<T>> =
             self.state.lock().expect("URef::state lock error");
 
         match &*state_guard {

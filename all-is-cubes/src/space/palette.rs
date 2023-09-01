@@ -1,13 +1,13 @@
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::fmt;
-use std::sync::Mutex;
 
 use crate::block::{self, Block, BlockChange, EvaluatedBlock, AIR, AIR_EVALUATED};
 use crate::listen::{self, Listener as _};
 use crate::math;
 use crate::space::{BlockIndex, SetCubeError, SpaceChange};
 use crate::time::Instant;
+use crate::util::maybe_sync::Mutex;
 use crate::util::TimeStats;
 
 cfg_if::cfg_if! {

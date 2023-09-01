@@ -23,9 +23,9 @@
 
 use alloc::sync::Arc;
 use core::{mem, ptr};
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use super::uref::UEntry;
+use crate::util::maybe_sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError};
 
 #[cfg(doc)]
 use super::URef;
@@ -121,8 +121,8 @@ impl<T: 'static> core::ops::DerefMut for UBorrowMutImpl<T> {
 #[derive(Copy, Clone)]
 pub(super) struct LockError;
 
-impl<T> From<std::sync::TryLockError<T>> for LockError {
-    fn from(_: std::sync::TryLockError<T>) -> Self {
+impl<T> From<TryLockError<T>> for LockError {
+    fn from(_: TryLockError<T>) -> Self {
         // TODO: Distinguish PoisonErrors (without granting access) for debugging purposes
         Self
     }

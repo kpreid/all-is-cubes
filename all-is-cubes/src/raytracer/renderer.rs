@@ -3,7 +3,6 @@ use alloc::string::{String, ToString};
 use core::fmt;
 
 use euclid::{point2, vec2};
-use futures_core::future::BoxFuture;
 use ordered_float::NotNan;
 
 use crate::camera::{
@@ -20,6 +19,7 @@ use crate::raytracer::{
 };
 use crate::space::Space;
 use crate::universe::URef;
+use crate::util::maybe_sync::BoxFuture;
 
 /// Builds upon [`UpdatingSpaceRaytracer`] to make a complete [`HeadlessRenderer`],
 /// following the scene and camera information in a [`StandardCameras`].

@@ -8,6 +8,8 @@ use core::time::Duration;
 mod custom_format;
 pub use custom_format::*;
 
+pub(crate) mod maybe_sync;
+
 #[doc(no_inline)]
 pub use yield_progress::{Builder as YieldProgressBuilder, YieldProgress};
 

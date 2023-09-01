@@ -4,9 +4,9 @@ use core::fmt;
 
 use alloc::boxed::Box;
 use alloc::string::String;
-use futures_core::future::BoxFuture;
 
 use crate::universe::Universe;
+use crate::util::maybe_sync::BoxFuture;
 use crate::util::{ErrorIfStd, YieldProgress};
 
 #[cfg(feature = "save")]

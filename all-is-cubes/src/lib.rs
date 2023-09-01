@@ -168,6 +168,7 @@
     not(any(test, feature = "arbitrary")),
     warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)
 )]
+#![cfg_attr(not(feature = "std"), allow(clippy::arc_with_non_send_sync))]
 
 #[allow(unused_imports)] // false positive unused macro_use
 #[macro_use]

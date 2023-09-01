@@ -13,7 +13,8 @@
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::fmt;
-use std::sync::RwLock;
+
+use crate::util::maybe_sync::RwLock;
 
 mod cell;
 pub use cell::*;

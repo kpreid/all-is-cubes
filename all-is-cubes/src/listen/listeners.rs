@@ -3,9 +3,9 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::fmt;
 use core::sync::atomic::{AtomicBool, Ordering};
-use std::sync::RwLock;
 
 use crate::listen::{Listen, Listener};
+use crate::util::maybe_sync::RwLock;
 
 /// A [`Listener`] which discards all messages and is suitable for filling
 /// listener parameters when no listener is needed.

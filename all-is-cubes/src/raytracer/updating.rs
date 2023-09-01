@@ -1,7 +1,6 @@
 use alloc::sync::{Arc, Weak};
 use core::fmt;
 use core::mem;
-use std::sync::Mutex;
 
 use hashbrown::HashSet as HbHashSet;
 
@@ -13,6 +12,7 @@ use crate::math::Cube;
 use crate::raytracer::{RtBlockData, RtOptionsRef, SpaceRaytracer, TracingBlock, TracingCubeData};
 use crate::space::{BlockIndex, Space, SpaceChange};
 use crate::universe::{RefError, URef};
+use crate::util::maybe_sync::Mutex;
 
 /// Manages a [`SpaceRaytracer`] so that it can be cheaply updated when the [`Space`] is
 /// changed.
