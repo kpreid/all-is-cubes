@@ -53,7 +53,7 @@ default = ["std"]
 # `std` dependencies, and may result in a broken build. Furthermore, this feature will have
 # non-additive effects; it may require certain callback types to be `Sync` when they would
 # not without the feature. This is unfortunate, but necessary.
-std = ["yield-progress/sync"]
+std = ["dep:once_cell", "yield-progress/sync"]
 # Adds `impl arbitrary::Arbitrary for ...`
 # Note: Not using euclid/arbitrary because it's broken
 arbitrary = ["dep:arbitrary", "ordered-float/arbitrary"]
@@ -74,6 +74,7 @@ arbitrary = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true, features = ["std"] } # used in serialization
 bitflags = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
+cfg-if = { workspace = true }
 downcast-rs = { version = "1.2.0", default-features = false }
 # mint feature to guarantee that our callers can use mint types
 # libm feature to guarantee compilability and compatibility with no_std
@@ -87,7 +88,7 @@ itertools = { workspace = true }
 log = { workspace = true }
 mutants = { workspace = true }
 num-traits = { workspace = true }
-once_cell = { workspace = true }
+once_cell = { workspace = true, optional = true }
 ordered-float = { workspace = true }
 png-decoder = { version = "0.1.1" }
 rand = { workspace = true }

@@ -163,21 +163,34 @@ pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DecodedPng {
     }
 }
 
-#[doc(hidden)]
-pub use ::once_cell::sync::Lazy as LazyForIncludeImage;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "std")] {
+        #[doc(hidden)]
+        pub use ::once_cell::sync::Lazy as LazyForIncludeImage;
 
-/// Load an image from a relative path, memoized.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! include_image {
-    ( $path:literal ) => {{
-        static IMAGE: $crate::content::load_image::LazyForIncludeImage<
-            $crate::content::load_image::DecodedPng,
-        > = $crate::content::load_image::LazyForIncludeImage::new(|| {
-            $crate::content::load_image::load_png_from_bytes($path, include_bytes!($path))
-        });
-        &*IMAGE
-    }};
+        /// Load an image from a relative path. Memoized if the `std` feature is enabled.
+        #[doc(hidden)]
+        #[macro_export]
+        macro_rules! include_image {
+            ( $path:literal ) => {{
+                static IMAGE: $crate::content::load_image::LazyForIncludeImage<
+                    $crate::content::load_image::DecodedPng,
+                > = $crate::content::load_image::LazyForIncludeImage::new(|| {
+                    $crate::content::load_image::load_png_from_bytes($path, include_bytes!($path))
+                });
+                &*IMAGE
+            }};
+        }
+    } else {
+        /// Load an image from a relative path. Memoized if the `std` feature is enabled.
+        #[doc(hidden)]
+        #[macro_export]
+        macro_rules! include_image {
+            ( $path:literal ) => {
+                &$crate::content::load_image::load_png_from_bytes($path, include_bytes!($path))
+            };
+        }
+    }
 }
 pub(crate) use include_image;
 

@@ -4,6 +4,8 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use core::iter::FusedIterator;
 use core::ops::RangeTo;
+
+#[cfg(feature = "std")]
 use std::sync::Mutex;
 
 use euclid::{vec3, Vector3D};
@@ -266,6 +268,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
 }
 
 fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<[Ccv]> {
+    #[cfg(feature = "std")]
     let mut cache = match CHUNK_CHART_CACHE.lock() {
         Ok(cache) => cache,
         Err(p) => {
@@ -275,6 +278,10 @@ fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) 
             cache
         }
     };
+
+    // If not on std, don't use a global cache. TODO: improve on  this
+    #[cfg(not(feature = "std"))]
+    let mut cache = BTreeMap::new();
 
     let len = cache.len();
 
@@ -299,6 +306,7 @@ fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) 
     }
 }
 
+#[cfg(feature = "std")]
 #[doc(hidden)] // used for benchmarks
 pub fn reset_chunk_chart_cache() {
     match CHUNK_CHART_CACHE.lock() {
@@ -361,6 +369,7 @@ fn chunk_distance_squared_for_view(chunk: Ccv) -> Distance {
 /// A cache for [`get_or_compute_chart_octant()`].
 ///
 /// Keys are `view_distance_in_squared_chunks` and values are `octant_chunks`.
+#[cfg(feature = "std")]
 static CHUNK_CHART_CACHE: Mutex<BTreeMap<GridCoordinate, Arc<[Ccv]>>> = Mutex::new(BTreeMap::new());
 
 /// A specification of which octants to include in [`ChunkChart::chunks()`].

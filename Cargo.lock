@@ -57,6 +57,7 @@ dependencies = [
  "base64 0.21.2",
  "bitflags 2.3.3",
  "bytemuck",
+ "cfg-if",
  "criterion",
  "downcast-rs",
  "embedded-graphics",
