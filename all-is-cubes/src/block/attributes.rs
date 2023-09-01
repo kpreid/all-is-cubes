@@ -131,7 +131,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
         arbitrary::size_hint::and_all(&[
-            String::size_hint(depth),
+            alloc::string::String::size_hint(depth),
             bool::size_hint(depth),
             RotationPlacementRule::size_hint(depth),
             crate::math::Rgb::size_hint(depth),
@@ -306,6 +306,7 @@ impl AnimationChange {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::String;
 
     /// [`BlockAttributes`] has an inherent `default()` function, which should be
     /// equivalent to the [`Default`] trait function.

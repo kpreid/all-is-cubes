@@ -127,6 +127,7 @@
     doc = "[`arbitrary::Arbitrary`]: https://docs.rs/arbitrary/1.0.2/arbitrary/trait.Arbitrary.html"
 )]
 #![cfg_attr(not(feature = "threads"), doc = "[`rayon`]: https://docs.rs/rayon/")]
+#![no_std]
 // Basic lint settings, which should be identical across all all-is-cubes project crates.
 // This list is sorted.
 #![allow(clippy::collapsible_else_if)]
@@ -168,8 +169,11 @@
     warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)
 )]
 
+#[allow(unused_imports)] // false positive unused macro_use
+#[macro_use]
 extern crate alloc;
-//extern crate std;
+#[cfg_attr(test, macro_use)]
+extern crate std;
 
 #[macro_use]
 pub mod math;

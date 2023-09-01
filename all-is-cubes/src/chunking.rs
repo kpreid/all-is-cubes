@@ -2,6 +2,7 @@
 
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::iter::FusedIterator;
 use core::ops::RangeTo;
 

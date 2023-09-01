@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use euclid::{Point3D, Vector3D};
 
 use crate::camera::eye_for_look_at;

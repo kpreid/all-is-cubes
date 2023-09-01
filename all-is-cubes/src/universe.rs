@@ -13,7 +13,10 @@
 //! bring your own synchronization mechanisms to ensure that readers and writers do not
 //! run at the same time.
 
+use alloc::boxed::Box;
+use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::fmt;
 use core::sync::atomic::{AtomicU64, Ordering};
 

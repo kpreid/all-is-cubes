@@ -3,6 +3,7 @@ use crate::math::{GridArray, GridRotation, Rgb};
 use crate::universe::{RefVisitor, VisitRefs};
 
 mod composite;
+use alloc::vec::Vec;
 pub use composite::*;
 mod r#move;
 pub use r#move::*;

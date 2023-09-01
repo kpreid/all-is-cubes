@@ -11,6 +11,7 @@
 //! messages, which will then be read and cleared by a later task.
 
 use alloc::sync::{Arc, Weak};
+use alloc::vec::Vec;
 use core::fmt;
 use std::sync::RwLock;
 
@@ -278,6 +279,7 @@ impl<M> Listener<M> for DynListener<M> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
 
     #[test]
     fn notifier_basics_and_debug() {

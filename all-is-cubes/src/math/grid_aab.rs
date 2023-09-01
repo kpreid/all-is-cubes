@@ -1,6 +1,8 @@
 //! Axis-aligned integer-coordinate box volumes ([`GridAab`]), arrays bounded by them
 //! ([`GridArray`]), and related.
 
+use alloc::boxed::Box;
+use alloc::string::String;
 use core::fmt;
 use core::iter::FusedIterator;
 use core::ops::Range;
@@ -716,7 +718,7 @@ impl GridAab {
             // TODO: better error message
             self.lower_bounds[axis]
                 .checked_sub(thickness)
-                .ok_or_else(|| GridOverflowError("abut() overflowed available range".to_string()))?
+                .ok_or_else(|| GridOverflowError("abut() overflowed available range".into()))?
         };
 
         let mut lower_bounds = self.lower_bounds();
@@ -1141,6 +1143,7 @@ mod tests {
     use super::*;
     use crate::block::Resolution::*;
     use crate::math::{GridRotation, Gridgid};
+    use alloc::vec::Vec;
     use indoc::indoc;
 
     fn cube(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate) -> Cube {

@@ -1,6 +1,7 @@
 //! [`Tool`] and related.
 
 use alloc::borrow::Cow;
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use core::{fmt, hash};
 
@@ -528,6 +529,7 @@ mod tests {
     use crate::transaction;
     use crate::universe::{UBorrow, URef, Universe};
     use crate::util::yield_progress_for_testing;
+    use alloc::boxed::Box;
     use pretty_assertions::assert_eq;
     use std::error::Error;
 

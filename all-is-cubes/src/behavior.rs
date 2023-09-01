@@ -2,6 +2,7 @@
 
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::any::TypeId;
 use core::fmt::{self, Debug};
 

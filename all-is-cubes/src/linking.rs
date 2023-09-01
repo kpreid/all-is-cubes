@@ -8,6 +8,8 @@
 //! by becoming aware of dependencies between “modules”. For now, it's just enough to
 //! solve bootstrapping needs.
 
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::fmt;
 use core::hash::Hash;
 use core::ops::Index;
@@ -342,6 +344,7 @@ mod tests {
     use crate::content::make_some_blocks;
     use crate::math::GridAab;
     use crate::util::assert_send_sync;
+    use alloc::string::ToString;
 
     #[derive(Exhaust, Clone, Debug, Eq, Hash, PartialEq)]
     enum Key {

@@ -1,3 +1,4 @@
+use alloc::string::String;
 use core::fmt;
 use core::marker::PhantomData;
 use core::time::Duration;

@@ -290,7 +290,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
             .build();
 
         // Generate some blocks to put in the space
-        let mut blocks = Vec::from(make_some_blocks::<2>()); // TODO: generate arbitrary blocks with attributes
+        let mut blocks = alloc::vec::Vec::from(make_some_blocks::<2>()); // TODO: generate arbitrary blocks with attributes
         #[allow(clippy::same_item_push)]
         for _ in 0..6 {
             // Make it probable that blocks are AIR

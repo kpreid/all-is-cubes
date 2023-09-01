@@ -354,6 +354,7 @@ mod tests {
     use crate::math::GridAab;
     use crate::space::Space;
     use crate::universe::Universe;
+    use alloc::vec::Vec;
     use euclid::point3;
     use pretty_assertions::assert_eq;
     use TraceStep::{EnterBlock, EnterSurface, Invisible};

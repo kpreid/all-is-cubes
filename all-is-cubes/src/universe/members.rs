@@ -4,7 +4,10 @@
 //! This module is not public and that is part of the protection of several items
 //! inside it (the public-in-private trick).
 
+use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
+use alloc::string::ToString;
+use alloc::vec::Vec;
 use core::fmt;
 
 use crate::block::BlockDef;

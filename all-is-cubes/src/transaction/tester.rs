@@ -1,6 +1,10 @@
-use super::*;
+use alloc::boxed::Box;
 use alloc::rc::Rc;
+use alloc::vec::Vec;
 use std::error::Error;
+use std::fmt::Debug;
+
+use super::Transaction;
 
 /// Tool for testing that a type of transaction obeys the rules:
 ///

@@ -719,6 +719,7 @@ fn ray_plane_intersection(
 mod tests {
     use super::*;
     use crate::math::{Aab, FaceMap};
+    use alloc::vec::Vec;
     use euclid::{point3, vec3, Point3D};
     use rand::SeedableRng as _;
 

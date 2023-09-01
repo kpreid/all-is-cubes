@@ -4,6 +4,8 @@
 //! Note that this entire module is `doc(hidden)`; pub items inside it
 //! are for intra-project use only.
 
+use alloc::vec::Vec;
+
 use crate::math::{Cube, FreeCoordinate, FreeVector, Geometry, LineVertex};
 use crate::raycast::Ray;
 use crate::space::PackedLight;

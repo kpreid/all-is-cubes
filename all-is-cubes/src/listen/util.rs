@@ -105,6 +105,7 @@ impl<M> Clone for NotifierForwarder<M> {
 mod tests {
     use super::*;
     use crate::listen::{Listen as _, Sink};
+    use alloc::vec::Vec;
 
     #[test]
     fn filter() {

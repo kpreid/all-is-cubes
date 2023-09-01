@@ -1,4 +1,5 @@
-use alloc::borrow::Cow;
+use alloc::borrow::{Cow, ToOwned};
+use alloc::vec::Vec;
 use core::fmt;
 use std::io::{self, Write as _};
 

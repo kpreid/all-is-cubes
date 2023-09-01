@@ -355,11 +355,10 @@ impl Geometry for Aab {
 
 #[cfg(test)]
 mod tests {
-    use euclid::point3;
-
-    use crate::math::{Cube, VectorOps};
-
     use super::*;
+    use crate::math::{Cube, VectorOps};
+    use alloc::vec::Vec;
+    use euclid::point3;
 
     #[test]
     fn new_wrong_order() {

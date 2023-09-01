@@ -1,3 +1,5 @@
+use alloc::boxed::Box;
+use alloc::string::{String, ToString};
 use core::fmt;
 
 use euclid::{point2, vec2};

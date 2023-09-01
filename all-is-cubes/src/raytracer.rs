@@ -8,6 +8,8 @@
 //! it is much simpler. It continues to serve as a “reference implementation” and is used
 //! by the terminal UI and in unit tests via [`print_space`].
 
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::fmt;
 
 use euclid::{vec3, Vector2D, Vector3D};
@@ -90,7 +92,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             custom_options: &custom_options,
         };
         SpaceRaytracer {
-            blocks: vec![],
+            blocks: Vec::new(),
             cubes: GridArray::from_elements(GridAab::from_lower_upper([0, 0, 0], [0, 0, 0]), [])
                 .unwrap(),
             sky_color,
@@ -313,7 +315,9 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                         );
                         (buf.into(), info)
                     })
-                    .chain(Some((line_ending.to_owned(), RaytraceInfo::default())).into_par_iter())
+                    .chain(
+                        Some((String::from(line_ending), RaytraceInfo::default())).into_par_iter(),
+                    )
             })
             .flatten();
 

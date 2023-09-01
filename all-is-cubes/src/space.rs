@@ -1,6 +1,8 @@
 //! That which contains many blocks.
 
 use alloc::borrow::Cow;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::fmt;
 use core::mem;
 use core::time::Duration;

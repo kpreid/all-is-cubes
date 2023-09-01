@@ -3,6 +3,7 @@
 use alloc::borrow::Cow;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::num::NonZeroU16;
 
 use crate::block::Block;

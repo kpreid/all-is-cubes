@@ -1,6 +1,8 @@
 //! Lighting algorithms for `Space`. This module is closely tied to `Space`
 //! and separated out for readability, not modularity.
 
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::fmt;
 

@@ -16,6 +16,7 @@
 //!     exclusive upper bounds).
 
 use alloc::borrow::{Borrow, Cow};
+use alloc::vec::Vec;
 use core::marker::PhantomData;
 use core::ops::Range;
 
@@ -486,9 +487,6 @@ where
         [top_left_2d.x, -bottom_right_2d.y, z_range.start],
         [bottom_right_2d.x, -top_left_2d.y, z_range.end],
     );
-    if false {
-        dbg!(top_left_2d, bottom_right_2d, drawing_bounds);
-    }
 
     let mut drawing_space = Space::builder(drawing_bounds)
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)

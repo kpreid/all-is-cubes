@@ -2,6 +2,8 @@
 //!
 //! Note that some sub-modules have their own test modules.
 
+use alloc::string::ToString;
+
 use indoc::indoc;
 
 use crate::block::{

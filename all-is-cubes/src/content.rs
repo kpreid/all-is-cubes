@@ -4,6 +4,8 @@
 //! `all-is-cubes-content` crate.
 
 use alloc::borrow::Cow;
+use alloc::string::ToString;
+use alloc::vec::Vec;
 
 use embedded_graphics::mono_font::iso_8859_1::FONT_9X15_BOLD;
 use embedded_graphics::mono_font::MonoTextStyle;

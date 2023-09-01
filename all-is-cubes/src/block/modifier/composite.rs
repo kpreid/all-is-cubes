@@ -1,5 +1,6 @@
 use core::mem;
 
+use alloc::vec;
 use ordered_float::NotNan;
 
 use crate::block::{

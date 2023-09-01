@@ -1,7 +1,9 @@
 //! “Integer allocation”: algorithms for finding small integers not currently in use
 //! for the same purpose.
 
+use alloc::vec::Vec;
 use core::fmt::Debug;
+
 use num_traits::int::PrimInt;
 
 /// An integer allocator; that is, an algorithm for solving the problem

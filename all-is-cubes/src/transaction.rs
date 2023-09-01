@@ -1,5 +1,6 @@
 //! The [`Transaction`] trait, for modifying game objects.
 
+use alloc::string::String;
 use alloc::sync::Arc;
 use core::any::type_name;
 use core::fmt::Debug;

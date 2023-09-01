@@ -1,6 +1,8 @@
 //! Tests of serialization and deserialization.
 
+use alloc::string::ToString;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::fmt;
 
 use euclid::vec3;

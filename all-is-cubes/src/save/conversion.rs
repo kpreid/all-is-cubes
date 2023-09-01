@@ -2,6 +2,10 @@
 //! normal operation.
 
 use alloc::borrow::Cow;
+use alloc::boxed::Box;
+use alloc::string::ToString;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -13,7 +17,6 @@ mod behavior {
         Behavior, BehaviorHost, BehaviorPersistence, BehaviorSet, BehaviorSetTransaction,
     };
     use crate::transaction::{Merge as _, Transaction as _};
-    use alloc::sync::Arc;
 
     // TODO: Stop serializing H::Attachment directly or document that it has to be stable.
 
@@ -868,7 +871,7 @@ mod universe {
         }
     }
 
-    thread_local! {
+    std::thread_local! {
         /// Thread-local state used to communicate from [`Universe`] deserialization to
         /// [`URef`] deserialization so that the [`URef`] points to a member of that [`Universe`].
         ///

@@ -704,6 +704,7 @@ const CONST_LINEAR_LOOKUP_TABLE: [f32; 256] = [
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
     use itertools::Itertools;
 
     // TODO: Add tests of the color not-NaN mechanisms.

@@ -1,5 +1,6 @@
 //! Algorithms for collision detection with [`Space`](crate::space::Space)s.
 
+use alloc::vec::Vec;
 use core::fmt;
 use std::collections::HashSet;
 
@@ -548,28 +549,21 @@ pub(crate) fn nudge_on_ray(
     };
     let translation = epsilon_nudge - penetration_depth;
 
-    if false {
-        dbg!(
-            face,
-            aab.face_coordinate(face),
-            penetration_depth,
-            translation,
-            direction_projection,
-        );
-    }
     segment.scale_direction(1.0 + translation / direction_projection)
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::block::Resolution::*;
     use crate::block::{Block, AIR};
     use crate::content::{make_slab, make_some_blocks};
     use crate::raytracer::print_space;
     use crate::universe::Universe;
-
-    use super::*;
+    use alloc::vec::Vec;
     use rand::{Rng, SeedableRng as _};
+    use std::eprintln;
+
     #[test]
     fn collide_along_ray_with_opaque_block() {
         collide_along_ray_tester(

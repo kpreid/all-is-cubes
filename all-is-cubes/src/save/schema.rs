@@ -16,7 +16,9 @@
 //! * [`Cow`] is sometimes used to avoid unnecessary clones during serialization.
 
 use alloc::borrow::Cow;
+use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};

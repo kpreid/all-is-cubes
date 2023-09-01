@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use std::collections::VecDeque;
 
 use euclid::{point3, vec3, Vector3D};

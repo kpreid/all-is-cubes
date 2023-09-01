@@ -2,6 +2,7 @@
 
 use alloc::borrow::Cow;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use crate::block::{
     AnimationHint, Atom, Block, BlockAttributes, BlockCollision, BlockDef, BlockParts, BlockPtr,

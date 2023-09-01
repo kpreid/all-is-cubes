@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use crate::block::{self, Block};
 use crate::math::{FaceMap, GridAab, GridRotation};
 use crate::space;

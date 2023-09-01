@@ -2,7 +2,9 @@
 
 use alloc::collections::btree_map::Entry::*;
 use alloc::collections::BTreeMap;
+use alloc::string::ToString;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::{fmt, mem};
 
 use crate::behavior::{self, BehaviorSet, BehaviorSetTransaction};

@@ -1,6 +1,9 @@
 //! Text-based raytracing output.
 
-use alloc::borrow::Cow;
+#![cfg_attr(not(feature = "std"), allow(unused_imports))]
+
+use alloc::borrow::{Cow, ToOwned};
+use alloc::string::{String, ToString};
 
 use euclid::vec2;
 
@@ -86,18 +89,20 @@ impl From<CharacterBuf> for String {
 /// Print an image of the given space as “ASCII art”.
 ///
 /// Intended for use in tests, to visualize the results in case of failure.
-/// Accordingly, it always writes to the same destination as [`print!`] (which is
+/// Accordingly, it always writes to the same destination as [`print!`](std::print) (which is
 /// redirected when tests are run).
 ///
 /// `direction` specifies the direction from which the camera will be looking towards
 /// the center of the space. The text output will be 80 columns wide.
+#[cfg(any(feature = "std", test))]
 pub fn print_space(space: &Space, direction: impl Into<FreeVector>) {
     print_space_impl(space, direction, |s| {
-        print!("{s}");
+        std::print!("{s}");
     });
 }
 
 /// Version of `print_space` that takes a destination, for testing.
+#[cfg(any(feature = "std", test))]
 fn print_space_impl<F: FnMut(&str)>(
     space: &Space,
     direction: impl Into<FreeVector>,

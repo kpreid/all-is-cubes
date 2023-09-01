@@ -217,6 +217,7 @@ impl fmt::Debug for Clock {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
 
     #[test]
     fn clock_debug() {

@@ -1,3 +1,6 @@
+use alloc::boxed::Box;
+use alloc::string::ToString;
+use alloc::vec::Vec;
 use core::any::Any;
 use core::fmt::{self, Debug};
 use std::collections::HashMap;
