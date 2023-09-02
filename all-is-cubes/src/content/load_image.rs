@@ -3,58 +3,59 @@
 //! TODO: stuff in this module is kind of duplicative of [`crate::drawing`]...
 
 use std::collections::HashMap;
-use std::hash::Hash;
-use std::io;
-use std::ops::Deref;
 
 use embedded_graphics::image::ImageDrawable;
 use embedded_graphics::prelude::{Dimensions as _, DrawTarget, Point, Size};
 use embedded_graphics::primitives::{PointsIter, Rectangle};
 use embedded_graphics::Drawable;
-use image::{DynamicImage, GenericImageView};
+use png_decoder::PngHeader;
 
 use crate::block::{Block, AIR};
 use crate::drawing::{rectangle_to_aab, VoxelBrush};
 use crate::math::{GridAab, GridRotation, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics};
 
-/// Adapter from [`image::GenericImageView`] to [`embedded_graphics::Drawable`].
+/// Return type of `png_decoder::decode`.
+#[doc(hidden)] // still experimental API — we probably want to newtype it
+pub type DecodedPng = (PngHeader, Vec<u8>);
+
+/// Pixel type.
+type Srgba = [u8; 4];
+
+/// Adapter from [`png_decoder`] decoded images to [`embedded_graphics::Drawable`].
 #[doc(hidden)] // still experimental API
 #[allow(missing_debug_implementations)]
-pub struct ImageAdapter<'b, I>
-where
-    I: Deref,
-    I::Target: GenericImageView,
-{
-    image_ref: I,
-    color_map: HashMap<<I::Target as GenericImageView>::Pixel, VoxelBrush<'b>>,
+pub struct PngAdapter<'a> {
+    width: u32,
+    height: u32,
+    rgba_image_data: &'a [Srgba],
+    color_map: HashMap<Srgba, VoxelBrush<'a>>,
     max_brush: GridAab,
 }
 
-impl<'b, I> ImageAdapter<'b, I>
-where
-    I: Deref,
-    I::Target: GenericImageView + Sized,
-    <I::Target as GenericImageView>::Pixel: Eq + Hash,
-{
-    pub fn adapt(
-        image_ref: I,
-        mut pixel_function: impl FnMut(<I::Target as GenericImageView>::Pixel) -> VoxelBrush<'b>,
+impl<'a> PngAdapter<'a> {
+    pub fn adapt<'png: 'a, 'brush: 'a>(
+        (header, data): &'png DecodedPng,
+        mut pixel_function: impl FnMut(Srgba) -> VoxelBrush<'brush>,
     ) -> Self {
-        let mut color_map: HashMap<<I::Target as GenericImageView>::Pixel, VoxelBrush<'b>> =
-            HashMap::new();
+        // Group into whole pixels
+        let rgba_image_data = bytemuck::cast_slice::<u8, [u8; 4]>(data);
+
+        let mut color_map: HashMap<Srgba, VoxelBrush<'a>> = HashMap::new();
         let mut max_brush: Option<GridAab> = None;
-        for (_, _, pixel) in image_ref.pixels() {
+        for &color in rgba_image_data.iter() {
             let brush = color_map
-                .entry(pixel)
-                .or_insert_with(|| pixel_function(pixel));
+                .entry(color)
+                .or_insert_with(|| pixel_function(color));
             if let Some(bounds) = brush.bounds() {
                 max_brush = max_brush.map(|m| m.union(bounds).unwrap()).or(Some(bounds));
             }
         }
 
         Self {
-            image_ref,
+            width: header.width,
+            height: header.height,
+            rgba_image_data,
             color_map,
             max_brush: max_brush.unwrap_or(GridAab::ORIGIN_CUBE),
         }
@@ -63,12 +64,7 @@ where
 
 /// Note: This implementation is on references so it can return [`VoxelBrush`]es
 /// borrowing from itself.
-impl<'b, I> ImageDrawable for &'b ImageAdapter<'b, I>
-where
-    I: Deref,
-    I::Target: GenericImageView,
-    <I::Target as GenericImageView>::Pixel: Eq + Hash,
-{
+impl<'b> ImageDrawable for &'b PngAdapter<'b> {
     type Color = &'b VoxelBrush<'b>;
 
     fn draw<D>(&self, target: &mut D) -> Result<(), <D as DrawTarget>::Error>
@@ -86,51 +82,48 @@ where
     where
         D: DrawTarget<Color = Self::Color>,
     {
+        let width = i32::try_from(self.width).expect("width too large");
         target.fill_contiguous(
             area,
             PointsIter::points(area).map(|Point { x, y }| {
                 self.color_map
-                    .get(&self.image_ref.get_pixel(x as u32, y as u32))
-                    .expect("image contains inconsistent color")
+                    .get(&self.rgba_image_data[usize::try_from(x + y * width).unwrap()])
+                    .expect("can't happen: color data changed")
             }),
         )
     }
 }
 
-impl<I> embedded_graphics::geometry::OriginDimensions for &'_ ImageAdapter<'_, I>
-where
-    I: Deref,
-    I::Target: GenericImageView,
-{
+impl embedded_graphics::geometry::OriginDimensions for &'_ PngAdapter<'_> {
     fn size(&self) -> Size {
-        let (width, height) = self.image_ref.dimensions();
+        let &&PngAdapter { width, height, .. } = self;
         // TODO: use max_brush to expand this
         Size { width, height }
     }
 }
 
-/// Take the pixels of the image and construct a [`Space`] from it.
+/// Convert a decoded PNG image into a [`Space`].
 ///
 /// The `block_function` will be memoized.
 ///
 /// TODO: Allow `SpaceBuilder` controls somehow. Maybe this belongs as a method on SpaceBuilder.
 /// TODO: pixel_function should have a Result return
 #[doc(hidden)] // still experimental API
-pub fn space_from_image<'b, I, F>(
-    image: &I,
+pub fn space_from_image<'b, F>(
+    png: &DecodedPng,
     rotation: GridRotation,
     pixel_function: F,
 ) -> Result<Space, SetCubeError>
 where
-    I: GenericImageView,
-    I::Pixel: Eq + std::hash::Hash,
-    F: FnMut(I::Pixel) -> VoxelBrush<'b>,
+    F: FnMut(Srgba) -> VoxelBrush<'b>,
 {
+    let header = &png.0;
+
     // TODO: let caller control the transform offsets (not necessarily positive-octant)
     let transform =
-        rotation.to_positive_octant_transform(image.width().max(image.height()) as i32 - 1);
+        rotation.to_positive_octant_transform(header.width.max(header.height) as i32 - 1);
 
-    let ia = &ImageAdapter::adapt(image, pixel_function);
+    let ia = &PngAdapter::adapt(png, pixel_function);
     let eg_image = embedded_graphics::image::Image::new(&ia, Point::zero());
 
     // Compute bounds including the brush sizes.
@@ -152,29 +145,23 @@ where
 /// All pixels with 0 alpha (regardless of other channel values) are converted to
 /// [`AIR`], to meet normal expectations about collision, selection, and equality.
 #[doc(hidden)] // still experimental API
-pub fn default_srgb<P: image::Pixel<Subpixel = u8>>(pixel: P) -> VoxelBrush<'static> {
-    let pixel = pixel.to_rgba();
+pub fn default_srgb(pixel: Srgba) -> VoxelBrush<'static> {
     VoxelBrush::single(if pixel[3] == 0 {
         AIR
     } else {
-        Block::from(Rgba::from_srgb8(pixel.0))
+        Block::from(Rgba::from_srgb8(pixel))
     })
 }
 
 /// Helper for [`include_image`] macro.
 #[doc(hidden)]
-pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DynamicImage {
-    match image::load(io::Cursor::new(bytes), image::ImageFormat::Png) {
+pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DecodedPng {
+    match png_decoder::decode(bytes) {
         Ok(i) => i,
-        Err(error) => panic!(
-            "Error loading image asset {name:?}: {error}",
-            error = crate::util::ErrorChain(&error)
-        ),
+        Err(error) => panic!("Error loading image asset {name:?}: {error:?}",),
     }
 }
 
-#[doc(hidden)]
-pub use ::image::DynamicImage as DynamicImageForIncludeImage;
 #[doc(hidden)]
 pub use ::once_cell::sync::Lazy as LazyForIncludeImage;
 
@@ -184,7 +171,7 @@ pub use ::once_cell::sync::Lazy as LazyForIncludeImage;
 macro_rules! include_image {
     ( $path:literal ) => {{
         static IMAGE: $crate::content::load_image::LazyForIncludeImage<
-            $crate::content::load_image::DynamicImageForIncludeImage,
+            $crate::content::load_image::DecodedPng,
         > = $crate::content::load_image::LazyForIncludeImage::new(|| {
             $crate::content::load_image::load_png_from_bytes($path, include_bytes!($path))
         });
@@ -198,10 +185,24 @@ mod tests {
     use super::*;
     use crate::math::Rgb;
 
-    fn test_image() -> image::RgbaImage {
-        image::RgbaImage::from_fn(2, 2, |x, y| {
-            image::Rgba([x as u8 * 255, y as u8 * 255, 0, 255])
-        })
+    fn test_image() -> DecodedPng {
+        (
+            PngHeader {
+                width: 2,
+                height: 2,
+                bit_depth: png_decoder::BitDepth::Eight,
+                color_type: png_decoder::ColorType::RgbAlpha,
+                compression_method: png_decoder::CompressionMethod::Deflate,
+                filter_method: png_decoder::FilterMethod::Adaptive,
+                interlace_method: png_decoder::InterlaceMethod::None,
+            },
+            vec![
+                0, 0, 0, 255, //
+                255, 0, 0, 255, //
+                0, 255, 0, 255, //
+                255, 255, 0, 255, //
+            ],
+        )
     }
 
     #[test]
@@ -232,14 +233,8 @@ mod tests {
 
     #[test]
     fn transparent_pixels_are_air() {
-        assert_eq!(
-            default_srgb(image::Rgba([0, 0, 0, 0])),
-            VoxelBrush::single(AIR)
-        );
-        assert_eq!(
-            default_srgb(image::Rgba([255, 0, 0, 0])),
-            VoxelBrush::single(AIR)
-        );
+        assert_eq!(default_srgb([0, 0, 0, 0]), VoxelBrush::single(AIR));
+        assert_eq!(default_srgb([255, 0, 0, 0]), VoxelBrush::single(AIR));
     }
 
     #[test]

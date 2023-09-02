@@ -169,8 +169,8 @@ impl Icons {
                                 GridRotation::RXZY,
                                 |color| {
                                     // TODO: Figure out abstractions to not need so much fiddly custom code
-                                    let bcolor = Block::from(Rgba::from_srgb8(color.0));
-                                    match color.0 {
+                                    let bcolor = Block::from(Rgba::from_srgb8(color));
+                                    match color {
                                         [0, 0, 0, 255] => {
                                             VoxelBrush::new(vec![([0, 15, 0], dots(0))])
                                         }

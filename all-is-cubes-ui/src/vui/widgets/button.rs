@@ -12,7 +12,7 @@ use all_is_cubes::block::{
     self, Block, BlockBuilder,
     Resolution::{self, R32},
 };
-use all_is_cubes::content::load_image::{default_srgb, ImageAdapter};
+use all_is_cubes::content::load_image::{default_srgb, DecodedPng, PngAdapter};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{
     image::Image as EgImage,
@@ -334,7 +334,7 @@ pub(crate) fn draw_target_for_button_label<C: PixelColor>(
 }
 
 pub(crate) enum ButtonIcon<'a> {
-    Icon(&'a image::DynamicImage),
+    Icon(&'a DecodedPng),
     Text(&'a MonoFont<'a>, &'a str),
 }
 
@@ -354,7 +354,7 @@ pub(crate) fn make_button_label_block(
 
     match icon {
         ButtonIcon::Icon(icon) => {
-            let id = &ImageAdapter::adapt(icon, default_srgb);
+            let id = &PngAdapter::adapt(icon, default_srgb);
             EgImage::new(&id, -id.bounding_box().center() - Point::new(1, 1))
                 .draw(&mut draw_target)?;
         }

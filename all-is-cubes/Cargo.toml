@@ -66,7 +66,7 @@ flate2 = { version = "1.0.26" }
 futures-core = { workspace = true }
 # image is used for its common image data types (for HeadlessRenderer),
 # and for PNG asset loading.
-image = { workspace = true, features = ["png"] }
+image = { workspace = true }
 indoc = { workspace = true }
 instant = { workspace = true }
 itertools = { workspace = true }
@@ -75,6 +75,7 @@ mutants = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
 ordered-float = { workspace = true }
+png-decoder = { version = "0.1.1" }
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }
 rayon = { workspace = true, optional = true }

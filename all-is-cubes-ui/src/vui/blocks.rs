@@ -147,9 +147,9 @@ impl UiBlocks {
                             GridRotation::RXyZ,
                             |color| match color {
                                 // Map placeholder colors to the color for each button's state.
-                                image::Rgba([255, 0, 0, 255]) => buttons[0].brush(),
-                                image::Rgba([0, 255, 0, 255]) => buttons[1].brush(),
-                                image::Rgba([0, 0, 255, 255]) => buttons[2].brush(),
+                                [255, 0, 0, 255] => buttons[0].brush(),
+                                [0, 255, 0, 255] => buttons[1].brush(),
+                                [0, 0, 255, 255] => buttons[2].brush(),
                                 _ => default_srgb(color),
                             },
                         )?),
