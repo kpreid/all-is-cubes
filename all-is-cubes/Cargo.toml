@@ -59,9 +59,9 @@ base64 = { workspace = true } # used in serialization
 bitflags = { workspace = true }
 bytemuck = { workspace = true, features = ["derive", "extern_crate_std"] } # derive used in serialization
 cgmath = "0.18.0"
-downcast-rs = "1.2.0"
+downcast-rs = { version = "1.2.0", default-features = false }
 embedded-graphics = "0.8.0"
-exhaust = { workspace = true }
+exhaust = { workspace = true, default-features = false }
 flate2 = { version = "1.0.26" }
 futures-core = { workspace = true }
 # image is used for its common image data types (for HeadlessRenderer),

@@ -1321,7 +1321,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba10f1843d67206bab864e012ab9d487210ced1faee97874b01fb067b9bbc2b4"
 dependencies = [
  "exhaust-macros",
- "itertools 0.10.5",
  "paste",
 ]
 
