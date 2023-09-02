@@ -36,20 +36,20 @@ pub trait Listen {
     /// Note that listeners are removed only via their returning false from
     /// [`Listener::alive()`]; there is no `unlisten()` operation, and identical listeners
     /// are not deduplicated.
-    fn listen<L: Listener<Self::Msg> + Send + Sync + 'static>(&self, listener: L);
+    fn listen<L: Listener<Self::Msg> + 'static>(&self, listener: L);
 }
 
 impl<T: Listen> Listen for &T {
     type Msg = T::Msg;
 
-    fn listen<L: Listener<Self::Msg> + Send + Sync + 'static>(&self, listener: L) {
+    fn listen<L: Listener<Self::Msg> + 'static>(&self, listener: L) {
         (**self).listen(listener)
     }
 }
 impl<T: Listen> Listen for Arc<T> {
     type Msg = T::Msg;
 
-    fn listen<L: Listener<Self::Msg> + Send + Sync + 'static>(&self, listener: L) {
+    fn listen<L: Listener<Self::Msg> + 'static>(&self, listener: L) {
         (**self).listen(listener)
     }
 }
@@ -139,7 +139,7 @@ impl<M: Clone + Send> Notifier<M> {
 impl<M: Clone + Send> Listen for Notifier<M> {
     type Msg = M;
 
-    fn listen<L: Listener<M> + Send + Sync + 'static>(&self, listener: L) {
+    fn listen<L: Listener<M> + 'static>(&self, listener: L) {
         if !listener.alive() {
             return;
         }
@@ -176,9 +176,9 @@ impl<M> fmt::Debug for Notifier<M> {
 /// for a "listen" operation to be implemented in terms of delegating to several others.
 /// This is not required, so that the `Listener` trait remains object-safe.
 ///
-/// Implementors should also implement [`Send`] and [`Sync`], as most usage of listeners
-/// might cross threads. However, this is not strictly required.
-pub trait Listener<M> {
+/// Implementors must also implement [`Send`] and [`Sync`] if the `std` feature of
+/// `all-is-cubes` is enabled.
+pub trait Listener<M>: private::RequireSendSyncIfStd {
     /// Process and store a message.
     ///
     /// Note that, since this method takes `&Self`, a `Listener` must use interior
@@ -217,7 +217,7 @@ pub trait Listener<M> {
     /// implementors should not override this.**
     fn erased(self) -> DynListener<M>
     where
-        Self: Sized + Send + Sync + 'static,
+        Self: Sized + 'static,
     {
         Arc::new(self)
     }
@@ -261,7 +261,7 @@ pub trait Listener<M> {
 }
 
 /// Type-erased form of a [`Listener`] which accepts messages of type `M`.
-pub type DynListener<M> = Arc<dyn Listener<M> + Send + Sync>;
+pub type DynListener<M> = Arc<dyn Listener<M>>;
 
 impl<M> Listener<M> for DynListener<M> {
     fn receive(&self, message: M) {
@@ -274,6 +274,18 @@ impl<M> Listener<M> for DynListener<M> {
 
     fn erased(self) -> DynListener<M> {
         self
+    }
+}
+
+mod private {
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "std")] {
+            pub trait RequireSendSyncIfStd: Send + Sync {}
+            impl<T: Send + Sync> RequireSendSyncIfStd for T {}
+        } else {
+            pub trait RequireSendSyncIfStd {}
+            impl<T> RequireSendSyncIfStd for T {}
+        }
     }
 }
 

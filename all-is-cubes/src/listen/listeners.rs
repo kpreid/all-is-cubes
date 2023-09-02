@@ -40,7 +40,8 @@ impl<F, T> FnListener<F, T> {
 
 impl<M, F, T> Listener<M> for FnListener<F, T>
 where
-    F: Fn(&T, M),
+    F: Fn(&T, M) + super::private::RequireSendSyncIfStd,
+    T: super::private::RequireSendSyncIfStd,
 {
     fn receive(&self, message: M) {
         if let Some(strong_target) = self.weak_target.upgrade() {
@@ -130,7 +131,7 @@ impl<M> Sink<M> {
     }
 }
 
-impl<M> Listener<M> for SinkListener<M> {
+impl<M: Send + Sync> Listener<M> for SinkListener<M> {
     fn receive(&self, message: M) {
         if let Some(cell) = self.weak_messages.upgrade() {
             cell.write().unwrap().push_back(message);

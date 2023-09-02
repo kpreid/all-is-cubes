@@ -32,7 +32,7 @@ use crate::universe::Universe;
 /// changes only with notification.
 fn listen(
     block: Block,
-    listener: impl listen::Listener<BlockChange> + Send + Sync + 'static,
+    listener: impl listen::Listener<BlockChange> + 'static,
 ) -> Result<(), EvalBlockError> {
     block
         .evaluate2(&block::EvalFilter {

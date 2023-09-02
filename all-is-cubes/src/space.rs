@@ -759,7 +759,7 @@ impl VisitRefs for Space {
 impl Listen for Space {
     type Msg = SpaceChange;
     /// Registers a listener for mutations of this space.
-    fn listen<L: Listener<SpaceChange> + Send + Sync + 'static>(&self, listener: L) {
+    fn listen<L: Listener<SpaceChange> + 'static>(&self, listener: L) {
         self.notifier.listen(listener)
     }
 }

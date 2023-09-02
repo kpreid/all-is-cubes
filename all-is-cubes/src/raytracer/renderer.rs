@@ -567,12 +567,12 @@ mod eg {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::assert_send_sync;
+    use crate::util::assert_conditional_send_sync;
 
     use super::*;
 
     #[test]
     fn renderer_is_send_sync() {
-        assert_send_sync::<RtRenderer>()
+        assert_conditional_send_sync::<RtRenderer>()
     }
 }

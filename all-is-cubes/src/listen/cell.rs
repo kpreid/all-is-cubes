@@ -30,7 +30,7 @@ struct ListenableCellStorage<T> {
     notifier: Option<Notifier<()>>,
 }
 
-impl<T: Sync> ListenableCell<T> {
+impl<T> ListenableCell<T> {
     /// Creates a new [`ListenableCell`] containing the given value.
     pub fn new(value: impl Into<Arc<T>>) -> Self {
         Self {
@@ -86,7 +86,7 @@ impl<T: Sync> ListenableCell<T> {
     }
 }
 
-impl<T: Clone + Sync> ListenableSource<T> {
+impl<T: Clone> ListenableSource<T> {
     /// Creates a new [`ListenableSource`] containing the given value, which will
     /// never change.
     pub fn constant(value: T) -> Self {
@@ -111,10 +111,10 @@ impl<T: Clone + Sync> ListenableSource<T> {
     }
 }
 
-impl<T: Clone + Sync> Listen for ListenableSource<T> {
+impl<T: Clone> Listen for ListenableSource<T> {
     type Msg = ();
 
-    fn listen<L: Listener<Self::Msg> + Send + Sync + 'static>(&self, listener: L) {
+    fn listen<L: Listener<Self::Msg> + 'static>(&self, listener: L) {
         if let Some(notifier) = &self.storage.notifier {
             notifier.listen(listener);
         }
@@ -130,7 +130,7 @@ pub struct ListenableCellWithLocal<T> {
     value: Arc<T>,
 }
 
-impl<T: Sync> ListenableCellWithLocal<T> {
+impl<T> ListenableCellWithLocal<T> {
     pub fn new(value: impl Into<Arc<T>>) -> Self {
         let value = value.into();
         Self {

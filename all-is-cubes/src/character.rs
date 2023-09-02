@@ -542,7 +542,7 @@ impl VisitRefs for Character {
 impl Listen for Character {
     type Msg = CharacterChange;
     /// Registers a listener for mutations of this character.
-    fn listen<L: Listener<CharacterChange> + Send + Sync + 'static>(&self, listener: L) {
+    fn listen<L: Listener<CharacterChange> + 'static>(&self, listener: L) {
         self.notifier.listen(listener)
     }
 }

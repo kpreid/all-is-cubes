@@ -206,11 +206,19 @@ impl fmt::Display for TimeStats {
     }
 }
 
-#[doc(hidden)]
+#[doc(hidden)] // for use in internal tests only
 pub fn assert_send_sync<T: Send + Sync>() {
     // We don't need to do anything in this function; the call to it having been successfully
     // compiled is the assertion.
 }
+
+// Assert `Send + Sync` only if the `std` feature is active.
+#[cfg(feature = "std")]
+#[doc(hidden)] // for use in internal tests only
+pub fn assert_conditional_send_sync<T: Send + Sync>() {}
+#[cfg(not(feature = "std"))]
+#[doc(hidden)] // for use in internal tests only
+pub fn assert_conditional_send_sync<T>() {}
 
 #[cfg(test)]
 mod tests {

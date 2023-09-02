@@ -179,7 +179,7 @@ impl<M: Send> ChannelListener<M> {
         Self { sender }
     }
 }
-impl<M> listen::Listener<M> for ChannelListener<M> {
+impl<M: Send> listen::Listener<M> for ChannelListener<M> {
     fn receive(&self, message: M) {
         _ = self.sender.send(message);
     }

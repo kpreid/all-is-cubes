@@ -48,7 +48,7 @@ impl Listen for BlockDef {
 
     /// Registers a listener for mutations of any data sources which may affect the
     /// [`Block::evaluate`] result from blocks defined using this block definition.
-    fn listen<L: Listener<BlockChange> + Send + Sync + 'static>(&self, listener: L) {
+    fn listen<L: Listener<BlockChange> + 'static>(&self, listener: L) {
         self.notifier.listen(listener)
     }
 }

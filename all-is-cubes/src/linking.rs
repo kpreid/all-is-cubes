@@ -153,16 +153,34 @@ where
         })
     }
 
-    /// Iterate over the entire contents of this.
-    pub fn iter(&self) -> impl Iterator<Item = (E, &Block)> + Send
-    where
-        E: Sync,
-        <E as Exhaust>::Iter: Send,
-    {
-        E::exhaust().map(|key| {
-            let block: &Block = &self.map[&key];
-            (key, block)
-        })
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "std")] {
+            /// Iterate over the entire contents of this.
+            pub fn iter(&self) -> impl Iterator<Item = (E, &Block)> + Send
+            where
+                E: Sync,
+                <E as Exhaust>::Iter: Send,
+            {
+                E::exhaust().map(|key| {
+                    let block: &Block = &self.map[&key];
+                    (key, block)
+                })
+            }
+        } else {
+            // `Block` is not `Sync` here, so this can't be `Send`.
+
+            /// Iterate over the entire contents of this.
+            pub fn iter(&self) -> impl Iterator<Item = (E, &Block)>
+            where
+                E: Sync,
+                <E as Exhaust>::Iter: Send,
+            {
+                E::exhaust().map(|key| {
+                    let block: &Block = &self.map[&key];
+                    (key, block)
+                })
+            }
+        }
     }
 }
 

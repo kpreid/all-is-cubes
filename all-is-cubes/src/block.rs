@@ -416,7 +416,7 @@ impl Block {
     /// incompletely or not at all. It should not be relied on.
     pub fn evaluate_and_listen(
         &self,
-        listener: impl Listener<BlockChange> + Send + Sync + 'static,
+        listener: impl Listener<BlockChange> + 'static,
     ) -> Result<EvaluatedBlock, EvalBlockError> {
         self.evaluate2(&EvalFilter {
             skip_eval: false,

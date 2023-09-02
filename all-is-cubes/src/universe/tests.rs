@@ -15,12 +15,12 @@ use crate::transaction::{self, Transaction};
 use crate::universe::{
     list_refs, InsertError, InsertErrorKind, Name, RefError, URef, Universe, UniverseTransaction,
 };
-use crate::util::assert_send_sync;
+use crate::util::assert_conditional_send_sync;
 
 #[test]
 fn thread_safety() {
-    assert_send_sync::<URef<Character>>();
-    assert_send_sync::<Universe>();
+    assert_conditional_send_sync::<URef<Character>>();
+    assert_conditional_send_sync::<Universe>();
 }
 
 #[test]
