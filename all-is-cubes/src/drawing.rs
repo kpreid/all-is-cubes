@@ -69,25 +69,37 @@ pub fn rectangle_to_aab(rectangle: Rectangle, transform: Gridgid, max_brush: Gri
 
     // TODO: propagate numeric overflow cases
 
-    // Construct rectangle whose edges *exclude* the direction in which the
-    // drawn pixels overhang, because that's going to change.
-    let type_converted_excluding_size = GridAab::from_lower_size(
-        [rectangle.top_left.x, rectangle.top_left.y, 0],
-        [
-            (rectangle.size.width - 1) as i32,
-            (rectangle.size.height - 1) as i32,
-            0,
-        ],
-    );
+    if rectangle.size.width == 0 || rectangle.size.height == 0 {
+        // Handle zero-sized rectangles — they don't draw any pixels, so don't enlarge them
 
-    // Transform into the target 3D coordinate system.
-    let transformed = type_converted_excluding_size.transform(transform).unwrap();
+        let type_converted = GridAab::from_lower_size(
+            [rectangle.top_left.x, rectangle.top_left.y, 0],
+            [rectangle.size.width as i32, rectangle.size.height as i32, 0],
+        );
 
-    // Account for the brush size -- assuming the brush is *not* rotated by the
-    // transform, so we must cancel it out.
-    // TODO: We want to change this to rotate the brush, but must do it globally
-    // consistently in both drawing and size-computation.
-    transformed.minkowski_sum(max_brush).unwrap()
+        // Transform into the target 3D coordinate system.
+        type_converted.transform(transform).unwrap()
+    } else {
+        // Construct rectangle whose edges *exclude* the direction in which the
+        // drawn pixels overhang, because that's going to change.
+        let type_converted_excluding_size = GridAab::from_lower_size(
+            [rectangle.top_left.x, rectangle.top_left.y, 0],
+            [
+                (rectangle.size.width - 1) as i32,
+                (rectangle.size.height - 1) as i32,
+                0,
+            ],
+        );
+
+        // Transform into the target 3D coordinate system.
+        let transformed = type_converted_excluding_size.transform(transform).unwrap();
+
+        // Account for the brush size -- assuming the brush is *not* rotated by the
+        // transform, so we must cancel it out.
+        // TODO: We want to change this to rotate the brush, but must do it globally
+        // consistently in both drawing and size-computation.
+        transformed.minkowski_sum(max_brush).unwrap()
+    }
 }
 
 /// Adapter to use a [`Space`] or [`SpaceTransaction`] as a [`DrawTarget`].
@@ -545,7 +557,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "TODO: make this succeed"]
     fn rectangle_to_aab_empty_rects_no_transform() {
         assert_eq!(
             rectangle_to_aab(
@@ -553,7 +564,8 @@ mod tests {
                 Gridgid::IDENTITY,
                 GridAab::ORIGIN_CUBE
             ),
-            GridAab::from_lower_size([3, 4, 0], [0, 10, 1])
+            GridAab::from_lower_size([3, 4, 0], [0, 10, 0]),
+            "empty width",
         );
         assert_eq!(
             rectangle_to_aab(
@@ -561,7 +573,8 @@ mod tests {
                 Gridgid::IDENTITY,
                 GridAab::ORIGIN_CUBE
             ),
-            GridAab::from_lower_size([3, 4, 0], [0, 10, 1])
+            GridAab::from_lower_size([3, 4, 0], [10, 0, 0]),
+            "empty height",
         );
     }
 
