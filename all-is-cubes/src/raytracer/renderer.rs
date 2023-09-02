@@ -2,12 +2,11 @@ use std::fmt;
 
 use cgmath::{ElementWise, Point2, Vector2};
 use futures_core::future::BoxFuture;
-use image::RgbaImage;
 use ordered_float::NotNan;
 
 use crate::camera::{
     AntialiasingOption, Camera, Flaws, FogOption, GraphicsOptions, HeadlessRenderer, Layers,
-    RenderError, StandardCameras, Viewport,
+    RenderError, Rendering, StandardCameras, Viewport,
 };
 use crate::character::Cursor;
 use crate::content::palette;
@@ -206,26 +205,22 @@ where
 }
 
 impl RtRenderer<()> {
-    /// As [`Self::draw()`], but the output is an [`RgbaImage`], and
+    /// As [`Self::draw()`], but the output is an [`Rendering`], and
     /// [`Camera::post_process_color()`] is applied to the pixels.
     ///
     ///  [`Camera::post_process_color()`]: crate::camera::Camera::post_process_color
     pub fn draw_rgba(
         &self,
         info_text_fn: impl FnOnce(&RaytraceInfo) -> String,
-    ) -> (RgbaImage, RaytraceInfo, Flaws) {
+    ) -> (Rendering, RaytraceInfo) {
         let camera = self.cameras.cameras().world.clone();
+        let size = self.modified_viewport().framebuffer_size;
 
-        let Vector2 {
-            x: width,
-            y: height,
-        } = self.modified_viewport().framebuffer_size;
-        let mut image = RgbaImage::new(width, height);
-
+        let mut data = vec![[0; 4]; usize::try_from(size.x * size.y).unwrap()];
         let info = self.draw::<ColorBuf, _, [u8; 4], _>(
             info_text_fn,
             |pixel_buf| camera.post_process_color(Rgba::from(pixel_buf)).to_srgb8(),
-            bytemuck::cast_slice_mut::<u8, [u8; 4]>(image.as_mut()),
+            &mut data,
         );
 
         let options = self.cameras.graphics_options();
@@ -240,7 +235,7 @@ impl RtRenderer<()> {
             flaws |= Flaws::NO_FOG;
         }
 
-        (image, info, flaws)
+        (Rendering { size, data, flaws }, info)
     }
 }
 
@@ -266,14 +261,11 @@ impl HeadlessRenderer for RtRenderer<()> {
         Box::pin(async move { self.update(cursor) })
     }
 
-    fn draw<'a>(
-        &'a mut self,
-        info_text: &'a str,
-    ) -> BoxFuture<'a, Result<(RgbaImage, Flaws), RenderError>> {
+    fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<Rendering, RenderError>> {
         Box::pin(async {
-            let (image, _rt_info, flaws) = self.draw_rgba(|_| info_text.to_string());
+            let (rendering, _rt_info) = self.draw_rgba(|_| info_text.to_string());
 
-            Ok((image, flaws))
+            Ok(rendering)
         })
     }
 }

@@ -375,11 +375,11 @@ async fn follow_character_change(context: RenderTestContext) {
     // Switch characters and draw the second -- the resulting sky color should be from it
     character_cell.set(Some(c2));
     renderer.update(None).await.unwrap();
-    let (image, _flaws) = renderer.draw("").await.unwrap();
+    let image = renderer.draw("").await.unwrap();
 
     assert_eq!(
-        image.get_pixel(0, 0),
-        &image::Rgba([0, 255, 0, 255]),
+        image.data[0],
+        [0, 255, 0, 255],
         "Should be looking at c2 (green)"
     );
 }
@@ -686,8 +686,8 @@ async fn no_update(mut context: RenderTestContext) {
     finish_universe_from_space(&mut universe, space);
 
     let mut renderer = context.renderer(&universe);
-    let (image, flaws) = renderer.draw("").await.unwrap();
-    context.compare_image(5, image, flaws);
+    let image = renderer.draw("").await.unwrap();
+    context.compare_image(5, image);
 
     // Now run a normal update and see what happens.
     context
@@ -782,11 +782,11 @@ async fn zero_viewport(mut context: RenderTestContext) {
 
     // Initially zero viewport
     renderer.update(None).await.unwrap();
-    let (image, _) = renderer
+    let image = renderer
         .draw(overlays.info_text.as_ref().unwrap())
         .await
         .unwrap();
-    assert_eq!(image.dimensions(), (0, 0));
+    assert_eq!(image.size, Vector2::new(0, 0));
 
     // Now confirm the renderer can produce an okay image afterward
     viewport_cell.set(COMMON_VIEWPORT);
@@ -797,11 +797,11 @@ async fn zero_viewport(mut context: RenderTestContext) {
     // Now try *resizing to* zero and back
     viewport_cell.set(zero);
     renderer.update(None).await.unwrap();
-    let (image, _) = renderer
+    let image = renderer
         .draw(overlays.info_text.as_ref().unwrap())
         .await
         .unwrap();
-    assert_eq!(image.dimensions(), (0, 0));
+    assert_eq!(image.size, Vector2::new(0, 0));
     viewport_cell.set(COMMON_VIEWPORT);
     context
         .render_comparison_test_with_renderer(TEXT_MAX_DIFF, &mut renderer, overlays)

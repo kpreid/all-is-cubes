@@ -31,8 +31,6 @@ all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.6.0" }
 arbitrary = { workspace = true, optional = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }
-# TODO: all-is-cubes should be reexporting image since the load_image module reveals it
-image = { workspace = true }
 instant = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }

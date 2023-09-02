@@ -88,12 +88,12 @@ impl Recorder {
                     .spawn({
                         move || {
                             while let Ok((frame_number, renderer)) = scene_receiver.recv() {
-                                let (image, _info, flaws) = renderer.draw_rgba(|_| String::new());
+                                let (image, _info) = renderer.draw_rgba(|_| String::new());
                                 image_data_sender
                                     .send((
                                         Status {
                                             frame_number,
-                                            flaws,
+                                            flaws: image.flaws,
                                         },
                                         image,
                                     ))

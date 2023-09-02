@@ -64,9 +64,6 @@ embedded-graphics = "0.8.0"
 exhaust = { workspace = true, default-features = false }
 flate2 = { version = "1.0.26" }
 futures-core = { workspace = true }
-# image is used for its common image data types (for HeadlessRenderer),
-# and for PNG asset loading.
-image = { workspace = true }
 indoc = { workspace = true }
 instant = { workspace = true }
 itertools = { workspace = true }

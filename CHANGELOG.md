@@ -28,6 +28,10 @@
         - `math::GridMatrix::decompose()`
         - `space::Space::draw_target()`
         - `space::SpaceTransaction::draw_target()`
+
+    - `camera::HeadlessRenderer` now returns a custom image container type `Rendering` instead of using `image::RgbaImage`.
+      (This way, no dependency on `image` is needed.)
+
     - `drawing::VoxelBrush::transform()` is renamed to `rotate()` and only accepts a rotation.
       This avoids confusion between points in space and cube-identifying coordinates.
     - Renamed `raytracer::PixelBuf` trait to `Accumulate`.

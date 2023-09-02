@@ -39,10 +39,10 @@ async fn renderer_test() {
             .unwrap()
             .build(cameras);
     renderer.update(None).await.unwrap();
-    let (image, _flaws) = renderer.draw("").await.unwrap();
+    let image = renderer.draw("").await.unwrap();
 
     assert_eq!(
-        image.get_pixel(0, 0).0,
+        image.data[0],
         palette::DAY_SKY_COLOR.with_alpha_one().to_srgb8()
     );
 }

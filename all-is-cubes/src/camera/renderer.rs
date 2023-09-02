@@ -1,10 +1,10 @@
+use cgmath::Vector2;
 use embedded_graphics::mono_font::iso_8859_1::FONT_7X13_BOLD;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::prelude::{PixelColor, Point};
 use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
 use futures_core::future::BoxFuture;
-use image::RgbaImage;
 
 use crate::camera::Flaws;
 use crate::character::Cursor;
@@ -34,16 +34,8 @@ pub trait HeadlessRenderer {
     /// This operation should not attempt to access the scene objects and therefore may be
     /// called while the [`Universe`] is being stepped on another thread.
     ///
-    /// The returned image is always 8 bits per component and should be in the sRGB color
-    /// space. (This trait may be revised in the future to support HDR rendering.)
-    ///
-    /// TODO: provide for returning performance info?
-    ///
     /// [`Universe`]: crate::universe::Universe
-    fn draw<'a>(
-        &'a mut self,
-        info_text: &'a str,
-    ) -> BoxFuture<'a, Result<(RgbaImage, Flaws), RenderError>>;
+    fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<Rendering, RenderError>>;
 }
 
 /// An error indicating that a [`HeadlessRenderer`] failed to operate.
@@ -59,6 +51,22 @@ pub enum RenderError {
     #[error("scene to be rendered was not available for reading")]
     Read(RefError),
     // TODO: add errors for out of memory, lost GPU, etc.
+}
+
+/// Image container produced by a [`HeadlessRenderer`].
+// ---
+// TODO: This is not very compatible with future changes, but it's not clear how to
+// improve extensibility. We would also like to have renderer-specific performance info.
+#[derive(Clone, Debug)]
+#[allow(clippy::exhaustive_structs)]
+pub struct Rendering {
+    /// Width and height of the image.
+    pub size: Vector2<u32>,
+    /// Image data, RGBA, 8 bits per component, in the sRGB color space.
+    pub data: Vec<[u8; 4]>,
+    /// Deficiencies of the rendering; ways in which it fails to accurately represent the
+    /// scene or apply the renderer’s configuration.
+    pub flaws: Flaws,
 }
 
 /// Provides the standard text style and positioning to draw the “debug info text”

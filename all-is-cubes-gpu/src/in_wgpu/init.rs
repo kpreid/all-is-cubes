@@ -5,6 +5,8 @@
 
 use std::sync::Arc;
 
+use all_is_cubes::camera::Rendering;
+
 /// Create a [`wgpu::Instance`] and [`wgpu::Adapter`] controlled by environment variables,
 /// and print information about the decision made.
 ///
@@ -87,28 +89,23 @@ fn shortened_adapter_info(info: &wgpu::AdapterInfo) -> String {
         .replace("device: 0, ", "")
 }
 
-/// Copy the contents of a texture into an [`ImageBuffer`], assuming that its byte layout
-/// is the same as that of `P`.
+/// Copy the contents of a texture into a [`Rendering`],
+/// assuming that its byte layout is RGBA8.
 ///
-/// Panics if the provided pixel type or viewport size are incorrect.
-///
-/// TODO: Despite being nominally async, this function blocks on retrieving the texture.
-/// It should be fixed not to.
+/// Panics if the pixel type or viewport size are incorrect.
 #[doc(hidden)]
-pub async fn get_image_from_gpu<P>(
+pub async fn get_image_from_gpu(
     device: Arc<wgpu::Device>,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     size: all_is_cubes::cgmath::Vector2<u32>,
-) -> image::ImageBuffer<P, Vec<P::Subpixel>>
-where
-    P: image::Pixel,
-    P::Subpixel: bytemuck::AnyBitPattern,
-{
-    let pixels_vec: Vec<P::Subpixel> =
-        get_texels_from_gpu(device, queue, texture, size, P::CHANNEL_COUNT.into()).await;
-    image::ImageBuffer::from_raw(size.x, size.y, pixels_vec)
-        .expect("image copy buffer was incorrectly sized")
+    flaws: all_is_cubes::camera::Flaws,
+) -> Rendering {
+    Rendering {
+        size,
+        data: get_texels_from_gpu::<[u8; 4]>(device, queue, texture, size, 1).await,
+        flaws,
+    }
 }
 
 /// Fetch the contents of a 2D texture, assuming that its byte layout is the same as that
@@ -116,9 +113,6 @@ where
 /// `dimensions.x * dimensions.y * components`.
 ///
 /// Panics if the provided sizes are incorrect.
-///
-/// TODO: Despite being nominally async, this function blocks on retrieving the texture.
-/// It should be fixed not to.
 #[doc(hidden)]
 pub async fn get_texels_from_gpu<C>(
     device: Arc<wgpu::Device>,

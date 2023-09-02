@@ -10,10 +10,9 @@ use futures_core::future::BoxFuture;
 use futures_util::future::Shared;
 use futures_util::stream;
 use futures_util::{FutureExt as _, StreamExt as _};
-use image::RgbaImage;
 use itertools::Itertools;
 
-use all_is_cubes::camera::{Flaws, HeadlessRenderer};
+use all_is_cubes::camera::{Flaws, HeadlessRenderer, Rendering};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::{CustomFormat as _, StatusText};
 
@@ -85,23 +84,20 @@ impl RenderTestContext {
             .update(overlays.cursor)
             .await
             .expect("renderer update() failed");
-        let (image, flaws) = renderer
+        let image = renderer
             .draw(overlays.info_text.unwrap_or(""))
             .await
             .expect("renderer draw() failed");
 
-        self.compare_image(allowed_difference, image, flaws)
+        self.compare_image(allowed_difference, image)
     }
 
     /// Perform an image comparison and log the result, without also calling the renderer
     /// ourselves.
+    ///
+    /// If flaws are present, then comparison failures do not fail the test.
     #[track_caller]
-    pub fn compare_image(
-        &mut self,
-        allowed_difference: impl Into<Threshold>,
-        image: RgbaImage,
-        flaws: Flaws,
-    ) {
+    pub fn compare_image(&mut self, allowed_difference: impl Into<Threshold>, image: Rendering) {
         let combo = ImageId {
             test_id: self.id(),
             renderer: self.renderer_factory.id(),
@@ -110,11 +106,11 @@ impl RenderTestContext {
                 self.image_serial
             },
         };
+        let flaws = image.flaws;
 
         let mut outcome = crate::compare_rendered_image(combo, allowed_difference.into(), image);
 
-        if matches!(outcome.outcome, ComparisonOutcome::Different { .. })
-            && flaws != Flaws::default()
+        if matches!(outcome.outcome, ComparisonOutcome::Different { .. }) && flaws != Flaws::empty()
         {
             outcome.outcome = ComparisonOutcome::Flawed(format!("{flaws:?}"));
         }

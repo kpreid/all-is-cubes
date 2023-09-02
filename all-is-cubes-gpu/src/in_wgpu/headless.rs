@@ -93,7 +93,7 @@ pub(super) enum RenderMsg {
     ),
     Render(
         String,
-        oneshot::Sender<Result<(image::RgbaImage, Flaws), camera::RenderError>>,
+        oneshot::Sender<Result<camera::Rendering, camera::RenderError>>,
     ),
 }
 
@@ -153,7 +153,7 @@ impl HeadlessRenderer for Renderer {
     fn draw<'a>(
         &'a mut self,
         info_text: &'a str,
-    ) -> BoxFuture<'a, Result<(image::RgbaImage, Flaws), camera::RenderError>> {
+    ) -> BoxFuture<'a, Result<camera::Rendering, camera::RenderError>> {
         let (tx, rx) = oneshot::channel();
         Box::pin(async move {
             self.send_maybe_wait(RenderMsg::Render(info_text.to_owned(), tx))
@@ -184,10 +184,7 @@ impl RendererImpl {
         Ok(())
     }
 
-    async fn draw(
-        &mut self,
-        info_text: &str,
-    ) -> Result<(image::RgbaImage, Flaws), camera::RenderError> {
+    async fn draw(&mut self, info_text: &str) -> Result<camera::Rendering, camera::RenderError> {
         // TODO: refactor so that this viewport read is done synchronously, outside the RendererImpl
         let viewport = self.viewport_source.snapshot();
         if self.viewport_dirty.get_and_clear() {
@@ -202,9 +199,10 @@ impl RendererImpl {
             &self.queue,
             &self.color_texture,
             viewport.framebuffer_size,
+            self.flaws,
         )
         .await;
-        Ok((image, self.flaws))
+        Ok(image)
     }
 }
 

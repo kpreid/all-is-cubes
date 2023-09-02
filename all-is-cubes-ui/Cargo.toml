@@ -19,7 +19,6 @@ all-is-cubes = { path = "../all-is-cubes", version = "0.6.0" }
 exhaust = { workspace = true }
 futures-core = { workspace = true }
 futures-task = { workspace = true }
-image = { workspace = true, features = ["png"] }
 indoc = { workspace = true }
 instant = { workspace = true }
 log = { workspace = true }

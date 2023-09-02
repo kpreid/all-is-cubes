@@ -40,6 +40,7 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
+use all_is_cubes::camera::Rendering;
 use image::RgbaImage;
 use rendiff::{Histogram, Threshold};
 
@@ -141,10 +142,17 @@ impl ComparisonRecord {
 pub fn compare_rendered_image(
     test: ImageId,
     allowed_difference: Threshold,
-    actual_image: RgbaImage,
+    actual_image: Rendering,
 ) -> ComparisonRecord {
     let actual_file_path = image_path(&test, Version::Actual);
     let diff_file_path = image_path(&test, Version::Diff);
+
+    let actual_image = image::RgbaImage::from_raw(
+        actual_image.size.x,
+        actual_image.size.y,
+        bytemuck::cast_vec::<[u8; 4], u8>(actual_image.data),
+    )
+    .unwrap();
 
     actual_image
         .save(&actual_file_path)

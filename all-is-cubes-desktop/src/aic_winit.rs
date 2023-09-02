@@ -540,10 +540,18 @@ impl RendererToWinit for RtToSoftbuffer {
             }
         }
 
-        let (image, _render_info, _flaws) = self
+        // TODO: reduce number of image copies and allocations here
+
+        let (image, _render_info) = self
             .renderer
             .draw_rgba(|render_info| session.info_text(render_info).to_string());
 
+        let image = image::RgbaImage::from_raw(
+            image.size.x,
+            image.size.y,
+            bytemuck::cast_vec::<[u8; 4], u8>(image.data),
+        )
+        .unwrap();
         let scaled_image = imageops::resize(
             &image,
             sb_image_size.width,

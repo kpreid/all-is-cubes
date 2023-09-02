@@ -66,12 +66,13 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion) {
         b.to_async(runtime).iter_with_large_drop(move || {
             let renderer = renderer.clone();
             async move {
-                let (image, flaws) = renderer.lock().unwrap().draw("").await.unwrap();
-                assert_eq!(flaws, Flaws::empty());
-                if false {
-                    // enable this for a check that we're rendering something sensible
-                    image.save("./wgpu_bench_output.png").unwrap();
-                }
+                let image = renderer.lock().unwrap().draw("").await.unwrap();
+                assert_eq!(image.flaws, Flaws::empty());
+                // if false {
+                //     // enable this for a check that we're rendering something sensible
+                //     // TODO: will need a type conversion
+                //     image.save("./wgpu_bench_output.png").unwrap();
+                // }
                 image
             }
         });

@@ -2,9 +2,9 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::sync::{mpsc, Arc};
 
-use image::RgbaImage;
 use png::{chunk::ChunkType, Encoder};
 
+use all_is_cubes::camera::Rendering;
 use all_is_cubes::listen;
 
 use crate::record::{RecordOptions, Status};
@@ -13,7 +13,7 @@ use crate::record::{RecordOptions, Status};
 pub(crate) fn threaded_write_frames(
     file: File,
     options: RecordOptions,
-    image_data_receiver: mpsc::Receiver<(Status, RgbaImage)>,
+    image_data_receiver: mpsc::Receiver<(Status, Rendering)>,
     status_notifier: Arc<listen::Notifier<Status>>,
 ) -> Result<(), std::io::Error> {
     let mut buf_writer = BufWriter::new(file);
@@ -21,8 +21,10 @@ pub(crate) fn threaded_write_frames(
         let mut png_writer = new_png_writer(&mut buf_writer, &options)?;
         'frame_loop: loop {
             match image_data_receiver.recv() {
-                Ok((status, image_data)) => {
-                    png_writer.write_image_data(image_data.as_ref())?;
+                Ok((status, image)) => {
+                    png_writer.write_image_data(bytemuck::cast_slice::<[u8; 4], u8>(
+                        image.data.as_ref(),
+                    ))?;
                     status_notifier.notify(status);
                 }
                 Err(mpsc::RecvError) => {
