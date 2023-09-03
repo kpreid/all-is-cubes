@@ -54,7 +54,7 @@ pub trait WhenceUniverse: fmt::Debug + Send + Sync + downcast_rs::Downcast + 'st
     /// The implementation should implement locking or other mechanisms as necessary to
     /// prevent `load()` and `save()` calls from corrupting each other.
     ///
-    /// If this is called even though [`Self::can_load()`] returned false, it should return
+    /// If this is called even though [`Self::can_save()`] returned false, it should return
     /// an `Err`, not panic.
     ///
     /// TODO: Define an error type for this to have at least broad categories.
