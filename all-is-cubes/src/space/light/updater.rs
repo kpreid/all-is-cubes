@@ -4,9 +4,8 @@
 use std::cmp::Ordering;
 use std::fmt;
 
-use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3};
+use cgmath::{EuclideanSpace as _, Point3, Vector3};
 use instant::{Duration, Instant};
-use once_cell::sync::Lazy;
 
 use super::debug::LightComputeOutput;
 use super::LightUpdateRequest;
@@ -24,47 +23,15 @@ use crate::util::{CustomFormat, StatusText};
 /// model.
 const SURFACE_ABSORPTION: f32 = 0.75;
 
-const RAY_DIRECTION_STEP: isize = 5;
-const RAY_CUBE_EDGE: usize = (RAY_DIRECTION_STEP as usize) * 2 + 1;
-const ALL_RAYS_COUNT: usize = RAY_CUBE_EDGE.pow(3) - (RAY_CUBE_EDGE - 2).pow(3);
-
 #[derive(Debug)]
 struct LightRayData {
     ray: Ray,
     face_cosines: FaceMap<f32>,
 }
 
-// TODO: Make multiple ray patterns that suit the maximum_distance parameter.
-static LIGHT_RAYS: Lazy<[LightRayData; ALL_RAYS_COUNT]> = Lazy::new(|| {
-    let mut rays: Vec<LightRayData> = Vec::new();
-    let origin = Point3::new(0.5, 0.5, 0.5);
-
-    // TODO: octahedron instead of cube
-    for x in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
-        for y in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
-            for z in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
-                if x.abs() == RAY_DIRECTION_STEP
-                    || y.abs() == RAY_DIRECTION_STEP
-                    || z.abs() == RAY_DIRECTION_STEP
-                {
-                    let direction = Vector3::new(
-                        x as FreeCoordinate,
-                        y as FreeCoordinate,
-                        z as FreeCoordinate,
-                    )
-                    .normalize();
-                    rays.push(LightRayData {
-                        ray: Ray { origin, direction },
-                        face_cosines: FaceMap::from_fn(|face| {
-                            face.dot(direction.map(|s| s as f32)).max(0.0)
-                        }),
-                    });
-                }
-            }
-        }
-    }
-    rays.try_into().unwrap()
-});
+// Build script generates the declaration:
+// static LIGHT_RAYS: &[LightRayData] = &[...
+include!(concat!(env!("OUT_DIR"), "/light_ray_pattern.rs"));
 
 /// Methods on Space that specifically implement the lighting algorithm.
 impl Space {
@@ -195,7 +162,7 @@ impl Space {
             let direction_weights = directions_to_seek_light(ev_origin, ev_neighbors);
 
             // TODO: Choose a ray pattern that suits the maximum_distance.
-            for &LightRayData { ray, face_cosines } in &LIGHT_RAYS[..] {
+            for &LightRayData { ray, face_cosines } in LIGHT_RAYS {
                 // TODO: Theoretically we should weight light rays by the cosine but that has caused poor behavior in the past.
                 let ray_weight_by_faces = face_cosines
                     .zip(direction_weights, |_face, ray_cosine, reflects| {
