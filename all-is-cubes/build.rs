@@ -38,9 +38,8 @@ fn generate_light_ray_pattern(path: &Path) {
                 {
                     let direction = Vector3::new(x as f64, y as f64, z as f64).normalize();
 
-                    
                     writeln!(file, "LightRayData {{").unwrap();
-                    writeln!(file, 
+                    writeln!(file,
                         "    ray: Ray {{ origin: Point3 {{ {origin} }}, direction: Vector3 {{ {direction} }} }},\n    face_cosines: FaceMap {{",
                         origin = vecfields(origin),
                         direction = vecfields(direction),
