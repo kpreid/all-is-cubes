@@ -81,6 +81,8 @@
 //!
 //! This crate, `all_is_cubes`, defines the following feature flags:
 //!
+//! * `save`:
+//!   Enable [`serde`] serialization of [`Universe`]s and some other types.
 //! * `threads`:
 //!   Enable use of threads for parallel and background processing, including via
 //!   [`rayon`]’s global thread pool.

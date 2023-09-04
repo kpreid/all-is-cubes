@@ -21,6 +21,7 @@ pub(crate) type PackedLightScalar = u8;
 #[repr(u8)]
 pub(crate) enum LightStatus {
     /// The cube's light value has never been computed.
+    #[allow(unused)] // currently only used on feature=save
     Uninitialized = 0,
     /// The cube has no surfaces to catch light and therefore the light value is not tracked.
     NoRays = 1,
@@ -194,6 +195,7 @@ impl From<Rgb> for PackedLight {
     }
 }
 
+#[cfg(feature = "save")]
 impl From<PackedLight> for crate::save::schema::LightSerV1 {
     fn from(p: PackedLight) -> Self {
         use crate::save::schema::LightStatusSerV1 as S;
@@ -209,6 +211,7 @@ impl From<PackedLight> for crate::save::schema::LightSerV1 {
     }
 }
 
+#[cfg(feature = "save")]
 impl From<crate::save::schema::LightSerV1> for PackedLight {
     fn from(ls: crate::save::schema::LightSerV1) -> Self {
         use crate::save::schema::LightStatusSerV1 as S;

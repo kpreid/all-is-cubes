@@ -238,8 +238,9 @@ impl universe::VisitRefs for Composite {
 /// TODO: Document behavior of `collision` and `selectable` properties.
 ///
 #[doc = include_str!("../../save/serde-warning.md")]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum CompositeOperator {
     /// Porter-Duff “over”. If both source and destination are opaque, the source is taken;

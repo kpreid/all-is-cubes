@@ -308,6 +308,7 @@ impl Universe {
     }
 
     /// Returns a `URef` to a member whose referent may or may not be deserialized yet.
+    #[cfg(feature = "save")]
     pub(crate) fn get_or_insert_deserializing<T>(
         &mut self,
         name: Name,
@@ -338,6 +339,7 @@ impl Universe {
 
     /// As `insert()`, but for assigning values to names that _might_ have gotten
     /// [`Self::get_or_insert_deserializing()`] called on them.
+    #[cfg(feature = "save")]
     pub(crate) fn insert_deserialized<T>(&mut self, name: Name, value: T) -> Result<(), InsertError>
     where
         Self: UniverseTable<T, Table = Storage<T>>,
@@ -465,6 +467,7 @@ impl Universe {
 
     /// Traverse all members and find [`URef`]s that were deserialized in disconnected form.
     /// Each one needs to have its state adjusted and checked that it actually exists.
+    #[cfg(feature = "save")]
     pub(crate) fn fix_deserialized_refs(&mut self) -> Result<(), DeserializeRefsError> {
         let visitor = &mut |maybe_broken_ref: &dyn URefErased| {
             let _result = maybe_broken_ref.fix_deserialized(self.id, URefErasedInternalToken);

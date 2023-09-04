@@ -16,10 +16,9 @@ use crate::math::*;
 #[doc = include_str!("../save/serde-warning.md")]
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::exhaustive_enums)]
-#[derive(
-    Clone, Copy, Debug, Hash, Eq, PartialEq, exhaust::Exhaust, serde::Deserialize, serde::Serialize,
-)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 pub enum Face6 {
     /// Negative X; the face whose normal vector is `(-1, 0, 0)`.
@@ -45,10 +44,9 @@ pub enum Face6 {
 #[doc = include_str!("../save/serde-warning.md")]
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::exhaustive_enums)]
-#[derive(
-    Clone, Copy, Debug, Hash, Eq, PartialEq, exhaust::Exhaust, serde::Deserialize, serde::Serialize,
-)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 pub enum Face7 {
     /// The interior volume of a cube, or an undefined direction. Corresponds to the vector `(0, 0, 0)`.
