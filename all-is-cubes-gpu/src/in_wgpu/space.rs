@@ -62,7 +62,13 @@ pub(crate) struct SpaceRenderer {
     space_bind_group:
         Memo<(wgpu::Id<wgpu::TextureView>, wgpu::Id<wgpu::TextureView>), wgpu::BindGroup>,
 
-    csm: ChunkedSpaceMesh<Option<ChunkBuffers>, WgpuBlockVertex, AtlasAllocator, CHUNK_SIZE>,
+    csm: ChunkedSpaceMesh<
+        Option<ChunkBuffers>,
+        WgpuBlockVertex,
+        AtlasAllocator,
+        instant::Instant,
+        CHUNK_SIZE,
+    >,
 
     interactive: bool,
 }

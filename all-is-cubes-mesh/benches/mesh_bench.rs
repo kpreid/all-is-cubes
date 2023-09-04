@@ -160,8 +160,13 @@ fn dynamic_benches(c: &mut Criterion) {
         let space_ref = URef::new_pending(Name::Pending, half_space(Block::from(Rgba::WHITE)));
         b.iter_batched_ref(
             || {
-                let csm: dynamic::ChunkedSpaceMesh<(), BlockVertex<TestPoint>, TestAllocator, 16> =
-                    dynamic::ChunkedSpaceMesh::new(space_ref.clone(), true);
+                let csm: dynamic::ChunkedSpaceMesh<
+                    (),
+                    BlockVertex<TestPoint>,
+                    TestAllocator,
+                    std::time::Instant,
+                    16,
+                > = dynamic::ChunkedSpaceMesh::new(space_ref.clone(), true);
                 let tex = TestAllocator::new();
                 (tex, csm)
             },

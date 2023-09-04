@@ -21,7 +21,7 @@ use crate::record::RecordOptions;
 #[derive(Debug)]
 pub(super) struct MeshRecorder {
     cameras: camera::StandardCameras,
-    csm: ChunkedSpaceMesh<MeshIndexCell, GltfVertex, GltfTextureAllocator, 32>,
+    csm: ChunkedSpaceMesh<MeshIndexCell, GltfVertex, GltfTextureAllocator, std::time::Instant, 32>,
     tex: GltfTextureAllocator,
     scene_sender: mpsc::SyncSender<MeshRecordMsg>,
 }

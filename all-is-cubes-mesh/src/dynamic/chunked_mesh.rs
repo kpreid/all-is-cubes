@@ -4,14 +4,13 @@ use std::sync::{Arc, Mutex, Weak};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use indoc::indoc;
-use instant::{Duration, Instant};
 
 use all_is_cubes::camera::{Camera, Flaws};
 use all_is_cubes::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex};
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
-use all_is_cubes::time;
+use all_is_cubes::time::{self, Duration};
 use all_is_cubes::universe::URef;
 use all_is_cubes::util::{CustomFormat, StatusText, TimeStats};
 
@@ -32,7 +31,7 @@ mod tests;
 ///
 /// [`SpaceMesh`]: crate::SpaceMesh
 #[derive(Debug)]
-pub struct ChunkedSpaceMesh<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
+pub struct ChunkedSpaceMesh<D, Vert, Tex, I, const CHUNK_SIZE: GridCoordinate>
 where
     Tex: texture::Allocator,
 {
@@ -68,18 +67,20 @@ where
     last_mesh_options: Option<MeshOptions>,
 
     /// Most recent time at which we reset to no data.
-    zero_time: Instant,
+    zero_time: I,
     /// Earliest time prior to `zero_time` at which we finished everything in the queues.
-    complete_time: Option<Instant>,
+    complete_time: Option<I>,
 }
 
-impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate> ChunkedSpaceMesh<D, Vert, Tex, CHUNK_SIZE>
+impl<D, Vert, Tex, I, const CHUNK_SIZE: GridCoordinate>
+    ChunkedSpaceMesh<D, Vert, Tex, I, CHUNK_SIZE>
 where
     D: Default,
     Vert: GfxVertex<TexPoint = <<Tex as texture::Allocator>::Tile as texture::Tile>::Point>
         + PartialEq,
     Tex: texture::Allocator,
     Tex::Tile: PartialEq + 'static,
+    I: time::Instant,
 {
     /// Constructs a new [`ChunkedSpaceMesh`] that will maintain a mesh representation of
     /// the contents of the given space, within a requested viewing distance (specified
@@ -103,7 +104,7 @@ where
             did_not_finish_chunks: true,
             startup_chunks_only: interactive,
             last_mesh_options: None,
-            zero_time: Instant::now(),
+            zero_time: I::now(),
             complete_time: None,
         }
     }
@@ -190,7 +191,7 @@ where
         &mut self,
         camera: &Camera,
         block_texture_allocator: &Tex,
-        deadline: time::Deadline<Instant>,
+        deadline: time::Deadline<I>,
         mut render_data_updater: F,
     ) -> CsmUpdateInfo
     where
@@ -228,13 +229,13 @@ where
         &mut self,
         camera: &Camera,
         block_texture_allocator: &Tex,
-        deadline: time::Deadline<Instant>,
+        deadline: time::Deadline<I>,
         mut render_data_updater: F,
     ) -> (CsmUpdateInfo, bool)
     where
         F: FnMut(dynamic::RenderDataUpdate<'_, D, Vert, Tex::Tile>),
     {
-        let update_start_time = Instant::now();
+        let update_start_time = I::now();
 
         let graphics_options = camera.options();
         let view_point = camera.view_position();
@@ -251,7 +252,7 @@ where
             // TODO: report error
             return (
                 CsmUpdateInfo {
-                    prep_time: Instant::now().duration_since(update_start_time),
+                    prep_time: I::now().saturating_duration_since(update_start_time),
                     ..CsmUpdateInfo::default()
                 },
                 false,
@@ -277,13 +278,13 @@ where
             // We don't need to clear self.chunks because they will automatically be considered
             // stale by the new block versioning value.
 
-            self.zero_time = Instant::now();
+            self.zero_time = I::now();
             self.complete_time = None;
         }
 
         self.chunk_chart.resize_if_needed(camera.view_distance());
 
-        let prep_to_update_meshes_time = Instant::now();
+        let prep_to_update_meshes_time = I::now();
 
         let block_updates = self.block_meshes.update(
             &mut todo.blocks,
@@ -303,7 +304,7 @@ where
         // We are now done with todo preparation, and block mesh updates,
         // and can start updating chunk meshes.
 
-        let block_update_to_chunk_scan_time = Instant::now();
+        let block_update_to_chunk_scan_time = I::now();
 
         // Drop out-of-range chunks from todo.chunks and self.chunks.
         // We do this before allocating new ones to keep maximum memory usage lower.
@@ -332,7 +333,7 @@ where
                 continue;
             }
 
-            let this_chunk_start_time = Instant::now();
+            let this_chunk_start_time = I::now();
             if deadline < this_chunk_start_time {
                 did_not_finish = true;
                 break;
@@ -351,7 +352,7 @@ where
                     chunk_entry,
                     Occupied(ref oe) if oe.get().stale_blocks(&self.block_meshes))
             {
-                //let compute_start = Instant::now();
+                //let compute_start = I::now();
                 let chunk = chunk_entry.or_insert_with(|| {
                     // Remember that we want to track dirty flags for this chunk.
                     todo.chunks.insert(p, ChunkTodo::CLEAN);
@@ -364,26 +365,27 @@ where
                     mesh_options,
                     &self.block_meshes,
                 );
-                let compute_end_update_start = Instant::now();
+                let compute_end_update_start = I::now();
                 render_data_updater(chunk.borrow_for_update(false));
 
-                chunk_mesh_generation_times +=
-                    TimeStats::one(compute_end_update_start.duration_since(this_chunk_start_time));
+                chunk_mesh_generation_times += TimeStats::one(
+                    compute_end_update_start.saturating_duration_since(this_chunk_start_time),
+                );
                 chunk_mesh_callback_times +=
-                    TimeStats::one(Instant::now().duration_since(compute_end_update_start));
+                    TimeStats::one(I::now().saturating_duration_since(compute_end_update_start));
             }
         }
         self.did_not_finish_chunks = did_not_finish;
         if !did_not_finish {
             self.startup_chunks_only = false;
         }
-        let chunk_scan_end_time = Instant::now();
+        let chunk_scan_end_time = I::now();
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
         let depth_sort_end_time = if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
             if chunk.depth_sort_for_view(view_point.cast::<Vert::Coordinate>().unwrap()) {
                 render_data_updater(chunk.borrow_for_update(true));
-                Some(Instant::now())
+                Some(I::now())
             } else {
                 None
             }
@@ -400,7 +402,7 @@ where
                 "SpaceRenderer({space}): all meshes done in {time}",
                 space = self.space().name(),
                 time = end_all_time
-                    .duration_since(self.zero_time)
+                    .saturating_duration_since(self.zero_time)
                     .custom_format(StatusText)
             );
             self.complete_time = Some(end_all_time);
@@ -416,8 +418,8 @@ where
         (
             CsmUpdateInfo {
                 flaws,
-                total_time: end_all_time.duration_since(update_start_time),
-                prep_time: prep_to_update_meshes_time.duration_since(update_start_time),
+                total_time: end_all_time.saturating_duration_since(update_start_time),
+                prep_time: prep_to_update_meshes_time.saturating_duration_since(update_start_time),
                 chunk_scan_time: chunk_scan_end_time
                     .saturating_duration_since(block_update_to_chunk_scan_time)
                     .saturating_sub(
@@ -425,7 +427,8 @@ where
                     ),
                 chunk_mesh_generation_times,
                 chunk_mesh_callback_times,
-                depth_sort_time: depth_sort_end_time.map(|t| t.duration_since(chunk_scan_end_time)),
+                depth_sort_time: depth_sort_end_time
+                    .map(|t| t.saturating_duration_since(chunk_scan_end_time)),
                 block_updates,
 
                 // TODO: remember this rather than computing it

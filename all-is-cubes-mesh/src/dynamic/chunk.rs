@@ -1,10 +1,7 @@
-use instant::Instant;
-
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::math::{Aab, Geometry, GridCoordinate, LineVertex};
 use all_is_cubes::space::{BlockIndex, Space};
-use all_is_cubes::util::{ConciseDebug, CustomFormat};
 
 use crate::{dynamic, texture, GfxVertex, MeshOptions, SpaceMesh};
 
@@ -79,32 +76,34 @@ where
         options: &MeshOptions,
         block_meshes: &dynamic::VersionedBlockMeshes<D, Vert, Tex::Tile>,
     ) {
-        let compute_start: Option<Instant> = dynamic::LOG_CHUNK_UPDATES.then(Instant::now);
+        // let compute_start: Option<I> = dynamic::LOG_CHUNK_UPDATES.then(Instant::now);
         let bounds = self.position.bounds();
         self.mesh.compute(space, bounds, options, block_meshes);
 
         // Logging
-        if let Some(start) = compute_start {
-            let duration_ms = Instant::now().duration_since(start).as_secs_f32() * 1000.0;
-
-            let chunk_origin = bounds.lower_bounds();
-            let vertices = self.mesh.vertices().len();
-            if vertices == 0 {
-                log::trace!(
-                    "meshed {:?}+ in {:.3} ms, 0",
-                    chunk_origin.custom_format(ConciseDebug),
-                    duration_ms,
-                );
-            } else {
-                log::trace!(
-                    "meshed {:?}+ in {:.3} ms, {} in {:.3} µs/v",
-                    chunk_origin.custom_format(ConciseDebug),
-                    duration_ms,
-                    vertices,
-                    duration_ms * (1000.0 / vertices as f32),
-                );
-            }
-        }
+        // TODO: This logging code has been disabled to avoid`std::time::Instant
+        //
+        // if let Some(start) = compute_start {
+        //     let duration_ms = Instant::now().duration_since(start).as_secs_f32() * 1000.0;
+        //
+        //     let chunk_origin = bounds.lower_bounds();
+        //     let vertices = self.mesh.vertices().len();
+        //     if vertices == 0 {
+        //         log::trace!(
+        //             "meshed {:?}+ in {:.3} ms, 0",
+        //             chunk_origin.custom_format(ConciseDebug),
+        //             duration_ms,
+        //         );
+        //     } else {
+        //         log::trace!(
+        //             "meshed {:?}+ in {:.3} ms, {} in {:.3} µs/v",
+        //             chunk_origin.custom_format(ConciseDebug),
+        //             duration_ms,
+        //             vertices,
+        //             duration_ms * (1000.0 / vertices as f32),
+        //         );
+        //     }
+        // }
         self.update_debug = !self.update_debug;
 
         // Record the block meshes we incorporated into the chunk mesh.

@@ -186,7 +186,6 @@ dependencies = [
  "either",
  "fnv",
  "indoc",
- "instant",
  "log",
  "mutants",
  "num-traits",

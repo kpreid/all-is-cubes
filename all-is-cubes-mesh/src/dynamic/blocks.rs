@@ -1,7 +1,6 @@
 use std::num::NonZeroU32;
 
 use fnv::FnvHashSet;
-use instant::{Duration, Instant};
 
 use all_is_cubes::block::{EvaluatedBlock, Resolution};
 use all_is_cubes::space::{BlockIndex, Space};
@@ -48,18 +47,19 @@ where
     /// it will be the correct length.
     ///
     /// Relies on the caller to check if `mesh_options` has changed and fill `todo`.
-    pub(crate) fn update<A, F>(
+    pub(crate) fn update<A, F, I>(
         &mut self,
         todo: &mut FnvHashSet<BlockIndex>,
         space: &Space,
         block_texture_allocator: &A,
         mesh_options: &MeshOptions,
-        deadline: time::Deadline<instant::Instant>,
+        deadline: time::Deadline<I>,
         mut render_data_updater: F,
     ) -> TimeStats
     where
         A: texture::Allocator<Tile = Tile>,
         F: FnMut(super::RenderDataUpdate<'_, D, Vert, Tile>),
+        I: time::Instant,
     {
         if todo.is_empty() {
             // Don't increment the version counter if we don't need to.
@@ -123,7 +123,7 @@ where
         }
 
         // Update individual meshes.
-        let mut last_start_time = Instant::now();
+        let mut last_start_time = I::now();
         let mut stats = TimeStats::default();
         while deadline > last_start_time && !todo.is_empty() {
             let index: BlockIndex = todo.iter().next().copied().unwrap();
@@ -192,8 +192,8 @@ where
                     // the chunks.
                 }
             }
-            let duration = stats.record_consecutive_interval(&mut last_start_time, Instant::now());
-            if duration > Duration::from_millis(4) {
+            let duration = stats.record_consecutive_interval(&mut last_start_time, I::now());
+            if duration > time::Duration::from_millis(4) {
                 log::trace!(
                     "Block mesh took {}: {:?} {:?}",
                     duration.custom_format(StatusText),

@@ -137,17 +137,14 @@ struct CsmTester {
     universe: Universe,
     space: URef<Space>,
     camera: Camera,
-    csm: ChunkedSpaceMesh<(), BlockVertex<NoTexture>, NoTextures, 16>,
+    csm: ChunkedSpaceMesh<(), BlockVertex<NoTexture>, NoTextures, std::time::Instant, CHUNK_SIZE>,
 }
 
 impl CsmTester {
     fn new(space: Space, view_distance: f64) -> Self {
         let mut universe = Universe::new();
         let space_ref = universe.insert_anonymous(space);
-        let csm = ChunkedSpaceMesh::<(), BlockVertex<NoTexture>, NoTextures, CHUNK_SIZE>::new(
-            space_ref.clone(),
-            true,
-        );
+        let csm = ChunkedSpaceMesh::new(space_ref.clone(), true);
         let camera = Camera::new(
             {
                 let mut o = GraphicsOptions::default();
