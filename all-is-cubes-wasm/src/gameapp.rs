@@ -20,13 +20,15 @@ use all_is_cubes::universe::{Universe, UniverseStepInfo};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_gpu::in_wgpu;
 use all_is_cubes_port::file::NonDiskFile;
-use all_is_cubes_ui::apps::{CursorIcon, Key, Session};
+use all_is_cubes_ui::apps::{CursorIcon, Key};
 
 use crate::js_bindings::GuiHelpers;
 
 use crate::web_glue::{
     add_event_listener, get_mandatory_element, replace_children_with_one_text_node,
 };
+
+pub(crate) type Session = all_is_cubes_ui::apps::Session<instant::Instant>;
 
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum WebRenderer {

@@ -20,7 +20,6 @@ exhaust = { workspace = true }
 futures-core = { workspace = true }
 futures-task = { workspace = true }
 indoc = { workspace = true }
-instant = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }
 thiserror = { workspace = true }

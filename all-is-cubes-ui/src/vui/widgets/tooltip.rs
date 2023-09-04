@@ -1,7 +1,6 @@
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 
-use instant::Duration;
 use once_cell::sync::Lazy;
 
 use all_is_cubes::block::{space_to_blocks, AnimationHint, BlockAttributes, Resolution, AIR};
@@ -16,7 +15,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::listen::{FnListener, Gate, Listen, Listener};
 use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridVector, Gridgid};
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
-use all_is_cubes::time::Tick;
+use all_is_cubes::time::{Duration, Tick};
 use all_is_cubes::universe::{URef, Universe};
 
 use crate::ui_content::hud::{HudBlocks, HudFont};

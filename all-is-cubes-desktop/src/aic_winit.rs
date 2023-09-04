@@ -7,6 +7,7 @@ use anyhow::anyhow;
 use image::imageops::{self, FilterType};
 use winit::event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::{CursorGrabMode, Window};
 
 use all_is_cubes::camera::{StandardCameras, Viewport};
 use all_is_cubes::cgmath::{Point2, Vector2};
@@ -14,8 +15,9 @@ use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource};
 use all_is_cubes::raytracer::RtRenderer;
 use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
 use all_is_cubes_gpu::wgpu;
-use all_is_cubes_ui::apps::{InputProcessor, Session};
-use winit::window::{CursorGrabMode, Window};
+use all_is_cubes_ui::apps::InputProcessor;
+
+use crate::Session;
 
 use crate::choose_graphical_window_size;
 use crate::glue::winit::{

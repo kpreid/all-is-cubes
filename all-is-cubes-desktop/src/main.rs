@@ -50,7 +50,6 @@ use all_is_cubes::space::{LightUpdatesInfo, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_content::TemplateParameters;
-use all_is_cubes_ui::apps::Session;
 
 mod aic_winit;
 use aic_winit::winit_main_loop;
@@ -71,6 +70,8 @@ use crate::session::DesktopSession;
 use crate::terminal::{
     create_terminal_session, terminal_main_loop, terminal_print_once, TerminalOptions,
 };
+
+type Session = all_is_cubes_ui::apps::Session<std::time::Instant>;
 
 // TODO: put version numbers in the title when used as a window title
 static TITLE: &str = "All is Cubes";

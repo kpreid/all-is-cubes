@@ -1,8 +1,6 @@
 use std::error::Error;
 use std::sync::{Arc, Mutex, Weak};
 
-use instant::Duration;
-
 use all_is_cubes::block::{self, Block, BlockAttributes, Primitive, Resolution, AIR};
 use all_is_cubes::cgmath::EuclideanSpace;
 use all_is_cubes::character::Character;
@@ -17,7 +15,7 @@ use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
 use all_is_cubes::listen::{DirtyFlag, Gate, Listen as _, ListenableSource, Listener};
 use all_is_cubes::math::{Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid};
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
-use all_is_cubes::time::Tick;
+use all_is_cubes::time::{Duration, Tick};
 use all_is_cubes::transaction::Merge as _;
 use all_is_cubes::universe::{URef, Universe};
 

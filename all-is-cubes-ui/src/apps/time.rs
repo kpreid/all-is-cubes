@@ -21,7 +21,7 @@ pub struct FrameClock<I> {
     draw_fps_counter: FpsCounter<I>,
 }
 
-impl<I: Instant> FrameClock<I> {
+impl<I> FrameClock<I> {
     /// Number of steps per frame to permit.
     /// This sets how low the frame rate can go below the step length before game time
     /// slows down.
@@ -40,6 +40,17 @@ impl<I: Instant> FrameClock<I> {
         }
     }
 
+    #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
+    pub fn draw_fps_counter(&self) -> &FpsCounter<I> {
+        &self.draw_fps_counter
+    }
+
+    fn step_length(&self) -> Duration {
+        self.schedule.delta_t()
+    }
+}
+
+impl<I: Instant> FrameClock<I> {
     /// Advance the clock using a source of absolute time.
     ///
     /// This cannot be meaningfully used in combination with
@@ -119,15 +130,6 @@ impl<I: Instant> FrameClock<I> {
         self.schedule = schedule;
     }
 
-    #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
-    pub fn draw_fps_counter(&self) -> &FpsCounter<I> {
-        &self.draw_fps_counter
-    }
-
-    fn step_length(&self) -> Duration {
-        self.schedule.delta_t()
-    }
-
     fn cap_step_time(&mut self) {
         let cap = self.step_length() * Self::CATCH_UP_STEPS;
         if self.accumulated_step_time > cap {
@@ -144,7 +146,7 @@ pub struct FpsCounter<I> {
     last_frame: Option<I>,
 }
 
-impl<I: Instant> FpsCounter<I> {
+impl<I> FpsCounter<I> {
     pub const fn new() -> Self {
         Self {
             average_frame_time_seconds: None,
@@ -152,6 +154,19 @@ impl<I: Instant> FpsCounter<I> {
         }
     }
 
+    pub fn period_seconds(&self) -> f64 {
+        match self.average_frame_time_seconds {
+            Some(nnt) => nnt.into_inner(),
+            None => f64::NAN,
+        }
+    }
+
+    pub fn frames_per_second(&self) -> f64 {
+        self.period_seconds().recip()
+    }
+}
+
+impl<I: Instant> FpsCounter<I> {
     pub fn record_frame(&mut self) {
         let this_frame = I::now();
 
@@ -178,20 +193,9 @@ impl<I: Instant> FpsCounter<I> {
         }
         self.last_frame = Some(this_frame);
     }
-
-    pub fn period_seconds(&self) -> f64 {
-        match self.average_frame_time_seconds {
-            Some(nnt) => nnt.into_inner(),
-            None => f64::NAN,
-        }
-    }
-
-    pub fn frames_per_second(&self) -> f64 {
-        self.period_seconds().recip()
-    }
 }
 
-impl<I: Instant> Default for FpsCounter<I> {
+impl<I> Default for FpsCounter<I> {
     fn default() -> Self {
         Self::new()
     }

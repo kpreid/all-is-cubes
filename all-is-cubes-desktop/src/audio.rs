@@ -3,10 +3,12 @@ use std::sync::{atomic, mpsc};
 
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::listen::Listener;
-use all_is_cubes_ui::apps::Session;
+
 use kira::manager::error::PlaySoundError;
 use kira::manager::AudioManager;
 use kira::sound::static_sound::StaticSoundData;
+
+use crate::Session;
 
 pub(crate) struct AudioOut {
     #[allow(dead_code)] // eventually we're going to need this for volume control etc.

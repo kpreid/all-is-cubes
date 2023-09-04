@@ -6,9 +6,9 @@ use all_is_cubes::camera::Viewport;
 use all_is_cubes::listen::{DirtyFlag, ListenableCell, Listener};
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_ui::apps::Session;
 
 use crate::record;
+use crate::Session;
 
 /// Wraps a basic [`Session`] to add functionality that is common within
 /// all-is-cubes-desktop's scope of supported usage (such as loading a universe

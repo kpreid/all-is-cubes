@@ -13,10 +13,10 @@ use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::Rgba;
 use all_is_cubes::raytracer::{Accumulate, CharacterBuf, CharacterRtData, ColorBuf, RtRenderer};
-use all_is_cubes_ui::apps::Session;
 
 use crate::glue::crossterm::{event_to_key, map_mouse_button};
 use crate::session::DesktopSession;
+use crate::Session;
 
 mod chars;
 mod options;
