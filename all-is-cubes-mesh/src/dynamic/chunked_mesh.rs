@@ -11,6 +11,7 @@ use all_is_cubes::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex};
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
+use all_is_cubes::time;
 use all_is_cubes::universe::URef;
 use all_is_cubes::util::{CustomFormat, StatusText, TimeStats};
 
@@ -189,7 +190,7 @@ where
         &mut self,
         camera: &Camera,
         block_texture_allocator: &Tex,
-        deadline: Instant,
+        deadline: time::Deadline<Instant>,
         mut render_data_updater: F,
     ) -> CsmUpdateInfo
     where
@@ -227,7 +228,7 @@ where
         &mut self,
         camera: &Camera,
         block_texture_allocator: &Tex,
-        deadline: Instant,
+        deadline: time::Deadline<Instant>,
         mut render_data_updater: F,
     ) -> (CsmUpdateInfo, bool)
     where
@@ -290,10 +291,10 @@ where
             block_texture_allocator,
             mesh_options,
             if self.startup_chunks_only {
-                update_start_time // a past time stands in for "spend zero time on this"
+                time::Deadline::Asap
             } else {
                 // TODO: don't hardcode this figure here, let the caller specify it
-                deadline.checked_sub(Duration::from_micros(500)).unwrap()
+                deadline - Duration::from_micros(500)
             },
             &mut render_data_updater,
         );
@@ -332,7 +333,7 @@ where
             }
 
             let this_chunk_start_time = Instant::now();
-            if this_chunk_start_time > deadline {
+            if deadline < this_chunk_start_time {
                 did_not_finish = true;
                 break;
             }
@@ -435,7 +436,7 @@ where
                     .map(|chunk| chunk.mesh().total_byte_size())
                     .sum(),
             },
-            end_all_time > deadline,
+            deadline < end_all_time,
         )
     }
 

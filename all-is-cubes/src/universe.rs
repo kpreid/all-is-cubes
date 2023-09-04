@@ -16,9 +16,6 @@
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
-
-use instant::Instant;
 
 use crate::block::BlockDef;
 use crate::character::Character;
@@ -202,9 +199,13 @@ impl Universe {
     /// Advance time for all members.
     ///
     /// * `deadline` is when to stop computing flexible things such as light transport.
-    pub fn step(&mut self, paused: bool, deadline: Instant) -> UniverseStepInfo {
+    pub fn step<I: time::Instant>(
+        &mut self,
+        paused: bool,
+        deadline: time::Deadline<I>,
+    ) -> UniverseStepInfo {
         let mut info = UniverseStepInfo::default();
-        let start_time = Instant::now();
+        let start_time = I::now();
 
         let tick = self.clock.advance(paused);
 
@@ -218,8 +219,9 @@ impl Universe {
         }
 
         // Compute how to divide time among spaces, based on the previous srep
-        let budget_per_space: Duration = deadline.saturating_duration_since(start_time)
-            / u32::try_from(self.spaces_with_work).unwrap_or(1).max(1);
+        let budget_per_space: Option<time::Duration> = deadline
+            .remaining_since(start_time)
+            .map(|dur| dur / u32::try_from(self.spaces_with_work).unwrap_or(1).max(1));
         self.spaces_with_work = 0;
 
         let mut transactions = Vec::new();
@@ -231,7 +233,10 @@ impl Universe {
                     space.step(
                         Some(&space_ref),
                         tick,
-                        deadline.min(Instant::now() + budget_per_space),
+                        match budget_per_space {
+                            Some(budget) => deadline.min(time::Deadline::At(I::now() + budget)),
+                            None => deadline,
+                        },
                     )
                 })
                 .expect("space borrowed during universe.step()");
@@ -263,7 +268,7 @@ impl Universe {
             }
         }
 
-        info.computation_time = Instant::now().duration_since(start_time);
+        info.computation_time = I::now().saturating_duration_since(start_time);
         info
     }
 
@@ -607,7 +612,7 @@ pub(crate) struct DeserializeRefsError {
 #[non_exhaustive]
 pub struct UniverseStepInfo {
     #[doc(hidden)]
-    pub computation_time: Duration,
+    pub computation_time: time::Duration,
     /// Number of members which needed to do something specific.
     active_members: usize,
     /// Number of members which were processed at all.

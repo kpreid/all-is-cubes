@@ -15,7 +15,7 @@ use crate::math::{Cube, GridCoordinate, GridPoint, Rgba};
 use crate::space::{
     GridAab, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpacePhysics,
 };
-use crate::time::{practically_infinite_deadline, Tick};
+use crate::time::{self, Tick};
 use crate::transaction;
 use crate::universe::{Name, RefError, URef, Universe, UniverseTransaction};
 
@@ -355,7 +355,7 @@ fn listens_to_block_changes() {
     // computations like reevaluation to happen during the notification process.
     assert_eq!(sink.drain(), vec![]);
     // Instead, it only happens the next time the space is stepped.
-    let (_, _) = space.step(None, Tick::arbitrary(), practically_infinite_deadline());
+    let (_, _) = space.step(None, Tick::arbitrary(), time::DeadlineStd::Whenever);
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(sink.drain(), vec![SpaceChange::BlockValue(0)]);
     assert_eq!(space.get_evaluated([0, 0, 0]), &new_evaluated);
@@ -385,7 +385,7 @@ fn indirect_becomes_evaluation_error() {
         .unwrap();
 
     // Step the space to let it notice.
-    let (_, _) = space.step(None, Tick::arbitrary(), practically_infinite_deadline());
+    let (_, _) = space.step(None, Tick::arbitrary(), time::DeadlineStd::Whenever);
 
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(sink.drain(), vec![SpaceChange::BlockValue(0)]);
@@ -493,7 +493,7 @@ fn block_tick_action() {
     space.set([0, 0, 0], block1).unwrap();
 
     // TODO: the block effect isn't a transaction yet but it should be
-    let (_info, step_txn) = space.step(None, Tick::arbitrary(), practically_infinite_deadline());
+    let (_info, step_txn) = space.step(None, Tick::arbitrary(), time::DeadlineStd::Whenever);
     assert_eq!(step_txn, UniverseTransaction::default());
 
     assert_eq!(&space[[0, 0, 0]], &block2);

@@ -2,6 +2,7 @@ use cgmath::Vector3;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::content::testing::lighting_bench_space;
+use all_is_cubes::time;
 use all_is_cubes::universe::Universe;
 
 pub fn evaluate_light_bench(c: &mut Criterion) {
@@ -16,7 +17,7 @@ pub fn evaluate_light_bench(c: &mut Criterion) {
                 (u, space)
             },
             |(_u, mut space)| {
-                space.evaluate_light(1, |_| {});
+                space.evaluate_light::<time::NoTime>(1, |_| {});
             },
             BatchSize::LargeInput,
         )

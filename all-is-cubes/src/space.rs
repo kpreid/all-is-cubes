@@ -3,9 +3,9 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::time::Duration;
 
 use cgmath::Vector3;
-use instant::{Duration, Instant};
 
 use crate::behavior::{self, BehaviorSet};
 use crate::block::{Block, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED};
@@ -20,11 +20,10 @@ use crate::math::{
     Cube, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridRotation, Gridgid, NotNan,
     Rgb,
 };
-use crate::time::Tick;
+use crate::time;
 use crate::transaction::{Merge, Transaction as _};
 use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
-use crate::util::{ConciseDebug, TimeStats};
-use crate::util::{CustomFormat, StatusText};
+use crate::util::{ConciseDebug, CustomFormat, StatusText, TimeStats};
 
 mod builder;
 pub use builder::{SpaceBuilder, SpaceBuilderBounds};
@@ -544,17 +543,17 @@ impl Space {
     ///
     /// * `tick` is how much time is to pass in the simulation.
     /// * `deadline` is when to stop computing flexible things such as light transport.
-    pub fn step(
+    pub fn step<I: time::Instant>(
         &mut self,
         self_ref: Option<&URef<Space>>,
-        tick: Tick,
-        deadline: Instant,
+        tick: time::Tick,
+        deadline: time::Deadline<I>,
     ) -> (SpaceStepInfo, UniverseTransaction) {
         // Process changed block definitions.
-        let evaluations = self.palette.step(&self.notifier);
+        let evaluations = self.palette.step::<I>(&self.notifier);
 
         // Process cubes_wanting_ticks.
-        let start_cube_ticks = Instant::now();
+        let start_cube_ticks = I::now();
         let mut tick_txn = SpaceTransaction::default();
         // TODO: don't empty the queue until the transaction succeeds
         let cubes_to_tick = std::mem::take(&mut self.cubes_wanting_ticks);
@@ -574,7 +573,7 @@ impl Space {
         //   determinism since the order is fixed
         let _ignored_failure = tick_txn.execute(self, &mut drop);
 
-        let cube_ticks_to_space_behaviors = Instant::now();
+        let cube_ticks_to_space_behaviors = I::now();
 
         let mut transaction = UniverseTransaction::default();
         if let Some(self_ref) = self_ref {
@@ -588,11 +587,10 @@ impl Space {
             }
         }
 
-        let space_behaviors_to_lighting = Instant::now();
+        let space_behaviors_to_lighting = I::now();
 
-        let light = self.update_lighting_from_queue(
-            deadline.saturating_duration_since(space_behaviors_to_lighting),
-        );
+        let light = self
+            .update_lighting_from_queue::<I>(deadline.remaining_since(space_behaviors_to_lighting));
 
         (
             SpaceStepInfo {
@@ -618,7 +616,7 @@ impl Space {
     /// `epsilon` specifies a threshold at which to stop doing updates.
     /// Zero means to run to full completion; one is the smallest unit of light level
     /// difference; and so on.
-    pub fn evaluate_light(
+    pub fn evaluate_light<I: time::Instant>(
         &mut self,
         epsilon: u8,
         mut progress_callback: impl FnMut(LightUpdatesInfo),
@@ -627,7 +625,7 @@ impl Space {
 
         let mut total = 0;
         loop {
-            let info = self.update_lighting_from_queue(Duration::from_secs_f32(0.25));
+            let info = self.update_lighting_from_queue::<I>(Some(Duration::from_secs_f32(0.25)));
 
             progress_callback(info);
 

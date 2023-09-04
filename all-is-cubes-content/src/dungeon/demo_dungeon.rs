@@ -18,6 +18,7 @@ use all_is_cubes::math::{
     Rgb, Rgba,
 };
 use all_is_cubes::space::{LightPhysics, Space};
+use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
@@ -590,7 +591,7 @@ pub(crate) async fn demo_dungeon(
     space.set_physics(physics);
     light_progress.progress(0.01).await;
     // Make a rough lighting pass so that we don't have completely black rooms on start.
-    space.evaluate_light(254, |_i| {
+    space.evaluate_light::<time::NoTime>(254, |_i| {
         // TODO: report progress
         // light_progress.progress(i.max_queue_priority as f32 / 255.0)
     });

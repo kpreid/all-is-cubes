@@ -1,11 +1,10 @@
 //! Lighting algorithms for `Space`. This module is closely tied to `Space`
 //! and separated out for readability, not modularity.
 
-use std::cmp::Ordering;
-use std::fmt;
+use core::cmp::Ordering;
+use core::fmt;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3};
-use instant::{Duration, Instant};
 
 use super::debug::LightComputeOutput;
 use super::LightUpdateRequest;
@@ -14,6 +13,7 @@ use crate::math::{Cube, Face6, FaceMap, FreeCoordinate, Geometry, NotNan, Rgb};
 use crate::raycast::{Ray, RaycastStep};
 use crate::space::light::{LightUpdateRayInfo, Priority};
 use crate::space::{GridAab, LightPhysics, PackedLight, PackedLightScalar, Space, SpaceChange};
+use crate::time::{Duration, Instant};
 use crate::util::{CustomFormat, StatusText};
 
 /// This parameter determines to what degree absorption of light due to a block surface's
@@ -53,13 +53,16 @@ impl Space {
 
     /// Do some lighting updates.
     #[doc(hidden)] // TODO: eliminate calls outside the crate
-    pub fn update_lighting_from_queue(&mut self, budget: Duration) -> LightUpdatesInfo {
+    pub fn update_lighting_from_queue<I: Instant>(
+        &mut self,
+        budget: Option<Duration>,
+    ) -> LightUpdatesInfo {
         let mut light_update_count: usize = 0;
         self.last_light_updates.clear();
         let mut max_difference: PackedLightScalar = 0;
 
-        if self.physics.light != LightPhysics::None && !budget.is_zero() {
-            let t0 = Instant::now();
+        if self.physics.light != LightPhysics::None && !budget.is_some_and(|d| d.is_zero()) {
+            let t0 = I::now();
             let mut cost = 0;
             // We convert the time budget to an arbitrary cost value in order to avoid
             // the overhead of frequently making syscalls to check the clock.
@@ -68,7 +71,10 @@ impl Space {
             // higher cost values. (TODO: Profile to assign more consistent cost values.)
             //
             // TODO: Is this worthwhile?
-            let max_cost = (budget.as_secs_f32() / self.light_cost_scale) as usize;
+            let max_cost = match budget {
+                Some(budget) => (budget.as_secs_f32() / self.light_cost_scale) as usize,
+                None => usize::MAX,
+            };
 
             while let Some(LightUpdateRequest { cube, .. }) = self.light_update_queue.pop() {
                 if false {
@@ -84,8 +90,8 @@ impl Space {
                 }
             }
 
-            let t1 = Instant::now();
-            let cost_scale = (t1 - t0).as_secs_f32() / cost as f32;
+            let t1 = I::now();
+            let cost_scale = t1.saturating_duration_since(t0).as_secs_f32() / cost as f32;
             if cost_scale.is_finite() {
                 // TODO(time-budget): don't let this grow or shrink too fast due to outliers
                 self.light_cost_scale = 0.125 * cost_scale + 0.875 * self.light_cost_scale;

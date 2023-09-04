@@ -10,6 +10,7 @@ use all_is_cubes::drawing::embedded_graphics::{mono_font::iso_8859_1 as font, te
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgba};
 use all_is_cubes::space::{Space, SpaceBuilder, SpacePhysics};
+use all_is_cubes::time;
 use all_is_cubes::transaction;
 use all_is_cubes::universe::{URef, Universe};
 
@@ -129,7 +130,7 @@ impl PageInst {
         space
             .try_modify(|space| {
                 space.fast_evaluate_light();
-                space.evaluate_light(10, |_| {});
+                space.evaluate_light::<time::NoTime>(10, |_| {});
             })
             .unwrap();
 

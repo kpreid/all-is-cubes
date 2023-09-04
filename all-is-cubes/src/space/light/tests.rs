@@ -7,7 +7,7 @@ use crate::block::{AnimationHint, Block, AIR};
 use crate::listen::{Listen as _, Listener, Sink};
 use crate::math::{Cube, FaceMap, GridPoint, Rgb, Rgba};
 use crate::space::{GridAab, LightPhysics, Space, SpaceChange, SpacePhysics};
-use crate::time::{practically_infinite_deadline, Tick};
+use crate::time;
 
 #[test]
 fn initial_lighting_value() {
@@ -39,7 +39,7 @@ fn step() {
     assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::NO_RAYS);
     assert_eq!(space.get_lighting([2, 0, 0]), PackedLight::NO_RAYS);
 
-    let (info, _) = space.step(None, Tick::arbitrary(), practically_infinite_deadline());
+    let (info, _) = space.step(None, time::Tick::arbitrary(), time::DeadlineStd::Whenever);
     assert_eq!(
         info.light,
         LightUpdatesInfo {
@@ -58,10 +58,10 @@ fn step() {
 #[test]
 fn evaluate_light() {
     let mut space = Space::empty_positive(3, 1, 1);
-    assert_eq!(0, space.evaluate_light(0, |_| {}));
+    assert_eq!(0, space.evaluate_light::<time::NoTime>(0, |_| {}));
     space.set([1, 0, 0], Rgb::ONE).unwrap();
-    assert_eq!(2, space.evaluate_light(0, |_| {}));
-    assert_eq!(0, space.evaluate_light(0, |_| {}));
+    assert_eq!(2, space.evaluate_light::<time::NoTime>(0, |_| {}));
+    assert_eq!(0, space.evaluate_light::<time::NoTime>(0, |_| {}));
     // This is just a smoke test, "is it plausible that it's working".
     // Ideally we'd confirm identical results from repeated step() and single evaluate_light().
 }
@@ -97,7 +97,7 @@ fn light_source_test_space(block: Block) -> Space {
         ..Default::default()
     });
     space.set([1, 1, 1], block).unwrap();
-    space.evaluate_light(0, |_| ());
+    space.evaluate_light::<time::NoTime>(0, |_| ());
     space
 }
 
@@ -155,7 +155,7 @@ fn animation_treated_as_visible() {
     fn eval_mid_block(block: Block) -> [LightStatus; 2] {
         let mut space = Space::empty_positive(3, 3, 3);
         space.set([1, 1, 1], block).unwrap();
-        space.evaluate_light(0, |_| {});
+        space.evaluate_light::<time::NoTime>(0, |_| {});
         [
             space.get_lighting([1, 1, 1]).status(),
             space.get_lighting([0, 1, 1]).status(),
@@ -188,7 +188,7 @@ fn reflectance_is_clamped() {
         .build();
     space.set([1, 1, 1], &over_unity_block).unwrap();
     space.set([3, 1, 1], &over_unity_block).unwrap();
-    space.evaluate_light(0, |_| {});
+    space.evaluate_light::<time::NoTime>(0, |_| {});
 
     let light = space.get_lighting([2, 1, 1]).value();
     dbg!(light);
@@ -219,7 +219,7 @@ fn disabled_lighting_does_not_update() {
     space.light_needs_update(Cube::new(0, 0, 0), Priority::UNINIT);
     assert_eq!(
         space
-            .step(None, Tick::arbitrary(), practically_infinite_deadline())
+            .step(None, time::Tick::arbitrary(), time::DeadlineStd::Whenever)
             .0
             .light,
         LightUpdatesInfo::default()

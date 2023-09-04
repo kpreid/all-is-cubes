@@ -455,7 +455,7 @@ fn evaluate_light_with_progress(space: &mut Space) {
     let light_progress = ProgressBar::new(100)
         .with_style(common_progress_style())
         .with_prefix("Lighting");
-    space.evaluate_light(1, lighting_progress_adapter(&light_progress));
+    space.evaluate_light::<std::time::Instant>(1, lighting_progress_adapter(&light_progress));
     light_progress.finish();
 }
 

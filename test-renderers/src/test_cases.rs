@@ -19,6 +19,7 @@ use all_is_cubes::math::{
     NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder};
+use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{RefError, URef, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
@@ -562,7 +563,7 @@ async fn icons(mut context: RenderTestContext) {
 
     let aspect_ratio = f64::from(space.bounds().size().y) / f64::from(space.bounds().size().x);
 
-    space.evaluate_light(1, |_| {});
+    space.evaluate_light::<time::NoTime>(1, |_| {});
     finish_universe_from_space(universe, space);
 
     let mut options = GraphicsOptions::UNALTERED_COLORS;
@@ -961,7 +962,7 @@ async fn fog_test_universe() -> Arc<Universe> {
     }
 
     space.fast_evaluate_light();
-    space.evaluate_light(1, |_| {});
+    space.evaluate_light::<time::NoTime>(1, |_| {});
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);
@@ -998,7 +999,7 @@ async fn light_test_universe() -> Arc<Universe> {
     }
 
     space.fast_evaluate_light();
-    space.evaluate_light(1, |_| {});
+    space.evaluate_light::<time::NoTime>(1, |_| {});
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);

@@ -1,7 +1,5 @@
-use instant::{Duration, Instant};
-
 use all_is_cubes::math::NotNan;
-use all_is_cubes::time::TickSchedule;
+use all_is_cubes::time::{Duration, Instant, TickSchedule};
 #[cfg(doc)]
 use all_is_cubes::universe::Universe;
 
@@ -9,10 +7,10 @@ use all_is_cubes::universe::Universe;
 /// Platform-independent; does not consult any clocks, only makes decisions
 /// given the provided information.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FrameClock {
+pub struct FrameClock<I> {
     schedule: TickSchedule,
 
-    last_absolute_time: Option<Instant>,
+    last_absolute_time: Option<I>,
 
     /// Whether there was a step and we should therefore draw a frame.
     /// TODO: This might go away in favor of actual dirty-notifications.
@@ -20,10 +18,10 @@ pub struct FrameClock {
 
     accumulated_step_time: Duration,
 
-    draw_fps_counter: FpsCounter,
+    draw_fps_counter: FpsCounter<I>,
 }
 
-impl FrameClock {
+impl<I: Instant> FrameClock<I> {
     /// Number of steps per frame to permit.
     /// This sets how low the frame rate can go below the step length before game time
     /// slows down.
@@ -46,9 +44,9 @@ impl FrameClock {
     ///
     /// This cannot be meaningfully used in combination with
     /// [`FrameClock::request_frame()`] or [`FrameClock::advance_by()`].
-    pub fn advance_to(&mut self, instant: Instant) {
+    pub fn advance_to(&mut self, instant: I) {
         if let Some(last_absolute_time) = self.last_absolute_time {
-            let delta = instant - last_absolute_time;
+            let delta = instant.saturating_duration_since(last_absolute_time);
             self.accumulated_step_time += delta;
             self.cap_step_time();
         }
@@ -84,7 +82,7 @@ impl FrameClock {
     ///
     /// [`FrameClock::advance_to()`] must have previously been called to give an absolute
     /// time reference.
-    pub fn next_step_or_draw_time(&self) -> Option<Instant> {
+    pub fn next_step_or_draw_time(&self) -> Option<I> {
         Some(self.last_absolute_time? + self.step_length())
     }
 
@@ -122,7 +120,7 @@ impl FrameClock {
     }
 
     #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
-    pub fn draw_fps_counter(&self) -> &FpsCounter {
+    pub fn draw_fps_counter(&self) -> &FpsCounter<I> {
         &self.draw_fps_counter
     }
 
@@ -139,23 +137,29 @@ impl FrameClock {
 }
 
 /// Counts frame time / frames-per-second against real time as defined by [`Instant::now`].
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
-pub struct FpsCounter {
+pub struct FpsCounter<I> {
     average_frame_time_seconds: Option<NotNan<f64>>,
-    last_frame: Option<Instant>,
+    last_frame: Option<I>,
 }
 
-impl FpsCounter {
+impl<I: Instant> FpsCounter<I> {
+    pub const fn new() -> Self {
+        Self {
+            average_frame_time_seconds: None,
+            last_frame: None,
+        }
+    }
+
     pub fn record_frame(&mut self) {
-        let this_frame = Instant::now();
+        let this_frame = I::now();
 
         let this_seconds = self
             .last_frame
             .and_then(|l| {
                 if this_frame > l {
-                    // `instant` crate doesn't have `checked_duration_since`
-                    Some(this_frame.duration_since(l))
+                    Some(this_frame.saturating_duration_since(l))
                 } else {
                     None
                 }
@@ -184,5 +188,11 @@ impl FpsCounter {
 
     pub fn frames_per_second(&self) -> f64 {
         self.period_seconds().recip()
+    }
+}
+
+impl<I: Instant> Default for FpsCounter<I> {
+    fn default() -> Self {
+        Self::new()
     }
 }

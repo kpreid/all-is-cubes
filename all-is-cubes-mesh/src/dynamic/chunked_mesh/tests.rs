@@ -1,7 +1,5 @@
 use std::sync::{Arc, Mutex};
 
-use instant::{Duration, Instant};
-
 use all_is_cubes::block::Block;
 use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, TransparencyOption, Viewport};
 use all_is_cubes::cgmath::{EuclideanSpace as _, Point3};
@@ -11,7 +9,7 @@ use all_is_cubes::math::{Cube, FreeCoordinate, GridAab, GridCoordinate};
 use all_is_cubes::math::{GridPoint, NotNan};
 use all_is_cubes::space::{Space, SpaceChange, SpaceTransaction};
 use all_is_cubes::universe::{URef, Universe};
-use all_is_cubes::{notnan, rgba_const, transaction};
+use all_is_cubes::{notnan, rgba_const, time, transaction};
 
 use crate::dynamic;
 use crate::texture::{NoTexture, NoTextures};
@@ -174,9 +172,7 @@ impl CsmTester {
         self.csm.update_blocks_and_some_chunks(
             &self.camera,
             &NoTextures,
-            // In theory we should have a “fake time source” for testing purposes,
-            // but this will do until we have tests of the actual timing logic.
-            Instant::now() + Duration::from_secs(1_000_000),
+            time::DeadlineStd::Whenever,
             render_data_updater,
         )
     }
@@ -303,12 +299,10 @@ fn did_not_finish_detection() {
     let mut tester = CsmTester::new(Space::empty_positive(1000, 1, 1), LARGE_VIEW_DISTANCE);
 
     eprintln!("--- timing out update");
-    // Perform an update with no time available so it will always time out and not
-    // update anything.
     let info = tester.csm.update_blocks_and_some_chunks(
         &tester.camera,
         &NoTextures,
-        Instant::now().checked_sub(Duration::from_secs(1)).unwrap(),
+        time::DeadlineStd::Asap,
         |_| {},
     );
 

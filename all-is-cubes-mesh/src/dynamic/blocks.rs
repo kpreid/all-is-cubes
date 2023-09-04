@@ -5,6 +5,7 @@ use instant::{Duration, Instant};
 
 use all_is_cubes::block::{EvaluatedBlock, Resolution};
 use all_is_cubes::space::{BlockIndex, Space};
+use all_is_cubes::time;
 use all_is_cubes::util::{CustomFormat as _, StatusText, TimeStats};
 
 use crate::texture;
@@ -53,7 +54,7 @@ where
         space: &Space,
         block_texture_allocator: &A,
         mesh_options: &MeshOptions,
-        deadline: Instant,
+        deadline: time::Deadline<instant::Instant>,
         mut render_data_updater: F,
     ) -> TimeStats
     where
@@ -124,7 +125,7 @@ where
         // Update individual meshes.
         let mut last_start_time = Instant::now();
         let mut stats = TimeStats::default();
-        while last_start_time < deadline && !todo.is_empty() {
+        while deadline > last_start_time && !todo.is_empty() {
             let index: BlockIndex = todo.iter().next().copied().unwrap();
             todo.remove(&index);
             let uindex: usize = index.into();

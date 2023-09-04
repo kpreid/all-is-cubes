@@ -12,6 +12,7 @@ use all_is_cubes::content::palette;
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, Rgb};
 use all_is_cubes::space::{Space, SpaceChange};
+use all_is_cubes::time;
 use all_is_cubes::universe::URef;
 use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, RenderDataUpdate};
 use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
@@ -160,7 +161,7 @@ impl SpaceRenderer {
     /// given [`deadline`] permits).
     pub(crate) fn update(
         &mut self,
-        deadline: Instant,
+        deadline: time::Deadline<Instant>,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         pipelines: &Pipelines,

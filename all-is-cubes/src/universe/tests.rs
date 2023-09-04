@@ -8,7 +8,7 @@ use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
 use crate::math::Rgba;
 use crate::space::Space;
-use crate::time::practically_infinite_deadline;
+use crate::time;
 use crate::transaction::{self, Transaction};
 use crate::universe::{
     list_refs, InsertError, InsertErrorKind, Name, RefError, URef, Universe, UniverseTransaction,
@@ -289,9 +289,9 @@ fn delete_wrong_universe_fails() {
 fn step_time() {
     let mut u = Universe::new();
     assert_eq!(u.session_step_time, 0);
-    u.step(false, practically_infinite_deadline());
+    u.step(false, time::DeadlineStd::Whenever);
     assert_eq!(u.session_step_time, 1);
-    u.step(true, practically_infinite_deadline());
+    u.step(true, time::DeadlineStd::Whenever);
     assert_eq!(u.session_step_time, 1);
 }
 
@@ -309,7 +309,7 @@ fn gc_implicit() {
     let mut u = Universe::new();
     u.insert_anonymous(BlockDef::new(AIR));
     assert_eq!(1, u.iter_by_type::<BlockDef>().count());
-    u.step(false, practically_infinite_deadline());
+    u.step(false, time::DeadlineStd::Whenever);
     assert_eq!(0, u.iter_by_type::<BlockDef>().count());
 }
 

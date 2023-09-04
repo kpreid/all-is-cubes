@@ -14,7 +14,7 @@ use all_is_cubes::inv::ToolError;
 use all_is_cubes::listen::{
     Listen as _, ListenableCell, ListenableCellWithLocal, ListenableSource, Listener, Notifier,
 };
-use all_is_cubes::time::{Duration, Instant};
+use all_is_cubes::time::{self, Duration};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
 use all_is_cubes::util::{CustomFormat, StatusText};
@@ -32,7 +32,7 @@ const LOG_FIRST_FRAMES: bool = false;
 pub struct Session {
     /// Determines the timing of simulation and drawing. The caller must arrange
     /// to advance time in the clock.
-    pub frame_clock: FrameClock,
+    pub frame_clock: FrameClock<instant::Instant>,
 
     /// Handles (some) user input. The caller must provide input events/state to this.
     /// [`Session`] will handle applying it to the game state.
@@ -251,7 +251,7 @@ impl Session {
 
         let mut result = None;
         // TODO: Catch-up implementation should probably live in FrameClock.
-        for _ in 0..FrameClock::CATCH_UP_STEPS {
+        for _ in 0..FrameClock::<instant::Instant>::CATCH_UP_STEPS {
             if self.frame_clock.should_step() {
                 let u_clock = self.game_universe.clock();
                 let paused = *self.paused.get();
@@ -278,7 +278,8 @@ impl Session {
                 // TODO(time-budget): better timing policy that explicitly trades off with time spent
                 // on rendering, event handling, etc.
                 // (That policy should probably live in `frame_clock`.)
-                let deadline = Instant::now() + game_tick.delta_t() / 4;
+                let deadline =
+                    time::Deadline::At(instant::Instant::now() + game_tick.delta_t() / 4);
 
                 // TODO(time-budget): give UI a minimum fraction of budget
                 let mut info = self.game_universe.step(paused, deadline);
@@ -395,7 +396,9 @@ impl Session {
                 if let Some(space_ref) = self.cursor_result.as_ref().map(Cursor::space) {
                     // TODO: make this a kind of SpaceTransaction, eliminating this try_modify.
                     let _ = space_ref.try_modify(|space| {
-                        space.update_lighting_from_queue(Duration::from_millis(1));
+                        space.update_lighting_from_queue::<instant::Instant>(Some(
+                            Duration::from_millis(1),
+                        ));
                     });
                 }
 
@@ -424,7 +427,7 @@ impl Session {
     }
 
     #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
-    pub fn draw_fps_counter(&self) -> &FpsCounter {
+    pub fn draw_fps_counter(&self) -> &FpsCounter<instant::Instant> {
         self.frame_clock.draw_fps_counter()
     }
 }

@@ -9,7 +9,7 @@ use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier
 use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::math::NotNan;
 use all_is_cubes::space::Space;
-use all_is_cubes::time::{Instant, Tick};
+use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
 use all_is_cubes::util::YieldProgress;
@@ -256,9 +256,19 @@ impl Vui {
         options
     }
 
-    // TODO: This should stop taking a `Tick` and instead expose what it needs to be stepped on
-    // a schedule independent of the game
-    pub fn step(&mut self, tick: Tick, deadline: Instant) -> UniverseStepInfo {
+    // TODO: This should stop taking a `Tick` and instead expose whatever is necessary for
+    // it to be stepped on a schedule independent of the in-game time.
+    pub fn step(
+        &mut self,
+        tick: time::Tick,
+        deadline: time::Deadline<impl time::Instant>,
+    ) -> UniverseStepInfo {
+        self.step_pre_sync();
+        self.universe.step(tick.paused(), deadline)
+    }
+
+    #[inline(never)]
+    fn step_pre_sync(&mut self) {
         // TODO: This should possibly be the responsibility of the TooltipState itself?
         if self.changed_character.get_and_clear() {
             if let Some(character_ref) = &*self.character_source.get() {
@@ -306,8 +316,6 @@ impl Vui {
                 self.set_state(VuiPageState::Hud);
             }
         }
-
-        self.universe.step(tick.paused(), deadline)
     }
 
     /// Present the UI visual response to a click (that has already been handled),

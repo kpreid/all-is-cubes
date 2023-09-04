@@ -1,13 +1,14 @@
-//! Time passing “in game”, i.e. in a [`Universe`] and its contents.
+//! Data types for simulated and real time.
 
-use std::fmt;
-
-pub use instant::{Duration, Instant};
+use core::fmt;
 
 #[cfg(doc)]
 use crate::universe::Universe;
 
-/// Specifies an amount of time passing in a [`Universe`]
+mod deadline;
+pub use deadline::*;
+
+/// Specifies an amount of time passing “in game” Home in a [`Universe`]
 /// and its contents.
 ///
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -211,15 +212,6 @@ impl fmt::Debug for Clock {
         } = *self;
         write!(f, "Clock({phase}/{divisor} of {base_duration:?})")
     }
-}
-
-#[doc(hidden)] // test helper
-pub fn practically_infinite_deadline() -> Instant {
-    /// A Duration long enough that it is not interesting in questions of testing, but not
-    /// so long that adding a reasonable number of it to an [`Instant`] will overflow.
-    const VERY_LONG: Duration = Duration::from_secs(86400 * 7);
-
-    Instant::now() + VERY_LONG
 }
 
 #[cfg(test)]

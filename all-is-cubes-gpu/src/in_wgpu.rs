@@ -6,6 +6,7 @@ use std::mem;
 use std::sync::Arc;
 
 use all_is_cubes::notnan;
+use all_is_cubes::time::Deadline;
 use instant::Instant;
 
 use all_is_cubes::camera::{info_text_drawable, Layers, StandardCameras};
@@ -425,7 +426,8 @@ impl EverythingRenderer {
 
         let update_prep_to_space_update_time = Instant::now();
 
-        let world_deadline = update_prep_to_space_update_time + frame_budget.update_meshes.world;
+        let world_deadline =
+            Deadline::At(update_prep_to_space_update_time + frame_budget.update_meshes.world);
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
 
         let space_infos: Layers<SpaceUpdateInfo> = Layers {

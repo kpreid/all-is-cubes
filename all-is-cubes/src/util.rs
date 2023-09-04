@@ -7,7 +7,6 @@ use std::ops::AddAssign;
 use std::time::Duration;
 
 use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
-use instant::Instant;
 
 pub use yield_progress::YieldProgress;
 
@@ -260,15 +259,15 @@ impl TimeStats {
     ///
     /// Returns the duration that was recorded.
     #[doc(hidden)] // for now, not making writing conveniences public
-    pub fn record_consecutive_interval(
+    pub fn record_consecutive_interval<I: crate::time::Instant>(
         &mut self,
-        last_marked_instant: &mut Instant,
-        now: Instant,
+        last_marked_instant: &mut I,
+        now: I,
     ) -> Duration {
         let previous = *last_marked_instant;
         *last_marked_instant = now;
 
-        let duration = now.duration_since(previous);
+        let duration = now.saturating_duration_since(previous);
         *self += Self::one(duration);
         duration
     }

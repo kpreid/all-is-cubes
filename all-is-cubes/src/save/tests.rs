@@ -17,7 +17,7 @@ use crate::inv::Tool;
 use crate::math::{Face6, GridAab, GridRotation, Rgb, Rgba};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
-use crate::time::{practically_infinite_deadline, Tick};
+use crate::time::{self, Tick};
 use crate::transaction::Transaction as _;
 use crate::universe::{Name, PartialUniverse, URef, Universe};
 
@@ -373,7 +373,7 @@ fn space_success() {
 
     let [block] = make_some_blocks();
     space.set([1, 2, 5], block).unwrap();
-    space.evaluate_light(0, |_| {});
+    space.evaluate_light::<time::NoTime>(0, |_| {});
 
     const NL: [u8; 4] = [0, 0, 0, 1];
     const IN: [u8; 4] = [0, 0, 0, 2];
@@ -531,7 +531,7 @@ fn space_light_queue_remembered() {
     );
 
     // Then, when stepped, they are updated
-    let (_, _) = space2.step(None, Tick::arbitrary(), practically_infinite_deadline());
+    let (_, _) = space2.step(None, Tick::arbitrary(), time::DeadlineStd::Whenever);
     assert_eq!(
         [0, 1, 2].map(|x| space2.get_lighting([x, 0, 0]).status()),
         [Opaque, Visible, NoRays]

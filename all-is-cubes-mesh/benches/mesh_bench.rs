@@ -7,7 +7,7 @@ use all_is_cubes::content::make_some_voxel_blocks;
 use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::Space;
-use all_is_cubes::time::practically_infinite_deadline;
+use all_is_cubes::time;
 use all_is_cubes::universe::{Name, URef, Universe};
 
 use all_is_cubes_mesh::texture::{TestAllocator, TestPoint, TestTile};
@@ -169,7 +169,7 @@ fn dynamic_benches(c: &mut Criterion) {
                 let info = csm.update_blocks_and_some_chunks(
                     &camera,
                     tex,
-                    practically_infinite_deadline(),
+                    time::DeadlineStd::Whenever,
                     |_| {},
                 );
                 assert_eq!(info.flaws, Flaws::empty()); // should not be unfinished

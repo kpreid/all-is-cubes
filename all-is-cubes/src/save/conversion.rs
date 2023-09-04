@@ -686,6 +686,7 @@ mod universe {
     use crate::character::Character;
     use crate::save::schema::MemberEntrySer;
     use crate::space::Space;
+    use crate::time;
     use crate::universe::{self, Name, PartialUniverse, UBorrow, URef, Universe};
     use schema::{MemberDe, NameSer, URefSer};
     use std::cell::RefCell;
@@ -788,7 +789,7 @@ mod universe {
             // Perform a paused step to let things do re-initialization,
             // such as `Space` block evaluation, without actually causing any in-game time
             // to pass.
-            universe.step(true, instant::Instant::now());
+            universe.step(true, time::DeadlineNt::Asap);
 
             Ok(universe)
         }

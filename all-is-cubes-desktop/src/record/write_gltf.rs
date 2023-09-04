@@ -3,14 +3,13 @@
 
 use std::fs;
 use std::sync::{mpsc, Arc};
-use std::time::{Duration, Instant};
 
 use anyhow::Context;
 
 use all_is_cubes::cgmath::EuclideanSpace as _;
 use all_is_cubes::math::{GridAab, GridVector};
 use all_is_cubes::space::Space;
-use all_is_cubes::{camera, listen, universe};
+use all_is_cubes::{camera, listen, time, universe};
 use all_is_cubes_mesh as mesh;
 use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, MeshLabel};
 use all_is_cubes_port::gltf::{
@@ -57,7 +56,7 @@ impl MeshRecorder {
         self.csm.update_blocks_and_some_chunks(
             &self.cameras.cameras().world,
             &self.tex,
-            Instant::now() + Duration::from_secs(86400),
+            time::DeadlineStd::Whenever,
             |u| {
                 if u.indices_only {
                     return;
@@ -127,7 +126,7 @@ pub(super) fn start_gltf_writing(
     let frame_pace = options
         .animation
         .as_ref()
-        .map_or(Duration::ZERO, |a| a.frame_period);
+        .map_or(time::Duration::ZERO, |a| a.frame_period);
 
     std::thread::Builder::new()
         .name("Mesh data encoder".to_string())

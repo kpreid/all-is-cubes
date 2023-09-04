@@ -2,12 +2,11 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::{Arc, Mutex, Weak};
 
-use instant::Instant;
-
 use crate::block::{self, Block, BlockChange, EvaluatedBlock, AIR, AIR_EVALUATED};
 use crate::listen::{self, Listener as _};
 use crate::math;
 use crate::space::{BlockIndex, SetCubeError, SpaceChange};
+use crate::time::Instant;
 use crate::util::TimeStats;
 
 /// Table of the [`Block`]s in a [`Space`](super::Space) independent of their location.
@@ -211,8 +210,11 @@ impl Palette {
     }
 
     /// Reevaluate changed blocks.
-    pub(crate) fn step(&mut self, notifier: &listen::Notifier<SpaceChange>) -> TimeStats {
-        let mut last_start_time = Instant::now();
+    pub(crate) fn step<I: Instant>(
+        &mut self,
+        notifier: &listen::Notifier<SpaceChange>,
+    ) -> TimeStats {
+        let mut last_start_time = I::now();
         let mut evaluations = TimeStats::default();
         {
             let mut try_eval_again = HashSet::new();
@@ -236,7 +238,7 @@ impl Palette {
                 // TODO: Process side effects on individual cubes such as reevaluating the
                 // lighting influenced by the block.
 
-                evaluations.record_consecutive_interval(&mut last_start_time, Instant::now());
+                evaluations.record_consecutive_interval(&mut last_start_time, I::now());
             }
             if !try_eval_again.is_empty() {
                 todo.blocks = try_eval_again;

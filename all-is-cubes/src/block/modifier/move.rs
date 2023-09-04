@@ -195,15 +195,14 @@ impl universe::VisitRefs for Move {
 
 #[cfg(test)]
 mod tests {
-    use cgmath::EuclideanSpace;
-    use ordered_float::NotNan;
-
     use crate::block::{Block, Composite, EvaluatedBlock, Evoxel, Resolution::*};
     use crate::content::make_some_blocks;
     use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgb, Rgba};
     use crate::space::Space;
-    use crate::time::practically_infinite_deadline;
+    use crate::time;
     use crate::universe::Universe;
+    use cgmath::EuclideanSpace;
+    use ordered_float::NotNan;
 
     use super::*;
 
@@ -317,7 +316,7 @@ mod tests {
         // TODO: We need a "step until idle" function, or for the UniverseStepInfo to convey how many blocks were updated / are waiting
         // TODO: Some tests will want to look at the partial results
         for _ in 0..257 {
-            universe.step(false, practically_infinite_deadline());
+            universe.step(false, time::DeadlineStd::Whenever);
         }
         checker(&space.read().unwrap(), &block);
     }
