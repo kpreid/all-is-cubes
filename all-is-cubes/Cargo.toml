@@ -51,15 +51,22 @@ default = []
 # Adds `impl arbitrary::Arbitrary for ...`
 arbitrary = ["dep:arbitrary", "ordered-float/arbitrary"]
 # Adds serde implementations.
-save = ["dep:serde", "dep:serde_repr", "dep:flate2", "ordered-float/serde"]
+save = [
+    "dep:base64", # encoded compressed data
+    "dep:flate2", # compression
+    "dep:serde",
+    "dep:serde_repr",
+    "bytemuck/extern_crate_std", # impl Error for CheckedCastError
+    "ordered-float/serde",
+]
 # Adds automatic parallelism to some algorithms such as raytracing.
 threads = ["dep:rayon"]
 
 [dependencies]
 arbitrary = { workspace = true, optional = true }
-base64 = { workspace = true } # used in serialization
+base64 = { workspace = true, optional = true, features = ["std"] } # used in serialization
 bitflags = { workspace = true }
-bytemuck = { workspace = true, features = ["derive", "extern_crate_std"] } # derive used in serialization
+bytemuck = { workspace = true, features = ["derive"] }
 cgmath = "0.18.0"
 downcast-rs = { version = "1.2.0", default-features = false }
 embedded-graphics = "0.8.0"

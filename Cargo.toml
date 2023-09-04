@@ -28,7 +28,7 @@ anyhow = "1.0.70"
 # Each use should be { optional = true }.
 arbitrary = { version = "1.1.6", features = ["derive"] }
 async_fn_traits = "0.1.1"
-base64 = "0.21.0"
+base64 = { version = "0.21.0", default-features = false }
 bitflags = "2.0.2"
 # Note that this excludes the "derive" feature but some crates need it.
 bytemuck = { version = "1.13.1", default-features = false }
