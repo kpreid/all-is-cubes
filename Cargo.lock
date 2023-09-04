@@ -95,7 +95,6 @@ dependencies = [
  "criterion",
  "exhaust",
  "futures-core",
- "instant",
  "itertools 0.11.0",
  "log",
  "macro_rules_attribute",

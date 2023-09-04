@@ -31,7 +31,6 @@ all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.6.0" }
 arbitrary = { workspace = true, optional = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }
-instant = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 macro_rules_attribute = { workspace = true }

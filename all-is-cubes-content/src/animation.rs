@@ -1,9 +1,9 @@
 //! Algorithms for animating blocks.
 
-use std::f64::consts::TAU;
-use std::fmt;
+use core::f64::consts::TAU;
+use core::fmt;
+use core::time::Duration;
 
-use instant::Duration;
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 

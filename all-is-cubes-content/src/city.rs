@@ -4,7 +4,6 @@
 use std::sync::Arc;
 
 use futures_core::future::BoxFuture;
-use instant::Instant;
 use rand::{Rng, SeedableRng as _};
 
 use all_is_cubes::cgmath::Vector3;
@@ -25,6 +24,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder, SpacePhysics};
+use all_is_cubes::time::Instant;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
@@ -38,12 +38,12 @@ use crate::{
     wavy_landscape, DemoBlocks, LandscapeBlocks,
 };
 
-pub(crate) async fn demo_city(
+pub(crate) async fn demo_city<I: Instant>(
     universe: &mut Universe,
     mut p: YieldProgress,
     params: crate::TemplateParameters,
 ) -> Result<Space, InGenError> {
-    let start_city_time = Instant::now();
+    let start_city_time = I::now();
 
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
@@ -236,11 +236,11 @@ pub(crate) async fn demo_city(
     }
     p.progress(0.4).await;
 
-    let blank_city_time = Instant::now();
+    let blank_city_time = I::now();
     log::trace!(
         "Blank city took {:.3} s",
         blank_city_time
-            .duration_since(start_city_time)
+            .saturating_duration_since(start_city_time)
             .as_secs_f32()
     );
 
@@ -268,10 +268,12 @@ pub(crate) async fn demo_city(
     }
 
     // TODO: Integrate logging and YieldProgress
-    let landscape_time = Instant::now();
+    let landscape_time = I::now();
     log::trace!(
         "Landscape took {:.3} s",
-        landscape_time.duration_since(blank_city_time).as_secs_f32()
+        landscape_time
+            .saturating_duration_since(blank_city_time)
+            .as_secs_f32()
     );
     let [exhibits_progress, final_progress] = p.split(0.8);
 
@@ -296,7 +298,7 @@ pub(crate) async fn demo_city(
     {
         exhibit_progress.set_label(format!("Exhibit “{name}”", name = exhibit.name));
         exhibit_progress.progress(0.0).await;
-        let start_exhibit_time = Instant::now();
+        let start_exhibit_time = I::now();
 
         // Execute the exhibit factory function.
         // TODO: Factory should be given a YieldProgress.
@@ -418,7 +420,7 @@ pub(crate) async fn demo_city(
         )?; // TODO: on failure, place an error marker and continue
 
         // Log build time
-        let exhibit_time = Instant::now().duration_since(start_exhibit_time);
+        let exhibit_time = I::now().saturating_duration_since(start_exhibit_time);
         log::trace!(
             "{:?} took {:.3} s",
             exhibit.name,

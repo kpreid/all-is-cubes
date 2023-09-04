@@ -24,7 +24,7 @@ async fn renderer_test() {
     let Some(adapter) = adapter else { return };
 
     let universe = UniverseTemplate::LightingBench
-        .build(YieldProgress::noop(), TemplateParameters::default())
+        .build::<instant::Instant>(YieldProgress::noop(), TemplateParameters::default())
         .await
         .unwrap();
     let cameras = StandardCameras::from_constant_for_test(

@@ -5,7 +5,8 @@
 
 use criterion::{async_executor::FuturesExecutor, criterion_group, criterion_main, Criterion};
 
-use instant::Duration;
+use std::time::Duration;
+
 use strum::IntoEnumIterator as _;
 
 use all_is_cubes::util::YieldProgress;
@@ -24,7 +25,7 @@ pub fn template_bench(c: &mut Criterion) {
         // TODO: specify a small size for each, where possible
         group.bench_function(&format!("{template}"), |b| {
             b.to_async(FuturesExecutor).iter_with_large_drop(|| {
-                template.clone().build(
+                template.clone().build::<std::time::Instant>(
                     YieldProgress::noop(),
                     TemplateParameters {
                         seed: Some(0),

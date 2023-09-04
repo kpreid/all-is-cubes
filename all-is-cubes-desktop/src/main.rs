@@ -382,7 +382,7 @@ async fn create_universe(
             });
             template
                 .clone()
-                .build(
+                .build::<std::time::Instant>(
                     yield_progress,
                     TemplateParameters {
                         seed: Some(seed),

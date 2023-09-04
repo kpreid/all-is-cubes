@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use all_is_cubes::save::WhenceUniverse;
+use all_is_cubes::time;
 use macro_rules_attribute::macro_rules_derive;
 use paste::paste;
 
@@ -135,7 +136,7 @@ impl UniverseTemplate {
     }
 
     /// Create a new [`Universe`] based on this template's specifications.
-    pub async fn build(
+    pub async fn build<I: time::Instant>(
         self,
         p: YieldProgress,
         params: TemplateParameters,
@@ -160,7 +161,7 @@ impl UniverseTemplate {
                 Fail => Some(Err(InGenError::Other(
                     "the Fail template always fails to generate".into(),
                 ))),
-                DemoCity => Some(demo_city(&mut universe, p.take().unwrap(), params).await),
+                DemoCity => Some(demo_city::<I>(&mut universe, p.take().unwrap(), params).await),
                 Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), params).await),
                 Islands => Some(islands(&mut universe, p.take().unwrap(), params).await),
                 Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
@@ -272,7 +273,8 @@ impl WhenceUniverse for TemplateAndParameters {
         Box::pin(async move {
             ingredients
                 .template
-                .build(progress, ingredients.parameters)
+                // TODO: don't use placeholder time
+                .build::<time::NoTime>(progress, ingredients.parameters)
                 .await
                 .map_err(From::from)
         })
@@ -463,7 +465,8 @@ mod tests {
     #[allow(clippy::let_underscore_future)]
     fn _test_build_future_is_send() {
         let _: BoxFuture<'_, _> = Box::pin(
-            UniverseTemplate::Atrium.build(YieldProgress::noop(), TemplateParameters::default()),
+            UniverseTemplate::Atrium
+                .build::<std::time::Instant>(YieldProgress::noop(), TemplateParameters::default()),
         );
     }
 
@@ -483,7 +486,10 @@ mod tests {
             }
         };
 
-        let result = template.clone().build(YieldProgress::noop(), params).await;
+        let result = template
+            .clone()
+            .build::<std::time::Instant>(YieldProgress::noop(), params)
+            .await;
 
         if matches!(template, UniverseTemplate::Fail) {
             // The Fail template _should_ return an error
