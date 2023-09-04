@@ -37,7 +37,6 @@ futures-channel = "0.3.28"
 getrandom = { version = "0.2.3", features = ["js"] }
 # Feature enabling for indirect dependency all-is-cubes-content → maze_generator → rand → getrandom
 getrandom_old = { package = "getrandom", version = "0.1.16", features = ["wasm-bindgen"] }
-# Feature enabling for indirect dependency all-is-cubes → instant
 instant = { workspace = true, features = ["wasm-bindgen"] }
 js-sys = "0.3.64"
 log = { workspace = true }

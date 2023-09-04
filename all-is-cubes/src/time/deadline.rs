@@ -21,16 +21,13 @@ where
     fn saturating_duration_since(self, other: Self) -> Duration;
 }
 
-// TODO: Eliminate this impl and crate dependency, instead requiring all callers to provide
-// appropriate adapters. We can't do this until we make all of the other non-platform-specific
-// crates fully generic instead of hardcoding `instant`.
-impl Instant for ::instant::Instant {
+impl Instant for std::time::Instant {
     fn now() -> Self {
-        ::instant::Instant::now()
+        std::time::Instant::now()
     }
 
     fn saturating_duration_since(self, other: Self) -> Duration {
-        ::instant::Instant::saturating_duration_since(&self, other)
+        std::time::Instant::saturating_duration_since(&self, other)
     }
 }
 

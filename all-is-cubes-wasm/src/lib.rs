@@ -38,6 +38,9 @@
 // * TODO: warn(missing_docs), eventually.
 #![forbid(unsafe_code)]
 
+use core::ops;
+use core::time::Duration;
+
 #[cfg(target_family = "wasm")]
 mod gameapp;
 #[cfg(target_family = "wasm")]
@@ -49,3 +52,31 @@ pub mod js_bindings;
 mod url_params;
 #[cfg(target_family = "wasm")]
 mod web_glue;
+
+/// Wrapper to implement [`all_is_cubes::time::Instant`] for [`instant::Instant`].
+///
+/// TODO: Replace this with just a direct web API binding?
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct AdaptedInstant(instant::Instant);
+
+impl all_is_cubes::time::Instant for AdaptedInstant {
+    fn now() -> Self {
+        Self(instant::Instant::now())
+    }
+
+    fn saturating_duration_since(self, other: Self) -> Duration {
+        instant::Instant::saturating_duration_since(&self.0, other.0)
+    }
+}
+impl ops::Add<Duration> for AdaptedInstant {
+    type Output = Self;
+    fn add(self, rhs: Duration) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
+impl ops::Sub<Duration> for AdaptedInstant {
+    type Output = Self;
+    fn sub(self, rhs: Duration) -> Self::Output {
+        Self(self.0 - rhs)
+    }
+}

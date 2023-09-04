@@ -17,7 +17,7 @@ use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport};
 use all_is_cubes::cgmath::{self, One as _, Point3, Vector3, Zero as _};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::{Face6, GridAab, Rgb, Rgba};
-use all_is_cubes::notnan;
+use all_is_cubes::{notnan, time};
 use all_is_cubes_mesh::{BlockVertex, Coloring};
 
 use crate::in_wgpu::{
@@ -41,7 +41,7 @@ where
 {
     let (device, queue) = adapter
         .request_device(
-            &in_wgpu::EverythingRenderer::<std::time::Instant>::device_descriptor(),
+            &in_wgpu::EverythingRenderer::<time::NoTime>::device_descriptor(),
             None,
         )
         .await
@@ -123,7 +123,7 @@ where
 
     // Placeholder space data for the bind group
     let texture_allocator = in_wgpu::block_texture::AtlasAllocator::new("shader test space");
-    texture_allocator.flush::<std::time::Instant>(&device, &queue);
+    texture_allocator.flush::<time::NoTime>(&device, &queue);
     let space_bind_group = in_wgpu::space::create_space_bind_group(
         "shader test space",
         &device,
