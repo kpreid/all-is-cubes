@@ -29,7 +29,7 @@ anyhow = "1.0.70"
 arbitrary = { version = "1.1.6", features = ["derive"] }
 async_fn_traits = "0.1.1"
 base64 = { version = "0.21.0", default-features = false }
-bitflags = "2.0.2"
+bitflags = { version = "2.0.2", default-features = false }
 # Note that this excludes the "derive" feature but some crates need it.
 bytemuck = { version = "1.13.1", default-features = false }
 # When upgrading clap, beware text output changes causing integration tests to fail.
@@ -38,7 +38,7 @@ clap = { version = "4.2.4", default-features = false, features = ["cargo", "depr
 # when benching/testing specific packages
 criterion = { version = "0.5.1", features = ["async_tokio", "cargo_bench_support", "html_reports"] }
 crossbeam-channel = { version = "0.5.8" }
-either = "1.8.0"
+either = { version = "1.8.0", default-features = false }
 exhaust = { version = "0.1.0", default-features = false }
 futures-channel = { version = "0.3.28", default-features = false, features = ["alloc"] }
 futures-core = { version = "0.3.28", default-features = false, features = ["alloc"] }
@@ -51,7 +51,7 @@ itertools = { version = "0.11.0", default-features = false, features = ["use_all
 log = { version = "0.4.17", default-features = false }
 macro_rules_attribute = "0.2.0"
 mutants = "0.0.3"
-num-traits = "0.2.15"
+num-traits = { version = "0.2.15", default-features = false }
 once_cell = "1.17.1"
 ordered-float = { version = "3.0.0", default-features = false }
 pretty_assertions = "1.2.0"
