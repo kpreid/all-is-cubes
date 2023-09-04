@@ -220,6 +220,40 @@ fn block_with_modifiers() {
 
 // TODO: test serialization of each modifier
 
+#[test]
+fn resolution() {
+    use block::Resolution::*;
+    assert_round_trip_value(&R1, json!(1));
+    assert_round_trip_value(&R2, json!(2));
+    assert_round_trip_value(&R4, json!(4));
+    assert_round_trip_value(&R8, json!(8));
+    assert_round_trip_value(&R16, json!(16));
+    assert_round_trip_value(&R32, json!(32));
+    assert_round_trip_value(&R64, json!(64));
+    assert_round_trip_value(&R128, json!(128));
+}
+
+#[test]
+fn resolution_de_err() {
+    use serde_json::{from_value, json};
+    assert_eq!(
+        from_value::<Resolution>(json!(-16))
+            .unwrap_err()
+            .to_string(),
+        "invalid value: integer `-16`, expected u16"
+    );
+    assert_eq!(
+        from_value::<Resolution>(json!(0)).unwrap_err().to_string(),
+        "0 is not a permitted resolution; must be a power of 2 between 1 and 127"
+    );
+    assert_eq!(
+        from_value::<Resolution>(json!(1.5))
+            .unwrap_err()
+            .to_string(),
+        "invalid type: floating point `1.5`, expected u16"
+    );
+}
+
 //------------------------------------------------------------------------------------------------//
 // Tests corresponding to the `character` module
 
