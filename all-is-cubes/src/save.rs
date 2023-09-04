@@ -7,11 +7,15 @@ use futures_core::future::BoxFuture;
 use crate::universe::Universe;
 use crate::util::YieldProgress;
 
+#[cfg(feature = "save")]
 mod compress;
+#[cfg(feature = "save")]
 pub(crate) mod conversion;
+#[cfg(feature = "save")]
 pub(crate) mod schema;
 
 #[cfg(test)]
+#[cfg(feature = "save")]
 mod tests;
 
 /// Specifies a file or other data storage a [`Universe`] can be read from or written to.

@@ -10,8 +10,9 @@ use crate::math::{FreeCoordinate, Rgb, Rgba};
 /// report such failings via [`Flaws`](crate::camera::Flaws).
 ///
 #[doc = include_str!("../save/serde-warning.md")]
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(default)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "save", serde(default))]
 #[non_exhaustive]
 pub struct GraphicsOptions {
     /// Whether and how to draw fog obscuring the view distance limit.
@@ -165,7 +166,8 @@ impl Default for GraphicsOptions {
 /// Choices for [`GraphicsOptions::fog`].
 ///
 #[doc = include_str!("../save/serde-warning.md")]
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum FogOption {
     /// No fog: objects will maintain their color and disappear raggedly.
@@ -181,7 +183,8 @@ pub enum FogOption {
 /// Choices for [`GraphicsOptions::tone_mapping`].
 ///
 #[doc = include_str!("../save/serde-warning.md")]
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum ToneMappingOperator {
     /// Limit values above the maximum (or below zero) to lie within that range.
@@ -218,7 +221,8 @@ impl ToneMappingOperator {
 /// [`ToneMappingOperator`].
 ///
 #[doc = include_str!("../save/serde-warning.md")]
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum ExposureOption {
     /// Constant exposure; light values in the scene are multiplied by this value
@@ -251,7 +255,8 @@ impl Default for ExposureOption {
 #[doc = include_str!("../save/serde-warning.md")]
 ///
 /// [`Space`]: crate::space::Space
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum LightingOption {
     /// No lighting: objects will be displayed with their original surface color.
@@ -270,8 +275,9 @@ pub enum LightingOption {
 /// of the volumetric interpretation.
 ///
 #[doc = include_str!("../save/serde-warning.md")]
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum TransparencyOption {
     /// Conventional transparent surfaces.
@@ -311,8 +317,9 @@ impl TransparencyOption {
 /// Choices for [`GraphicsOptions::antialiasing`].
 ///
 #[doc = include_str!("../save/serde-warning.md")]
-#[derive(Clone, Debug, Default, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum AntialiasingOption {
     /// Do not apply antialiasing. Every pixel of the rendered image will be the exact

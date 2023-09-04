@@ -408,6 +408,7 @@ impl super::URefErased for AnyURef {
         self.clone()
     }
 
+    #[cfg(feature = "save")]
     fn fix_deserialized(
         &self,
         universe_id: super::UniverseId,

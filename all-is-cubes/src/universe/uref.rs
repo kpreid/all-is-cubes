@@ -63,6 +63,7 @@ enum State<T> {
     /// is a reference that is being deserialized.
     ///
     /// May transition to [`State::Member`] when the [`Universe`] is fully deserialized.
+    #[cfg(feature = "save")]
     Deserializing { name: Name, universe_id: UniverseId },
 
     /// In a [`Universe`] (or has been deleted from one).
@@ -130,6 +131,7 @@ impl<T: 'static> URef<T> {
     pub fn name(&self) -> Name {
         match self.state.lock().as_deref() {
             Ok(State::Pending { name, .. }) => name.clone(),
+            #[cfg(feature = "save")]
             Ok(State::Deserializing { name, .. }) => name.clone(),
             Ok(State::Member { name, .. }) => name.clone(),
             Ok(State::Gone { name }) => name.clone(),
@@ -146,6 +148,7 @@ impl<T: 'static> URef<T> {
     pub fn universe_id(&self) -> Option<UniverseId> {
         match *self.state.lock().ok()? {
             State::Pending { .. } => None,
+            #[cfg(feature = "save")]
             State::Deserializing { universe_id, .. } => Some(universe_id),
             State::Member { universe_id, .. } => Some(universe_id),
             State::Gone { .. } => None,
@@ -188,6 +191,7 @@ impl<T: 'static> URef<T> {
         Ok(function(data))
     }
 
+    #[cfg(feature = "save")]
     pub(crate) fn insert_value_from_deserialization(&self, new_data: T) -> Result<(), RefError> {
         let strong: Arc<RwLock<UEntry<T>>> = self.upgrade()?;
         let mut guard = strong
@@ -257,10 +261,17 @@ impl<T: 'static> URef<T> {
         match self.state.lock() {
             Ok(state_guard) => match &*state_guard {
                 State::Pending { .. } => {}
-                State::Member { .. } | State::Deserializing { .. } => {
+                State::Member { .. } => {
                     return Err(PreconditionFailed {
                         location: "UniverseTransaction",
                         problem: "insert(): the URef is already in a universe",
+                    });
+                }
+                #[cfg(feature = "save")]
+                State::Deserializing { .. } => {
+                    return Err(PreconditionFailed {
+                        location: "UniverseTransaction",
+                        problem: "insert(): the URef is already in a universe being deserialized",
                     });
                 }
                 State::Gone { .. } => {
@@ -334,7 +345,14 @@ impl<T: 'static> URef<T> {
                     kind: InsertErrorKind::Gone,
                 })
             }
-            State::Member { name, .. } | State::Deserializing { name, .. } => {
+            State::Member { name, .. } => {
+                return Err(InsertError {
+                    name: name.clone(),
+                    kind: InsertErrorKind::AlreadyInserted,
+                })
+            }
+            #[cfg(feature = "save")]
+            State::Deserializing { name, .. } => {
                 return Err(InsertError {
                     name: name.clone(),
                     kind: InsertErrorKind::AlreadyInserted,
@@ -569,6 +587,7 @@ impl<T> URootRef<T> {
     }
 
     /// Construct a root with no value for mid-deserialization states.
+    #[cfg(feature = "save")]
     pub(super) fn new_deserializing(universe_id: UniverseId, name: Name) -> Self {
         URootRef {
             strong_ref: Arc::new(RwLock::new(UEntry { data: None })),
@@ -612,6 +631,7 @@ pub trait URefErased: core::any::Any {
     /// This method is hidden and cannot actually be called from outside the crate;
     /// it is part of the trait so that it is possible to call this through [`VisitRefs`].
     #[doc(hidden)]
+    #[cfg(feature = "save")]
     fn fix_deserialized(
         &self,
         expected_universe_id: UniverseId,
@@ -633,6 +653,7 @@ impl<T: UniverseMember> URefErased for URef<T> {
     }
 
     #[doc(hidden)]
+    #[cfg(feature = "save")]
     fn fix_deserialized(
         &self,
         expected_universe_id: UniverseId,
@@ -644,6 +665,7 @@ impl<T: UniverseMember> URefErased for URef<T> {
             self.state.lock().expect("URef::state lock error");
 
         match &*state_guard {
+            #[cfg(feature = "save")]
             &State::Deserializing {
                 ref name,
                 universe_id,
@@ -667,12 +689,14 @@ impl ToOwned for dyn URefErased {
     }
 }
 
+#[cfg(feature = "save")]
 mod private {
     /// Private type making it impossible to call [`URefErased::connect_deserialized`] outside
     /// the crate.
     #[derive(Debug)]
     pub struct URefErasedInternalToken;
 }
+#[cfg(feature = "save")]
 pub(crate) use private::URefErasedInternalToken;
 
 #[cfg(test)]

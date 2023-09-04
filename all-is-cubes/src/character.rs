@@ -1,6 +1,5 @@
 //! Player-character stuff.
 
-use std::borrow::Cow::Borrowed;
 use std::collections::HashSet;
 use std::fmt;
 use std::sync::Arc;
@@ -19,6 +18,7 @@ use crate::listen::{Listen, Listener, Notifier};
 use crate::math::{Aab, Face6, Face7, FreeCoordinate, Rgb};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
 use crate::raycast::Ray;
+#[cfg(feature = "save")]
 use crate::save::schema;
 use crate::space::Space;
 use crate::time::Tick;
@@ -552,6 +552,7 @@ impl crate::behavior::BehaviorHost for Character {
     type Attachment = ();
 }
 
+#[cfg(feature = "save")]
 impl serde::Serialize for Character {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -597,14 +598,15 @@ impl serde::Serialize for Character {
             yaw,
             pitch,
 
-            inventory: Borrowed(inventory),
+            inventory: std::borrow::Cow::Borrowed(inventory),
             selected_slots,
-            behaviors: Borrowed(behaviors),
+            behaviors: std::borrow::Cow::Borrowed(behaviors),
         }
         .serialize(serializer)
     }
 }
 
+#[cfg(feature = "save")]
 impl<'de> serde::Deserialize<'de> for Character {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

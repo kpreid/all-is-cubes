@@ -27,8 +27,9 @@ use crate::math::*;
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::exhaustive_enums)]
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 pub enum GridRotation {
     // TODO: shuffle or explicitly number these to choose a meaningful numbering

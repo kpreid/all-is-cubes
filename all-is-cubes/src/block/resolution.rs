@@ -184,12 +184,14 @@ impl ops::Div<Resolution> for Resolution {
     }
 }
 
+#[cfg(feature = "save")]
 impl serde::Serialize for Resolution {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         u16::from(*self).serialize(serializer)
     }
 }
 
+#[cfg(feature = "save")]
 impl<'de> serde::Deserialize<'de> for Resolution {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         u16::deserialize(deserializer)?

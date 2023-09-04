@@ -770,7 +770,8 @@ impl crate::behavior::BehaviorHost for Space {
 /// exists.
 // ---
 // TODO: This shouldn't directly implement Serialize
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 pub struct SpaceBehaviorAttachment {
     bounds: GridAab,
     rotation: GridRotation,
@@ -1089,6 +1090,7 @@ pub struct Extract<'s> {
 
 impl<'s> Extract<'s> {
     /// Returns the cube being processed.
+    #[allow(unused)] // currently only used on feature=save
     pub(crate) fn cube(&self) -> Cube {
         self.cube
     }

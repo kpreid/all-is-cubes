@@ -182,10 +182,12 @@ impl<H: BehaviorHost> BehaviorSet<H> {
         transaction.unwrap_or_default()
     }
 
+    #[allow(unused)] // currently only used on feature=save
     pub(crate) fn iter(&self) -> impl Iterator<Item = &BehaviorSetEntry<H>> + '_ {
         self.items.iter()
     }
 
+    #[allow(unused)] // currently only used on feature=save
     pub(crate) fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
@@ -543,7 +545,10 @@ mod testing {
 /// offer some means to access this functionality or replace the [`Behavior`] system
 /// entirely.
 #[derive(Debug)]
-pub struct BehaviorPersistence(pub(crate) crate::save::schema::BehaviorV1Ser);
+pub struct BehaviorPersistence(
+    #[cfg(feature = "save")] pub(crate) crate::save::schema::BehaviorV1Ser,
+    #[cfg(not(feature = "save"))] (),
+);
 
 #[cfg(test)]
 mod tests {

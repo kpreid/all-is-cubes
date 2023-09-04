@@ -47,6 +47,7 @@ impl Zoom {
     }
 
     /// Decompose into parts, for serialization.
+    #[cfg(feature = "save")]
     pub(crate) fn to_serial_schema(&self) -> crate::save::schema::ModifierSer {
         let Zoom { scale, offset } = *self;
         crate::save::schema::ModifierSer::ZoomV1 {

@@ -50,6 +50,8 @@ harness = false
 default = []
 # Adds `impl arbitrary::Arbitrary for ...`
 arbitrary = ["dep:arbitrary", "ordered-float/arbitrary"]
+# Adds serde implementations.
+save = ["dep:serde", "dep:serde_repr", "dep:flate2", "ordered-float/serde"]
 # Adds automatic parallelism to some algorithms such as raytracing.
 threads = ["dep:rayon"]
 
@@ -62,7 +64,7 @@ cgmath = "0.18.0"
 downcast-rs = { version = "1.2.0", default-features = false }
 embedded-graphics = "0.8.0"
 exhaust = { workspace = true, default-features = false }
-flate2 = { version = "1.0.26" }
+flate2 = { version = "1.0.26", optional = true }
 futures-core = { workspace = true }
 indoc = { workspace = true }
 instant = { workspace = true }
@@ -76,9 +78,9 @@ png-decoder = { version = "0.1.1" }
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }
 rayon = { workspace = true, optional = true }
-# std and rc features needed because we are [de]serializing `Arc`s
-serde = { workspace = true, features = ["derive", "std", "rc"] }
-serde_repr = { version = "0.1.12", default-features = false }
+# rc feature needed because we are [de]serializing `Arc`s
+serde = { workspace = true, optional = true, features = ["derive", "rc"] }
+serde_repr = { version = "0.1.12", optional = true, default-features = false }
 thiserror = { workspace = true }
 yield-progress = { version = "0.1.0" }
 

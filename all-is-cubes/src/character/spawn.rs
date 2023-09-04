@@ -3,6 +3,7 @@ use cgmath::{Point3, Vector3};
 use crate::camera::eye_for_look_at;
 use crate::inv::Slot;
 use crate::math::{Face6, FreeCoordinate, GridAab, NotNan};
+#[cfg(feature = "save")]
 use crate::save::schema;
 use crate::universe::{RefVisitor, VisitRefs};
 
@@ -118,6 +119,7 @@ impl VisitRefs for Spawn {
     }
 }
 
+#[cfg(feature = "save")]
 impl serde::Serialize for Spawn {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -140,6 +142,7 @@ impl serde::Serialize for Spawn {
     }
 }
 
+#[cfg(feature = "save")]
 impl<'de> serde::Deserialize<'de> for Spawn {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
