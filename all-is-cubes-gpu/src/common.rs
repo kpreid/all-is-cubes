@@ -1,8 +1,7 @@
 //! Items not specific to a particular GPU API.
 
 use std::error::Error;
-
-use instant::Duration;
+use std::time::Duration;
 
 use all_is_cubes::camera::{Layers, RenderError};
 use all_is_cubes::universe::RefError;

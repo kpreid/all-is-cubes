@@ -3,8 +3,6 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, Weak};
 
-use instant::Instant;
-
 use all_is_cubes::camera::{Camera, Flaws};
 use all_is_cubes::cgmath::{EuclideanSpace, Point3, Vector3};
 use all_is_cubes::chunking::ChunkPos;
@@ -34,7 +32,7 @@ const CHUNK_SIZE: GridCoordinate = 16;
 /// Manages cached data and GPU resources for drawing a single [`Space`] and
 /// following its changes.
 #[derive(Debug)]
-pub(crate) struct SpaceRenderer {
+pub(crate) struct SpaceRenderer<I> {
     space_label: String,
     /// A debugging label for the space's render pass.
     /// (Derived from constructor's space_label)
@@ -62,13 +60,7 @@ pub(crate) struct SpaceRenderer {
     space_bind_group:
         Memo<(wgpu::Id<wgpu::TextureView>, wgpu::Id<wgpu::TextureView>), wgpu::BindGroup>,
 
-    csm: ChunkedSpaceMesh<
-        Option<ChunkBuffers>,
-        WgpuBlockVertex,
-        AtlasAllocator,
-        instant::Instant,
-        CHUNK_SIZE,
-    >,
+    csm: ChunkedSpaceMesh<Option<ChunkBuffers>, WgpuBlockVertex, AtlasAllocator, I, CHUNK_SIZE>,
 
     interactive: bool,
 }
@@ -80,7 +72,7 @@ struct ChunkBuffers {
     index_format: wgpu::IndexFormat,
 }
 
-impl SpaceRenderer {
+impl<I: time::Instant> SpaceRenderer<I> {
     /// TODO: Simplify callers by making it possible to create a `SpaceRenderer` without a space.
     /// Besides simpler initialization, this will also allow reusing allocated resources across a
     /// period of no space.
@@ -167,14 +159,14 @@ impl SpaceRenderer {
     /// given [`deadline`] permits).
     pub(crate) fn update(
         &mut self,
-        deadline: time::Deadline<Instant>,
+        deadline: time::Deadline<I>,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         pipelines: &Pipelines,
         camera: &Camera,
         mut bwp: BeltWritingParts<'_, '_>,
     ) -> Result<SpaceUpdateInfo, GraphicsResourceError> {
-        let start_time = Instant::now();
+        let start_time = I::now();
 
         let mut todo = self.todo.lock().unwrap();
 
@@ -188,7 +180,7 @@ impl SpaceRenderer {
         self.sky_color = space.physics().sky_color;
 
         // Update light texture
-        let start_light_update = Instant::now();
+        let start_light_update = I::now();
         let mut light_update_count = 0;
         if let Some(set) = &mut todo.light {
             // TODO: work in larger, ahem, chunks
@@ -203,7 +195,7 @@ impl SpaceRenderer {
             light_update_count += self.light_texture.update_all(queue, space);
             todo.light = Some(HashSet::new());
         }
-        let end_light_update = Instant::now();
+        let end_light_update = I::now();
 
         // Update chunks
         let csm_info = self.csm.update_blocks_and_some_chunks(
@@ -250,7 +242,7 @@ impl SpaceRenderer {
         // Flush all texture updates to GPU.
         // This must happen after `csm.update_blocks_and_some_chunks` so that the newly
         // generated meshes have the texels they expect.
-        let (block_texture_view, texture_info) = self.block_texture.flush(device, queue);
+        let (block_texture_view, texture_info) = self.block_texture.flush::<I>(device, queue);
 
         // Update space bind group if needed.
         self.space_bind_group.get_or_insert(
@@ -269,11 +261,11 @@ impl SpaceRenderer {
             },
         );
 
-        let end_time = Instant::now();
+        let end_time = I::now();
 
         Ok(SpaceUpdateInfo {
-            total_time: end_time.duration_since(start_time),
-            light_update_time: end_light_update.duration_since(start_light_update),
+            total_time: end_time.saturating_duration_since(start_time),
+            light_update_time: end_light_update.saturating_duration_since(start_light_update),
             light_update_count,
             chunk_info: csm_info,
             texture_info,
@@ -295,7 +287,7 @@ impl SpaceRenderer {
         color_load_op: wgpu::LoadOp<wgpu::Color>,
         store_depth: bool,
     ) -> Result<SpaceDrawInfo, GraphicsResourceError> {
-        let start_time = Instant::now();
+        let start_time = I::now();
 
         let csm = &self.csm;
         let view_chunk = csm.view_chunk();
@@ -366,7 +358,7 @@ impl SpaceRenderer {
         }
 
         // Opaque geometry first, in front-to-back order
-        let start_opaque_draw_time = Instant::now();
+        let start_opaque_draw_time = I::now();
         let mut chunks_drawn = 0;
         let mut squares_drawn = 0;
         render_pass.set_pipeline(&pipelines.opaque_render_pipeline);
@@ -389,7 +381,7 @@ impl SpaceRenderer {
         }
 
         // Transparent geometry after opaque geometry, in back-to-front order
-        let start_draw_transparent_time = Instant::now();
+        let start_draw_transparent_time = I::now();
         if camera.options().transparency.will_output_alpha() {
             render_pass.set_pipeline(&pipelines.transparent_render_pipeline);
             for chunk in csm.iter_in_view(camera).rev() {
@@ -419,12 +411,13 @@ impl SpaceRenderer {
             bytemuck::cast_slice::<WgpuInstanceData, u8>(instance_data.as_slice()),
         );
 
-        let end_time = Instant::now();
+        let end_time = I::now();
 
         Ok(SpaceDrawInfo {
-            draw_init_time: start_opaque_draw_time.duration_since(start_time),
-            draw_opaque_time: start_draw_transparent_time.duration_since(start_opaque_draw_time),
-            draw_transparent_time: end_time.duration_since(start_draw_transparent_time),
+            draw_init_time: start_opaque_draw_time.saturating_duration_since(start_time),
+            draw_opaque_time: start_draw_transparent_time
+                .saturating_duration_since(start_opaque_draw_time),
+            draw_transparent_time: end_time.saturating_duration_since(start_draw_transparent_time),
             squares_drawn,
             chunks_drawn,
             flaws,

@@ -42,7 +42,6 @@ bytemuck = { workspace = true, features = ["derive"] }
 futures-channel = { workspace = true, features = ["sink"] }
 futures-core = { workspace = true }
 futures-util = { workspace = true, features = ["sink"] }
-instant = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }

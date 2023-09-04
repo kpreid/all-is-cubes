@@ -8,6 +8,7 @@ use std::sync::Arc;
 use once_cell::sync::Lazy;
 
 use all_is_cubes::camera::{GraphicsOptions, ToneMappingOperator};
+use all_is_cubes::time;
 
 use crate::in_wgpu::glue::create_wgsl_module_from_reloadable;
 use crate::reloadable::{reloadable_str, Reloadable};
@@ -164,9 +165,9 @@ impl PostprocessUniforms {
     }
 }
 
-pub(crate) fn postprocess(
+pub(crate) fn postprocess<I: time::Instant>(
     // TODO: instead of accepting `EverythingRenderer`, pass smaller (but not too numerous) things
-    ev: &mut super::EverythingRenderer,
+    ev: &mut super::EverythingRenderer<I>,
     queue: &wgpu::Queue,
     output: &wgpu::Texture,
 ) {

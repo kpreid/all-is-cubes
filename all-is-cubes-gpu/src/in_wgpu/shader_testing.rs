@@ -40,7 +40,10 @@ where
     T: bytemuck::Pod,
 {
     let (device, queue) = adapter
-        .request_device(&in_wgpu::EverythingRenderer::device_descriptor(), None)
+        .request_device(
+            &in_wgpu::EverythingRenderer::<std::time::Instant>::device_descriptor(),
+            None,
+        )
         .await
         .unwrap();
     #[cfg_attr(target_family = "wasm", allow(clippy::arc_with_non_send_sync))]
@@ -120,7 +123,7 @@ where
 
     // Placeholder space data for the bind group
     let texture_allocator = in_wgpu::block_texture::AtlasAllocator::new("shader test space");
-    texture_allocator.flush(&device, &queue);
+    texture_allocator.flush::<std::time::Instant>(&device, &queue);
     let space_bind_group = in_wgpu::space::create_space_bind_group(
         "shader test space",
         &device,

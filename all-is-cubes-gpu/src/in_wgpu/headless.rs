@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use all_is_cubes::time;
 use futures_channel::oneshot;
 use futures_core::future::BoxFuture;
 
@@ -25,7 +26,10 @@ impl Builder {
         adapter: Arc<wgpu::Adapter>,
     ) -> Result<Self, wgpu::RequestDeviceError> {
         let (device, queue) = adapter
-            .request_device(&in_wgpu::EverythingRenderer::device_descriptor(), None)
+            .request_device(
+                &in_wgpu::EverythingRenderer::<time::NoTime>::device_descriptor(),
+                None,
+            )
             .await?;
         Ok(Self {
             device: Arc::new(device),
@@ -79,7 +83,7 @@ struct RendererImpl {
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
     color_texture: wgpu::Texture,
-    everything: super::EverythingRenderer,
+    everything: super::EverythingRenderer<time::NoTime>,
     viewport_source: ListenableSource<Viewport>,
     viewport_dirty: DirtyFlag,
     flaws: Flaws,

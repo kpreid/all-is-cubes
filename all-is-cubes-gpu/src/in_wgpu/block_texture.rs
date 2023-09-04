@@ -5,10 +5,9 @@
 
 use std::sync::{Arc, Mutex, Weak};
 
-use instant::Instant;
-
 use all_is_cubes::cgmath::{Point3, Vector3};
 use all_is_cubes::math::GridAab;
+use all_is_cubes::time;
 use all_is_cubes_mesh::texture;
 
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
@@ -110,12 +109,12 @@ impl AtlasAllocator {
     }
 
     /// Copy the texels of all modified and still-referenced tiles to the GPU's texture.
-    pub fn flush(
+    pub fn flush<I: time::Instant>(
         &self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) -> (Arc<wgpu::TextureView>, BlockTextureInfo) {
-        let start_time = Instant::now();
+        let start_time = I::now();
         let backing = &mut *self.backing.lock().unwrap();
 
         let needed_texture_size = size_vector_to_extent(backing.alloctree.bounds().size());
@@ -217,7 +216,7 @@ impl AtlasAllocator {
             texture_view.clone(),
             BlockTextureInfo {
                 flushed: count_written,
-                flush_time: Instant::now().duration_since(start_time),
+                flush_time: I::now().saturating_duration_since(start_time),
                 in_use_tiles: backing.in_use.len(),
                 in_use_texels: backing.alloctree.occupied_volume(),
                 capacity_texels: backing.alloctree.bounds().volume(),

@@ -1,6 +1,5 @@
 use std::fmt;
-
-use instant::Duration;
+use std::time::Duration;
 
 use all_is_cubes::camera::{Flaws, Layers};
 use all_is_cubes::util::{CustomFormat, StatusText};

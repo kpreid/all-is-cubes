@@ -183,7 +183,7 @@ pub(crate) async fn create_winit_wgpu_desktop_session(
     session: Session,
     window: WinAndState,
     viewport_cell: ListenableCell<Viewport>,
-) -> Result<DesktopSession<SurfaceRenderer, WinAndState>, anyhow::Error> {
+) -> Result<DesktopSession<SurfaceRenderer<Instant>, WinAndState>, anyhow::Error> {
     let start_time = Instant::now();
 
     viewport_cell.set(physical_size_to_viewport(
@@ -495,7 +495,7 @@ pub(crate) trait RendererToWinit: 'static {
     fn redraw(&mut self, session: &Session, window: &Window);
 }
 
-impl RendererToWinit for SurfaceRenderer {
+impl RendererToWinit for SurfaceRenderer<Instant> {
     fn update_world_camera(&mut self) {
         self.update_world_camera()
     }

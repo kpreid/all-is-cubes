@@ -6,8 +6,7 @@ use std::mem;
 use std::sync::Arc;
 
 use all_is_cubes::notnan;
-use all_is_cubes::time::Deadline;
-use instant::Instant;
+use all_is_cubes::time;
 
 use all_is_cubes::camera::{info_text_drawable, Layers, StandardCameras};
 use all_is_cubes::cgmath::Vector2;
@@ -54,25 +53,25 @@ mod vertex;
 /// to draw on.
 //#[derive(Debug)]
 #[allow(missing_debug_implementations)] // TODO: wgpu::util::StagingBelt isn't Debug (will be in the future)
-pub struct SurfaceRenderer {
+pub struct SurfaceRenderer<I> {
     surface: wgpu::Surface,
     device: Arc<wgpu::Device>,
     queue: wgpu::Queue,
 
-    everything: EverythingRenderer,
+    everything: EverythingRenderer<I>,
 
     /// True if we need to reconfigure the surface.
     viewport_dirty: DirtyFlag,
 }
 
-impl SurfaceRenderer {
+impl<I: time::Instant> SurfaceRenderer<I> {
     pub async fn new(
         cameras: StandardCameras,
         surface: wgpu::Surface,
         adapter: &wgpu::Adapter,
     ) -> Result<Self, GraphicsResourceError> {
         let (device, queue) = adapter
-            .request_device(&EverythingRenderer::device_descriptor(), None)
+            .request_device(&EverythingRenderer::<I>::device_descriptor(), None)
             .await
             .map_err(|e| {
                 GraphicsResourceError::new(
@@ -140,9 +139,9 @@ impl SurfaceRenderer {
 
         // If the GPU is busy, `get_current_texture()` blocks until a previous texture
         // is no longer in use (except on wasm, in which case submit() seems to take the time).
-        let before_get = Instant::now();
+        let before_get = I::now();
         let output = self.surface.get_current_texture()?;
-        let after_get = Instant::now();
+        let after_get = I::now();
 
         let draw_info = self.everything.draw_frame_linear(&self.queue)?;
 
@@ -158,7 +157,7 @@ impl SurfaceRenderer {
             },
         } = draw_info.space_info;
         let info = RenderInfo {
-            waiting_for_gpu: after_get.duration_since(before_get),
+            waiting_for_gpu: after_get.saturating_duration_since(before_get),
             flaws: update_info.flaws | world_flaws | ui_flaws,
             update: update_info,
             draw: draw_info,
@@ -181,7 +180,7 @@ impl SurfaceRenderer {
 /// scene and UI, but not the surface it's drawn on. This may be used in tests or
 /// to support
 #[derive(Debug)]
-pub struct EverythingRenderer {
+pub struct EverythingRenderer<I> {
     device: Arc<wgpu::Device>,
 
     staging_belt: wgpu::util::StagingBelt,
@@ -196,7 +195,7 @@ pub struct EverythingRenderer {
     /// Pipelines and layouts for rendering Space content
     pipelines: Pipelines,
 
-    space_renderers: Layers<Option<SpaceRenderer>>,
+    space_renderers: Layers<Option<SpaceRenderer<I>>>,
     /// Texture atlas shared between all space renderers.
     block_texture: AtlasAllocator,
 
@@ -217,7 +216,7 @@ pub struct EverythingRenderer {
     info_text_sampler: wgpu::Sampler,
 }
 
-impl EverythingRenderer {
+impl<I: time::Instant> EverythingRenderer<I> {
     /// A device descriptor suitable for the expectations of [`EverythingRenderer`].
     pub fn device_descriptor() -> wgpu::DeviceDescriptor<'static> {
         wgpu::DeviceDescriptor {
@@ -339,7 +338,7 @@ impl EverythingRenderer {
         cursor_result: Option<&Cursor>,
         frame_budget: &FrameBudget,
     ) -> Result<UpdateInfo, GraphicsResourceError> {
-        let start_frame_time = Instant::now();
+        let start_frame_time = I::now();
 
         // This updates camera matrices and graphics options which we are going to consult
         // or copy to the GPU.
@@ -424,10 +423,10 @@ impl EverythingRenderer {
             encoder: &mut encoder,
         };
 
-        let update_prep_to_space_update_time = Instant::now();
+        let update_prep_to_space_update_time = I::now();
 
         let world_deadline =
-            Deadline::At(update_prep_to_space_update_time + frame_budget.update_meshes.world);
+            time::Deadline::At(update_prep_to_space_update_time + frame_budget.update_meshes.world);
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
 
         let space_infos: Layers<SpaceUpdateInfo> = Layers {
@@ -465,7 +464,7 @@ impl EverythingRenderer {
                 .unwrap_or_default(),
         };
 
-        let space_update_to_lines_time = Instant::now();
+        let space_update_to_lines_time = I::now();
 
         // Prepare cursor and debug lines.
         {
@@ -511,19 +510,19 @@ impl EverythingRenderer {
             self.lines_vertex_count = v.len() as u32;
         };
 
-        let lines_to_submit_time = Instant::now();
+        let lines_to_submit_time = I::now();
 
         // TODO: measure time of these
         self.staging_belt.finish();
         queue.submit(std::iter::once(encoder.finish()));
 
-        let finish_update_time = Instant::now();
+        let finish_update_time = I::now();
         Ok(UpdateInfo {
             flaws: self.fb.flaws() | space_infos.world.flaws() | space_infos.ui.flaws(),
-            total_time: finish_update_time.duration_since(start_frame_time),
-            prep_time: update_prep_to_space_update_time.duration_since(start_frame_time),
-            lines_time: lines_to_submit_time.duration_since(space_update_to_lines_time),
-            submit_time: Some(finish_update_time.duration_since(lines_to_submit_time)),
+            total_time: finish_update_time.saturating_duration_since(start_frame_time),
+            prep_time: update_prep_to_space_update_time.saturating_duration_since(start_frame_time),
+            lines_time: lines_to_submit_time.saturating_duration_since(space_update_to_lines_time),
+            submit_time: Some(finish_update_time.saturating_duration_since(lines_to_submit_time)),
             spaces: space_infos,
         })
     }
@@ -531,7 +530,7 @@ impl EverythingRenderer {
     /// Create, or set the space of, a [`SpaceRenderer`].
     fn update_space_renderer(
         label: &str,
-        renderer: &mut Option<SpaceRenderer>,
+        renderer: &mut Option<SpaceRenderer<I>>,
         space: Option<&URef<Space>>,
         device: &wgpu::Device,
         pipelines: &Pipelines,
@@ -579,7 +578,7 @@ impl EverythingRenderer {
         // not read the texture.
         let mut output_needs_clearing = true;
 
-        let start_draw_time = Instant::now();
+        let start_draw_time = I::now();
         let world_draw_info = if let Some(sr) = &self.space_renderers.world {
             let camera = &self.cameras.cameras().world;
             sr.draw(
@@ -602,7 +601,7 @@ impl EverythingRenderer {
         } else {
             SpaceDrawInfo::default()
         };
-        let world_to_lines_time = Instant::now();
+        let world_to_lines_time = I::now();
 
         // Lines pass (if there are any lines)
         if let (Some(sr), 1..) = (&self.space_renderers.world, self.lines_vertex_count) {
@@ -630,7 +629,7 @@ impl EverythingRenderer {
             render_pass.draw(0..self.lines_vertex_count, 0..1);
         }
 
-        let lines_to_ui_time = Instant::now();
+        let lines_to_ui_time = I::now();
         let ui_draw_info = if let Some(sr) = &self.space_renderers.ui {
             sr.draw(
                 &self.fb,
@@ -648,7 +647,7 @@ impl EverythingRenderer {
         } else {
             SpaceDrawInfo::default()
         };
-        let ui_to_postprocess_time = Instant::now();
+        let ui_to_postprocess_time = I::now();
 
         // Write the postprocess camera data.
         // Note: this can't use the StagingBelt because it was already finish()ed.
@@ -672,18 +671,18 @@ impl EverythingRenderer {
         queue.submit(std::iter::once(encoder.finish()));
         self.staging_belt.recall();
 
-        let end_time = Instant::now();
+        let end_time = I::now();
         Ok(DrawInfo {
             times: Layers {
-                world: world_to_lines_time.duration_since(start_draw_time),
-                ui: ui_to_postprocess_time.duration_since(lines_to_ui_time),
+                world: world_to_lines_time.saturating_duration_since(start_draw_time),
+                ui: ui_to_postprocess_time.saturating_duration_since(lines_to_ui_time),
             },
             space_info: Layers {
                 world: world_draw_info,
                 ui: ui_draw_info,
             },
             // TODO: count bloom (call it postprocess) time separately from submit
-            submit_time: Some(end_time.duration_since(ui_to_postprocess_time)),
+            submit_time: Some(end_time.saturating_duration_since(ui_to_postprocess_time)),
         })
     }
 

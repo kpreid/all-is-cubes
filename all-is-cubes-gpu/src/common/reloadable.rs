@@ -4,12 +4,12 @@
 //! via a background thread and all-is-cubes's `ListenableSource` mechanism.
 
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Duration;
 
-use instant::Duration;
 use once_cell::sync::Lazy;
+use resource::Resource;
 
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use resource::Resource;
 
 #[derive(Clone)]
 pub(crate) struct Reloadable(Arc<ReloadableInner>);
