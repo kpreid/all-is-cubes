@@ -50,6 +50,8 @@ tui = { version = "0.19.0", default-features = false, features = ["crossterm"] }
 unicode-width = { version = "0.1.9", default-features = false }
 # Note on feature selection: winit requires either "x11" or "wayland" to build at all on Linux, which is harmless elsewhere. I picked x11 because it should be the most compatible.
 winit = { version = "0.28.1", default-features = false, features = ["x11"] }
+# Enable the log-hiccups feature
+yield-progress = { workspace = true, features = ["log_hiccups"] }
 
 [dev-dependencies]
 gltf = "1.3.0" # for round-trip test; must match version of gltf-json
