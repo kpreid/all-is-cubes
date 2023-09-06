@@ -17,7 +17,6 @@ use all_is_cubes::camera::{GraphicsOptions, StandardCameras, Viewport};
 use all_is_cubes::cgmath::{Point2, Vector2};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::universe::{Universe, UniverseStepInfo};
-use all_is_cubes::util::YieldProgress;
 use all_is_cubes_gpu::in_wgpu;
 use all_is_cubes_port::file::NonDiskFile;
 use all_is_cubes_ui::apps::{CursorIcon, Key};

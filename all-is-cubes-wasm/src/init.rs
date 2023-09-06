@@ -7,7 +7,6 @@ use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 
 use web_sys::{console, Document};
 
-use all_is_cubes::util::YieldProgress;
 use all_is_cubes_gpu::in_wgpu;
 
 use crate::gameapp::{create_session, StaticDom, WebRenderer, WebSession};
@@ -85,11 +84,14 @@ async fn start_game_with_dom(
     gui_helpers: GuiHelpers,
     static_dom: &StaticDom,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let progress = YieldProgress::new(yield_to_event_loop, {
-        let progress_bar = SendWrapper::new(static_dom.progress_bar.clone());
-        // TODO: hook up label
-        move |fraction, _label| progress_bar.set_value(fraction.into())
-    });
+    let progress = yield_progress::Builder::new()
+        .yield_using(|_| yield_to_event_loop())
+        .progress_using({
+            let progress_bar = SendWrapper::new(static_dom.progress_bar.clone());
+            // TODO: hook up label
+            move |info| progress_bar.set_value(info.fraction().into())
+        })
+        .build();
     let [app_progress, progress] = progress.split(0.1);
     let [universe_progress, post_universe_progress] = progress.split(0.98);
 
