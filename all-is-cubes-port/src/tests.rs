@@ -2,12 +2,11 @@ use std::error::Error as _;
 use std::sync::Arc;
 
 use all_is_cubes::block;
-use all_is_cubes::util::assert_send_sync;
+use all_is_cubes::util::{assert_send_sync, yield_progress_for_testing};
 
 use crate::file::NonDiskFile;
 use crate::{
-    load_universe_from_file, BlockDef, ExportError, ExportSet, ImportError, Path, PathBuf,
-    Universe, YieldProgress,
+    load_universe_from_file, BlockDef, ExportError, ExportSet, ImportError, Path, PathBuf, Universe,
 };
 
 #[test]
@@ -19,7 +18,7 @@ fn errors_are_send_sync() {
 #[tokio::test]
 async fn import_unknown_format() {
     let error = load_universe_from_file(
-        YieldProgress::noop(),
+        yield_progress_for_testing(),
         Arc::new(NonDiskFile::from_name_and_data_source("foo".into(), || {
             Ok(b"nonsense".to_vec())
         })),

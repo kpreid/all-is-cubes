@@ -527,7 +527,7 @@ mod tests {
     use crate::space::Space;
     use crate::transaction;
     use crate::universe::{UBorrow, URef, Universe};
-    use crate::util::YieldProgress;
+    use crate::util::yield_progress_for_testing;
     use pretty_assertions::assert_eq;
     use std::error::Error;
 
@@ -617,7 +617,7 @@ mod tests {
     async fn dummy_icons() -> BlockProvider<Icons> {
         // TODO: Might be good to generate differently labeled blocks... maybe BlockProvider should have a way to do that for any enum.
         let [block] = make_some_blocks();
-        BlockProvider::new(YieldProgress::noop(), |_| Ok(block.clone()))
+        BlockProvider::new(yield_progress_for_testing(), |_| Ok(block.clone()))
             .await
             .unwrap()
     }

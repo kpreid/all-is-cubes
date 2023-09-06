@@ -303,9 +303,10 @@ impl fmt::Display for ToolbarButtonState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::util::yield_progress_for_testing;
 
     #[tokio::test]
     async fn blocks_smoke_test() {
-        UiBlocks::new(&mut Universe::new(), YieldProgress::noop()).await;
+        UiBlocks::new(&mut Universe::new(), yield_progress_for_testing()).await;
     }
 }

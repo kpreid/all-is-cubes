@@ -460,14 +460,15 @@ async fn arbitrary_space(
 mod tests {
     use super::*;
     use all_is_cubes::time;
+    use all_is_cubes::util::yield_progress_for_testing;
     use futures_core::future::BoxFuture;
 
     #[allow(clippy::let_underscore_future)]
     fn _test_build_future_is_send() {
-        let _: BoxFuture<'_, _> = Box::pin(
-            UniverseTemplate::Atrium
-                .build::<std::time::Instant>(YieldProgress::noop(), TemplateParameters::default()),
-        );
+        let _: BoxFuture<'_, _> = Box::pin(UniverseTemplate::Atrium.build::<std::time::Instant>(
+            yield_progress_for_testing(),
+            TemplateParameters::default(),
+        ));
     }
 
     pub(super) async fn check_universe_template(template: UniverseTemplate) {
@@ -488,7 +489,7 @@ mod tests {
 
         let result = template
             .clone()
-            .build::<std::time::Instant>(YieldProgress::noop(), params)
+            .build::<std::time::Instant>(yield_progress_for_testing(), params)
             .await;
 
         if matches!(template, UniverseTemplate::Fail) {

@@ -10,7 +10,6 @@ use all_is_cubes::camera::{Flaws, StandardCameras};
 use all_is_cubes::listen::{self, ListenableSource};
 use all_is_cubes::raytracer::RtRenderer;
 use all_is_cubes::universe::Universe;
-use all_is_cubes::util::YieldProgress;
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
 use all_is_cubes_port::{ExportFormat, ExportSet};
 
@@ -212,7 +211,7 @@ impl Recorder {
                     runtime_handle
                         .block_on(all_is_cubes_port::export_to_path(
                             // TODO: hook up a progress bar
-                            YieldProgress::noop(),
+                            crate::glue::tokio_yield_progress().build(),
                             export_format,
                             export_set,
                             options.output_path.clone(),

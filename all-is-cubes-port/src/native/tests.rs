@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use all_is_cubes::block;
 use all_is_cubes::universe::{Name, URef};
-use all_is_cubes::util::YieldProgress;
+use all_is_cubes::util::yield_progress_for_testing;
 
 use crate::{export_to_path, load_universe_from_file, ExportSet};
 
@@ -14,9 +14,10 @@ async fn import_export_native_format() {
         env!("CARGO_MANIFEST_DIR"),
         "/src/native/tests/native-test.alliscubesjson"
     ));
-    let universe = load_universe_from_file(YieldProgress::noop(), Arc::new(import_path.clone()))
-        .await
-        .unwrap();
+    let universe =
+        load_universe_from_file(yield_progress_for_testing(), Arc::new(import_path.clone()))
+            .await
+            .unwrap();
 
     assert_eq!(
         universe.whence.document_name(),
@@ -32,7 +33,7 @@ async fn import_export_native_format() {
     let destination_dir = tempfile::tempdir().unwrap();
     let destination: PathBuf = destination_dir.path().join("foo.alliscubesjson");
     export_to_path(
-        YieldProgress::noop(),
+        yield_progress_for_testing(),
         crate::ExportFormat::AicJson,
         ExportSet::all_of_universe(&universe),
         destination.to_path_buf(),

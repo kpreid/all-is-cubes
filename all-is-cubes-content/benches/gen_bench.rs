@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use strum::IntoEnumIterator as _;
 
-use all_is_cubes::util::YieldProgress;
+use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 
 pub fn template_bench(c: &mut Criterion) {
@@ -26,7 +26,7 @@ pub fn template_bench(c: &mut Criterion) {
         group.bench_function(&format!("{template}"), |b| {
             b.to_async(FuturesExecutor).iter_with_large_drop(|| {
                 template.clone().build::<std::time::Instant>(
-                    YieldProgress::noop(),
+                    yield_progress_for_testing(),
                     TemplateParameters {
                         seed: Some(0),
                         size: None,

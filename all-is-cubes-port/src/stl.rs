@@ -121,6 +121,7 @@ mod tests {
     use all_is_cubes::content::make_some_voxel_blocks;
     use all_is_cubes::content::testing::lighting_bench_space;
     use all_is_cubes::universe::{Name, URef, Universe};
+    use all_is_cubes::util::yield_progress_for_testing;
     use std::collections::BTreeSet;
     use std::path::PathBuf;
 
@@ -150,7 +151,7 @@ mod tests {
         let destination: PathBuf = destination_dir.path().join("foo.stl");
 
         crate::export_to_path(
-            YieldProgress::noop(),
+            yield_progress_for_testing(),
             ExportFormat::Stl,
             ExportSet::from_block_defs(block_defs),
             destination,

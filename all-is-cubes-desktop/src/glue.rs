@@ -14,3 +14,7 @@ pub(crate) trait Window {
 impl Window for () {
     fn set_title(&self, _title: String) {}
 }
+
+pub(crate) fn tokio_yield_progress() -> yield_progress::Builder {
+    yield_progress::Builder::new().yield_using(|_| tokio::task::yield_now())
+}
