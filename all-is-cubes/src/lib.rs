@@ -173,6 +173,7 @@
 #[allow(unused_imports)] // false positive unused macro_use
 #[macro_use]
 extern crate alloc;
+#[cfg(any(feature = "std", test))]
 #[cfg_attr(test, macro_use)]
 extern crate std;
 

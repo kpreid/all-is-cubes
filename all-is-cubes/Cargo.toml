@@ -99,7 +99,7 @@ rayon = { workspace = true, optional = true }
 # rc feature needed because we are [de]serializing `Arc`s
 serde = { workspace = true, optional = true, features = ["derive", "rc"] }
 serde_repr = { version = "0.1.12", optional = true, default-features = false }
-yield-progress = { workspace = true, features = ["sync"] }
+yield-progress = { workspace = true }
 
 [build-dependencies]
 # for calculation in build script
