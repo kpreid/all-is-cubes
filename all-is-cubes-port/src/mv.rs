@@ -328,6 +328,7 @@ mod tests {
     use all_is_cubes::block::BlockDef;
     use all_is_cubes::raytracer::print_space;
     use all_is_cubes::universe::URef;
+    use all_is_cubes::util::yield_progress_for_testing;
     use either::Either;
 
     #[test]
@@ -364,7 +365,9 @@ mod tests {
 
     #[tokio::test]
     async fn invalid_file_error() {
-        let error = load_dot_vox(YieldProgress::noop(), &[]).await.unwrap_err();
+        let error = load_dot_vox(yield_progress_for_testing(), &[])
+            .await
+            .unwrap_err();
         assert!(
             matches!(
                 error,
@@ -379,12 +382,12 @@ mod tests {
     ) -> Result<Universe, Either<ExportError, DotVoxConversionError>> {
         // TODO: also roundtrip through bytes, for maximum rigor
         let data = export_to_dot_vox_data(
-            YieldProgress::noop(),
+            yield_progress_for_testing(),
             ExportSet::all_of_universe(export_universe),
         )
         .await
         .map_err(Either::Left)?;
-        dot_vox_data_to_universe(YieldProgress::noop(), &data)
+        dot_vox_data_to_universe(yield_progress_for_testing(), &data)
             .await
             .map_err(Either::Right)
     }
@@ -451,10 +454,12 @@ mod tests {
             Space::builder(GridAab::from_lower_size([0, 0, 0], [257, 1, 1])).build(),
         );
 
-        let error =
-            export_to_dot_vox_data(YieldProgress::noop(), ExportSet::from_spaces(vec![space]))
-                .await
-                .unwrap_err();
+        let error = export_to_dot_vox_data(
+            yield_progress_for_testing(),
+            ExportSet::from_spaces(vec![space]),
+        )
+        .await
+        .unwrap_err();
         assert!(matches!(error, ExportError::NotRepresentable { .. }));
     }
 
@@ -465,10 +470,12 @@ mod tests {
             .insert("x".into(), BlockDef::new(block::AIR))
             .unwrap();
 
-        let error =
-            export_to_dot_vox_data(YieldProgress::noop(), ExportSet::all_of_universe(&universe))
-                .await
-                .unwrap_err();
+        let error = export_to_dot_vox_data(
+            yield_progress_for_testing(),
+            ExportSet::all_of_universe(&universe),
+        )
+        .await
+        .unwrap_err();
         assert!(matches!(
             error,
             ExportError::NotRepresentable {

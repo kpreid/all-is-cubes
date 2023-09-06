@@ -22,7 +22,7 @@ use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{RefError, URef, Universe, UniverseTransaction};
-use all_is_cubes::util::YieldProgress;
+use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::{make_some_voxel_blocks, palette};
 
@@ -449,11 +449,11 @@ async fn icons(mut context: RenderTestContext) {
     };
 
     let universe = &mut Universe::new();
-    Icons::new(universe, YieldProgress::noop())
+    Icons::new(universe, yield_progress_for_testing())
         .await
         .install(universe)
         .unwrap();
-    let ui_blocks_p = UiBlocks::new(universe, YieldProgress::noop())
+    let ui_blocks_p = UiBlocks::new(universe, yield_progress_for_testing())
         .await
         .install(universe)
         .unwrap();

@@ -263,7 +263,7 @@ impl WebSession {
                                     SendWrapper::new(buffer.dyn_into().unwrap());
                                 // TODO: error reporting
                                 let universe = all_is_cubes_port::load_universe_from_file(
-                                    YieldProgress::noop(),
+                                    yield_progress::Builder::new().build(),
                                     Arc::new(NonDiskFile::from_name_and_data_source(
                                         found_file.name(),
                                         move || Ok(Uint8Array::new(&buffer).to_vec()),

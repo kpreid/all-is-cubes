@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::listen::{DirtyFlag, ListenableCell, Listener};
 use all_is_cubes::universe::UniverseStepInfo;
-use all_is_cubes::util::YieldProgress;
 
 use crate::record;
 use crate::Session;
@@ -133,7 +132,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         // Also a progress bar and other UI.
         self.session.set_universe_async(async move {
             let universe = all_is_cubes_port::load_universe_from_file(
-                YieldProgress::noop(),
+                crate::glue::tokio_yield_progress().build(),
                 Arc::new(path.clone()),
             )
             .await

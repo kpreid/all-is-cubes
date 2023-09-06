@@ -8,7 +8,15 @@ use std::time::Duration;
 
 use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
 
-pub use yield_progress::YieldProgress;
+#[doc(no_inline)]
+pub use yield_progress::{Builder as YieldProgressBuilder, YieldProgress};
+
+#[doc(hidden)]
+pub fn yield_progress_for_testing() -> YieldProgress {
+    // Theoretically we should use Tokio's yield function, but it shouldn't matter for
+    // tests and I don't want the dependency here.
+    yield_progress::Builder::new().build()
+}
 
 /// Generic extension to [`std::fmt`'s set of formatting traits](std::fmt#formatting-traits).
 ///

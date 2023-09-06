@@ -527,12 +527,13 @@ fn square_radius(resolution: Resolution, cube: Cube) -> [GridCoordinate; 2] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::content::make_some_blocks;
+    use crate::make_some_blocks;
+    use all_is_cubes::util::yield_progress_for_testing;
 
     #[tokio::test]
     pub async fn install_demo_blocks_test() {
         let mut universe = Universe::new();
-        install_demo_blocks(&mut universe, YieldProgress::noop())
+        install_demo_blocks(&mut universe, yield_progress_for_testing())
             .await
             .unwrap();
         // TODO: assert what entries were created, once Universe has iteration

@@ -269,9 +269,10 @@ impl Icons {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::yield_progress_for_testing;
 
     #[tokio::test]
     async fn icons_smoke_test() {
-        Icons::new(&mut Universe::new(), YieldProgress::noop()).await;
+        Icons::new(&mut Universe::new(), yield_progress_for_testing()).await;
     }
 }

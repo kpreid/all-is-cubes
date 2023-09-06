@@ -9,7 +9,7 @@ use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Name, URef, Universe};
-use all_is_cubes::util::YieldProgress;
+use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_mesh::{block_meshes_for_space, MeshOptions, SpaceMesh};
 
 use crate::{ExportError, ExportFormat, ExportSet};
@@ -92,7 +92,7 @@ async fn export_block_defs() {
     let destination: PathBuf = destination_dir.path().join("export_block_defs.gltf");
 
     crate::export_to_path(
-        YieldProgress::noop(),
+        yield_progress_for_testing(),
         ExportFormat::Gltf,
         ExportSet::from_block_defs(block_defs),
         PathBuf::from(&destination),
@@ -116,7 +116,7 @@ async fn export_space_not_supported() {
     let destination: PathBuf = destination_dir.path().join("foo.gltf");
 
     let error = crate::export_to_path(
-        YieldProgress::noop(),
+        yield_progress_for_testing(),
         ExportFormat::Gltf,
         ExportSet::all_of_universe(&universe),
         destination,

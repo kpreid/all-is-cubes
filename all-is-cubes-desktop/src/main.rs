@@ -48,7 +48,6 @@ use all_is_cubes::cgmath::{Vector2, Zero as _};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
 use all_is_cubes::universe::Universe;
-use all_is_cubes::util::YieldProgress;
 use all_is_cubes_content::TemplateParameters;
 
 mod aic_winit;
@@ -366,13 +365,12 @@ async fn create_universe(
     universe_progress_bar.set_position(0);
     let yield_progress = {
         let universe_progress_bar = universe_progress_bar.clone();
-        YieldProgress::new(
-            || std::future::ready(()),
-            move |fraction, label| {
-                universe_progress_bar.set_position((fraction * 100.0) as u64);
-                universe_progress_bar.set_message(String::from(label));
-            },
-        )
+        glue::tokio_yield_progress()
+            .progress_using(move |info| {
+                universe_progress_bar.set_position((info.fraction() * 100.0) as u64);
+                universe_progress_bar.set_message(String::from(info.label_str()));
+            })
+            .build()
     };
     let universe = match input_source.clone() {
         UniverseSource::Template(template, TemplateParameters { seed, size }) => {

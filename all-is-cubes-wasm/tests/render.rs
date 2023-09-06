@@ -9,7 +9,7 @@ use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
 // use web_sys::{Element, HtmlCanvasElement};
 
 use all_is_cubes::camera::{GraphicsOptions, HeadlessRenderer as _, StandardCameras, Viewport};
-use all_is_cubes::util::YieldProgress;
+use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{palette, TemplateParameters, UniverseTemplate};
 use all_is_cubes_gpu::in_wgpu::init;
 
@@ -25,7 +25,7 @@ async fn renderer_test() {
 
     let universe = UniverseTemplate::LightingBench
         .build::<all_is_cubes_wasm::AdaptedInstant>(
-            YieldProgress::noop(),
+            yield_progress_for_testing(),
             TemplateParameters::default(),
         )
         .await
