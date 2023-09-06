@@ -49,6 +49,7 @@ harness = false
 [features]
 default = []
 # Adds `impl arbitrary::Arbitrary for ...`
+# Note: Not using euclid/arbitrary because it's broken
 arbitrary = ["dep:arbitrary", "ordered-float/arbitrary"]
 # Adds serde implementations.
 save = [
@@ -69,6 +70,9 @@ bitflags = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 cgmath = "0.18.0"
 downcast-rs = { version = "1.2.0", default-features = false }
+# mint feature to guarantee that our callers can use mint types
+# libm feature to guarantee compilability and compatibility with no_std
+euclid = { version = "0.22.9", default-features = false, features = ["libm", "mint"] }
 embedded-graphics = "0.8.0"
 exhaust = { workspace = true, default-features = false }
 flate2 = { version = "1.0.26", optional = true }
@@ -93,6 +97,7 @@ yield-progress = { workspace = true, features = ["sync"] }
 [build-dependencies]
 # for calculation in build script
 cgmath = "0.18.0"
+euclid = { version = "0.22.9", default-features = false, features = ["libm", "mint"] }
 
 [dev-dependencies]
 criterion = { workspace = true }
