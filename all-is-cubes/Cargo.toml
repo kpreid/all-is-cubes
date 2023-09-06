@@ -88,7 +88,7 @@ rayon = { workspace = true, optional = true }
 serde = { workspace = true, optional = true, features = ["derive", "rc"] }
 serde_repr = { version = "0.1.12", optional = true, default-features = false }
 thiserror = { workspace = true }
-yield-progress = { version = "0.1.0" }
+yield-progress = { workspace = true, features = ["sync"] }
 
 [build-dependencies]
 # for calculation in build script

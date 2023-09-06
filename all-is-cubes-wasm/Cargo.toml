@@ -46,6 +46,8 @@ send_wrapper = "0.6.0"
 wasm-bindgen = "0.2.87"
 wasm-bindgen-futures = { workspace = true }
 wgpu = { workspace = true, features = ["webgl"] }
+# Enable the log-hiccups feature
+yield-progress = { workspace = true, features = ["log_hiccups"] }
 
 [dependencies.web-sys]
 version = "0.3.64"
