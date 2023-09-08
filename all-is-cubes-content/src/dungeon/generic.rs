@@ -65,7 +65,7 @@ impl DungeonGrid {
                 face,
                 GridCoordinate::from(self.room_wall_thickness[face])
                     + GridCoordinate::from(self.room_wall_thickness[face.opposite()])
-                    + GridCoordinate::from(self.gap_between_walls[face.axis_number()]),
+                    + GridCoordinate::from(self.gap_between_walls[face.axis()]),
             )
             .unwrap()
     }

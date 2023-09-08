@@ -1,12 +1,16 @@
 //! Axis-aligned unit vectors: the [`Face6`] and [`Face7`] types.
 //! This module is private but reexported by its parent.
 
-use std::ops::{Index, IndexMut};
+use core::fmt;
+use core::ops::{Index, IndexMut};
 
 use cgmath::{BaseNum, Vector3};
 pub use ordered_float::{FloatIsNan, NotNan};
 
-use crate::math::*;
+use crate::math::{
+    Axis, ConciseDebug, Cube, CustomFormat, FreeCoordinate, Geometry, GridCoordinate, GridPoint,
+    GridRotation, GridVector, Gridgid, LineVertex, Point3, Zero,
+};
 
 /// Identifies a face of a cube or an orthogonal unit vector.
 ///
@@ -90,17 +94,14 @@ impl Face6 {
         }
     }
 
-    /// Returns which axis this face's normal vector is parallel to, with the numbering
-    /// X = 0, Y = 1, Z = 2, which matches the indexes used by most arrays.
-    ///
-    /// The numeric type is [`usize`] for convenient use in array indexing.
+    /// Returns which axis this face's normal vector is parallel to.
     #[inline]
     #[must_use]
-    pub const fn axis_number(self) -> usize {
+    pub const fn axis(self) -> Axis {
         match self {
-            Self::NX | Self::PX => 0,
-            Self::NY | Self::PY => 1,
-            Self::NZ | Self::PZ => 2,
+            Self::NX | Self::PX => Axis::X,
+            Self::NY | Self::PY => Axis::Y,
+            Self::NZ | Self::PZ => Axis::Z,
         }
     }
 
@@ -277,18 +278,16 @@ impl Face7 {
         }
     }
 
-    /// Returns which axis this face's normal vector is parallel to, with the numbering
-    /// X = 0, Y = 1, Z = 2, or [`None`] if the face is [`Face7::Within`].
-    ///
-    /// The numeric type is [`usize`] for convenient use in array indexing.
+    /// Returns which axis this face's normal vector is parallel to,
+    /// or [`None`] if the face is [`Face7::Within`].
     #[inline]
     #[must_use]
-    pub const fn axis_number(self) -> Option<usize> {
+    pub const fn axis(self) -> Option<Axis> {
         match self {
             Face7::Within => None,
-            Face7::NX | Face7::PX => Some(0),
-            Face7::NY | Face7::PY => Some(1),
-            Face7::NZ | Face7::PZ => Some(2),
+            Face7::NX | Face7::PX => Some(Axis::X),
+            Face7::NY | Face7::PY => Some(Axis::Y),
+            Face7::NZ | Face7::PZ => Some(Axis::Z),
         }
     }
 

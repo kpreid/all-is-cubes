@@ -8,7 +8,8 @@
 use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
 
 use crate::math::{
-    Cube, CubeFace, Face7, FreeCoordinate, Geometry, GridAab, GridCoordinate, GridPoint, LineVertex,
+    Axis, Cube, CubeFace, Face7, FreeCoordinate, Geometry, GridAab, GridCoordinate, GridPoint,
+    LineVertex,
 };
 
 /// A ray; a half-infinite line segment (sometimes used as finite by the length of the
@@ -321,7 +322,7 @@ impl Raycaster {
 
         // Save t position before we update it.
         // We could back-compute this instead as
-        //     let axis = self.last_face.axis_number().unwrap();
+        //     let axis = self.last_face.axis().unwrap();
         //     self.t_max[axis] - self.t_delta[axis]
         // but that seems an excessive computation to save a field.
         self.last_t_distance = self.t_max[axis];
@@ -365,7 +366,7 @@ impl Raycaster {
             Some(bound_v) => {
                 let mut oob_enter = false;
                 let mut oob_exit = false;
-                for axis in 0..3 {
+                for axis in Axis::ALL {
                     let oob_low = self.cube[axis] < bound_v[axis].start;
                     let oob_high = self.cube[axis] >= bound_v[axis].end;
                     if self.step[axis] == 0 {
@@ -400,7 +401,7 @@ impl Raycaster {
         // intersect with. (Strictly speaking, this could be combined with the next
         // loop, but it seems more elegant to have a well-defined point.)
         let mut plane_origin = bounds.lower_bounds();
-        for axis in 0..3 {
+        for axis in Axis::ALL {
             if self.step[axis] < 0 {
                 // Iff the ray is going negatively, then we must use the upper bound
                 // for the plane origin in this axis. Otherwise, either it doesn't
@@ -411,7 +412,7 @@ impl Raycaster {
 
         // Perform intersections.
         let mut max_t: FreeCoordinate = 0.0;
-        for axis in 0..3 {
+        for axis in Axis::ALL {
             let mut plane_normal = Vector3::zero();
             let direction = self.step[axis];
             if direction == 0 {
@@ -596,13 +597,13 @@ impl RaycastStep {
     /// assert_eq!(next(), Point3::new(2.0, 0.5, 0.5));
     /// ```
     pub fn intersection_point(&self, ray: Ray) -> Point3<FreeCoordinate> {
-        let current_face_axis = self.cube_face.face.axis_number();
+        let current_face_axis = self.cube_face.face.axis();
         if current_face_axis.is_none() {
             ray.origin
         } else {
             let mut intersection_point =
                 self.cube_face.cube.lower_bounds().map(FreeCoordinate::from);
-            for axis in 0..3 {
+            for axis in Axis::ALL {
                 let step_direction = signum_101(ray.direction[axis]);
                 if Some(axis) == current_face_axis {
                     // This is the plane we just hit.
@@ -1156,7 +1157,7 @@ mod tests {
                     let point = step.intersection_point(ray);
                     let mut surfaces = 0;
                     let mut interiors = 0;
-                    for axis in 0..3 {
+                    for axis in Axis::ALL {
                         if point[axis] == 0.0 || point[axis] == 1.0 {
                             surfaces += 1;
                         } else if point[axis] > 0.0 && point[axis] < 1.0 {

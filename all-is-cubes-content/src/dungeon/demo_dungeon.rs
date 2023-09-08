@@ -14,8 +14,8 @@ use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, GridVector,
-    Rgb, Rgba,
+    Axis, Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation,
+    GridVector, Rgb, Rgba,
 };
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::time;
@@ -117,7 +117,7 @@ impl DemoTheme {
         face: Face6,
         has_gate: bool,
     ) -> Result<(), InGenError> {
-        let passage_axis = face.axis_number();
+        let passage_axis = face.axis();
 
         let mut room_1_box = self.actual_room_box(
             room_position,
@@ -136,8 +136,8 @@ impl DemoTheme {
         }
 
         let wall_parallel = GridRotation::CLOCKWISE.transform(face);
-        let parallel_axis = wall_parallel.axis_number();
-        assert!(parallel_axis != 1);
+        let parallel_axis = wall_parallel.axis();
+        assert!(parallel_axis != Axis::Y);
 
         let rotate_nz_to_face = GridRotation::from_to(Face6::NZ, face, Face6::PY).unwrap();
 
@@ -173,9 +173,10 @@ impl DemoTheme {
 
         // Gate
         if has_gate {
-            let gate_box = doorway_box.abut(face, -1).unwrap().translate(
-                face.opposite().normal_vector() * doorway_box.size()[face.axis_number()] / 2,
-            );
+            let gate_box = doorway_box
+                .abut(face, -1)
+                .unwrap()
+                .translate(face.opposite().normal_vector() * doorway_box.size()[face.axis()] / 2);
             let gate_side_1 = gate_box.abut(wall_parallel.opposite(), -1).unwrap();
             let gate_side_2 = gate_box.abut(wall_parallel, -1).unwrap();
             space.fill_uniform(

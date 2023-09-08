@@ -179,19 +179,14 @@ pub fn make_slab(
 /// ```
 pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
     for face in Face6::ALL {
-        let axis = face.axis_number();
-        let axis_color = [
-            palette::UNIFORM_LUMINANCE_RED,
-            palette::UNIFORM_LUMINANCE_GREEN,
-            palette::UNIFORM_LUMINANCE_BLUE,
-        ][axis];
+        let axis = face.axis();
         let direction = face.normal_vector::<GridCoordinate>()[axis];
         let raycaster = Raycaster::new([0.5, 0.5, 0.5], face.normal_vector::<FreeCoordinate>())
             .within(space.bounds());
         for step in raycaster {
             let i = step.cube_ahead().lower_bounds()[axis] * direction; // always positive
             let (color, display_name): (Rgb, Cow<'static, str>) = if i.rem_euclid(2) == 0 {
-                (axis_color, i.rem_euclid(10).to_string().into())
+                (axis.color(), i.rem_euclid(10).to_string().into())
             } else {
                 if direction > 0 {
                     (rgb_const!(1.0, 1.0, 1.0), ["X", "Y", "Z"][axis].into())
@@ -204,7 +199,7 @@ pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
                 Block::builder()
                     .display_name(display_name)
                     .color(color.with_alpha_one())
-                    .light_emission(axis_color * 3.0)
+                    .light_emission(axis.color() * 3.0)
                     .build(),
             )?;
         }

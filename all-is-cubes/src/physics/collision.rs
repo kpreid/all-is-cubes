@@ -729,7 +729,7 @@ mod tests {
             let step = aab_raycast(moving_aab, ray, false)
                 .nth(rng.gen_range(1..10))
                 .unwrap();
-            let axis = step.face().axis_number().expect("should have an axis");
+            let axis = step.face().axis().expect("should have an axis");
             let segment = ray.scale_direction(step.t_distance()); // TODO: this should be a function? Should aab_raycast return a special step type with these features?
             let unnudged_aab = moving_aab.translate(segment.unit_endpoint().to_vec());
             let face_to_nudge: Face6 = Face6::try_from(step.face().opposite()).unwrap();

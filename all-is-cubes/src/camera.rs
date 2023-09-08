@@ -9,7 +9,7 @@ use itertools::Itertools as _;
 use ordered_float::NotNan;
 
 use crate::chunking::OctantMask;
-use crate::math::{Aab, FreeCoordinate, GridAab, Rgba};
+use crate::math::{Aab, Axis, FreeCoordinate, GridAab, Rgba};
 use crate::raycast::Ray;
 
 mod flaws;
@@ -503,7 +503,7 @@ pub fn eye_for_look_at(
     direction: Vector3<FreeCoordinate>,
 ) -> Point3<FreeCoordinate> {
     let mut space_radius: FreeCoordinate = 0.0;
-    for axis in 0..3 {
+    for axis in Axis::ALL {
         space_radius = space_radius.max(bounds.size()[axis].into());
     }
     bounds.center() + direction.normalize() * space_radius // TODO: allow for camera FoV

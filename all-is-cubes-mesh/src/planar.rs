@@ -6,7 +6,7 @@ use all_is_cubes::block::Resolution;
 use all_is_cubes::cgmath::{
     ElementWise as _, EuclideanSpace as _, Matrix4, Point2, Point3, Transform as _, Vector2,
 };
-use all_is_cubes::math::{Face6, FreeCoordinate, GridCoordinate, Rgba};
+use all_is_cubes::math::{Axis, Face6, FreeCoordinate, GridCoordinate, Rgba};
 
 use crate::texture::{self, TextureCoordinate};
 use crate::{BlockVertex, Coloring, IndexVec};
@@ -198,7 +198,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
             });
 
             // Ensure the transformed clamp range is not inverted.
-            for axis in 0..3 {
+            for axis in Axis::ALL {
                 all_is_cubes::math::sort_two(&mut clamp_min[axis], &mut clamp_max[axis]);
             }
 

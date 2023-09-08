@@ -4,7 +4,7 @@ use std::iter::FusedIterator;
 
 use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero as _};
 
-use crate::math::{Face6, FreeCoordinate, Geometry, GridAab, GridCoordinate, LineVertex};
+use crate::math::{Axis, Face6, FreeCoordinate, Geometry, GridAab, GridCoordinate, LineVertex};
 
 /// Axis-Aligned Box data type.
 ///
@@ -175,7 +175,9 @@ impl Aab {
     ///
     /// TODO: example + tests
     pub fn contains(&self, point: Point3<FreeCoordinate>) -> bool {
-        for axis in 0..3 {
+        // I tried changing this to an Iterator::all() and the asm was longer.
+        // I tried changing this to be completely unrolled and it was more or less the same.
+        for axis in Axis::ALL {
             if !(self.lower_bounds[axis] <= point[axis] && point[axis] <= self.upper_bounds[axis]) {
                 return false;
             }
@@ -187,7 +189,7 @@ impl Aab {
     ///
     /// TODO: example + tests
     pub fn intersects(&self, other: Aab) -> bool {
-        for axis in 0..3 {
+        for axis in Axis::ALL {
             let intersection_min = self.lower_bounds[axis].max(other.lower_bounds[axis]);
             let intersection_max = self.upper_bounds[axis].min(other.upper_bounds[axis]);
             match intersection_min.partial_cmp(&intersection_max) {
@@ -252,7 +254,7 @@ impl Aab {
         direction: Vector3<FreeCoordinate>,
     ) -> Vector3<FreeCoordinate> {
         let mut leading_corner = Vector3::zero();
-        for axis in 0..3 {
+        for axis in Axis::ALL {
             if direction[axis] >= 0.0 {
                 leading_corner[axis] = self.upper_bounds[axis];
             } else {
@@ -482,7 +484,7 @@ mod tests {
         {
             let leading_corner = aab.leading_corner(direction);
 
-            for axis in 0..3 {
+            for axis in Axis::ALL {
                 // Note that this condition is not true in general, but only if the AAB
                 // contains the origin.
                 assert_eq!(leading_corner[axis].signum(), direction[axis].signum());

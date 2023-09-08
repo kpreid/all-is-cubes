@@ -9,8 +9,8 @@ use cgmath::{EuclideanSpace as _, Point3, Vector3};
 
 use crate::block::Resolution;
 use crate::math::{
-    sort_two, Aab, Cube, Face6, FaceMap, FreeCoordinate, GridCoordinate, GridPoint, GridVector,
-    Gridgid,
+    sort_two, Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, GridCoordinate, GridPoint,
+    GridVector, Gridgid,
 };
 
 /// An axis-aligned box with integer coordinates, whose volume is no larger than [`usize::MAX`].
@@ -89,15 +89,15 @@ impl GridAab {
 
         // TODO: Test these error cases.
         // TODO: Replace string error construction with an error enum.
-        for i in 0..3 {
-            if sizes[i] < 0 {
+        for axis in Axis::ALL {
+            if sizes[axis] < 0 {
                 return Err(GridOverflowError(format!(
-                    "sizes[{}] must be ≥ 0, not {}",
-                    i, sizes[i]
+                    "sizes.{axis:x} must be ≥ 0, not {sa}",
+                    sa = sizes[axis]
                 )));
             }
-            lower_bounds[i].checked_add(sizes[i]).ok_or_else(|| {
-                GridOverflowError(format!("lower_bounds[{i}] too large for sizes"))
+            lower_bounds[axis].checked_add(sizes[axis]).ok_or_else(|| {
+                GridOverflowError(format!("lower_bounds.{axis:x} too large for sizes"))
             })?;
         }
         Self::checked_volume_helper(sizes)
@@ -209,7 +209,7 @@ impl GridAab {
     /// of the `?` operator without which this is even worse.
     fn checked_volume_helper(sizes: GridVector) -> Result<usize, ()> {
         let mut volume: usize = 1;
-        for i in 0..3 {
+        for i in Axis::ALL {
             volume = volume
                 .checked_mul(usize::try_from(sizes[i]).map_err(|_| ())?)
                 .ok_or(())?;
@@ -336,26 +336,24 @@ impl GridAab {
     /// The range of X coordinates for unit cubes within the box.
     #[inline]
     pub fn x_range(&self) -> Range<GridCoordinate> {
-        self.axis_range(0)
+        self.axis_range(Axis::X)
     }
 
     /// The range of Y coordinates for unit cubes within the box.
     #[inline]
     pub fn y_range(&self) -> Range<GridCoordinate> {
-        self.axis_range(1)
+        self.axis_range(Axis::Y)
     }
 
     /// The range of Z coordinates for unit cubes within the box.
     #[inline]
     pub fn z_range(&self) -> Range<GridCoordinate> {
-        self.axis_range(2)
+        self.axis_range(Axis::Z)
     }
 
     /// The range of coordinates for cubes within the box along the given axis.
-    ///
-    /// Panics if `axis >= 3`.
     #[inline]
-    pub fn axis_range(&self, axis: usize) -> Range<GridCoordinate> {
+    pub fn axis_range(&self, axis: Axis) -> Range<GridCoordinate> {
         (self.lower_bounds()[axis])..(self.upper_bounds()[axis])
     }
 
@@ -424,7 +422,7 @@ impl GridAab {
     pub fn contains_box(&self, other: GridAab) -> bool {
         let self_upper = self.upper_bounds();
         let other_upper = other.upper_bounds();
-        for axis in 0..3 {
+        for axis in Axis::ALL {
             if other.lower_bounds[axis] < self.lower_bounds[axis]
                 || other_upper[axis] > self_upper[axis]
             {
@@ -459,7 +457,7 @@ impl GridAab {
         let upper = self
             .upper_bounds()
             .zip(other.upper_bounds(), GridCoordinate::min);
-        for axis in 0..3 {
+        for axis in Axis::ALL {
             if upper[axis] <= lower[axis] {
                 return None;
             }
@@ -563,7 +561,7 @@ impl GridAab {
         let mut p2 = transform.transform_point(self.upper_bounds());
 
         // Swap coordinates in case of rotation or reflection.
-        for axis in 0..3 {
+        for axis in Axis::ALL {
             sort_two(&mut p1[axis], &mut p2[axis]);
         }
         Some(Self::from_lower_upper(p1, p2))
@@ -707,7 +705,7 @@ impl GridAab {
     /// ```
     #[inline]
     pub fn abut(self, face: Face6, thickness: GridCoordinate) -> Result<Self, GridOverflowError> {
-        let axis = face.axis_number();
+        let axis = face.axis();
 
         let mut size = self.size();
         size[axis] = thickness.max(-size[axis]).abs();

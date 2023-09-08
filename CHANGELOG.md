@@ -5,6 +5,8 @@
 ### Added
 
 - `all-is-cubes` library:
+    - `math::Axis` is an enum of coordinate axes.
+
     - `math::Cube` represents a unit cube on the grid; it replaces many previous uses of `GridPoint` to identify cubes.
 
     - `math::Gridgid` represents rigid transformations, a useful subset of what `GridMatrix` already could do.
@@ -22,6 +24,9 @@
         - `EvaluatedBlock`’s `color` field is computed more accurately, ignoring voxels hidden by other voxels.
 
     - All functions manipulating volume data in `Space`, `GridArray`, `Evoxels`, etc. have changed signature to use the new type `math::Cube` instead of `math::GridPoint`.
+
+    - All functions using `usize` to identify a coordinate axis now use `math::Axis` instead.
+      `Face6::axis_number()` and `Face7::axis_number()` are now called `axis()`.
 
     - The following functions have changed signature to use the new type `math::Gridgid`:
         - `math::GridAab::transform()`

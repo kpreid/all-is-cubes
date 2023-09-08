@@ -346,7 +346,7 @@ impl GridRotation {
     pub fn transform(self, face: Face6) -> Face6 {
         // TODO: there ought to be a much cleaner way to express this
         // ... and it should be a const fn, too
-        let p = self.to_basis()[face.axis_number()];
+        let p = self.to_basis()[face.axis()];
         if face.is_negative() {
             p.opposite()
         } else {
@@ -591,8 +591,8 @@ mod tests {
                         }
                         None => {
                             assert!(
-                                up_face.axis_number() == from_face.axis_number()
-                                    || up_face.axis_number() == to_face.axis_number(),
+                                up_face.axis() == from_face.axis()
+                                    || up_face.axis() == to_face.axis(),
                                 "returned None incorrectly: {info:?}"
                             );
                         }

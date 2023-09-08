@@ -11,7 +11,7 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint,
+    Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint,
     GridRotation, GridVector, Gridgid, Rgb, Rgba,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
@@ -333,7 +333,7 @@ fn arch_row(
     for i in 0..section_count {
         let column_base = first_column_base + offset * (i + 1);
 
-        let banner_color = if parallel.axis_number() == 2 {
+        let banner_color = if parallel.axis() == Axis::Y {
             match i.rem_euclid(3) {
                 0 => Some(BannerColor::Red),
                 1 => Some(BannerColor::Green),

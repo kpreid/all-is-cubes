@@ -208,6 +208,7 @@ pub(crate) fn make_tree(
 use graph::Growph;
 mod graph {
     use super::*;
+    use all_is_cubes::math::Axis;
 
     /// A graph of connections between adjacent blocks of a tree we're going to grow.
     ///
@@ -234,11 +235,11 @@ mod graph {
                 // TODO: could, theoretically, numeric overflow
                 self.data
                     .get(cube + neighbor_face.normal_vector())
-                    .map(|cell| cell.pos_neighbors[neighbor_face.axis_number()])
+                    .map(|cell| cell.pos_neighbors[neighbor_face.axis()])
             } else {
                 self.data
                     .get(cube)
-                    .map(|cell| cell.pos_neighbors[neighbor_face.axis_number()])
+                    .map(|cell| cell.pos_neighbors[neighbor_face.axis()])
             }
         }
 
@@ -252,12 +253,12 @@ mod graph {
                 // TODO: could, theoretically, numeric overflow
                 self.data
                     .get_mut(cube + neighbor_face.normal_vector())
-                    .map(|cell| &mut cell.pos_neighbors[neighbor_face.axis_number()])
+                    .map(|cell| &mut cell.pos_neighbors[neighbor_face.axis()])
             } else {
                 // TODO: reject attempts to modify the extraneous edges exiting the upper bounds
                 self.data
                     .get_mut(cube)
-                    .map(|cell| &mut cell.pos_neighbors[neighbor_face.axis_number()])
+                    .map(|cell| &mut cell.pos_neighbors[neighbor_face.axis()])
             }
         }
 
@@ -310,7 +311,7 @@ mod graph {
 
     impl petgraph::visit::GraphBase for Growph {
         type NodeId = Cube;
-        type EdgeId = (Cube, usize); // TODO: this is evidence for wanting an axis-ID enum
+        type EdgeId = (Cube, Axis);
     }
     impl petgraph::visit::Data for Growph {
         type NodeWeight = Option<TreeGrowth>;
@@ -376,7 +377,7 @@ mod graph {
     }
     impl petgraph::visit::EdgeRef for GrowphEdgeRef {
         type NodeId = Cube;
-        type EdgeId = (Cube, usize);
+        type EdgeId = (Cube, Axis);
         type Weight = Option<TreeGrowth>;
 
         fn source(&self) -> Self::NodeId {
@@ -397,7 +398,7 @@ mod graph {
                 } else {
                     self.source()
                 },
-                self.face.axis_number(),
+                self.face.axis(),
             )
         }
     }

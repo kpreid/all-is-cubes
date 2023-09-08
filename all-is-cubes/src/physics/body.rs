@@ -253,7 +253,7 @@ impl Body {
             let axis = collision
                 .contact
                 .normal()
-                .axis_number()
+                .axis()
                 .expect("Face7::Within collisions should not reach here");
             // Advance however much straight-line distance is available.
             // But a little bit back from that, to avoid floating point error pushing us

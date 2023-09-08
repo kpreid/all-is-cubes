@@ -2,7 +2,9 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use all_is_cubes::cgmath::{Vector3, Zero as _};
-use all_is_cubes::math::{Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::math::{
+    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector,
+};
 use all_is_cubes::space::{Space, SpaceBuilder, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _, Transaction as _};
 
@@ -92,7 +94,7 @@ impl LayoutGrant {
         );
 
         if enlarge_for_symmetry {
-            for axis in 0..3 {
+            for axis in Axis::ALL {
                 if self.gravity[axis] == Align::Center
                     && self.bounds.size()[axis].rem_euclid(2) != sizes[axis].rem_euclid(2)
                 {
@@ -105,7 +107,7 @@ impl LayoutGrant {
         let sizes = sizes.zip(self.bounds.size(), GridCoordinate::min);
 
         let mut origin = GridPoint::new(0, 0, 0);
-        for axis in 0..3 {
+        for axis in Axis::ALL {
             let l = self.bounds.lower_bounds()[axis];
             let h = self.bounds.upper_bounds()[axis] - sizes[axis];
             origin[axis] = match self.gravity[axis] {
@@ -309,7 +311,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 let mut bounds = grant.bounds;
                 for child in children {
                     let requirements = child.requirements();
-                    let axis = direction.axis_number();
+                    let axis = direction.axis();
                     let size_on_axis = requirements.minimum[axis];
                     let available_size = bounds.size()[axis];
                     if size_on_axis > available_size {
@@ -445,10 +447,10 @@ impl<W: Layoutable> Layoutable for LayoutTree<W> {
                 ref children,
             } => {
                 let mut accumulator = GridVector::zero();
-                let stack_axis = direction.axis_number();
+                let stack_axis = direction.axis();
                 for child in children {
                     let child_req = child.requirements();
-                    for axis in 0..3 {
+                    for axis in Axis::ALL {
                         if axis == stack_axis {
                             accumulator[axis] += child_req.minimum[axis];
                         } else {

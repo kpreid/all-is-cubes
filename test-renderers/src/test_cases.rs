@@ -947,7 +947,7 @@ async fn fog_test_universe() -> Arc<Universe> {
         .color(rgba_const!(1.0, 0.05, 0.05, 1.0))
         .light_emission(rgb_const!(40.0, 0.05, 0.05))
         .build();
-    for z in bounds.axis_range(2).step_by(2) {
+    for z in bounds.z_range().step_by(2) {
         let x = (z * 19i32).rem_euclid(bounds.size().x) + bounds.lower_bounds().x;
 
         space
