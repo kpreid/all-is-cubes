@@ -526,7 +526,7 @@ impl Evoxels {
     pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &'_ mut Evoxel> {
         match self {
             Evoxels::One(v) => core::slice::from_mut(v).iter_mut(),
-            Evoxels::Many(_, voxels) => voxels.elements_mut().iter_mut(),
+            Evoxels::Many(_, voxels) => voxels.as_linear_mut().iter_mut(),
         }
     }
 

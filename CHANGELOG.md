@@ -36,6 +36,8 @@
         - `space::Space::draw_target()`
         - `space::SpaceTransaction::draw_target()`
 
+    - `math::GridArray` is now `math::Vol` and allows choice of the data container type.
+
     - `camera::HeadlessRenderer` now returns a custom image container type `Rendering` instead of using `image::RgbaImage`.
       (This way, no dependency on `image` is needed.)
 

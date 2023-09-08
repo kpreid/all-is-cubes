@@ -1,32 +1,70 @@
 use alloc::boxed::Box;
 use core::fmt;
+use core::ops::{Deref, DerefMut};
 
-use crate::math::{Cube, GridAab, GridCoordinate, GridVector};
+#[cfg(doc)]
+use alloc::vec::Vec;
+
+use crate::math::{Cube, GridAab, GridCoordinate, GridIter, GridVector};
+
+// #[derive(Clone, Copy, Debug)]
+// pub struct XMaj;
+
+/// Z-major ordering: linearly adjacent elements have adjacent Z coordinates.
+///
+/// `[0, 0, 0], [0, 0, 1], [0, 0, 2], ..., [0, 1, 0], [0, 1, 1], ...`
+///
+/// Use this type with [`Vol`] to store volume data in this order.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
+pub struct ZMaj;
 
 /// A 3-dimensional array with arbitrary element type instead of [`Space`](crate::space::Space)'s
 /// fixed types.
+// ---
+// TOOD: deprecate/replace this
+pub type GridArray<V> = Vol<Box<[V]>, ZMaj>;
+
+/// Type for volume data stored in a slice, or for generating linear indexing.
 ///
-/// TODO: Should we rebuild Space on top of this?
+/// * `C` is some slice container type, e.g. `&[T]` or `Box<[T]>`.
+///   It may also be `()` to describe a linearization without actually storing data.
+/// * `O` specifies the choice of linearization.
+///   Currently, only one choice exists, [`ZMaj`].
+///
+/// In addition to the data, each [`Vol`] stores the [`GridAab`] defining its size;
+/// the container's length must be equal to the volume of that AAB. Whether that can be
+/// relied upon entirely depends on whether the specific container value produces
+/// the same length of slice every time it is [`Deref`]erenced without mutating it directly.
+/// For example, `Vec<T>` and `Box<[T]>` satisfy this criterion; the fact that [`Vec`] has
+/// length-mutating operations is irrelevant because no `&mut Vec<T>` is exposed.
+///
+/// A [`Vol`] whose volume exceeds [`usize::MAX`] cannot exist.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)] // TODO: nondefault Debug
-pub struct GridArray<V> {
+pub struct Vol<C, O = ZMaj> {
+    /// Invariant: `bounds` has a volume that is at most [`usize::MAX`].
     bounds: GridAab,
-    contents: Box<[V]>,
+    ordering: O,
+    /// Invariant: `contents.deref().len()`, if it exists, equals `bounds.volume()`.
+    contents: C,
 }
 
-impl<V> GridArray<V> {
-    /// Constructs a [`GridArray`] by using the provided function to compute a value
+/// Constructors from elements.
+impl<V, O: Default> Vol<Box<[V]>, O> {
+    /// Constructs a `Vol<Box<[V]>>` by using the provided function to compute a value
     /// for each point.
     pub fn from_fn<F>(bounds: GridAab, f: F) -> Self
     where
         F: FnMut(Cube) -> V,
     {
-        GridArray {
+        Vol {
             bounds,
+            ordering: O::default(),
             contents: bounds.interior_iter().map(f).collect(),
         }
     }
 
-    /// Constructs a [`GridArray`] by cloning the provided value for each point.
+    /// Constructs a `Vol<Box<[V]>>` by cloning the provided value for each point.
     ///
     /// TODO: This feels like it should be called 'filled' or 'cloned', but if so,
     /// maybe [`FaceMap::repeat`](crate::math::FaceMap::repeat) should also change?
@@ -37,45 +75,46 @@ impl<V> GridArray<V> {
         Self::from_fn(bounds, |_| value.clone())
     }
 
-    /// Constructs a [`GridArray`] with a single value, in bounds `ORIGIN_CUBE`.
+    /// Constructs a `Vol<Box<[V]>>` with a single value, in bounds `ORIGIN_CUBE`.
     ///
     /// If the single element should be at a different location, you can call
-    /// [`.translate(offset)`](Self::translate), or use [`GridArray::from_elements()`]
+    /// [`.translate(offset)`](Self::translate), or use [`Vol::from_elements()`]
     /// instead.
     pub fn from_element(value: V) -> Self {
         Self::from_elements(GridAab::ORIGIN_CUBE, [value]).unwrap()
     }
 
-    /// Constructs a [`GridArray`] containing the provided elements, which must be in the
-    /// ordering used by [`GridAab::interior_iter()`].
+    /// Constructs a `Vol<Box<[V]>>` containing the provided elements, which must be in the
+    /// ordering specified by `O`.
     ///
-    /// Returns an [`ArrayLengthError`] if the number of elements does not match
+    /// Returns a [`VolLengthError`] if the number of elements does not match
     /// [`bounds.volume()`](GridAab::volume).
     pub fn from_elements(
         bounds: GridAab,
         elements: impl Into<Box<[V]>>,
-    ) -> Result<Self, ArrayLengthError> {
+    ) -> Result<Self, VolLengthError> {
         let elements = elements.into();
         if elements.len() == bounds.volume() {
-            Ok(GridArray {
+            Ok(Vol {
                 bounds,
+                ordering: O::default(),
                 contents: elements,
             })
         } else {
-            Err(ArrayLengthError {
+            Err(VolLengthError {
                 input_length: elements.len(),
                 bounds,
             })
         }
     }
 
-    /// Constructs a [`GridArray`] from nested Rust arrays in [Z][Y[X] order with the Y axis
+    /// Constructs a [`Vol<Box<[V]>>`] from nested Rust arrays in [Z][Y][X] order with the Y axis
     /// mirrored. The result's bounds's lower bounds are zero.
     ///
     /// Note: The current implementation requires that `V` implement [`Clone`], and will
     /// clone each element once, but this may be improved in the future.
     // TODO: Decide if this is a good public interface.
-    // TODO: Reimplement this in terms of adopting the elements as a linear array, then performing an axis swap.
+    // TODO: Reimplement this in terms of adopting the elements as a linear array.
     // TODO: Test.
     #[doc(hidden)] // used by all-is-cubes-content
     pub fn from_y_flipped_array<const DX: usize, const DY: usize, const DZ: usize>(
@@ -96,32 +135,21 @@ impl<V> GridArray<V> {
             |p| array[p.z as usize][(DY - 1) - (p.y as usize)][p.x as usize].clone(),
         )
     }
+}
 
-    /// Returns the [`GridAab`] specifying the bounds of this array.
+impl<C, O> Vol<C, O> {
+    /// Returns the [`GridAab`] specifying the bounds of this volume data.
     #[inline]
     pub fn bounds(&self) -> GridAab {
         self.bounds
     }
 
-    /// Returns the element at `position` of this array, or [`None`] if `position` is out
-    /// of bounds.
-    #[inline]
-    pub fn get(&self, position: impl Into<Cube>) -> Option<&V> {
-        self.bounds
-            .index(position.into())
-            .map(|index| &self.contents[index])
+    /// Returns the linear contents without copying.
+    pub(crate) fn into_elements(self) -> C {
+        self.contents
     }
 
-    /// Returns a mutable reference to the element at `position` of this array,
-    /// or [`None`] if `position` is out of bounds.
-    #[inline]
-    pub fn get_mut(&mut self, position: impl Into<Cube>) -> Option<&mut V> {
-        self.bounds
-            .index(position.into())
-            .map(|index| &mut self.contents[index])
-    }
-
-    /// Adds to the origin of the array without affecting the contents.
+    /// Translates the volume without affecting its contents.
     ///
     /// Panics if this would cause numeric overflow.
     ///
@@ -133,57 +161,138 @@ impl<V> GridArray<V> {
         if new_bounds.size() != self.bounds.size() {
             // We can't just continue like `GridAab::translate` does, because that would
             // break the invariant that self.bounds.volume() == self.contents.len().
-            panic!("GridArray::translate() offset caused numeric overflow");
+            panic!("Vol::translate() offset caused numeric overflow");
         }
         self.bounds = new_bounds;
         self
     }
+}
 
-    /// Iterates over all the cubes and values in this array, in the ordering used by
-    /// [`GridAab::interior_iter()`].
-    pub fn iter(&self) -> impl Iterator<Item = (Cube, &V)> {
-        self.bounds.interior_iter().zip(self.contents.iter())
-    }
-
-    /// Iterates over all the cubes and values in this array, in the ordering used by
-    /// [`GridAab::interior_iter()`].
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Cube, &mut V)> {
-        self.bounds.interior_iter().zip(self.contents.iter_mut())
-    }
-
-    /// Returns mutable access to the contents. They are ordered in the same order that
-    /// [`GridArray::from_elements()`] expects.
-    pub(crate) fn elements_mut(&mut self) -> &mut [V] {
-        // Note that since we only return a reference to the _slice_, providing this access
-        // cannot break the length invariant.
-        &mut self.contents
-    }
-
-    /// Apply `f` to each element of the array, producing a new array of the results.
-    pub fn map<T, F>(self, f: F) -> GridArray<T>
-    where
-        F: FnMut(V) -> T,
-    {
-        GridArray {
-            bounds: self.bounds,
-            contents: self.contents.into_vec().into_iter().map(f).collect(),
-        }
-    }
-
-    /// Returns the contents without copying. They are ordered in the same order that
-    /// [`GridArray::from_elements()`] expects.
-    pub(crate) fn into_elements(self) -> Box<[V]> {
-        self.contents
+impl<C> Vol<C, ZMaj> {
+    /// Iterate over all cubes that this contains, in the order of the linearization,
+    /// without including the stored data (if there is any).
+    pub fn iter_cubes(&self) -> GridIter {
+        self.bounds.interior_iter()
     }
 }
 
-impl<P: Into<Cube>, V> core::ops::Index<P> for GridArray<V> {
+/// Linear data access.
+impl<C, O, V> Vol<C, O>
+where
+    C: Deref<Target = [V]>,
+    O: Copy,
+{
+    /// Return a [`Vol`] that borrows the contents of this one.
+    pub fn as_ref(&self) -> Vol<&[V], O> {
+        Vol {
+            bounds: self.bounds,
+            ordering: self.ordering,
+            contents: self.as_linear(),
+        }
+    }
+
+    /// Return a [`Vol`] that mutably borrows the contents of this one.
+    pub fn as_mut(&mut self) -> Vol<&mut [V], O>
+    where
+        C: DerefMut,
+    {
+        Vol {
+            bounds: self.bounds,
+            ordering: self.ordering,
+            contents: self.as_linear_mut(),
+        }
+    }
+
+    /// Returns the linear contents viewed as a slice.
+    pub fn as_linear(&self) -> &[V] {
+        let s = &*self.contents;
+        debug_assert_eq!(s.len(), self.bounds.volume());
+        s
+    }
+
+    /// Returns the linear contents viewed as a mutable slice.
+    pub fn as_linear_mut(&mut self) -> &mut [V]
+    where
+        C: DerefMut,
+    {
+        let s = &mut *self.contents;
+        debug_assert_eq!(s.len(), self.bounds.volume());
+        s
+    }
+}
+
+/// Element lookup operations by 3D coordinates.
+impl<C, V> Vol<C, ZMaj>
+where
+    C: Deref<Target = [V]>,
+{
+    /// Returns the element at `position` of this volume data, or [`None`] if `position` is out
+    /// of bounds.
+    #[inline]
+    pub fn get(&self, position: impl Into<Cube>) -> Option<&V> {
+        let index = self.bounds.index(position.into())?;
+        Some(&self.as_linear()[index])
+    }
+
+    /// Returns a mutable reference to the element at `position` of this volume data,
+    /// or [`None`] if `position` is out of bounds.
+    #[inline]
+    pub fn get_mut(&mut self, position: impl Into<Cube>) -> Option<&mut V>
+    where
+        C: DerefMut,
+    {
+        let index = self.bounds.index(position.into())?;
+        Some(&mut self.as_linear_mut()[index])
+    }
+
+    /// Iterates over all the cubes and values in this volume data, in the ordering specified
+    /// by the `O` type parameter.
+    pub fn iter<'s>(&'s self) -> impl Iterator<Item = (Cube, &V)>
+    where
+        V: 's,
+    {
+        self.bounds.interior_iter().zip(self.as_linear().iter())
+    }
+
+    /// Iterates by mutable reference over all the cubes and values in this volume data,
+    /// in the ordering specified by the `O` type parameter.
+    pub fn iter_mut<'s>(&'s mut self) -> impl Iterator<Item = (Cube, &mut V)>
+    where
+        C: DerefMut,
+        V: 's,
+    {
+        self.bounds
+            .interior_iter()
+            .zip(self.as_linear_mut().iter_mut())
+    }
+}
+
+impl<V, O> Vol<Box<[V]>, O> {
+    /// Apply `f` to each element and collect the results into the same shape and ordering.
+    pub fn map<T, F>(self, f: F) -> Vol<Box<[T]>, O>
+    where
+        F: FnMut(V) -> T,
+    {
+        Vol {
+            bounds: self.bounds,
+            ordering: self.ordering,
+            contents: self.contents.into_vec().into_iter().map(f).collect(),
+        }
+    }
+}
+
+impl<P, C, O, V> core::ops::Index<P> for Vol<C, O>
+where
+    P: Into<Cube>,
+    C: Deref<Target = [V]>,
+    O: Copy,
+{
     type Output = V;
 
-    /// Returns the element at `position` of this array, or panics if `position` is out of
-    /// bounds.
+    /// Returns the element at `position` of this volume data,
+    /// or panics if `position` is out of bounds.
     ///
-    /// Use [`GridArray::get`] for a non-panicing alternative.
+    /// Use [`Vol::get()`] for a non-panicing alternative.
     #[inline(always)] // measured faster on wasm32 in worldgen
     fn index(&self, position: P) -> &Self::Output {
         let position: Cube = position.into();
@@ -197,9 +306,14 @@ impl<P: Into<Cube>, V> core::ops::Index<P> for GridArray<V> {
         }
     }
 }
-impl<P: Into<Cube>, V> core::ops::IndexMut<P> for GridArray<V> {
-    /// Returns the element at `position` of this array, or panics if `position` is out of
-    /// bounds.
+impl<P, C, O, V> core::ops::IndexMut<P> for Vol<C, O>
+where
+    P: Into<Cube>,
+    C: DerefMut<Target = [V]>,
+    O: Copy,
+{
+    /// Returns the element at `position` of this volume data,
+    /// or panics if `position` is out of bounds.
     #[inline(always)]
     fn index_mut(&mut self, position: P) -> &mut Self::Output {
         let position: Cube = position.into();
@@ -215,14 +329,15 @@ impl<P: Into<Cube>, V> core::ops::IndexMut<P> for GridArray<V> {
 }
 
 #[cfg(feature = "arbitrary")]
-mod grid_array_arb {
+mod vol_arb {
     use super::*;
     use arbitrary::Arbitrary;
 
-    /// Let's not spend too much memory on generating arbitrary length arrays.
+    /// Let's not spend too much memory on generating arbitrary length vectors.
     /// This does reduce coverage...
     const MAX_VOLUME: usize = 2_usize.pow(16);
 
+    // TODO: Generalize this implementation to `Vol`
     impl<'a, V: Arbitrary<'a>> Arbitrary<'a> for GridArray<V> {
         fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
             let bounds = GridAab::arbitrary_with_max_volume(u, MAX_VOLUME)?;
@@ -245,17 +360,17 @@ mod grid_array_arb {
     }
 }
 
-/// Error from [`GridArray::from_elements`] being given the wrong length.
+/// Error from [`Vol::from_elements()`] being given the wrong length.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ArrayLengthError {
+pub struct VolLengthError {
     input_length: usize,
     bounds: GridAab,
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for ArrayLengthError {}
+impl std::error::Error for VolLengthError {}
 
-impl fmt::Display for ArrayLengthError {
+impl fmt::Display for VolLengthError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             input_length,
@@ -263,7 +378,7 @@ impl fmt::Display for ArrayLengthError {
         } = self;
         write!(
             f,
-            "array of length {input_length} cannot fill volume {v} of {bounds:?}",
+            "data of length {input_length} cannot fill volume {v} of {bounds:?}",
             v = self.bounds.volume()
         )
     }
@@ -289,7 +404,7 @@ mod tests {
         let bounds = GridAab::from_lower_size([10, 0, 0], [4, 1, 1]);
         assert_eq!(
             GridArray::from_elements(bounds, vec![10i32, 11, 12]),
-            Err(ArrayLengthError {
+            Err(VolLengthError {
                 input_length: 3,
                 bounds
             })
