@@ -55,7 +55,10 @@ mod web_glue;
 
 /// Wrapper to implement [`all_is_cubes::time::Instant`] for [`instant::Instant`].
 ///
-/// TODO: Replace this with just a direct web API binding?
+/// Note: This code exists in multiple locations because duplicating it is easier than
+/// arranging for a shared dependency.
+///
+/// TODO: Replace this with just a direct web API binding, not [`instant`]?
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct AdaptedInstant(instant::Instant);
 

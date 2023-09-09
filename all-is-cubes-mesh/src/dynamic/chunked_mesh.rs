@@ -197,6 +197,15 @@ where
     where
         F: FnMut(dynamic::RenderDataUpdate<'_, D, Vert, Tex::Tile>),
     {
+        // if deadline == time::Deadline::Whenever {
+        //     // If we have time, don't bother with the startup pass.
+        //     // TODO: This might be papering over a bug where the second pass wouldn't
+        //     // finish the job like it should; but in any case it's the right choice for
+        //     // overall performance. We can check for the bug by passing a very long
+        //     // non-Whenever deadline.
+        //     self.startup_chunks_only = false;
+        // }
+
         let was_startup_chunks_only = self.startup_chunks_only;
         let (mut info1, timed_out) = self.update_once(
             camera,

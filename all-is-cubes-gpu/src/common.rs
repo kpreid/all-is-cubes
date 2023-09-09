@@ -1,6 +1,7 @@
 //! Items not specific to a particular GPU API.
 
 use std::error::Error;
+use std::ops;
 use std::time::Duration;
 
 use all_is_cubes::camera::{Layers, RenderError};
@@ -92,7 +93,37 @@ impl FrameBudget {
 
 /// A Duration long enough that it is not interesting in questions of rendering, but not
 /// so long that adding a reasonable number of it to an [`Instant`] will overflow.
+/// TODO: Replace all this with the newer `Deadline` concept?
 const VERY_LONG: Duration = Duration::from_secs(86400 * 7);
+
+/// Wrapper to implement [`all_is_cubes::time::Instant`] for [`instant::Instant`].
+///
+/// Note: This code exists in multiple locations because duplicating it is easier than
+/// arranging for a shared dependency.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct AdaptedInstant(instant::Instant);
+
+impl all_is_cubes::time::Instant for AdaptedInstant {
+    fn now() -> Self {
+        Self(instant::Instant::now())
+    }
+
+    fn saturating_duration_since(self, other: Self) -> Duration {
+        instant::Instant::saturating_duration_since(&self.0, other.0)
+    }
+}
+impl ops::Add<Duration> for AdaptedInstant {
+    type Output = Self;
+    fn add(self, rhs: Duration) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
+impl ops::Sub<Duration> for AdaptedInstant {
+    type Output = Self;
+    fn sub(self, rhs: Duration) -> Self::Output {
+        Self(self.0 - rhs)
+    }
+}
 
 /// Single-entry cache.
 #[derive(Clone, Debug)]

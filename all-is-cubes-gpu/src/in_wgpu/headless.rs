@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use all_is_cubes::time;
 use futures_channel::oneshot;
 use futures_core::future::BoxFuture;
 
@@ -8,7 +7,7 @@ use all_is_cubes::camera::{self, Flaws, HeadlessRenderer, StandardCameras, Viewp
 use all_is_cubes::character::Cursor;
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 
-use crate::common::{FrameBudget, GraphicsResourceError};
+use crate::common::{AdaptedInstant, FrameBudget, GraphicsResourceError};
 use crate::in_wgpu::{self, init};
 
 /// Builder for the headless [`Renderer`].
@@ -27,7 +26,7 @@ impl Builder {
     ) -> Result<Self, wgpu::RequestDeviceError> {
         let (device, queue) = adapter
             .request_device(
-                &in_wgpu::EverythingRenderer::<time::NoTime>::device_descriptor(),
+                &in_wgpu::EverythingRenderer::<AdaptedInstant>::device_descriptor(),
                 None,
             )
             .await?;
@@ -83,7 +82,7 @@ struct RendererImpl {
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
     color_texture: wgpu::Texture,
-    everything: super::EverythingRenderer<time::NoTime>,
+    everything: super::EverythingRenderer<AdaptedInstant>,
     viewport_source: ListenableSource<Viewport>,
     viewport_dirty: DirtyFlag,
     flaws: Flaws,
