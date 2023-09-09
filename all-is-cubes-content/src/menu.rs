@@ -7,7 +7,6 @@ use all_is_cubes::{
         Block, BlockAttributes,
         Resolution::{self, R16},
     },
-    cgmath::{Vector3, Zero as _},
     character::Spawn,
     content::palette,
     drawing::{
@@ -18,6 +17,7 @@ use all_is_cubes::{
             text::{Baseline, Text},
         },
     },
+    euclid::Vector3D,
     inv::Tool,
     linking::InGenError,
     math::{Face6, GridAab, GridVector, Gridgid},
@@ -132,7 +132,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
 
     let logo_text_space = LayoutTree::leaf(logo_text()).to_space(
         SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
-        Vector3::new(Align::Center, Align::Center, Align::Low),
+        Vector3D::new(Align::Center, Align::Center, Align::Low),
     )?;
     let logo_widget = widgets::Voxels::new(
         logo_text_space.bounds(),
@@ -180,7 +180,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
         .physics({
             let mut p = SpacePhysics::default();
             p.sky_color = palette::MENU_BACK.to_rgb();
-            p.gravity = Vector3::zero();
+            p.gravity = Vector3D::zero();
             p
         })
         .spawn({

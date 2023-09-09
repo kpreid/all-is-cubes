@@ -14,7 +14,7 @@ use web_sys::{
 };
 
 use all_is_cubes::camera::{GraphicsOptions, StandardCameras, Viewport};
-use all_is_cubes::cgmath::{Point2, Vector2};
+use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::universe::{Universe, UniverseStepInfo};
 use all_is_cubes_gpu::in_wgpu;
@@ -423,14 +423,14 @@ impl WebSession {
         let lock = self.check_pointer_lock();
 
         let i = &mut inner.session.input_processor;
-        i.mouselook_delta(Vector2::new(
+        i.mouselook_delta(Vector2D::new(
             event.movement_x().into(),
             event.movement_y().into(),
         ));
         i.has_pointer_lock(lock);
         i.mouse_pixel_position(
             *self.viewport_cell.get(),
-            Some(Point2::new(
+            Some(Point2D::new(
                 event.client_x().into(),
                 event.client_y().into(),
             )),

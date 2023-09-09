@@ -2,8 +2,8 @@
 
 use std::fmt;
 
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
-use all_is_cubes::math::{Cube, Face6, FreeCoordinate, Rgba};
+use all_is_cubes::euclid::Point3D;
+use all_is_cubes::math::{Cube, Face6, FreeCoordinate, FreePoint, FreeVector, Rgba};
 use all_is_cubes::util::{ConciseDebug, CustomFormat};
 
 /// Basic vertex data type for a [`BlockMesh`].
@@ -18,7 +18,7 @@ use all_is_cubes::util::{ConciseDebug, CustomFormat};
 #[derive(Clone, Copy, PartialEq)]
 pub struct BlockVertex<T> {
     /// Vertex position.
-    pub position: Point3<FreeCoordinate>,
+    pub position: FreePoint,
     /// Vertex normal, always axis-aligned.
     pub face: Face6,
     /// Surface color or texture coordinate.
@@ -128,13 +128,12 @@ pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized + 'static 
     /// Number type for the vertex position coordinates.
     // ---
     // Explanation for this trait bound: `ordered_float` conditionally depending on features
-    // requires either `Float` or `FloatCore`, and `cgmath::BaseFloat` doesn't include
-    // `FloatCore` as a supertrait.
+    // requires either `Float` or `FloatCore.
     //
     // (I've put in a PR to make the dependency *unconditional*,
     // <https://github.com/reem/rust-ordered-float/pull/138>,
-    // but that won't change the bounds required here.)
-    type Coordinate: all_is_cubes::cgmath::BaseFloat + num_traits::float::FloatCore;
+    // but that's not yet released.)
+    type Coordinate: num_traits::float::Float + num_traits::float::FloatCore;
 
     /// Point type identifying a point in the block's texture.
     type TexPoint: Copy;
@@ -157,7 +156,7 @@ pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized + 'static 
     /// Returns the position of this vertex.
     ///
     /// Note: This is used to perform depth sorting for transparent vertices.
-    fn position(&self) -> Point3<Self::Coordinate>;
+    fn position(&self) -> Point3D<Self::Coordinate, Cube>;
 }
 
 /// Trivial implementation of [`GfxVertex`] for testing purposes. Discards lighting.
@@ -165,15 +164,15 @@ impl<T: Copy + 'static> GfxVertex for BlockVertex<T> {
     const WANTS_DEPTH_SORTING: bool = true;
     type Coordinate = FreeCoordinate;
     type TexPoint = T;
-    type BlockInst = Vector3<FreeCoordinate>;
+    type BlockInst = FreeVector;
 
-    fn position(&self) -> Point3<FreeCoordinate> {
+    fn position(&self) -> FreePoint {
         self.position
     }
 
     #[inline]
     fn instantiate_block(cube: Cube) -> Self::BlockInst {
-        cube.lower_bounds().to_vec().map(FreeCoordinate::from)
+        cube.lower_bounds().to_f64().to_vector()
     }
 
     #[inline]
@@ -181,3 +180,6 @@ impl<T: Copy + 'static> GfxVertex for BlockVertex<T> {
         self.position += offset;
     }
 }
+
+/// A vertex type's position using its coordinate type.
+pub(crate) type VPos<V> = Point3D<<V as GfxVertex>::Coordinate, Cube>;

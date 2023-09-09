@@ -15,7 +15,6 @@
 //!     and rectangles have inclusive upper bounds (whereas our [`GridAab`]s have
 //!     exclusive upper bounds).
 
-use cgmath::EuclideanSpace as _;
 use embedded_graphics::geometry::{Dimensions, Point, Size};
 use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
 use embedded_graphics::prelude::{DrawTarget, Drawable, Pixel};
@@ -398,7 +397,7 @@ impl<'a> VoxelBrush<'a> {
     pub fn bounds(&self) -> Option<GridAab> {
         let mut bounds: Option<GridAab> = None;
         for &(offset, _) in self.0.iter() {
-            let cube = Cube::from(GridPoint::from_vec(offset)).grid_aab();
+            let cube = Cube::from(offset.to_point()).grid_aab();
             if let Some(bounds) = &mut bounds {
                 // TODO: don't panic?
                 *bounds = (*bounds).union(cube).unwrap();
@@ -515,7 +514,6 @@ mod tests {
     use crate::math::{GridRotation, Rgba};
     use crate::raytracer::print_space;
     use crate::universe::Universe;
-    use cgmath::Zero;
     use embedded_graphics::primitives::{Primitive, PrimitiveStyle};
 
     /// With identity transform, `rectangle_to_aab`'s output matches exactly as one might

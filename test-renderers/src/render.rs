@@ -3,8 +3,8 @@
 use std::fmt::Debug;
 
 use all_is_cubes::camera::{GraphicsOptions, HeadlessRenderer, StandardCameras, Viewport};
-use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Cursor;
+use all_is_cubes::euclid::vec2;
 use all_is_cubes::universe::Universe;
 
 use crate::RendererId;
@@ -71,6 +71,6 @@ pub trait RendererFactory: Send + Sync + Debug {
 /// time and output images are small, without being so small as to be unintelligible.
 /// It also needs to match `wgpu::COPY_BYTES_PER_ROW_ALIGNMENT`.
 pub const COMMON_VIEWPORT: Viewport = Viewport {
-    nominal_size: Vector2::new(128., 96.),
-    framebuffer_size: Vector2::new(128, 96),
+    nominal_size: vec2(128., 96.),
+    framebuffer_size: vec2(128, 96),
 };

@@ -6,10 +6,10 @@ use std::fmt::Debug;
 
 use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
 use all_is_cubes::camera::Flaws;
-use all_is_cubes::cgmath::Point2;
+use all_is_cubes::euclid::point2;
 use all_is_cubes::math::{
     Cube, Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate,
-    OpacityCategory, Rgba,
+    OpacityCategory, Rgba, VectorOps,
 };
 use all_is_cubes::space::Space;
 
@@ -306,8 +306,8 @@ where
                             },
                             &QuadTransform::new(face, Resolution::R1),
                             /* depth= */ 0.,
-                            Point2 { x: 0., y: 0. },
-                            Point2 { x: 1., y: 1. },
+                            point2(0., 0.),
+                            point2(1., 1.),
                             // TODO: Respect the prefer_textures option.
                             QuadColoring::<T::Plane>::Solid(block_color),
                         );

@@ -4,7 +4,6 @@ use std::sync::Arc;
 use half::f16;
 
 use all_is_cubes::camera;
-use all_is_cubes::cgmath::Vector2;
 use all_is_cubes_gpu::in_wgpu::init;
 use all_is_cubes_gpu::in_wgpu::shader_testing;
 
@@ -42,7 +41,7 @@ pub(crate) async fn run_shader_test(test_wgsl: &str) -> image::Rgba32FImage {
     let adapter = adapter().await;
 
     // 32 is the minimum viewport width that will satisfy copy alignment
-    let output_viewport = camera::Viewport::with_scale(1.0, Vector2::new(32, 32));
+    let output_viewport = camera::Viewport::with_scale(1.0, [32, 32]);
 
     let f16_pixels: Vec<f16> =
         shader_testing::run_shader_test(&adapter, output_viewport, test_wgsl).await;

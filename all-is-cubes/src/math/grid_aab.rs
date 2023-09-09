@@ -5,12 +5,12 @@ use std::fmt;
 use std::iter::FusedIterator;
 use std::ops::Range;
 
-use cgmath::{EuclideanSpace as _, Point3, Vector3};
+use euclid::{Point3D, Vector3D};
 
 use crate::block::Resolution;
 use crate::math::{
-    sort_two, Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, GridCoordinate, GridPoint,
-    GridVector, Gridgid,
+    sort_two, Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridCoordinate,
+    GridPoint, GridVector, Gridgid, VectorOps,
 };
 
 /// An axis-aligned box with integer coordinates, whose volume is no larger than [`usize::MAX`].
@@ -178,19 +178,19 @@ impl GridAab {
 
         // Shuffle the sizes to remove any bias.
         let sizes = *u.choose(&[
-            Vector3::new(size_1, size_2, size_3),
-            Vector3::new(size_1, size_3, size_2),
-            Vector3::new(size_2, size_1, size_3),
-            Vector3::new(size_2, size_3, size_1),
-            Vector3::new(size_3, size_1, size_2),
-            Vector3::new(size_3, size_2, size_1),
+            GridVector::new(size_1, size_2, size_3),
+            GridVector::new(size_1, size_3, size_2),
+            GridVector::new(size_2, size_1, size_3),
+            GridVector::new(size_2, size_3, size_1),
+            GridVector::new(size_3, size_1, size_2),
+            GridVector::new(size_3, size_2, size_1),
         ])?;
 
         // Compute lower bounds that are valid for the sizes.
-        let lower_bounds = Point3::new(
-            u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes[0])?,
-            u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes[1])?,
-            u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes[2])?,
+        let lower_bounds = GridPoint::new(
+            u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes.x)?,
+            u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes.y)?,
+            u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes.z)?,
         );
 
         Ok(Self::from_lower_size(lower_bounds, sizes))
@@ -234,7 +234,7 @@ impl GridAab {
 
     pub(crate) fn surface_area(&self) -> usize {
         // can't fail because it would fail the volume check
-        let size = self.sizes.cast::<usize>().unwrap();
+        let size = self.sizes.to_usize();
 
         size.x * size.y * 2 + size.x * size.z * 2 + size.y * size.z * 2
     }
@@ -242,7 +242,7 @@ impl GridAab {
     /// Returns whether the box contains no cubes (its volume is zero).
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.sizes[0] == 0 || self.sizes[1] == 0 || self.sizes[2] == 0
+        self.sizes.x == 0 || self.sizes.y == 0 || self.sizes.z == 0
     }
 
     /// Determines whether a unit cube lies within this box and, if it does, returns the
@@ -268,8 +268,8 @@ impl GridAab {
         // of bounds, just in the other direction, because wrapping subtraction is an
         // injective mapping of integers, and every in-bounds maps to in-bounds, so
         // every out-of-bounds must also map to out-of-bounds.
-        let deoffsetted: Point3<GridCoordinate> =
-            Point3::from(cube).zip(self.lower_bounds, GridCoordinate::wrapping_sub);
+        let deoffsetted: GridPoint =
+            GridPoint::from(cube).zip(self.lower_bounds, GridCoordinate::wrapping_sub);
 
         // Bounds check, expressed as a single unsigned comparison.
         if (deoffsetted.x as u32 >= sizes.x as u32)
@@ -284,9 +284,9 @@ impl GridAab {
         // * We just checked it is not negative
         // * We just checked it is not greater than `self.sizes[i]`, which is an `i32`
         // * We don't support platforms with `usize` smaller than 32 bits
-        let ixvec: Point3<usize> = deoffsetted.map(|c| c as usize);
+        let ixvec: Point3D<usize, _> = deoffsetted.to_usize();
 
-        let usizes: Vector3<usize> = sizes.map(|c| c as usize);
+        let usizes = sizes.to_usize();
 
         // Compute index.
         // Always use wrapping (rather than maybe-checked) arithmetic, because we
@@ -326,7 +326,7 @@ impl GridAab {
     /// Compared to [`GridAab::size()`], this is a convenience so that callers needing
     /// unsigned integers do not need to write a fallible-looking conversion.
     #[inline]
-    pub fn unsigned_size(&self) -> Vector3<u32> {
+    pub fn unsigned_size(&self) -> Vector3D<u32, Cube> {
         // Convert the i32 we know to be positive to u32.
         // Declaring the parameter type ensures that if we ever decide to change the numeric type
         // of `GridCoordinate`, this will fail to compile.
@@ -357,18 +357,17 @@ impl GridAab {
         (self.lower_bounds()[axis])..(self.upper_bounds()[axis])
     }
 
-    /// The center of the enclosed volume. Returns [`FreeCoordinate`] since the center
+    /// The center of the enclosed volume. Returns [`FreeCoordinate`]s since the center
     /// may be at a half-block position.
     ///
     /// ```
-    /// use all_is_cubes::math::GridAab;
-    /// use all_is_cubes::cgmath::Point3;
+    /// use all_is_cubes::math::{FreePoint, GridAab};
     ///
     /// let b = GridAab::from_lower_size([0, 0, -2], [10, 3, 4]);
-    /// assert_eq!(b.center(), Point3::new(5.0, 1.5, 0.0));
+    /// assert_eq!(b.center(), FreePoint::new(5.0, 1.5, 0.0));
     /// ```
     #[inline]
-    pub fn center(&self) -> Point3<FreeCoordinate> {
+    pub fn center(&self) -> FreePoint {
         self.lower_bounds.map(FreeCoordinate::from) + self.sizes.map(FreeCoordinate::from) / 2.0
     }
 
@@ -495,7 +494,7 @@ impl GridAab {
     pub(crate) fn minkowski_sum(self, other: GridAab) -> Result<GridAab, GridOverflowError> {
         // TODO: needs checked sums
         Self::checked_from_lower_size(
-            self.lower_bounds() + other.lower_bounds().to_vec(),
+            self.lower_bounds() + other.lower_bounds().to_vector(),
             self.size() + other.size(),
         )
     }
@@ -519,11 +518,11 @@ impl GridAab {
         if self.is_empty() {
             None
         } else {
-            let upper_bounds = self.upper_bounds();
+            let _upper_bounds = self.upper_bounds();
             Some(Cube::new(
-                rng.gen_range(self.lower_bounds[0]..upper_bounds[0]),
-                rng.gen_range(self.lower_bounds[1]..upper_bounds[1]),
-                rng.gen_range(self.lower_bounds[2]..upper_bounds[2]),
+                rng.gen_range(self.x_range()),
+                rng.gen_range(self.y_range()),
+                rng.gen_range(self.z_range()),
             ))
         }
     }
@@ -541,7 +540,7 @@ impl GridAab {
     /// ```
     #[must_use]
     pub fn translate(&self, offset: impl Into<GridVector>) -> Self {
-        let offset = GridPoint::from_vec(offset.into());
+        let offset = offset.into().to_point();
         let new_lb = self
             .lower_bounds()
             .zip(offset, GridCoordinate::saturating_add);

@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use all_is_cubes::block::{Block, BlockAttributes, Primitive, Resolution};
-use all_is_cubes::cgmath::EuclideanSpace as _;
-use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, VectorOps};
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::universe::URef;
 
@@ -74,18 +73,18 @@ impl vui::Widget for Voxels {
         .shrink_to(self.region.size(), false)
         .bounds
         .lower_bounds()
-        .to_vec();
+        .to_vector();
         // gravity_offset_in_voxels is now the offset within the low-corner block at
         // which the low-corner voxels should start.
 
         let block_to_voxels_transform = {
             // Apply gravity and the translation that was requested
             GridMatrix::from_translation(
-                self.region.lower_bounds().to_vec() - gravity_offset_in_voxels)
+                self.region.lower_bounds().to_vector() - gravity_offset_in_voxels)
             // Scale up from blocks to voxels
             * GridMatrix::from_scale(scale_g)
             // Subtract the absolute position to get relative position
-            * GridMatrix::from_translation(-position.bounds.lower_bounds().to_vec())
+            * GridMatrix::from_translation(-position.bounds.lower_bounds().to_vector())
         };
 
         let mut txn = SpaceTransaction::default();
@@ -111,7 +110,8 @@ mod tests {
     use super::*;
     use crate::vui::{instantiate_widget, Align};
     use all_is_cubes::block::Resolution::*;
-    use all_is_cubes::cgmath::{Point3, Vector3};
+
+    use all_is_cubes::euclid::Vector3D;
     use all_is_cubes::math::Cube;
     use all_is_cubes::universe::Universe;
 
@@ -155,7 +155,7 @@ mod tests {
         let output_origin = GridPoint::new(100, 100, 100);
         let grant = vui::LayoutGrant {
             bounds: GridAab::from_lower_size(output_origin, [3, 3, 3]),
-            gravity: Vector3::new(Align::Low, Align::Center, Align::High),
+            gravity: Vector3D::new(Align::Low, Align::Center, Align::High),
         };
         let (output_bounds, output) =
             test_voxels_widget(v_space_bounds, grant, BlockAttributes::default());
@@ -172,7 +172,7 @@ mod tests {
                 space: _,
             } => {
                 assert_eq!(resolution, R8);
-                assert_eq!(offset, Point3::new(0, 0, -7));
+                assert_eq!(offset, GridPoint::new(0, 0, -7));
             }
             ref p => panic!("unexpected primitive {p:?}"),
         }
@@ -184,7 +184,7 @@ mod tests {
                 space: _,
             } => {
                 assert_eq!(resolution, R8);
-                assert_eq!(offset, Point3::new(0, 0, 1));
+                assert_eq!(offset, GridPoint::new(0, 0, 1));
             }
             ref p => panic!("unexpected primitive {p:?}"),
         }

@@ -1,4 +1,3 @@
-use cgmath::Vector2;
 use embedded_graphics::mono_font::iso_8859_1::FONT_7X13_BOLD;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::prelude::{PixelColor, Point};
@@ -6,7 +5,7 @@ use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
 use futures_core::future::BoxFuture;
 
-use crate::camera::Flaws;
+use crate::camera::{Flaws, ImageSize};
 use crate::character::Cursor;
 use crate::universe::RefError;
 
@@ -61,7 +60,7 @@ pub enum RenderError {
 #[allow(clippy::exhaustive_structs)]
 pub struct Rendering {
     /// Width and height of the image.
-    pub size: Vector2<u32>,
+    pub size: ImageSize,
     /// Image data, RGBA, 8 bits per component, in the sRGB color space.
     pub data: Vec<[u8; 4]>,
     /// Deficiencies of the rendering; ways in which it fails to accurately represent the

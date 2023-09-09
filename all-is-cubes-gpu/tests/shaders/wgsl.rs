@@ -2,7 +2,6 @@
 
 use std::fmt;
 
-use all_is_cubes::cgmath;
 use all_is_cubes::util::CustomFormat;
 
 /// Generate a fragment shader entry point from an expression.
@@ -33,12 +32,12 @@ impl CustomFormat<ToWgsl> for f32 {
     }
 }
 
-impl<T> CustomFormat<ToWgsl> for cgmath::Vector4<T>
+impl<T> CustomFormat<ToWgsl> for [T; 4]
 where
     T: CustomFormat<ToWgsl> + WgslTypeName,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, f: ToWgsl) -> fmt::Result {
-        let cgmath::Vector4 { x, y, z, w } = self;
+        let [x, y, z, w] = self;
         let t = T::wgsl_type_name();
         write!(
             fmt,

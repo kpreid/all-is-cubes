@@ -66,8 +66,8 @@ impl vui::Layoutable for Block {
 mod tests {
     use super::*;
     use crate::vui::Align;
-    use all_is_cubes::cgmath::Vector3;
     use all_is_cubes::content::make_some_blocks;
+    use all_is_cubes::euclid::Vector3D;
     use all_is_cubes::math::{GridAab, GridPoint};
 
     #[test]
@@ -76,7 +76,7 @@ mod tests {
         let origin = GridPoint::new(1, 2, 3);
         let grant = vui::LayoutGrant {
             bounds: GridAab::from_lower_size(origin, [1, 1, 1]),
-            gravity: Vector3::new(Align::Low, Align::Center, Align::High),
+            gravity: Vector3D::new(Align::Low, Align::Center, Align::High),
         };
         let (bounds, space) = vui::instantiate_widget(grant, block.clone());
         assert_eq!(bounds, Some(grant.bounds));
@@ -89,7 +89,7 @@ mod tests {
         let origin = GridPoint::new(1, 2, 3);
         let grant = vui::LayoutGrant {
             bounds: GridAab::from_lower_size(origin, [0, 1, 1]),
-            gravity: Vector3::new(Align::Low, Align::Center, Align::High),
+            gravity: Vector3D::new(Align::Low, Align::Center, Align::High),
         };
         let (bounds, _space) = vui::instantiate_widget(grant, block.clone());
         assert_eq!(bounds, None);

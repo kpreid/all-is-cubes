@@ -5,16 +5,16 @@
 use std::mem;
 use std::sync::Arc;
 
-use all_is_cubes::notnan;
-use all_is_cubes::time;
-
 use all_is_cubes::camera::{info_text_drawable, Layers, StandardCameras};
-use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Rgb888, Drawable};
+use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::listen::DirtyFlag;
+use all_is_cubes::math::VectorOps;
+use all_is_cubes::notnan;
 use all_is_cubes::space::Space;
+use all_is_cubes::time;
 use all_is_cubes::universe::URef;
 
 use crate::{
@@ -325,7 +325,8 @@ impl<I: time::Instant> EverythingRenderer<I> {
             Some("info_text_texture"),
             viewport
                 .nominal_size
-                .map(|component| (component as u32).max(1)),
+                .map(|component| (component as u32).max(1))
+                .cast_unit(), // info text texture is deliberately sized in nominal pixels to control the font size
         );
         new_self
     }
@@ -348,7 +349,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         {
             let viewport = self.cameras.viewport();
             let size = viewport.framebuffer_size;
-            let previous_size = Vector2::new(self.config.width, self.config.height);
+            let previous_size = Vector2D::new(self.config.width, self.config.height);
             // wgpu insists on nonzero values, so if we get a zero, ignore it
             if size != previous_size && size.x != 0 && size.y != 0 {
                 self.config.width = size.x;
@@ -359,7 +360,8 @@ impl<I: time::Instant> EverythingRenderer<I> {
                     Some("info_text_texture"),
                     viewport
                         .nominal_size
-                        .map(|component| (component as u32).max(1)),
+                        .map(|component| (component as u32).max(1))
+                        .cast_unit(),
                 );
             }
 

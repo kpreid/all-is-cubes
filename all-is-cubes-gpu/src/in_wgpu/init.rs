@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use all_is_cubes::camera::Rendering;
+use all_is_cubes::camera::{self, Rendering};
 
 /// Create a [`wgpu::Instance`] and [`wgpu::Adapter`] controlled by environment variables,
 /// and print information about the decision made.
@@ -98,8 +98,8 @@ pub async fn get_image_from_gpu(
     device: Arc<wgpu::Device>,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
-    size: all_is_cubes::cgmath::Vector2<u32>,
-    flaws: all_is_cubes::camera::Flaws,
+    size: camera::ImageSize,
+    flaws: camera::Flaws,
 ) -> Rendering {
     Rendering {
         size,
@@ -118,7 +118,7 @@ pub async fn get_texels_from_gpu<C>(
     device: Arc<wgpu::Device>,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
-    dimensions: all_is_cubes::cgmath::Vector2<u32>,
+    dimensions: camera::ImageSize,
     components: usize,
 ) -> Vec<C>
 where

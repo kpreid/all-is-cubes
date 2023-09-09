@@ -4,7 +4,6 @@ use itertools::Itertools as _;
 use petgraph::visit::EdgeRef as _;
 
 use all_is_cubes::block::{self, Block, AIR};
-use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridRotation, GridVector,
@@ -175,7 +174,7 @@ pub(crate) fn make_tree(
     }
 
     // Patch up into-root flow so it will be properly sized
-    graph.data[root - GridVector::unit_y()].flow = graph.data[root].flow;
+    graph.data[root + GridVector::new(0, -1, 0)].flow = graph.data[root].flow;
 
     // Adjust branch sizes based on flow data
     for cube in graph.bounds().interior_iter() {
@@ -208,6 +207,7 @@ pub(crate) fn make_tree(
 use graph::Growph;
 mod graph {
     use super::*;
+    use all_is_cubes::euclid::default::Vector3D;
     use all_is_cubes::math::Axis;
 
     /// A graph of connections between adjacent blocks of a tree we're going to grow.
@@ -295,14 +295,14 @@ mod graph {
 
     #[derive(Copy, Clone, Debug)]
     pub(crate) struct GrowphCell {
-        pos_neighbors: Vector3<Option<TreeGrowth>>,
+        pos_neighbors: Vector3D<Option<TreeGrowth>>,
         leaves: Option<TreeGrowth>,
         pub(crate) flow: u16,
     }
     impl GrowphCell {
         fn new() -> Self {
             Self {
-                pos_neighbors: Vector3::new(None, None, None),
+                pos_neighbors: Vector3D::new(None, None, None),
                 leaves: None,
                 flow: 0,
             }

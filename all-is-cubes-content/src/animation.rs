@@ -8,7 +8,6 @@ use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
 use all_is_cubes::block::{Block, BlockCollision, AIR};
-use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace as _};
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{Cube, GridAab, GridArray, GridPoint, GridVector, Rgba};
 use all_is_cubes::space::{Space, SpaceTransaction};
@@ -259,7 +258,7 @@ impl Clock {
             for y in 0..16 {
                 let cube = Cube::new(x, y, 0);
                 let centered_point = (cube - GridVector::new(8, 8, 0)).midpoint();
-                let r = centered_point.to_vec().magnitude();
+                let r = centered_point.to_vector().length();
                 let block = {
                     let base_angle = centered_point.x.atan2(centered_point.y) / TAU;
                     if r > 8.0 {

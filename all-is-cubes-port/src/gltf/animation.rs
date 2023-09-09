@@ -57,7 +57,7 @@ pub(crate) fn add_camera_animation(
                     writer
                         .frame_states
                         .iter()
-                        .map(|frame| frame.camera_transform.disp.cast::<f32>().unwrap().into()),
+                        .map(|frame| frame.camera_transform.translation.to_f32().into()),
                 )?,
                 extensions: Default::default(),
                 extras: Default::default(),
@@ -87,7 +87,7 @@ pub(crate) fn add_camera_animation(
                     writer
                         .frame_states
                         .iter()
-                        .map(|frame| convert_quaternion(frame.camera_transform.rot).0),
+                        .map(|frame| convert_quaternion(frame.camera_transform.rotation).0),
                 )?,
                 extensions: Default::default(),
                 extras: Default::default(),

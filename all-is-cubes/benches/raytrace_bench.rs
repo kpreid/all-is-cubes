@@ -1,4 +1,3 @@
-use cgmath::{Vector2, Vector3};
 use criterion::measurement::WallTime;
 use criterion::{criterion_group, criterion_main, Bencher, Criterion};
 
@@ -8,6 +7,7 @@ use all_is_cubes::camera::{
 use all_is_cubes::character::Character;
 use all_is_cubes::content::testing::lighting_bench_space;
 use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::math::GridVector;
 use all_is_cubes::raytracer::RtRenderer;
 use all_is_cubes::universe::{URef, Universe};
 
@@ -20,7 +20,7 @@ struct TestData {
 impl TestData {
     fn new() -> Self {
         let mut universe = Universe::new();
-        let space = lighting_bench_space(&mut universe, Vector3::new(54, 16, 54)).unwrap();
+        let space = lighting_bench_space(&mut universe, GridVector::new(54, 16, 54)).unwrap();
         let space = universe.insert_anonymous(space);
         let character = universe.insert_anonymous(Character::spawn_default(space));
         Self {
@@ -35,7 +35,7 @@ impl TestData {
         let mut renderer = RtRenderer::new(
             StandardCameras::new(
                 ListenableSource::constant(options),
-                ListenableSource::constant(Viewport::with_scale(1.0, Vector2::new(64, 16))),
+                ListenableSource::constant(Viewport::with_scale(1.0, [64, 16])),
                 ListenableSource::constant(Some(self.character.clone())),
                 ListenableSource::constant(UiViewState::default()),
             ),

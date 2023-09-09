@@ -1,9 +1,9 @@
+use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::util::YieldProgress;
 
-use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, Vector3};
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint, GridVector,
+    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridVector, VectorOps,
 };
 use all_is_cubes::space::Space;
 
@@ -20,21 +20,21 @@ pub struct DungeonGrid {
     /// should instead make this a `GridAab` and add a `GridAab::minkowski_sum` method.
     pub room_wall_thickness: FaceMap<u16>,
     /// Thickness of the space lying between each pair of rooms, belonging to neither.
-    pub gap_between_walls: Vector3<u16>,
+    pub gap_between_walls: Vector3D<u16, Cube>,
 }
 
 impl DungeonGrid {
     /// Returns the distance from the end of one room interior to the beginning of
     /// another, along each axis.
     #[rustfmt::skip]
-    pub fn gap_between_rooms(&self) -> Vector3<GridCoordinate> {
+    pub fn gap_between_rooms(&self) -> GridVector {
         self.gap_between_walls.map(GridCoordinate::from)
             + self.room_wall_thickness.negatives().map(GridCoordinate::from)
             + self.room_wall_thickness.positives().map(GridCoordinate::from)
     }
 
     /// Returns the distances from one room to the same point on the next room, along each axis.
-    pub fn room_spacing(&self) -> Vector3<GridCoordinate> {
+    pub fn room_spacing(&self) -> GridVector {
         self.room_box.size() + self.gap_between_rooms()
     }
 
@@ -43,8 +43,8 @@ impl DungeonGrid {
     pub fn room_translation(&self, room_position: Cube) -> GridVector {
         room_position
             .lower_bounds()
-            .to_vec()
-            .mul_element_wise(self.room_spacing())
+            .to_vector()
+            .component_mul(self.room_spacing())
     }
 
     pub fn room_box_including_walls(&self) -> GridAab {
@@ -79,21 +79,25 @@ impl DungeonGrid {
     ///
     /// TODO: This is off by at least 1 (in the too-big direction); write tests and fix.
     pub fn minimum_space_for_rooms(&self, rooms: GridAab) -> GridAab {
-        let spacing = GridPoint::from_vec(self.room_spacing());
+        let spacing = self.room_spacing();
         let basic_size = GridAab::from_lower_upper(
-            rooms.lower_bounds().mul_element_wise(spacing),
+            rooms
+                .lower_bounds()
+                .to_vector()
+                .component_mul(spacing)
+                .to_point(),
             rooms
                 .upper_bounds()
-                .mul_element_wise(spacing)
+                .to_vector()
+                .component_mul(spacing)
+                .to_point()
                 // Correct "fencepost error": spacing * number of rooms has one extra
                 // "post" (gap_between_walls).
-                .sub_element_wise(GridPoint::from_vec(
-                    self.gap_between_walls.map(GridCoordinate::from),
-                )),
+                - self.gap_between_walls.map(GridCoordinate::from),
         );
         // basic_size has the correct size, but not the correct position relative to room_box
         // and its walls
-        basic_size.translate(self.room_box_including_walls().lower_bounds().to_vec())
+        basic_size.translate(self.room_box_including_walls().lower_bounds().to_vector())
     }
 }
 

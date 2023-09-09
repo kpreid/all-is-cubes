@@ -1,6 +1,6 @@
 //! Mathematical utilities and decisions.
 
-use cgmath::{Point3, Vector3};
+use euclid::Vector3D;
 use num_traits::identities::Zero;
 pub use ordered_float::{FloatIsNan, NotNan};
 
@@ -113,7 +113,7 @@ pub trait Geometry {
 
     /// Translate (move) this object by the specified offset.
     #[must_use]
-    fn translate(self, offset: Vector3<Self::Coord>) -> Self;
+    fn translate(self, offset: Vector3D<Self::Coord, Cube>) -> Self;
 
     /// Represent this object as a line drawing, or wireframe.
     ///
@@ -138,7 +138,7 @@ pub trait Geometry {
 #[non_exhaustive]
 pub struct LineVertex {
     /// Position of the vertex.
-    pub position: Point3<FreeCoordinate>,
+    pub position: FreePoint,
 
     /// Color in which to draw the line.
     ///
@@ -149,8 +149,8 @@ pub struct LineVertex {
     pub color: Option<crate::math::Rgba>,
 }
 
-impl From<Point3<FreeCoordinate>> for LineVertex {
-    fn from(position: Point3<FreeCoordinate>) -> Self {
+impl From<FreePoint> for LineVertex {
+    fn from(position: FreePoint) -> Self {
         Self {
             position,
             color: None,

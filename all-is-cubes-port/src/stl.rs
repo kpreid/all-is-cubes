@@ -6,13 +6,12 @@ use itertools::Itertools as _;
 use stl_io::Triangle;
 
 use all_is_cubes::block::{self, Block};
-use all_is_cubes::universe::PartialUniverse;
-
 use all_is_cubes::camera::GraphicsOptions;
-use all_is_cubes::cgmath::{EuclideanSpace as _, Vector3};
-use all_is_cubes::math::FreeCoordinate;
+use all_is_cubes::euclid::Vector3D;
+use all_is_cubes::math::{Cube, FreeCoordinate, VectorOps};
 use all_is_cubes::notnan;
 use all_is_cubes::space::Space;
+use all_is_cubes::universe::PartialUniverse;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_mesh::{
     self as mesh,
@@ -102,14 +101,14 @@ fn space_mesh_to_triangles(
             ];
             Triangle {
                 normal: convert_vector(tri[0].face.normal_vector()),
-                vertices: tri.map(|v| convert_vector(v.position.to_vec())),
+                vertices: tri.map(|v| convert_vector(v.position.to_vector())),
             }
         })
         .collect()
 }
 
 #[inline]
-fn convert_vector(input: Vector3<FreeCoordinate>) -> stl_io::Vector<f32> {
+fn convert_vector(input: Vector3D<FreeCoordinate, Cube>) -> stl_io::Vector<f32> {
     stl_io::Vector::new(input.map(|c| c as f32).into())
 }
 
@@ -120,6 +119,7 @@ mod tests {
     use all_is_cubes::block::BlockDef;
     use all_is_cubes::content::make_some_voxel_blocks;
     use all_is_cubes::content::testing::lighting_bench_space;
+    use all_is_cubes::math::GridVector;
     use all_is_cubes::universe::{Name, URef, Universe};
     use all_is_cubes::util::yield_progress_for_testing;
     use std::collections::BTreeSet;
@@ -128,7 +128,7 @@ mod tests {
     #[test]
     fn space_to_stl_smoke_test() {
         let mut u = Universe::new();
-        let space = lighting_bench_space(&mut u, Vector3::new(54, 16, 54)).unwrap();
+        let space = lighting_bench_space(&mut u, GridVector::new(54, 16, 54)).unwrap();
         let mesh = space_to_stl_triangles(&space);
         assert!(mesh.len() > 30_000, "{}", mesh.len());
     }

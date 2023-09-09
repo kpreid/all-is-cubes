@@ -12,12 +12,12 @@ use all_is_cubes::camera::{
     RenderError, StandardCameras, ToneMappingOperator, TransparencyOption, UiViewState,
     ViewTransform, Viewport,
 };
-use all_is_cubes::cgmath::{EuclideanSpace as _, One, Point2, Point3, Vector2, Vector3};
 use all_is_cubes::character::{Character, Spawn};
+use all_is_cubes::euclid::{point3, vec2, vec3, Point2D, Vector2D, Vector3D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridRotation, GridVector,
-    NotNan, Rgb, Rgba,
+    Cube, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation,
+    GridVector, NotNan, Rgb, Rgba, VectorOps,
 };
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder};
 use all_is_cubes::time;
@@ -150,11 +150,11 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
         })
         .build();
 
-    let dr = Vector3::new(1, 0, 0);
-    let dg = Vector3::new(1, 1, 0);
-    let db = Vector3::new(0, 1, 0);
+    let dr = GridVector::new(1, 0, 0);
+    let dg = GridVector::new(1, 1, 0);
+    let db = GridVector::new(0, 1, 0);
     for i in 0..=255u8 {
-        let p = Point3::new(
+        let p = GridPoint::new(
             i32::from(i.rem_euclid(16)) * 2,
             i32::from(i.div_euclid(16)) * 2,
             0,
@@ -180,7 +180,7 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
         GraphicsOptions::UNALTERED_COLORS,
         Viewport::with_scale(
             1.0,
-            Vector2::new(1, 1) * (f64::from(bounds.size().x) * 4.) as u32,
+            Vector2D::one() * (f64::from(bounds.size().x) * 4.) as u32,
         ),
         &universe,
     );
@@ -206,7 +206,7 @@ async fn cursor_basic(mut context: RenderTestContext) {
         COMMON_VIEWPORT,
         &universe,
     );
-    let cursor = cameras.project_cursor(Point2::origin());
+    let cursor = cameras.project_cursor(Point2D::origin());
     let overlays = Overlays {
         cursor: cursor.as_ref(),
         info_text: None,
@@ -495,7 +495,7 @@ async fn icons(mut context: RenderTestContext) {
         let space = w
             .to_space(
                 SpaceBuilder::default(),
-                Vector3::new(Align::Low, Align::Low, Align::Low),
+                Vector3D::new(Align::Low, Align::Low, Align::Low),
             )
             .unwrap();
         assert_eq!(space.bounds().size(), GridVector::new(1, 1, 1));
@@ -542,7 +542,7 @@ async fn icons(mut context: RenderTestContext) {
 
     // Fill space with blocks
     let mut space = Space::builder(bounds)
-        .spawn_position(Point3::new(
+        .spawn_position(point3(
             FreeCoordinate::from(bounds.size().x) / 2.,
             FreeCoordinate::from(bounds.size().y) / 2.,
             FreeCoordinate::from(bounds.size().y) * 1.5,
@@ -576,7 +576,7 @@ async fn icons(mut context: RenderTestContext) {
             Threshold::new([(8, 2000), (20, 100), (40, 20)]),
             StandardCameras::from_constant_for_test(
                 options,
-                Viewport::with_scale(1.0, [256, (256.0 * aspect_ratio) as u32].into()),
+                Viewport::with_scale(1.0, [256, (256.0 * aspect_ratio) as u32]),
                 universe,
             ),
             Overlays::NONE,
@@ -604,7 +604,7 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
         ListenableSource::constant(universe.get_default_character()),
         ListenableSource::constant(UiViewState {
             space: Some(ui_space(&mut universe)),
-            view_transform: ViewTransform::one(),
+            view_transform: ViewTransform::identity(),
             graphics_options: options,
         }),
     );
@@ -651,7 +651,7 @@ async fn layers_ui_only(mut context: RenderTestContext) {
         ListenableSource::constant(None),
         ListenableSource::constant(UiViewState {
             space: Some(ui_space(&mut universe)),
-            view_transform: ViewTransform::one(),
+            view_transform: ViewTransform::identity(),
             graphics_options: GraphicsOptions::UNALTERED_COLORS,
         }),
     );
@@ -771,7 +771,7 @@ async fn transparent_one(mut context: RenderTestContext, transparency_option: &s
 async fn zero_viewport(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, one_cube_space());
-    let zero = Viewport::with_scale(1.00, Vector2::new(0, 0));
+    let zero = Viewport::with_scale(1.00, [0, 0]);
     let viewport_cell = ListenableCell::new(zero);
     let cameras: StandardCameras = StandardCameras::new(
         ListenableSource::constant(GraphicsOptions::default()),
@@ -792,7 +792,7 @@ async fn zero_viewport(mut context: RenderTestContext) {
         .draw(overlays.info_text.as_ref().unwrap())
         .await
         .unwrap();
-    assert_eq!(image.size, Vector2::new(0, 0));
+    assert_eq!(image.size, vec2(0, 0));
 
     // Now confirm the renderer can produce an okay image afterward
     viewport_cell.set(COMMON_VIEWPORT);
@@ -807,7 +807,7 @@ async fn zero_viewport(mut context: RenderTestContext) {
         .draw(overlays.info_text.as_ref().unwrap())
         .await
         .unwrap();
-    assert_eq!(image.size, Vector2::new(0, 0));
+    assert_eq!(image.size, vec2(0, 0));
     viewport_cell.set(COMMON_VIEWPORT);
     context
         .render_comparison_test_with_renderer(TEXT_MAX_DIFF, &mut renderer, overlays)
@@ -898,8 +898,8 @@ async fn antialias_test_universe() -> Arc<Universe> {
         .light_physics(LightPhysics::None)
         .spawn({
             let mut spawn = Spawn::default_for_new_space(bounds);
-            spawn.set_eye_position(Point3::new(0., 0., 0.));
-            spawn.set_look_direction(Vector3::new(0.4, -0.2, -1.0));
+            spawn.set_eye_position(point3(0., 0., 0.));
+            spawn.set_look_direction(vec3(0.4, -0.2, -1.0));
             spawn
         })
         .build();
@@ -925,8 +925,8 @@ async fn fog_test_universe() -> Arc<Universe> {
     let mut space = Space::builder(bounds)
         .spawn({
             let mut spawn = Spawn::default_for_new_space(bounds);
-            spawn.set_eye_position(Point3::new(0., 10., 0.));
-            spawn.set_look_direction(Vector3::new(0.4, 0., -1.0));
+            spawn.set_eye_position(point3(0., 10., 0.));
+            spawn.set_look_direction(vec3(0.4, 0., -1.0));
             spawn
         })
         .build();
@@ -978,7 +978,7 @@ async fn fog_test_universe() -> Arc<Universe> {
 async fn light_test_universe() -> Arc<Universe> {
     let bounds = GridAab::from_lower_size([-10, -10, -1], [20, 20, 5]);
     let mut space = Space::builder(bounds)
-        .spawn_position(Point3::new(0., 0., 8.))
+        .spawn_position(point3(0., 0., 8.))
         .build();
 
     // Back wall

@@ -6,7 +6,6 @@ use std::sync::Arc;
 use futures_core::future::BoxFuture;
 use rand::{Rng, SeedableRng as _};
 
-use all_is_cubes::cgmath::Vector3;
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::iso_8859_1 as font,
     text::{Alignment, Baseline, TextStyleBuilder},
@@ -73,7 +72,7 @@ pub(crate) async fn demo_city<I: Instant>(
     let sky_height = 30;
     let ground_depth = 30; // TODO: wavy_landscape is forcing us to have extra symmetry here
     let underground_floor_y = -5;
-    let space_size = params.size.unwrap_or(Vector3::new(160, 60, 160));
+    let space_size = params.size.unwrap_or(GridVector::new(160, 60, 160));
     let bounds = GridAab::from_lower_upper(
         [-space_size.x / 2, -ground_depth, -space_size.z / 2],
         [space_size.x / 2, sky_height, space_size.z / 2],
@@ -164,9 +163,9 @@ pub(crate) async fn demo_city<I: Instant>(
         let other_side_of_road =
             GridRotation::from_basis([Face6::NX, Face6::PY, Face6::NZ]) * road_aligned_rotation;
         let rotations = [other_side_of_road, road_aligned_rotation];
-        let raycaster = Raycaster::new([0.5, 0.5, 0.5], face.normal_vector::<FreeCoordinate>())
+        let raycaster = Raycaster::new([0.5, 0.5, 0.5], face.normal_vector::<FreeCoordinate, _>())
             .within(space.bounds());
-        let curb_y = GridVector::unit_y();
+        let curb_y = GridVector::new(0, 1, 0);
         for (i, step) in raycaster.enumerate() {
             let i = i as GridCoordinate;
             // Road surface
@@ -212,9 +211,9 @@ pub(crate) async fn demo_city<I: Instant>(
             // Dig underground passages
             // TODO: They need a connection to the surface
             for p in -road_radius..=road_radius {
-                for z in underground_floor_y..0 {
+                for y in underground_floor_y..0 {
                     space.set(
-                        step.cube_ahead() + perpendicular * p + Vector3::unit_y() * z,
+                        step.cube_ahead() + perpendicular * p + GridVector::new(0, y, 0),
                         &AIR,
                     )?;
                 }
@@ -334,7 +333,7 @@ pub(crate) async fn demo_city<I: Instant>(
             enclosure_at_plot.lower_bounds(),
             [
                 enclosure_at_plot.upper_bounds().x,
-                1.max(plot.lower_bounds()[1]), // handles case where plot is floating
+                1.max(plot.lower_bounds().y), // handles case where plot is floating
                 enclosure_at_plot.upper_bounds().z,
             ],
         );
@@ -386,16 +385,14 @@ pub(crate) async fn demo_city<I: Instant>(
                 )
                 .unwrap();
 
-            let sign_position_in_plot_coordinates = {
-                GridVector {
-                    // extending right from left edge
-                    x: enclosure_footprint.lower_bounds().x,
-                    // at ground level
-                    y: 0,
-                    // minus 1 to put the Signboard blockss on the enclosure blocks
-                    z: enclosure_footprint.upper_bounds().z - 1,
-                }
-            };
+            let sign_position_in_plot_coordinates = GridVector::new(
+                // extending right from left edge
+                enclosure_footprint.lower_bounds().x,
+                // at ground level
+                0,
+                // minus 1 to put the Signboard blockss on the enclosure blocks
+                enclosure_footprint.upper_bounds().z - 1,
+            );
             let sign_transform =
                 plot_transform * Gridgid::from_translation(sign_position_in_plot_coordinates);
 

@@ -1,10 +1,8 @@
-use cgmath::{Basis3, Decomposed, One, Vector3};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
-use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport};
-use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
 use all_is_cubes::chunking::{reset_chunk_chart_cache, ChunkChart, ChunkPos, OctantMask};
-use all_is_cubes::math::{Cube, GridAab};
+use all_is_cubes::math::{Cube, FreeVector, GridAab};
 
 fn chunk_chart_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("ChunkChart");
@@ -29,14 +27,12 @@ fn cull_bench(c: &mut Criterion) {
     let mut camera = Camera::new(
         GraphicsOptions::default(),
         // only aspect ratio should matter
-        Viewport::with_scale(1.0, Vector2::new(800, 600)),
+        Viewport::with_scale(1.0, [800, 600]),
     );
     // Set a small translation to avoid the edge case of being exactly on a chunk boundaries.
-    camera.set_view_transform(Decomposed {
-        scale: 1.0,
-        rot: Basis3::one(),
-        disp: -Vector3::new(0.01, 0.01, 0.01),
-    });
+    camera.set_view_transform(ViewTransform::from_translation(-FreeVector::new(
+        0.01, 0.01, 0.01,
+    )));
 
     c.bench_function("bounds", |b| {
         b.iter(|| {

@@ -1,9 +1,8 @@
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point3};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::math::{Aab, Geometry, GridCoordinate, LineVertex};
 use all_is_cubes::space::{BlockIndex, Space};
 
-use crate::{dynamic, texture, GfxVertex, MeshOptions, SpaceMesh};
+use crate::{dynamic, texture, GfxVertex, MeshOptions, SpaceMesh, VPos};
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
@@ -124,21 +123,14 @@ where
     ///
     /// Returns whether anything was done, i.e. whether the new indices should be copied
     /// to the GPU.
-    pub fn depth_sort_for_view(&mut self, view_position: Point3<Vert::Coordinate>) -> bool {
+    pub fn depth_sort_for_view(&mut self, view_position: VPos<Vert>) -> bool {
         // Subtract chunk origin because the mesh coordinates are in chunk-relative
         // coordinates but the incoming view position is in world coordinates.
         // TODO: This makes poor use of the precision of Vert::Coordinate (probably f32).
         // Instead we should explicitly accept relative coordinates.
-        self.mesh.depth_sort_for_view(
-            view_position
-                - self
-                    .position
-                    .bounds()
-                    .lower_bounds()
-                    .to_vec()
-                    .cast()
-                    .unwrap(),
-        )
+        let lbp: VPos<Vert> = self.position.bounds().lower_bounds().cast();
+        self.mesh
+            .depth_sort_for_view(view_position - lbp.to_vector())
     }
 
     pub(crate) fn stale_blocks(

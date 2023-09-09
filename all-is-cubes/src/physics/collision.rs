@@ -3,14 +3,14 @@
 use std::collections::HashSet;
 use std::fmt;
 
-use cgmath::{EuclideanSpace as _, InnerSpace as _, Vector3, Zero as _};
+use euclid::Vector3D;
 
 use super::POSITION_EPSILON;
 use crate::block::Evoxels;
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{
     Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridAab, GridArray,
-    GridCoordinate, LineVertex,
+    GridCoordinate, LineVertex, VectorOps,
 };
 use crate::raycast::{Ray, Raycaster};
 use crate::space::Space;
@@ -111,7 +111,7 @@ impl fmt::Debug for Contact {
 impl Geometry for Contact {
     type Coord = GridCoordinate;
 
-    fn translate(mut self, offset: Vector3<Self::Coord>) -> Self {
+    fn translate(mut self, offset: Vector3D<Self::Coord, Cube>) -> Self {
         match &mut self {
             Contact::Block(CubeFace { mut cube, .. }) => cube += offset,
             Contact::Voxel { mut cube, .. } => cube += offset,
@@ -194,7 +194,7 @@ where
     let mut already_colliding: HashSet<Contact> = HashSet::new();
 
     debug_assert!(
-        ray.direction.magnitude2() < super::body::VELOCITY_MAGNITUDE_LIMIT_SQUARED * 2.,
+        ray.direction.square_length() < super::body::VELOCITY_MAGNITUDE_LIMIT_SQUARED * 2.,
         "Attempting to collide_along_ray a very long distance: {ray:?}"
     );
 
@@ -211,7 +211,7 @@ where
             R1,
             stop_at.reversed(),
         );
-        let step_aab = aab.translate(offset_segment.unit_endpoint().to_vec());
+        let step_aab = aab.translate(offset_segment.unit_endpoint().to_vector());
         if ray_step.t_distance() >= 1.0 {
             // Movement is unobstructed in this timestep.
             break;
@@ -409,7 +409,7 @@ impl CollisionSpace for Space {
                     .contact
                     .cube()
                     .lower_bounds()
-                    .to_vec()
+                    .to_vector()
                     .map(|s| -FreeCoordinate::from(s));
                 let scale = FreeCoordinate::from(resolution);
                 // Transform our original AAB and ray so that it is in the coordinate system of the block voxels.
@@ -517,7 +517,7 @@ pub(crate) fn nudge_on_ray(
     subdivision: Resolution,
     backward: bool,
 ) -> Ray {
-    if segment.direction.is_zero() {
+    if segment.direction == Vector3D::zero() {
         return segment;
     }
     let face: Face6 = match face.try_into() {
@@ -529,7 +529,7 @@ pub(crate) fn nudge_on_ray(
     let penetration_depth = {
         let subdivision = FreeCoordinate::from(subdivision);
         let fc_scaled = aab
-            .translate(segment.unit_endpoint().to_vec())
+            .translate(segment.unit_endpoint().to_vector())
             .face_coordinate(face)
             * subdivision;
         (fc_scaled - fc_scaled.round()) / subdivision
@@ -724,14 +724,14 @@ mod tests {
                 Aab::new(-2., 2., -2., 2., -2., 2.).random_point(&mut rng),
                 Aab::new(-1., 1., -1., 1., -1., 1.)
                     .random_point(&mut rng)
-                    .to_vec(),
+                    .to_vector(),
             );
             let step = aab_raycast(moving_aab, ray, false)
                 .nth(rng.gen_range(1..10))
                 .unwrap();
             let axis = step.face().axis().expect("should have an axis");
             let segment = ray.scale_direction(step.t_distance()); // TODO: this should be a function? Should aab_raycast return a special step type with these features?
-            let unnudged_aab = moving_aab.translate(segment.unit_endpoint().to_vec());
+            let unnudged_aab = moving_aab.translate(segment.unit_endpoint().to_vector());
             let face_to_nudge: Face6 = Face6::try_from(step.face().opposite()).unwrap();
 
             eprintln!("\n#{case_number} with inputs:");
@@ -745,10 +745,10 @@ mod tests {
                 // TODO: test non-1 resolution
                 let adjusted_segment =
                     nudge_on_ray(moving_aab, segment, face_to_nudge.into(), R1, backward);
-                let nudged_aab = moving_aab.translate(adjusted_segment.unit_endpoint().to_vec());
+                let nudged_aab = moving_aab.translate(adjusted_segment.unit_endpoint().to_vector());
 
                 // Check that the nudge was not too big
-                let nudge_length = (adjusted_segment.direction - segment.direction).magnitude();
+                let nudge_length = (adjusted_segment.direction - segment.direction).length();
                 assert!(
                     nudge_length <= 0.001,
                     "nudge moved too far\nfrom {segment:?}\n  to {adjusted_segment:?}\ndistance of {nudge_length}"

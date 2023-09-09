@@ -180,8 +180,8 @@ pub fn make_slab(
 pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
     for face in Face6::ALL {
         let axis = face.axis();
-        let direction = face.normal_vector::<GridCoordinate>()[axis];
-        let raycaster = Raycaster::new([0.5, 0.5, 0.5], face.normal_vector::<FreeCoordinate>())
+        let direction = face.normal_vector::<GridCoordinate, ()>()[axis];
+        let raycaster = Raycaster::new([0.5, 0.5, 0.5], face.normal_vector::<FreeCoordinate, _>())
             .within(space.bounds());
         for step in raycaster {
             let i = step.cube_ahead().lower_bounds()[axis] * direction; // always positive

@@ -5,13 +5,13 @@
 
 use std::sync::{Arc, Mutex, Weak};
 
-use all_is_cubes::cgmath::{Point3, Vector3};
-use all_is_cubes::math::GridAab;
+use all_is_cubes::euclid::Translation3D;
+use all_is_cubes::math::{GridAab, GridCoordinate, VectorOps};
 use all_is_cubes::time;
 use all_is_cubes_mesh::texture;
 
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
-use crate::in_wgpu::vertex::TexPoint;
+use crate::in_wgpu::vertex::{AtlasTexel, TexPoint};
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};
 use crate::BlockTextureInfo;
 
@@ -34,7 +34,7 @@ pub struct AtlasTile {
     /// Original bounds as requested (not texture coordinates).
     requested_bounds: GridAab,
     /// Translation of the requested bounds to the actual region within the texture.
-    offset: Vector3<i32>,
+    offset: Translation3D<GridCoordinate, texture::TexelUnit, AtlasTexel>,
     /// Actual storage and metadata about the tile; may be updated as needed by the
     /// allocator to grow the texture.
     ///
@@ -250,7 +250,7 @@ impl texture::Allocator for AtlasAllocator {
 
         let result = AtlasTile {
             requested_bounds,
-            offset: handle.offset,
+            offset: Translation3D::from_untyped(&handle.offset),
             backing: Arc::new(Mutex::new(TileBacking {
                 handle: Some(handle),
                 data: None,
@@ -320,9 +320,9 @@ impl Eq for AtlasTile {}
 impl texture::Plane for AtlasPlane {
     type Point = TexPoint;
 
-    fn grid_to_texcoord(&self, in_tile_grid: Point3<f32>) -> Self::Point {
+    fn grid_to_texcoord(&self, in_tile_grid: texture::TilePoint) -> Self::Point {
         // TODO: assert in bounds, just in case
-        in_tile_grid + self.tile.offset.map(|c| c as f32)
+        (in_tile_grid + self.tile.offset.to_vector().map(|c| c as f32)).cast_unit()
     }
 }
 

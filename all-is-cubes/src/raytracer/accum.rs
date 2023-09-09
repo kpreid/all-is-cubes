@@ -2,10 +2,11 @@
 
 use std::convert::TryFrom as _;
 
-use cgmath::{Vector3, Zero as _};
+use euclid::Vector3D;
+use ordered_float::NotNan;
 
 use crate::camera::GraphicsOptions;
-use crate::math::Rgba;
+use crate::math::{Intensity, Rgb, Rgba};
 use crate::space::SpaceBlockData;
 
 /// Borrowed data which may be used to customize the result of raytracing.
@@ -130,7 +131,7 @@ pub struct ColorBuf {
     /// display supposing that everything not already traced is black.
     ///
     /// Note: Not using the [`Rgb`](crate::math::Rgb) type so as to skip NaN checks.
-    color_accumulator: Vector3<f32>,
+    color_accumulator: Vector3D<f32, Intensity>,
 
     /// Fraction of the color value that is to be determined by future, rather than past,
     /// tracing; starts at 1.0 and decreases as surfaces are encountered.
@@ -149,7 +150,7 @@ impl Accumulate for ColorBuf {
 
     #[inline]
     fn add(&mut self, surface_color: Rgba, _block_data: &Self::BlockData) {
-        let color_vector: Vector3<f32> = surface_color.to_rgb().into();
+        let color_vector: Vector3D<f32, Intensity> = surface_color.to_rgb().into();
         let surface_alpha = surface_color.alpha().into_inner();
         let alpha_for_add = surface_alpha * self.ray_alpha;
         self.ray_alpha *= 1.0 - surface_alpha;
@@ -162,7 +163,7 @@ impl Accumulate for ColorBuf {
             color_accumulator: items
                 .iter()
                 .map(|cb| cb.color_accumulator)
-                .sum::<Vector3<f32>>()
+                .sum::<Vector3D<f32, Intensity>>()
                 / (N as f32),
             ray_alpha: items.iter().map(|cb| cb.ray_alpha).sum::<f32>() / (N as f32),
         }
@@ -173,7 +174,7 @@ impl Default for ColorBuf {
     #[inline]
     fn default() -> Self {
         Self {
-            color_accumulator: Vector3::zero(),
+            color_accumulator: Vector3D::zero(),
             ray_alpha: 1.0,
         }
     }
@@ -192,8 +193,9 @@ impl From<ColorBuf> for Rgba {
         } else {
             let color_alpha = 1.0 - buf.ray_alpha;
             let non_premultiplied_color = buf.color_accumulator / color_alpha;
-            Rgba::try_from(non_premultiplied_color.extend(color_alpha))
-                .unwrap_or_else(|_| Rgba::new(1.0, 0.0, 0.0, 1.0))
+            Rgb::try_from(non_premultiplied_color)
+                .unwrap_or_else(|_| rgb_const!(1.0, 0.0, 0.0))
+                .with_alpha(NotNan::new(color_alpha).unwrap_or(notnan!(1.0)))
         }
     }
 }

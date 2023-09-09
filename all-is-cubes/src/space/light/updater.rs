@@ -4,12 +4,12 @@
 use core::cmp::Ordering;
 use core::fmt;
 
-use cgmath::{EuclideanSpace as _, Point3, Vector3};
+use euclid::{Point3D, Vector3D};
 
 use super::debug::LightComputeOutput;
 use super::LightUpdateRequest;
 use crate::block::EvaluatedBlock;
-use crate::math::{Cube, Face6, FaceMap, FreeCoordinate, Geometry, NotNan, Rgb};
+use crate::math::{Cube, Face6, FaceMap, FreeCoordinate, Geometry, NotNan, Rgb, VectorOps};
 use crate::raycast::{Ray, RaycastStep};
 use crate::space::light::{LightUpdateRayInfo, Priority};
 use crate::space::{GridAab, LightPhysics, PackedLight, PackedLightScalar, Space, SpaceChange};
@@ -342,7 +342,7 @@ impl LightRayState {
             origin_cube
                 .lower_bounds()
                 .map(FreeCoordinate::from)
-                .to_vec(),
+                .to_vector(),
         );
         LightRayState {
             alpha: 1.0,

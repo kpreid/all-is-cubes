@@ -4,12 +4,12 @@ use std::borrow::Cow;
 use std::ops::Range;
 use std::sync::Arc;
 
+use all_is_cubes::euclid::{Point3D, Vector3D};
 use all_is_cubes_mesh::IndexSlice;
 use bytemuck::Pod;
 use wgpu::util::DeviceExt as _;
 
-use all_is_cubes::cgmath::{Point3, Vector3};
-use all_is_cubes::math::{GridAab, GridCoordinate, Rgba};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridVector, Rgba};
 
 use crate::reloadable::Reloadable;
 use crate::GraphicsResourceError;
@@ -41,8 +41,8 @@ impl PartialEq for PaddedVec3 {
 }
 impl Eq for PaddedVec3 {}
 
-impl From<Vector3<f32>> for PaddedVec3 {
-    fn from(data: Vector3<f32>) -> Self {
+impl<U> From<Vector3D<f32, U>> for PaddedVec3 {
+    fn from(data: Vector3D<f32, U>) -> Self {
         Self {
             data: data.into(),
             padding: 0.,
@@ -120,20 +120,20 @@ pub fn write_texture_by_aab<T: Pod>(
 }
 
 /// Convert point to [`wgpu::Origin3d`]. Panics if the input is negative.
-pub fn point_to_origin(origin: Point3<GridCoordinate>) -> wgpu::Origin3d {
+pub fn point_to_origin<U>(origin: Point3D<GridCoordinate, U>) -> wgpu::Origin3d {
     wgpu::Origin3d {
-        x: origin[0].try_into().expect("negative origin"),
-        y: origin[1].try_into().expect("negative origin"),
-        z: origin[2].try_into().expect("negative origin"),
+        x: origin.x.try_into().expect("negative origin"),
+        y: origin.y.try_into().expect("negative origin"),
+        z: origin.z.try_into().expect("negative origin"),
     }
 }
 
 /// Convert vector of sizes to [`wgpu::Extent3d`]. Panics if the input is negative.
-pub fn size_vector_to_extent(size: Vector3<GridCoordinate>) -> wgpu::Extent3d {
+pub fn size_vector_to_extent(size: GridVector) -> wgpu::Extent3d {
     wgpu::Extent3d {
-        width: size[0].try_into().expect("negative size"),
-        height: size[1].try_into().expect("negative size"),
-        depth_or_array_layers: size[2].try_into().expect("negative size"),
+        width: size.x.try_into().expect("negative size"),
+        height: size.y.try_into().expect("negative size"),
+        depth_or_array_layers: size.z.try_into().expect("negative size"),
     }
 }
 

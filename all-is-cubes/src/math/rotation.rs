@@ -1,11 +1,13 @@
 //! Rotations which exchange axes (thus not leaving the integer grid).
 //! This module is private but reexported by its parent.
 
-use std::ops::Mul;
+use core::marker::PhantomData;
+use core::ops::Mul;
 
-use cgmath::{One, Vector3, Zero as _};
+use crate::math::{Face6, GridCoordinate, GridMatrix, GridVector, Gridgid, Vector3D, VectorOps};
 
-use crate::math::*;
+#[cfg(doc)]
+use crate::math::GridAab;
 
 /// Represents a discrete (grid-aligned) rotation, or exchange of axes.
 ///
@@ -111,12 +113,11 @@ impl GridRotation {
     ///
     /// Panics if the three provided axes are not mutually perpendicular.
     #[inline]
-    pub fn from_basis(basis: impl Into<Vector3<Face6>>) -> Self {
+    pub fn from_basis(basis: impl Into<[Face6; 3]>) -> Self {
         Self::from_basis_impl(basis.into())
     }
 
-    fn from_basis_impl(basis: Vector3<Face6>) -> Self {
-        let basis: [Face6; 3] = basis.into(); // for concise matching
+    fn from_basis_impl(basis: [Face6; 3]) -> Self {
         use {Face6::*, GridRotation::*};
         match basis {
             [PX, PY, PZ] => RXYZ,
@@ -223,64 +224,64 @@ impl GridRotation {
     #[doc(hidden)]
     #[inline]
     #[rustfmt::skip] // dense data layout
-    pub const fn to_basis(self) -> Vector3<Face6> {
+    pub const fn to_basis(self) -> Vector3D<Face6, ()> {
         use {Face6::*, GridRotation::*};
         match self {
-            RXYZ => Vector3 { x: PX, y: PY, z: PZ },
-            RXZY => Vector3 { x: PX, y: PZ, z: PY },
-            RYXZ => Vector3 { x: PY, y: PX, z: PZ },
-            RYZX => Vector3 { x: PY, y: PZ, z: PX },
-            RZXY => Vector3 { x: PZ, y: PX, z: PY },
-            RZYX => Vector3 { x: PZ, y: PY, z: PX },
+            RXYZ => Vector3D { x: PX, y: PY, z: PZ, _unit: PhantomData },
+            RXZY => Vector3D { x: PX, y: PZ, z: PY, _unit: PhantomData },
+            RYXZ => Vector3D { x: PY, y: PX, z: PZ, _unit: PhantomData },
+            RYZX => Vector3D { x: PY, y: PZ, z: PX, _unit: PhantomData },
+            RZXY => Vector3D { x: PZ, y: PX, z: PY, _unit: PhantomData },
+            RZYX => Vector3D { x: PZ, y: PY, z: PX, _unit: PhantomData },
 
-            RXYz => Vector3 { x: PX, y: PY, z: NZ },
-            RXZy => Vector3 { x: PX, y: PZ, z: NY },
-            RYXz => Vector3 { x: PY, y: PX, z: NZ },
-            RYZx => Vector3 { x: PY, y: PZ, z: NX },
-            RZXy => Vector3 { x: PZ, y: PX, z: NY },
-            RZYx => Vector3 { x: PZ, y: PY, z: NX },
+            RXYz => Vector3D { x: PX, y: PY, z: NZ, _unit: PhantomData },
+            RXZy => Vector3D { x: PX, y: PZ, z: NY, _unit: PhantomData },
+            RYXz => Vector3D { x: PY, y: PX, z: NZ, _unit: PhantomData },
+            RYZx => Vector3D { x: PY, y: PZ, z: NX, _unit: PhantomData },
+            RZXy => Vector3D { x: PZ, y: PX, z: NY, _unit: PhantomData },
+            RZYx => Vector3D { x: PZ, y: PY, z: NX, _unit: PhantomData },
 
-            RXyZ => Vector3 { x: PX, y: NY, z: PZ },
-            RXzY => Vector3 { x: PX, y: NZ, z: PY },
-            RYxZ => Vector3 { x: PY, y: NX, z: PZ },
-            RYzX => Vector3 { x: PY, y: NZ, z: PX },
-            RZxY => Vector3 { x: PZ, y: NX, z: PY },
-            RZyX => Vector3 { x: PZ, y: NY, z: PX },
+            RXyZ => Vector3D { x: PX, y: NY, z: PZ, _unit: PhantomData },
+            RXzY => Vector3D { x: PX, y: NZ, z: PY, _unit: PhantomData },
+            RYxZ => Vector3D { x: PY, y: NX, z: PZ, _unit: PhantomData },
+            RYzX => Vector3D { x: PY, y: NZ, z: PX, _unit: PhantomData },
+            RZxY => Vector3D { x: PZ, y: NX, z: PY, _unit: PhantomData },
+            RZyX => Vector3D { x: PZ, y: NY, z: PX, _unit: PhantomData },
 
-            RXyz => Vector3 { x: PX, y: NY, z: NZ },
-            RXzy => Vector3 { x: PX, y: NZ, z: NY },
-            RYxz => Vector3 { x: PY, y: NX, z: NZ },
-            RYzx => Vector3 { x: PY, y: NZ, z: NX },
-            RZxy => Vector3 { x: PZ, y: NX, z: NY },
-            RZyx => Vector3 { x: PZ, y: NY, z: NX },
+            RXyz => Vector3D { x: PX, y: NY, z: NZ, _unit: PhantomData },
+            RXzy => Vector3D { x: PX, y: NZ, z: NY, _unit: PhantomData },
+            RYxz => Vector3D { x: PY, y: NX, z: NZ, _unit: PhantomData },
+            RYzx => Vector3D { x: PY, y: NZ, z: NX, _unit: PhantomData },
+            RZxy => Vector3D { x: PZ, y: NX, z: NY, _unit: PhantomData },
+            RZyx => Vector3D { x: PZ, y: NY, z: NX, _unit: PhantomData },
 
-            RxYZ => Vector3 { x: NX, y: PY, z: PZ },
-            RxZY => Vector3 { x: NX, y: PZ, z: PY },
-            RyXZ => Vector3 { x: NY, y: PX, z: PZ },
-            RyZX => Vector3 { x: NY, y: PZ, z: PX },
-            RzXY => Vector3 { x: NZ, y: PX, z: PY },
-            RzYX => Vector3 { x: NZ, y: PY, z: PX },
+            RxYZ => Vector3D { x: NX, y: PY, z: PZ, _unit: PhantomData },
+            RxZY => Vector3D { x: NX, y: PZ, z: PY, _unit: PhantomData },
+            RyXZ => Vector3D { x: NY, y: PX, z: PZ, _unit: PhantomData },
+            RyZX => Vector3D { x: NY, y: PZ, z: PX, _unit: PhantomData },
+            RzXY => Vector3D { x: NZ, y: PX, z: PY, _unit: PhantomData },
+            RzYX => Vector3D { x: NZ, y: PY, z: PX, _unit: PhantomData },
 
-            RxYz => Vector3 { x: NX, y: PY, z: NZ },
-            RxZy => Vector3 { x: NX, y: PZ, z: NY },
-            RyXz => Vector3 { x: NY, y: PX, z: NZ },
-            RyZx => Vector3 { x: NY, y: PZ, z: NX },
-            RzXy => Vector3 { x: NZ, y: PX, z: NY },
-            RzYx => Vector3 { x: NZ, y: PY, z: NX },
+            RxYz => Vector3D { x: NX, y: PY, z: NZ, _unit: PhantomData },
+            RxZy => Vector3D { x: NX, y: PZ, z: NY, _unit: PhantomData },
+            RyXz => Vector3D { x: NY, y: PX, z: NZ, _unit: PhantomData },
+            RyZx => Vector3D { x: NY, y: PZ, z: NX, _unit: PhantomData },
+            RzXy => Vector3D { x: NZ, y: PX, z: NY, _unit: PhantomData },
+            RzYx => Vector3D { x: NZ, y: PY, z: NX, _unit: PhantomData },
 
-            RxyZ => Vector3 { x: NX, y: NY, z: PZ },
-            RxzY => Vector3 { x: NX, y: NZ, z: PY },
-            RyxZ => Vector3 { x: NY, y: NX, z: PZ },
-            RyzX => Vector3 { x: NY, y: NZ, z: PX },
-            RzxY => Vector3 { x: NZ, y: NX, z: PY },
-            RzyX => Vector3 { x: NZ, y: NY, z: PX },
+            RxyZ => Vector3D { x: NX, y: NY, z: PZ, _unit: PhantomData },
+            RxzY => Vector3D { x: NX, y: NZ, z: PY, _unit: PhantomData },
+            RyxZ => Vector3D { x: NY, y: NX, z: PZ, _unit: PhantomData },
+            RyzX => Vector3D { x: NY, y: NZ, z: PX, _unit: PhantomData },
+            RzxY => Vector3D { x: NZ, y: NX, z: PY, _unit: PhantomData },
+            RzyX => Vector3D { x: NZ, y: NY, z: PX, _unit: PhantomData },
 
-            Rxyz => Vector3 { x: NX, y: NY, z: NZ },
-            Rxzy => Vector3 { x: NX, y: NZ, z: NY },
-            Ryxz => Vector3 { x: NY, y: NX, z: NZ },
-            Ryzx => Vector3 { x: NY, y: NZ, z: NX },
-            Rzxy => Vector3 { x: NZ, y: NX, z: NY },
-            Rzyx => Vector3 { x: NZ, y: NY, z: NX },
+            Rxyz => Vector3D { x: NX, y: NY, z: NZ, _unit: PhantomData },
+            Rxzy => Vector3D { x: NX, y: NZ, z: NY, _unit: PhantomData },
+            Ryxz => Vector3D { x: NY, y: NX, z: NZ, _unit: PhantomData },
+            Ryzx => Vector3D { x: NY, y: NZ, z: NX, _unit: PhantomData },
+            Rzxy => Vector3D { x: NZ, y: NX, z: NY, _unit: PhantomData },
+            Rzyx => Vector3D { x: NZ, y: NY, z: NX, _unit: PhantomData },
         }
     }
 
@@ -300,7 +301,7 @@ impl GridRotation {
     ///
     /// Such matrices are suitable for rotating the voxels of a block, provided
     /// that the voxel coordinates are then transformed with [`GridMatrix::transform_cube`],
-    /// *not* [`GridMatrix::transform_point`](cgmath::Transform::transform_point)
+    /// *not* [`GridMatrix::transform_point`]
     /// (due to the lower-corner format of cube coordinates).
     /// ```
     /// use all_is_cubes::math::{GridAab, Cube, GridRotation};
@@ -336,7 +337,7 @@ impl GridRotation {
             x: basis.x.normal_vector(),
             y: basis.y.normal_vector(),
             z: basis.z.normal_vector(),
-            w: Vector3::zero(),
+            w: Vector3D::zero(),
         }
     }
 
@@ -381,7 +382,7 @@ impl GridRotation {
         // In a coordinate system of the *same handedness*, the cross product computes
         // the same
 
-        let Vector3 { x, y, z } = self.to_basis();
+        let Vector3D { x, y, z, _unit } = self.to_basis();
         // u8 casts are a kludge to make == work as a const fn.
         x.cross(y) as u8 != z as u8
     }
@@ -455,7 +456,7 @@ impl Default for GridRotation {
     }
 }
 
-impl One for GridRotation {
+impl num_traits::One for GridRotation {
     /// Returns the identity (no rotation).
     #[inline]
     fn one() -> Self {
@@ -493,7 +494,8 @@ impl Mul<Self> for GridRotation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cgmath::{EuclideanSpace as _, Transform as _};
+    use crate::math::GridPoint;
+    use num_traits::One;
     use std::collections::HashSet;
     use Face6::*;
 
@@ -561,7 +563,7 @@ mod tests {
         for rot in GridRotation::ALL {
             let point = GridPoint::new(1, 20, 300);
             assert_eq!(
-                GridPoint::from_vec(rot.transform_vector(point.to_vec())),
+                rot.transform_vector(point.to_vector()).to_point(),
                 rot.to_rotation_matrix().transform_point(point),
             );
         }

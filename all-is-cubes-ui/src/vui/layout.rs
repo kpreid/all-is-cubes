@@ -1,9 +1,10 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use all_is_cubes::cgmath::{Vector3, Zero as _};
+use all_is_cubes::euclid;
+use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector,
+    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector, VectorOps,
 };
 use all_is_cubes::space::{Space, SpaceBuilder, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _, Transaction as _};
@@ -71,7 +72,7 @@ impl LayoutGrant {
     pub fn new(bounds: GridAab) -> Self {
         LayoutGrant {
             bounds,
-            gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
+            gravity: Vector3D::new(Align::Center, Align::Center, Align::Center),
         }
     }
 
@@ -149,7 +150,7 @@ pub enum Align {
 /// itself towards if it is not intending to fill that space.
 ///
 /// TODO: Use a better enum
-pub type Gravity = Vector3<Align>;
+pub type Gravity = euclid::default::Vector3D<Align>;
 
 /// Something which can occupy space in a [`LayoutTree`], or is one.
 ///
@@ -353,7 +354,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 LayoutTree::Hud {
                     crosshair: crosshair.perform_layout(LayoutGrant {
                         bounds: crosshair_bounds,
-                        gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
+                        gravity: Vector3D::new(Align::Center, Align::Center, Align::Center),
                     })?,
                     toolbar: toolbar.perform_layout(LayoutGrant {
                         bounds: GridAab::from_lower_upper(
@@ -368,7 +369,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                                 grant.bounds.upper_bounds().z,
                             ],
                         ),
-                        gravity: Vector3::new(Align::Center, Align::Low, Align::Center),
+                        gravity: Vector3D::new(Align::Center, Align::Low, Align::Center),
                     })?,
                     control_bar: control_bar.perform_layout(LayoutGrant {
                         bounds: GridAab::from_lower_upper(
@@ -379,7 +380,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                             ],
                             grant.bounds.upper_bounds(),
                         ),
-                        gravity: Vector3::new(Align::High, Align::High, Align::Low),
+                        gravity: Vector3D::new(Align::High, Align::High, Align::Low),
                     })?,
                 }
             }
@@ -619,7 +620,7 @@ mod tests {
         // (because LayoutGrant::new sets gravity to center)
         assert_eq!(
             LayoutGrant::new(GridAab::from_lower_size([0, 0, 0], [5, 10, 20]))
-                .shrink_to(Vector3::new(10, 10, 10), false),
+                .shrink_to(GridVector::new(10, 10, 10), false),
             LayoutGrant::new(GridAab::from_lower_size([0, 0, 5], [5, 10, 10]))
         );
     }
@@ -629,10 +630,10 @@ mod tests {
     fn shrink_to_rounding_without_enlarging() {
         let grant = LayoutGrant {
             bounds: GridAab::from_lower_size([10, 10, 10], [10, 10, 11]),
-            gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
+            gravity: Vector3D::new(Align::Center, Align::Center, Align::Center),
         };
         assert_eq!(
-            grant.shrink_to(Vector3::new(1, 2, 2), false),
+            grant.shrink_to(GridVector::new(1, 2, 2), false),
             LayoutGrant {
                 bounds: GridAab::from_lower_size([14, 14, 14], [1, 2, 2]), // TODO: oughta be rounding down
                 gravity: grant.gravity,
@@ -651,10 +652,10 @@ mod tests {
         // Z axis is an even size in an odd grant
         let grant = LayoutGrant {
             bounds: GridAab::from_lower_size([10, 10, 10], [10, 10, 9]),
-            gravity: Vector3::new(Align::Center, Align::Center, Align::Center),
+            gravity: Vector3D::new(Align::Center, Align::Center, Align::Center),
         };
         assert_eq!(
-            grant.shrink_to(Vector3::new(1, 2, 2), true),
+            grant.shrink_to(GridVector::new(1, 2, 2), true),
             LayoutGrant {
                 bounds: GridAab::from_lower_size([14, 14, 13], [2, 2, 3]),
                 gravity: grant.gravity,

@@ -45,9 +45,9 @@
 use std::collections::HashSet;
 
 use all_is_cubes::block::{Block, Resolution, AIR};
-use all_is_cubes::cgmath::{ElementWise, InnerSpace, Point3, Vector3};
+use all_is_cubes::euclid::vec3;
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint,
+    Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridArray, GridCoordinate, GridPoint,
     GridVector, Gridgid,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpaceTransaction};
@@ -86,7 +86,7 @@ pub(crate) fn voronoi_pattern<'a>(
     resolution: Resolution,
     wrapping: bool,
     // TODO: not a well-founded choice of iterator type, just convenient
-    points: impl IntoIterator<Item = &'a (Point3<FreeCoordinate>, Block)> + Clone,
+    points: impl IntoIterator<Item = &'a (FreePoint, Block)> + Clone,
 ) -> impl Fn(Cube) -> &'a Block {
     // We use the strategy of flood-filling each point up front, because for
     // large numbers of points that's much cheaper than evaluating every cube
@@ -119,13 +119,13 @@ pub(crate) fn voronoi_pattern<'a>(
                 continue;
             }
 
-            let test_point = cube.midpoint();
+            let test_point: FreePoint = cube.midpoint();
 
             let offset = test_point - region_point;
             // TODO: add ability to muck with the distance metric in custom ways
             // instead of this hardcoded one.
-            let offset = offset.mul_element_wise(Vector3::new(1.0, 2.0, 1.0));
-            let distance_squared = offset.magnitude2();
+            let offset = offset.component_mul(vec3(1.0, 2.0, 1.0));
+            let distance_squared = offset.square_length();
 
             if distance_squared < pattern[cube_wrapped].0 {
                 pattern[cube_wrapped] = (distance_squared, block);
@@ -223,12 +223,4 @@ pub(crate) fn space_to_transaction_copy(
         .unwrap();
     }
     txn
-}
-
-/// Compute the squared magnitude of a [`GridVector`].
-///
-/// [`cgmath::InnerSpace::magnitude2`] would do the same but only for floats.
-#[inline]
-pub(crate) fn int_magnitude_squared(v: GridVector) -> GridCoordinate {
-    v.x * v.x + v.y * v.y + v.z * v.z
 }

@@ -1,14 +1,14 @@
 //! Tests for [`crate::mesh`].
 
-use all_is_cubes::math::{Cube, Rgb};
 use pretty_assertions::assert_eq;
 
 use all_is_cubes::block::{
     Atom, Block, BlockAttributes, BlockCollision, Primitive, Resolution::*, AIR,
 };
 use all_is_cubes::camera::{Flaws, GraphicsOptions, TransparencyOption};
-use all_is_cubes::cgmath::{MetricSpace as _, Point3, Transform as _, Vector3};
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
+use all_is_cubes::euclid::{Point3D, Vector3D};
+use all_is_cubes::math::{Cube, Rgb, VectorOps};
 use all_is_cubes::math::{
     Face6::{self, *},
     FaceMap, FreeCoordinate, GridAab, GridRotation, Rgba,
@@ -17,7 +17,7 @@ use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::{notnan, rgba_const};
 
-use crate::texture::{TestAllocator, TestPoint, TestTile};
+use crate::texture::{TestAllocator, TestPoint, TestTile, TexelUnit};
 use crate::{
     block_meshes_for_space, BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering,
     IndexSlice, MeshOptions, SpaceMesh,
@@ -124,7 +124,7 @@ fn excludes_hidden_faces_of_blocks() {
         space_mesh
             .vertices()
             .iter()
-            .filter(|vertex| vertex.position.distance2(Point3::new(1.0, 1.0, 1.0)) < 0.99)
+            .filter(|vertex| (vertex.position - Point3D::new(1., 1., 1.)).square_length() < 0.99)
             .collect::<Vec<&BlockVertex<TestPoint>>>(),
         "found an interior point"
     );
@@ -564,7 +564,7 @@ fn depth_ordering_from_view_direction() {
     for x in range.clone() {
         for y in range.clone() {
             for z in range.clone() {
-                let direction = Vector3::new(x, y, z);
+                let direction = Vector3D::new(x, y, z);
                 let ordering = DepthOrdering::from_view_direction(direction);
                 let rotated_direction = match ordering {
                     DepthOrdering::Any => {
@@ -600,7 +600,7 @@ fn depth_ordering_from_view_direction() {
 /// the data is a fully `pub` struct and enum.)
 #[test]
 fn texture_clamp_coordinate_ordering() {
-    const ALL_TRUE: Point3<bool> = Point3::new(true, true, true);
+    const ALL_TRUE: Point3D<bool, TexelUnit> = Point3D::new(true, true, true);
 
     let mut universe = Universe::new();
     let [block] = make_some_voxel_blocks(&mut universe);

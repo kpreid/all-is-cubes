@@ -3,12 +3,12 @@
 use std::ops::Range;
 
 use all_is_cubes::block::Resolution;
-use all_is_cubes::cgmath::{
-    ElementWise as _, EuclideanSpace as _, Matrix4, Point2, Point3, Transform as _, Vector2,
+use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D};
+use all_is_cubes::math::{
+    Axis, Cube, Face6, FreeCoordinate, FreePoint, GridCoordinate, Rgba, VectorOps,
 };
-use all_is_cubes::math::{Axis, Face6, FreeCoordinate, GridCoordinate, Rgba};
 
-use crate::texture::{self, TextureCoordinate};
+use crate::texture::{self, TexelUnit, TextureCoordinate, TilePoint};
 use crate::{BlockVertex, Coloring, IndexVec};
 
 /// Data structure for the state and components of the "greedy meshing" algorithm.
@@ -41,7 +41,11 @@ impl GreedyMesher {
     /// Actually run the algorithm.
     pub(crate) fn run(
         mut self,
-        mut quad_callback: impl FnMut(&Self, Point2<GridCoordinate>, Point2<GridCoordinate>),
+        mut quad_callback: impl FnMut(
+            &Self,
+            Point2D<GridCoordinate, TexelUnit>,
+            Point2D<GridCoordinate, TexelUnit>,
+        ),
     ) {
         for tl in self.image_t_range.clone() {
             for sl in self.image_s_range.clone() {
@@ -82,7 +86,7 @@ impl GreedyMesher {
                         self.erase(s, t);
                     }
                 }
-                quad_callback(&self, Point2::new(sl, tl), Point2::new(sh, th));
+                quad_callback(&self, Point2D::new(sl, tl), Point2D::new(sh, th));
             }
         }
     }
@@ -156,8 +160,8 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
     indices: &mut IndexVec,
     transform: &QuadTransform,
     depth: FreeCoordinate,
-    low_corner: Point2<FreeCoordinate>,
-    high_corner: Point2<FreeCoordinate>,
+    low_corner: Point2D<FreeCoordinate, TexelUnit>,
+    high_corner: Point2D<FreeCoordinate, TexelUnit>,
     coloring: QuadColoring<'_, Tex>,
 ) {
     let index_origin: u32 = vertices.len().try_into().expect("vertex index overflow");
@@ -166,17 +170,17 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
 
     // This iterator computes the coordinates but not the vertex --
     // it is shared between the colored and textured cases.
-    let position_iter = QUAD_VERTICES.iter().map(|&unit_square_point| {
+    let position_iter = QUAD_VERTICES.iter().map(|&unit_square_point| -> FreePoint {
         let rectangle_point =
-            low_corner.to_vec() + unit_square_point.mul_element_wise(high_corner - low_corner);
-        Point3::from_vec(rectangle_point.extend(depth))
+            low_corner.to_vector() + unit_square_point.component_mul(high_corner - low_corner);
+        rectangle_point.extend(depth).to_point().cast_unit()
     });
 
     // Compute and push the four vertices.
     match coloring {
         QuadColoring::Solid(color) => {
             // Performance note: not using array::map() because, by benchmark, that's slower.
-            vertices.extend(position_iter.map(|voxel_grid_point| {
+            vertices.extend(position_iter.map(|voxel_grid_point| -> V {
                 V::from(BlockVertex {
                     position: transform.transform_position(voxel_grid_point),
                     face,
@@ -186,16 +190,16 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
         }
         QuadColoring::Texture(tile) => {
             // Transform planar texture coordinates into the 3D coordinate system.
-            let mut clamp_min = transform.transform_texture_point(Point3 {
-                x: low_corner.x as TextureCoordinate + half_texel,
-                y: low_corner.y as TextureCoordinate + half_texel,
-                z: depth as TextureCoordinate,
-            });
-            let mut clamp_max = transform.transform_texture_point(Point3 {
-                x: high_corner.x as TextureCoordinate - half_texel,
-                y: high_corner.y as TextureCoordinate - half_texel,
-                z: depth as TextureCoordinate,
-            });
+            let mut clamp_min = transform.transform_texture_point(TilePoint::new(
+                low_corner.x as TextureCoordinate + half_texel,
+                low_corner.y as TextureCoordinate + half_texel,
+                depth as TextureCoordinate,
+            ));
+            let mut clamp_max = transform.transform_texture_point(TilePoint::new(
+                high_corner.x as TextureCoordinate - half_texel,
+                high_corner.y as TextureCoordinate - half_texel,
+                depth as TextureCoordinate,
+            ));
 
             // Ensure the transformed clamp range is not inverted.
             for axis in Axis::ALL {
@@ -212,7 +216,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
                     face,
                     coloring: Coloring::Texture {
                         pos: tile.grid_to_texcoord(transform.transform_texture_point(
-                            voxel_grid_point.map(|s| s as TextureCoordinate),
+                            voxel_grid_point.map(|s| s as TextureCoordinate).cast_unit(),
                         )),
                         clamp_min,
                         clamp_max,
@@ -232,8 +236,10 @@ pub(super) struct QuadTransform {
     // TODO: specialize transforms since there are only 6 possible values plus scale,
     // so we don't need as many ops as a full matrix-vector multiplication?
     // Or would the branching needed make it pointless?
-    position_transform: Matrix4<FreeCoordinate>,
-    texture_transform: Matrix4<TextureCoordinate>,
+    //
+    // TODO(euclid migration): We can at least make this a RigidTransform3D
+    position_transform: Transform3D<FreeCoordinate, Cube, Cube>,
+    texture_transform: Transform3D<TextureCoordinate, TexelUnit, TexelUnit>,
 }
 
 impl QuadTransform {
@@ -241,20 +247,24 @@ impl QuadTransform {
         let voxel_to_block_scale = FreeCoordinate::from(resolution).recip();
         Self {
             face,
-            position_transform: face.face_transform(1).to_matrix().to_free()
-                * Matrix4::from_scale(voxel_to_block_scale),
-            texture_transform: face
-                .face_transform(resolution.to_grid())
-                .to_matrix()
-                .to_free()
-                .cast::<TextureCoordinate>()
-                .unwrap(/* infallible float-to-float conversion */),
+            position_transform: Transform3D::from_scale(Scale::new(voxel_to_block_scale))
+                .then(&face.face_transform(1).to_matrix().to_free()),
+            texture_transform: Transform3D::from_untyped(
+                &face
+                    .face_transform(resolution.to_grid())
+                    .to_matrix()
+                    .to_free()
+                    .to_untyped()
+                    .cast::<TextureCoordinate>(),
+            ),
         }
     }
 
     #[inline]
-    fn transform_position(&self, voxel_grid_point: Point3<f64>) -> Point3<f64> {
-        self.position_transform.transform_point(voxel_grid_point)
+    fn transform_position(&self, voxel_grid_point: FreePoint) -> FreePoint {
+        self.position_transform
+            .transform_point3d(voxel_grid_point)
+            .unwrap(/* would only fail in case of perspective projection */)
     }
 
     /// Transform a point from quad U-V-depth coordinates with a scale of
@@ -263,26 +273,26 @@ impl QuadTransform {
     /// The depth value is offset by +0.5 texel (into the depth of the voxel being
     /// drawn), to move it from edge coordinates to mid-texel coordinates.
     #[inline]
-    fn transform_texture_point(
-        &self,
-        mut point: Point3<TextureCoordinate>,
-    ) -> Point3<TextureCoordinate> {
+    fn transform_texture_point(&self, mut point: TilePoint) -> TilePoint {
         // todo: incorporate z offset into the matrix
         point.z += 0.5;
-        self.texture_transform.transform_point(point)
+        self.texture_transform.transform_point3d(point).unwrap()
     }
 }
 
-const QUAD_VERTICES: &[Vector2<FreeCoordinate>; 4] = &[
+const QUAD_VERTICES: &[Vector2D<FreeCoordinate, TexelUnit>; 4] = &[
     // Two-triangle quad.
     // Note that looked at from a X-right Y-up view, these triangles are
     // clockwise, but they're properly counterclockwise from the perspective
     // that we're drawing the face _facing towards negative Z_ (into the screen),
     // which is how cube faces as implicitly defined by Face6::matrix work.
-    Vector2::new(0.0, 0.0),
-    Vector2::new(0.0, 1.0),
-    Vector2::new(1.0, 0.0),
-    Vector2::new(1.0, 1.0),
+    //
+    // Units note: these are not technically `TexelUnit`s but their sole usage is
+    // multiplying so they are.
+    Vector2D::new(0.0, 0.0),
+    Vector2D::new(0.0, 1.0),
+    Vector2D::new(1.0, 0.0),
+    Vector2D::new(1.0, 1.0),
 ];
 
 const QUAD_INDICES: &[u32; 6] = &[0, 1, 2, 2, 1, 3];

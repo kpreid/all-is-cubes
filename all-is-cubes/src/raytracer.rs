@@ -10,18 +10,17 @@
 
 use std::fmt;
 
-use cgmath::{
-    EuclideanSpace as _, InnerSpace as _, Point2, Vector2, Vector3, VectorSpace as _, Zero as _,
-};
-use cgmath::{Point3, Vector4};
+use euclid::{vec3, Vector2D, Vector3D};
 use ordered_float::NotNan;
 #[cfg(feature = "threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use crate::block::{Evoxels, Resolution, AIR};
+use crate::camera::NdcPoint2;
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 use crate::math::{
-    smoothstep, Cube, Face6, Face7, FreeCoordinate, GridAab, GridArray, GridMatrix, Rgb, Rgba,
+    smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, GridArray,
+    GridMatrix, Intensity, Rgb, Rgba, VectorOps,
 };
 use crate::raycast::Ray;
 use crate::space::{BlockIndex, PackedLight, Space, SpaceBlockData};
@@ -115,7 +114,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         };
 
         let mut state: TracingState<P> = TracingState {
-            t_to_absolute_distance: ray.direction.magnitude(),
+            t_to_absolute_distance: ray.direction.length(),
             cubes_traced: 0,
             accumulator: P::default(),
         };
@@ -185,7 +184,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             .unwrap_or(self.sky_color)
     }
 
-    fn get_interpolated_light(&self, point: Point3<FreeCoordinate>, face: Face7) -> Rgb {
+    fn get_interpolated_light(&self, point: FreePoint, face: Face7) -> Rgb {
         // This implementation is duplicated in WGSL in interpolated_space_light()
         // in all-is-cubes-gpu/src/in_wgpu/shaders/blocks-and-lines.wgsl.
 
@@ -193,7 +192,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let above_surface_epsilon = 0.5 / 256.0;
 
         // The position we should start with for light lookup and interpolation.
-        let origin = point.to_vec() + face.normal_vector() * above_surface_epsilon;
+        let origin = point.to_vector() + face.normal_vector() * above_surface_epsilon;
 
         // Find linear interpolation coefficients based on where we are relative to
         // a half-cube-offset grid.
@@ -202,15 +201,14 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             Err(_) => GridMatrix::ZERO,
         }
         .to_free();
-        let mut mix_1 = (origin.dot(reference_frame.x.truncate()) - 0.5).rem_euclid(1.0);
-        let mut mix_2 = (origin.dot(reference_frame.y.truncate()) - 0.5).rem_euclid(1.0);
+        let reference_frame_x = reference_frame.transform_vector3d(vec3(1., 0., 0.));
+        let reference_frame_y = reference_frame.transform_vector3d(vec3(0., 1., 0.));
+
+        let mut mix_1 = (origin.dot(reference_frame_x) - 0.5).rem_euclid(1.0);
+        let mut mix_2 = (origin.dot(reference_frame_y) - 0.5).rem_euclid(1.0);
 
         // Ensure that mix <= 0.5, i.e. the 'near' side below is the side we are on
-        fn flip_mix(
-            mix: &mut FreeCoordinate,
-            dir: Vector4<FreeCoordinate>,
-        ) -> Vector3<FreeCoordinate> {
-            let dir = dir.truncate();
+        fn flip_mix(mix: &mut FreeCoordinate, dir: FreeVector) -> FreeVector {
             if *mix > 0.5 {
                 *mix = 1.0 - *mix;
                 -dir
@@ -218,8 +216,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                 dir
             }
         }
-        let dir_1 = flip_mix(&mut mix_1, reference_frame.x);
-        let dir_2 = flip_mix(&mut mix_2, reference_frame.y);
+        let dir_1 = flip_mix(&mut mix_1, reference_frame_x);
+        let dir_2 = flip_mix(&mut mix_2, reference_frame_y);
 
         // Modify interpolation by smoothstep to change the visual impression towards
         // "blurred blocks" and away from the diamond-shaped gradients of linear interpolation
@@ -229,17 +227,16 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let mix_2 = smoothstep(mix_2);
 
         // Retrieve light data, again using the half-cube-offset grid (this way we won't have edge artifacts).
-        let get_light =
-            |p: Vector3<FreeCoordinate>| match Cube::containing(Point3::from_vec(origin) + p) {
-                Some(cube) => self.get_packed_light(cube),
-                None => self.packed_sky_color,
-            };
+        let get_light = |p: FreeVector| match Cube::containing(origin.to_point() + p) {
+            Some(cube) => self.get_packed_light(cube),
+            None => self.packed_sky_color,
+        };
         let lin_lo = -0.5;
         let lin_hi = 0.5;
-        let near12 = get_light(lin_lo * dir_1 + lin_lo * dir_2);
-        let near1far2 = get_light(lin_lo * dir_1 + lin_hi * dir_2);
-        let near2far1 = get_light(lin_hi * dir_1 + lin_lo * dir_2);
-        let mut far12 = get_light(lin_hi * dir_1 + lin_hi * dir_2);
+        let near12 = get_light(dir_1 * lin_lo + dir_2 * lin_lo);
+        let near1far2 = get_light(dir_1 * lin_lo + dir_2 * lin_hi);
+        let near2far1 = get_light(dir_1 * lin_hi + dir_2 * lin_lo);
+        let mut far12 = get_light(dir_1 * lin_hi + dir_2 * lin_hi);
 
         if !near1far2.valid() && !near2far1.valid() {
             // The far corner is on the other side of a diagonal wall, so should be
@@ -255,12 +252,13 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
         // Perform bilinear interpolation.
         // TODO: most of the prior math for the mix values should be f32 already
-        let v = Vector4::lerp(
-            Vector4::lerp(near12, near1far2, mix_2 as f32),
-            Vector4::lerp(near2far1, far12, mix_2 as f32),
+        let [r, g, b, final_weight] = mix4(
+            mix4(near12, near1far2, mix_2 as f32),
+            mix4(near2far1, far12, mix_2 as f32),
             mix_1 as f32,
         );
-        Rgb::try_from(v.truncate() / v.w.max(0.1)).unwrap()
+        // Apply weight
+        Rgb::try_from(Vector3D::from([r, g, b]) / final_weight.max(0.1)).unwrap()
     }
 }
 
@@ -309,8 +307,10 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                     .into_par_iter()
                     .map(move |xch| {
                         let x = viewport.normalize_fb_x(xch);
-                        let (buf, info) = self
-                            .trace_ray::<P>(camera.project_ndc_into_world(Point2::new(x, y)), true);
+                        let (buf, info) = self.trace_ray::<P>(
+                            camera.project_ndc_into_world(NdcPoint2::new(x, y)),
+                            true,
+                        );
                         (buf.into(), info)
                     })
                     .chain(Some((line_ending.to_owned(), RaytraceInfo::default())).into_par_iter())
@@ -344,7 +344,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             for xch in 0..viewport_size.x {
                 let x = viewport.normalize_fb_x(xch);
                 let (buf, info) =
-                    self.trace_ray::<P>(camera.project_ndc_into_world(Point2::new(x, y)), true);
+                    self.trace_ray::<P>(camera.project_ndc_into_world(NdcPoint2::new(x, y)), true);
                 total_info += info;
                 write(buf.into().as_str())?;
             }
@@ -359,9 +359,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     where
         P: Accumulate<BlockData = D> + Into<String>,
     {
-        let mut out = String::with_capacity(
-            camera.viewport().framebuffer_size.dot(Vector2::new(1, 1)) as usize,
-        );
+        let mut out =
+            String::with_capacity(camera.viewport().framebuffer_size.dot(Vector2D::one()) as usize);
         self.trace_scene_to_text::<P, _, _>(camera, line_ending, |s| {
             out.push_str(s);
             Ok::<(), std::convert::Infallible>(())
@@ -385,6 +384,14 @@ where
             .field("sky_color", &self.sky_color)
             .finish_non_exhaustive()
     }
+}
+
+fn mix4(a: [f32; 4], b: [f32; 4], amount: f32) -> [f32; 4] {
+    core::array::from_fn(|i| {
+        let a = a[i];
+        let b = b[i];
+        a + (b - a) * amount
+    })
 }
 
 /// Performance info from a [`SpaceRaytracer`] operation.
@@ -597,10 +604,10 @@ pub(crate) fn trace_for_eval(
 
     let mut cube = origin;
     let mut color_buf = ColorBuf::default();
-    let mut emission = Vector3::zero();
+    let mut emission = Vector3D::zero();
 
     while let Some(voxel) = voxels.get(cube) {
-        emission += Vector3::<f32>::from(voxel.emission) * color_buf.ray_alpha;
+        emission += Vector3D::from(voxel.emission) * color_buf.ray_alpha;
         color_buf.add(apply_transmittance(voxel.color, thickness), &());
 
         if color_buf.opaque() {
@@ -617,7 +624,7 @@ pub(crate) fn trace_for_eval(
 #[derive(Clone, Copy)]
 pub(crate) struct EvalTrace {
     pub color: Rgba,
-    pub emission: Vector3<f32>,
+    pub emission: Vector3D<f32, Intensity>,
 }
 
 #[cfg(feature = "threads")]

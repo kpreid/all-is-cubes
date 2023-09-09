@@ -9,9 +9,10 @@ use winit::event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent}
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{CursorGrabMode, Window};
 
-use all_is_cubes::camera::{StandardCameras, Viewport};
-use all_is_cubes::cgmath::{Point2, Vector2};
+use all_is_cubes::camera::{self, StandardCameras, Viewport};
+use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource};
+use all_is_cubes::math::VectorOps;
 use all_is_cubes::raytracer::RtRenderer;
 use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
 use all_is_cubes_gpu::wgpu;
@@ -147,7 +148,7 @@ pub(crate) fn winit_main_loop<Ren: RendererToWinit + 'static>(
 pub(crate) fn create_window(
     event_loop: &EventLoop<()>,
     window_title: &str,
-    requested_size: Option<Vector2<u32>>,
+    requested_size: Option<Vector2D<u32, camera::NominalPixel>>,
     fullscreen: bool,
 ) -> Result<WinAndState, winit::error::OsError> {
     // Pick a window size.
@@ -267,7 +268,10 @@ pub(crate) fn create_winit_rt_desktop_session(
 
     fn raytracer_size_policy(mut viewport: Viewport) -> Viewport {
         // use 2x2 nominal pixels
-        viewport.framebuffer_size = viewport.nominal_size.map(|c| (c / 2.0).round() as u32);
+        viewport.framebuffer_size = viewport
+            .nominal_size
+            .map(|c| (c / 2.0).round() as u32)
+            .cast_unit();
         viewport
     }
 
@@ -350,7 +354,7 @@ fn handle_winit_event<Ren: RendererToWinit>(
                     let position: [f64; 2] = position.into();
                     input_processor.mouse_pixel_position(
                         *dsession.viewport_cell.get(),
-                        Some(Point2::from(position) / dsession.window.window.scale_factor()),
+                        Some(Point2D::from(position) / dsession.window.window.scale_factor()),
                         false,
                     );
                     // TODO: Is it worth improving responsiveness by immediately executing

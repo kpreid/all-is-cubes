@@ -4,12 +4,12 @@
 use core::fmt;
 use core::ops::{Index, IndexMut};
 
-use cgmath::{BaseNum, Vector3};
+use euclid::Vector3D;
 pub use ordered_float::{FloatIsNan, NotNan};
 
 use crate::math::{
     Axis, ConciseDebug, Cube, CustomFormat, FreeCoordinate, Geometry, GridCoordinate, GridPoint,
-    GridRotation, GridVector, Gridgid, LineVertex, Point3, Zero,
+    GridRotation, GridVector, Gridgid, LineVertex, VectorOps, Zero,
 };
 
 /// Identifies a face of a cube or an orthogonal unit vector.
@@ -149,21 +149,6 @@ impl Face6 {
 
     /// Returns the face whose normal is the cross product of these faces' normals.
     /// Since cross products may be zero, the result is a [`Face7`].
-    ///
-    /// ```
-    /// use all_is_cubes::math::Face6;
-    ///
-    /// for face1 in Face6::ALL {
-    ///     for face2 in Face6::ALL {
-    ///         // Cross product of faces is identical to cross product of vectors.
-    ///         assert_eq!(
-    ///             face1.cross(face2).normal_vector::<f64>(),
-    ///             face1.normal_vector().cross(face2.normal_vector()),
-    ///             "{:?} cross {:?}", face1, face2,
-    ///         );
-    ///     }
-    /// }
-    /// ```
     #[inline]
     #[must_use]
     pub const fn cross(self, other: Self) -> Face7 {
@@ -172,9 +157,9 @@ impl Face6 {
     /// Returns the axis-aligned unit vector normal to this face.
     #[inline]
     #[must_use]
-    pub fn normal_vector<S>(self) -> Vector3<S>
+    pub fn normal_vector<S, U>(self) -> Vector3D<S, U>
     where
-        S: BaseNum + std::ops::Neg<Output = S>,
+        S: num_traits::Zero + num_traits::One + std::ops::Neg<Output = S>,
     {
         self.into7().normal_vector()
     }
@@ -183,17 +168,16 @@ impl Face6 {
     /// implemented by selecting the relevant component.
     ///
     /// ```
-    /// use cgmath::{Vector3, InnerSpace};
-    /// use all_is_cubes::math::Face6;
+    /// use all_is_cubes::math::{Face6, FreeVector};
     ///
-    /// let sample_vector = Vector3::new(1.0, 2.0, 5.0_f64);
+    /// let sample_vector = FreeVector::new(1.0, 2.0, 5.0_f64);
     /// for face in Face6::ALL {
     ///     assert_eq!(face.dot(sample_vector), face.normal_vector().dot(sample_vector));
     /// }
     /// ```
     #[inline]
     #[must_use]
-    pub fn dot<S>(self, vector: Vector3<S>) -> S
+    pub fn dot<S, U>(self, vector: Vector3D<S, U>) -> S
     where
         S: Zero + std::ops::Neg<Output = S>,
     {
@@ -337,21 +321,6 @@ impl Face7 {
     }
 
     /// Returns the face whose normal is the cross product of these faces' normals.
-    ///
-    /// ```
-    /// use all_is_cubes::math::Face7;
-    ///
-    /// for face1 in Face7::ALL {
-    ///     for face2 in Face7::ALL {
-    ///         // Cross product of faces is identical to cross product of vectors.
-    ///         assert_eq!(
-    ///             face1.cross(face2).normal_vector::<f64>(),
-    ///             face1.normal_vector().cross(face2.normal_vector()),
-    ///             "{:?} cross {:?}", face1, face2,
-    ///         );
-    ///     }
-    /// }
-    /// ```
     #[inline]
     #[must_use]
     pub const fn cross(self, other: Self) -> Self {
@@ -413,18 +382,18 @@ impl Face7 {
     /// zero vector.
     #[inline]
     #[must_use]
-    pub fn normal_vector<S>(self) -> Vector3<S>
+    pub fn normal_vector<S, U>(self) -> Vector3D<S, U>
     where
-        S: BaseNum + std::ops::Neg<Output = S>,
+        S: num_traits::Zero + num_traits::One + std::ops::Neg<Output = S>,
     {
         match self {
-            Face7::Within => Vector3::new(S::zero(), S::zero(), S::zero()),
-            Face7::NX => Vector3::new(-S::one(), S::zero(), S::zero()),
-            Face7::NY => Vector3::new(S::zero(), -S::one(), S::zero()),
-            Face7::NZ => Vector3::new(S::zero(), S::zero(), -S::one()),
-            Face7::PX => Vector3::new(S::one(), S::zero(), S::zero()),
-            Face7::PY => Vector3::new(S::zero(), S::one(), S::zero()),
-            Face7::PZ => Vector3::new(S::zero(), S::zero(), S::one()),
+            Face7::Within => Vector3D::new(S::zero(), S::zero(), S::zero()),
+            Face7::NX => Vector3D::new(-S::one(), S::zero(), S::zero()),
+            Face7::NY => Vector3D::new(S::zero(), -S::one(), S::zero()),
+            Face7::NZ => Vector3D::new(S::zero(), S::zero(), -S::one()),
+            Face7::PX => Vector3D::new(S::one(), S::zero(), S::zero()),
+            Face7::PY => Vector3D::new(S::zero(), S::one(), S::zero()),
+            Face7::PZ => Vector3D::new(S::zero(), S::zero(), S::one()),
         }
     }
 
@@ -432,17 +401,16 @@ impl Face7 {
     /// implemented by selecting the relevant component.
     ///
     /// ```
-    /// use cgmath::{Vector3, InnerSpace};
-    /// use all_is_cubes::math::Face7;
+    /// use all_is_cubes::math::{Face7, FreeVector};
     ///
-    /// let sample_vector = Vector3::new(1.0, 2.0, 5.0_f64);
+    /// let sample_vector = FreeVector::new(1.0, 2.0, 5.0_f64);
     /// for face in Face7::ALL {
     ///     assert_eq!(face.dot(sample_vector), face.normal_vector().dot(sample_vector));
     /// }
     /// ```
     #[inline]
     #[must_use]
-    pub fn dot<S>(self, vector: Vector3<S>) -> S
+    pub fn dot<S, U>(self, vector: Vector3D<S, U>) -> S
     where
         S: Zero + std::ops::Neg<Output = S>,
     {
@@ -526,16 +494,17 @@ impl TryFrom<GridVector> for Face7 {
     /// let v = GridVector::new(1, 2, 3);
     /// assert_eq!(Face7::try_from(v), Err(v));
     /// ```
+    #[rustfmt::skip]
     fn try_from(value: GridVector) -> Result<Self, Self::Error> {
         use Face7::*;
         match value {
-            GridVector { x: 0, y: 0, z: 0 } => Ok(Within),
-            GridVector { x: 1, y: 0, z: 0 } => Ok(PX),
-            GridVector { x: 0, y: 1, z: 0 } => Ok(PY),
-            GridVector { x: 0, y: 0, z: 1 } => Ok(PZ),
-            GridVector { x: -1, y: 0, z: 0 } => Ok(NX),
-            GridVector { x: 0, y: -1, z: 0 } => Ok(NY),
-            GridVector { x: 0, y: 0, z: -1 } => Ok(NZ),
+            GridVector { _unit: _, x: 0, y: 0, z: 0 } => Ok(Within),
+            GridVector { _unit: _, x: 1, y: 0, z: 0 } => Ok(PX),
+            GridVector { _unit: _, x: 0, y: 1, z: 0 } => Ok(PY),
+            GridVector { _unit: _, x: 0, y: 0, z: 1 } => Ok(PZ),
+            GridVector { _unit: _, x: -1, y: 0, z: 0 } => Ok(NX),
+            GridVector { _unit: _, x: 0, y: -1, z: 0 } => Ok(NY),
+            GridVector { _unit: _, x: 0, y: 0, z: -1 } => Ok(NZ),
             not_unit_vector => Err(not_unit_vector),
         }
     }
@@ -586,35 +555,34 @@ impl<V> FaceMap<V> {
     // TODO: Evaluate whether this is a good API.
     #[inline]
     #[doc(hidden)] // used by all-is-cubes-content
-    pub fn symmetric(values: impl Into<Vector3<V>>) -> Self
+    pub fn symmetric([x, y, z]: [V; 3]) -> Self
     where
         V: Default + Clone,
     {
-        let values = values.into();
         Self {
-            nx: values.x.clone(),
-            px: values.x,
-            ny: values.y.clone(),
-            py: values.y,
-            nz: values.z.clone(),
-            pz: values.z,
+            nx: x.clone(),
+            px: x,
+            ny: y.clone(),
+            py: y,
+            nz: z.clone(),
+            pz: z,
         }
     }
 
     /// Returns a vector containing the values for each negative face.
-    pub fn negatives(self) -> Vector3<V>
+    pub fn negatives<U>(self) -> Vector3D<V, U>
     where
         V: Copy,
     {
-        Vector3::new(self.nx, self.ny, self.nz)
+        Vector3D::new(self.nx, self.ny, self.nz)
     }
 
     /// Returns a vector containing the values for each positive face.
-    pub fn positives(self) -> Vector3<V>
+    pub fn positives<U>(self) -> Vector3D<V, U>
     where
         V: Copy,
     {
-        Vector3::new(self.px, self.py, self.pz)
+        Vector3D::new(self.px, self.py, self.pz)
     }
 
     /// Iterate over the map's key-value pairs by reference, in the same order as [`Face6::ALL`].
@@ -814,7 +782,7 @@ impl fmt::Debug for CubeFace {
 impl Geometry for CubeFace {
     type Coord = GridCoordinate;
 
-    fn translate(mut self, offset: Vector3<Self::Coord>) -> Self {
+    fn translate(mut self, offset: GridVector) -> Self {
         self.cube += offset;
         self
     }
@@ -832,10 +800,10 @@ impl Geometry for CubeFace {
         if let Ok(face) = Face6::try_from(self.face) {
             let face_transform = face.face_transform(1);
             const X_POINTS: [GridPoint; 4] = [
-                Point3::new(0, 0, 0),
-                Point3::new(1, 1, 0),
-                Point3::new(1, 0, 0),
-                Point3::new(0, 1, 0),
+                GridPoint::new(0, 0, 0),
+                GridPoint::new(1, 1, 0),
+                GridPoint::new(1, 0, 0),
+                GridPoint::new(0, 1, 0),
             ];
             // TODO: this is a messy kludge and really we should be stealing corner points
             // from the AAB instead, but there isn't yet a good way to do that.
@@ -853,6 +821,34 @@ impl Geometry for CubeFace {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cross_6() {
+        for face1 in Face6::ALL {
+            for face2 in Face6::ALL {
+                // Cross product of faces is identical to cross product of vectors.
+                assert_eq!(
+                    face1.cross(face2).normal_vector::<f64, ()>(),
+                    face1.normal_vector().cross(face2.normal_vector()),
+                    "{face1:?} cross {face2:?}",
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn cross_7() {
+        for face1 in Face7::ALL {
+            for face2 in Face7::ALL {
+                // Cross product of faces is identical to cross product of vectors.
+                assert_eq!(
+                    face1.cross(face2).normal_vector::<f64, ()>(),
+                    face1.normal_vector().cross(face2.normal_vector()),
+                    "{face1:?} cross {face2:?}",
+                );
+            }
+        }
+    }
 
     #[test]
     fn face_transform_does_not_reflect() {

@@ -43,9 +43,10 @@ use clap::{CommandFactory as _, Parser as _};
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::Rng;
 
-use all_is_cubes::camera::{GraphicsOptions, Viewport};
-use all_is_cubes::cgmath::{Vector2, Zero as _};
+use all_is_cubes::camera::{self, GraphicsOptions, Viewport};
+use all_is_cubes::euclid::{vec2, Vector2D};
 use all_is_cubes::listen::ListenableCell;
+use all_is_cubes::math::VectorOps;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes_content::TemplateParameters;
@@ -157,7 +158,7 @@ fn main() -> Result<(), anyhow::Error> {
     // this is mostly confined to initialization.
     let viewport_cell = ListenableCell::new(Viewport::with_scale(
         1.0,
-        display_size.unwrap_or_else(Vector2::zero),
+        display_size.unwrap_or_else(Vector2D::zero).cast_unit(),
     ));
 
     let start_session_time = Instant::now();
@@ -267,8 +268,9 @@ fn main() -> Result<(), anyhow::Error> {
                         // TODO: Default display size should be based on terminal width
                         // (but not necessarily the full height)
                         display_size
-                            .unwrap_or_else(|| Vector2::new(80, 24))
-                            .map(|component| component.min(u16::MAX.into()) as u16),
+                            .unwrap_or_else(|| Vector2D::new(80, 24))
+                            .map(|component| component.min(u16::MAX.into()) as u16)
+                            .cast_unit(),
                     )
                 },
                 dsession,
@@ -479,12 +481,14 @@ fn common_progress_style() -> ProgressStyle {
 /// Choose a window size (in terms of viewport size) when the user did not request one.
 ///
 /// The given dimensions are of the maximum possible viewport size, if known.
-fn choose_graphical_window_size(maximum_size: Option<Vector2<u32>>) -> Vector2<u32> {
+fn choose_graphical_window_size(
+    maximum_size: Option<Vector2D<u32, camera::NominalPixel>>,
+) -> Vector2D<u32, camera::NominalPixel> {
     match maximum_size {
         Some(maximum_size) => {
             // TODO: consider constraining the aspect ratio, setting a maximum size, and other caveats
             maximum_size * 7 / 10
         }
-        None => Vector2::new(800, 600),
+        None => vec2(800, 600),
     }
 }

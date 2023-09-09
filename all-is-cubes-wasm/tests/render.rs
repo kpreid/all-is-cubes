@@ -32,7 +32,7 @@ async fn renderer_test() {
         .unwrap();
     let cameras = StandardCameras::from_constant_for_test(
         GraphicsOptions::UNALTERED_COLORS,
-        Viewport::with_scale(1.0, [256, 256].into()),
+        Viewport::with_scale(1.0, [256, 256]),
         &universe,
     );
 

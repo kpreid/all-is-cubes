@@ -1,17 +1,17 @@
 use std::fmt;
 
-use cgmath::{ElementWise, Point2, Vector2};
+use euclid::{point2, vec2};
 use futures_core::future::BoxFuture;
 use ordered_float::NotNan;
 
 use crate::camera::{
     AntialiasingOption, Camera, Flaws, FogOption, GraphicsOptions, HeadlessRenderer, Layers,
-    RenderError, Rendering, StandardCameras, Viewport,
+    NdcPoint2, RenderError, Rendering, StandardCameras, Viewport,
 };
 use crate::character::Cursor;
 use crate::content::palette;
 use crate::listen::ListenableSource;
-use crate::math::Rgba;
+use crate::math::{Rgba, VectorOps};
 use crate::raytracer::{
     Accumulate, ColorBuf, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer,
     UpdatingSpaceRaytracer,
@@ -325,11 +325,11 @@ fn trace_patch_in_one_space<P: Accumulate>(
         }
         AntialiasingOption::Always => {
             const N: usize = 4;
-            const SAMPLE_POINTS: [Vector2<f64>; N] = [
-                Vector2::new(1. / 8., 5. / 8.),
-                Vector2::new(3. / 8., 1. / 8.),
-                Vector2::new(5. / 8., 7. / 8.),
-                Vector2::new(7. / 8., 3. / 8.),
+            const SAMPLE_POINTS: [euclid::default::Vector2D<f64>; N] = [
+                vec2(1. / 8., 5. / 8.),
+                vec2(3. / 8., 1. / 8.),
+                vec2(5. / 8., 7. / 8.),
+                vec2(7. / 8., 3. / 8.),
             ];
             let mut info = RaytraceInfo::default();
             let samples: [P; N] = std::array::from_fn(|i| {
@@ -346,18 +346,19 @@ fn trace_patch_in_one_space<P: Accumulate>(
 }
 
 /// A rectangle in normalized device coordinates (-1 to 1 is the viewport).
+// TODO(euclid migration): use euclid::Box2D
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct NdcRect {
-    low: Point2<f64>,
-    high: Point2<f64>,
+    low: NdcPoint2,
+    high: NdcPoint2,
 }
 impl NdcRect {
-    fn center(self) -> Point2<f64> {
+    fn center(self) -> NdcPoint2 {
         self.low.zip(self.high, |a, b| (a + b) / 2.)
     }
 
-    fn point_within(self, uv: Vector2<f64>) -> Point2<f64> {
-        self.low + (self.high - self.low).mul_element_wise(uv)
+    fn point_within(self, uv: euclid::default::Vector2D<f64>) -> NdcPoint2 {
+        self.low + (self.high - self.low).component_mul(uv.cast_unit())
     }
 }
 
@@ -367,7 +368,6 @@ impl NdcRect {
 mod trace_image {
     use super::*;
     use crate::raytracer::{Accumulate, RaytraceInfo};
-    use cgmath::Point2;
 
     /// Compute a full image, writing it into `output`.
     ///
@@ -416,8 +416,8 @@ mod trace_image {
                         let x0 = viewport.normalize_fb_x_edge(xch);
                         let x1 = viewport.normalize_fb_x_edge(xch + 1);
                         let (pixel, info) = scene.trace_patch(NdcRect {
-                            low: Point2::new(x0, y0),
-                            high: Point2::new(x1, y1),
+                            low: point2(x0, y0),
+                            high: point2(x1, y1),
                         });
                         *pixel_out = encoder(pixel);
                         info
@@ -464,8 +464,8 @@ mod trace_image {
             for x_edge in 1..=viewport_size.x {
                 let x1 = viewport.normalize_fb_x_edge(x_edge);
                 let (pixel, info) = scene.trace_patch(NdcRect {
-                    low: Point2::new(x0, y0),
-                    high: Point2::new(x1, y1),
+                    low: point2(x0, y0),
+                    high: point2(x1, y1),
                 });
                 output[index] = encoder(pixel);
                 total_info += info;

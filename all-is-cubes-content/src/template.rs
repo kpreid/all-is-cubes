@@ -2,20 +2,20 @@
 
 use std::sync::Arc;
 
-use all_is_cubes::save::WhenceUniverse;
-use all_is_cubes::time;
 use macro_rules_attribute::macro_rules_derive;
 use paste::paste;
 
 use all_is_cubes::block::Block;
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
+use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb, Rgba,
+    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb, Rgba, VectorOps,
 };
+use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{LightPhysics, Space};
+use all_is_cubes::time;
 use all_is_cubes::universe::{Name, URef, Universe};
 use all_is_cubes::util::YieldProgress;
 
@@ -169,7 +169,7 @@ impl UniverseTemplate {
                 MengerSponge => Some(menger_sponge(&mut universe, 4)),
                 LightingBench => Some(all_is_cubes::content::testing::lighting_bench_space(
                     &mut universe,
-                    params.size.unwrap_or(Vector3::new(54, 16, 54)),
+                    params.size.unwrap_or(GridVector::new(54, 16, 54)),
                 )),
                 #[cfg(feature = "arbitrary")]
                 Random => Some(
@@ -244,7 +244,7 @@ pub struct TemplateParameters {
     ///
     /// If the space cannot be constructed in approximately this size, building the
     /// template should return an error.
-    pub size: Option<Vector3<GridCoordinate>>,
+    pub size: Option<GridVector>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -307,7 +307,7 @@ async fn islands(
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
 
     let TemplateParameters { size, seed: _ } = params;
-    let size = size.unwrap_or(Vector3::new(1000, 400, 1000));
+    let size = size.unwrap_or(GridVector::new(1000, 400, 1000));
 
     // Set up dimensions
     let bounds = GridAab::from_lower_size([size.x / -2, size.y / -2, size.z], size);
@@ -333,7 +333,7 @@ async fn islands(
 
     for (i, island_pos) in island_grid.interior_iter().enumerate() {
         let cell_bounds = GridAab::from_lower_size(
-            Point3::from_vec(island_pos.lower_bounds().to_vec() * island_stride),
+            (island_pos.lower_bounds().to_vector() * island_stride).to_point(),
             [island_stride, island_stride, island_stride],
         )
         .intersection(bounds)
@@ -374,7 +374,8 @@ fn cornell_box() -> Result<Space, InGenError> {
         .spawn({
             let mut spawn = Spawn::default_for_new_space(bounds);
             spawn.set_inventory(free_editing_starter_inventory(true));
-            spawn.set_eye_position(Point3::<FreeCoordinate>::new(0.5, 0.5, 1.6) * box_size.into());
+            spawn.set_eye_position(Point3D::<FreeCoordinate, _>::new(0.5, 0.5, 1.6)
+                * FreeCoordinate::from(box_size));
             spawn
         })
         .build();
@@ -415,7 +416,7 @@ async fn arbitrary_space(
     mut progress: YieldProgress,
     seed: u64,
 ) -> Result<Space, InGenError> {
-    use all_is_cubes::cgmath::Zero;
+    use all_is_cubes::euclid::Vector3D;
     use arbitrary::{Arbitrary, Error, Unstructured};
     use rand::{RngCore, SeedableRng};
 
@@ -437,7 +438,7 @@ async fn arbitrary_space(
 
                 // Patch physics to be reasonable
                 let mut p = space.physics().clone();
-                p.gravity = Vector3::zero(); // won't be a floor
+                p.gravity = Vector3D::zero(); // won't be a floor
                 p.sky_color = p.sky_color * (0.5 / p.sky_color.luminance());
                 space.set_physics(p);
 
@@ -459,6 +460,7 @@ async fn arbitrary_space(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::euclid::Vector3D;
     use all_is_cubes::time;
     use all_is_cubes::util::yield_progress_for_testing;
     use futures_core::future::BoxFuture;
@@ -478,7 +480,7 @@ mod tests {
             // run a much smaller instance of it for the does-it-succeed test.
             TemplateParameters {
                 seed: Some(0x7f16dfe65954583e),
-                size: Some(Vector3::new(100, 50, 100)),
+                size: Some(Vector3D::new(100, 50, 100)),
             }
         } else {
             TemplateParameters {

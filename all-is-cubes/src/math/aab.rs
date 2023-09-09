@@ -2,9 +2,12 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::iter::FusedIterator;
 
-use cgmath::{EuclideanSpace as _, Point3, Vector3, Zero as _};
+use euclid::{Point3D, Vector3D};
 
-use crate::math::{Axis, Face6, FreeCoordinate, Geometry, GridAab, GridCoordinate, LineVertex};
+use crate::math::{
+    Axis, Face6, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab, GridCoordinate,
+    LineVertex, VectorOps,
+};
 
 /// Axis-Aligned Box data type.
 ///
@@ -12,34 +15,23 @@ use crate::math::{Axis, Face6, FreeCoordinate, Geometry, GridAab, GridCoordinate
 /// [`GridAab`].
 ///
 #[doc = include_str!("../save/serde-warning.md")]
+// TODO(euclid migration): Replace this with `euclid` box type? Probably not.
 #[derive(Copy, Clone, PartialEq)]
 pub struct Aab {
     // TODO: Should we be using NotNan coordinates?
     // The upper > lower checks will reject NaNs anyway.
-    lower_bounds: Point3<FreeCoordinate>,
-    upper_bounds: Point3<FreeCoordinate>,
+    lower_bounds: FreePoint,
+    upper_bounds: FreePoint,
     // TODO: revisit which things we should be precalculating
-    sizes: Vector3<FreeCoordinate>,
+    sizes: FreeVector,
 }
 
 impl Aab {
     /// The [`Aab`] of zero size at the origin.
     pub const ZERO: Aab = Aab {
-        lower_bounds: Point3 {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-        },
-        upper_bounds: Point3 {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-        },
-        sizes: Vector3 {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-        },
+        lower_bounds: Point3D::new(0., 0., 0.),
+        upper_bounds: Point3D::new(0., 0., 0.),
+        sizes: Vector3D::new(0., 0., 0.),
     };
 
     /// Constructs an [`Aab`] from individual coordinates.
@@ -52,7 +44,7 @@ impl Aab {
         lz: FreeCoordinate,
         hz: FreeCoordinate,
     ) -> Self {
-        Self::from_lower_upper(Point3::new(lx, ly, lz), Point3::new(hx, hy, hz))
+        Self::from_lower_upper(Point3D::new(lx, ly, lz), Point3D::new(hx, hy, hz))
     }
 
     /// Constructs an [`Aab`] from most-negative and most-positive corner points.
@@ -60,8 +52,8 @@ impl Aab {
     /// Panics if the points are not in the proper order or if they are NaN.
     #[track_caller]
     pub fn from_lower_upper(
-        lower_bounds: impl Into<Point3<FreeCoordinate>>,
-        upper_bounds: impl Into<Point3<FreeCoordinate>>,
+        lower_bounds: impl Into<FreePoint>,
+        upper_bounds: impl Into<FreePoint>,
     ) -> Self {
         let lower_bounds = lower_bounds.into();
         let upper_bounds = upper_bounds.into();
@@ -79,8 +71,8 @@ impl Aab {
     /// Returns [`None`] if the points are not in the proper order or if they are NaN.
     // TODO: Make this public but give it an error type?
     pub(crate) fn checked_from_lower_upper(
-        lower_bounds: Point3<FreeCoordinate>,
-        upper_bounds: Point3<FreeCoordinate>,
+        lower_bounds: FreePoint,
+        upper_bounds: FreePoint,
     ) -> Option<Self> {
         if lower_bounds.x <= upper_bounds.x
             && lower_bounds.y <= upper_bounds.y
@@ -97,24 +89,24 @@ impl Aab {
         }
     }
 
-    /// The most negative corner of the box, as a [`Point3`].
-    pub const fn lower_bounds_p(&self) -> Point3<FreeCoordinate> {
+    /// The most negative corner of the box, as a [`Point3D`].
+    pub const fn lower_bounds_p(&self) -> FreePoint {
         self.lower_bounds
     }
 
-    /// The most positive corner of the box, as a [`Point3`].
-    pub const fn upper_bounds_p(&self) -> Point3<FreeCoordinate> {
+    /// The most positive corner of the box, as a [`Point3D`].
+    pub const fn upper_bounds_p(&self) -> FreePoint {
         self.upper_bounds
     }
 
-    /// The most negative corner of the box, as a [`Vector3`].
-    pub fn lower_bounds_v(&self) -> Vector3<FreeCoordinate> {
-        self.lower_bounds.to_vec()
+    /// The most negative corner of the box, as a [`Vector3D`].
+    pub fn lower_bounds_v(&self) -> FreeVector {
+        self.lower_bounds.to_vector()
     }
 
-    /// The most positive corner of the box, as a [`Vector3`].
-    pub fn upper_bounds_v(&self) -> Vector3<FreeCoordinate> {
-        self.upper_bounds.to_vec()
+    /// The most positive corner of the box, as a [`Vector3D`].
+    pub fn upper_bounds_v(&self) -> FreeVector {
+        self.upper_bounds.to_vector()
     }
 
     /// Returns the position of the identified face of the box on the axis it is
@@ -135,35 +127,32 @@ impl Aab {
 
     /// Size of the box in each axis; equivalent to
     /// `self.upper_bounds() - self.lower_bounds()`.
-    pub fn size(&self) -> Vector3<FreeCoordinate> {
+    pub fn size(&self) -> FreeVector {
         self.sizes
     }
 
     /// The center of the enclosed volume.
     ///
     /// ```
-    /// use all_is_cubes::math::Aab;
-    /// use cgmath::Point3;
+    /// use all_is_cubes::math::{Aab, FreePoint};
     ///
     /// let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
-    /// assert_eq!(aab.center(), Point3::new(1.5, 3.5, 5.5));
+    /// assert_eq!(aab.center(), FreePoint::new(1.5, 3.5, 5.5));
     /// ```
-    pub fn center(&self) -> Point3<FreeCoordinate> {
-        self.lower_bounds.map(FreeCoordinate::from) + self.sizes.map(FreeCoordinate::from) / 2.0
+    pub fn center(&self) -> FreePoint {
+        self.lower_bounds + self.sizes / 2.0
     }
 
     /// Iterates over the eight corner points of the box.
     /// The ordering is deterministic but not currently declared stable.
     pub(crate) fn corner_points(
         self,
-    ) -> impl Iterator<Item = Point3<FreeCoordinate>>
-           + DoubleEndedIterator
-           + ExactSizeIterator
-           + FusedIterator {
+    ) -> impl Iterator<Item = FreePoint> + DoubleEndedIterator + ExactSizeIterator + FusedIterator
+    {
         let l = self.lower_bounds;
         let u = self.upper_bounds;
         (0..8).map(move |i| {
-            Point3::new(
+            Point3D::new(
                 if i & 1 == 0 { l.x } else { u.x },
                 if i & 2 == 0 { l.y } else { u.y },
                 if i & 4 == 0 { l.z } else { u.z },
@@ -174,7 +163,7 @@ impl Aab {
     /// Returns whether this AAB, including the boundary, contains the point.
     ///
     /// TODO: example + tests
-    pub fn contains(&self, point: Point3<FreeCoordinate>) -> bool {
+    pub fn contains(&self, point: FreePoint) -> bool {
         // I tried changing this to an Iterator::all() and the asm was longer.
         // I tried changing this to be completely unrolled and it was more or less the same.
         for axis in Axis::ALL {
@@ -202,11 +191,11 @@ impl Aab {
 
     /// Returns a random point within this box, using inclusive ranges
     /// (`lower_bounds[axis] ≤ random_point()[axis] ≤ upper_bounds[axis]`).
-    pub fn random_point(self, rng: &mut impl rand::Rng) -> Point3<FreeCoordinate> {
-        Point3::new(
-            rng.gen_range(self.lower_bounds[0]..=self.upper_bounds[0]),
-            rng.gen_range(self.lower_bounds[1]..=self.upper_bounds[1]),
-            rng.gen_range(self.lower_bounds[2]..=self.upper_bounds[2]),
+    pub fn random_point(self, rng: &mut impl rand::Rng) -> FreePoint {
+        FreePoint::new(
+            rng.gen_range(self.lower_bounds.x..=self.upper_bounds.x),
+            rng.gen_range(self.lower_bounds.y..=self.upper_bounds.y),
+            rng.gen_range(self.lower_bounds.z..=self.upper_bounds.z),
         )
     }
 
@@ -234,7 +223,7 @@ impl Aab {
     pub fn expand(self, distance: FreeCoordinate) -> Self {
         // We could imagine a non-uniform version of this, but the fully general one
         // looks a lot like generally constructing a new Aab.
-        let distance_vec = Vector3::new(1.0, 1.0, 1.0) * distance;
+        let distance_vec = Vector3D::new(1.0, 1.0, 1.0) * distance;
         match Self::checked_from_lower_upper(
             self.lower_bounds - distance_vec,
             self.upper_bounds + distance_vec,
@@ -249,11 +238,8 @@ impl Aab {
 
     #[inline]
     // Not public because this is an odd interface that primarily helps with collision.
-    pub(crate) fn leading_corner(
-        &self,
-        direction: Vector3<FreeCoordinate>,
-    ) -> Vector3<FreeCoordinate> {
-        let mut leading_corner = Vector3::zero();
+    pub(crate) fn leading_corner(&self, direction: FreeVector) -> FreeVector {
+        let mut leading_corner = Vector3D::zero();
         for axis in Axis::ALL {
             if direction[axis] >= 0.0 {
                 leading_corner[axis] = self.upper_bounds[axis];
@@ -331,7 +317,7 @@ impl fmt::Debug for Aab {
 impl Geometry for Aab {
     type Coord = FreeCoordinate;
 
-    fn translate(self, offset: Vector3<FreeCoordinate>) -> Self {
+    fn translate(self, offset: FreeVector) -> Self {
         Self::from_lower_upper(self.lower_bounds + offset, self.upper_bounds + offset)
     }
 
@@ -339,7 +325,7 @@ impl Geometry for Aab {
     where
         E: Extend<LineVertex>,
     {
-        let mut vertices = [LineVertex::from(Point3::origin()); 24];
+        let mut vertices = [LineVertex::from(FreePoint::origin()); 24];
         let l = self.lower_bounds_p();
         let u = self.upper_bounds_p();
         for axis_0 in Axis::ALL {
@@ -369,22 +355,24 @@ impl Geometry for Aab {
 
 #[cfg(test)]
 mod tests {
-    use crate::math::Cube;
+    use euclid::point3;
+
+    use crate::math::{Cube, VectorOps};
 
     use super::*;
 
     #[test]
     fn new_wrong_order() {
         assert_eq!(
-            Aab::checked_from_lower_upper(Point3::new(2., 1., 1.), Point3::new(1., 2., 2.)),
+            Aab::checked_from_lower_upper(point3(2., 1., 1.), point3(1., 2., 2.)),
             None
         );
         assert_eq!(
-            Aab::checked_from_lower_upper(Point3::new(1., 2., 1.), Point3::new(2., 1., 2.)),
+            Aab::checked_from_lower_upper(point3(1., 2., 1.), point3(2., 1., 2.)),
             None
         );
         assert_eq!(
-            Aab::checked_from_lower_upper(Point3::new(1., 1., 2.), Point3::new(2., 2., 1.)),
+            Aab::checked_from_lower_upper(point3(1., 1., 2.), point3(2., 2., 1.)),
             None
         );
     }
@@ -392,13 +380,13 @@ mod tests {
     #[test]
     fn new_nan() {
         assert_eq!(
-            Aab::checked_from_lower_upper(Point3::new(0., 0., 0.), Point3::new(1., 1., f64::NAN)),
+            Aab::checked_from_lower_upper(point3(0., 0., 0.), point3(1., 1., f64::NAN)),
             None
         );
     }
 
     #[test]
-    #[should_panic = "invalid AAB points that are misordered or NaN: lower Point3 [0.0, 0.0, 0.0] upper Point3 [1.0, 1.0, NaN]"]
+    #[should_panic = "invalid AAB points that are misordered or NaN: lower (0.0, 0.0, 0.0) upper (1.0, 1.0, NaN)"]
     fn new_panic_message() {
         Aab::from_lower_upper([0., 0., 0.], [1., 1., f64::NAN]);
     }
@@ -480,7 +468,7 @@ mod tests {
         for direction in (-1..=1)
             .zip(-1..=1)
             .zip(-1..=1)
-            .map(|((x, y), z)| Vector3::new(x, y, z).map(FreeCoordinate::from))
+            .map(|((x, y), z)| Vector3D::new(x, y, z).map(FreeCoordinate::from))
         {
             let leading_corner = aab.leading_corner(direction);
 
@@ -496,23 +484,20 @@ mod tests {
     /// (since it's oddball and not fully nailed down).
     #[test]
     fn corner_points() {
-        // use all_is_cubes::cgmath::Point3;
-        // use all_is_cubes::math::{Aab, Cube};
-
         assert_eq!(
             Cube::new(10, 20, 30)
                 .aab()
                 .corner_points()
                 .collect::<Vec<_>>(),
             vec![
-                Point3::new(10., 20., 30.),
-                Point3::new(11., 20., 30.),
-                Point3::new(10., 21., 30.),
-                Point3::new(11., 21., 30.),
-                Point3::new(10., 20., 31.),
-                Point3::new(11., 20., 31.),
-                Point3::new(10., 21., 31.),
-                Point3::new(11., 21., 31.),
+                point3(10., 20., 30.),
+                point3(11., 20., 30.),
+                point3(10., 21., 30.),
+                point3(11., 21., 30.),
+                point3(10., 20., 31.),
+                point3(11., 20., 31.),
+                point3(10., 21., 31.),
+                point3(11., 21., 31.),
             ],
         );
     }

@@ -2,10 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use all_is_cubes::block::Block;
 use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, TransparencyOption, Viewport};
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point3};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::listen::Listener as _;
-use all_is_cubes::math::{Cube, FreeCoordinate, GridAab, GridCoordinate};
+use all_is_cubes::math::{Cube, FreePoint, GridAab, GridCoordinate};
 use all_is_cubes::math::{GridPoint, NotNan};
 use all_is_cubes::space::{Space, SpaceChange, SpaceTransaction};
 use all_is_cubes::universe::{URef, Universe};
@@ -175,9 +174,10 @@ impl CsmTester {
     }
 
     /// Move camera to a position measured in chunks.
-    fn move_camera_to(&mut self, position: impl Into<Point3<FreeCoordinate>>) {
+    fn move_camera_to(&mut self, position: impl Into<FreePoint>) {
+        // TODO(euclid migration): wrong unit
         let mut view_transform = self.camera.get_view_transform();
-        view_transform.disp = position.into().to_vec() * f64::from(CHUNK_SIZE);
+        view_transform.translation = position.into().to_vector() * f64::from(CHUNK_SIZE);
         self.camera.set_view_transform(view_transform);
     }
 }
@@ -278,7 +278,7 @@ fn drop_chunks_when_moving() {
 
     // Move over one chunk at a time repeatedly.
     for i in 1..30 {
-        let position = Point3::new(1.5 + f64::from(i), 0.5, 0.5);
+        let position = FreePoint::new(1.5 + f64::from(i), 0.5, 0.5);
         tester.move_camera_to(position);
         tester.update(|_| {});
         let count = tester.csm.iter_chunks().count();

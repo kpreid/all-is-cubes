@@ -1,13 +1,14 @@
-use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero};
-use ordered_float::NotNan;
 use std::fmt;
+
+use euclid::Vector3D;
+use ordered_float::NotNan;
 
 use super::collision::{
     aab_raycast, collide_along_ray, find_colliding_cubes, nudge_on_ray, Contact,
 };
 use crate::block::{BlockCollision, Resolution};
-use crate::math::{Aab, Face7, FreeCoordinate, Geometry as _};
-use crate::physics::{StopAt, POSITION_EPSILON};
+use crate::math::{Aab, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry as _, VectorOps};
+use crate::physics::{StopAt, Velocity, POSITION_EPSILON};
 use crate::raycast::Ray;
 use crate::space::Space;
 use crate::time::Tick;
@@ -32,9 +33,9 @@ pub(crate) const VELOCITY_MAGNITUDE_LIMIT_SQUARED: FreeCoordinate =
 pub struct Body {
     // TODO: pub space: Option<URef<Space>>   --- or maybe backwards?
     /// Position.
-    pub position: Point3<FreeCoordinate>,
+    pub position: FreePoint,
     /// Velocity, in position units per second.
-    pub velocity: Vector3<FreeCoordinate>,
+    pub velocity: Vector3D<FreeCoordinate, Velocity>,
 
     /// Collision volume, defined with `position` as the origin.
     // Thought for the future: switching to a "cylinder" representation (height + radius)
@@ -109,13 +110,10 @@ impl CustomFormat<StatusText> for Body {
 
 impl Body {
     /// Constructs a [`Body`] requiring only information that can't be reasonably defaulted.
-    pub fn new_minimal(
-        position: impl Into<Point3<FreeCoordinate>>,
-        collision_box: impl Into<Aab>,
-    ) -> Self {
+    pub fn new_minimal(position: impl Into<FreePoint>, collision_box: impl Into<Aab>) -> Self {
         Self {
             position: position.into(),
-            velocity: Vector3::zero(),
+            velocity: Vector3D::zero(),
             collision_box: collision_box.into(),
             flying: false,
             noclip: false,
@@ -157,7 +155,7 @@ impl Body {
             collision_callback(contact);
         };
 
-        if !self.position.to_vec().magnitude2().is_finite() {
+        if !self.position.to_vector().square_length().is_finite() {
             // If position is NaN or infinite, can't do anything, but don't panic
             return BodyStepInfo {
                 quiescent: false,
@@ -169,7 +167,7 @@ impl Body {
 
         if !self.flying && !tick.paused() {
             if let Some(space) = colliding_space {
-                self.velocity += space.physics().gravity.map(|c| c.into_inner()) * dt;
+                self.velocity += space.physics().gravity.map(|c| c.into_inner()).cast_unit() * dt;
             }
         }
 
@@ -179,9 +177,9 @@ impl Body {
             None
         };
 
-        let velocity_magnitude_squared = self.velocity.magnitude2();
+        let velocity_magnitude_squared = self.velocity.square_length();
         if !velocity_magnitude_squared.is_finite() {
-            self.velocity = Vector3::zero();
+            self.velocity = Vector3D::zero();
         } else if velocity_magnitude_squared <= VELOCITY_EPSILON_SQUARED || tick.paused() {
             return BodyStepInfo {
                 quiescent: true,
@@ -194,13 +192,13 @@ impl Body {
         }
 
         // TODO: correct integration of acceleration due to gravity
-        let unobstructed_delta_position = self.velocity * dt;
+        let unobstructed_delta_position: FreeVector = self.velocity.cast_unit() * dt;
 
         // Do collision detection and resolution.
         if let Some(space) = colliding_space {
             let mut i = 0;
             let mut delta_position = unobstructed_delta_position;
-            while delta_position != Vector3::zero() {
+            while delta_position != Vector3D::zero() {
                 assert!(i < 3, "sliding collision loop did not finish");
                 // Each call to collide_and_advance will zero at least one axis of delta_position.
                 // The nonzero axes are for sliding movement.
@@ -235,8 +233,8 @@ impl Body {
         &mut self,
         space: &Space,
         collision_callback: &mut CC,
-        mut delta_position: Vector3<FreeCoordinate>,
-    ) -> (Vector3<FreeCoordinate>, MoveSegment)
+        mut delta_position: FreeVector,
+    ) -> (FreeVector, MoveSegment)
     where
         CC: FnMut(Contact),
     {
@@ -286,7 +284,7 @@ impl Body {
             // We did not hit anything for the length of the raycast. Proceed unobstructed.
             self.position += delta_position;
             (
-                Vector3::zero(),
+                Vector3D::zero(),
                 MoveSegment {
                     delta_position,
                     stopped_by: None,
@@ -296,18 +294,18 @@ impl Body {
     }
 
     /// Check if we're intersecting any blocks and fix that if so.
-    fn push_out(&mut self, space: &Space) -> Option<Vector3<FreeCoordinate>> {
+    fn push_out(&mut self, space: &Space) -> Option<FreeVector> {
         let colliding = find_colliding_cubes(space, self.collision_box_abs())
             .next()
             .is_some();
         if colliding {
-            let exit_backwards = -self.velocity;
+            let exit_backwards: FreeVector = -self.velocity.cast_unit(); // don't care about magnitude
             let shortest_push_out = (-1..=1)
                 .flat_map(move |dx| {
                     (-1..=1).flat_map(move |dy| {
                         (-1..=1).map(move |dz| {
-                            let direction = Vector3::new(dx, dy, dz).map(FreeCoordinate::from);
-                            if direction == Vector3::zero() {
+                            let direction = Vector3D::new(dx, dy, dz).map(FreeCoordinate::from);
+                            if direction == Vector3D::zero() {
                                 // We've got an extra case, and an item to delete from the combinations,
                                 // so substitute the one from the other.
                                 exit_backwards
@@ -330,12 +328,12 @@ impl Body {
     }
 
     /// Try moving in the given direction, find an empty space, and
-    /// return the position and distance to it.
+    /// return the new position and distance to it.
     fn attempt_push_out(
         &self,
         space: &Space,
-        direction: Vector3<FreeCoordinate>,
-    ) -> Option<(Point3<FreeCoordinate>, NotNan<FreeCoordinate>)> {
+        direction: FreeVector,
+    ) -> Option<(FreePoint, NotNan<FreeCoordinate>)> {
         if false {
             // TODO: This attempted implementation does not work, causing lots of falling into
             // blocks. But if we can fix the bugs, it will make push-out actually work with
@@ -365,7 +363,7 @@ impl Body {
                 );
                 let step_aab = self
                     .collision_box
-                    .translate(adjusted_segment.unit_endpoint().to_vec());
+                    .translate(adjusted_segment.unit_endpoint().to_vector());
                 for cube in step_aab.round_up_to_grid().interior_iter() {
                     // TODO: refactor to combine this with other collision attribute tests
                     match space.get_evaluated(cube).uniform_collision {
@@ -383,7 +381,7 @@ impl Body {
                 // No collisions, so we can use this.
                 return Some((
                     adjusted_segment.unit_endpoint(),
-                    NotNan::new(ray_step.t_distance() * direction.magnitude()).ok()?,
+                    NotNan::new(ray_step.t_distance() * direction.length()).ok()?,
                 ));
             }
 
@@ -405,14 +403,14 @@ impl Body {
     /// assert_eq!(body.collision_box_abs(), Aab::new(-1.0, 1.0, 18.0, 22.0, -3.0, 3.0));
     /// ```
     pub fn collision_box_abs(&self) -> Aab {
-        self.collision_box.translate(self.position.to_vec())
+        self.collision_box.translate(self.position.to_vector())
     }
 
     /// Changes [`self.yaw`](Self::yaw) and [`self.pitch`](Self::pitch) to look directly
     /// towards the given point within the same coordinate system as
     /// [`self.position`](Self::position).
-    pub fn look_at(&mut self, point: impl Into<Point3<FreeCoordinate>>) {
-        let direction = point.into() - self.position;
+    pub fn look_at(&mut self, point: impl Into<FreePoint>) {
+        let direction: FreeVector = point.into() - self.position;
         let horizontal_distance = direction.x.hypot(direction.z);
 
         self.yaw = (180.0 - (direction.x).atan2(direction.z).to_degrees()).rem_euclid(360.0);
@@ -429,7 +427,7 @@ pub struct BodyStepInfo {
     /// Whether movement computation was skipped due to approximately zero velocity.
     pub quiescent: bool,
     #[allow(missing_docs)] // TODO: explain
-    pub push_out: Option<Vector3<FreeCoordinate>>,
+    pub push_out: Option<FreeVector>,
     #[allow(missing_docs)] // TODO: explain
     pub already_colliding: Option<Contact>,
     /// Details on movement and collision. A single frame's movement may have up to three
@@ -459,7 +457,7 @@ impl CustomFormat<ConciseDebug> for BodyStepInfo {
 #[non_exhaustive]
 pub struct MoveSegment {
     /// The change in position.
-    pub delta_position: Vector3<FreeCoordinate>,
+    pub delta_position: FreeVector,
     /// What solid object stopped this segment from continuing further
     /// (there may be others, but this is one of them), or None if there
     /// was no obstacle.
@@ -469,7 +467,7 @@ pub struct MoveSegment {
 impl CustomFormat<ConciseDebug> for MoveSegment {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
         let mut nonempty = false;
-        if !self.delta_position.is_zero() {
+        if self.delta_position != FreeVector::zero() {
             nonempty = true;
             write!(
                 fmt,
@@ -494,7 +492,7 @@ impl CustomFormat<ConciseDebug> for MoveSegment {
 impl Default for MoveSegment {
     fn default() -> Self {
         Self {
-            delta_position: Vector3::zero(),
+            delta_position: Vector3D::zero(),
             stopped_by: None,
         }
     }
@@ -568,7 +566,7 @@ mod tests {
     fn look_at() {
         let do_test = |direction, yaw, pitch| {
             let mut body = Body::new_minimal([10., 0., 0.], Aab::ZERO);
-            body.look_at(Point3::new(10., 0., 0.) + Vector3::from(direction));
+            body.look_at(FreePoint::new(10., 0., 0.) + FreeVector::from(direction));
             println!("{direction:?} {yaw} {pitch}");
             assert_eq!(body.yaw, yaw);
             assert_eq!(body.pitch, pitch);

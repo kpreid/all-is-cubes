@@ -1,5 +1,5 @@
-use all_is_cubes::cgmath::{Point3, Vector3};
-use all_is_cubes::math::{Cube, GridVector};
+use all_is_cubes::euclid::{Point3D, Vector3D};
+use all_is_cubes::math::{Cube, GridVector, VectorOps};
 use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
 
 use crate::DebugLineVertex;
@@ -8,7 +8,14 @@ use crate::DebugLineVertex;
 /// 0..256 or similar, not 0..1).
 ///
 /// TODO: Convert these to fixed-point and save some size
-pub(crate) type TexPoint = Point3<f32>;
+pub(crate) type TexPoint = Point3D<f32, AtlasTexel>;
+
+/// Coordinate system for texels in the 3D atlas texture.
+#[doc(hidden)]
+pub enum AtlasTexel {}
+
+/// Coordinate system for within-cube positions divided by 256.
+pub(crate) enum CubeFix256 {}
 
 /// Triangle mesh vertex type that is used for rendering [blocks].
 ///
@@ -77,8 +84,10 @@ impl WgpuBlockVertex {
 impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
     #[inline]
     fn from(vertex: BlockVertex<TexPoint>) -> Self {
-        let position_in_cube_fixed: Point3<u32> =
-            vertex.position.map(|coord| (coord * 256.) as u32);
+        let position_in_cube_fixed: Point3D<u32, CubeFix256> = vertex
+            .position
+            .map(|coord| (coord * 256.) as u32)
+            .cast_unit();
         let cube_packed = 0; // will be overwritten later by instantiate_vertex()
         let normal = vertex.face as u32;
 
@@ -107,7 +116,7 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
             } => Self {
                 cube_packed,
                 position_in_cube_and_normal_packed,
-                color_or_texture: [tc[0], tc[1], tc[2], -1.0],
+                color_or_texture: [tc.x, tc.y, tc.z, -1.0],
                 clamp_min: clamp_min.into(),
                 clamp_max: clamp_max.into(),
             },
@@ -136,18 +145,18 @@ impl GfxVertex for WgpuBlockVertex {
     }
 
     #[inline]
-    fn position(&self) -> Point3<Self::Coordinate> {
-        let cube = Point3 {
-            x: self.cube_packed & 0xFF,
-            y: (self.cube_packed >> 8) & 0xFF,
-            z: (self.cube_packed >> 16) & 0xFF,
-        };
+    fn position(&self) -> Point3D<Self::Coordinate, Cube> {
+        let cube = Point3D::new(
+            self.cube_packed & 0xFF,
+            (self.cube_packed >> 8) & 0xFF,
+            (self.cube_packed >> 16) & 0xFF,
+        );
         let pos_packed = self.position_in_cube_and_normal_packed;
-        let position_in_cube_fixed = Vector3 {
-            x: pos_packed[0] & 0xFFFF,
-            y: (pos_packed[0] >> 16) & 0xFFFF,
-            z: pos_packed[1] & 0xFFFF,
-        };
+        let position_in_cube_fixed = Vector3D::new(
+            pos_packed[0] & 0xFFFF,
+            (pos_packed[0] >> 16) & 0xFFFF,
+            pos_packed[1] & 0xFFFF,
+        );
         cube.map(|c| c as f32) + position_in_cube_fixed.map(|c| c as f32 / 256.)
     }
 }
@@ -210,7 +219,7 @@ impl WgpuLinesVertex {
 
 impl DebugLineVertex for WgpuLinesVertex {
     fn from_position_color(
-        position: Point3<all_is_cubes::math::FreeCoordinate>,
+        position: all_is_cubes::math::FreePoint,
         color: all_is_cubes::math::Rgba,
     ) -> Self {
         Self {
@@ -222,10 +231,9 @@ impl DebugLineVertex for WgpuLinesVertex {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use all_is_cubes::math::{Face6, Rgba};
     use std::mem;
-
-    use super::*;
 
     /// Assert the vertex's size, just so that we're reminded to think about it when we
     /// change the amount of data in it. This assertion is not platform-dependent because
@@ -242,11 +250,14 @@ mod tests {
     #[test]
     fn block_vertex_position() {
         let mut vertex = WgpuBlockVertex::from(BlockVertex {
-            position: Point3::new(0.25, 0.0, 1.0),
+            position: Point3D::new(0.25, 0.0, 1.0),
             face: Face6::PX,
             coloring: Coloring::Solid(Rgba::new(0.0, 0.5, 1.0, 0.5)),
         });
         vertex.instantiate_vertex(WgpuBlockVertex::instantiate_block(Cube::new(100, 50, 7)));
-        assert_eq!(GfxVertex::position(&vertex), Point3::new(100.25, 50.0, 8.0));
+        assert_eq!(
+            GfxVertex::position(&vertex),
+            Point3D::new(100.25, 50.0, 8.0)
+        );
     }
 }

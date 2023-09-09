@@ -208,7 +208,7 @@ mod tests {
     use crate::raytracer::{CharacterBuf, CharacterRtData};
     use crate::universe::Universe;
     use crate::util::{CustomFormat, Unquote};
-    use cgmath::{Decomposed, Transform as _, Vector2, Vector3};
+    use euclid::{vec2, vec3};
     use pretty_assertions::assert_eq;
 
     struct EquivalenceTester {
@@ -230,19 +230,11 @@ mod tests {
             let mut camera = Camera::new(
                 graphics_options.snapshot(),
                 Viewport {
-                    nominal_size: Vector2::new(72., 72.),
-                    framebuffer_size: Vector2::new(72, 36),
+                    nominal_size: vec2(72., 72.),
+                    framebuffer_size: vec2(72, 36),
                 },
             );
-            camera.set_view_transform(
-                Decomposed::look_at_rh(
-                    eye_for_look_at(bounds, Vector3::unit_z()),
-                    bounds.center(),
-                    Vector3::new(0., 1., 0.),
-                )
-                .inverse_transform()
-                .unwrap(),
-            );
+            camera.look_at_y_up(eye_for_look_at(bounds, vec3(0., 0., 1.)), bounds.center());
 
             Self {
                 updating: UpdatingSpaceRaytracer::new(

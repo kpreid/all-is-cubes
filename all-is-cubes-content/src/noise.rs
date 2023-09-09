@@ -1,7 +1,7 @@
 use noise::NoiseFn;
 
 use all_is_cubes::block::Resolution;
-use all_is_cubes::math::{Cube, GridAab, GridArray, GridPoint};
+use all_is_cubes::math::{Cube, GridAab, GridArray, GridPoint, VectorOps};
 
 /// Generates a [`Block`]-shape of noise values from a [`NoiseFn`].
 ///

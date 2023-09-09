@@ -2,7 +2,6 @@ use std::error::Error;
 use std::sync::{Arc, Mutex, Weak};
 
 use all_is_cubes::block::{self, Block, BlockAttributes, Primitive, Resolution, AIR};
-use all_is_cubes::cgmath::EuclideanSpace;
 use all_is_cubes::character::Character;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{
@@ -145,7 +144,7 @@ struct ToolbarController {
 
 impl ToolbarController {
     fn slot_position(&self, slot_index: usize) -> Cube {
-        self.first_slot_position + GridVector::unit_x() * 2 * slot_index as GridCoordinate
+        self.first_slot_position + GridVector::new(2, 0, 0) * slot_index as GridCoordinate
     }
 
     /// Returns a transaction to draw items and their stack counts, without using self.character
@@ -233,7 +232,7 @@ impl ToolbarController {
                 }
             });
             txn.set_overwrite(
-                position + GridVector::unit_y(),
+                position + GridVector::new(0, 1, 0),
                 self.definition.hud_blocks.blocks
                     [UiBlocks::ToolbarPointer(this_slot_selected_mask)]
                 .clone(),

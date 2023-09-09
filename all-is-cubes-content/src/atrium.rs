@@ -6,13 +6,13 @@ use std::fmt;
 use exhaust::Exhaust;
 
 use all_is_cubes::block::{self, Block, Composite, Resolution, RotationPlacementRule, Zoom, AIR};
-use all_is_cubes::cgmath::{EuclideanSpace as _, InnerSpace, Point3, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
+use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
     Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint,
-    GridRotation, GridVector, Gridgid, Rgb, Rgba,
+    GridRotation, GridVector, Gridgid, Rgb, Rgba, VectorOps,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -37,15 +37,16 @@ pub(crate) async fn atrium(
     let between_small_arches = 3;
     let between_large_arches = between_small_arches * 2 + 1;
     let balcony_radius = 4;
-    let large_arch_count = Vector3::new(1, 0, 5); // x, dummy y, z
+    let large_arch_count_x = 1;
+    let large_arch_count_z = 5;
     let floor_count = 4;
     let sun_height = 10;
 
     let origin = GridAab::from_lower_size([0, 0, 0], [1, 1, 1]);
     let atrium_footprint = origin.expand(FaceMap::symmetric([
-        ((between_large_arches + WALL) * large_arch_count.x) / 2 - WALL,
+        ((between_large_arches + WALL) * large_arch_count_x) / 2 - WALL,
         0,
-        ((between_large_arches + WALL) * large_arch_count.z) / 2 - WALL,
+        ((between_large_arches + WALL) * large_arch_count_z) / 2 - WALL,
     ]));
     let arches_footprint = atrium_footprint.expand(FaceMap::symmetric([WALL, 0, WALL]));
     let balconies_footprint =
@@ -71,7 +72,7 @@ pub(crate) async fn atrium(
         .spawn({
             // TODO: default_for_new_space isn't really doing anything for us here
             let mut spawn = Spawn::default_for_new_space(space_bounds);
-            spawn.set_eye_position(Point3::new(
+            spawn.set_eye_position(Point3D::new(
                 0.5,
                 1.91 + FreeCoordinate::from(ceiling_height + 2),
                 10.0,
@@ -81,7 +82,7 @@ pub(crate) async fn atrium(
         })
         .sky_color(rgb_const!(0.242, 0.617, 0.956) * 1.0)
         .light_physics(all_is_cubes::space::LightPhysics::Rays {
-            maximum_distance: space_bounds.size().map(f64::from).magnitude() as u16,
+            maximum_distance: space_bounds.size().map(f64::from).length() as u16,
         })
         .build();
 
@@ -347,7 +348,7 @@ fn arch_row(
             |p, block| map_text_block(pattern[p], blocks, p, block, banner_color),
             pattern.bounds(),
             space,
-            Gridgid::from_translation(column_base.to_vec())
+            Gridgid::from_translation(column_base.to_vector())
                 * rotation.to_positive_octant_transform(1),
         )?;
     }
@@ -560,7 +561,7 @@ async fn install_atrium_blocks(
 
     // TODO: duplicated procgen code — figure out a good toolkit of math helpers
     let one_diagonal = GridVector::new(1, 1, 1);
-    let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);
+    let center_point_doubled = (one_diagonal * resolution_g).to_point();
 
     BlockProvider::<AtriumBlocks>::new(progress, |key| {
         Ok(match key {

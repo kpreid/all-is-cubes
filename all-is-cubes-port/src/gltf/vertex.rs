@@ -1,7 +1,7 @@
 //! [`GltfVertex`], vertex type for writing to glTF buffers.
 
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
-use all_is_cubes::math::Cube;
+use all_is_cubes::euclid::{Point3D, Vector3D};
+use all_is_cubes::math::{Cube, VectorOps};
 use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
 
 use super::glue::Lef32;
@@ -41,12 +41,12 @@ impl GltfVertex {
 impl From<BlockVertex<GltfAtlasPoint>> for GltfVertex {
     #[inline]
     fn from(vertex: BlockVertex<GltfAtlasPoint>) -> Self {
-        let position = Lef32::from_vec3(vertex.position.cast::<f32>().unwrap().to_vec());
+        let position = Lef32::from_vec3(vertex.position.to_f32().to_vector());
         match vertex.coloring {
             Coloring::Solid(color) => {
                 Self {
                     position,
-                    base_color: Lef32::from_vec4(color.clamp().into()),
+                    base_color: <[f32; 4]>::from(color.clamp()).map(Lef32::from),
                     // TODO: We need to ensure that the texture, if present, has white allocated here.
                     base_color_tc: [Lef32::ZERO; 2],
                 }
@@ -75,7 +75,7 @@ impl From<BlockVertex<GltfAtlasPoint>> for GltfVertex {
                 Self {
                     position,
                     base_color,
-                    base_color_tc: Lef32::from_vec2(point_within.to_vec()),
+                    base_color_tc: Into::<[f32; 2]>::into(point_within).map(Lef32::from),
                 }
             }
         }
@@ -85,21 +85,21 @@ impl From<BlockVertex<GltfAtlasPoint>> for GltfVertex {
 impl GfxVertex for GltfVertex {
     const WANTS_DEPTH_SORTING: bool = false;
     type Coordinate = f32;
-    type BlockInst = Vector3<f32>;
+    type BlockInst = Vector3D<f32, Cube>;
     type TexPoint = GltfAtlasPoint;
 
     #[inline]
     fn instantiate_block(cube: Cube) -> Self::BlockInst {
-        cube.lower_bounds().to_vec().map(|s| s as f32)
+        cube.lower_bounds().to_vector().map(|s| s as f32)
     }
 
     #[inline]
     fn instantiate_vertex(&mut self, cube: Self::BlockInst) {
-        self.position = Lef32::from_vec3(self.position().to_vec() + cube);
+        self.position = Lef32::from_vec3(self.position().to_vector() + cube);
     }
 
     #[inline]
-    fn position(&self) -> Point3<Self::Coordinate> {
-        Point3::<Lef32>::from(self.position).map(f32::from)
+    fn position(&self) -> Point3D<Self::Coordinate, Cube> {
+        Point3D::<Lef32, _>::from(self.position).map(f32::from)
     }
 }
