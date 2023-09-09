@@ -26,7 +26,7 @@ doctest = false
 harness = false
 
 [dependencies]
-all-is-cubes = { path = "../all-is-cubes", features = ["threads"] }
+all-is-cubes = { path = "../all-is-cubes", features = ["save", "threads"] }
 all-is-cubes-content = { path = "../all-is-cubes-content" }
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", features = ["wgpu"] }
 all-is-cubes-ui = { path = "../all-is-cubes-ui" }
