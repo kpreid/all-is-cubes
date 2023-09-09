@@ -1,5 +1,5 @@
 use core::cmp::Ordering;
-use core::ops;
+use core::{fmt, ops};
 
 #[doc(no_inline)]
 pub use core::time::Duration;
@@ -8,7 +8,7 @@ pub use core::time::Duration;
 ///
 /// Because this trait is not object-safe, it is usually used with the `Deadline` wrapper,
 /// which provides higher-level Operations to avoid needing to compare two instants.
-pub trait Instant: Copy + Ord + Send + Sync + 'static
+pub trait Instant: Copy + Ord + Send + Sync + fmt::Debug + 'static
 where
     Self: ops::Add<Duration, Output = Self>,
     Self: ops::Sub<Duration, Output = Self>,
