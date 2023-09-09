@@ -357,7 +357,7 @@ impl NdcRect {
     }
 
     fn point_within(self, uv: Vector2<f64>) -> Point2<f64> {
-        self.low + (self.high - self.low).mul_element_wise(uv.x)
+        self.low + (self.high - self.low).mul_element_wise(uv)
     }
 }
 
