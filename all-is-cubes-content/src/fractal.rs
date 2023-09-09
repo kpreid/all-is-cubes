@@ -1,10 +1,10 @@
 use all_is_cubes::block::Block;
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::free_editing_starter_inventory;
+use all_is_cubes::euclid::Point3D;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector, VectorOps};
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
@@ -65,12 +65,12 @@ where
     } else {
         let size_of_next_level: GridCoordinate = 3_i32.pow((level - 1).into());
         for which_section in pow3aab(1).interior_iter() {
-            let Point3 { x, y, z } = which_section
+            let Point3D { x, y, z, .. } = which_section
                 .lower_bounds()
                 .map(|c| u8::from(c.rem_euclid(2) == 1));
             if x + y + z <= 1 {
                 let section_corner =
-                    lower_corner + which_section.lower_bounds().to_vec() * size_of_next_level;
+                    lower_corner + which_section.lower_bounds().to_vector() * size_of_next_level;
                 visit_menger_sponge_points(level - 1, section_corner, function)?;
             }
         }

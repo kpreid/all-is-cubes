@@ -6,7 +6,6 @@ use all_is_cubes::transaction::Transaction;
 use criterion::Criterion;
 
 use all_is_cubes::camera::{Flaws, GraphicsOptions, HeadlessRenderer, StandardCameras, Viewport};
-use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::character::Character;
 use all_is_cubes::math::GridVector;
 use all_is_cubes::space::{Space, SpaceTransaction};
@@ -102,7 +101,7 @@ async fn create_updated_renderer(
         .unwrap()
         .build(StandardCameras::from_constant_for_test(
             GraphicsOptions::default(),
-            Viewport::with_scale(1.0, Vector2::new(1024, 1024)),
+            Viewport::with_scale(1.0, [1024, 1024]),
             &universe,
         ));
 

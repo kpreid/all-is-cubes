@@ -1,6 +1,6 @@
-use all_is_cubes::camera::{Camera, FogOption, LightingOption};
-use all_is_cubes::cgmath::{EuclideanSpace, Matrix4, Vector3};
-use all_is_cubes::math::Rgb;
+use all_is_cubes::camera::{Camera, FogOption, LightingOption, Ndc};
+use all_is_cubes::euclid::Transform3D;
+use all_is_cubes::math::{GridVector, Rgb, VectorOps};
 
 use crate::in_wgpu::glue::PaddedVec3;
 
@@ -41,7 +41,7 @@ pub(crate) struct ShaderSpaceCamera {
 }
 
 impl ShaderSpaceCamera {
-    pub fn new(camera: &Camera, sky_color: Rgb, light_lookup_offset: Vector3<i32>) -> Self {
+    pub fn new(camera: &Camera, sky_color: Rgb, light_lookup_offset: GridVector) -> Self {
         let options = camera.options();
         let view_distance = camera.view_distance() as f32;
         let (fog_mode_blend, fog_distance) = match options.fog {
@@ -52,9 +52,9 @@ impl ShaderSpaceCamera {
         };
 
         Self {
-            projection_matrix: convert_matrix(OPENGL_TO_WGPU_PROJECTION * camera.projection()),
+            projection_matrix: convert_matrix(camera.projection().then(&OPENGL_TO_WGPU_PROJECTION)),
             view_matrix: convert_matrix(camera.view_matrix()),
-            view_position: camera.view_position().map(|s| s as f32).to_vec().into(),
+            view_position: camera.view_position().map(|s| s as f32).to_vector().into(),
 
             light_lookup_offset: light_lookup_offset.into(),
             light_option: match options.lighting_display {
@@ -67,7 +67,7 @@ impl ShaderSpaceCamera {
                 ),
             },
 
-            fog_color: Vector3::<f32>::from(sky_color).into(),
+            fog_color: sky_color.into(),
             fog_mode_blend,
             fog_distance,
 
@@ -77,12 +77,12 @@ impl ShaderSpaceCamera {
         }
     }
 }
-fn convert_matrix(matrix: Matrix4<f64>) -> [[f32; 4]; 4] {
-    matrix.cast::<f32>().unwrap(/* f64 to f32 is infallible */).into()
+fn convert_matrix<Src, Dst>(matrix: Transform3D<f64, Src, Dst>) -> [[f32; 4]; 4] {
+    matrix.cast::<f32>().to_arrays()
 }
 
 // TODO: does it make sense to break this out really?
-const OPENGL_TO_WGPU_PROJECTION: Matrix4<f64> = Matrix4::new(
+const OPENGL_TO_WGPU_PROJECTION: Transform3D<f64, Ndc, Ndc> = Transform3D::new(
     1.0, 0.0, 0.0, 0.0, //
     0.0, 1.0, 0.0, 0.0, //
     0.0, 0.0, 0.5, 0.0, //

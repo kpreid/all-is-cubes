@@ -7,7 +7,7 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-use cgmath::{InnerSpace as _, Point3, Vector3};
+use euclid::default::{Point3D, Vector3D};
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
@@ -24,7 +24,7 @@ const RAY_DIRECTION_STEP: isize = 5;
 fn generate_light_ray_pattern(path: &Path) {
     let mut file = fs::File::create(path).expect("failed to create light ray file");
 
-    let origin = Point3::new(0.5, 0.5, 0.5);
+    let origin = Point3D::new(0.5, 0.5, 0.5);
 
     writeln!(file, "static LIGHT_RAYS: &[LightRayData] = &[").unwrap();
 
@@ -36,24 +36,24 @@ fn generate_light_ray_pattern(path: &Path) {
                     || y.abs() == RAY_DIRECTION_STEP
                     || z.abs() == RAY_DIRECTION_STEP
                 {
-                    let direction = Vector3::new(x as f64, y as f64, z as f64).normalize();
+                    let direction = Vector3D::new(x as f64, y as f64, z as f64).normalize();
 
                     writeln!(file, "LightRayData {{").unwrap();
                     writeln!(file,
-                        "    ray: Ray {{ origin: Point3 {{ {origin} }}, direction: Vector3 {{ {direction} }} }},\n    face_cosines: FaceMap {{",
+                        "    ray: Ray {{ origin: Point3D::new({origin}), direction: Vector3D::new({direction}) }},\n    face_cosines: FaceMap {{",
                         origin = vecfields(origin),
                         direction = vecfields(direction),
                     ).unwrap();
 
                     for (name, unit_vector) in [
-                        ("nx", -Vector3::unit_x()),
-                        ("ny", -Vector3::unit_y()),
-                        ("nz", -Vector3::unit_z()),
-                        ("px", Vector3::unit_x()),
-                        ("py", Vector3::unit_y()),
-                        ("pz", Vector3::unit_z()),
+                        ("nx", Vector3D::new(-1, 0, 0)),
+                        ("ny", Vector3D::new(0, -1, 0)),
+                        ("nz", Vector3D::new(0, 0, -1)),
+                        ("px", Vector3D::new(1, 0, 0)),
+                        ("py", Vector3D::new(0, 1, 0)),
+                        ("pz", Vector3D::new(0, 0, 1)),
                     ] {
-                        let cosine = unit_vector.dot(direction.map(|s| s as f32)).max(0.0);
+                        let cosine = unit_vector.to_f32().dot(direction.to_f32()).max(0.0);
                         writeln!(file, "        {name}: {cosine:?},").unwrap();
                     }
 
@@ -72,5 +72,5 @@ fn generate_light_ray_pattern(path: &Path) {
 
 fn vecfields(value: impl Into<[f64; 3]>) -> String {
     let [x, y, z] = value.into();
-    format!("x: {x:?}, y: {y:?}, z: {z:?},")
+    format!("{x:?}, {y:?}, {z:?},")
 }

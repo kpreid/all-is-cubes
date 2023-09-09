@@ -1,6 +1,5 @@
 //! Lesser-used helpers for [`BlockBuilder`].
 
-use cgmath::EuclideanSpace as _;
 use std::borrow::Cow;
 use std::sync::Arc;
 

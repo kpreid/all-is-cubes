@@ -9,7 +9,6 @@
 
 use std::borrow::Cow;
 
-use cgmath::EuclideanSpace as _;
 use pretty_assertions::assert_eq;
 
 use crate::block::{
@@ -194,7 +193,7 @@ fn evaluate_voxels_checked_individually() {
     let block = Block::builder()
         .attributes(attributes.clone())
         .voxels_fn(&mut universe, resolution, |point| {
-            let point = point.lower_bounds().cast::<f32>().unwrap();
+            let point = point.lower_bounds().cast::<f32>();
             Block::from(Rgba::new(point.x, point.y, point.z, 1.0))
         })
         .unwrap()
@@ -207,7 +206,7 @@ fn evaluate_voxels_checked_individually() {
         Evoxels::Many(
             resolution,
             GridArray::from_fn(GridAab::for_block(resolution), |point| {
-                let point = point.lower_bounds().cast::<f32>().unwrap();
+                let point = point.lower_bounds().cast::<f32>();
                 Evoxel {
                     color: Rgba::new(point.x, point.y, point.z, 1.0),
                     emission: Rgb::ZERO,
@@ -337,14 +336,14 @@ fn recur_with_offset() {
     let mut space = Space::empty_positive(resolution_g * 2, resolution_g, resolution_g);
     space
         .fill(space.bounds(), |point| {
-            let point = point.lower_bounds().cast::<f32>().unwrap();
+            let point = point.lower_bounds().cast::<f32>();
             Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
         })
         .unwrap();
     let space_ref = universe.insert_anonymous(space);
     let block_at_offset = Block::from_primitive(Primitive::Recur {
         attributes: BlockAttributes::default(),
-        offset: GridPoint::from_vec(offset),
+        offset: offset.to_point(),
         resolution,
         space: space_ref.clone(),
     });
@@ -355,7 +354,7 @@ fn recur_with_offset() {
         Evoxels::Many(
             resolution,
             GridArray::from_fn(GridAab::for_block(resolution as Resolution), |point| {
-                let point = (point.lower_bounds() + offset).cast::<f32>().unwrap();
+                let point = (point.lower_bounds() + offset).cast::<f32>();
                 Evoxel {
                     color: Rgba::new(point.x, point.y, point.z, 1.0),
                     emission: Rgb::ZERO,
@@ -396,7 +395,7 @@ fn indirect_equivalence() {
     // and we can use the more concise version
     space
         .fill(space.bounds(), |point| {
-            let point = point.lower_bounds().cast::<f32>().unwrap();
+            let point = point.lower_bounds().cast::<f32>();
             Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
         })
         .unwrap();

@@ -1,13 +1,15 @@
 use super::*;
+use euclid::Rotation3D;
 use pretty_assertions::assert_eq;
+use rand::SeedableRng;
 
 #[test]
 fn camera_bad_viewport_doesnt_panic() {
     Camera::new(
         GraphicsOptions::default(),
         Viewport {
-            nominal_size: Vector2::new(0.0, 0.0),
-            framebuffer_size: Vector2::new(0, 0),
+            nominal_size: Vector2D::new(0.0, 0.0),
+            framebuffer_size: Vector2D::new(0, 0),
         },
     );
 }
@@ -28,11 +30,10 @@ fn set_options_updates_matrices() {
 fn camera_view_position() {
     // This test used to be less trivial when the transform was taken as a matrix
     let mut camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
-    let pos = Point3::new(1.0, 2.0, 3.0);
-    camera.set_view_transform(Decomposed {
-        scale: 1.0,
-        rot: Basis3::one(),
-        disp: pos.to_vec(),
+    let pos = Point3D::new(1.0, 2.0, 3.0);
+    camera.set_view_transform(ViewTransform {
+        rotation: Rotation3D::identity(),
+        translation: pos.to_vector().cast_unit(),
     });
     assert_eq!(camera.view_position(), pos);
 }
@@ -45,7 +46,7 @@ fn view_frustum() {
             fov_y: NotNan::from(90),
             ..GraphicsOptions::default()
         },
-        Viewport::with_scale(1.0, Vector2::new(10, 5)),
+        Viewport::with_scale(1.0, [10, 5]),
     );
     // TODO: approximate comparison instead of equals
     let x_near = 0.062499999999999986;
@@ -57,14 +58,14 @@ fn view_frustum() {
     assert_eq!(
         camera.view_frustum,
         FrustumPoints {
-            lbn: Point3::new(-x_near, -y_near, z_near),
-            ltn: Point3::new(-x_near, y_near, z_near),
-            rbn: Point3::new(x_near, -y_near, z_near),
-            rtn: Point3::new(x_near, y_near, z_near),
-            lbf: Point3::new(-x_far, -y_far, z_far),
-            ltf: Point3::new(-x_far, y_far, z_far),
-            rbf: Point3::new(x_far, -y_far, z_far),
-            rtf: Point3::new(x_far, y_far, z_far),
+            lbn: point3(-x_near, -y_near, z_near),
+            ltn: point3(-x_near, y_near, z_near),
+            rbn: point3(x_near, -y_near, z_near),
+            rtn: point3(x_near, y_near, z_near),
+            lbf: point3(-x_far, -y_far, z_far),
+            ltf: point3(-x_far, y_far, z_far),
+            rbf: point3(x_far, -y_far, z_far),
+            rtf: point3(x_far, y_far, z_far),
             bounds: Aab::new(-x_far, x_far, -y_far, y_far, z_far, z_near),
         }
     );
@@ -116,4 +117,34 @@ fn exposure_automatic_disabled_when_lighting_is_disabled() {
 
     camera.set_measured_exposure(7.0);
     assert_eq!(camera.exposure(), notnan!(1.0)); // ignoring measured
+}
+
+#[test]
+fn look_at_identity() {
+    let id = ViewTransform::identity();
+    assert_eq!(look_at_y_up(point3(0., 0., 0.), point3(0., 0., -10.)), id);
+}
+
+#[test]
+fn look_at_direction_consistency() {
+    let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(253789);
+    for _ in 0..100 {
+        let Some(direction) = Aab::new(-1., 1., -1., 1., -1., 1.)
+            .random_point(&mut rng)
+            .to_vector()
+            .try_normalize()
+        else {
+            continue;
+        };
+        let rotation = look_at_y_up(point3(0., 0., 0.), direction.to_point());
+        let rotated_eye_vector = rotation
+            .to_transform()
+            .transform_vector3d(vec3(0., 0., -1.));
+
+        let difference = rotated_eye_vector - direction;
+        assert!(
+            difference.length() < 1e-4,
+            "{direction:?} -> {rotated_eye_vector:?}"
+        );
+    }
 }

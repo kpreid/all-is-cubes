@@ -1,9 +1,9 @@
 use std::fmt;
 use std::sync::atomic::AtomicBool;
 
-use all_is_cubes::camera::{Flaws, GraphicsOptions};
-use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::camera::{Flaws, GraphicsOptions, ImagePixel};
 use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
+use all_is_cubes::euclid::Vector2D;
 
 use super::bloom;
 use crate::EgFramebuffer;
@@ -34,7 +34,12 @@ impl DrawableTexture {
     ///
     /// The current texture data will be discarded if and only if the given size is
     /// different than the previous size.
-    pub fn resize(&mut self, device: &wgpu::Device, label: Option<&str>, size: Vector2<u32>) {
+    pub fn resize(
+        &mut self,
+        device: &wgpu::Device,
+        label: Option<&str>,
+        size: Vector2D<u32, ImagePixel>,
+    ) {
         let new_extent = wgpu::Extent3d {
             width: size.x,
             height: size.y,

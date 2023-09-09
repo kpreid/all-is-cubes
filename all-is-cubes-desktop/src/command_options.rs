@@ -10,8 +10,9 @@ use clap::{builder::TypedValueParser, Parser, ValueEnum};
 use once_cell::sync::Lazy;
 use strum::IntoEnumIterator;
 
-use all_is_cubes::cgmath::{Vector2, Vector3};
-use all_is_cubes::math::GridCoordinate;
+use all_is_cubes::camera;
+use all_is_cubes::euclid::Vector2D;
+use all_is_cubes::math::{GridCoordinate, GridVector};
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 use all_is_cubes_port::ExportFormat;
 
@@ -178,7 +179,8 @@ impl AicDesktopArgs {
             image_size: self
                 .display_size
                 .0
-                .unwrap_or_else(|| Vector2::new(640, 480)),
+                .unwrap_or_else(|| Vector2D::new(640, 480))
+                .cast_unit(), // nominal = physical here
             save_all: self.save_all,
             animation: match self.duration {
                 Some(duration) => {
@@ -263,7 +265,7 @@ pub enum GraphicsType {
 /// Window/image size, parseable in a variety of formats, and with `None` referring to
 /// “automatic”, not “optional”.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct DisplaySizeArg(pub Option<Vector2<u32>>);
+pub(crate) struct DisplaySizeArg(pub Option<Vector2D<u32, camera::NominalPixel>>);
 
 impl FromStr for DisplaySizeArg {
     type Err = String;
@@ -280,14 +282,14 @@ impl FromStr for DisplaySizeArg {
                 .collect::<Result<Vec<u32>, String>>()?
                 .try_into()
                 .map_err(|_| String::from("must be two integers or \"auto\""))?;
-            Ok(DisplaySizeArg(Some(Vector2::from(dims))))
+            Ok(DisplaySizeArg(Some(Vector2D::from(dims))))
         }
     }
 }
 
 /// Template generation size.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct SpaceSizeArg(pub Option<Vector3<GridCoordinate>>);
+pub(crate) struct SpaceSizeArg(pub Option<GridVector>);
 
 impl FromStr for SpaceSizeArg {
     type Err = String;
@@ -309,7 +311,7 @@ impl FromStr for SpaceSizeArg {
                 .collect::<Result<Vec<GridCoordinate>, String>>()?
                 .try_into()
                 .map_err(|_| String::from("must be three integers or \"default\""))?;
-            Ok(SpaceSizeArg(Some(Vector3::from(dims))))
+            Ok(SpaceSizeArg(Some(GridVector::from(dims))))
         }
     }
 }
@@ -392,7 +394,7 @@ mod tests {
                 output_path: PathBuf::from("output.png"),
                 output_format: RecordFormat::PngOrApng,
                 save_all: false,
-                image_size: Vector2::new(640, 480),
+                image_size: Vector2D::new(640, 480),
                 animation: None,
             },
         );
@@ -409,7 +411,7 @@ mod tests {
                 output_path: PathBuf::from("fancy.png"),
                 output_format: RecordFormat::PngOrApng,
                 save_all: false,
-                image_size: Vector2::new(640, 480),
+                image_size: Vector2D::new(640, 480),
                 animation: Some(RecordAnimationOptions {
                     frame_count: 180,
                     frame_period: Duration::from_nanos((1e9 / 60.0) as u64),
@@ -517,9 +519,9 @@ mod tests {
     fn display_size_parse() {
         let parse = |s: &str| s.parse::<DisplaySizeArg>().map(|DisplaySizeArg(size)| size);
         let err = |s: &str| Err(s.to_owned());
-        assert_eq!(parse("1,2"), Ok(Some(Vector2::new(1, 2))));
-        assert_eq!(parse("30x93"), Ok(Some(Vector2::new(30, 93))));
-        assert_eq!(parse("30×93"), Ok(Some(Vector2::new(30, 93))));
+        assert_eq!(parse("1,2"), Ok(Some(Vector2D::new(1, 2))));
+        assert_eq!(parse("30x93"), Ok(Some(Vector2D::new(30, 93))));
+        assert_eq!(parse("30×93"), Ok(Some(Vector2D::new(30, 93))));
         assert_eq!(parse(""), err("\"\" not an integer or \"auto\""));
         assert_eq!(parse("1"), err("must be two integers or \"auto\""));
         assert_eq!(parse("a"), err("\"a\" not an integer or \"auto\""));
@@ -533,9 +535,9 @@ mod tests {
     fn space_size_parse() {
         let parse = |s: &str| s.parse::<SpaceSizeArg>().map(|SpaceSizeArg(size)| size);
         let err = |s: &str| Err(s.to_owned());
-        assert_eq!(parse("1,2,3"), Ok(Some(Vector3::new(1, 2, 3))));
-        assert_eq!(parse("10x20x30"), Ok(Some(Vector3::new(10, 20, 30))));
-        assert_eq!(parse("10×20×30"), Ok(Some(Vector3::new(10, 20, 30))));
+        assert_eq!(parse("1,2,3"), Ok(Some(GridVector::new(1, 2, 3))));
+        assert_eq!(parse("10x20x30"), Ok(Some(GridVector::new(10, 20, 30))));
+        assert_eq!(parse("10×20×30"), Ok(Some(GridVector::new(10, 20, 30))));
         assert_eq!(parse(""), err("\"\" not an integer or \"default\""));
         assert_eq!(parse("1"), err("must be three integers or \"default\""));
         assert_eq!(parse("a"), err("\"a\" not an integer or \"default\""));

@@ -1,11 +1,11 @@
 //! Import and export of MagicaVoxel `.vox` files.
 
 use all_is_cubes::block::{self, Block};
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point3, Vector3};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
+use all_is_cubes::euclid::{vec3, Point3D, Vector3D};
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{Cube, GridAab, GridRotation, GridVector, Gridgid, Rgb, Rgba};
+use all_is_cubes::math::{Cube, GridAab, GridRotation, GridVector, Gridgid, Rgb, Rgba, VectorOps};
 use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
 use all_is_cubes::universe::{self, Name, PartialUniverse, Universe};
 use all_is_cubes::util::{ConciseDebug, CustomFormat, YieldProgress};
@@ -171,7 +171,7 @@ fn dot_vox_model_to_space(
 
     let mut space = Space::builder(bounds)
         .spawn({
-            let mut spawn = Spawn::looking_at_space(bounds, Vector3::new(-1., 1., 1.));
+            let mut spawn = Spawn::looking_at_space(bounds, vec3(-1., 1., 1.));
             spawn.set_inventory(free_editing_starter_inventory(true));
             spawn
         })
@@ -182,14 +182,7 @@ fn dot_vox_model_to_space(
         .build();
 
     for v in model.voxels.iter() {
-        let converted_cube: Cube = Cube::from(
-            Point3 {
-                x: v.x,
-                y: v.y,
-                z: v.z,
-            }
-            .map(i32::from),
-        );
+        let converted_cube: Cube = Cube::from(Point3D::new(v.x, v.y, v.z).map(i32::from));
         let transformed_cube = transform.transform_cube(converted_cube);
 
         #[allow(clippy::unnecessary_lazy_evaluations)] // dubious positive
@@ -258,12 +251,12 @@ fn space_to_dot_vox_model(
 
     Ok(dot_vox::Model {
         size: {
-            let Vector3 { x, y, z } = transform
+            // TODO: tidy this up by rotating the bounds?
+            let Vector3D { x, y, z, _unit } = transform
                 .rotation
                 .transform_vector(space.bounds().size())
                 .map(i32::abs) // vector rotation might make it negative
-                .cast::<u32>()
-                .unwrap(); // conversion from positive i32 to u32 cannot fail
+                .to_u32(); // conversion from positive i32 to u32 cannot overflow
             dot_vox::Size { x, y, z }
         },
         voxels,
@@ -310,7 +303,7 @@ fn mv_to_aic_coordinate_transform(mv_size: dot_vox::Size) -> Gridgid {
 /// Also translates coordinates so that the lower bounds are zero, since the dot-vox format
 /// does not support arbitrary lower bounds.
 fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
-    let aic_size = aic_bounds.size().cast::<u32>().expect("negative sizes");
+    let aic_size = aic_bounds.unsigned_size();
     let mv_size = dot_vox::Size {
         // Note axis swap! We can't just delegate this to the transform because the transform doesn't exist yet.
         // (TODO: But we could delegate it to the GridRotation)
@@ -319,7 +312,7 @@ fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
         z: aic_size.y,
     };
     mv_to_aic_coordinate_transform(mv_size).inverse()
-        * Gridgid::from_translation(-aic_bounds.lower_bounds().to_vec())
+        * Gridgid::from_translation(-aic_bounds.lower_bounds().to_vector())
 }
 
 #[cfg(test)]

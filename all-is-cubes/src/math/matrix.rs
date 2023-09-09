@@ -2,50 +2,49 @@
 //! This module is private but reexported by its parent.
 
 use std::cmp::Ordering;
-use std::ops::Mul;
+use std::ops::{self, Mul};
 
-use cgmath::{
-    EuclideanSpace as _, InnerSpace, Matrix4, One, Transform, Vector3, Vector4, Zero as _,
-};
-pub use ordered_float::{FloatIsNan, NotNan};
+use euclid::Vector3D;
+use num_traits::One;
 
 use crate::math::{
-    Cube, Face6, Face7, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector,
-    Gridgid, Point3,
+    Axis, Cube, Face6, Face7, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector,
+    Gridgid, VectorOps,
 };
 
-/// A 4×3 affine transformation matrix in [`GridCoordinate`]s, rather than floats as
-/// [`cgmath::Matrix4`] requires.
+/// A 4×3 affine transformation matrix in [`GridCoordinate`]s.
 ///
 /// TODO: The operators implemented for this are very incomplete.
+///
+/// TODO(euclid migration): Can we dispose of this type now?
 #[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct GridMatrix {
     /// First column
-    pub x: Vector3<GridCoordinate>,
+    pub x: GridVector,
     /// Second column
-    pub y: Vector3<GridCoordinate>,
+    pub y: GridVector,
     /// Third column
-    pub z: Vector3<GridCoordinate>,
+    pub z: GridVector,
     /// Fourth column (translation)
-    pub w: Vector3<GridCoordinate>,
+    pub w: GridVector,
 }
 
 impl GridMatrix {
     pub(crate) const ZERO: Self = Self {
-        x: Vector3::new(0, 0, 0),
-        y: Vector3::new(0, 0, 0),
-        z: Vector3::new(0, 0, 0),
-        w: Vector3::new(0, 0, 0),
+        x: Vector3D::new(0, 0, 0),
+        y: Vector3D::new(0, 0, 0),
+        z: Vector3D::new(0, 0, 0),
+        w: Vector3D::new(0, 0, 0),
     };
 
     /// For Y-down drawing
     #[doc(hidden)] // used by all-is-cubes-content - TODO: public?
     pub const FLIP_Y: Self = Self {
-        x: Vector3::new(1, 0, 0),
-        y: Vector3::new(0, -1, 0),
-        z: Vector3::new(0, 0, 1),
-        w: Vector3::new(0, 0, 0),
+        x: Vector3D::new(1, 0, 0),
+        y: Vector3D::new(0, -1, 0),
+        z: Vector3D::new(0, 0, 1),
+        w: Vector3D::new(0, 0, 0),
     };
 
     /// Note: This takes the same column-major ordering as [`cgmath`], so the argument order
@@ -67,10 +66,10 @@ impl GridMatrix {
         w2: GridCoordinate,
     ) -> Self {
         Self {
-            x: Vector3::new(x0, x1, x2),
-            y: Vector3::new(y0, y1, y2),
-            z: Vector3::new(z0, z1, z2),
-            w: Vector3::new(w0, w1, w2),
+            x: Vector3D::new(x0, x1, x2),
+            y: Vector3D::new(y0, y1, y2),
+            z: Vector3D::new(z0, z1, z2),
+            w: Vector3D::new(w0, w1, w2),
         }
     }
 
@@ -90,10 +89,10 @@ impl GridMatrix {
     #[inline]
     pub fn from_scale(scale: GridCoordinate) -> Self {
         Self {
-            x: Vector3::new(scale, 0, 0),
-            y: Vector3::new(0, scale, 0),
-            z: Vector3::new(0, 0, scale),
-            w: Vector3::new(0, 0, 0),
+            x: Vector3D::new(scale, 0, 0),
+            y: Vector3D::new(0, scale, 0),
+            z: Vector3D::new(0, 0, scale),
+            w: Vector3D::new(0, 0, 0),
         }
     }
 
@@ -103,7 +102,6 @@ impl GridMatrix {
     /// Skews or scaling cannot be performed using this constructor.
     ///
     /// ```
-    /// use cgmath::Transform as _;  // trait method Transform::transform_point
     /// use all_is_cubes::math::{Face7::*, GridMatrix, GridPoint};
     ///
     /// let transform = GridMatrix::from_origin([10, 10, 10], PX, PZ, NY);
@@ -118,27 +116,26 @@ impl GridMatrix {
             x: x.normal_vector(),
             y: y.normal_vector(),
             z: z.normal_vector(),
-            w: origin.into().to_vec(),
+            w: origin.into().to_vector(),
         }
     }
 
     /// Convert this integer-valued matrix to an equivalent float-valued matrix.
     #[inline]
-    pub fn to_free(self) -> Matrix4<FreeCoordinate> {
-        Matrix4 {
-            x: self.x.map(FreeCoordinate::from).extend(0.),
-            y: self.y.map(FreeCoordinate::from).extend(0.),
-            z: self.z.map(FreeCoordinate::from).extend(0.),
-            w: self.w.map(FreeCoordinate::from).extend(1.),
-        }
+    #[rustfmt::skip]
+    pub fn to_free(self) -> euclid::Transform3D<FreeCoordinate, Cube, Cube> {
+        euclid::Transform3D::new(
+            self.x.x, self.x.y, self.x.z, 0,
+            self.y.x, self.y.y, self.y.z, 0,
+            self.z.x, self.z.y, self.z.z, 0,
+            self.w.x, self.w.y, self.w.z, 1,
+        ).cast()
     }
 
     /// Returns row `r` of the matrix.
-    ///
-    /// Panics if `r >= 3`.
     #[inline(always)]
-    pub fn row(&self, r: usize) -> Vector4<GridCoordinate> {
-        Vector4::new(self.x[r], self.y[r], self.z[r], self.w[r])
+    fn row(&self, r: Axis) -> MVector4<GridCoordinate> {
+        MVector4::new(self.x[r], self.y[r], self.z[r], self.w[r])
     }
 
     /// Equivalent to temporarily applying an offset of `[0.5, 0.5, 0.5]` while
@@ -151,7 +148,6 @@ impl GridMatrix {
     ///
     /// ```
     /// use all_is_cubes::math::{Cube, Face7::*, GridMatrix, GridPoint};
-    /// use cgmath::Transform; // for transform_point
     ///
     /// // Translation without rotation has the usual definition.
     /// let matrix = GridMatrix::from_translation([10, 0, 0]);
@@ -226,42 +222,34 @@ impl One for GridMatrix {
     }
 }
 
-impl Transform<GridPoint> for GridMatrix {
-    fn look_at(eye: GridPoint, center: GridPoint, up: GridVector) -> Self {
-        Self::look_at_rh(eye, center, up)
-    }
-
-    fn look_at_rh(_eye: GridPoint, _center: GridPoint, _up: GridVector) -> Self {
-        todo!("look_at_rh is not yet implemented");
-        // We may in the future find use for this for choosing block rotations.
-    }
-
-    fn look_at_lh(_eye: GridPoint, _center: GridPoint, _up: GridVector) -> Self {
-        unimplemented!("left-handed coordinates are not currently used, so look_at_lh has not been not implemented");
-    }
-
+/// TODO(euclid migration): this used to be a `cgmath::Transform` impl; clean up
+impl GridMatrix {
+    /// Transform (rotate and scale) the given vector.
+    /// The translation part of this matrix is ignored.
     #[inline]
-    fn transform_vector(&self, vec: GridVector) -> GridVector {
-        GridVector {
-            x: self.row(0).truncate().dot(vec),
-            y: self.row(1).truncate().dot(vec),
-            z: self.row(2).truncate().dot(vec),
-        }
+    #[must_use]
+    pub fn transform_vector(&self, vec: GridVector) -> GridVector {
+        GridVector::new(
+            self.row(Axis::X).truncate().dot(vec),
+            self.row(Axis::Y).truncate().dot(vec),
+            self.row(Axis::Z).truncate().dot(vec),
+        )
     }
 
+    /// Transform the given point by this matrix.
     #[inline]
-    fn transform_point(&self, point: GridPoint) -> GridPoint {
-        let homogeneous = point.to_vec().extend(1);
-        GridPoint {
-            x: self.row(0).dot(homogeneous),
-            y: self.row(1).dot(homogeneous),
-            z: self.row(2).dot(homogeneous),
-        }
+    #[must_use]
+    pub fn transform_point(&self, point: GridPoint) -> GridPoint {
+        let homogeneous = MVector4::homogeneous(point.to_vector());
+        GridPoint::new(
+            self.row(Axis::X).dot(homogeneous),
+            self.row(Axis::Y).dot(homogeneous),
+            self.row(Axis::Z).dot(homogeneous),
+        )
     }
 
     /// ```
     /// use all_is_cubes::math::{GridMatrix, GridPoint};
-    /// use cgmath::Transform as _;
     ///
     /// let transform_1 = GridMatrix::new(
     ///     0, -1, 0,
@@ -277,23 +265,26 @@ impl Transform<GridPoint> for GridMatrix {
     ///     transform_1.transform_point(transform_2.transform_point(GridPoint::new(0, 3, 0))),
     /// );
     /// ```
-    fn concat(&self, other: &Self) -> Self {
+    #[must_use]
+    pub fn concat(&self, other: &Self) -> Self {
         GridMatrix {
             x: self.transform_vector(other.x),
             y: self.transform_vector(other.y),
             z: self.transform_vector(other.z),
             // Shenanigan because we're working in 4x3 rather than 4x4
             // with homogeneous coordinate vectors.
-            w: self.transform_point(Point3::from_vec(other.w)).to_vec(),
+            w: self.transform_point(other.w.to_point()).to_vector(),
         }
     }
 
-    fn inverse_transform(&self) -> Option<Self> {
+    /// Invert this matrix. Returns [`None`] if it is not invertible.
+    pub fn inverse_transform(&self) -> Option<Self> {
         // For now, implement this the expensive but simple way of borrowing float matrix ops.
 
         const INVERSE_EPSILON: FreeCoordinate = 0.25 / (GridCoordinate::MAX as FreeCoordinate);
-        fn try_round(v: Vector4<FreeCoordinate>, expected_w: FreeCoordinate) -> Option<GridVector> {
-            let mut result = GridVector::zero();
+        fn try_round(v: [FreeCoordinate; 4], expected_w: FreeCoordinate) -> Option<GridVector> {
+            let mut result = Vector3D::zero();
+            #[allow(clippy::needless_range_loop)]
             for axis in 0..4 {
                 let rounded = v[axis].round();
                 let remainder = v[axis] - rounded;
@@ -301,32 +292,78 @@ impl Transform<GridPoint> for GridMatrix {
                     // The inverse matrix has a non-integer element.
                     return None;
                 }
-                if axis == 3 {
-                    #[allow(clippy::float_cmp)]
-                    if rounded != expected_w {
-                        return None;
-                    }
-                } else {
+                match axis {
                     // TODO: check for overflow
-                    result[axis] = rounded as GridCoordinate;
+                    0 => result.x = rounded as GridCoordinate,
+                    1 => result.y = rounded as GridCoordinate,
+                    2 => result.z = rounded as GridCoordinate,
+                    3 =>
+                    {
+                        #[allow(clippy::float_cmp)]
+                        if rounded != expected_w {
+                            return None;
+                        }
+                    }
+                    _ => unreachable!(),
                 }
             }
             Some(result)
         }
 
-        let fi = self.to_free().inverse_transform()?;
+        let fi = self.to_free().inverse()?.to_arrays();
         Some(GridMatrix {
-            x: try_round(fi.x, 0.0)?,
-            y: try_round(fi.y, 0.0)?,
-            z: try_round(fi.z, 0.0)?,
-            w: try_round(fi.w, 1.0)?,
+            x: try_round(fi[0], 0.0)?,
+            y: try_round(fi[1], 0.0)?,
+            z: try_round(fi[2], 0.0)?,
+            w: try_round(fi[3], 1.0)?,
         })
+    }
+}
+
+/// Mini 4D vector for matrix rows.
+#[allow(clippy::exhaustive_structs)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct MVector4<T> {
+    x: T,
+    y: T,
+    z: T,
+    w: T,
+}
+
+impl<T: Copy> MVector4<T> {
+    fn new(x: T, y: T, z: T, w: T) -> Self {
+        Self { x, y, z, w }
+    }
+
+    fn homogeneous<U>(v: Vector3D<T, U>) -> MVector4<T>
+    where
+        T: One,
+    {
+        Self {
+            x: v.x,
+            y: v.y,
+            z: v.z,
+            w: T::one(),
+        }
+    }
+
+    fn dot(self, other: Self) -> T
+    where
+        T: ops::Mul<Output = T>,
+        T: ops::Add<Output = T>,
+    {
+        self.x * other.x + self.y * other.y + self.z * other.z + self.w * other.w
+    }
+
+    fn truncate<U>(self) -> Vector3D<T, U> {
+        Vector3D::new(self.x, self.y, self.z)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use euclid::{point3, vec3, Transform3D};
     use rand::{Rng, SeedableRng as _};
     use rand_xoshiro::Xoshiro256Plus;
 
@@ -362,7 +399,7 @@ mod tests {
             9, 10, 11,
             13, 14, 15,
         );
-        assert_eq!(m.to_free(), Matrix4::new(
+        assert_eq!(m.to_free(), Transform3D::new(
             1., 2., 3., 0.,
             5., 6., 7., 0.,
             9., 10., 11., 0.,
@@ -379,12 +416,14 @@ mod tests {
             assert_eq!(
                 m.transform_point(GridPoint::new(2, 300, 40000))
                     .map(FreeCoordinate::from),
-                m.to_free().transform_point(Point3::new(2., 300., 40000.)),
+                m.to_free()
+                    .transform_point3d(point3(2., 300., 40000.))
+                    .unwrap(),
             );
             assert_eq!(
                 m.transform_vector(GridVector::new(10, 20, 30))
                     .map(FreeCoordinate::from),
-                m.to_free().transform_vector(Vector3::new(10., 20., 30.)),
+                m.to_free().transform_vector3d(vec3(10., 20., 30.)),
             );
         }
     }
@@ -395,7 +434,8 @@ mod tests {
         for _ in 1..100 {
             let m1 = random_grid_matrix(&mut rng);
             let m2 = random_grid_matrix(&mut rng);
-            assert_eq!(m1.concat(&m2).to_free(), m1.to_free().concat(&m2.to_free()),);
+            // our concat() orderingis inherited from cgmath which is opposite of euclid then()
+            assert_eq!(m1.concat(&m2).to_free(), m2.to_free().then(&m1.to_free()));
         }
     }
 
@@ -409,7 +449,7 @@ mod tests {
             if let Some(inv) = inv {
                 assert_eq!(
                     Some(inv.to_free()),
-                    m.to_free().inverse_transform(),
+                    m.to_free().inverse(),
                     "inverse of {m:?}",
                 );
                 nontrivial += 1;

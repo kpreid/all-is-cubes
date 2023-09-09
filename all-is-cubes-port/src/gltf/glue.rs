@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use all_is_cubes::cgmath;
+use all_is_cubes::euclid;
 
 use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
@@ -57,14 +57,8 @@ impl Lef32 {
     /// All bits zero is also the value 'positive zero'.
     pub const ZERO: Self = Lef32([0, 0, 0, 0]);
 
-    pub(crate) fn from_vec2(vector: cgmath::Vector2<f32>) -> [Self; 2] {
-        vector.map(Lef32::from).into()
-    }
-    pub(crate) fn from_vec3(vector: cgmath::Vector3<f32>) -> [Self; 3] {
-        vector.map(Lef32::from).into()
-    }
-    pub(crate) fn from_vec4(vector: cgmath::Vector4<f32>) -> [Self; 4] {
-        vector.map(Lef32::from).into()
+    pub(crate) fn from_vec3<U>(vector: euclid::Vector3D<f32, U>) -> [Self; 3] {
+        Into::<[f32; 3]>::into(vector).map(Lef32::from)
     }
 }
 
@@ -95,10 +89,11 @@ impl From<Lef32> for f32 {
     }
 }
 
-pub(crate) fn convert_quaternion(rot: cgmath::Basis3<f64>) -> gltf_json::scene::UnitQuaternion {
-    let q: cgmath::Quaternion<f64> = rot.into();
-    let q: cgmath::Quaternion<f32> = q.cast().unwrap();
-    gltf_json::scene::UnitQuaternion([q.v.x, q.v.y, q.v.z, q.s])
+pub(crate) fn convert_quaternion<Src, Dst>(
+    q: euclid::Rotation3D<f64, Src, Dst>,
+) -> gltf_json::scene::UnitQuaternion {
+    let q = q.normalize(); // shouldn't be *necessary* but…
+    gltf_json::scene::UnitQuaternion([q.i as f32, q.j as f32, q.k as f32, q.r as f32])
 }
 
 /// Shorthand to construct a `Node` having no contents until modified.

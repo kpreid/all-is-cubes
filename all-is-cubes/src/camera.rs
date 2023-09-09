@@ -1,15 +1,17 @@
 //! Projection and view matrices, viewport and aspect ratio, visibility,
 //! raycasting into the scene, etc.
 
-use cgmath::{
-    Basis3, Decomposed, Deg, EuclideanSpace as _, InnerSpace as _, Matrix4, One as _, Point2,
-    Point3, SquareMatrix, Transform, Vector2, Vector3,
+use euclid::{
+    point3, vec3, Angle, Point2D, Point3D, RigidTransform3D, Rotation3D, Transform3D, Vector2D,
 };
 use itertools::Itertools as _;
+use num_traits::One;
 use ordered_float::NotNan;
 
 use crate::chunking::OctantMask;
-use crate::math::{Aab, Axis, FreeCoordinate, GridAab, Rgba};
+use crate::math::{
+    Aab, Axis, Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, Rgba, VectorOps,
+};
 use crate::raycast::Ray;
 
 mod flaws;
@@ -27,15 +29,13 @@ pub use stdcam::*;
 #[cfg(test)]
 mod tests;
 
-type M = Matrix4<FreeCoordinate>;
-
 /// Representation of a camera viewpoint and orientation, using [`cgmath`] types.
 ///
 /// Note that this is treated as a transform **from** the origin looking in the &minus;Z
-/// direction **to** the camera position in the world. This is done so that the
-/// [`Decomposed::disp`] vector is equal to the world position, rather than needing to
-/// be rotated by the view direction.
-pub type ViewTransform = Decomposed<Vector3<FreeCoordinate>, Basis3<FreeCoordinate>>;
+/// direction (eye space) **to** the camera position and orientation (world space).
+/// This is done so that the [`RigidTransform3D::translation`] vector is equal to the
+/// world position, rather than needing to be rotated by the view direction.
+pub type ViewTransform = RigidTransform3D<FreeCoordinate, Eye, Cube>;
 
 /// Defines a viewpoint in/of the world: a viewport (aspect ratio), projection matrix,
 /// and view matrix.
@@ -56,19 +56,19 @@ pub struct Camera {
     /// Inverse of `eye_to_world_transform` as a matrix.
     /// Might also be called "view matrix".
     /// Calculated by [`Self::compute_matrices`].
-    world_to_eye_matrix: M,
+    world_to_eye_matrix: Transform3D<FreeCoordinate, Cube, Eye>,
 
     /// Projection matrix derived from viewport and options.
     /// Calculated by [`Self::compute_matrices`].
-    projection: M,
+    projection: Transform3D<FreeCoordinate, Eye, Ndc>,
 
     /// View point derived from view matrix.
     /// Calculated by [`Self::compute_matrices`].
-    view_position: Point3<FreeCoordinate>,
+    view_position: FreePoint,
 
     /// Inverse of `projection * world_to_eye_matrix`.
     /// Calculated by [`Self::compute_matrices`].
-    inverse_projection_view: M,
+    inverse_projection_view: Transform3D<FreeCoordinate, Ndc, Cube>,
 
     /// Bounds of the visible area in world space.
     /// Calculated by [`Self::compute_matrices`].
@@ -84,19 +84,19 @@ impl Camera {
     /// Create a camera which has
     ///
     /// * `options` and `viewport` as given,
-    /// * a `view_transform` of [`ViewTransform::one()`], and
+    /// * a `view_transform` of [`ViewTransform::identity()`], and
     /// * an `exposure` determined based on the graphics options.
     pub fn new(options: GraphicsOptions, viewport: Viewport) -> Self {
         let options = options.repair();
         let mut new_self = Self {
             viewport,
-            eye_to_world_transform: ViewTransform::one(),
+            eye_to_world_transform: ViewTransform::identity(),
 
             // Overwritten immediately by compute_matrices
-            world_to_eye_matrix: M::identity(),
-            projection: M::identity(),
-            view_position: Point3::origin(),
-            inverse_projection_view: M::identity(),
+            world_to_eye_matrix: Transform3D::identity(),
+            projection: Transform3D::identity(),
+            view_position: Point3D::origin(),
+            inverse_projection_view: Transform3D::identity(),
             view_frustum: Default::default(),
 
             exposure_value: options.exposure.initial(),
@@ -139,8 +139,8 @@ impl Camera {
     /// Returns the field of view, expressed in degrees on the vertical axis (that is, the
     /// horizontal field of view depends on the viewport's aspect ratio).
     /// This differs from the value in [`GraphicsOptions`] by being clamped to valid values.
-    pub fn fov_y(&self) -> Deg<FreeCoordinate> {
-        Deg(self.options.fov_y.into_inner())
+    pub fn fov_y(&self) -> FreeCoordinate {
+        self.options.fov_y.into_inner()
     }
 
     /// Returns the view distance; the far plane of the projection matrix, or the distance
@@ -154,21 +154,19 @@ impl Camera {
     /// Besides controlling rendering, this is used to determine world coordinates for purposes
     /// of [`view_position`](Self::view_position) and
     /// [`project_ndc_into_world`](Self::project_ndc_into_world).
-    ///
-    /// The scale currently must be 1.
-    #[track_caller]
     #[allow(clippy::float_cmp)]
     pub fn set_view_transform(&mut self, eye_to_world_transform: ViewTransform) {
-        if eye_to_world_transform == self.eye_to_world_transform {
+        if eye_to_world_transform.to_untyped() == self.eye_to_world_transform.to_untyped() {
             return;
         }
-        assert_eq!(
-            eye_to_world_transform.scale, 1.0,
-            "eye_to_world_transform.scale must be equal to 1"
-        );
 
         self.eye_to_world_transform = eye_to_world_transform;
         self.compute_matrices();
+    }
+
+    /// Sets the view transform like [`Self::set_view_transform()`], but in “look at” fashion.
+    pub fn look_at_y_up(&mut self, eye: FreePoint, target: FreePoint) {
+        self.set_view_transform(look_at_y_up(eye, target))
     }
 
     /// Gets the last eye-to-world transform set by [`Self::set_view_transform()`].
@@ -177,17 +175,17 @@ impl Camera {
     }
 
     /// Returns a projection matrix suitable for OpenGL use.
-    pub fn projection(&self) -> M {
+    pub fn projection(&self) -> Transform3D<FreeCoordinate, Eye, Ndc> {
         self.projection
     }
 
     /// Returns a view matrix suitable for OpenGL use.
-    pub fn view_matrix(&self) -> M {
+    pub fn view_matrix(&self) -> Transform3D<FreeCoordinate, Cube, Eye> {
         self.world_to_eye_matrix
     }
 
     /// Returns the eye position in world coordinates, as set by [`Camera::set_view_transform()`].
-    pub fn view_position(&self) -> Point3<FreeCoordinate> {
+    pub fn view_position(&self) -> FreePoint {
         self.view_position
     }
 
@@ -225,12 +223,21 @@ impl Camera {
     /// Converts a screen position in normalized device coordinates (as produced by
     /// [`Viewport::normalize_nominal_point`]) into a ray in world space.
     /// Uses the view transformation given by [`set_view_transform`](Self::set_view_transform).
-    pub fn project_ndc_into_world(&self, ndc: Point2<FreeCoordinate>) -> Ray {
-        let ndc_near = ndc.to_vec().extend(-1.0).extend(1.0);
-        let ndc_far = ndc.to_vec().extend(1.0).extend(1.0);
+    pub fn project_ndc_into_world(&self, ndc: NdcPoint2) -> Ray {
+        let ndc_near = ndc.extend(-1.0);
+        let ndc_far = ndc.extend(1.0);
+
         // World-space endpoints of the ray.
-        let world_near = Point3::from_homogeneous(self.inverse_projection_view * ndc_near);
-        let world_far = Point3::from_homogeneous(self.inverse_projection_view * ndc_far);
+        // TODO(euclid migration): don't unwrap, do what instead?
+        let world_near = self
+            .inverse_projection_view
+            .transform_point3d(ndc_near)
+            .unwrap();
+        let world_far = self
+            .inverse_projection_view
+            .transform_point3d(ndc_far)
+            .unwrap();
+
         let direction = world_far - world_near;
         Ray {
             origin: world_near,
@@ -238,8 +245,9 @@ impl Camera {
         }
     }
 
-    fn project_point_into_world(&self, p: Point3<FreeCoordinate>) -> Point3<FreeCoordinate> {
-        Point3::from_homogeneous(self.inverse_projection_view * p.to_homogeneous())
+    fn project_point_into_world(&self, p: NdcPoint3) -> FreePoint {
+        // TODO(euclid migration): don't unwrap, do what instead?
+        self.inverse_projection_view.transform_point3d(p).unwrap()
     }
 
     /// Determine whether the given `Aab` is visible in this projection+view.
@@ -291,9 +299,9 @@ impl Camera {
     ///
     /// Note: NOT `#[inline]` because profiling shows that to have a negative effect.
     fn separated_along(
-        points1: impl IntoIterator<Item = Point3<FreeCoordinate>>,
-        points2: impl IntoIterator<Item = Point3<FreeCoordinate>>,
-        axis: Vector3<FreeCoordinate>,
+        points1: impl IntoIterator<Item = FreePoint>,
+        points2: impl IntoIterator<Item = FreePoint>,
+        axis: FreeVector,
     ) -> bool {
         let (min1, max1) = projected_range(points1, axis);
         let (min2, max2) = projected_range(points2, axis);
@@ -336,40 +344,94 @@ impl Camera {
     }
 
     fn compute_matrices(&mut self) {
-        self.projection = cgmath::perspective(
-            self.fov_y(),
-            self.viewport.nominal_aspect_ratio(),
-            /* near: */ 1. / 32., // half a voxel at resolution=16
-            /* far: */ self.view_distance(),
+        let fov_cot = (self.fov_y() / 2.).to_radians().tan().recip();
+        let aspect = self.viewport.nominal_aspect_ratio();
+
+        let near = 1. / 32.; // half a voxel at resolution=16
+        let far = self.view_distance();
+
+        // Rationale for this particular matrix formula: "that's what `cgmath` does".
+        //
+        // Note that this is an OpenGL—style projection matrix — that is, the depth range
+        // is -1 to 1, not 0 to 1. TODO: Change that, and update the documentation.
+        #[rustfmt::skip]
+        let projection = Transform3D::new(
+            fov_cot / aspect, 0.0, 0.0, 0.0,
+            0.0, fov_cot, 0.0, 0.0,
+            0.0, 0.0, (far + near) / (near - far), -1.0,
+            0.0, 0.0, (2. * far * near) / (near - far), 0.0,
         );
+        self.projection = projection;
 
-        self.world_to_eye_matrix = self.eye_to_world_transform
-            .inverse_transform()
-            .unwrap(/* Inverting cannot fail as long as scale is nonzero */)
-            .into();
+        self.world_to_eye_matrix = self.eye_to_world_transform.inverse().to_transform();
 
-        self.view_position = Point3::from_vec(self.eye_to_world_transform.disp);
+        self.view_position = self.eye_to_world_transform.translation.to_point();
 
-        self.inverse_projection_view = (self.projection * self.world_to_eye_matrix)
-            .inverse_transform()
+        self.inverse_projection_view = self
+            .world_to_eye_matrix
+            .then(&self.projection)
+            .inverse()
             .expect("projection and view matrix was not invertible");
 
         // Compute the view frustum's corner points,
         // by unprojecting the corners of clip space.
         self.view_frustum = FrustumPoints {
-            lbn: self.project_point_into_world(Point3::new(-1., -1., -1.)),
-            rbn: self.project_point_into_world(Point3::new(1., -1., -1.)),
-            ltn: self.project_point_into_world(Point3::new(-1., 1., -1.)),
-            rtn: self.project_point_into_world(Point3::new(1., 1., -1.)),
-            lbf: self.project_point_into_world(Point3::new(-1., -1., 1.)),
-            rbf: self.project_point_into_world(Point3::new(1., -1., 1.)),
-            ltf: self.project_point_into_world(Point3::new(-1., 1., 1.)),
-            rtf: self.project_point_into_world(Point3::new(1., 1., 1.)),
+            lbn: self.project_point_into_world(point3(-1., -1., -1.)),
+            rbn: self.project_point_into_world(point3(1., -1., -1.)),
+            ltn: self.project_point_into_world(point3(-1., 1., -1.)),
+            rtn: self.project_point_into_world(point3(1., 1., -1.)),
+            lbf: self.project_point_into_world(point3(-1., -1., 1.)),
+            rbf: self.project_point_into_world(point3(1., -1., 1.)),
+            ltf: self.project_point_into_world(point3(-1., 1., 1.)),
+            rtf: self.project_point_into_world(point3(1., 1., 1.)),
             bounds: Aab::ZERO,
         };
         self.view_frustum.compute_bounds();
     }
 }
+
+/// Unit-of-measure/coordinate-system type for points/vectors in “eye space”,
+/// the space of camera-relative coordinates that are *not* perspective-projected.
+///
+/// +X is right, +Y is up, +Z is towards-the-viewer (right-handed coordinates).
+#[allow(clippy::exhaustive_enums)]
+#[derive(Debug, Eq, PartialEq)]
+pub enum Eye {}
+
+/// Unit-of-measure type for vectors representing the on-screen dimensions of a [`Viewport`],
+/// which may be different from the “physical” pixels of the image rendered to it.
+#[allow(clippy::exhaustive_enums)]
+#[derive(Debug, Eq, PartialEq)]
+pub enum NominalPixel {}
+
+/// Unit-of-measure type for vectors representing the width and height of an image.
+///
+/// Used in [`Viewport::framebuffer_size`].
+#[allow(clippy::exhaustive_enums)]
+#[derive(Debug, Eq, PartialEq)]
+pub enum ImagePixel {}
+
+/// Unit-of-measure type for points/vectors in “normalized device coordinates”
+/// (where screen-space x and y have the range -1 to 1, zero is the center of the
+/// screen, and z is image depth rather than an equivalent third spatial axis).
+#[allow(clippy::exhaustive_enums)]
+#[derive(Debug, Eq, PartialEq)]
+pub enum Ndc {}
+
+/// Screen-space point in [normalized device coordinates](Ndc), with depth.
+pub type NdcPoint2 = euclid::Point2D<f64, Ndc>;
+/// Screen-space point in [normalized device coordinates](Ndc), with depth.
+pub type NdcPoint3 = euclid::Point3D<f64, Ndc>;
+
+/// Width and height of an image, framebuffer, or window, as measured in actual distinct
+/// image pixels.
+///
+/// For sizes that are in nominal, or “logical” pixel units that have become separated from
+/// actual image or display resolution, use `Vector2D<T, NominalPixel>`; there is no type
+/// alias for that.
+///
+/// TODO: euclid has a `Size2D` type. Try switching to that.
+pub type ImageSize = Vector2D<u32, ImagePixel>;
 
 /// Viewport dimensions for rendering and UI layout with the correct resolution and
 /// aspect ratio.
@@ -378,10 +440,10 @@ impl Camera {
 pub struct Viewport {
     /// Viewport dimensions to use for determining aspect ratio and interpreting
     /// pointer events.
-    pub nominal_size: Vector2<FreeCoordinate>,
+    pub nominal_size: Vector2D<FreeCoordinate, NominalPixel>,
     /// Viewport dimensions to use for framebuffer configuration.
     /// This aspect ratio may differ to represent non-square pixels.
-    pub framebuffer_size: Vector2<u32>,
+    pub framebuffer_size: ImageSize,
 }
 
 impl Viewport {
@@ -391,10 +453,14 @@ impl Viewport {
     ///
     /// The `nominal_size` will be the given `framebuffer_size` divided by the given
     /// `scale_factor`.
-    pub fn with_scale(scale_factor: f64, framebuffer_size: Vector2<u32>) -> Self {
+    pub fn with_scale(
+        scale_factor: f64,
+        framebuffer_size: impl Into<Vector2D<u32, ImagePixel>>,
+    ) -> Self {
+        let framebuffer_size = framebuffer_size.into();
         Self {
             framebuffer_size,
-            nominal_size: framebuffer_size.map(f64::from) / scale_factor,
+            nominal_size: framebuffer_size.map(f64::from).cast_unit() / scale_factor,
         }
     }
 
@@ -402,8 +468,8 @@ impl Viewport {
     /// but do not care about its effects.
     #[doc(hidden)]
     pub const ARBITRARY: Viewport = Viewport {
-        nominal_size: Vector2::new(2.0, 2.0),
-        framebuffer_size: Vector2::new(2, 2),
+        nominal_size: Vector2D::new(2.0, 2.0),
+        framebuffer_size: Vector2D::new(2, 2),
     };
 
     /// Calculates the aspect ratio (width divided by height) of the `nominal_size` of this
@@ -455,8 +521,8 @@ impl Viewport {
     ///
     /// TODO: Some windowing APIs providing float input might have different ideas of pixel centers.
     #[inline]
-    pub fn normalize_nominal_point(&self, nominal_point: Point2<f64>) -> Vector2<FreeCoordinate> {
-        Vector2::new(
+    pub fn normalize_nominal_point(&self, nominal_point: Point2D<f64, NominalPixel>) -> NdcPoint2 {
+        Point2D::new(
             (nominal_point.x + 0.5) / self.nominal_size.x * 2.0 - 1.0,
             -((nominal_point.y + 0.5) / self.nominal_size.y * 2.0 - 1.0),
         )
@@ -479,8 +545,8 @@ impl Viewport {
 impl<'a> arbitrary::Arbitrary<'a> for Viewport {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Viewport {
-            nominal_size: Vector2::new(u.arbitrary()?, u.arbitrary()?),
-            framebuffer_size: Vector2::new(u.arbitrary()?, u.arbitrary()?),
+            nominal_size: Vector2D::new(u.arbitrary()?, u.arbitrary()?),
+            framebuffer_size: Vector2D::new(u.arbitrary()?, u.arbitrary()?),
         })
     }
 
@@ -498,10 +564,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Viewport {
 ///
 /// TODO: This function does not yet consider the effects of field-of-view,
 /// and it will need additional parameters to do so.
-pub fn eye_for_look_at(
-    bounds: GridAab,
-    direction: Vector3<FreeCoordinate>,
-) -> Point3<FreeCoordinate> {
+pub fn eye_for_look_at(bounds: GridAab, direction: FreeVector) -> FreePoint {
     let mut space_radius: FreeCoordinate = 0.0;
     for axis in Axis::ALL {
         space_radius = space_radius.max(bounds.size()[axis].into());
@@ -509,39 +572,54 @@ pub fn eye_for_look_at(
     bounds.center() + direction.normalize() * space_radius // TODO: allow for camera FoV
 }
 
+/// Look-at implementation broken out for testing
+fn look_at_y_up(eye: FreePoint, target: FreePoint) -> ViewTransform {
+    let look_direction = target - eye;
+    let yaw = Angle {
+        radians: look_direction.x.atan2(-look_direction.z),
+    };
+    let pitch = Angle {
+        radians: (-look_direction.y).atan2(look_direction.xz().length()),
+    };
+    ViewTransform {
+        rotation: Rotation3D::<_, Eye, Cube>::around_x(-pitch).then(&Rotation3D::around_y(-yaw)),
+        translation: eye.to_vector(),
+    }
+}
+
 /// A view frustum, represented by its corner points.
 /// This is an underconstrained representation, but one that is useful to precompute.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct FrustumPoints {
-    lbf: Point3<FreeCoordinate>,
-    rbf: Point3<FreeCoordinate>,
-    ltf: Point3<FreeCoordinate>,
-    rtf: Point3<FreeCoordinate>,
-    lbn: Point3<FreeCoordinate>,
-    rbn: Point3<FreeCoordinate>,
-    ltn: Point3<FreeCoordinate>,
-    rtn: Point3<FreeCoordinate>,
+    lbf: FreePoint,
+    rbf: FreePoint,
+    ltf: FreePoint,
+    rtf: FreePoint,
+    lbn: FreePoint,
+    rbn: FreePoint,
+    ltn: FreePoint,
+    rtn: FreePoint,
     bounds: Aab,
 }
 
 impl Default for FrustumPoints {
     fn default() -> Self {
         Self {
-            lbf: Point3::origin(),
-            rbf: Point3::origin(),
-            ltf: Point3::origin(),
-            rtf: Point3::origin(),
-            lbn: Point3::origin(),
-            rbn: Point3::origin(),
-            ltn: Point3::origin(),
-            rtn: Point3::origin(),
+            lbf: Point3D::origin(),
+            rbf: Point3D::origin(),
+            ltf: Point3D::origin(),
+            rtf: Point3D::origin(),
+            lbn: Point3D::origin(),
+            rbn: Point3D::origin(),
+            ltn: Point3D::origin(),
+            rtn: Point3D::origin(),
             bounds: Aab::new(0., 0., 0., 0., 0., 0.),
         }
     }
 }
 
 impl FrustumPoints {
-    fn iter(self) -> impl Iterator<Item = Point3<FreeCoordinate>> {
+    fn iter(self) -> impl Iterator<Item = FreePoint> {
         [
             self.lbf, self.rbf, self.ltf, self.rtf, self.lbn, self.rbn, self.ltn, self.rtn,
         ]
@@ -549,9 +627,9 @@ impl FrustumPoints {
     }
 
     fn compute_bounds(&mut self) {
-        let (xl, xh) = projected_range(self.iter(), Vector3::unit_x());
-        let (yl, yh) = projected_range(self.iter(), Vector3::unit_y());
-        let (zl, zh) = projected_range(self.iter(), Vector3::unit_z());
+        let (xl, xh) = projected_range(self.iter(), vec3(1., 0., 0.));
+        let (yl, yh) = projected_range(self.iter(), vec3(0., 1., 0.));
+        let (zl, zh) = projected_range(self.iter(), vec3(0., 0., 1.));
         self.bounds = Aab::from_lower_upper([xl, yl, zl], [xh, yh, zh]);
     }
 }
@@ -560,12 +638,12 @@ impl FrustumPoints {
 /// with the axis vector.
 #[inline(always)]
 fn projected_range(
-    points: impl IntoIterator<Item = Point3<FreeCoordinate>>,
-    axis: Vector3<FreeCoordinate>,
+    points: impl IntoIterator<Item = FreePoint>,
+    axis: FreeVector,
 ) -> (FreeCoordinate, FreeCoordinate) {
     points
         .into_iter()
-        .map(|p| p.to_vec().dot(axis))
+        .map(|p| p.to_vector().dot(axis))
         .minmax()
         .into_option()
         .unwrap()

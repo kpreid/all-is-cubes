@@ -4,13 +4,10 @@
 use std::convert::TryFrom;
 use std::f64::consts::PI;
 
+use all_is_cubes::euclid::{Point3D, Rotation2D, Vector2D, Vector3D};
 use exhaust::Exhaust as _;
 use rand::SeedableRng as _;
 
-use all_is_cubes::cgmath::{
-    Basis2, ElementWise, EuclideanSpace as _, InnerSpace as _, Point3, Rad, Rotation as _,
-    Rotation2, Vector2, Vector3,
-};
 use all_is_cubes::content::load_image::{default_srgb, space_from_image};
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::drawing::{
@@ -30,7 +27,7 @@ use all_is_cubes::drawing::{
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
-    GridVector, NotNan, Rgb, Rgba,
+    GridVector, NotNan, Rgb, Rgba, VectorOps,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -234,23 +231,23 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
     let paint3 = Block::from(Rgba::new(0.9, 0.7, 0.1, 1.0));
     drawing_space.fill(drawing_space.bounds(), |p| {
         // Measure from midpoint of odd dimension space
-        let p = p - Vector3::new(1, 1, 1) * (GridCoordinate::from(resolution) / 2);
+        let p = p - Vector3D::new(1, 1, 1) * (GridCoordinate::from(resolution) / 2);
         // Work in floating point
         let p = p.lower_bounds().map(FreeCoordinate::from);
 
-        let cylindrical = Vector2::new((p.x.powi(2) + p.y.powi(2)).sqrt(), p.z);
-        let torus_cross_section = cylindrical - Vector2::new(toroidal_radius, 0.);
-        let knot_center_angle = Rad(p.x.atan2(p.y));
+        let cylindrical = Vector2D::<_, Cube>::new(p.to_vector().xy().length(), p.z);
+        let torus_cross_section = cylindrical - Vector2D::new(toroidal_radius, 0.);
+        let knot_center_angle = p.xy().to_vector().angle_from_x_axis();
         let rotated_cross_section =
-            Basis2::from_angle(knot_center_angle * twists).rotate_vector(torus_cross_section);
+            Rotation2D::new(knot_center_angle * twists).transform_vector(torus_cross_section);
 
-        let angle_if_within_strand = |offset: Vector2<f64>| {
+        let angle_if_within_strand = |offset: Vector2D<f64, Cube>| {
             let knot_center = rotated_cross_section
-                .mul_element_wise(Vector2::new(1.0, 2.0_f64.sqrt().recip()))
+                .component_mul(Vector2D::new(1.0, 2.0_f64.sqrt().recip()))
                 + offset;
-            if knot_center.magnitude() < strand_radius {
+            if knot_center.length() < strand_radius {
                 // Add center angle to add twist relative to the strands.
-                Some(knot_center.x.atan2(knot_center.y) + knot_center_angle.0)
+                Some(knot_center.x.atan2(knot_center.y) + knot_center_angle.radians)
             } else {
                 None
             }
@@ -259,8 +256,8 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
         // Compute stripe pattern
         // Note that the second strand is rotated by PI so they join up
         if let Some(strand_radial_angle) =
-            angle_if_within_strand(Vector2::new(-knot_split_radius, 0.)).or_else(|| {
-                angle_if_within_strand(Vector2::new(knot_split_radius, 0.)).map(|a| a + PI)
+            angle_if_within_strand(Vector2D::new(-knot_split_radius, 0.)).or_else(|| {
+                angle_if_within_strand(Vector2D::new(knot_split_radius, 0.)).map(|a| a + PI)
             })
         {
             let unit_range = (strand_radial_angle / (PI * 2.)).rem_euclid(1.0);
@@ -403,7 +400,12 @@ async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
                         face.cross(Face6::PY).try_into().unwrap(),
                     )
                     .unwrap(),
-                    Err(GridVector { x: 0, y: 0, z: 0 }) => GridRotation::RXyZ,
+                    Err(GridVector {
+                        x: 0,
+                        y: 0,
+                        z: 0,
+                        _unit,
+                    }) => GridRotation::RXyZ,
                     Err(_) => GridRotation::IDENTITY,
                 }),
             )?;
@@ -447,13 +449,19 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
                             return AIR.clone();
                         }
                         let rescale = if resolution > R8 { 4 } else { 1 };
-                        let color = Rgb::from(p.lower_bounds().to_vec().map(|s| {
-                            NotNan::new(
-                                (s / GridCoordinate::from(rescale)) as f32
-                                    / f32::from(u16::from(resolution) / rescale - 1).max(1.),
-                            )
-                            .unwrap()
-                        }));
+                        let color = Rgb::from(
+                            p.lower_bounds()
+                                .to_vector()
+                                .map(|s| {
+                                    NotNan::new(
+                                        (s / GridCoordinate::from(rescale)) as f32
+                                            / f32::from(u16::from(resolution) / rescale - 1)
+                                                .max(1.),
+                                    )
+                                    .unwrap()
+                                })
+                                .cast_unit(),
+                        );
                         Block::from(color)
                     })?
                     .build(),
@@ -582,7 +590,7 @@ async fn ZOOM(_: &Exhibit, universe: &mut Universe) {
                 let mut zoom_block = specimen.clone();
                 zoom_block
                     .modifiers_mut()
-                    .push(Zoom::new(scale, cube.lower_bounds().cast().unwrap()).into());
+                    .push(Zoom::new(scale, cube.lower_bounds().cast()).into());
                 zoom_block
             })
             .unwrap();
@@ -732,11 +740,12 @@ async fn COLORS(_: &Exhibit, universe: &mut Universe) {
     space.fill(space.bounds(), |p| {
         let color_point = p.lower_bounds() / 2;
         let part_of_grid: [GridCoordinate; 3] =
-            p.lower_bounds().to_vec().map(|s| s.rem_euclid(2)).into();
+            p.lower_bounds().to_vector().map(|s| s.rem_euclid(2)).into();
         let color = Rgb::from(
             color_point
-                .to_vec()
-                .map(|s| NotNan::new(s as f32 / (gradient_resolution - 1) as f32).unwrap()),
+                .to_vector()
+                .map(|s| NotNan::new(s as f32 / (gradient_resolution - 1) as f32).unwrap())
+                .cast_unit(),
         );
         let color_srgb = color.with_alpha_one().to_srgb8();
         let description = format!(
@@ -1143,7 +1152,7 @@ async fn UI_BLOCKS(_: &Exhibit, universe: &mut Universe) {
 
     // Fill space with blocks
     let mut space = Space::builder(bounds)
-        .spawn_position(Point3::new(
+        .spawn_position(Point3D::new(
             FreeCoordinate::from(bounds.size().x) / 2.,
             FreeCoordinate::from(bounds.size().y) / 2.,
             FreeCoordinate::from(bounds.size().y) * 1.5,
@@ -1303,7 +1312,7 @@ where
 {
     let origin = origin.into();
     for (y, block) in (0..).zip(blocks) {
-        space.set(origin + GridVector::unit_y() * y, block)?;
+        space.set(origin + GridVector::new(0, y, 0), block)?;
     }
     Ok(())
 }

@@ -16,7 +16,7 @@ use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
 use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, ViewTransform};
-use all_is_cubes::cgmath::One as _;
+use all_is_cubes::math::VectorOps;
 use all_is_cubes::universe::PartialUniverse;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_mesh::{BlockMesh, MeshOptions, SpaceMesh};
@@ -160,8 +160,9 @@ impl GltfWriter {
 
         self.frame_states.push(FrameState {
             visible_mesh_instances: visible_meshes.to_vec(),
-            camera_transform: our_camera
-                .map_or_else(ViewTransform::one, |camera| camera.get_view_transform()),
+            camera_transform: our_camera.map_or_else(ViewTransform::identity, |camera| {
+                camera.get_view_transform()
+            }),
         });
         self.any_time_visible_mesh_instances
             .extend(visible_meshes.iter());
@@ -205,9 +206,8 @@ impl GltfWriter {
             };
             if let Some(initial_state) = self.frame_states.get(0) {
                 let t = initial_state.camera_transform;
-                camera_node.translation = Some(t.disp.map(|c| c as f32).into());
-                camera_node.rotation = Some(convert_quaternion(t.rot));
-                camera_node.scale = Some([t.scale as f32; 3]);
+                camera_node.translation = Some(t.translation.map(|c| c as f32).into());
+                camera_node.rotation = Some(convert_quaternion(t.rotation));
             }
             let camera_node_index = push_and_return_index(&mut self.root.nodes, camera_node);
             scene_nodes.push(camera_node_index);

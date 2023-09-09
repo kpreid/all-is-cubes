@@ -2,11 +2,11 @@
 
 use std::io;
 
+use all_is_cubes::euclid::Point2D;
 use gltf_json::validation::Checked::Valid;
 
-use all_is_cubes::cgmath::{EuclideanSpace, Point2, Point3, Transform};
-use all_is_cubes::math::{GridAab, GridRotation};
-use all_is_cubes_mesh::texture;
+use all_is_cubes::math::{GridAab, GridRotation, VectorOps};
+use all_is_cubes_mesh::texture::{self, TilePoint};
 
 use super::glue::push_and_return_index;
 use super::GltfDataDestination;
@@ -154,23 +154,26 @@ pub struct GltfTexturePlane {
 impl texture::Plane for GltfTexturePlane {
     type Point = GltfAtlasPoint;
 
-    fn grid_to_texcoord(&self, tc_in_tile: Point3<f32>) -> Self::Point {
+    fn grid_to_texcoord(&self, tc_in_tile: TilePoint) -> Self::Point {
         // TODO: precompute more of this
-        let rot_tc = self
+        let rot_tc: TilePoint = self
             .rotation
             .to_rotation_matrix()
             .to_free()
-            .transform_point(tc_in_tile.map(f64::from))
+            .with_source::<texture::TexelUnit>() // TODO(euclid migration): clunky
+            .with_destination::<texture::TexelUnit>()
+            .transform_point3d(tc_in_tile.map(f64::from))
+            .unwrap()
             .map(|c| c as f32);
         let rot_bounds = self.bounds.transform(self.rotation.into()).unwrap();
 
         // Translate to get coordinates within the rotated-to-XY plane.
-        let point_within = rot_tc - rot_bounds.lower_bounds().cast::<f32>().unwrap();
+        let point_within = rot_tc - rot_bounds.lower_bounds().to_f32().cast_unit();
         debug_assert!(
             point_within.z >= 0.0 && point_within.z <= 1.0,
             "{tc_in_tile:?} -> {point_within:?}"
         );
-        let point_within = Point2::from_vec(point_within.truncate());
+        let point_within = point_within.to_2d().to_point();
 
         GltfAtlasPoint {
             plane_id: self.plane_id,
@@ -189,7 +192,7 @@ pub struct GltfAtlasPoint {
     /// Unique ID of the plane.
     pub(crate) plane_id: u64,
     /// Point within the plane, still with 1 unit = 1 texel coordinates.
-    pub(crate) point_within: Point2<f32>,
+    pub(crate) point_within: Point2D<f32, texture::TexelUnit>,
 }
 
 /// Generate the atlas texture and necessary glTF entities.
@@ -250,6 +253,7 @@ pub(super) fn insert_block_texture_atlas(
 }
 
 mod internal {
+    use all_is_cubes::euclid::Point3D;
     use all_is_cubes::math::Cube;
 
     use super::*;
@@ -299,9 +303,7 @@ mod internal {
                 let size = sliced_bounds
                     .transform(rotation.into())
                     .unwrap(/* cannot overflow? */)
-                    .size()
-                    .cast::<u32>()
-                    .unwrap(/* cannot overflow */);
+                    .unsigned_size();
                 assert_eq!(
                     size.z, 1,
                     "failed to rotate slice {sliced_bounds:?} into the XY plane with {rotation:?}: {size:?}"
@@ -338,7 +340,7 @@ mod internal {
                 let entry = &entries[index];
 
                 let rotated_slice_bounds = entry.rotated_slice_bounds();
-                let rotated_size = rotated_slice_bounds.size().cast::<u32>().unwrap(); // cannot overflow because nonnegative
+                let rotated_size = rotated_slice_bounds.unsigned_size();
                 let unrotate = entry.rotation.inverse();
                 let texels_size = entry.source_bounds.size();
                 let texels = entry
@@ -351,10 +353,10 @@ mod internal {
                 for y in 0..rotated_size.y {
                     for x in 0..rotated_size.x {
                         // Zero-offset position in the rotated-to-flat slice.
-                        let pixel_position = Point3::new(x, y, 0).cast::<i32>().unwrap();
+                        let pixel_position = Point3D::new(x, y, 0).cast::<i32>();
                         // Position in the rotated-to-flat slice's coordinates.
                         let position_in_rotated_slice = Cube::from(
-                            pixel_position + rotated_slice_bounds.lower_bounds().to_vec(),
+                            pixel_position + rotated_slice_bounds.lower_bounds().to_vector(),
                         );
                         // TODO: this single cube is a kludge to simplify off-by-1 problems with rotation
                         // We should have transform helpers instead of computing twice as many coordinates.

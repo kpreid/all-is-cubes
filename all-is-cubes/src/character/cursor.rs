@@ -4,12 +4,13 @@
 
 use std::fmt;
 
-use cgmath::{EuclideanSpace, InnerSpace as _, Matrix4, Point3, Transform as _};
+use euclid::point3;
 
 use crate::block::{recursive_ray, Block, EvaluatedBlock, Evoxel, Evoxels};
 use crate::content::palette;
 use crate::math::{
-    Aab, Cube, Face6, Face7, FreeCoordinate, Geometry, GridCoordinate, GridVector, LineVertex,
+    Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry, GridCoordinate,
+    GridVector, LineVertex, VectorOps,
 };
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
@@ -117,7 +118,7 @@ pub struct Cursor {
     face_selected: Face7,
 
     /// Intersection point where the ray entered the cube.
-    point_entered: Point3<FreeCoordinate>,
+    point_entered: FreePoint,
 
     /// Distance from ray origin (viewpoint) to `point_entered`.
     distance_to_point: FreeCoordinate,
@@ -244,7 +245,7 @@ impl Geometry for Cursor {
                 self.cube()
                     .lower_bounds()
                     .map(FreeCoordinate::from)
-                    .to_vec(),
+                    .to_vector(),
             );
 
         // Add wireframe of the block.
@@ -258,26 +259,28 @@ impl Geometry for Cursor {
         // Frame the selected face with a square.
         // TODO: Position this frame relative to block_aabb.
         if let Ok(face) = Face6::try_from(self.face_selected()) {
-            let face_transform_full = Matrix4::from_translation(
-                self.hit()
+            let face_transform_full = face.face_transform(1).to_matrix().to_free().then(
+                &self
+                    .hit()
                     .position
                     .lower_bounds()
                     .map(FreeCoordinate::from)
-                    .to_vec(),
-            ) * face.face_transform(1).to_matrix().to_free();
+                    .to_vector()
+                    .to_transform(),
+            );
 
             let inset = 1. / 128.;
             for &p in [
-                Point3::new(inset, inset, -offset_from_surface),
-                Point3::new(inset, 1. - inset, -offset_from_surface),
-                Point3::new(1. - inset, 1. - inset, -offset_from_surface),
-                Point3::new(1. - inset, inset, -offset_from_surface),
-                Point3::new(inset, inset, -offset_from_surface),
+                point3(inset, inset, -offset_from_surface),
+                point3(inset, 1. - inset, -offset_from_surface),
+                point3(1. - inset, 1. - inset, -offset_from_surface),
+                point3(1. - inset, inset, -offset_from_surface),
+                point3(inset, inset, -offset_from_surface),
             ]
             .windows(2)
             .flatten()
             {
-                let position = face_transform_full.transform_point(p);
+                let position = face_transform_full.transform_point3d(p).unwrap();
                 output.extend([LineVertex {
                     position,
                     color: Some(palette::CURSOR_OUTLINE),
@@ -294,9 +297,11 @@ impl Geometry for Cursor {
                 .windows(2)
                 .flatten()
             {
+                let tip: FreeVector = face_transform_axes_only
+                    .transform_vector3d(f.normal_vector::<_, Cube>() * (1.0 / 32.0));
                 let position = self.point_entered
                     + self.face_entered.normal_vector() * offset_from_surface
-                    + face_transform_axes_only.transform_vector(f.normal_vector() * (1.0 / 32.0));
+                    + tip;
                 output.extend([LineVertex {
                     position,
                     color: Some(palette::CURSOR_OUTLINE),
@@ -316,7 +321,7 @@ mod tests {
     use crate::content::{make_slab, make_some_blocks};
     use crate::math::{GridAab, Rgba};
     use crate::universe::Universe;
-    use cgmath::Vector3;
+    use euclid::{Point3D, Vector3D};
 
     fn test_space<const N: usize>(universe: &mut Universe, blocks: [&Block; N]) -> URef<Space> {
         let mut space =
@@ -330,8 +335,8 @@ mod tests {
     /// A [`Ray`] aligned with the X axis, such that it starts in cube [-1, 0, 0] and hits
     /// [0, 0, 0], [1, 0, 0], [2, 0, 0], et cetera, and just slightly above the midpoint.
     const X_RAY: Ray = Ray {
-        origin: Point3::new(-0.5, 0.500001, 0.500001),
-        direction: Vector3::new(1., 0., 0.),
+        origin: Point3D::new(-0.5, 0.500001, 0.500001),
+        direction: Vector3D::new(1., 0., 0.),
     };
 
     #[test]
@@ -410,8 +415,8 @@ mod tests {
     ///  -1      0      1
     /// ```
     const SLOPING_RAY: Ray = Ray {
-        origin: Point3::new(-0.25, 1.0, 0.5),
-        direction: Vector3::new(1.0, -1.0, 0.0),
+        origin: Point3D::new(-0.25, 1.0, 0.5),
+        direction: Vector3D::new(1.0, -1.0, 0.0),
     };
 
     /// Testing the “normal” case in contrast to `slope_hits_face_different_from_entered`.

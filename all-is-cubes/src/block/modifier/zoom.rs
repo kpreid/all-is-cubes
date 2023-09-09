@@ -1,11 +1,14 @@
-use cgmath::{EuclideanSpace as _, Point3};
+use euclid::Point3D;
 
-use crate::block::{
-    self, Evoxel, Evoxels, MinEval, Modifier,
-    Resolution::{self, R1},
-};
 use crate::math::{Cube, GridAab, GridArray, GridCoordinate, GridPoint};
 use crate::universe;
+use crate::{
+    block::{
+        self, Evoxel, Evoxels, MinEval, Modifier,
+        Resolution::{self, R1},
+    },
+    math::VectorOps,
+};
 
 /// Data for [`Modifier::Zoom`], describing a portion of the original block that is scaled
 /// up to become the whole block.
@@ -20,7 +23,7 @@ pub struct Zoom {
     /// Which portion of the block/space will be used, specified in terms of an offset
     /// in the grid of zoomed blocks (that is, this should have coordinates between `0`
     /// and `scale - 1`).
-    offset: Point3<u8>,
+    offset: Point3D<u8, Cube>,
     // /// If present, a space to extract voxels from _instead of_ the underlying
     // /// [`Primitive`]. This may be used so that the before-zooming block can be a
     // /// custom preview rather than an exact miniature of the multi-block
@@ -81,7 +84,9 @@ impl Zoom {
                 MinEval { attributes, voxels }
             }
             Evoxels::Many(_, voxels) => {
-                let voxel_offset = offset_in_zoomed_blocks.map(GridCoordinate::from).to_vec()
+                let voxel_offset = offset_in_zoomed_blocks
+                    .map(GridCoordinate::from)
+                    .to_vector()
                     * GridCoordinate::from(zoom_resolution);
                 match GridAab::for_block(zoom_resolution)
                     .intersection(voxels.bounds().translate(-voxel_offset))
@@ -151,18 +156,19 @@ mod tests {
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::math::{GridAab, GridVector, Rgba};
     use crate::universe::Universe;
+    use euclid::point3;
     use pretty_assertions::assert_eq;
 
     #[test]
-    #[should_panic(expected = "Zoom offset Point3 [2, 1, 1] out of bounds for 2")]
+    #[should_panic(expected = "Zoom offset (2, 1, 1) out of bounds for 2")]
     fn construction_out_of_range_high() {
-        Zoom::new(R2, Point3::new(2, 1, 1));
+        Zoom::new(R2, point3(2, 1, 1));
     }
 
     #[test]
-    #[should_panic(expected = "Zoom offset Point3 [-1, 1, 1] out of bounds for 2")]
+    #[should_panic(expected = "Zoom offset (-1, 1, 1) out of bounds for 2")]
     fn construction_out_of_range_low() {
-        Zoom::new(R2, Point3::new(-1, 1, 1));
+        Zoom::new(R2, point3(-1, 1, 1));
     }
 
     #[test]
@@ -179,7 +185,7 @@ mod tests {
             dbg!(x);
             let zoomed = original_block.clone().with_modifier(Zoom::new(
                 R2, // scale up by two = divide resolution by two
-                Point3::new(x, 0, 0),
+                point3(x, 0, 0),
             ));
             let ev_zoomed = zoomed.evaluate().unwrap();
             assert_eq!(
@@ -215,7 +221,7 @@ mod tests {
         let mut zoomed = original.clone();
         zoomed.modifiers_mut().push(Modifier::Zoom(Zoom {
             scale: R2,
-            offset: Point3::new(1, 0, 0),
+            offset: point3(1, 0, 0),
         }));
         assert_eq!(zoomed.evaluate().unwrap().color, original.color());
     }

@@ -4,8 +4,8 @@ use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 
 use all_is_cubes::block::{Evoxel, Evoxels};
-use all_is_cubes::cgmath::Point3;
 use all_is_cubes::content::palette;
+use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{Cube, GridAab};
 use all_is_cubes::util::{ConciseDebug, CustomFormat};
 
@@ -21,6 +21,19 @@ pub(crate) type TextureCoordinate = f32;
 /// Color data accepted by [`Allocator`].
 /// The components are sRGB `[R, G, B, A]`.
 pub type Texel = [u8; 4];
+
+/// Unit-of-measure identifier used with [`euclid`](all_is_cubes::euclid) for “whole texels”.
+/// TODO(euclid migration): Better name, and a type alias for the point
+#[allow(clippy::exhaustive_enums)]
+#[derive(Debug)]
+pub enum TexelUnit {}
+
+/// 3D point type which identifies a point within a specific allocated [`Tile`],
+/// in the same coordinate system as the `bounds` passed to [`Allocator::allocate()`].
+///
+/// Note that this uses float, not integer, coordinates; but fractional values refer to
+/// fractions of texels.
+pub type TilePoint = Point3D<TextureCoordinate, TexelUnit>;
 
 /// Allocator of 3D regions (“tiles”) in a texture atlas to paint block voxels into.
 /// Implement this trait using the target graphics API's 3D texture type.
@@ -97,7 +110,7 @@ pub trait Plane: Clone {
     ///
     /// The returned texture coordinates are guaranteed to be valid only as long as
     /// `self` (or a clone of it) has not been dropped.
-    fn grid_to_texcoord(&self, in_tile_grid: Point3<TextureCoordinate>) -> Self::Point;
+    fn grid_to_texcoord(&self, in_tile_grid: TilePoint) -> Self::Point;
 }
 
 impl<T: Allocator> Allocator for &T {
@@ -229,7 +242,7 @@ impl Tile for NoTexture {
 impl Plane for NoTexture {
     type Point = Self;
 
-    fn grid_to_texcoord(&self, _: Point3<TextureCoordinate>) -> Self::Point {
+    fn grid_to_texcoord(&self, _: Point3D<TextureCoordinate, TexelUnit>) -> Self::Point {
         match *self {}
     }
 }
@@ -330,14 +343,14 @@ impl Tile for TestTile {
 impl Plane for TestTile {
     type Point = TestPoint;
 
-    fn grid_to_texcoord(&self, in_tile: Point3<TextureCoordinate>) -> Self::Point {
+    fn grid_to_texcoord(&self, in_tile: Point3D<TextureCoordinate, TexelUnit>) -> Self::Point {
         in_tile
     }
 }
 
 /// Texture point for [`TestAllocator`]
 #[doc(hidden)]
-pub type TestPoint = Point3<TextureCoordinate>;
+pub type TestPoint = Point3D<TextureCoordinate, TexelUnit>;
 
 #[cfg(test)]
 mod tests {

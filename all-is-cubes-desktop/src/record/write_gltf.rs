@@ -6,7 +6,6 @@ use std::sync::{mpsc, Arc};
 
 use anyhow::Context;
 
-use all_is_cubes::cgmath::EuclideanSpace as _;
 use all_is_cubes::math::{GridAab, GridVector};
 use all_is_cubes::space::Space;
 use all_is_cubes::{camera, listen, time, universe};
@@ -81,7 +80,7 @@ impl MeshRecorder {
                     .map(|c| {
                         (
                             c.render_data.clone(),
-                            c.position().bounds().lower_bounds().to_vec(),
+                            c.position().bounds().lower_bounds().to_vector(),
                         )
                     })
                     .collect(),

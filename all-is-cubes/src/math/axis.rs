@@ -123,9 +123,9 @@ mod impl_index_axis {
         }
     }
 
-    macro_rules! impl_xyz {
+    macro_rules! impl_xyz_e {
         ($($type:tt)*) => {
-            impl<T> ops::Index<Axis> for $($type)*<T> {
+            impl<T, U> ops::Index<Axis> for $($type)*<T, U> {
                 type Output = T;
 
                 fn index(&self, index: Axis) -> &Self::Output {
@@ -136,7 +136,7 @@ mod impl_index_axis {
                     }
                 }
             }
-            impl<T> ops::IndexMut<Axis> for $($type)*<T> {
+            impl<T, U> ops::IndexMut<Axis> for $($type)*<T, U> {
                 fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
                     match index {
                         Axis::X => &mut self.x,
@@ -147,8 +147,8 @@ mod impl_index_axis {
             }
         };
     }
-    impl_xyz!(cgmath::Vector3);
-    impl_xyz!(cgmath::Point3);
+    impl_xyz_e!(euclid::Vector3D);
+    impl_xyz_e!(euclid::Point3D);
 }
 
 #[cfg(test)]

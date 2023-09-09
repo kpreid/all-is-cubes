@@ -1,14 +1,13 @@
 use all_is_cubes::camera::GraphicsOptions;
-use all_is_cubes::cgmath::Point3;
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{Aab, FreeCoordinate, Geometry, LineVertex, Rgba};
+use all_is_cubes::math::{Aab, FreePoint, Geometry, LineVertex, Rgba};
 use all_is_cubes::space::Space;
 use all_is_cubes::util::MapExtend;
 
 /// TODO: give this trait a better name, especially now that `LineVertex` exists.
 pub(crate) trait DebugLineVertex {
-    fn from_position_color(position: Point3<FreeCoordinate>, color: Rgba) -> Self;
+    fn from_position_color(position: FreePoint, color: Rgba) -> Self;
 }
 
 /// The `Character`'s space should be the given `Space` if both are present

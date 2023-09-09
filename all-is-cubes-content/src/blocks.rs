@@ -3,13 +3,13 @@
 
 use std::fmt;
 
+use all_is_cubes::euclid::Vector3D;
 use exhaust::Exhaust;
 
 use all_is_cubes::block::{
     AnimationHint, Atom, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution,
     Resolution::*, RotationPlacementRule, AIR,
 };
-use all_is_cubes::cgmath::{ElementWise as _, EuclideanSpace as _, InnerSpace, Vector3};
 use all_is_cubes::drawing::embedded_graphics::{
     prelude::Point,
     primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable},
@@ -17,8 +17,8 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector,
-    Gridgid, NotNan, Rgb, Rgba,
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector, Gridgid,
+    NotNan, Rgb, Rgba, VectorOps,
 };
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -26,7 +26,6 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{rgb_const, rgba_const};
 
-use crate::int_magnitude_squared;
 use crate::landscape::install_landscape_blocks;
 use crate::noise::NoiseFnExt;
 use crate::palette;
@@ -82,7 +81,7 @@ pub async fn install_demo_blocks(
     // TODO: The whole premise of how to procedurally generate blocks like this ought
     // to be made more convenient, though.
     let one_diagonal = GridVector::new(1, 1, 1);
-    let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);
+    let center_point_doubled = (one_diagonal * resolution_g).to_point();
 
     let [landscape_p, p] = p.split(0.5);
     install_landscape_blocks(universe, resolution, landscape_p).await?;
@@ -95,9 +94,10 @@ pub async fn install_demo_blocks(
 
     let curb_fn = |cube: Cube| {
         let width = resolution_g / 3;
-        if int_magnitude_squared(
-            (cube - Cube::new(width / 2 + 2, 0, 0)).mul_element_wise(GridVector::new(1, 2, 0)),
-        ) < width.pow(2)
+        if (cube - Cube::new(width / 2 + 2, 0, 0))
+            .component_mul(GridVector::new(1, 2, 0))
+            .square_length()
+            < width.pow(2)
         {
             scale_color(curb_color.clone(), road_noise(cube), 0.02)
         } else {
@@ -137,9 +137,9 @@ pub async fn install_demo_blocks(
                             .map(|c| c / (FreeCoordinate::from(resolution_g) / 2.0) - 1.0);
                         let power = 7.;
                         let r = unit_radius_point
-                            .to_vec()
+                            .to_vector()
                             .map(|c| c.abs().powf(power))
-                            .dot(Vector3::new(1.0, 1.0, 1.0));
+                            .dot(Vector3D::new(1.0, 1.0, 1.0));
                         gradient_lookup(&glass_densities, (1.0 - r as f32) * 2.0)
                     })?
                     .build()
@@ -155,9 +155,9 @@ pub async fn install_demo_blocks(
             Lamp => Block::builder()
                 .display_name("Lamp")
                 .voxels_fn(universe, resolution, |cube| {
-                    if int_magnitude_squared(
-                        cube.lower_bounds() * 2 + one_diagonal - center_point_doubled,
-                    ) <= resolution_g.pow(2)
+                    if (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
+                        .square_length()
+                        <= resolution_g.pow(2)
                     {
                         &lamp_globe
                     } else {
@@ -170,10 +170,10 @@ pub async fn install_demo_blocks(
                 .display_name("Lamppost")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(universe, resolution, |cube| {
-                    if int_magnitude_squared(
-                        (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
-                            .mul_element_wise(GridVector::new(1, 0, 1)),
-                    ) <= 4i32.pow(2)
+                    if (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
+                        .component_mul(GridVector::new(1, 0, 1))
+                        .square_length()
+                        <= 4i32.pow(2)
                     {
                         &lamppost_metal
                     } else {
@@ -207,10 +207,9 @@ pub async fn install_demo_blocks(
                 .voxels_fn(universe, resolution, |cube| {
                     let shape: [GridCoordinate; 16] =
                         [4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 7, 8];
-                    let r2 = int_magnitude_squared(
-                        (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
-                            .mul_element_wise(GridVector::new(1, 0, 1)),
-                    );
+                    let r2 = (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
+                        .component_mul(GridVector::new(1, 0, 1))
+                        .square_length();
                     if r2 < shape.get(cube.y as usize).copied().unwrap_or(0).pow(2) {
                         &lamppost_metal
                     } else {
@@ -224,11 +223,13 @@ pub async fn install_demo_blocks(
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
                 .voxels_fn(universe, resolution, |cube| {
                     // TODO: fancier/tidier appearance; this was just some tinkering from the original `Lamp` sphere
-                    let r2 = int_magnitude_squared(
-                        (cube.lower_bounds() * 2 + one_diagonal
-                            - center_point_doubled.mul_element_wise(GridPoint::new(1, 1, 0)))
-                        .mul_element_wise(GridVector::new(3, 1, 1)),
-                    );
+                    let r2 = (cube.lower_bounds() * 2 + one_diagonal
+                        - center_point_doubled
+                            .to_vector()
+                            .component_mul(GridVector::new(1, 1, 0)))
+                    .to_vector()
+                    .component_mul(GridVector::new(3, 1, 1))
+                    .square_length();
                     if r2 <= (resolution_g - 2).pow(2) {
                         &lamp_globe
                     } else if r2 <= (resolution_g + 4).pow(2) && cube.z == 0 {
@@ -258,9 +259,9 @@ pub async fn install_demo_blocks(
                     // TODO: We really need better procgen tools
                     let p2 = p.lower_bounds() * 2 + one_diagonal - center_point_doubled;
                     let r = p2
-                        .mul_element_wise(Vector3::new(1, 1, 0))
+                        .component_mul(Vector3D::new(1, 1, 0))
                         .map(|c| f64::from(c) / 2.0)
-                        .magnitude();
+                        .length();
                     let body_radius = if p.z < 6 {
                         f64::from(p.z) / 1.5 + 1.0
                     } else {
@@ -358,7 +359,7 @@ pub async fn install_demo_blocks(
                 let mut post = |x| -> Result<(), InGenError> {
                     let mut plane = space.draw_target(Gridgid {
                         rotation: GridRotation::RZYX,
-                        translation: GridVector { x, y: 0, z: 0 },
+                        translation: GridVector::new(x, 0, 0),
                     });
                     let style = &PrimitiveStyle::with_stroke(&sign_post, 2);
                     let z = resolution_g - 3;

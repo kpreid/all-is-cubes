@@ -1,13 +1,15 @@
 //! Data structures for light storage and algorithms.
 
 use std::collections::hash_map::Entry;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 
-use cgmath::{Vector3, Vector4};
+use euclid::default::Vector3D;
 
-use crate::math::*;
-use crate::space::*;
+use crate::math::{Cube, GridCoordinate, GridPoint, NotNan, Rgb, VectorOps};
+
+#[cfg(doc)]
+use crate::space::Space;
 
 /// One component of a `PackedLight`.
 pub(crate) type PackedLightScalar = u8;
@@ -40,7 +42,7 @@ pub struct PackedLight {
     // so we could in theory make this an enum, but that wouldn't actually compact the
     // representation, and this representation maps to 8-bit-per-component RGBA which is
     // what the shader expects.
-    value: Vector3<PackedLightScalar>,
+    value: Vector3D<PackedLightScalar>,
     status: LightStatus,
 }
 // TODO: Once we've built out the rest of the game, do some performance testing and
@@ -55,18 +57,17 @@ impl PackedLight {
     pub(crate) const ZERO: Self = Self::none(LightStatus::Visible);
     pub(crate) const OPAQUE: Self = Self::none(LightStatus::Opaque);
     pub(crate) const NO_RAYS: Self = Self::none(LightStatus::NoRays);
-    pub(crate) const ONE: PackedLight = PackedLight {
-        status: LightStatus::Visible,
-        value: Vector3 {
-            x: Self::LOG_OFFSET as PackedLightScalar,
-            y: Self::LOG_OFFSET as PackedLightScalar,
-            z: Self::LOG_OFFSET as PackedLightScalar,
-        },
+    pub(crate) const ONE: PackedLight = {
+        let one_scalar = Self::LOG_OFFSET as PackedLightScalar;
+        PackedLight {
+            status: LightStatus::Visible,
+            value: Vector3D::new(one_scalar, one_scalar, one_scalar),
+        }
     };
 
     pub(crate) fn some(value: Rgb) -> Self {
         PackedLight {
-            value: Vector3::new(
+            value: Vector3D::new(
                 Self::scalar_in(value.red()),
                 Self::scalar_in(value.green()),
                 Self::scalar_in(value.blue()),
@@ -77,7 +78,7 @@ impl PackedLight {
 
     pub(crate) const fn none(status: LightStatus) -> Self {
         PackedLight {
-            value: Vector3 { x: 0, y: 0, z: 0 },
+            value: Vector3D::new(0, 0, 0),
             status,
         }
     }
@@ -86,9 +87,9 @@ impl PackedLight {
     #[inline]
     pub fn value(&self) -> Rgb {
         Rgb::new_nn(
-            Self::scalar_out_nn(self.value[0]),
-            Self::scalar_out_nn(self.value[1]),
-            Self::scalar_out_nn(self.value[2]),
+            Self::scalar_out_nn(self.value.x),
+            Self::scalar_out_nn(self.value.y),
+            Self::scalar_out_nn(self.value.z),
         )
     }
 
@@ -108,11 +109,11 @@ impl PackedLight {
     /// much this color should actually contribute to the surface color. It is usually
     /// 0 or 1, but is set slightly above zero for opaque blocks to create the ambient
     /// occlusion effect.
-    pub(crate) fn value_with_ambient_occlusion(&self) -> Vector4<f32> {
-        Vector4::new(
-            Self::scalar_out(self.value[0]),
-            Self::scalar_out(self.value[1]),
-            Self::scalar_out(self.value[2]),
+    pub(crate) fn value_with_ambient_occlusion(&self) -> [f32; 4] {
+        [
+            Self::scalar_out(self.value.x),
+            Self::scalar_out(self.value.y),
+            Self::scalar_out(self.value.z),
             match self.status {
                 LightStatus::Uninitialized => 0.0,
                 LightStatus::NoRays => 0.0,
@@ -120,17 +121,19 @@ impl PackedLight {
                 LightStatus::Opaque => 0.25,
                 LightStatus::Visible => 1.0,
             },
-        )
+        ]
     }
 
     #[inline]
     #[doc(hidden)] // TODO: used by all_is_cubes_gpu; but it should be doable equivalently using public functions
     pub fn as_texel(self) -> [u8; 4] {
         let Self {
-            value: Vector3 { x, y, z },
+            value: Vector3D {
+                x: r, y: g, z: b, ..
+            },
             status,
         } = self;
-        [x, y, z, status as u8]
+        [r, g, b, status as u8]
     }
 
     /// Computes a degree of difference between two [`PackedLight`] values, used to decide
@@ -141,9 +144,9 @@ impl PackedLight {
         fn abs_diff(a: PackedLightScalar, b: PackedLightScalar) -> PackedLightScalar {
             a.max(b) - a.min(b)
         }
-        let mut difference = abs_diff(self.value[0], other.value[0])
-            .max(abs_diff(self.value[1], other.value[1]))
-            .max(abs_diff(self.value[2], other.value[2]));
+        let mut difference = abs_diff(self.value.x, other.value.x)
+            .max(abs_diff(self.value.y, other.value.y))
+            .max(abs_diff(self.value.z, other.value.z));
 
         if other.status != self.status {
             // A non-opaque block changing to an opaque one, or similar, changes the
@@ -216,7 +219,7 @@ impl From<crate::save::schema::LightSerV1> for PackedLight {
     fn from(ls: crate::save::schema::LightSerV1) -> Self {
         use crate::save::schema::LightStatusSerV1 as S;
         PackedLight {
-            value: Vector3::from(ls.value),
+            value: Vector3D::from(ls.value),
             status: match ls.status {
                 S::Uninitialized => LightStatus::Uninitialized,
                 S::NoRays => LightStatus::NoRays,
@@ -239,7 +242,7 @@ impl LightUpdateRequest {
     /// assuming the viewpoint starts close to the origin it will see good nearby
     /// lighting sooner.)
     fn fallback_priority(&self) -> GridCoordinate {
-        let GridPoint { x, y, z } = GridPoint::from(self.cube)
+        let GridPoint { x, y, z, _unit } = GridPoint::from(self.cube)
             .map(|c| if c > 0 { -c } else { c } + GridCoordinate::MAX / 3);
         x.saturating_add(y).saturating_add(z)
     }
@@ -400,19 +403,19 @@ mod tests {
             .flat_map(|s| {
                 vec![
                     PackedLight {
-                        value: Vector3::new(s, 0, 0),
+                        value: Vector3D::new(s, 0, 0),
                         status: LightStatus::Visible,
                     },
                     PackedLight {
-                        value: Vector3::new(0, s, 0),
+                        value: Vector3D::new(0, s, 0),
                         status: LightStatus::Visible,
                     },
                     PackedLight {
-                        value: Vector3::new(0, 0, s),
+                        value: Vector3D::new(0, 0, s),
                         status: LightStatus::Visible,
                     },
                     PackedLight {
-                        value: Vector3::new(s, 127, 255),
+                        value: Vector3D::new(s, 127, 255),
                         status: LightStatus::Visible,
                     },
                 ]

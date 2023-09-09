@@ -1,12 +1,12 @@
 use std::f64::consts::TAU;
 
+use all_is_cubes::euclid::Vector3D;
 use exhaust::Exhaust;
 use maze_generator::prelude::{FieldType, Generator};
 use rand::prelude::SliceRandom;
 use rand::{Rng, SeedableRng};
 
 use all_is_cubes::block::{Block, Resolution::*, RotationPlacementRule, AIR};
-use all_is_cubes::cgmath::{ElementWise, EuclideanSpace as _, Vector3};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::load_image::space_from_image;
 use all_is_cubes::content::palette;
@@ -14,8 +14,8 @@ use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation,
-    GridVector, Rgb, Rgba,
+    Axis, Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridRotation, GridVector, Rgb,
+    Rgba,
 };
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::time;
@@ -207,9 +207,9 @@ impl DemoTheme {
         } else {
             let eb = room_data.extended_map_bounds();
             self.dungeon_grid
-                .room_box_at(room_position + eb.lower_bounds().to_vec())
+                .room_box_at(room_position + eb.lower_bounds().to_vector())
                 .union(self.dungeon_grid.room_box_at(
-                    room_position + eb.upper_bounds().to_vec() - GridVector::new(1, 1, 1),
+                    room_position + eb.upper_bounds().to_vector() - GridVector::new(1, 1, 1),
                 ))
                 .unwrap()
         }
@@ -364,7 +364,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     space.set(floor_middle, &self.item_pedestal)?;
                     // TODO: This should be in pick-up-able form as opposed to placed,
                     // once such a distinction is actually implemented
-                    space.set(floor_middle + GridVector::unit_y(), block)?;
+                    space.set(floor_middle + GridVector::new(0, 1, 0), block)?;
                 }
 
                 // Set spawn.
@@ -414,14 +414,13 @@ pub(crate) async fn demo_dungeon(
     let dungeon_grid = DungeonGrid {
         room_box: GridAab::from_lower_size([0, 0, 0], [9, 5, 9]),
         room_wall_thickness: FaceMap::repeat(1),
-        gap_between_walls: Vector3::new(1, 1, 1),
+        gap_between_walls: Vector3D::new(1, 1, 1),
     };
     let perimeter_margin = 30;
 
-    let requested_rooms = requested_size
-        .unwrap_or(Vector3::new(135, 40, 135))
-        .sub_element_wise(Vector3::new(perimeter_margin, 0, perimeter_margin))
-        .div_element_wise(dungeon_grid.room_spacing());
+    let requested_rooms = (requested_size.unwrap_or(Vector3D::new(135, 40, 135))
+        - Vector3D::new(perimeter_margin, 0, perimeter_margin))
+    .component_div(dungeon_grid.room_spacing());
     if requested_rooms.x == 0 || requested_rooms.z == 0 {
         return Err(InGenError::Other("Size too small".into()));
     }
@@ -631,7 +630,7 @@ pub async fn install_dungeon_blocks(
     let resolution = R16;
     let resolution_g = GridCoordinate::from(resolution);
     let one_diagonal = GridVector::new(1, 1, 1);
-    let center_point_doubled = GridPoint::from_vec(one_diagonal * resolution_g);
+    let center_point_doubled = (one_diagonal * resolution_g).to_point();
 
     let light_voxel = Block::builder()
         .color(Rgba::new(0.7, 0.7, 0.0, 1.0))

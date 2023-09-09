@@ -8,8 +8,8 @@ use anyhow::Context;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use tui::layout::Rect;
 
-use all_is_cubes::camera::{Camera, StandardCameras, Viewport};
-use all_is_cubes::cgmath::{Point2, Vector2};
+use all_is_cubes::camera::{self, Camera, StandardCameras, Viewport};
+use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::Rgba;
 use all_is_cubes::raytracer::{Accumulate, CharacterBuf, CharacterRtData, ColorBuf, RtRenderer};
@@ -32,7 +32,7 @@ use ui::{InventoryDisplay, OutMsg, TerminalWindow, UiFrame};
 /// built on the same components as [`terminal_main_loop`].
 pub(crate) fn terminal_print_once(
     mut dsession: DesktopSession<TerminalRenderer, TerminalWindow>,
-    display_size: Vector2<u16>,
+    display_size: Vector2D<u16, camera::ImagePixel>,
 ) -> Result<(), anyhow::Error> {
     let rect = Rect::new(0, 0, display_size.x, display_size.y);
     dsession.window.send(OutMsg::OverrideViewport(rect));
@@ -220,7 +220,7 @@ fn run(
                     // need to undo here, but it would be better to directly input the right coordinate
                     // system. Define a version of mouse_pixel_position which takes sizes directly?
                     let position =
-                        Point2::new((f64::from(column) - 0.5) * 0.5, f64::from(row) - 0.5);
+                        Point2D::new((f64::from(column) - 0.5) * 0.5, f64::from(row) - 0.5);
                     dsession.session.input_processor.mouse_pixel_position(
                         *dsession.viewport_cell.get(),
                         Some(position),
@@ -370,6 +370,6 @@ impl Accumulate for ColorCharacterBuf {
     }
 }
 
-fn rect_size(rect: Rect) -> Vector2<u16> {
-    Vector2::new(rect.width, rect.height)
+fn rect_size(rect: Rect) -> Vector2D<u16, camera::ImagePixel> {
+    Vector2D::new(rect.width, rect.height)
 }

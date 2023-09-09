@@ -1,9 +1,9 @@
 #![no_main]
 extern crate all_is_cubes;
 
-use all_is_cubes::cgmath::{InnerSpace, Point3, Vector3};
 use all_is_cubes::character::Character;
-use all_is_cubes::math::{Aab, FreeCoordinate, NotNan};
+use all_is_cubes::euclid::Vector3D;
+use all_is_cubes::math::{self, Aab, FreeCoordinate, NotNan, VectorOps};
 use all_is_cubes::space::Space;
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::Universe;
@@ -17,9 +17,9 @@ fuzz_target!(|input: ([FreeCoordinate; 3], [FreeCoordinate; 3], Space)| {
     let interesting_bounds_aab = Aab::from(space.bounds()).expand(10.0);
 
     // TODO: write a proper Arbitrary impl on a wrapper
-    let position: Point3<FreeCoordinate> = position.into();
-    let velocity: Vector3<FreeCoordinate> = velocity.into();
-    if space.physics().gravity.map(NotNan::into_inner).magnitude() > 100. {
+    let position: math::FreePoint = position.into();
+    let velocity: Vector3D<_, _> = velocity.into();
+    if space.physics().gravity.map(NotNan::into_inner).length() > 100. {
         return;
     }
 

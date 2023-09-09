@@ -2,7 +2,6 @@
 //!
 //! Note that some sub-modules have their own test modules.
 
-use cgmath::EuclideanSpace as _;
 use indoc::indoc;
 
 use crate::block::{

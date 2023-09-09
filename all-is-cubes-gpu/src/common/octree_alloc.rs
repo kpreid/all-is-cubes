@@ -1,5 +1,5 @@
-use all_is_cubes::cgmath::EuclideanSpace;
-use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::euclid::default::Translation3D;
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector, VectorOps};
 
 /// An octree that knows how to allocate box regions of itself. It stores no other data.
 #[derive(Clone, Debug)]
@@ -216,14 +216,14 @@ impl AlloctreeNode {
 
                     // It's possible for the offset calculation to overflow if the request
                     // bounds are near GridCoordinate::MIN.
-                    let offset = GridVector {
-                        x: low_corner.x.checked_sub(request.lower_bounds().x)?,
-                        y: low_corner.y.checked_sub(request.lower_bounds().y)?,
-                        z: low_corner.z.checked_sub(request.lower_bounds().z)?,
-                    };
+                    let offset = Translation3D::new(
+                        low_corner.x.checked_sub(request.lower_bounds().x)?,
+                        low_corner.y.checked_sub(request.lower_bounds().y)?,
+                        low_corner.z.checked_sub(request.lower_bounds().z)?,
+                    );
                     *self = AlloctreeNode::Full;
                     Some(AlloctreeHandle {
-                        allocation: request.translate(offset),
+                        allocation: request.translate(offset.to_vector().cast_unit()),
                         offset,
                     })
                 }
@@ -244,7 +244,7 @@ impl AlloctreeNode {
                     .filter_map(|(child, child_position)| {
                         child.allocate(
                             size_exponent - 1,
-                            low_corner + child_position.lower_bounds().to_vec() * child_size,
+                            low_corner + child_position.lower_bounds().to_vector() * child_size,
                             request,
                         )
                     })
@@ -271,7 +271,7 @@ impl AlloctreeNode {
                     .expect("Alloctree::free: out of bounds");
                 children[child_index].free(
                     size_exponent - 1,
-                    relative_low_corner - which_child.to_vec() * child_size,
+                    relative_low_corner - which_child.to_vector() * child_size,
                 );
             }
         }
@@ -282,6 +282,8 @@ impl AlloctreeNode {
 ///
 /// This **does not deallocate on drop**, because the tree does not implement interior
 /// mutability; it is the caller's responsibility to provide such functionality if needed.
+//
+// TODO(euclid migration): don't use Grid* units since these are not space cubes
 #[derive(Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct AlloctreeHandle {
@@ -289,7 +291,7 @@ pub struct AlloctreeHandle {
     pub allocation: GridAab,
     /// Coordinate translation from the originally requested [`GridAab`] to the location
     /// allocated for it.
-    pub offset: GridVector,
+    pub offset: Translation3D<GridCoordinate>,
 }
 
 /// Test if the given [`GridAab`] fits in a cube of the given size.

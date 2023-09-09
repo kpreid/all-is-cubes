@@ -3,17 +3,20 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use all_is_cubes::camera::{
-    FogOption, GraphicsOptions, LightingOption, TransparencyOption, Viewport,
+    FogOption, GraphicsOptions, LightingOption, NdcPoint2, NominalPixel, TransparencyOption,
+    Viewport,
 };
-use all_is_cubes::cgmath::{EuclideanSpace as _, Point2, Vector2, Vector3, Zero as _};
 use all_is_cubes::character::Character;
+use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use all_is_cubes::math::FreeCoordinate;
+use all_is_cubes::math::{FreeCoordinate, FreeVector, VectorOps};
 use all_is_cubes::notnan;
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{URef, Universe};
 
 use crate::apps::ControlMessage;
+
+type MousePoint = Point2D<f64, NominalPixel>;
 
 /// Parse input events, particularly key-down/up pairs, into character control and such.
 ///
@@ -53,14 +56,14 @@ pub struct InputProcessor {
     has_pointer_lock: bool,
 
     /// Net mouse movement since the last [`Self::apply_input`].
-    mouselook_buffer: Vector2<FreeCoordinate>,
+    mouselook_buffer: Vector2D<FreeCoordinate, NominalPixel>,
 
     /// Mouse position in NDC. None if out of bounds/lost focus.
-    mouse_ndc_position: Option<Point2<FreeCoordinate>>,
+    mouse_ndc_position: Option<NdcPoint2>,
 
     /// Mouse position used for generating mouselook deltas.
     /// [`None`] if games.
-    mouse_previous_pixel_position: Option<Point2<f64>>,
+    mouse_previous_pixel_position: Option<MousePoint>,
 }
 
 impl InputProcessor {
@@ -75,8 +78,8 @@ impl InputProcessor {
             command_buffer: Vec::new(),
             mouselook_mode: ListenableCell::new(false), // TODO: might want a parameter
             has_pointer_lock: false,
-            mouselook_buffer: Vector2::zero(),
-            mouse_ndc_position: Some(Point2::origin()),
+            mouselook_buffer: Vector2D::zero(),
+            mouse_ndc_position: Some(NdcPoint2::origin()),
             mouse_previous_pixel_position: None,
         }
     }
@@ -187,7 +190,7 @@ impl InputProcessor {
     /// suitable for joystick-type input.
     ///
     /// Note that absolute cursor positions must be provided separately.
-    pub fn mouselook_delta(&mut self, delta: Vector2<FreeCoordinate>) {
+    pub fn mouselook_delta(&mut self, delta: Vector2D<FreeCoordinate, NominalPixel>) {
         // TODO: sensitivity option
         if self.has_pointer_lock {
             self.mouselook_buffer += delta * 0.2;
@@ -204,31 +207,29 @@ impl InputProcessor {
     ///
     /// If this is never called, the default value is (0, 0) which corresponds to the
     /// center of the screen.
-    pub fn mouse_ndc_position(&mut self, position: Option<Point2<FreeCoordinate>>) {
+    pub fn mouse_ndc_position(&mut self, position: Option<NdcPoint2>) {
         self.mouse_ndc_position = position.filter(|p| p.x.abs() <= 1. && p.y.abs() <= 1.);
     }
 
     /// Provide position of mouse pointer or other input device in pixel coordinates
-    /// framed by the given [`Viewport`].
+    /// framed by the given [`Viewport`]'s `nominal_size`.
     /// [`None`] denotes the cursor being outside the viewport, and out-of-range
     /// coordinates will be treated the same.
     ///
     /// This is equivalent to converting the coordinates and calling
     /// [`InputProcessor::mouse_ndc_position`].
     ///
-    /// If this is never called, the default value is (0, 0) which corresponds to the
-    /// center of the screen.
+    /// If this is never called, the default `mouse_ndc_position` value is (0, 0), which
+    /// corresponds to the center of the screen.
     ///
     /// TODO: this should take float input, probably
     pub fn mouse_pixel_position(
         &mut self,
         viewport: Viewport,
-        position: Option<Point2<f64>>,
+        position: Option<Point2D<f64, NominalPixel>>,
         derive_movement: bool,
     ) {
-        self.mouse_ndc_position(
-            position.map(|p| Point2::from_vec(viewport.normalize_nominal_point(p))),
-        );
+        self.mouse_ndc_position(position.map(|p| viewport.normalize_nominal_point(p)));
 
         if derive_movement {
             if let (Some(p1), Some(p2)) = (self.mouse_previous_pixel_position, position) {
@@ -241,8 +242,8 @@ impl InputProcessor {
     }
 
     /// Returns the character movement velocity that input is currently requesting.
-    pub fn movement(&self) -> Vector3<FreeCoordinate> {
-        Vector3::new(
+    pub fn movement(&self) -> FreeVector {
+        FreeVector::new(
             self.net_movement(Key::Character('a'), Key::Character('d')),
             self.net_movement(Key::Character('c'), Key::Character('e')),
             self.net_movement(Key::Character('w'), Key::Character('s')),
@@ -267,7 +268,7 @@ impl InputProcessor {
             self.key_up(key);
         }
 
-        self.mouselook_buffer = Vector2::zero();
+        self.mouselook_buffer = Vector2D::zero();
     }
 
     /// Applies the accumulated input from previous events.
@@ -294,7 +295,7 @@ impl InputProcessor {
                     let movement = self.movement();
                     character.set_velocity_input(movement);
 
-                    let turning = Vector2::new(
+                    let turning = Vector2D::<_, ()>::new(
                         key_turning_step * self.net_movement(Key::Left, Key::Right)
                             + self.mouselook_buffer.x,
                         key_turning_step * self.net_movement(Key::Up, Key::Down)
@@ -404,9 +405,9 @@ impl InputProcessor {
     ///
     /// Returns [`None`] if the mouse position is out of bounds, the window has lost
     /// focus, or similar conditions under which no cursor should be shown.
-    pub fn cursor_ndc_position(&self) -> Option<Point2<FreeCoordinate>> {
+    pub fn cursor_ndc_position(&self) -> Option<NdcPoint2> {
         if *self.mouselook_mode.get() {
-            Some(Point2::origin())
+            Some(NdcPoint2::origin())
         } else {
             self.mouse_ndc_position
         }
@@ -462,6 +463,7 @@ pub enum Key {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::euclid::vec3;
     use all_is_cubes::space::Space;
     use all_is_cubes::universe::{URef, Universe};
 
@@ -485,29 +487,29 @@ mod tests {
     #[test]
     fn movement() {
         let mut input = InputProcessor::new();
-        assert_eq!(input.movement(), Vector3::new(0.0, 0.0, 0.0));
+        assert_eq!(input.movement(), vec3(0.0, 0.0, 0.0));
         input.key_down(Key::Character('d'));
-        assert_eq!(input.movement(), Vector3::new(1.0, 0.0, 0.0));
+        assert_eq!(input.movement(), vec3(1.0, 0.0, 0.0));
         input.key_down(Key::Character('a'));
-        assert_eq!(input.movement(), Vector3::new(0.0, 0.0, 0.0));
+        assert_eq!(input.movement(), vec3(0.0, 0.0, 0.0));
         input.key_up(Key::Character('d'));
-        assert_eq!(input.movement(), Vector3::new(-1.0, 0.0, 0.0));
+        assert_eq!(input.movement(), vec3(-1.0, 0.0, 0.0));
     }
 
     #[test]
     fn focus_lost_cancels_keys() {
         let mut input = InputProcessor::new();
-        assert_eq!(input.movement(), Vector3::zero());
+        assert_eq!(input.movement(), FreeVector::zero());
         input.key_down(Key::Character('d'));
-        assert_eq!(input.movement(), Vector3::unit_x());
+        assert_eq!(input.movement(), vec3(1., 0., 0.));
         input.key_focus(false);
-        assert_eq!(input.movement(), Vector3::zero()); // Lost focus, no movement.
+        assert_eq!(input.movement(), FreeVector::zero()); // Lost focus, no movement.
 
         // Confirm that keys work again afterward.
         input.key_focus(true);
-        assert_eq!(input.movement(), Vector3::zero());
+        assert_eq!(input.movement(), FreeVector::zero());
         input.key_down(Key::Character('d'));
-        assert_eq!(input.movement(), Vector3::unit_x());
+        assert_eq!(input.movement(), vec3(1., 0., 0.));
         // TODO: test (and handle) key events arriving while focus is lost, just in case.
     }
 

@@ -2,16 +2,20 @@
 
 use std::fmt;
 
-use cgmath::{Vector3, Vector4, Zero as _};
+use euclid::Vector3D;
+use ordered_float::NotNan;
 
-use crate::block::{
-    self, BlockAttributes, BlockCollision,
-    Resolution::{self, R1},
-};
 use crate::content::palette;
 use crate::math::{Cube, Face6, FaceMap, GridAab, GridArray, OpacityCategory, Rgb, Rgba};
 use crate::raytracer;
 use crate::universe::RefError;
+use crate::{
+    block::{
+        self, BlockAttributes, BlockCollision,
+        Resolution::{self, R1},
+    },
+    math::Intensity,
+};
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
@@ -160,8 +164,9 @@ impl EvaluatedBlock {
         // of all six faces by tracing in from the edges, and then averages them.
         // TODO: Account for reduced bounds being smaller
         let (color, emission): (Rgba, Rgb) = {
-            let mut color_sum: Vector4<f32> = Vector4::zero();
-            let mut emission_sum: Vector3<f32> = Vector3::zero();
+            let mut color_sum: Vector3D<f32, Intensity> = Vector3D::zero();
+            let mut alpha_sum: f32 = 0.0;
+            let mut emission_sum: Vector3D<f32, Intensity> = Vector3D::zero();
             let mut count = 0;
             // Loop over all face voxels.
             // (This is a similar structure to the algorithm we use for mesh generation.)
@@ -180,7 +185,8 @@ impl EvaluatedBlock {
 
                         let raytracer::EvalTrace { color, emission } =
                             raytracer::trace_for_eval(&voxels, cube, face.opposite(), resolution);
-                        color_sum += color.into();
+                        color_sum += color.to_rgb().into();
+                        alpha_sum += color.alpha().into_inner();
                         emission_sum += emission;
                         count += 1;
                     }
@@ -192,11 +198,12 @@ impl EvaluatedBlock {
                 // Note the divisors —- this adds transparency to compensate for when the
                 // voxel data doesn't cover the full_block_bounds.
                 (
-                    Rgba::try_from(
-                        (color_sum.truncate() / (count as f32))
-                            .extend(color_sum.w / (full_block_bounds.surface_area() as f32)),
-                    )
-                    .expect("Recursive block color computation produced NaN"),
+                    Rgb::try_from(color_sum / (count as f32))
+                        .expect("Recursive block color computation produced NaN")
+                        .with_alpha(
+                            NotNan::new(alpha_sum / (full_block_bounds.surface_area() as f32))
+                                .expect("Recursive block alpha computation produced NaN"),
+                        ),
                     Rgb::try_from(emission_sum / full_block_bounds.surface_area() as f32)
                         .expect("Recursive block emission computation produced NaN"),
                 )

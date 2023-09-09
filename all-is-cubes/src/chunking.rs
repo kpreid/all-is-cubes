@@ -5,11 +5,19 @@ use std::iter::FusedIterator;
 use std::ops::RangeTo;
 use std::sync::{Arc, Mutex};
 
-use cgmath::{EuclideanSpace as _, Point3, Vector3};
+use euclid::{vec3, Vector3D};
 
 use crate::math::{
-    int_magnitude_squared, Cube, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector,
+    Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint, VectorOps,
 };
+
+/// Unit-of-measure type for chunk positions *not* tracking the chunk size in the type.
+#[allow(clippy::exhaustive_enums)]
+#[derive(Debug)]
+enum WholeChunk {}
+
+/// Relative chunk position (coordinates in units of whole chunks)
+type Ccv = Vector3D<i32, WholeChunk>;
 
 /// Type to distinguish chunk coordinates from cube coordinates.
 ///
@@ -51,7 +59,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     /// Returns the distance between the two given chunks. See the [`Distance`] for an
     /// explanation of what that means.
     pub fn distance(self, other: Self) -> Distance {
-        chunk_distance_squared_for_view(self.0 - other.0)
+        chunk_distance_squared_for_view((self.0 - other.0).cast_unit())
     }
 
     /// Returns the squared distance along the shortest line from `origin_chunk`'s bounds
@@ -73,9 +81,7 @@ pub fn cube_to_chunk<const CHUNK_SIZE: GridCoordinate>(cube: Cube) -> ChunkPos<C
     ))
 }
 /// Scale an arbitrary point to obtain the containing chunk.
-pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(
-    point: Point3<FreeCoordinate>,
-) -> ChunkPos<CHUNK_SIZE> {
+pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(point: FreePoint) -> ChunkPos<CHUNK_SIZE> {
     ChunkPos(
         Cube::containing(
         point.map(|c| c.div_euclid(FreeCoordinate::from(CHUNK_SIZE))),
@@ -148,7 +154,7 @@ pub struct ChunkChart<const CHUNK_SIZE: GridCoordinate> {
     /// This vector may contain more than the desired chunks; this is done so that a small
     /// chart can reuse the work to construct a large one.
     /// TODO: That is not actually implemented.
-    octant_chunks: Arc<[GridVector]>,
+    octant_chunks: Arc<[Ccv]>,
 
     /// Range of elements of `octant_chunks` to actually use.
     octant_range: RangeTo<usize>,
@@ -205,7 +211,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
             .iter()
             .copied()
             .flat_map(move |v| AxisMirrorIter::new(v, mask))
-            .map(move |v| ChunkPos(origin.0 + v))
+            .map(move |v| ChunkPos(origin.0 + v.cast_unit()))
     }
 
     /// Convert to a `Space` so it can be directly viewed; for tests.
@@ -216,7 +222,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
 
         let mut max = GridPoint::origin();
         for chunk in self.octant_chunks[self.octant_range].iter().copied() {
-            max = max.zip(Point3::from_vec(chunk), GridCoordinate::max);
+            max = max.zip(chunk.to_point().cast_unit(), GridCoordinate::max);
         }
         let extent = GridAab::from_lower_upper(max.map(|c| -c - 1), max.map(|c| c + 2));
         let mut space = crate::space::Space::empty(extent);
@@ -258,9 +264,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     }
 }
 
-fn get_or_compute_chart_octant(
-    view_distance_in_squared_chunks: GridCoordinate,
-) -> Arc<[GridVector]> {
+fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<[Ccv]> {
     let mut cache = match CHUNK_CHART_CACHE.lock() {
         Ok(cache) => cache,
         Err(p) => {
@@ -304,19 +308,19 @@ pub fn reset_chunk_chart_cache() {
     }
 }
 
-fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<[GridVector]> {
+fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<[Ccv]> {
     // We're going to compute in the zero-or-positive octant, which means that the chunk origin
     // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
     // each chunk.
 
     let candidates = GridAab::from_lower_size(
         [0, 0, 0],
-        Vector3::new(1, 1, 1) * (view_distance_in_squared_chunks + 1),
+        vec3(1, 1, 1) * (view_distance_in_squared_chunks + 1),
     );
-    let mut octant_chunks: Vec<GridVector> = Vec::with_capacity(candidates.volume());
+    let mut octant_chunks: Vec<Ccv> = Vec::with_capacity(candidates.volume());
     // (This for loop has been measured as slightly faster than a .filter().collect().)
     for chunk_cube in candidates.interior_iter() {
-        let chunk = chunk_cube.lower_bounds().to_vec();
+        let chunk = chunk_cube.lower_bounds().to_vector().cast_unit();
         if chunk_distance_squared_for_view(chunk).nearest_approach_squared
             <= view_distance_in_squared_chunks
         {
@@ -330,11 +334,11 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<
 
 /// Builds on [`chunk_distance_squared_for_view`] by breaking ties so the result is
 /// a stable ordering. This is the ordering that `ChunkChart::octant_chunks` contains.
-fn depth_sort_key(&chunk: &Vector3<i32>) -> (Distance, [i32; 3]) {
+fn depth_sort_key(&chunk: &Ccv) -> (Distance, [i32; 3]) {
     (chunk_distance_squared_for_view(chunk), chunk.into())
 }
 
-fn chunk_distance_squared_for_view(chunk: Vector3<i32>) -> Distance {
+fn chunk_distance_squared_for_view(chunk: Ccv) -> Distance {
     let chunk = chunk.map(i32::abs);
     // By subtracting 1 from all coordinates, we include the chunks intersecting
     // the view sphere centered on the _farthest corner point_ of the
@@ -343,10 +347,12 @@ fn chunk_distance_squared_for_view(chunk: Vector3<i32>) -> Distance {
     // The max(0) includes the axis-aligned span of chunks that form the
     // Minkowski-sum-expanded cube faces.
     Distance {
-        nearest_approach_squared: int_magnitude_squared(chunk.map(
-            #[inline(always)]
-            |s| (s - 1).max(0),
-        )),
+        nearest_approach_squared: chunk
+            .map(
+                #[inline(always)]
+                |s| (s - 1).max(0),
+            )
+            .square_length(),
         off_plane_count: (chunk.x.signum() + chunk.y.signum() + chunk.z.signum()) as u8,
     }
 }
@@ -354,8 +360,7 @@ fn chunk_distance_squared_for_view(chunk: Vector3<i32>) -> Distance {
 /// A cache for [`get_or_compute_chart_octant()`].
 ///
 /// Keys are `view_distance_in_squared_chunks` and values are `octant_chunks`.
-static CHUNK_CHART_CACHE: Mutex<BTreeMap<GridCoordinate, Arc<[GridVector]>>> =
-    Mutex::new(BTreeMap::new());
+static CHUNK_CHART_CACHE: Mutex<BTreeMap<GridCoordinate, Arc<[Ccv]>>> = Mutex::new(BTreeMap::new());
 
 /// A specification of which octants to include in [`ChunkChart::chunks()`].
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -403,7 +408,7 @@ impl OctantMask {
     pub const NONE: Self = Self { flags: 0x00 };
 
     /// Set the flag for the octant the given vector occupies.
-    pub(crate) fn set_octant_of(&mut self, vector: Vector3<FreeCoordinate>) {
+    pub(crate) fn set_octant_of(&mut self, vector: FreeVector) {
         let index = u8::from(vector.x >= 0.) << 2
             | u8::from(vector.y >= 0.) << 1
             | u8::from(vector.z >= 0.);
@@ -457,13 +462,13 @@ impl OctantMask {
 ///
 /// Part of the implementation of [`ChunkChart`].
 struct AxisMirrorIter {
-    v: GridVector,
+    v: Ccv,
     /// Which copies are yet to be emitted.
     todo: OctantMask,
 }
 impl AxisMirrorIter {
     #[inline]
-    fn new(v: GridVector, mask: OctantMask) -> Self {
+    fn new(v: Ccv, mask: OctantMask) -> Self {
         // For each axis whose value is zero, collapse the mask into being one-sided on that axis
         // Note that it is critical that each of these reads the preceding stage; otherwise multiple
         // axes won't combine the effects of collapsing properly.
@@ -480,7 +485,7 @@ impl AxisMirrorIter {
         Self { v, todo }
     }
 
-    fn generate_and_clear(&mut self, octant_index: u8) -> GridVector {
+    fn generate_and_clear(&mut self, octant_index: u8) -> Ccv {
         self.todo.flags &= !(1 << octant_index);
         let mut result = self.v;
         if octant_index & 0b100 == 0 {
@@ -499,9 +504,9 @@ impl AxisMirrorIter {
     }
 }
 impl Iterator for AxisMirrorIter {
-    type Item = GridVector;
+    type Item = Ccv;
     #[inline]
-    fn next(&mut self) -> Option<GridVector> {
+    fn next(&mut self) -> Option<Ccv> {
         self.todo
             .first()
             .map(|index| self.generate_and_clear(index))
@@ -528,6 +533,7 @@ impl FusedIterator for AxisMirrorIter {}
 mod tests {
     use super::*;
     use crate::raytracer::print_space;
+    use euclid::{vec3, Vector3D};
     use pretty_assertions::assert_eq;
     use rand::{Rng, SeedableRng};
     use std::collections::HashSet;
@@ -547,7 +553,7 @@ mod tests {
             let origin_cube = Cube::new(100, 200, 300);
             // Arbitrary chunk size
             const CS: GridCoordinate = 32;
-            let grid_distance = ChunkPos::<CS>(origin_cube + Vector3::from(pos))
+            let grid_distance = ChunkPos::<CS>(origin_cube + Vector3D::from(pos))
                 .min_distance_squared_from(ChunkPos(origin_cube));
             assert_eq!(grid_distance.rem_euclid(CS.pow(2)), 0);
             grid_distance / CS.pow(2)
@@ -802,9 +808,9 @@ mod tests {
     fn octant_mask_smoke_test() {
         let mut mask = OctantMask::NONE;
         assert_eq!(mask, OctantMask::NONE);
-        mask.set_octant_of(Vector3::new(1., 1., 1.));
+        mask.set_octant_of(vec3(1., 1., 1.));
         assert_eq!(mask, OctantMask { flags: 0b1000_0000 });
-        mask.set_octant_of(Vector3::new(-1., -1., -1.));
+        mask.set_octant_of(vec3(-1., -1., -1.));
         assert_eq!(mask, OctantMask { flags: 0b1000_0001 });
         assert_eq!(mask.first(), Some(0));
         assert_eq!(mask.last(), Some(7));

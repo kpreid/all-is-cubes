@@ -15,8 +15,8 @@ use tui::text::{Span, Spans};
 use tui::widgets::{Borders, Paragraph};
 use tui::Terminal;
 
-use all_is_cubes::cgmath::{ElementWise as _, Vector2};
 use all_is_cubes::character::{Character, Cursor};
+use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::inv::Slot;
 use all_is_cubes::universe::URef;
 use all_is_cubes::util::{CustomFormat, StatusText};
@@ -292,14 +292,8 @@ impl TerminalState {
         let image_size_in_characters = image
             .viewport
             .framebuffer_size
-            .map(|s| s as usize)
-            .div_element_wise(
-                image
-                    .options
-                    .characters
-                    .rays_per_character()
-                    .map(usize::from),
-            );
+            .to_usize()
+            .component_div(image.options.characters.rays_per_character().to_usize());
 
         let mut rect = self.viewport_position;
         // Clamp rect to match the actual image data size, to avoid trying to read the
@@ -313,8 +307,7 @@ impl TerminalState {
             }
             let mut x = 0;
             while x < rect.width {
-                let (text, color) =
-                    image_patch_to_character(image, Vector2::new(x as usize, y as usize));
+                let (text, color) = image_patch_to_character(image, Vector2D::new(x, y).to_usize());
 
                 let width = write_colored_and_measure(
                     backend,

@@ -5,11 +5,13 @@ use bitvec::vec::BitVec;
 use ordered_float::OrderedFloat;
 
 use all_is_cubes::camera::Flaws;
-use all_is_cubes::cgmath::{EuclideanSpace as _, MetricSpace as _, Point3, Vector3, Zero as _};
-use all_is_cubes::math::{Cube, Face6, GridAab, GridCoordinate, GridRotation};
+use all_is_cubes::euclid::Point3D;
+use all_is_cubes::math::{
+    Cube, Face6, GridAab, GridCoordinate, GridRotation, GridVector, VectorOps as _,
+};
 use all_is_cubes::space::{BlockIndex, Space};
 
-use crate::texture;
+use crate::{texture, VPos};
 use crate::{BlockMesh, GfxVertex, IndexSlice, IndexVec, MeshOptions};
 
 /// A triangle mesh representation of a [`Space`] (or part of it) which may
@@ -211,7 +213,7 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
             write_block_mesh_to_space_mesh(
                 block_mesh,
                 // translate mesh to be always located at lower_bounds
-                cube - bounds.lower_bounds().to_vec(),
+                cube - bounds.lower_bounds().to_vector(),
                 &mut self.vertices,
                 &mut self.indices,
                 &mut transparent_indices,
@@ -298,7 +300,7 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
             // and no other polygons, though.
             struct QuadWithMid<S, I> {
                 indices: [I; 6],
-                midpoint: Point3<S>,
+                midpoint: Point3D<S, Cube>,
             }
             let quads = bytemuck::cast_slice::<I, [I; 6]>(&transparent_indices);
             let mut sortable_quads: Vec<QuadWithMid<V::Coordinate, I>> = quads
@@ -329,7 +331,7 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
                 // (not `sort_unstable_by_key`).
                 sortable_quads.sort_by_key(|quad| -> [OrderedFloat<V::Coordinate>; 3] {
                     basis
-                        .map(|f| OrderedFloat(-f.dot(quad.midpoint.to_vec())))
+                        .map(|f| OrderedFloat(-f.dot(quad.midpoint.to_vector())))
                         .into()
                 });
 
@@ -362,7 +364,7 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
     ///
     /// Note that in the current implementation, the return value is `true` even if no
     /// reordering occurred, unless there is nothing to sort. This may be improved in the future.
-    pub fn depth_sort_for_view(&mut self, view_position: Point3<V::Coordinate>) -> bool {
+    pub fn depth_sort_for_view(&mut self, view_position: VPos<V>) -> bool {
         if !V::WANTS_DEPTH_SORTING {
             return false;
         }
@@ -378,14 +380,18 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
             IndexVec::U16(vec) => {
                 bytemuck::cast_slice_mut::<u16, [u16; 6]>(&mut vec[range]).sort_unstable_by_key(
                     |indices| {
-                        -OrderedFloat(view_position.distance2(Self::midpoint(vertices, *indices)))
+                        -OrderedFloat(
+                            (view_position - Self::midpoint(vertices, *indices)).square_length(),
+                        )
                     },
                 );
             }
             IndexVec::U32(vec) => {
                 bytemuck::cast_slice_mut::<u32, [u32; 6]>(&mut vec[range]).sort_unstable_by_key(
                     |indices| {
-                        -OrderedFloat(view_position.distance2(Self::midpoint(vertices, *indices)))
+                        -OrderedFloat(
+                            (view_position - Self::midpoint(vertices, *indices)).square_length(),
+                        )
                     },
                 );
             }
@@ -396,14 +402,14 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
 
     /// Compute quad midpoint from quad vertices, for depth sorting.
     #[inline]
-    fn midpoint<I>(vertices: &[V], indices: [I; 6]) -> Point3<V::Coordinate>
+    fn midpoint<I>(vertices: &[V], indices: [I; 6]) -> VPos<V>
     where
         I: num_traits::NumCast,
     {
         let one_half = num_traits::cast::<f32, V::Coordinate>(0.5f32).unwrap();
         // We only need to look at one of the two triangles,
         // because they have the same bounding rectangle.
-        let [v0, v1, v2, ..]: [Point3<V::Coordinate>; 6] =
+        let [v0, v1, v2, ..]: [VPos<V>; 6] =
             indices.map(|i| vertices[num_traits::cast::<I, usize>(i).unwrap()].position());
         let max = v0
             .zip(v1, num_traits::Float::max)
@@ -411,7 +417,7 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
         let min = v0
             .zip(v1, num_traits::Float::min)
             .zip(v2, num_traits::Float::min);
-        (max + min.to_vec()) * one_half
+        (max + min.to_vector()) * one_half
     }
 }
 
@@ -756,8 +762,8 @@ impl DepthOrdering {
     /// If the vector is zero, [`DepthOrdering::Within`] will be returned. Thus, passing
     /// coordinates in units of chunks will result in returning `Within` exactly when the
     /// viewpoint is within the chunk (implying the need for finer-grained sorting).
-    pub fn from_view_direction(direction: Vector3<GridCoordinate>) -> DepthOrdering {
-        if direction == Vector3::zero() {
+    pub fn from_view_direction(direction: GridVector) -> DepthOrdering {
+        if direction == GridVector::zero() {
             return DepthOrdering::Within;
         }
 

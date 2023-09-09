@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{Angle as _, Deg, Point3, Vector3};
+use euclid::{point3, Vector3D};
 
 use crate::block::{Block, AIR};
 use crate::character::{cursor_raycast, Character, CharacterChange, CharacterTransaction, Spawn};
@@ -67,11 +67,14 @@ fn spawn_look_direction_default() {
 fn spawn_look_direction() {
     let character = test_spawn(|space| {
         let mut spawn = Spawn::default_for_new_space(space.bounds());
-        spawn.set_look_direction(Vector3::new(1., 1., -1.));
+        spawn.set_look_direction(Vector3D::new(1., 1., -1.));
         spawn
     });
     assert_eq!(character.body.yaw, 45.0);
-    assert_eq!(character.body.pitch, Deg::atan2(-1., 2.0f64.sqrt()).0);
+    assert_eq!(
+        character.body.pitch,
+        (-1f64).atan2(2.0f64.sqrt()).to_degrees()
+    );
 }
 
 #[test]
@@ -175,7 +178,7 @@ fn no_superjumping() {
         space
     });
     let mut character = Character::spawn_default(space);
-    character.body.position = Point3::new(
+    character.body.position = point3(
         0.,
         character.body.collision_box.face_coordinate(Face6::NY) + 1.1,
         0.,

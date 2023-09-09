@@ -1,7 +1,8 @@
 use std::fmt;
 
-use all_is_cubes::camera::Viewport;
-use all_is_cubes::cgmath::{ElementWise as _, Vector2};
+use all_is_cubes::camera::{self, ImagePixel, Viewport};
+use all_is_cubes::euclid::Vector2D;
+use all_is_cubes::math::VectorOps;
 use all_is_cubes::raytracer::RaytraceInfo;
 
 use super::{TerminalOptions, TextAndColor};
@@ -32,7 +33,7 @@ impl fmt::Debug for TextRayImage {
 }
 
 impl TextRayImage {
-    pub fn patch_size(&self) -> Vector2<u8> {
+    pub fn patch_size(&self) -> Vector2D<u8, camera::ImagePixel> {
         self.options.characters.rays_per_character()
     }
 
@@ -41,12 +42,12 @@ impl TextRayImage {
     /// Panics if the array size doesn't match `patch_size()`.
     pub fn get_patch<const W: usize, const H: usize>(
         &self,
-        character_position: Vector2<usize>,
+        character_position: Vector2D<usize, ImagePixel>,
     ) -> [[&TextAndColor; W]; H] {
         let patch_size = self.patch_size().map(usize::from);
         let data: &[TextAndColor] = &self.image;
         let image_row_length = usize::try_from(self.viewport.framebuffer_size.x).unwrap();
-        let base_image_pos = character_position.mul_element_wise(patch_size);
+        let base_image_pos = character_position.component_mul(patch_size);
 
         assert!(
             patch_size.x == W && patch_size.y == H,

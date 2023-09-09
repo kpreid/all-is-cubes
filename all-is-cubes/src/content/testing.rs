@@ -1,4 +1,3 @@
-use cgmath::{Vector2, Vector3};
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
@@ -6,7 +5,7 @@ use crate::block::{Block, AIR};
 use crate::character::Spawn;
 use crate::content::free_editing_starter_inventory;
 use crate::linking::InGenError;
-use crate::math::{Face6, FaceMap, GridAab, GridCoordinate, Rgba};
+use crate::math::{Face6, FaceMap, GridAab, GridVector, Rgba};
 use crate::space::{LightPhysics, Space, SpacePhysics};
 use crate::universe::Universe;
 
@@ -21,7 +20,7 @@ use crate::universe::Universe;
 #[doc(hidden)]
 pub fn lighting_bench_space(
     _universe: &mut Universe,
-    requested_space_size: Vector3<GridCoordinate>,
+    requested_space_size: GridVector,
 ) -> Result<Space, InGenError> {
     // Constant sizes
     let section_width = 6;
@@ -29,7 +28,7 @@ pub fn lighting_bench_space(
     let section_spacing = section_width + margin;
 
     // Sizes chosen based on constants and space_size
-    let array_side_lengths = Vector2::new(
+    let array_side_lengths = euclid::default::Vector2D::new(
         (requested_space_size.x - margin) / section_spacing,
         (requested_space_size.z - margin) / section_spacing,
     );

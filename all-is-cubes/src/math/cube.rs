@@ -1,8 +1,9 @@
 use core::fmt;
 
-use cgmath::{Point3, Vector3};
-
-use crate::math::{Aab, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector};
+use crate::math::{
+    Aab, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint, GridVector,
+    VectorOps,
+};
 use crate::util::ConciseDebug;
 
 /// “A cube”, in this documentation, is a unit cube whose corners' coordinates are integers.
@@ -63,13 +64,12 @@ impl Cube {
     /// returns [`None`].
     ///
     /// ```
-    /// use all_is_cubes::cgmath::Point3;
-    /// use all_is_cubes::math::Cube;
+    /// use all_is_cubes::math::{FreePoint, Cube};
     ///
-    /// assert_eq!(Cube::containing(Point3::new(1.0, 1.5, -2.5)), Some(Cube::new(1, 1, -3)));
+    /// assert_eq!(Cube::containing(FreePoint::new(1.0, 1.5, -2.5)), Some(Cube::new(1, 1, -3)));
     /// ```
     #[inline]
-    pub fn containing(point: Point3<FreeCoordinate>) -> Option<Self> {
+    pub fn containing(point: FreePoint) -> Option<Self> {
         const RANGE: std::ops::Range<FreeCoordinate> =
             (GridCoordinate::MIN as FreeCoordinate)..(GridCoordinate::MAX as FreeCoordinate + 1.0);
 
@@ -104,13 +104,13 @@ impl Cube {
 
     /// Returns the midpoint of this cube.
     #[inline] // trivial arithmetic
-    pub fn midpoint(self) -> Point3<FreeCoordinate> {
+    pub fn midpoint(self) -> FreePoint {
         let Self { x, y, z } = self;
-        Point3 {
-            x: FreeCoordinate::from(x) + 0.5,
-            y: FreeCoordinate::from(y) + 0.5,
-            z: FreeCoordinate::from(z) + 0.5,
-        }
+        FreePoint::new(
+            FreeCoordinate::from(x) + 0.5,
+            FreeCoordinate::from(y) + 0.5,
+            FreeCoordinate::from(z) + 0.5,
+        )
     }
 
     /// Constructs a [`GridAab`] with a volume of 1, containing this cube.
@@ -138,7 +138,7 @@ impl Cube {
     pub fn aab(self) -> Aab {
         // Note: this does not use `.upper_bounds()` so that it is non-panicking.
         let lower = GridPoint::from(self).map(FreeCoordinate::from);
-        Aab::from_lower_upper(lower, lower + Vector3::new(1.0, 1.0, 1.0))
+        Aab::from_lower_upper(lower, lower + FreeVector::new(1.0, 1.0, 1.0))
     }
 
     /// Componentwise [`GridCoordinate::checked_add()`].
@@ -255,7 +255,7 @@ mod conversion {
     impl From<Cube> for GridPoint {
         #[inline]
         fn from(Cube { x, y, z }: Cube) -> GridPoint {
-            GridPoint { x, y, z }
+            GridPoint::new(x, y, z)
         }
     }
 
@@ -267,7 +267,7 @@ mod conversion {
     }
     impl From<GridPoint> for Cube {
         #[inline]
-        fn from(GridPoint { x, y, z }: GridPoint) -> Self {
+        fn from(GridPoint { x, y, z, _unit }: GridPoint) -> Self {
             Self { x, y, z }
         }
     }
@@ -276,40 +276,38 @@ mod conversion {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use euclid::point3;
 
     #[test]
     fn containing_inf() {
         assert_eq!(
-            Cube::containing(Point3::new(FreeCoordinate::INFINITY, 0., 0.)),
+            Cube::containing(point3(FreeCoordinate::INFINITY, 0., 0.)),
             None
         );
         assert_eq!(
-            Cube::containing(Point3::new(-FreeCoordinate::INFINITY, 0., 0.)),
+            Cube::containing(point3(-FreeCoordinate::INFINITY, 0., 0.)),
             None
         );
     }
 
     #[test]
     fn containing_nan() {
-        assert_eq!(
-            Cube::containing(Point3::new(0., 0., FreeCoordinate::NAN)),
-            None
-        );
+        assert_eq!(Cube::containing(point3(0., 0., FreeCoordinate::NAN)), None);
     }
 
     #[test]
     fn containing_in_and_out_of_range() {
         let fmax = FreeCoordinate::from(GridCoordinate::MAX);
         let fmin = FreeCoordinate::from(GridCoordinate::MIN);
-        assert_eq!(Cube::containing(Point3::new(0., 0., fmin - 0.001)), None);
+        assert_eq!(Cube::containing(point3(0., 0., fmin - 0.001)), None);
         assert_eq!(
-            Cube::containing(Point3::new(0., 0., fmin + 0.001,)),
+            Cube::containing(point3(0., 0., fmin + 0.001,)),
             Some(Cube::new(0, 0, GridCoordinate::MIN))
         );
         assert_eq!(
-            Cube::containing(Point3::new(0., 0., fmax + 0.999,)),
+            Cube::containing(point3(0., 0., fmax + 0.999,)),
             Some(Cube::new(0, 0, GridCoordinate::MAX))
         );
-        assert_eq!(Cube::containing(Point3::new(0., 0., fmax + 1.001)), None);
+        assert_eq!(Cube::containing(point3(0., 0., fmax + 1.001)), None);
     }
 }

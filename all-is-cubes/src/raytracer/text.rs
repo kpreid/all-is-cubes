@@ -2,10 +2,10 @@
 
 use std::borrow::Cow;
 
-use cgmath::{Decomposed, Transform, Vector2, Vector3};
+use euclid::vec2;
 
 use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, Viewport};
-use crate::math::{FreeCoordinate, Rgba};
+use crate::math::{FreeVector, Rgba};
 use crate::raytracer::{Accumulate, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer};
 use crate::space::{Space, SpaceBlockData};
 
@@ -91,7 +91,7 @@ impl From<CharacterBuf> for String {
 ///
 /// `direction` specifies the direction from which the camera will be looking towards
 /// the center of the space. The text output will be 80 columns wide.
-pub fn print_space(space: &Space, direction: impl Into<Vector3<FreeCoordinate>>) {
+pub fn print_space(space: &Space, direction: impl Into<FreeVector>) {
     print_space_impl(space, direction, |s| {
         print!("{s}");
     });
@@ -100,25 +100,20 @@ pub fn print_space(space: &Space, direction: impl Into<Vector3<FreeCoordinate>>)
 /// Version of `print_space` that takes a destination, for testing.
 fn print_space_impl<F: FnMut(&str)>(
     space: &Space,
-    direction: impl Into<Vector3<FreeCoordinate>>,
+    direction: impl Into<FreeVector>,
     mut write: F,
 ) -> RaytraceInfo {
     // TODO: optimize height (and thus aspect ratio) for the shape of the space
     let mut camera = Camera::new(
         GraphicsOptions::default(),
         Viewport {
-            nominal_size: Vector2::new(40., 40.),
-            framebuffer_size: Vector2::new(80, 40),
+            nominal_size: vec2(40., 40.),
+            framebuffer_size: vec2(80, 40),
         },
     );
-    camera.set_view_transform(
-        Decomposed::look_at_rh(
-            eye_for_look_at(space.bounds(), direction.into()),
-            space.bounds().center(),
-            Vector3::new(0., 1., 0.),
-        )
-        .inverse_transform()
-        .unwrap(),
+    camera.look_at_y_up(
+        eye_for_look_at(space.bounds(), direction.into()),
+        space.bounds().center(),
     );
 
     SpaceRaytracer::<CharacterRtData>::new(space, GraphicsOptions::default(), ())

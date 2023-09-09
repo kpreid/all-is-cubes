@@ -1,11 +1,11 @@
 //! That which contains many blocks.
 
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt;
 use std::time::Duration;
 
-use cgmath::Vector3;
+use euclid::{vec3, Vector3D};
 
 use crate::behavior::{self, BehaviorSet};
 use crate::block::{Block, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED};
@@ -18,8 +18,9 @@ use crate::inv::EphemeralOpaque;
 use crate::listen::{Listen, Listener, Notifier};
 use crate::math::{
     Cube, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridRotation, Gridgid, NotNan,
-    Rgb,
+    Rgb, VectorOps,
 };
+use crate::physics::Acceleration;
 use crate::time;
 use crate::transaction::{Merge, Transaction as _};
 use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
@@ -812,7 +813,7 @@ pub struct SpacePhysics {
     /// Gravity vector for moving objects, in cubes/s².
     ///
     /// TODO: Expand this to an enum which allows non-uniform gravity patterns.
-    pub gravity: Vector3<NotNan<FreeCoordinate>>,
+    pub gravity: Vector3D<NotNan<FreeCoordinate>, Acceleration>,
 
     /// Color of light arriving from outside the space, used for light calculation
     /// and rendering.
@@ -827,7 +828,7 @@ pub struct SpacePhysics {
 
 impl SpacePhysics {
     pub(crate) const DEFAULT: Self = Self {
-        gravity: Vector3::new(notnan!(0.), notnan!(-20.), notnan!(0.)),
+        gravity: vec3(notnan!(0.), notnan!(-20.), notnan!(0.)),
         sky_color: DAY_SKY_COLOR,
         light: LightPhysics::DEFAULT,
     };
@@ -835,7 +836,7 @@ impl SpacePhysics {
     /// Recommended defaults for spaces which are going to define a [`Block`]'s voxels.
     /// In particular, disables light since it will not be used.
     pub const DEFAULT_FOR_BLOCK: Self = Self {
-        gravity: Vector3::new(notnan!(0.), notnan!(0.), notnan!(0.)),
+        gravity: vec3(notnan!(0.), notnan!(0.), notnan!(0.)),
         sky_color: rgb_const!(0.5, 0.5, 0.5),
         light: LightPhysics::None,
     };
@@ -870,7 +871,7 @@ impl Default for SpacePhysics {
 impl<'a> arbitrary::Arbitrary<'a> for SpacePhysics {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self {
-            gravity: Vector3::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
+            gravity: vec3(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
             sky_color: u.arbitrary()?,
             light: u.arbitrary()?,
         })

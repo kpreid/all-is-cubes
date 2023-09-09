@@ -6,7 +6,8 @@ use std::io;
 use crossterm::style::{Color, Colors, SetColors};
 use crossterm::QueueableCommand as _;
 
-use all_is_cubes::cgmath::{InnerSpace, Vector2};
+use all_is_cubes::camera::ImagePixel;
+use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::math::{Rgb, Rgba};
 
 use super::options::{CharacterMode, ColorMode};
@@ -14,7 +15,7 @@ use super::{TextAndColor, TextRayImage};
 
 pub(super) fn image_patch_to_character(
     image: &TextRayImage,
-    char_pos: Vector2<usize>,
+    char_pos: Vector2D<usize, ImagePixel>,
 ) -> (&str, Colors) {
     let options = &image.options;
     // This match's `get_patch()` calls must match TerminalOptions::rays_per_character.
@@ -115,9 +116,7 @@ pub(super) fn image_patch_to_character(
             let braille_dot_bit = |(_, color): &TextAndColor, number_z: usize| -> usize {
                 if let Some(color) = color {
                     let threshold = ((number_z as f32
-                        + char_pos
-                            .map(|c| c as f32)
-                            .dot(Vector2::new(284.1834, 100.2384)))
+                        + char_pos.to_f32().dot(Vector2D::new(284.1834, 100.2384)))
                     .rem_euclid(8.0)
                         + 0.5)
                         / 8.0;
@@ -285,12 +284,13 @@ fn fallback_measure_str(text: &str) -> u16 {
 mod tests {
     use super::*;
     use crate::terminal::{TerminalOptions, TextAndColor};
-    use all_is_cubes::camera::Viewport;
+    use all_is_cubes::camera::{ImageSize, Viewport};
+    use all_is_cubes::euclid::vec2;
     use all_is_cubes::raytracer::RaytraceInfo;
 
     fn test_image(
         options: TerminalOptions,
-        dimensions: Vector2<u32>,
+        dimensions: ImageSize,
         characters: impl IntoIterator<Item = char>,
         colors: impl IntoIterator<Item = Rgba>,
     ) -> TextRayImage {
@@ -314,7 +314,7 @@ mod tests {
         //let reset = Colors::new(Color::Reset, Color::Reset);
         (0..image.viewport.framebuffer_size.x as usize)
             .map(|x| {
-                let (text, _color) = image_patch_to_character(image, Vector2::new(x, y));
+                let (text, _color) = image_patch_to_character(image, Vector2D::new(x, y));
                 //assert_eq!(color, reset);
                 text
             })
@@ -334,7 +334,7 @@ mod tests {
             .map(|v| Rgba::from_luminance(v / 5.0));
         let image = &test_image(
             mode_no_color(CharacterMode::Shades),
-            Vector2::new(colors.len() as u32, 1),
+            vec2(colors.len() as u32, 1),
             std::iter::repeat('*'),
             colors,
         );
@@ -348,7 +348,7 @@ mod tests {
             .map(|v| Rgba::from_luminance(v / 5.0));
         let image = &test_image(
             mode_no_color(CharacterMode::Split),
-            Vector2::new(colors.len() as u32, 2),
+            vec2(colors.len() as u32, 2),
             std::iter::repeat('*'),
             colors.into_iter().chain(colors), // 2 rows of same color
         );
@@ -362,7 +362,7 @@ mod tests {
             .map(|v| Rgba::from_luminance(v / 5.0));
         let image = &test_image(
             mode_no_color(CharacterMode::Shapes),
-            Vector2::new(colors.len() as u32, 2),
+            vec2(colors.len() as u32, 2),
             std::iter::repeat('*'),
             colors.into_iter().chain(colors), // 2 rows of same color
         );
@@ -376,7 +376,7 @@ mod tests {
             .map(|v| Rgba::from_luminance(v / 5.0));
         let image = &test_image(
             mode_no_color(CharacterMode::Shapes),
-            Vector2::new(colors.len() as u32, 2),
+            vec2(colors.len() as u32, 2),
             std::iter::repeat('*'),
             [Rgba::BLACK; 10].into_iter().chain(colors), // black above ramp
         );

@@ -4,11 +4,13 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex, Weak};
 
 use all_is_cubes::camera::{Camera, Flaws};
-use all_is_cubes::cgmath::{EuclideanSpace, Point3, Vector3};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{Listen as _, Listener};
-use all_is_cubes::math::{Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, Rgb};
+use all_is_cubes::math::{
+    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, Rgb,
+    VectorOps,
+};
 use all_is_cubes::space::{Space, SpaceChange};
 use all_is_cubes::time;
 use all_is_cubes::universe::URef;
@@ -351,7 +353,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             if !range.is_empty() {
                 set_buffers(render_pass, buffers);
                 let id = u32::try_from(instance_data.len()).unwrap();
-                instance_data.push(WgpuInstanceData::new(p.bounds().lower_bounds().to_vec()));
+                instance_data.push(WgpuInstanceData::new(p.bounds().lower_bounds().to_vector()));
                 render_pass.draw_indexed(to_wgpu_index_range(range.clone()), 0, id..(id + 1));
                 *squares_drawn += range.len() / 6;
             }
@@ -450,14 +452,15 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 for i in 1..CHUNK_SIZE {
                     let mut push = |p| {
                         v.push(WgpuLinesVertex::from_position_color(
-                            ft.transform_point(p).map(FreeCoordinate::from) + chunk_origin.to_vec(),
+                            ft.transform_point(p).map(FreeCoordinate::from)
+                                + chunk_origin.to_vector(),
                             palette::DEBUG_CHUNK_MINOR,
                         ));
                     };
-                    push(Point3::new(i, 0, 0));
-                    push(Point3::new(i, CHUNK_SIZE, 0));
-                    push(Point3::new(0, i, 0));
-                    push(Point3::new(CHUNK_SIZE, i, 0));
+                    push(GridPoint::new(i, 0, 0));
+                    push(GridPoint::new(i, CHUNK_SIZE, 0));
+                    push(GridPoint::new(0, i, 0));
+                    push(GridPoint::new(CHUNK_SIZE, i, 0));
                 }
             }
         }
@@ -698,7 +701,7 @@ impl SpaceLightTexture {
         self.texture_bounds.volume()
     }
 
-    fn light_lookup_offset(&self) -> Vector3<i32> {
-        -self.texture_bounds.lower_bounds().to_vec()
+    fn light_lookup_offset(&self) -> GridVector {
+        -self.texture_bounds.lower_bounds().to_vector()
     }
 }

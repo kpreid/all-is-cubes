@@ -1,16 +1,18 @@
 use std::fmt;
 
-use cgmath::{ElementWise, EuclideanSpace as _, InnerSpace, Vector3};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::prelude::{Drawable, Primitive};
 use embedded_graphics::primitives::{Circle, Line, PrimitiveStyleBuilder};
+use euclid::vec3;
 use exhaust::Exhaust;
 
 use crate::block::{Block, Resolution::*, AIR, AIR_EVALUATED};
 use crate::content::load_image::{default_srgb, include_image, space_from_image};
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
-use crate::math::{Face6, FreeCoordinate, GridCoordinate, GridRotation, GridVector, Gridgid, Rgba};
+use crate::math::{
+    Face6, FreeCoordinate, GridCoordinate, GridRotation, GridVector, Gridgid, Rgba, VectorOps,
+};
 use crate::space::Space;
 use crate::universe::Universe;
 
@@ -241,9 +243,9 @@ impl Icons {
                             let centered_p =
                                 cube.midpoint().map(|c| c - f64::from(resolution) / 2.0);
                             let r4 = centered_p
-                                .to_vec()
-                                .mul_element_wise(Vector3::new(1., 0., 1.))
-                                .magnitude2()
+                                .to_vector()
+                                .component_mul(vec3(1., 0., 1.))
+                                .square_length()
                                 .powi(2);
                             if r4 <= shape_radius.powi(4) {
                                 if block == &shell_block

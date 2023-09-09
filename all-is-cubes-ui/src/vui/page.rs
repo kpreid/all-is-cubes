@@ -4,11 +4,11 @@ use std::sync::Arc;
 use all_is_cubes::block::AIR;
 use all_is_cubes::block::{Block, BlockAttributes, Resolution};
 use all_is_cubes::camera;
-use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{mono_font::iso_8859_1 as font, text::TextStyle};
 use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgba};
+use all_is_cubes::euclid::{vec2, Vector2D};
+use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgba};
 use all_is_cubes::space::{Space, SpaceBuilder, SpacePhysics};
 use all_is_cubes::time;
 use all_is_cubes::transaction;
@@ -26,7 +26,7 @@ use crate::vui::{
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct UiSize {
     /// Two-dimensional size; individual pages may have their own choices of depth.
-    size: Vector2<GridCoordinate>,
+    size: Vector2D<GridCoordinate, Cube>,
 }
 
 impl UiSize {
@@ -45,7 +45,7 @@ impl UiSize {
             .max(8);
         let height = height / 2 * 2 + 1; // ensure odd
         Self {
-            size: Vector2::new(width, height),
+            size: vec2(width, height),
         }
     }
 
@@ -61,7 +61,7 @@ impl UiSize {
     // TODO: validate this doesn't crash on wonky sizes.
     pub(crate) fn create_space(self) -> Space {
         let bounds = self.space_bounds();
-        let Vector2 { x: w, y: h } = self.size;
+        let Vector2D { x: w, y: h, .. } = self.size;
         let mut space = Space::builder(bounds)
             .physics({
                 let mut physics = SpacePhysics::default();
@@ -211,8 +211,7 @@ mod tests {
             vec![([800, 600], [25, 19]), ([1000, 600], [25, 15])];
         let mut failed = 0;
         for (nominal_viewport, expected_size) in cases {
-            let actual_size =
-                UiSize::new(camera::Viewport::with_scale(1.0, nominal_viewport.into())).size;
+            let actual_size = UiSize::new(camera::Viewport::with_scale(1.0, nominal_viewport)).size;
             let actual_size: [i32; 2] = actual_size.into();
             if actual_size != expected_size {
                 println!("{nominal_viewport:?} expected to produce {expected_size:?}; got {actual_size:?}");

@@ -2,12 +2,11 @@ use std::sync::mpsc::TryRecvError;
 use std::sync::{mpsc, Arc, Mutex};
 
 use all_is_cubes::camera::{FogOption, GraphicsOptions, UiViewState, ViewTransform, Viewport};
-use all_is_cubes::cgmath::{Angle as _, Decomposed, Deg, One, Transform, Vector3};
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::inv::{EphemeralOpaque, Tool, ToolError, ToolInput};
 use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier};
 use all_is_cubes::math::FreeCoordinate;
-use all_is_cubes::math::NotNan;
+use all_is_cubes::math::{FreeVector, NotNan};
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
@@ -211,9 +210,9 @@ impl Vui {
             view_transform: match space.as_ref() {
                 Some(space) => Self::view_transform(
                     &space.read().unwrap(), // TODO: eliminate this unwrap
-                    all_is_cubes::cgmath::Deg(graphics_options.fov_y.into_inner()),
+                    graphics_options.fov_y.into_inner(),
                 ),
-                None => ViewTransform::one(),
+                None => ViewTransform::identity(),
             },
             space,
             graphics_options,
@@ -225,7 +224,7 @@ impl Vui {
     /// It does not need to be rechecked other than on aspect ratio changes.
     ///
     /// TODO: used to be public before [`UiViewState`]; refactor in light of
-    fn view_transform(space: &Space, fov_y: Deg<FreeCoordinate>) -> ViewTransform {
+    fn view_transform(space: &Space, fov_y_degrees: FreeCoordinate) -> ViewTransform {
         let bounds = space.bounds();
         let mut ui_center = bounds.center();
 
@@ -233,14 +232,11 @@ impl Vui {
         // (at least vertically, as we don't have aspect ratio support yet).
         ui_center.z = 0.0;
 
-        let view_distance = FreeCoordinate::from(bounds.size().y) * (fov_y / 2.).cot() / 2.;
-        Decomposed::look_at_rh(
-            ui_center + Vector3::new(0., 0., view_distance),
-            ui_center,
-            Vector3::new(0., 1., 0.),
+        let view_distance =
+            FreeCoordinate::from(bounds.size().y) / (fov_y_degrees / 2.).to_radians().tan() / 2.;
+        ViewTransform::from_translation(
+            ui_center.to_vector() + FreeVector::new(0., 0., view_distance),
         )
-        .inverse_transform() // Our view transform standard is camera-to-world not world-to-camera
-        .unwrap()
     }
 
     /// Compute graphics options to render the VUI space given the user's regular options.

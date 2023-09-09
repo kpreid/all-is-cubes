@@ -5,26 +5,30 @@
 //! looking for *raytracing*, forming an image from many rays, that’s
 //! [`all_is_cubes::raytracer`](crate::raytracer).
 
-use cgmath::{EuclideanSpace as _, InnerSpace as _, Point3, Vector3, Zero as _};
+use euclid::Vector3D;
 
 use crate::math::{
-    Axis, Cube, CubeFace, Face7, FreeCoordinate, Geometry, GridAab, GridCoordinate, GridPoint,
-    LineVertex,
+    Axis, Cube, CubeFace, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab,
+    GridCoordinate, GridPoint, GridVector, LineVertex, VectorOps,
 };
+
+/// Vector unit type for units of "t" (ray-length).
+enum Tc {}
 
 /// A ray; a half-infinite line segment (sometimes used as finite by the length of the
 /// direction vector).
 #[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ray {
+    // TODO(euclid migration): should we expose the coordinate unit generic?
     /// The sole endpoint of the ray.
-    pub origin: Point3<FreeCoordinate>,
+    pub origin: FreePoint,
 
     /// The direction in which the ray extends infinitely.
     ///
     /// The meaning, if any, of the magnitude of this vector depends on context;
     /// considered as a geometric object it is a parameter.
-    pub direction: Vector3<FreeCoordinate>,
+    pub direction: FreeVector,
 }
 
 impl Ray {
@@ -32,21 +36,18 @@ impl Ray {
     /// Other than the use of [`Into`], this is equivalent to a struct literal.
     ///
     /// ```
-    /// use all_is_cubes::cgmath::{Point3, Vector3};
+    /// use all_is_cubes::euclid::{point3, vec3};
     /// use all_is_cubes::raycast::Ray;
     ///
     /// assert_eq!(
-    ///     Ray::new((1., 2., 3.,), (4., 5., 6.,)),
+    ///     Ray::new([1., 2., 3.], [4., 5., 6.]),
     ///     Ray {
-    ///         origin: Point3::new(1., 2., 3.),
-    ///         direction: Vector3::new(4., 5., 6.),
+    ///         origin: point3(1., 2., 3.),
+    ///         direction: vec3(4., 5., 6.),
     ///     }
     /// );
     /// ```
-    pub fn new(
-        origin: impl Into<Point3<FreeCoordinate>>,
-        direction: impl Into<Vector3<FreeCoordinate>>,
-    ) -> Self {
+    pub fn new(origin: impl Into<FreePoint>, direction: impl Into<FreeVector>) -> Self {
         Self {
             origin: origin.into(),
             direction: direction.into(),
@@ -79,13 +80,13 @@ impl Ray {
     ///
     /// This only makes sense in contexts which are specifically using the length of the
     /// direction vector as a distance.
-    pub(crate) fn unit_endpoint(self) -> Point3<FreeCoordinate> {
+    pub(crate) fn unit_endpoint(self) -> FreePoint {
         self.origin + self.direction
     }
 
     fn advance(self, t: FreeCoordinate) -> Self {
         Self {
-            origin: self.origin + t * self.direction,
+            origin: self.origin + self.direction * t,
             direction: self.direction,
         }
     }
@@ -94,7 +95,7 @@ impl Ray {
 impl Geometry for Ray {
     type Coord = FreeCoordinate;
 
-    fn translate(self, offset: Vector3<FreeCoordinate>) -> Self {
+    fn translate(self, offset: FreeVector) -> Self {
         Self {
             origin: self.origin + offset,
             ..self
@@ -145,20 +146,21 @@ pub struct Raycaster {
     emit_current: bool,
 
     /// Cube we're in; always the next cube to return from the iterator.
-    /// This is stored as a `GridPoint` for easier arithmetic on it.
+    ///
+    /// This is stored as a [`GridPoint`], not a [`Cube`], for easier arithmetic on it.
     cube: GridPoint,
 
     /// Which way to increment `cube` when stepping; signum of `direction`.
-    step: Vector3<GridCoordinate>,
+    step: Vector3D<GridCoordinate, Cube>,
 
     /// t_max stores the t-value at which we would next cross a cube boundary,
     /// for each axis in which we could move. Thus, the least element of t_max
     /// is the next intersection between the grid and the ray.
-    t_max: Vector3<FreeCoordinate>,
+    t_max: Vector3D<FreeCoordinate, Tc>,
 
     /// The change in t when taking a full grid step along a given axis.
     /// Always positive; partially infinite if axis-aligned.
-    t_delta: Vector3<FreeCoordinate>,
+    t_delta: Vector3D<FreeCoordinate, Tc>,
 
     /// Last face we passed through.
     last_face: Face7,
@@ -171,7 +173,7 @@ pub struct Raycaster {
     ///
     /// Stored as ranges rather than [`GridAab`] because we need to work with only the
     /// upper bound and not the size. (TODO: Maybe `GridAab` should do that too?)
-    bounds: Option<Vector3<std::ops::Range<GridCoordinate>>>,
+    bounds: Option<Vector3D<std::ops::Range<GridCoordinate>, Cube>>,
 }
 
 impl Raycaster {
@@ -188,7 +190,7 @@ impl Raycaster {
     /// use all_is_cubes::math::Cube;
     /// use all_is_cubes::raycast::Raycaster;
     ///
-    /// let mut r = Raycaster::new((0.5, 0.5, 0.5), (1.0, 0.5, 0.0));
+    /// let mut r = Raycaster::new([0.5, 0.5, 0.5], [1.0, 0.5, 0.0]);
     /// let mut next = || r.next().unwrap();
     ///
     /// // The cube containing the origin point is always the first cube reported.
@@ -198,14 +200,11 @@ impl Raycaster {
     /// assert_eq!(next().cube_ahead(), Cube::new(2, 1, 0));
     /// ```
     #[must_use]
-    pub fn new(
-        origin: impl Into<Point3<FreeCoordinate>>,
-        direction: impl Into<Vector3<FreeCoordinate>>,
-    ) -> Self {
+    pub fn new(origin: impl Into<FreePoint>, direction: impl Into<FreeVector>) -> Self {
         Self::new_impl(origin.into(), direction.into())
     }
 
-    fn new_impl(origin: Point3<FreeCoordinate>, mut direction: Vector3<FreeCoordinate>) -> Self {
+    fn new_impl(origin: FreePoint, mut direction: FreeVector) -> Self {
         // A ray whose direction vector is infinite — or very large — cannot be processed
         // correctly because we rely on discriminating between different `t` values
         // (distance in units of the direction vector) to choose the correct next cube.
@@ -213,11 +212,10 @@ impl Raycaster {
         // (We cannot simply rescale the direction vector because that would change the
         // reported `t` outputs.)
         // TODO: Define better threshold value.
-        if !direction[..]
-            .iter()
+        if !vec_iter(direction)
             .all(|d| d.abs().partial_cmp(&1e100) == Some(std::cmp::Ordering::Less))
         {
-            direction = Vector3::zero();
+            direction = Vector3D::zero();
         }
 
         // If there is no enclosing cube then the current cube is undefined so we cannot make
@@ -236,8 +234,11 @@ impl Raycaster {
             emit_current: true,
             cube,
             step: direction.map(signum_101),
-            t_max: origin.to_vec().zip(direction, scale_to_integer_step),
-            t_delta: direction.map(|x| x.abs().recip()),
+            t_max: origin
+                .to_vector()
+                .zip(direction, scale_to_integer_step)
+                .cast_unit(),
+            t_delta: direction.map(|x| x.abs().recip()).cast_unit(),
             last_face: Face7::Within,
             last_t_distance: 0.0,
             bounds: None,
@@ -248,12 +249,12 @@ impl Raycaster {
     /// This is used when numeric overflow prevents success.
     fn new_empty() -> Self {
         Self {
-            ray: Ray::new(Point3::origin(), Vector3::zero()),
+            ray: Ray::new(FreePoint::origin(), FreeVector::zero()),
             emit_current: false,
             cube: GridPoint::origin(),
-            step: Vector3::zero(),
-            t_max: Vector3::zero(),
-            t_delta: Vector3::new(f64::INFINITY, f64::INFINITY, f64::INFINITY),
+            step: Vector3D::zero(),
+            t_max: Vector3D::zero(),
+            t_delta: Vector3D::new(f64::INFINITY, f64::INFINITY, f64::INFINITY),
             last_face: Face7::Within,
             last_t_distance: 0.0,
             bounds: None,
@@ -276,7 +277,7 @@ impl Raycaster {
     /// TODO: This function was added for the needs of the raytracer. Think about API design more.
     pub(crate) fn set_bounds(&mut self, bounds: GridAab) {
         if self.bounds.is_none() {
-            self.bounds = Some(Vector3::new(
+            self.bounds = Some(Vector3D::new(
                 bounds.x_range(),
                 bounds.y_range(),
                 bounds.z_range(),
@@ -307,23 +308,23 @@ impl Raycaster {
         // t_max stores the t-value at which we cross a cube boundary along the
         // X axis, per component. Therefore, choosing the least t_max axis
         // chooses the closest cube boundary.
-        let axis: usize = if self.t_max.x < self.t_max.y {
+        let axis: Axis = if self.t_max.x < self.t_max.y {
             if self.t_max.x < self.t_max.z {
-                0 /* x */
+                Axis::X
             } else {
-                2 /* z */
+                Axis::Z
             }
         } else {
             if self.t_max.y < self.t_max.z {
-                1 /* y */
+                Axis::Y
             } else {
-                2 /* z */
+                Axis::Z
             }
         };
 
         assert!(
             self.step[axis] != 0,
-            "step on axis {axis} which is zero; state = {self:#?}"
+            "step on axis {axis:X} which is zero; state = {self:#?}"
         );
 
         // Save t position before we update it.
@@ -354,11 +355,11 @@ impl Raycaster {
     #[inline(always)]
     fn valid_for_stepping(&self) -> bool {
         // If all stepping directions are 0, then we cannot make progress.
-        self.step != Vector3::zero()
+        self.step != Vector3D::zero()
         // Also check if we had some kind of arithmetic problem in the state.
         // But permit some positive infinity, because that's just an axis-aligned ray.
-        && !self.t_max[..].iter().any(|t| t.is_nan())
-        && self.t_max[..].iter().any(|t| t.is_finite())
+        && !vec_iter(self.t_max).any(|t| t.is_nan())
+        && vec_iter(self.t_max).any(|t| t.is_finite())
     }
 
     /// Returns whether `self.cube` is outside of `self.bounds`.
@@ -401,9 +402,9 @@ impl Raycaster {
         // Find the point which is the origin of all three planes that we want to
         // intersect with. (Strictly speaking, this could be combined with the next
         // loop, but it seems more elegant to have a well-defined point.)
-        let plane_origin = {
+        let plane_origin: GridPoint = {
             let bounds = self.bounds.as_ref().unwrap();
-            let mut plane_origin = Point3::new(0, 0, 0);
+            let mut plane_origin = GridPoint::new(0, 0, 0);
             for axis in Axis::ALL {
                 if self.step[axis] < 0 {
                     // Iff the ray is going negatively, then we must use the upper bound
@@ -420,12 +421,12 @@ impl Raycaster {
         // Perform intersections.
         let mut max_t: FreeCoordinate = 0.0;
         for axis in Axis::ALL {
-            let mut plane_normal = Vector3::zero();
             let direction = self.step[axis];
             if direction == 0 {
                 // Parallel ray; no intersection.
                 continue;
             }
+            let mut plane_normal = Vector3D::zero();
             plane_normal[axis] = direction;
             let intersection_t = ray_plane_intersection(self.ray, plane_origin, plane_normal);
             max_t = max_t.max(intersection_t);
@@ -434,7 +435,7 @@ impl Raycaster {
         // TODO: Right test?
         if max_t > self.last_t_distance {
             // Go forward to half a cube behind where we think we found the intersection point.
-            let t_start = max_t - 0.5 / self.ray.direction.magnitude();
+            let t_start = max_t - 0.5 / self.ray.direction.length();
             let t_start = if t_start.is_finite() { t_start } else { max_t };
             let ff_ray = self.ray.advance(t_start);
 
@@ -455,8 +456,9 @@ impl Raycaster {
                 // t_max is done the same as in new(), except with an offset
                 t_max: ff_ray
                     .origin
-                    .to_vec()
+                    .to_vector()
                     .zip(ff_ray.direction, scale_to_integer_step)
+                    .cast_unit()
                     .map(|t| t + t_start),
                 last_t_distance: t_start,
 
@@ -528,7 +530,7 @@ pub struct RaycastStep {
     cube_face: CubeFace,
     /// The distance traversed, as measured in multiples of the supplied direction vector.
     t_distance: FreeCoordinate,
-    t_max: Vector3<FreeCoordinate>,
+    t_max: Vector3D<FreeCoordinate, Tc>,
 }
 
 impl RaycastStep {
@@ -611,24 +613,24 @@ impl RaycastStep {
     /// no more than +1.0 different.
     ///
     /// ```
-    /// use all_is_cubes::cgmath::Point3;
+    /// use all_is_cubes::euclid::point3;
     /// use all_is_cubes::raycast::Ray;
     ///
-    /// let ray = Ray::new((0.5, 0.5, 0.5), (1.0, 0.0, 0.0));
+    /// let ray = Ray::new([0.5, 0.5, 0.5], [1.0, 0.0, 0.0]);
     /// let mut raycaster = ray.cast();
     /// let mut next = || raycaster.next().unwrap().intersection_point(ray);
     ///
     /// // First intersection is the interior of the origin cube.
-    /// assert_eq!(next(), Point3::new(0.5, 0.5, 0.5));
-    /// assert_eq!(next(), Point3::new(1.0, 0.5, 0.5));
-    /// assert_eq!(next(), Point3::new(2.0, 0.5, 0.5));
+    /// assert_eq!(next(), point3(0.5, 0.5, 0.5));
+    /// assert_eq!(next(), point3(1.0, 0.5, 0.5));
+    /// assert_eq!(next(), point3(2.0, 0.5, 0.5));
     /// ```
-    pub fn intersection_point(&self, ray: Ray) -> Point3<FreeCoordinate> {
+    pub fn intersection_point(&self, ray: Ray) -> FreePoint {
         let current_face_axis = self.cube_face.face.axis();
         if current_face_axis.is_none() {
             ray.origin
         } else {
-            let mut intersection_point =
+            let mut intersection_point: FreePoint =
                 self.cube_face.cube.lower_bounds().map(FreeCoordinate::from);
             for axis in Axis::ALL {
                 let step_direction = signum_101(ray.direction[axis]);
@@ -654,6 +656,10 @@ impl RaycastStep {
             intersection_point
         }
     }
+}
+
+fn vec_iter<T, U>(v: Vector3D<T, U>) -> impl Iterator<Item = T> {
+    Into::<[T; 3]>::into(v).into_iter()
 }
 
 /// 3-valued signum (zero produces zero) rather than the 2-valued one Rust gives,
@@ -699,10 +705,10 @@ pub fn scale_to_integer_step(mut s: FreeCoordinate, mut ds: FreeCoordinate) -> F
 fn ray_plane_intersection(
     ray: Ray,
     plane_origin: GridPoint,
-    plane_normal: Vector3<GridCoordinate>,
+    plane_normal: GridVector,
 ) -> FreeCoordinate {
-    let plane_origin = plane_origin.map(FreeCoordinate::from);
-    let plane_normal = plane_normal.map(FreeCoordinate::from);
+    let plane_origin: FreePoint = plane_origin.map(FreeCoordinate::from);
+    let plane_normal: FreeVector = plane_normal.map(FreeCoordinate::from);
     let relative_position = plane_origin - ray.origin;
 
     // Compute the intersection 't' value.
@@ -711,10 +717,9 @@ fn ray_plane_intersection(
 
 #[cfg(test)]
 mod tests {
-    use crate::math::{Aab, FaceMap};
-
     use super::*;
-    use cgmath::Vector3;
+    use crate::math::{Aab, FaceMap};
+    use euclid::{point3, vec3, Point3D};
     use rand::SeedableRng as _;
 
     /// Alternative to [`RaycastStep`] which contains optional data so partial assertions
@@ -724,7 +729,7 @@ mod tests {
         cube: Cube,
         face: Face7,
         t_distance: Option<FreeCoordinate>,
-        intersection_point: Option<Point3<FreeCoordinate>>,
+        intersection_point: Option<FreePoint>,
     }
 
     impl TestStep {
@@ -802,10 +807,7 @@ mod tests {
     fn simple_almost_1d() {
         // Testing all six directions to ensure the axis selection logic picks the correct one
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(0.01, 0.0001, 0.0001),
-            ),
+            &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(0.01, 0.0001, 0.0001)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(11, 20, 30, Face7::NX, 50.0),
@@ -813,10 +815,7 @@ mod tests {
             ],
         );
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(-0.01, 0.0001, 0.0001),
-            ),
+            &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(-0.01, 0.0001, 0.0001)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(9, 20, 30, Face7::PX, 50.0),
@@ -824,10 +823,7 @@ mod tests {
             ],
         );
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(0.0001, 0.01, 0.0001),
-            ),
+            &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(0.0001, 0.01, 0.0001)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(10, 21, 30, Face7::NY, 50.0),
@@ -835,10 +831,7 @@ mod tests {
             ],
         );
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(0.0001, -0.01, 0.0001),
-            ),
+            &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(0.0001, -0.01, 0.0001)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(10, 19, 30, Face7::PY, 50.0),
@@ -846,10 +839,7 @@ mod tests {
             ],
         );
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(0.0001, 0.0001, 0.01),
-            ),
+            &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(0.0001, 0.0001, 0.01)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(10, 20, 31, Face7::NZ, 50.0),
@@ -857,10 +847,7 @@ mod tests {
             ],
         );
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(0.0001, 0.0001, -0.01),
-            ),
+            &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(0.0001, 0.0001, -0.01)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(10, 20, 29, Face7::PZ, 50.0),
@@ -873,7 +860,7 @@ mod tests {
     fn simple_exactly_1d() {
         // Not testing all six directions because other tests cover that
         assert_steps(
-            &mut Raycaster::new(Point3::new(10.5, 20.5, 30.5), Vector3::new(0.01, 0.0, 0.0)),
+            &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(0.01, 0.0, 0.0)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(11, 20, 30, Face7::NX, 50.0),
@@ -881,7 +868,7 @@ mod tests {
             ],
         );
         assert_steps(
-            &mut Raycaster::new(Point3::new(10.5, 20.5, 30.5), Vector3::new(-0.01, 0.0, 0.0)),
+            &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(-0.01, 0.0, 0.0)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(9, 20, 30, Face7::PX, 50.0),
@@ -893,7 +880,7 @@ mod tests {
     #[test]
     fn direction_zero_produces_origin_cube_only() {
         assert_only_one_step(
-            &mut Raycaster::new(Point3::new(10.5, 20.5, 30.5), Vector3::zero()),
+            &mut Raycaster::new(point3(10.5, 20.5, 30.5), Vector3D::zero()),
             step(10, 20, 30, Face7::Within, 0.0),
         );
     }
@@ -901,7 +888,7 @@ mod tests {
     #[test]
     fn direction_negative_zero_produces_origin_cube_only() {
         assert_only_one_step(
-            &mut Raycaster::new(Point3::new(10.5, 20.5, 30.5), Vector3::zero()),
+            &mut Raycaster::new(point3(10.5, 20.5, 30.5), Vector3D::zero()),
             step(10, 20, 30, Face7::Within, 0.0),
         );
     }
@@ -910,8 +897,8 @@ mod tests {
     fn direction_nan_produces_origin_cube_only() {
         assert_only_one_step(
             &mut Raycaster::new(
-                Point3::new(10.5, 20.5, 30.5),
-                Vector3::new(1.0, 2.0, FreeCoordinate::NAN),
+                point3(10.5, 20.5, 30.5),
+                vec3(1.0, 2.0, FreeCoordinate::NAN),
             ),
             step(10, 20, 30, Face7::Within, 0.0),
         );
@@ -923,7 +910,7 @@ mod tests {
     fn start_on_cube_edge_parallel() {
         // Positive origin, positive direction
         assert_steps(
-            &mut Raycaster::new(Point3::new(10.0, 20.5, 30.5), Vector3::new(2.0, 0.1, 0.1)),
+            &mut Raycaster::new(point3(10.0, 20.5, 30.5), vec3(2.0, 0.1, 0.1)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(11, 20, 30, Face7::NX, 0.5),
@@ -932,7 +919,7 @@ mod tests {
         );
         // Positive origin, negative direction
         assert_steps(
-            &mut Raycaster::new(Point3::new(10.0, 20.5, 30.5), Vector3::new(-2.0, 0.1, 0.1)),
+            &mut Raycaster::new(point3(10.0, 20.5, 30.5), vec3(-2.0, 0.1, 0.1)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(9, 20, 30, Face7::PX, 0.5),
@@ -941,7 +928,7 @@ mod tests {
         );
         // Negative origin, positive direction
         assert_steps(
-            &mut Raycaster::new(Point3::new(-10.0, 20.5, 30.5), Vector3::new(2.0, 0.1, 0.1)),
+            &mut Raycaster::new(point3(-10.0, 20.5, 30.5), vec3(2.0, 0.1, 0.1)),
             vec![
                 step(-10, 20, 30, Face7::Within, 0.0),
                 step(-9, 20, 30, Face7::NX, 0.5),
@@ -950,7 +937,7 @@ mod tests {
         );
         // Negative origin, negative direction
         assert_steps(
-            &mut Raycaster::new(Point3::new(-10.0, 20.5, 30.5), Vector3::new(-2.0, 0.1, 0.1)),
+            &mut Raycaster::new(point3(-10.0, 20.5, 30.5), vec3(-2.0, 0.1, 0.1)),
             vec![
                 step(-10, 20, 30, Face7::Within, 0.0),
                 step(-11, 20, 30, Face7::PX, 0.5),
@@ -965,7 +952,7 @@ mod tests {
     fn start_on_cube_edge_perpendicular() {
         // Positive origin, positive direction
         assert_steps(
-            &mut Raycaster::new(Point3::new(10.0, 20.5, 30.5), Vector3::new(0.125, 1.0, 0.0)),
+            &mut Raycaster::new(point3(10.0, 20.5, 30.5), vec3(0.125, 1.0, 0.0)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(10, 21, 30, Face7::NY, 0.5),
@@ -974,10 +961,7 @@ mod tests {
         );
         // Positive origin, negative direction
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(10.0, 20.5, 30.5),
-                Vector3::new(-0.125, -1.0, 0.0),
-            ),
+            &mut Raycaster::new(point3(10.0, 20.5, 30.5), vec3(-0.125, -1.0, 0.0)),
             vec![
                 step(10, 20, 30, Face7::Within, 0.0),
                 step(10, 19, 30, Face7::PY, 0.5),
@@ -986,10 +970,7 @@ mod tests {
         );
         // Negative origin, positive direction
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(-10.0, -20.5, 30.5),
-                Vector3::new(0.125, 1.0, 0.0),
-            ),
+            &mut Raycaster::new(point3(-10.0, -20.5, 30.5), vec3(0.125, 1.0, 0.0)),
             vec![
                 step(-10, -21, 30, Face7::Within, 0.0),
                 step(-10, -20, 30, Face7::NY, 0.5),
@@ -998,10 +979,7 @@ mod tests {
         );
         // Negative origin, negative direction
         assert_steps(
-            &mut Raycaster::new(
-                Point3::new(-10.0, -20.5, 30.5),
-                Vector3::new(-0.125, -1.0, 0.0),
-            ),
+            &mut Raycaster::new(point3(-10.0, -20.5, 30.5), vec3(-0.125, -1.0, 0.0)),
             vec![
                 step(-10, -21, 30, Face7::Within, 0.0),
                 step(-10, -22, 30, Face7::PY, 0.5),
@@ -1035,9 +1013,7 @@ mod tests {
     #[test]
     fn start_outside_of_integer_range_with_bounds() {
         let bounds = GridAab::from_lower_size([0, 0, 0], [10, 10, 10]);
-        assert_no_steps(
-            Raycaster::new(Point3::new(0., 1e303, 0.), Vector3::new(0., -1e303, 0.)).within(bounds),
-        );
+        assert_no_steps(Raycaster::new(point3(0., 1e303, 0.), vec3(0., -1e303, 0.)).within(bounds));
     }
 
     /// If we start inside the range of `GridCoordinate`s and exit, this should
@@ -1069,7 +1045,7 @@ mod tests {
     #[test]
     fn within_bounds() {
         // Ray oriented diagonally on the -X side of bounds that are short on the X axis.
-        let mut r = Raycaster::new(Point3::new(0.0, -0.25, -0.5), Vector3::new(1.0, 1.0, 1.0))
+        let mut r = Raycaster::new(point3(0.0, -0.25, -0.5), vec3(1.0, 1.0, 1.0))
             .within(GridAab::from_lower_size([2, -10, -10], [2, 20, 20]));
         assert_steps_option(
             &mut r,
@@ -1094,8 +1070,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "not implemented: multiple uses of .within()")]
     fn within_twice() {
-        let bounds = GridAab::from_lower_size(Point3::new(2, -10, -10), [2, 20, 20]);
-        let _ = Raycaster::new(Point3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 1.0, 1.0))
+        let bounds = GridAab::from_lower_size(GridPoint::new(2, -10, -10), [2, 20, 20]);
+        let _ = Raycaster::new(point3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0))
             .within(bounds)
             .within(bounds);
     }
@@ -1110,8 +1086,8 @@ mod tests {
     fn regression_test_1() {
         assert_steps(
             &mut Raycaster::new(
-                Point3::new(4.833333333333334, 4.666666666666666, -3.0),
-                Vector3::new(0.0, 0.0, 10.0),
+                point3(4.833333333333334, 4.666666666666666, -3.0),
+                vec3(0.0, 0.0, 10.0),
             ),
             vec![
                 step(4, 4, -3, Face7::Within, 0.0),
@@ -1125,11 +1101,11 @@ mod tests {
     /// which should produce zero steps.
     #[test]
     fn regression_test_2() {
-        let bounds = GridAab::from_lower_size(Point3::new(0, 0, 0), [10, 10, 10]);
+        let bounds = GridAab::from_lower_size(GridPoint::new(0, 0, 0), [10, 10, 10]);
         assert_steps_option(
             &mut Raycaster::new(
-                Point3::new(18.166666666666668, 4.666666666666666, -3.0),
-                Vector3::new(0.0, 0.0, 16.0),
+                point3(18.166666666666668, 4.666666666666666, -3.0),
+                vec3(0.0, 0.0, 16.0),
             )
             .within(bounds),
             vec![None],
@@ -1144,12 +1120,12 @@ mod tests {
     fn regression_long_distance_fast_forward() {
         assert_steps(
             &mut Raycaster::new(
-                Point3::new(
+                point3(
                     6.749300603672869e-67,
                     6.750109954921438e-67,
                     -85891558.96000093,
                 ),
-                Vector3::new(1.1036366354256313e-305, 0.0, 8589152896.000092),
+                vec3(1.1036366354256313e-305, 0.0, 8589152896.000092),
             )
             .within(GridAab::from_lower_upper([-10, -20, -30], [10, 20, 30])),
             vec![step(0, 0, -30, Face7::NZ, 0.010000000000000002)],
@@ -1162,9 +1138,9 @@ mod tests {
         let mut raycaster = ray.cast();
         let mut next = || raycaster.next().unwrap().intersection_point(ray);
 
-        assert_eq!(next(), Point3::new(0.5, 0.5, 0.5));
-        assert_eq!(next(), Point3::new(0.0, 0.5, 0.5));
-        assert_eq!(next(), Point3::new(-1.0, 0.5, 0.5));
+        assert_eq!(next(), Point3D::new(0.5, 0.5, 0.5));
+        assert_eq!(next(), Point3D::new(0.0, 0.5, 0.5));
+        assert_eq!(next(), Point3D::new(-1.0, 0.5, 0.5));
     }
 
     #[test]
@@ -1180,7 +1156,7 @@ mod tests {
                 ray_origins.random_point(&mut rng),
                 Aab::new(-1., 1., -1., 1., -1., 1.)
                     .random_point(&mut rng)
-                    .to_vec(),
+                    .to_vector(),
             );
             let steps: Vec<RaycastStep> = ray.cast().within(bounds).collect();
             match &steps[..] {

@@ -1,6 +1,4 @@
-use cgmath::EuclideanSpace as _;
-
-use crate::math::{Cube, GridMatrix, GridPoint, GridRotation, GridVector};
+use crate::math::{Cube, GridMatrix, GridPoint, GridRotation, GridVector, VectorOps};
 #[cfg(doc)]
 use crate::math::{GridAab, GridCoordinate};
 
@@ -27,14 +25,14 @@ impl Gridgid {
     /// The identity transform, which leaves points unchanged.
     pub const IDENTITY: Self = Self {
         rotation: GridRotation::IDENTITY,
-        translation: GridVector { x: 0, y: 0, z: 0 },
+        translation: GridVector::new(0, 0, 0),
     };
 
     /// For Y-down drawing
     #[doc(hidden)] // used by all-is-cubes-content - TODO: public?
     pub const FLIP_Y: Self = Self {
         rotation: GridRotation::RXyZ,
-        translation: GridVector { x: 0, y: 0, z: 0 },
+        translation: GridVector::new(0, 0, 0),
     };
 
     /// Constructs a [`Gridgid`] that only performs rotation.
@@ -47,7 +45,7 @@ impl Gridgid {
     pub const fn from_rotation_about_origin(rotation: GridRotation) -> Self {
         Self {
             rotation,
-            translation: GridVector { x: 0, y: 0, z: 0 },
+            translation: GridVector::new(0, 0, 0),
         }
     }
 
@@ -72,7 +70,7 @@ impl Gridgid {
     /// [`Gridgid::transform_cube()`] instead.
     #[inline]
     pub fn transform_point(self, point: GridPoint) -> GridPoint {
-        GridPoint::from_vec(self.rotation.transform_vector(point.to_vec()) + self.translation)
+        (self.rotation.transform_vector(point.to_vector()) + self.translation).to_point()
     }
 
     /// Equivalent to temporarily applying an offset of `[0.5, 0.5, 0.5]` while
@@ -129,9 +127,7 @@ impl std::ops::Mul for Gridgid {
         Self {
             // TODO: test this
             rotation: self.rotation * rhs.rotation,
-            translation: self
-                .transform_point(GridPoint::from_vec(rhs.translation))
-                .to_vec(),
+            translation: self.transform_point(rhs.translation.to_point()).to_vector(),
         }
     }
 }
@@ -152,7 +148,6 @@ impl From<Gridgid> for GridMatrix {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cgmath::Transform as _;
     use rand::seq::SliceRandom as _;
     use rand::SeedableRng as _;
     use rand_xoshiro::Xoshiro256Plus;

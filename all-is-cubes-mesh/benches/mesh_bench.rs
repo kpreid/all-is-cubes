@@ -2,7 +2,6 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::{Block, Resolution::R16, AIR};
 use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, Viewport};
-use all_is_cubes::cgmath::Vector2;
 use all_is_cubes::content::make_some_voxel_blocks;
 use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::rgba_const;
@@ -151,10 +150,7 @@ fn slow_mesh_benches(c: &mut Criterion) {
 fn dynamic_benches(c: &mut Criterion) {
     let mut g = c.benchmark_group("dynamic");
     let graphics_options = GraphicsOptions::default();
-    let camera = Camera::new(
-        graphics_options,
-        Viewport::with_scale(1.0, Vector2::new(100, 100)),
-    );
+    let camera = Camera::new(graphics_options, Viewport::with_scale(1.0, [100, 100]));
 
     g.bench_function("initial-update", |b| {
         let space_ref = URef::new_pending(Name::Pending, half_space(Block::from(Rgba::WHITE)));

@@ -1,4 +1,4 @@
-use cgmath::One;
+use num_traits::One;
 use ordered_float::NotNan;
 
 use crate::math::{FreeCoordinate, Rgb, Rgba};

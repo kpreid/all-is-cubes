@@ -196,3 +196,5 @@ pub mod util;
 
 /// Re-export the version of the `cgmath` crate we're using.
 pub use cgmath;
+/// Re-export the version of the `euclid` vector math library we're using.
+pub use euclid;

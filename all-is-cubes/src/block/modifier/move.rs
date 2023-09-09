@@ -1,10 +1,8 @@
-use cgmath::Zero;
-
 use crate::block::{
     self, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution::R16, AIR,
 };
 use crate::drawing::VoxelBrush;
-use crate::math::{Face6, GridAab, GridArray, GridCoordinate};
+use crate::math::{Face6, GridAab, GridArray, GridCoordinate, GridVector};
 use crate::universe;
 
 /// Data for [`Modifier::Move`]; displaces the block out of the grid, cropping it.
@@ -110,7 +108,9 @@ impl Move {
         let animation_action = if displaced_bounds.is_none() && velocity >= 0 {
             // Displaced to invisibility; turn into just plain air.
             Some(VoxelBrush::single(AIR))
-        } else if translation_in_res.is_zero() && velocity == 0 || distance == 0 && velocity < 0 {
+        } else if translation_in_res == GridVector::zero() && velocity == 0
+            || distance == 0 && velocity < 0
+        {
             // Either a stationary displacement which is invisible, or an animated one which has finished its work.
             assert!(
                 matches!(&block.modifiers()[this_modifier_index], Modifier::Move(m) if m == self)
@@ -195,16 +195,14 @@ impl universe::VisitRefs for Move {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::block::{Block, Composite, EvaluatedBlock, Evoxel, Resolution::*};
     use crate::content::make_some_blocks;
     use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgb, Rgba};
     use crate::space::Space;
     use crate::time;
     use crate::universe::Universe;
-    use cgmath::EuclideanSpace;
     use ordered_float::NotNan;
-
-    use super::*;
 
     #[test]
     fn move_atom_block_evaluation() {

@@ -4,7 +4,6 @@ use std::sync::{Arc, Mutex};
 use once_cell::sync::Lazy;
 
 use all_is_cubes::block::{space_to_blocks, AnimationHint, BlockAttributes, Resolution, AIR};
-use all_is_cubes::cgmath::EuclideanSpace as _;
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::MonoTextStyle,
@@ -264,9 +263,10 @@ impl WidgetController for TooltipController {
         // TODO: there should be a space_to_transaction_copy function or something
         // to implement this systematically
         for i in 0..self.position.size().x {
+            let offset = GridVector::new(i, 0, 0);
             txn.set_overwrite(
-                origin + i * GridVector::unit_x(),
-                toolbar_text_blocks[GridPoint::from_vec(i * GridVector::unit_x())].clone(),
+                origin + offset,
+                toolbar_text_blocks[offset.to_point()].clone(),
             );
         }
         Ok(txn)

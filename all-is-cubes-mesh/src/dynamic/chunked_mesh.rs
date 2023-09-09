@@ -392,7 +392,7 @@ where
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
         let depth_sort_end_time = if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
-            if chunk.depth_sort_for_view(view_point.cast::<Vert::Coordinate>().unwrap()) {
+            if chunk.depth_sort_for_view(view_point.cast::<Vert::Coordinate>()) {
                 render_data_updater(chunk.borrow_for_update(true));
                 Some(I::now())
             } else {

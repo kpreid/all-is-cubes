@@ -13,10 +13,10 @@ use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
 use all_is_cubes::block::Resolution;
-use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport};
-use all_is_cubes::cgmath::{self, One as _, Point3, Vector3, Zero as _};
+use all_is_cubes::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
+use all_is_cubes::euclid::{point3, Rotation3D};
 use all_is_cubes::listen::ListenableSource;
-use all_is_cubes::math::{Face6, GridAab, Rgb, Rgba};
+use all_is_cubes::math::{Face6, FreeVector, GridAab, GridVector, Rgb, Rgba};
 use all_is_cubes::{notnan, time};
 use all_is_cubes_mesh::{BlockVertex, Coloring};
 
@@ -142,17 +142,17 @@ where
         label: None,
         contents: bytemuck::bytes_of(&[
             WgpuBlockVertex::from(BlockVertex {
-                position: Point3::new(0., 0., 0.),
+                position: point3(0., 0., 0.),
                 face: Face6::PZ,
                 coloring: Coloring::Solid(Rgba::WHITE),
             }),
             WgpuBlockVertex::from(BlockVertex {
-                position: Point3::new(1., 0., 0.),
+                position: point3(1., 0., 0.),
                 face: Face6::PZ,
                 coloring: Coloring::Solid(Rgba::WHITE),
             }),
             WgpuBlockVertex::from(BlockVertex {
-                position: Point3::new(0., 1., 0.),
+                position: point3(0., 1., 0.),
                 face: Face6::PZ,
                 coloring: Coloring::Solid(Rgba::WHITE),
             }),
@@ -162,23 +162,26 @@ where
 
     let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
-        contents: bytemuck::bytes_of(&[WgpuInstanceData::new(Vector3::new(0, 0, 0))]),
+        contents: bytemuck::bytes_of(&[WgpuInstanceData::new(GridVector::zero())]),
         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
     });
 
     let mut options = GraphicsOptions::default();
     options.fov_y = notnan!(90.0);
     let mut camera = Camera::new(options, output_viewport);
-    camera.set_view_transform(cgmath::Decomposed {
-        scale: 1.0,
-        rot: cgmath::Basis3::one(),
-        disp: Vector3::new(0.25, 0.25, 0.125),
+    camera.set_view_transform(ViewTransform {
+        rotation: Rotation3D::identity(),
+        translation: FreeVector::new(0.25, 0.25, 0.125),
     });
     let camera_buffer = SpaceCameraBuffer::new("shader test space", &device, &pipelines);
     queue.write_buffer(
         &camera_buffer.buffer,
         0,
-        bytemuck::bytes_of(&ShaderSpaceCamera::new(&camera, Rgb::ZERO, Vector3::zero())),
+        bytemuck::bytes_of(&ShaderSpaceCamera::new(
+            &camera,
+            Rgb::ZERO,
+            GridVector::zero(),
+        )),
     );
 
     let mut encoder =

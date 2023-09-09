@@ -1,9 +1,7 @@
-use cgmath::{EuclideanSpace, InnerSpace, Point3};
-
 use crate::behavior::BehaviorSet;
 use crate::block::{Block, AIR};
 use crate::character::Spawn;
-use crate::math::{FreeCoordinate, GridArray, Rgb};
+use crate::math::{FreePoint, GridArray, Rgb};
 use crate::space::{
     BlockIndex, GridAab, LightPhysics, PackedLight, Palette, PaletteError, Space, SpacePhysics,
 };
@@ -123,9 +121,9 @@ impl SpaceBuilder<GridAab> {
     ///
     /// Panics if any of the given coordinates is infinite or NaN.
     #[track_caller]
-    pub fn spawn_position(mut self, position: Point3<FreeCoordinate>) -> Self {
+    pub fn spawn_position(mut self, position: FreePoint) -> Self {
         assert!(
-            position.to_vec().magnitude2().is_finite(),
+            position.to_vector().square_length().is_finite(),
             "spawn_position must be finite"
         );
 

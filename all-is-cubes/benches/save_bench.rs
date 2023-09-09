@@ -2,17 +2,17 @@
 
 use std::hint::black_box;
 
-use cgmath::Vector3;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::content::testing::lighting_bench_space;
+use all_is_cubes::math::GridVector;
 use all_is_cubes::universe::Universe;
 
 pub fn save_space(c: &mut Criterion) {
     // TODO: add significant content beyond the `Space` (or maybe separate benches)
     let universe_to_save = {
         let mut u = Universe::new();
-        let space = lighting_bench_space(&mut u, Vector3::new(100, 32, 100)).unwrap();
+        let space = lighting_bench_space(&mut u, GridVector::new(100, 32, 100)).unwrap();
         u.insert("space".into(), space).unwrap();
         u
     };

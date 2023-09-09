@@ -5,8 +5,7 @@ use std::ops::RangeInclusive;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use all_is_cubes::camera::Viewport;
-use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::camera::{self, Viewport};
 
 /// Options for recording and output in [`record_main`].
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -15,7 +14,7 @@ pub struct RecordOptions {
     pub output_path: PathBuf,
     pub output_format: RecordFormat,
     pub save_all: bool,
-    pub image_size: Vector2<u32>,
+    pub image_size: camera::ImageSize,
     pub animation: Option<RecordAnimationOptions>,
 }
 

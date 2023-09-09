@@ -1,6 +1,4 @@
-use cgmath::{One, Point2};
-
-use crate::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
+use crate::camera::{Camera, GraphicsOptions, NdcPoint2, ViewTransform, Viewport};
 use crate::character::{cursor_raycast, Character, Cursor};
 use crate::listen::{DirtyFlag, ListenableCell, ListenableSource};
 use crate::math::FreeCoordinate;
@@ -200,7 +198,9 @@ impl StandardCameras {
             if self.character.is_none() {
                 // Reset transform so it isn't a *stale* transform.
                 // TODO: set an error flag saying that nothing should be drawn
-                self.cameras.world.set_view_transform(One::one());
+                self.cameras
+                    .world
+                    .set_view_transform(ViewTransform::identity());
             }
         }
 
@@ -289,7 +289,7 @@ impl StandardCameras {
     ///
     /// Make sure to call [`StandardCameras::update`] first so that the cameras are
     /// up to date with game state.
-    pub fn project_cursor(&self, ndc_pos: Point2<FreeCoordinate>) -> Option<Cursor> {
+    pub fn project_cursor(&self, ndc_pos: NdcPoint2) -> Option<Cursor> {
         if let Some(ui_space_ref) = self.ui_space.as_ref() {
             let ray = self.cameras.ui.project_ndc_into_world(ndc_pos);
             if let Some(cursor) = cursor_raycast(ray, ui_space_ref, FreeCoordinate::INFINITY) {
@@ -348,7 +348,7 @@ impl Default for UiViewState {
     fn default() -> Self {
         Self {
             space: Default::default(),
-            view_transform: ViewTransform::one(),
+            view_transform: ViewTransform::identity(),
             graphics_options: Default::default(),
         }
     }

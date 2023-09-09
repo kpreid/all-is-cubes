@@ -1,8 +1,8 @@
 use crossterm::style::Color;
 
-use all_is_cubes::camera::Viewport;
-use all_is_cubes::cgmath::{ElementWise as _, InnerSpace as _, Vector2, Vector3};
-use all_is_cubes::math::{FreeCoordinate, Rgba};
+use all_is_cubes::camera::{ImagePixel, Viewport};
+use all_is_cubes::euclid::{Vector2D, Vector3D};
+use all_is_cubes::math::{FreeCoordinate, Rgba, VectorOps};
 
 /// Options for the terminal UI.
 ///
@@ -20,19 +20,20 @@ pub(crate) struct TerminalOptions {
 impl TerminalOptions {
     /// Compute viewport to use for raytracing, given the size in characters of the
     /// drawing area.
-    pub(crate) fn viewport_from_terminal_size(&self, size: Vector2<u16>) -> Viewport {
+    pub(crate) fn viewport_from_terminal_size(&self, size: Vector2D<u16, ImagePixel>) -> Viewport {
         // max(1) is to keep the projection math from blowing up.
         // TODO: Remove this and make it more robust instead.
-        let size = size.map(|c| c.max(1));
+        let size = size.max(Vector2D::one());
         Viewport {
             framebuffer_size: size
                 .map(u32::from)
-                .mul_element_wise(self.characters.rays_per_character().map(u32::from)),
+                .component_mul(self.characters.rays_per_character().map(u32::from)),
 
             // Assume that characters are approximately twice as tall as they are wide.
             nominal_size: size
                 .map(FreeCoordinate::from)
-                .mul_element_wise(Vector2::new(0.5, 1.0)),
+                .component_mul(Vector2D::new(0.5, 1.0))
+                .cast_unit(),
         }
     }
 }
@@ -113,9 +114,9 @@ impl ColorMode {
 
                 let luminance = rgba.luminance();
                 // TODO: this is probably not how you calculate saturation
-                let saturation = Vector3::from(rgba.to_rgb())
+                let saturation = Vector3D::from(rgba.to_rgb())
                     .map(|component| (component - luminance).abs())
-                    .dot(Vector3::new(1., 1., 1.));
+                    .dot(Vector3D::new(1., 1., 1.));
 
                 // Pick the gray ramp (more shades) or the RGB cube based on whether
                 // there is significant saturation (threshold picked arbitrarily).
@@ -173,12 +174,12 @@ impl CharacterMode {
         }
     }
 
-    pub fn rays_per_character(&self) -> Vector2<u8> {
+    pub fn rays_per_character(&self) -> Vector2D<u8, ImagePixel> {
         use CharacterMode::*;
         match self {
-            Names | Shades => Vector2::new(1, 1),
-            Split | Shapes => Vector2::new(1, 2),
-            Braille => Vector2::new(2, 4),
+            Names | Shades => Vector2D::new(1, 1),
+            Split | Shapes => Vector2D::new(1, 2),
+            Braille => Vector2D::new(2, 4),
         }
     }
 }

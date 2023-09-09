@@ -3,7 +3,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use cgmath::Vector3;
+use euclid::vec3;
 use pretty_assertions::assert_eq;
 use serde_json::{from_value, json, to_value};
 
@@ -363,7 +363,7 @@ fn space_success() {
     let bounds = GridAab::from_lower_upper([1, 2, 3], [4, 5, 6]);
     let mut space = Space::builder(bounds)
         .physics(SpacePhysics {
-            gravity: Vector3::new(notnan!(0.0), notnan!(0.25), notnan!(1.0)),
+            gravity: vec3(notnan!(0.0), notnan!(0.25), notnan!(1.0)),
             sky_color: Rgb::ONE,
             light: LightPhysics::Rays {
                 maximum_distance: 123,

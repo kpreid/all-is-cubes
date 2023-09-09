@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::HtmlCanvasElement;
 
 use all_is_cubes::camera::Viewport;
-use all_is_cubes::cgmath::Vector2;
+use all_is_cubes::euclid::Vector2D;
 
 // This uses the “JS snippet” feature of wasm-bindgen, to cause gui.js to be embedded in
 // the produced JS bundle.
@@ -43,8 +43,8 @@ impl CanvasHelper {
         let raw_px = self.viewport_px_raw();
         let raw_dev = self.viewport_dev_raw();
         Viewport {
-            nominal_size: Vector2::new(raw_px[0], raw_px[1]),
-            framebuffer_size: Vector2::new(raw_dev[0] as u32, raw_dev[1] as u32),
+            nominal_size: Vector2D::new(raw_px[0], raw_px[1]),
+            framebuffer_size: Vector2D::new(raw_dev[0] as u32, raw_dev[1] as u32),
         }
     }
 }

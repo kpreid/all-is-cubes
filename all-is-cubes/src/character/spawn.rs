@@ -1,10 +1,11 @@
-use cgmath::{Point3, Vector3};
+use euclid::{Point3D, Vector3D};
 
 use crate::camera::eye_for_look_at;
 use crate::inv::Slot;
-use crate::math::{Face6, FreeCoordinate, GridAab, NotNan};
+use crate::math::{Cube, Face6, FreeCoordinate, FreePoint, FreeVector, GridAab, NotNan};
 #[cfg(feature = "save")]
 use crate::save::schema;
+
 use crate::universe::{RefVisitor, VisitRefs};
 
 /// Defines the initial state of a [`Character`] that is being created or moved into a [`Space`].
@@ -21,13 +22,13 @@ pub struct Spawn {
     pub(super) bounds: GridAab,
 
     /// Desired eye position, in cube coordinates.
-    pub(super) eye_position: Option<Point3<NotNan<FreeCoordinate>>>,
+    pub(super) eye_position: Option<Point3D<NotNan<FreeCoordinate>, Cube>>,
 
     /// Direction the character should be facing, or looking at.
     ///
     /// TODO: Should we represent a full rotation (quaternion) instead?
     /// Or something that can't be zero? Nonzero integers, perhaps?
-    pub(super) look_direction: Vector3<NotNan<FreeCoordinate>>,
+    pub(super) look_direction: Vector3D<NotNan<FreeCoordinate>, Cube>,
 
     /// Initial inventory contents, created from nothing.
     pub(super) inventory: Vec<Slot>,
@@ -44,7 +45,7 @@ impl Spawn {
         Spawn {
             bounds: bounds.abut(Face6::PZ, 40).unwrap_or(bounds),
             eye_position: None,
-            look_direction: Vector3::new(NotNan::from(0), NotNan::from(0), NotNan::from(-1)),
+            look_direction: Vector3D::new(NotNan::from(0), NotNan::from(0), NotNan::from(-1)),
             inventory: vec![],
         }
     }
@@ -57,10 +58,7 @@ impl Spawn {
     ///
     /// TODO: This needs better-defined FOV/distance considerations before making it public
     #[doc(hidden)]
-    pub fn looking_at_space(
-        space_bounds: GridAab,
-        direction: impl Into<Vector3<FreeCoordinate>>,
-    ) -> Self {
+    pub fn looking_at_space(space_bounds: GridAab, direction: impl Into<FreeVector>) -> Self {
         let direction = direction.into();
         let mut spawn = Self::default_for_new_space(space_bounds);
         spawn.set_eye_position(eye_for_look_at(space_bounds, direction));
@@ -69,15 +67,15 @@ impl Spawn {
     }
 
     /// Sets the position at which the character will appear, in terms of its viewpoint.
-    pub fn set_eye_position(&mut self, position: impl Into<Point3<FreeCoordinate>>) {
+    pub fn set_eye_position(&mut self, position: impl Into<FreePoint>) {
         let position = position.into();
         // TODO: accept None for clearing
         // TODO: If we're going to suppress NaN, then it makes sense to suppress infinities too; come up with a general theory of how we want all-is-cubes to handle unreasonable positions.
-        self.eye_position = Some(Point3 {
-            x: notnan_or_zero(position.x),
-            y: notnan_or_zero(position.y),
-            z: notnan_or_zero(position.z),
-        });
+        self.eye_position = Some(Point3D::new(
+            notnan_or_zero(position.x),
+            notnan_or_zero(position.y),
+            notnan_or_zero(position.z),
+        ));
     }
 
     /// Sets the bounds within which the character may be placed is allowed.
@@ -88,13 +86,13 @@ impl Spawn {
     /// Sets the direction the character should be facing, or looking at.
     ///
     /// The results are unspecified but harmless if the direction is zero or NaN.
-    pub fn set_look_direction(&mut self, direction: impl Into<Vector3<FreeCoordinate>>) {
+    pub fn set_look_direction(&mut self, direction: impl Into<FreeVector>) {
         let direction = direction.into();
-        self.look_direction = Vector3 {
-            x: notnan_or_zero(direction.x),
-            y: notnan_or_zero(direction.y),
-            z: notnan_or_zero(direction.z),
-        };
+        self.look_direction = Vector3D::new(
+            notnan_or_zero(direction.x),
+            notnan_or_zero(direction.y),
+            notnan_or_zero(direction.z),
+        );
     }
 
     /// Sets the starting inventory items.
@@ -171,11 +169,11 @@ impl<'a> arbitrary::Arbitrary<'a> for Spawn {
         Ok(Self {
             bounds: GridAab::arbitrary(u)?,
             eye_position: if u.arbitrary()? {
-                Some(Point3::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?))
+                Some(Point3D::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?))
             } else {
                 None
             },
-            look_direction: Vector3::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
+            look_direction: Vector3D::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
             inventory: vec![], // TODO: need impl Arbitrary for Tool
         })
     }

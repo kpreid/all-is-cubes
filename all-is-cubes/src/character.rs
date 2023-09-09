@@ -4,19 +4,15 @@ use std::collections::HashSet;
 use std::fmt;
 use std::sync::Arc;
 
-use cgmath::{
-    Angle as _, Basis3, Decomposed, Deg, ElementWise as _, EuclideanSpace as _, Matrix3, Point3,
-    Rotation3, Transform, Vector3,
-};
-use num_traits::identities::Zero;
+use euclid::{Angle, Point3D, Rotation3D, Vector3D};
 use ordered_float::NotNan;
 
 use crate::behavior::{self, Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
 use crate::inv::{self, Inventory, InventoryTransaction, Slot, Tool};
 use crate::listen::{Listen, Listener, Notifier};
-use crate::math::{Aab, Face6, Face7, FreeCoordinate, Rgb};
-use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
+use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, Rgb, VectorOps};
+use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};
 use crate::raycast::Ray;
 #[cfg(feature = "save")]
 use crate::save::schema;
@@ -61,14 +57,14 @@ pub struct Character {
 
     /// Velocity specified by user input, which the actual velocity is smoothly adjusted
     /// towards.
-    velocity_input: Vector3<FreeCoordinate>,
+    velocity_input: FreeVector,
 
     /// Offset to be added to `body.position` to produce the drawn eye position.
     /// Used to produce camera shifting effects when the body is stopped by an obstacle
     /// or otherwise moves suddenly.
-    eye_displacement_pos: Vector3<FreeCoordinate>,
+    eye_displacement_pos: Vector3D<FreeCoordinate, Cube>,
     /// Velocity of the `eye_displacement_pos` point (relative to body).
-    eye_displacement_vel: Vector3<FreeCoordinate>,
+    eye_displacement_vel: Vector3D<FreeCoordinate, Velocity>,
 
     // TODO: Does this belong here? Or in the Space?
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu
@@ -166,8 +162,9 @@ impl Character {
         ];
 
         let look_direction = spawn.look_direction.map(|c| c.into_inner());
-        let yaw = Deg::atan2(look_direction.x, -look_direction.z);
-        let pitch = Deg::atan2(-look_direction.y, look_direction.z.hypot(look_direction.x));
+        let yaw = f64::atan2(look_direction.x, -look_direction.z).to_degrees();
+        let pitch =
+            f64::atan2(-look_direction.y, look_direction.z.hypot(look_direction.x)).to_degrees();
 
         // TODO: This should be configurable, possibly in some more 'template' way
         // than per-spawn?
@@ -176,12 +173,12 @@ impl Character {
         // Choose position.
         // TODO: Should also check if the chosen position is intersecting with the contents
         // of the Space, and avoid that.
-        let position = match spawn.eye_position {
+        let position: FreePoint = match spawn.eye_position {
             Some(pos) => pos.map(NotNan::into_inner),
             None => {
                 // Stand on the floor of the spawn bounds.
                 // TODO: Account for different gravity.
-                let mut pos = spawn.bounds.center();
+                let mut pos: FreePoint = spawn.bounds.center();
                 pos.y = collision_box.face_coordinate(Face6::NY)
                     - Aab::from(spawn.bounds).face_coordinate(Face6::NY);
                 pos
@@ -191,14 +188,14 @@ impl Character {
         Self {
             body: Body {
                 flying: false, // will be overriden anyway
-                yaw: yaw.0,
-                pitch: pitch.0,
+                yaw,
+                pitch,
                 ..Body::new_minimal(position, collision_box)
             },
             space,
-            velocity_input: Vector3::zero(),
-            eye_displacement_pos: Vector3::zero(),
-            eye_displacement_vel: Vector3::zero(),
+            velocity_input: Vector3D::zero(),
+            eye_displacement_pos: Vector3D::zero(),
+            eye_displacement_vel: Vector3D::zero(),
             colliding_cubes: HashSet::new(),
             last_step_info: None,
             light_samples: [Rgb::ONE; 100],
@@ -223,11 +220,15 @@ impl Character {
     ///
     /// See the documentation for [`ViewTransform`] for the interpretation of this transform.
     pub fn view(&self) -> ViewTransform {
-        Decomposed {
-            scale: 1.0,
-            rot: Basis3::from_angle_y(Deg(-self.body.yaw))
-                * Basis3::from_angle_x(Deg(-self.body.pitch)),
-            disp: self.body.position.to_vec() + self.eye_displacement_pos,
+        ViewTransform {
+            /// Remember, this is an eye *to* world transform.
+            rotation: Rotation3D::<_, crate::camera::Eye, Cube>::around_x(Angle {
+                radians: -self.body.pitch.to_radians(),
+            })
+            .then(&Rotation3D::around_y(Angle {
+                radians: -self.body.yaw.to_radians(),
+            })),
+            translation: (self.body.position.to_vector() + self.eye_displacement_pos).cast_unit(),
         }
     }
 
@@ -287,25 +288,25 @@ impl Character {
         self.body.flying = flying;
 
         let dt = tick.delta_t().as_secs_f64();
-        let control_orientation: Matrix3<FreeCoordinate> =
-            Matrix3::from_angle_y(-Deg(self.body.yaw));
+        // TODO(euclid migration): take advantage of coordinate system types
+        let control_orientation = Rotation3D::around_y(-Angle::radians(self.body.yaw.to_radians()));
         // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
         let initial_body_velocity = self.body.velocity;
 
         let speed = if flying { FLYING_SPEED } else { WALKING_SPEED };
-        let mut velocity_target = control_orientation * self.velocity_input * speed;
+        let mut velocity_target =
+            control_orientation.transform_vector3d(self.velocity_input * speed);
         if !flying {
             velocity_target.y = 0.0;
         }
         // TODO should have an on-ground condition...
         let stiffness = if flying {
-            Vector3::new(10.8, 10.8, 10.8)
+            Vector3D::new(10.8, 10.8, 10.8)
         } else {
-            Vector3::new(10.8, 0., 10.8)
+            Vector3D::new(10.8, 0., 10.8)
         }; // TODO constants/tables...
 
-        self.body.velocity +=
-            (velocity_target - self.body.velocity).mul_element_wise(stiffness) * dt;
+        self.body.velocity += (velocity_target - self.body.velocity).component_mul(stiffness) * dt;
 
         let body_step_info = if let Ok(space) = self.space.read() {
             self.update_exposure(&space, dt);
@@ -362,11 +363,11 @@ impl Character {
         // TODO: Try applying velocity_input to this positively, "leaning forward".
         // First, update velocity.
         let body_delta_v_this_frame = self.body.velocity - initial_body_velocity;
-        self.eye_displacement_vel -= body_delta_v_this_frame * 0.04;
-        self.eye_displacement_vel += self.eye_displacement_pos * -(0.005f64.powf(dt));
+        self.eye_displacement_vel -= body_delta_v_this_frame.cast_unit() * 0.04;
+        self.eye_displacement_vel += self.eye_displacement_pos.cast_unit() * -(0.005f64.powf(dt));
         self.eye_displacement_vel *= 0.005f64.powf(dt);
         // Then apply position to velocity.
-        self.eye_displacement_pos += self.eye_displacement_vel * dt;
+        self.eye_displacement_pos += self.eye_displacement_vel.cast_unit() * dt;
         // TODO: Clamp eye_displacement_pos to be within the body AAB.
 
         self.last_step_info = body_step_info;
@@ -388,9 +389,9 @@ impl Character {
 
         // Sample surrounding light.
         {
-            let vt = self.view();
+            let vt = self.view().to_transform();
             let sqrtedge = (self.light_samples.len() as FreeCoordinate).sqrt();
-            let ray_origin = vt.transform_point(Point3::origin());
+            let ray_origin = vt.transform_point3d(Point3D::origin()).unwrap();
             'rays: for _ray in 0..10 {
                 // TODO: better idea for what ray count should be
                 let index = (self.light_sample_index + 1).rem_euclid(self.light_samples.len());
@@ -399,7 +400,7 @@ impl Character {
                 let ray = Ray::new(
                     ray_origin,
                     // Fixed 90° FOV
-                    vt.transform_vector(Vector3::new(
+                    vt.transform_vector3d(Vector3D::new(
                         (indexf).rem_euclid(sqrtedge) / sqrtedge * 2. - 1.,
                         (indexf).div_euclid(sqrtedge) / sqrtedge * 2. - 1.,
                         -1.0,
@@ -450,7 +451,7 @@ impl Character {
     }
 
     /// Maximum range for normal keyboard input should be -1 to 1
-    pub fn set_velocity_input(&mut self, velocity: Vector3<FreeCoordinate>) {
+    pub fn set_velocity_input(&mut self, velocity: FreeVector) {
         self.velocity_input = velocity;
     }
 
@@ -493,11 +494,7 @@ impl Character {
     /// Figure out what the correct overall thing is.
     pub fn jump_if_able(&mut self) {
         if self.is_on_ground() {
-            self.body.velocity += Vector3 {
-                x: 0.,
-                y: JUMP_SPEED,
-                z: 0.,
-            };
+            self.body.velocity += Vector3D::new(0., JUMP_SPEED, 0.);
         }
     }
 
@@ -642,11 +639,11 @@ impl<'de> serde::Deserialize<'de> for Character {
 
                 // Not persisted - run-time connections to other things
                 notifier: Notifier::new(),
-                velocity_input: Vector3::zero(),
+                velocity_input: Vector3D::zero(),
 
                 // Not persisted - decorative simulation
-                eye_displacement_pos: Vector3::zero(),
-                eye_displacement_vel: Vector3::zero(),
+                eye_displacement_pos: Vector3D::zero(),
+                eye_displacement_vel: Vector3D::zero(),
                 colliding_cubes: HashSet::new(),
                 last_step_info: None,
                 light_samples: [Rgb::ONE; 100],

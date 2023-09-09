@@ -9,11 +9,10 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::sync::Arc;
 
-use cgmath::{EuclideanSpace as _, Point3};
-
 use crate::listen::{self, Listen, Listener};
 use crate::math::{
     Cube, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba,
+    VectorOps,
 };
 use crate::raycast::Ray;
 use crate::space::{SetCubeError, Space, SpaceChange};
@@ -482,7 +481,7 @@ impl Block {
 
                 // The region of `space` that the parameters say to look at.
                 let full_resolution_bounds =
-                    GridAab::for_block(resolution).translate(offset.to_vec());
+                    GridAab::for_block(resolution).translate(offset.to_vector());
 
                 if let Some(listener) = &filter.listener {
                     block_space.listen(listener.clone().filter(move |msg| {
@@ -516,7 +515,7 @@ impl Block {
                             #[inline(always)]
                             |e| Evoxel::from_block(e.block_data().evaluated()),
                         )
-                        .translate(-offset.to_vec()),
+                        .translate(-offset.to_vector()),
                     None => {
                         // If there is no intersection, then return an empty voxel array,
                         // with an arbitrary position.
@@ -753,10 +752,9 @@ pub const AIR: Block = Block(BlockPtr::Static(&Primitive::Air));
 #[inline]
 pub(crate) fn recursive_ray(ray: Ray, cube: Cube, resolution: Resolution) -> Ray {
     Ray {
-        origin: Point3::from_vec(
-            (ray.origin - cube.lower_bounds().map(FreeCoordinate::from))
-                * FreeCoordinate::from(resolution),
-        ),
+        origin: ((ray.origin - cube.lower_bounds().map(FreeCoordinate::from))
+            * FreeCoordinate::from(resolution))
+        .to_point(),
         direction: ray.direction,
     }
 }
@@ -879,7 +877,7 @@ pub fn space_to_blocks(
     destination_space.fill(destination_bounds, move |cube| {
         Some(Block::from_primitive(Primitive::Recur {
             attributes: attributes.clone(),
-            offset: GridPoint::from_vec(cube.lower_bounds().to_vec() * resolution_g),
+            offset: (cube.lower_bounds().to_vector() * resolution_g).to_point(),
             resolution,
             space: space_ref.clone(),
         }))
