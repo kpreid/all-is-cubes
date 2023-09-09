@@ -48,6 +48,28 @@ impl Axis {
     pub const fn index(self) -> usize {
         self as usize
     }
+
+    /// Maps X to Y, Y to Z, and Z to X.
+    #[inline]
+    #[must_use]
+    pub const fn increment(self) -> Self {
+        match self {
+            Axis::X => Axis::Y,
+            Axis::Y => Axis::Z,
+            Axis::Z => Axis::X,
+        }
+    }
+
+    /// Maps X to Z, Y to X, and Z to Y.
+    #[inline]
+    #[must_use]
+    pub const fn decrement(self) -> Self {
+        match self {
+            Axis::X => Axis::Z,
+            Axis::Y => Axis::X,
+            Axis::Z => Axis::Y,
+        }
+    }
 }
 
 /// Format the axis as one of the strings "x", "y", or "z" (lowercase).
@@ -136,6 +158,19 @@ mod tests {
     #[test]
     fn axis_fmt() {
         use Axis::*;
-        assert_eq!(format!("{X:x} {Y:x} {Z:x} {X:X} {Y:X} {Z:X}"), "x y z X Y Z");
+        assert_eq!(
+            format!("{X:x} {Y:x} {Z:x} {X:X} {Y:X} {Z:X}"),
+            "x y z X Y Z"
+        );
+    }
+
+    #[test]
+    fn inc_dec_properties() {
+        for axis in Axis::ALL {
+            assert_ne!(axis, axis.increment());
+            assert_ne!(axis, axis.decrement());
+            assert_eq!(axis, axis.increment().decrement());
+            assert_eq!(axis, axis.decrement().increment());
+        }
     }
 }

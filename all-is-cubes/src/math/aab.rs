@@ -342,10 +342,10 @@ impl Geometry for Aab {
         let mut vertices = [LineVertex::from(Point3::origin()); 24];
         let l = self.lower_bounds_p();
         let u = self.upper_bounds_p();
-        for axis_0 in 0..3_usize {
-            let vbase = axis_0 * 8;
-            let axis_1 = (axis_0 + 1).rem_euclid(3);
-            let axis_2 = (axis_0 + 2).rem_euclid(3);
+        for axis_0 in Axis::ALL {
+            let vbase = usize::from(axis_0) * 8;
+            let axis_1 = axis_0.increment();
+            let axis_2 = axis_0.decrement();
             let mut p = l;
             // Walk from lower to upper in a helix.
             vertices[vbase].position = p;
