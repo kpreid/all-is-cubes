@@ -8,8 +8,9 @@ use futures_util::FutureExt;
 
 use all_is_cubes::block::{Block, Resolution::*};
 use all_is_cubes::camera::{
-    AntialiasingOption, ExposureOption, FogOption, GraphicsOptions, LightingOption, RenderError,
-    StandardCameras, ToneMappingOperator, TransparencyOption, UiViewState, ViewTransform, Viewport,
+    AntialiasingOption, ExposureOption, Flaws, FogOption, GraphicsOptions, LightingOption,
+    RenderError, StandardCameras, ToneMappingOperator, TransparencyOption, UiViewState,
+    ViewTransform, Viewport,
 };
 use all_is_cubes::cgmath::{EuclideanSpace as _, One, Point2, Point3, Vector2, Vector3};
 use all_is_cubes::character::{Character, Spawn};
@@ -686,8 +687,12 @@ async fn no_update(mut context: RenderTestContext) {
     let space = one_cube_space();
     finish_universe_from_space(&mut universe, space);
 
+    // Call draw() without update().
     let mut renderer = context.renderer(&universe);
-    let image = renderer.draw("").await.unwrap();
+    let mut image = renderer.draw("").await.unwrap();
+
+    // Check the output, but ignore that it's potentially unfinished.
+    image.flaws.remove(Flaws::UNFINISHED);
     context.compare_image(5, image);
 
     // Now run a normal update and see what happens.

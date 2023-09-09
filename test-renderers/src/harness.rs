@@ -110,7 +110,10 @@ impl RenderTestContext {
 
         let mut outcome = crate::compare_rendered_image(combo, allowed_difference.into(), image);
 
-        if matches!(outcome.outcome, ComparisonOutcome::Different { .. }) && flaws != Flaws::empty()
+        if flaws.contains(Flaws::UNFINISHED) {
+            outcome.outcome = ComparisonOutcome::Unfinished;
+        } else if matches!(outcome.outcome, ComparisonOutcome::Different { .. })
+            && flaws != Flaws::empty()
         {
             outcome.outcome = ComparisonOutcome::Flawed(format!("{flaws:?}"));
         }
@@ -312,7 +315,15 @@ where
                 if e.is_panic() {
                     let panic_str: String = match e.into_panic().downcast::<String>() {
                         Ok(boxed_str) => *boxed_str,
-                        Err(_) => "<non-string panic>".into(),
+                        Err(panic_value) => match panic_value.downcast::<&'static str>() {
+                            Ok(boxed_str) => String::from(*boxed_str),
+                            Err(panic_value) => {
+                                format!(
+                                    "<non-string panic {:?}>",
+                                    <dyn std::any::Any>::type_id(&*panic_value)
+                                )
+                            }
+                        },
                     };
                     match format {
                         Format::Pretty => println!(" panicked: {panic_str}"),

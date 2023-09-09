@@ -141,6 +141,7 @@ mod tmpl {
                     ComparisonOutcome::Equal => false,
                     ComparisonOutcome::Flawed(_) => false,
                     ComparisonOutcome::NoExpected => true,
+                    ComparisonOutcome::Unfinished => true,
                 },
                 // Show histogram details but only if not flawed
                 diffcount: match &input.outcome {
