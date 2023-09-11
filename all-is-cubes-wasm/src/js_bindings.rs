@@ -5,7 +5,6 @@ use web_sys::HtmlCanvasElement;
 
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::cgmath::Vector2;
-use all_is_cubes::math::FreeCoordinate;
 
 // This uses the “JS snippet” feature of wasm-bindgen, to cause gui.js to be embedded in
 // the produced JS bundle.
@@ -37,8 +36,6 @@ extern "C" {
     fn viewport_px_raw(this: &CanvasHelper) -> Vec<f64>;
     #[wasm_bindgen(method, getter, js_name = viewportDev)]
     fn viewport_dev_raw(this: &CanvasHelper) -> Vec<f64>;
-    #[wasm_bindgen(method, js_name = normalizePosition)]
-    fn normalize_position_raw(this: &CanvasHelper) -> Vec<f64>;
 }
 
 impl CanvasHelper {
@@ -49,10 +46,5 @@ impl CanvasHelper {
             nominal_size: Vector2::new(raw_px[0], raw_px[1]),
             framebuffer_size: Vector2::new(raw_dev[0] as u32, raw_dev[1] as u32),
         }
-    }
-
-    pub fn normalize_position(&self) -> Vector2<FreeCoordinate> {
-        let raw = self.normalize_position_raw();
-        Vector2::new(raw[0], raw[1])
     }
 }

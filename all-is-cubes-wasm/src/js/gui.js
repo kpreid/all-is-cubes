@@ -60,15 +60,6 @@ export class CanvasHelper {
 
   // property .viewportPx
 
-  // Given pixel X and Y as used in mouse events, return GL-style normalized
-  // device coordinates.
-  normalizePosition(x, y) {
-    return [
-      x / this.viewportPx[0] * 2 - 1,
-      y / this.viewportPx[1] * -2 + 1,
-    ];
-  }
-
   // Attempt to enter or leave fullscreen mode.
   // 
   // TODO: This and its companion isFullscreen() make document.body fullscreen, but for
