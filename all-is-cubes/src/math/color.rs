@@ -421,33 +421,13 @@ impl Add<Rgb> for Rgb {
         Self(self.0 + other.0)
     }
 }
-impl Add<Rgba> for Rgba {
-    type Output = Self;
-    #[inline]
-    fn add(self, other: Self) -> Self {
-        Self(self.0 + other.0)
-    }
-}
 impl AddAssign<Rgb> for Rgb {
     #[inline]
     fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
-impl AddAssign<Rgba> for Rgba {
-    #[inline]
-    fn add_assign(&mut self, other: Self) {
-        self.0 += other.0;
-    }
-}
 impl Sub<Rgb> for Rgb {
-    type Output = Self;
-    #[inline]
-    fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
-    }
-}
-impl Sub<Rgba> for Rgba {
     type Output = Self;
     #[inline]
     fn sub(self, other: Self) -> Self {
