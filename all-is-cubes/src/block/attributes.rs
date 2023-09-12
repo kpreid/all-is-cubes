@@ -97,7 +97,7 @@ impl BlockAttributes {
         tick_action: None,
         animation_hint: AnimationHint::UNCHANGING,
     };
-    const DEFAULT_REF: &Self = &Self::DEFAULT;
+    const DEFAULT_REF: &'static Self = &Self::DEFAULT;
 
     /// Block attributes suitable as default values for in-game use.
     ///
