@@ -68,7 +68,6 @@ arbitrary = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true, features = ["std"] } # used in serialization
 bitflags = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
-cgmath = "0.18.0"
 downcast-rs = { version = "1.2.0", default-features = false }
 # mint feature to guarantee that our callers can use mint types
 # libm feature to guarantee compilability and compatibility with no_std
@@ -96,7 +95,6 @@ yield-progress = { workspace = true, features = ["sync"] }
 
 [build-dependencies]
 # for calculation in build script
-cgmath = "0.18.0"
 euclid = { version = "0.22.9", default-features = false, features = ["libm", "mint"] }
 
 [dev-dependencies]

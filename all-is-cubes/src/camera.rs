@@ -29,7 +29,7 @@ pub use stdcam::*;
 #[cfg(test)]
 mod tests;
 
-/// Representation of a camera viewpoint and orientation, using [`cgmath`] types.
+/// Representation of a camera viewpoint and orientation.
 ///
 /// Note that this is treated as a transform **from** the origin looking in the &minus;Z
 /// direction (eye space) **to** the camera position and orientation (world space).
