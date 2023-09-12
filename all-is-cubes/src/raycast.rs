@@ -430,15 +430,32 @@ impl Raycaster {
             // Go forward to half a cube behind where we think we found the intersection point.
             let t_start = max_t - 0.5 / self.ray.direction.magnitude();
             let t_start = if t_start.is_finite() { t_start } else { max_t };
-            let mut new_state = self.ray.advance(t_start).cast();
+            let ff_ray = self.ray.advance(t_start);
 
-            new_state.bounds = self.bounds.clone(); // .within() would recurse
+            let Some(cube) = Cube::containing(ff_ray.origin) else {
+                // Can't fast-forward if we would numeric overflow
+                return;
+            };
 
-            // Adapt t values
-            new_state.t_max = new_state.t_max.map(|t| t + t_start);
-            new_state.last_t_distance = t_start;
+            *self = Self {
+                ray: ff_ray,
+                emit_current: false,
+                last_face: self.last_face,
+                cube: cube.lower_bounds(),
 
-            *self = new_state;
+                // t_max is done the same as in new(), except with an offset
+                t_max: ff_ray
+                    .origin
+                    .to_vec()
+                    .zip(ff_ray.direction, scale_to_integer_step)
+                    .map(|t| t + t_start),
+                last_t_distance: t_start,
+
+                // These fields don't depend on position.
+                step: self.step,
+                t_delta: self.t_delta,
+                bounds: self.bounds.clone(),
+            };
         }
     }
 }
