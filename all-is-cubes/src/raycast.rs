@@ -392,23 +392,24 @@ impl Raycaster {
     /// the bounds later, attempt to move the position to intersect sooner.
     #[mutants::skip] // an optimization not a behavior change
     fn fast_forward(&mut self) {
-        let bounds = {
-            let Vector3 { x, y, z } = self.bounds.clone().unwrap();
-            GridAab::from_lower_upper([x.start, y.start, z.start], [x.end, y.end, z.end])
-        };
-
         // Find the point which is the origin of all three planes that we want to
         // intersect with. (Strictly speaking, this could be combined with the next
         // loop, but it seems more elegant to have a well-defined point.)
-        let mut plane_origin = bounds.lower_bounds();
-        for axis in Axis::ALL {
-            if self.step[axis] < 0 {
-                // Iff the ray is going negatively, then we must use the upper bound
-                // for the plane origin in this axis. Otherwise, either it doesn't
-                // matter (parallel) or should be lower bound.
-                plane_origin[axis] = bounds.upper_bounds()[axis];
+        let plane_origin = {
+            let bounds = self.bounds.as_ref().unwrap();
+            let mut plane_origin = Point3::new(0, 0, 0);
+            for axis in Axis::ALL {
+                if self.step[axis] < 0 {
+                    // Iff the ray is going negatively, then we must use the upper bound
+                    // for the plane origin in this axis. Otherwise, either it doesn't
+                    // matter (parallel) or should be lower bound.
+                    plane_origin[axis] = bounds[axis].end;
+                } else {
+                    plane_origin[axis] = bounds[axis].start;
+                }
             }
-        }
+            plane_origin
+        };
 
         // Perform intersections.
         let mut max_t: FreeCoordinate = 0.0;
