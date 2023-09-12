@@ -183,11 +183,13 @@ mod arithmetic {
 
     impl ops::Add<GridVector> for Cube {
         type Output = Self;
+        #[inline]
         fn add(self, rhs: GridVector) -> Self::Output {
             Self::from(self.lower_bounds() + rhs)
         }
     }
     impl ops::AddAssign<GridVector> for Cube {
+        #[inline]
         fn add_assign(&mut self, rhs: GridVector) {
             *self = Self::from(self.lower_bounds() + rhs)
         }
@@ -195,11 +197,13 @@ mod arithmetic {
 
     impl ops::Sub<GridVector> for Cube {
         type Output = Self;
+        #[inline]
         fn sub(self, rhs: GridVector) -> Self::Output {
             Self::from(self.lower_bounds() - rhs)
         }
     }
     impl ops::SubAssign<GridVector> for Cube {
+        #[inline]
         fn sub_assign(&mut self, rhs: GridVector) {
             *self = Self::from(self.lower_bounds() - rhs)
         }
@@ -207,6 +211,7 @@ mod arithmetic {
 
     impl ops::Sub<Cube> for Cube {
         type Output = GridVector;
+        #[inline]
         fn sub(self, rhs: Cube) -> Self::Output {
             self.lower_bounds() - rhs.lower_bounds()
         }
@@ -217,43 +222,51 @@ mod conversion {
     use super::*;
 
     impl AsRef<[GridCoordinate; 3]> for Cube {
+        #[inline]
         fn as_ref(&self) -> &[GridCoordinate; 3] {
             bytemuck::cast_ref(self)
         }
     }
     impl AsMut<[GridCoordinate; 3]> for Cube {
+        #[inline]
         fn as_mut(&mut self) -> &mut [GridCoordinate; 3] {
             bytemuck::cast_mut(self)
         }
     }
     impl std::borrow::Borrow<[GridCoordinate; 3]> for Cube {
+        #[inline]
         fn borrow(&self) -> &[GridCoordinate; 3] {
             bytemuck::cast_ref(self)
         }
     }
     impl std::borrow::BorrowMut<[GridCoordinate; 3]> for Cube {
+        #[inline]
         fn borrow_mut(&mut self) -> &mut [GridCoordinate; 3] {
             bytemuck::cast_mut(self)
         }
     }
 
     impl From<Cube> for [GridCoordinate; 3] {
+        #[inline]
         fn from(Cube { x, y, z }: Cube) -> [GridCoordinate; 3] {
             [x, y, z]
         }
     }
     impl From<Cube> for GridPoint {
+        #[inline]
         fn from(Cube { x, y, z }: Cube) -> GridPoint {
             GridPoint { x, y, z }
         }
     }
 
     impl From<[GridCoordinate; 3]> for Cube {
+        #[inline]
         fn from([x, y, z]: [GridCoordinate; 3]) -> Self {
             Self { x, y, z }
         }
     }
     impl From<GridPoint> for Cube {
+        #[inline]
         fn from(GridPoint { x, y, z }: GridPoint) -> Self {
             Self { x, y, z }
         }
