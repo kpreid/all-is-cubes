@@ -489,8 +489,6 @@ impl Mul<Self> for GridRotation {
     }
 }
 
-// TODO: consider implementing cgmath::Transform for GridRotation.
-
 #[cfg(test)]
 mod tests {
     use super::*;

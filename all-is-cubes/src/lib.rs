@@ -108,10 +108,7 @@
 //! `all_is_cubes` depends on and re-exports the following crates as part of its public
 //! API:
 //!
-//! * [`cgmath`] for vector math (as `all_is_cubes::cgmath`).
-//!   This design choice was not made after a thorough review and I am open to being
-//!   convinced to switching libraries. (The replacement must accept arbitrary types for
-//!   vector components.)
+//! * [`euclid`] for vector math (as `all_is_cubes::euclid`).
 //! * [`ordered_float`] (as `all_is_cubes::math::NotNan`).
 //! * [`embedded_graphics`] (as `all_is_cubes::drawing::embedded_graphics`).
 //!
@@ -194,7 +191,5 @@ pub mod transaction;
 pub mod universe;
 pub mod util;
 
-/// Re-export the version of the `cgmath` crate we're using.
-pub use cgmath;
 /// Re-export the version of the `euclid` vector math library we're using.
 pub use euclid;

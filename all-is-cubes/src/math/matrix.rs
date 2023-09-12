@@ -47,7 +47,7 @@ impl GridMatrix {
         w: Vector3D::new(0, 0, 0),
     };
 
-    /// Note: This takes the same column-major ordering as [`cgmath`], so the argument order
+    /// Note: This takes the elements in a column-major ordering, so the argument order
     /// is transposed relative to a conventional textual display of a matrix.
     #[allow(clippy::too_many_arguments)]
     #[inline]
