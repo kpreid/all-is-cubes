@@ -12,9 +12,9 @@ use alloc::borrow::Cow;
 use pretty_assertions::assert_eq;
 
 use crate::block::{
-    self, Atom, Block, BlockAttributes, BlockChange, BlockCollision, BlockDef, BlockDefTransaction,
-    EvalBlockError, Evoxel, Evoxels, Modifier, Primitive, Resolution, Resolution::*, AIR,
-    AIR_EVALUATED,
+    self, modifier, Atom, Block, BlockAttributes, BlockChange, BlockCollision, BlockDef,
+    BlockDefTransaction, EvalBlockError, Evoxel, Evoxels, Modifier, Primitive, Resolution,
+    Resolution::*, AIR, AIR_EVALUATED,
 };
 use crate::content::make_some_blocks;
 use crate::listen::{self, NullListener, Sink};
@@ -410,6 +410,22 @@ mod eval {
         let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
         let eval_def = block_def_ref.read().unwrap().evaluate();
         assert_eq!(eval_bare, eval_def);
+    }
+
+    /// Fuzz-discovered test case for panic during evaluation,
+    /// in `raytracer::apply_transmittance`.
+    #[test]
+    fn color_evaluation_regression() {
+        let block = Block::builder()
+            .color(Rgba::new(1e28, 1e28, 1e28, 1e28))
+            // Modifier matters because it causes the block to become voxels
+            .modifier(Modifier::Move(modifier::Move {
+                direction: Face6::NX,
+                distance: 0,
+                velocity: 0,
+            }))
+            .build();
+        block.evaluate().unwrap();
     }
 }
 

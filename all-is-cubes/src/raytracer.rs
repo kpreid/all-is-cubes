@@ -575,7 +575,7 @@ impl<P: Accumulate> TracingState<P> {
 #[inline]
 fn apply_transmittance(color: Rgba, thickness: f32) -> Rgba {
     // Convert alpha to transmittance (light transmitted / light received).
-    let unit_transmittance = 1.0 - color.alpha().into_inner();
+    let unit_transmittance = 1.0 - color.clamp().alpha().into_inner();
     // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
     let depth_transmittance = unit_transmittance.powf(thickness);
     // Convert back to alpha.
