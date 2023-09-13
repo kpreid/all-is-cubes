@@ -21,6 +21,7 @@ where
     fn saturating_duration_since(self, other: Self) -> Duration;
 }
 
+#[cfg(any(feature = "std", test))]
 impl Instant for std::time::Instant {
     fn now() -> Self {
         std::time::Instant::now()
@@ -95,7 +96,7 @@ impl<I: Instant> Deadline<I> {
     }
 }
 
-impl<I: Instant> std::ops::Add<Duration> for Deadline<I> {
+impl<I: Instant> core::ops::Add<Duration> for Deadline<I> {
     type Output = Self;
     fn add(self, rhs: Duration) -> Self::Output {
         match self {
@@ -105,7 +106,7 @@ impl<I: Instant> std::ops::Add<Duration> for Deadline<I> {
         }
     }
 }
-impl<I: Instant> std::ops::Sub<Duration> for Deadline<I> {
+impl<I: Instant> core::ops::Sub<Duration> for Deadline<I> {
     type Output = Self;
     fn sub(self, rhs: Duration) -> Self::Output {
         match self {
