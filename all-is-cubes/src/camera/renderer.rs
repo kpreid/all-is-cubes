@@ -40,7 +40,7 @@ pub trait HeadlessRenderer {
 }
 
 /// An error indicating that a [`HeadlessRenderer`] failed to operate.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 pub enum RenderError {
     /// A component of the [`Universe`] that is to be rendered was not available
@@ -49,9 +49,18 @@ pub enum RenderError {
     /// TODO: The renderers currently implemented don't return this error but panic.
     ///
     /// [`Universe`]: crate::universe::Universe
-    #[error("scene to be rendered was not available for reading")]
+    #[displaydoc("scene to be rendered was not available for reading")]
     Read(RefError),
     // TODO: add errors for out of memory, lost GPU, etc.
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for RenderError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            RenderError::Read(e) => Some(e),
+        }
+    }
 }
 
 /// Image container produced by a [`HeadlessRenderer`].

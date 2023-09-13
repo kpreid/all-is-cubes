@@ -769,18 +769,26 @@ impl Merge for CharacterTransaction {
 }
 
 /// Transaction conflict error type for a [`CharacterTransaction`].
-#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 pub enum CharacterTransactionConflict {
-    #[allow(missing_docs)]
-    #[error("conflict in character body")]
+    /// conflict in character body
     Body(core::convert::Infallible),
-    #[allow(missing_docs)]
-    #[error("conflict in character inventory")]
+    /// conflict in character inventory
     Inventory(inv::InventoryConflict),
-    #[allow(missing_docs)]
-    #[error("conflict in character behaviors")]
+    /// conflict in character behaviors
     Behaviors(behavior::BehaviorTransactionConflict),
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for CharacterTransactionConflict {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            CharacterTransactionConflict::Body(_) => None,
+            CharacterTransactionConflict::Inventory(e) => Some(e),
+            CharacterTransactionConflict::Behaviors(e) => Some(e),
+        }
+    }
 }
 
 /// Description of a change to a [`Character`] for use in listeners.

@@ -59,6 +59,7 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "criterion",
+ "displaydoc",
  "downcast-rs",
  "embedded-graphics",
  "euclid",
@@ -80,7 +81,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_repr",
- "thiserror",
  "tokio",
  "yield-progress",
 ]
@@ -1210,6 +1210,17 @@ name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
+
+[[package]]
+name = "displaydoc"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "487585f4d0c6655fe74905e2504d8ad6908e4db67f744eb140876906c2f3175d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.27",
+]
 
 [[package]]
 name = "dlib"

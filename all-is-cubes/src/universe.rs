@@ -601,8 +601,8 @@ impl fmt::Display for InsertError {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
-#[error("data contains a reference to {to} that was not defined")]
+#[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
+#[displaydoc("data contains a reference to {to} that was not defined")]
 pub(crate) struct DeserializeRefsError {
     /// Name in the bad reference.
     to: Name,

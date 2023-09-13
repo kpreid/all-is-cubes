@@ -514,19 +514,14 @@ impl listen::Listener<BlockChange> for BlockListener {
 //
 // TODO: `SpaceBuilder` doesn't actually use `Palette` directly yet; this is here because
 // we plan that it *will*, and then `Palette` will be returning some of these errors.
-#[derive(Clone, Debug, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq)]
 #[allow(missing_docs)]
 #[non_exhaustive]
 pub enum PaletteError {
     /// The given palette is larger than the maximum supported length.
-    #[error("a palette of {len} blocks is too large")]
     PaletteTooLarge { len: usize },
 
     /// One of the indices in the data was outside the bounds of the palette.
-    #[error(
-        "block index {index} for cube {cube:?} exceeds palette length {palette_len}",
-        cube = Into::<[i32; 3]>::into(*.cube),
-    )]
     Index {
         index: BlockIndex,
         cube: math::Cube,
@@ -534,7 +529,6 @@ pub enum PaletteError {
     },
 
     /// The provided data did not match the bounds of the [`Space`](crate::space::Space).
-    #[error("data bounds {actual:?} is incorrect for space bounds {expected:?}")]
     WrongDataBounds {
         expected: math::GridAab,
         actual: math::GridAab,
@@ -543,12 +537,45 @@ pub enum PaletteError {
     /// The palette contained duplicate blocks.
     ///
     /// Note: in some cases, duplicates are permitted and this error will not be produced.
-    #[error("duplicate block at indices {index_1} and {index_2}: {block:?}")]
     Duplicate {
         index_1: BlockIndex,
         index_2: BlockIndex,
         block: Block,
     },
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for PaletteError {}
+
+impl fmt::Display for PaletteError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PaletteError::PaletteTooLarge { len } => {
+                write!(f, "a palette of {len} blocks is too large")
+            }
+            PaletteError::Index {
+                index,
+                cube,
+                palette_len,
+            } => write!(
+                f,
+                "block index {index} for cube {cube:?} exceeds palette length {palette_len}",
+                cube = Into::<[i32; 3]>::into(*cube),
+            ),
+            PaletteError::WrongDataBounds { expected, actual } => write!(
+                f,
+                "data bounds {actual:?} is incorrect for space bounds {expected:?}",
+            ),
+            PaletteError::Duplicate {
+                index_1,
+                index_2,
+                block,
+            } => write!(
+                f,
+                "duplicate block at indices {index_1} and {index_2}: {block:?}",
+            ),
+        }
+    }
 }
 
 /// Error returned from palette operations that would expand the palette but are out of

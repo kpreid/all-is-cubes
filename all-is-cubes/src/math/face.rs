@@ -512,8 +512,8 @@ impl TryFrom<GridVector> for Face7 {
 
 /// Error resulting from providing [`Face7::Within`] where a definite nonzero direction
 /// is needed, such as converting to a [`Face6`].
-#[derive(Copy, Clone, Debug, Eq, PartialEq, thiserror::Error)]
-#[error("Face7::Within does not have a direction or axis")]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, displaydoc::Display)]
+#[displaydoc("Face7::Within does not have a direction or axis")]
 #[allow(clippy::exhaustive_structs)]
 pub struct Faceless;
 

@@ -500,12 +500,15 @@ impl<H: BehaviorHost> Clone for Replace<H> {
 //---
 // Currently private internals, because we will probably want to have a better strategy
 // for addressing behaviors than indices.
-#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
-#[error("tried to replace the same behavior slot, {slot}, twice")]
+#[displaydoc("tried to replace the same behavior slot, {slot}, twice")]
 pub struct BehaviorTransactionConflict {
     slot: usize,
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for BehaviorTransactionConflict {}
 
 #[cfg(test)]
 pub(crate) use testing::*;

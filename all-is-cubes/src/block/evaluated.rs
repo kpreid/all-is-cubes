@@ -322,17 +322,33 @@ impl EvaluatedBlock {
 }
 
 /// Errors resulting from [`Block::evaluate()`].
-#[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 pub enum EvalBlockError {
     /// The block definition contained recursion that exceeded the evaluation limit.
-    #[error("block definition contains too much recursion")]
+    #[displaydoc("block definition contains too much recursion")]
     StackOverflow,
     /// Data referenced by the block definition was not available to read.
     ///
     /// This may be temporary or permanent; consult the [`RefError`] to determine that.
-    #[error("block data inaccessible: {0}")]
-    DataRefIs(#[from] RefError),
+    #[displaydoc("block data inaccessible: {0}")]
+    DataRefIs(RefError),
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for EvalBlockError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            EvalBlockError::StackOverflow => None,
+            EvalBlockError::DataRefIs(e) => Some(e),
+        }
+    }
+}
+
+impl From<RefError> for EvalBlockError {
+    fn from(value: RefError) -> Self {
+        EvalBlockError::DataRefIs(value)
+    }
 }
 
 impl EvalBlockError {

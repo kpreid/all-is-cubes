@@ -476,15 +476,15 @@ impl<'a, T: arbitrary::Arbitrary<'a> + 'static> arbitrary::Arbitrary<'a> for URe
 }
 
 /// Errors resulting from attempting to borrow/dereference a [`URef`].
-#[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 pub enum RefError {
     /// Target was deleted, or its entire universe was dropped.
-    #[error("object was deleted: {0}")]
+    #[displaydoc("object was deleted: {0}")]
     Gone(Name),
 
     /// Target is currently incompatibly borrowed.
-    #[error("object is currently in use: {0}")]
+    #[displaydoc("object is currently in use: {0}")]
     InUse(Name),
 
     /// Target does not have its data yet, which means that a serialized universe had
@@ -493,9 +493,12 @@ pub enum RefError {
     /// This can only happen during deserialization (and the error text will not actually
     /// appear because it is adjusted elsewhere)
     #[doc(hidden)]
-    #[error("object was referenced but not defined: {0}")]
+    #[displaydoc("object was referenced but not defined: {0}")]
     NotReady(Name),
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for RefError {}
 
 /// A wrapper type for an immutably borrowed value from an [`URef`].
 pub struct UBorrow<T: 'static>(owning_guard::UBorrowImpl<T>);

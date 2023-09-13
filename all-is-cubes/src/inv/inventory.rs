@@ -454,15 +454,18 @@ pub struct InventoryCheck {
 }
 
 /// Transaction conflict error type for an [`InventoryTransaction`].
-#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 pub enum InventoryConflict {
     /// Tried to replace the same inventory slot.
-    #[error("tried to replace the same inventory slot, {slot}, twice")]
+    #[displaydoc("tried to replace the same inventory slot, {slot}, twice")]
     #[non_exhaustive]
     #[allow(missing_docs)]
     ReplaceSameSlot { slot: usize },
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for InventoryConflict {}
 
 /// Description of a change to an [`Inventory`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

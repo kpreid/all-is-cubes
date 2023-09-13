@@ -246,7 +246,7 @@ impl transaction::Merge for BlockDefTransaction {
 /// Transaction conflict error type for a [`BlockDefTransaction`].
 // ---
 // TODO: this is identical to `CubeConflict` but for the names
-#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct BlockDefConflict {
     /// The transactions have conflicting preconditions (`old` blocks).
@@ -254,6 +254,9 @@ pub struct BlockDefConflict {
     /// The transactions are attempting to replace the same BlockDef with different blocks.
     pub(crate) new: bool,
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for BlockDefConflict {}
 
 impl fmt::Display for BlockDefConflict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

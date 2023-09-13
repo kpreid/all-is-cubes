@@ -4,7 +4,6 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::ops::AddAssign;
 use core::time::Duration;
-use std::error::Error;
 
 mod custom_format;
 pub use custom_format::*;
@@ -19,33 +18,65 @@ pub fn yield_progress_for_testing() -> YieldProgress {
     yield_progress::Builder::new().build()
 }
 
-/// Formatting wrapper which prints an [`Error`] together with its
-/// `source()` chain, with at least one newline between each.
-///
-/// The text begins with the [`core::fmt::Display`] format of the error.
-///
-/// Design note: This is not a [`CustomFormat`] because that has a blanket implementation
-/// which interferes with this one for [`Error`].
-#[doc(hidden)] // not something we wish to be stable public API
-#[derive(Clone, Copy, Debug)]
-#[allow(clippy::exhaustive_structs)]
-pub struct ErrorChain<'a>(pub &'a (dyn Error + 'a));
+#[cfg(feature = "std")]
+pub use error_chain::ErrorChain;
+#[cfg(feature = "std")]
+mod error_chain {
+    use core::fmt;
+    use std::error::Error;
 
-impl fmt::Display for ErrorChain<'_> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        format_error_chain(fmt, self.0)
+    /// Formatting wrapper which prints an [`Error`] together with its
+    /// `source()` chain, with at least one newline between each.
+    ///
+    /// The text begins with the [`core::fmt::Display`] format of the error.
+    ///
+    /// Design note: This is not a [`CustomFormat`] because that has a blanket implementation
+    /// which interferes with this one for [`Error`].
+    #[doc(hidden)] // not something we wish to be stable public API
+    #[derive(Clone, Copy, Debug)]
+    #[allow(clippy::exhaustive_structs)]
+    pub struct ErrorChain<'a>(pub &'a (dyn Error + 'a));
+
+    impl fmt::Display for ErrorChain<'_> {
+        fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+            format_error_chain(fmt, self.0)
+        }
+    }
+    fn format_error_chain(
+        fmt: &mut fmt::Formatter<'_>,
+        mut error: &(dyn Error + '_),
+    ) -> fmt::Result {
+        // Write the error's own message. This is expected NOT to contain the sources itself.
+        write!(fmt, "{error}")?;
+
+        while let Some(source) = error.source() {
+            error = source;
+            write!(fmt, "\n\nCaused by:\n    {error}")?;
+        }
+
+        Ok(())
     }
 }
-fn format_error_chain(fmt: &mut fmt::Formatter<'_>, mut error: &(dyn Error + '_)) -> fmt::Result {
-    // Write the error's own message. This is expected NOT to contain the sources itself.
-    write!(fmt, "{error}")?;
 
-    while let Some(source) = error.source() {
-        error = source;
-        write!(fmt, "\n\nCaused by:\n    {error}")?;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "std")] {
+        /// Alias for [`std::error::Error`] that is a substitute when not on `std`.
+        #[doc(hidden)]
+        pub use std::error::Error as ErrorIfStd;
+    } else {
+        use alloc::boxed::Box;
+
+        /// Substitute for [`std::error::Error`] with the same supertraits but no methods.
+        #[doc(hidden)]
+        pub trait ErrorIfStd: fmt::Debug + fmt::Display {}
+        impl<T> ErrorIfStd for T where T: fmt::Debug + fmt::Display {}
+
+        impl From<&str> for Box<dyn ErrorIfStd + Send + Sync> {
+            fn from(s: &str) -> Self {
+                Box::new(alloc::string::String::from(s))
+            }
+        }
     }
-
-    Ok(())
 }
 
 /// Equivalent of [`Iterator::map`] but applied to an [`Extend`] instead, transforming
@@ -182,15 +213,32 @@ pub fn assert_send_sync<T: Send + Sync>() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::error::Error;
+    use std::fmt;
 
     #[test]
     fn error_chain() {
-        #[derive(Debug, thiserror::Error)]
-        #[error("TestError1")]
+        #[derive(Debug)]
         struct TestError1;
-        #[derive(Debug, thiserror::Error)]
-        #[error("TestError2")]
-        struct TestError2(#[source] TestError1);
+        impl Error for TestError1 {}
+        impl fmt::Display for TestError1 {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "TestError1")
+            }
+        }
+
+        #[derive(Debug)]
+        struct TestError2(TestError1);
+        impl Error for TestError2 {
+            fn source(&self) -> Option<&(dyn Error + 'static)> {
+                Some(&self.0)
+            }
+        }
+        impl fmt::Display for TestError2 {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "TestError2")
+            }
+        }
 
         assert_eq!(
             format!("{}", ErrorChain(&TestError2(TestError1))),

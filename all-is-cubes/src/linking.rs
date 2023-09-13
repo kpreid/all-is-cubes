@@ -14,7 +14,6 @@ use core::fmt;
 use core::hash::Hash;
 use core::ops::Index;
 use std::collections::HashMap;
-use std::error::Error;
 
 use exhaust::Exhaust;
 
@@ -22,7 +21,7 @@ use crate::block::{Block, BlockDef, Primitive};
 use crate::space::SetCubeError;
 use crate::transaction::ExecuteError;
 use crate::universe::{InsertError, Name, URef, Universe};
-use crate::util::YieldProgress;
+use crate::util::{ErrorIfStd, YieldProgress};
 
 fn name_in_module<E: BlockModule>(key: &E) -> Name {
     Name::from(format!("{ns}/{key}", ns = E::namespace()))
@@ -230,21 +229,30 @@ impl<E: Eq + Hash> Index<E> for BlockProvider<E> {
 
 /// Error when a [`BlockProvider`] could not be created because the definitions of some
 /// of its blocks are missing.
-#[derive(Clone, Debug, Eq, thiserror::Error, PartialEq)]
-#[error("missing block definitions: {missing:?}")] // TODO: use Name's Display within the list
+#[derive(Clone, Debug, Eq, displaydoc::Display, PartialEq)]
+#[displaydoc("missing block definitions: {missing:?}")] // TODO: use Name's Display within the list
 pub struct ProviderError {
     missing: Box<[Name]>,
 }
 
+#[cfg(feature = "std")]
+impl std::error::Error for ProviderError {}
+
 /// An error resulting from “world generation”: failure to calculate/create/place objects
 /// (due to bad parameters or unforeseen edge cases), failure to successfully store them
 /// in or retrieve them from a [`Universe`], et cetera.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub struct GenError {
-    // TODO: Replace box with enum for common cases
-    #[source]
+    #[cfg_attr(not(feature = "std"), allow(dead_code))]
     detail: InGenError,
     for_object: Option<Name>,
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for GenError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.detail)
+    }
 }
 
 impl GenError {
@@ -293,40 +301,62 @@ impl From<InsertError> for GenError {
 ///
 /// TODO: Work this into a coherent set of error cases rather than purely
 /// "I saw one of these once, so add it".
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum InGenError {
     /// Generic error container for unusual situations.
-    #[error(transparent)]
-    Other(Box<dyn Error + Send + Sync>),
+    Other(Box<dyn ErrorIfStd + Send + Sync>),
 
     /// Something else needed to be generated and that failed.
-    #[error(transparent)]
     Gen(Box<GenError>),
 
     /// Failed to insert the generated items in the [`Universe`].
-    #[error(transparent)]
-    Insert(#[from] InsertError),
+    Insert(InsertError),
 
     /// Failed to find a needed dependency.
     // TODO: Any special handling? Phrase this as "missing dependency"?
-    #[error(transparent)]
-    Provider(#[from] ProviderError),
+    Provider(ProviderError),
 
     /// Failed during [`Space`](crate::space::Space) manipulation.
-    #[error(transparent)]
-    SetCube(#[from] SetCubeError),
+    SetCube(SetCubeError),
 
     /// Failed during a transaction.
     // TODO: This isn't very coherent; we're just aggregating various errors
-    #[error(transparent)]
-    Transaction(#[from] ExecuteError),
+    Transaction(ExecuteError),
 }
 
 impl InGenError {
     /// Convert an arbitrary error to `InGenError`.
-    pub fn other<E: Error + Send + Sync + 'static>(error: E) -> Self {
+    #[cfg_attr(not(feature = "std"), doc(hidden))]
+    pub fn other<E: ErrorIfStd + Send + Sync + 'static>(error: E) -> Self {
         Self::Other(Box::new(error))
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for InGenError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            InGenError::Other(e) => e.source(),
+            InGenError::Gen(e) => e.source(),
+            InGenError::Insert(e) => e.source(),
+            InGenError::Provider(e) => e.source(),
+            InGenError::SetCube(e) => e.source(),
+            InGenError::Transaction(e) => e.source(),
+        }
+    }
+}
+
+impl fmt::Display for InGenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            InGenError::Other(e) => e.fmt(f),
+            InGenError::Gen(e) => e.fmt(f),
+            InGenError::Insert(e) => e.fmt(f),
+            InGenError::Provider(e) => e.fmt(f),
+            InGenError::SetCube(e) => e.fmt(f),
+            InGenError::Transaction(e) => e.fmt(f),
+        }
     }
 }
 
@@ -334,6 +364,26 @@ impl From<GenError> for InGenError {
     fn from(error: GenError) -> Self {
         // We need to box this to avoid an unboxed recursive type.
         InGenError::Gen(Box::new(error))
+    }
+}
+impl From<InsertError> for InGenError {
+    fn from(error: InsertError) -> Self {
+        InGenError::Insert(error)
+    }
+}
+impl From<ProviderError> for InGenError {
+    fn from(error: ProviderError) -> Self {
+        InGenError::Provider(error)
+    }
+}
+impl From<SetCubeError> for InGenError {
+    fn from(error: SetCubeError) -> Self {
+        InGenError::SetCube(error)
+    }
+}
+impl From<ExecuteError> for InGenError {
+    fn from(error: ExecuteError) -> Self {
+        InGenError::Transaction(error)
     }
 }
 
@@ -345,6 +395,7 @@ mod tests {
     use crate::math::GridAab;
     use crate::util::assert_send_sync;
     use alloc::string::ToString;
+    use std::error::Error;
 
     #[derive(Exhaust, Clone, Debug, Eq, Hash, PartialEq)]
     enum Key {

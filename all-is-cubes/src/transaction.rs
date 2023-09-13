@@ -3,10 +3,10 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::any::type_name;
-use core::fmt::Debug;
-use std::error::Error;
+use core::fmt;
 
 use crate::universe::{URef, UTransactional, UniverseTransaction};
+use crate::util::ErrorIfStd;
 
 mod generic;
 pub use generic::MapConflict;
@@ -138,7 +138,9 @@ pub trait Merge {
     /// Accordingly, it might not describe the _entire_ area of the conflict
     /// but only one example from it, so as to avoid needing to allocate a
     /// data structure of arbitrary size.
-    type Conflict: std::error::Error + 'static;
+    ///
+    /// This type should implement [`std::error::Error`] when possible.
+    type Conflict: fmt::Debug + fmt::Display + 'static;
 
     /// Checks whether two transactions can be merged into a single transaction.
     /// If so, returns [`Ok`] containing data which may be passed to [`Self::merge`].
@@ -177,8 +179,7 @@ pub trait Merge {
 }
 
 /// Error type from [`Transaction::execute()`].
-#[derive(Clone, Debug, thiserror::Error)]
-#[error(transparent)]
+#[derive(Clone, Debug)]
 #[allow(clippy::exhaustive_enums)]
 pub enum ExecuteError {
     /// The transaction's preconditions were not met; it does not apply to the current
@@ -190,19 +191,41 @@ pub enum ExecuteError {
     Commit(CommitError),
 }
 
+#[cfg(feature = "std")]
+impl std::error::Error for ExecuteError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ExecuteError::Check(e) => e.source(),
+            ExecuteError::Commit(e) => e.source(),
+        }
+    }
+}
+
+impl fmt::Display for ExecuteError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ExecuteError::Check(e) => e.fmt(f),
+            ExecuteError::Commit(e) => e.fmt(f),
+        }
+    }
+}
+
 /// Error type returned by [`Transaction::check`].
 ///
 /// Note: This type is designed to be cheap to construct, as it is expected that game
 /// mechanics _may_ result in transactions repeatedly failing. Hence, it does not contain
 /// full details on the failure.
-#[derive(Clone, Debug, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq, displaydoc::Display)]
 #[allow(clippy::derive_partial_eq_without_eq)]
-#[error("Transaction precondition not met: {location}: {problem}")]
+#[displaydoc("Transaction precondition not met: {location}: {problem}")]
 pub struct PreconditionFailed {
     // TODO: Figure out how to have at least a little dynamic information. `Option<[i32; 3]>` ???
     pub(crate) location: &'static str,
     pub(crate) problem: &'static str,
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for PreconditionFailed {}
 
 /// Type of “unexpected errors” from [`Transaction::commit()`].
 //
@@ -210,28 +233,26 @@ pub struct PreconditionFailed {
 /// during normal game operation; it exists because we want to do better than panicking
 /// if it does, and give a report that's detailed enough that someone might be able to
 /// fix the underlying bug.
-#[derive(Clone, Debug, thiserror::Error)]
-#[error("Unexpected error while committing a transaction")]
+#[derive(Clone, Debug, displaydoc::Display)]
+#[displaydoc("Unexpected error while committing a transaction")]
 pub struct CommitError(CommitErrorKind);
 
-#[derive(Clone, Debug, thiserror::Error)]
+#[derive(Clone, Debug, displaydoc::Display)]
 enum CommitErrorKind {
-    #[error("{transaction_type}::commit() failed")]
+    #[displaydoc("{transaction_type}::commit() failed")]
     Leaf {
         transaction_type: &'static str,
-        #[source]
-        error: Arc<dyn Error + Send + Sync>,
+        error: Arc<dyn ErrorIfStd + Send + Sync>,
     },
-    #[error("{transaction_type}::commit() failed: {message}")]
+    #[displaydoc("{transaction_type}::commit() failed: {message}")]
     LeafMessage {
         transaction_type: &'static str,
         message: String,
     },
     /// A transaction forwarded an error to one of its parts and that failed.
-    #[error("in transaction part '{component}'")]
+    #[displaydoc("in transaction part '{component}'")]
     Context {
         component: String,
-        #[source]
         error: Arc<CommitError>, // must box recursion, might as well Arc
     },
 }
@@ -240,7 +261,7 @@ impl CommitError {
     /// Wrap an arbitrary unexpected error as a [`CommitError`].
     /// `T` should be the type of the transaction that caught it.
     #[must_use]
-    pub fn catch<T, E: Error + Send + Sync + 'static>(error: E) -> Self {
+    pub fn catch<T, E: ErrorIfStd + Send + Sync + 'static>(error: E) -> Self {
         CommitError(CommitErrorKind::Leaf {
             transaction_type: type_name::<T>(),
             error: Arc::new(error),
@@ -266,6 +287,17 @@ impl CommitError {
             component,
             error: Arc::new(self),
         })
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for CommitError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match &self.0 {
+            CommitErrorKind::Leaf { error, .. } => Some(error),
+            CommitErrorKind::LeafMessage { .. } => None,
+            CommitErrorKind::Context { error, .. } => Some(error),
+        }
     }
 }
 

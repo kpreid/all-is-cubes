@@ -926,11 +926,10 @@ impl Default for LightPhysics {
 /// Ways that [`Space::set`] can fail to make a change.
 ///
 /// Note that "already contained the given block" is considered a success.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum SetCubeError {
     /// The given cube or region is not within the bounds of this Space.
-    #[error("{:?} is outside of the bounds {:?}", .modification, .space_bounds)]
     OutOfBounds {
         /// The cube or region where modification was attempted.
         modification: GridAab,
@@ -939,10 +938,30 @@ pub enum SetCubeError {
     },
 
     /// More distinct blocks were added than currently supported.
-    #[error("more than {} block types is not yet supported", BlockIndex::MAX as usize + 1)]
     TooManyBlocks(),
 }
 
+#[cfg(feature = "std")]
+impl std::error::Error for SetCubeError {}
+
+impl fmt::Display for SetCubeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SetCubeError::OutOfBounds {
+                modification,
+                space_bounds,
+            } => write!(
+                f,
+                "{modification:?} is outside of the bounds {space_bounds:?}"
+            ),
+            SetCubeError::TooManyBlocks() => write!(
+                f,
+                "more than {} block types is not yet supported",
+                BlockIndex::MAX as usize + 1
+            ),
+        }
+    }
+}
 /// Description of a change to a [`Space`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[allow(clippy::exhaustive_enums)] // any change will probably be breaking anyway

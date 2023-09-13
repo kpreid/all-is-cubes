@@ -6,14 +6,20 @@ use std::collections::HashMap;
 use crate::transaction::Merge;
 
 /// Transaction conflict error type for transactions on [`BTreeMap`]s or [`HashMap`]s.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct MapConflict<K, C> {
     /// The key in the map for which `self.conflict` occurred.
     pub key: K,
     /// The conflict that occurred with two transactions for the same map value.
-    #[source]
     pub conflict: C,
+}
+
+#[cfg(feature = "std")]
+impl<K: fmt::Debug, C: std::error::Error + 'static> std::error::Error for MapConflict<K, C> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.conflict)
+    }
 }
 
 impl<K: fmt::Debug, C> fmt::Display for MapConflict<K, C> {

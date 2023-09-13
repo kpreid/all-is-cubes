@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::any::Any;
-use core::fmt::{self, Debug};
+use core::fmt;
 use std::collections::HashMap;
 
 use crate::transaction::{
@@ -139,9 +139,9 @@ impl AnyTransaction {
 }
 
 /// Hide the wrapper type entirely since its type is determined entirely by its contents.
-impl Debug for AnyTransaction {
+impl fmt::Debug for AnyTransaction {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Debug::fmt(self.transaction_as_debug(), fmt)
+        fmt::Debug::fmt(self.transaction_as_debug(), fmt)
     }
 }
 
@@ -214,15 +214,35 @@ pub struct UniverseCommitCheck {
 }
 
 /// Transaction conflict error type for [`UniverseTransaction`].
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum UniverseConflict {
     /// The two transactions modify members of different [`Universe`]s.
-    #[error("cannot merge transactions From different universes")]
     DifferentUniverse(UniverseId, UniverseId),
     /// The two transactions attempt to modify a member in conflicting ways.
-    #[error("transaction conflict at member {key}", key = .0.key)]
-    Member(#[from] transaction::MapConflict<Name, MemberConflict>),
+    Member(transaction::MapConflict<Name, MemberConflict>),
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for UniverseConflict {}
+
+impl fmt::Display for UniverseConflict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UniverseConflict::DifferentUniverse(_, _) => {
+                write!(f, "cannot merge transactions From different universes")
+            }
+            UniverseConflict::Member(c) => {
+                write!(f, "transaction conflict at member {key}", key = c.key)
+            }
+        }
+    }
+}
+
+impl From<transaction::MapConflict<Name, MemberConflict>> for UniverseConflict {
+    fn from(value: transaction::MapConflict<Name, MemberConflict>) -> Self {
+        Self::Member(value)
+    }
 }
 
 impl Transactional for Universe {
@@ -395,7 +415,7 @@ impl Merge for UniverseTransaction {
 }
 
 /// This formatting is chosen to be similar to [`Universe`]'s.
-impl Debug for UniverseTransaction {
+impl fmt::Debug for UniverseTransaction {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = fmt.debug_struct("UniverseTransaction");
         for (name, txn) in &self.members {
@@ -529,7 +549,7 @@ impl MemberTxn {
     }
 
     /// Returns the transaction out of the wrappers.
-    fn transaction_as_debug(&self) -> &dyn Debug {
+    fn transaction_as_debug(&self) -> &dyn fmt::Debug {
         use MemberTxn::*;
         match self {
             Modify(t) => t.transaction_as_debug(),
@@ -615,18 +635,29 @@ impl Merge for MemberTxn {
 }
 
 /// Transaction conflict error type for a single member in a [`UniverseTransaction`].
-#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 pub enum MemberConflict {
-    /// Tried to insert and simultaneously modify some member.
-    #[error("cannot simultaneously insert and make another change")]
+    /// cannot simultaneously insert and make another change
     InsertVsOther,
-    /// Tried to delete and simultaneously modify some member.
-    #[error("cannot simultaneously delete and make another change")]
+
+    /// cannot simultaneously delete and make another change
     DeleteVsOther,
+
     /// Tried to make incompatible modifications to the data of the member.
-    #[error(transparent)]
+    #[displaydoc("{0}")]
     Modify(ModifyMemberConflict),
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for MemberConflict {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            MemberConflict::InsertVsOther => None,
+            MemberConflict::DeleteVsOther => None,
+            MemberConflict::Modify(e) => e.source(),
+        }
+    }
 }
 
 /// Transaction conflict error type for modifying a [`Universe`] member (something a
@@ -635,9 +666,27 @@ pub enum MemberConflict {
 // Public wrapper hiding the details of [`AnyTransactionConflict`] which is an enum.
 // TODO: Probably this should just _be_ that enum, but let's hold off till a use case
 // shows up.
-#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
-#[error(transparent)]
-pub struct ModifyMemberConflict(#[from] AnyTransactionConflict);
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModifyMemberConflict(AnyTransactionConflict);
+
+#[cfg(feature = "std")]
+impl std::error::Error for ModifyMemberConflict {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.0.source()
+    }
+}
+
+impl fmt::Display for ModifyMemberConflict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl From<AnyTransactionConflict> for ModifyMemberConflict {
+    fn from(value: AnyTransactionConflict) -> Self {
+        Self(value)
+    }
+}
 
 #[cfg(test)]
 mod tests {

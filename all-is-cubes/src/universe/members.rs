@@ -356,14 +356,12 @@ macro_rules! member_enums_and_impls {
         }
 
         /// [`AnyTransaction`] conflict errors.
-        #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+        #[derive(Clone, Debug, Eq, PartialEq)]
         #[allow(clippy::large_enum_variant)]
         #[non_exhaustive]
         pub(in crate::universe) enum AnyTransactionConflict {
-            #[error("Mismatched transaction target types")]
             Mismatch,
             $(
-                #[error(transparent)]
                 $member_type(
                     <
                         <$member_type as transaction::Transactional>::Transaction
@@ -371,6 +369,25 @@ macro_rules! member_enums_and_impls {
                     >::Conflict
                 ),
             )*
+        }
+
+        #[cfg(feature = "std")]
+        impl std::error::Error for AnyTransactionConflict {
+            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                match self {
+                    Self::Mismatch => None,
+                    $( Self::$member_type(e) => Some(e), )*
+                }
+            }
+        }
+
+        impl fmt::Display for AnyTransactionConflict {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self {
+                    Self::Mismatch => write!(f, "Mismatched transaction target types"),
+                    $( Self::$member_type(e) => e.fmt(f), )*
+                }
+            }
         }
     }
 }

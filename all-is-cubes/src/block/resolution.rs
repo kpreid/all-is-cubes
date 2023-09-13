@@ -202,8 +202,11 @@ impl<'de> serde::Deserialize<'de> for Resolution {
 
 /// Error type produced by [`TryFrom`] for [`Resolution`], and deserializing resolutions,
 /// when the number is not a permitted resolution value.
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, thiserror::Error)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub struct IntoResolutionError<N>(N);
+
+#[cfg(feature = "std")]
+impl<N: fmt::Display + fmt::Debug> std::error::Error for IntoResolutionError<N> {}
 
 impl<N: fmt::Display> fmt::Display for IntoResolutionError<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

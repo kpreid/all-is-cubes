@@ -871,8 +871,8 @@ impl FusedIterator for GridIter {}
 
 /// Error when a [`GridAab`] or [`Cube`] cannot be constructed from the given input.
 // TODO: Make this an enum
-#[derive(Clone, Debug, thiserror::Error, Eq, PartialEq)]
-#[error("{0}")]
+#[derive(Clone, Debug, displaydoc::Display, Eq, PartialEq)]
+#[displaydoc("{0}")]
 pub struct GridOverflowError(String);
 
 /// A 3-dimensional array with arbitrary element type instead of [`Space`](crate::space::Space)'s
@@ -1118,11 +1118,27 @@ mod grid_array_arb {
 }
 
 /// Error from [`GridArray::from_elements`] being given the wrong length.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
-#[error("array of length {input_length} cannot fill volume {v} of {bounds:?}", v = self.bounds.volume())]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ArrayLengthError {
     input_length: usize,
     bounds: GridAab,
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for ArrayLengthError {}
+
+impl fmt::Display for ArrayLengthError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            input_length,
+            bounds,
+        } = self;
+        write!(
+            f,
+            "array of length {input_length} cannot fill volume {v} of {bounds:?}",
+            v = self.bounds.volume()
+        )
+    }
 }
 
 /// `Debug`-formatting helper

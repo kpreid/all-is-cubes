@@ -411,30 +411,50 @@ impl ToolInput {
 }
 
 /// Ways that a tool can fail.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 pub enum ToolError {
     // TODO: Add tests for these error messages and make them make good sense in contexts
     // they might appear ... or possibly we have a separate trait for them
     /// There was no tool to use (empty inventory slot, nonexistent slot, nonexistent inventory…).
-    #[error("no tool")]
+    #[displaydoc("no tool")]
     NoTool,
     /// The tool cannot currently be used or does not apply to the target.
-    #[error("does not apply")]
+    #[displaydoc("does not apply")]
     NotUsable,
     /// Cannot place a block or similar because there's a block occupying the space.
-    #[error("there's something in the way")]
+    #[displaydoc("there's something in the way")]
     Obstacle,
     /// The tool requires a target cube and none was present.
-    #[error("nothing is selected")]
+    #[displaydoc("nothing is selected")]
     NothingSelected,
     /// The space to be operated on could not be accessed.
-    #[error("error accessing space: {0}")]
-    SpaceRef(#[from] RefError),
+    #[displaydoc("error accessing space: {0}")]
+    SpaceRef(RefError),
     /// An error occurred while executing the effects of the tool.
     /// TODO: Improve this along with [`Transaction`] error types.
-    #[error("unexpected error: {0}")]
+    #[displaydoc("unexpected error: {0}")]
     Internal(String),
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for ToolError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ToolError::NoTool => None,
+            ToolError::NotUsable => None,
+            ToolError::Obstacle => None,
+            ToolError::NothingSelected => None,
+            ToolError::SpaceRef(e) => Some(e),
+            ToolError::Internal(_) => None,
+        }
+    }
+}
+
+impl From<RefError> for ToolError {
+    fn from(value: RefError) -> Self {
+        ToolError::SpaceRef(value)
+    }
 }
 
 impl ToolError {

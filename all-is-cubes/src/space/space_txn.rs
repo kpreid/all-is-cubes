@@ -378,18 +378,39 @@ impl fmt::Debug for SpaceTransaction {
 }
 
 /// Transaction conflict error type for a [`SpaceTransaction`].
-#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum SpaceTransactionConflict {
     #[allow(missing_docs)]
-    #[error("conflict at cube {c}", c = .cube.custom_format(ConciseDebug))]
     Cube {
         cube: Cube, // TODO: GridAab instead?
         conflict: CubeConflict,
     },
     #[allow(missing_docs)]
-    #[error("conflict in behaviors")]
     Behaviors(behavior::BehaviorTransactionConflict),
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for SpaceTransactionConflict {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            SpaceTransactionConflict::Cube { conflict, .. } => Some(conflict),
+            SpaceTransactionConflict::Behaviors(conflict) => Some(conflict),
+        }
+    }
+}
+
+impl fmt::Display for SpaceTransactionConflict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SpaceTransactionConflict::Cube { cube, conflict: _ } => write!(
+                f,
+                "conflict at cube {c}",
+                c = cube.custom_format(ConciseDebug)
+            ),
+            SpaceTransactionConflict::Behaviors(_) => write!(f, "conflict in behaviors"),
+        }
+    }
 }
 
 /// Data for a single cube in a [`SpaceTransaction`]. This does not function as a
@@ -467,7 +488,7 @@ struct CubeMergeCheck {
 }
 
 /// Transaction conflict error type for a single cube of a [`SpaceTransaction`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct CubeConflict {
     /// The transactions have conflicting preconditions (`old` blocks).
@@ -475,6 +496,9 @@ pub struct CubeConflict {
     /// The transactions are attempting to modify the same cube.
     pub(crate) new: bool,
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for CubeConflict {}
 
 impl fmt::Display for CubeConflict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
