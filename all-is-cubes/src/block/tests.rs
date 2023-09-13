@@ -85,328 +85,332 @@ fn block_debug_with_modifiers() {
     );
 }
 
-#[test]
-fn evaluate_air_self_consistent() {
-    AIR.evaluate().unwrap().consistency_check();
-}
+mod eval {
+    use super::{assert_eq, *};
 
-#[test]
-fn evaluate_air_consistent_with_constant() {
-    assert_eq!(AIR.evaluate().unwrap(), AIR_EVALUATED);
-    assert_eq!(
-        Block::from(Primitive::Air).evaluate().unwrap(),
-        AIR_EVALUATED
-    );
-}
+    #[test]
+    fn air_self_consistent() {
+        AIR.evaluate().unwrap().consistency_check();
+    }
 
-#[test]
-fn evaluate_air_consistent_with_evoxel_air() {
-    assert_eq!(
-        AIR.evaluate().unwrap().voxels.single_voxel().unwrap(),
-        Evoxel::AIR
-    );
-}
+    #[test]
+    fn air_consistent_with_constant() {
+        assert_eq!(AIR.evaluate().unwrap(), AIR_EVALUATED);
+        assert_eq!(
+            Block::from(Primitive::Air).evaluate().unwrap(),
+            AIR_EVALUATED
+        );
+    }
 
-#[test]
-fn evaluate_air_in_recursive_block() {
-    let mut universe = Universe::new();
-    let block = Block::builder()
-        .voxels_fn(&mut universe, R1, |_| AIR)
-        .unwrap()
-        .build();
-    assert_eq!(
-        block.evaluate().unwrap().voxels.single_voxel().unwrap(),
-        Evoxel::AIR
-    );
-}
+    #[test]
+    fn air_consistent_with_evoxel_air() {
+        assert_eq!(
+            AIR.evaluate().unwrap().voxels.single_voxel().unwrap(),
+            Evoxel::AIR
+        );
+    }
 
-#[test]
-fn evaluate_opaque_atom_and_attributes() {
-    let color = Rgba::new(1.0, 2.0, 3.0, 1.0);
-    let attributes = BlockAttributes {
-        display_name: Cow::Borrowed("hello world"),
-        selectable: false,
-        ..BlockAttributes::default()
-    };
-    let block = Block::from(Atom {
-        attributes: attributes.clone(),
-        color,
-        emission: Rgb::ONE,
-        collision: BlockCollision::None,
-    });
-    let e = block.evaluate().unwrap();
-    assert_eq!(e.attributes, attributes);
-    assert_eq!(e.color, block.color());
-    assert_eq!(
-        e.voxels,
-        Evoxels::One(Evoxel {
+    #[test]
+    fn air_in_recursive_block() {
+        let mut universe = Universe::new();
+        let block = Block::builder()
+            .voxels_fn(&mut universe, R1, |_| AIR)
+            .unwrap()
+            .build();
+        assert_eq!(
+            block.evaluate().unwrap().voxels.single_voxel().unwrap(),
+            Evoxel::AIR
+        );
+    }
+
+    #[test]
+    fn opaque_atom_and_attributes() {
+        let color = Rgba::new(1.0, 2.0, 3.0, 1.0);
+        let attributes = BlockAttributes {
+            display_name: Cow::Borrowed("hello world"),
+            selectable: false,
+            ..BlockAttributes::default()
+        };
+        let block = Block::from(Atom {
+            attributes: attributes.clone(),
             color,
             emission: Rgb::ONE,
-            selectable: false,
             collision: BlockCollision::None,
-        })
-    );
-    assert_eq!(e.resolution(), R1);
-    assert_eq!(e.opaque, FaceMap::repeat(true));
-    assert_eq!(e.visible, true);
-    assert_eq!(
-        e.voxel_opacity_mask,
-        Some(GridArray::from_element(OpacityCategory::Opaque))
-    )
-}
+        });
+        let e = block.evaluate().unwrap();
+        assert_eq!(e.attributes, attributes);
+        assert_eq!(e.color, block.color());
+        assert_eq!(
+            e.voxels,
+            Evoxels::One(Evoxel {
+                color,
+                emission: Rgb::ONE,
+                selectable: false,
+                collision: BlockCollision::None,
+            })
+        );
+        assert_eq!(e.resolution(), R1);
+        assert_eq!(e.opaque, FaceMap::repeat(true));
+        assert_eq!(e.visible, true);
+        assert_eq!(
+            e.voxel_opacity_mask,
+            Some(GridArray::from_element(OpacityCategory::Opaque))
+        )
+    }
 
-#[test]
-fn evaluate_transparent_atom() {
-    let color = Rgba::new(1.0, 2.0, 3.0, 0.5);
-    let block = Block::from(color);
-    let e = block.evaluate().unwrap();
-    assert_eq!(e.color, block.color());
-    assert!(matches!(e.voxels, Evoxels::One(_)));
-    assert_eq!(e.opaque, FaceMap::repeat(false));
-    assert_eq!(e.visible, true);
-    assert_eq!(
-        e.voxel_opacity_mask,
-        Some(GridArray::from_element(OpacityCategory::Partial))
-    )
-}
+    #[test]
+    fn transparent_atom() {
+        let color = Rgba::new(1.0, 2.0, 3.0, 0.5);
+        let block = Block::from(color);
+        let e = block.evaluate().unwrap();
+        assert_eq!(e.color, block.color());
+        assert!(matches!(e.voxels, Evoxels::One(_)));
+        assert_eq!(e.opaque, FaceMap::repeat(false));
+        assert_eq!(e.visible, true);
+        assert_eq!(
+            e.voxel_opacity_mask,
+            Some(GridArray::from_element(OpacityCategory::Partial))
+        )
+    }
 
-#[test]
-fn evaluate_invisible_atom() {
-    let block = Block::from(Rgba::TRANSPARENT);
-    let e = block.evaluate().unwrap();
-    assert_eq!(e.color, Rgba::TRANSPARENT);
-    assert!(matches!(e.voxels, Evoxels::One(_)));
-    assert_eq!(e.opaque, FaceMap::repeat(false));
-    assert_eq!(e.visible, false);
-    assert_eq!(e.voxel_opacity_mask, None)
-}
+    #[test]
+    fn invisible_atom() {
+        let block = Block::from(Rgba::TRANSPARENT);
+        let e = block.evaluate().unwrap();
+        assert_eq!(e.color, Rgba::TRANSPARENT);
+        assert!(matches!(e.voxels, Evoxels::One(_)));
+        assert_eq!(e.opaque, FaceMap::repeat(false));
+        assert_eq!(e.visible, false);
+        assert_eq!(e.voxel_opacity_mask, None)
+    }
 
-#[test]
-fn evaluate_voxels_checked_individually() {
-    let resolution = R2;
-    let mut universe = Universe::new();
+    #[test]
+    fn voxels_checked_individually() {
+        let resolution = R2;
+        let mut universe = Universe::new();
 
-    let attributes = BlockAttributes {
-        display_name: Cow::Borrowed("hello world"),
-        ..BlockAttributes::default()
-    };
-    let block = Block::builder()
-        .attributes(attributes.clone())
-        .voxels_fn(&mut universe, resolution, |point| {
-            let point = point.lower_bounds().cast::<f32>();
-            Block::from(Rgba::new(point.x, point.y, point.z, 1.0))
-        })
-        .unwrap()
-        .build();
-
-    let e = block.evaluate().unwrap();
-    assert_eq!(e.attributes, attributes);
-    assert_eq!(
-        e.voxels,
-        Evoxels::Many(
-            resolution,
-            GridArray::from_fn(GridAab::for_block(resolution), |point| {
+        let attributes = BlockAttributes {
+            display_name: Cow::Borrowed("hello world"),
+            ..BlockAttributes::default()
+        };
+        let block = Block::builder()
+            .attributes(attributes.clone())
+            .voxels_fn(&mut universe, resolution, |point| {
                 let point = point.lower_bounds().cast::<f32>();
-                Evoxel {
-                    color: Rgba::new(point.x, point.y, point.z, 1.0),
-                    emission: Rgb::ZERO,
-                    selectable: true,
-                    collision: BlockCollision::Hard,
-                }
+                Block::from(Rgba::new(point.x, point.y, point.z, 1.0))
             })
-        )
-    );
-    assert_eq!(e.color, Rgba::new(0.5, 0.5, 0.5, 1.0));
-    assert_eq!(e.resolution(), resolution);
-    assert_eq!(e.opaque, FaceMap::repeat(true));
-    assert_eq!(e.visible, true);
-    assert_eq!(
-        e.voxel_opacity_mask,
-        Some(GridArray::repeat(
-            GridAab::for_block(resolution),
-            OpacityCategory::Opaque,
-        ))
-    )
-}
+            .unwrap()
+            .build();
 
-#[test]
-fn evaluate_transparent_voxels() {
-    let mut universe = Universe::new();
-    let resolution = R4;
-    let alpha = 0.5;
-    let block = Block::builder()
-        .voxels_fn(&mut universe, resolution, |point| {
-            Block::from(Rgba::new(
-                0.0,
-                0.0,
-                0.0,
-                if point.x == 0 && point.z == 0 {
-                    alpha
-                } else {
-                    1.0
-                },
+        let e = block.evaluate().unwrap();
+        assert_eq!(e.attributes, attributes);
+        assert_eq!(
+            e.voxels,
+            Evoxels::Many(
+                resolution,
+                GridArray::from_fn(GridAab::for_block(resolution), |point| {
+                    let point = point.lower_bounds().cast::<f32>();
+                    Evoxel {
+                        color: Rgba::new(point.x, point.y, point.z, 1.0),
+                        emission: Rgb::ZERO,
+                        selectable: true,
+                        collision: BlockCollision::Hard,
+                    }
+                })
+            )
+        );
+        assert_eq!(e.color, Rgba::new(0.5, 0.5, 0.5, 1.0));
+        assert_eq!(e.resolution(), resolution);
+        assert_eq!(e.opaque, FaceMap::repeat(true));
+        assert_eq!(e.visible, true);
+        assert_eq!(
+            e.voxel_opacity_mask,
+            Some(GridArray::repeat(
+                GridAab::for_block(resolution),
+                OpacityCategory::Opaque,
             ))
-        })
-        .unwrap()
-        .build();
-
-    let e = block.evaluate().unwrap();
-    // Transparency is (currently) computed by an orthographic view through all six
-    // faces, and only two out of six faces in this test block don't fully cover
-    // the light paths with opaque surfaces.
-    assert_eq!(
-        e.color,
-        Rgba::new(
-            0.0,
-            0.0,
-            0.0,
-            1.0 - (alpha / (f32::from(resolution).powi(2) * 3.0))
         )
-    );
-    assert_eq!(
-        e.opaque,
-        FaceMap {
-            nx: false,
-            ny: false,
-            nz: false,
-            px: true,
-            py: false,
-            pz: true,
-        }
-    );
-    assert_eq!(e.visible, true);
-}
+    }
 
-#[test]
-fn evaluate_voxels_full_but_transparent() {
-    let resolution = R4;
-    let mut universe = Universe::new();
-    let block = Block::builder()
-        .voxels_fn(&mut universe, resolution, |cube| {
-            Block::from(Rgba::new(
+    #[test]
+    fn transparent_voxels() {
+        let mut universe = Universe::new();
+        let resolution = R4;
+        let alpha = 0.5;
+        let block = Block::builder()
+            .voxels_fn(&mut universe, resolution, |point| {
+                Block::from(Rgba::new(
+                    0.0,
+                    0.0,
+                    0.0,
+                    if point.x == 0 && point.z == 0 {
+                        alpha
+                    } else {
+                        1.0
+                    },
+                ))
+            })
+            .unwrap()
+            .build();
+
+        let e = block.evaluate().unwrap();
+        // Transparency is (currently) computed by an orthographic view through all six
+        // faces, and only two out of six faces in this test block don't fully cover
+        // the light paths with opaque surfaces.
+        assert_eq!(
+            e.color,
+            Rgba::new(
                 0.0,
                 0.0,
                 0.0,
-                if cube == Cube::new(1, 1, 1) { 1.0 } else { 0.0 },
-            ))
-        })
-        .unwrap()
-        .build();
+                1.0 - (alpha / (f32::from(resolution).powi(2) * 3.0))
+            )
+        );
+        assert_eq!(
+            e.opaque,
+            FaceMap {
+                nx: false,
+                ny: false,
+                nz: false,
+                px: true,
+                py: false,
+                pz: true,
+            }
+        );
+        assert_eq!(e.visible, true);
+    }
 
-    let e = block.evaluate().unwrap();
-    assert_eq!(
-        e.color,
-        Rgba::new(0.0, 0.0, 0.0, 1.0 / f32::from(resolution).powi(2))
-    );
-    assert_eq!(e.resolution(), resolution);
-    assert_eq!(e.opaque, FaceMap::repeat(false));
-    assert_eq!(e.visible, true);
-}
+    #[test]
+    fn voxels_full_but_transparent() {
+        let resolution = R4;
+        let mut universe = Universe::new();
+        let block = Block::builder()
+            .voxels_fn(&mut universe, resolution, |cube| {
+                Block::from(Rgba::new(
+                    0.0,
+                    0.0,
+                    0.0,
+                    if cube == Cube::new(1, 1, 1) { 1.0 } else { 0.0 },
+                ))
+            })
+            .unwrap()
+            .build();
 
-/// Test the situation where the space is smaller than the block: in particular,
-/// even if the space is all opaque, the block should not be counted as opaque.
-#[test]
-fn evaluate_voxels_partial_not_filling() {
-    let resolution = R4;
-    let mut universe = Universe::new();
-    let mut space = Space::empty_positive(2, 4, 4);
-    space
-        .fill_uniform(space.bounds(), Block::from(Rgba::WHITE))
-        .unwrap();
-    let space_ref = universe.insert_anonymous(space);
-    let block = Block::builder()
-        .voxels_ref(resolution as Resolution, space_ref.clone())
-        .build();
+        let e = block.evaluate().unwrap();
+        assert_eq!(
+            e.color,
+            Rgba::new(0.0, 0.0, 0.0, 1.0 / f32::from(resolution).powi(2))
+        );
+        assert_eq!(e.resolution(), resolution);
+        assert_eq!(e.opaque, FaceMap::repeat(false));
+        assert_eq!(e.visible, true);
+    }
 
-    let e = block.evaluate().unwrap();
-    // of 6 faces, 2 are opaque and 2 are half-transparent, thus there are 8 opaque half-faces.
-    assert_eq!(e.color, Rgba::new(1.0, 1.0, 1.0, 8. / 12.));
-    assert_eq!(e.resolution(), resolution);
-    assert_eq!(e.opaque, FaceMap::repeat(false).with(Face6::NX, true));
-    assert_eq!(e.visible, true);
-}
+    /// Test the situation where the space is smaller than the block: in particular,
+    /// even if the space is all opaque, the block should not be counted as opaque.
+    #[test]
+    fn voxels_partial_not_filling() {
+        let resolution = R4;
+        let mut universe = Universe::new();
+        let mut space = Space::empty_positive(2, 4, 4);
+        space
+            .fill_uniform(space.bounds(), Block::from(Rgba::WHITE))
+            .unwrap();
+        let space_ref = universe.insert_anonymous(space);
+        let block = Block::builder()
+            .voxels_ref(resolution as Resolution, space_ref.clone())
+            .build();
 
-/// Tests that the `offset` field of `Primitive::Recur` is respected.
-#[test]
-fn recur_with_offset() {
-    let resolution = R4;
-    let resolution_g = GridCoordinate::from(resolution);
-    let offset = GridVector::new(resolution_g, 0, 0);
-    let mut universe = Universe::new();
-    let mut space = Space::empty_positive(resolution_g * 2, resolution_g, resolution_g);
-    space
-        .fill(space.bounds(), |point| {
-            let point = point.lower_bounds().cast::<f32>();
-            Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
-        })
-        .unwrap();
-    let space_ref = universe.insert_anonymous(space);
-    let block_at_offset = Block::from_primitive(Primitive::Recur {
-        attributes: BlockAttributes::default(),
-        offset: offset.to_point(),
-        resolution,
-        space: space_ref.clone(),
-    });
+        let e = block.evaluate().unwrap();
+        // of 6 faces, 2 are opaque and 2 are half-transparent, thus there are 8 opaque half-faces.
+        assert_eq!(e.color, Rgba::new(1.0, 1.0, 1.0, 8. / 12.));
+        assert_eq!(e.resolution(), resolution);
+        assert_eq!(e.opaque, FaceMap::repeat(false).with(Face6::NX, true));
+        assert_eq!(e.visible, true);
+    }
 
-    let e = block_at_offset.evaluate().unwrap();
-    assert_eq!(
-        e.voxels,
-        Evoxels::Many(
+    /// Tests that the `offset` field of `Primitive::Recur` is respected.
+    #[test]
+    fn recur_with_offset() {
+        let resolution = R4;
+        let resolution_g = GridCoordinate::from(resolution);
+        let offset = GridVector::new(resolution_g, 0, 0);
+        let mut universe = Universe::new();
+        let mut space = Space::empty_positive(resolution_g * 2, resolution_g, resolution_g);
+        space
+            .fill(space.bounds(), |point| {
+                let point = point.lower_bounds().cast::<f32>();
+                Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
+            })
+            .unwrap();
+        let space_ref = universe.insert_anonymous(space);
+        let block_at_offset = Block::from_primitive(Primitive::Recur {
+            attributes: BlockAttributes::default(),
+            offset: offset.to_point(),
             resolution,
-            GridArray::from_fn(GridAab::for_block(resolution as Resolution), |point| {
-                let point = (point.lower_bounds() + offset).cast::<f32>();
-                Evoxel {
-                    color: Rgba::new(point.x, point.y, point.z, 1.0),
-                    emission: Rgb::ZERO,
-                    selectable: true,
-                    collision: BlockCollision::Hard,
-                }
-            })
-        )
-    );
-}
+            space: space_ref.clone(),
+        });
 
-/// Fuzzer-derived regression test for numeric overflow
-#[test]
-fn recur_offset_negative_overflow() {
-    let mut universe = Universe::new();
-    let space = Space::builder(GridAab::from_lower_upper(
-        [1743229108, 939544399, -2147463345],
-        [1743229109, 939544400, -2147461505],
-    ))
-    .build();
-    let block_at_offset = Block::from_primitive(Primitive::Recur {
-        attributes: BlockAttributes::default(),
-        offset: GridPoint::new(-414232629, -2147483648, -13697025),
-        resolution: R128,
-        space: universe.insert_anonymous(space),
-    });
+        let e = block_at_offset.evaluate().unwrap();
+        assert_eq!(
+            e.voxels,
+            Evoxels::Many(
+                resolution,
+                GridArray::from_fn(GridAab::for_block(resolution as Resolution), |point| {
+                    let point = (point.lower_bounds() + offset).cast::<f32>();
+                    Evoxel {
+                        color: Rgba::new(point.x, point.y, point.z, 1.0),
+                        emission: Rgb::ZERO,
+                        selectable: true,
+                        collision: BlockCollision::Hard,
+                    }
+                })
+            )
+        );
+    }
 
-    let e = block_at_offset.evaluate().unwrap();
-    assert!(!e.visible);
-}
-
-#[test]
-fn indirect_equivalence() {
-    let resolution = R4;
-    let mut universe = Universe::new();
-    let mut space = Space::empty(GridAab::for_block(resolution));
-    // TODO: BlockGen should support constructing indirects (by default, even)
-    // and we can use the more concise version
-    space
-        .fill(space.bounds(), |point| {
-            let point = point.lower_bounds().cast::<f32>();
-            Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
-        })
-        .unwrap();
-    let space_ref = universe.insert_anonymous(space);
-    let block = Block::builder()
-        .voxels_ref(resolution as Resolution, space_ref.clone())
+    /// Fuzzer-derived regression test for numeric overflow
+    #[test]
+    fn recur_offset_negative_overflow() {
+        let mut universe = Universe::new();
+        let space = Space::builder(GridAab::from_lower_upper(
+            [1743229108, 939544399, -2147463345],
+            [1743229109, 939544400, -2147461505],
+        ))
         .build();
-    let eval_bare = block.evaluate();
-    let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
-    let eval_def = block_def_ref.read().unwrap().evaluate();
-    assert_eq!(eval_bare, eval_def);
+        let block_at_offset = Block::from_primitive(Primitive::Recur {
+            attributes: BlockAttributes::default(),
+            offset: GridPoint::new(-414232629, -2147483648, -13697025),
+            resolution: R128,
+            space: universe.insert_anonymous(space),
+        });
+
+        let e = block_at_offset.evaluate().unwrap();
+        assert!(!e.visible);
+    }
+
+    #[test]
+    fn indirect_equivalence() {
+        let resolution = R4;
+        let mut universe = Universe::new();
+        let mut space = Space::empty(GridAab::for_block(resolution));
+        // TODO: BlockGen should support constructing indirects (by default, even)
+        // and we can use the more concise version
+        space
+            .fill(space.bounds(), |point| {
+                let point = point.lower_bounds().cast::<f32>();
+                Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
+            })
+            .unwrap();
+        let space_ref = universe.insert_anonymous(space);
+        let block = Block::builder()
+            .voxels_ref(resolution as Resolution, space_ref.clone())
+            .build();
+        let eval_bare = block.evaluate();
+        let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
+        let eval_def = block_def_ref.read().unwrap().evaluate();
+        assert_eq!(eval_bare, eval_def);
+    }
 }
 
 #[test]
