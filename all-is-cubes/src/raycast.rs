@@ -227,17 +227,7 @@ impl Raycaster {
             Some(cube) => cube.lower_bounds(),
             None => {
                 // Return a raycaster which emits no cubes.
-                return Self {
-                    ray: Ray::new(origin, direction),
-                    emit_current: false, // emit no cubes
-                    cube: GridPoint::origin(),
-                    step: Vector3::zero(),
-                    t_max: Vector3::zero(),
-                    t_delta: Vector3::new(f64::INFINITY, f64::INFINITY, f64::INFINITY),
-                    last_face: Face7::Within,
-                    last_t_distance: 0.0,
-                    bounds: None,
-                };
+                return Self::new_empty();
             }
         };
 
@@ -248,6 +238,22 @@ impl Raycaster {
             step: direction.map(signum_101),
             t_max: origin.to_vec().zip(direction, scale_to_integer_step),
             t_delta: direction.map(|x| x.abs().recip()),
+            last_face: Face7::Within,
+            last_t_distance: 0.0,
+            bounds: None,
+        }
+    }
+
+    /// Construct a [`Raycaster`] which will produce no items.
+    /// This is used when numeric overflow prevents success.
+    fn new_empty() -> Self {
+        Self {
+            ray: Ray::new(Point3::origin(), Vector3::zero()),
+            emit_current: false,
+            cube: GridPoint::origin(),
+            step: Vector3::zero(),
+            t_max: Vector3::zero(),
+            t_delta: Vector3::new(f64::INFINITY, f64::INFINITY, f64::INFINITY),
             last_face: Face7::Within,
             last_t_distance: 0.0,
             bounds: None,
@@ -433,7 +439,10 @@ impl Raycaster {
             let ff_ray = self.ray.advance(t_start);
 
             let Some(cube) = Cube::containing(ff_ray.origin) else {
-                // Can't fast-forward if we would numeric overflow
+                // Can't fast-forward if we would numeric overflow.
+                // But in that case, also, we almost certainly can't feasibly
+                // raycast either.
+                *self = Self::new_empty();
                 return;
             };
 
@@ -1089,6 +1098,11 @@ mod tests {
         let _ = Raycaster::new(Point3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 1.0, 1.0))
             .within(bounds)
             .within(bounds);
+    }
+
+    #[test]
+    fn no_steps() {
+        assert_no_steps(Raycaster::new_empty());
     }
 
     /// An example of an axis-aligned ray that wasn't working.
