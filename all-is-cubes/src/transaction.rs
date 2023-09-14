@@ -83,14 +83,14 @@ pub trait Transaction<T: ?Sized>: Merge {
     /// need to override this. Equivalent to:
     ///
     /// ```rust
-    /// # use all_is_cubes::transaction::{Transaction, no_outputs};
+    /// # use all_is_cubes::transaction::{Transaction, ExecuteError, no_outputs};
     /// # use all_is_cubes::universe::{Universe, UniverseTransaction};
     /// # let transaction = UniverseTransaction::default();
     /// # let target = &mut Universe::new();
     /// # let outputs = &mut no_outputs;
-    /// let check = transaction.check(target)?;
-    /// transaction.commit(target, check, outputs)?;
-    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+    /// let check = transaction.check(target).map_err(ExecuteError::Check)?;
+    /// transaction.commit(target, check, outputs).map_err(ExecuteError::Commit)?;
+    /// # Ok::<(), ExecuteError>(())
     /// ```
     fn execute(
         &self,
