@@ -18,7 +18,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::{self, Ordering};
 
 use crate::block::BlockDef;
 use crate::character::Character;
@@ -94,11 +94,30 @@ impl fmt::Display for Name {
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub struct UniverseId(u64);
 
-static UNIVERSE_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+cfg_if::cfg_if! {
+    // Use 64 bit if possible, because 64 bits is enough to be infeasible to overflow
+    // by counting one at a time.
+    if #[cfg(target_has_atomic = "64")] {
+        static UNIVERSE_ID_COUNTER: atomic::AtomicU64 = atomic::AtomicU64::new(0);
+    } else if #[cfg(target_has_atomic = "32")] {
+        static UNIVERSE_ID_COUNTER: atomic::AtomicU32 = atomic::AtomicU32::new(0);
+    } else {
+        // If this doesn't work we'll give up.
+        static UNIVERSE_ID_COUNTER: atomic::AtomicUsize = atomic::AtomicUsize::new(0);
+    }
+}
 
 impl UniverseId {
     fn new() -> Self {
-        Self(UNIVERSE_ID_COUNTER.fetch_add(1, Ordering::Relaxed))
+        #![allow(clippy::useless_conversion)] // useless on pointer_width=64
+
+        let id = UNIVERSE_ID_COUNTER
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |counter| {
+                counter.checked_add(1)
+            })
+            .expect("universe id overflow");
+
+        Self(id.try_into().unwrap()) // try_into because of usize-to-u64 case
     }
 }
 
