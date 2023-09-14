@@ -217,6 +217,7 @@ mod tests {
     use std::fmt;
 
     #[test]
+    #[cfg(feature = "std")]
     fn error_chain() {
         #[derive(Debug)]
         struct TestError1;

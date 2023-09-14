@@ -144,7 +144,7 @@ pub type DeadlineNt = Deadline<NoTime>;
 ///
 /// Use this for specifying [`Deadline::Asap`] or [`Deadline::Whenever`] when no instant type
 /// is available **and it's okay for all time measurements to be recorded as zero**.
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", test))]
 pub type DeadlineStd = Deadline<std::time::Instant>;
 
 impl<I: Instant> From<I> for Deadline<I> {

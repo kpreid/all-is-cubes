@@ -443,6 +443,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")] // Error::source only exists on std
     fn gen_error_message() {
         let set_cube_error = SetCubeError::OutOfBounds {
             modification: GridAab::for_block(R1),

@@ -549,9 +549,7 @@ mod tests {
     use crate::transaction;
     use crate::universe::{UBorrow, URef, Universe};
     use crate::util::yield_progress_for_testing;
-    use alloc::boxed::Box;
     use pretty_assertions::assert_eq;
-    use std::error::Error;
 
     #[derive(Debug)]
     struct ToolTester {
@@ -615,13 +613,11 @@ mod tests {
         }
 
         /// As `equip_and_use_tool`, but also commit the transaction.
-        /// TODO: Needs a better error return type (requires Transaction to do so).
-        fn equip_use_commit(
-            &mut self,
-            stack: impl Into<Slot>,
-        ) -> Result<(), Box<dyn Error + Send + Sync>> {
-            let transaction = self.equip_and_use_tool(stack)?;
-            transaction.execute(&mut self.universe, &mut transaction::no_outputs)?;
+        fn equip_use_commit(&mut self, stack: impl Into<Slot>) -> Result<(), EucError> {
+            let transaction = self.equip_and_use_tool(stack).map_err(EucError::Use)?;
+            transaction
+                .execute(&mut self.universe, &mut transaction::no_outputs)
+                .map_err(EucError::Commit)?;
             Ok(())
         }
 
@@ -634,6 +630,12 @@ mod tests {
         fn character(&self) -> UBorrow<Character> {
             self.character_ref.read().unwrap()
         }
+    }
+
+    #[derive(Clone, Debug)]
+    enum EucError {
+        Use(ToolError),
+        Commit(transaction::ExecuteError),
     }
 
     async fn dummy_icons() -> BlockProvider<Icons> {
