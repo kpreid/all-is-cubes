@@ -3,10 +3,16 @@ use core::fmt;
 use euclid::Vector3D;
 use ordered_float::NotNan;
 
+#[cfg(not(feature = "std"))]
+/// Acts as polyfill for float methods
+use num_traits::float::Float as _;
+
 use super::collision::{
     aab_raycast, collide_along_ray, find_colliding_cubes, nudge_on_ray, Contact,
 };
 use crate::block::{BlockCollision, Resolution};
+#[cfg(not(feature = "std"))]
+use crate::math::Euclid as _;
 use crate::math::{Aab, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry as _, VectorOps};
 use crate::physics::{StopAt, Velocity, POSITION_EPSILON};
 use crate::raycast::Ray;

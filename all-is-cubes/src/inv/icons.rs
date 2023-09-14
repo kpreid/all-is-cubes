@@ -6,6 +6,10 @@ use embedded_graphics::primitives::{Circle, Line, PrimitiveStyleBuilder};
 use euclid::vec3;
 use exhaust::Exhaust;
 
+#[cfg(not(feature = "std"))]
+/// Acts as polyfill for float methods
+use num_traits::float::FloatCore as _;
+
 use crate::block::{Block, Resolution::*, AIR, AIR_EVALUATED};
 use crate::content::load_image::{default_srgb, include_image, space_from_image};
 use crate::drawing::VoxelBrush;

@@ -164,7 +164,7 @@ impl Clock {
     pub const fn new(schedule: TickSchedule, phase: u16) -> Self {
         Self {
             schedule,
-            phase: phase.rem_euclid(schedule.divisor),
+            phase: phase % schedule.divisor,
         }
     }
 
@@ -182,7 +182,7 @@ impl Clock {
     pub fn advance(&mut self, paused: bool) -> Tick {
         let tick = self.next_tick(paused);
         if !paused {
-            self.phase = (self.phase + 1).rem_euclid(self.schedule.divisor);
+            self.phase = (self.phase + 1) % self.schedule.divisor;
         }
         tick
     }

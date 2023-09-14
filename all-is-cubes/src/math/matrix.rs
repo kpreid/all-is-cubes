@@ -7,6 +7,10 @@ use core::ops::{self, Mul};
 use euclid::Vector3D;
 use num_traits::One;
 
+#[cfg(not(feature = "std"))]
+/// Acts as polyfill for float methods
+use num_traits::float::FloatCore as _;
+
 use crate::math::{
     Axis, Cube, Face6, Face7, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector,
     Gridgid, VectorOps,

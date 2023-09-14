@@ -8,6 +8,10 @@ use itertools::Itertools as _;
 use num_traits::One;
 use ordered_float::NotNan;
 
+#[cfg(not(feature = "std"))]
+/// Acts as polyfill for float methods
+use num_traits::float::Float as _;
+
 use crate::chunking::OctantMask;
 use crate::math::{
     Aab, Axis, Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, Rgba, VectorOps,

@@ -7,6 +7,12 @@
 
 use euclid::Vector3D;
 
+#[cfg(not(feature = "std"))]
+/// Acts as polyfill for float methods
+use num_traits::float::Float as _;
+
+#[cfg(not(feature = "std"))]
+use crate::math::Euclid as _;
 use crate::math::{
     Axis, Cube, CubeFace, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab,
     GridCoordinate, GridPoint, GridVector, LineVertex, VectorOps,

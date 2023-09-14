@@ -4,6 +4,10 @@ use euclid::Vector3D;
 use num_traits::identities::Zero;
 pub use ordered_float::{FloatIsNan, NotNan};
 
+#[cfg(not(feature = "std"))]
+/// Acts as polyfill for float methods
+use num_traits::float::FloatCore as _;
+
 use crate::util::{ConciseDebug, CustomFormat};
 
 mod aab;
@@ -102,6 +106,23 @@ pub(crate) fn smoothstep(x: f64) -> f64 {
 pub fn sort_two<T: PartialOrd>(a: &mut T, b: &mut T) {
     if *a > *b {
         core::mem::swap(a, b);
+    }
+}
+
+#[cfg(not(feature = "std"))]
+/// Identical to [`num_traits::Euclid`] except that its signatures are compatible with
+/// `std` versions.
+pub(crate) trait Euclid {
+    fn div_euclid(self, rhs: Self) -> Self;
+    fn rem_euclid(self, rhs: Self) -> Self;
+}
+#[cfg(not(feature = "std"))]
+impl<T: num_traits::Euclid + Copy> Euclid for T {
+    fn div_euclid(self, rhs: Self) -> Self {
+        <T as num_traits::Euclid>::div_euclid(&self, &rhs)
+    }
+    fn rem_euclid(self, rhs: Self) -> Self {
+        <T as num_traits::Euclid>::rem_euclid(&self, &rhs)
     }
 }
 

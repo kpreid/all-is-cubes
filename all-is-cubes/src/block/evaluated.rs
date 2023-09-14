@@ -375,7 +375,7 @@ impl EvalBlockError {
             Evoxels::Many(
                 resolution,
                 GridArray::from_fn(GridAab::for_block(resolution), |cube| {
-                    pattern[(cube.x + cube.y + cube.z).rem_euclid(2) as usize]
+                    pattern[((cube.x + cube.y + cube.z).rem_euclid(2)) as usize]
                 }),
             ),
         )

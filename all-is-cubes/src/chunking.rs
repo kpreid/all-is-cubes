@@ -11,6 +11,12 @@ use std::sync::Mutex;
 
 use euclid::{vec3, Vector3D};
 
+#[cfg(not(feature = "std"))]
+/// Acts as polyfill for float methods
+use num_traits::float::FloatCore as _;
+
+#[cfg(not(feature = "std"))]
+use crate::math::Euclid as _;
 use crate::math::{
     Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint, VectorOps,
 };
@@ -186,7 +192,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
         };
         let view_distance_in_chunks = sanitized / FreeCoordinate::from(CHUNK_SIZE);
 
-        view_distance_in_chunks.powf(2.).ceil() as GridCoordinate
+        view_distance_in_chunks.powi(2).ceil() as GridCoordinate
     }
 
     /// Recalculate the chart if the provided distance is different.

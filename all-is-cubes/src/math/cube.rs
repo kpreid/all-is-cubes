@@ -1,5 +1,9 @@
 use core::fmt;
 
+#[cfg(not(feature = "std"))]
+/// Acts as polyfill for float methods
+use num_traits::float::FloatCore as _;
+
 use crate::math::{
     Aab, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint, GridVector,
     VectorOps,

@@ -14,12 +14,19 @@ use core::fmt;
 
 use euclid::{vec3, Vector2D, Vector3D};
 use ordered_float::NotNan;
+
+#[cfg(not(feature = "std"))]
+/// Acts as polyfill for float methods
+use num_traits::float::Float as _;
+
 #[cfg(feature = "threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use crate::block::{Evoxels, Resolution, AIR};
 use crate::camera::NdcPoint2;
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
+#[cfg(not(feature = "std"))]
+use crate::math::Euclid as _;
 use crate::math::{
     smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, GridArray,
     GridMatrix, Intensity, Rgb, Rgba, VectorOps,

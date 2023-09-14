@@ -7,6 +7,10 @@ use std::collections::HashMap;
 
 use euclid::default::Vector3D;
 
+#[cfg(not(feature = "std"))]
+/// Acts as polyfill for float methods
+use num_traits::float::Float as _;
+
 use crate::math::{Cube, GridCoordinate, GridPoint, NotNan, Rgb, VectorOps};
 
 #[cfg(doc)]
