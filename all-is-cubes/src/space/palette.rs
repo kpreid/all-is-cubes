@@ -1,7 +1,6 @@
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::fmt;
-use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
 use crate::block::{self, Block, BlockChange, EvaluatedBlock, AIR, AIR_EVALUATED};
@@ -11,13 +10,26 @@ use crate::space::{BlockIndex, SetCubeError, SpaceChange};
 use crate::time::Instant;
 use crate::util::TimeStats;
 
+cfg_if::cfg_if! {
+    if #[cfg(feature = "std")] {
+        // HashDoS-resistant
+        use std::collections::HashMap as BlockHashMap;
+    } else {
+        // no_std compatible
+        use hashbrown::HashMap as BlockHashMap;
+    }
+
+}
+
 /// Table of the [`Block`]s in a [`Space`](super::Space) independent of their location.
 pub(super) struct Palette {
     /// Lookup from arbitrarily assigned indices to blocks.
     entries: Vec<SpaceBlockData>,
 
     /// Reverse lookup from `Block` value to the index in `entries`.
-    block_to_index: HashMap<Block, BlockIndex>,
+    //---
+    // TODO: We may want to switch this to
+    block_to_index: BlockHashMap<Block, BlockIndex>,
 
     /// Storage for incoming change notifications from blocks.
     todo: Arc<Mutex<PaletteTodo>>,
@@ -31,7 +43,7 @@ impl Palette {
         if count == 0 {
             return Self {
                 entries: Vec::new(),
-                block_to_index: HashMap::new(),
+                block_to_index: BlockHashMap::new(),
                 todo,
             };
         }
@@ -49,7 +61,7 @@ impl Palette {
 
         Self {
             entries: vec![block_data],
-            block_to_index: HashMap::from([(block, 0)]),
+            block_to_index: BlockHashMap::from([(block, 0)]),
             todo,
         }
     }
@@ -58,10 +70,10 @@ impl Palette {
     /// Constructs a `Palette` with the given blocks and all zero counts.
     ///
     /// If the input contains any duplicate entries, then they will be combined, and the
-    /// returned [`HashMap`] will contain the required data remapping.
+    /// returned [`hashbrown::HashMap`] will contain the required data remapping.
     pub(crate) fn from_blocks(
         blocks: &mut dyn ExactSizeIterator<Item = Block>,
-    ) -> Result<(Self, HashMap<BlockIndex, BlockIndex>), PaletteError> {
+    ) -> Result<(Self, hashbrown::HashMap<BlockIndex, BlockIndex>), PaletteError> {
         let dummy_notifier = listen::Notifier::new();
 
         let len = blocks.len();
@@ -71,11 +83,11 @@ impl Palette {
 
         let mut new_self = Self {
             entries: Vec::with_capacity(blocks.len()),
-            block_to_index: HashMap::with_capacity(blocks.len()),
+            block_to_index: BlockHashMap::with_capacity(blocks.len()),
             todo: Default::default(),
         };
 
-        let mut remapping = HashMap::new();
+        let mut remapping = hashbrown::HashMap::new();
         for (original_index, block) in (0..).zip(blocks) {
             let new_index = new_self
                 .ensure_index(&block, &dummy_notifier, false)
@@ -219,7 +231,7 @@ impl Palette {
         let mut last_start_time = I::now();
         let mut evaluations = TimeStats::default();
         {
-            let mut try_eval_again = HashSet::new();
+            let mut try_eval_again = hashbrown::HashSet::new();
             let mut todo = self.todo.lock().unwrap();
             for block_index in todo.blocks.drain() {
                 notifier.notify(SpaceChange::BlockValue(block_index));
@@ -257,7 +269,7 @@ impl Palette {
     pub(crate) fn consistency_check(&self, contents: &[BlockIndex]) {
         let mut problems = Vec::new();
 
-        let mut actual_counts: HashMap<BlockIndex, usize> = HashMap::new();
+        let mut actual_counts: hashbrown::HashMap<BlockIndex, usize> = Default::default();
         for index in contents.iter().copied() {
             *actual_counts.entry(index).or_insert(0) += 1;
         }
@@ -355,7 +367,7 @@ impl Clone for Palette {
         // This will unfortunately also cause a reevaluation, but avoiding that would
         // be additional complexity.
         let todo = Arc::new(Mutex::new(PaletteTodo {
-            blocks: HashSet::from_iter((0..self.entries.len()).map(|i| i as BlockIndex)),
+            blocks: hashbrown::HashSet::from_iter((0..self.entries.len()).map(|i| i as BlockIndex)),
         }));
 
         Self {
@@ -482,7 +494,7 @@ impl SpaceBlockData {
 /// [`Palette`]'s todo list for the next `step()`.
 #[derive(Debug, Default)]
 struct PaletteTodo {
-    blocks: HashSet<BlockIndex>,
+    blocks: hashbrown::HashSet<BlockIndex>,
 }
 
 /// [`PaletteTodo`]'s listener for block change notifications.

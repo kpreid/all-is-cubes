@@ -2,9 +2,9 @@
 
 use alloc::vec::Vec;
 use core::fmt;
-use std::collections::HashSet;
 
 use euclid::Vector3D;
+use hashbrown::HashSet as HbHashSet;
 
 #[cfg(not(feature = "std"))]
 /// Acts as polyfill for float methods
@@ -196,7 +196,7 @@ where
     Sp: CollisionSpace,
     CC: FnMut(Contact),
 {
-    let mut already_colliding: HashSet<Contact> = HashSet::new();
+    let mut already_colliding: HbHashSet<Contact> = HbHashSet::new();
 
     debug_assert!(
         ray.direction.square_length() < super::body::VELOCITY_MAGNITUDE_LIMIT_SQUARED * 2.,

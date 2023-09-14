@@ -3,7 +3,8 @@
 //! TODO: stuff in this module is kind of duplicative of [`crate::drawing`]...
 
 use alloc::vec::Vec;
-use std::collections::HashMap;
+
+use hashbrown::HashMap;
 
 use embedded_graphics::image::ImageDrawable;
 use embedded_graphics::prelude::{Dimensions as _, DrawTarget, Point, Size};

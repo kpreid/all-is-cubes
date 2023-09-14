@@ -6,9 +6,9 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::mem;
 use core::time::Duration;
-use std::collections::HashSet;
 
 use euclid::{vec3, Vector3D};
+use hashbrown::HashSet as HbHashSet;
 
 use crate::behavior::{self, BehaviorSet};
 use crate::block::{Block, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED};
@@ -91,7 +91,7 @@ pub struct Space {
     spawn: Spawn,
 
     /// Cubes that should be checked on the next call to step()
-    cubes_wanting_ticks: HashSet<Cube>,
+    cubes_wanting_ticks: HbHashSet<Cube>,
 
     notifier: Notifier<SpaceChange>,
 }
@@ -205,7 +205,7 @@ impl Space {
             physics,
             behaviors,
             spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(bounds)),
-            cubes_wanting_ticks: HashSet::new(),
+            cubes_wanting_ticks: Default::default(),
             notifier: Notifier::new(),
         }
     }

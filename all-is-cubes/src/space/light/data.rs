@@ -2,10 +2,10 @@
 
 use alloc::collections::BTreeSet;
 use core::fmt;
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
 
 use euclid::default::Vector3D;
+use hashbrown::hash_map::Entry;
+use hashbrown::HashMap as HbHashMap;
 
 #[cfg(not(feature = "std"))]
 /// Acts as polyfill for float methods
@@ -318,14 +318,14 @@ pub(crate) struct LightUpdateQueue {
     queue: BTreeSet<LightUpdateRequest>,
     /// Maps Cube to priority value. This allows deduplicating entries, including
     /// removing low-priority entries in favor of high-priority ones
-    table: HashMap<Cube, Priority>,
+    table: HbHashMap<Cube, Priority>,
 }
 
 impl LightUpdateQueue {
     pub fn new() -> Self {
         Self {
             queue: BTreeSet::new(),
-            table: HashMap::new(),
+            table: HbHashMap::new(),
         }
     }
 

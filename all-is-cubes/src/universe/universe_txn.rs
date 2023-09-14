@@ -3,7 +3,8 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::any::Any;
 use core::fmt;
-use std::collections::HashMap;
+
+use hashbrown::HashMap as HbHashMap;
 
 use crate::transaction::{
     self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
@@ -186,7 +187,7 @@ where
 pub struct UniverseTransaction {
     /// Transactions on existing members or named insertions.
     /// Invariant: None of the names are [`Name::Pending`].
-    members: HashMap<Name, MemberTxn>,
+    members: HbHashMap<Name, MemberTxn>,
 
     /// Insertions of anonymous members, kept separate since they do not have unique [`Name`]s.
     /// Unlike insertions of named members, these cannot fail to merge or commit.
@@ -205,11 +206,11 @@ pub struct UniverseTransaction {
 // TODO: Benchmark cheaper HashMaps / using BTreeMap here
 #[doc(hidden)] // Almost certainly will never need to be used explicitly
 #[derive(Debug)]
-pub struct UniverseMergeCheck(HashMap<Name, MemberMergeCheck>);
+pub struct UniverseMergeCheck(HbHashMap<Name, MemberMergeCheck>);
 #[doc(hidden)] // Almost certainly will never need to be used explicitly
 #[derive(Debug)]
 pub struct UniverseCommitCheck {
-    members: HashMap<Name, MemberCommitCheck>,
+    members: HbHashMap<Name, MemberCommitCheck>,
     anonymous_insertions: Vec<MemberCommitCheck>,
 }
 
@@ -256,7 +257,7 @@ impl UniverseTransaction {
     fn from_member_txn(name: Name, transaction: MemberTxn) -> Self {
         UniverseTransaction {
             universe_id: transaction.universe_id(),
-            members: HashMap::from([(name, transaction)]),
+            members: HbHashMap::from([(name, transaction)]),
             anonymous_insertions: Vec::new(),
         }
     }
@@ -273,7 +274,7 @@ impl UniverseTransaction {
                 MemberTxn::Insert(UniverseMember::into_any_ref(reference)),
             ),
             Name::Pending => Self {
-                members: HashMap::new(),
+                members: HbHashMap::new(),
                 anonymous_insertions: vec![MemberTxn::Insert(UniverseMember::into_any_ref(
                     reference,
                 ))],
@@ -328,7 +329,7 @@ impl Transaction<Universe> for UniverseTransaction {
                 });
             }
         }
-        let mut member_checks = HashMap::with_capacity(self.members.len());
+        let mut member_checks = HbHashMap::with_capacity(self.members.len());
         for (name, member) in self.members.iter() {
             match name {
                 Name::Specific(_) | Name::Anonym(_) => {}
@@ -702,14 +703,13 @@ mod tests {
     use crate::space::SpaceTransactionConflict;
     use crate::transaction::{ExecuteError, MapConflict, TransactionTester};
     use indoc::indoc;
-    use std::collections::HashMap;
 
     #[test]
     fn has_default() {
         assert_eq!(
             UniverseTransaction::default(),
             UniverseTransaction {
-                members: HashMap::new(),
+                members: HbHashMap::new(),
                 anonymous_insertions: Vec::new(),
                 universe_id: None,
             }

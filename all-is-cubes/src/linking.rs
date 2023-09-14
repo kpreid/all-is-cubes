@@ -13,9 +13,9 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::hash::Hash;
 use core::ops::Index;
-use std::collections::HashMap;
 
 use exhaust::Exhaust;
+use hashbrown::HashMap as HbHashMap;
 
 use crate::block::{Block, BlockDef, Primitive};
 use crate::space::SetCubeError;
@@ -61,7 +61,7 @@ pub trait BlockModule: Exhaust + fmt::Debug + fmt::Display + Eq + Hash + Clone {
 pub struct BlockProvider<E> {
     /// Guaranteed to contain an entry for every variant of `E` if `E`'s
     /// [`Exhaust`] implementation is accurate.
-    map: HashMap<E, Block>,
+    map: HbHashMap<E, Block>,
 }
 
 impl<E> Default for BlockProvider<E>
@@ -94,7 +94,7 @@ where
         B: Into<Block>,
     {
         let count = E::exhaust().count();
-        let mut map = HashMap::with_capacity(count);
+        let mut map = HbHashMap::with_capacity(count);
         for (key, progress) in E::exhaust().zip(progress.split_evenly(count)) {
             let block: Block = definer(key.clone())
                 .map_err(|e| GenError::failure(e, name_in_module(&key)))?
@@ -127,7 +127,7 @@ where
     where
         E: Eq + Hash + fmt::Display,
     {
-        let mut found: HashMap<E, URef<BlockDef>> = HashMap::new();
+        let mut found: HbHashMap<E, URef<BlockDef>> = HbHashMap::new();
         let mut missing = Vec::new();
         for key in E::exhaust() {
             let name = name_in_module(&key);
@@ -209,7 +209,7 @@ impl<E: Exhaust + fmt::Debug + Clone + Eq + Hash> BlockProvider<E> {
 
     #[cfg(test)]
     fn consistency_check(&self) {
-        use std::collections::HashSet;
+        use hashbrown::HashSet;
         let expected_keys: HashSet<E> = E::exhaust().collect();
         let actual_keys: HashSet<E> = self.map.keys().cloned().collect();
         assert_eq!(

@@ -2,9 +2,9 @@
 
 use alloc::sync::Arc;
 use core::fmt;
-use std::collections::HashSet;
 
 use euclid::{Angle, Point3D, Rotation3D, Vector3D};
+use hashbrown::HashSet as HbHashSet;
 use ordered_float::NotNan;
 
 #[cfg(not(feature = "std"))]
@@ -74,7 +74,7 @@ pub struct Character {
 
     // TODO: Does this belong here? Or in the Space?
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu
-    pub colliding_cubes: HashSet<Contact>,
+    pub colliding_cubes: HbHashSet<Contact>,
 
     /// Last [`Character::step`] info result, for debugging.
     pub(crate) last_step_info: Option<BodyStepInfo>,
@@ -202,7 +202,7 @@ impl Character {
             velocity_input: Vector3D::zero(),
             eye_displacement_pos: Vector3D::zero(),
             eye_displacement_vel: Vector3D::zero(),
-            colliding_cubes: HashSet::new(),
+            colliding_cubes: HbHashSet::new(),
             last_step_info: None,
             light_samples: [Rgb::ONE; 100],
             light_sample_index: 0,
@@ -650,7 +650,7 @@ impl<'de> serde::Deserialize<'de> for Character {
                 // Not persisted - decorative simulation
                 eye_displacement_pos: Vector3D::zero(),
                 eye_displacement_vel: Vector3D::zero(),
-                colliding_cubes: HashSet::new(),
+                colliding_cubes: HbHashSet::new(),
                 last_step_info: None,
                 light_samples: [Rgb::ONE; 100],
                 light_sample_index: 0,

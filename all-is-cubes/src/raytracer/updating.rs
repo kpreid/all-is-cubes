@@ -1,8 +1,9 @@
 use alloc::sync::{Arc, Weak};
 use core::fmt;
 use core::mem;
-use std::collections::HashSet;
 use std::sync::Mutex;
+
+use hashbrown::HashSet as HbHashSet;
 
 use crate::block::AIR;
 use crate::camera::GraphicsOptions;
@@ -56,8 +57,8 @@ where
         let todo = Arc::new(Mutex::new(SrtTodo {
             listener: true,
             everything: true,
-            blocks: HashSet::new(),
-            cubes: HashSet::new(),
+            blocks: Default::default(),
+            cubes: Default::default(),
         }));
 
         // TODO: Placeholder for more detailed graphics options updating
@@ -166,8 +167,8 @@ struct SrtTodo {
     everything: bool,
 
     // TODO: Benchmark using a BitVec instead.
-    blocks: HashSet<BlockIndex>,
-    cubes: HashSet<Cube>,
+    blocks: HbHashSet<BlockIndex>,
+    cubes: HbHashSet<Cube>,
 }
 
 /// [`Listener`] adapter for [`SpaceRendererTodo`].
