@@ -110,10 +110,10 @@ fn text_shadow_alpha(texcoord: vec2<f32>) -> f32 {
             texcoord + offset * derivatives,
             0.0
         ).a;
-        let weight: f32 = 0.2 / max(1.0, length(offset));
+        let weight: f32 = 0.35 / max(0.001, length(offset));
         accumulator = accumulator + offset_alpha * weight;
     }
-    return pow(clamp(accumulator, 0.0, 0.5), 0.48);
+    return pow(clamp(accumulator, 0.0, 1.0), 0.7);
 }
 
 @fragment
