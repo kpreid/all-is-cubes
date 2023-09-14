@@ -79,6 +79,13 @@ jobs:
     continue-on-error: ${{ !matrix.primary }}
 
     steps:
+    # Free some disk space so our largest builds can complete reliably.
+    - uses: jlumbroso/free-disk-space@v1.2.0
+      if: ${{ matrix.os == 'ubuntu' }}
+      with:
+        large-packages: false # slow
+        swap-storage: false
+
     - run: df -h .
 
     - uses: actions/checkout@v3.1.0
