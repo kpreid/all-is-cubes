@@ -99,13 +99,9 @@ pub struct BlockMesh<V, T> {
     /// from multiple directions or when the eye position is inside the block.
     pub(super) interior_vertices: BlockFaceMesh<V>,
 
-    /// Texture tiles used by the vertices; holding these objects is intended to ensure
-    /// the texture coordinates stay valid.
-    ///
-    /// TODO: Each block mesh used to require more than one tile, but they no longer
-    /// do. Convert this to an Option, unless we decide that e.g. we want the triangulator
-    /// to be responsible for optimizing opaque blocks into 6 face textures.
-    pub(super) textures_used: Vec<T>,
+    /// Texture used by the vertices;
+    /// holding this handle ensures that the texture coordinates stay valid.
+    pub(super) texture_used: Option<T>,
 
     /// The [`EvaluatedBlock::voxel_opacity_mask`] that the mesh was constructed from;
     /// if new block data has the same mask, then it is safe to replace the texture
@@ -135,7 +131,7 @@ impl<V, T> BlockMesh<V, T> {
             pz: BlockFaceMesh::EMPTY,
         },
         interior_vertices: BlockFaceMesh::EMPTY,
-        textures_used: Vec::new(),
+        texture_used: None,
         voxel_opacity_mask: None,
         flaws: Flaws::empty(),
     };
@@ -157,7 +153,10 @@ impl<V, T> BlockMesh<V, T> {
     /// the life of this mesh.
     // TODO: revisit this interface design. Maybe callers should just have an Rc<BlockMesh>?
     pub(crate) fn textures(&self) -> &[T] {
-        &self.textures_used
+        match &self.texture_used {
+            Some(t) => core::slice::from_ref(t),
+            None => &[],
+        }
     }
 
     /// Reports any flaws in this mesh: reasons why using it to create a rendering would
@@ -198,14 +197,10 @@ impl<V, T> BlockMesh<V, T> {
         }
 
         // Need to deref the Vec in self.textures_used before matching
-        match (
-            &self.voxel_opacity_mask,
-            self.textures_used.as_mut_slice(),
-            block,
-        ) {
+        match (&self.voxel_opacity_mask, &mut self.texture_used, block) {
             (
                 Some(old_mask),
-                [existing_texture],
+                Some(existing_texture),
                 EvaluatedBlock {
                     voxels,
                     voxel_opacity_mask: Some(new_mask),
@@ -246,7 +241,7 @@ where
         let Self {
             face_vertices,
             interior_vertices,
-            textures_used,
+            texture_used,
             voxel_opacity_mask,
             flaws,
         } = self;
@@ -254,7 +249,7 @@ where
             fv.clear();
         }
         interior_vertices.clear();
-        textures_used.clear();
+        *texture_used = None;
         *voxel_opacity_mask = None;
         *flaws = Flaws::empty();
     }
@@ -551,7 +546,7 @@ where
                 }
 
                 // TODO: avoid allocation
-                self.textures_used = texture_if_needed.into_iter().collect();
+                self.texture_used = texture_if_needed;
                 self.voxel_opacity_mask = if used_any_vertex_colors {
                     None
                 } else {
@@ -573,7 +568,7 @@ impl<V, T> Default for BlockMesh<V, T> {
         Self {
             face_vertices: FaceMap::default(),
             interior_vertices: BlockFaceMesh::default(),
-            textures_used: Vec::new(),
+            texture_used: None,
             voxel_opacity_mask: None,
             flaws: Flaws::empty(),
         }

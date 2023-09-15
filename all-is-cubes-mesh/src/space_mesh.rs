@@ -530,7 +530,7 @@ impl<V: GfxVertex, T: texture::Tile> From<&BlockMesh<V, T>> for SpaceMesh<V, T> 
             meta: MeshMeta {
                 opaque_range: 0..0,
                 transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
-                textures_used: block_mesh.textures_used.clone(),
+                textures_used: block_mesh.textures().to_vec(),
                 flaws: block_mesh.flaws(),
             },
             block_indices_used,
