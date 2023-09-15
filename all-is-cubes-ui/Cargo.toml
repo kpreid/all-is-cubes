@@ -16,13 +16,13 @@ bench = false
 
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.6.0" }
+displaydoc = { workspace = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }
 futures-task = { workspace = true }
 indoc = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }
-thiserror = { workspace = true }
 
 [dev-dependencies]
 futures-channel = { workspace = true }

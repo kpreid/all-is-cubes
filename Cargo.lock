@@ -244,6 +244,7 @@ name = "all-is-cubes-ui"
 version = "0.6.0"
 dependencies = [
  "all-is-cubes",
+ "displaydoc",
  "exhaust",
  "futures-channel",
  "futures-core",
@@ -252,7 +253,6 @@ dependencies = [
  "log",
  "once_cell",
  "pretty_assertions",
- "thiserror",
  "tokio",
 ]
 

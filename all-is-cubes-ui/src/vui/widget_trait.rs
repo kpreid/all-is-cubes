@@ -183,34 +183,32 @@ impl Behavior<Space> for WidgetBehavior {
 /// them in a [`Space`].
 ///
 /// [`LayoutTree`]: crate::vui::LayoutTree
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, displaydoc::Display)]
 #[non_exhaustive]
 pub enum InstallVuiError {
     /// The widget failed to initialize for some reason.
-    #[error("error initializing widget ({:?})", .widget)]
+    #[displaydoc("error initializing widget ({widget:?})")]
     WidgetInitialization {
         /// TODO: This should be `Arc<dyn Widget>` instead.
         /// Or, if we come up with some way of giving widgets IDs, that.
         widget: Box<dyn WidgetController>,
 
         /// The error returned by [`WidgetController::initialize()`].
-        #[source]
         error: Box<InstallVuiError>,
     },
 
     /// A transaction conflict arose between two widgets or parts of a widget's installation.
-    #[error("transaction conflict involving a widget")]
+    #[displaydoc("transaction conflict involving a widget")]
     #[non_exhaustive]
     Conflict {
         // TODO: Include the widget(s) involved, once `Arc<dyn Widget>` is piped around everywhere
         // and not just sometimes Widget or sometimes WidgetController.
         #[allow(missing_docs)]
-        #[source]
         error: space::SpaceTransactionConflict,
     },
 
     /// The widget attempted to modify space outside its assigned bounds.
-    #[error(
+    #[displaydoc(
         "widget attempted to write out of bounds\n\
         grant: {grant:?}\n\
         attempted write: {erroneous:?}\n\
@@ -230,13 +228,23 @@ pub enum InstallVuiError {
 
     /// Installing the widget tree failed, because one of the widgets' transactions failed.
     /// This usually indicates a bug in the widget implementation.
-    #[error("installing widget tree failed")]
+    #[displaydoc("installing widget tree failed")]
     #[non_exhaustive]
     ExecuteInstallation {
         #[allow(missing_docs)]
-        #[source]
         error: transaction::ExecuteError,
     },
+}
+
+impl std::error::Error for InstallVuiError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            InstallVuiError::WidgetInitialization { error, .. } => Some(error),
+            InstallVuiError::Conflict { error } => Some(error),
+            InstallVuiError::OutOfBounds { .. } => None,
+            InstallVuiError::ExecuteInstallation { error } => Some(error),
+        }
+    }
 }
 
 impl From<InstallVuiError> for all_is_cubes::linking::InGenError {
