@@ -43,7 +43,8 @@ pub trait Allocator {
     /// Allocation handles produced by this allocator.
     type Tile: Tile<Point = Self::Point>;
 
-    /// Type of points within the texture, that vertices store.
+    /// Type of points within the texture, that vertices store (or at least, that are
+    /// used to construct vertices).
     type Point;
 
     /// Allocate a tile, whose range of texels will be reserved for use as long as the
@@ -58,6 +59,12 @@ pub trait Allocator {
 }
 
 /// 3D texture volume provided by an [`Allocator`] to paint a block's voxels in.
+///
+/// When all clones of this value are dropped, the texture allocation may be released and
+/// the texture coordinate region may be reused for different data.
+///
+/// Implement this along with [`Allocator`] and [`Plane`] to provide appropriate texture
+/// storage for a particular graphics system.
 pub trait Tile: Clone {
     /// Return type of [`Self::slice()`].
     type Plane: Plane<Point = Self::Point>;
@@ -96,10 +103,8 @@ pub trait Tile: Clone {
 
 /// 2D texture slice to use for texturing the surface of a voxel mesh.
 ///
-/// When all clones of this value are dropped, the texture allocation may be released and
-/// the texture coordinate region may be reused for different data. (Implementations which
-/// are natively 3D may accomplish that by having this type simply contain a [`Tile`] rather
-/// than tracking each plane on its own.)
+/// Implement this along with [`Allocator`] and [`Tile`] to provide appropriate texture
+/// storage for a particular graphics system.
 pub trait Plane: Clone {
     /// Type of points within this texture, that are to be used in vertices.
     type Point: Copy;
@@ -109,7 +114,7 @@ pub trait Plane: Clone {
     /// the target [`GfxVertex`](super::GfxVertex) type.
     ///
     /// The returned texture coordinates are guaranteed to be valid only as long as
-    /// `self` (or a clone of it) has not been dropped.
+    /// the parent [`Tile`] (or a clone of it) has not been dropped.
     fn grid_to_texcoord(&self, in_tile_grid: TilePoint) -> Self::Point;
 }
 
