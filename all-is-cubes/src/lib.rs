@@ -89,12 +89,18 @@
 //!   This feature does not affect the public API, only performance and dependencies.
 //! * `arbitrary`: Adds implementations of the [`arbitrary::Arbitrary`] trait for
 //!   fuzzing / property testing on types defined by this crate.
+//! * `std` (enabled by default):
+//!   If disabled, the library becomes `no_std` compatible, at this cost:
+//!   * Many types are no longer [`Send`] or [`Sync`].
+//!   * [`Listener`](crate::listen::Listener) callbacks are no longer required to be `Send + Sync`,
+//!     **which makes this feature non-additive**. Proceed with care.
+//!   * Certain data calculations are not memoized.
+//!   * Error types do not implement [`std::error::Error`].
+//!   
 //!
 //! ## Platform compatibility
 //!
-//! * This crate is not `no_std` compatible due to need for floating-point functions,
-//!   and several currently incompatible dependencies.
-//! * However, it is compatible with web `wasm32-unknown-unknown`.
+//! * Compatible with web `wasm32-unknown-unknown`, whether or not the `std` feature is active.
 //!   That is, the parts of `std` it uses are the thread-safety and floating-point parts,
 //!   not IO (and not creating threads, unless requested).
 //! * `usize` must be at least 32 bits (that is, not 16).

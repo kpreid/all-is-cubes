@@ -46,13 +46,10 @@ harness = false
 name = "space_bench"
 harness = false
 
+# See src/lib.rs documentation for more details on features.
 [features]
 default = ["std"]
 # Adds std-dependent functionality such as thread safety.
-# Caution: This is a work in progress. Disabling this feature does not yet remove all
-# `std` dependencies, and may result in a broken build. Furthermore, this feature will have
-# non-additive effects; it may require certain callback types to be `Sync` when they would
-# not without the feature. This is unfortunate, but necessary.
 std = ["dep:once_cell", "yield-progress/sync"]
 # Adds `impl arbitrary::Arbitrary for ...`
 # Note: Not using euclid/arbitrary because it's broken
@@ -66,7 +63,8 @@ save = [
     "bytemuck/extern_crate_std", # impl Error for CheckedCastError
     "ordered-float/serde",
 ]
-# Adds automatic parallelism to some algorithms such as raytracing.
+# Adds automatic parallelism to some algorithms.
+# If disabled, `std::thread` is never used.
 threads = ["std", "dep:rayon"]
 
 [dependencies]
