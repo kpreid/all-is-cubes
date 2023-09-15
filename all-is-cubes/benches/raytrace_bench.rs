@@ -10,6 +10,7 @@ use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::GridVector;
 use all_is_cubes::raytracer::RtRenderer;
 use all_is_cubes::universe::{URef, Universe};
+use all_is_cubes::util::yield_progress_for_testing;
 
 /// Non-mutated test data shared between benches
 struct TestData {
@@ -18,9 +19,16 @@ struct TestData {
     character: URef<Character>,
 }
 impl TestData {
-    fn new() -> Self {
+    #[tokio::main]
+    async fn new() -> Self {
         let mut universe = Universe::new();
-        let space = lighting_bench_space(&mut universe, GridVector::new(54, 16, 54)).unwrap();
+        let space = lighting_bench_space(
+            &mut universe,
+            yield_progress_for_testing(),
+            GridVector::new(54, 16, 54),
+        )
+        .await
+        .unwrap();
         let space = universe.insert_anonymous(space);
         let character = universe.insert_anonymous(Character::spawn_default(space));
         Self {

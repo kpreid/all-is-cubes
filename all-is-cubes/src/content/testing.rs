@@ -8,6 +8,7 @@ use crate::linking::InGenError;
 use crate::math::{Face6, FaceMap, GridAab, GridVector, Rgba};
 use crate::space::{LightPhysics, Space, SpacePhysics};
 use crate::universe::Universe;
+use crate::util::YieldProgress;
 
 /// Test space for the `lighting_bench` benchmark, designed to exercise a variety of
 /// geometric and color circumstances for the lighting algorithm.
@@ -18,8 +19,9 @@ use crate::universe::Universe;
 /// TODO: Once we have the ability to write save files, give the benchmark code an option
 /// to do that instead, so this can just live in the benchmark instead of indirect.
 #[doc(hidden)]
-pub fn lighting_bench_space(
+pub async fn lighting_bench_space(
     _universe: &mut Universe,
+    progress: YieldProgress,
     requested_space_size: GridVector,
 ) -> Result<Space, InGenError> {
     // Constant sizes
@@ -58,6 +60,7 @@ pub fn lighting_bench_space(
         .build();
 
     // Ground level
+    // TODO: Make this async-yielding somehow (will need work in Space itself)
     space
         .fill_uniform(
             space_bounds.expand(FaceMap::default().with(Face6::PY, -yup)),
@@ -65,9 +68,17 @@ pub fn lighting_bench_space(
         )
         .unwrap();
 
+    let progress = progress.finish_and_cut(0.25).await;
+
     // Individual test sections (buildings/caves)
-    for sx in 0..array_side_lengths.x {
-        for sz in 0..array_side_lengths.y {
+    for (progress, sx) in progress
+        .split_evenly(array_side_lengths.x as usize)
+        .zip(0..)
+    {
+        for (progress, sz) in progress
+            .split_evenly(array_side_lengths.y as usize)
+            .zip(0..)
+        {
             // Independent RNG for each section, so that the number of values used doesn't
             // affect the next section.
             let mut rng = Xoshiro256Plus::seed_from_u64((sx + sz * array_side_lengths.x) as u64);
@@ -123,6 +134,7 @@ pub fn lighting_bench_space(
                 }
                 _ => unreachable!("rng range"),
             }
+            progress.finish().await;
         }
     }
 

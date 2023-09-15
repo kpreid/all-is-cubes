@@ -167,10 +167,14 @@ impl UniverseTemplate {
                 Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
                 CornellBox => Some(cornell_box()),
                 MengerSponge => Some(menger_sponge(&mut universe, 4)),
-                LightingBench => Some(all_is_cubes::content::testing::lighting_bench_space(
-                    &mut universe,
-                    params.size.unwrap_or(GridVector::new(54, 16, 54)),
-                )),
+                LightingBench => Some(
+                    all_is_cubes::content::testing::lighting_bench_space(
+                        &mut universe,
+                        p.take().unwrap(),
+                        params.size.unwrap_or(GridVector::new(54, 16, 54)),
+                    )
+                    .await,
+                ),
                 #[cfg(feature = "arbitrary")]
                 Random => Some(
                     arbitrary_space(&mut universe, p.take().unwrap(), params.seed.unwrap_or(0))
@@ -179,7 +183,7 @@ impl UniverseTemplate {
             };
 
             if let Some(p) = p {
-                p.progress(1.0).await;
+                p.finish().await;
             }
 
             maybe_space

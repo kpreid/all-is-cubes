@@ -88,8 +88,10 @@ async fn create_updated_renderer(
     let mut universe = Universe::new();
     let space = all_is_cubes::content::testing::lighting_bench_space(
         &mut universe,
+        all_is_cubes::util::yield_progress_for_testing(),
         GridVector::new(50, 50, 50),
     )
+    .await
     .unwrap();
     let space = universe.insert_anonymous(space);
     universe

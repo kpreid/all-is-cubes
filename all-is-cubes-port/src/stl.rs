@@ -125,10 +125,16 @@ mod tests {
     use std::collections::BTreeSet;
     use std::path::PathBuf;
 
-    #[test]
-    fn space_to_stl_smoke_test() {
+    #[tokio::test]
+    async fn space_to_stl_smoke_test() {
         let mut u = Universe::new();
-        let space = lighting_bench_space(&mut u, GridVector::new(54, 16, 54)).unwrap();
+        let space = lighting_bench_space(
+            &mut u,
+            yield_progress_for_testing(),
+            GridVector::new(54, 16, 54),
+        )
+        .await
+        .unwrap();
         let mesh = space_to_stl_triangles(&space);
         assert!(mesh.len() > 30_000, "{}", mesh.len());
     }
