@@ -96,17 +96,18 @@ impl From<CharacterBuf> for String {
 /// the center of the space. The text output will be 80 columns wide.
 #[cfg(any(feature = "std", test))]
 pub fn print_space(space: &Space, direction: impl Into<FreeVector>) {
-    print_space_impl(space, direction, |s| {
+    print_space_impl(space, direction.into(), &mut |s| {
         std::print!("{s}");
     });
 }
 
-/// Version of `print_space` that takes a destination, for testing.
+/// Version of `print_space` that takes a destination, for testing, and is non-generic,
+/// for build performance.
 #[cfg(any(feature = "std", test))]
-fn print_space_impl<F: FnMut(&str)>(
+fn print_space_impl(
     space: &Space,
-    direction: impl Into<FreeVector>,
-    mut write: F,
+    direction: FreeVector,
+    write: &mut dyn FnMut(&str),
 ) -> RaytraceInfo {
     // TODO: optimize height (and thus aspect ratio) for the shape of the space
     let mut camera = Camera::new(
@@ -117,7 +118,7 @@ fn print_space_impl<F: FnMut(&str)>(
         },
     );
     camera.look_at_y_up(
-        eye_for_look_at(space.bounds(), direction.into()),
+        eye_for_look_at(space.bounds(), direction),
         space.bounds().center(),
     );
 
@@ -132,6 +133,8 @@ fn print_space_impl<F: FnMut(&str)>(
 
 #[cfg(test)]
 mod tests {
+    use euclid::vec3;
+
     use super::*;
     use crate::block::{Block, Resolution::R4};
     use crate::content::make_some_blocks;
@@ -146,7 +149,7 @@ mod tests {
         space.set([2, 0, 0], &b2).unwrap();
 
         let mut output = String::new();
-        print_space_impl(&space, [1., 1., 1.], |s| output += s);
+        print_space_impl(&space, vec3(1., 1., 1.), &mut |s| output += s);
         print!("{output}");
         pretty_assertions::assert_eq!(
             output,
@@ -216,7 +219,7 @@ mod tests {
         space.set([1, 0, 0], &partial_block).unwrap();
 
         let mut output = String::new();
-        print_space_impl(&space, [1., 1., 1.], |s| output += s);
+        print_space_impl(&space, vec3(1., 1., 1.), &mut |s| output += s);
         print!("{output}");
         pretty_assertions::assert_eq!(
             output,
