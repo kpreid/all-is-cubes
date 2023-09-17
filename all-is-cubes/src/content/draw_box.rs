@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use crate::block::{self, Block};
-use crate::math::{FaceMap, GridAab, GridRotation};
+use crate::math::{Cube, FaceMap, GridAab, GridRotation};
 use crate::space;
 
 /// Set of blocks used to draw 3D boxes of any size, allowing corners and edges to have
@@ -331,19 +331,10 @@ impl BoxStyle {
     //
     // TODO: allow specifying what happens to existing blocks.
     pub fn create_box(&self, bounds: GridAab) -> space::SpaceTransaction {
-        // Compute the regions which are the faces of the box.
-        let face_aabs = FaceMap::from_fn(|face| bounds.abut(face, -1).unwrap());
-
         let mut txn = space::SpaceTransaction::default();
-        // TODO: skip the interior if it has nothing to do, rather than iterating
-        // over the entire volume.
+        // TODO: This would ideally be a set of fill() operations instead of iteration
         for cube in bounds.interior_iter() {
-            let on_face = face_aabs.map(|_, aab| aab.contains_cube(cube));
-            let part = &self.parts[usize::from(on_face.nx) + usize::from(on_face.px) * 2]
-                [usize::from(on_face.ny) + usize::from(on_face.py) * 2]
-                [usize::from(on_face.nz) + usize::from(on_face.pz) * 2];
-
-            if let Some(part) = part {
+            if let Some(part) = self.cube_at(bounds, cube) {
                 // TODO: give transactions the ability to compose with already-present blocks
                 // so that this can be no-precondition but also no-overwrite? will need
                 // allowed-composition-rule work.
@@ -352,6 +343,31 @@ impl BoxStyle {
         }
 
         txn
+    }
+
+    /// Returns the block that is the part of this box at the specified `cube`.
+    pub fn cube_at(&self, bounds: GridAab, cube: Cube) -> Option<&Block> {
+        let on_face = on_faces(bounds, cube);
+        self.parts[usize::from(on_face.nx) + usize::from(on_face.px) * 2]
+            [usize::from(on_face.ny) + usize::from(on_face.py) * 2]
+            [usize::from(on_face.nz) + usize::from(on_face.pz) * 2]
+            .as_ref()
+    }
+}
+
+/// Returns whether the cube lies within the outermost layer of `bounds`, for each face.
+///
+/// TODO: This seems generally useful; should it be a method on [`GridAab`]?
+fn on_faces(bounds: GridAab, cube: Cube) -> FaceMap<bool> {
+    let lb = bounds.lower_bounds();
+    let ub = bounds.upper_bounds();
+    FaceMap {
+        nx: lb.x == cube.x,
+        ny: lb.y == cube.y,
+        nz: lb.z == cube.z,
+        px: ub.x.checked_sub(1) == Some(cube.x),
+        py: ub.y.checked_sub(1) == Some(cube.y),
+        pz: ub.z.checked_sub(1) == Some(cube.z),
     }
 }
 
