@@ -31,6 +31,8 @@ mod matrix;
 pub use matrix::*;
 mod rotation;
 pub use rotation::*;
+mod vol;
+pub use vol::*;
 
 /// Allows writing a [`NotNan`] value as a constant expression (which is not currently
 /// a feature provided by the [`ordered_float`] crate itself).
