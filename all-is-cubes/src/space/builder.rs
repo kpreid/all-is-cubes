@@ -94,7 +94,7 @@ impl<B: SpaceBuilderBounds> SpaceBuilder<B> {
 
 impl SpaceBuilder<()> {
     /// Use [`SpaceBuilder::default()`] as the public way to call this.
-    pub(super) const fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             bounds: (),
             spawn: None,

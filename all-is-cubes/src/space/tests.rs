@@ -427,7 +427,7 @@ fn space_debug() {
                     sky_color: Rgb(0.8962694, 0.8962694, 1.0),
                     light: None,
                 },
-                behaviors: BehaviorSet([]),
+                behaviors: BehaviorSet({}),
                 cubes_wanting_ticks: {},
                 ..
             }

@@ -7,6 +7,7 @@ use core::any::TypeId;
 use core::fmt::{self, Debug};
 
 use downcast_rs::{impl_downcast, Downcast};
+use hashbrown::HashMap as HbHashMap;
 
 use crate::time::Tick;
 use crate::transaction::{self, Merge as _, Transaction};
@@ -94,15 +95,15 @@ impl<'a, H: BehaviorHost + Debug> Debug for BehaviorContext<'a, H> {
 ///
 #[doc = include_str!("save/serde-warning.md")]
 pub struct BehaviorSet<H: BehaviorHost> {
-    /// Behaviors are stored in [`Arc`] so that they can be used in transactions in ways
-    /// that would otherwise require `Clone + PartialEq`.
-    items: Vec<BehaviorSetEntry<H>>,
+    members: HbHashMap<Key, BehaviorSetEntry<H>>,
 }
 
 impl<H: BehaviorHost> BehaviorSet<H> {
     /// Constructs an empty [`BehaviorSet`].
-    pub const fn new() -> Self {
-        BehaviorSet { items: Vec::new() }
+    pub fn new() -> Self {
+        BehaviorSet {
+            members: HbHashMap::new(),
+        }
     }
 
     /// Find behaviors of a specified type.
@@ -127,8 +128,8 @@ impl<H: BehaviorHost> BehaviorSet<H> {
         &'a self,
         type_filter: Option<TypeId>,
     ) -> impl Iterator<Item = QueryItem<'a, H, dyn Behavior<H> + 'static>> + 'a {
-        self.items
-            .iter()
+        self.members
+            .values()
             .map(
                 move |entry: &'a BehaviorSetEntry<H>| -> QueryItem<'a, H, dyn Behavior<H> + 'static> {
                     QueryItem {
@@ -151,7 +152,7 @@ impl<H: BehaviorHost> BehaviorSet<H> {
         tick: Tick,
     ) -> UniverseTransaction {
         let mut transactions = Vec::new();
-        for (index, entry) in self.items.iter().enumerate() {
+        for (&key, entry) in self.members.iter() {
             let context = &BehaviorContext {
                 host,
                 attachment: &entry.attachment,
@@ -159,7 +160,7 @@ impl<H: BehaviorHost> BehaviorSet<H> {
                 self_transaction_binder: &|new_behavior| {
                     host_transaction_binder(set_transaction_binder(
                         BehaviorSetTransaction::replace(
-                            index,
+                            key,
                             Replace {
                                 old: entry.clone(),
                                 new: BehaviorSetEntry {
@@ -185,19 +186,20 @@ impl<H: BehaviorHost> BehaviorSet<H> {
 
     #[allow(unused)] // currently only used on feature=save
     pub(crate) fn iter(&self) -> impl Iterator<Item = &BehaviorSetEntry<H>> + '_ {
-        self.items.iter()
+        self.members.values()
     }
 
     #[allow(unused)] // currently only used on feature=save
     pub(crate) fn is_empty(&self) -> bool {
-        self.items.is_empty()
+        self.members.is_empty()
     }
 }
 
 impl<H: BehaviorHost> Clone for BehaviorSet<H> {
     fn clone(&self) -> Self {
+        // TODO: reassign all keys?
         Self {
-            items: self.items.clone(),
+            members: self.members.clone(),
         }
     }
 }
@@ -211,7 +213,7 @@ impl<H: BehaviorHost> Default for BehaviorSet<H> {
 impl<H: BehaviorHost> core::fmt::Debug for BehaviorSet<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "BehaviorSet(")?;
-        f.debug_list().entries(&*self.items).finish()?;
+        f.debug_map().entries(self.members.iter()).finish()?;
         write!(f, ")")?;
         Ok(())
     }
@@ -219,8 +221,8 @@ impl<H: BehaviorHost> core::fmt::Debug for BehaviorSet<H> {
 
 impl<H: BehaviorHost> VisitRefs for BehaviorSet<H> {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
-        let Self { items } = self;
-        for entry in items {
+        let Self { members } = self;
+        for entry in members.values() {
             entry.behavior.visit_refs(visitor);
         }
     }
@@ -230,8 +232,55 @@ impl<H: BehaviorHost> transaction::Transactional for BehaviorSet<H> {
     type Transaction = BehaviorSetTransaction<H>;
 }
 
+/// Identifier of a behavior that's been inserted into a behavior set, assigned at
+/// insertion time.
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+struct Key(u64);
+
+impl Key {
+    fn new() -> Self {
+        #![allow(clippy::useless_conversion)] // useless on pointer_width=64
+
+        use core::sync::atomic::{self, Ordering};
+
+        cfg_if::cfg_if! {
+            // Use 64 bit if possible, because 64 bits is enough to be infeasible to overflow
+            // by counting one at a time.
+            if #[cfg(target_has_atomic = "64")] {
+                static ID_COUNTER: atomic::AtomicU64 = atomic::AtomicU64::new(0);
+            } else if #[cfg(target_has_atomic = "32")] {
+                static ID_COUNTER: atomic::AtomicU32 = atomic::AtomicU32::new(0);
+            } else {
+                // If this doesn't work we'll give up.
+                static ID_COUNTER: atomic::AtomicUsize = atomic::AtomicUsize::new(0);
+            }
+        }
+
+        let id = ID_COUNTER
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |counter| {
+                counter.checked_add(1)
+            })
+            .expect("behavior id overflow");
+
+        Self(id.try_into().unwrap()) // try_into because of usize-to-u64 case
+    }
+}
+
+impl fmt::Display for Key {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+impl fmt::Debug for Key {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
 pub(crate) struct BehaviorSetEntry<H: BehaviorHost> {
     pub(crate) attachment: H::Attachment,
+    /// Behaviors are stored in [`Arc`] so that they can be used in transactions in ways
+    /// that would otherwise require `Clone + PartialEq`.
     pub(crate) behavior: Arc<dyn Behavior<H>>,
 }
 
@@ -302,7 +351,7 @@ impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> Debug for QueryItem<'a, H, B>
 #[derive(Debug)]
 pub struct BehaviorSetTransaction<H: BehaviorHost> {
     /// Replacement of existing behaviors or their attachments.
-    replace: BTreeMap<usize, Replace<H>>,
+    replace: BTreeMap<Key, Replace<H>>,
     /// Newly inserted behaviors.
     insert: Vec<BehaviorSetEntry<H>>,
 }
@@ -322,9 +371,9 @@ impl<H: BehaviorHost> BehaviorSetTransaction<H> {
 
     /// This function is private because the normal way it is used is via
     /// [`BehaviorContext::replace_self()`]
-    fn replace(index: usize, replacement: Replace<H>) -> Self {
+    fn replace(key: Key, replacement: Replace<H>) -> Self {
         BehaviorSetTransaction {
-            replace: BTreeMap::from([(index, replacement)]),
+            replace: BTreeMap::from([(key, replacement)]),
             ..Default::default()
         }
     }
@@ -364,11 +413,11 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
     ) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
         let Self { replace, insert } = self;
         // TODO: need to compare replacement preconditions
-        for (&index, Replace { old, new: _ }) in replace {
+        for (key, Replace { old, new: _ }) in replace {
             if let Some(BehaviorSetEntry {
                 attachment,
                 behavior,
-            }) = target.items.get(index)
+            }) = target.members.get(key)
             {
                 if attachment != &old.attachment {
                     return Err(transaction::PreconditionFailed {
@@ -402,10 +451,22 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
         (): Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
-        for (index, replacement) in &self.replace {
-            target.items[*index] = replacement.new.clone();
+        for (key, replacement) in &self.replace {
+            let Some(entry) = target.members.get_mut(key) else {
+                return Err(transaction::CommitError::message::<Self>(format!(
+                    "behavior set does not contain key {key}"
+                )));
+            };
+            let BehaviorSetEntry {
+                attachment,
+                behavior,
+            } = replacement.new.clone();
+            entry.attachment = attachment;
+            entry.behavior = behavior;
         }
-        target.items.extend(self.insert.iter().cloned());
+        target
+            .members
+            .extend(self.insert.iter().cloned().map(|entry| (Key::new(), entry)));
         Ok(())
     }
 }
@@ -416,12 +477,12 @@ impl<H: BehaviorHost> transaction::Merge for BehaviorSetTransaction<H> {
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         // Don't allow any touching the same slot at all.
-        if let Some(&slot) = self
+        if let Some(&key) = self
             .replace
             .keys()
-            .find(|slot| other.replace.contains_key(slot))
+            .find(|key| other.replace.contains_key(key))
         {
-            return Err(BehaviorTransactionConflict { slot });
+            return Err(BehaviorTransactionConflict { key });
         }
         Ok(())
     }
@@ -502,9 +563,9 @@ impl<H: BehaviorHost> Clone for Replace<H> {
 // for addressing behaviors than indices.
 #[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
-#[displaydoc("tried to replace the same behavior slot, {slot}, twice")]
+#[displaydoc("tried to replace the same behavior slot, {key}, twice")]
 pub struct BehaviorTransactionConflict {
-    slot: usize,
+    key: Key,
 }
 
 #[cfg(feature = "std")]
@@ -563,26 +624,36 @@ mod tests {
     use crate::space::{Space, SpaceBehaviorAttachment};
     use crate::time;
     use crate::universe::Universe;
-    use indoc::indoc;
 
     #[test]
     fn behavior_set_debug() {
         use pretty_assertions::assert_eq;
 
         let mut set = BehaviorSet::<Character>::new();
-        assert_eq!(format!("{set:?}"), "BehaviorSet([])");
-        assert_eq!(format!("{set:#?}"), "BehaviorSet([])");
+
+        // Empty set
+        assert_eq!(format!("{set:?}"), "BehaviorSet({})");
+        assert_eq!(format!("{set:#?}"), "BehaviorSet({})");
+
         BehaviorSetTransaction::insert((), Arc::new(NoopBehavior(1)))
             .execute(&mut set, &mut transaction::no_outputs)
             .unwrap();
-        assert_eq!(format!("{set:?}"), "BehaviorSet([NoopBehavior(1) @ ()])");
+        let key = *set.members.keys().next().unwrap();
+
+        // Nonempty set
+        assert_eq!(
+            format!("{set:?}"),
+            format!("BehaviorSet({{{key:?}: NoopBehavior(1) @ ()}})")
+        );
         assert_eq!(
             format!("{set:#?}\n"),
-            indoc! {"
-                BehaviorSet([
-                    NoopBehavior(1) @ (),
-                ])
-            "},
+            indoc::formatdoc!(
+                "
+                BehaviorSet({{
+                    {key:?}: NoopBehavior(1) @ (),
+                }})
+            "
+            ),
         );
     }
 
@@ -710,7 +781,7 @@ mod tests {
         let attachment2 =
             SpaceBehaviorAttachment::new(GridAab::from_lower_size([10, 0, 0], [1, 1, 1]));
         let transaction = BehaviorSetTransaction::<Space>::replace(
-            0,
+            Key::new(),
             Replace {
                 old: BehaviorSetEntry {
                     attachment: attachment1,
@@ -737,10 +808,11 @@ mod tests {
         BehaviorSetTransaction::insert(attachment, Arc::new(NoopBehavior(1)))
             .execute(&mut set, &mut transaction::no_outputs)
             .unwrap();
+        let key = *set.members.keys().next().unwrap();
 
         // Try mismatched behavior
         let transaction = BehaviorSetTransaction::<Space>::replace(
-            0,
+            key,
             Replace {
                 old: BehaviorSetEntry {
                     attachment,
@@ -762,7 +834,7 @@ mod tests {
 
         // Try mismatched attachment
         let transaction = BehaviorSetTransaction::<Space>::replace(
-            0,
+            key,
             Replace {
                 old: BehaviorSetEntry {
                     // not equal to attachment
