@@ -1,17 +1,24 @@
 //! Dynamic add-ons to game objects; we might also have called them “components”.
 
 use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::any::TypeId;
 use core::fmt::{self, Debug};
+use core::mem;
+use core::task::Waker;
+
+#[cfg(doc)]
+use core::future::Future;
 
 use downcast_rs::{impl_downcast, Downcast};
 use hashbrown::HashMap as HbHashMap;
+use hashbrown::HashSet as HbHashSet;
 
 use crate::time::Tick;
 use crate::transaction::{self, Merge as _, Transaction};
 use crate::universe::{RefVisitor, UniverseTransaction, VisitRefs};
+use crate::util::maybe_sync::Mutex;
 
 /// Dynamic add-ons to game objects; we might also have called them “components”.
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
@@ -55,11 +62,22 @@ pub struct BehaviorContext<'a, H: BehaviorHost> {
     /// the host should be affected by the behavior.
     pub attachment: &'a H::Attachment,
 
+    waker: &'a Waker,
+
     host_transaction_binder: &'a dyn Fn(H::Transaction) -> UniverseTransaction,
     self_transaction_binder: &'a dyn Fn(Arc<dyn Behavior<H>>) -> UniverseTransaction,
 }
 
 impl<'a, H: BehaviorHost> BehaviorContext<'a, H> {
+    /// Returns a [`Waker`] that should be used to signal when the behavior's
+    /// [`step()`](Behavior::step) should be called again, in the case where it
+    /// returns [`Then::Sleep`].
+    ///
+    /// This is precisely analogous to the use of [`Waker`] with [`Future::poll()`].
+    pub fn waker(&self) -> &'a Waker {
+        self.waker
+    }
+
     /// Take a transaction applicable to the behavior's host, and wrap it to become a
     /// [`UniverseTransaction`] for the host's containing universe.
     pub fn bind_host(&self, transaction: H::Transaction) -> UniverseTransaction {
@@ -94,10 +112,11 @@ pub enum Then {
     Drop,
 
     /// Step again upon the next tick.
-    Step,
     // TODO: specify whether to step when paused?
+    Step,
 
-    // TODO: quiescence
+    /// Don't step until the [`BehaviorContext::waker()`] is invoked.
+    Sleep,
 }
 
 /// Collects [`Behavior`]s and invokes them.
@@ -110,6 +129,9 @@ pub enum Then {
 #[doc = include_str!("save/serde-warning.md")]
 pub struct BehaviorSet<H: BehaviorHost> {
     members: HbHashMap<Key, BehaviorSetEntry<H>>,
+
+    /// Contains the key of every behavior whose `Waker` was invoked.
+    woken: Arc<Mutex<HbHashSet<Key>>>,
 }
 
 impl<H: BehaviorHost> BehaviorSet<H> {
@@ -117,6 +139,7 @@ impl<H: BehaviorHost> BehaviorSet<H> {
     pub fn new() -> Self {
         BehaviorSet {
             members: HbHashMap::new(),
+            woken: Default::default(),
         }
     }
 
@@ -166,11 +189,24 @@ impl<H: BehaviorHost> BehaviorSet<H> {
         tick: Tick,
     ) -> UniverseTransaction {
         let mut transactions = Vec::new();
-        for (&key, entry) in self.members.iter() {
+
+        // TODO: We're not yet actually using this, just clearing it.
+        // TODO: Find a way to drain the set without holding the lock and without
+        // reallocating.
+        #[allow(unused)]
+        let woken: HbHashSet<_> = mem::take(&mut self.woken.lock().unwrap());
+
+        for key in woken {
+            let Some(entry) = self.members.get(&key) else {
+                // ignore spurious wakes of dropped behaviors
+                continue;
+            };
+
             let context = &BehaviorContext {
                 tick,
                 host,
                 attachment: &entry.attachment,
+                waker: entry.waker.as_ref().unwrap(),
                 host_transaction_binder,
                 self_transaction_binder: &|new_behavior| {
                     host_transaction_binder(set_transaction_binder(
@@ -181,6 +217,7 @@ impl<H: BehaviorHost> BehaviorSet<H> {
                                 new: Some(BehaviorSetEntry {
                                     attachment: entry.attachment.clone(),
                                     behavior: new_behavior,
+                                    waker: None,
                                 }),
                             },
                         ),
@@ -195,7 +232,11 @@ impl<H: BehaviorHost> BehaviorSet<H> {
                 Then::Drop => transactions.push(host_transaction_binder(set_transaction_binder(
                     BehaviorSetTransaction::delete(key, entry.clone()),
                 ))),
-                Then::Step => {}
+
+                // Step is currently equivalent to just self-waking immediately.
+                Then::Step => context.waker.wake_by_ref(),
+
+                Then::Sleep => { /* no action needed */ }
             }
         }
         let transaction = transactions
@@ -217,10 +258,22 @@ impl<H: BehaviorHost> BehaviorSet<H> {
 
 impl<H: BehaviorHost> Clone for BehaviorSet<H> {
     fn clone(&self) -> Self {
-        // TODO: reassign all keys?
-        Self {
-            members: self.members.clone(),
-        }
+        let woken = Arc::new(Mutex::new(self.members.keys().cloned().collect()));
+
+        // Reassign keys and wakers
+        // Note: This is similar to `BehaviorSetTransaction::commit()`.
+        let members: HbHashMap<Key, _> = self
+            .members
+            .values()
+            .map(|entry| {
+                let mut entry = entry.clone();
+                let key = Key::new();
+                entry.waker = Some(BehaviorWaker::create_waker(key, &woken));
+                (key, entry)
+            })
+            .collect();
+
+        Self { woken, members }
     }
 }
 
@@ -241,7 +294,7 @@ impl<H: BehaviorHost> core::fmt::Debug for BehaviorSet<H> {
 
 impl<H: BehaviorHost> VisitRefs for BehaviorSet<H> {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
-        let Self { members } = self;
+        let Self { members, woken: _ } = self;
         for entry in members.values() {
             entry.behavior.visit_refs(visitor);
         }
@@ -302,6 +355,9 @@ pub(crate) struct BehaviorSetEntry<H: BehaviorHost> {
     /// Behaviors are stored in [`Arc`] so that they can be used in transactions in ways
     /// that would otherwise require `Clone + PartialEq`.
     pub(crate) behavior: Arc<dyn Behavior<H>>,
+    /// None if the entry is not yet inserted in a behavior set.
+    /// TODO: This could be just a separate type or generic instead of a run-time Option.
+    waker: Option<Waker>,
 }
 
 impl<H: BehaviorHost> Clone for BehaviorSetEntry<H> {
@@ -310,6 +366,7 @@ impl<H: BehaviorHost> Clone for BehaviorSetEntry<H> {
         Self {
             attachment: self.attachment.clone(),
             behavior: self.behavior.clone(),
+            waker: self.waker.clone(),
         }
     }
 }
@@ -319,6 +376,7 @@ impl<H: BehaviorHost> Debug for BehaviorSetEntry<H> {
         let BehaviorSetEntry {
             attachment,
             behavior,
+            waker: _,
         } = self;
         behavior.fmt(f)?; // inherit alternate prettyprint mode
         write!(f, " @ {attachment:?}")?; // don't
@@ -330,6 +388,35 @@ impl<H: BehaviorHost> PartialEq for BehaviorSetEntry<H> {
     #[allow(clippy::vtable_address_comparisons)] // The hazards should be okay for this use case
     fn eq(&self, other: &Self) -> bool {
         self.attachment == other.attachment && Arc::ptr_eq(&self.behavior, &other.behavior)
+    }
+}
+
+struct BehaviorWaker {
+    key: Key,
+    set: Weak<Mutex<HbHashSet<Key>>>,
+}
+impl BehaviorWaker {
+    fn create_waker(key: Key, woken: &Arc<Mutex<HbHashSet<Key>>>) -> Waker {
+        Waker::from(Arc::new(BehaviorWaker {
+            key,
+            set: Arc::downgrade(woken),
+        }))
+    }
+}
+impl alloc::task::Wake for BehaviorWaker {
+    fn wake(self: Arc<Self>) {
+        self.wake_by_ref()
+    }
+    fn wake_by_ref(self: &Arc<Self>) {
+        let Some(strong_set) = self.set.upgrade() else {
+            // behavior set was dropped, so it will never step anything again
+            return;
+        };
+        let Ok(mut mut_set) = strong_set.lock() else {
+            // a previous panic corrupted state
+            return;
+        };
+        mut_set.insert(self.key);
     }
 }
 
@@ -404,6 +491,7 @@ impl<H: BehaviorHost> BehaviorSetTransaction<H> {
             insert: vec![BehaviorSetEntry {
                 attachment,
                 behavior,
+                waker: None,
             }],
             ..Default::default()
         }
@@ -452,6 +540,7 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
             if let Some(BehaviorSetEntry {
                 attachment,
                 behavior,
+                waker: _,
             }) = target.members.get(key)
             {
                 if attachment != &old.attachment {
@@ -497,7 +586,12 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
                     let BehaviorSetEntry {
                         attachment,
                         behavior,
+                        waker,
                     } = new.clone();
+                    assert!(
+                        waker.is_none(),
+                        "transaction entries should not have wakers"
+                    );
                     entry.attachment = attachment;
                     entry.behavior = behavior;
                 }
@@ -510,9 +604,27 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
                 }
             }
         }
+
+        // TODO: Instead of error, recover by recreating the list
+        let mut woken = target.woken.lock().map_err(|_| {
+            transaction::CommitError::message::<Self>("behavior set wake lock poisoned".into())
+        })?;
+
         target
             .members
-            .extend(self.insert.iter().cloned().map(|entry| (Key::new(), entry)));
+            .extend(self.insert.iter().cloned().map(|mut entry| {
+                // Note: This is similar to `BehaviorSet::clone()`.
+
+                let key = Key::new();
+
+                // Mark behavior as to be stepped immediately
+                woken.insert(key);
+
+                // Hook up waker
+                entry.waker = Some(BehaviorWaker::create_waker(key, &target.woken));
+
+                (key, entry)
+            }));
         Ok(())
     }
 }
@@ -667,8 +779,9 @@ mod tests {
     use crate::character::{Character, CharacterTransaction};
     use crate::math::{FreeCoordinate, GridAab};
     use crate::physics::BodyTransaction;
-    use crate::space::{Space, SpaceBehaviorAttachment};
+    use crate::space::{Space, SpaceBehaviorAttachment, SpaceTransaction};
     use crate::time;
+    use crate::transaction::no_outputs;
     use crate::universe::Universe;
 
     #[test]
@@ -825,6 +938,51 @@ mod tests {
     }
 
     #[test]
+    fn sleep_and_wake() {
+        use std::sync::mpsc;
+
+        #[derive(Debug)]
+        struct SleepBehavior {
+            tx: mpsc::Sender<Waker>,
+        }
+        impl Behavior<Space> for SleepBehavior {
+            fn step(&self, context: &BehaviorContext<'_, Space>) -> (UniverseTransaction, Then) {
+                self.tx.send(context.waker().clone()).unwrap();
+                (UniverseTransaction::default(), Then::Sleep)
+            }
+            fn persistence(&self) -> Option<BehaviorPersistence> {
+                None
+            }
+        }
+        impl VisitRefs for SleepBehavior {
+            fn visit_refs(&self, _: &mut dyn RefVisitor) {}
+        }
+
+        // Setup
+        let (tx, rx) = mpsc::channel();
+        let mut u = Universe::new();
+        let space = u.insert("space".into(), Space::empty_positive(1, 1, 1)).unwrap();
+        SpaceTransaction::add_behavior(GridAab::ORIGIN_CUBE, SleepBehavior { tx })
+            .bind(space)
+            .execute(&mut u, &mut no_outputs)
+            .unwrap();
+        assert_eq!(mpsc::TryRecvError::Empty, rx.try_recv().unwrap_err());
+
+        // First step
+        u.step(false, time::DeadlineNt::Whenever);
+        let waker: Waker = rx.try_recv().unwrap();
+
+        // Second step — should *not* step the behavior because it didn't wake.
+        u.step(false, time::DeadlineNt::Whenever);
+        assert_eq!(mpsc::TryRecvError::Empty, rx.try_recv().unwrap_err());
+
+        // Wake and step again
+        waker.wake();
+        u.step(false, time::DeadlineNt::Whenever);
+        rx.try_recv().unwrap();
+    }
+
+    #[test]
     fn txn_attachments_insert() {
         let attachment =
             SpaceBehaviorAttachment::new(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]));
@@ -848,10 +1006,12 @@ mod tests {
                 old: BehaviorSetEntry {
                     attachment: attachment1,
                     behavior: Arc::new(NoopBehavior(1)),
+                    waker: None,
                 },
                 new: Some(BehaviorSetEntry {
                     attachment: attachment2,
                     behavior: Arc::new(NoopBehavior(1)),
+                    waker: None,
                 }),
             },
         );
@@ -879,10 +1039,12 @@ mod tests {
                 old: BehaviorSetEntry {
                     attachment,
                     behavior: Arc::new(NoopBehavior(2)), // not equal to actual behavior
+                    waker: None,
                 },
                 new: Some(BehaviorSetEntry {
                     attachment,
                     behavior: Arc::new(NoopBehavior(3)),
+                    waker: None,
                 }),
             },
         );
@@ -905,10 +1067,12 @@ mod tests {
                         [1, 1, 1],
                     )),
                     behavior: Arc::new(NoopBehavior(1)),
+                    waker: None,
                 },
                 new: Some(BehaviorSetEntry {
                     attachment,
                     behavior: Arc::new(NoopBehavior(1)),
+                    waker: None,
                 }),
             },
         );

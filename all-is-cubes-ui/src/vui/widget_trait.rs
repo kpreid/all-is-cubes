@@ -161,6 +161,7 @@ impl Behavior<Space> for WidgetBehavior {
         &self,
         context: &behavior::BehaviorContext<'_, Space>,
     ) -> (UniverseTransaction, behavior::Then) {
+        // TODO: pass waker to the widget controller and change `Then` to `Sleep`.
         let txn = self
             .controller
             .lock()
