@@ -63,7 +63,21 @@ pub enum Name {
     Anonym(usize),
 
     /// Not yet been assigned a name; this may be replaced with `Anonym` but not `Specific`.
+    ///
+    /// This name is always replaced at the moment of insertion in the [`Universe`].
     Pending,
+}
+
+impl Name {
+    /// Returns whether universe members with this name should be counted as GC roots
+    /// (not deleted even if unreferenced).
+    fn is_gc_root(&self) -> bool {
+        match self {
+            Name::Specific(_) => true,
+            Name::Anonym(_) => false,
+            Name::Pending => unreachable!("inconsistency: Pending should not occur here"),
+        }
+    }
 }
 
 impl From<&str> for Name {
@@ -673,7 +687,7 @@ impl CustomFormat<StatusText> for UniverseStepInfo {
 fn gc_members<T>(table: &mut Storage<T>) {
     let mut dead: Vec<Name> = Vec::new();
     for (name, root) in table.iter() {
-        if root.weak_ref_count() == 0 {
+        if !name.is_gc_root() && root.weak_ref_count() == 0 {
             dead.push(name.clone());
         }
     }

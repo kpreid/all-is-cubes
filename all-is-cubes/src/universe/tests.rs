@@ -315,6 +315,18 @@ fn gc_implicit() {
     assert_eq!(0, u.iter_by_type::<BlockDef>().count());
 }
 
+/// Named members are considered garbage-collection roots and do not get automatically
+/// deleted.
+#[test]
+fn gc_preserves_named() {
+    let mut u = Universe::new();
+    u.insert("foo".into(), BlockDef::new(AIR)).unwrap();
+    assert_eq!(1, u.iter_by_type::<BlockDef>().count());
+    u.gc();
+    assert_eq!(1, u.iter_by_type::<BlockDef>().count());
+    u.get::<BlockDef>(&"foo".into()).unwrap();
+}
+
 #[test]
 fn visit_refs_block_def_no_ref() {
     assert_eq!(list_refs(&BlockDef::new(AIR)), vec![]);
