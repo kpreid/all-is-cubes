@@ -624,7 +624,7 @@ mod testing {
     use super::*;
 
     /// A [`Behavior`] implementation that does nothing and carries arbitrary data, for testing.
-    #[derive(Clone)]
+    #[derive(Clone, Eq, PartialEq)]
     pub(crate) struct NoopBehavior<D>(pub D);
 
     impl<D: Debug> fmt::Debug for NoopBehavior<D> {
@@ -793,42 +793,23 @@ mod tests {
         #[derive(Debug, Eq, PartialEq)]
         struct Unexpected;
 
-        /// A parameterized behavior so we can easily have two types
-        #[derive(Debug, Eq, PartialEq)]
-        struct Q<T>(T);
-        impl<T: Debug + Send + Sync + 'static> Behavior<Character> for Q<T> {
-            fn step(
-                &self,
-                _context: &BehaviorContext<'_, Character>,
-            ) -> (UniverseTransaction, Then) {
-                (UniverseTransaction::default(), Then::Step)
-            }
-            fn persistence(&self) -> Option<BehaviorPersistence> {
-                None
-            }
-        }
-        impl<T> VisitRefs for Q<T> {
-            // No references
-            fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
-        }
-
         let mut set = BehaviorSet::<Character>::new();
-        let arc_qe = Arc::new(Q(Expected));
+        let arc_qe = Arc::new(NoopBehavior(Expected));
         BehaviorSetTransaction::insert((), arc_qe.clone())
             .execute(&mut set, &mut transaction::no_outputs)
             .unwrap();
         // different type, so it should not be found
-        let arc_qu = Arc::new(Q(Unexpected));
+        let arc_qu = Arc::new(NoopBehavior(Unexpected));
         BehaviorSetTransaction::insert((), arc_qu.clone())
             .execute(&mut set, &mut transaction::no_outputs)
             .unwrap();
 
         // Type-specific query should find one
         assert_eq!(
-            set.query::<Q<Expected>>()
+            set.query::<NoopBehavior<Expected>>()
                 .map(|qi| qi.behavior)
                 .collect::<Vec<_>>(),
-            vec![&Q(Expected)],
+            vec![&NoopBehavior(Expected)],
         );
 
         // General query should find both
