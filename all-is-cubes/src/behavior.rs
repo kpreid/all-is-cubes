@@ -87,7 +87,7 @@ impl<'a, H: BehaviorHost + Debug> Debug for BehaviorContext<'a, H> {
 /// A behavior's request for what should happen to it next.
 ///
 /// Returned from [`Behavior::step()`]. Analogous to [`core::task::Poll`] for futures.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum Then {
     /// Remove the behavior from the behavior set, and never call it again.
@@ -178,10 +178,10 @@ impl<H: BehaviorHost> BehaviorSet<H> {
                             key,
                             Replace {
                                 old: entry.clone(),
-                                new: BehaviorSetEntry {
+                                new: Some(BehaviorSetEntry {
                                     attachment: entry.attachment.clone(),
                                     behavior: new_behavior,
-                                },
+                                }),
                             },
                         ),
                     ))
@@ -192,7 +192,9 @@ impl<H: BehaviorHost> BehaviorSet<H> {
                 transactions.push(txn);
             }
             match then {
-                Then::Drop => {} // transactions.push(set),
+                Then::Drop => transactions.push(host_transaction_binder(set_transaction_binder(
+                    BehaviorSetTransaction::delete(key, entry.clone()),
+                ))),
                 Then::Step => {}
             }
         }
@@ -368,7 +370,7 @@ impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> Debug for QueryItem<'a, H, B>
 /// A [`Transaction`] that adds or modifies [`Behavior`]s in a [`BehaviorSet`].
 #[derive(Debug)]
 pub struct BehaviorSetTransaction<H: BehaviorHost> {
-    /// Replacement of existing behaviors or their attachments.
+    /// Replacement of existing behaviors or their attachments, or removal.
     replace: BTreeMap<Key, Replace<H>>,
     /// Newly inserted behaviors.
     insert: Vec<BehaviorSetEntry<H>>,
@@ -376,9 +378,9 @@ pub struct BehaviorSetTransaction<H: BehaviorHost> {
 
 #[derive(Debug)]
 struct Replace<H: BehaviorHost> {
-    // TODO: Should we also offer not replacing behavior or not replacing attachment?
     old: BehaviorSetEntry<H>,
-    new: BehaviorSetEntry<H>,
+    /// If None, delete the behavior
+    new: Option<BehaviorSetEntry<H>>,
 }
 
 impl<H: BehaviorHost> BehaviorSetTransaction<H> {
@@ -407,14 +409,29 @@ impl<H: BehaviorHost> BehaviorSetTransaction<H> {
         }
     }
 
+    /// This function is private because the normal way it is used is via
+    /// [`Behavior::step()`] returning [`Then::Drop`]
+    fn delete(key: Key, existing_entry: BehaviorSetEntry<H>) -> Self {
+        Self::replace(
+            key,
+            Replace {
+                old: existing_entry,
+                new: None,
+            },
+        )
+    }
+
     /// Returns an iterator over every behavior attachment added, removed, or modified by
     /// this transaction (not necessary free of duplicates).
     pub(crate) fn attachments_affected(&self) -> impl Iterator<Item = &H::Attachment> {
-        // TODO: needs to collect `replace` attachments too
-        let replace = self
-            .replace
-            .values()
-            .flat_map(|Replace { old, new }| [&old.attachment, &new.attachment]);
+        let replace = self.replace.values().flat_map(|Replace { old, new }| {
+            [
+                Some(&old.attachment),
+                new.as_ref().map(|entry| &entry.attachment),
+            ]
+            .into_iter()
+            .flatten()
+        });
         let insert = self.insert.iter().map(|entry| &entry.attachment);
         replace.chain(insert)
     }
@@ -470,17 +487,28 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
         for (key, replacement) in &self.replace {
-            let Some(entry) = target.members.get_mut(key) else {
-                return Err(transaction::CommitError::message::<Self>(format!(
-                    "behavior set does not contain key {key}"
-                )));
-            };
-            let BehaviorSetEntry {
-                attachment,
-                behavior,
-            } = replacement.new.clone();
-            entry.attachment = attachment;
-            entry.behavior = behavior;
+            match &replacement.new {
+                Some(new) => {
+                    let Some(entry) = target.members.get_mut(key) else {
+                        return Err(transaction::CommitError::message::<Self>(format!(
+                            "behavior set does not contain key {key}"
+                        )));
+                    };
+                    let BehaviorSetEntry {
+                        attachment,
+                        behavior,
+                    } = new.clone();
+                    entry.attachment = attachment;
+                    entry.behavior = behavior;
+                }
+                None => {
+                    let Some(_) = target.members.remove(key) else {
+                        return Err(transaction::CommitError::message::<Self>(format!(
+                            "behavior set does not contain key {key}"
+                        )));
+                    };
+                }
+            }
         }
         target
             .members
@@ -675,23 +703,25 @@ mod tests {
         );
     }
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq)]
     struct SelfModifyingBehavior {
         foo: u32,
+        then: Then,
     }
     impl Behavior<Character> for SelfModifyingBehavior {
         fn step(&self, context: &BehaviorContext<'_, Character>) -> (UniverseTransaction, Then) {
-            (
-                context
-                    .replace_self(SelfModifyingBehavior { foo: self.foo + 1 })
-                    .merge(
-                        context.bind_host(CharacterTransaction::body(BodyTransaction {
-                            delta_yaw: FreeCoordinate::from(self.foo),
-                        })),
-                    )
-                    .unwrap(),
-                Then::Step,
-            )
+            let mut txn = context.bind_host(CharacterTransaction::body(BodyTransaction {
+                delta_yaw: FreeCoordinate::from(self.foo),
+            }));
+            if self.then != Then::Drop {
+                txn = txn
+                    .merge(context.replace_self(SelfModifyingBehavior {
+                        foo: self.foo + 1,
+                        ..self.clone()
+                    }))
+                    .unwrap();
+            }
+            (txn, self.then.clone())
         }
         fn persistence(&self) -> Option<BehaviorPersistence> {
             None
@@ -709,7 +739,10 @@ mod tests {
         // TODO: Once we have a simpler type than Character to test with, do that
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let mut character = Character::spawn_default(space);
-        character.add_behavior(SelfModifyingBehavior { foo: 1 });
+        character.add_behavior(SelfModifyingBehavior {
+            foo: 1,
+            then: Then::Step,
+        });
         let character = u.insert_anonymous(character);
 
         u.step(false, time::DeadlineStd::Whenever);
@@ -718,6 +751,39 @@ mod tests {
         // Until we have a way to query the behavior set, the best test we can do is to
         // read its effects.
         assert_eq!(character.read().unwrap().body.yaw, 3.0);
+    }
+
+    #[test]
+    fn dropped_when_requested() {
+        let mut u = Universe::new();
+        // TODO: Once we have a simpler type than Character to test with, do that
+        let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let mut character = Character::spawn_default(space);
+        character.add_behavior(SelfModifyingBehavior {
+            foo: 1,
+            then: Then::Drop,
+        });
+        let character = u.insert_anonymous(character);
+
+        assert_eq!(
+            character
+                .read()
+                .unwrap()
+                .behaviors
+                .query::<SelfModifyingBehavior>()
+                .count(),
+            1
+        );
+        u.step(false, time::DeadlineStd::Whenever);
+        assert_eq!(
+            character
+                .read()
+                .unwrap()
+                .behaviors
+                .query::<SelfModifyingBehavior>()
+                .count(),
+            0
+        );
     }
 
     #[test]
@@ -802,10 +868,10 @@ mod tests {
                     attachment: attachment1,
                     behavior: Arc::new(NoopBehavior(1)),
                 },
-                new: BehaviorSetEntry {
+                new: Some(BehaviorSetEntry {
                     attachment: attachment2,
                     behavior: Arc::new(NoopBehavior(1)),
-                },
+                }),
             },
         );
         assert_eq!(
@@ -833,10 +899,10 @@ mod tests {
                     attachment,
                     behavior: Arc::new(NoopBehavior(2)), // not equal to actual behavior
                 },
-                new: BehaviorSetEntry {
+                new: Some(BehaviorSetEntry {
                     attachment,
                     behavior: Arc::new(NoopBehavior(3)),
-                },
+                }),
             },
         );
         assert_eq!(
@@ -859,10 +925,10 @@ mod tests {
                     )),
                     behavior: Arc::new(NoopBehavior(1)),
                 },
-                new: BehaviorSetEntry {
+                new: Some(BehaviorSetEntry {
                     attachment,
                     behavior: Arc::new(NoopBehavior(1)),
-                },
+                }),
             },
         );
         assert_eq!(
@@ -876,10 +942,16 @@ mod tests {
 
     #[test]
     fn txn_systematic() {
-        let b1 = Arc::new(SelfModifyingBehavior { foo: 100 });
-        let b2 = Arc::new(SelfModifyingBehavior { foo: 200 });
+        let b1 = Arc::new(SelfModifyingBehavior {
+            foo: 100,
+            then: Then::Step,
+        });
+        let b2 = Arc::new(SelfModifyingBehavior {
+            foo: 200,
+            then: Then::Step,
+        });
 
-        // TODO: cannot test replace() because we don't have stable indexes/keys
+        // TODO: test replace() but we'll need to be able to discover the keys
 
         transaction::TransactionTester::new()
             .transaction(BehaviorSetTransaction::default(), |_, _| Ok(()))
