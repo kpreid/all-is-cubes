@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use all_is_cubes::character::{self, Character};
 use all_is_cubes::physics::BodyTransaction;
-use all_is_cubes::time::Tick;
 use all_is_cubes::{behavior, listen, universe};
 use anyhow::Context;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -145,16 +144,14 @@ struct AutoRotate {
 impl behavior::Behavior<character::Character> for AutoRotate {
     fn step(
         &self,
-        c: &behavior::BehaviorContext<'_, Character>,
-        tick: Tick,
-    ) -> universe::UniverseTransaction {
+        context: &behavior::BehaviorContext<'_, Character>,
+    ) -> (universe::UniverseTransaction, behavior::Then) {
         let mut body_txn = BodyTransaction::default();
-        body_txn.delta_yaw = self.rate.into_inner() * tick.delta_t().as_secs_f64();
-        c.bind_host(character::CharacterTransaction::body(body_txn))
-    }
-
-    fn alive(&self, _context: &behavior::BehaviorContext<'_, Character>) -> bool {
-        true
+        body_txn.delta_yaw = self.rate.into_inner() * context.tick.delta_t().as_secs_f64();
+        (
+            context.bind_host(character::CharacterTransaction::body(body_txn)),
+            behavior::Then::Step,
+        )
     }
 
     fn persistence(&self) -> Option<behavior::BehaviorPersistence> {

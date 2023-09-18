@@ -17,16 +17,11 @@ use crate::universe::{RefVisitor, UniverseTransaction, VisitRefs};
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
 /// is invoked.
 pub trait Behavior<H: BehaviorHost>: Debug + Send + Sync + Downcast + VisitRefs + 'static {
-    /// Computes a transaction to apply the effects of this behavior for one timestep.
+    /// Computes a transaction to apply the effects of this behavior for one timestep,
+    /// and specifies when next to step the behavior again (if ever).
     ///
     /// TODO: Define what happens if the transaction fails.
-    fn step(&self, _context: &BehaviorContext<'_, H>, _tick: Tick) -> UniverseTransaction {
-        UniverseTransaction::default()
-    }
-
-    /// Returns [`false`] if the [`Behavior`] should be dropped because conditions under
-    /// which it is useful no longer apply.
-    fn alive(&self, context: &BehaviorContext<'_, H>) -> bool;
+    fn step(&self, context: &BehaviorContext<'_, H>) -> (UniverseTransaction, Then);
 
     /// If `None`, then the behavior should not be persisted/saved to disk, because it will be
     /// reconstructed as needed (e.g. collision, occupancy, user interaction, particles).
@@ -36,8 +31,6 @@ pub trait Behavior<H: BehaviorHost>: Debug + Send + Sync + Downcast + VisitRefs 
     ///
     /// TODO: Return type isn't a clean public API, nor extensible.
     fn persistence(&self) -> Option<BehaviorPersistence>;
-
-    // TODO: quiescence, incoming events...
 }
 
 impl_downcast!(Behavior<H> where H: BehaviorHost);
@@ -52,11 +45,16 @@ pub trait BehaviorHost: transaction::Transactional + 'static {
 /// Items available to a [`Behavior`] during [`Behavior::step()`].
 #[non_exhaustive]
 pub struct BehaviorContext<'a, H: BehaviorHost> {
+    /// The time tick that is currently passing, causing this step.
+    pub tick: Tick,
+
     /// The current state of the behavior's host object.
     pub host: &'a H,
+
     /// Additional data about “where” the behavior is attached to the host; what part of
     /// the host should be affected by the behavior.
     pub attachment: &'a H::Attachment,
+
     host_transaction_binder: &'a dyn Fn(H::Transaction) -> UniverseTransaction,
     self_transaction_binder: &'a dyn Fn(Arc<dyn Behavior<H>>) -> UniverseTransaction,
 }
@@ -84,6 +82,22 @@ impl<'a, H: BehaviorHost + Debug> Debug for BehaviorContext<'a, H> {
             .field("host", &self.host)
             .finish_non_exhaustive()
     }
+}
+
+/// A behavior's request for what should happen to it next.
+///
+/// Returned from [`Behavior::step()`]. Analogous to [`core::task::Poll`] for futures.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum Then {
+    /// Remove the behavior from the behavior set, and never call it again.
+    Drop,
+
+    /// Step again upon the next tick.
+    Step,
+    // TODO: specify whether to step when paused?
+
+    // TODO: quiescence
 }
 
 /// Collects [`Behavior`]s and invokes them.
@@ -154,6 +168,7 @@ impl<H: BehaviorHost> BehaviorSet<H> {
         let mut transactions = Vec::new();
         for (&key, entry) in self.members.iter() {
             let context = &BehaviorContext {
+                tick,
                 host,
                 attachment: &entry.attachment,
                 host_transaction_binder,
@@ -172,10 +187,13 @@ impl<H: BehaviorHost> BehaviorSet<H> {
                     ))
                 },
             };
-            if entry.behavior.alive(context) {
-                transactions.push(entry.behavior.step(context, tick));
-            } else {
-                // TODO: mark for removal and prove it was done
+            let (txn, then) = entry.behavior.step(context);
+            if txn != UniverseTransaction::default() {
+                transactions.push(txn);
+            }
+            match then {
+                Then::Drop => {} // transactions.push(set),
+                Then::Step => {}
             }
         }
         let transaction = transactions
@@ -591,8 +609,8 @@ mod testing {
     }
 
     impl<H: BehaviorHost, D: Debug + Send + Sync + 'static> Behavior<H> for NoopBehavior<D> {
-        fn alive(&self, _context: &BehaviorContext<'_, H>) -> bool {
-            true
+        fn step(&self, _context: &BehaviorContext<'_, H>) -> (UniverseTransaction, Then) {
+            (UniverseTransaction::default(), Then::Step)
         }
         fn persistence(&self) -> Option<BehaviorPersistence> {
             None
@@ -662,25 +680,19 @@ mod tests {
         foo: u32,
     }
     impl Behavior<Character> for SelfModifyingBehavior {
-        fn step(
-            &self,
-            context: &BehaviorContext<'_, Character>,
-            _tick: Tick,
-        ) -> UniverseTransaction {
-            context
-                .replace_self(SelfModifyingBehavior { foo: self.foo + 1 })
-                .merge(
-                    context.bind_host(CharacterTransaction::body(BodyTransaction {
-                        delta_yaw: FreeCoordinate::from(self.foo),
-                    })),
-                )
-                .unwrap()
+        fn step(&self, context: &BehaviorContext<'_, Character>) -> (UniverseTransaction, Then) {
+            (
+                context
+                    .replace_self(SelfModifyingBehavior { foo: self.foo + 1 })
+                    .merge(
+                        context.bind_host(CharacterTransaction::body(BodyTransaction {
+                            delta_yaw: FreeCoordinate::from(self.foo),
+                        })),
+                    )
+                    .unwrap(),
+                Then::Step,
+            )
         }
-
-        fn alive(&self, _context: &BehaviorContext<'_, Character>) -> bool {
-            true
-        }
-
         fn persistence(&self) -> Option<BehaviorPersistence> {
             None
         }
@@ -719,8 +731,11 @@ mod tests {
         #[derive(Debug, Eq, PartialEq)]
         struct Q<T>(T);
         impl<T: Debug + Send + Sync + 'static> Behavior<Character> for Q<T> {
-            fn alive(&self, _context: &BehaviorContext<'_, Character>) -> bool {
-                true
+            fn step(
+                &self,
+                _context: &BehaviorContext<'_, Character>,
+            ) -> (UniverseTransaction, Then) {
+                (UniverseTransaction::default(), Then::Step)
             }
             fn persistence(&self) -> Option<BehaviorPersistence> {
                 None

@@ -1080,11 +1080,14 @@ impl ActivatableRegion {
 }
 
 impl behavior::Behavior<Space> for ActivatableRegion {
-    fn alive(&self, _: &behavior::BehaviorContext<'_, Space>) -> bool {
-        // TODO: Give a way for this to be deleted automatically
-        true
+    fn step(
+        &self,
+        _context: &behavior::BehaviorContext<'_, Space>,
+    ) -> (UniverseTransaction, behavior::Then) {
+        // TODO: Give a way for this to be deleted automatically when
+        // its effect is gone
+        (UniverseTransaction::default(), behavior::Then::Step)
     }
-
     fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
         // Not useful to serialize since `EphemeralOpaque` can't be.
         None

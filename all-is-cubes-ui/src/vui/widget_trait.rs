@@ -9,7 +9,7 @@ use all_is_cubes::math::GridAab;
 use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::{self, Merge as _};
-use all_is_cubes::universe::{RefVisitor, VisitRefs};
+use all_is_cubes::universe::{RefVisitor, UniverseTransaction, VisitRefs};
 
 use crate::vui::{validate_widget_transaction, LayoutGrant, Layoutable, Positioned};
 
@@ -160,22 +160,17 @@ impl Behavior<Space> for WidgetBehavior {
     fn step(
         &self,
         context: &behavior::BehaviorContext<'_, Space>,
-        tick: Tick,
-    ) -> all_is_cubes::universe::UniverseTransaction {
+    ) -> (UniverseTransaction, behavior::Then) {
         let txn = self
             .controller
             .lock()
             .unwrap()
-            .step(tick)
+            .step(context.tick)
             .expect("TODO: behaviors should have an error reporting path");
         // TODO: should be using the attachment bounds instead of the layout grant to validate bounds
         validate_widget_transaction(&self.widget.value, &txn, &self.widget.position)
             .expect("transaction validation failed");
-        context.bind_host(txn)
-    }
-
-    fn alive(&self, _: &behavior::BehaviorContext<'_, Space>) -> bool {
-        true
+        (context.bind_host(txn), behavior::Then::Step)
     }
 
     fn persistence(&self) -> Option<behavior::BehaviorPersistence> {

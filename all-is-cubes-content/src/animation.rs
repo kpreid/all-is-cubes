@@ -61,11 +61,11 @@ impl<F: Fn(Cube, u64) -> Block + Clone + Send + Sync + 'static> behavior::Behavi
     fn step(
         &self,
         context: &behavior::BehaviorContext<'_, Space>,
-        tick: Tick,
-    ) -> UniverseTransaction {
+    ) -> (UniverseTransaction, behavior::Then) {
         let mut mut_self: AnimatedVoxels<F> = self.clone();
-        mut_self.accumulator += tick.delta_t();
-        if mut_self.accumulator >= mut_self.frame_period {
+        // TODO: replace this accumulator with asking the behavior set to schedule for us
+        mut_self.accumulator += context.tick.delta_t();
+        let txn = if mut_self.accumulator >= mut_self.frame_period {
             mut_self.accumulator -= mut_self.frame_period;
             mut_self.frame = mut_self.frame.wrapping_add(1);
 
@@ -77,11 +77,9 @@ impl<F: Fn(Cube, u64) -> Block + Clone + Send + Sync + 'static> behavior::Behavi
                 .unwrap()
         } else {
             context.replace_self(mut_self)
-        }
-    }
+        };
 
-    fn alive(&self, _context: &behavior::BehaviorContext<'_, Space>) -> bool {
-        true
+        (txn, behavior::Then::Step)
     }
 
     fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
@@ -190,10 +188,9 @@ impl behavior::Behavior<Space> for Fire {
     fn step(
         &self,
         context: &behavior::BehaviorContext<'_, Space>,
-        tick: Tick,
-    ) -> UniverseTransaction {
+    ) -> (UniverseTransaction, behavior::Then) {
         let mut mut_self = self.clone();
-        if mut_self.tick_state(tick) {
+        let txn = if mut_self.tick_state(context.tick) {
             let paint_txn = mut_self.paint();
             context
                 .replace_self(mut_self)
@@ -201,11 +198,8 @@ impl behavior::Behavior<Space> for Fire {
                 .unwrap()
         } else {
             context.replace_self(mut_self)
-        }
-    }
-
-    fn alive(&self, _context: &behavior::BehaviorContext<'_, Space>) -> bool {
-        true
+        };
+        (txn, behavior::Then::Step)
     }
 
     fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
@@ -301,18 +295,16 @@ impl behavior::Behavior<Space> for Clock {
     fn step(
         &self,
         context: &behavior::BehaviorContext<'_, Space>,
-        _tick: Tick,
-    ) -> UniverseTransaction {
+    ) -> (UniverseTransaction, behavior::Then) {
         let mut mut_self = self.clone();
         mut_self.ticks += 1;
-        context
-            .bind_host(mut_self.paint())
-            .merge(context.replace_self(mut_self))
-            .unwrap()
-    }
-
-    fn alive(&self, _context: &behavior::BehaviorContext<'_, Space>) -> bool {
-        true
+        (
+            context
+                .bind_host(mut_self.paint())
+                .merge(context.replace_self(mut_self))
+                .unwrap(),
+            behavior::Then::Step,
+        )
     }
 
     fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
