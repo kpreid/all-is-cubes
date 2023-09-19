@@ -63,16 +63,12 @@ jobs:
       with:
         ref: unstable-rust
 
-    - name: Install Rust toolchain
-      # Install exactly what we need: compiler, Cargo, clippy, rustfmt
+    - name: Set Rust toolchain
+      # The rust-toolchain.toml file specifies the targets and components we need.
+      # Therefore, CI only needs to set the toolchain override.
       run: |
-          rustup toolchain install "${{ matrix.toolchain }}" --profile=minimal --component=clippy --component=rustfmt
-          rustup target add --toolchain="${{ matrix.toolchain }}" wasm32-unknown-unknown
           rustup override set "${{ matrix.toolchain }}"
-
-    - name: Install nightly too
-      if: ${{ matrix.depversions == 'minimal' }}
-      run: rustup toolchain install nightly --profile=minimal 
+          rustup show  # triggers installation of selected toolchain
 
     - name: Install native libraries
       if: ${{ runner.os == 'Linux' }}
