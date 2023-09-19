@@ -783,7 +783,7 @@ impl fmt::Display for Timing {
     }
 }
 
-/// Measure the time from creation to drop.
+/// Measure the time from creation to drop. Also prints text to mark these spans.
 struct CaptureTime<'a> {
     label: String,
     start: Instant,
@@ -792,8 +792,14 @@ struct CaptureTime<'a> {
 
 impl<'a> CaptureTime<'a> {
     fn new(time_log: &'a mut Vec<Timing>, label: impl Into<String>) -> Self {
+        let label = label.into();
+        if std::env::var("GITHUB_ACTIONS").is_ok() {
+            eprintln!("::group::{label}");
+        } else {
+            eprintln!("------ [xtask] START: {label} ------");
+        }
         Self {
-            label: label.into(),
+            label,
             start: Instant::now(),
             output: time_log,
         }
@@ -802,9 +808,16 @@ impl<'a> CaptureTime<'a> {
 
 impl Drop for CaptureTime<'_> {
     fn drop(&mut self) {
-        self.output.push(Timing {
-            label: mem::take(&mut self.label),
-            time: Instant::now().duration_since(self.start),
-        });
+        let label = mem::take(&mut self.label);
+        let time = Instant::now().duration_since(self.start);
+        if std::env::var("GITHUB_ACTIONS").is_ok() {
+            eprintln!("::endgroup::");
+        } else {
+            eprintln!(
+                "------ [xtask] END: {label} ({time:.1?} s) ------",
+                time = time.as_secs_f64()
+            );
+        }
+        self.output.push(Timing { label, time });
     }
 }
