@@ -243,9 +243,13 @@ jobs:
       run: |
         rustup toolchain install nightly --component miri
     
-    - name: Run Miri tests
+    - name: Run Miri tests, std
       # `universe::owning_guard` is the only module that contains nontrivial unsafe code,
       # and the tests in `universe` are those most worth running to exercise it.
+      run: |
+        cargo +nightly miri test --no-default-features -p all-is-cubes universe:: --features std
+    
+    - name: Run Miri tests, no_std
       run: |
         cargo +nightly miri test --no-default-features -p all-is-cubes universe::
     
