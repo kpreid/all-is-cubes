@@ -7,7 +7,6 @@ use core::any::TypeId;
 use core::fmt::{self, Debug};
 
 use downcast_rs::{impl_downcast, Downcast};
-use hashbrown::HashMap as HbHashMap;
 
 use crate::time::Tick;
 use crate::transaction::{self, Merge as _, Transaction};
@@ -109,18 +108,25 @@ pub enum Then {
 ///
 #[doc = include_str!("save/serde-warning.md")]
 pub struct BehaviorSet<H: BehaviorHost> {
-    members: HbHashMap<Key, BehaviorSetEntry<H>>,
+    /// Note that this map is deterministically ordered, so any incidental things
+    /// depending on ordering, such as [`Self::query()`] will be deterministic.
+    /// (Transaction merges would prevent nondeterministic gameplay outcomes, but
+    /// it still wouldn't be ideal.)
+    members: BTreeMap<Key, BehaviorSetEntry<H>>,
 }
 
 impl<H: BehaviorHost> BehaviorSet<H> {
     /// Constructs an empty [`BehaviorSet`].
     pub fn new() -> Self {
         BehaviorSet {
-            members: HbHashMap::new(),
+            members: BTreeMap::new(),
         }
     }
 
     /// Find behaviors of a specified type.
+    ///
+    /// The behaviors will be returned in a deterministic order. In the current
+    /// implementation, that order is the order in which they were added.
     ///
     /// TODO: Allow querying by attachment details (spatial, etc)
     pub fn query<T: Behavior<H>>(&self) -> impl Iterator<Item = QueryItem<'_, H, T>> + '_ {
@@ -136,6 +142,9 @@ impl<H: BehaviorHost> BehaviorSet<H> {
     }
 
     /// Find behaviors by filter criteria. All `None`s mean “anything”.
+    ///
+    /// The behaviors will be returned in a deterministic order. In the current
+    /// implementation, that order is the order in which they were added.
     ///
     /// TODO: Allow querying by attachment details (spatial, etc)
     pub fn query_any<'a>(
