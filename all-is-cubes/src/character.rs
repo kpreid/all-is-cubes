@@ -227,7 +227,7 @@ impl Character {
     /// See the documentation for [`ViewTransform`] for the interpretation of this transform.
     pub fn view(&self) -> ViewTransform {
         ViewTransform {
-            /// Remember, this is an eye *to* world transform.
+            // Remember, this is an eye *to* world transform.
             rotation: Rotation3D::<_, crate::camera::Eye, Cube>::around_x(Angle {
                 radians: -self.body.pitch.to_radians(),
             })
