@@ -548,8 +548,21 @@ fn do_for_all_packages(
     if op != TestOrCheck::Lint && config.scope.includes_main_workspace() {
         match features {
             Features::Default => {
-                let _t = CaptureTime::new(time_log, format!("{op:?}"));
-                op.cargo_cmd(config).run()?;
+                {
+                    let _t = CaptureTime::new(time_log, format!("{op:?}"));
+                    op.cargo_cmd(config).run()?;
+                }
+
+                {
+                    // Check `all-is-cubes` with default features disabled, because that's
+                    // more easily broken by accident (such as by introducing an unintended
+                    // `Send` bound) then our other features.
+                    let _t = CaptureTime::new(time_log, format!("{op:?} aic no_std"));
+                    cargo()
+                        .arg(op.non_build_check_subcmd())
+                        .args(["--package=all-is-cubes", "--no-default-features"])
+                        .run()?;
+                }
             }
 
             Features::AllAndNothing => {
