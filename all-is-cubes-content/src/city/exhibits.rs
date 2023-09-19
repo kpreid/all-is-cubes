@@ -1,7 +1,9 @@
 //! Miscellanous demonstrations of capability and manual test-cases.
 //! The exhibits defined in this file are combined into [`crate::demo_city`].
 
+use all_is_cubes::listen::ListenableSource;
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::convert::{identity, TryFrom as _};
 use core::f64::consts::PI;
@@ -23,14 +25,14 @@ use all_is_cubes::drawing::embedded_graphics::{
     primitives::{PrimitiveStyle, Rectangle, StyledDrawable},
 };
 use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::euclid::{vec3, Point3D, Rotation2D, Vector2D, Vector3D};
+use all_is_cubes::euclid::{size3, vec3, Point3D, Rotation2D, Vector2D, Vector3D};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::Gridgid;
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
     GridVector, NotNan, Rgb, Rgba, VectorOps,
 };
-use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
+use all_is_cubes::space::{SetCubeError, Space, SpaceBuilder, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::{include_image, rgb_const, rgba_const};
 
@@ -58,6 +60,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     MOVED_BLOCKS,
     ROTATIONS,
     UI_BLOCKS,
+    UI_PROGRESS_BAR,
     TREES,
     CHUNK_CHART,
     COLOR_LIGHTS,
@@ -1268,6 +1271,45 @@ fn UI_BLOCKS(ctx: Context<'_>) {
             )
             .unwrap();
     }
+
+    Ok((space, ExhibitTransaction::default()))
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "UI: Progress Bar",
+    subtitle: "",
+    placement: Placement::Surface,
+)]
+fn UI_PROGRESS_BAR(ctx: Context<'_>) {
+    use all_is_cubes_ui::vui::{self, widgets};
+
+    let pb = |fraction: f64| -> vui::WidgetTree {
+        vui::LayoutTree::leaf(widgets::ProgressBar::new(
+            ctx.widget_theme,
+            Face6::PX,
+            ListenableSource::constant(widgets::ProgressBarState::new(fraction)),
+        ))
+    };
+
+    let tree: vui::WidgetTree = Arc::new(vui::LayoutTree::Stack {
+        direction: Face6::PY,
+        children: vec![
+            Arc::new(vui::LayoutTree::Spacer(vui::LayoutRequest {
+                minimum: size3(2, 0, 1),
+            })),
+            pb(0.00),
+            pb(0.25),
+            pb(0.50),
+            pb(0.75),
+            pb(1.00),
+        ],
+    });
+
+    let space = tree.to_space(
+        SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
+        vui::Gravity::new(vui::Align::Center, vui::Align::Low, vui::Align::Center),
+    )?;
 
     Ok((space, ExhibitTransaction::default()))
 }
