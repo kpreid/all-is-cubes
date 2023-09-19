@@ -21,6 +21,9 @@
         - Mesh updates (currently only block meshes, not chunk meshes) may be executed in the background rather than strictly during `update()`.
           This must be externally driven; if you wish to do so, clone the `ChunkedSpaceMesh::job_queue()`, and create one or more tasks/threads which take work from it.
 
+- `all-is-cubes-ui` library:
+    - New widget `ProgressBar`.
+
 ### Changed
 
 - `all-is-cubes` library:

@@ -202,8 +202,8 @@ impl<C, O> Vol<C, O> {
         size.width as usize * size.height as usize * size.depth as usize
     }
 
-    /// Returns the linear contents without copying.
-    pub(crate) fn into_elements(self) -> C {
+    /// Extracts the linear contents, discarding the bounds and ordering.
+    pub fn into_elements(self) -> C {
         self.contents
     }
 

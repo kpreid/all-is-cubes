@@ -24,6 +24,8 @@ pub struct WidgetTheme {
     pub(crate) widget_blocks: BlockProvider<WidgetBlocks>,
     pub(crate) dialog_box_style: BoxStyle,
     pub(crate) layout_debug_box_style: BoxStyle,
+    pub(crate) progress_bar_empty: BoxStyle,
+    pub(crate) progress_bar_full: BoxStyle,
 }
 
 impl WidgetTheme {
@@ -38,17 +40,22 @@ impl WidgetTheme {
     ) -> Result<Self, GenError> {
         let widget_blocks = WidgetBlocks::new(txn, progress).await.install(txn)?;
 
-        let dialog_box_style =
-            BoxStyle::from_nine_and_thin(&widget_blocks[WidgetBlocks::DialogBackground]);
-        let layout_debug_box_style = BoxStyle::from_composited_corner_and_edge(
-            widget_blocks[WidgetBlocks::LayoutDebugBoxCorner].clone(),
-            widget_blocks[WidgetBlocks::LayoutDebugBoxEdge].clone(),
-        );
-
         Ok(Self {
+            dialog_box_style: BoxStyle::from_nine_and_thin(
+                &widget_blocks[WidgetBlocks::DialogBackground],
+            ),
+            layout_debug_box_style: BoxStyle::from_composited_corner_and_edge(
+                widget_blocks[WidgetBlocks::LayoutDebugBoxCorner].clone(),
+                widget_blocks[WidgetBlocks::LayoutDebugBoxEdge].clone(),
+            ),
+            progress_bar_empty: BoxStyle::from_nine_and_thin(
+                &widget_blocks[WidgetBlocks::ProgressBar { full: false }],
+            ),
+            progress_bar_full: BoxStyle::from_nine_and_thin(
+                &widget_blocks[WidgetBlocks::ProgressBar { full: true }],
+            ),
+
             widget_blocks,
-            dialog_box_style,
-            layout_debug_box_style,
         })
     }
 
@@ -78,6 +85,11 @@ pub enum WidgetBlocks {
     /// 4x4x1 multiblock defining a `BoxStyle` for [`widgets::Frame`] dialog box backgrounds.
     DialogBackground,
 
+    /// 4x4x1 multiblock defining a pair of `BoxStyle`s for [`widgets::ProgressBar`].
+    ProgressBar {
+        full: bool,
+    },
+
     // TODO: consider moving these to a separate "WidgetTheme" enum to shift the complexity
     /// Appearance of a [`widgets::ActionButton`] without label.
     ActionButton(ButtonVisualState),
@@ -103,6 +115,7 @@ impl fmt::Display for WidgetBlocks {
                 write!(f, "toolbar-pointer/{b0}-{b1}-{b2}")
             }
             WidgetBlocks::DialogBackground => write!(f, "dialog-background"),
+            WidgetBlocks::ProgressBar { full } => write!(f, "progress-bar/{full}"),
             WidgetBlocks::ActionButton(state) => write!(f, "action-button/{state}"),
             WidgetBlocks::ToggleButton(state) => write!(f, "toggle-button/{state}"),
             WidgetBlocks::LayoutDebugBoxCorner => write!(f, "layout-debug-box-corner"),
@@ -173,6 +186,24 @@ impl WidgetBlocks {
                             R64, // 16 res × 4 tiles
                             txn.insert_anonymous(space_from_image(
                                 include_image!("theme/dialog-background.png"),
+                                GridRotation::IDENTITY,
+                                &default_srgb,
+                            )?),
+                        )
+                        .build()
+                }
+
+                WidgetBlocks::ProgressBar { full } => {
+                    Block::builder()
+                        .display_name(format! {"Progress Bar {}", if full {"Full"} else {"Empty"}})
+                        .voxels_handle(
+                            R64, // 16 res × 4 tiles
+                            txn.insert_anonymous(space_from_image(
+                                if full {
+                                    include_image!("theme/progress-bar-full.png")
+                                } else {
+                                    include_image!("theme/progress-bar-empty.png")
+                                },
                                 GridRotation::IDENTITY,
                                 &default_srgb,
                             )?),

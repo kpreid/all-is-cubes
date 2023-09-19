@@ -18,6 +18,8 @@ mod button;
 pub use button::*;
 mod debug;
 pub use debug::*;
+mod progress_bar;
+pub use progress_bar::*;
 mod theme;
 pub use theme::*;
 mod toolbar;
@@ -26,6 +28,10 @@ mod tooltip;
 pub(crate) use tooltip::*;
 mod voxels;
 pub use voxels::*;
+
+// Reexported for use with VUI because it isn't currently publicly exported otherwise.
+// TODO: unclear where this type should be canonically exported.
+pub use all_is_cubes::content::BoxStyle;
 
 /// Generic widget controller that only does something on `initialize()`.
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -5,10 +5,7 @@ use all_is_cubes::euclid::size3;
 use all_is_cubes::math::{Face6, FaceMap};
 
 use crate::vui;
-
-// Reexported for use with VUI because it isn't currently publicly exported otherwise.
-// TODO: unclear where this type should be canonically exported.
-pub use all_is_cubes::content::BoxStyle;
+use crate::vui::widgets::BoxStyle;
 
 /// Widget that fills its volume with some [`BoxStyle`], and requests at least 1 cube of
 /// depth.

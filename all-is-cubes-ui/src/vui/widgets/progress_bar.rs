@@ -1,0 +1,242 @@
+use std::sync::Arc;
+
+use all_is_cubes::block::{Block, Composite, CompositeOperator, AIR};
+use all_is_cubes::euclid::num::Zero as _;
+use all_is_cubes::listen::{DirtyFlag, ListenableSource};
+use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridSize, NotNan};
+use all_is_cubes::space::SpaceTransaction;
+
+use crate::vui;
+use crate::vui::widgets::{BoxStyle, WidgetTheme};
+
+/// Widget which draws a progress bar.
+#[derive(Clone, Debug)]
+pub struct ProgressBar {
+    empty_style: BoxStyle,
+    filled_style: BoxStyle,
+    direction: Face6,
+    source: ListenableSource<ProgressBarState>,
+}
+
+/// Information presented by a [`ProgressBar`] widget.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct ProgressBarState {
+    /// A number from 0 to 1 which specifies how much of the progress bar is full.
+    fraction: NotNan<f64>,
+}
+
+/// Identical to [`ProgressBarState`] except rounded to the finest granularity we distinguish.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct InternalState {
+    sixteenths: GridCoordinate,
+}
+
+impl ProgressBar {
+    /// Create a progress bar widget.
+    ///
+    /// * `theme` defines the style with which the progress bar is drawn.
+    /// * `direction` is which direction the progress bar fills up in.
+    /// * `source` is the data source.
+    pub fn new(
+        theme: &WidgetTheme,
+        direction: Face6,
+        source: ListenableSource<ProgressBarState>,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            empty_style: theme.progress_bar_empty.clone(),
+            filled_style: theme.progress_bar_full.clone(),
+            direction,
+            source,
+        })
+    }
+}
+
+impl vui::Layoutable for ProgressBar {
+    fn requirements(&self) -> vui::LayoutRequest {
+        // Any size is permitted as long as it fits
+        vui::LayoutRequest {
+            minimum: GridSize::new(1, 1, 1),
+        }
+    }
+}
+
+impl vui::Widget for ProgressBar {
+    fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
+        Box::new(ProgressBarController {
+            todo: DirtyFlag::listening(true, &self.source),
+            definition: self,
+            position: position.bounds,
+            last_drawn_state: None,
+        })
+    }
+}
+
+impl ProgressBarState {
+    /// `fraction` should be a number from 0 to 1 which specifies how much of the progress bar is
+    /// full. If it is `NaN`, zero is substituted.
+    pub fn new(fraction: f64) -> Self {
+        Self {
+            fraction: NotNan::new(fraction.clamp(0.0, 1.0)).unwrap_or(NotNan::zero()),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ProgressBarController {
+    definition: Arc<ProgressBar>,
+    position: GridAab,
+    todo: DirtyFlag,
+    last_drawn_state: Option<InternalState>,
+}
+
+impl ProgressBarController {
+    fn convert_state(&self, requested_state: &ProgressBarState) -> InternalState {
+        InternalState {
+            sixteenths: (requested_state.fraction.into_inner()
+                * f64::from(self.position.size()[self.definition.direction.axis()])
+                * 16.0)
+                .round() as GridCoordinate,
+        }
+    }
+
+    fn paint_txn(&self, state: &InternalState) -> vui::WidgetTransaction {
+        let d = &self.definition;
+        let bounds = self.position;
+        let axis = d.direction.axis();
+
+        let mut txn = SpaceTransaction::default();
+        for cube in bounds.interior_iter() {
+            // TODO: respect requested direction
+            let lb_in_sixteenths =
+                (cube.lower_bounds()[axis] - bounds.lower_bounds()[axis]).saturating_mul(16);
+            let ub_in_sixteenths =
+                (cube.upper_bounds()[axis] - bounds.lower_bounds()[axis]).saturating_mul(16);
+
+            //eprintln!("{cube:?} {lb_in_sixteenths}..{s}..{ub_in_sixteenths}", s=state.sixteenths);
+
+            let block: Block = if ub_in_sixteenths <= state.sixteenths {
+                // Bar is full up to this cube
+                d.filled_style.cube_at(bounds, cube).unwrap_or(&AIR).clone()
+            } else if state.sixteenths <= lb_in_sixteenths {
+                // Bar is empty above this cube
+                d.empty_style.cube_at(bounds, cube).unwrap_or(&AIR).clone()
+            } else {
+                // TODO: Compose an actually fractionally-full block using a mask and maybe `Move`
+                Composite::new(
+                    d.filled_style.cube_at(bounds, cube).unwrap_or(&AIR).clone(),
+                    CompositeOperator::Over,
+                )
+                .compose_or_replace(d.empty_style.cube_at(bounds, cube).unwrap_or(&AIR).clone())
+            };
+
+            txn.at(cube).overwrite(block);
+        }
+
+        txn
+    }
+}
+
+impl vui::WidgetController for ProgressBarController {
+    fn initialize(
+        &mut self,
+        _: &vui::WidgetContext<'_>,
+    ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
+        let new_state = self.convert_state(&self.definition.source.get());
+        let txn = self.paint_txn(&new_state);
+        self.last_drawn_state = Some(new_state);
+        Ok(txn)
+    }
+
+    fn step(
+        &mut self,
+        _context: &vui::WidgetContext<'_>,
+    ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn std::error::Error + Send + Sync>> {
+        if !self.todo.get_and_clear() {
+            return Ok((SpaceTransaction::default(), vui::Then::Step));
+        }
+
+        let new_state = self.convert_state(&self.definition.source.get());
+
+        // Don't redraw if the new state is visually identical.
+        if self.last_drawn_state.as_ref() == Some(&new_state) {
+            return Ok((SpaceTransaction::default(), vui::Then::Step));
+        }
+
+        let txn = self.paint_txn(&new_state);
+        self.last_drawn_state = Some(new_state);
+        Ok((txn, vui::Then::Step))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use all_is_cubes::space::{SpaceBuilder, SpacePhysics};
+    use all_is_cubes::transaction::Transaction as _;
+    use all_is_cubes::util::yield_progress_for_testing;
+    use all_is_cubes::{transaction, universe};
+
+    #[tokio::test]
+    async fn progress_output() {
+        // TODO: this theme setup logic should be part of a widget test setup helper
+        let mut universe = universe::Universe::new();
+        let mut install_txn = universe::UniverseTransaction::default();
+        let widget_theme = WidgetTheme::new(&mut install_txn, yield_progress_for_testing())
+            .await
+            .unwrap();
+        install_txn
+            .execute(&mut universe, &mut transaction::no_outputs)
+            .unwrap();
+
+        let bounds = GridAab::from_lower_upper([0, 0, 0], [4, 1, 1]);
+
+        let pb = |fraction: f64| -> String {
+            let tree = vui::leaf_widget(ProgressBar::new(
+                &widget_theme,
+                Face6::PX,
+                ListenableSource::constant(ProgressBarState::new(fraction)),
+            ));
+
+            let mut space = SpaceBuilder::default()
+                .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+                .bounds(bounds)
+                .build();
+
+            vui::install_widgets(
+                vui::LayoutGrant {
+                    bounds: space.bounds(),
+                    gravity: vui::Gravity::new(
+                        vui::Align::Center,
+                        vui::Align::Center,
+                        vui::Align::Low,
+                    ),
+                },
+                &tree,
+            )
+            .unwrap()
+            .execute(&mut space, &mut transaction::no_outputs)
+            .unwrap();
+
+            space
+                .extract::<Vec<char>, _>(bounds, |e| {
+                    e.block_data()
+                        .evaluated()
+                        .attributes
+                        .display_name
+                        .chars()
+                        .last()
+                        .unwrap_or('\0')
+                })
+                .into_elements()
+                .into_iter()
+                .collect::<String>()
+        };
+
+        // TODO: we will need a cleverer strategy to test fractional blocks
+        assert_eq!(
+            [pb(0.0).as_str(), pb(0.5).as_str(), pb(1.0).as_str()],
+            ["yyyy", "llyy", "llll"]
+        );
+    }
+}
