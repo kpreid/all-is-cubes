@@ -557,7 +557,7 @@ fn do_for_all_packages(
                     // Check `all-is-cubes` with default features disabled, because that's
                     // more easily broken by accident (such as by introducing an unintended
                     // `Send` bound) then our other features.
-                    let _t = CaptureTime::new(time_log, format!("{op:?} aic no_std"));
+                    let _t = CaptureTime::new(time_log, "check aic no_std");
                     cargo()
                         .arg(op.non_build_check_subcmd())
                         .args(["--package=all-is-cubes", "--no-default-features"])
