@@ -1,5 +1,6 @@
+use alloc::sync::Arc;
 use std::error::Error;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use once_cell::sync::Lazy;
 

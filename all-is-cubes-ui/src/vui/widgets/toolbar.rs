@@ -1,5 +1,6 @@
+use alloc::sync::{Arc, Weak};
 use std::error::Error;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::Mutex;
 
 use all_is_cubes::block::{self, Block, BlockAttributes, Primitive, Resolution, AIR};
 use all_is_cubes::character::Character;
@@ -216,7 +217,7 @@ impl ToolbarController {
         let mut txn = SpaceTransaction::default();
         for index in 0..self.definition.slot_count {
             let position = self.slot_position(index);
-            let this_slot_selected_mask = std::array::from_fn(|sel| {
+            let this_slot_selected_mask = core::array::from_fn(|sel| {
                 if selected_slots
                     .get(sel)
                     .map(|&i| i == index)

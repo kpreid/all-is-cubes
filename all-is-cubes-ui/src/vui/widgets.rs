@@ -1,6 +1,6 @@
 //! Specific UI widgets.
 
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::math::GridVector;

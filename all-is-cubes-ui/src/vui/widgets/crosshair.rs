@@ -1,5 +1,5 @@
+use alloc::sync::Arc;
 use std::error::Error;
-use std::sync::Arc;
 
 use all_is_cubes::block::{Block, AIR};
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};

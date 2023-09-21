@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
+use alloc::{borrow::Cow, sync::Arc};
 
 use all_is_cubes::{
     block::Block,

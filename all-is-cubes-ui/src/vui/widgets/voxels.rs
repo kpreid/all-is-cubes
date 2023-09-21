@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 use all_is_cubes::block::{Block, BlockAttributes, Primitive, Resolution};
 use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, VectorOps};

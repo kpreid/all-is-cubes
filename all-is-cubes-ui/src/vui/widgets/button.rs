@@ -1,8 +1,8 @@
+use alloc::sync::Arc;
+use core::fmt;
+use core::hash::Hash;
+use core::sync::atomic::{AtomicU8, Ordering::Relaxed};
 use std::error::Error;
-use std::fmt;
-use std::hash::Hash;
-use std::sync::atomic::{AtomicU8, Ordering::Relaxed};
-use std::sync::Arc;
 
 use exhaust::Exhaust;
 

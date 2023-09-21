@@ -1,5 +1,5 @@
-use std::borrow::Cow;
-use std::sync::Arc;
+use alloc::borrow::Cow;
+use alloc::sync::Arc;
 
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::{MonoFont, MonoTextStyle},

@@ -1,5 +1,5 @@
-use std::borrow::Cow;
-use std::sync::Arc;
+use alloc::borrow::Cow;
+use alloc::sync::Arc;
 
 use all_is_cubes::block::AIR;
 use all_is_cubes::block::{Block, BlockAttributes, Resolution};

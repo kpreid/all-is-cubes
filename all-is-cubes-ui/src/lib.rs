@@ -49,6 +49,8 @@
 #![forbid(unsafe_code)]
 // TODO: #![warn(missing_docs)]
 
+extern crate alloc;
+
 pub mod apps;
 pub mod logo;
 mod ui_content;

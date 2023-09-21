@@ -1,6 +1,6 @@
 //! Contents of various UI pages.
 
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 use all_is_cubes::block::{Block, Resolution::*};
 use all_is_cubes::math::Face6;

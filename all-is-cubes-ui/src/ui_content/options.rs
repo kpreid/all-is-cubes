@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 use all_is_cubes::block;
 use all_is_cubes::camera::{AntialiasingOption, GraphicsOptions};

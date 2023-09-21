@@ -1,5 +1,6 @@
-use std::fmt;
-use std::sync::{mpsc, Arc, Mutex};
+use alloc::sync::Arc;
+use core::fmt;
+use std::sync::{mpsc, Mutex};
 
 use all_is_cubes::block::{self, Block};
 use all_is_cubes::camera::GraphicsOptions;
@@ -149,8 +150,8 @@ impl HudBlocks {
             ([0, -1, 0], palette::HUD_TEXT_STROKE.into()),
         ]);
 
-        let dialog_box_style = BoxStyle::from_nine_and_thin(std::array::from_fn(|y| {
-            std::array::from_fn(|x| {
+        let dialog_box_style = BoxStyle::from_nine_and_thin(core::array::from_fn(|y| {
+            core::array::from_fn(|x| {
                 ui_blocks[UiBlocks::DialogBackground]
                     .clone()
                     .with_modifier(block::Zoom::new(

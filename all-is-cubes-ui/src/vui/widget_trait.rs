@@ -1,8 +1,9 @@
 //! UI [`Widget`] trait and related glue.
 
+use alloc::sync::Arc;
+use core::fmt::Debug;
 use std::error::Error;
-use std::fmt::Debug;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use all_is_cubes::behavior::{self, Behavior};
 use all_is_cubes::math::GridAab;

@@ -1,9 +1,9 @@
-use std::fmt;
-use std::future::Future;
-use std::marker::PhantomData;
+use alloc::sync::Arc;
+use core::fmt;
+use core::future::Future;
+use core::marker::PhantomData;
+use core::task::{Context, Poll};
 use std::sync::mpsc::{self, TryRecvError};
-use std::sync::Arc;
-use std::task::{Context, Poll};
 
 use futures_core::future::BoxFuture;
 use futures_task::noop_waker_ref;

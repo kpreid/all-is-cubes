@@ -1,6 +1,6 @@
+use core::time::Duration;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
-use std::time::Duration;
 
 use all_is_cubes::camera::{
     FogOption, GraphicsOptions, LightingOption, NdcPoint2, NominalPixel, TransparencyOption,

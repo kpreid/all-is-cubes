@@ -1,5 +1,6 @@
+use alloc::sync::Arc;
 use std::sync::mpsc::TryRecvError;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Mutex};
 
 use all_is_cubes::camera::{FogOption, GraphicsOptions, UiViewState, ViewTransform, Viewport};
 use all_is_cubes::character::{Character, Cursor};

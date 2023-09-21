@@ -1,5 +1,5 @@
-use std::rc::Rc;
-use std::sync::Arc;
+use alloc::rc::Rc;
+use alloc::sync::Arc;
 
 use all_is_cubes::euclid;
 use all_is_cubes::euclid::Vector3D;
@@ -288,7 +288,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
     pub fn perform_layout(
         &self,
         grant: LayoutGrant,
-    ) -> Result<Arc<LayoutTree<Positioned<W>>>, std::convert::Infallible> {
+    ) -> Result<Arc<LayoutTree<Positioned<W>>>, core::convert::Infallible> {
         Ok(Arc::new(match *self {
             LayoutTree::Leaf(ref w) => LayoutTree::Leaf(Positioned {
                 // TODO: Implicitly Arc the leaf values? Or just drop this idea of the tree being
