@@ -52,6 +52,7 @@ pub struct ActionButton {
 }
 
 impl ActionButton {
+    #[allow(missing_docs)]
     pub fn new(
         label: Block,
         theme: &linking::BlockProvider<UiBlocks>,
@@ -152,6 +153,7 @@ impl<D: Clone + Sync + fmt::Debug> fmt::Debug for ToggleButton<D> {
 }
 
 impl<D> ToggleButton<D> {
+    #[allow(missing_docs)]
     pub fn new(
         data_source: ListenableSource<D>,
         projection: impl Fn(&D) -> bool + Send + Sync + 'static,

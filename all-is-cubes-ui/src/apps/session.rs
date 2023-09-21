@@ -154,6 +154,7 @@ impl<I: time::Instant> Session<I> {
         self.game_universe_in_progress = Some(Box::pin(future));
     }
 
+    /// Returns the current game universe owned by this session.
     pub fn universe(&self) -> &Universe {
         &self.game_universe
     }
@@ -174,10 +175,12 @@ impl<I: time::Instant> Session<I> {
         }
     }
 
+    /// Allows reading, and observing changes to, the current graphics options.
     pub fn graphics_options(&self) -> ListenableSource<GraphicsOptions> {
         self.graphics_options.as_source()
     }
 
+    /// Allows setting the current graphics options.
     pub fn graphics_options_mut(&self) -> &ListenableCell<GraphicsOptions> {
         &self.graphics_options
     }
@@ -570,6 +573,7 @@ impl fmt::Debug for ControlMessage {
     }
 }
 
+/// Displayable data returned by [`Session::info_text()`].
 #[derive(Copy, Clone, Debug)]
 pub struct InfoText<'a, I, T> {
     session: &'a Session<I>,

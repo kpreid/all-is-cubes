@@ -47,7 +47,7 @@
 
 // Crate-specific lint settings.
 #![forbid(unsafe_code)]
-// TODO: #![warn(missing_docs)]
+#![warn(missing_docs)]
 
 extern crate alloc;
 

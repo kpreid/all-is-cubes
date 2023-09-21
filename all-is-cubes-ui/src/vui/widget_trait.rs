@@ -193,6 +193,7 @@ pub enum InstallVuiError {
         /// Or, if we come up with some way of giving widgets IDs, that.
         widget: Box<dyn WidgetController>,
 
+        /// The error returned by [`WidgetController::initialize()`].
         #[source]
         error: Box<InstallVuiError>,
     },
@@ -203,6 +204,7 @@ pub enum InstallVuiError {
     Conflict {
         // TODO: Include the widget(s) involved, once `Arc<dyn Widget>` is piped around everywhere
         // and not just sometimes Widget or sometimes WidgetController.
+        #[allow(missing_docs)]
         #[source]
         error: space::SpaceTransactionConflict,
     },
@@ -226,9 +228,12 @@ pub enum InstallVuiError {
         widget: Arc<dyn Widget>,
     },
 
+    /// Installing the widget tree failed, because one of the widgets' transactions failed.
+    /// This usually indicates a bug in the widget implementation.
     #[error("installing widget tree failed")]
     #[non_exhaustive]
     ExecuteInstallation {
+        #[allow(missing_docs)]
         #[source]
         error: transaction::ExecuteError,
     },

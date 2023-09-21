@@ -386,6 +386,10 @@ impl InputProcessor {
         }
     }
 
+    /// Returns a source which reports whether the mouselook mode (mouse movement is
+    /// interpreted as view rotation) is currently active.
+    ///
+    /// This value may be toggled by in-game UI.
     pub fn mouselook_mode(&self) -> ListenableSource<bool> {
         self.mouselook_mode.as_source()
     }

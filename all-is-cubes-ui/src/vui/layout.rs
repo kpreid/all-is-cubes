@@ -11,6 +11,10 @@ use all_is_cubes::transaction::{self, Merge as _, Transaction as _};
 
 use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
 
+/// A tree of [`Widget`]s that can be put in a [`Space`] to create UI.
+///
+/// Create this via [`LayoutTree`]. Use it via [`install_widgets()`].
+// ---
 // TODO: can we come up with a way to not even need this type alias?
 // The Arcs are clunky to use.
 pub type WidgetTree = Arc<LayoutTree<Arc<dyn Widget>>>;
@@ -156,6 +160,7 @@ pub type Gravity = euclid::default::Vector3D<Align>;
 ///
 /// TODO: give this trait and [`LayoutRequest`] better names
 pub trait Layoutable {
+    /// Requested minimum size and positioning of this object.
     fn requirements(&self) -> LayoutRequest;
 }
 
@@ -197,7 +202,9 @@ pub enum LayoutTree<W> {
 
     /// Add the specified amount of space around the child.
     Margin {
+        /// Minimum amount of space to leave on each face.
         margin: FaceMap<GridCoordinate>,
+        #[allow(missing_docs)]
         child: Arc<LayoutTree<W>>,
     },
 
@@ -205,6 +212,7 @@ pub enum LayoutTree<W> {
     Stack {
         /// Which axis of space to arrange on.
         direction: Face6,
+        #[allow(missing_docs)]
         children: Vec<Arc<LayoutTree<W>>>,
     },
 
@@ -213,6 +221,7 @@ pub enum LayoutTree<W> {
 
     /// A custom layout dedicated to the HUD.
     /// TODO: Find a better abstraction than a variant of `LayoutTree` for this.
+    #[allow(missing_docs)]
     Hud {
         crosshair: Arc<LayoutTree<W>>,
         toolbar: Arc<LayoutTree<W>>,
@@ -225,24 +234,31 @@ pub enum LayoutTree<W> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
 pub struct Positioned<W> {
+    #[allow(missing_docs)]
     pub value: W,
+    #[allow(missing_docs)]
     pub position: LayoutGrant,
 }
 
 impl<W> LayoutTree<W> {
+    /// Constructs a tree node that takes up no space.
     pub fn empty() -> Arc<Self> {
         Arc::new(Self::Spacer(LayoutRequest::EMPTY))
     }
 
+    /// Constructs a [`LayoutTree::Leaf`], already wrapped in [`Arc`].
     pub fn leaf(widget_value: W) -> Arc<Self> {
         Arc::new(Self::Leaf(widget_value))
     }
 
+    /// Constructs a [`LayoutTree::Spacer`], already wrapped in [`Arc`].
     pub fn spacer(requirements: LayoutRequest) -> Arc<Self> {
         Arc::new(Self::Spacer(requirements))
     }
 
+    /// Iterates over every leaf (value of type `W`) in this tree.
     pub fn leaves<'s>(&'s self) -> impl Iterator<Item = &'s W> + Clone {
+        // TODO: Reimplement this as a direct iterator instead of collecting
         let mut leaves: Vec<&'s W> = Vec::new();
         self.for_each_leaf(&mut |leaf| leaves.push(leaf));
         leaves.into_iter()
@@ -389,6 +405,10 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
 }
 
 impl LayoutTree<Arc<dyn Widget>> {
+    /// Create a [`Space`] with these widgets installed in it, just large enough to fit.
+    ///
+    /// Note that the widgets will not actually appear as blocks until the first time the
+    /// space is stepped.
     pub fn to_space<B: all_is_cubes::space::SpaceBuilderBounds>(
         self: Arc<Self>,
         builder: SpaceBuilder<B>,

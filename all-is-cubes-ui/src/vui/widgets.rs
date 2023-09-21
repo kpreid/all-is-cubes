@@ -29,6 +29,8 @@ pub use voxels::*;
 pub struct OneshotController(pub Option<vui::WidgetTransaction>);
 
 impl OneshotController {
+    /// Creates a [`OneshotController`] that will execute the given transaction once,
+    /// then do nothing.
     #[allow(clippy::new_ret_no_self)]
     pub fn new(transaction: vui::WidgetTransaction) -> Box<dyn vui::WidgetController> {
         Box::new(Self(Some(transaction)))

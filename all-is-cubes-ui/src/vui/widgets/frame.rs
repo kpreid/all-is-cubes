@@ -19,6 +19,7 @@ pub struct Frame {
 }
 
 impl Frame {
+    /// Creates a `Frame` with the specified style.
     pub fn new(style: BoxStyle) -> Arc<Self> {
         Arc::new(Self { style })
     }

@@ -1,3 +1,5 @@
+//! Drawing the All is Cubes logo.
+
 use alloc::{borrow::Cow, sync::Arc};
 
 use all_is_cubes::{

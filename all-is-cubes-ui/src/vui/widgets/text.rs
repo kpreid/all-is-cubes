@@ -21,10 +21,14 @@ use crate::vui::{widgets, LayoutGrant, LayoutRequest, Layoutable, Widget, Widget
 #[derive(Clone, Debug)]
 #[allow(clippy::exhaustive_structs)] // TODO: find a better strategy
 pub struct LargeText {
+    /// Text to be displayed.
     pub text: Cow<'static, str>,
-    /// Needs to be a function to be Send+Sync
+    /// Font with which to draw the text.
+    /// Needs to be a function to be Send+Sync.
     pub font: fn() -> &'static MonoFont<'static>,
+    /// Brush with which to draw the text.
     pub brush: VoxelBrush<'static>,
+    /// Text positioning within the bounds of the widget.
     pub text_style: TextStyle,
 }
 
