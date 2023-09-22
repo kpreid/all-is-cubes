@@ -13,8 +13,8 @@ use core::fmt;
 
 use crate::listen::{self, Listen, Listener};
 use crate::math::{
-    Cube, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba,
-    VectorOps,
+    Cube, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba, VectorOps,
+    Vol,
 };
 use crate::raycast::Ray;
 use crate::space::{SetCubeError, Space, SpaceChange};
@@ -507,7 +507,7 @@ impl Block {
                 }
 
                 // Intersect that region with the actual bounds of `space`.
-                let voxels: GridArray<Evoxel> = match full_resolution_bounds
+                let voxels: Vol<Arc<[Evoxel]>> = match full_resolution_bounds
                     .intersection(block_space.bounds())
                     .filter(|_| !filter.skip_eval)
                 {
@@ -522,7 +522,7 @@ impl Block {
                         // If there is no intersection, then return an empty voxel array,
                         // with an arbitrary position.
                         // Also applies when skip_eval is true
-                        GridArray::from_elements(
+                        Vol::from_elements(
                             GridAab::from_lower_size([0, 0, 0], [0, 0, 0]),
                             Box::<[Evoxel]>::default(),
                         )

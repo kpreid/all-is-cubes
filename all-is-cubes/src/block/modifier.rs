@@ -1,5 +1,5 @@
 use crate::block::{self, Block, Evoxels, MinEval};
-use crate::math::{GridArray, GridRotation, Rgb};
+use crate::math::{GridRotation, Rgb, Vol};
 use crate::universe::{RefVisitor, VisitRefs};
 
 mod composite;
@@ -115,7 +115,7 @@ impl Modifier {
                     MinEval {
                         voxels: Evoxels::Many(
                             resolution,
-                            GridArray::from_fn(
+                            Vol::from_fn(
                                 value.voxels.bounds().transform(inner_to_outer).unwrap(),
                                 |cube| {
                                     value
@@ -192,7 +192,7 @@ mod tests {
     use super::*;
     use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Primitive, Resolution::R2};
     use crate::content::make_some_voxel_blocks;
-    use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgba};
+    use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgba, Vol};
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
 
@@ -240,7 +240,7 @@ mod tests {
                 light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(
                     R2,
-                    GridArray::from_fn(block_bounds, |cube| {
+                    Vol::from_fn(block_bounds, |cube| {
                         Evoxel {
                             color: rotated_color_fn(cube),
                             emission: Rgb::ZERO,
@@ -252,7 +252,7 @@ mod tests {
                 opaque: FaceMap::repeat(false).with(rotation.transform(Face6::NY), true),
                 visible: true,
                 uniform_collision: Some(BlockCollision::Hard),
-                voxel_opacity_mask: Some(GridArray::from_fn(block_bounds, |cube| {
+                voxel_opacity_mask: Some(Vol::from_fn(block_bounds, |cube| {
                     if cube.x == 0 {
                         OpacityCategory::Opaque
                     } else {

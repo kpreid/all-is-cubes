@@ -3,13 +3,14 @@
 //! This module is internal and reexported by its parent.
 
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
 use all_is_cubes::camera::Flaws;
 use all_is_cubes::euclid::point2;
 use all_is_cubes::math::{
-    Cube, Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate,
-    OpacityCategory, Rgba, VectorOps,
+    Cube, Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridCoordinate, OpacityCategory, Rgba,
+    VectorOps, Vol,
 };
 use all_is_cubes::space::Space;
 
@@ -111,7 +112,7 @@ pub struct BlockMesh<V, T> {
     /// colors have been embedded in the mesh vertices, making a mesh update required.
     /// (TODO: We could be more precise about which voxels are so frozen -- revisit
     /// whether that's worthwhile.)
-    pub(super) voxel_opacity_mask: Option<GridArray<OpacityCategory>>,
+    pub(super) voxel_opacity_mask: Option<Vol<Arc<[OpacityCategory]>>>,
 
     /// Flaws in this mesh, that should be reported as flaws in any rendering containing it.
     flaws: Flaws,

@@ -2,11 +2,12 @@
 
 use core::fmt;
 
+use alloc::sync::Arc;
 use euclid::Vector3D;
 use ordered_float::NotNan;
 
 use crate::content::palette;
-use crate::math::{Cube, Face6, FaceMap, GridAab, GridArray, OpacityCategory, Rgb, Rgba};
+use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgb, Rgba, Vol};
 use crate::raytracer;
 use crate::universe::RefError;
 use crate::{
@@ -77,7 +78,7 @@ pub struct EvaluatedBlock {
     /// obligating [`AIR_EVALUATED`] to allocate at compile time, which is impossible.
     /// It doesn't harm normal operation because the point of having this is to compare
     /// block shapes, which is trivial if the block is invisible.)
-    pub voxel_opacity_mask: Option<GridArray<OpacityCategory>>,
+    pub voxel_opacity_mask: Option<Vol<Arc<[OpacityCategory]>>>,
 }
 
 impl fmt::Debug for EvaluatedBlock {
@@ -111,7 +112,7 @@ impl fmt::Debug for EvaluatedBlock {
         }
         ds.field(
             "voxel_opacity_mask",
-            &voxel_opacity_mask.as_ref().map(GridArray::bounds),
+            &voxel_opacity_mask.as_ref().map(Vol::bounds),
         );
         ds.finish()
     }
@@ -125,7 +126,7 @@ impl EvaluatedBlock {
     /// This is also available as `impl From<MinEval> for EvaluatedBlock`.
     pub(crate) fn from_voxels(attributes: BlockAttributes, voxels: Evoxels) -> EvaluatedBlock {
         // Optimization for single voxels:
-        // don't allocate any `GridArray`s or perform any generalized scans.
+        // don't allocate any `Vol`s or perform any generalized scans.
         if let Some(Evoxel {
             color,
             emission,
@@ -150,7 +151,7 @@ impl EvaluatedBlock {
                 voxel_opacity_mask: if !visible {
                     None
                 } else {
-                    Some(GridArray::from_element(color.opacity_category()))
+                    Some(Vol::from_element(color.opacity_category()))
                 },
             };
         }
@@ -218,7 +219,7 @@ impl EvaluatedBlock {
                 None
             };
             let mut collision_unequal = false;
-            // TODO: use GridArray iter
+            // TODO: use Vol iter
             for position in voxels.bounds().interior_iter() {
                 let voxel: Evoxel = voxels[position];
 
@@ -251,7 +252,7 @@ impl EvaluatedBlock {
         let voxel_opacity_mask = if !visible {
             None
         } else {
-            Some(GridArray::from_fn(voxels.bounds(), |p| {
+            Some(Vol::from_fn(voxels.bounds(), |p| {
                 voxels[p].color.opacity_category()
             }))
         };
@@ -374,7 +375,7 @@ impl EvalBlockError {
             },
             Evoxels::Many(
                 resolution,
-                GridArray::from_fn(GridAab::for_block(resolution), |cube| {
+                Vol::from_fn(GridAab::for_block(resolution), |cube| {
                     pattern[((cube.x + cube.y + cube.z).rem_euclid(2)) as usize]
                 }),
             ),
@@ -463,7 +464,7 @@ impl Evoxel {
 /// in which case the out-of-bounds space should be treated as [`Evoxel::AIR`].
 /// The logical bounds are always the cube computed by [`GridAab::for_block`].
 ///
-/// This improves on a `GridArray<Evoxel>` by avoiding heap allocation and indirection
+/// This improves on a `Vol<Arc<[Evoxel]>>` by avoiding heap allocation and indirection
 /// for the case of a single element, and by returning voxels by value rather than
 /// reference.
 ///
@@ -478,9 +479,9 @@ impl Evoxel {
 pub enum Evoxels {
     /// Compact representation of exactly one voxel. The resolution is implicitly 1.
     One(Evoxel),
-    /// The [`GridArray`] should not have any data outside of the expected bounds
-    /// `GridAab::for_block(resolution)`.
-    Many(Resolution, GridArray<Evoxel>),
+    /// The [`Vol`] should not have any data outside of the expected bounds
+    /// `GridAab::for_block(resolution)`, but may have less.
+    Many(Resolution, Vol<Arc<[Evoxel]>>),
 }
 
 impl Evoxels {
@@ -510,7 +511,7 @@ impl Evoxels {
     /// out of bounds of the data (which is not necessarily out of bounds of the block;
     /// missing data should be taken as [`Evoxel::AIR`]).
     ///
-    /// Generally behaves like [`GridArray::get()`].
+    /// Generally behaves like [`Vol::get()`].
     ///
     /// TODO: Should we inherently return AIR instead of None?
     #[inline]
@@ -526,7 +527,7 @@ impl Evoxels {
     pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &'_ mut Evoxel> {
         match self {
             Evoxels::One(v) => core::slice::from_mut(v).iter_mut(),
-            Evoxels::Many(_, voxels) => voxels.as_linear_mut().iter_mut(),
+            Evoxels::Many(_, voxels) => voxels.make_linear_mut().iter_mut(),
         }
     }
 
@@ -563,7 +564,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
             Evoxels::One(u.arbitrary()?)
         } else {
             // TODO: limit array bounds to the resolution
-            Evoxels::Many(resolution, GridArray::arbitrary(u)?)
+            Evoxels::Many(resolution, Vol::arbitrary(u)?)
         })
     }
 
@@ -572,7 +573,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
             Resolution::size_hint(depth),
             arbitrary::size_hint::or(
                 Evoxel::size_hint(depth),
-                GridArray::<Evoxel>::size_hint(depth),
+                Vol::<Arc<[Evoxel]>>::size_hint(depth),
             ),
         ])
     }
@@ -667,13 +668,13 @@ mod tests {
         assert_eq!(
             EvaluatedBlock::from_voxels(
                 attributes.clone(),
-                Evoxels::Many(resolution, GridArray::from_elements(bounds, []).unwrap())
+                Evoxels::Many(resolution, Vol::from_fn(bounds, |_| unreachable!()))
             ),
             EvaluatedBlock {
                 attributes,
                 color: Rgba::TRANSPARENT,
                 light_emission: Rgb::ZERO,
-                voxels: Evoxels::Many(resolution, GridArray::from_elements(bounds, []).unwrap()),
+                voxels: Evoxels::Many(resolution, Vol::from_fn(bounds, |_| unreachable!())),
                 opaque: FaceMap::repeat(false),
                 visible: false,
                 uniform_collision: Some(BlockCollision::None),
@@ -697,7 +698,7 @@ mod tests {
             let ev_one = EvaluatedBlock::from_voxels(attributes.clone(), Evoxels::One(voxel));
             let ev_many = EvaluatedBlock::from_voxels(
                 attributes.clone(),
-                Evoxels::Many(R2, GridArray::from_fn(GridAab::for_block(R2), |_| voxel)),
+                Evoxels::Many(R2, Vol::from_fn(GridAab::for_block(R2), |_| voxel)),
             );
 
             // Check that they are identical except for the voxel data
@@ -727,7 +728,7 @@ mod tests {
         let inner_color = Rgba::new(0.0, 1.0, 0.0, 1.0);
         let voxels = Evoxels::Many(
             resolution,
-            GridArray::from_fn(outer_bounds, |p| {
+            Vol::from_fn(outer_bounds, |p| {
                 Evoxel::from_color(if inner_bounds.contains_cube(p) {
                     inner_color
                 } else {

@@ -1,5 +1,6 @@
 //! Algorithms for collision detection with [`Space`](crate::space::Space)s.
 
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 
@@ -14,8 +15,8 @@ use super::POSITION_EPSILON;
 use crate::block::Evoxels;
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{
-    Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridAab, GridArray,
-    GridCoordinate, LineVertex, VectorOps,
+    Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridAab, GridCoordinate,
+    LineVertex, VectorOps, Vol,
 };
 use crate::raycast::{Ray, Raycaster};
 use crate::space::Space;
@@ -346,7 +347,7 @@ where
 }
 
 /// Abstraction over voxel arrays that the collision detection algorithm can use,
-/// i.e. [`Space`] and `GridArray<Evoxel>`.
+/// i.e. [`Space`] and `Vol<Arc<[Evoxel]>>`.
 pub(crate) trait CollisionSpace {
     type Cell;
 
@@ -449,11 +450,11 @@ impl CollisionSpace for Space {
     }
 }
 
-impl CollisionSpace for GridArray<Evoxel> {
+impl CollisionSpace for Vol<Arc<[Evoxel]>> {
     type Cell = Evoxel;
 
     fn bounds(&self) -> GridAab {
-        GridArray::bounds(self)
+        Vol::bounds(self)
     }
 
     #[inline]

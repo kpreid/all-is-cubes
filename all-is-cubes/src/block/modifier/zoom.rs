@@ -1,6 +1,6 @@
 use euclid::Point3D;
 
-use crate::math::{Cube, GridAab, GridArray, GridCoordinate, GridPoint};
+use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, Vol};
 use crate::universe;
 use crate::{
     block::{
@@ -101,7 +101,7 @@ impl Zoom {
                         attributes,
                         voxels: Evoxels::Many(
                             zoom_resolution,
-                            GridArray::from_fn(intersected_bounds, |p| voxels[p + voxel_offset]),
+                            Vol::from_fn(intersected_bounds, |p| voxels[p + voxel_offset]),
                         ),
                     },
                 }
@@ -201,7 +201,7 @@ mod tests {
                         ev_original.attributes.clone(),
                         Evoxels::Many(
                             zoom_resolution,
-                            GridArray::from_fn(GridAab::for_block(zoom_resolution), |p| {
+                            Vol::from_fn(GridAab::for_block(zoom_resolution), |p| {
                                 original_voxels[p + GridVector::new(
                                     GridCoordinate::from(zoom_resolution) * x,
                                     0,

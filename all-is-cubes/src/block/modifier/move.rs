@@ -2,7 +2,7 @@ use crate::block::{
     self, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution::R16, AIR,
 };
 use crate::drawing::VoxelBrush;
-use crate::math::{Face6, GridAab, GridArray, GridCoordinate, GridVector};
+use crate::math::{Face6, GridAab, GridCoordinate, GridVector, Vol};
 use crate::universe;
 
 /// Data for [`Modifier::Move`]; displaces the block out of the grid, cropping it.
@@ -150,9 +150,7 @@ impl Move {
                 let displaced_voxels = match &input.voxels {
                     Evoxels::Many(_, voxels) => Evoxels::Many(
                         effective_resolution,
-                        GridArray::from_fn(displaced_bounds, |cube| {
-                            voxels[cube - translation_in_res]
-                        }),
+                        Vol::from_fn(displaced_bounds, |cube| voxels[cube - translation_in_res]),
                     ),
                     &Evoxels::One(voxel) => {
                         // Input block is a solid color; synthesize voxels.
@@ -160,7 +158,7 @@ impl Move {
                         // compared to the velocity.
                         Evoxels::Many(
                             effective_resolution,
-                            GridArray::from_fn(displaced_bounds, |_| voxel),
+                            Vol::from_fn(displaced_bounds, |_| voxel),
                         )
                     }
                 };
@@ -225,15 +223,12 @@ mod tests {
                 light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(
                     R16,
-                    GridArray::repeat(expected_bounds, Evoxel::from_block(&ev_original))
+                    Vol::repeat(expected_bounds, Evoxel::from_block(&ev_original))
                 ),
                 opaque: FaceMap::repeat(false).with(Face6::PY, true),
                 visible: true,
                 uniform_collision: None,
-                voxel_opacity_mask: Some(GridArray::repeat(
-                    expected_bounds,
-                    OpacityCategory::Opaque
-                )),
+                voxel_opacity_mask: Some(Vol::repeat(expected_bounds, OpacityCategory::Opaque)),
             }
         );
     }
@@ -265,15 +260,12 @@ mod tests {
                 light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(
                     resolution,
-                    GridArray::repeat(expected_bounds, Evoxel::from_block(&ev_original))
+                    Vol::repeat(expected_bounds, Evoxel::from_block(&ev_original))
                 ),
                 opaque: FaceMap::repeat(false).with(Face6::PY, true),
                 visible: true,
                 uniform_collision: None,
-                voxel_opacity_mask: Some(GridArray::repeat(
-                    expected_bounds,
-                    OpacityCategory::Opaque
-                )),
+                voxel_opacity_mask: Some(Vol::repeat(expected_bounds, OpacityCategory::Opaque)),
             }
         );
     }

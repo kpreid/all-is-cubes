@@ -1,9 +1,10 @@
+use alloc::sync::Arc;
 use euclid::Vector3D;
 
 use crate::block::{recursive_ray, Evoxel, Evoxels};
 use crate::camera::LightingOption;
 use crate::math::{
-    Cube, Face7, FaceMap, FreeCoordinate, FreePoint, GridArray, Rgb, Rgba, VectorOps,
+    Cube, Face7, FaceMap, FreeCoordinate, FreePoint, GridArray, Rgb, Rgba, VectorOps, Vol,
 };
 use crate::raycast::{Ray, Raycaster};
 use crate::raytracer::{RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData};
@@ -254,7 +255,7 @@ struct VoxelSurfaceIter<'a, D> {
     block_data: &'a D,
     /// Reciprocal of resolution, for scaling back to outer world
     antiscale: FreeCoordinate,
-    array: &'a GridArray<Evoxel>,
+    array: &'a Vol<Arc<[Evoxel]>>,
 
     /// Cube these voxels are located in, for lighting lookups.
     block_cube: Cube,

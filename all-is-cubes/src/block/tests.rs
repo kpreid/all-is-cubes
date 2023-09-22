@@ -19,8 +19,8 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::listen::{self, NullListener, Sink};
 use crate::math::{
-    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation, GridVector,
-    OpacityCategory, Rgb, Rgba,
+    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector,
+    OpacityCategory, Rgb, Rgba, Vol,
 };
 use crate::space::{Space, SpaceTransaction};
 use crate::transaction;
@@ -154,7 +154,7 @@ mod eval {
         assert_eq!(e.visible, true);
         assert_eq!(
             e.voxel_opacity_mask,
-            Some(GridArray::from_element(OpacityCategory::Opaque))
+            Some(Vol::from_element(OpacityCategory::Opaque))
         )
     }
 
@@ -169,7 +169,7 @@ mod eval {
         assert_eq!(e.visible, true);
         assert_eq!(
             e.voxel_opacity_mask,
-            Some(GridArray::from_element(OpacityCategory::Partial))
+            Some(Vol::from_element(OpacityCategory::Partial))
         )
     }
 
@@ -208,7 +208,7 @@ mod eval {
             e.voxels,
             Evoxels::Many(
                 resolution,
-                GridArray::from_fn(GridAab::for_block(resolution), |point| {
+                Vol::from_fn(GridAab::for_block(resolution), |point| {
                     let point = point.lower_bounds().cast::<f32>();
                     Evoxel {
                         color: Rgba::new(point.x, point.y, point.z, 1.0),
@@ -225,7 +225,7 @@ mod eval {
         assert_eq!(e.visible, true);
         assert_eq!(
             e.voxel_opacity_mask,
-            Some(GridArray::repeat(
+            Some(Vol::repeat(
                 GridAab::for_block(resolution),
                 OpacityCategory::Opaque,
             ))
@@ -356,7 +356,7 @@ mod eval {
             e.voxels,
             Evoxels::Many(
                 resolution,
-                GridArray::from_fn(GridAab::for_block(resolution as Resolution), |point| {
+                Vol::from_fn(GridAab::for_block(resolution as Resolution), |point| {
                     let point = (point.lower_bounds() + offset).cast::<f32>();
                     Evoxel {
                         color: Rgba::new(point.x, point.y, point.z, 1.0),
