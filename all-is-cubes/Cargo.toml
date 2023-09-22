@@ -90,6 +90,7 @@ mutants = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true, optional = true }
 ordered-float = { workspace = true }
+polonius-the-crab = { workspace = true }
 png-decoder = { version = "0.1.1" }
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }

@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 
@@ -52,6 +53,7 @@ pub struct Vol<C, O = ZMaj> {
 /// Constructors from elements.
 impl<C, O: Default, V> Vol<C, O>
 where
+    // Note that the Deref bound is necessary to give this a unique `V`.
     C: Deref<Target = [V]> + FromIterator<V>,
 {
     /// Constructs a `Vol<Box<[V]>>` by using the provided function to compute a value
@@ -221,6 +223,15 @@ where
     }
 }
 
+impl<V: Clone, O> Vol<Arc<[V]>, O> {
+    /// Returns the linear contents viewed as a mutable slice, as if by [`Arc::make_mut()`].
+    pub(crate) fn make_linear_mut(&mut self) -> &mut [V] {
+        let slice: &mut [V] = arc_make_mut_slice(&mut self.contents);
+        debug_assert_eq!(slice.len(), self.bounds.volume());
+        slice
+    }
+}
+
 /// Element lookup operations by 3D coordinates.
 impl<C, V> Vol<C, ZMaj>
 where
@@ -384,6 +395,20 @@ impl fmt::Display for VolLengthError {
             v = self.bounds.volume()
         )
     }
+}
+
+/// As [`Arc::make_mut()`], but for slices, `Arc<[_]>`.
+fn arc_make_mut_slice<T: Clone>(mut arc: &mut Arc<[T]>) -> &mut [T] {
+    // Use `get_mut()` to emulate `make_mut()`.
+    // And since this is a "maybe return a mutable borrow" pattern, we have to appease
+    // the borrow checker about it, hence `polonius_the_crab` getting involved.
+    polonius_the_crab::polonius!(|arc| -> &'polonius mut [T] {
+        if let Some(slice) = Arc::get_mut(arc) {
+            polonius_the_crab::polonius_return!(slice);
+        }
+    });
+    *arc = Arc::from_iter(arc.iter().cloned());
+    Arc::get_mut(arc).unwrap()
 }
 
 #[cfg(test)]
