@@ -556,8 +556,7 @@ mod space {
                     .collect(),
                 contents: GzSerde(Cow::Owned(
                     self.extract(self.bounds(), |e| Leu16::from(e.block_index()))
-                        .into_elements()
-                        .into(),
+                        .into_elements(),
                 )),
                 light: if matches!(self.physics().light, space::LightPhysics::None) {
                     None
@@ -570,8 +569,7 @@ mod space {
                             }
                             light
                         })
-                        .into_elements()
-                        .into(),
+                        .into_elements(),
                     )))
                 },
                 behaviors: Cow::Borrowed(self.behaviors()),

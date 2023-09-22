@@ -12,7 +12,7 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::listen::{Listen as _, Sink};
-use crate::math::{Cube, GridCoordinate, GridPoint, Rgba};
+use crate::math::{Cube, GridArray, GridCoordinate, GridPoint, Rgba};
 use crate::space::{
     GridAab, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpacePhysics,
 };
@@ -250,7 +250,7 @@ fn extract() {
     space.set([1, 0, 0], &block_1).unwrap();
 
     let extract_bounds = GridAab::from_lower_size([1, 0, 0], [1, 1, 1]);
-    let extracted = space.extract(extract_bounds, |e| {
+    let extracted: GridArray<Block> = space.extract(extract_bounds, |e| {
         // TODO: arrange to sanity check index and lighting
         let block = e.block_data().block().clone();
         assert_eq!(block.evaluate().unwrap(), e.block_data().evaluated);
@@ -266,7 +266,7 @@ fn extract() {
 fn extract_out_of_bounds() {
     let space = Space::empty_positive(2, 1, 1);
     let extract_bounds = GridAab::from_lower_size([1, 0, 0], [1, 2, 1]);
-    space.extract(extract_bounds, |_| ());
+    let _: GridArray<()> = space.extract(extract_bounds, |_| ());
 }
 
 #[test]

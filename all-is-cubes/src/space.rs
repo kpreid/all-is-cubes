@@ -5,6 +5,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
 use core::mem;
+use core::ops;
 use core::time::Duration;
 
 use euclid::{vec3, Vector3D};
@@ -19,9 +20,10 @@ use crate::content::palette::DAY_SKY_COLOR;
 use crate::drawing::DrawingPlane;
 use crate::inv::EphemeralOpaque;
 use crate::listen::{Listen, Listener, Notifier};
+use crate::math::Vol;
 use crate::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridRotation, Gridgid, NotNan,
-    Rgb, VectorOps,
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, Gridgid, NotNan, Rgb,
+    VectorOps,
 };
 use crate::physics::Acceleration;
 use crate::time;
@@ -239,18 +241,21 @@ impl Space {
     /// Copy data out of a portion of the space in a caller-chosen format.
     ///
     /// The given `bounds` must be fully contained within `self.bounds()`.
-    pub fn extract<'s, V>(
+    pub fn extract<'s, C, V>(
         &'s self,
         bounds: GridAab,
         mut extractor: impl FnMut(Extract<'s>) -> V,
-    ) -> GridArray<V> {
+    ) -> Vol<C>
+    where
+        C: ops::Deref<Target = [V]> + FromIterator<V>,
+    {
         assert!(self.bounds.contains_box(bounds));
 
         // TODO: Implement an iterator over the indexes (which is not just
         // interior_iter().enumerate() because it's a sub-region) so that we don't
         // have to run independent self.bounds.index() calculations per cube.
         // (But before that, we can optimize the case given bounds are the whole space.)
-        GridArray::from_fn(bounds, |cube| {
+        Vol::from_fn(bounds, |cube| {
             extractor(Extract {
                 space: self,
                 cube,
