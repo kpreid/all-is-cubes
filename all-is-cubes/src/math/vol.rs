@@ -50,7 +50,10 @@ pub struct Vol<C, O = ZMaj> {
 }
 
 /// Constructors from elements.
-impl<V, O: Default> Vol<Box<[V]>, O> {
+impl<C, O: Default, V> Vol<C, O>
+where
+    C: Deref<Target = [V]> + FromIterator<V>,
+{
     /// Constructs a `Vol<Box<[V]>>` by using the provided function to compute a value
     /// for each point.
     pub fn from_fn<F>(bounds: GridAab, f: F) -> Self
@@ -64,7 +67,7 @@ impl<V, O: Default> Vol<Box<[V]>, O> {
         }
     }
 
-    /// Constructs a `Vol<Box<[V]>>` by cloning the provided value for each point.
+    /// Constructs a `Vol<C>` by cloning the provided value for each point.
     ///
     /// TODO: This feels like it should be called 'filled' or 'cloned', but if so,
     /// maybe [`FaceMap::repeat`](crate::math::FaceMap::repeat) should also change?
@@ -75,24 +78,21 @@ impl<V, O: Default> Vol<Box<[V]>, O> {
         Self::from_fn(bounds, |_| value.clone())
     }
 
-    /// Constructs a `Vol<Box<[V]>>` with a single value, in bounds `ORIGIN_CUBE`.
+    /// Constructs a `Vol<C>` with a single value, in bounds `ORIGIN_CUBE`.
     ///
     /// If the single element should be at a different location, you can call
     /// [`.translate(offset)`](Self::translate), or use [`Vol::from_elements()`]
     /// instead.
     pub fn from_element(value: V) -> Self {
-        Self::from_elements(GridAab::ORIGIN_CUBE, [value]).unwrap()
+        Self::from_elements(GridAab::ORIGIN_CUBE, core::iter::once(value).collect::<C>()).unwrap()
     }
 
-    /// Constructs a `Vol<Box<[V]>>` containing the provided elements, which must be in the
+    /// Constructs a `Vol<C>` containing the provided elements, which must be in the
     /// ordering specified by `O`.
     ///
     /// Returns a [`VolLengthError`] if the number of elements does not match
     /// [`bounds.volume()`](GridAab::volume).
-    pub fn from_elements(
-        bounds: GridAab,
-        elements: impl Into<Box<[V]>>,
-    ) -> Result<Self, VolLengthError> {
+    pub fn from_elements(bounds: GridAab, elements: impl Into<C>) -> Result<Self, VolLengthError> {
         let elements = elements.into();
         if elements.len() == bounds.volume() {
             Ok(Vol {
@@ -337,15 +337,17 @@ mod vol_arb {
     /// This does reduce coverage...
     const MAX_VOLUME: usize = 2_usize.pow(16);
 
-    // TODO: Generalize this implementation to `Vol`
-    impl<'a, V: Arbitrary<'a>> Arbitrary<'a> for GridArray<V> {
+    impl<'a, V: Arbitrary<'a>, C> Arbitrary<'a> for Vol<C, ZMaj>
+    where
+        C: FromIterator<V> + Deref<Target = [V]>,
+    {
         fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
             let bounds = GridAab::arbitrary_with_max_volume(u, MAX_VOLUME)?;
-            let contents: Box<[V]> = u
+            let contents: C = u
                 .arbitrary_iter()?
                 .take(bounds.volume())
-                .collect::<Result<Box<[V]>, _>>()?;
-            GridArray::from_elements(bounds, contents).map_err(|_| arbitrary::Error::NotEnoughData)
+                .collect::<Result<C, _>>()?;
+            Vol::from_elements(bounds, contents).map_err(|_| arbitrary::Error::NotEnoughData)
         }
 
         fn size_hint(depth: usize) -> (usize, Option<usize>) {
