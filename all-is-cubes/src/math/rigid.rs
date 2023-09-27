@@ -1,4 +1,4 @@
-use crate::math::{Cube, GridMatrix, GridPoint, GridRotation, GridVector, VectorOps};
+use crate::math::{Cube, GridMatrix, GridPoint, GridRotation, GridVector};
 #[cfg(doc)]
 use crate::math::{GridAab, GridCoordinate};
 
@@ -102,7 +102,7 @@ impl Gridgid {
     pub fn transform_cube(&self, cube: Cube) -> Cube {
         Cube::from(
             self.transform_point(cube.lower_bounds())
-                .zip(self.transform_point(cube.upper_bounds()), |a, b| a.min(b)),
+                .min(self.transform_point(cube.upper_bounds())),
         )
     }
 

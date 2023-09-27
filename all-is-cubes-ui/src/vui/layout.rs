@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 use all_is_cubes::euclid;
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector, VectorOps,
+    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector,
 };
 use all_is_cubes::space::{Space, SpaceBuilder, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _, Transaction as _};
@@ -109,7 +109,7 @@ impl LayoutGrant {
         }
 
         // Ensure we don't enlarge the size of self by clamping the proposed size
-        let sizes = sizes.zip(self.bounds.size(), GridCoordinate::min);
+        let sizes = sizes.min(self.bounds.size());
 
         let mut origin = GridPoint::new(0, 0, 0);
         for axis in Axis::ALL {

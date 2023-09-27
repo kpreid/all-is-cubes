@@ -451,12 +451,8 @@ impl GridAab {
     ///     Some(GridAab::from_lower_size([1, 0, 0], [1, 1, 2])));
     /// ```
     pub fn intersection(self, other: GridAab) -> Option<GridAab> {
-        let lower = self
-            .lower_bounds()
-            .zip(other.lower_bounds(), GridCoordinate::max);
-        let upper = self
-            .upper_bounds()
-            .zip(other.upper_bounds(), GridCoordinate::min);
+        let lower = self.lower_bounds().max(other.lower_bounds());
+        let upper = self.upper_bounds().min(other.upper_bounds());
         for axis in Axis::ALL {
             if upper[axis] <= lower[axis] {
                 return None;
@@ -483,12 +479,8 @@ impl GridAab {
     /// ```
     #[inline]
     pub fn union(self, other: GridAab) -> Result<GridAab, GridOverflowError> {
-        let lower = self
-            .lower_bounds()
-            .zip(other.lower_bounds(), GridCoordinate::min);
-        let upper = self
-            .upper_bounds()
-            .zip(other.upper_bounds(), GridCoordinate::max);
+        let lower = self.lower_bounds().min(other.lower_bounds());
+        let upper = self.upper_bounds().max(other.upper_bounds());
         Self::checked_from_lower_size(lower, upper - lower)
     }
 

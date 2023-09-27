@@ -13,7 +13,7 @@ use num_traits::float::FloatCore as _;
 
 use crate::math::{
     Axis, Cube, Face6, Face7, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector,
-    Gridgid, VectorOps,
+    Gridgid,
 };
 
 /// A 4×3 affine transformation matrix in [`GridCoordinate`]s.
@@ -169,7 +169,7 @@ impl GridMatrix {
     pub fn transform_cube(&self, cube: Cube) -> Cube {
         Cube::from(
             self.transform_point(cube.lower_bounds())
-                .zip(self.transform_point(cube.upper_bounds()), |a, b| a.min(b)),
+                .min(self.transform_point(cube.upper_bounds())),
         )
     }
 
@@ -367,6 +367,7 @@ impl<T: Copy> MVector4<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::math::VectorOps;
     use euclid::{point3, vec3, Transform3D};
     use rand::{Rng, SeedableRng as _};
     use rand_xoshiro::Xoshiro256Plus;

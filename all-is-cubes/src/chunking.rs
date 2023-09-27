@@ -232,7 +232,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
 
         let mut max = GridPoint::origin();
         for chunk in self.octant_chunks[self.octant_range].iter().copied() {
-            max = max.zip(chunk.to_point().cast_unit(), GridCoordinate::max);
+            max = max.max(chunk.to_point().cast_unit());
         }
         let extent = GridAab::from_lower_upper(max.map(|c| -c - 1), max.map(|c| c + 2));
         let mut space = crate::space::Space::empty(extent);
