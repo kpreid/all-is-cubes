@@ -356,7 +356,7 @@ struct NdcRect {
 }
 impl NdcRect {
     fn center(self) -> NdcPoint2 {
-        self.low.zip(self.high, |a, b| (a + b) / 2.)
+        (self.low + self.high.to_vector()) / 2.
     }
 
     fn point_within(self, uv: euclid::default::Vector2D<f64>) -> NdcPoint2 {
