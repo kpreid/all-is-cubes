@@ -15,8 +15,7 @@ use all_is_cubes::block::{self, Block, BlockAttributes, Resolution::*, AIR};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::inv::Slot;
-use all_is_cubes::inv::Tool;
+use all_is_cubes::inv::{Slot, Tool};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
     Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector, Gridgid, Rgb,
@@ -27,10 +26,7 @@ use all_is_cubes::time::Instant;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_ui::logo::logo_text;
-use all_is_cubes_ui::vui::{
-    install_widgets, widgets, Align, Gravity, LayoutGrant, LayoutTree, WidgetTree,
-};
+use all_is_cubes_ui::{logo::logo_text, vui, vui::widgets};
 
 use crate::{
     clouds::clouds, exhibits::DEMO_CITY_EXHIBITS, noise::NoiseFnExt, space_to_space_copy,
@@ -283,9 +279,9 @@ pub(crate) async fn demo_city<I: Instant>(
         .unwrap()
         .abut(Face6::PY, -(sky_height - 12))
         .unwrap();
-    install_widgets(
-        LayoutGrant::new(logo_location),
-        &LayoutTree::leaf(logo_text()),
+    vui::install_widgets(
+        vui::LayoutGrant::new(logo_location),
+        &vui::LayoutTree::leaf(logo_text()),
     )?
     .execute(&mut space, &mut transaction::no_outputs)?;
     planner.occupied_plots.push(logo_location);
@@ -361,11 +357,13 @@ pub(crate) async fn demo_city<I: Instant>(
                 },
             );
 
-            let info_voxels_widget: WidgetTree = Arc::new(LayoutTree::Stack {
+            let info_voxels_widget: vui::WidgetTree = Arc::new(vui::LayoutTree::Stack {
                 direction: Face6::PZ,
                 children: vec![
-                    LayoutTree::leaf(widgets::Frame::with_block(demo_blocks[Signboard].clone())),
-                    LayoutTree::leaf(Arc::new(widgets::Voxels::new(
+                    vui::LayoutTree::leaf(widgets::Frame::with_block(
+                        demo_blocks[Signboard].clone(),
+                    )),
+                    vui::LayoutTree::leaf(Arc::new(widgets::Voxels::new(
                         bounds_for_info_voxels,
                         universe.insert_anonymous(exhibit_info_space),
                         info_resolution,
@@ -381,7 +379,7 @@ pub(crate) async fn demo_city<I: Instant>(
             let info_sign_space = info_voxels_widget
                 .to_space(
                     SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
-                    Gravity::new(Align::Center, Align::Center, Align::Low),
+                    vui::Gravity::new(vui::Align::Center, vui::Align::Center, vui::Align::Low),
                 )
                 .unwrap();
 
@@ -477,10 +475,10 @@ pub(crate) struct Exhibit {
 ///
 /// The space's bounds extend upward from [0, 0, 0].
 fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
-    let info_widgets: WidgetTree = Arc::new(LayoutTree::Stack {
+    let info_widgets: vui::WidgetTree = Arc::new(vui::LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
-            LayoutTree::leaf(Arc::new(widgets::LargeText {
+            vui::LayoutTree::leaf(Arc::new(widgets::LargeText {
                 text: exhibit.name.into(),
                 font: || &font::FONT_9X18_BOLD,
                 brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
@@ -489,7 +487,7 @@ fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
                     .baseline(Baseline::Middle)
                     .build(),
             })),
-            LayoutTree::leaf(Arc::new(widgets::LargeText {
+            vui::LayoutTree::leaf(Arc::new(widgets::LargeText {
                 text: {
                     let t = exhibit.subtitle;
                     // TODO: rectangle_to_aab() fails when the empty string is drawn;
@@ -514,7 +512,7 @@ fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
     // TODO: give it a maximum size, instead of what we currently do which is truncating later
     let space = info_widgets.to_space(
         SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
-        Gravity::new(Align::Low, Align::Low, Align::Low),
+        vui::Gravity::new(vui::Align::Low, vui::Align::Low, vui::Align::Low),
     )?;
     Ok(space)
 }
