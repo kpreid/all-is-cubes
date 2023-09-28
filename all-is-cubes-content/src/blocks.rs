@@ -1,7 +1,7 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
-use std::fmt;
+use core::fmt;
 
 use all_is_cubes::euclid::Vector3D;
 use exhaust::Exhaust;

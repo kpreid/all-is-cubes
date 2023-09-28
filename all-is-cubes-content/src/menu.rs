@@ -1,4 +1,6 @@
-use std::sync::Arc;
+use alloc::string::ToString as _;
+use alloc::sync::Arc;
+use alloc::{boxed::Box, vec::Vec};
 
 use strum::IntoEnumIterator;
 

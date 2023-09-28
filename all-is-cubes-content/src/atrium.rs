@@ -1,7 +1,8 @@
 //! A voxel reinterpretation of the famous Sponza Atrium test scene.
 
-use std::f64::consts::TAU;
-use std::fmt;
+use alloc::vec::Vec;
+use core::f64::consts::TAU;
+use core::fmt;
 
 use exhaust::Exhaust;
 
@@ -314,7 +315,7 @@ fn map_text_block(
         b'f' => lookup_multiblock_2d(blocks, AtriumBlocks::Pole, [cube.z - 1, 0]),
         _ => panic!(
             "Unrecognized block character {:?}",
-            std::str::from_utf8(&[ascii])
+            core::str::from_utf8(&[ascii])
         ),
     }
 }

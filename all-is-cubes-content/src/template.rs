@@ -1,6 +1,8 @@
 //! First-run game content. (Well, all runs, since we don't have saving yet.)
 
-use std::sync::Arc;
+use alloc::boxed::Box;
+use alloc::string::{String, ToString as _};
+use alloc::sync::Arc;
 
 use macro_rules_attribute::macro_rules_derive;
 use paste::paste;

@@ -1,4 +1,5 @@
-use std::fmt;
+use core::array;
+use core::fmt;
 
 use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
@@ -136,7 +137,7 @@ pub async fn install_landscape_blocks(
         |value| value * (f64::from(resolution) * 1.7) + (f64::from(resolution) * -0.34),
     );
 
-    let stone_points: [_; 240] = std::array::from_fn(|_| {
+    let stone_points: [_; 240] = array::from_fn(|_| {
         (
             Cube::ORIGIN.aab().random_point(rng),
             scale_color(colors[Stone].clone(), rng.gen_range(0.9..1.1), 0.02),
@@ -145,7 +146,7 @@ pub async fn install_landscape_blocks(
     let stone_pattern = voronoi_pattern(resolution, true, &stone_points);
 
     // TODO: give dirt a palette of varying hue and saturation
-    let dirt_points: [_; 1024] = std::array::from_fn(|_| {
+    let dirt_points: [_; 1024] = array::from_fn(|_| {
         (
             Cube::ORIGIN.aab().random_point(rng),
             scale_color(colors[Dirt].clone(), rng.gen_range(0.9..1.1), 0.02),

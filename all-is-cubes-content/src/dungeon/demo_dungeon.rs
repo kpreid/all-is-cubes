@@ -1,4 +1,5 @@
-use std::f64::consts::TAU;
+use core::f64::consts::TAU;
+use core::mem;
 
 use all_is_cubes::euclid::Vector3D;
 use exhaust::Exhaust;
@@ -132,7 +133,7 @@ impl DemoTheme {
                 .expect("passage led to nonexistent room"),
         );
         if room_1_box.lower_bounds()[passage_axis] > room_2_box.lower_bounds()[passage_axis] {
-            std::mem::swap(&mut room_1_box, &mut room_2_box);
+            mem::swap(&mut room_1_box, &mut room_2_box);
         }
 
         let wall_parallel = GridRotation::CLOCKWISE.transform(face);

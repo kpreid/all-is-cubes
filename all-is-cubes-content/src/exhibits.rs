@@ -1,8 +1,11 @@
 //! Miscellanous demonstrations of capability and manual test-cases.
 //! The exhibits defined in this file are combined into [`crate::demo_city`].
 
-use std::convert::TryFrom;
-use std::f64::consts::PI;
+use alloc::boxed::Box;
+use alloc::string::ToString as _;
+use alloc::vec::Vec;
+use core::convert::TryFrom as _;
+use core::f64::consts::PI;
 
 use all_is_cubes::euclid::{Point3D, Rotation2D, Vector2D, Vector3D};
 use exhaust::Exhaust as _;
@@ -1254,7 +1257,7 @@ async fn DESTRUCTION(_: &Exhibit, universe: &mut Universe) {
     ) -> Result<Block, InGenError> {
         let solid = Block::from(Rgba::WHITE);
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3887829);
-        let points: [_; 32] = std::array::from_fn(|_| {
+        let points: [_; 32] = core::array::from_fn(|_| {
             let free_point = Cube::ORIGIN.aab().random_point(&mut rng);
             (
                 free_point,
@@ -1308,7 +1311,7 @@ fn stack<'b, B>(
     blocks: impl IntoIterator<Item = B>,
 ) -> Result<(), SetCubeError>
 where
-    B: Into<std::borrow::Cow<'b, Block>>,
+    B: Into<alloc::borrow::Cow<'b, Block>>,
 {
     let origin = origin.into();
     for (y, block) in (0..).zip(blocks) {

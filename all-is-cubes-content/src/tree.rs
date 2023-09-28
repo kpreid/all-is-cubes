@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 
 use itertools::Itertools as _;
 use petgraph::visit::EdgeRef as _;
@@ -209,6 +209,8 @@ mod graph {
     use super::*;
     use all_is_cubes::euclid::default::Vector3D;
     use all_is_cubes::math::Axis;
+    use alloc::boxed::Box;
+    use core::mem;
 
     /// A graph of connections between adjacent blocks of a tree we're going to grow.
     ///
@@ -412,7 +414,7 @@ mod graph {
     }
     impl petgraph::visit::VisitMap<Cube> for VisitMap {
         fn visit(&mut self, node: Cube) -> bool {
-            !std::mem::replace(
+            !mem::replace(
                 self.0.get_mut(node).expect("node coordinates out of range"),
                 true,
             )

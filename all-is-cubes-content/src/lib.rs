@@ -7,6 +7,8 @@
 //! provide [`UniverseTemplate`]; other items should be assumed not particularly
 //! stable.
 
+#![no_std]
+//
 // Basic lint settings, which should be identical across all all-is-cubes project crates.
 // This list is sorted.
 #![allow(clippy::collapsible_else_if)]
@@ -39,8 +41,16 @@
 // #![warn(unused_crate_dependencies)]  // noisy for dev-dependencies; enable sometimes for review
 
 // Crate-specific lint settings.
+#![cfg_attr(
+    not(test),
+    warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)
+)]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+
+#[macro_use]
+extern crate alloc;
+extern crate std;
 
 use std::collections::HashSet;
 
