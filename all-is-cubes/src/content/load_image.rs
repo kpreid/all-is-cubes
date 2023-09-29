@@ -28,8 +28,8 @@ type Srgba = [u8; 4];
 #[doc(hidden)] // still experimental API
 #[allow(missing_debug_implementations)]
 pub struct PngAdapter<'a> {
-    width: u32,
-    height: u32,
+    width: i32,
+    height: i32,
     rgba_image_data: &'a [Srgba],
     color_map: HashMap<Srgba, VoxelBrush<'a>>,
     max_brush: GridAab,
@@ -55,12 +55,34 @@ impl<'a> PngAdapter<'a> {
         }
 
         Self {
-            width: header.width,
-            height: header.height,
+            width: i32::try_from(header.width).unwrap(),
+            height: i32::try_from(header.height).unwrap(),
             rgba_image_data,
             color_map,
             max_brush: max_brush.unwrap_or(GridAab::ORIGIN_CUBE),
         }
+    }
+
+    pub fn size(&self) -> euclid::default::Size2D<i32> {
+        euclid::default::Size2D::new(self.width, self.height)
+    }
+}
+
+impl<'a> PngAdapter<'a> {
+    #[doc(hidden)] // TODO: ponder good API
+    pub fn get_brush(&self, x: i32, y: i32) -> &VoxelBrush<'_> {
+        if x < 0 || y < 0 || x >= self.width || y >= self.height {
+            return VoxelBrush::EMPTY_REF;
+        }
+        let Ok(pixel_index) = usize::try_from(x + y * self.width) else {
+            return VoxelBrush::EMPTY_REF;
+        };
+        let Some(pixel) = self.rgba_image_data.get(pixel_index) else {
+            return VoxelBrush::EMPTY_REF;
+        };
+        self.color_map
+            .get(pixel)
+            .expect("can't happen: color data changed")
     }
 }
 
@@ -84,23 +106,20 @@ impl<'b> ImageDrawable for &'b PngAdapter<'b> {
     where
         D: DrawTarget<Color = Self::Color>,
     {
-        let width = i32::try_from(self.width).expect("width too large");
         target.fill_contiguous(
             area,
-            PointsIter::points(area).map(|Point { x, y }| {
-                self.color_map
-                    .get(&self.rgba_image_data[usize::try_from(x + y * width).unwrap()])
-                    .expect("can't happen: color data changed")
-            }),
+            PointsIter::points(area).map(|Point { x, y }| self.get_brush(x, y)),
         )
     }
 }
 
 impl embedded_graphics::geometry::OriginDimensions for &'_ PngAdapter<'_> {
     fn size(&self) -> Size {
-        let &&PngAdapter { width, height, .. } = self;
         // TODO: use max_brush to expand this
-        Size { width, height }
+        Size {
+            width: self.width.unsigned_abs(),
+            height: self.height.unsigned_abs(),
+        }
     }
 }
 

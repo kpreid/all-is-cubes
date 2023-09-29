@@ -286,6 +286,11 @@ impl<'a> VoxelColor<'a> for Rgb888 {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct VoxelBrush<'a>(Vec<(GridVector, Cow<'a, Block>)>);
 
+impl VoxelBrush<'static> {
+    /// A reference to `VoxelBrush::new([])`.
+    pub const EMPTY_REF: &'static Self = &VoxelBrush(Vec::new());
+}
+
 impl<'a> VoxelBrush<'a> {
     /// Makes a [`VoxelBrush`] which paints the specified blocks at the specified offsets
     /// from each pixel position. (`Cube::ORIGIN` is zero offset.)
@@ -408,6 +413,16 @@ impl<'a> VoxelBrush<'a> {
             }
         }
         bounds
+    }
+
+    /// Returns the block at the origin if there is one.
+    ///
+    /// This is the inverse of [`VoxelBrush::single()`].
+    pub fn origin_block(&self) -> Option<&Block> {
+        self.0
+            .iter()
+            .find(|&&(p, _)| p == GridVector::zero())
+            .map(|(_, block)| &**block)
     }
 }
 

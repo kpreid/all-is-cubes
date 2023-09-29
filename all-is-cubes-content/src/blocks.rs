@@ -5,6 +5,7 @@ use core::fmt;
 
 use all_is_cubes::euclid::Vector3D;
 use exhaust::Exhaust;
+use rand::{Rng as _, SeedableRng as _};
 
 use all_is_cubes::block::{
     AnimationHint, Atom, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution,
@@ -87,7 +88,6 @@ pub async fn install_demo_blocks(
     install_landscape_blocks(universe, resolution, landscape_p).await?;
     p.progress(0.0).await;
 
-    let road_color: Block = Rgba::new(0.157, 0.130, 0.154, 1.0).into();
     let curb_color: Block = Rgba::new(0.788, 0.765, 0.741, 1.0).into();
     let road_noise_v = noise::Value::new(0x52b19f6a);
     let road_noise = move |cube: Cube| road_noise_v.at_grid(cube.lower_bounds()) * 0.12 + 1.0;
@@ -145,12 +145,30 @@ pub async fn install_demo_blocks(
                     .build()
             }
 
-            Road => Block::builder()
-                .display_name("Road")
-                .voxels_fn(universe, resolution, |cube| {
-                    scale_color(road_color.clone(), road_noise(cube), 0.02)
-                })?
-                .build(),
+            Road => {
+                let output_resolution = R32;
+                // Use the image as a source of color palettes, not an image.
+                // TODO: use hash of coord instead of rng
+
+                use all_is_cubes::content::load_image::{default_srgb, PngAdapter};
+
+                let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3458679152340);
+
+                let palette_image = PngAdapter::adapt(
+                    all_is_cubes::include_image!("blocks/road-palette.png"),
+                    default_srgb,
+                );
+                let range = 0..palette_image.size().width;
+
+                Block::builder()
+                    .display_name("Road")
+                    .voxels_fn(universe, output_resolution, |cube| {
+                        let y = (i32::from(output_resolution) - 1 - cube.y) / 2;
+                        let x = rng.gen_range(range.clone());
+                        palette_image.get_brush(x, y).origin_block().unwrap_or(&AIR)
+                    })?
+                    .build()
+            }
 
             Lamp => Block::builder()
                 .display_name("Lamp")
