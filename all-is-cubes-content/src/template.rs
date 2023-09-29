@@ -1,4 +1,4 @@
-//! First-run game content. (Well, all runs, since we don't have saving yet.)
+//! First-run game content.
 
 use alloc::boxed::Box;
 use alloc::string::{String, ToString as _};
