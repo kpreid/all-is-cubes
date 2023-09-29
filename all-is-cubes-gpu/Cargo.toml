@@ -70,7 +70,7 @@ wgpu = { workspace = true, optional = true, features = ["webgl"] }
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_tokio"] }
 # f16 support for working with floating point textures in tests.
-half = { version = "2.3.1", features = ["bytemuck"] }
+half = { version = "2.0.0", features = ["bytemuck"] }
 # Used in shader tests. TODO: Not really necessary
 image = { workspace = true }
 # Using tokio for async test-running.
