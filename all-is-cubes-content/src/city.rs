@@ -656,8 +656,8 @@ impl CityPlanner {
     /// Distance from the center cube to the line of cubes where lampposts are placed.
     const LAMP_POSITION_RADIUS: GridCoordinate = Self::ROAD_RADIUS + 1;
     /// Distance from the center cube to the line of the front of each placed exhibit.
-    /// TODO: The units of this isn't being consistent, since it is actually + 2 from the lamps
-    const PLOT_FRONT_RADIUS: GridCoordinate = Self::LAMP_POSITION_RADIUS + 1;
+    /// TODO: The units of this isn't being consistent, since it is actually + 1 from the lamps
+    const PLOT_FRONT_RADIUS: GridCoordinate = Self::LAMP_POSITION_RADIUS;
     const GAP_BETWEEN_PLOTS: GridCoordinate = 1;
 
     pub fn new(space_bounds: GridAab) -> Self {
