@@ -170,8 +170,8 @@ pub(crate) async fn demo_city<I: Instant>(
             }
 
             // Curbs
-            if i > road_radius {
-                for (side, &p) in [-(road_radius + 1), road_radius + 1].iter().enumerate() {
+            if i >= road_radius {
+                for &(side, p) in [(1, -road_radius), (0, road_radius)].iter() {
                     let position = step.cube_ahead() + perpendicular * p + curb_y;
 
                     // Place curb and combine it with other curb blocks .
@@ -186,7 +186,7 @@ pub(crate) async fn demo_city<I: Instant>(
                         position,
                         block::Composite::new(
                             demo_blocks[Curb].clone().rotate(rotations[side]),
-                            block::CompositeOperator::Over,
+                            block::CompositeOperator::In,
                         )
                         .with_disassemblable()
                         .compose_or_replace(to_compose_with),
@@ -530,7 +530,7 @@ struct CityPlanner {
 impl CityPlanner {
     const ROAD_RADIUS: GridCoordinate = 2;
     /// Distance from the center cube to the line of cubes where lampposts are placed.
-    const LAMP_POSITION_RADIUS: GridCoordinate = Self::ROAD_RADIUS + 2;
+    const LAMP_POSITION_RADIUS: GridCoordinate = Self::ROAD_RADIUS + 1;
     /// Distance from the center cube to the line of the front of each placed exhibit.
     /// TODO: The units of this isn't being consistent, since it is actually + 2 from the lamps
     const PLOT_FRONT_RADIUS: GridCoordinate = Self::LAMP_POSITION_RADIUS + 1;
