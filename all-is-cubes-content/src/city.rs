@@ -380,7 +380,38 @@ async fn place_exhibits_in_city<I: Instant>(
         space.fill_uniform(enclosure, &demo_blocks[ExhibitBackground])?;
         exhibit_progress.progress(0.4).await;
 
-        // TODO: Add "entrances" so it's clear what the "front" of the exhibit is supposed to be.
+        // Cut an "entranceway" into the curb and grass
+        {
+            let front_face = plot_transform.rotation.transform(Face6::PZ);
+            // Compute the surface that needs to be clear for walking
+            let entrance_plane = enclosure
+                .expand(FaceMap {
+                    // subtract enclosure bounds
+                    nx: -1,
+                    ny: 0,
+                    nz: -1,
+                    px: -1,
+                    py: 0,
+                    pz: -1,
+                })
+                .abut(Face6::PY, 0)
+                .unwrap()
+                .abut(front_face, 1) // re-add enclosure bounds
+                .unwrap()
+                .abut(
+                    front_face,
+                    CityPlanner::PLOT_FRONT_RADIUS - CityPlanner::ROAD_RADIUS + 1,
+                )
+                .unwrap();
+
+            let walkway = entrance_plane.abut(Face6::NY, 1).unwrap();
+            space.fill_uniform(walkway, &demo_blocks[DemoBlocks::Road])?;
+
+            let walking_volume = entrance_plane.abut(Face6::PY, 2).unwrap();
+            space.fill_uniform(walking_volume, &AIR)?;
+
+            planner.occupied_plots.push(walking_volume);
+        }
 
         // Draw exhibit info
         {
