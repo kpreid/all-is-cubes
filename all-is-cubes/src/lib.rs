@@ -204,6 +204,9 @@ pub mod op;
 pub mod physics;
 pub mod raycast;
 pub mod raytracer;
+#[cfg(feature = "rerun")]
+#[doc(hidden)]
+pub mod rerun_glue;
 pub mod save;
 pub mod space;
 pub mod time;
