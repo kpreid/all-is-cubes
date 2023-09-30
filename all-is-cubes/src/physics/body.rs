@@ -1,3 +1,5 @@
+#[cfg(feature = "rerun")]
+use alloc::vec::Vec;
 use core::fmt;
 
 use euclid::Vector3D;
@@ -21,6 +23,9 @@ use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::{self, Transaction};
 use crate::util::{ConciseDebug, Refmt as _, StatusText};
+
+#[cfg(feature = "rerun")]
+use crate::rerun_glue as rg;
 
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
 const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
@@ -129,6 +134,26 @@ impl Body {
         }
     }
 
+    /// `step_with_rerun()` but with no rerun arg for use by tests.
+    #[cfg(test)]
+    pub(crate) fn step<CC>(
+        &mut self,
+        tick: Tick,
+        colliding_space: Option<&Space>,
+        collision_callback: CC,
+    ) -> BodyStepInfo
+    where
+        CC: FnMut(Contact),
+    {
+        self.step_with_rerun(
+            tick,
+            colliding_space,
+            collision_callback,
+            #[cfg(feature = "rerun")]
+            &Default::default(),
+        )
+    }
+
     /// Advances time for the body.
     ///
     /// If `colliding_space` is present then the body may collide with blocks in that space
@@ -138,18 +163,31 @@ impl Body {
     ///
     /// This method is private because the exact details of what inputs are required are
     /// unstable.
-    pub(crate) fn step<CC>(
+    pub(crate) fn step_with_rerun<CC>(
         &mut self,
         tick: Tick,
         mut colliding_space: Option<&Space>,
         mut collision_callback: CC,
+        #[cfg(feature = "rerun")] rerun_destination: &crate::rerun_glue::Destination,
     ) -> BodyStepInfo
     where
         CC: FnMut(Contact),
     {
         let dt = tick.delta_t().as_secs_f64();
         let mut move_segments = [MoveSegment::default(); 3];
+        let mut move_segment_index = 0;
+        #[cfg(feature = "rerun")]
+        let mut move_segment_arrows: [rg::components::Arrow3D; 3] =
+            std::array::from_fn(|_| rg::components::Arrow3D {
+                origin: Default::default(),
+                vector: Default::default(),
+            });
         let mut already_colliding = None;
+        #[cfg(feature = "rerun")]
+        let mut contact_accum: Vec<Contact> = Vec::new();
+
+        #[cfg(feature = "rerun")]
+        let re_timepoint = rerun_destination.stream.now(); // includes our own universe-time
 
         if self.noclip {
             colliding_space = None;
@@ -160,6 +198,9 @@ impl Body {
                 already_colliding = Some(contact);
             }
             collision_callback(contact);
+
+            #[cfg(feature = "rerun")]
+            contact_accum.push(contact);
         };
 
         if !self.position.to_vector().square_length().is_finite() {
@@ -178,6 +219,8 @@ impl Body {
             }
         }
 
+        #[cfg(feature = "rerun")]
+        let position_before_push_out = self.position;
         let push_out_info = if let Some(space) = colliding_space {
             self.push_out(space)
         } else {
@@ -203,18 +246,31 @@ impl Body {
 
         // Do collision detection and resolution.
         if let Some(space) = colliding_space {
-            let mut i = 0;
             let mut delta_position = unobstructed_delta_position;
             while delta_position != Vector3D::zero() {
-                assert!(i < 3, "sliding collision loop did not finish");
+                assert!(
+                    move_segment_index < 3,
+                    "sliding collision loop did not finish"
+                );
+                #[cfg(feature = "rerun")]
+                let position_before_move = self.position;
                 // Each call to collide_and_advance will zero at least one axis of delta_position.
                 // The nonzero axes are for sliding movement.
                 let (new_delta_position, segment) =
                     self.collide_and_advance(space, &mut collision_callback, delta_position);
                 delta_position = new_delta_position;
-                move_segments[i] = segment;
 
-                i += 1;
+                // Diagnostic recording of the individual move segments
+                move_segments[move_segment_index] = segment;
+                #[cfg(feature = "rerun")]
+                {
+                    move_segment_arrows[move_segment_index] = rg::components::Arrow3D {
+                        origin: rg::convert_vec(position_before_move.to_vector()),
+                        vector: rg::convert_vec(segment.delta_position),
+                    };
+                }
+
+                move_segment_index += 1;
             }
         } else {
             self.position += unobstructed_delta_position;
@@ -225,6 +281,79 @@ impl Body {
         }
 
         // TODO: after gravity, falling-below-the-world protection
+
+        #[cfg(feature = "rerun")]
+        {
+            use crate::content::palette;
+
+            let base_path = &rerun_destination.path;
+
+            // Log batch of contacts
+            {
+                let mut contact_boxes = Vec::new();
+                let mut contact_transforms = Vec::new();
+                let mut contact_labels = Vec::new();
+                for contact in contact_accum {
+                    let (box3d, transform) = rg::convert_aab(contact.aab(), Vector3D::zero());
+                    contact_boxes.push(box3d);
+                    contact_transforms.push(transform);
+                    contact_labels.push(rg::components::Label(format!("{contact:?}")));
+                }
+                rerun_destination.send(&rg::entity_path!["contact"], |sender| {
+                    sender
+                        .with_timepoint(re_timepoint.clone())
+                        .with_component(&contact_boxes)?
+                        .with_component(&contact_transforms)?
+                        .with_component(&contact_labels)?
+                        .with_splat(rg::components::ColorRGBA::from(
+                            palette::DEBUG_COLLISION_CUBES,
+                        ))
+                });
+            }
+
+            // Log push_out operation
+            // TODO: should this be just a maybe-fourth movement arrow?
+            let push_out_path = base_path.join(&rg::entity_path!["push_out"]);
+            match push_out_info {
+                Some(push_out_vector) => {
+                    rerun_destination.send(&push_out_path, |sender| {
+                        sender
+                            .with_timepoint(re_timepoint.clone()) // TODO: still needed?
+                            .with_component(&[rg::components::Arrow3D {
+                                origin: rg::convert_vec(position_before_push_out.to_vector()),
+                                vector: rg::convert_vec(push_out_vector),
+                            }])
+                    });
+                }
+                None => rerun_destination.clear_recursive(&push_out_path),
+            }
+
+            // Log body position point
+            rerun_destination.send(&rg::EntityPath::new(vec![]), |sender| {
+                sender
+                    .with_timepoint(re_timepoint.clone())
+                    .with_component(&[rg::convert_point(self.position)])
+            });
+
+            // Log collision box
+            let (box3d, transform) = rg::convert_aab(self.collision_box, self.position.to_vector());
+            rerun_destination.send(&rg::entity_path!["collision_box"], |sender| {
+                sender
+                    .with_timepoint(re_timepoint.clone())
+                    .with_component(&[box3d])?
+                    .with_component(&[transform])?
+                    .with_splat(rg::components::ColorRGBA::from(
+                        palette::DEBUG_COLLISION_BOX,
+                    ))
+            });
+
+            // Log move segments
+            rerun_destination.send(&rg::entity_path!["move_segment"], |sender| {
+                sender
+                    .with_timepoint(re_timepoint)
+                    .with_component(&move_segment_arrows[..move_segment_index])
+            });
+        }
 
         BodyStepInfo {
             quiescent: false,

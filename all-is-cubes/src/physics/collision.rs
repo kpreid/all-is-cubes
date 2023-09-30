@@ -55,6 +55,23 @@ impl Contact {
         }
     }
 
+    /// Returns the AAB of the cube or voxel that was collided with.
+    #[cfg(feature = "rerun")]
+    pub(crate) fn aab(&self) -> Aab {
+        match *self {
+            Contact::Block(CubeFace { cube, .. }) => Aab::from(GridAab::single_cube(cube)),
+            Contact::Voxel {
+                cube,
+                resolution,
+                voxel,
+            } => {
+                let aab = Aab::from(GridAab::single_cube(voxel.cube));
+                aab.scale(FreeCoordinate::from(resolution).recip())
+                    .translate(cube.lower_bounds().to_vector().cast())
+            }
+        }
+    }
+
     /// Returns the contact normal: the direction in which the colliding box should be
     /// pushed back.
     ///

@@ -99,6 +99,9 @@ pub struct Character {
 
     // TODO: not crate access: we need something like the listen() method for Notifier
     pub(crate) behaviors: BehaviorSet<Character>,
+
+    #[cfg(feature = "rerun")]
+    rerun_destination: crate::rerun_glue::Destination,
 }
 
 impl fmt::Debug for Character {
@@ -209,6 +212,9 @@ impl Character {
             selected_slots,
             notifier: Notifier::new(),
             behaviors: BehaviorSet::new(),
+
+            #[cfg(feature = "rerun")]
+            rerun_destination: Default::default(),
         }
     }
 
@@ -317,9 +323,15 @@ impl Character {
 
             let colliding_cubes = &mut self.colliding_cubes;
             colliding_cubes.clear();
-            Some(self.body.step(tick, Some(&*space), |cube| {
-                colliding_cubes.insert(cube);
-            }))
+            Some(self.body.step_with_rerun(
+                tick,
+                Some(&*space),
+                |cube| {
+                    colliding_cubes.insert(cube);
+                },
+                #[cfg(feature = "rerun")]
+                &self.rerun_destination,
+            ))
         } else {
             // TODO: set a warning flag
             None
@@ -509,6 +521,12 @@ impl Character {
                 .iter()
                 .any(|contact| contact.normal() == Face7::PY)
     }
+
+    /// Activate logging this character's state to a Rerun stream.
+    #[cfg(feature = "rerun")]
+    pub fn log_to_rerun(&mut self, destination: crate::rerun_glue::Destination) {
+        self.rerun_destination = destination;
+    }
 }
 
 impl VisitRefs for Character {
@@ -530,6 +548,8 @@ impl VisitRefs for Character {
             selected_slots: _,
             notifier: _,
             behaviors,
+            #[cfg(feature = "rerun")]
+                rerun_destination: _,
         } = self;
         visitor.visit(space);
         inventory.visit_refs(visitor);
@@ -578,6 +598,8 @@ impl serde::Serialize for Character {
             // Not persisted - run-time connections to other things
             notifier: _,
             velocity_input: _,
+            #[cfg(feature = "rerun")]
+                rerun_destination: _,
 
             // Not persisted - decorative simulation
             eye_displacement_pos: _,
@@ -644,6 +666,8 @@ impl<'de> serde::Deserialize<'de> for Character {
                 // Not persisted - run-time connections to other things
                 notifier: Notifier::new(),
                 velocity_input: Vector3D::zero(),
+                #[cfg(feature = "rerun")]
+                rerun_destination: Default::default(),
 
                 // Not persisted - decorative simulation
                 eye_displacement_pos: Vector3D::zero(),

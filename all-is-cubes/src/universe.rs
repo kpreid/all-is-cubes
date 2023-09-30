@@ -29,6 +29,9 @@ use crate::time;
 use crate::transaction::Transaction as _;
 use crate::util::{Refmt as _, StatusText};
 
+#[cfg(feature = "rerun")]
+use crate::rerun_glue as rg;
+
 // Note: Most things in `members` are either an impl, private, or intentionally public-in-private.
 // Therefore, no glob reexport.
 mod members;
@@ -186,6 +189,9 @@ pub struct Universe {
     session_step_time: u64,
 
     spaces_with_work: usize,
+
+    #[cfg(feature = "rerun")]
+    rerun_destination: crate::rerun_glue::Destination,
 }
 
 impl Universe {
@@ -201,6 +207,8 @@ impl Universe {
             clock: time::Clock::new(time::TickSchedule::per_second(60), 0),
             session_step_time: 0,
             spaces_with_work: 0,
+            #[cfg(feature = "rerun")]
+            rerun_destination: Default::default(),
         }
     }
 
@@ -246,6 +254,11 @@ impl Universe {
         let start_time = I::now();
 
         let tick = self.clock.advance(paused);
+
+        #[cfg(feature = "rerun")]
+        self.rerun_destination
+            .stream
+            .set_time_sequence("session_step_time", Some(self.session_step_time as i64));
 
         if self.wants_gc {
             self.gc();
@@ -549,6 +562,24 @@ impl Universe {
 
         Ok(())
     }
+
+    /// Activate logging this universe's time to a Rerun stream.
+    #[cfg(feature = "rerun")]
+    pub fn log_to_rerun(&mut self, destination: rg::Destination) {
+        self.rerun_destination = destination;
+
+        // Initialize axes.
+        // TODO: this should be per-Space in principle
+        self.rerun_destination
+            .send(&rg::EntityPath::from(vec![]), |sender| {
+                sender.with_timeless(true).with_component(&[
+                    re_sdk::components::ViewCoordinates::from_up_and_handedness(
+                        crate::math::Face6::PY.into(),
+                        re_sdk::coordinates::Handedness::Right,
+                    ),
+                ])
+            });
+    }
 }
 
 impl fmt::Debug for Universe {
@@ -562,6 +593,8 @@ impl fmt::Debug for Universe {
             clock,
             session_step_time,
             spaces_with_work,
+            #[cfg(feature = "rerun")]
+                rerun_destination: _,
         } = self;
 
         let mut ds = fmt.debug_struct("Universe");
