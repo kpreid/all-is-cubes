@@ -46,9 +46,10 @@ use all_is_cubes::{
 };
 use all_is_cubes::{include_image, rgb_const, rgba_const};
 
+use crate::alg::{four_walls, voronoi_pattern};
 use crate::{
-    four_walls, make_slab, make_some_blocks, make_some_voxel_blocks, palette, tree, AnimatedVoxels,
-    DemoBlocks, Exhibit, Fire, LandscapeBlocks,
+    make_slab, make_some_blocks, make_some_voxel_blocks, palette, tree, AnimatedVoxels, DemoBlocks,
+    Exhibit, Fire, LandscapeBlocks,
 };
 
 /// All exhibits which will show up in [`crate::UniverseTemplate::DemoCity`].
@@ -1268,7 +1269,7 @@ async fn DESTRUCTION(_: &Exhibit, universe: &mut Universe) {
                 },
             )
         });
-        let pattern = crate::voronoi_pattern(resolution, false, &points);
+        let pattern = voronoi_pattern(resolution, false, &points);
 
         Ok(Block::builder()
             .voxels_fn(universe, resolution, pattern)?

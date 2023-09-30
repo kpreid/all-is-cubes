@@ -8,8 +8,8 @@ use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
 use all_is_cubes::block::{
-    AnimationHint, Atom, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution,
-    Resolution::*, RotationPlacementRule, AIR,
+    AnimationHint, Atom, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution::*,
+    RotationPlacementRule, AIR,
 };
 use all_is_cubes::drawing::embedded_graphics::{
     prelude::Point,
@@ -27,8 +27,8 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{rgb_const, rgba_const};
 
+use crate::alg::{gradient_lookup, scale_color, square_radius, NoiseFnExt as _};
 use crate::landscape::install_landscape_blocks;
-use crate::noise::NoiseFnExt;
 use crate::palette;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::IntoStaticStr /* kludge */, Exhaust)]
@@ -499,54 +499,9 @@ pub async fn install_demo_blocks(
     Ok(())
 }
 
-/// Generate a copy of a [`Primitive::Atom`] block with its color scaled by the given scalar.
-///
-/// The scalar is rounded to steps of `quantization`, to reduce the number of distinct
-/// block types generated.
-///
-/// If the computation is NaN or the block is not an atom, it is returned unchanged.
-pub(crate) fn scale_color(mut block: Block, scalar: f64, quantization: f64) -> Block {
-    let scalar = (scalar / quantization).round() * quantization;
-    match (block.primitive_mut(), NotNan::new(scalar as f32)) {
-        (Primitive::Atom(Atom { color, .. }), Ok(scalar)) => {
-            *color = (color.to_rgb() * scalar).with_alpha(color.alpha());
-        }
-        _ => {}
-    }
-    block
-}
-
-/// Subdivide the range 0.0 to 1.0 into `gradient.len()` parts and return the [`Block`]
-/// which the value falls into.
-///
-/// Panics if `gradient.len() == 0`.
-pub(crate) fn gradient_lookup(gradient: &[Block], value: f32) -> &Block {
-    &gradient[((value * gradient.len() as f32) as usize).clamp(0, gradient.len() - 1)]
-}
-
-/// Compute the cube's distance from the midpoint of the Y axis of the block volume.
-///
-/// The centermost 4 cubes that exist in every resolution above 1 all have a distance of 1.
-/// (No cube ever has a distance of 0, so 0 can be used in a comparison for “never”.)
-///
-/// The first returned number is the "radius" value and the second is the distance
-/// on the lesser axis, which may be used for distance from the center or corner along
-/// the surface.
-fn square_radius(resolution: Resolution, cube: Cube) -> [GridCoordinate; 2] {
-    let distances_vec = cube
-        .lower_bounds()
-        .map(|c| (c * 2 + 1 - GridCoordinate::from(resolution)).abs() / 2 + 1);
-    if distances_vec.x > distances_vec.z {
-        [distances_vec.x, distances_vec.z]
-    } else {
-        [distances_vec.z, distances_vec.x]
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::make_some_blocks;
     use all_is_cubes::util::yield_progress_for_testing;
 
     #[tokio::test]
@@ -556,40 +511,5 @@ mod tests {
             .await
             .unwrap();
         // TODO: assert what entries were created, once Universe has iteration
-    }
-
-    #[test]
-    fn gradient_lookup_cases() {
-        let blocks = make_some_blocks::<4>();
-        let inputs_and_output_indices = [
-            (-f32::INFINITY, 0),
-            (-10.0, 0),
-            (-0.1, 0),
-            (0.0, 0),
-            (0.24, 0),
-            (0.25, 1),
-            (0.26, 1),
-            (0.49, 1),
-            (0.50, 2),
-            (0.51, 2),
-            (0.9, 3),
-            (1.0, 3),
-            (1.1, 3),
-            (10.0, 3),
-            (f32::INFINITY, 3),
-            (f32::NAN, 0),
-        ];
-        assert_eq!(
-            inputs_and_output_indices.map(|(i, _)| gradient_lookup(&blocks, i)),
-            inputs_and_output_indices.map(|(_, o)| &blocks[o]),
-        );
-    }
-
-    #[test]
-    fn square_radius_cases() {
-        assert_eq!(
-            [6, 7, 8, 9].map(|x| square_radius(R16, Cube::new(x, 2, 8))[0]),
-            [2, 1, 1, 2]
-        );
     }
 }

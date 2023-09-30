@@ -19,9 +19,8 @@ use all_is_cubes::{
     math::Cube,
 };
 
-use crate::blocks::scale_color;
-use crate::noise::{array_of_noise, NoiseFnExt};
-use crate::{palette, tree, voronoi_pattern};
+use crate::alg::{array_of_noise, scale_color, voronoi_pattern, NoiseFnExt};
+use crate::{palette, tree};
 
 /// Names for blocks assigned specific roles in generating outdoor landscapes.
 ///

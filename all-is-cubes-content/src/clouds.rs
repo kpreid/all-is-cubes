@@ -4,7 +4,7 @@ use all_is_cubes::block::{Block, BlockCollision, AIR};
 use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, NotNan, Rgb};
 use all_is_cubes::space::{SetCubeError, Space};
 
-use crate::noise::NoiseFnExt;
+use crate::alg::NoiseFnExt as _;
 
 /// Fill the [`AIR`] portions of `region` in `space` with clouds made up of various
 /// transparent blocks.

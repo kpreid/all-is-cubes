@@ -118,7 +118,7 @@ impl vui::WidgetController for TemplateButtonController {
             bounds.upper_bounds().z - 1,
         );
         txn = txn
-            .merge(crate::space_to_transaction_copy(
+            .merge(crate::alg::space_to_transaction_copy(
                 &self.definition.text_blocks,
                 text_bounds.translate(-text_dest_origin),
                 Gridgid::from_translation(text_dest_origin),

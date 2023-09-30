@@ -28,9 +28,9 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::{logo::logo_text, vui, vui::widgets};
 
+use crate::alg::{space_to_space_copy, NoiseFnExt as _};
 use crate::{
-    clouds::clouds, exhibits::DEMO_CITY_EXHIBITS, noise::NoiseFnExt, space_to_space_copy,
-    wavy_landscape, DemoBlocks, LandscapeBlocks,
+    clouds::clouds, exhibits::DEMO_CITY_EXHIBITS, wavy_landscape, DemoBlocks, LandscapeBlocks,
 };
 
 pub(crate) async fn demo_city<I: Instant>(

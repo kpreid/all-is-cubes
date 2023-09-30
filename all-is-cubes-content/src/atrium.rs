@@ -21,8 +21,8 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{rgb_const, rgba_const};
 
-use crate::noise::array_of_noise;
-use crate::{four_walls, scale_color, Fire};
+use crate::alg::{array_of_noise, four_walls, scale_color};
+use crate::Fire;
 
 /// A special name for "the thickness of a 1-block-thick wall/floor/pillar", for readability.
 const WALL: GridCoordinate = 1;

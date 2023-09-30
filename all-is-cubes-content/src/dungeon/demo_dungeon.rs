@@ -25,8 +25,9 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{include_image, rgb_const};
 
+use crate::alg::four_walls;
 use crate::dungeon::{build_dungeon, f2d, maze_to_array, DungeonGrid, Theme};
-use crate::{four_walls, tree, DemoBlocks, LandscapeBlocks, TemplateParameters};
+use crate::{tree, DemoBlocks, LandscapeBlocks, TemplateParameters};
 
 const WINDOW_PATTERN: [GridCoordinate; 3] = [-2, 0, 2];
 
