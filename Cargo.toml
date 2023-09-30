@@ -78,7 +78,7 @@ trycmd = "0.14.1" # keep in sync with `snapbox`
 wasm-bindgen-futures = "0.4.34"
 # Note: "expose_ids" feature is not needed globally but is enabled to avoid compiling two versions
 wgpu = { version = "0.17.0", features = ["expose-ids"] }
-yield-progress = { version = "0.1.3", default-features = false }
+yield-progress = { version = "0.1.4", default-features = false }
 
 [profile.dev]
 # Enable some optimization to improve interactive performance in manual testing/experimenting.
