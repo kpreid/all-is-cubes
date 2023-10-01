@@ -287,6 +287,40 @@ pub(crate) async fn demo_city<I: Instant>(
     planner.occupied_plots.push(logo_location);
 
     // Exhibits
+    place_exhibits_in_city::<I>(exhibits_progress, universe, &mut planner, &mut space).await?;
+
+    final_progress.progress(0.0).await;
+
+    // Sprinkle some trees around in the remaining space.
+    plant_trees(
+        final_progress.start_and_cut(0.5, "Trees").await,
+        params,
+        &mut planner,
+        &mut space,
+        universe,
+    )
+    .await?;
+
+    // Enable light computation
+    space.set_physics({
+        let mut p = space.physics().clone();
+        p.light = SpacePhysics::default().light;
+        p
+    });
+    final_progress.finish().await;
+
+    Ok(space)
+}
+
+async fn place_exhibits_in_city<I: Instant>(
+    exhibits_progress: YieldProgress,
+    universe: &mut Universe,
+    planner: &mut CityPlanner,
+    space: &mut Space,
+) -> Result<(), InGenError> {
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+    use DemoBlocks::*;
+
     'exhibit: for (exhibit, mut exhibit_progress) in DEMO_CITY_EXHIBITS
         .iter()
         .zip(exhibits_progress.split_evenly(DEMO_CITY_EXHIBITS.len()))
@@ -400,19 +434,14 @@ pub(crate) async fn demo_city<I: Instant>(
             space_to_space_copy(
                 &info_sign_space,
                 info_sign_space.bounds(),
-                &mut space,
+                space,
                 sign_transform,
             )?;
         }
         exhibit_progress.progress(0.66).await;
 
         // Place exhibit content
-        space_to_space_copy(
-            &exhibit_space,
-            exhibit_footprint,
-            &mut space,
-            plot_transform,
-        )?; // TODO: on failure, place an error marker and continue
+        space_to_space_copy(&exhibit_space, exhibit_footprint, space, plot_transform)?; // TODO: on failure, place an error marker and continue
 
         // Log build time
         let exhibit_time = I::now().saturating_duration_since(start_exhibit_time);
@@ -423,29 +452,9 @@ pub(crate) async fn demo_city<I: Instant>(
         );
 
         exhibit_progress.finish().await;
-    } // end per-exhibit loop
+    }
 
-    final_progress.progress(0.0).await;
-
-    // Sprinkle some trees around in the remaining space.
-    plant_trees(
-        final_progress.start_and_cut(0.5, "Trees").await,
-        params,
-        &mut planner,
-        &mut space,
-        universe,
-    )
-    .await?;
-
-    // Enable light computation
-    space.set_physics({
-        let mut p = space.physics().clone();
-        p.light = SpacePhysics::default().light;
-        p
-    });
-    final_progress.finish().await;
-
-    Ok(space)
+    Ok(())
 }
 
 async fn plant_trees(
