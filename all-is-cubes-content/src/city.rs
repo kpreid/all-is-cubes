@@ -270,7 +270,7 @@ pub(crate) async fn demo_city<I: Instant>(
             .saturating_duration_since(blank_city_time)
             .as_secs_f32()
     );
-    let [exhibits_progress, final_progress] = p.split(0.8);
+    let [exhibits_progress, mut final_progress] = p.split(0.8);
 
     // All is Cubes logo
     let logo_location = space
@@ -428,29 +428,14 @@ pub(crate) async fn demo_city<I: Instant>(
     final_progress.progress(0.0).await;
 
     // Sprinkle some trees around in the remaining space.
-    {
-        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(params.seed.unwrap_or(0));
-        let possible_tree_origins: GridAab = planner.y_range(1, 2);
-        for _ in 0..60 {
-            // won't get this many trees, because some will be blocked
-            let tree_origin = possible_tree_origins.random_cube(&mut rng).unwrap();
-            let height = rng.gen_range(1..8);
-            let tree_bounds = GridAab::single_cube(tree_origin).expand(FaceMap {
-                nx: height / 3,
-                ny: 0,
-                nz: height / 3,
-                px: height / 3,
-                py: height - 1,
-                pz: height / 3,
-            });
-            if space.bounds().contains_box(tree_bounds) && !planner.is_occupied(tree_bounds) {
-                crate::tree::make_tree(&landscape_blocks, &mut rng, tree_origin, tree_bounds)?
-                    .execute(&mut space, &mut transaction::no_outputs)?;
-            }
-        }
-    }
-
-    final_progress.progress(0.5).await;
+    plant_trees(
+        final_progress.start_and_cut(0.5, "Trees").await,
+        params,
+        &mut planner,
+        &mut space,
+        universe,
+    )
+    .await?;
 
     // Enable light computation
     space.set_physics({
@@ -461,6 +446,38 @@ pub(crate) async fn demo_city<I: Instant>(
     final_progress.finish().await;
 
     Ok(space)
+}
+
+async fn plant_trees(
+    progress: YieldProgress,
+    params: crate::TemplateParameters,
+    planner: &mut CityPlanner,
+    space: &mut Space,
+    universe: &Universe,
+) -> Result<(), InGenError> {
+    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
+    let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(params.seed.unwrap_or(0));
+    let possible_tree_origins: GridAab = planner.y_range(1, 2);
+
+    for progress in progress.split_evenly(60) {
+        // won't get this many trees, because some will be blocked
+        let tree_origin = possible_tree_origins.random_cube(&mut rng).unwrap();
+        let height = rng.gen_range(1..8);
+        let tree_bounds = GridAab::single_cube(tree_origin).expand(FaceMap {
+            nx: height / 3,
+            ny: 0,
+            nz: height / 3,
+            px: height / 3,
+            py: height - 1,
+            pz: height / 3,
+        });
+        if space.bounds().contains_box(tree_bounds) && !planner.is_occupied(tree_bounds) {
+            crate::tree::make_tree(&landscape_blocks, &mut rng, tree_origin, tree_bounds)?
+                .execute(space, &mut transaction::no_outputs)?;
+        }
+        progress.finish().await;
+    }
+    Ok(())
 }
 
 #[allow(clippy::type_complexity)]
