@@ -541,8 +541,8 @@ impl CityPlanner {
 
         let mut occupied_plots = Vec::new();
         let road = GridAab::from_lower_upper(
-            [-Self::LAMP_POSITION_RADIUS, 0, -city_radius],
-            [Self::LAMP_POSITION_RADIUS + 1, 2, city_radius + 1],
+            [-Self::ROAD_RADIUS, 0, -city_radius],
+            [Self::ROAD_RADIUS + 1, 2, city_radius + 1],
         );
         occupied_plots.push(road);
         occupied_plots.push(road.transform(GridRotation::CLOCKWISE.into()).unwrap());
