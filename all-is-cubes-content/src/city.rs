@@ -4,6 +4,7 @@
 use alloc::{sync::Arc, vec::Vec};
 
 use futures_core::future::BoxFuture;
+use itertools::Itertools;
 use rand::{Rng, SeedableRng as _};
 
 use all_is_cubes::drawing::embedded_graphics::{
@@ -18,7 +19,8 @@ use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::{Slot, Tool};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector, Gridgid, Rgb,
+    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector,
+    Gridgid, Rgb,
 };
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder, SpacePhysics};
@@ -28,7 +30,7 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::{logo::logo_text, vui, vui::widgets};
 
-use crate::alg::{space_to_space_copy, NoiseFnExt as _};
+use crate::alg::{space_to_space_copy, walk, NoiseFnExt as _};
 use crate::{
     clouds::clouds, exhibits::DEMO_CITY_EXHIBITS, wavy_landscape, DemoBlocks, LandscapeBlocks,
 };
@@ -61,6 +63,7 @@ pub(crate) async fn demo_city<I: Instant>(
 
     // Layout parameters
     // TODO: move to CityPlanner
+    let road_directions = [Face6::PX, Face6::NX, Face6::PZ, Face6::NZ];
     let road_radius = CityPlanner::ROAD_RADIUS;
     let lamp_position_radius = CityPlanner::LAMP_POSITION_RADIUS;
     let exhibit_front_radius = CityPlanner::PLOT_FRONT_RADIUS;
@@ -75,14 +78,6 @@ pub(crate) async fn demo_city<I: Instant>(
     );
 
     let mut planner = CityPlanner::new(bounds);
-
-    // Prepare brushes.
-    let lamp_brush = VoxelBrush::new([
-        ([0, 0, 0], &demo_blocks[LamppostBase]),
-        ([0, 1, 0], &demo_blocks[LamppostSegment]),
-        ([0, 2, 0], &demo_blocks[LamppostTop]),
-        ([0, 3, 0], &demo_blocks[Lamp]),
-    ]);
 
     // Construct space.
     let mut space = Space::builder(bounds)
@@ -153,7 +148,7 @@ pub(crate) async fn demo_city<I: Instant>(
     p.progress(0.3).await;
 
     // Roads and lamps
-    for face in [Face6::PX, Face6::NX, Face6::PZ, Face6::NZ] {
+    for face in road_directions {
         let perpendicular: GridVector = GridRotation::CLOCKWISE.transform(face).normal_vector();
         let road_aligned_rotation = GridRotation::from_to(Face6::NZ, face, Face6::PY).unwrap();
         let other_side_of_road =
@@ -190,16 +185,6 @@ pub(crate) async fn demo_city<I: Instant>(
                         )
                         .with_disassemblable()
                         .compose_or_replace(to_compose_with),
-                    )?;
-                }
-            }
-
-            // Lampposts
-            if (i - lamp_position_radius).rem_euclid(lamp_spacing) == 0 {
-                for p in &[-lamp_position_radius, lamp_position_radius] {
-                    lamp_brush.paint(
-                        &mut space,
-                        step.cube_ahead() + GridVector::new(0, 1, 0) + perpendicular * *p,
                     )?;
                 }
             }
@@ -288,6 +273,30 @@ pub(crate) async fn demo_city<I: Instant>(
 
     // Exhibits
     place_exhibits_in_city::<I>(exhibits_progress, universe, &mut planner, &mut space).await?;
+
+    // Lampposts
+    'directions: for direction in road_directions {
+        let perpendicular: GridVector =
+            GridRotation::CLOCKWISE.transform(direction).normal_vector();
+        for distance in (lamp_position_radius..).step_by(lamp_spacing) {
+            for side_of_road in [-1, 1] {
+                let globe_cube = Cube::new(0, 4, 0)
+                    + direction.normal_vector() * distance
+                    + perpendicular * (side_of_road * lamp_position_radius);
+                if !bounds.contains_cube(globe_cube) {
+                    continue 'directions;
+                }
+
+                let Some(base_cube) = planner.find_cube_near(
+                    globe_cube - GridVector::new(0, 3, 0),
+                    &[direction, direction.opposite()],
+                ) else {
+                    continue;
+                };
+                place_lamppost(base_cube, globe_cube, &mut space, &demo_blocks)?;
+            }
+        }
+    }
 
     final_progress.progress(0.0).await;
 
@@ -437,6 +446,11 @@ async fn place_exhibits_in_city<I: Instant>(
                 space,
                 sign_transform,
             )?;
+
+            // Mark sign space as occupied
+            planner
+                .occupied_plots
+                .push(info_sign_space.bounds().transform(sign_transform).unwrap());
         }
         exhibit_progress.progress(0.66).await;
 
@@ -486,6 +500,59 @@ async fn plant_trees(
         }
         progress.finish().await;
     }
+    Ok(())
+}
+
+fn place_lamppost(
+    base_position: Cube,
+    globe_position: Cube,
+    space: &mut Space,
+    demo_blocks: &BlockProvider<DemoBlocks>,
+) -> Result<(), InGenError> {
+    use DemoBlocks::*;
+
+    fn rot_py_to(to: Face6) -> GridRotation {
+        // TODO: make it possible to express this more elegantly
+        // "rotate A to B by the shortest path possible, and if it is 180º then prefer this axis of rotation"
+        GridRotation::from_to(Face6::PY, to, Face6::PX)
+            .or_else(|| GridRotation::from_to(Face6::PY, to, Face6::PZ))
+            .unwrap()
+    }
+
+    space.set(base_position, &demo_blocks[LamppostBase])?;
+
+    for (step1, step2) in walk(base_position, globe_position).tuple_windows() {
+        // let prev_cube = step1.cube;
+        let prev_dir: Face6 = step1.face.try_into().unwrap();
+        let this_cube = step2.cube;
+        let next_dir: Face6 = step2.face.try_into().unwrap();
+        let next_cube = step2.adjacent();
+
+        let block = if next_cube == globe_position {
+            demo_blocks[LamppostTop].clone().rotate(rot_py_to(next_dir))
+        } else {
+            demo_blocks[LamppostSegment]
+                .clone()
+                .rotate(rot_py_to(next_dir))
+        };
+
+        let block = if prev_dir == next_dir {
+            block
+        } else {
+            block::Composite::new(
+                demo_blocks[LamppostSegment]
+                    .clone()
+                    .rotate(rot_py_to(prev_dir)),
+                block::CompositeOperator::Over,
+            )
+            .compose_or_replace(block)
+        };
+
+        space.set(this_cube, block)?;
+    }
+
+    space.set(globe_position, &demo_blocks[Lamp])?;
+
     Ok(())
 }
 
@@ -627,6 +694,31 @@ impl CityPlanner {
                     self.occupied_plots.push(transformed);
                     return Some(transform);
                 }
+            }
+        }
+        None
+    }
+
+    fn find_cube_near(&self, start_cube: Cube, directions: &[Face6]) -> Option<Cube> {
+        for distance in 0.. {
+            let mut some_in_bounds = false;
+            for &direction in directions {
+                let cube = start_cube + direction.normal_vector() * distance;
+                if self.space_bounds.contains_cube(cube) {
+                    some_in_bounds = true;
+                } else {
+                    break;
+                }
+                if !self.is_occupied(cube.grid_aab()) {
+                    return Some(cube);
+                }
+                if distance == 0 {
+                    // no need to try multiple equivalent directions
+                    break;
+                }
+            }
+            if !some_in_bounds {
+                break;
             }
         }
         None

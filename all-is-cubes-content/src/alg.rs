@@ -8,8 +8,8 @@ use std::collections::HashSet;
 use all_is_cubes::block::{Atom, Block, Primitive, Resolution, AIR};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridArray, GridCoordinate, GridPoint,
-    GridVector, Gridgid, NotNan, VectorOps as _,
+    Cube, CubeFace, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridArray, GridCoordinate,
+    GridPoint, GridVector, Gridgid, NotNan, VectorOps as _,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpaceTransaction};
 
@@ -211,10 +211,54 @@ pub(crate) fn square_radius(resolution: Resolution, cube: Cube) -> [GridCoordina
     }
 }
 
+/// Returns a path of single-cube steps from `start` to `end`.
+///
+/// TODO: If useful, allow specifying style of traversal — which axis first, or longest
+/// axis first, or evenly distributed (Bresenham).
+pub(crate) fn walk(start: Cube, end: Cube) -> impl Iterator<Item = CubeFace> + Clone {
+    use itertools::repeat_n;
+    use Face6::*;
+    let delta = end - start;
+    let dists = delta.abs().cast::<usize>();
+
+    let x_steps = repeat_n(if delta.x > 0 { PX } else { NX }, dists.x);
+    let y_steps = repeat_n(if delta.y > 0 { PY } else { NY }, dists.y);
+    let z_steps = repeat_n(if delta.z > 0 { PZ } else { NZ }, dists.z);
+    let steps = y_steps.chain(x_steps).chain(z_steps);
+
+    #[derive(Clone, Debug)]
+    struct CubeIter<I> {
+        start: Cube,
+        // end: Cube,
+        inner: I,
+    }
+    impl<I: Iterator<Item = Face6>> Iterator for CubeIter<I> {
+        type Item = CubeFace;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            let face = self.inner.next()?;
+            let step = CubeFace {
+                cube: self.start,
+                face: face.into(),
+            };
+            self.start += face.normal_vector();
+            Some(step)
+        }
+    }
+
+    CubeIter {
+        start,
+        //  end,
+        inner: steps,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::make_some_blocks;
+    use all_is_cubes::math::Face7;
+    use itertools::Itertools as _;
     use Resolution::*;
 
     #[test]
@@ -249,6 +293,57 @@ mod tests {
         assert_eq!(
             [6, 7, 8, 9].map(|x| square_radius(R16, Cube::new(x, 2, 8))[0]),
             [2, 1, 1, 2]
+        );
+    }
+
+    #[test]
+    fn walk_cases() {
+        use Face7::*;
+        let start = Cube::new(1, 2, 3);
+
+        assert_eq!(walk(start, start).collect_vec(), vec![]);
+        assert_eq!(
+            walk(start, Cube::new(1, 3, 3)).collect_vec(),
+            vec![CubeFace {
+                cube: start,
+                face: PY
+            }]
+        );
+        assert_eq!(
+            walk(start, Cube::new(1, 1, 3)).collect_vec(),
+            vec![CubeFace {
+                cube: start,
+                face: NY
+            }]
+        );
+        assert_eq!(
+            walk(start, Cube::new(0, 4, 0)).collect_vec(),
+            vec![
+                CubeFace {
+                    cube: start,
+                    face: PY
+                },
+                CubeFace {
+                    cube: Cube::new(1, 3, 3),
+                    face: PY
+                },
+                CubeFace {
+                    cube: Cube::new(1, 4, 3),
+                    face: NX
+                },
+                CubeFace {
+                    cube: Cube::new(0, 4, 3),
+                    face: NZ
+                },
+                CubeFace {
+                    cube: Cube::new(0, 4, 2),
+                    face: NZ
+                },
+                CubeFace {
+                    cube: Cube::new(0, 4, 1),
+                    face: NZ
+                },
+            ]
         );
     }
 }
