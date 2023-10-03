@@ -17,11 +17,13 @@ impl IndexVec {
     /// Creates an empty [`IndexVec`].
     ///
     /// This operation does not allocate heap memory and is generally similar to [`Vec::new()`].
+    #[inline]
     pub const fn new() -> Self {
         Self::U16(Vec::new())
     }
 
     /// Creates an empty [`IndexVec`] with the given capacity.
+    #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         // Predict whether we will need 32-bit indices. Generally, indices will be of quads,
         // meaning that we have 6 indices for 4 vertices. Therefore, if capacity * 4/6
@@ -39,6 +41,7 @@ impl IndexVec {
     /// Use this for all read operations.
     ///
     /// Panics if the given range exceeds the length of `self`.
+    #[inline]
     pub fn as_slice<R>(&self, range: R) -> IndexSlice<'_>
     where
         [u16]: std::ops::Index<R, Output = [u16]>,
@@ -58,6 +61,7 @@ impl IndexVec {
 
     /// Resets the vector to have zero length and the same capacity.
     /// Note that this preserves the previous index type.
+    #[inline]
     pub fn clear(&mut self) {
         match self {
             IndexVec::U16(vec) => vec.clear(),
@@ -74,6 +78,7 @@ impl IndexVec {
     }
 
     /// As per [`Vec::reserve_exact()`].
+    #[inline]
     pub fn reserve_exact(&mut self, additional: usize) {
         match self {
             IndexVec::U16(vec) => vec.reserve_exact(additional),
@@ -94,6 +99,7 @@ pub enum IndexSlice<'a> {
 
 impl<'a> IndexSlice<'a> {
     /// Returns the number of indices in this slice.
+    #[inline]
     pub fn len(&self) -> usize {
         match self {
             IndexSlice::U16(slice) => slice.len(),
@@ -102,6 +108,7 @@ impl<'a> IndexSlice<'a> {
     }
 
     /// Returns the index data interpreted as bytes in **native endianness**.
+    #[inline]
     pub fn as_bytes(&self) -> &'a [u8] {
         match self {
             IndexSlice::U16(slice) => bytemuck::cast_slice::<u16, u8>(slice),
@@ -110,11 +117,13 @@ impl<'a> IndexSlice<'a> {
     }
 
     /// Returns whether this slice is empty (`len() == 0`).
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Returns the indices in this slice, each converted unconditionally to [`u32`].
+    #[inline]
     pub fn iter_u32(&self) -> impl Iterator<Item = u32> + '_ {
         match self {
             IndexSlice::U16(slice) => Either::Left(slice.iter().copied().map(u32::from)),
@@ -124,12 +133,14 @@ impl<'a> IndexSlice<'a> {
 }
 
 impl Default for IndexVec {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl Extend<u16> for IndexVec {
+    #[inline]
     fn extend<T: IntoIterator<Item = u16>>(&mut self, iter: T) {
         match self {
             IndexVec::U16(vec) => vec.extend(iter),
@@ -139,6 +150,7 @@ impl Extend<u16> for IndexVec {
 }
 
 impl Extend<u32> for IndexVec {
+    #[inline]
     fn extend<T: IntoIterator<Item = u32>>(&mut self, iter: T) {
         match self {
             IndexVec::U16(u16_vec) => {
