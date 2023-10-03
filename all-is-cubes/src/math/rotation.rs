@@ -516,6 +516,32 @@ mod tests {
     }
 
     #[test]
+    fn inverse_axioms() {
+        assert_eq!(GridRotation::IDENTITY.inverse(), GridRotation::IDENTITY);
+        for rot in GridRotation::ALL {
+            assert_eq!(rot * rot.inverse(), GridRotation::IDENTITY, "{rot:?}");
+            assert_eq!(rot.inverse().inverse(), rot, "{rot:?}");
+        }
+    }
+
+    #[test]
+    fn inverse_effect() {
+        let v = GridVector::new(1, 5, 100);
+        for rot in GridRotation::ALL {
+            assert_eq!(
+                rot.transform_vector(rot.inverse().transform_vector(v)),
+                v,
+                "{rot:?}"
+            );
+            assert_eq!(
+                rot.inverse().transform_vector(rot.transform_vector(v)),
+                v,
+                "{rot:?}"
+            );
+        }
+    }
+
+    #[test]
     fn is_reflection_consistency() {
         for a in GridRotation::ALL {
             for b in GridRotation::ALL {
