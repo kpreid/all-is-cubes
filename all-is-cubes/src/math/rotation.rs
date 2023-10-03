@@ -396,10 +396,23 @@ impl GridRotation {
     ///     assert_eq!(rotation * rotation.inverse(), GridRotation::IDENTITY);
     /// }
     /// ```
+    #[rustfmt::skip]
     #[must_use]
-    pub fn inverse(self) -> Self {
-        // TODO: Make this more efficient. Can we do it without writing out another 48-element match?
-        self.iterate().last().unwrap()
+    #[inline]
+    pub const fn inverse(self) -> Self {
+        use GridRotation::*;
+        match self {
+            RXYZ => RXYZ, RXYz => RXYz, RXyZ => RXyZ, RXyz => RXyz, RxYZ => RxYZ,
+            RxYz => RxYz, RxyZ => RxyZ, Rxyz => Rxyz, RXZY => RXZY, RXZy => RXzY,
+            RXzY => RXZy, RXzy => RXzy, RxZY => RxZY, RxZy => RxzY, RxzY => RxZy,
+            Rxzy => Rxzy, RYXZ => RYXZ, RYXz => RYXz, RYxZ => RyXZ, RYxz => RyXz,
+            RyXZ => RYxZ, RyXz => RYxz, RyxZ => RyxZ, Ryxz => Ryxz, RYZX => RZXY,
+            RYZx => RzXY, RYzX => RZXy, RYzx => RzXy, RyZX => RZxY, RyZx => RzxY,
+            RyzX => RZxy, Ryzx => Rzxy, RZXY => RYZX, RZXy => RYzX, RZxY => RyZX,
+            RZxy => RyzX, RzXY => RYZx, RzXy => RYzx, RzxY => RyZx, Rzxy => Ryzx,
+            RZYX => RZYX, RZYx => RzYX, RZyX => RZyX, RZyx => RzyX, RzYX => RZYx,
+            RzYx => RzYx, RzyX => RZyx, Rzyx => Rzyx,
+        }
     }
 
     /// Generates the sequence of rotations that may be obtained by concatenating/multiplying
@@ -539,6 +552,20 @@ mod tests {
                 "{rot:?}"
             );
         }
+    }
+
+    /// We can compute the inverse via iterate().
+    /// This test also serves to regenerate the inverse table.
+    #[test]
+    fn inverse_from_iterate() {
+        let mut ok = true;
+        for rot in GridRotation::ALL {
+            let iter_inv = rot.iterate().last().unwrap();
+            let inv = rot.inverse();
+            println!("{rot:?} => {iter_inv:?}, // {inv:?}");
+            ok = ok && iter_inv == inv;
+        }
+        assert!(ok);
     }
 
     #[test]
