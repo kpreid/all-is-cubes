@@ -174,17 +174,27 @@ impl Extend<u32> for IndexVec {
                     return; // succeeded at fitting all u32s in u16s
                 }
 
-                // Construct new u32 vector using
-                // * the existing items
-                // * the new item triggering the conversion
-                // * the remaining new items
-                *self = IndexVec::U32(Vec::from_iter(
-                    mem::take(u16_vec)
-                        .into_iter()
-                        .map(u32::from)
-                        .chain([non_fitting_element])
-                        .chain(iter),
-                ));
+                *self = upgrade_to_u32(u16_vec, non_fitting_element, iter);
+
+                #[cold]
+                #[inline(never)]
+                fn upgrade_to_u32(
+                    u16_vec: &mut Vec<u16>,
+                    non_fitting_element: u32,
+                    iter: impl Iterator<Item = u32>,
+                ) -> IndexVec {
+                    // Construct new u32 vector using
+                    // * the existing items
+                    // * the new item triggering the conversion
+                    // * the remaining new items
+                    IndexVec::U32(Vec::from_iter(
+                        mem::take(u16_vec)
+                            .into_iter()
+                            .map(u32::from)
+                            .chain([non_fitting_element])
+                            .chain(iter),
+                    ))
+                }
             }
             IndexVec::U32(vec) => vec.extend(iter),
         }
