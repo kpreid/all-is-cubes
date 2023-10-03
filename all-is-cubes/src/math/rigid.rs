@@ -111,6 +111,7 @@ impl Gridgid {
     /// May panic or wrap (as per the Rust `overflow-checks` compilation option)
     /// if `self.translation` has any components equal to [`GridCoordinate::MIN`].
     #[must_use]
+    #[inline]
     pub fn inverse(self) -> Self {
         let rotation = self.rotation.inverse();
         Self {

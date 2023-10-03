@@ -389,6 +389,7 @@ impl GridAab {
     ///         Cube::new(10, 21, 32),
     ///     ])
     /// ```
+    #[inline]
     pub fn interior_iter(self) -> GridIter {
         GridIter::new(self)
     }
@@ -450,6 +451,7 @@ impl GridAab {
     ///         GridAab::from_lower_size([1, 0, 0], [2, 1, 2])),
     ///     Some(GridAab::from_lower_size([1, 0, 0], [1, 1, 2])));
     /// ```
+    #[inline]
     pub fn intersection(self, other: GridAab) -> Option<GridAab> {
         let lower = self.lower_bounds().max(other.lower_bounds());
         let upper = self.upper_bounds().min(other.upper_bounds());
