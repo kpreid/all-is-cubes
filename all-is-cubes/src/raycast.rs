@@ -5,6 +5,8 @@
 //! looking for *raytracing*, forming an image from many rays, that’s
 //! [`all_is_cubes::raytracer`](crate::raytracer).
 
+use core::f64::consts::TAU;
+
 use euclid::Vector3D;
 
 #[cfg(not(feature = "std"))]
@@ -112,8 +114,48 @@ impl Geometry for Ray {
     where
         E: Extend<LineVertex>,
     {
-        // TODO: add an arrowhead
-        output.extend([self.origin.into(), self.unit_endpoint().into()]);
+        // Draw line
+        let tip = self.unit_endpoint();
+        output.extend([self.origin.into(), tip.into()]);
+
+        // If the length is nonzero, draw arrowhead
+        let length = self.direction.length();
+        if length.partial_cmp(&0.0) != Some(core::cmp::Ordering::Greater) {
+            return;
+        }
+        let norm_dir = self.direction / length;
+
+        // Pick a size of arrowhead
+        let head_length = (length * 0.25).min(0.125);
+        let head_width = head_length * 0.25;
+        let head_base_point = tip - norm_dir * head_length;
+
+        // Pick a set of perpendicular axes
+        let mut perp1 = norm_dir.cross(FreeVector::new(0., 1., 0.));
+        if (perp1.length() - 1.0).abs() > 1e-2 {
+            // handle parallel-to-up vectors
+            perp1 = norm_dir.cross(FreeVector::new(1., 0., 0.));
+        }
+        let perp2 = norm_dir.cross(perp1);
+
+        // Generate a wireframe cone
+        fn ang(step: i32) -> f64 {
+            f64::from(step) * (TAU / 8.0)
+        }
+        for step in 0..8 {
+            let circle_point = head_base_point
+                + perp1 * head_width * ang(step).sin()
+                + perp2 * head_width * ang(step).cos();
+            let adj_circle_point = head_base_point
+                + perp1 * head_width * ang(step + 1).sin()
+                + perp2 * head_width * ang(step + 1).cos();
+            output.extend([
+                circle_point.into(),
+                tip.into(),
+                circle_point.into(),
+                adj_circle_point.into(),
+            ]);
+        }
     }
 }
 
