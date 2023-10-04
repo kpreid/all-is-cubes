@@ -16,7 +16,7 @@ use crate::block::{
 use crate::character::{Character, Spawn};
 use crate::content::make_some_blocks;
 use crate::inv::Tool;
-use crate::math::{Face6, GridAab, GridRotation, Rgb, Rgba};
+use crate::math::{Face6, GridAab, GridRotation, Rgb, Rgba, Cube};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::time::{self, Tick};
@@ -329,6 +329,14 @@ fn spawn() {
             "look_direction": [0.0, 0.0, -1.0],
         }),
     );
+}
+
+//------------------------------------------------------------------------------------------------//
+// Tests corresponding to the `math` module
+
+#[test]
+fn cube() {
+    assert_round_trip_value(&Cube::new(1, 2, 3), json!([1, 2, 3]));
 }
 
 //------------------------------------------------------------------------------------------------//

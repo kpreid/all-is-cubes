@@ -374,7 +374,28 @@ mod block {
 
 mod math {
     use super::*;
-    use crate::math::{Aab, GridAab};
+    use crate::math::{Aab, Cube, GridAab};
+
+    impl Serialize for Cube {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            let &Cube { x, y, z } = self;
+
+            [x, y, z].serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Cube {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let [x, y, z] = <[i32; 3]>::deserialize(deserializer)?;
+            Ok(Cube::new(x, y, z))
+        }
+    }
 
     impl Serialize for Aab {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
