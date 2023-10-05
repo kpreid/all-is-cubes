@@ -11,11 +11,14 @@ use downcast_rs::{impl_downcast, Downcast};
 use crate::time::Tick;
 use crate::transaction::{self, Merge as _, Transaction};
 use crate::universe::{RefVisitor, UniverseTransaction, VisitRefs};
+use crate::util::maybe_sync::SendSyncIfStd;
 
 /// Dynamic add-ons to game objects; we might also have called them “components”.
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
 /// is invoked.
-pub trait Behavior<H: BehaviorHost>: Debug + Send + Sync + Downcast + VisitRefs + 'static {
+pub trait Behavior<H: BehaviorHost>:
+    Debug + SendSyncIfStd + Downcast + VisitRefs + 'static
+{
     /// Computes a transaction to apply the effects of this behavior for one timestep,
     /// and specifies when next to step the behavior again (if ever).
     ///

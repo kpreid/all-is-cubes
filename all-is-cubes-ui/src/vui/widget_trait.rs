@@ -11,6 +11,7 @@ use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::{self, Merge as _};
 use all_is_cubes::universe::{RefVisitor, UniverseTransaction, VisitRefs};
+use all_is_cubes::util::maybe_sync::SendSyncIfStd;
 
 use crate::vui::{validate_widget_transaction, LayoutGrant, Layoutable, Positioned};
 
@@ -47,7 +48,7 @@ pub type WidgetTransaction = SpaceTransaction;
 ///
 /// [`LayoutTree`]: crate::vui::LayoutTree
 /// [`controller()`]: Self::controller
-pub trait Widget: Layoutable + Debug + Send + Sync {
+pub trait Widget: Layoutable + Debug + SendSyncIfStd {
     /// Create a [`WidgetController`] to manage the widget's existence in a particular
     /// region of a particular [`Space`].
     ///
@@ -78,7 +79,7 @@ pub trait Widget: Layoutable + Debug + Send + Sync {
 /// their assigned regions of space and therefore will not experience transaction conflicts.
 ///
 /// [`OneshotController`]: crate::vui::widgets::OneshotController
-pub trait WidgetController: Debug + Send + Sync + 'static {
+pub trait WidgetController: Debug + SendSyncIfStd + 'static {
     /// Write the initial state of the widget to the space.
     /// This is called at most once.
     fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {

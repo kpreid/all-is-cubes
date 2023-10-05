@@ -5,7 +5,7 @@ use core::fmt;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::listen::{Listen, Listener};
-use crate::util::maybe_sync::RwLock;
+use crate::util::maybe_sync::{RwLock, SendSyncIfStd};
 
 /// A [`Listener`] which discards all messages and is suitable for filling
 /// listener parameters when no listener is needed.
@@ -40,8 +40,8 @@ impl<F, T> FnListener<F, T> {
 
 impl<M, F, T> Listener<M> for FnListener<F, T>
 where
-    F: Fn(&T, M) + super::private::RequireSendSyncIfStd,
-    T: super::private::RequireSendSyncIfStd,
+    F: Fn(&T, M) + SendSyncIfStd,
+    T: SendSyncIfStd,
 {
     fn receive(&self, message: M) {
         if let Some(strong_target) = self.weak_target.upgrade() {

@@ -8,7 +8,8 @@ use core::time::Duration;
 mod custom_format;
 pub use custom_format::*;
 
-pub(crate) mod maybe_sync;
+#[doc(hidden)] // public to allow our other crates to match, only
+pub mod maybe_sync;
 
 #[doc(no_inline)]
 pub use yield_progress::{Builder as YieldProgressBuilder, YieldProgress};

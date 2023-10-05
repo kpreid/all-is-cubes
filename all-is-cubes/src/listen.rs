@@ -14,7 +14,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::fmt;
 
-use crate::util::maybe_sync::RwLock;
+use crate::util::maybe_sync::{RwLock, SendSyncIfStd};
 
 mod cell;
 pub use cell::*;
@@ -178,7 +178,7 @@ impl<M> fmt::Debug for Notifier<M> {
 ///
 /// Implementors must also implement [`Send`] and [`Sync`] if the `std` feature of
 /// `all-is-cubes` is enabled.
-pub trait Listener<M>: private::RequireSendSyncIfStd {
+pub trait Listener<M>: SendSyncIfStd {
     /// Process and store a message.
     ///
     /// Note that, since this method takes `&Self`, a `Listener` must use interior
@@ -274,18 +274,6 @@ impl<M> Listener<M> for DynListener<M> {
 
     fn erased(self) -> DynListener<M> {
         self
-    }
-}
-
-mod private {
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "std")] {
-            pub trait RequireSendSyncIfStd: Send + Sync {}
-            impl<T: Send + Sync> RequireSendSyncIfStd for T {}
-        } else {
-            pub trait RequireSendSyncIfStd {}
-            impl<T> RequireSendSyncIfStd for T {}
-        }
     }
 }
 

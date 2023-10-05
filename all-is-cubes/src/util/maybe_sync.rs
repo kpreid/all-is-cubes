@@ -2,6 +2,16 @@ use core::{fmt, ops};
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {
+        pub trait SendSyncIfStd: Send + Sync {}
+        impl<T: Send + Sync> SendSyncIfStd for T {}
+    } else {
+        pub trait SendSyncIfStd {}
+        impl<T> SendSyncIfStd for T {}
+    }
+}
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "std")] {
         /// This type alias for a boxed future requires `Sync` if the `std` feature is
         /// enabled.
         pub(crate) type BoxFuture<'a, T> = futures_core::future::BoxFuture<'a, T>;
