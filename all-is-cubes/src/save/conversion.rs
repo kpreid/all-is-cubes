@@ -912,8 +912,7 @@ mod universe {
 
     impl ContextScope {
         fn install(new_context: DeContext) -> Self {
-            UREF_DESERIALIZATION_CONTEXT.with(|tl| {
-                let mut tl = tl.borrow_mut();
+            UREF_DESERIALIZATION_CONTEXT.with_borrow_mut(|tl| {
                 assert!(tl.is_none(), "cannot nest Universe deserialization");
                 *tl = Some(new_context);
             });
@@ -922,9 +921,8 @@ mod universe {
 
         /// Uninstall and retrieve the context. Panics if none present.
         fn take(self) -> DeContext {
-            let context = UREF_DESERIALIZATION_CONTEXT.with(|tl| {
-                tl.borrow_mut()
-                    .take()
+            let context = UREF_DESERIALIZATION_CONTEXT.with_borrow_mut(|tl| {
+                tl.take()
                     .expect("something went wrong with UREF_DESERIALIZATION_CONTEXT")
             });
             core::mem::forget(self); // don't run Drop
