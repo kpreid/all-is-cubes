@@ -253,7 +253,29 @@ jobs:
     - name: Run Miri tests, no_std
       run: |
         cargo +nightly miri test --no-default-features -p all-is-cubes universe::
-    
+
+  no_std:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3.1.0
+
+    # The build is faster *without* this cache.
+    # - uses: Swatinem/rust-cache@v2.0.2
+
+    - name: Install Rust toolchain
+      run: |
+        rustup toolchain install stable --profile minimal
+        rustup target add thumbv7em-none-eabihf
+
+    - name: no_std build
+      run: |
+        cargo check --no-default-features -p all-is-cubes --target thumbv7em-none-eabihf
+
+    - name: no_std lint
+      run: |
+        cargo clippy --no-default-features -p all-is-cubes --target thumbv7em-none-eabihf
+
   fuzz:
     # Don't spend time on fuzzing if the build failed indicating the code is bad other ways
     needs: build
