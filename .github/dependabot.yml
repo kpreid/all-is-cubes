@@ -16,3 +16,7 @@ updates:
         # does not make the error of increasing version *requirements* to require
         # the patch. See comments above on versioning-strategy.
         update-types: ["version-update:semver-patch"]
+      
+      # Skip deps we only use for tooling and not on external data
+      - dependency-name: "cargo_metadata"
+      - dependency-name: "toml_edit"
