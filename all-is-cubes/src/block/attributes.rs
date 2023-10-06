@@ -3,7 +3,7 @@
 use alloc::borrow::Cow;
 use core::fmt;
 
-use crate::math::Face6;
+use crate::math::{Face6, GridRotation};
 use crate::op::Operation;
 use crate::universe::VisitRefs;
 
@@ -103,6 +103,40 @@ impl BlockAttributes {
     pub const fn default() -> BlockAttributes {
         Self::DEFAULT
     }
+
+    pub(crate) fn rotationally_symmetric(&self) -> bool {
+        let Self {
+            display_name: _,
+            selectable: _,
+            rotation_rule,
+            tick_action,
+            animation_hint: _,
+        } = self;
+
+        rotation_rule.rotationally_symmetric() && tick_action.is_none()
+    }
+
+    pub(crate) fn rotate(self, rotation: GridRotation) -> BlockAttributes {
+        let Self {
+            display_name,
+            selectable,
+            rotation_rule,
+            mut tick_action,
+            animation_hint,
+        } = self;
+
+        if let Some(TickAction(op)) = tick_action {
+            tick_action = Some(TickAction(op.rotate(rotation)));
+        }
+
+        Self {
+            display_name,
+            selectable,
+            rotation_rule: rotation_rule.rotate(rotation),
+            tick_action,
+            animation_hint,
+        }
+    }
 }
 
 impl Default for BlockAttributes {
@@ -197,6 +231,23 @@ pub enum RotationPlacementRule {
         by: Face6,
         // TODO: control rotation about additional axis
     },
+}
+
+impl RotationPlacementRule {
+    pub(crate) fn rotationally_symmetric(&self) -> bool {
+        match self {
+            RotationPlacementRule::Never => true,
+            RotationPlacementRule::Attach { by: _ } => false,
+        }
+    }
+
+    fn rotate(mut self, rotation: GridRotation) -> RotationPlacementRule {
+        match &mut self {
+            RotationPlacementRule::Attach { by } => *by = rotation.transform(*by),
+            RotationPlacementRule::Never => {}
+        }
+        self
+    }
 }
 
 /// Specifies how a [`Block`] might change in the very near future, for the benefit

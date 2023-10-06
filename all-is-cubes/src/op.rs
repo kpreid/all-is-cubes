@@ -2,7 +2,7 @@
 
 use crate::drawing::VoxelBrush;
 use crate::inv::{Inventory, InventoryTransaction};
-use crate::math::Gridgid;
+use crate::math::{GridRotation, Gridgid};
 use crate::space::{Space, SpaceTransaction};
 use crate::universe::VisitRefs;
 
@@ -56,6 +56,12 @@ impl Operation {
 
                 Ok((space_txn, InventoryTransaction::default()))
             }
+        }
+    }
+
+    pub(crate) fn rotate(self, rotation: GridRotation) -> Self {
+        match self {
+            Operation::Paint(brush) => Operation::Paint(brush.rotate(rotation)),
         }
     }
 }

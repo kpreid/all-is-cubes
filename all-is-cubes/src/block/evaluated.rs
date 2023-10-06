@@ -638,6 +638,11 @@ impl MinEval {
     pub fn resolution(&self) -> Resolution {
         self.voxels.resolution()
     }
+
+    pub(crate) fn rotationally_symmetric(&self) -> bool {
+        let Self { attributes, voxels } = self;
+        attributes.rotationally_symmetric() && voxels.resolution() == R1
+    }
 }
 
 #[cfg(test)]

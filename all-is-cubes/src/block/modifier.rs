@@ -101,7 +101,7 @@ impl Modifier {
             }
 
             Modifier::Rotate(rotation) => {
-                if matches!(value.voxels, Evoxels::One(_)) || filter.skip_eval {
+                if filter.skip_eval || value.rotationally_symmetric() {
                     // Skip computation of transforms
                     value
                 } else {
@@ -125,7 +125,7 @@ impl Modifier {
                                 },
                             ),
                         ),
-                        attributes: value.attributes,
+                        attributes: value.attributes.rotate(rotation),
                     }
                 }
             }
@@ -190,9 +190,12 @@ pub(crate) enum ModifierUnspecialize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::{BlockAttributes, TickAction};
     use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Primitive, Resolution::R2};
     use crate::content::make_some_voxel_blocks;
+    use crate::drawing::VoxelBrush;
     use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgba, Vol};
+    use crate::op::Operation;
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
 
@@ -202,6 +205,7 @@ mod tests {
         let block_bounds = GridAab::for_block(resolution);
         let rotation = GridRotation::RYXZ;
         let mut universe = Universe::new();
+        let [replacement] = make_some_voxel_blocks(&mut universe);
         let color_fn = |cube: Cube| {
             Rgba::new(
                 cube.x as f32,
@@ -224,18 +228,18 @@ mod tests {
                 Block::from(color_fn(cube))
             })
             .unwrap()
+            .rotation_rule(block::RotationPlacementRule::Attach { by: Face6::PX })
+            .tick_action(Some(TickAction::from(Operation::Paint(
+                VoxelBrush::single(replacement.clone()),
+            ))))
             .build();
 
-        let oe = block.evaluate().unwrap();
         let rotated = block.clone().rotate(rotation);
         let re = rotated.evaluate().unwrap();
 
-        // TODO: We don't quite yet have rotation for any attributes, but we *will*
-        // (rotation_rule in particular might need to adapt).
         assert_eq!(
             re,
             EvaluatedBlock {
-                attributes: oe.attributes,
                 color: Rgba::new(1. / 3., 0., 1. / 3., 2. / 3.),
                 light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(
@@ -259,6 +263,14 @@ mod tests {
                         OpacityCategory::Invisible
                     }
                 })),
+                attributes: BlockAttributes {
+                    display_name: "foo".into(),
+                    tick_action: Some(TickAction::from(Operation::Paint(VoxelBrush::single(
+                        replacement.rotate(rotation).clone()
+                    )))),
+                    rotation_rule: block::RotationPlacementRule::Attach { by: Face6::PY },
+                    ..BlockAttributes::default()
+                },
             }
         );
     }

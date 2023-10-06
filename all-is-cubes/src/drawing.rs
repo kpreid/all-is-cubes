@@ -389,13 +389,20 @@ impl<'a> VoxelBrush<'a> {
         self
     }
 
-    /// Apply the given rotation (about the no-offset block) to the position of each block.
+    /// Apply the given rotation (about the no-offset block) to the position of each block
+    /// and to the blocks themselves.
     #[must_use]
-    pub fn rotate(mut self, rotation: GridRotation) -> Self {
-        for (block_offset, _) in self.0.iter_mut() {
-            *block_offset = rotation.transform_vector(*block_offset);
+    pub fn rotate(self, rotation: GridRotation) -> Self {
+        if rotation == GridRotation::IDENTITY {
+            self
+        } else {
+            VoxelBrush::new(self.0.into_iter().map(|(block_offset, block)| {
+                (
+                    rotation.transform_vector(block_offset),
+                    block.into_owned().rotate(rotation),
+                )
+            }))
         }
-        self
     }
 
     /// Computes the region affected by this brush, as if it were painted at the origin.
