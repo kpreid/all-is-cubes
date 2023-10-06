@@ -19,6 +19,7 @@ use alloc::borrow::Cow;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::num::NonZeroU16;
 
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
@@ -62,9 +63,9 @@ pub(crate) enum BehaviorV1Ser {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum BlockSer {
+pub(crate) enum BlockSer<'a> {
     BlockV1 {
-        primitive: PrimitiveSer,
+        primitive: PrimitiveSer<'a>,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         modifiers: Vec<ModifierSer>,
     },
@@ -72,20 +73,20 @@ pub(crate) enum BlockSer {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum PrimitiveSer {
+pub(crate) enum PrimitiveSer<'a> {
     AirV1,
     AtomV1 {
         color: RgbaSer,
         #[serde(default, skip_serializing_if = "is_default")]
         light_emission: RgbSer,
         #[serde(flatten)]
-        attributes: BlockAttributesV1Ser,
+        attributes: BlockAttributesV1Ser<'a>,
         #[serde(default, skip_serializing_if = "is_default")]
         collision: BlockCollisionSer,
     },
     RecurV1 {
         #[serde(flatten)]
-        attributes: BlockAttributesV1Ser,
+        attributes: BlockAttributesV1Ser<'a>,
         space: universe::URef<space::Space>,
         #[serde(default, skip_serializing_if = "is_default")]
         offset: [i32; 3],
@@ -97,15 +98,15 @@ pub(crate) enum PrimitiveSer {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct BlockAttributesV1Ser {
+pub(crate) struct BlockAttributesV1Ser<'a> {
     #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub display_name: String,
+    pub display_name: String, // TODO: Cow
     #[serde(default = "return_true", skip_serializing_if = "is_true")]
     pub selectable: bool,
     #[serde(default, skip_serializing_if = "is_default")]
     pub rotation_rule: RotationPlacementRuleSer,
-    // TODO: tick_action is a kludge but we should serialize it or its replacement
-    // pub(crate) tick_action: Option<VoxelBrush<'static>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tick_action: Option<TickActionSer<'a>>,
     #[serde(default, skip_serializing_if = "is_default")]
     pub animation_hint: AnimationHintSer,
 }
@@ -136,6 +137,12 @@ pub(crate) enum RotationPlacementRuleSer {
     },
 }
 
+/// Unversioned because it's versioned by the parent struct
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct TickActionSer<'a> {
+    pub operation: Cow<'a, crate::op::Operation>,
+    pub period: NonZeroU16,
+}
 #[derive(Copy, Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub(crate) enum AnimationHintSer {
@@ -231,7 +238,7 @@ pub(crate) enum InventorySer {
 /// Not tagged since it will only appear inside an [`InventorySer`].
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct InvStackSer {
-    pub(crate) count: core::num::NonZeroU16,
+    pub(crate) count: NonZeroU16,
     pub(crate) item: inv::Tool,
 }
 

@@ -4,12 +4,12 @@ use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
+use core::num::NonZeroU16;
 
 use euclid::vec3;
 use pretty_assertions::assert_eq;
 use serde_json::{from_value, json, to_value};
 
-use crate::{behavior, op};
 use crate::block::{
     self, AnimationChange, AnimationHint, Block, BlockDef, Modifier, Resolution, AIR,
 };
@@ -23,6 +23,7 @@ use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::time::{self, Tick};
 use crate::transaction::Transaction as _;
 use crate::universe::{Name, PartialUniverse, URef, Universe};
+use crate::{behavior, op};
 
 #[track_caller]
 /// Serialize and deserialize and assert the value is equal.
@@ -162,7 +163,6 @@ fn block_atom_default() {
 
 #[test]
 fn block_atom_with_all_attributes() {
-    // TODO: tick_action is not serialized yet,
     assert_round_trip_value(
         &Block::builder()
             .color(Rgba::new(1.0, 0.5, 0.0, 0.5))
@@ -170,6 +170,10 @@ fn block_atom_with_all_attributes() {
             .display_name("foo")
             .selectable(false)
             .rotation_rule(block::RotationPlacementRule::Attach { by: Face6::PX })
+            .tick_action(Some(block::TickAction {
+                operation: op::Operation::Paint(VoxelBrush::new([([0, 0, 0], AIR)])),
+                period: NonZeroU16::new(3).unwrap(),
+            }))
             .light_emission(Rgb::new(1.0, 0.0, 10.0))
             .animation_hint(AnimationHint {
                 redefinition: AnimationChange::ColorSameCategory,
@@ -187,6 +191,21 @@ fn block_atom_with_all_attributes() {
                 "rotation_rule": {
                     "type": "AttachV1",
                     "by": "PX",
+                },
+                "tick_action": {
+                    "period": 3,
+                    "operation": {
+                        "type": "PaintV1",
+                        "blocks": [
+                            [
+                                [0, 0, 0],
+                                {
+                                    "type": "BlockV1",
+                                    "primitive": {"type": "AirV1"},
+                                }
+                            ]
+                        ]
+                    }
                 },
                 "light_emission": [1.0, 0.0, 10.0],
                 "animation_hint": {

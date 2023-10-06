@@ -79,7 +79,7 @@ mod block {
     use super::*;
     use crate::block::{
         AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision, Composite,
-        Modifier, Move, Primitive, Quote, RotationPlacementRule, Zoom,
+        Modifier, Move, Primitive, Quote, RotationPlacementRule, TickAction, Zoom,
     };
     use crate::math::{Rgb, Rgba};
     use schema::{BlockSer, ModifierSer};
@@ -115,8 +115,8 @@ mod block {
         }
     }
 
-    impl From<&Primitive> for schema::PrimitiveSer {
-        fn from(value: &Primitive) -> Self {
+    impl<'a> From<&'a Primitive> for schema::PrimitiveSer<'a> {
+        fn from(value: &'a Primitive) -> Self {
             match value {
                 Primitive::Indirect(definition) => schema::PrimitiveSer::IndirectV1 {
                     definition: definition.clone(),
@@ -148,8 +148,8 @@ mod block {
         }
     }
 
-    impl From<schema::PrimitiveSer> for Primitive {
-        fn from(value: schema::PrimitiveSer) -> Self {
+    impl<'a> From<schema::PrimitiveSer<'a>> for Primitive {
+        fn from(value: schema::PrimitiveSer<'a>) -> Self {
             match value {
                 schema::PrimitiveSer::IndirectV1 { definition } => Primitive::Indirect(definition),
                 schema::PrimitiveSer::AtomV1 {
@@ -179,38 +179,53 @@ mod block {
         }
     }
 
-    impl From<&BlockAttributes> for schema::BlockAttributesV1Ser {
-        fn from(value: &BlockAttributes) -> Self {
+    impl<'a> From<&'a BlockAttributes> for schema::BlockAttributesV1Ser<'a> {
+        fn from(value: &'a BlockAttributes) -> Self {
             let &BlockAttributes {
                 ref display_name,
                 selectable,
                 rotation_rule,
-                tick_action: _, // TODO: serialize tick_action once it is cleaner
+                ref tick_action,
                 animation_hint,
             } = value;
             schema::BlockAttributesV1Ser {
                 display_name: display_name.to_string(),
                 selectable,
                 rotation_rule: rotation_rule.into(),
+                tick_action: tick_action.as_ref().map(
+                    |&TickAction {
+                         ref operation,
+                         period,
+                     }| schema::TickActionSer {
+                        operation: Cow::Borrowed(operation),
+                        period,
+                    },
+                ),
                 animation_hint: animation_hint.into(),
             }
         }
     }
 
-    impl From<schema::BlockAttributesV1Ser> for BlockAttributes {
-        fn from(value: schema::BlockAttributesV1Ser) -> Self {
+    impl<'a> From<schema::BlockAttributesV1Ser<'a>> for BlockAttributes {
+        fn from(value: schema::BlockAttributesV1Ser<'a>) -> Self {
             // TODO: implement deserializing all attributes
             let schema::BlockAttributesV1Ser {
                 display_name,
                 selectable,
                 rotation_rule,
+                tick_action,
                 animation_hint,
             } = value;
             Self {
                 display_name: display_name.into(),
                 selectable,
                 rotation_rule: rotation_rule.into(),
-                tick_action: None,
+                tick_action: tick_action.map(|schema::TickActionSer { operation, period }| {
+                    TickAction {
+                        operation: operation.into_owned(),
+                        period,
+                    }
+                }),
                 animation_hint: animation_hint.into(),
             }
         }
@@ -567,9 +582,9 @@ mod op {
             S: Serializer,
         {
             match self {
-                op::Operation::Paint(brush) => {
-                    schema::OperationSer::PaintV1 { blocks: brush.entries_for_serialization() }
-                }
+                op::Operation::Paint(brush) => schema::OperationSer::PaintV1 {
+                    blocks: brush.entries_for_serialization(),
+                },
             }
             .serialize(serializer)
         }
