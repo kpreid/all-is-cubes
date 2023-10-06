@@ -2,6 +2,7 @@
 //! or UI.
 
 use core::fmt;
+use core::num::NonZeroU16;
 
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::op::Operation;
@@ -422,7 +423,7 @@ pub async fn install_demo_blocks(
                     .display_name(format!("Explosion {timer}"))
                     .color(Rgb::ONE.with_alpha(NotNan::new(decay).unwrap()))
                     .collision(BlockCollision::None)
-                    .light_emission(Rgb::ONE * decay)
+                    .light_emission(rgb_const!(1.0, 0.77, 0.40) * 10.0 * decay)
                     .build()
             }
         })
@@ -439,13 +440,13 @@ pub async fn install_demo_blocks(
             let mut block: Block = (*block_def_ref.read().unwrap()).clone();
 
             if let Primitive::Atom(Atom { attributes, .. }) = block.primitive_mut() {
-                attributes.tick_action = Some(TickAction::from(Operation::Paint(if i > 30 {
+                let brush = if i > 30 {
                     // Expire
                     VoxelBrush::single(AIR)
                 } else {
                     let next = &provider_for_patch[Explosion(i + 1)];
                     if i < 15 {
-                        // Expand for the first 0.25 seconds out to ~5 blocks
+                        // Expand at first out to ~5 blocks
                         if i % 3 == 0 {
                             if i % 6 == 0 {
                                 VoxelBrush::new([
@@ -481,7 +482,13 @@ pub async fn install_demo_blocks(
                         // Just fade
                         VoxelBrush::new([([0, 0, 0], next.clone())])
                     }
-                })));
+                };
+                attributes.tick_action = Some({
+                    TickAction {
+                        operation: Operation::Paint(brush),
+                        period: NonZeroU16::new(3).unwrap(),
+                    }
+                });
             } else {
                 panic!("not atom");
             }
