@@ -556,6 +556,39 @@ mod inv {
     }
 }
 
+mod op {
+    use super::*;
+    use crate::drawing::VoxelBrush;
+    use crate::op;
+
+    impl Serialize for op::Operation {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            match self {
+                op::Operation::Paint(brush) => {
+                    schema::OperationSer::PaintV1 { blocks: brush.entries_for_serialization() }
+                }
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for op::Operation {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            Ok(match schema::OperationSer::deserialize(deserializer)? {
+                schema::OperationSer::PaintV1 { blocks } => {
+                    op::Operation::Paint(VoxelBrush::new(blocks))
+                }
+            })
+        }
+    }
+}
+
 mod space {
     use super::*;
     use crate::math::GridArray;

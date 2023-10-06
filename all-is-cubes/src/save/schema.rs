@@ -272,6 +272,15 @@ type RgbSer = [NotNan<f32>; 3];
 type RgbaSer = [NotNan<f32>; 4];
 
 //------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `op` module
+
+#[derive(Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum OperationSer {
+    PaintV1 { blocks: Vec<([i32; 3], Block)> },
+}
+
+//------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `space` module
 
 #[derive(Debug, Deserialize, Serialize)]

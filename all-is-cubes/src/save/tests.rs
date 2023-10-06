@@ -9,14 +9,15 @@ use euclid::vec3;
 use pretty_assertions::assert_eq;
 use serde_json::{from_value, json, to_value};
 
-use crate::behavior;
+use crate::{behavior, op};
 use crate::block::{
     self, AnimationChange, AnimationHint, Block, BlockDef, Modifier, Resolution, AIR,
 };
 use crate::character::{Character, Spawn};
 use crate::content::make_some_blocks;
+use crate::drawing::VoxelBrush;
 use crate::inv::Tool;
-use crate::math::{Face6, GridAab, GridRotation, Rgb, Rgba, Cube};
+use crate::math::{Cube, Face6, GridAab, GridRotation, Rgb, Rgba};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::time::{self, Tick};
@@ -337,6 +338,28 @@ fn spawn() {
 #[test]
 fn cube() {
     assert_round_trip_value(&Cube::new(1, 2, 3), json!([1, 2, 3]));
+}
+
+//------------------------------------------------------------------------------------------------//
+// Tests corresponding to the `ops` module
+
+#[test]
+fn operation_paint() {
+    assert_round_trip_value(
+        &op::Operation::Paint(VoxelBrush::new([([0, 0, 0], AIR)])),
+        json!({
+            "type": "PaintV1",
+            "blocks": [
+                [
+                    [0, 0, 0],
+                    {
+                        "type": "BlockV1",
+                        "primitive": {"type": "AirV1"},
+                    }
+                ]
+            ]
+        }),
+    );
 }
 
 //------------------------------------------------------------------------------------------------//

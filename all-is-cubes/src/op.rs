@@ -18,7 +18,6 @@ use crate::universe::VisitRefs;
 /// general functional programming language.
 #[doc = include_str!("save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-// #[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))] // TODO: define schema
 #[non_exhaustive]
 pub enum Operation {
     /// Apply the brush centered on the cube.
