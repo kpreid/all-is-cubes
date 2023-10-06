@@ -58,6 +58,12 @@ impl Operation {
         }
     }
 
+    pub(crate) fn rotationally_symmetric(&self) -> bool {
+        match self {
+            Operation::Paint(_) => false, // TODO
+        }
+    }
+
     pub(crate) fn rotate(self, rotation: GridRotation) -> Self {
         match self {
             Operation::Paint(brush) => Operation::Paint(brush.rotate(rotation)),

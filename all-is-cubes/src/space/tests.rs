@@ -3,6 +3,8 @@
 //! Note that some sub-modules have their own test modules.
 
 use alloc::string::ToString;
+use alloc::vec::Vec;
+use core::num::NonZeroU16;
 
 use indoc::indoc;
 
@@ -485,21 +487,50 @@ fn set_physics_light_rays() {
 
 #[test]
 fn block_tick_action() {
-    let [mut block1, block2] = make_some_blocks();
-    if let Primitive::Atom(Atom { attributes, .. }) = block1.primitive_mut() {
-        attributes.tick_action = Some(TickAction::from(Operation::Paint(VoxelBrush::single(
-            block2.clone(),
-        ))));
-    } else {
-        panic!();
+    let [mut block1, mut block2, block3] = make_some_blocks();
+
+    // Hook them up to turn into each other
+    fn connect(from: &mut Block, to: &Block) {
+        if let Primitive::Atom(Atom { attributes, .. }) = from.primitive_mut() {
+            attributes.tick_action = Some({
+                let operation = Operation::Paint(VoxelBrush::single(to.clone()));
+                TickAction {
+                    operation,
+                    period: NonZeroU16::new(2).unwrap(),
+                }
+            });
+        } else {
+            panic!();
+        }
     }
+    connect(&mut block2, &block3);
+    connect(&mut block1, &block2);
 
     let mut space = Space::empty_positive(1, 1, 1);
-    space.set([0, 0, 0], block1).unwrap();
+    space.set([0, 0, 0], &block1).unwrap();
 
-    // TODO: the block effect isn't a transaction yet but it should be
-    let (_info, step_txn) = space.step(None, Tick::arbitrary(), time::DeadlineStd::Whenever);
-    assert_eq!(step_txn, UniverseTransaction::default());
+    // Setup done, now simulate.
+    let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
+    let mut blocks_found = Vec::new();
+    for _ in 0..6 {
+        // Record the current state in a readable fashion
+        let found = &space[[0, 0, 0]];
+        blocks_found.push(if found == &block1 {
+            1
+        } else if found == &block2 {
+            2
+        } else if found == &block3 {
+            3
+        } else {
+            99
+        });
 
-    assert_eq!(&space[[0, 0, 0]], &block2);
+        let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineStd::Whenever);
+        // TODO: the block effect isn't a returned transaction yet but it should be.
+        // This test will need reworking at that point.
+        assert_eq!(step_txn, UniverseTransaction::default());
+    }
+
+    // Check sequence of changes
+    assert_eq!(blocks_found, [1, 2, 2, 3, 3, 3]);
 }

@@ -570,9 +570,16 @@ impl Space {
         let cubes_to_tick = mem::take(&mut self.cubes_wanting_ticks);
         let count_cubes_ticked = cubes_to_tick.len();
         for position in cubes_to_tick {
-            if let Some(TickAction(operation)) =
+            if let Some(TickAction { operation, period }) =
                 self.get_evaluated(position).attributes.tick_action.as_ref()
             {
+                if tick.prev_phase().rem_euclid(period.get()) != 0 {
+                    // Don't tick yet.
+                    // TODO: Use a more efficient queue structure
+                    self.cubes_wanting_ticks.insert(position);
+                    continue;
+                }
+
                 match operation.apply(
                     self,
                     None,

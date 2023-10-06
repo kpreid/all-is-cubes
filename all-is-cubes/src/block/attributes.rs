@@ -2,6 +2,7 @@
 
 use alloc::borrow::Cow;
 use core::fmt;
+use core::num::NonZeroU16;
 
 use crate::math::{Face6, GridRotation};
 use crate::op::Operation;
@@ -11,6 +12,7 @@ use crate::universe::VisitRefs;
 use crate::{
     block::{Block, BlockDef, Primitive},
     space::Space,
+    time::TickSchedule,
 };
 
 /// Collection of miscellaneous attribute data for blocks that doesn't come in variants.
@@ -113,7 +115,10 @@ impl BlockAttributes {
             animation_hint: _,
         } = self;
 
-        rotation_rule.rotationally_symmetric() && tick_action.is_none()
+        rotation_rule.rotationally_symmetric()
+            && !tick_action
+                .as_ref()
+                .is_some_and(|a| !a.rotationally_symmetric())
     }
 
     pub(crate) fn rotate(self, rotation: GridRotation) -> BlockAttributes {
@@ -125,8 +130,8 @@ impl BlockAttributes {
             animation_hint,
         } = self;
 
-        if let Some(TickAction(op)) = tick_action {
-            tick_action = Some(TickAction(op.rotate(rotation)));
+        if let Some(a) = tick_action {
+            tick_action = Some(a.rotate(rotation));
         }
 
         Self {
@@ -353,22 +358,54 @@ impl AnimationChange {
 
 /// Something a block does when time passes.
 ///
-/// Currently, this is an [`Operation`], but in the future it will have timing controls.
-///
 /// Stored in [`BlockAttributes`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[allow(clippy::exhaustive_structs)] // will deliberately break
-pub struct TickAction(pub Operation);
+pub struct TickAction {
+    /// Operation to perform on the schedule.
+    pub operation: Operation,
+    /// Period, relative to the universe's [`TickSchedule`]`'s tick length, with which
+    /// to perform this action.
+    ///
+    /// For example, if this is `1`, then it will be executed on every tick.
+    //---
+    // TODO: This should probably be its own data type
+    pub period: NonZeroU16,
+}
+
+impl TickAction {
+    fn rotationally_symmetric(&self) -> bool {
+        let Self {
+            operation,
+            period: _,
+        } = self;
+        operation.rotationally_symmetric()
+    }
+
+    fn rotate(self, rotation: GridRotation) -> TickAction {
+        let Self { operation, period } = self;
+        let operation = operation.rotate(rotation);
+        Self { operation, period }
+    }
+}
 
 impl From<Operation> for TickAction {
-    fn from(op: Operation) -> Self {
-        Self(op)
+    /// TODO: remove uses of this
+    fn from(operation: Operation) -> Self {
+        Self {
+            operation,
+            period: NonZeroU16::MIN,
+        }
     }
 }
 
 impl VisitRefs for TickAction {
     fn visit_refs(&self, visitor: &mut dyn crate::universe::RefVisitor) {
-        self.0.visit_refs(visitor);
+        let Self {
+            operation,
+            period: _,
+        } = self;
+        operation.visit_refs(visitor);
     }
 }
 
