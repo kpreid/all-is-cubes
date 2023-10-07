@@ -3,7 +3,6 @@
 
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
-use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -189,7 +188,7 @@ mod block {
                 animation_hint,
             } = value;
             schema::BlockAttributesV1Ser {
-                display_name: display_name.to_string(),
+                display_name: Cow::Borrowed(&**display_name),
                 selectable,
                 rotation_rule: rotation_rule.into(),
                 tick_action: tick_action.as_ref().map(
@@ -217,7 +216,12 @@ mod block {
                 animation_hint,
             } = value;
             Self {
-                display_name: display_name.into(),
+                // convert Cow<'a> to Cow<'static>
+                display_name: if display_name == "" {
+                    Cow::Borrowed("")
+                } else {
+                    Cow::Owned(display_name.into())
+                },
                 selectable,
                 rotation_rule: rotation_rule.into(),
                 tick_action: tick_action.map(|schema::TickActionSer { operation, period }| {

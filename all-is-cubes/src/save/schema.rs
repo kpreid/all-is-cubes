@@ -16,7 +16,6 @@
 //! * [`Cow`] is sometimes used to avoid unnecessary clones during serialization.
 
 use alloc::borrow::Cow;
-use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::num::NonZeroU16;
@@ -99,8 +98,8 @@ pub(crate) enum PrimitiveSer<'a> {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct BlockAttributesV1Ser<'a> {
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub display_name: String, // TODO: Cow
+    #[serde(default, skip_serializing_if = "str::is_empty")]
+    pub display_name: Cow<'a, str>,
     #[serde(default = "return_true", skip_serializing_if = "is_true")]
     pub selectable: bool,
     #[serde(default, skip_serializing_if = "is_default")]
