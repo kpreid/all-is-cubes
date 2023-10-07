@@ -42,6 +42,12 @@ where
 
     block_meshes: dynamic::VersionedBlockMeshes<D, Vert, Tex::Tile>,
 
+    /// Table of all blocks in the space rendered individually (instanced) rather than being merged
+    /// into chunk meshes.
+    //---
+    // TODO: controllable layout
+    block_instances: FnvHashMap<BlockIndex, FnvHashSet<Cube>>,
+
     /// Invariant: the set of present chunks (keys here) is the same as the set of keys
     /// in `todo.read().unwrap().chunks`.
     chunks: FnvHashMap<ChunkPos<CHUNK_SIZE>, ChunkMesh<D, Vert, Tex, CHUNK_SIZE>>,
@@ -98,6 +104,7 @@ where
             space,
             todo: todo_rc,
             block_meshes: dynamic::VersionedBlockMeshes::new(),
+            block_instances: FnvHashMap::default(),
             chunks: FnvHashMap::default(),
             chunk_chart: ChunkChart::new(0.0),
             view_chunk: ChunkPos(Cube::new(0, 0, 0)),
@@ -177,6 +184,15 @@ where
                 let (m, d) = &vbm.instance_data;
                 (m, d)
             })
+    }
+
+    /// Returns the list of placements of blocks which should be rendered individually
+    /// rather than as chunk meshes.
+    ///
+    /// TODO(instancing): This exposes too many implementation choices, and should instead
+    /// be customizable to produce an instance buffer memory layout.
+    pub fn block_instances(&self) -> &FnvHashMap<BlockIndex, FnvHashSet<Cube>> {
+        &self.block_instances
     }
 
     /// Recompute meshes of all blocks that need it, and the nearest chunks that need it.
