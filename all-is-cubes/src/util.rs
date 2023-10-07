@@ -22,6 +22,7 @@ pub fn yield_progress_for_testing() -> YieldProgress {
 }
 
 #[cfg(feature = "std")]
+#[doc(hidden)]
 pub use error_chain::ErrorChain;
 #[cfg(feature = "std")]
 mod error_chain {
