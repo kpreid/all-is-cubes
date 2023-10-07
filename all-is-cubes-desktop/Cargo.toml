@@ -19,6 +19,9 @@ path = "src/main.rs"
 doc = false # Do not overwrite library crate's documentation
 bench = false
 
+[features]
+rerun = ["dep:re_sdk", "all-is-cubes/rerun"]
+
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", version = "0.6.0", features = ["save", "threads"] }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.6.0" }
@@ -28,6 +31,7 @@ all-is-cubes-port = { path = "../all-is-cubes-port", version = "0.6.0" }
 all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.6.0" }
 anyhow = { workspace = true }
 bytemuck = { workspace = true }
+cfg-if = { workspace = true }
 clap = { workspace = true }
 # Note: keep crossterm in sync with tui's crossterm dependency.
 crossterm = "0.25.0"
@@ -39,6 +43,9 @@ log = { workspace = true }
 once_cell = { workspace = true }
 png = "0.17.6"
 rand = { workspace = true, features = ["std", "std_rng"] }
+# re_sdk is a data-logging and visualization tool; we are currently using it _only_ for
+# development of All is Cubes itself.
+re_sdk = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 simplelog = { workspace = true }

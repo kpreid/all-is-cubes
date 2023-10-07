@@ -102,6 +102,7 @@ fn main() -> Result<(), anyhow::Error> {
         verbose,
         simplify_log_format,
         no_config_files,
+        rerun,
     } = options.clone();
 
     // Initialize logging -- but only if it won't interfere.
@@ -182,6 +183,7 @@ fn main() -> Result<(), anyhow::Error> {
         output_file,
         precompute_light,
         headless: options.is_headless(),
+        rerun,
     };
 
     // The graphics type selects not only the kind of 'window' we create, but also the
@@ -301,6 +303,7 @@ fn inner_main<Ren, Win>(
         output_file,
         headless,
         precompute_light,
+        rerun,
     } = params;
 
     // At this point we have just finished whatever the GraphicsType did before calling
@@ -330,9 +333,24 @@ fn inner_main<Ren, Win>(
             && output_file.as_ref().map_or(false, |file| {
                 determine_record_format(file).map_or(false, |fmt| fmt.includes_light())
             }));
-    let universe = runtime
+    let mut universe = runtime
         .block_on(create_universe(input_source, precompute_light))
         .context("failed to create universe from requested template or file")?;
+
+    if rerun {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "rerun")] {
+                connect_rerun(&mut universe);
+            } else {
+                // suppress warning
+                let _ = &mut universe;
+
+                // TODO: cleaner error handling from this point
+                panic!("not compiled with rerun logging support");
+            }
+        }
+    }
+
     dsession.session.set_universe(universe);
 
     log::trace!("Entering event loop.");
@@ -349,6 +367,7 @@ struct InnerMainParams {
     output_file: Option<PathBuf>,
     headless: bool,
     precompute_light: bool,
+    rerun: bool,
 }
 
 /// Perform and log the creation of the universe.
@@ -450,6 +469,28 @@ fn headless_main_loop(
     }
 
     Ok(())
+}
+
+#[cfg(feature = "rerun")]
+fn connect_rerun(universe: &mut Universe) {
+    use all_is_cubes::rerun_glue as rg;
+
+    // Note: Empty path doesn't make logging at the root
+    let root_path = rg::entity_path!["dt"];
+
+    let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes")
+        .default_enabled(true)
+        .connect(re_sdk::default_server_addr(), Some(Duration::from_secs(1)))
+        .unwrap();
+    let destination = rg::Destination {
+        stream,
+        path: root_path,
+    };
+    universe.log_to_rerun(destination.clone());
+    if let Some(c) = universe.get_default_character() {
+        c.try_modify(|c| c.log_to_rerun(destination.child(&rg::entity_path!["character"])))
+            .unwrap();
+    }
 }
 
 fn evaluate_light_with_progress(space: &mut Space) {

@@ -157,6 +157,10 @@ pub(crate) struct AicDesktopArgs {
         value_name = "FILE"
     )]
     pub(crate) input_file: Option<PathBuf>,
+
+    /// Activate logging to Rerun
+    #[arg(hide = true, long = "rerun")]
+    pub(crate) rerun: bool,
 }
 
 impl AicDesktopArgs {
