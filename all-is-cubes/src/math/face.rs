@@ -8,9 +8,10 @@ use euclid::Vector3D;
 pub use ordered_float::{FloatIsNan, NotNan};
 
 use crate::math::{
-    Axis, ConciseDebug, Cube, CustomFormat, FreeCoordinate, Geometry, GridCoordinate, GridPoint,
-    GridRotation, GridVector, Gridgid, LineVertex, VectorOps, Zero,
+    Axis, ConciseDebug, Cube, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridRotation,
+    GridVector, Gridgid, LineVertex, VectorOps, Zero,
 };
+use crate::util::Refmt as _;
 
 /// Identifies a face of a cube or an orthogonal unit vector.
 ///
@@ -772,7 +773,7 @@ impl fmt::Debug for CubeFace {
         write!(
             fmt,
             "CubeFace({:?}, {:?})",
-            self.cube.custom_format(ConciseDebug),
+            self.cube.refmt(&ConciseDebug),
             self.face,
         )
     }

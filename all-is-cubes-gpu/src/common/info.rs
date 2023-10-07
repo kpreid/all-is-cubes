@@ -2,7 +2,7 @@ use std::fmt;
 use std::time::Duration;
 
 use all_is_cubes::camera::{Flaws, Layers};
-use all_is_cubes::util::{CustomFormat, StatusText};
+use all_is_cubes::util::{Fmt, Refmt, StatusText};
 use all_is_cubes_mesh::dynamic::CsmUpdateInfo;
 
 /// Performance info about drawing an entire scene.
@@ -61,8 +61,8 @@ pub struct DrawInfo {
     pub(crate) submit_time: Option<Duration>,
 }
 
-impl CustomFormat<StatusText> for RenderInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+impl Fmt<StatusText> for RenderInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
         let &Self {
             waiting_for_gpu,
             update:
@@ -93,14 +93,14 @@ impl CustomFormat<StatusText> for RenderInfo {
             fmt,
             // TODO: adjust this format to account for more pieces
             "Frame time: {} (GPU wait {}, update {}, draw world {}, ui {}",
-            total_time.custom_format(StatusText),
-            waiting_for_gpu.custom_format(StatusText),
-            update_time.custom_format(StatusText),
-            draw_time.world.custom_format(StatusText),
-            draw_time.ui.custom_format(StatusText),
+            total_time.refmt(&StatusText),
+            waiting_for_gpu.refmt(&StatusText),
+            update_time.refmt(&StatusText),
+            draw_time.world.refmt(&StatusText),
+            draw_time.ui.refmt(&StatusText),
         )?;
         if let Some(t) = submit_time {
-            write!(fmt, ", submit {}", t.custom_format(StatusText))?;
+            write!(fmt, ", submit {}", t.refmt(&StatusText))?;
         }
         writeln!(fmt, ")")?;
 
@@ -108,27 +108,27 @@ impl CustomFormat<StatusText> for RenderInfo {
         write!(
             fmt,
             "Update breakdown: prep {}, world mesh {}, ui mesh {}, lines {}",
-            update_prep_time.custom_format(StatusText),
-            update_spaces.world.total_time.custom_format(StatusText),
-            update_spaces.ui.total_time.custom_format(StatusText),
-            lines_time.custom_format(StatusText),
+            update_prep_time.refmt(&StatusText),
+            update_spaces.world.total_time.refmt(&StatusText),
+            update_spaces.ui.total_time.refmt(&StatusText),
+            lines_time.refmt(&StatusText),
         )?;
         if let Some(t) = update_submit_time {
-            write!(fmt, ", submit {}", t.custom_format(StatusText))?;
+            write!(fmt, ", submit {}", t.refmt(&StatusText))?;
         }
 
         // Spaces
         write!(
             fmt,
             "\n\nWORLD:\n{}\n{}\n\n",
-            update_spaces.world.custom_format(StatusText),
-            draw_spaces.world.custom_format(StatusText)
+            update_spaces.world.refmt(&StatusText),
+            draw_spaces.world.refmt(&StatusText)
         )?;
         write!(
             fmt,
             "UI:\n{}\n{}",
-            update_spaces.ui.custom_format(StatusText),
-            draw_spaces.ui.custom_format(StatusText)
+            update_spaces.ui.refmt(&StatusText),
+            draw_spaces.ui.refmt(&StatusText)
         )?;
 
         write!(fmt, "\nRender flaws: {flaws}")?;
@@ -164,8 +164,8 @@ impl SpaceUpdateInfo {
     }
 }
 
-impl CustomFormat<StatusText> for SpaceUpdateInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: StatusText) -> fmt::Result {
+impl Fmt<StatusText> for SpaceUpdateInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
         let &SpaceUpdateInfo {
             total_time: _, // we print this as summary info from the parent only
             ref chunk_info,
@@ -174,14 +174,14 @@ impl CustomFormat<StatusText> for SpaceUpdateInfo {
             light_update_count,
         } = self;
 
-        let light_update_time = light_update_time.custom_format(format_type);
+        let light_update_time = light_update_time.refmt(fopt);
 
-        writeln!(fmt, "{}", chunk_info.custom_format(format_type))?;
+        writeln!(fmt, "{}", chunk_info.refmt(fopt))?;
         writeln!(
             fmt,
             "Light: {light_update_count:3} cubes in {light_update_time}"
         )?;
-        write!(fmt, "{:#?}", texture_info.custom_format(StatusText))?;
+        write!(fmt, "{:#?}", texture_info.refmt(fopt))?;
         Ok(())
     }
 }
@@ -217,8 +217,8 @@ pub struct SpaceDrawInfo {
     pub(crate) flaws: Flaws,
 }
 
-impl CustomFormat<StatusText> for SpaceDrawInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: StatusText) -> fmt::Result {
+impl Fmt<StatusText> for SpaceDrawInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
         let &SpaceDrawInfo {
             draw_init_time,
             draw_opaque_time,
@@ -228,9 +228,9 @@ impl CustomFormat<StatusText> for SpaceDrawInfo {
             flaws: _, // TODO: include or exclude?
         } = self;
 
-        let draw_init_time = draw_init_time.custom_format(format_type);
-        let draw_opaque_time = draw_opaque_time.custom_format(format_type);
-        let draw_transparent_time = draw_transparent_time.custom_format(format_type);
+        let draw_init_time = draw_init_time.refmt(fopt);
+        let draw_opaque_time = draw_opaque_time.refmt(fopt);
+        let draw_transparent_time = draw_transparent_time.refmt(fopt);
 
         writeln!(
             fmt,
@@ -268,8 +268,8 @@ impl Default for BlockTextureInfo {
     }
 }
 
-impl CustomFormat<StatusText> for BlockTextureInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: StatusText) -> fmt::Result {
+impl Fmt<StatusText> for BlockTextureInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
         write!(
             fmt,
             "Textures: {} tiles, {} texels ({}% of {}) used, {:2} flushed in {}",
@@ -278,7 +278,7 @@ impl CustomFormat<StatusText> for BlockTextureInfo {
             (self.in_use_texels as f32 / self.capacity_texels as f32 * 100.0).ceil() as usize,
             self.capacity_texels,
             self.flushed,
-            self.flush_time.custom_format(format_type)
+            self.flush_time.refmt(fopt)
         )
     }
 }

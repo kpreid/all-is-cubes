@@ -15,7 +15,7 @@ use crate::space::{ActivatableRegion, GridAab, SetCubeError, Space};
 use crate::transaction::{
     no_outputs, CommitError, Merge, NoOutput, PreconditionFailed, Transaction, Transactional,
 };
-use crate::util::{ConciseDebug, CustomFormat as _};
+use crate::util::{ConciseDebug, Refmt as _};
 
 impl Transactional for Space {
     type Transaction = SpaceTransaction;
@@ -365,10 +365,7 @@ impl fmt::Debug for SpaceTransaction {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = fmt.debug_struct("SpaceTransaction");
         for (cube, txn) in &self.cubes {
-            ds.field(
-                &Cube::from(*cube).custom_format(ConciseDebug).to_string(),
-                txn,
-            );
+            ds.field(&Cube::from(*cube).refmt(&ConciseDebug).to_string(), txn);
         }
         if !self.behaviors.is_empty() {
             ds.field("behaviors", &self.behaviors);
@@ -403,11 +400,9 @@ impl std::error::Error for SpaceTransactionConflict {
 impl fmt::Display for SpaceTransactionConflict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SpaceTransactionConflict::Cube { cube, conflict: _ } => write!(
-                f,
-                "conflict at cube {c}",
-                c = cube.custom_format(ConciseDebug)
-            ),
+            SpaceTransactionConflict::Cube { cube, conflict: _ } => {
+                write!(f, "conflict at cube {c}", c = cube.refmt(&ConciseDebug))
+            }
             SpaceTransactionConflict::Behaviors(_) => write!(f, "conflict in behaviors"),
         }
     }

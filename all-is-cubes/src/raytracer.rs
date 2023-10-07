@@ -13,11 +13,11 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use euclid::{vec3, Vector2D, Vector3D};
-use ordered_float::NotNan;
-
+use manyfmt::Fmt;
 #[cfg(not(feature = "std"))]
 /// Acts as polyfill for float methods
 use num_traits::float::Float as _;
+use ordered_float::NotNan;
 
 #[cfg(feature = "threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
@@ -33,7 +33,7 @@ use crate::math::{
 };
 use crate::raycast::Ray;
 use crate::space::{BlockIndex, PackedLight, Space, SpaceBlockData};
-use crate::util::{CustomFormat, StatusText};
+use crate::util::StatusText;
 
 mod accum;
 pub use accum::*;
@@ -432,8 +432,8 @@ impl core::iter::Sum for RaytraceInfo {
     }
 }
 
-impl CustomFormat<StatusText> for RaytraceInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _format_type: StatusText) -> fmt::Result {
+impl Fmt<StatusText> for RaytraceInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
         let &Self { cubes_traced } = self;
         write!(fmt, "Cubes traced: {cubes_traced}")
     }

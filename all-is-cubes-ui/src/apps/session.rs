@@ -18,7 +18,7 @@ use all_is_cubes::listen::{
 use all_is_cubes::time::{self, Duration};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
-use all_is_cubes::util::{CustomFormat, StatusText};
+use all_is_cubes::util::{Fmt, Refmt as _, StatusText};
 
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
 use crate::ui_content::Vui;
@@ -304,7 +304,7 @@ impl<I: time::Instant> Session<I> {
                     log::debug!(
                         "tick={} step {}",
                         self.tick_counter_for_logging,
-                        info.computation_time.custom_format(StatusText)
+                        info.computation_time.refmt(&StatusText)
                     );
                 }
                 self.last_step_info = info.clone();
@@ -421,12 +421,12 @@ impl<I: time::Instant> Session<I> {
 
     /// Returns textual information intended to be overlaid as a HUD on top of the rendered scene
     /// containing diagnostic information about rendering and stepping.
-    pub fn info_text<T: CustomFormat<StatusText>>(&self, render: T) -> InfoText<'_, I, T> {
+    pub fn info_text<T: Fmt<StatusText>>(&self, render: T) -> InfoText<'_, I, T> {
         if LOG_FIRST_FRAMES && self.tick_counter_for_logging <= 10 {
             log::debug!(
                 "tick={} draw {}",
                 self.tick_counter_for_logging,
-                render.custom_format(StatusText)
+                render.refmt(&StatusText)
             )
         }
 
@@ -596,25 +596,20 @@ pub struct InfoText<'a, I, T> {
     render: T,
 }
 
-impl<I: time::Instant, T: CustomFormat<StatusText>> fmt::Display for InfoText<'_, I, T> {
+impl<I: time::Instant, T: Fmt<StatusText>> fmt::Display for InfoText<'_, I, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(character_ref) = self.session.game_character.borrow() {
-            write!(
-                f,
-                "{}",
-                character_ref.read().unwrap().custom_format(StatusText)
-            )
-            .unwrap();
+            write!(f, "{}", character_ref.read().unwrap().refmt(&StatusText)).unwrap();
         }
         write!(
             f,
             "\n\n{:#?}\n\nFPS: {:2.1}\n{:#?}\n\n",
-            self.session.last_step_info.custom_format(StatusText),
+            self.session.last_step_info.refmt(&StatusText),
             self.session
                 .frame_clock
                 .draw_fps_counter()
                 .frames_per_second(),
-            self.render.custom_format(StatusText),
+            self.render.refmt(&StatusText),
         )?;
         match self.session.cursor_result() {
             Some(cursor) => write!(f, "{cursor}"),

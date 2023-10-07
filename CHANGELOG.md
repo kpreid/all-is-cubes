@@ -48,6 +48,10 @@
       This avoids confusion between points in space and cube-identifying coordinates.
     - Renamed `raytracer::PixelBuf` trait to `Accumulate`.
 
+    - `all_is_cubes::util::CustomFormat` has been split into a separate library called `manyfmt`,
+      reexported at `all_is_cubes::util::manyfmt`.
+      The `CustomFormat` trait is now split into two traits, `Fmt` (for implementing) and `Refmt` (extension).
+
 - `all-is-cubes-mesh` library:
     - Renamed `TextureAllocator` to `texture::Allocator`.
     - Renamed `TextureTile` to `texture::Tile`.

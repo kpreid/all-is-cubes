@@ -14,6 +14,9 @@ pub mod maybe_sync;
 #[doc(no_inline)]
 pub use yield_progress::{Builder as YieldProgressBuilder, YieldProgress};
 
+#[doc(no_inline)]
+pub use manyfmt::{refmt, Fmt, Refmt};
+
 #[doc(hidden)]
 pub fn yield_progress_for_testing() -> YieldProgress {
     // Theoretically we should use Tokio's yield function, but it shouldn't matter for
@@ -34,7 +37,7 @@ mod error_chain {
     ///
     /// The text begins with the [`core::fmt::Display`] format of the error.
     ///
-    /// Design note: This is not a [`CustomFormat`] because that has a blanket implementation
+    /// Design note: This is not a [`manyfmt::Fmt`] because that has a blanket implementation
     /// which interferes with this one for [`Error`].
     #[doc(hidden)] // not something we wish to be stable public API
     #[derive(Clone, Copy, Debug)]
@@ -192,17 +195,17 @@ impl fmt::Display for TimeStats {
             None => write!(
                 f,
                 "(-------- .. {}) for {:3}, total {}",
-                self.max.custom_format(StatusText),
+                self.max.refmt(&StatusText),
                 self.count,
-                self.sum.custom_format(StatusText),
+                self.sum.refmt(&StatusText),
             ),
             Some(min) => write!(
                 f,
                 "({} .. {}) for {:3}, total {}",
-                min.custom_format(StatusText),
-                self.max.custom_format(StatusText),
+                min.refmt(&StatusText),
+                self.max.refmt(&StatusText),
                 self.count,
-                self.sum.custom_format(StatusText),
+                self.sum.refmt(&StatusText),
             ),
         }
     }

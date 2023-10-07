@@ -10,6 +10,7 @@ use core::time::Duration;
 
 use euclid::{vec3, Vector3D};
 use hashbrown::HashSet as HbHashSet;
+use manyfmt::Fmt;
 
 use crate::behavior::{self, BehaviorSet};
 use crate::block::TickAction;
@@ -31,7 +32,7 @@ use crate::physics::Acceleration;
 use crate::time;
 use crate::transaction::{Merge, Transaction as _};
 use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
-use crate::util::{ConciseDebug, CustomFormat, StatusText, TimeStats};
+use crate::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
 
 mod builder;
 pub use builder::{SpaceBuilder, SpaceBuilderBounds};
@@ -882,7 +883,7 @@ impl fmt::Debug for SpacePhysics {
         f.debug_struct("SpacePhysics")
             .field(
                 "gravity",
-                &gravity.map(NotNan::into_inner).custom_format(ConciseDebug),
+                &gravity.map(NotNan::into_inner).refmt(&ConciseDebug),
             )
             .field("sky_color", &sky_color)
             .field("light", &light)
@@ -1051,8 +1052,8 @@ impl core::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
         self.light += other.light;
     }
 }
-impl CustomFormat<StatusText> for SpaceStepInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+impl Fmt<StatusText> for SpaceStepInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
         let Self {
             spaces,
             evaluations,
@@ -1062,9 +1063,9 @@ impl CustomFormat<StatusText> for SpaceStepInfo {
             light,
         } = self;
         if self.spaces > 0 {
-            let light = light.custom_format(StatusText);
-            let cube_time = cube_time.custom_format(StatusText);
-            let behaviors_time = behaviors_time.custom_format(StatusText);
+            let light = light.refmt(fopt);
+            let cube_time = cube_time.refmt(fopt);
+            let behaviors_time = behaviors_time.refmt(fopt);
             write!(
                 fmt,
                 "\

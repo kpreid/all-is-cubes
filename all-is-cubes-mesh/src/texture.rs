@@ -7,7 +7,7 @@ use all_is_cubes::block::{Evoxel, Evoxels};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{Cube, GridAab};
-use all_is_cubes::util::{ConciseDebug, CustomFormat};
+use all_is_cubes::util::{ConciseDebug, Fmt};
 
 #[cfg(doc)]
 use all_is_cubes::math::GridArray;
@@ -252,8 +252,8 @@ impl Plane for NoTexture {
     }
 }
 
-impl CustomFormat<ConciseDebug> for NoTexture {
-    fn fmt(&self, _: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
+impl Fmt<ConciseDebug> for NoTexture {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>, _: &ConciseDebug) -> fmt::Result {
         match *self {}
     }
 }

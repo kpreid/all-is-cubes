@@ -7,6 +7,7 @@ use core::cmp::Ordering;
 use core::fmt;
 
 use euclid::{Point3D, Vector3D};
+use manyfmt::Fmt;
 
 use super::debug::LightComputeOutput;
 use super::LightUpdateRequest;
@@ -16,7 +17,7 @@ use crate::raycast::{Ray, RaycastStep};
 use crate::space::light::{LightUpdateRayInfo, Priority};
 use crate::space::{GridAab, LightPhysics, PackedLight, PackedLightScalar, Space, SpaceChange};
 use crate::time::{Duration, Instant};
-use crate::util::{CustomFormat, StatusText};
+use crate::util::StatusText;
 
 /// This parameter determines to what degree absorption of light due to a block surface's
 /// color is taken into account. At zero, it is not (all surfaces are perfectly
@@ -532,8 +533,8 @@ impl core::ops::AddAssign<LightUpdatesInfo> for LightUpdatesInfo {
         self.max_queue_priority = self.max_queue_priority.max(other.max_queue_priority);
     }
 }
-impl CustomFormat<StatusText> for LightUpdatesInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+impl Fmt<StatusText> for LightUpdatesInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
         write!(
             fmt,
             "{:4} (max diff {:3}) of {:4} (max pri {:3?})",

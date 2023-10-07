@@ -8,7 +8,7 @@ pub use ordered_float::{FloatIsNan, NotNan};
 /// Acts as polyfill for float methods
 use num_traits::float::FloatCore as _;
 
-use crate::util::{ConciseDebug, CustomFormat};
+use crate::util::ConciseDebug;
 
 mod aab;
 pub use aab::*;

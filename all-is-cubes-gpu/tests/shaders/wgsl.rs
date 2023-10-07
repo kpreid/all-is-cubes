@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use all_is_cubes::util::CustomFormat;
+use all_is_cubes::util::{Fmt, Refmt as _};
 
 /// Generate a fragment shader entry point from an expression.
 pub fn frag_expr(expr: &str) -> String {
@@ -22,30 +22,30 @@ trait WgslTypeName {
 #[derive(Clone, Copy, Debug)]
 pub struct ToWgsl;
 
-pub fn to_wgsl<T: CustomFormat<ToWgsl>>(value: T) -> String {
-    value.custom_format(ToWgsl).to_string()
+pub fn to_wgsl<T: Fmt<ToWgsl>>(value: T) -> String {
+    value.refmt(&ToWgsl).to_string()
 }
 
-impl CustomFormat<ToWgsl> for f32 {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ToWgsl) -> fmt::Result {
+impl Fmt<ToWgsl> for f32 {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &ToWgsl) -> fmt::Result {
         write!(fmt, "{:?}", self)
     }
 }
 
-impl<T> CustomFormat<ToWgsl> for [T; 4]
+impl<T> Fmt<ToWgsl> for [T; 4]
 where
-    T: CustomFormat<ToWgsl> + WgslTypeName,
+    T: Fmt<ToWgsl> + WgslTypeName,
 {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, f: ToWgsl) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, f: &ToWgsl) -> fmt::Result {
         let [x, y, z, w] = self;
         let t = T::wgsl_type_name();
         write!(
             fmt,
             "vec4<{t}>({x}, {y}, {z}, {w})",
-            x = x.custom_format(f),
-            y = y.custom_format(f),
-            z = z.custom_format(f),
-            w = w.custom_format(f),
+            x = x.refmt(f),
+            y = y.refmt(f),
+            z = z.refmt(f),
+            w = w.refmt(f),
         )
     }
 }

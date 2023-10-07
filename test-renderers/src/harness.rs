@@ -14,7 +14,7 @@ use itertools::Itertools;
 
 use all_is_cubes::camera::{Flaws, HeadlessRenderer, Rendering};
 use all_is_cubes::universe::Universe;
-use all_is_cubes::util::{CustomFormat as _, StatusText};
+use all_is_cubes::util::{Refmt as _, StatusText};
 
 use crate::{
     results_json_path, write_report_file, ComparisonOutcome, ComparisonRecord, ImageId, Overlays,
@@ -302,7 +302,7 @@ where
             Ok(case_time) => {
                 match format {
                     Format::Pretty => {
-                        println!(" ok in {}", case_time.custom_format(StatusText))
+                        println!(" ok in {}", case_time.refmt(&StatusText))
                     }
                     Format::Terse => print!("."),
                 }

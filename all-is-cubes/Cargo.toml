@@ -86,6 +86,7 @@ hashbrown = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
+manyfmt = { workspace = true }
 mutants = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true, optional = true }

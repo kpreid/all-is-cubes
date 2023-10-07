@@ -209,8 +209,8 @@ mod tests {
     use crate::content::make_some_voxel_blocks;
     use crate::raytracer::{CharacterBuf, CharacterRtData};
     use crate::universe::Universe;
-    use crate::util::{CustomFormat, Unquote};
     use euclid::{vec2, vec3};
+    use manyfmt::{formats::Unquote, Refmt};
     use pretty_assertions::assert_eq;
 
     struct EquivalenceTester {
@@ -266,10 +266,7 @@ mod tests {
             )
             .trace_scene_to_string::<CharacterBuf>(&self.camera, "\n");
 
-            assert_eq!(
-                image_updating.custom_format(Unquote),
-                image_fresh.custom_format(Unquote)
-            );
+            assert_eq!(image_updating.refmt(&Unquote), image_fresh.refmt(&Unquote));
             print!("{image_updating}");
             Ok(())
         }

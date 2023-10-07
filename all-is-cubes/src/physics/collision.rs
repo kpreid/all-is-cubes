@@ -20,7 +20,7 @@ use crate::math::{
 };
 use crate::raycast::{Ray, Raycaster};
 use crate::space::Space;
-use crate::util::{ConciseDebug, CustomFormat, MapExtend};
+use crate::util::{ConciseDebug, MapExtend, Refmt as _};
 
 /// An individual collision contact; something in a [`Space`] that a moving [`Aab`]
 /// collided with.
@@ -96,7 +96,7 @@ impl fmt::Debug for Contact {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Block(CubeFace { cube, face }) => {
-                write!(f, "{face:?} of {}", cube.custom_format(ConciseDebug))
+                write!(f, "{face:?} of {}", cube.refmt(&ConciseDebug))
             }
             Self::Voxel {
                 cube,
@@ -106,8 +106,8 @@ impl fmt::Debug for Contact {
                 f,
                 "{:?} of {} {}/{}",
                 face,
-                cube.custom_format(ConciseDebug),
-                voxel.custom_format(ConciseDebug),
+                cube.refmt(&ConciseDebug),
+                voxel.refmt(&ConciseDebug),
                 resolution
             ),
         }

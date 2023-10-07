@@ -4,7 +4,7 @@ use std::fmt;
 
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, FreePoint, FreeVector, Rgba};
-use all_is_cubes::util::{ConciseDebug, CustomFormat};
+use all_is_cubes::util::{ConciseDebug, Fmt, Refmt as _};
 
 /// Basic vertex data type for a [`BlockMesh`].
 /// Implement <code>[`From`]&lt;[`BlockVertex`]&gt;</code> (and usually [`GfxVertex`])
@@ -77,7 +77,7 @@ where
         write!(
             fmt,
             "{{ p: {:?} n: {:?} c: {:?} }}",
-            self.position.custom_format(ConciseDebug),
+            self.position.refmt(&ConciseDebug),
             self.face,
             self.coloring
         )
@@ -85,14 +85,14 @@ where
 }
 impl<T> fmt::Debug for Coloring<T>
 where
-    T: CustomFormat<ConciseDebug>, // TODO: inelegant
+    T: Fmt<ConciseDebug>, // TODO: inelegant
 {
     // TODO: test formatting of this
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Coloring::Solid(color) => write!(fmt, "Solid({color:?})"),
             Coloring::Texture { pos, .. } => {
-                write!(fmt, "Texture({:?})", pos.custom_format(ConciseDebug))
+                write!(fmt, "Texture({:?})", pos.refmt(&ConciseDebug))
             }
         }
     }

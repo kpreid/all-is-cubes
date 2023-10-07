@@ -5,6 +5,7 @@ use core::fmt;
 
 use euclid::{Angle, Point3D, Rotation3D, Vector3D};
 use hashbrown::HashSet as HbHashSet;
+use manyfmt::Fmt;
 use ordered_float::NotNan;
 
 #[cfg(not(feature = "std"))]
@@ -28,7 +29,7 @@ use crate::transaction::{
     self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
 };
 use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
-use crate::util::{ConciseDebug, CustomFormat, StatusText};
+use crate::util::{ConciseDebug, Refmt as _, StatusText};
 
 mod cursor;
 pub use cursor::*;
@@ -105,10 +106,7 @@ impl fmt::Debug for Character {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Character")
             .field("body", &self.body)
-            .field(
-                "velocity_input",
-                &self.velocity_input.custom_format(ConciseDebug),
-            )
+            .field("velocity_input", &self.velocity_input.refmt(&ConciseDebug))
             .field("colliding_cubes", &self.colliding_cubes)
             // TODO: report light samples
             .field("exposure", &self.exposure_log.exp())
@@ -118,12 +116,12 @@ impl fmt::Debug for Character {
     }
 }
 
-impl CustomFormat<StatusText> for Character {
+impl Fmt<StatusText> for Character {
     #[mutants::skip] // technically user visible but really debugging
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
-        writeln!(fmt, "{}", self.body.custom_format(StatusText))?;
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
+        writeln!(fmt, "{}", self.body.refmt(&StatusText))?;
         if let Some(info) = &self.last_step_info {
-            writeln!(fmt, "Last step: {:#?}", info.custom_format(ConciseDebug))?;
+            writeln!(fmt, "Last step: {:#?}", info.refmt(&ConciseDebug))?;
         }
         write!(fmt, "Colliding: {:?}", self.colliding_cubes.len())
     }

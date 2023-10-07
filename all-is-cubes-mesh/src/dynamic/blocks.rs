@@ -5,7 +5,7 @@ use fnv::FnvHashSet;
 use all_is_cubes::block::{EvaluatedBlock, Resolution};
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::time;
-use all_is_cubes::util::{CustomFormat as _, StatusText, TimeStats};
+use all_is_cubes::util::{Refmt as _, StatusText, TimeStats};
 
 use crate::texture;
 use crate::{BlockMesh, GetBlockMesh, GfxVertex, MeshOptions, SpaceMesh};
@@ -196,7 +196,7 @@ where
             if duration > time::Duration::from_millis(4) {
                 log::trace!(
                     "Block mesh took {}: {:?} {:?}",
-                    duration.custom_format(StatusText),
+                    duration.refmt(&StatusText),
                     new_evaluated_block.attributes.display_name,
                     bd.block(),
                 );

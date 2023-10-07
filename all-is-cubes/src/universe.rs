@@ -20,12 +20,14 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::sync::atomic::{self, Ordering};
 
+use manyfmt::Fmt;
+
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::{Space, SpaceStepInfo};
 use crate::time;
 use crate::transaction::Transaction as _;
-use crate::util::{CustomFormat, StatusText};
+use crate::util::{Refmt as _, StatusText};
 
 // Note: Most things in `members` are either an impl, private, or intentionally public-in-private.
 // Therefore, no glob reexport.
@@ -665,8 +667,8 @@ impl core::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
         self.space_step += other.space_step;
     }
 }
-impl CustomFormat<StatusText> for UniverseStepInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+impl Fmt<StatusText> for UniverseStepInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
         let Self {
             computation_time,
             active_members,
@@ -676,9 +678,9 @@ impl CustomFormat<StatusText> for UniverseStepInfo {
         writeln!(
             fmt,
             "Step computation: {t} for {active_members} of {total_members}",
-            t = computation_time.custom_format(StatusText),
+            t = computation_time.refmt(fopt),
         )?;
-        write!(fmt, "{}", space_step.custom_format(StatusText))?;
+        write!(fmt, "{}", space_step.refmt(fopt))?;
         Ok(())
     }
 }

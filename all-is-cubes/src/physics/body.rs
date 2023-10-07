@@ -1,6 +1,7 @@
 use core::fmt;
 
 use euclid::Vector3D;
+use manyfmt::Fmt;
 use ordered_float::NotNan;
 
 #[cfg(not(feature = "std"))]
@@ -19,7 +20,7 @@ use crate::raycast::Ray;
 use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::{self, Transaction};
-use crate::util::{ConciseDebug, CustomFormat, StatusText};
+use crate::util::{ConciseDebug, Refmt as _, StatusText};
 
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
 const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
@@ -82,8 +83,8 @@ impl fmt::Debug for Body {
             pitch,
         } = self;
         fmt.debug_struct("Body")
-            .field("position", &position.custom_format(ConciseDebug))
-            .field("velocity", &velocity.custom_format(ConciseDebug))
+            .field("position", &position.refmt(&ConciseDebug))
+            .field("velocity", &velocity.refmt(&ConciseDebug))
             .field("collision_box", &collision_box)
             .field("flying", &flying)
             .field("noclip", &noclip)
@@ -94,15 +95,15 @@ impl fmt::Debug for Body {
 }
 
 /// Omits collision box on the grounds that it is presumably constant
-impl CustomFormat<StatusText> for Body {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: StatusText) -> fmt::Result {
+impl Fmt<StatusText> for Body {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
         write!(
             fmt,
             "Position: {}  Yaw: {:5.1}°  Pitch: {:5.1}°\nVelocity: {}",
-            self.position.custom_format(ConciseDebug),
+            self.position.refmt(&ConciseDebug),
             self.yaw,
             self.pitch,
-            self.velocity.custom_format(ConciseDebug),
+            self.velocity.refmt(&ConciseDebug),
         )?;
         if self.flying {
             write!(fmt, "  Flying")?;
@@ -441,19 +442,13 @@ pub struct BodyStepInfo {
     pub move_segments: [MoveSegment; 3],
 }
 
-impl CustomFormat<ConciseDebug> for BodyStepInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, format_type: ConciseDebug) -> fmt::Result {
+impl Fmt<ConciseDebug> for BodyStepInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &ConciseDebug) -> fmt::Result {
         fmt.debug_struct("BodyStepInfo")
             .field("quiescent", &self.quiescent)
             .field("already_colliding", &self.already_colliding)
-            .field(
-                "push_out",
-                &self.push_out.as_ref().map(|v| v.custom_format(format_type)),
-            )
-            .field(
-                "move_segments",
-                &self.move_segments.custom_format(format_type),
-            )
+            .field("push_out", &self.push_out.as_ref().map(|v| v.refmt(fopt)))
+            .field("move_segments", &self.move_segments.refmt(fopt))
             .finish()
     }
 }
@@ -470,16 +465,12 @@ pub struct MoveSegment {
     pub stopped_by: Option<Contact>,
 }
 
-impl CustomFormat<ConciseDebug> for MoveSegment {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
+impl Fmt<ConciseDebug> for MoveSegment {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &ConciseDebug) -> fmt::Result {
         let mut nonempty = false;
         if self.delta_position != FreeVector::zero() {
             nonempty = true;
-            write!(
-                fmt,
-                "move {:?}",
-                self.delta_position.custom_format(ConciseDebug)
-            )?;
+            write!(fmt, "move {:?}", self.delta_position.refmt(fopt))?;
         }
         if let Some(stopped_by) = &self.stopped_by {
             if nonempty {

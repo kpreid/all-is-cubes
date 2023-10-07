@@ -19,7 +19,7 @@ use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::inv::Slot;
 use all_is_cubes::universe::URef;
-use all_is_cubes::util::{CustomFormat, StatusText};
+use all_is_cubes::util::{Refmt as _, StatusText};
 
 use crate::terminal::chars::{image_patch_to_character, write_colored_and_measure};
 use crate::terminal::TextRayImage;
@@ -478,7 +478,7 @@ impl TerminalState {
                 );
 
                 f.render_widget(
-                    Paragraph::new(format!("{}", info.custom_format(StatusText))),
+                    Paragraph::new(format!("{}", info.refmt(&StatusText))),
                     render_info_rect,
                 );
             }

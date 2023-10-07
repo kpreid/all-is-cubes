@@ -18,7 +18,7 @@ use crate::universe::{
     universe_txn as ut, InsertError, Name, PartialUniverse, URef, URefErased, URootRef, Universe,
     UniverseIter,
 };
-use crate::util::CustomFormat as _;
+use crate::util::Refmt as _;
 
 /// A `BTreeMap` is used to ensure that the iteration order is deterministic across
 /// runs/versions.
@@ -451,7 +451,7 @@ where
         // };
         ds.field(
             &name.to_string(),
-            &core::marker::PhantomData::<T>.custom_format(crate::util::TypeName),
+            &core::marker::PhantomData::<T>.refmt(&crate::util::TypeName),
         );
     }
 }

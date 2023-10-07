@@ -90,13 +90,13 @@ where
         //     if vertices == 0 {
         //         log::trace!(
         //             "meshed {:?}+ in {:.3} ms, 0",
-        //             chunk_origin.custom_format(ConciseDebug),
+        //             chunk_origin.refmt(&ConciseDebug),
         //             duration_ms,
         //         );
         //     } else {
         //         log::trace!(
         //             "meshed {:?}+ in {:.3} ms, {} in {:.3} µs/v",
-        //             chunk_origin.custom_format(ConciseDebug),
+        //             chunk_origin.refmt(&ConciseDebug),
         //             duration_ms,
         //             vertices,
         //             duration_ms * (1000.0 / vertices as f32),

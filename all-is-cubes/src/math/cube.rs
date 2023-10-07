@@ -175,8 +175,8 @@ impl fmt::Debug for Cube {
         write!(f, "({x:+.3?}, {y:+.3?}, {z:+.3?})")
     }
 }
-impl crate::util::CustomFormat<ConciseDebug> for Cube {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>, _: ConciseDebug) -> fmt::Result {
+impl manyfmt::Fmt<ConciseDebug> for Cube {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>, _: &ConciseDebug) -> fmt::Result {
         fmt::Debug::fmt(self, f)
     }
 }

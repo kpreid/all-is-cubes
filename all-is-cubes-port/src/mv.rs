@@ -8,7 +8,7 @@ use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{Cube, GridAab, GridRotation, GridVector, Gridgid, Rgb, Rgba, VectorOps};
 use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
 use all_is_cubes::universe::{self, Name, PartialUniverse, Universe};
-use all_is_cubes::util::{ConciseDebug, CustomFormat, YieldProgress};
+use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
 
 use crate::{ExportError, ExportSet};
 
@@ -211,7 +211,7 @@ fn space_to_dot_vox_model(
             name: Some(space_ref.name()),
             reason: format!(
                 "space of size {} is too large to export to .vox; must be 256 or less in each axis",
-                bounds.size().custom_format(ConciseDebug)
+                bounds.size().refmt(&ConciseDebug)
             ),
         });
     }
