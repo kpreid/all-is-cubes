@@ -15,6 +15,8 @@
         
         - `math::Face6::face_transform()`
         - `math::GridRotation::to_positive_octant_transform()`
+    
+    - `block::BlockAttributes::tick_action` can now specify a time period rather than always occurring on the next tick.
 
 ### Changed
 
@@ -22,6 +24,7 @@
     - Block schema and behavior changes:
         - Light emission is now a property of `Atom` blocks instead of `BlockAttributes`.
         - `EvaluatedBlock`’s `color` field is computed more accurately, ignoring voxels hidden by other voxels.
+        - `BlockAttributes::tick_action` is now a dedicated `TickAction` type instead of `VoxelBrush`.
 
     - All vector and matrix types from the library `cgmath` have been replaced with the library `euclid`.
 
