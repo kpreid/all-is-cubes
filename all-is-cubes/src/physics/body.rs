@@ -176,18 +176,9 @@ impl Body {
         let dt = tick.delta_t().as_secs_f64();
         let mut move_segments = [MoveSegment::default(); 3];
         let mut move_segment_index = 0;
-        #[cfg(feature = "rerun")]
-        let mut move_segment_arrows: [rg::components::Arrow3D; 3] =
-            std::array::from_fn(|_| rg::components::Arrow3D {
-                origin: Default::default(),
-                vector: Default::default(),
-            });
         let mut already_colliding = None;
         #[cfg(feature = "rerun")]
         let mut contact_accum: Vec<Contact> = Vec::new();
-
-        #[cfg(feature = "rerun")]
-        let re_timepoint = rerun_destination.stream.now(); // includes our own universe-time
 
         if self.noclip {
             colliding_space = None;
@@ -245,6 +236,8 @@ impl Body {
         let unobstructed_delta_position: FreeVector = self.velocity.cast_unit() * dt;
 
         // Do collision detection and resolution.
+        #[cfg(feature = "rerun")]
+        let position_before_move_segments = self.position;
         if let Some(space) = colliding_space {
             let mut delta_position = unobstructed_delta_position;
             while delta_position != Vector3D::zero() {
@@ -252,8 +245,6 @@ impl Body {
                     move_segment_index < 3,
                     "sliding collision loop did not finish"
                 );
-                #[cfg(feature = "rerun")]
-                let position_before_move = self.position;
                 // Each call to collide_and_advance will zero at least one axis of delta_position.
                 // The nonzero axes are for sliding movement.
                 let (new_delta_position, segment) =
@@ -262,13 +253,6 @@ impl Body {
 
                 // Diagnostic recording of the individual move segments
                 move_segments[move_segment_index] = segment;
-                #[cfg(feature = "rerun")]
-                {
-                    move_segment_arrows[move_segment_index] = rg::components::Arrow3D {
-                        origin: rg::convert_vec(position_before_move.to_vector()),
-                        vector: rg::convert_vec(segment.delta_position),
-                    };
-                }
 
                 move_segment_index += 1;
             }
@@ -286,73 +270,61 @@ impl Body {
         {
             use crate::content::palette;
 
-            let base_path = &rerun_destination.path;
-
             // Log batch of contacts
-            {
-                let mut contact_boxes = Vec::new();
-                let mut contact_transforms = Vec::new();
-                let mut contact_labels = Vec::new();
-                for contact in contact_accum {
-                    let (box3d, transform) = rg::convert_aab(contact.aab(), Vector3D::zero());
-                    contact_boxes.push(box3d);
-                    contact_transforms.push(transform);
-                    contact_labels.push(rg::components::Label(format!("{contact:?}")));
-                }
-                rerun_destination.send(&rg::entity_path!["contact"], |sender| {
-                    sender
-                        .with_timepoint(re_timepoint.clone())
-                        .with_component(&contact_boxes)?
-                        .with_component(&contact_transforms)?
-                        .with_component(&contact_labels)?
-                        .with_splat(rg::components::ColorRGBA::from(
-                            palette::DEBUG_COLLISION_CUBES,
-                        ))
-                });
-            }
+            rerun_destination.log(
+                &rg::entity_path!["contacts"],
+                &rg::convert_aabs(
+                    contact_accum.iter().map(|contact| contact.aab()),
+                    FreeVector::zero(),
+                )
+                .with_labels(
+                    contact_accum
+                        .into_iter()
+                        .map(|contact| format!("{contact:?}")),
+                )
+                .with_colors([rg::components::Color::from(palette::DEBUG_COLLISION_CUBES)]),
+            );
 
             // Log push_out operation
             // TODO: should this be just a maybe-fourth movement arrow?
-            let push_out_path = base_path.join(&rg::entity_path!["push_out"]);
             match push_out_info {
-                Some(push_out_vector) => {
-                    rerun_destination.send(&push_out_path, |sender| {
-                        sender
-                            .with_timepoint(re_timepoint.clone()) // TODO: still needed?
-                            .with_component(&[rg::components::Arrow3D {
-                                origin: rg::convert_vec(position_before_push_out.to_vector()),
-                                vector: rg::convert_vec(push_out_vector),
-                            }])
-                    });
-                }
-                None => rerun_destination.clear_recursive(&push_out_path),
+                Some(push_out_vector) => rerun_destination.log(
+                    &rg::entity_path!["push_out"],
+                    &rg::archetypes::Arrows3D::from_vectors([rg::convert_vec(push_out_vector)])
+                        .with_origins([rg::convert_point(position_before_push_out)]),
+                ),
+                None => rerun_destination.clear_recursive(&rg::entity_path!["push_out"]),
             }
 
             // Log body position point
-            rerun_destination.send(&rg::EntityPath::new(vec![]), |sender| {
-                sender
-                    .with_timepoint(re_timepoint.clone())
-                    .with_component(&[rg::convert_point(self.position)])
-            });
+            rerun_destination.log(
+                &rg::EntityPath::new(vec![]),
+                &rg::archetypes::Points3D::new([rg::convert_point(self.position)]),
+            );
 
-            // Log collision box
-            let (box3d, transform) = rg::convert_aab(self.collision_box, self.position.to_vector());
-            rerun_destination.send(&rg::entity_path!["collision_box"], |sender| {
-                sender
-                    .with_timepoint(re_timepoint.clone())
-                    .with_component(&[box3d])?
-                    .with_component(&[transform])?
-                    .with_splat(rg::components::ColorRGBA::from(
-                        palette::DEBUG_COLLISION_BOX,
-                    ))
-            });
+            // Log body collision box
+            let collision_boxes = rg::convert_aabs([self.collision_box], self.position.to_vector());
+            rerun_destination.log(
+                &rg::entity_path!["collision_box"],
+                &collision_boxes
+                    .with_colors([rg::components::Color::from(palette::DEBUG_COLLISION_BOX)]),
+            );
 
             // Log move segments
-            rerun_destination.send(&rg::entity_path!["move_segment"], |sender| {
-                sender
-                    .with_timepoint(re_timepoint)
-                    .with_component(&move_segment_arrows[..move_segment_index])
-            });
+            rerun_destination.log(
+                &rg::entity_path!["move_segment"],
+                &rg::archetypes::Arrows3D::from_vectors(
+                    move_segments.map(|seg| rg::convert_vec(seg.delta_position)),
+                )
+                .with_origins(move_segments.into_iter().scan(
+                    position_before_move_segments,
+                    |pos, seg| {
+                        let arrow_origin = rg::convert_point(*pos);
+                        *pos += seg.delta_position;
+                        Some(arrow_origin)
+                    },
+                )),
+            );
         }
 
         BodyStepInfo {

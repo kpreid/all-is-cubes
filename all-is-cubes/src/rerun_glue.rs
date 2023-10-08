@@ -1,12 +1,13 @@
+use alloc::vec::Vec;
 use core::fmt;
 
-use re_sdk::RecordingStream;
+use re_sdk::{datatypes, RecordingStream};
 
 use crate::math;
 
 // To support concise conditional debugging, this module re-exports many items from rerun.
 pub use re_log_types::{entity_path, EntityPath, Index};
-pub use re_sdk::{components, MsgSender};
+pub use re_sdk::{archetypes, components};
 
 /// Information that an entity or parent of entities can store in order to know where to
 /// send their Rerun logging data.
@@ -35,26 +36,16 @@ impl Default for Destination {
 }
 
 impl Destination {
-    pub fn send(
-        &self,
-        path_suffix: &EntityPath,
-        f: impl FnOnce(MsgSender) -> Result<MsgSender, re_sdk::MsgSenderError>,
-    ) {
-        let sender = MsgSender::new(self.path.join(path_suffix));
-        match f(sender) {
+    pub fn log(&self, path_suffix: &EntityPath, data: &impl re_sdk::AsComponents) {
+        match self.stream.log(self.path.join(path_suffix), data) {
+            Ok(()) => (),
             Err(e) => log::error!("Rerun logging failed: {e}", e = crate::util::ErrorChain(&e)),
-            Ok(sender) => match sender.send(&self.stream) {
-                Ok(()) => (),
-                Err(e) => log::error!("Rerun logging failed: {e}", e = crate::util::ErrorChain(&e)),
-            },
         }
     }
 
     pub fn clear_recursive(&self, path_suffix: &EntityPath) {
-        self.stream
-            .record_path_op(re_log_types::PathOp::ClearRecursive(
-                self.path.join(path_suffix),
-            ))
+        // TODO: this is no longer necessary
+        self.log(path_suffix, &archetypes::Clear::new(true));
     }
 
     #[must_use]
@@ -70,45 +61,35 @@ impl Destination {
 
 // --- Components ---
 
-pub fn convert_point<S, U>(point: euclid::Point3D<S, U>) -> components::Point3D
+pub fn convert_point<S, U>(point: euclid::Point3D<S, U>) -> components::Position3D
 where
     S: num_traits::NumCast + Copy,
 {
     let array: [f32; 3] = point.cast::<f32>().into();
-    components::Point3D::from(array)
+    components::Position3D::from(array)
 }
-pub fn convert_vec<S, U>(point: euclid::Vector3D<S, U>) -> components::Vec3D
+pub fn convert_vec<S, U>(v: euclid::Vector3D<S, U>) -> datatypes::Vec3D
 where
     S: num_traits::NumCast + Copy,
 {
-    let array: [f32; 3] = point.cast::<f32>().into();
-    components::Vec3D::from(array)
+    let array: [f32; 3] = v.cast::<f32>().into();
+    datatypes::Vec3D::from(array)
 }
 
-pub fn convert_aab(
-    aab: math::Aab,
+pub fn convert_aabs(
+    aabs: impl IntoIterator<Item = math::Aab>,
     offset: math::FreeVector,
-) -> (components::Box3D, components::Vec3D) {
-    let euclid::Vector3D {
-        x: sx,
-        y: sy,
-        z: sz,
-        _unit: _,
-    } = (aab.size() * 0.5).cast::<f32>();
-
-    // Box3D is *always* centered, so we need to separately extract the Aab's center as a
-    // translation.
-    let center = aab.center();
-    let combined_offset: [f32; 3] = (center + offset).cast::<f32>().into();
-
-    (
-        components::Box3D {
-            x: sx,
-            y: sy,
-            z: sz,
-        },
-        components::Vec3D::from(combined_offset),
-    )
+) -> archetypes::Boxes3D {
+    let (half_sizes, centers): (Vec<components::HalfSizes3D>, Vec<components::Position3D>) = aabs
+        .into_iter()
+        .map(|aab| {
+            (
+                components::HalfSizes3D(convert_vec(aab.size() / 2.0)),
+                convert_point(aab.center() + offset),
+            )
+        })
+        .unzip();
+    archetypes::Boxes3D::from_half_sizes(half_sizes).with_centers(centers)
 }
 
 impl From<math::Face6> for re_sdk::coordinates::SignedAxis3 {
@@ -144,24 +125,14 @@ impl From<math::Face6> for re_sdk::coordinates::SignedAxis3 {
     }
 }
 
-impl From<math::Rgb> for components::ColorRGBA {
+impl From<math::Rgb> for components::Color {
     fn from(value: math::Rgb) -> Self {
         value.with_alpha_one().into()
     }
 }
-impl From<math::Rgba> for components::ColorRGBA {
+impl From<math::Rgba> for components::Color {
     fn from(value: math::Rgba) -> Self {
         let [r, g, b, a] = value.to_srgb8();
-        components::ColorRGBA::from_unmultiplied_rgba(r, g, b, a)
-    }
-}
-
-impl From<crate::raycast::Ray> for components::Arrow3D {
-    fn from(value: crate::raycast::Ray) -> Self {
-        let crate::raycast::Ray { origin, direction } = value;
-        components::Arrow3D {
-            origin: convert_vec(origin.to_vector()),
-            vector: convert_vec(direction),
-        }
+        components::Color::from_unmultiplied_rgba(r, g, b, a)
     }
 }

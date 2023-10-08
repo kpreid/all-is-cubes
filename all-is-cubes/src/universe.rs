@@ -571,14 +571,17 @@ impl Universe {
         // Initialize axes.
         // TODO: this should be per-Space in principle
         self.rerun_destination
-            .send(&rg::EntityPath::from(vec![]), |sender| {
-                sender.with_timeless(true).with_component(&[
-                    re_sdk::components::ViewCoordinates::from_up_and_handedness(
+            .stream
+            .log_timeless(
+                self.rerun_destination.path.clone(),
+                &rg::archetypes::ViewCoordinates::new(
+                    rg::components::ViewCoordinates::from_up_and_handedness(
                         crate::math::Face6::PY.into(),
                         re_sdk::coordinates::Handedness::Right,
                     ),
-                ])
-            });
+                ),
+            )
+            .unwrap();
     }
 }
 
