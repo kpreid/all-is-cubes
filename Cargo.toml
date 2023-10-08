@@ -68,7 +68,7 @@ re_sdk = { version = "0.9.0", default-features = false }
 rendiff = { version = "0.1.0" }
 send_wrapper = "0.6.0"
 serde = { version = "1.0.160", default-features = false, features = ["derive"] }
-serde_json = "1.0.64"
+serde_json = "1.0.79"
 simplelog = "0.12.0"
 snapbox = "0.4.11" # keep in sync with `trycmd`
 strum = { version = "0.25.0", default-features = false, features = ["derive"] }
