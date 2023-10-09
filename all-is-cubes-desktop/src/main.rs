@@ -481,7 +481,8 @@ fn connect_rerun(universe: &mut Universe) {
         .unwrap();
     let destination = rg::Destination {
         stream,
-        // Note: Empty path doesn't seem to work with logging coordinate axes
+        // Note: This must not be empty for ViewCoordinates to work
+        // https://github.com/rerun-io/rerun/issues/3538
         path: rg::entity_path!["dt"],
     };
 
