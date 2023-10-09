@@ -283,17 +283,6 @@ impl Body {
                 .with_class_ids([rg::ClassId::CollisionContact]),
             );
 
-            // Log push_out operation
-            // TODO: should this be just a maybe-fourth movement arrow?
-            match push_out_info {
-                Some(push_out_vector) => rerun_destination.log(
-                    &rg::entity_path!["push_out"],
-                    &rg::archetypes::Arrows3D::from_vectors([rg::convert_vec(push_out_vector)])
-                        .with_origins([rg::convert_point(position_before_push_out)]),
-                ),
-                None => rerun_destination.clear_recursive(&rg::entity_path!["push_out"]),
-            }
-
             // Log body position point
             rerun_destination.log(
                 &rg::EntityPath::new(vec![]),
@@ -307,20 +296,42 @@ impl Body {
                 &collision_boxes.with_class_ids([rg::ClassId::BodyCollisionBox]),
             );
 
+            // Our movement arrows shall be logged relative to all collision box corners.
+            let arrow_offsets = || self.collision_box.corner_points().map(|p| p.to_vector());
+
+            // Log push_out operation
+            // TODO: should this be just a maybe-fourth movement arrow?
+            match push_out_info {
+                Some(push_out_vector) => rerun_destination.log(
+                    &rg::entity_path!["push_out"],
+                    &rg::archetypes::Arrows3D::from_vectors(
+                        arrow_offsets().map(|_| rg::convert_vec(push_out_vector)),
+                    )
+                    .with_origins(
+                        arrow_offsets()
+                            .map(|offset| rg::convert_point(position_before_push_out + offset)),
+                    ),
+                ),
+                None => rerun_destination.clear_recursive(&rg::entity_path!["push_out"]),
+            }
+
             // Log move segments
             rerun_destination.log(
                 &rg::entity_path!["move_segment"],
                 &rg::archetypes::Arrows3D::from_vectors(
-                    move_segments.map(|seg| rg::convert_vec(seg.delta_position)),
+                    arrow_offsets()
+                        .flat_map(|_| move_segments.map(|seg| rg::convert_vec(seg.delta_position))),
                 )
-                .with_origins(move_segments.into_iter().scan(
-                    position_before_move_segments,
-                    |pos, seg| {
-                        let arrow_origin = rg::convert_point(*pos);
-                        *pos += seg.delta_position;
-                        Some(arrow_origin)
-                    },
-                )),
+                .with_origins(arrow_offsets().flat_map(|offset| {
+                    move_segments.into_iter().scan(
+                        position_before_move_segments + offset,
+                        |pos, seg| {
+                            let arrow_origin = rg::convert_point(*pos);
+                            *pos += seg.delta_position;
+                            Some(arrow_origin)
+                        },
+                    )
+                })),
             );
         }
 
