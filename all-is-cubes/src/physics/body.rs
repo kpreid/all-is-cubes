@@ -316,23 +316,27 @@ impl Body {
             }
 
             // Log move segments
-            rerun_destination.log(
-                &rg::entity_path!["move_segment"],
-                &rg::archetypes::Arrows3D::from_vectors(
-                    arrow_offsets()
-                        .flat_map(|_| move_segments.map(|seg| rg::convert_vec(seg.delta_position))),
-                )
-                .with_origins(arrow_offsets().flat_map(|offset| {
-                    move_segments.into_iter().scan(
-                        position_before_move_segments + offset,
-                        |pos, seg| {
-                            let arrow_origin = rg::convert_point(*pos);
-                            *pos += seg.delta_position;
-                            Some(arrow_origin)
-                        },
-                    )
-                })),
-            );
+            {
+                let move_segments = &move_segments[..move_segment_index]; // trim empty entries
+                rerun_destination.log(
+                    &rg::entity_path!["move_segment"],
+                    &rg::archetypes::Arrows3D::from_vectors(arrow_offsets().flat_map(|_| {
+                        move_segments
+                            .iter()
+                            .map(|seg| rg::convert_vec(seg.delta_position))
+                    }))
+                    .with_origins(arrow_offsets().flat_map(|offset| {
+                        move_segments.iter().scan(
+                            position_before_move_segments + offset,
+                            |pos, seg| {
+                                let arrow_origin = rg::convert_point(*pos);
+                                *pos += seg.delta_position;
+                                Some(arrow_origin)
+                            },
+                        )
+                    })),
+                );
+            }
         }
 
         BodyStepInfo {
