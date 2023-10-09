@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use re_sdk::{datatypes, RecordingStream};
+use re_sdk::{datatypes, RecordingStream, RecordingStreamResult};
 
 use crate::math;
 
@@ -36,11 +36,34 @@ impl Default for Destination {
 }
 
 impl Destination {
-    pub fn log(&self, path_suffix: &EntityPath, data: &impl re_sdk::AsComponents) {
-        match self.stream.log(self.path.join(path_suffix), data) {
+    /// Log the initial data every stream should have.
+    pub fn log_initialization(&self) {
+        let path = EntityPath::from(vec![]);
+        self.catch(|| {
+            self.stream
+                .log_timeless(path.clone(), &annotation_context())?;
+            self.stream.log_timeless(
+                path.clone(),
+                &archetypes::ViewCoordinates::new(
+                    components::ViewCoordinates::from_up_and_handedness(
+                        crate::math::Face6::PY.into(),
+                        re_sdk::coordinates::Handedness::Right,
+                    ),
+                ),
+            )?;
+            Ok(())
+        });
+    }
+
+    fn catch(&self, f: impl FnOnce() -> RecordingStreamResult<()>) {
+        match f() {
             Ok(()) => (),
             Err(e) => log::error!("Rerun logging failed: {e}", e = crate::util::ErrorChain(&e)),
         }
+    }
+
+    pub fn log(&self, path_suffix: &EntityPath, data: &impl re_sdk::AsComponents) {
+        self.catch(|| self.stream.log(self.path.join(path_suffix), data))
     }
 
     pub fn clear_recursive(&self, path_suffix: &EntityPath) {
@@ -57,9 +80,37 @@ impl Destination {
     }
 }
 
-// --- Entities ---
+// --- Timeless configuration ---
 
-// --- Components ---
+/// Enum describing class id numbers we use in our rerun streams.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+#[repr(u16)]
+pub enum ClassId {
+    BodyCollisionBox = 0,
+    CollisionContact = 1,
+}
+impl From<ClassId> for datatypes::ClassId {
+    fn from(value: ClassId) -> Self {
+        Self(value as u16)
+    }
+}
+
+fn annotation_context() -> re_sdk::archetypes::AnnotationContext {
+    use crate::content::palette as p;
+    use ClassId as C;
+    let descs = [
+        (C::BodyCollisionBox, "body box", p::DEBUG_COLLISION_BOX),
+        (C::CollisionContact, "contact", p::DEBUG_COLLISION_CUBES),
+    ];
+    re_sdk::archetypes::AnnotationContext::new(
+        descs
+            .into_iter()
+            .map(|(id, label, color)| (id as u16, label, datatypes::Rgba32::from(color))),
+    )
+}
+
+// --- Data conversion ---
 
 pub fn convert_point<S, U>(point: euclid::Point3D<S, U>) -> components::Position3D
 where
@@ -130,9 +181,15 @@ impl From<math::Rgb> for components::Color {
         value.with_alpha_one().into()
     }
 }
-impl From<math::Rgba> for components::Color {
+// impl From<math::Rgba> for components::Color {
+//     fn from(value: math::Rgba) -> Self {
+//         let [r, g, b, a] = value.to_srgb8();
+//         components::Color::from_unmultiplied_rgba(r, g, b, a)
+//     }
+// }
+impl From<math::Rgba> for datatypes::Rgba32 {
     fn from(value: math::Rgba) -> Self {
         let [r, g, b, a] = value.to_srgb8();
-        components::Color::from_unmultiplied_rgba(r, g, b, a)
+        datatypes::Rgba32::from_unmultiplied_rgba(r, g, b, a)
     }
 }

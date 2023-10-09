@@ -268,8 +268,6 @@ impl Body {
 
         #[cfg(feature = "rerun")]
         {
-            use crate::content::palette;
-
             // Log batch of contacts
             rerun_destination.log(
                 &rg::entity_path!["contacts"],
@@ -282,7 +280,7 @@ impl Body {
                         .into_iter()
                         .map(|contact| format!("{contact:?}")),
                 )
-                .with_colors([rg::components::Color::from(palette::DEBUG_COLLISION_CUBES)]),
+                .with_class_ids([rg::ClassId::CollisionContact]),
             );
 
             // Log push_out operation
@@ -306,8 +304,7 @@ impl Body {
             let collision_boxes = rg::convert_aabs([self.collision_box], self.position.to_vector());
             rerun_destination.log(
                 &rg::entity_path!["collision_box"],
-                &collision_boxes
-                    .with_colors([rg::components::Color::from(palette::DEBUG_COLLISION_BOX)]),
+                &collision_boxes.with_class_ids([rg::ClassId::BodyCollisionBox]),
             );
 
             // Log move segments

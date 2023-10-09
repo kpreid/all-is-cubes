@@ -475,17 +475,20 @@ fn headless_main_loop(
 fn connect_rerun(universe: &mut Universe) {
     use all_is_cubes::rerun_glue as rg;
 
-    // Note: Empty path doesn't make logging at the root
-    let root_path = rg::entity_path!["dt"];
-
     let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes")
         .default_enabled(true)
         .connect(re_sdk::default_server_addr(), Some(Duration::from_secs(1)))
         .unwrap();
     let destination = rg::Destination {
         stream,
-        path: root_path,
+        // Note: Empty path doesn't seem to work with logging coordinate axes
+        path: rg::entity_path!["dt"],
     };
+
+    // Log timeless configuration
+    destination.log_initialization();
+
+    // Attach to universe elements
     universe.log_to_rerun(destination.clone());
     if let Some(c) = universe.get_default_character() {
         c.try_modify(|c| c.log_to_rerun(destination.child(&rg::entity_path!["character"])))
