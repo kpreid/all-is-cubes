@@ -360,12 +360,8 @@ impl EvalBlockError {
     // TODO: test this
     pub fn to_placeholder(&self) -> EvaluatedBlock {
         let resolution = Resolution::R8;
-        // TODO: dedicated palette colors, more detail (e.g. type of error as an icon)
-        let pattern = [
-            palette::MISSING_VOXEL_FALLBACK,
-            palette::MISSING_TEXTURE_FALLBACK,
-        ]
-        .map(Evoxel::from_color);
+        // TODO: indicate type of error or at least have some kind of icon,
+        let pattern = [palette::BLOCK_EVAL_ERROR, Rgba::BLACK].map(Evoxel::from_color);
 
         EvaluatedBlock::from_voxels(
             BlockAttributes {

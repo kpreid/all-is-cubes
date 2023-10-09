@@ -192,7 +192,7 @@ pub(super) fn copy_voxels_into_existing_texture<T: Tile>(voxels: &Evoxels, textu
                 texels.push(
                     voxels
                         .get(Cube { x, y, z })
-                        .unwrap_or(Evoxel::from_color(palette::MISSING_VOXEL_FALLBACK))
+                        .unwrap_or(Evoxel::from_color(palette::MISSING_VOXEL_ERROR))
                         .color
                         .to_srgb8(),
                 );

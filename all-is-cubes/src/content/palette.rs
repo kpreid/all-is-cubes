@@ -60,20 +60,14 @@ palette! {
     /// Default sky color for new [`Space`](crate::space::Space)s.
     DAY_SKY_COLOR = srgb[243 243 255];
 
-    // Rendering fallbacks.
-    /// Used on the surface of a mesh where there should be a texture, but something went
-    /// wrong.
-    ///
-    /// TODO: This is no longer actually used, as the mesh generation now explicitly
-    /// reports flaws while using an approximate value. But perhaps we should use this
-    /// for another error condition.
-    MISSING_TEXTURE_FALLBACK = srgb[0xFF 0x00 0xBB 0xFF];
+    /// Used in texture atlases to mark areas that should not be visible.
+    UNALLOCATED_TEXELS_ERROR = srgb[0xFF 0x00 0xBB 0xFF];
+
+    /// Used as a placeholder appearance when a block definition fails to evaluate.
+    BLOCK_EVAL_ERROR = srgb[0xFF 0xBB 0x00 0xFF];
+
     /// Used when a recursive block definition should have provided a voxel color but did not.
-    MISSING_VOXEL_FALLBACK = srgb[0xBB 0x00 0xFF 0xFF];
-    /// Used in unallocated texture atlas space.
-    ///
-    /// TODO: Not currently used.
-    UNPAINTED_TEXTURE_FALLBACK = srgb[0x00 0xC5 0xC5 0xFF];
+    MISSING_VOXEL_ERROR = srgb[0xBB 0x00 0xFF 0xFF];
 
     /// Fill color to draw when a renderer does not have any [`Space`](crate::space::Space)
     /// to define a sky color.

@@ -5,6 +5,7 @@
 
 use std::sync::{Arc, Mutex, Weak};
 
+use all_is_cubes::content::palette;
 use all_is_cubes::euclid::Translation3D;
 use all_is_cubes::math::{GridAab, GridCoordinate, VectorOps};
 use all_is_cubes::time;
@@ -41,6 +42,14 @@ pub struct AtlasTile {
     /// Note on lock ordering: Do not attempt to acquire the allocator's lock while this
     /// lock is held.
     backing: Arc<Mutex<TileBacking>>,
+}
+
+/// Internal, weak-referencing version of [`AtlasTile`].
+#[derive(Debug)]
+struct WeakTile {
+    /// Bounds of the allocation in the atlas.
+    allocated_bounds: GridAab,
+    backing: Weak<Mutex<TileBacking>>,
 }
 
 /// Texture plane handle used by [`AtlasAllocator`].
@@ -80,7 +89,7 @@ struct AllocatorBacking {
     /// Weak references to every tile.
     /// This is used to gather all data that needs to be flushed (written to the GPU
     /// texture).
-    in_use: Vec<Weak<Mutex<TileBacking>>>,
+    in_use: Vec<WeakTile>,
 
     /// Debug label for the GPU texture resource.
     texture_label: String,
@@ -187,27 +196,48 @@ impl AtlasAllocator {
             (texture, texture_view)
         });
 
+        // Process tiles needing updates or deallocation.
         let mut count_written = 0;
         if backing.dirty {
-            backing.in_use.retain(|weak_backing| {
+            backing.in_use.retain(|weak_tile| {
                 // Process the non-dropped weak references
-                weak_backing.upgrade().map_or(false, |strong_backing| {
-                    let backing: &mut TileBacking = &mut strong_backing.lock().unwrap();
-                    if backing.dirty || copy_everything_anyway {
-                        if let Some(data) = backing.data.as_ref() {
-                            let region: GridAab = backing
-                                .handle
-                                .as_ref()
-                                .expect("can't happen: dead TileBacking")
-                                .allocation;
+                match weak_tile.backing.upgrade() {
+                    Some(strong_ref) => {
+                        let backing: &mut TileBacking = &mut strong_ref.lock().unwrap();
+                        if backing.dirty || copy_everything_anyway {
+                            if let Some(data) = backing.data.as_ref() {
+                                let region: GridAab = backing
+                                    .handle
+                                    .as_ref()
+                                    .expect("can't happen: dead TileBacking")
+                                    .allocation;
 
-                            write_texture_by_aab(queue, texture, region, data);
-                            backing.dirty = false;
-                            count_written += 1;
+                                write_texture_by_aab(queue, texture, region, data);
+
+                                backing.dirty = false;
+                                count_written += 1;
+                            }
                         }
+                        true // retain in self.in_use
                     }
-                    true // retain in self.in_use
-                })
+                    None => {
+                        // No strong references to the tile remain.
+                        // Overwrite it to mark stale data.
+                        // TODO: This is inefficient but we want to keep it at least until fixing
+                        // <https://github.com/kpreid/all-is-cubes/issues/378>, at which point we
+                        // might reasonably disable it.
+                        let region = weak_tile.allocated_bounds;
+                        write_texture_by_aab(
+                            queue,
+                            texture,
+                            region,
+                            // TODO: keep a preallocated GPU buffer instead
+                            &vec![palette::UNALLOCATED_TEXELS_ERROR.to_srgb8(); region.volume()],
+                        );
+
+                        false // discard from self.in_use
+                    }
+                }
             });
         }
 
@@ -247,6 +277,7 @@ impl texture::Allocator for AtlasAllocator {
         let handle = allocator_backing
             .alloctree
             .allocate_with_growth(requested_bounds)?;
+        let allocated_bounds = handle.allocation;
 
         let result = AtlasTile {
             requested_bounds,
@@ -258,9 +289,10 @@ impl texture::Allocator for AtlasAllocator {
                 allocator: Arc::downgrade(&self.backing),
             })),
         };
-        allocator_backing
-            .in_use
-            .push(Arc::downgrade(&result.backing));
+        allocator_backing.in_use.push(WeakTile {
+            allocated_bounds,
+            backing: Arc::downgrade(&result.backing),
+        });
         Some(result)
     }
 }
