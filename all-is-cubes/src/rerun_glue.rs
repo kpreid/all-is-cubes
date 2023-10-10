@@ -87,8 +87,10 @@ impl Destination {
 #[non_exhaustive]
 #[repr(u16)]
 pub enum ClassId {
-    BodyCollisionBox = 0,
-    CollisionContact = 1,
+    SpaceBlock,
+    BodyCollisionBox,
+    CollisionContactWithin,
+    CollisionContactAgainst,
 }
 impl From<ClassId> for datatypes::ClassId {
     fn from(value: ClassId) -> Self {
@@ -99,15 +101,24 @@ impl From<ClassId> for datatypes::ClassId {
 fn annotation_context() -> re_sdk::archetypes::AnnotationContext {
     use crate::content::palette as p;
     use ClassId as C;
+
+    #[rustfmt::skip]
     let descs = [
         (C::BodyCollisionBox, "body box", p::DEBUG_COLLISION_BOX),
-        (C::CollisionContact, "contact", p::DEBUG_COLLISION_CUBES),
+        (C::CollisionContactWithin, "within", p::DEBUG_COLLISION_CUBE_WITHIN),
+        (C::CollisionContactAgainst, "against", p::DEBUG_COLLISION_CUBE_AGAINST),
+        (C::SpaceBlock, "", rgba_const!(0.15, 0.15, 0.15, 1.0)),
     ];
-    re_sdk::archetypes::AnnotationContext::new(
-        descs
-            .into_iter()
-            .map(|(id, label, color)| (id as u16, label, datatypes::Rgba32::from(color))),
-    )
+
+    re_sdk::archetypes::AnnotationContext::new(descs.into_iter().map(|(id, label, color)| {
+        datatypes::AnnotationInfo {
+            id: id as u16,
+            label: Some(label)
+                .filter(|label| !label.is_empty())
+                .map(datatypes::Utf8::from),
+            color: Some(datatypes::Rgba32::from(color)),
+        }
+    }))
 }
 
 // --- Data conversion ---

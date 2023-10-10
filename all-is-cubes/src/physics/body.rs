@@ -268,20 +268,65 @@ impl Body {
 
         #[cfg(feature = "rerun")]
         {
-            // Log batch of contacts
-            rerun_destination.log(
-                &rg::entity_path!["contacts"],
-                &rg::convert_aabs(
-                    contact_accum.iter().map(|contact| contact.aab()),
-                    FreeVector::zero(),
-                )
-                .with_labels(
-                    contact_accum
-                        .into_iter()
-                        .map(|contact| format!("{contact:?}")),
-                )
-                .with_class_ids([rg::ClassId::CollisionContact]),
-            );
+            use crate::content::palette;
+
+            // Log nearby cubes and whether they are contacts.
+            if let Some(space) = colliding_space {
+                // TODO: If we make more general use of rerun, this is going to need to be moved from
+                // here to `Space` itself
+                let cubes = self
+                    .collision_box_abs()
+                    .expand(0.875)
+                    .round_up_to_grid()
+                    .interior_iter()
+                    .filter(|cube| {
+                        space.get_evaluated(*cube).uniform_collision != Some(BlockCollision::None)
+                    });
+                let (class_ids, colors): (Vec<rg::ClassId>, Vec<_>) = cubes
+                    .clone()
+                    .map(|cube| {
+                        // O(n) but n is small
+                        let this_contact =
+                            contact_accum.iter().find(|contact| contact.cube() == cube);
+                        if let Some(this_contact) = this_contact {
+                            if this_contact.normal() == Face7::Within {
+                                (
+                                    rg::ClassId::CollisionContactWithin,
+                                    palette::DEBUG_COLLISION_CUBE_WITHIN,
+                                )
+                            } else {
+                                (
+                                    rg::ClassId::CollisionContactAgainst,
+                                    palette::DEBUG_COLLISION_CUBE_AGAINST,
+                                )
+                            }
+                        } else {
+                            (rg::ClassId::SpaceBlock, space.get_evaluated(cube).color)
+                        }
+                    })
+                    .unzip();
+                rerun_destination.log(
+                    &rg::entity_path!["blocks"],
+                    &rg::convert_aabs(
+                        cubes.map(|cube| {
+                            let ev = space.get_evaluated(cube);
+                            // approximation of block's actual collision bounds
+                            Aab::from(ev.voxels_bounds())
+                                .scale(FreeCoordinate::from(ev.voxels.resolution()).recip())
+                                .translate(cube.lower_bounds().to_f64().to_vector())
+                        }),
+                        FreeVector::zero(),
+                    )
+                    .with_radii(class_ids.iter().map(|class| match class {
+                        rg::ClassId::SpaceBlock => 0.001,
+                        rg::ClassId::CollisionContactAgainst => 0.002,
+                        rg::ClassId::CollisionContactWithin => 0.005,
+                        _ => unreachable!(),
+                    }))
+                    .with_class_ids(class_ids)
+                    .with_colors(colors),
+                );
+            }
 
             // Log body position point
             rerun_destination.log(

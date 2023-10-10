@@ -1,7 +1,7 @@
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{Aab, FreePoint, Geometry, LineVertex, Rgba};
+use all_is_cubes::math::{Aab, Face7, FreePoint, Geometry, LineVertex, Rgba};
 use all_is_cubes::space::Space;
 use all_is_cubes::util::MapExtend;
 
@@ -60,7 +60,12 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
             );
             // What it collided with
             for contact in &character.colliding_cubes {
-                wireframe_vertices(v, palette::DEBUG_COLLISION_CUBES, contact);
+                let color = if contact.normal() == Face7::Within {
+                    palette::DEBUG_COLLISION_CUBE_WITHIN
+                } else {
+                    palette::DEBUG_COLLISION_CUBE_AGAINST
+                };
+                wireframe_vertices(v, color, contact);
             }
         }
     }
