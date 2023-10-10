@@ -323,7 +323,7 @@ impl Character {
 
             let colliding_cubes = &mut self.colliding_cubes;
             colliding_cubes.clear();
-            Some(self.body.step_with_rerun(
+            let info = self.body.step_with_rerun(
                 tick,
                 Some(&*space),
                 |cube| {
@@ -331,7 +331,12 @@ impl Character {
                 },
                 #[cfg(feature = "rerun")]
                 &self.rerun_destination,
-            ))
+            );
+            if let Some(push_out_displacement) = info.push_out {
+                // Smooth out camera effect of push-outs
+                self.eye_displacement_pos -= push_out_displacement;
+            }
+            Some(info)
         } else {
             // TODO: set a warning flag
             None
@@ -380,9 +385,13 @@ impl Character {
         // First, update velocity.
         let body_delta_v_this_frame = self.body.velocity - initial_body_velocity;
         self.eye_displacement_vel -= body_delta_v_this_frame.cast_unit() * 0.04;
-        self.eye_displacement_vel += self.eye_displacement_pos.cast_unit() * -(0.005f64.powf(dt));
-        self.eye_displacement_vel *= 0.005f64.powf(dt);
-        // Then apply position to velocity.
+        // Return-to-center force — linear near zero and increasing quadratically
+        self.eye_displacement_vel -= self.eye_displacement_pos.cast_unit()
+            * (self.eye_displacement_pos.length() + 1.0)
+            * 1e21_f64.powf(dt);
+        // Damping.
+        self.eye_displacement_vel *= 1e-9_f64.powf(dt);
+        // Finally, apply velocity to position.
         self.eye_displacement_pos += self.eye_displacement_vel.cast_unit() * dt;
         // TODO: Clamp eye_displacement_pos to be within the body AAB.
 
