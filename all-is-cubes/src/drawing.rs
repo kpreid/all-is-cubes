@@ -611,7 +611,7 @@ mod tests {
     fn rectangle_to_aab_consistent_with_drawing_and_bounding_box() {
         // The bounds of this space will be used as the test case, by constructing various
         // transformed DrawingPlanes and seeing what they think their bounding box is.
-        let space_bounds = GridAab::from_lower_upper([-5, -20, -100], [30, 10, 100]);
+        let space_bounds = GridAab::from_lower_upper([-11, -20, -100], [30, 10, 100]);
         let mut space = Space::builder(space_bounds).build();
 
         // Brush to nominally draw with.
@@ -629,7 +629,11 @@ mod tests {
         for rotation in GridRotation::ALL {
             // Pick a translation to test.
             // Note: these translations must not cause the depth axis to exit the space_bounds.
-            for translation in [GridVector::zero(), GridVector::new(10, 5, 0)] {
+            for translation in [
+                GridVector::zero(),
+                GridVector::new(10, 5, 0),
+                GridVector::new(-10, -5, 0),
+            ] {
                 // The transform we're testing with.
                 let transform = Gridgid {
                     translation,
@@ -657,9 +661,9 @@ mod tests {
                 let txn_bounds = txn.bounds().unwrap();
                 let txn_matches_bounding_box = txn_bounds == bounds_converted;
 
-                println!("{rotation:?} → rect {plane_bbox:?}");
+                println!("{transform:?} → rect {plane_bbox:?}");
                 println!("  rectangle_to_aab() = {bounds_converted:?} ({bounding_box_fits:?})");
-                println!("  drawing() = {txn_bounds:?} ({txn_matches_bounding_box:?})");
+                println!("  drawn = {txn_bounds:?} ({txn_matches_bounding_box:?})");
                 println!();
                 all_good &= bounding_box_fits && txn_matches_bounding_box;
             }
