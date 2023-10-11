@@ -22,6 +22,18 @@ use crate::raycast::{Ray, Raycaster};
 use crate::space::Space;
 use crate::util::{ConciseDebug, MapExtend, Refmt as _};
 
+#[cfg(doc)]
+use crate::raycast::RaycastStep;
+
+/// Conditional debug prints used for development of `escape_along_ray`.
+/// Hard-disabled by default.
+macro_rules! println_escape_debug {
+    ($($args:tt)*) => {
+        // std::eprintln!($($args:tt)*)
+        {}
+    };
+}
+
 /// An individual collision contact; something in a [`Space`] that a moving [`Aab`]
 /// collided with.
 ///
@@ -149,9 +161,34 @@ impl Geometry for Contact {
 /// Result of [`collide_along_ray`] which specifies a collision point possibly inside the cube.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct CollisionRayEnd {
-    /// Non-colliding length of the provided ray.
+    /// Non-colliding length of the provided ray. This is in units of the ray's direction
+    /// vector's length, *not* ordinary space coordinates.
     pub t_distance: FreeCoordinate,
     pub contact: Contact,
+}
+
+impl CollisionRayEnd {
+    /// Given a voxel collision, convert it to a block collision.
+    fn wrap_as_voxel(self, cube: Cube, resolution: Resolution) -> CollisionRayEnd {
+        let CollisionRayEnd {
+            t_distance: voxel_t_distance,
+            contact,
+        } = self;
+
+        match contact {
+            Contact::Block(voxel) => CollisionRayEnd {
+                // We don't need to adjust the distance because the ray length
+                // will have been scaled appropriately itself.
+                t_distance: voxel_t_distance,
+                contact: Contact::Voxel {
+                    cube,
+                    resolution,
+                    voxel,
+                },
+            },
+            Contact::Voxel { .. } => panic!("encountered 3-level voxel recursion"),
+        }
+    }
 }
 
 /// Specifies the ending condition for [`collide_along_ray()`]: what type of situation
@@ -164,7 +201,9 @@ pub(crate) enum StopAt {
     /// Stop when something new is collided with (excluding the starting position).
     NotAlreadyColliding,
     /// Stop at the first position where nothing is being collided with.
-    #[allow(dead_code)] // TODO: write tests and use this in the implementation of push_out()
+    ///
+    /// TODO: Remove this as it doesn't work.
+    #[allow(dead_code)]
     EmptySpace,
 }
 
@@ -182,10 +221,11 @@ impl StopAt {
 /// and find the first point at which it collides with `space`'s collidable blocks.
 ///
 /// The return value specifies the distance achieved and the normal (face) of the surface collided
-///  with; if [`None`], then no obstacles were met along the full length of the line segment.
+///  with; if [`None`], then no obstacles were met along the full length of the line segment (or,
+/// if `stop_at` is [`StopAt::EmptySpace`], then no empty space was found).
 ///
 /// `collision_callback` is called once for each colliding cube — any one of them would have been
-/// sufficient to stop the ray, but all are reported.
+/// sufficient to stop the ray, but all are reported. TODO: This description isn't quite right
 pub(crate) fn collide_along_ray<Sp, CC>(
     space: &Sp,
     ray: Ray,
@@ -209,7 +249,7 @@ where
     // cases), but this would be an optimization which only affects the unusual case of
     // being out of bounds, so it's not worth doing unless we specifically expect to have
     // many bodies outside a space and occasionally inside.
-    for ray_step in aab_raycast(aab, ray, stop_at.reversed()) {
+    'ray_step: for ray_step in aab_raycast(aab, ray, stop_at.reversed()) {
         let offset_segment = nudge_on_ray(
             aab,
             ray.scale_direction(ray_step.t_distance()),
@@ -228,7 +268,7 @@ where
         let potential_intersection_bounds =
             match step_aab.round_up_to_grid().intersection(space.bounds()) {
                 Some(aab) => aab,
-                None => continue,
+                None => continue 'ray_step,
             };
 
         // Loop over all the cubes that our AAB is just now intersecting and check if
@@ -237,7 +277,7 @@ where
         // cubes that must have been detected in the _previous_ step.
         let mut something_hit = None;
         let mut nothing_hit = true;
-        for cube in potential_intersection_bounds.interior_iter() {
+        'potential_collision: for cube in potential_intersection_bounds.interior_iter() {
             let cell = space.get_cell(cube);
             let full_cube_end = CollisionRayEnd {
                 t_distance: ray_step.t_distance(),
@@ -249,12 +289,13 @@ where
             let found_end = match Sp::collision(cell) {
                 Some(BlockCollision::None) => {
                     // No collision for this block
-                    continue;
+                    continue 'potential_collision;
                 }
                 Some(BlockCollision::Hard) => full_cube_end,
-                None /* recursion */ => {
+                None => {
+                    // Recursion
                     if let Some(found_end) = Sp::recurse(
-                        full_cube_end.clone(),
+                        cube,
                         aab,
                         ray,
                         cell,
@@ -269,7 +310,7 @@ where
                         found_end
                     } else {
                         // No collision
-                        continue;
+                        continue 'potential_collision;
                     }
                 }
             };
@@ -284,9 +325,9 @@ where
                     // maybe there's no clear direction.)
                     already_colliding.insert(found_end.contact);
                     collision_callback(found_end.contact);
-                    continue;
+                    continue 'potential_collision;
                 } else if already_colliding.contains(&found_end.contact.without_normal()) {
-                    continue;
+                    continue 'potential_collision;
                 }
             }
 
@@ -322,6 +363,138 @@ where
         }
     }
 
+    // We reach here if the loop reached the end of the line without finding a `stop_at`
+    // point, *or* if the line is zero length (in which case `aab_raycast` stops).
+    None
+}
+
+/// Move `aab`'s origin along the line segment from `ray.origin` to `ray.origin + ray.direction`,
+/// and find the first point at which it **does not** collide with `space`'s collidable blocks.
+///
+/// The return value specifies the distance achieved in units of `ray`'s length, or [`None`] if
+/// no empty space was found along that length.
+///
+/// TODO: This function doesn't yet work well enough to use.
+//---
+// Design note: This is not the same code as `collide_along_ray()` because so much of the
+// control flow needs to have opposite logic that it is more confusing than helpful to
+// combine them.
+pub(crate) fn escape_along_ray<Sp>(space: &Sp, ray: Ray, aab: Aab) -> Option<CollisionRayEnd>
+where
+    Sp: CollisionSpace,
+{
+    println_escape_debug!("* entering escape_along_ray {ray:?}");
+
+    // A cube we collided with on the previous step, used to produce the end information
+    // in the non-recursive case.
+    let mut last_obstacle: Option<Cube> = None;
+
+    // TODO: Useful optimization for large AABs would be skipping forward whenever
+    // we have at least one contact.
+    'ray_step: for ray_step in aab_raycast(aab, ray, true) {
+        println_escape_debug!("  step {ray_step:?}");
+        let offset_segment = nudge_on_ray(
+            aab,
+            ray.scale_direction(ray_step.t_distance()),
+            ray_step.face().opposite(),
+            R1,
+            false,
+        );
+        let step_aab = aab.translate(offset_segment.unit_endpoint().to_vector());
+        if ray_step.t_distance() >= 1.0 {
+            // Space is fully obstructed along the entire ray.
+            break 'ray_step;
+        }
+
+        // Compute the AAB of the potential intersection, excluding the exterior of the
+        // space.
+        let potential_intersection_bounds =
+            step_aab.round_up_to_grid().intersection(space.bounds());
+
+        let mut farthest_recursive_end: Option<CollisionRayEnd> = None;
+        // Loop over all the cubes that our AAB is currently intersecting.
+        for cube in potential_intersection_bounds
+            .iter()
+            .flat_map(|aab| aab.interior_iter())
+        {
+            let cell = space.get_cell(cube);
+            match Sp::collision(cell) {
+                Some(BlockCollision::None) => {
+                    // No collision for this block
+                }
+                Some(BlockCollision::Hard) => {
+                    // Collided with this block, so we need to look further to find free space
+                    last_obstacle = Some(cube);
+                    continue 'ray_step;
+                }
+                None => {
+                    // Recursion
+                    println_escape_debug!("  > recursing into {cube:?}");
+                    let found_end = Sp::recurse_escape(cube, aab, ray, cell);
+                    println_escape_debug!("  < exiting recursion {found_end:?}");
+                    if let Some(found_end) = found_end {
+                        if found_end.t_distance
+                            > farthest_recursive_end
+                                .as_ref()
+                                .map_or(0., |end| end.t_distance)
+                        {
+                            farthest_recursive_end = Some(found_end);
+                        }
+                    }
+                }
+            }
+        }
+
+        // If we didn't continue 'ray_step, then we have found a free spot based on the cubes we
+        // scanned. However, if it's recursive, then we've advanced forward a little bit, which
+        // might introduce *new* collisions, so we need to do an extra check.
+        match farthest_recursive_end {
+            Some(end) => {
+                if collides_at_end(space, aab, ray, &end) {
+                    // Other obstacles. Keep going forward.
+                } else {
+                    println_escape_debug!("  found free space after recursion {end:?}");
+                    return Some(end);
+                }
+            }
+            None => {
+                // Report having lost contact with the last_obstacle cube.
+                // Or if there was none (no intersection even from the start),
+                // return the origin cube as a placeholder.
+                let end = match last_obstacle {
+                    Some(cube) => {
+                        let end = CollisionRayEnd {
+                            t_distance: ray_step.t_distance(),
+                            contact: Contact::Block(CubeFace {
+                                cube,
+                                face: ray_step.face().opposite(),
+                            }),
+                        };
+                        println_escape_debug!("  returning last_obstacle {end:?}");
+                        end
+                    }
+                    None => {
+                        println_escape_debug!("  no obstacles, returning origin");
+                        CollisionRayEnd {
+                            t_distance: 0.,
+                            contact: Contact::Block(CubeFace {
+                                cube: Cube::containing(ray.origin).unwrap_or(Cube::ORIGIN),
+                                face: Face7::Within,
+                            }),
+                        }
+                    }
+                };
+                debug_assert!(
+                    !collides_at_end(space, aab, ray, &end),
+                    "failed to find actually non-colliding point"
+                );
+                return Some(end);
+            }
+        }
+    }
+
+    // We reach here if the loop reached the end of the line without finding a free spot,
+    // either by the t_distance check or because it has zero direction.
     None
 }
 
@@ -346,6 +519,20 @@ where
     points.into_iter()
 }
 
+/// Returns whether `collision_box` translated to the point along `ray` specified by `end`
+/// collides with anything in `space`.
+fn collides_at_end<Sp>(space: &Sp, collision_box: Aab, ray: Ray, end: &CollisionRayEnd) -> bool
+where
+    Sp: CollisionSpace,
+{
+    let proposed_aab = collision_box.translate(
+        ray.scale_direction(end.t_distance)
+            .unit_endpoint()
+            .to_vector(),
+    );
+    find_colliding_cubes(space, proposed_aab).next().is_some()
+}
+
 /// Abstraction over voxel arrays that the collision detection algorithm can use,
 /// i.e. [`Space`] and `Vol<Arc<[Evoxel]>>`.
 pub(crate) trait CollisionSpace {
@@ -365,16 +552,23 @@ pub(crate) trait CollisionSpace {
     /// TODO: document
     fn get_voxels(cell: &Self::Cell) -> Option<&Evoxels>;
 
-    /// TODO: document
+    /// Recursion helper for [`collide_along_ray()`].
+    /// This breaks the infinite static recursion we would get otherwise,
+    /// by only compiling into a call to [`collide_along_ray()`] if there is anything to do.
+    /// TODO: document further
     ///
     /// * `entry_end`: the endpoint we would return if the recursion stopped here — entering the given cell.
     fn recurse(
-        entry_end: CollisionRayEnd,
+        cube: Cube,
         aab: Aab,
         ray: Ray,
         cell: &Self::Cell,
         stop_at: StopAt,
     ) -> Option<CollisionRayEnd>;
+
+    /// Recursion helper for [`escape_along_ray()`].
+    fn recurse_escape(cube: Cube, aab: Aab, ray: Ray, cell: &Self::Cell)
+        -> Option<CollisionRayEnd>;
 }
 
 impl CollisionSpace for Space {
@@ -401,19 +595,19 @@ impl CollisionSpace for Space {
 
     #[inline]
     fn recurse(
-        entry_end: CollisionRayEnd,
+        cube: Cube,
         space_aab: Aab,
         space_ray: Ray,
         evaluated: &EvaluatedBlock,
         stop_at: StopAt,
     ) -> Option<CollisionRayEnd> {
         match &evaluated.voxels {
-            // Plain non-recursive collision
-            Evoxels::One(_) => Some(entry_end),
+            // Unreachable unless the evaluated block is falsely claiming lack of uniform
+            // collision. TODO: Stop needing this branch by using the methods of Evoxels
+            // instead of a match.
+            Evoxels::One(_) => unreachable!(),
             &Evoxels::Many(resolution, ref voxels) => {
-                let cube_translation = entry_end
-                    .contact
-                    .cube()
+                let cube_translation = cube
                     .lower_bounds()
                     .to_vector()
                     .map(|s| -FreeCoordinate::from(s));
@@ -422,29 +616,37 @@ impl CollisionSpace for Space {
                 // Note: aab is not translated since it's relative to the ray anyway.
                 let voxel_aab = space_aab.scale(scale);
                 let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
-                if let Some(hit_voxel) =
-                    collide_along_ray(voxels, voxel_ray, voxel_aab, |_| {}, stop_at)
-                {
-                    let CollisionRayEnd {
-                        t_distance: voxel_t_distance,
-                        contact,
-                    } = hit_voxel;
+                let result = collide_along_ray(voxels, voxel_ray, voxel_aab, |_| {}, stop_at);
+                result.map(|end| end.wrap_as_voxel(cube, resolution))
+            }
+        }
+    }
 
-                    match contact {
-                        Contact::Block(voxel) => Some(CollisionRayEnd {
-                            t_distance: voxel_t_distance,
-                            contact: Contact::Voxel {
-                                cube: entry_end.contact.cube(),
-                                resolution,
-                                voxel,
-                            },
-                        }),
-                        Contact::Voxel { .. } => panic!("encountered 3-level voxel recursion"),
-                    }
-                } else {
-                    // Didn't hit anything within this block.
-                    None
-                }
+    #[inline]
+    fn recurse_escape(
+        cube: Cube,
+        space_aab: Aab,
+        space_ray: Ray,
+        evaluated: &EvaluatedBlock,
+    ) -> Option<CollisionRayEnd> {
+        match &evaluated.voxels {
+            // Unreachable unless the evaluated block is falsely claiming lack of uniform
+            // collision. TODO: Stop needing this branch by using the methods of Evoxels
+            // instead of a match.
+            Evoxels::One(_) => unreachable!(),
+            &Evoxels::Many(resolution, ref voxels) => {
+                // TODO: deduplicate scaling code
+                let cube_translation = cube
+                    .lower_bounds()
+                    .to_vector()
+                    .map(|s| -FreeCoordinate::from(s));
+                let scale = FreeCoordinate::from(resolution);
+                // Transform our original AAB and ray so that it is in the coordinate system of the block voxels.
+                // Note: aab is not translated since it's relative to the ray anyway.
+                let voxel_aab = space_aab.scale(scale);
+                let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
+                let result = escape_along_ray(voxels, voxel_ray, voxel_aab);
+                result.map(|end| end.wrap_as_voxel(cube, resolution))
             }
         }
     }
@@ -476,13 +678,20 @@ impl CollisionSpace for Vol<Arc<[Evoxel]>> {
     }
     #[inline(always)]
     fn recurse(
-        entry_end: CollisionRayEnd,
+        _cube: Cube,
         _aab: Aab,
         _local_ray: Ray,
         _cell: &Self::Cell,
         _stop_at: StopAt,
     ) -> Option<CollisionRayEnd> {
-        Some(entry_end)
+        // collision() never returns None so this should never be called
+        unreachable!()
+    }
+
+    #[inline(always)]
+    fn recurse_escape(_: Cube, _: Aab, _: Ray, _: &Self::Cell) -> Option<CollisionRayEnd> {
+        // collision() never returns None so this should never be called
+        unreachable!()
     }
 }
 
@@ -490,7 +699,8 @@ impl CollisionSpace for Vol<Arc<[Evoxel]>> {
 /// the positions where the AAB moves into new cubes. The returned ray steps' `t_distance`
 /// values report how far to move the AAB to meet the edge.
 ///
-/// If `reversed` is true, find positions where it leaves cubes.
+/// If `reversed` is true, find positions where it leaves cubes (which will be the
+/// [`RaycastStep::cube_behind()`] of each step).
 ///
 /// Note that due to the nature of floating-point arithmetic, it is uncertain whether the
 /// resulting new AAB position will have the AAB's forward face land before, after, or
@@ -711,6 +921,124 @@ mod tests {
                 ]
             )
         )
+    }
+
+    #[test]
+    fn escape_past_simple_face() {
+        let ray = Ray::new([0.0, 0.0, 0.0], [0., 16., 0.]);
+        escape_along_ray_tester(
+            ray,
+            |_u| {
+                let [block] = make_some_blocks();
+                [AIR, block]
+            },
+            Some(CollisionRayEnd {
+                t_distance: 1.0 / ray.direction.length(),
+                contact: Contact::Block(CubeFace {
+                    cube: Cube::new(1, 0, 0),
+                    face: Face7::PY,
+                }),
+            }),
+        );
+    }
+
+    /// [`escape_along_ray()`] where the end point is against a recursive face
+    /// and no other recursive blocks are involved.
+    #[test]
+    fn escape_to_recursive_face_once() {
+        let ray = Ray::new([0.0, 0.0, 0.0], [0., 16., 0.]);
+        escape_along_ray_tester(
+            ray,
+            |u| [AIR, make_slab(u, 1, R2)],
+            Some(CollisionRayEnd {
+                // halfway through one block
+                t_distance: 0.5 / ray.direction.length(),
+                contact: Contact::Voxel {
+                    cube: Cube::new(1, 0, 0),
+                    resolution: R2,
+                    voxel: CubeFace {
+                        cube: Cube::new(0, 0, 0),
+                        face: Face7::PY,
+                    },
+                },
+            }),
+        );
+    }
+
+    /// [`escape_along_ray()`] where the end point is *not* the recursive face first
+    /// encountered.
+    #[test]
+    fn escape_past_recursive_face() {
+        let ray = Ray::new([0.0, 0.0, 0.0], [0., 16., 0.]);
+        escape_along_ray_tester(
+            ray,
+            |u| {
+                let [block] = make_some_blocks();
+                [block, make_slab(u, 1, R2)]
+            },
+            Some(CollisionRayEnd {
+                t_distance: 1.0 / ray.direction.length(),
+                contact: Contact::Block(CubeFace {
+                    cube: Cube::new(0, 0, 0),
+                    face: Face7::PY,
+                }),
+            }),
+        );
+    }
+
+    /// [`escape_along_ray()`] with two different recursive faces
+    #[test]
+    fn escape_two_recursive_face() {
+        let ray = Ray::new([0.0, 0.0, 0.0], [0., 16., 0.]);
+        escape_along_ray_tester(
+            ray,
+            |u| [make_slab(u, 1, R4), make_slab(u, 2, R4)],
+            Some(CollisionRayEnd {
+                t_distance: 0.5 / ray.direction.length(),
+                contact: Contact::Voxel {
+                    cube: Cube::new(1, 0, 0),
+                    resolution: R4,
+                    voxel: CubeFace {
+                        cube: Cube::new(0, 1, 0),
+                        face: Face7::PY,
+                    },
+                },
+            }),
+        );
+    }
+
+    /// [`escape_along_ray()`] without any collisions at all
+    #[test]
+    fn escape_no_collision() {
+        let ray = Ray::new([0.0, 0.0, 0.0], [0., 16., 0.]);
+        escape_along_ray_tester(
+            ray,
+            |_| [AIR, AIR],
+            Some(CollisionRayEnd {
+                t_distance: 0.,
+                contact: Contact::Block(CubeFace {
+                    cube: Cube::new(0, 0, 0),
+                    face: Face7::Within,
+                }),
+            }),
+        );
+    }
+    fn escape_along_ray_tester(
+        ray: Ray,
+        block_gen: fn(&mut Universe) -> [Block; 2],
+        expected_end: Option<CollisionRayEnd>,
+    ) {
+        let u = &mut Universe::new();
+        let blocks = block_gen(u);
+        let mut space = Space::empty_positive(2, 1, 1);
+        space.set([0, 0, 0], &blocks[0]).unwrap();
+        space.set([1, 0, 0], &blocks[1]).unwrap();
+        print_space(&space, [1., 1., 1.]);
+
+        let aab = Aab::from_lower_upper([0., 0., 0.], [1.5, 1.5, 1.5]);
+
+        let result = escape_along_ray(&space, ray, aab);
+        assert_eq!(result, expected_end);
     }
 
     #[test]

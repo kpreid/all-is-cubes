@@ -11,7 +11,7 @@ use ordered_float::NotNan;
 use num_traits::float::Float as _;
 
 use super::collision::{
-    aab_raycast, collide_along_ray, find_colliding_cubes, nudge_on_ray, Contact,
+    aab_raycast, collide_along_ray, escape_along_ray, find_colliding_cubes, nudge_on_ray, Contact,
 };
 use crate::block::{BlockCollision, Resolution};
 #[cfg(not(feature = "std"))]
@@ -500,15 +500,14 @@ impl Body {
         direction: FreeVector,
     ) -> Option<(FreePoint, NotNan<FreeCoordinate>)> {
         if false {
-            // TODO: This attempted implementation does not work, causing lots of falling into
-            // blocks. But if we can fix the bugs, it will make push-out actually work with
-            // recursive blocks. (It's why I added StopAt::EmptySpace.)
+            // TODO: This attempted reimplementation does not work yet.
+            // Once `escape_along_ray()` is working properly, we can enable this and make
+            // push-out actually work with recursive blocks.
 
             let direction = direction.normalize(); // TODO: set this to a max distance
             let ray = Ray::new(self.position, direction);
 
-            let end =
-                collide_along_ray(space, ray, self.collision_box, |_| {}, StopAt::EmptySpace)?;
+            let end = escape_along_ray(space, ray, self.collision_box)?;
 
             let nudged_distance = end.t_distance + POSITION_EPSILON;
             Some((
