@@ -200,32 +200,16 @@ pub(crate) enum StopAt {
     Anything,
     /// Stop when something new is collided with (excluding the starting position).
     NotAlreadyColliding,
-    /// Stop at the first position where nothing is being collided with.
-    ///
-    /// TODO: Remove this as it doesn't work.
-    #[allow(dead_code)]
-    EmptySpace,
-}
-
-impl StopAt {
-    fn reversed(self) -> bool {
-        match self {
-            StopAt::Anything => false,
-            StopAt::NotAlreadyColliding => false,
-            StopAt::EmptySpace => true,
-        }
-    }
 }
 
 /// Move `aab`'s origin along the line segment from `ray.origin` to `ray.origin + ray.direction`,
 /// and find the first point at which it collides with `space`'s collidable blocks.
 ///
 /// The return value specifies the distance achieved and the normal (face) of the surface collided
-///  with; if [`None`], then no obstacles were met along the full length of the line segment (or,
-/// if `stop_at` is [`StopAt::EmptySpace`], then no empty space was found).
+///  with; if [`None`], then no obstacles were met along the full length of the line segment.
 ///
 /// `collision_callback` is called once for each colliding cube — any one of them would have been
-/// sufficient to stop the ray, but all are reported. TODO: This description isn't quite right
+/// sufficient to stop the ray, but all are reported. It is not called for each voxel of each cube.
 pub(crate) fn collide_along_ray<Sp, CC>(
     space: &Sp,
     ray: Ray,
@@ -249,13 +233,13 @@ where
     // cases), but this would be an optimization which only affects the unusual case of
     // being out of bounds, so it's not worth doing unless we specifically expect to have
     // many bodies outside a space and occasionally inside.
-    'ray_step: for ray_step in aab_raycast(aab, ray, stop_at.reversed()) {
+    'ray_step: for ray_step in aab_raycast(aab, ray, false) {
         let offset_segment = nudge_on_ray(
             aab,
             ray.scale_direction(ray_step.t_distance()),
             ray_step.face().opposite(),
             R1,
-            stop_at.reversed(),
+            false,
         );
         let step_aab = aab.translate(offset_segment.unit_endpoint().to_vector());
         if ray_step.t_distance() >= 1.0 {
@@ -276,7 +260,6 @@ where
         // TODO: Useful optimization for large AABs would be skipping all the interior
         // cubes that must have been detected in the _previous_ step.
         let mut something_hit = None;
-        let mut nothing_hit = true;
         'potential_collision: for cube in potential_intersection_bounds.interior_iter() {
             let cell = space.get_cell(cube);
             let full_cube_end = CollisionRayEnd {
@@ -315,9 +298,6 @@ where
                 }
             };
 
-            // If we didn't continue then we hit something.
-            nothing_hit = false;
-
             if stop_at == StopAt::NotAlreadyColliding {
                 if found_end.contact.normal() == Face7::Within {
                     // If we start intersecting a block, we are allowed to leave it; pretend
@@ -344,22 +324,8 @@ where
         }
 
         // Now that we've found _all_ the contacts for this step, report the collision.
-        match stop_at {
-            StopAt::Anything | StopAt::NotAlreadyColliding => {
-                if let Some(end) = something_hit {
-                    return Some(end);
-                }
-            }
-            StopAt::EmptySpace => {
-                if nothing_hit {
-                    return Some(CollisionRayEnd {
-                        t_distance: ray_step.t_distance(),
-                        // TODO: incorrect result; this should arguably refer to the surface we're
-                        // just *leaving*, and in any case should use recursion
-                        contact: Contact::Block(ray_step.cube_face()),
-                    });
-                }
-            }
+        if let Some(end) = something_hit {
+            return Some(end);
         }
     }
 
