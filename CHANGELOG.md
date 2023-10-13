@@ -47,6 +47,10 @@
     - Renamed `dynamic::ChunkedSpaceMesh::update_blocks_and_some_chunks()` to `update()`, which is shorter and also more accurate nowadays since it isn't guaranteed to update all blocks.
     - `dynamic::ChunkedSpaceMesh` requires a texture allocator passed to `new()` instead of `update()`.
 
+- `all-is-cubes-ui` library:
+    - `apps::Session::set_universe_async()` has been replaced with the more flexible `set_main_task()`.
+      It can do several things via the `MainTaskContext` type.
+
 ### Removed
 
 - `all-is-cubes` library:

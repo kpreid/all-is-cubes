@@ -153,6 +153,7 @@ name = "all-is-cubes-ui"
 version = "0.7.0"
 dependencies = [
  "all-is-cubes",
+ "async_fn_traits",
  "displaydoc",
  "exhaust",
  "futures-core",
@@ -160,6 +161,7 @@ dependencies = [
  "futures-util",
  "indoc",
  "log",
+ "scopeguard",
 ]
 
 [[package]]
@@ -229,6 +231,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39e9c3835d686b0a6084ab4234fcd1b07dbf6e4767dce60874b12356a25ecd4a"
 dependencies = [
  "libloading 0.7.4",
+]
+
+[[package]]
+name = "async_fn_traits"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc58d489c5f2d2c5be31b9004cec7af25a70d23df4d8111715eee736234cf217"
+dependencies = [
+ "paste",
 ]
 
 [[package]]

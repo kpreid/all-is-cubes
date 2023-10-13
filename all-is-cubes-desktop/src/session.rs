@@ -2,11 +2,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use all_is_cubes::arcstr;
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::listen::{DirtyFlag, ListenableCell, Listener};
 #[cfg(doc)]
 use all_is_cubes::universe::Universe;
 use all_is_cubes::universe::UniverseStepInfo;
+use all_is_cubes_ui::apps::ExitMainTask;
 
 use crate::record;
 use crate::Session;
@@ -129,7 +131,8 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         Ok(())
     }
 
-    /// Replace the session's universe with one whose contents are the given file.
+    /// Replace the session's universe with one whose contents are the given file,
+    /// in a manner appropriate for e.g. the user dropping a file on the window.
     ///
     /// See [`all_is_cubes_port::load_universe_from_file`] for supported formats.
     ///
@@ -140,23 +143,35 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
     pub fn replace_universe_with_file(&mut self, path: PathBuf) {
         let altered = self.session_altered.listener();
 
-        // TODO: Offer confirmation before replacing the current universe.
-        // Also a progress bar and other UI.
-        self.session.set_universe_async(async move {
-            let universe = all_is_cubes_port::load_universe_from_file(
+        // TODO: Also make a way to do this that isn't replacing the main task,
+        // or that defines a way for the existing main task to coordinate.
+        self.session.set_main_task(move |ctx| async move {
+            // TODO: Offer confirmation before replacing the current universe.
+            // TODO: Then open a progress-bar UI page while we load.
+
+            // TODO: spawn the actual work instead of doing it in this task
+            match all_is_cubes_port::load_universe_from_file(
                 crate::glue::tokio_yield_progress().build(),
                 Arc::new(path.clone()),
             )
             .await
-            .map_err(|e| {
-                // TODO: show error in user interface
-                log::error!("Failed to load file '{}':\n{}", path.display(), e);
-            })?;
+            {
+                Ok(universe) => {
+                    ctx.set_universe(universe);
 
-            // TODO: this should be a notification we get from the `Session` instead
-            altered.receive(&[()]);
+                    // TODO: this should be a notification we get from the `Session` instead
+                    altered.receive(&[()]);
+                }
+                Err(e) => {
+                    ctx.show_modal_message(arcstr::format!(
+                        "Failed to load file '{}':\n{}",
+                        path.display(),
+                        e
+                    ));
+                }
+            }
 
-            Ok(universe)
+            ExitMainTask
         })
     }
 

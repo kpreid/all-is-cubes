@@ -4,6 +4,7 @@ use core::future::Future;
 use core::marker::PhantomData;
 use core::task::{Context, Poll};
 use std::sync::mpsc::{self, TryRecvError};
+use std::sync::Mutex;
 
 use futures_core::future::BoxFuture;
 use futures_task::noop_waker_ref;
@@ -50,9 +51,11 @@ pub struct Session<I> {
     game_character: ListenableCellWithLocal<Option<Handle<Character>>>,
     space_watch_state: SpaceWatchState,
 
-    /// If present, a future that should be polled to produce a new [`Universe`]
-    /// to replace `self.game_universe`. See [`Self::set_universe_async`].
-    game_universe_in_progress: Option<BoxFuture<'static, Result<Universe, ()>>>,
+    /// If present, a future that is polled at the beginning of stepping,
+    /// which may read or write parts of the session state via the context it was given.
+    main_task: Option<BoxFuture<'static, ExitMainTask>>,
+
+    task_context_inner: Arc<Mutex<Option<TaskContextInner>>>,
 
     /// Outputs [`Fluff`] from the game character's viewpoint and also the session UI.
     //---
@@ -91,7 +94,8 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
             game_universe,
             game_character,
             space_watch_state,
-            game_universe_in_progress,
+            main_task,
+            task_context_inner,
             fluff_notifier,
             paused,
             ui,
@@ -110,10 +114,8 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
             .field("game_universe", game_universe)
             .field("game_character", game_character)
             .field("space_watch_state", space_watch_state)
-            .field(
-                "game_universe_in_progress",
-                &game_universe_in_progress.as_ref().map(|_| "..."),
-            )
+            .field("main_task", &main_task.as_ref().map(|_| "..."))
+            .field("task_context_inner", task_context_inner)
             .field("fluff_notifier", fluff_notifier)
             .field("paused", &paused)
             .field("ui", &ui)
@@ -142,9 +144,6 @@ impl<I: time::Instant> Session<I> {
     /// Replace the game universe, such as on initial startup or because the player
     /// chose to load a new one.
     pub fn set_universe(&mut self, u: Universe) {
-        // Clear any previous set_universe_async.
-        self.game_universe_in_progress = None;
-
         self.game_universe = u;
         self.game_character
             .set(self.game_universe.get_default_character());
@@ -163,23 +162,24 @@ impl<I: time::Instant> Session<I> {
         self.sync_character_space();
     }
 
-    /// Perform [`Self::set_universe`] on the result of the provided future when it
-    /// completes.
+    /// Install a main task in the session, replacing any existing one.
     ///
-    /// This is intended to be used for simultaneously initializing the UI and universe.
-    /// Later upgrades might might add a loading screen.
+    /// The main task is an `async` task (that is, a [`Future`] that will be polled without further
+    /// intervention) which executes interleaved with this session's routine operations done by
+    /// [`Session::maybe_step_universe()`], and therefore has the opportunity to intervene in them.
     ///
-    /// The future will be cancelled if [`Self::set_universe_async`] or
-    /// [`Self::set_universe`] is called before it completes.
-    /// Currently, the future is polled once per frame unconditionally.
     ///
-    /// If the future returns `Err`, then the current universe is not replaced. There is
-    /// not any mechanism to display an error message; that must be done separately.
-    pub fn set_universe_async<F>(&mut self, future: F)
+    /// The main task is given a [`MainTaskContext`] by which it can manipulate the session.
+    /// The context will panic if it is used at times when the main task is not running.
+    pub fn set_main_task<F>(&mut self, task_ctor: F)
     where
-        F: Future<Output = Result<Universe, ()>> + Send + 'static,
+        F: async_fn_traits::AsyncFnOnce1<MainTaskContext, Output = ExitMainTask>,
+        F::OutputFuture: Send + 'static,
     {
-        self.game_universe_in_progress = Some(Box::pin(future));
+        let context = MainTaskContext {
+            inner: self.task_context_inner.clone(),
+        };
+        self.main_task = Some(Box::pin(task_ctor(context)));
     }
 
     /// Returns the current game universe owned by this session.
@@ -229,10 +229,10 @@ impl<I: time::Instant> Session<I> {
         self.fluff_notifier.listen(listener)
     }
 
-    /// Steps the universe if the `FrameClock` says it's time to do so.
-    /// Always returns info for the last step even if multiple steps were taken.
+    /// Steps the universe if the [`FrameClock`] says it's time to do so.
+    /// Also may update other session state from any incoming events.
     ///
-    /// Also applies input from the control channel. TODO: Should that be separate?
+    /// Always returns info for the last step even if multiple steps were taken.
     pub fn maybe_step_universe(&mut self) -> Option<UniverseStepInfo> {
         self.sync_character_space();
 
@@ -244,6 +244,9 @@ impl<I: time::Instant> Session<I> {
                         if let Some(ui) = &mut self.ui {
                             ui.back();
                         }
+                    }
+                    ControlMessage::ShowModal(message) => {
+                        self.show_modal_message(message);
                     }
                     ControlMessage::EnterDebug => {
                         if let Some(ui) = &mut self.ui {
@@ -290,6 +293,9 @@ impl<I: time::Instant> Session<I> {
                     ControlMessage::ToggleMouselook => {
                         self.input_processor.toggle_mouselook_mode();
                     }
+                    ControlMessage::SetUniverse(universe) => {
+                        self.set_universe(universe);
+                    }
                     ControlMessage::ModifyGraphicsOptions(f) => {
                         self.graphics_options.set(f(self.graphics_options.get()));
                     }
@@ -302,25 +308,32 @@ impl<I: time::Instant> Session<I> {
             }
         }
 
-        if let Some(future) = self.game_universe_in_progress.as_mut() {
+        if let Some(future) = self.main_task.as_mut() {
+            {
+                let mut context_guard = match self.task_context_inner.lock() {
+                    Ok(g) => g,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                *context_guard = Some(TaskContextInner {
+                    control_channel_sender: self.control_channel_sender.clone(),
+                });
+            }
+            // Reset on drop even if the future panics
+            let _reset_on_drop = scopeguard::guard((), |()| {
+                let mut context_guard = match self.task_context_inner.lock() {
+                    Ok(g) => g,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                *context_guard = None;
+            });
+
             match future
                 .as_mut()
                 .poll(&mut Context::from_waker(noop_waker_ref()))
             {
                 Poll::Pending => {}
-                Poll::Ready(result) => {
-                    self.game_universe_in_progress = None;
-                    match result {
-                        Ok(universe) => {
-                            self.set_universe(universe);
-                        }
-                        Err(()) => {
-                            // No error reporting, for now; let it be the caller's resposibility
-                            // (which we indicate by making the error type be ()).
-                            // There should be something, but it's not clear what; perhaps
-                            // it will become clearer as the UI gets fleshed out.
-                        }
-                    }
+                Poll::Ready(ExitMainTask) => {
+                    self.main_task = None;
                 }
             }
         }
@@ -640,7 +653,8 @@ impl<I: time::Instant> SessionBuilder<I> {
             game_character,
             game_universe,
             space_watch_state,
-            game_universe_in_progress: None,
+            main_task: None,
+            task_context_inner: Arc::new(Mutex::new(None)),
             fluff_notifier: Arc::new(listen::Notifier::new()),
             paused,
             control_channel: control_recv,
@@ -706,11 +720,15 @@ pub(crate) enum ControlMessage {
     /// Save the game universe back to its [`WhenceUniverse`].
     Save,
 
+    ShowModal(ArcStr),
+
     EnterDebug,
 
     TogglePause,
 
     ToggleMouselook,
+
+    SetUniverse(Universe),
 
     /// TODO: this should be "modify user preferences", from which graphics options are derived.
     ModifyGraphicsOptions(Box<dyn FnOnce(Arc<GraphicsOptions>) -> Arc<GraphicsOptions> + Send>),
@@ -722,10 +740,12 @@ impl fmt::Debug for ControlMessage {
         match self {
             Self::Back => write!(f, "Back"),
             Self::Save => write!(f, "Save"),
+            Self::ShowModal(_msg) => f.debug_struct("ShowModal").finish_non_exhaustive(),
             Self::EnterDebug => write!(f, "EnterDebug"),
             Self::TogglePause => write!(f, "TogglePause"),
             Self::ToggleMouselook => write!(f, "ToggleMouselook"),
-            Self::ModifyGraphicsOptions(_f) => f
+            Self::SetUniverse(_u) => f.debug_struct("SetUniverse").finish_non_exhaustive(),
+            Self::ModifyGraphicsOptions(_func) => f
                 .debug_struct("ModifyGraphicsOptions")
                 .finish_non_exhaustive(),
         }
@@ -847,6 +867,81 @@ pub enum QuitCancelled {
     UserCancelled,
 }
 
+/// Indicates that a [`Session`]'s main task wishes to exit, leaving the session
+/// only controlled externally.
+///
+/// This type carries no information and merely exists to distinguish an intentional exit
+/// from accidentally returning [`()`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
+pub struct ExitMainTask;
+
+/// Given to the task of a [`Session::set_main_task()`] to allow manipulating the session.
+#[derive(Debug)]
+
+pub struct MainTaskContext {
+    inner: Arc<Mutex<Option<TaskContextInner>>>,
+}
+
+impl MainTaskContext {
+    /// Replaces the session's universe.
+    ///
+    /// Panics if called while the main task is suspended.
+    pub fn set_universe(&self, universe: Universe) {
+        self.with(|ctx| {
+            // TODO: Instead of using the control channel, this should have an immediate
+            // side-effect. That'll be trickier to implement, so not bothering for now.
+            ctx.control_channel_sender
+                .send(ControlMessage::SetUniverse(universe))
+                .unwrap();
+        })
+    }
+
+    /// Display a dialog box with a message. The user can exit the dialog box to return
+    /// to the previous UI page.
+    ///
+    /// The message may contain newlines and will be word-wrapped.
+    ///
+    /// If this session was constructed without UI then the message will be logged instead.
+    ///
+    /// Caution: calling this repeatedly will currently result in stacking up arbitrary
+    /// numbers of dialogs. Avoid using it for situations not in response to user action.
+    //---
+    // TODO: We should have some kind of UI state management framework that coordinates
+    // the main task with VUI pages, so that the main task can pop messages at opportune
+    // times.
+    pub fn show_modal_message(&self, message: ArcStr) {
+        self.with(|ctx| {
+            ctx.control_channel_sender
+                .send(ControlMessage::ShowModal(message))
+                .unwrap();
+        })
+    }
+
+    /// Allows another universe step, input processing, etc. to occur.
+    ///
+    /// TODO: Explain exactly what phase/state this resumes in.
+    pub async fn yield_to_step(&self) {
+        // TODO: roundabout implementation
+        all_is_cubes::util::YieldProgressBuilder::new()
+            .build()
+            .yield_without_progress()
+            .await
+    }
+
+    #[track_caller]
+    fn with<R>(&self, f: impl FnOnce(&mut TaskContextInner) -> R) -> R {
+        f(self.inner.lock().unwrap().as_mut().expect(
+            "MainTaskContext operations may not be called while the main task is not executing",
+        ))
+    }
+}
+
+#[derive(Debug)]
+struct TaskContextInner {
+    control_channel_sender: mpsc::SyncSender<ControlMessage>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -893,18 +988,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_universe_async() {
+    async fn main_task() {
         let old_marker = Name::from("old");
         let new_marker = Name::from("new");
-        let mut session = Session::<std::time::Instant>::builder().build().await;
+        let mut session = Session::<all_is_cubes::time::NoTime>::builder()
+            .build()
+            .await;
         session
             .universe_mut()
             .insert(old_marker.clone(), Space::empty_positive(1, 1, 1))
             .unwrap();
 
-        // Set up async loading but don't deliver anything yet
+        // Set up task that won't do anything yet
         let (send, recv) = oneshot::channel();
-        session.set_universe_async(async { recv.await.unwrap() });
+        session.set_main_task(move |ctx| async move {
+            let new_universe = recv.await.unwrap();
+            ctx.set_universe(new_universe);
+            ExitMainTask
+        });
 
         // Existing universe should still be present.
         session.maybe_step_universe();
@@ -915,9 +1016,11 @@ mod tests {
         new_universe
             .insert(new_marker.clone(), Space::empty_positive(1, 1, 1))
             .unwrap();
-        send.send(Ok(new_universe)).unwrap();
+        send.send(new_universe).unwrap();
 
         // Receive it.
+        // TODO: two steps should not be necessary
+        session.maybe_step_universe();
         session.maybe_step_universe();
         assert!(session.universe_mut().get::<Space>(&new_marker).is_some());
         assert!(session.universe_mut().get::<Space>(&old_marker).is_none());

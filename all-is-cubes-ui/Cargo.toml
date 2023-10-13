@@ -17,6 +17,7 @@ bench = false
 [dependencies]
 # TODO: Disable default features. Requires more `maybe_sync` work.
 all-is-cubes = { workspace = true, default-features = true }
+async_fn_traits = { workspace = true }
 displaydoc = { workspace = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }
@@ -24,6 +25,7 @@ futures-task = { workspace = true }
 futures-util = { workspace = true }
 indoc = { workspace = true }
 log = { workspace = true }
+scopeguard = { workspace = true }
 
 [dev-dependencies]
 futures-channel = { workspace = true }

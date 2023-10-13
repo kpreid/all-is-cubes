@@ -255,6 +255,7 @@ name = "all-is-cubes-ui"
 version = "0.7.0"
 dependencies = [
  "all-is-cubes",
+ "async_fn_traits",
  "displaydoc",
  "exhaust",
  "futures-channel",
@@ -264,6 +265,7 @@ dependencies = [
  "indoc",
  "log",
  "pretty_assertions",
+ "scopeguard",
  "tokio",
 ]
 
