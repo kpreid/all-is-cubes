@@ -335,7 +335,7 @@ fn arch_row(
     for i in 0..section_count {
         let column_base = first_column_base + offset * (i + 1);
 
-        let banner_color = if parallel.axis() == Axis::Y {
+        let banner_color = if parallel.axis() == Axis::Z {
             match i.rem_euclid(3) {
                 0 => Some(BannerColor::Red),
                 1 => Some(BannerColor::Green),
