@@ -19,8 +19,7 @@ struct WgpuBlockVertex {
     @location(0) cube_packed: u32,
     @location(1) position_in_cube_and_normal_packed: vec2<u32>,
     @location(2) color_or_texture: vec4<f32>,
-    @location(3) clamp_min: vec3<f32>,
-    @location(4) clamp_max: vec3<f32>,
+    @location(3) clamp_min_max: vec3<u32>,
 };
 
 // Mirrors `struct WgpuInstanceData` on the Rust side.
@@ -152,7 +151,13 @@ fn block_vertex_main(
         case 6u { normal = vec3<f32>(0.0, 0.0, 1.0); }
         default: {}
     }
-    
+
+    // Unpack clamp rectangle coordinates.
+    let clamp_min_fixpoint = input.clamp_min_max & vec3<u32>(0x0000FFFFu);
+    let clamp_max_fixpoint = (input.clamp_min_max & vec3<u32>(0xFFFF0000u)) >> vec3<u32>(16u);
+    let clamp_min = vec3<f32>(clamp_min_fixpoint) / 2.0;
+    let clamp_max = vec3<f32>(clamp_max_fixpoint) / 2.0;
+
     // Generate tangents (with always positive components).
     // TODO: Would it be better to just put this in the above switch statement?
     // TODO: Is the always-positive rule actually needed?
@@ -177,8 +182,8 @@ fn block_vertex_main(
         bitangent,
         normal,
         input.color_or_texture,
-        input.clamp_min,
-        input.clamp_max,
+        clamp_min,
+        clamp_max,
         compute_fog(world_position),
         // Note that we do not normalize this vector: by keeping things linear, we
         // allow linear interpolation between vertices to get the right answer.

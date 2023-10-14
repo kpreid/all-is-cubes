@@ -12,7 +12,7 @@ use all_is_cubes::time;
 use all_is_cubes_mesh::texture;
 
 use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
-use crate::in_wgpu::vertex::{AtlasTexel, TexPoint};
+use crate::in_wgpu::vertex::{AtlasTexel, FixTexCoord, TexPoint};
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};
 use crate::BlockTextureInfo;
 
@@ -354,7 +354,9 @@ impl texture::Plane for AtlasPlane {
 
     fn grid_to_texcoord(&self, in_tile_grid: texture::TilePoint) -> Self::Point {
         // TODO: assert in bounds, just in case
-        (in_tile_grid + self.tile.offset.to_vector().map(|c| c as f32)).cast_unit()
+        let float_point =
+            (in_tile_grid + self.tile.offset.to_vector().map(|c| c as f32)).cast_unit();
+        float_point.map(FixTexCoord::from_float)
     }
 }
 

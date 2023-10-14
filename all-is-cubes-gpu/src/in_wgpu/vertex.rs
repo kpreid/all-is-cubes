@@ -6,9 +6,7 @@ use crate::DebugLineVertex;
 
 /// Texture coordinates in the 3D atlas texture, in units of texels (i.e. the range is
 /// 0..256 or similar, not 0..1).
-///
-/// TODO: Convert these to fixed-point and save some size
-pub(crate) type TexPoint = Point3D<f32, AtlasTexel>;
+pub(crate) type TexPoint = Point3D<FixTexCoord, AtlasTexel>;
 
 /// Coordinate system for texels in the 3D atlas texture.
 #[doc(hidden)]
@@ -24,7 +22,7 @@ pub(crate) enum CubeFix256 {}
 #[repr(C)]
 pub(crate) struct WgpuBlockVertex {
     /// Chunk-relative position of the cube containing the triangle this vertex belongs to,
-    /// packed into a u32 as x + (y << 8) + (z << 16).
+    /// packed into a u32 as x | (y << 8) | (z << 16).
     ///
     /// Note that this is not the same as floor() of the final coordinates, since a
     /// block's mesh coordinates range from 0 to 1 inclusive.
@@ -50,16 +48,20 @@ pub(crate) struct WgpuBlockVertex {
     /// Packed format:
     /// * If `[3]` is in the range 0.0 to 1.0, then the attribute is a linear RGBA color.
     /// * If `[3]` is -1.0, then the first three components are 3D texture coordinates,
-    ///   stored in texel units not normalized 0-1 units.
+    ///   stored in texel units rather than normalized 0-1 units.
+    ///
+    /// TODO: we don't need `f32` precision here.
     color_or_texture: [f32; 4],
 
-    /// Interpolated texture coordinates are clamped to be ≥ this value, to avoid bleeding.
+    /// Interpolated texture coordinates are clamped to be within these ranges,
+    /// to avoid bleeding.
     ///
-    /// TODO: pack these into u16s and save some memory.
-    clamp_min: [f32; 3],
-
-    /// Interpolated texture coordinates are clamped to be ≤ this value, to avoid bleeding.
-    clamp_max: [f32; 3],
+    /// Each u32 is two packed [`FixTexCoord`], min | (max << 16).
+    ///
+    /// Design note: It would be more straightforward to use `f16` here, but that's a
+    /// WebGPU optional extension; and there are no `[f16; 3]` vectors so it would still
+    /// require some data shuffling.
+    clamp_min_max: [u32; 3],
 }
 
 impl WgpuBlockVertex {
@@ -67,8 +69,7 @@ impl WgpuBlockVertex {
         0 => Uint32, // cube_packed
         1 => Uint32x2, // position_in_cube_and_normal_packed
         2 => Float32x4, // color_or_texture
-        3 => Float32x3, // clamp_min
-        4 => Float32x3, // clamp_max
+        3 => Uint32x3, // clamp_min_max
         // location numbers must not clash with WgpuInstanceData
     ];
 
@@ -105,8 +106,7 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
                     cube_packed,
                     position_in_cube_and_normal_packed,
                     color_or_texture: color_attribute,
-                    clamp_min: [0., 0., 0.],
-                    clamp_max: [0., 0., 0.],
+                    clamp_min_max: [0, 0, 0],
                 }
             }
             Coloring::Texture {
@@ -116,9 +116,8 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
             } => Self {
                 cube_packed,
                 position_in_cube_and_normal_packed,
-                color_or_texture: [tc.x, tc.y, tc.z, -1.0],
-                clamp_min: clamp_min.into(),
-                clamp_max: clamp_max.into(),
+                color_or_texture: [tc.x.into(), tc.y.into(), tc.z.into(), -1.0],
+                clamp_min_max: clamp_min.zip(clamp_max, FixTexCoord::pack).into(),
             },
         }
     }
@@ -129,6 +128,7 @@ impl GfxVertex for WgpuBlockVertex {
     /// TODO: no reason this should be f32 other than scaling to fractional integers.
     /// The depth sorting system should be made more flexible here.
     type Coordinate = f32;
+
     /// Packed cube coordinates
     type BlockInst = u32;
     type TexPoint = TexPoint;
@@ -229,6 +229,32 @@ impl DebugLineVertex for WgpuLinesVertex {
     }
 }
 
+/// Fixed-point texture coordinate, with a multiplier of 2 so it can represent edges and
+/// middles of texels (0.0, 0.5, 1.0, 1.5, ...)
+///
+/// This type should not be used directly; it is public as an element of [`WgpuBlockVertex`]'s
+/// trait implementations.
+#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct FixTexCoord(u16);
+
+impl FixTexCoord {
+    pub(crate) fn from_float(float_tc: f32) -> Self {
+        debug_assert!(float_tc >= 0.0);
+        Self((float_tc * 2.).round() as u16)
+    }
+
+    pub(crate) fn pack(low: Self, high: Self) -> u32 {
+        u32::from(low.0) | (u32::from(high.0) << 16)
+    }
+}
+
+impl From<FixTexCoord> for f32 {
+    fn from(tc: FixTexCoord) -> Self {
+        f32::from(tc.0) / 2.
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240,7 +266,7 @@ mod tests {
     /// the struct is designed to have a fixed layout communicating to the shader anyway.
     #[test]
     fn vertex_size() {
-        assert_eq!(mem::size_of::<WgpuBlockVertex>(), 52);
+        assert_eq!(mem::size_of::<WgpuBlockVertex>(), 40);
         assert_eq!(mem::size_of::<WgpuLinesVertex>(), 28);
     }
 
@@ -259,5 +285,17 @@ mod tests {
             GfxVertex::position(&vertex),
             Point3D::new(100.25, 50.0, 8.0)
         );
+    }
+
+    #[test]
+    fn fix_tex_coord() {
+        for int_part in 0..=256u16 {
+            for frac_part in 0..=1 {
+                let float = f32::from(int_part) + f32::from(frac_part) * 0.5;
+                let fix = FixTexCoord::from_float(float);
+                assert_eq!(fix.0, int_part * 2 + frac_part);
+                assert_eq!(float, f32::from(fix));
+            }
+        }
     }
 }
