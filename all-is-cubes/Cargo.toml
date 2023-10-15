@@ -112,6 +112,7 @@ yield-progress = { workspace = true }
 euclid = { version = "0.22.9", default-features = false, features = ["libm", "mint"] }
 
 [dev-dependencies]
+allocation-counter = { workspace = true }
 criterion = { workspace = true }
 pretty_assertions = { workspace = true }
 serde_json = { workspace = true }

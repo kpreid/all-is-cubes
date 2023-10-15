@@ -24,6 +24,7 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
+allocation-counter = "0.8.1"
 anyhow = "1.0.70"
 # Each use should be { optional = true }.
 arbitrary = { version = "1.1.6", features = ["derive"] }

@@ -26,6 +26,8 @@ pub struct BlockAttributes {
     ///
     /// The default value is the empty string. The empty string should be considered a
     /// reasonable choice for solid-color blocks with no special features.
+    // ---
+    // TODO: Make this a refcounted type so we can make cloning O(1).
     pub display_name: Cow<'static, str>,
 
     /// Whether players' [cursors](crate::character::Cursor) target it or pass through it.
