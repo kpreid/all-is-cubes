@@ -20,6 +20,7 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::sync::atomic::{self, Ordering};
 
+use arcstr::ArcStr;
 use manyfmt::Fmt;
 
 use crate::block::BlockDef;
@@ -59,10 +60,9 @@ mod tests;
 #[doc = include_str!("save/serde-warning.md")]
 #[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Name {
     /// An explicitly set name.
-    Specific(Arc<str>),
+    Specific(ArcStr),
 
     /// An automatically assigned name.
     Anonym(usize),
@@ -97,6 +97,12 @@ impl From<String> for Name {
     }
 }
 
+impl From<ArcStr> for Name {
+    fn from(value: ArcStr) -> Self {
+        Self::Specific(value)
+    }
+}
+
 impl fmt::Display for Name {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -104,6 +110,33 @@ impl fmt::Display for Name {
             Name::Anonym(index) => write!(f, "[anonymous #{index}]"),
             Name::Pending => write!(f, "[pending anonymous]"),
         }
+    }
+}
+
+// Manual impl because `ArcStr` doesn't impl Arbitrary.
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Name {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(match u.int_in_range::<u8>(0..=2)? {
+            0 => Name::Specific(u.arbitrary::<String>()?.into()),
+            1 => Name::Anonym(u.arbitrary()?),
+            2 => Name::Pending,
+            _ => unreachable!(),
+        })
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        use arbitrary::size_hint;
+        size_hint::recursion_guard(depth, |depth| {
+            size_hint::and(
+                u8::size_hint(depth),
+                size_hint::or_all(&[
+                    String::size_hint(depth),
+                    usize::size_hint(depth),
+                    <()>::size_hint(depth),
+                ]),
+            )
+        })
     }
 }
 

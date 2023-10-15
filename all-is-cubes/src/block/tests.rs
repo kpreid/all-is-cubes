@@ -7,8 +7,6 @@
 
 #![allow(clippy::bool_assert_comparison)]
 
-use alloc::borrow::Cow;
-
 use pretty_assertions::assert_eq;
 
 use crate::block::{
@@ -127,7 +125,7 @@ mod eval {
     fn opaque_atom_and_attributes() {
         let color = Rgba::new(1.0, 2.0, 3.0, 1.0);
         let attributes = BlockAttributes {
-            display_name: Cow::Borrowed("hello world"),
+            display_name: arcstr::literal!("hello world"),
             selectable: false,
             ..BlockAttributes::default()
         };
@@ -190,7 +188,7 @@ mod eval {
         let mut universe = Universe::new();
 
         let attributes = BlockAttributes {
-            display_name: Cow::Borrowed("hello world"),
+            display_name: arcstr::literal!("hello world"),
             ..BlockAttributes::default()
         };
         let block = Block::builder()

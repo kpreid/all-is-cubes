@@ -79,6 +79,7 @@ thiserror = "1.0.40"
 # The library crates do not require Tokio.
 tokio = { version = "1.28.0", default-features = false }
 trycmd = "0.14.1" # keep in sync with `snapbox`
+unicode-segmentation = { version = "1.10.1", default-features = false }
 wasm-bindgen-futures = "0.4.34"
 # Note: "expose_ids" feature is not needed globally but is enabled to avoid compiling two versions
 wgpu = { version = "0.17.0", features = ["expose-ids"] }

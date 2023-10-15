@@ -16,10 +16,10 @@
 //! * [`Cow`] is sometimes used to avoid unnecessary clones during serialization.
 
 use alloc::borrow::Cow;
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::num::NonZeroU16;
 
+use arcstr::ArcStr;
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 
@@ -99,7 +99,7 @@ pub(crate) enum PrimitiveSer<'a> {
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct BlockAttributesV1Ser<'a> {
     #[serde(default, skip_serializing_if = "str::is_empty")]
-    pub display_name: Cow<'a, str>,
+    pub display_name: ArcStr,
     #[serde(default = "return_true", skip_serializing_if = "is_true")]
     pub selectable: bool,
     #[serde(default, skip_serializing_if = "is_default")]
@@ -387,6 +387,6 @@ pub(crate) enum URefSer {
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub(crate) enum NameSer {
-    Specific(Arc<str>),
+    Specific(ArcStr),
     Anonym(usize),
 }

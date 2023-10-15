@@ -1,6 +1,5 @@
 //! Rendering as terminal text. Why not? Turn cubes into rectangles.
 
-use std::borrow::Cow;
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
 
@@ -8,6 +7,7 @@ use anyhow::Context;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use tui::layout::Rect;
 
+use all_is_cubes::arcstr::literal_substr;
 use all_is_cubes::camera::{self, Camera, StandardCameras, Viewport};
 use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
@@ -356,7 +356,7 @@ impl Accumulate for ColorCharacterBuf {
 
     fn hit_nothing(&mut self) {
         self.text
-            .add(Rgba::TRANSPARENT, &CharacterRtData(Cow::Borrowed(" ")));
+            .add(Rgba::TRANSPARENT, &CharacterRtData(literal_substr!(" ")));
         self.override_color = true;
     }
 

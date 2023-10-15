@@ -2,8 +2,7 @@ use alloc::sync::Arc;
 use std::error::Error;
 use std::sync::Mutex;
 
-use once_cell::sync::Lazy;
-
+use all_is_cubes::arcstr::{literal, ArcStr};
 use all_is_cubes::block::{space_to_blocks, AnimationHint, BlockAttributes, Resolution, AIR};
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::drawing::embedded_graphics::{
@@ -20,8 +19,6 @@ use all_is_cubes::universe::{URef, Universe};
 
 use crate::ui_content::hud::{HudBlocks, HudFont};
 use crate::vui::{LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction};
-
-static EMPTY_ARC_STR: Lazy<Arc<str>> = Lazy::new(|| "".into());
 
 #[derive(Debug)]
 pub(crate) struct TooltipState {
@@ -65,7 +62,7 @@ impl TooltipState {
         }
     }
 
-    pub fn set_message(&mut self, text: Arc<str>) {
+    pub fn set_message(&mut self, text: ArcStr) {
         self.dirty_inventory = false;
         self.set_contents(TooltipContents::Message(text))
     }
@@ -77,7 +74,7 @@ impl TooltipState {
     }
 
     /// Advances time and returns the string that should be newly written to the screen, if different than the previous call.
-    fn step(&mut self, hud_blocks: &HudBlocks, tick: Tick) -> Option<Arc<str>> {
+    fn step(&mut self, hud_blocks: &HudBlocks, tick: Tick) -> Option<ArcStr> {
         if let Some(ref mut age) = self.age {
             *age += tick.delta_t();
             if *age > Duration::from_secs(1) {
@@ -101,8 +98,8 @@ impl TooltipState {
                         .icon(&hud_blocks.icons)
                         .evaluate()
                         .ok()
-                        .map(|ev_block| ev_block.attributes.display_name.into_owned().into())
-                        .unwrap_or_else(|| EMPTY_ARC_STR.clone());
+                        .map(|ev_block| ev_block.attributes.display_name.clone())
+                        .unwrap_or_else(|| literal!(""));
                     let new_contents = TooltipContents::InventoryItem {
                         source_slot: selected_slot,
                         text: new_text,
@@ -160,17 +157,19 @@ enum TooltipContents {
     /// right away.
     JustStartedExisting,
     Blanked,
-    Message(Arc<str>),
+    Message(ArcStr),
     InventoryItem {
         source_slot: usize,
-        text: Arc<str>,
+        text: ArcStr,
     },
 }
 
 impl TooltipContents {
-    fn text(&self) -> &Arc<str> {
+    fn text(&self) -> &ArcStr {
+        static EMPTY: ArcStr = literal!("");
+
         match self {
-            TooltipContents::JustStartedExisting | TooltipContents::Blanked => &EMPTY_ARC_STR,
+            TooltipContents::JustStartedExisting | TooltipContents::Blanked => &EMPTY,
             TooltipContents::Message(m) => m,
             TooltipContents::InventoryItem { text, .. } => text,
         }
@@ -275,7 +274,7 @@ impl WidgetController for TooltipController {
 
     fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         // None if no update is needed
-        let text_update: Option<Arc<str>> = self
+        let text_update: Option<ArcStr> = self
             .definition
             .state
             .try_lock()

@@ -55,6 +55,7 @@ version = "0.6.0"
 dependencies = [
  "allocation-counter",
  "arbitrary",
+ "arcstr",
  "base64 0.21.2",
  "bitflags 2.3.3",
  "bytemuck",
@@ -88,6 +89,7 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "tokio",
+ "unicode-segmentation",
  "yield-progress",
 ]
 
@@ -257,7 +259,6 @@ dependencies = [
  "futures-task",
  "indoc",
  "log",
- "once_cell",
  "pretty_assertions",
  "tokio",
 ]
@@ -420,6 +421,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2d098ff73c1ca148721f37baad5ea6a465a13f9573aba8641fbbbae8164a54e"
 dependencies = [
  "derive_arbitrary",
+]
+
+[[package]]
+name = "arcstr"
+version = "1.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f907281554a3d0312bb7aab855a8e0ef6cbf1614d06de54105039ca8b34460e"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -1959,7 +1969,7 @@ checksum = "02c69ce7e7c0f17aa18fdd9d0de39727adb9c6281f2ad12f57cbe54ae6e76e7d"
 dependencies = [
  "az",
  "bytemuck",
- "half 1.8.2",
+ "half 2.3.1",
  "serde",
  "typenum",
 ]

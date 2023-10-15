@@ -2,10 +2,11 @@
 
 #![cfg_attr(not(feature = "std"), allow(unused_imports))]
 
-use alloc::borrow::{Cow, ToOwned};
-use alloc::string::{String, ToString};
+use alloc::string::String;
 
+use arcstr::{literal_substr, ArcStr, Substr};
 use euclid::vec2;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, Viewport};
 use crate::math::{FreeVector, Rgba};
@@ -15,31 +16,27 @@ use crate::space::{Space, SpaceBlockData};
 /// TODO: better name, docs
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
-pub struct CharacterRtData(pub Cow<'static, str>);
+pub struct CharacterRtData(pub Substr);
 
 impl RtBlockData for CharacterRtData {
     type Options = ();
 
     fn from_block(_: RtOptionsRef<'_, Self::Options>, s: &SpaceBlockData) -> Self {
-        // TODO: For more Unicode correctness, index by grapheme cluster
         // TODO: allow customizing the fallback character
-        Self(
-            s.evaluated()
-                .attributes
-                .display_name
-                .chars()
-                .next()
-                .map(|c| Cow::Owned(c.to_string()))
-                .unwrap_or(Cow::Borrowed("#")),
-        )
+        let name: &ArcStr = &s.evaluated().attributes.display_name;
+        let char = match name.graphemes(true).next() {
+            Some(s) => name.substr_from(s),
+            None => literal_substr!("#"),
+        };
+        Self(char)
     }
 
     fn error(_: RtOptionsRef<'_, Self::Options>) -> Self {
-        Self(Cow::Borrowed("X"))
+        Self(literal_substr!("X"))
     }
 
     fn sky(_: RtOptionsRef<'_, Self::Options>) -> Self {
-        Self(Cow::Borrowed(" "))
+        Self(literal_substr!(" "))
     }
 }
 
@@ -49,7 +46,7 @@ impl RtBlockData for CharacterRtData {
 #[allow(clippy::derive_partial_eq_without_eq)]
 pub struct CharacterBuf {
     /// Text to draw, if determined yet.
-    hit_text: Option<String>,
+    hit_text: Option<Substr>,
 }
 
 impl Accumulate for CharacterBuf {
@@ -63,12 +60,12 @@ impl Accumulate for CharacterBuf {
     #[inline]
     fn add(&mut self, _surface_color: Rgba, d: &Self::BlockData) {
         if self.hit_text.is_none() {
-            self.hit_text = Some(String::from(d.0.clone()));
+            self.hit_text = Some(d.0.clone());
         }
     }
 
     fn hit_nothing(&mut self) {
-        self.hit_text = Some(".".to_owned());
+        self.hit_text = Some(literal_substr!("."));
     }
 
     fn mean<const N: usize>(items: [Self; N]) -> Self {
@@ -79,10 +76,16 @@ impl Accumulate for CharacterBuf {
     }
 }
 
+impl From<CharacterBuf> for Substr {
+    #[inline]
+    fn from(buf: CharacterBuf) -> Substr {
+        buf.hit_text.unwrap_or_else(|| literal_substr!("."))
+    }
+}
 impl From<CharacterBuf> for String {
     #[inline]
     fn from(buf: CharacterBuf) -> String {
-        buf.hit_text.unwrap_or_else(|| ".".to_owned())
+        Substr::from(buf).to_string()
     }
 }
 

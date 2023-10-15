@@ -105,7 +105,7 @@ fn graphics_toggle_button(
     setter: fn(&mut GraphicsOptions, bool),
 ) -> WidgetTree {
     let icon = hud_inputs.hud_blocks.blocks[icon_key].clone();
-    let text_label = String::from(icon.evaluate().unwrap().attributes.display_name);
+    let text_label = icon.evaluate().unwrap().attributes.display_name.clone();
     let button: Arc<dyn Widget> = widgets::ToggleButton::new(
         hud_inputs.graphics_options.clone(),
         getter,
@@ -132,7 +132,7 @@ fn graphics_toggle_button(
             children: vec![LayoutTree::leaf(button), {
                 // TODO: extract this for general use and reconcile with pages::parts::shrink()
                 let text: WidgetTree = LayoutTree::leaf(Arc::new(widgets::LargeText {
-                    text: text_label.into(),
+                    text: text_label,
                     font: || &font::FONT_6X10,
                     brush: VoxelBrush::single(block::Block::from(palette::ALMOST_BLACK)),
                     text_style: TextStyle::default(),

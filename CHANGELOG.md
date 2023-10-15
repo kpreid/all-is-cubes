@@ -33,6 +33,9 @@
     - All functions using `usize` to identify a coordinate axis now use `math::Axis` instead.
       `Face6::axis_number()` and `Face7::axis_number()` are now called `axis()`.
 
+    - In block names and universe member names, `Cow<'static, str>` and `Arc<str>` have been replaced with `arcstr::ArcStr`.
+      This type allows both refcounting and static literal strings.
+
     - The following functions have changed signature to use the new type `math::Gridgid`:
         - `math::GridAab::transform()`
         - `math::GridMatrix::decompose()`

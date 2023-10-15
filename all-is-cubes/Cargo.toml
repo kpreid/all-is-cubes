@@ -50,7 +50,11 @@ harness = false
 [features]
 default = ["std"]
 # Adds std-dependent functionality such as thread safety.
-std = ["dep:once_cell", "yield-progress/sync"]
+std = [
+    "dep:once_cell",
+    "arcstr/std", # not required but nicer behavior
+    "yield-progress/sync",
+]
 # Adds `impl arbitrary::Arbitrary for ...`
 # Note: Not using euclid/arbitrary because it's broken
 arbitrary = ["dep:arbitrary", "ordered-float/arbitrary"]
@@ -71,6 +75,7 @@ threads = ["std", "dep:rayon"]
 
 [dependencies]
 arbitrary = { workspace = true, optional = true }
+arcstr = { version = "1.1.5", default-features = false, features = ["serde", "substr"] }
 base64 = { workspace = true, optional = true, features = ["std"] } # used in serialization
 bitflags = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
@@ -105,6 +110,7 @@ re_sdk = { workspace = true, optional = true }
 # rc feature needed because we are [de]serializing `Arc`s
 serde = { workspace = true, optional = true, features = ["derive", "rc"] }
 serde_repr = { version = "0.1.12", optional = true, default-features = false }
+unicode-segmentation = { workspace = true }
 yield-progress = { workspace = true }
 
 [build-dependencies]

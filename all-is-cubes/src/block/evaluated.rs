@@ -595,6 +595,10 @@ pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     voxel_opacity_mask: None,
 };
 
+/// This separate item is needed to convince the compiler that `AIR_ATTRIBUTES.display_name`
+/// isn't being dropped if we return `&AIR_EVALUATED`.
+pub(crate) const AIR_EVALUATED_REF: &EvaluatedBlock = &AIR_EVALUATED;
+
 pub(super) const AIR_EVALUATED_MIN: MinEval = MinEval {
     attributes: AIR_ATTRIBUTES,
     voxels: Evoxels::One(Evoxel::AIR),
@@ -602,7 +606,7 @@ pub(super) const AIR_EVALUATED_MIN: MinEval = MinEval {
 
 /// Used only by [`AIR_EVALUATED`].
 const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
-    display_name: alloc::borrow::Cow::Borrowed("<air>"),
+    display_name: arcstr::literal!("<air>"),
     selectable: false,
     rotation_rule: block::RotationPlacementRule::Never,
     tick_action: None,

@@ -1,8 +1,9 @@
 //! [`BlockAttributes`] and closely related types.
 
-use alloc::borrow::Cow;
 use core::fmt;
 use core::num::NonZeroU16;
+
+use arcstr::ArcStr;
 
 use crate::math::{Face6, GridRotation};
 use crate::op::Operation;
@@ -26,9 +27,10 @@ pub struct BlockAttributes {
     ///
     /// The default value is the empty string. The empty string should be considered a
     /// reasonable choice for solid-color blocks with no special features.
-    // ---
-    // TODO: Make this a refcounted type so we can make cloning O(1).
-    pub display_name: Cow<'static, str>,
+    //---
+    // Design note: The use of `ArcStr` allows cloning a `BlockAttributes` to be O(1)
+    // allocate no additional memory.
+    pub display_name: ArcStr,
 
     /// Whether players' [cursors](crate::character::Cursor) target it or pass through it.
     ///
@@ -92,7 +94,7 @@ impl fmt::Debug for BlockAttributes {
 
 impl BlockAttributes {
     const DEFAULT: Self = BlockAttributes {
-        display_name: Cow::Borrowed(""),
+        display_name: arcstr::literal!(""),
         selectable: true,
         rotation_rule: RotationPlacementRule::Never,
         tick_action: None,
@@ -159,7 +161,7 @@ impl Default for BlockAttributes {
 impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(BlockAttributes {
-            display_name: Cow::Owned(u.arbitrary()?),
+            display_name: u.arbitrary::<alloc::string::String>()?.into(),
             selectable: u.arbitrary()?,
             rotation_rule: u.arbitrary()?,
             tick_action: None, // TODO: need Arbitrary for Block

@@ -1,8 +1,9 @@
 //! Drawing the All is Cubes logo.
 
-use alloc::{borrow::Cow, sync::Arc};
+use alloc::sync::Arc;
 
 use all_is_cubes::{
+    arcstr::literal,
     block::Block,
     content::palette,
     drawing::{
@@ -22,7 +23,7 @@ pub fn logo_text() -> Arc<dyn vui::Widget> {
     let background_text_block: Block = palette::LOGO_STROKE.into();
 
     Arc::new(vui::widgets::LargeText {
-        text: Cow::Borrowed("All is Cubes"),
+        text: literal!("All is Cubes"),
         font: || &FONT_9X15_BOLD,
         brush: {
             VoxelBrush::new([

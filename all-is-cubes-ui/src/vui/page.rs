@@ -1,6 +1,6 @@
-use alloc::borrow::Cow;
 use alloc::sync::Arc;
 
+use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::AIR;
 use all_is_cubes::block::{Block, BlockAttributes, Resolution};
 use all_is_cubes::camera;
@@ -182,7 +182,7 @@ pub(crate) mod parts {
         )))
     }
 
-    pub fn heading(text: impl Into<Cow<'static, str>>) -> WidgetTree {
+    pub fn heading(text: impl Into<ArcStr>) -> WidgetTree {
         LayoutTree::leaf(Arc::new(widgets::LargeText {
             text: text.into(),
             font: || &font::FONT_9X15_BOLD,
@@ -191,7 +191,7 @@ pub(crate) mod parts {
         }))
     }
 
-    pub fn paragraph(text: impl Into<Cow<'static, str>>) -> WidgetTree {
+    pub fn paragraph(text: impl Into<ArcStr>) -> WidgetTree {
         LayoutTree::leaf(Arc::new(widgets::LargeText {
             text: text.into(),
             font: || &font::FONT_6X10,

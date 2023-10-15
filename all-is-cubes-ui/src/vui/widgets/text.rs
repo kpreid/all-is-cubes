@@ -1,6 +1,6 @@
-use alloc::borrow::Cow;
 use alloc::sync::Arc;
 
+use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::{MonoFont, MonoTextStyle},
     prelude::{Dimensions, Point},
@@ -22,7 +22,7 @@ use crate::vui::{widgets, LayoutGrant, LayoutRequest, Layoutable, Widget, Widget
 #[allow(clippy::exhaustive_structs)] // TODO: find a better strategy
 pub struct LargeText {
     /// Text to be displayed.
-    pub text: Cow<'static, str>,
+    pub text: ArcStr,
     /// Font with which to draw the text.
     /// Needs to be a function to be Send+Sync.
     pub font: fn() -> &'static MonoFont<'static>,

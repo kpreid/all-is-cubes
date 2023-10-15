@@ -1,8 +1,9 @@
 //! Lesser-used helpers for [`BlockBuilder`].
 
-use alloc::borrow::Cow;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+
+use arcstr::ArcStr;
 
 use crate::block::{
     AnimationHint, Atom, Block, BlockAttributes, BlockCollision, BlockDef, BlockParts, BlockPtr,
@@ -28,7 +29,7 @@ use crate::universe::{Name, URef, Universe};
 ///
 /// assert_eq!(block.evaluate().unwrap().color, Rgba::new(0.5, 0.5, 0., 1.));
 /// assert_eq!(
-///     block.evaluate().unwrap().attributes.display_name.as_ref(),
+///     block.evaluate().unwrap().attributes.display_name.as_str(),
 ///     "BROWN",
 /// );
 /// ```
@@ -72,7 +73,7 @@ impl<C> BlockBuilder<C> {
     }
 
     /// Sets the value for [`BlockAttributes::display_name`].
-    pub fn display_name(mut self, value: impl Into<Cow<'static, str>>) -> Self {
+    pub fn display_name(mut self, value: impl Into<ArcStr>) -> Self {
         self.attributes.display_name = value.into();
         self
     }

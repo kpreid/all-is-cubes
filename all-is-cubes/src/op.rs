@@ -16,6 +16,9 @@ use crate::universe::VisitRefs;
 /// TODO: The current representation as an enum is a temporary measure to replace a
 /// bunch of existing mechanics. In the future it will be something somewhat more like a
 /// general functional programming language.
+///
+/// TODO: Ensure that cloning this type is O(1) and doesn't duplicate memory, because as a
+/// part of `BlockAttribtes` and `EvaluatedBlock` it is cloned a lot.
 #[doc = include_str!("save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]

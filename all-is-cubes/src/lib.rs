@@ -214,5 +214,7 @@ pub mod transaction;
 pub mod universe;
 pub mod util;
 
+/// Re-export the version of the `arcstr` string type library we're using.
+pub use arcstr;
 /// Re-export the version of the `euclid` vector math library we're using.
 pub use euclid;

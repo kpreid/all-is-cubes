@@ -3,7 +3,6 @@
 //! This module is private; the public interface to this stuff is the separate
 //! `all-is-cubes-content` crate.
 
-use alloc::borrow::Cow;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
@@ -15,9 +14,10 @@ use embedded_graphics::text::Baseline;
 use embedded_graphics::text::Text;
 use embedded_graphics::text::TextStyleBuilder;
 
+use crate::arcstr::{literal, ArcStr};
 use crate::block::{Block, Resolution, Resolution::R16, RotationPlacementRule};
 use crate::inv::{Slot, Tool};
-use crate::math::{Face6, FreeCoordinate, GridAab, GridCoordinate, Rgb, Rgba};
+use crate::math::{Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, Rgb, Rgba};
 use crate::raycast::Raycaster;
 use crate::space::{SetCubeError, Space};
 use crate::universe::Universe;
@@ -180,6 +180,15 @@ pub fn make_slab(
 /// assert_ne!(space[[0, 0, -10]], AIR);
 /// ```
 pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
+    const DIR_NAMES: FaceMap<ArcStr> = FaceMap {
+        nx: literal!("x"),
+        ny: literal!("y"),
+        nz: literal!("z"),
+        px: literal!("X"),
+        py: literal!("Y"),
+        pz: literal!("Z"),
+    };
+
     for face in Face6::ALL {
         let axis = face.axis();
         let direction = face.normal_vector::<GridCoordinate, ()>()[axis];
@@ -187,13 +196,13 @@ pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
             .within(space.bounds());
         for step in raycaster {
             let i = step.cube_ahead().lower_bounds()[axis] * direction; // always positive
-            let (color, display_name): (Rgb, Cow<'static, str>) = if i.rem_euclid(2) == 0 {
+            let (color, display_name): (Rgb, ArcStr) = if i.rem_euclid(2) == 0 {
                 (axis.color(), i.rem_euclid(10).to_string().into())
             } else {
                 if direction > 0 {
-                    (rgb_const!(1.0, 1.0, 1.0), ["X", "Y", "Z"][axis].into())
+                    (rgb_const!(1.0, 1.0, 1.0), DIR_NAMES[face].clone())
                 } else {
-                    (rgb_const!(0.0, 0.0, 0.0), ["x", "y", "z"][axis].into())
+                    (rgb_const!(0.0, 0.0, 0.0), DIR_NAMES[face].clone())
                 }
             };
             space.set(

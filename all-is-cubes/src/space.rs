@@ -14,7 +14,7 @@ use manyfmt::Fmt;
 
 use crate::behavior::{self, BehaviorSet};
 use crate::block::TickAction;
-use crate::block::{Block, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED};
+use crate::block::{Block, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED_REF};
 #[cfg(doc)]
 use crate::character::Character;
 use crate::character::Spawn;
@@ -274,7 +274,7 @@ impl Space {
         if let Some(index) = self.bounds.index(position.into()) {
             self.palette.entry(self.contents[index]).evaluated()
         } else {
-            &AIR_EVALUATED
+            AIR_EVALUATED_REF
         }
     }
 

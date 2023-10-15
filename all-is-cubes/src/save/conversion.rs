@@ -188,7 +188,7 @@ mod block {
                 animation_hint,
             } = value;
             schema::BlockAttributesV1Ser {
-                display_name: Cow::Borrowed(&**display_name),
+                display_name: display_name.clone(),
                 selectable,
                 rotation_rule: rotation_rule.into(),
                 tick_action: tick_action.as_ref().map(
@@ -216,12 +216,7 @@ mod block {
                 animation_hint,
             } = value;
             Self {
-                // convert Cow<'a> to Cow<'static>
-                display_name: if display_name == "" {
-                    Cow::Borrowed("")
-                } else {
-                    Cow::Owned(display_name.into())
-                },
+                display_name,
                 selectable,
                 rotation_rule: rotation_rule.into(),
                 tick_action: tick_action.map(|schema::TickActionSer { operation, period }| {
