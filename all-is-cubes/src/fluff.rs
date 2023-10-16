@@ -5,7 +5,7 @@
 /// Each [`Fluff`] value represents the beginning of such an effect. It does not specify
 /// anything about the exact duration; the intent is that they should all be negligibly
 /// short.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum Fluff {
     /// A standard beep/“bell” sound, as might be used for a notification or error.

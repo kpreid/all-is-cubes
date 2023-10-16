@@ -10,6 +10,7 @@ use core::{fmt, mem};
 use crate::behavior::{self, BehaviorSet, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::drawing::DrawingPlane;
+use crate::fluff::Fluff;
 use crate::math::{Cube, GridCoordinate, GridPoint, Gridgid};
 use crate::space::{ActivatableRegion, GridAab, SetCubeError, Space};
 use crate::transaction::{
@@ -90,18 +91,7 @@ impl SpaceTransaction {
     /// transaction.
     // TODO: no tests
     pub fn set_overwrite(&mut self, cube: impl Into<GridPoint>, block: Block) {
-        match self.cubes.entry(cube.into().into()) {
-            Vacant(entry) => {
-                entry.insert(CubeTransaction {
-                    old: None,
-                    new: Some(block),
-                    ..Default::default()
-                });
-            }
-            Occupied(mut entry) => {
-                entry.get_mut().new = Some(block);
-            }
-        }
+        self.at(cube).new = Some(block);
     }
 
     /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
@@ -165,6 +155,14 @@ impl SpaceTransaction {
         Self::single(cube, CubeTransaction::ACTIVATE)
     }
 
+    /// Emit [`Fluff`] (sound/particle effects) located at the given cube when this
+    /// transaction is committed, in addition to other effects of the transaction.
+    ///
+    /// TODO: will eventually need rotation.
+    pub fn add_fluff(&mut self, cube: Cube, fluff: crate::fluff::Fluff) {
+        self.at(cube).fluff.push(fluff);
+    }
+
     /// Computes the region of cubes directly affected by this transaction.
     /// Ignores behaviors.
     ///
@@ -213,6 +211,17 @@ impl SpaceTransaction {
 
         bounds
     }
+
+    /// Returns the [`CubeTransaction`] at the given cube, creating it if necessary.
+    ///
+    /// This is used for in-place mutation; to create a transaction affecting a single
+    /// cube, use [`SpaceTransaction::single()`].
+    ///
+    /// TODO: decide whether to make this and `CubeTransaction` public
+    fn at(&mut self, cube: impl Into<GridPoint>) -> &mut CubeTransaction {
+        let cube: GridPoint = cube.into();
+        self.cubes.entry(cube.into()).or_default()
+    }
 }
 
 impl Transaction<Space> for SpaceTransaction {
@@ -228,6 +237,7 @@ impl Transaction<Space> for SpaceTransaction {
                 new: _,
                 conserved,
                 activate: _,
+                fluff: _,
             },
         ) in &self.cubes
         {
@@ -273,9 +283,12 @@ impl Transaction<Space> for SpaceTransaction {
                 new,
                 conserved,
                 activate,
+                fluff,
             },
         ) in &self.cubes
         {
+            let cube = Cube::from(cube);
+
             if let Some(new) = new {
                 match space.set(cube, new) {
                     Ok(_) => Ok(()),
@@ -286,26 +299,37 @@ impl Transaction<Space> for SpaceTransaction {
                     Err(other) => Err(CommitError::catch::<Self, _>(other)),
                 }?;
             }
+
             if *activate {
                 // Deferred for slightly more consistency
                 to_activate.push(cube);
             }
+
+            for fluff in fluff.iter().cloned() {
+                space.fluff_notifier.notify(super::SpaceFluff {
+                    position: cube,
+                    fluff,
+                });
+            }
         }
+
         self.behaviors
             .commit(&mut space.behaviors, check, &mut no_outputs)
             .map_err(|e| e.context("behaviors".into()))?;
+
         if !to_activate.is_empty() {
             'b: for query_item in space.behaviors.query::<ActivatableRegion>() {
                 // TODO: error return from the function? error report for nonexistence?
                 for cube in to_activate.iter().copied() {
                     // TODO: this should be part of the query instead, to allow efficient search
-                    if query_item.attachment.bounds.contains_cube(cube.into()) {
+                    if query_item.attachment.bounds.contains_cube(cube) {
                         query_item.behavior.activate();
                         continue 'b;
                     }
                 }
             }
         }
+
         Ok(())
     }
 }
@@ -426,6 +450,15 @@ struct CubeTransaction {
     /// The cube was “activated” (clicked on, more or less) and should
     /// respond to that.
     activate: bool,
+
+    /// [`Fluff`] to emit at this location when the transaction is committed.
+    ///
+    /// TODO: eventually will need rotation and possibly intra-cube positioning.
+    ///
+    /// TODO: define a merge ordering. should this be a multi-BTreeSet?
+    ///
+    /// TODO: Allow having a single entry with no allocation?
+    fluff: Vec<Fluff>,
 }
 
 impl CubeTransaction {
@@ -434,6 +467,7 @@ impl CubeTransaction {
         new: None,
         conserved: false,
         activate: true,
+        fluff: Vec::new(),
     };
 }
 
@@ -472,6 +506,11 @@ where {
             old: self.old.or(other.old),
             new: self.new.or(other.new),
             activate: self.activate || other.activate,
+            fluff: {
+                let mut fluff = self.fluff;
+                fluff.extend(other.fluff);
+                fluff
+            },
         }
     }
 }
@@ -619,6 +658,7 @@ mod tests {
                         new: Some(b2.clone()),
                         conserved: true,
                         activate: false,
+                        fluff: vec![],
                     }
                 ),
                 (
@@ -628,6 +668,7 @@ mod tests {
                         new: Some(b3.clone()),
                         conserved: true,
                         activate: false,
+                        fluff: vec![],
                     }
                 ),
             ]

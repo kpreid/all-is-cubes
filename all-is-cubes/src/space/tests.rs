@@ -14,14 +14,16 @@ use crate::block::{
 };
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
+use crate::fluff::Fluff;
 use crate::listen::{Listen as _, Sink};
 use crate::math::{Cube, GridArray, GridCoordinate, GridPoint, Rgba};
 use crate::op::Operation;
 use crate::space::{
-    GridAab, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpacePhysics,
+    GridAab, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpaceFluff, SpacePhysics,
+    SpaceTransaction,
 };
 use crate::time::{self, Tick};
-use crate::transaction;
+use crate::transaction::{self, Transaction as _};
 use crate::universe::{Name, RefError, URef, Universe, UniverseTransaction};
 
 // TODO: test consistency between the index and get_* methods
@@ -244,6 +246,26 @@ fn change_listener() {
     // No change, no notification
     assert_eq!(Ok(false), space.set([0, 0, 0], &block));
     assert_eq!(sink.drain(), vec![]);
+}
+
+#[test]
+fn fluff_listener() {
+    let mut space = Space::empty_positive(1, 1, 1);
+    let mut txn = SpaceTransaction::default();
+    txn.add_fluff(Cube::ORIGIN, Fluff::Happened);
+    let sink = Sink::new();
+    space.fluff().listen(sink.listener());
+
+    txn.execute(&mut space, &mut transaction::no_outputs)
+        .unwrap();
+
+    assert_eq!(
+        sink.drain(),
+        vec![SpaceFluff {
+            position: Cube::ORIGIN,
+            fluff: Fluff::Happened,
+        }]
+    );
 }
 
 #[test]

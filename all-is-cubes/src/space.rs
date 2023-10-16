@@ -20,6 +20,7 @@ use crate::character::Character;
 use crate::character::Spawn;
 use crate::content::palette::DAY_SKY_COLOR;
 use crate::drawing::DrawingPlane;
+use crate::fluff::Fluff;
 use crate::inv::EphemeralOpaque;
 use crate::inv::InventoryTransaction;
 use crate::listen::{Listen, Listener, Notifier};
@@ -98,7 +99,11 @@ pub struct Space {
     /// Cubes that should be checked on the next call to step()
     cubes_wanting_ticks: HbHashSet<Cube>,
 
-    notifier: Notifier<SpaceChange>,
+    /// Notifier of changes to Space data.
+    change_notifier: Notifier<SpaceChange>,
+
+    /// Notifier which delivers [`Fluff`] (events that happen in the space but are not changes).
+    fluff_notifier: Notifier<SpaceFluff>,
 }
 
 impl fmt::Debug for Space {
@@ -211,7 +216,8 @@ impl Space {
             behaviors,
             spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(bounds)),
             cubes_wanting_ticks: Default::default(),
-            notifier: Notifier::new(),
+            change_notifier: Notifier::new(),
+            fluff_notifier: Notifier::new(),
         }
     }
 
@@ -348,14 +354,16 @@ impl Space {
             // to characterize and won't create unnecessary holes.
             if self
                 .palette
-                .try_replace_unique(old_block_index, block, &self.notifier)
+                .try_replace_unique(old_block_index, block, &self.change_notifier)
             {
                 self.side_effects_of_set(old_block_index, position, contents_index);
                 return Ok(true);
             }
 
             // Find or allocate index for new block. This must be done before other mutations since it can fail.
-            let new_block_index = self.palette.ensure_index(block, &self.notifier, true)?;
+            let new_block_index = self
+                .palette
+                .ensure_index(block, &self.change_notifier, true)?;
 
             // Update counts
             self.palette.decrement_maybe_free(old_block_index);
@@ -406,7 +414,7 @@ impl Space {
                 // But it'll at least save a little bit of memory.)
                 self.light_update_queue.remove(position);
 
-                self.notifier.notify(SpaceChange::Lighting(position));
+                self.change_notifier.notify(SpaceChange::Lighting(position));
             } else {
                 self.light_needs_update(position, light::Priority::NEWLY_VISIBLE);
             }
@@ -420,7 +428,7 @@ impl Space {
             }
         }
 
-        self.notifier.notify(SpaceChange::Block(position));
+        self.change_notifier.notify(SpaceChange::Block(position));
     }
 
     /// Replace blocks in `region` with a block computed by the function.
@@ -510,7 +518,7 @@ impl Space {
             self.contents.fill(/* block index = */ 0);
             // TODO: also need to reset lighting and activate tick_action.
             // And see if we can share more of the logic of this with new_from_builder().
-            self.notifier.notify(SpaceChange::EveryBlock);
+            self.change_notifier.notify(SpaceChange::EveryBlock);
             Ok(())
         } else {
             // Fall back to the generic strategy.
@@ -562,7 +570,7 @@ impl Space {
         deadline: time::Deadline<I>,
     ) -> (SpaceStepInfo, UniverseTransaction) {
         // Process changed block definitions.
-        let evaluations = self.palette.step::<I>(&self.notifier);
+        let evaluations = self.palette.step::<I>(&self.change_notifier);
 
         // Process cubes_wanting_ticks.
         let start_cube_ticks = I::now();
@@ -637,6 +645,11 @@ impl Space {
             },
             transaction,
         )
+    }
+
+    /// Returns the source of [fluff](Fluff) occurring in this space.
+    pub fn fluff(&self) -> impl Listen<Msg = SpaceFluff> + '_ {
+        &self.fluff_notifier
     }
 
     /// Perform lighting updates until there are none left to do. Returns the number of
@@ -776,7 +789,8 @@ impl VisitRefs for Space {
             behaviors,
             spawn,
             cubes_wanting_ticks: _,
-            notifier: _,
+            change_notifier: _,
+            fluff_notifier: _,
         } = self;
         palette.visit_refs(visitor);
         behaviors.visit_refs(visitor);
@@ -788,7 +802,7 @@ impl Listen for Space {
     type Msg = SpaceChange;
     /// Registers a listener for mutations of this space.
     fn listen<L: Listener<SpaceChange> + 'static>(&self, listener: L) {
-        self.notifier.listen(listener)
+        self.change_notifier.listen(listener)
     }
 }
 
@@ -1008,6 +1022,17 @@ pub enum SpaceChange {
     /// Equivalent to [`SpaceChange::Block`] for every cube and [`SpaceChange::Number`]
     /// for every index.
     EveryBlock,
+}
+
+/// [`Fluff`] happening at a point in space.
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct SpaceFluff {
+    /// Cube at which it was emitted.
+    /// TODO: we're going to want rotation and fine positioning eventually
+    pub position: Cube,
+    #[allow(missing_docs)]
+    pub fluff: Fluff,
 }
 
 /// Performance data returned by [`Space::step`]. The exact contents of this structure

@@ -120,7 +120,7 @@ impl Space {
             cost += 200;
             // TODO: compute index only once
             self.lighting[self.bounds().index(cube).unwrap()] = new_light_value;
-            self.notifier.notify(SpaceChange::Lighting(cube));
+            self.change_notifier.notify(SpaceChange::Lighting(cube));
 
             // The light algorithm, in its current form, can spend a very long time
             // evaluating 1-unit differences and possibly even loop infinitely. As a
