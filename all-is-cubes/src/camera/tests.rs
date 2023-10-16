@@ -1,7 +1,12 @@
-use super::*;
-use euclid::Rotation3D;
+use euclid::{point3, vec3, Point3D, Rotation3D, Vector2D};
 use pretty_assertions::assert_eq;
 use rand::SeedableRng;
+
+use crate::camera::{
+    look_at_y_up, Camera, ExposureOption, FrustumPoints, GraphicsOptions, LightingOption,
+    ViewTransform, Viewport,
+};
+use crate::math::{Aab, NotNan};
 
 #[test]
 fn camera_bad_viewport_doesnt_panic() {
