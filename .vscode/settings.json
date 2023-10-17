@@ -12,5 +12,4 @@
         "Cargo.toml",
         "fuzz/Cargo.toml",
     ],
-    "workbench.editor.pinnedTabsOnSeparateRow": true
 }
