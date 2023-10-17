@@ -623,6 +623,8 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 .world
                 .debug_lines(&self.cameras.cameras().world, &mut v);
 
+            v.extend(self.space_renderers.world.particle_lines());
+
             self.lines_buffer.write_with_resizing(
                 bwp.reborrow(),
                 &wgpu::util::BufferInitDescriptor {

@@ -2,20 +2,22 @@
 
 use std::collections::HashSet;
 use std::mem;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{atomic, mpsc, Arc, Mutex, Weak};
 use std::time::Duration;
 
 use all_is_cubes::camera::{Camera, Flaws};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
+use all_is_cubes::euclid::num::Zero as _;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, VectorOps,
+    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, NotNan,
+    Rgb, VectorOps,
 };
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
-use all_is_cubes::space::{Sky, Space, SpaceChange};
+use all_is_cubes::space::{Sky, Space, SpaceChange, SpaceFluff};
 use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, HandleError};
 use all_is_cubes::util::Executor;
@@ -81,7 +83,17 @@ pub(crate) struct SpaceRenderer<I: time::Instant> {
     /// If [`None`], then we currently have no [`Space`].
     csm: Option<ChunkedSpaceMesh<WgpuMt<I>, CHUNK_SIZE>>,
 
+    /// The `interactive` parameter passed to `ChunkedSpaceMesh` construction.
     interactive: bool,
+
+    /// Active [`Space::fluff()`], and in the future other particles, that we're drawing.
+    /// Currently, it's all made of lines and thus invoked from the parent `EverythingRenderer`,
+    /// but we do the tracking as time passes.
+    particle_sets: Vec<ParticleSet>,
+
+    /// Receiver whose sender end is held by a space listener, which feeds new particles into
+    /// [Self::particle_sets].
+    particle_rx: mpsc::Receiver<ParticleSet>,
 
     #[cfg(feature = "rerun")]
     rerun_destination: all_is_cubes::rerun_glue::Destination,
@@ -122,6 +134,11 @@ impl<I: time::Instant> SpaceRenderer<I> {
             csm: None,
             interactive,
             space_label,
+            particle_sets: Vec::new(),
+            particle_rx: {
+                let (_, rx) = mpsc::sync_channel(0);
+                rx
+            },
             #[cfg(feature = "rerun")]
             rerun_destination: Default::default(),
         })
@@ -168,6 +185,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
             space_bind_group: _, // will be updated later
             csm,
             interactive,
+            particle_sets,
+            particle_rx,
             #[cfg(feature = "rerun")]
                 rerun_destination: _,
         } = self;
@@ -185,6 +204,15 @@ impl<I: time::Instant> SpaceRenderer<I> {
         #[cfg(feature = "rerun")]
         {
             new_csm.log_to_rerun(self.rerun_destination.clone());
+        }
+
+        {
+            let (particle_tx, new_particle_rx) = mpsc::sync_channel(400);
+            space_borrowed
+                .fluff()
+                .listen(FluffListener::new(particle_tx));
+            particle_sets.clear();
+            *particle_rx = new_particle_rx;
         }
 
         // Spawn background mesh jobs
@@ -231,12 +259,16 @@ impl<I: time::Instant> SpaceRenderer<I> {
             space_bind_group: _,
             csm,
             interactive: _,
+            particle_sets,
+            particle_rx,
             #[cfg(feature = "rerun")]
                 rerun_destination: _,
         } = self;
 
         // detach from space notifier, and also request rebuilding the skybox
         *todo = Arc::new(Mutex::new(SpaceRendererTodo::EVERYTHING));
+        particle_sets.clear();
+        (_, *particle_rx) = mpsc::sync_channel(0);
         *csm = None;
     }
 
@@ -312,6 +344,17 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 }
             },
         );
+
+        // Update particle state.
+        self.particle_sets.retain_mut(|pset| {
+            // TODO: We need information about rate of time passing, to decide what the age
+            // should be incremented by, but don't have it
+            pset.age += 1;
+            pset.age <= 10
+        });
+        while let Ok(pset) = self.particle_rx.try_recv() {
+            self.particle_sets.push(pset);
+        }
 
         // Ensure instance buffer is big enough.
         // This is an overallocation because it doesn't account for culling or empty chunks,
@@ -633,6 +676,10 @@ impl<I: time::Instant> SpaceRenderer<I> {
         })
     }
 
+    pub fn particle_lines(&self) -> impl Iterator<Item = WgpuLinesVertex> + '_ {
+        self.particle_sets.iter().flat_map(|p| p.lines())
+    }
+
     /// Returns the camera, to allow additional drawing in the same coordinate system.
     pub(crate) fn camera_bind_group(&self) -> &wgpu::BindGroup {
         &self.camera_buffer.bind_group
@@ -821,6 +868,43 @@ fn update_chunk_buffers<I: time::Instant>(
     buffers.index_format = to_wgpu_index_format(new_indices);
 }
 
+/// One or more particles derived from [`Fluff`] or similar.
+#[derive(Debug)]
+struct ParticleSet {
+    fluff: SpaceFluff,
+    age: u64,
+}
+impl ParticleSet {
+    fn from_fluff(fluff: SpaceFluff) -> Option<ParticleSet> {
+        use all_is_cubes::fluff::Fluff;
+        // Filter whether we want particles for this at all.
+        // TODO: The initial age should be determined by time in the Space, so that we don't get
+        // lingeringly visible hiccups any time a frame is skipped.
+        match fluff.fluff {
+            Fluff::BlockFault(_) => Some(Self { fluff, age: 0 }),
+            Fluff::Beep
+            | Fluff::Happened
+            | Fluff::PlaceBlockGeneric
+            | Fluff::BlockImpact { .. } => None,
+            _ => todo!(),
+        }
+    }
+
+    fn lines(&self) -> impl Iterator<Item = WgpuLinesVertex> {
+        // TODO: this simple wireframe cube is a placeholder for more general mechanisms.
+        // (But probably we also want to stop using lines, at some point, and use
+        // specially-created block meshes instead.)
+        let mut tmp: Vec<WgpuLinesVertex> = Vec::with_capacity(24); // TODO: inefficient allocation per object
+        crate::wireframe_vertices::<WgpuLinesVertex, _, _>(
+            &mut tmp,
+            Rgb::ONE
+                .with_alpha(NotNan::new(0.9f32.powf(self.age as f32)).unwrap_or(NotNan::zero())),
+            &self.fluff.position.aab().expand(0.004 * (self.age as f64)),
+        );
+        tmp.into_iter()
+    }
+}
+
 /// [`SpaceRenderer`]'s set of things that need recomputing.
 #[derive(Debug)]
 struct SpaceRendererTodo {
@@ -871,6 +955,43 @@ impl Listener<SpaceChange> for TodoListener {
 
     fn alive(&self) -> bool {
         self.0.strong_count() > 0
+    }
+}
+
+#[derive(Debug)]
+struct FluffListener {
+    particle_sender: mpsc::SyncSender<ParticleSet>,
+    alive: atomic::AtomicBool,
+}
+
+impl FluffListener {
+    fn new(sender: mpsc::SyncSender<ParticleSet>) -> Self {
+        Self {
+            particle_sender: sender,
+            alive: atomic::AtomicBool::new(true),
+        }
+    }
+}
+
+impl Listener<SpaceFluff> for FluffListener {
+    fn receive(&self, fluff: SpaceFluff) {
+        let Some(message) = ParticleSet::from_fluff(fluff) else {
+            return;
+        };
+
+        match self.particle_sender.try_send(message) {
+            Ok(()) => {}
+            Err(mpsc::TrySendError::Disconnected(_)) => {
+                self.alive.store(false, atomic::Ordering::Relaxed);
+            }
+            Err(mpsc::TrySendError::Full(_)) => {
+                // ignore
+            }
+        }
+    }
+
+    fn alive(&self) -> bool {
+        self.alive.load(atomic::Ordering::Relaxed)
     }
 }
 
