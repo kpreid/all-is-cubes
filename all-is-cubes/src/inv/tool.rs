@@ -355,6 +355,7 @@ impl ToolInput {
         old_block: Block,
         new_block: Block,
     ) -> Result<UniverseTransaction, ToolError> {
+        let affected_cube = cursor.cube() + cursor.face_selected().normal_vector();
         let rotation = match new_block
             .evaluate()
             .map_err(|e| ToolError::Internal(e.to_string()))? // TODO: better error typing here
@@ -375,11 +376,14 @@ impl ToolInput {
                     .unwrap_or(GridRotation::IDENTITY)
             }
         };
-        self.set_cube(
-            cursor.cube() + cursor.face_selected().normal_vector(),
-            old_block,
-            new_block.rotate(rotation),
-        )
+        let txn = self.set_cube(affected_cube, old_block, new_block.rotate(rotation))?;
+        let txn = txn
+            .merge(
+                SpaceTransaction::fluff(affected_cube, Fluff::PlaceBlockGeneric)
+                    .bind(self.cursor()?.space().clone()),
+            )
+            .expect("fluff never fails to merge");
+        Ok(txn)
     }
 
     /// Returns a [`Cursor`] indicating what blocks the tool should act on, if it is

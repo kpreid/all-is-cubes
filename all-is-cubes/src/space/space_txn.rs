@@ -159,8 +159,18 @@ impl SpaceTransaction {
     /// transaction is committed, in addition to other effects of the transaction.
     ///
     /// TODO: will eventually need rotation.
-    pub fn add_fluff(&mut self, cube: Cube, fluff: crate::fluff::Fluff) {
+    pub fn add_fluff(&mut self, cube: Cube, fluff: Fluff) {
         self.at(cube).fluff.push(fluff);
+    }
+
+    /// Emit [`Fluff`] (sound/particle effects) located at the given cube when this
+    /// transaction is committed.
+    ///
+    /// TODO: will eventually need rotation.
+    pub fn fluff(cube: Cube, fluff: Fluff) -> Self {
+        let mut txn = Self::default();
+        txn.at(cube).fluff.push(fluff);
+        txn
     }
 
     /// Computes the region of cubes directly affected by this transaction.
