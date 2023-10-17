@@ -205,7 +205,7 @@ pub(crate) struct WgpuLinesVertex {
 impl WgpuLinesVertex {
     const ATTRIBUTE_LAYOUT: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![
         0 => Float32x3,
-        1 => Float32x2,
+        1 => Float32x4,
     ];
 
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
