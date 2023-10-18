@@ -105,8 +105,6 @@ impl DefaultProvision for LandscapeBlocks {
 ///
 /// This is an async function for the sake of cancellation and optional cooperative
 /// multitasking. It may be blocked on from a synchronous context.
-// TODO: not sure if we want this to be a public interface; is currently in use by lighting_bench
-#[doc(hidden)]
 pub async fn install_landscape_blocks(
     universe: &mut Universe,
     resolution: Resolution,
