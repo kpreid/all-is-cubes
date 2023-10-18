@@ -145,6 +145,17 @@ impl<I: time::Instant> Session<I> {
         self.sync_character_space();
     }
 
+    /// Set the character which this session is “looking through the eyes of”.
+    /// It must be from the universe previously set with `set_universe()`.
+    pub fn set_character(&mut self, character: Option<URef<Character>>) {
+        if let Some(character) = &character {
+            assert!(character.universe_id() == Some(self.game_universe.universe_id()));
+        }
+
+        self.game_character.set(character);
+        self.sync_character_space();
+    }
+
     /// Perform [`Self::set_universe`] on the result of the provided future when it
     /// completes.
     ///
@@ -712,9 +723,48 @@ pub enum CursorIcon {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::space::Space;
+    use all_is_cubes::character::CharacterTransaction;
+    use all_is_cubes::math::Cube;
+    use all_is_cubes::space::{Space, SpaceTransaction};
+    use all_is_cubes::transaction::no_outputs;
     use all_is_cubes::universe::{Name, Universe};
     use futures_channel::oneshot;
+
+    #[tokio::test]
+    async fn fluff_forwarding_following() {
+        // Create universe members
+        let mut u = Universe::new();
+        let space1 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let space2 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let character = u.insert_anonymous(Character::spawn_default(space1.clone()));
+        let st = SpaceTransaction::fluff(Cube::ORIGIN, Fluff::Happened);
+
+        // Create session
+        let mut session = Session::<std::time::Instant>::builder().build().await;
+        session.set_universe(u);
+        session.set_character(Some(character.clone()));
+        let sink = listen::Sink::<Fluff>::new();
+        session.listen_fluff(sink.listener());
+
+        // Try some fluff with the initial state (we haven't even stepped the session)
+        space1.execute(&st, &mut no_outputs).unwrap();
+        assert_eq!(sink.drain(), vec![Fluff::Happened]);
+
+        // Change spaces
+        character
+            .execute(
+                &CharacterTransaction::move_to_space(space2.clone()),
+                &mut no_outputs,
+            )
+            .unwrap();
+        session.maybe_step_universe();
+
+        // Check we're now listening to the new space only
+        space1.execute(&st, &mut no_outputs).unwrap();
+        assert_eq!(sink.drain(), vec![]);
+        space2.execute(&st, &mut no_outputs).unwrap();
+        assert_eq!(sink.drain(), vec![Fluff::Happened]);
+    }
 
     #[tokio::test]
     async fn set_universe_async() {
