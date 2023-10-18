@@ -743,7 +743,6 @@ mod tests {
                             },
                         ),
                         conserved: true,
-                        activate: false,
                     },
                 },
             }

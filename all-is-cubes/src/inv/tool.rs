@@ -754,9 +754,11 @@ mod tests {
             });
             let transaction = tester.equip_and_use_tool(tool.clone()).unwrap();
 
+            let mut expected_cube_transaction =
+                SpaceTransaction::set_cube(Cube::ORIGIN, Some(AIR), Some(tool_block.clone()));
+            expected_cube_transaction.add_fluff(Cube::ORIGIN, Fluff::PlaceBlockGeneric);
             let expected_cube_transaction =
-                SpaceTransaction::set_cube([0, 0, 0], Some(AIR), Some(tool_block.clone()))
-                    .bind(tester.space_ref.clone());
+                expected_cube_transaction.bind(tester.space_ref.clone());
             assert_eq!(
                 transaction,
                 if expect_consume {
@@ -809,11 +811,15 @@ mod tests {
             .unwrap();
         assert_eq!(
             transaction,
-            SpaceTransaction::set_cube(
-                [0, 0, 0],
-                Some(AIR),
-                Some(tool_block.clone().rotate(GridRotation::CLOCKWISE))
-            )
+            {
+                let mut t = SpaceTransaction::set_cube(
+                    [0, 0, 0],
+                    Some(AIR),
+                    Some(tool_block.clone().rotate(GridRotation::CLOCKWISE)),
+                );
+                t.add_fluff(Cube::ORIGIN, Fluff::PlaceBlockGeneric);
+                t
+            }
             .bind(tester.space_ref.clone())
         );
     }

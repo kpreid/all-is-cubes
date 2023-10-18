@@ -397,12 +397,13 @@ impl Merge for SpaceTransaction {
 
 impl fmt::Debug for SpaceTransaction {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { cubes, behaviors } = self;
         let mut ds = fmt.debug_struct("SpaceTransaction");
-        for (cube, txn) in &self.cubes {
+        for (cube, txn) in cubes {
             ds.field(&Cube::from(*cube).refmt(&ConciseDebug).to_string(), txn);
         }
-        if !self.behaviors.is_empty() {
-            ds.field("behaviors", &self.behaviors);
+        if !behaviors.is_empty() {
+            ds.field("behaviors", &behaviors);
         }
         ds.finish()
     }
@@ -444,7 +445,7 @@ impl fmt::Display for SpaceTransactionConflict {
 
 /// Data for a single cube in a [`SpaceTransaction`]. This does not function as a
 /// transaction on its own, though it does implement [`Merge`].
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Default, Eq, PartialEq)]
 struct CubeTransaction {
     /// Previous block which must occupy this cube.
     /// If `None`, no precondition.
@@ -469,6 +470,31 @@ struct CubeTransaction {
     ///
     /// TODO: Allow having a single entry with no allocation?
     fluff: Vec<Fluff>,
+}
+
+impl fmt::Debug for CubeTransaction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            old,
+            new,
+            conserved,
+            activate,
+            fluff,
+        } = self;
+        let mut ds = f.debug_struct("CubeTransaction");
+        if old.is_some() || new.is_some() {
+            ds.field("old", &old);
+            ds.field("new", &new);
+            ds.field("conserved", &conserved);
+        }
+        if *activate {
+            ds.field("activate", &activate);
+        }
+        if !fluff.is_empty() {
+            ds.field("fluff", &fluff);
+        }
+        ds.finish()
+    }
 }
 
 impl CubeTransaction {
