@@ -123,7 +123,7 @@ where
     }
 }
 
-type PredicateRes = Result<(), Box<dyn Error>>;
+pub type PredicateRes = Result<(), Box<dyn Error>>;
 
 struct TransactionAndPredicate<'a, Tr, Ta> {
     transaction: Tr,

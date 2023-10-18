@@ -695,12 +695,24 @@ impl<'de> serde::Deserialize<'de> for Character {
 #[derive(Clone, Debug, Default, PartialEq)]
 #[must_use]
 pub struct CharacterTransaction {
+    set_space: Option<URef<Space>>,
     body: BodyTransaction,
     inventory: InventoryTransaction,
     behaviors: BehaviorSetTransaction<Character>,
 }
 
 impl CharacterTransaction {
+    /// Move the character to a different [`Space`].
+    ///
+    /// Note that this leaves the position within the spaces unchanged; use a
+    /// [`body()`](Self::body) transaction to also change that. TODO: Better API?
+    pub fn move_to_space(space: URef<Space>) -> Self {
+        CharacterTransaction {
+            set_space: Some(space),
+            ..Default::default()
+        }
+    }
+
     /// Modify the character's [`Body`].
     pub fn body(t: BodyTransaction) -> Self {
         CharacterTransaction {
@@ -736,10 +748,16 @@ impl Transaction<Character> for CharacterTransaction {
     type Output = transaction::NoOutput;
 
     fn check(&self, target: &Character) -> Result<Self::CommitCheck, PreconditionFailed> {
+        let Self {
+            set_space: _, // no check needed
+            body,
+            inventory,
+            behaviors,
+        } = self;
         Ok((
-            self.body.check(&target.body)?,
-            self.inventory.check(&target.inventory)?,
-            self.behaviors.check(&target.behaviors)?,
+            body.check(&target.body)?,
+            inventory.check(&target.inventory)?,
+            behaviors.check(&target.behaviors)?,
         ))
     }
 
@@ -749,6 +767,10 @@ impl Transaction<Character> for CharacterTransaction {
         (body_check, inventory_check, behaviors_check): Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
+        if let Some(space) = &self.set_space {
+            target.space = space.clone();
+        }
+
         self.body
             .commit(&mut target.body, body_check, outputs)
             .map_err(|e| e.context("body".into()))?;
@@ -777,6 +799,9 @@ impl Merge for CharacterTransaction {
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         use CharacterTransactionConflict as C;
+        if self.set_space.is_some() && other.set_space.is_some() {
+            return Err(CharacterTransactionConflict::SetSpace);
+        }
         Ok((
             self.body.check_merge(&other.body).map_err(C::Body)?,
             self.inventory
@@ -794,6 +819,7 @@ impl Merge for CharacterTransaction {
         (body_check, inventory_check, behaviors_check): Self::MergeCheck,
     ) -> Self {
         Self {
+            set_space: self.set_space.or(other.set_space),
             body: self.body.commit_merge(other.body, body_check),
             inventory: self
                 .inventory
@@ -809,6 +835,8 @@ impl Merge for CharacterTransaction {
 #[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 pub enum CharacterTransactionConflict {
+    /// conflict in space to move character into
+    SetSpace,
     /// conflict in character body
     Body(core::convert::Infallible),
     /// conflict in character inventory
@@ -821,6 +849,7 @@ pub enum CharacterTransactionConflict {
 impl std::error::Error for CharacterTransactionConflict {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            CharacterTransactionConflict::SetSpace => None,
             CharacterTransactionConflict::Body(_) => None,
             CharacterTransactionConflict::Inventory(e) => Some(e),
             CharacterTransactionConflict::Behaviors(e) => Some(e),

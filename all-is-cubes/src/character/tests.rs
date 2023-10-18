@@ -116,9 +116,33 @@ fn transaction_systematic() {
     let new_item_1 = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 1.0, 0.0))));
     let new_item_2 = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 0.0, 1.0))));
 
+    let new_space_1 = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+    let new_space_2 = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+
     // TODO: Add tests of stack modification, emptying, merging
 
+    fn rassert(condition: bool, msg: &'static str) -> transaction::PredicateRes {
+        // TODO: put this helper function somewhere? call it a better name?
+        if condition {
+            Ok(())
+        } else {
+            Err(msg.into())
+        }
+    }
     TransactionTester::new()
+        // Set space
+        .transaction(
+            CharacterTransaction::move_to_space(space_ref.clone()),
+            |_, after| rassert(after.space == space_ref, "expected space_ref"),
+        )
+        .transaction(
+            CharacterTransaction::move_to_space(new_space_1.clone()),
+            |_, after| rassert(after.space == new_space_1, "expected new_space_1"),
+        )
+        .transaction(
+            CharacterTransaction::move_to_space(new_space_2.clone()),
+            |_, after| rassert(after.space == new_space_2, "expected new_space_2"),
+        )
         // Body transactions
         .transaction(
             CharacterTransaction::body(BodyTransaction::default()),
@@ -138,10 +162,10 @@ fn transaction_systematic() {
                 new_item_1.clone(),
             )),
             |_, after| {
-                if after.inventory().slots[0] != new_item_1 {
-                    return Err("did not replace new_item_1".into());
-                }
-                Ok(())
+                rassert(
+                    after.inventory().slots[0] == new_item_1,
+                    "did not replace new_item_1",
+                )
             },
         )
         .transaction(
@@ -152,10 +176,10 @@ fn transaction_systematic() {
                 new_item_2.clone(),
             )),
             |_, after| {
-                if after.inventory().slots[0] != new_item_2 {
-                    return Err("did not replace new_item_2".into());
-                }
-                Ok(())
+                rassert(
+                    after.inventory().slots[0] == new_item_2,
+                    "did not replace new_item_2",
+                )
             },
         )
         .target(|| Character::spawn_default(space_ref.clone()))
