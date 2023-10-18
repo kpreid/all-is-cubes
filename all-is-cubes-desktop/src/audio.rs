@@ -82,7 +82,9 @@ fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: Aud
     while let Ok(message) = receiver.recv() {
         match message {
             AudioCommand::Fluff(Fluff::Beep) => play_fluff(&mut manager, &beep),
-            AudioCommand::Fluff(Fluff::Happened) => play_fluff(&mut manager, &happened),
+            AudioCommand::Fluff(Fluff::Happened | Fluff::PlaceBlockGeneric) => {
+                play_fluff(&mut manager, &happened)
+            }
             AudioCommand::Fluff(f) => log::debug!("No known sound for Fluff value: {f:?}"),
         }
     }

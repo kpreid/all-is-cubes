@@ -13,11 +13,13 @@ use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::inv::ToolError;
 use all_is_cubes::listen::{
-    Listen as _, ListenableCell, ListenableCellWithLocal, ListenableSource, Listener, Notifier,
+    self, Listen as _, ListenableCell, ListenableCellWithLocal, ListenableSource, Listener,
+    Notifier,
 };
+use all_is_cubes::space::{self, Space};
 use all_is_cubes::time::{self, Duration};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
+use all_is_cubes::universe::{self, URef, Universe, UniverseStepInfo};
 use all_is_cubes::util::{Fmt, Refmt as _, StatusText};
 
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
@@ -46,12 +48,16 @@ pub struct Session<I> {
 
     game_universe: Universe,
     game_character: ListenableCellWithLocal<Option<URef<Character>>>,
+    space_watch_state: SpaceWatchState,
 
     /// If present, a future that should be polled to produce a new [`Universe`]
     /// to replace `self.game_universe`. See [`Self::set_universe_async`].
     game_universe_in_progress: Option<BoxFuture<'static, Result<Universe, ()>>>,
 
-    fluff_notifier: Notifier<Fluff>, // TODO: should include spatial information
+    /// Outputs [`Fluff`] from the game character's viewpoint and also the session UI.
+    //---
+    // TODO: should include spatial information and source information
+    fluff_notifier: Arc<Notifier<Fluff>>,
 
     paused: ListenableCell<bool>,
 
@@ -82,6 +88,7 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
             graphics_options,
             game_universe,
             game_character,
+            space_watch_state,
             game_universe_in_progress,
             fluff_notifier,
             paused,
@@ -99,6 +106,7 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
             .field("graphics_options", graphics_options)
             .field("game_universe", game_universe)
             .field("game_character", game_character)
+            .field("space_watch_state", space_watch_state)
             .field(
                 "game_universe_in_progress",
                 &game_universe_in_progress.as_ref().map(|_| "..."),
@@ -133,6 +141,8 @@ impl<I: time::Instant> Session<I> {
         self.game_universe = u;
         self.game_character
             .set(self.game_universe.get_default_character());
+
+        self.sync_character_space();
     }
 
     /// Perform [`Self::set_universe`] on the result of the provided future when it
@@ -206,6 +216,8 @@ impl<I: time::Instant> Session<I> {
     ///
     /// Also applies input from the control channel. TODO: Should that be separate?
     pub fn maybe_step_universe(&mut self) -> Option<UniverseStepInfo> {
+        self.sync_character_space();
+
         loop {
             match self.control_channel.try_recv() {
                 Ok(msg) => match msg {
@@ -373,8 +385,7 @@ impl<I: time::Instant> Session<I> {
                 self.fluff_notifier.notify(fluff);
             }
         } else {
-            // TODO: placeholder; this should come out of in-world behavior or widget behavior instead.
-            self.fluff_notifier.notify(Fluff::Happened);
+            // success effects should come from the tool's transaction
         }
 
         if let Some(ui) = &self.ui {
@@ -416,6 +427,22 @@ impl<I: time::Instant> Session<I> {
             } else {
                 Err(ToolError::NoTool)
             }
+        }
+    }
+
+    /// Check if the current game character's current space differs from the current
+    /// `SpaceWatchState`, and update the latter if so.
+    fn sync_character_space(&mut self) {
+        let character_read: Option<universe::UBorrow<Character>> = self
+            .game_character
+            .borrow()
+            .as_ref()
+            .map(|cref| cref.read().expect("TODO: decide how to handle error"));
+        let space: Option<&URef<Space>> = character_read.as_ref().map(|ch| &ch.space);
+
+        if space != self.space_watch_state.space.as_ref() {
+            self.space_watch_state = SpaceWatchState::new(space.cloned(), &self.fluff_notifier)
+                .expect("TODO: decide how to handle error");
         }
     }
 
@@ -486,6 +513,8 @@ impl<I: time::Instant> SessionBuilder<I> {
         let paused = ListenableCell::new(false);
         let (control_send, control_recv) = mpsc::sync_channel(100);
 
+        let space_watch_state = SpaceWatchState::empty();
+
         Session {
             ui: match viewport_for_ui {
                 Some(viewport) => Some(
@@ -508,8 +537,9 @@ impl<I: time::Instant> SessionBuilder<I> {
             graphics_options,
             game_character,
             game_universe,
+            space_watch_state,
             game_universe_in_progress: None,
-            fluff_notifier: Notifier::new(),
+            fluff_notifier: Arc::new(Notifier::new()),
             paused,
             control_channel: control_recv,
             control_channel_sender: control_send,
@@ -585,6 +615,52 @@ impl fmt::Debug for ControlMessage {
             Self::ModifyGraphicsOptions(_f) => f
                 .debug_struct("ModifyGraphicsOptions")
                 .finish_non_exhaustive(),
+        }
+    }
+}
+
+/// Bundle of things relating to the [`Session`] watching a particular [`Space`] that
+/// its [`Character`] is in.
+#[derive(Debug)]
+struct SpaceWatchState {
+    /// Which space this relates to watching.
+    space: Option<URef<Space>>,
+
+    /// Gates the message forwarding from the `space` to `Session::fluff_notifier`.
+    #[allow(dead_code)] // acts upon being dropped
+    fluff_gate: listen::Gate,
+    // /// Camera state copied from the character, for use by fluff forwarder.
+    // camera: Camera,
+}
+
+impl SpaceWatchState {
+    fn new(
+        space: Option<URef<Space>>,
+        fluff_notifier: &Arc<listen::Notifier<Fluff>>,
+    ) -> Result<Self, universe::RefError> {
+        if let Some(space) = space {
+            let space_read = space.read()?;
+            let (fluff_gate, fluff_forwarder) =
+                listen::Notifier::forwarder(Arc::downgrade(fluff_notifier))
+                    .filter(|sf: space::SpaceFluff| {
+                        // TODO: do not discard spatial information; and add source information
+                        Some(sf.fluff)
+                    })
+                    .gate();
+            space_read.fluff().listen(fluff_forwarder);
+            Ok(Self {
+                space: Some(space),
+                fluff_gate,
+            })
+        } else {
+            Ok(Self::empty())
+        }
+    }
+
+    fn empty() -> SpaceWatchState {
+        Self {
+            space: None,
+            fluff_gate: listen::Gate::default(),
         }
     }
 }
