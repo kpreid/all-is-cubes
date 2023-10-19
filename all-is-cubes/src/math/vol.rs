@@ -213,6 +213,30 @@ impl<C, O> Vol<C, O> {
         self.bounds = new_bounds;
         self
     }
+
+    // TODO: good public api?
+    pub(crate) fn map_container<C2, V2, F>(self, f: F) -> Vol<C2, O>
+    where
+        F: FnOnce(C) -> C2,
+        C2: Deref<Target = [V2]>,
+    {
+        let bounds = self.bounds;
+        let contents = f(self.contents);
+        if contents.len() != bounds.volume() {
+            panic!(
+                "{}",
+                VolLengthError {
+                    input_length: contents.len(),
+                    bounds,
+                }
+            )
+        }
+        Vol {
+            bounds,
+            ordering: self.ordering,
+            contents,
+        }
+    }
 }
 
 impl<C> Vol<C, ZMaj> {
