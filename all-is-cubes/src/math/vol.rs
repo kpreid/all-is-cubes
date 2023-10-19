@@ -50,6 +50,33 @@ pub struct Vol<C, O = ZMaj> {
     contents: C,
 }
 
+/// Constructors from linear containers.
+impl<C, O: Default, V> Vol<C, O>
+where
+    C: Deref<Target = [V]>,
+{
+    /// Constructs a `Vol<C>` containing the provided elements, which must be in the
+    /// ordering specified by `O`.
+    ///
+    /// Returns a [`VolLengthError`] if the number of elements does not match
+    /// [`bounds.volume()`](GridAab::volume).
+    pub fn from_elements(bounds: GridAab, elements: impl Into<C>) -> Result<Self, VolLengthError> {
+        let elements = elements.into();
+        if elements.len() == bounds.volume() {
+            Ok(Vol {
+                bounds,
+                ordering: O::default(),
+                contents: elements,
+            })
+        } else {
+            Err(VolLengthError {
+                input_length: elements.len(),
+                bounds,
+            })
+        }
+    }
+}
+
 /// Constructors from elements.
 impl<C, O: Default, V> Vol<C, O>
 where
@@ -87,27 +114,6 @@ where
     /// instead.
     pub fn from_element(value: V) -> Self {
         Self::from_elements(GridAab::ORIGIN_CUBE, core::iter::once(value).collect::<C>()).unwrap()
-    }
-
-    /// Constructs a `Vol<C>` containing the provided elements, which must be in the
-    /// ordering specified by `O`.
-    ///
-    /// Returns a [`VolLengthError`] if the number of elements does not match
-    /// [`bounds.volume()`](GridAab::volume).
-    pub fn from_elements(bounds: GridAab, elements: impl Into<C>) -> Result<Self, VolLengthError> {
-        let elements = elements.into();
-        if elements.len() == bounds.volume() {
-            Ok(Vol {
-                bounds,
-                ordering: O::default(),
-                contents: elements,
-            })
-        } else {
-            Err(VolLengthError {
-                input_length: elements.len(),
-                bounds,
-            })
-        }
     }
 
     /// Constructs a [`Vol<Box<[V]>>`] from nested Rust arrays in [Z][Y][X] order with the Y axis
