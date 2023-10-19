@@ -94,6 +94,10 @@ pub(crate) enum PrimitiveSer<'a> {
     IndirectV1 {
         definition: URef<block::BlockDef>,
     },
+    TextPrimitiveV1 {
+        text: TextSer,
+        offset: [GridCoordinate; 3],
+    },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -190,6 +194,43 @@ pub(crate) enum ModifierSer {
         distance: u16,
         velocity: i16,
     },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum TextSer {
+    TextV1 {
+        string: ArcStr,
+        font: FontSer,
+        positioning: PositioningSerV1,
+    },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) enum FontSer {
+    System16V1,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct PositioningSerV1 {
+    pub(crate) x: PositioningXSer,
+    pub(crate) line_y: PositioningYSer,
+    pub(crate) z: i8,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) enum PositioningXSer {
+    LeftV1,
+    CenterV1,
+    RightV1,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) enum PositioningYSer {
+    BodyTopV1,
+    BodyMiddleV1,
+    BaselineV1,
+    BodyBottomV1,
 }
 
 //------------------------------------------------------------------------------------------------//

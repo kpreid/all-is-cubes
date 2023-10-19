@@ -3,6 +3,7 @@
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use arcstr::literal;
 use core::fmt;
 use core::num::NonZeroU16;
 
@@ -213,6 +214,43 @@ fn block_atom_with_all_attributes() {
                     "redefinition": "ColorSameCategory",
                     "replacement": "Shape",
                 },
+            },
+        }),
+    );
+}
+
+#[test]
+fn block_text() {
+    use block::text;
+
+    assert_round_trip_value(
+        &Block::from_primitive(block::Primitive::Text {
+            text: text::Text::new(
+                literal!("hello"),
+                text::Font::System16,
+                text::Positioning {
+                    x: text::PositioningX::Center,
+                    line_y: text::PositioningY::BodyTop,
+                    z: 7,
+                },
+            ),
+            offset: vec3(100, 0, 0),
+        }),
+        json!({
+            "type": "BlockV1",
+            "primitive": {
+                "type": "TextPrimitiveV1",
+                "text": {
+                    "type": "TextV1",
+                    "string": "hello",
+                    "font": "System16V1",
+                    "positioning": {
+                        "x": "CenterV1",
+                        "line_y": "BodyTopV1",
+                        "z": 7,
+                    }
+                },
+                "offset": [100, 0, 0],
             },
         }),
     );

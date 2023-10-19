@@ -13,8 +13,8 @@ use core::fmt;
 
 use crate::listen::{self, Listen, Listener};
 use crate::math::{
-    Cube, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, Rgb, Rgba, VectorOps,
-    Vol,
+    Cube, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba,
+    VectorOps, Vol,
 };
 use crate::raycast::Ray;
 use crate::space::{SetCubeError, Space, SpaceChange};
@@ -38,6 +38,8 @@ pub use modifier::*;
 
 mod resolution;
 pub use resolution::*;
+
+pub mod text;
 
 #[cfg(test)]
 mod tests;
@@ -124,6 +126,21 @@ pub enum Primitive {
     /// data model — so that if it is, say, serialized and loaded in a future version,
     /// it is still recognized as [`AIR`]. Additionally, it's cheaper to compare this way.
     Air,
+
+    /// A piece of text rendered as voxels.
+    ///
+    /// To combine the text with other shapes, use [`Modifier::Composite`].
+    Text {
+        /// The text to draw, and the font and text-layout-dependent positioning.
+        text: text::Text,
+
+        /// Translation, in whole cubes, of the region of the text to draw.
+        ///
+        /// For text within a single block, this should be zero.
+        /// For multi-block text, this should be equal to the difference between
+        /// the adjacent blocks' positions.
+        offset: GridVector,
+    },
 }
 
 /// Data of [`Primitive::Atom`]. The definition of a single [block](Block) that has uniform
@@ -535,6 +552,8 @@ impl Block {
                     voxels: Evoxels::Many(resolution, voxels),
                 }
             }
+
+            Primitive::Text { ref text, offset } => text.evaluate(offset, depth, filter)?,
         };
 
         for (index, modifier) in self.modifiers().iter().enumerate() {
@@ -552,7 +571,7 @@ impl Block {
         match *self.primitive() {
             Primitive::Atom(Atom { color, .. }) => color,
             Primitive::Air => AIR_EVALUATED.color,
-            Primitive::Indirect(_) | Primitive::Recur { .. } => {
+            Primitive::Indirect(_) | Primitive::Recur { .. } | Primitive::Text { .. } => {
                 panic!("Block::color not defined for non-atom blocks")
             }
         }
@@ -788,6 +807,11 @@ impl fmt::Debug for Primitive {
                 .field("resolution", resolution)
                 .finish(),
             Self::Air => write!(f, "Air"),
+            Self::Text { text, offset } => f
+                .debug_struct("Text")
+                .field("offset", offset)
+                .field("text", text)
+                .finish(),
         }
     }
 }
@@ -828,6 +852,7 @@ impl VisitRefs for Primitive {
                 visitor.visit(space);
                 attributes.visit_refs(visitor);
             }
+            Primitive::Text { text, offset: _ } => text.visit_refs(visitor),
         }
     }
 }
