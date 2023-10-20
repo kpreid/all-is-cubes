@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 use std::sync::mpsc::TryRecvError;
 use std::sync::{mpsc, Mutex};
 
+use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::camera::{FogOption, GraphicsOptions, UiViewState, ViewTransform, Viewport};
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::inv::{EphemeralOpaque, Tool, ToolError, ToolInput};
@@ -155,7 +156,7 @@ impl Vui {
         self.current_view.as_source()
     }
 
-    pub(crate) fn set_state(&mut self, state: VuiPageState) {
+    pub(crate) fn set_state(&mut self, state: impl Into<Arc<VuiPageState>>) {
         self.state.set(state);
 
         // Special case: the dump state has to replace the widget tree, and
@@ -320,6 +321,16 @@ impl Vui {
         }
     }
 
+    pub fn show_modal_message(&mut self, message: ArcStr) {
+        let content = EphemeralOpaque::from(Arc::new(
+            pages::new_message_widget_tree(&mut self.universe, message, &self.hud_inputs).unwrap(),
+        ));
+        self.set_state(VuiPageState::Dump {
+            previous: self.state.get(),
+            content,
+        });
+    }
+
     /// Present the UI visual response to a click (that has already been handled),
     /// either a small indication that a button was pressed or an error message.
     pub fn show_click_result(&self, button: usize, result: Result<(), ToolError>) {
@@ -388,7 +399,7 @@ impl Vui {
                 self.set_state(VuiPageState::Hud);
             }
             VuiPageState::Dump { ref previous, .. } => {
-                self.set_state(*previous.clone());
+                self.set_state(Arc::clone(previous));
             }
         }
     }
@@ -409,9 +420,8 @@ pub(crate) enum VuiPageState {
     /// Arbitrary widgets that have already been computed, and which don't demand
     /// any navigation behavior more complex than “cancellable”. This is to be used for
     /// viewing various reports/dialogs until we have a better idea.
-    #[allow(dead_code)] // TODO: Use this
     Dump {
-        previous: Box<VuiPageState>,
+        previous: Arc<VuiPageState>,
         content: EphemeralOpaque<WidgetTree>,
     },
 }

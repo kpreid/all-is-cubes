@@ -2,6 +2,7 @@
 
 use alloc::sync::Arc;
 
+use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::{Block, Resolution::*};
 use all_is_cubes::math::Face6;
 use all_is_cubes::universe::Universe;
@@ -116,6 +117,29 @@ pub(super) fn new_about_widget_tree(
             LayoutTree::leaf(shrink(u, R32, paragraph(about_text))?),
             // LayoutTree::leaf(shrink(u, R32, heading("License"))?),
             // LayoutTree::leaf(shrink(u, R32, paragraph("TODO"))?),
+        ],
+    });
+    Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
+        hud_inputs
+            .hud_blocks
+            .dialog_background()
+            .as_background_of(contents),
+    ))))
+}
+
+/// A message in a "modal dialog box".
+pub(super) fn new_message_widget_tree(
+    u: &mut Universe,
+    message: ArcStr,
+    hud_inputs: &HudInputs,
+) -> Result<WidgetTree, InstallVuiError> {
+    use parts::{paragraph, shrink};
+
+    let contents = Arc::new(LayoutTree::Stack {
+        direction: Face6::NY,
+        children: vec![
+            LayoutTree::leaf(shrink(u, R32, paragraph(message))?),
+            back_button(hud_inputs),
         ],
     });
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(

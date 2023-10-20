@@ -8,6 +8,7 @@ use std::sync::mpsc::{self, TryRecvError};
 use futures_core::future::BoxFuture;
 use futures_task::noop_waker_ref;
 
+use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::camera::{GraphicsOptions, StandardCameras, UiViewState, Viewport};
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::fluff::Fluff;
@@ -366,6 +367,23 @@ impl<I: time::Instant> Session<I> {
             // * Maybe a lack-of-world should be indicated with a disabled cursor.
             None => &CursorIcon::Crosshair,
             Some(_) => &CursorIcon::PointingHand,
+        }
+    }
+
+    /// Display a dialog box with a message. The user can exit the dialog box to return
+    /// to the previous UI page.
+    ///
+    /// The message may contain newlines and will be word-wrapped.
+    ///
+    /// If this session was constructed without UI then the message will be logged instead.
+    ///
+    /// Caution: calling this repeatedly will currently result in stacking up arbitrary
+    /// numbers of dialogs. Avoid using it for situations not in response to user action.
+    pub fn show_modal_message(&mut self, message: ArcStr) {
+        if let Some(ui) = &mut self.ui {
+            ui.show_modal_message(message);
+        } else {
+            log::info!("UI message not shown: {message}");
         }
     }
 
