@@ -238,7 +238,7 @@ impl all_is_cubes::save::WhenceUniverse for PortWhence {
         // TODO: in order to implement this we need to be able to write to a `Fileish`
         // or have an accompanying destination
         let _ = (universe, progress, self.save_format);
-        todo!();
+        Box::pin(async { Err("saving via `WhenceUniverse` is not yet implemented".into()) })
     }
 }
 
