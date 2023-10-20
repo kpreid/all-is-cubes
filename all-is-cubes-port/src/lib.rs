@@ -48,9 +48,9 @@
 #![warn(missing_docs)]
 
 use std::ffi::OsString;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::{fs, io};
 
 use futures_core::future::BoxFuture;
 
@@ -123,7 +123,10 @@ pub async fn export_to_path(
     destination: PathBuf,
 ) -> Result<(), crate::ExportError> {
     match format {
-        ExportFormat::AicJson => native::export_native_json(progress, source, destination).await,
+        ExportFormat::AicJson => {
+            let mut writer = io::BufWriter::new(fs::File::create(destination)?);
+            native::export_native_json(progress, source, &mut writer).await
+        }
         ExportFormat::DotVox => {
             // TODO: async file IO?
             mv::export_dot_vox(progress, source, fs::File::create(destination)?).await
@@ -216,10 +219,11 @@ impl all_is_cubes::save::WhenceUniverse for PortWhence {
     }
 
     fn can_save(&self) -> bool {
-        // TODO: implement this along with save()
-        #[allow(unused)]
-        let _ = self.save_format;
-        false
+        match self.save_format {
+            Some(ExportFormat::AicJson) => true,
+            Some(_) => false,
+            None => false,
+        }
     }
 
     fn load(
@@ -235,10 +239,24 @@ impl all_is_cubes::save::WhenceUniverse for PortWhence {
         universe: &Universe,
         progress: YieldProgress,
     ) -> BoxFuture<'static, Result<(), Box<dyn std::error::Error + Send + Sync>>> {
-        // TODO: in order to implement this we need to be able to write to a `Fileish`
-        // or have an accompanying destination
-        let _ = (universe, progress, self.save_format);
-        Box::pin(async { Err("saving via `WhenceUniverse` is not yet implemented".into()) })
+        let source = ExportSet::all_of_universe(universe);
+        let save_format = self.save_format;
+        let file = self.file.clone();
+        Box::pin(async move {
+            // TODO: merge this and `export_to_path()`
+            match save_format {
+                Some(ExportFormat::AicJson) => {
+                    let mut buf = Vec::new();
+                    native::export_native_json(progress, source, &mut buf).await?;
+                    file.write(&buf)?;
+                    Ok(())
+                }
+                Some(_) => {
+                    Err("saving this format via `WhenceUniverse` is not yet implemented".into())
+                }
+                None => Err("saving the file format that was loaded is not supported".into()),
+            }
+        })
     }
 }
 

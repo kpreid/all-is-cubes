@@ -19,6 +19,13 @@ pub trait Fileish: fmt::Debug + Send + Sync {
     ///
     /// TODO: This should probably be async.
     fn read(&self) -> Result<Vec<u8>, io::Error>;
+
+    /// Overwrites the file contents, if possible.
+    ///
+    /// TODO: This should probably be async.
+    ///
+    /// TODO: Need a way to communicate “this is definitely never writability”.
+    fn write(&self, data: &[u8]) -> Result<(), io::Error>;
 }
 
 // TODO: when Rust has generic associated types we will no longer
@@ -40,17 +47,23 @@ impl Fileish for PathBuf {
     fn read(&self) -> Result<Vec<u8>, io::Error> {
         std::fs::read(self)
     }
+
+    fn write(&self, data: &[u8]) -> Result<(), io::Error> {
+        std::fs::write(self, data)
+    }
 }
 
 /// General-purpose implementation of [`Fileish`].
+///
+/// TODO: figure out how writing works for this
 pub struct NonDiskFile<O> {
     name: String,
-    opener: O,
+    reader: O,
 }
 
 impl<O> fmt::Debug for NonDiskFile<O> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { name, opener: _ } = self;
+        let Self { name, reader: _ } = self;
         f.debug_struct("NonDiskFile")
             .field("name", name)
             .finish_non_exhaustive()
@@ -60,7 +73,10 @@ impl<O> fmt::Debug for NonDiskFile<O> {
 impl<O> NonDiskFile<O> {
     /// Construct a new [`NonDiskFile`] from its parts.
     pub fn from_name_and_data_source(name: String, opener: O) -> Self {
-        Self { name, opener }
+        Self {
+            name,
+            reader: opener,
+        }
     }
 }
 
@@ -77,6 +93,13 @@ where
     }
 
     fn read(&self) -> Result<Vec<u8>, io::Error> {
-        (self.opener)()
+        (self.reader)()
+    }
+
+    fn write(&self, _data: &[u8]) -> Result<(), io::Error> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "writing is not yet implemented for NonDiskFile",
+        ))
     }
 }

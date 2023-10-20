@@ -1,5 +1,4 @@
-use std::path::PathBuf;
-use std::{fs, io};
+use std::io;
 
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
@@ -29,18 +28,15 @@ pub(crate) fn import_native_json(
     })
 }
 
+/// The `destination` should be buffered for efficiency.
 pub(crate) async fn export_native_json(
     progress: YieldProgress,
     source: ExportSet,
-    destination: PathBuf,
+    destination: &mut (dyn io::Write + Send),
 ) -> Result<(), ExportError> {
     // TODO: Spin off a blocking thread to perform this export
     let ExportSet { contents } = source;
-    serde_json::to_writer(
-        io::BufWriter::new(fs::File::create(destination)?),
-        &contents,
-    )
-    .map_err(|error| {
+    serde_json::to_writer(destination, &contents).map_err(|error| {
         // TODO: report non-IO errors distinctly
         ExportError::Write(io::Error::new(io::ErrorKind::Other, error))
     })?;
