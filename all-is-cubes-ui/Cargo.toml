@@ -21,6 +21,7 @@ displaydoc = { workspace = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }
 futures-task = { workspace = true }
+futures-util = { workspace = true }
 indoc = { workspace = true }
 log = { workspace = true }
 

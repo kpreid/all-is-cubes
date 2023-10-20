@@ -8,7 +8,7 @@ use std::sync::mpsc::{self, TryRecvError};
 use futures_core::future::BoxFuture;
 use futures_task::noop_waker_ref;
 
-use all_is_cubes::arcstr::ArcStr;
+use all_is_cubes::arcstr::{self, ArcStr};
 use all_is_cubes::camera::{GraphicsOptions, StandardCameras, UiViewState, Viewport};
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::fluff::Fluff;
@@ -21,7 +21,7 @@ use all_is_cubes::space::{self, Space};
 use all_is_cubes::time::{self, Duration};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{self, URef, Universe, UniverseStepInfo};
-use all_is_cubes::util::{Fmt, Refmt as _, StatusText};
+use all_is_cubes::util::{Fmt, Refmt as _, StatusText, YieldProgressBuilder};
 
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
 use crate::ui_content::Vui;
@@ -230,7 +230,7 @@ impl<I: time::Instant> Session<I> {
     pub fn maybe_step_universe(&mut self) -> Option<UniverseStepInfo> {
         self.sync_character_space();
 
-        loop {
+        'handle_message: loop {
             match self.control_channel.try_recv() {
                 Ok(msg) => match msg {
                     ControlMessage::Back => {
@@ -240,10 +240,33 @@ impl<I: time::Instant> Session<I> {
                         }
                     }
                     ControlMessage::Save => {
-                        todo!("Need to await the future or make saving synchronous");
-                        // let u = &self.game_universe;
-                        // let _fut = u.whence.save(u, YieldProgressBuilder::new().build());
-                        // // TODO: need to await the future
+                        // TODO: Make this asynchronous. We will need to suspend normal
+                        // stepping during that period.
+                        let u = &self.game_universe;
+                        let fut = u.whence.save(
+                            u,
+                            YieldProgressBuilder::new()
+                                .yield_using(|_| async {}) // noop yield
+                                .build(),
+                        );
+                        match futures_util::FutureExt::now_or_never(fut) {
+                            Some(Ok(())) => {
+                                // TODO: show a momentary "Saved!" message
+                            }
+                            Some(Err(e)) => {
+                                self.show_modal_message(arcstr::format!(
+                                    "{}",
+                                    all_is_cubes::util::ErrorChain(&*e)
+                                ));
+                                continue 'handle_message;
+                            }
+                            None => {
+                                self.show_modal_message(
+                                    "unsupported: saving did not complete synchronously".into(),
+                                );
+                                continue 'handle_message;
+                            }
+                        }
                     }
                     ControlMessage::TogglePause => {
                         self.paused.set(!*self.paused.get());
@@ -620,9 +643,6 @@ pub(crate) enum ControlMessage {
     Back,
 
     /// Save the game universe back to its [`WhenceUniverse`].
-    ///
-    /// TODO: This is not yet implemented and its usage in the UI is disabled.
-    #[allow(dead_code)]
     Save,
 
     TogglePause,

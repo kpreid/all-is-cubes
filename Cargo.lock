@@ -257,6 +257,7 @@ dependencies = [
  "futures-channel",
  "futures-core",
  "futures-task",
+ "futures-util",
  "indoc",
  "log",
  "pretty_assertions",
