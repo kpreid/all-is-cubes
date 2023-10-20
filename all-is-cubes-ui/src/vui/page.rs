@@ -76,7 +76,7 @@ impl UiSize {
             let mut add_frame = |z, color| {
                 let frame_block = Block::from(color);
                 space
-                    .fill_uniform(GridAab::from_lower_size([0, 0, z], [w, h, 1]), frame_block)
+                    .fill_uniform(GridAab::from_lower_size([0, 0, z], [w, h, 1]), &frame_block)
                     .unwrap();
                 space
                     .fill_uniform(GridAab::from_lower_size([1, 1, z], [w - 2, h - 2, 1]), &AIR)

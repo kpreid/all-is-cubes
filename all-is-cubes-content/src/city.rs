@@ -235,7 +235,7 @@ pub(crate) async fn demo_city<I: Instant>(
         ],
         [-exhibit_front_radius, sky_height, -exhibit_front_radius],
     );
-    space.fill_uniform(landscape_region, AIR)?;
+    space.fill_uniform(landscape_region, &AIR)?;
     landscape_progress.progress(0.5).await;
     wavy_landscape(landscape_region, &mut space, &landscape_blocks, 1.0)?;
     planner.occupied_plots.push(landscape_region);

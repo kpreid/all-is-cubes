@@ -312,7 +312,7 @@ mod eval {
         let mut universe = Universe::new();
         let mut space = Space::empty_positive(2, 4, 4);
         space
-            .fill_uniform(space.bounds(), Block::from(Rgba::WHITE))
+            .fill_uniform(space.bounds(), &Block::from(Rgba::WHITE))
             .unwrap();
         let space_ref = universe.insert_anonymous(space);
         let block = Block::builder()

@@ -208,7 +208,7 @@ mod tests {
         let mut universe = Universe::new();
         let mut block_space = Space::empty_positive(4, 2, 4);
         block_space
-            .fill_uniform(block_space.bounds(), Block::from(Rgba::WHITE))
+            .fill_uniform(block_space.bounds(), &Block::from(Rgba::WHITE))
             .unwrap();
         let space_ref = universe.insert_anonymous(block_space);
         let partial_block = Block::builder()

@@ -582,8 +582,8 @@ impl Body {
     /// Changes [`self.yaw`](Self::yaw) and [`self.pitch`](Self::pitch) to look directly
     /// towards the given point within the same coordinate system as
     /// [`self.position`](Self::position).
-    pub fn look_at(&mut self, point: impl Into<FreePoint>) {
-        let direction: FreeVector = point.into() - self.position;
+    pub fn look_at(&mut self, point: FreePoint) {
+        let direction: FreeVector = point - self.position;
         let horizontal_distance = direction.x.hypot(direction.z);
 
         self.yaw = (180.0 - (direction.x).atan2(direction.z).to_degrees()).rem_euclid(360.0);

@@ -183,13 +183,13 @@ impl DemoTheme {
             let gate_side_2 = gate_box.abut(wall_parallel, -1).unwrap();
             space.fill_uniform(
                 gate_side_2,
-                self.blocks[DungeonBlocks::Gate]
+                &self.blocks[DungeonBlocks::Gate]
                     .clone()
                     .rotate(rotate_nz_to_face),
             )?;
             space.fill_uniform(
                 gate_side_1,
-                self.blocks[DungeonBlocks::GatePocket]
+                &self.blocks[DungeonBlocks::GatePocket]
                     .clone()
                     .rotate(rotate_nz_to_face),
             )?;

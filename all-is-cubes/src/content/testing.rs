@@ -64,7 +64,7 @@ pub async fn lighting_bench_space(
     space
         .fill_uniform(
             space_bounds.expand(FaceMap::default().with(Face6::PY, -yup)),
-            Block::from(rgb_const!(0.5, 0.5, 0.5)),
+            &Block::from(rgb_const!(0.5, 0.5, 0.5)),
         )
         .unwrap();
 
@@ -98,13 +98,13 @@ pub async fn lighting_bench_space(
             ));
             match rng.gen_range(0..3) {
                 0 => {
-                    space.fill_uniform(section_bounds, color).unwrap();
+                    space.fill_uniform(section_bounds, &color).unwrap();
                 }
                 1 => {
                     space
                         .fill_uniform(
                             section_bounds.expand(FaceMap::default().with(Face6::PY, -yup)),
-                            color,
+                            &color,
                         )
                         .unwrap();
                     space

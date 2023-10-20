@@ -164,9 +164,9 @@ impl PackedLight {
         difference
     }
 
-    fn scalar_in(value: impl Into<f32>) -> PackedLightScalar {
+    fn scalar_in(value: NotNan<f32>) -> PackedLightScalar {
         // Note that `as` is a saturating cast.
-        (value.into().log2() * Self::LOG_SCALE + Self::LOG_OFFSET) as PackedLightScalar
+        (value.log2() * Self::LOG_SCALE + Self::LOG_OFFSET) as PackedLightScalar
     }
 
     /// Convert a `PackedLightScalar` value to a linear color component value.
@@ -435,7 +435,7 @@ mod tests {
     #[test]
     fn packed_light_roundtrip() {
         for i in PackedLightScalar::MIN..PackedLightScalar::MAX {
-            assert_eq!(i, PackedLight::scalar_in(PackedLight::scalar_out(i)));
+            assert_eq!(i, PackedLight::scalar_in(PackedLight::scalar_out_nn(i)));
         }
     }
 

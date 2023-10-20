@@ -220,7 +220,7 @@ fn half_space(block: Block) -> Space {
     let bounds = GridAab::from_lower_size([0, 0, 0], [16, 16, 16]);
     let mut space = Space::empty(bounds);
     space
-        .fill_uniform(GridAab::from_lower_size([0, 0, 0], [16, 8, 16]), block)
+        .fill_uniform(GridAab::from_lower_size([0, 0, 0], [16, 8, 16]), &block)
         .unwrap();
     space
 }

@@ -85,29 +85,31 @@ impl GridAab {
         lower_bounds: impl Into<GridPoint>,
         sizes: impl Into<GridVector>,
     ) -> Result<Self, GridOverflowError> {
-        let lower_bounds = lower_bounds.into();
-        let sizes = sizes.into();
-
-        // TODO: Test these error cases.
-        // TODO: Replace string error construction with an error enum.
-        for axis in Axis::ALL {
-            if sizes[axis] < 0 {
-                return Err(GridOverflowError(format!(
-                    "sizes.{axis:x} must be ≥ 0, not {sa}",
-                    sa = sizes[axis]
-                )));
+        fn inner(lower_bounds: GridPoint, sizes: GridVector) -> Result<GridAab, GridOverflowError> {
+            // TODO: Test these error cases.
+            // TODO: Replace string error construction with an error enum.
+            for axis in Axis::ALL {
+                if sizes[axis] < 0 {
+                    return Err(GridOverflowError(format!(
+                        "sizes.{axis:x} must be ≥ 0, not {sa}",
+                        sa = sizes[axis]
+                    )));
+                }
+                lower_bounds[axis].checked_add(sizes[axis]).ok_or_else(|| {
+                    GridOverflowError(format!("lower_bounds.{axis:x} too large for sizes"))
+                })?;
             }
-            lower_bounds[axis].checked_add(sizes[axis]).ok_or_else(|| {
-                GridOverflowError(format!("lower_bounds.{axis:x} too large for sizes"))
+            GridAab::checked_volume_helper(sizes).map_err(|()| {
+                GridOverflowError(format!("volume too large; {sizes:?} overflows"))
             })?;
-        }
-        Self::checked_volume_helper(sizes)
-            .map_err(|()| GridOverflowError(format!("volume too large; {sizes:?} overflows")))?;
 
-        Ok(GridAab {
-            lower_bounds,
-            sizes,
-        })
+            Ok(GridAab {
+                lower_bounds,
+                sizes,
+            })
+        }
+
+        inner(lower_bounds.into(), sizes.into())
     }
 
     /// Constructs a [`GridAab`] from inclusive lower bounds and exclusive upper bounds.
@@ -535,14 +537,18 @@ impl GridAab {
     /// ```
     #[must_use]
     pub fn translate(&self, offset: impl Into<GridVector>) -> Self {
-        let offset = offset.into().to_point();
-        let new_lb = self
-            .lower_bounds()
-            .zip(offset, GridCoordinate::saturating_add);
-        let new_ub = self
-            .upper_bounds()
-            .zip(offset, GridCoordinate::saturating_add);
-        Self::from_lower_upper(new_lb, new_ub)
+        fn inner(this: &GridAab, offset: GridVector) -> GridAab {
+            let offset = offset.to_point();
+            let new_lb = this
+                .lower_bounds()
+                .zip(offset, GridCoordinate::saturating_add);
+            let new_ub = this
+                .upper_bounds()
+                .zip(offset, GridCoordinate::saturating_add);
+            GridAab::from_lower_upper(new_lb, new_ub)
+        }
+
+        inner(self, offset.into())
     }
 
     /// Translate and rotate the box according to the given transform.

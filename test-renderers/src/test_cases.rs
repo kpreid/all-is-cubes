@@ -938,7 +938,7 @@ async fn fog_test_universe() -> Arc<Universe> {
     space
         .fill_uniform(
             bounds.abut(Face6::NY, -1).unwrap(),
-            Block::from(rgba_const!(0.0, 1.0, 0.5, 1.0)),
+            &Block::from(rgba_const!(0.0, 1.0, 0.5, 1.0)),
         )
         .unwrap();
 
@@ -946,7 +946,7 @@ async fn fog_test_universe() -> Arc<Universe> {
     space
         .fill_uniform(
             bounds.abut(Face6::PX, -1).unwrap(),
-            Block::from(rgba_const!(1.0, 0.5, 0.5, 1.0)),
+            &Block::from(rgba_const!(1.0, 0.5, 0.5, 1.0)),
         )
         .unwrap();
 
@@ -988,7 +988,7 @@ async fn light_test_universe() -> Arc<Universe> {
     space
         .fill_uniform(
             bounds.abut(Face6::NZ, -1).unwrap(),
-            Block::from(rgba_const!(0.5, 0.5, 0.5, 1.0)),
+            &Block::from(rgba_const!(0.5, 0.5, 0.5, 1.0)),
         )
         .unwrap();
 

@@ -193,7 +193,7 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
         |_origin, direction, _length, wall_excluding_corners| {
             space.fill_uniform(
                 wall_excluding_corners,
-                window_block
+                &window_block
                     .clone()
                     .rotate(GridRotation::from_to(Face6::PX, direction, Face6::PY).unwrap()),
             )?;
@@ -1062,7 +1062,7 @@ async fn SWIMMING_POOL(_: &Exhibit, _: &mut Universe) {
     let mut space = Space::empty(water_area);
     space.fill_uniform(
         water_area,
-        Block::builder()
+        &Block::builder()
             .display_name("Not entirely unlike water")
             .color(Rgba::new(0.96, 0.96, 1.0, 0.1))
             .collision(BlockCollision::None)

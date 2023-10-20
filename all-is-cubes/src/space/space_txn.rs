@@ -90,8 +90,8 @@ impl SpaceTransaction {
     /// This is thus comparable to a direct [`Space::set()`] after the rest of the
     /// transaction.
     // TODO: no tests
-    pub fn set_overwrite(&mut self, cube: impl Into<GridPoint>, block: Block) {
-        self.at(cube).new = Some(block);
+    pub fn set_overwrite(&mut self, cube: impl Into<Cube>, block: Block) {
+        self.at(cube.into()).new = Some(block);
     }
 
     /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
@@ -121,8 +121,7 @@ impl SpaceTransaction {
         self
     }
 
-    fn single(cube: impl Into<Cube>, transaction: CubeTransaction) -> Self {
-        let cube: Cube = cube.into();
+    fn single(cube: Cube, transaction: CubeTransaction) -> Self {
         let mut cubes = BTreeMap::new();
         cubes.insert(cube.into(/* array */), transaction);
         SpaceTransaction {
@@ -228,7 +227,7 @@ impl SpaceTransaction {
     /// cube, use [`SpaceTransaction::single()`].
     ///
     /// TODO: decide whether to make this and `CubeTransaction` public
-    fn at(&mut self, cube: impl Into<GridPoint>) -> &mut CubeTransaction {
+    fn at(&mut self, cube: Cube) -> &mut CubeTransaction {
         let cube: GridPoint = cube.into();
         self.cubes.entry(cube.into()).or_default()
     }

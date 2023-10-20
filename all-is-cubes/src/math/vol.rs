@@ -164,7 +164,12 @@ impl<C, O> Vol<C, O> {
     /// TODO: example
     #[must_use]
     #[track_caller]
-    pub fn translate(mut self, offset: impl Into<GridVector>) -> Self {
+    pub fn translate(self, offset: impl Into<GridVector>) -> Self {
+        self.translate_impl(offset.into())
+    }
+
+    #[track_caller]
+    fn translate_impl(mut self, offset: GridVector) -> Self {
         let new_bounds = self.bounds.translate(offset);
         if new_bounds.size() != self.bounds.size() {
             // We can't just continue like `GridAab::translate` does, because that would

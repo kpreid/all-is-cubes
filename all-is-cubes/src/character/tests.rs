@@ -233,7 +233,7 @@ fn click_wrong_space_or_correct_space() {
         universe.insert_anonymous({
             let mut sp1 = Space::empty_positive(1, 1, 1);
             // add something for the raycast to hit
-            sp1.fill_uniform(sp1.bounds(), Block::from(Rgb::ONE))
+            sp1.fill_uniform(sp1.bounds(), &Block::from(Rgb::ONE))
                 .unwrap();
             sp1
         })

@@ -500,11 +500,7 @@ impl Space {
     /// ```
     ///
     /// See also [`Space::fill`] for non-uniform fill and bulk copies.
-    pub fn fill_uniform<'b>(
-        &mut self,
-        region: GridAab,
-        block: impl Into<Cow<'b, Block>>,
-    ) -> Result<(), SetCubeError> {
+    pub fn fill_uniform(&mut self, region: GridAab, block: &Block) -> Result<(), SetCubeError> {
         if !self.bounds.contains_box(region) {
             Err(SetCubeError::OutOfBounds {
                 modification: region,
@@ -512,9 +508,8 @@ impl Space {
             })
         } else if self.bounds() == region {
             // We're overwriting the entire space, so we might as well re-initialize it.
-            let block = block.into();
             let volume = self.bounds().volume();
-            self.palette = Palette::new(block.clone().into_owned(), volume);
+            self.palette = Palette::new(block.clone(), volume);
             self.contents.fill(/* block index = */ 0);
             // TODO: also need to reset lighting and activate tick_action.
             // And see if we can share more of the logic of this with new_from_builder().
@@ -522,8 +517,7 @@ impl Space {
             Ok(())
         } else {
             // Fall back to the generic strategy.
-            let block = block.into().into_owned();
-            self.fill(region, |_| Some(&block))
+            self.fill(region, |_| Some(block))
         }
     }
 

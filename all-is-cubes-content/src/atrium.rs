@@ -106,7 +106,7 @@ pub(crate) async fn atrium(
         |_origin, direction, _length, wall_excluding_corners| -> Result<(), InGenError> {
             space.fill_uniform(
                 wall_excluding_corners,
-                blocks[AtriumBlocks::GroundFloor]
+                &blocks[AtriumBlocks::GroundFloor]
                     .clone()
                     .rotate(GridRotation::from_to(Face6::PZ, direction, Face6::PY).unwrap()),
             )?;
