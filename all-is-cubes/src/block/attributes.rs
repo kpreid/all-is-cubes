@@ -164,7 +164,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
             display_name: u.arbitrary::<alloc::string::String>()?.into(),
             selectable: u.arbitrary()?,
             rotation_rule: u.arbitrary()?,
-            tick_action: None, // TODO: need Arbitrary for Block
+            tick_action: u.arbitrary()?,
             animation_hint: u.arbitrary()?,
         })
     }
@@ -174,7 +174,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
             alloc::string::String::size_hint(depth),
             bool::size_hint(depth),
             RotationPlacementRule::size_hint(depth),
-            crate::math::Rgb::size_hint(depth),
+            TickAction::size_hint(depth),
             AnimationHint::size_hint(depth),
         ])
     }
@@ -364,6 +364,7 @@ impl AnimationChange {
 ///
 /// Stored in [`BlockAttributes`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[allow(clippy::exhaustive_structs)] // will deliberately break
 pub struct TickAction {
     /// Operation to perform on the schedule.

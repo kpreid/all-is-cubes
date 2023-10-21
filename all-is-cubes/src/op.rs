@@ -21,6 +21,7 @@ use crate::universe::VisitRefs;
 /// part of `BlockAttribtes` and `EvaluatedBlock` it is cloned a lot.
 #[doc = include_str!("save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Operation {
     /// Apply the brush centered on the cube.

@@ -473,6 +473,33 @@ impl crate::universe::VisitRefs for VoxelBrush<'_> {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+#[mutants::skip]
+impl<'a, 'b> arbitrary::Arbitrary<'a> for VoxelBrush<'b> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(VoxelBrush(
+            u.arbitrary_iter()?
+                .map(|result| {
+                    result.map(|(offset, block): ([i32; 3], Block)| {
+                        (offset.into(), Cow::Owned(block))
+                    })
+                })
+                .collect::<arbitrary::Result<Vec<(GridVector, Cow<'b, Block>)>>>()?,
+        ))
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        use arbitrary::{
+            size_hint::{and, and_all},
+            Arbitrary,
+        };
+        and(
+            and(GridAab::size_hint(depth), bool::size_hint(depth)),
+            and_all(&[<f64 as Arbitrary>::size_hint(depth); 6]),
+        )
+    }
+}
+
 /// Converts the return value of [`Space::set`] to the return value of
 /// [`DrawTarget::draw_pixel`], by making out-of-bounds not an error.
 fn ignore_out_of_bounds(result: Result<bool, SetCubeError>) -> Result<(), SetCubeError> {
