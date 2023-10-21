@@ -34,6 +34,15 @@ pub use rotation::*;
 mod vol;
 pub use vol::*;
 
+// We make an assumption in several places that `usize` is at least 32 bits.
+// It's likely that compilation would not succeed anyway, but let's make it explicit.
+#[cfg(not(any(
+    target_pointer_width = "32",
+    target_pointer_width = "64",
+    target_pointer_width = "128",
+)))]
+compile_error!("all-is-cubes does not support platforms with less than 32-bit `usize`");
+
 /// Allows writing a [`NotNan`] value as a constant expression (which is not currently
 /// a feature provided by the [`ordered_float`] crate itself).
 ///
