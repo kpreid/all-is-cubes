@@ -59,7 +59,7 @@ mod atrium;
 mod blocks;
 pub use blocks::*;
 mod city;
-pub(crate) use city::*;
+pub(crate) use city::demo_city;
 mod clouds;
 mod template;
 pub use template::*;

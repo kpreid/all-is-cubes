@@ -70,7 +70,6 @@ pub(crate) async fn demo_city<I: Instant>(
     let lamp_spacing = 20;
     let sky_height = 30;
     let ground_depth = 30; // TODO: wavy_landscape is forcing us to have extra symmetry here
-    let underground_floor_y = -5;
     let space_size = params.size.unwrap_or(GridVector::new(160, 60, 160));
     let bounds = GridAab::from_lower_upper(
         [-space_size.x / 2, -ground_depth, -space_size.z / 2],
@@ -192,7 +191,7 @@ pub(crate) async fn demo_city<I: Instant>(
             // Dig underground passages
             // TODO: They need a connection to the surface
             for p in -road_radius..=road_radius {
-                for y in underground_floor_y..0 {
+                for y in CityPlanner::UNDERGROUND_FLOOR_Y..0 {
                     space.set(
                         step.cube_ahead() + perpendicular * p + GridVector::new(0, y, 0),
                         &AIR,
@@ -354,12 +353,11 @@ async fn place_exhibits_in_city<I: Instant>(
         };
         exhibit_progress.progress(0.33).await;
 
-        // Now that we know the size of the exhibit, find a place for it.
+        // Now that we know the size of the exhibit, find a place for it that fits its bounds.
         let exhibit_footprint = exhibit_space.bounds();
-
         let enclosure_footprint = exhibit_footprint.expand(FaceMap::repeat(1));
 
-        let Some(plot_transform) = planner.find_plot(enclosure_footprint) else {
+        let Some(plot_transform) = planner.find_plot(enclosure_footprint, exhibit.placement) else {
             log::error!("Out of city space!");
             break 'exhibit;
         };
@@ -372,7 +370,9 @@ async fn place_exhibits_in_city<I: Instant>(
             enclosure_at_plot.lower_bounds(),
             [
                 enclosure_at_plot.upper_bounds().x,
-                1.max(plot.lower_bounds().y), // handles case where plot is floating
+                // max()ing handles the case where the plot is floating but should still
+                // have enclosure floor
+                exhibit.placement.floor().max(plot.lower_bounds().y),
                 enclosure_at_plot.upper_bounds().z,
             ],
         );
@@ -591,8 +591,25 @@ fn place_lamppost(
 pub(crate) struct Exhibit {
     pub name: &'static str,
     pub subtitle: &'static str,
+    pub placement: Placement,
     pub factory:
         for<'a> fn(&'a Exhibit, &'a mut Universe) -> BoxFuture<'a, Result<Space, InGenError>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Placement {
+    Surface,
+    #[allow(unused)] // TODO: polish this and then use it
+    Underground,
+}
+
+impl Placement {
+    fn floor(self) -> GridCoordinate {
+        match self {
+            Placement::Surface => CityPlanner::SURFACE_Y,
+            Placement::Underground => CityPlanner::UNDERGROUND_FLOOR_Y,
+        }
+    }
 }
 
 /// Generate a Space containing text voxels to put on the signboard for an exhibit.
@@ -660,13 +677,20 @@ impl CityPlanner {
     const PLOT_FRONT_RADIUS: GridCoordinate = Self::LAMP_POSITION_RADIUS;
     const GAP_BETWEEN_PLOTS: GridCoordinate = 1;
 
+    const SURFACE_Y: GridCoordinate = 1;
+    const UNDERGROUND_FLOOR_Y: GridCoordinate = -10;
+
     pub fn new(space_bounds: GridAab) -> Self {
         let city_radius = space_bounds.upper_bounds().x; // TODO: compare everything and take the max
 
         let mut occupied_plots = Vec::new();
         let road = GridAab::from_lower_upper(
-            [-Self::ROAD_RADIUS, 0, -city_radius],
-            [Self::ROAD_RADIUS + 1, 2, city_radius + 1],
+            [
+                -Self::ROAD_RADIUS,
+                Self::UNDERGROUND_FLOOR_Y - 1,
+                -city_radius,
+            ],
+            [Self::ROAD_RADIUS + 1, Self::SURFACE_Y + 2, city_radius + 1],
         );
         occupied_plots.push(road);
         occupied_plots.push(road.transform(GridRotation::CLOCKWISE.into()).unwrap());
@@ -677,7 +701,7 @@ impl CityPlanner {
         }
     }
 
-    pub fn find_plot(&mut self, plot_shape: GridAab) -> Option<Gridgid> {
+    pub fn find_plot(&mut self, plot_shape: GridAab, placement: Placement) -> Option<Gridgid> {
         // TODO: We'd like to resume the search from _when we left off_, but that's tricky since a
         // smaller plot might fit where a large one didn't. So, quadratic search it is for now.
         for d in 0..=self.city_radius {
@@ -692,7 +716,7 @@ impl CityPlanner {
 
                     let mut transform = Gridgid::from_translation(GridVector::new(
                         d,
-                        1,
+                        placement.floor(),
                         if left_side {
                             -Self::PLOT_FRONT_RADIUS - plot_shape.upper_bounds().z
                         } else {

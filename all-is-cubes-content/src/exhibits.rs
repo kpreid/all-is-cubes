@@ -47,9 +47,10 @@ use all_is_cubes::{
 use all_is_cubes::{include_image, rgb_const, rgba_const};
 
 use crate::alg::{four_walls, voronoi_pattern};
+use crate::city::{Exhibit, Placement};
 use crate::{
     make_slab, make_some_blocks, make_some_voxel_blocks, palette, tree, AnimatedVoxels, DemoBlocks,
-    Exhibit, Fire, LandscapeBlocks,
+    Fire, LandscapeBlocks,
 };
 
 /// All exhibits which will show up in [`crate::UniverseTemplate::DemoCity`].
@@ -100,6 +101,7 @@ macro_rules! exhibit {
     subtitle:
         "Test depth sorting and blending.\n\
         Lighting of volumes still needs work.",
+    placement: Placement::Surface,
 )]
 async fn TRANSPARENCY_LARGE(_: &Exhibit, _universe: &mut Universe) {
     let mut space = Space::empty(GridAab::from_lower_size([-3, 0, -3], [7, 5, 7]));
@@ -135,6 +137,7 @@ async fn TRANSPARENCY_LARGE(_: &Exhibit, _universe: &mut Universe) {
     subtitle:
         "Transparency in complex blocks is not correctly implemented.\n\
         We also need something for surface properties.",
+    placement: Placement::Surface,
 )]
 async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
     let footprint = GridAab::from_lower_size([0, 0, 0], [7, 4, 7]);
@@ -217,6 +220,7 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Knot",
     subtitle: "Complex voxel shape",
+    placement: Placement::Surface,
 )]
 async fn KNOT(this: &Exhibit, universe: &mut Universe) {
     let footprint = GridAab::from_lower_size([-2, -2, -1], [5, 5, 3]);
@@ -291,6 +295,7 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Text",
     subtitle: "",
+    placement: Placement::Surface,
 )]
 async fn TEXT(_: &Exhibit, universe: &mut Universe) {
     let space = draw_to_blocks(
@@ -313,6 +318,7 @@ async fn TEXT(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Animation",
     subtitle: "Blocks whose definition is animated",
+    placement: Placement::Surface,
 )]
 async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
@@ -384,6 +390,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Collision",
     subtitle: "Test cases for character/world collision",
+    placement: Placement::Surface,
 )]
 async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
     let half_block = make_slab(universe, 2, R4);
@@ -433,6 +440,7 @@ async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
     subtitle:
         "Voxel blocks can be subdivided into\n\
         powers of 2 from 2 to 256.",
+    placement: Placement::Surface,
 )]
 async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
     let footprint = GridAab::from_lower_size([0, 0, 0], [5, 3, 3]);
@@ -496,6 +504,7 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "World's Smallest Voxel",
     subtitle: "1/128th the length of a standard block",
+    placement: Placement::Surface,
 )]
 async fn SMALLEST(_: &Exhibit, universe: &mut Universe) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
@@ -528,6 +537,7 @@ async fn SMALLEST(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Rotations",
     subtitle: "Rotated blocks and GridRotation::from_to()",
+    placement: Placement::Surface,
 )]
 async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
@@ -577,6 +587,7 @@ async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Modifier::Zoom",
     subtitle: "",
+    placement: Placement::Surface,
 )]
 async fn ZOOM(_: &Exhibit, universe: &mut Universe) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
@@ -613,6 +624,7 @@ async fn ZOOM(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Modifier::Composite",
     subtitle: "",
+    placement: Placement::Surface,
 )]
 async fn COMPOSITE(_: &Exhibit, universe: &mut Universe) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
@@ -695,6 +707,7 @@ async fn COMPOSITE(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Modifier::Move",
     subtitle: "Stationary but not animated cases.",
+    placement: Placement::Surface,
 )]
 async fn MOVED_BLOCKS(_: &Exhibit, universe: &mut Universe) {
     let mut space = Space::empty(GridAab::from_lower_upper([0, 0, -3], [16, 2, 3]));
@@ -729,6 +742,7 @@ async fn MOVED_BLOCKS(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Colors",
     subtitle: "RGB cube of 5 linear color steps",
+    placement: Placement::Surface,
 )]
 async fn COLORS(_: &Exhibit, universe: &mut Universe) {
     let gradient_resolution = 5;
@@ -801,6 +815,7 @@ async fn COLORS(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Colored Lights",
     subtitle: "RGBCMY lights in an enclosed room",
+    placement: Placement::Surface,
 )]
 async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
     let room_width = 11;
@@ -962,6 +977,7 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "ChunkChart",
     subtitle: "Volume of world chunks in view at a distance of 4.99",
+    placement: Placement::Surface,
 )]
 async fn CHUNK_CHART(_: &Exhibit, _: &mut Universe) {
     use all_is_cubes::chunking::ChunkChart;
@@ -975,6 +991,7 @@ async fn CHUNK_CHART(_: &Exhibit, _: &mut Universe) {
 #[exhibit(
     name: "make_some_blocks()",
     subtitle: "",
+    placement: Placement::Surface,
 )]
 async fn MAKE_SOME_BLOCKS(_: &Exhibit, universe: &mut Universe) {
     const ROWS: GridCoordinate = 5;
@@ -1005,6 +1022,7 @@ async fn MAKE_SOME_BLOCKS(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Dashed outline boxes",
     subtitle: "",
+    placement: Placement::Surface,
 )]
 async fn DASHED_BOXES(_: &Exhibit, universe: &mut Universe) {
     let color = Rgb::new(1.0, 0.5, 0.5);
@@ -1054,6 +1072,7 @@ async fn DASHED_BOXES(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Swimming Pool",
     subtitle: "Transparent blocks that can be passed through",
+    placement: Placement::Surface,
 )]
 async fn SWIMMING_POOL(_: &Exhibit, _: &mut Universe) {
     let width = 6;
@@ -1075,6 +1094,7 @@ async fn SWIMMING_POOL(_: &Exhibit, _: &mut Universe) {
 #[exhibit(
     name: "space_from_image()",
     subtitle: "Using rotations XYZ, XyZ, XZY, xYZ",
+    placement: Placement::Surface,
 )]
 async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
     // TODO: it would be nice if this exhibit visualized the generated bounding box somehow
@@ -1119,6 +1139,7 @@ async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
     name: "UI Blocks",
     subtitle:
         "Blocks from the UI system (inactive)",
+    placement: Placement::Surface,
 )]
 async fn UI_BLOCKS(_: &Exhibit, universe: &mut Universe) {
     // TODO: This was designed for a render test and is still shaped for that rather than
@@ -1183,6 +1204,7 @@ async fn UI_BLOCKS(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Trees",
     subtitle: "",
+    placement: Placement::Surface,
 )]
 async fn TREES(_: &Exhibit, universe: &mut Universe) {
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
@@ -1239,6 +1261,7 @@ async fn TREES(_: &Exhibit, universe: &mut Universe) {
 #[exhibit(
     name: "Block Destruction",
     subtitle: "Animation prototype",
+    placement: Placement::Surface,
 )]
 async fn DESTRUCTION(_: &Exhibit, universe: &mut Universe) {
     let width = 7;
