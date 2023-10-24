@@ -29,7 +29,9 @@ Related crates
 *   [`all-is-cubes-ui`](https://crates.io/crates/all-is-cubes-ui)
     contains a widget framework and basic user interface functions (not platform-specific)
 *   [`all-is-cubes-content`](https://crates.io/crates/all-is-cubes-content)
-    contains procedural generation and data for “game content” as opposed to the engine; it is separated so that it is possible to depend on the engine alone, and for compilation speed.
+    contains procedural generation and data for concrete “game content” as opposed to the engine.
+*   [`all-is-cubes-port`](https://crates.io/crates/all-is-cubes-port)
+    provides import and export to various formats.
 *   [`all-is-cubes-desktop`](https://crates.io/crates/all-is-cubes-desktop)
     is a binary you can build and run to “play the game”.
 *   [`all-is-cubes-server`](https://crates.io/crates/all-is-cubes-server)

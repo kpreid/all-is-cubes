@@ -1,9 +1,9 @@
 All is Cubes
 ============
 
-This project is (will be) a game engine for worlds made of cubical blocks. The unique feature of this engine is that each ordinary block is itself made out of blocks; each block can be directly edited in the same fashion as the outside world.
+This project is (will be) a game engine for worlds made of cubical blocks (“blocky voxels”). The particular features of this engine are that each ordinary block is itself made out of blocks, and all game mechanics are defined by data within the world that can be interactively edited.
 
-Or rather, that's the plan; for now, this is just my very first project written in Rust, and I am aiming to duplicate and expand on the functionality of my previous work [Cubes](https://github.com/kpreid/cubes/). That was written in JavaScript; this compiles to WebAssembly so the result will still run in the browser (hopefully faster), but also support a multiplayer server and storage backend.
+Or rather, that's the plan; for now, it mainly supports rendering of said content, and I am aiming to duplicate and expand on the functionality of my previous work [Cubes](https://github.com/kpreid/cubes/). That was written in JavaScript; this compiles to WebAssembly so the result will still run in the browser, but also someday support a multiplayer server and storage backend.
 
 ![](https://switchb.org/kpreid/2020/all-is-cubes-10-13-progress.png)
 
@@ -12,14 +12,21 @@ Project organization
 
 This repository is divided into several Rust packages:
 
-* `all-is-cubes/` is a library containing all of the fundamental data types and algorithms. It is intended to be usable as a library but also contains the non-platform-specific top-level application logic.
+* `all-is-cubes/` is a library containing all of the fundamental data types and simulation algorithms.
 * `all-is-cubes-mesh/` is a library containing algorithms to generate triangle meshes from the voxel data.
 * `all-is-cubes-gpu/` is a library containing the GPU-based rendering code, depending on [`wgpu`](https://wgpu.rs/).
 * `all-is-cubes-ui/` is a library containing a widget framework and basic user interface functions (not platform-specific).
 * `all-is-cubes-content/` is a library containing “game content” — procedural generation and demos — that does not need to be part of the core library but is used by all of the below binaries.
+* `all-is-cubes-port/` is a library implementing import and export to various formats.
 * `all-is-cubes-desktop/` is a standalone game app which will use `winit` and `wgpu` for platform windowing & graphics, or ASCII-art raytracing in the terminal.
 * `all-is-cubes-wasm/` is the game app code for the browser/WebAssembly environment (if compiled outside of `wasm32` architecture, it will be an empty crate).
 * `all-is-cubes-server/` is to be a network server for the game, but right now only contains a preconfigured HTTP static file server.
+
+The following packages and other directories are for testing:
+
+* `fuzz/` is a package containing fuzz tests.
+* `test-renderers/` is a package containing image-comparison tests.
+* `tools/` contains miscellaneous files relating to development.
 
 Building and running
 --------------------

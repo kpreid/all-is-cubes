@@ -15,7 +15,7 @@ Requirements
 
 Your system must have these installed:
 
-* If on Linux, then the libraries that Ubuntu calls `libxrandr-dev`, `xorg-dev`, `libwayland-dev`, and `libasound2-dev`.
+* If on Linux, then the libraries that Ubuntu calls `libxrandr-dev`, `xorg-dev`, `libx11-xcb-dev`, `libwayland-dev`, and `libasound2-dev`.
 
 Usage
 -----

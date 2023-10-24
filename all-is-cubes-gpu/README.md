@@ -5,7 +5,7 @@ All is Cubes is a “voxel game” where each block is made out of smaller block
 
 This particular library package contains algorithms for rendering All is Cubes content using the [`wgpu`] graphics API abstraction library.
 
-The API is fairly unstable and primarily intended to serve the needs of the existing desktop and web “app” crates.
+The API is fairly unstable and primarily intended to serve the needs of the existing desktop and web “app” crates; I do not recommend using this library directly. If you have a use case for this library, please get in touch.
 
 [`wgpu`]: https://wgpu.rs/
 
