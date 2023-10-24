@@ -5,7 +5,9 @@ This project is (will be) a game engine for worlds made of cubical blocks (“bl
 
 Or rather, that's the plan; for now, it mainly supports rendering of said content, and I am aiming to duplicate and expand on the functionality of my previous work [Cubes](https://github.com/kpreid/cubes/). That was written in JavaScript; this compiles to WebAssembly so the result will still run in the browser, but also someday support a multiplayer server and storage backend.
 
-![](https://switchb.org/kpreid/2020/all-is-cubes-10-13-progress.png)
+![](https://annex.switchb.org/2023/10-24-all-is-cubes-atrium.jpg)
+
+Above: a partial, procedural voxel recreation of the Sponza Atrium computer graphics test scene, assembled and rendered using All is Cubes.
 
 Project organization
 --------------------
