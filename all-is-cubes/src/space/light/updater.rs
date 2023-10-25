@@ -85,7 +85,10 @@ impl Space {
                     self.last_light_updates.push(cube);
                 }
                 light_update_count += 1;
-                let (difference, cube_cost) = self.update_lighting_now_on(cube);
+
+                let computation = self.compute_lighting(cube);
+
+                let (difference, cube_cost) = self.apply_lighting_update(cube, computation);
                 max_difference = max_difference.max(difference);
                 cost += cube_cost;
                 if cost >= max_cost {
@@ -109,14 +112,20 @@ impl Space {
         }
     }
 
+    /// Given a fresh [`ComputedLight`], actually insert it into the space light data
+    /// and enqueue more cubes, then return a cost value accounting for the update.
     #[inline]
-    fn update_lighting_now_on(&mut self, cube: Cube) -> (PackedLightScalar, usize) {
+    fn apply_lighting_update(
+        &mut self,
+        cube: Cube,
+        computation: ComputedLight<()>,
+    ) -> (PackedLightScalar, usize) {
         let ComputedLight {
             light: new_light_value,
             dependencies,
             mut cost,
             debug: (),
-        } = self.compute_lighting(cube);
+        } = computation;
 
         let old_light_value: PackedLight = self.get_lighting(cube);
         // Compare and set new value. Note that we MUST compare only the packed value so
