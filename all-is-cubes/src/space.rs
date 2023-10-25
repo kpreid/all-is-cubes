@@ -286,7 +286,7 @@ impl Space {
         self.light.get(cube.into())
     }
 
-    #[allow(unused)] // currently only used on feature=save
+    #[allow(unused)] // currently only used on feature=save and tests
     pub(crate) fn in_light_update_queue(&self, cube: Cube) -> bool {
         self.light.in_light_update_queue(cube)
     }

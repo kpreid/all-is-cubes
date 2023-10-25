@@ -2,6 +2,7 @@
 //! volumes ([`Vol`]), and related.
 
 use alloc::string::String;
+use core::cmp::Ordering;
 use core::fmt;
 use core::iter::FusedIterator;
 use core::ops::Range;
@@ -767,6 +768,37 @@ impl GridIter {
             },
         }
     }
+
+    /// Returns the bounds which this iterator iterates over.
+    /// This may be larger than the union of produced cubes, but it will not be smaller.
+    pub(crate) fn bounds(&self) -> GridAab {
+        GridAab::from_ranges([
+            self.x_range.clone(),
+            self.y_range.clone(),
+            self.z_range.clone(),
+        ])
+    }
+
+    // Returns whether the iterator will produce the given cube.
+    pub(crate) fn contains_cube(&self, cube: Cube) -> bool {
+        if !self.bounds().contains_cube(cube) {
+            return false;
+        }
+        match cube.x.cmp(&self.cube.x) {
+            Ordering::Greater => true, // in a plane not yet emitted
+            Ordering::Less => false,   // in a plane already emitted
+            Ordering::Equal => {
+                match cube.y.cmp(&self.cube.y) {
+                    Ordering::Greater => true, // in a row not yet emitted
+                    Ordering::Less => false,   // in a row already emitted
+                    Ordering::Equal => {
+                        // We have now reduced to the single-dimensional case.
+                        cube.z >= self.cube.z
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl Iterator for GridIter {
@@ -1044,6 +1076,26 @@ mod tests {
                 assert_eq!(fold_cube, next_cube.unwrap());
             });
             assert_eq!(iter_to_next.next(), None, "finish");
+        }
+    }
+
+    #[test]
+    fn grid_iter_contains_cube() {
+        let b = GridAab::from_lower_size([0, 0, 0], [3, 3, 3]);
+        let expected_sequence: Vec<Cube> = b.interior_iter().collect();
+
+        let mut iter = b.interior_iter();
+        for current in 0..expected_sequence.len() {
+            for &cube in &expected_sequence[..current] {
+                assert!(!iter.contains_cube(cube), "{cube:?} should be absent at {current}");
+            }
+            for &cube in &expected_sequence[current..] {
+                assert!(iter.contains_cube(cube), "{cube:?} should be present at {current}");
+            }
+
+            let item = iter.next();
+
+            assert_eq!(item, Some(expected_sequence[current])); // sanity check, not what we're testing
         }
     }
 

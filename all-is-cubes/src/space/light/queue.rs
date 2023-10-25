@@ -7,7 +7,7 @@ use euclid::Vector3D;
 use hashbrown::hash_map::Entry;
 use hashbrown::HashMap as HbHashMap;
 
-use crate::math::{Cube, GridCoordinate, GridPoint, VectorOps as _};
+use crate::math::{Cube, GridAab, GridCoordinate, GridIter, GridPoint, VectorOps as _};
 use crate::space::light::PackedLightScalar;
 
 /// An entry in a [`LightUpdateQueue`], specifying a cubes that needs its light updated.
@@ -114,9 +114,20 @@ pub(crate) struct LightUpdateQueue {
     /// Sorted storage of queue elements.
     /// This is a BTreeSet rather than a BinaryHeap so that items can be removed.
     queue: BTreeSet<LightUpdateRequest>,
-    /// Maps Cube to priority value. This allows deduplicating entries, including
+
+    /// Maps [`Cube`] to priority value. This allows deduplicating entries, including
     /// removing low-priority entries in favor of high-priority ones
     table: HbHashMap<Cube, Priority>,
+
+    /// If not `None`, then we are performing an update of **every** cube of the space,
+    /// and this iterator returns the next cube to update at `sweep_priority`.
+    sweep: Option<GridIter>,
+
+    /// Priority with which the `sweep` should be performed.
+    sweep_priority: Priority,
+
+    /// Whether a new sweep is needed after the current one.
+    sweep_again: bool,
 }
 
 impl LightUpdateQueue {
@@ -124,17 +135,24 @@ impl LightUpdateQueue {
         Self {
             queue: BTreeSet::new(),
             table: HbHashMap::new(),
+            sweep: None,
+            sweep_priority: Priority::MIN,
+            sweep_again: false,
         }
     }
 
     #[inline]
     pub fn contains(&self, cube: Cube) -> bool {
         self.table.contains_key(&cube)
+            || self
+                .sweep
+                .as_ref()
+                .is_some_and(|sweep| sweep.contains_cube(cube))
     }
 
     /// Inserts a queue entry or increases the priority of an existing one.
     #[inline]
-    pub fn insert(&mut self, request: LightUpdateRequest) {
+    pub(crate) fn insert(&mut self, request: LightUpdateRequest) {
         match self.table.entry(request.cube) {
             Entry::Occupied(mut e) => {
                 let existing_priority = *e.get();
@@ -155,7 +173,32 @@ impl LightUpdateQueue {
         }
     }
 
+    /// Requests that the queue should produce every cube in `bounds` at `priority`,
+    /// without the cost of designating each cube individually.
+    pub(crate) fn sweep(&mut self, bounds: GridAab, priority: Priority) {
+        if self
+            .sweep
+            .as_ref()
+            .is_some_and(|it| it.bounds().contains_box(bounds))
+            && self.sweep_priority >= priority
+        {
+            self.sweep_again = true;
+            self.sweep_priority = Ord::max(self.sweep_priority, priority);
+        } else if self.sweep.is_some() {
+            // Ideally, if we have an existing higher priority sweep, we'd finish it first
+            // and remember the next one, but not bothering with that now.
+            self.sweep = Some(bounds.interior_iter());
+            self.sweep_priority = Ord::max(self.sweep_priority, priority);
+        } else {
+            // No current sweep, so we can ignore existing priority.
+            self.sweep = Some(bounds.interior_iter());
+            self.sweep_priority = priority;
+        }
+    }
+
     /// Removes the specified queue entry and returns whether it was present.
+    ///
+    /// Sweeps do not count as present entries.
     pub fn remove(&mut self, cube: Cube) -> bool {
         if let Some(priority) = self.table.remove(&cube) {
             let q_removed = self.queue.remove(&LightUpdateRequest { cube, priority });
@@ -166,8 +209,24 @@ impl LightUpdateQueue {
         }
     }
 
+    /// Removes and returns the highest priority queue entry.
     #[inline]
     pub fn pop(&mut self) -> Option<LightUpdateRequest> {
+        if let Some(sweep) = &mut self.sweep {
+            if peek_priority(&self.queue).map_or(true, |p| self.sweep_priority > p) {
+                if let Some(cube) = sweep.next() {
+                    return Some(LightUpdateRequest {
+                        cube,
+                        priority: self.sweep_priority,
+                    });
+                } else {
+                    // Sweep ended
+                    self.sweep = None;
+                    self.sweep_priority = Priority::MIN;
+                }
+            }
+        }
+
         let result = self.queue.pop_last();
         if let Some(request) = result {
             let removed = self.table.remove(&request.cube);
@@ -176,30 +235,58 @@ impl LightUpdateQueue {
         result
     }
 
+    pub fn clear(&mut self) {
+        self.queue.clear();
+        self.table.clear();
+        self.sweep = None;
+        self.sweep_priority = Priority::MIN;
+        self.sweep_again = false;
+    }
+
+    /// Returns the number of elements that will be produced by [`Self::pop()`].
     #[inline]
     pub fn len(&self) -> usize {
-        self.queue.len()
+        let sweep_items = match &self.sweep {
+            Some(sweep) => {
+                sweep.len()
+                    + if self.sweep_again {
+                        sweep.bounds().volume()
+                    } else {
+                        0
+                    }
+            }
+            None => 0,
+        };
+        self.queue.len() + sweep_items
     }
 
     #[inline]
     pub fn peek_priority(&self) -> Priority {
-        self.queue
-            .last()
-            .copied()
-            .map(|r| r.priority)
-            .unwrap_or(Priority::MIN)
+        peek_priority(&self.queue).unwrap_or(Priority::MIN)
     }
+}
 
-    pub fn clear(&mut self) {
-        self.queue.clear();
-        self.table.clear();
-    }
+#[inline]
+fn peek_priority(queue: &BTreeSet<LightUpdateRequest>) -> Option<Priority> {
+    queue.last().copied().map(|r| r.priority)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use alloc::vec::Vec;
+
+    fn drain(queue: &mut LightUpdateQueue) -> Vec<LightUpdateRequest> {
+        Vec::from_iter(std::iter::from_fn(|| queue.pop()))
+    }
+
+    fn r(cube: [GridCoordinate; 3], priority: PackedLightScalar) -> LightUpdateRequest {
+        let priority = Priority(priority);
+        LightUpdateRequest {
+            cube: Cube::from(cube),
+            priority,
+        }
+    }
 
     #[test]
     fn priority_relations() {
@@ -218,14 +305,6 @@ mod tests {
 
     #[test]
     fn queue_ordering() {
-        fn r(cube: [GridCoordinate; 3], priority: PackedLightScalar) -> LightUpdateRequest {
-            let priority = Priority(priority);
-            LightUpdateRequest {
-                cube: Cube::from(cube),
-                priority,
-            }
-        }
-
         let mut queue = LightUpdateQueue::new();
         queue.insert(r([0, 0, 0], 1));
         queue.insert(r([2, 0, 0], 1));
@@ -237,7 +316,7 @@ mod tests {
         queue.insert(r([0, 0, 1], 100));
 
         assert_eq!(
-            Vec::from_iter(std::iter::from_fn(|| queue.pop())),
+            drain(&mut queue),
             vec![
                 // High priorities
                 r([0, 0, 2], 200),
@@ -252,5 +331,60 @@ mod tests {
         );
     }
 
-    // TODO: Test of queue priority updates
+    #[test]
+    fn sweep_basic() {
+        let mut queue = LightUpdateQueue::new();
+
+        queue.insert(LightUpdateRequest {
+            priority: Priority(101),
+            cube: Cube::new(0, 101, 0),
+        });
+        queue.insert(LightUpdateRequest {
+            priority: Priority(100),
+            cube: Cube::new(0, 100, 0),
+        });
+        queue.insert(LightUpdateRequest {
+            priority: Priority(99),
+            cube: Cube::new(0, 99, 0),
+        });
+        queue.sweep(
+            GridAab::from_lower_upper([0, 0, 0], [3, 1, 1]),
+            Priority(100),
+        );
+
+        assert_eq!(queue.len(), 6);
+        assert_eq!(
+            drain(&mut queue),
+            vec![
+                // Higher priority than sweep
+                r([0, 101, 0], 101),
+                // Equal priority explicit elements win
+                r([0, 100, 0], 100),
+                // Sweep elements.
+                // Sweeps don't use the interleaved order, not because we don't want to, but
+                // because that is more complex and thus not implemented.
+                r([0, 0, 0], 100),
+                r([1, 0, 0], 100),
+                r([2, 0, 0], 100),
+                // Lower priority than sweep
+                r([0, 99, 0], 99),
+            ]
+        )
+    }
+
+    #[test]
+    fn sweep_then_clear() {
+        let mut queue = LightUpdateQueue::new();
+        queue.sweep(
+            GridAab::from_lower_upper([0, 0, 0], [3, 1, 1]),
+            Priority(100),
+        );
+
+        queue.clear();
+
+        assert_eq!(queue.len(), 0);
+        assert_eq!(queue.pop(), None);
+    }
+
+    // TODO: Test of changing the priority of existing queue entries
 }
