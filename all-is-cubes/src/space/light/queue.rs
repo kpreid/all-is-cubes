@@ -2,6 +2,7 @@
 
 use alloc::collections::BTreeSet;
 use core::fmt;
+use euclid::Vector3D;
 
 use hashbrown::hash_map::Entry;
 use hashbrown::HashMap as HbHashMap;
@@ -22,9 +23,28 @@ impl LightUpdateRequest {
     /// assuming the viewpoint starts close to the origin it will see good nearby
     /// lighting sooner.)
     fn fallback_priority(&self) -> GridCoordinate {
-        let GridPoint { x, y, z, _unit } = GridPoint::from(self.cube)
-            .map(|c| if c > 0 { -c } else { c } + GridCoordinate::MAX / 3);
-        x.saturating_add(y).saturating_add(z)
+        const COORD_OFFSET: GridCoordinate = 0;
+
+        let cube = GridPoint::from(self.cube);
+
+        // Give first priority to a half-resolution grid (8 times faster), then its offset
+        // by 1 copy, then further slices of it.
+        let bits = cube.to_vector().map(|c| c.rem_euclid(2) == 0);
+        #[rustfmt::skip]
+        let boost = match bits {
+            Vector3D {x: false, y: false, z: false, _unit } => 1_000_000,
+            Vector3D {x: true, y: true, z: true, _unit } => 900_000,
+            // Now the other cases in arbitrary order
+            Vector3D {x: true, y: false, z: true, _unit } => 500_000,
+            Vector3D {x: true, y: true, z: false, _unit } => 400_000,
+            Vector3D {x: true, y: false, z: false, _unit } => 300_000,
+            Vector3D {x: false, y: false, z: true, _unit } => 200_000,
+            Vector3D {x: false, y: true, z: false, _unit } => 100_000,
+            Vector3D {x: false, y: true, z: true, _unit } => 0,
+        };
+
+        let GridPoint { x, y, z, _unit } = cube.map(|c| if c > 0 { -c } else { c } + COORD_OFFSET);
+        x.saturating_add(y).saturating_add(z).saturating_add(boost)
     }
 }
 
@@ -179,6 +199,7 @@ impl LightUpdateQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
 
     #[test]
     fn priority_relations() {
@@ -209,14 +230,26 @@ mod tests {
         queue.insert(r([0, 0, 0], 1));
         queue.insert(r([2, 0, 0], 1));
         queue.insert(r([1, 0, 0], 1));
+        queue.insert(r([3, 0, 0], 1));
+        queue.insert(r([4, 0, 0], 1));
+        queue.insert(r([3, 0, 0], 1));
         queue.insert(r([0, 0, 2], 200));
         queue.insert(r([0, 0, 1], 100));
-        assert_eq!(queue.pop(), Some(r([0, 0, 2], 200)));
-        assert_eq!(queue.pop(), Some(r([0, 0, 1], 100)));
-        assert_eq!(queue.pop(), Some(r([0, 0, 0], 1)));
-        assert_eq!(queue.pop(), Some(r([1, 0, 0], 1)));
-        assert_eq!(queue.pop(), Some(r([2, 0, 0], 1)));
-        assert_eq!(queue.pop(), None);
+
+        assert_eq!(
+            Vec::from_iter(std::iter::from_fn(|| queue.pop())),
+            vec![
+                // High priorities
+                r([0, 0, 2], 200),
+                r([0, 0, 1], 100),
+                // Half-resolution and distance orderings
+                r([0, 0, 0], 1),
+                r([2, 0, 0], 1),
+                r([4, 0, 0], 1),
+                r([1, 0, 0], 1),
+                r([3, 0, 0], 1),
+            ]
+        );
     }
 
     // TODO: Test of queue priority updates
