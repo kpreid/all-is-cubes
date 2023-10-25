@@ -9,6 +9,9 @@ use core::fmt;
 use euclid::{Point3D, Vector3D};
 use manyfmt::Fmt;
 
+#[cfg(feature = "threads")]
+use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
+
 use super::debug::LightComputeOutput;
 use super::LightUpdateRequest;
 use crate::block::EvaluatedBlock;
@@ -79,6 +82,40 @@ impl Space {
                 None => usize::MAX,
             };
 
+            // TODO: More efficient threading. Instead of creating batches up front,
+            // run a continuous pipeline of calculations in the background and only apply
+            // them when we have this current opportunity.
+            // This will require making stored light data `Arc`ed and double-buffered or atomic,
+            // so it can be consulted by the calculation.
+            #[cfg(feature = "threads")]
+            while self.light_update_queue.len() > 0 {
+                // TODO: empirical tuning suggests that 128 is a good minimum batch size,
+                // but is too big for the amount of time we want to take
+                let some_updates: [Option<LightUpdateRequest>; 32] =
+                    [None::<LightUpdateRequest>; 32].map(|_| self.light_update_queue.pop());
+                let outputs = some_updates
+                    .as_slice()
+                    .into_par_iter()
+                    .flatten()
+                    .map(|&LightUpdateRequest { cube, .. }| self.compute_lighting(cube))
+                    .collect::<Vec<ComputedLight<()>>>();
+                for output in outputs {
+                    if false {
+                        // Log cubes that were updated for debug visualization.
+                        self.last_light_updates.push(output.cube);
+                    }
+                    light_update_count += 1;
+                    let (difference, cube_cost) = self.apply_lighting_update(output);
+                    max_difference = max_difference.max(difference);
+                    cost += cube_cost;
+                }
+
+                if cost >= max_cost {
+                    break;
+                }
+            }
+
+            #[cfg(not(feature = "threads"))]
             while let Some(LightUpdateRequest { cube, .. }) = self.light_update_queue.pop() {
                 if false {
                     // Log cubes that were updated for debug visualization.
@@ -88,7 +125,7 @@ impl Space {
 
                 let computation = self.compute_lighting(cube);
 
-                let (difference, cube_cost) = self.apply_lighting_update(cube, computation);
+                let (difference, cube_cost) = self.apply_lighting_update(computation);
                 max_difference = max_difference.max(difference);
                 cost += cube_cost;
                 if cost >= max_cost {
@@ -117,10 +154,10 @@ impl Space {
     #[inline]
     fn apply_lighting_update(
         &mut self,
-        cube: Cube,
         computation: ComputedLight<()>,
     ) -> (PackedLightScalar, usize) {
         let ComputedLight {
+            cube,
             light: new_light_value,
             dependencies,
             mut cost,
@@ -221,6 +258,7 @@ impl Space {
         let new_light_value = cube_buffer.finish(origin_is_opaque);
 
         ComputedLight {
+            cube,
             light: new_light_value,
             dependencies: cube_buffer.dependencies,
             cost: cube_buffer.cost,
@@ -531,6 +569,8 @@ impl LightBuffer {
 #[derive(Clone, Debug)]
 #[doc(hidden)] // used for debug rendering
 pub struct ComputedLight<D> {
+    pub cube: Cube,
+
     pub light: PackedLight,
     /// Cubes which the computed value depends on (imprecisely; empty cubes passed through
     /// are not listed).
