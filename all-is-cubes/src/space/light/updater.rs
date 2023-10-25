@@ -111,7 +111,13 @@ impl Space {
 
     #[inline]
     fn update_lighting_now_on(&mut self, cube: Cube) -> (PackedLightScalar, usize) {
-        let (new_light_value, dependencies, mut cost, ()) = self.compute_lighting(cube);
+        let ComputedLight {
+            light: new_light_value,
+            dependencies,
+            mut cost,
+            debug: (),
+        } = self.compute_lighting(cube);
+
         let old_light_value: PackedLight = self.get_lighting(cube);
         // Compare and set new value. Note that we MUST compare only the packed value so
         // that changes are detected in terms of that rounding, not float values.
@@ -145,7 +151,7 @@ impl Space {
     /// (imprecisely; empty cubes passed through are not listed).
     #[inline]
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu for debugging
-    pub fn compute_lighting<D>(&self, cube: Cube) -> (PackedLight, Vec<Cube>, usize, D)
+    pub fn compute_lighting<D>(&self, cube: Cube) -> ComputedLight<D>
     where
         D: LightComputeOutput,
     {
@@ -205,12 +211,12 @@ impl Space {
 
         let new_light_value = cube_buffer.finish(origin_is_opaque);
 
-        (
-            new_light_value,
-            cube_buffer.dependencies,
-            cube_buffer.cost,
-            D::new(cube, new_light_value, info_rays),
-        )
+        ComputedLight {
+            light: new_light_value,
+            dependencies: cube_buffer.dependencies,
+            cost: cube_buffer.cost,
+            debug: D::new(cube, new_light_value, info_rays),
+        }
     }
 
     /// Clear and recompute light data and update queue, in a way which gets fast approximate
@@ -509,6 +515,23 @@ impl LightBuffer {
         };
         new_light_value
     }
+}
+
+/// Result of [`Space::compute_lighting()`] — new light for one cube.
+/// TODO: better name
+#[derive(Clone, Debug)]
+#[doc(hidden)] // used for debug rendering
+pub struct ComputedLight<D> {
+    pub light: PackedLight,
+    /// Cubes which the computed value depends on (imprecisely; empty cubes passed through
+    /// are not listed).
+    ///
+    /// Note: I tried making this allocation reused and it didn't help.
+    dependencies: Vec<Cube>,
+
+    cost: usize,
+
+    pub debug: D,
 }
 
 /// Performance data for bulk light updates.
