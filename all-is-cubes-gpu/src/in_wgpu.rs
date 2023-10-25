@@ -221,8 +221,11 @@ impl<I: time::Instant> EverythingRenderer<I> {
     pub fn device_descriptor() -> wgpu::DeviceDescriptor<'static> {
         wgpu::DeviceDescriptor {
             features: wgpu::Features::empty(),
-            limits: wgpu::Limits::downlevel_webgl2_defaults()
-                .using_resolution(wgpu::Limits::default()),
+            limits: wgpu::Limits {
+                max_inter_stage_shader_components: 32, // number used by blocks-and-lines shader
+                ..wgpu::Limits::downlevel_webgl2_defaults()
+                    .using_resolution(wgpu::Limits::default())
+            },
             label: None,
         }
     }
@@ -598,7 +601,10 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 },
                 // We need to store the depth buffer if and only if we are going to do
                 // the lines pass.
-                self.lines_vertex_count > 0,
+                match self.lines_vertex_count > 0 {
+                    true => wgpu::StoreOp::Store,
+                    false => wgpu::StoreOp::Discard,
+                },
             )?
         } else {
             SpaceDrawInfo::default()
@@ -614,10 +620,11 @@ impl<I: time::Instant> EverythingRenderer<I> {
                     view: depth_texture_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Load,
-                        store: false, // nothing uses the depth buffer after this
+                        store: wgpu::StoreOp::Discard, // nothing uses the depth buffer after this
                     }),
                     stencil_ops: None,
                 }),
+                ..Default::default()
             });
             render_pass.set_pipeline(&self.pipelines.lines_render_pipeline);
             render_pass.set_bind_group(0, sr.camera_bind_group(), &[]);
@@ -644,7 +651,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 } else {
                     wgpu::LoadOp::Load
                 },
-                false, // nothing uses the ui depth buffer
+                wgpu::StoreOp::Discard, // nothing uses the ui depth buffer
             )?
         } else {
             SpaceDrawInfo::default()

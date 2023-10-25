@@ -189,7 +189,7 @@ where
     {
         // TODO: not using all of fbt's services
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: None,
+            label: Some("shader test render pass"),
             // Clear with a nonzero color so that if something goes wrong and the full screen
             // triangle isn't drawn, we know that we're not just reading zeroed memory or a zero
             // result.
@@ -200,10 +200,11 @@ where
                 view: &fbt.depth_texture_view,
                 depth_ops: Some(wgpu::Operations {
                     load: wgpu::LoadOp::Clear(1.0),
-                    store: false,
+                    store: wgpu::StoreOp::Discard,
                 }),
                 stencil_ops: None,
             }),
+            ..Default::default()
         });
         render_pass.set_bind_group(0, &camera_buffer.bind_group, &[]);
         render_pass.set_bind_group(1, &space_bind_group, &[]);

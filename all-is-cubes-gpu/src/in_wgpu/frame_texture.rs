@@ -283,7 +283,7 @@ impl FramebufferTextures {
             resolve_target: self.linear_scene_resolved_view.as_ref(),
             ops: wgpu::Operations {
                 load: color_load_op,
-                store: true,
+                store: wgpu::StoreOp::Store,
             },
         }
     }

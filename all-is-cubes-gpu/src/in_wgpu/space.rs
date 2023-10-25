@@ -287,7 +287,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         pipelines: &Pipelines,
         camera: &Camera,
         color_load_op: wgpu::LoadOp<wgpu::Color>,
-        store_depth: bool,
+        store_depth: wgpu::StoreOp,
     ) -> Result<SpaceDrawInfo, GraphicsResourceError> {
         let start_time = I::now();
 
@@ -326,6 +326,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 }),
                 stencil_ops: None,
             }),
+            ..Default::default()
         });
         render_pass.set_bind_group(0, &self.camera_buffer.bind_group, &[]);
         if let Some(space_bind_group) = self.space_bind_group.get() {
