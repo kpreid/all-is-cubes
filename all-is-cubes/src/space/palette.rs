@@ -2,9 +2,11 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::fmt;
 
+use itertools::Itertools as _;
+
 use crate::block::{self, Block, BlockChange, EvaluatedBlock, AIR, AIR_EVALUATED};
 use crate::listen::{self, Listener as _};
-use crate::math;
+use crate::math::{self, OpacityCategory};
 use crate::space::{BlockIndex, SetCubeError, SpaceChange};
 use crate::time::Instant;
 use crate::util::maybe_sync::Mutex;
@@ -109,6 +111,17 @@ impl Palette {
     #[track_caller]
     pub(crate) fn entry(&self, index: BlockIndex) -> &SpaceBlockData {
         &self.entries[index as usize]
+    }
+
+    /// If this palette contains only blocks of uniform [`EvaluatedBlock::opacity_as_category()`]
+    /// according to their current evaluations, return that, otherwise
+    /// return [`OpacityCategory::Partial`].
+    pub(crate) fn all_block_opacities_as_category(&self) -> OpacityCategory {
+        self.entries
+            .iter()
+            .map(|entry| entry.evaluated.opacity_as_category())
+            .all_equal_value()
+            .unwrap_or(OpacityCategory::Partial)
     }
 
     /// Finds or creates a new palette entry for the given block, and returns the index.
