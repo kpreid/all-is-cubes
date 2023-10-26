@@ -618,7 +618,7 @@ impl Fmt<ConciseDebug> for BodyStepInfo {
             .field("already_colliding", &self.already_colliding)
             .field("push_out", &self.push_out.as_ref().map(|v| v.refmt(fopt)))
             .field("move_segments", &self.move_segments.refmt(fopt))
-            .field("delta_v", &self.delta_v)
+            .field("delta_v", &self.delta_v.refmt(fopt))
             .finish()
     }
 }
