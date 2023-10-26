@@ -312,6 +312,24 @@ impl EvaluatedBlock {
         self.voxels.bounds()
     }
 
+    /// Expresses the opacity of the block as an [`OpacityCategory`].
+    ///
+    /// If the return value is [`OpacityCategory::Partial`], this does not necessarily mean
+    /// that the block contains semitransparent voxels, but only that the block as a whole
+    /// does not fully pass light, and has not been confirmed to fully obstruct light.
+    ///
+    /// TODO: Review uses of .opaque and .visible and see if they can be usefully replaced
+    /// by this.
+    pub(crate) fn opacity_as_category(&self) -> OpacityCategory {
+        if self.opaque == FaceMap::repeat(true) {
+            OpacityCategory::Opaque
+        } else if !self.visible {
+            OpacityCategory::Invisible
+        } else {
+            OpacityCategory::Partial
+        }
+    }
+
     // --- Other ---
 
     #[doc(hidden)]
@@ -746,5 +764,21 @@ mod tests {
         let ev = EvaluatedBlock::from_voxels(BlockAttributes::default(), voxels);
 
         assert_eq!(ev.color, outer_color);
+    }
+
+    #[test]
+    fn opacity_as_category() {
+        for color in [
+            Rgba::BLACK,
+            Rgba::WHITE,
+            Rgba::TRANSPARENT,
+            Rgba::new(0.0, 0.5, 1.0, 0.5),
+        ] {
+            assert_eq!(
+                Block::from(color).evaluate().unwrap().opacity_as_category(),
+                color.opacity_category(),
+                "Input color {color:?}"
+            );
+        }
     }
 }
