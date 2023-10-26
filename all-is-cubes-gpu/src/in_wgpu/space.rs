@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex, Weak};
 use all_is_cubes::camera::{Camera, Flaws};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
+use all_is_cubes::euclid::vec3;
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, Rgb,
@@ -18,7 +19,9 @@ use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, RenderDataUpdate};
 use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
 
 use crate::in_wgpu::frame_texture::FramebufferTextures;
-use crate::in_wgpu::glue::{size_vector_to_extent, to_wgpu_index_format, write_texture_by_aab};
+use crate::in_wgpu::glue::{
+    point_to_origin, size_vector_to_extent, to_wgpu_index_format, write_texture_by_aab,
+};
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::vertex::{WgpuInstanceData, WgpuLinesVertex};
 use crate::in_wgpu::{
@@ -186,13 +189,9 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let mut light_update_count = 0;
         if let Some(set) = &mut todo.light {
             // TODO: work in larger, ahem, chunks
-            for cube in set.drain() {
-                light_update_count += self.light_texture.update(
-                    queue,
-                    space,
-                    GridAab::from_lower_size(cube, [1, 1, 1]),
-                );
-            }
+            light_update_count +=
+                self.light_texture
+                    .update_scatter(device, queue, space, set.drain());
         } else {
             light_update_count += self.light_texture.update_all(queue, space);
             todo.light = Some(HashSet::new());
@@ -665,9 +664,14 @@ pub(in crate::in_wgpu) struct SpaceLightTexture {
     texture_view: wgpu::TextureView,
     /// The region of cube coordinates for which there are valid texels.
     texture_bounds: GridAab,
+    /// Temporary storage for updated light texels to be copied into the texture.
+    copy_buffer: wgpu::Buffer,
 }
 
 impl SpaceLightTexture {
+    const COPY_BUFFER_TEXELS: usize = 1024;
+    const COMPONENTS: usize = 4;
+
     /// Construct a new `SpaceLightTexture` for the specified size of [`Space`],
     /// with no data.
     pub fn new(label_prefix: &str, device: &wgpu::Device, bounds: GridAab) -> Self {
@@ -694,12 +698,18 @@ impl SpaceLightTexture {
             texture_view: texture.create_view(&wgpu::TextureViewDescriptor::default()),
             texture,
             texture_bounds,
+            copy_buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(&format!("{label_prefix} space light copy buffer")),
+                size: u64::try_from(Self::COPY_BUFFER_TEXELS * Self::COMPONENTS).unwrap(),
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
+                mapped_at_creation: false,
+            }),
         }
     }
 
     /// Copy the specified region of light data.
     pub fn update(&mut self, queue: &wgpu::Queue, space: &Space, region: GridAab) -> usize {
-        let mut data: Vec<[u8; 4]> = Vec::with_capacity(region.volume());
+        let mut data: Vec<[u8; Self::COMPONENTS]> = Vec::with_capacity(region.volume());
         // TODO: Enable circular operation and eliminate the need for the offset of the
         // coordinates (texture_bounds.lower_bounds() and light_offset in the shader)
         // by doing a coordinate wrap-around -- the shader and the Space will agree
@@ -726,6 +736,70 @@ impl SpaceLightTexture {
     pub fn update_all(&mut self, queue: &wgpu::Queue, space: &Space) -> usize {
         self.update(queue, space, self.texture_bounds);
         self.texture_bounds.volume()
+    }
+
+    /// Copy many individual cubes of light data.
+    pub fn update_scatter(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        space: &Space,
+        cubes: impl IntoIterator<Item = Cube>,
+    ) -> usize {
+        let mut total_count = 0;
+
+        // Break into batches of our buffer size.
+        for cube_batch in
+            itertools::Itertools::chunks(cubes.into_iter(), Self::COPY_BUFFER_TEXELS).into_iter()
+        {
+            let mut data: [[u8; Self::COMPONENTS]; Self::COPY_BUFFER_TEXELS] =
+                [[0; Self::COMPONENTS]; Self::COPY_BUFFER_TEXELS];
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("space light scatter-copy"),
+            });
+            let mut batch_count = 0;
+
+            for (index, cube) in cube_batch.into_iter().enumerate() {
+                data[index] = space.get_lighting(cube).as_texel();
+
+                // TODO: When compute shaders are available, use a compute shader to do these
+                // scattered writes instead of issuing individual commands.
+                encoder.copy_buffer_to_texture(
+                    wgpu::ImageCopyBuffer {
+                        buffer: &self.copy_buffer,
+                        layout: wgpu::ImageDataLayout {
+                            offset: (index * Self::COMPONENTS) as u64,
+                            bytes_per_row: None,
+                            rows_per_image: None,
+                        },
+                    },
+                    wgpu::ImageCopyTexture {
+                        texture: &self.texture,
+                        mip_level: 0,
+                        origin: point_to_origin(cube.lower_bounds() + self.light_lookup_offset()),
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    size_vector_to_extent(vec3(1, 1, 1)),
+                );
+
+                batch_count += 1;
+                total_count += 1;
+            }
+
+            // TODO: use `StagingBelt` to write buffer instead.
+            // To do this optimally, `StagingBelt` will need to be modified to allow
+            // us accessing its buffers to issue a `copy_buffer_to_texture` instead of
+            // it issuing a `copy_buffer_to_buffer`.
+            queue.write_buffer(
+                &self.copy_buffer,
+                0,
+                bytemuck::cast_slice::<[u8; Self::COMPONENTS], u8>(&data[..batch_count]),
+            );
+
+            queue.submit([encoder.finish()]);
+        }
+
+        total_count
     }
 
     fn light_lookup_offset(&self) -> GridVector {
