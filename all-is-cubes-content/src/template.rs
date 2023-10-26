@@ -392,7 +392,7 @@ fn cornell_box() -> Result<Space, InGenError> {
     let light: Block = Block::builder()
         .display_name("Light")
         .color(Rgba::new(1.0, 1.0, 1.0, 1.0))
-        .light_emission(Rgb::new(40., 40., 40.))
+        .light_emission(Rgb::ONE * 8.0)
         .build();
 
     // Floor.
