@@ -23,7 +23,7 @@ use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};
 use crate::raycast::Ray;
 #[cfg(feature = "save")]
 use crate::save::schema;
-use crate::space::{Space, SpaceTransaction};
+use crate::space::{LightPhysics, Space, SpaceTransaction};
 use crate::time::Tick;
 use crate::transaction::{
     self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
@@ -428,6 +428,12 @@ impl Character {
 
         // Sample surrounding light.
         {
+            let max_steps = match space.physics().light {
+                LightPhysics::None => 0,
+                LightPhysics::Rays { maximum_distance } => {
+                    usize::from(maximum_distance).saturating_mul(2)
+                }
+            };
             let vt = self.view().to_transform();
             let sqrtedge = (self.light_samples.len() as FreeCoordinate).sqrt();
             let ray_origin = vt.transform_point3d(Point3D::origin()).unwrap();
@@ -447,7 +453,7 @@ impl Character {
                 );
                 // TODO: this should be something more like the light-propagation raycast.
                 let bounds = space.bounds();
-                for step in ray.cast().take(20) {
+                for step in ray.cast().within(bounds).take(max_steps) {
                     // Require hitting a visible surface and checking behind it, because if we
                     // just take the first valid value, then we'll trivially pick the same cube
                     // every time if our eye is within a cube with valid light.
