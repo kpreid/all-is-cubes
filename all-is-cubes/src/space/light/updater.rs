@@ -19,7 +19,9 @@ use crate::math::{
 };
 use crate::raycast::{Ray, RaycastStep};
 use crate::space::light::{LightUpdateRayInfo, LightUpdateRequest, Priority};
-use crate::space::{GridAab, LightPhysics, PackedLight, PackedLightScalar, Space, SpaceChange};
+use crate::space::{
+    GridAab, LightPhysics, LightStatus, PackedLight, PackedLightScalar, Space, SpaceChange,
+};
 use crate::time::{Duration, Instant};
 use crate::util::StatusText;
 
@@ -174,6 +176,34 @@ impl Space {
             // TODO: compute index only once
             self.lighting[self.bounds().index(cube).unwrap()] = new_light_value;
             self.change_notifier.notify(SpaceChange::Lighting(cube));
+
+            // If neighbors have missing (not just stale) light values, fill them in too.
+            for dir in Face6::ALL {
+                let neighbor_cube = cube + dir.normal_vector();
+                let Some(neighbor_index) = self.bounds().index(neighbor_cube) else {
+                    // neighbor is out of bounds
+                    continue;
+                };
+                match self.lighting[neighbor_index].status() {
+                    LightStatus::Uninitialized => {
+                        if self.lighting[neighbor_index] == new_light_value {
+                            continue;
+                        }
+                        if self.get_evaluated(neighbor_cube).opaque == FaceMap::repeat(true) {
+                            // neighbor is fully opaque — don't light it
+                            continue;
+                        }
+                        self.lighting[neighbor_index] = PackedLight::guess(new_light_value.value());
+                        self.change_notifier
+                            .notify(SpaceChange::Lighting(neighbor_cube));
+                        // We don't put the neighbor on the update queue because it should
+                        // already be there.
+                    }
+                    LightStatus::Opaque | LightStatus::Visible | LightStatus::NoRays => {
+                        // Already valid, or possibly valid; do nothing.
+                    }
+                }
+            }
 
             // The light algorithm, in its current form, can spend a very long time
             // evaluating 1-unit differences and possibly even loop infinitely. As a

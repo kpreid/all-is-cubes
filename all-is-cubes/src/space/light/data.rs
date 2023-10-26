@@ -24,8 +24,13 @@ pub(crate) type PackedLightScalar = u8;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub(crate) enum LightStatus {
-    /// The cube's light value has never been computed.
-    #[allow(unused)] // currently only used on feature=save
+    /// The cube's light value has never been computed, or it has been computed
+    /// as a wild guess that should be used only if no better data is available.
+    ///
+    /// This value may appear when:
+    ///
+    /// * [`SpaceBuilder::palette_and_contents()`] was called without including light data.
+    /// * The light updater is speculatively copying from neighboring cubes.
     Uninitialized = 0,
     /// The cube has no surfaces to catch light and therefore the light value is not tracked.
     NoRays = 1,
@@ -83,6 +88,17 @@ impl PackedLight {
         PackedLight {
             value: Vector3D::new(0, 0, 0),
             status,
+        }
+    }
+
+    pub(crate) fn guess(value: Rgb) -> Self {
+        PackedLight {
+            value: Vector3D::new(
+                Self::scalar_in(value.red()),
+                Self::scalar_in(value.green()),
+                Self::scalar_in(value.blue()),
+            ),
+            status: LightStatus::Uninitialized,
         }
     }
 
