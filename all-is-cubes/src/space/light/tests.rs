@@ -10,9 +10,55 @@ use crate::space::{GridAab, LightPhysics, Space, SpaceChange, SpacePhysics};
 use crate::time;
 
 #[test]
-fn initial_lighting_value() {
-    let space = Space::empty_positive(1, 1, 1);
+fn initial_value_in_empty_space() {
+    let space = Space::builder(GridAab::ORIGIN_CUBE).build();
+    std::dbg!(&space);
     assert_eq!(PackedLight::NO_RAYS, space.get_lighting([0, 0, 0]));
+}
+
+#[test]
+fn initial_value_in_filled_space() {
+    let space = Space::builder(GridAab::ORIGIN_CUBE)
+        .filled_with(Block::from(Rgba::WHITE))
+        .build();
+    assert_eq!(PackedLight::OPAQUE, space.get_lighting([0, 0, 0]));
+}
+
+#[test]
+fn initial_value_initialized_after_creation() {
+    // First, initialize the space empty and without light data.
+    // Note that we must use a space bigger than 1x1x1 because
+    // the set_physics() will do a fast_evaluate_light(), not just all-Uninitialized.
+    let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 3, 3]))
+        .light_physics(LightPhysics::None)
+        .build();
+    assert_eq!(PackedLight::ONE, space.get_lighting([0, 0, 0]));
+
+    // Put a block in it so this is not a trivial case, and activate lighting.
+    space
+        .set([1, 1, 1], Block::from(Rgba::new(1.0, 0.0, 0.0, 1.0)))
+        .unwrap();
+    space.set_physics(SpacePhysics {
+        light: LightPhysics::Rays {
+            maximum_distance: 10,
+        },
+        ..space.physics().clone()
+    });
+
+    // Note: this is pretty specific to the `fast_evaluate_light()` algorithm
+    // and will probably break when we improve it.
+    assert_eq!(
+        space.packed_sky_color,
+        space.get_lighting([1, 2, 1]),
+        "sky above obstacle"
+    );
+    assert_eq!(
+        PackedLight::UNINITIALIZED_AND_BLACK,
+        space.get_lighting([1, 0, 1]),
+        "unknown below obstacle"
+    );
+
+    // TODO: also test what happens on updates?
 }
 
 #[test]

@@ -56,9 +56,10 @@ impl PackedLight {
     const LOG_SCALE: f32 = 16.0;
     const LOG_OFFSET: f32 = 128.0;
 
-    pub(crate) const ZERO: Self = Self::none(LightStatus::Visible);
+    // pub(crate) const ZERO: Self = Self::none(LightStatus::Visible);
     pub(crate) const OPAQUE: Self = Self::none(LightStatus::Opaque);
     pub(crate) const NO_RAYS: Self = Self::none(LightStatus::NoRays);
+    pub(crate) const UNINITIALIZED_AND_BLACK: Self = Self::none(LightStatus::Uninitialized);
     pub(crate) const ONE: PackedLight = {
         let one_scalar = Self::LOG_OFFSET as PackedLightScalar;
         PackedLight {

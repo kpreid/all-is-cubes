@@ -13,21 +13,18 @@ use hashbrown::HashSet as HbHashSet;
 use manyfmt::Fmt;
 
 use crate::behavior::{self, BehaviorSet};
-use crate::block::TickAction;
-use crate::block::{Block, EvaluatedBlock, Resolution, AIR, AIR_EVALUATED_REF};
+use crate::block::{Block, EvaluatedBlock, Resolution, TickAction, AIR, AIR_EVALUATED_REF};
 #[cfg(doc)]
 use crate::character::Character;
 use crate::character::Spawn;
 use crate::content::palette::DAY_SKY_COLOR;
 use crate::drawing::DrawingPlane;
 use crate::fluff::Fluff;
-use crate::inv::EphemeralOpaque;
-use crate::inv::InventoryTransaction;
+use crate::inv::{EphemeralOpaque, InventoryTransaction};
 use crate::listen::{Listen, Listener, Notifier};
-use crate::math::Vol;
 use crate::math::{
     Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, Gridgid, NotNan, Rgb,
-    VectorOps,
+    VectorOps, Vol,
 };
 use crate::physics::Acceleration;
 use crate::time;
@@ -160,11 +157,13 @@ impl Space {
         let (palette, contents, lighting, light_update_queue) = match contents {
             builder::Fill::Block(block) => {
                 let volume = bounds.volume();
+                let palette = Palette::new(block, volume);
+                let opacity = palette.all_block_opacities_as_category();
                 (
-                    Palette::new(block, volume),
+                    palette,
                     vec![0; volume].into(),
-                    physics.light.initialize_lighting(bounds),
-                    LightUpdateQueue::new(), // TODO: nonempty if block is transparent
+                    physics.light.initialize_lighting(bounds, opacity),
+                    LightUpdateQueue::new(), // TODO: nonempty if opacity is partial
                 )
             }
             builder::Fill::Data {
@@ -192,8 +191,10 @@ impl Space {
                         (light.into_elements(), queue)
                     }
                     _ => (
-                        physics.light.initialize_lighting(bounds),
-                        LightUpdateQueue::new(),
+                        physics
+                            .light
+                            .initialize_lighting(bounds, palette.all_block_opacities_as_category()),
+                        LightUpdateQueue::new(), // TODO: nonempty if needed
                     ),
                 };
 
@@ -695,8 +696,12 @@ impl Space {
         self.packed_sky_color = physics.sky_color.into();
         let old_physics = mem::replace(&mut self.physics, physics);
         if self.physics.light != old_physics.light {
-            // TODO: == comparison is too broad once there are parameters -- might be a minor change of color etc.
-            self.lighting = self.physics.light.initialize_lighting(self.bounds);
+            // TODO: If the new physics is broadly similar, then reuse the old data as a
+            // starting point instead of immediately throwing it out.
+            self.lighting = self
+                .physics
+                .light
+                .initialize_lighting(self.bounds, self.palette.all_block_opacities_as_category());
 
             match self.physics.light {
                 LightPhysics::None => {

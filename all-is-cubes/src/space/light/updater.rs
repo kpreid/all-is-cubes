@@ -13,11 +13,12 @@ use manyfmt::Fmt;
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use super::debug::LightComputeOutput;
-use super::LightUpdateRequest;
 use crate::block::EvaluatedBlock;
-use crate::math::{Cube, Face6, FaceMap, FreeCoordinate, Geometry, NotNan, Rgb, VectorOps};
+use crate::math::{
+    Cube, Face6, FaceMap, FreeCoordinate, Geometry, NotNan, OpacityCategory, Rgb, VectorOps,
+};
 use crate::raycast::{Ray, RaycastStep};
-use crate::space::light::{LightUpdateRayInfo, Priority};
+use crate::space::light::{LightUpdateRayInfo, LightUpdateRequest, Priority};
 use crate::space::{GridAab, LightPhysics, PackedLight, PackedLightScalar, Space, SpaceChange};
 use crate::time::{Duration, Instant};
 use crate::util::StatusText;
@@ -305,7 +306,7 @@ impl Space {
                             });
 
                             if covered {
-                                PackedLight::ZERO
+                                PackedLight::UNINITIALIZED_AND_BLACK
                             } else {
                                 self.packed_sky_color
                             }
@@ -320,12 +321,26 @@ impl Space {
 }
 
 impl LightPhysics {
-    /// Generate the lighting data array that a newly created empty [`Space`] should have.
-    pub(crate) fn initialize_lighting(&self, bounds: GridAab) -> Box<[PackedLight]> {
+    /// Generate the lighting data array that a [`Space`] with this light physics should have.
+    ///
+    /// `opacity` specifies Whether the blacks in the space are uniformly fully opaque or
+    /// uniformly fully transparent, in which case the initialization can be optimal.
+    ///
+    /// TODO: Also return whether light updates are needed.
+    pub(crate) fn initialize_lighting(
+        &self,
+        bounds: GridAab,
+        opacity: OpacityCategory,
+    ) -> Box<[PackedLight]> {
         match self {
             LightPhysics::None => Box::new([]),
             LightPhysics::Rays { .. } => {
-                vec![PackedLight::NO_RAYS; bounds.volume()].into_boxed_slice()
+                let value = match opacity {
+                    OpacityCategory::Invisible => PackedLight::NO_RAYS,
+                    OpacityCategory::Partial => PackedLight::UNINITIALIZED_AND_BLACK,
+                    OpacityCategory::Opaque => PackedLight::OPAQUE,
+                };
+                vec![value; bounds.volume()].into_boxed_slice()
             }
         }
     }
