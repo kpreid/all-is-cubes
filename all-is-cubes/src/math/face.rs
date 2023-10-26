@@ -5,7 +5,6 @@ use core::fmt;
 use core::ops::{Index, IndexMut};
 
 use euclid::Vector3D;
-pub use ordered_float::{FloatIsNan, NotNan};
 
 use crate::math::{
     Axis, ConciseDebug, Cube, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridRotation,

@@ -204,7 +204,7 @@ impl GltfWriter {
                 camera: Some(camera_index),
                 ..empty_node(None)
             };
-            if let Some(initial_state) = self.frame_states.get(0) {
+            if let Some(initial_state) = self.frame_states.first() {
                 let t = initial_state.camera_transform;
                 camera_node.translation = Some(t.translation.map(|c| c as f32).into());
                 camera_node.rotation = Some(convert_quaternion(t.rotation));
@@ -365,13 +365,13 @@ pub(crate) async fn export_gltf(
     } = source;
 
     // If unsupported list is nonempty, fail.
-    if let Some(first) = spaces.get(0) {
+    if let Some(first) = spaces.first() {
         return Err(ExportError::NotRepresentable {
             name: Some(first.name()),
             reason: "Exporting spaces to glTF is not yet supported".into(),
         });
     }
-    if let Some(first) = characters.get(0) {
+    if let Some(first) = characters.first() {
         return Err(ExportError::NotRepresentable {
             name: Some(first.name()),
             reason: "Exporting characters to glTF is not yet supported".into(),

@@ -103,7 +103,7 @@ pub(crate) async fn export_to_dot_vox_data(
     } = source;
 
     // If block def list is nonempty, fail.
-    if let Some(first) = block_defs.get(0) {
+    if let Some(first) = block_defs.first() {
         return Err(ExportError::NotRepresentable {
             name: Some(first.name()),
             reason: "Exporting BlockDefs to .vox is not yet supported".into(),
