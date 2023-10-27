@@ -668,6 +668,19 @@ mod tests {
     use super::*;
     use crate::block::{AnimationHint, Block, Resolution, Resolution::R2, AIR};
     use pretty_assertions::assert_eq;
+    use std::mem::size_of;
+
+    /// `Evoxel`s are stored in large quantity, so we should think carefully any time we
+    /// might make it bigger. Or maybe even try to make it smaller.
+    #[test]
+    fn evoxel_size() {
+        assert_eq!(
+            size_of::<Evoxel>(),
+            (4 + 3) * size_of::<f32>() // colors
+                + 2 // flags
+                + 2 // padding
+        )
+    }
 
     #[test]
     fn visible_or_animated() {
