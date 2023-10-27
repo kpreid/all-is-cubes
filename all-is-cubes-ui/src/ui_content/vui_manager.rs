@@ -14,7 +14,7 @@ use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
 
-use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState, InputProcessor};
+use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState, InputProcessor, QuitFn};
 use crate::ui_content::hud::{HudBlocks, HudInputs};
 use crate::ui_content::pages;
 use crate::vui::widgets::TooltipState;
@@ -80,6 +80,7 @@ impl Vui {
         viewport_source: ListenableSource<Viewport>,
         fullscreen_source: ListenableSource<FullscreenState>,
         set_fullscreen: FullscreenSetter,
+        quit: Option<QuitFn>,
     ) -> Self {
         let mut universe = Universe::new();
         // TODO: take YieldProgress as a parameter
@@ -111,6 +112,7 @@ impl Vui {
             mouselook_mode: input_processor.mouselook_mode(),
             fullscreen_mode: fullscreen_source,
             set_fullscreen,
+            quit,
         };
         let hud_widget_tree = super::hud::new_hud_widget_tree(
             character_source.clone(),
@@ -470,6 +472,7 @@ mod tests {
             cctx,
             ListenableSource::constant(Viewport::ARBITRARY),
             ListenableSource::constant(None),
+            None,
             None,
         )
         .await;

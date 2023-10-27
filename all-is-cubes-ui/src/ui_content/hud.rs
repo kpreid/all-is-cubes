@@ -40,6 +40,7 @@ pub(crate) struct HudInputs {
     pub mouselook_mode: ListenableSource<bool>,
     pub fullscreen_mode: ListenableSource<FullscreenState>,
     pub set_fullscreen: FullscreenSetter,
+    pub(crate) quit: Option<crate::apps::QuitFn>,
 }
 
 impl fmt::Debug for HudInputs {

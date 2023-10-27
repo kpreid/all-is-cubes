@@ -531,6 +531,8 @@ pub struct SessionBuilder<I> {
     fullscreen_state: ListenableSource<FullscreenState>,
     set_fullscreen: FullscreenSetter,
 
+    quit: Option<QuitFn>,
+
     _instant: PhantomData<I>,
 }
 
@@ -540,6 +542,7 @@ impl<I> Default for SessionBuilder<I> {
             viewport_for_ui: None,
             fullscreen_state: ListenableSource::constant(None),
             set_fullscreen: None,
+            quit: None,
             _instant: PhantomData,
         }
     }
@@ -556,6 +559,7 @@ impl<I: time::Instant> SessionBuilder<I> {
             viewport_for_ui,
             fullscreen_state,
             set_fullscreen,
+            quit,
             _instant: _,
         } = self;
         let game_universe = Universe::new();
@@ -579,6 +583,7 @@ impl<I: time::Instant> SessionBuilder<I> {
                         viewport,
                         fullscreen_state,
                         set_fullscreen,
+                        quit,
                     )
                     .await,
                 ),
@@ -625,6 +630,15 @@ impl<I: time::Instant> SessionBuilder<I> {
     ) -> Self {
         self.fullscreen_state = state;
         self.set_fullscreen = setter;
+        self
+    }
+
+    /// Enable a “quit”/“exit” command in the session's user interface.
+    ///
+    /// This does not cause the session to self-destruct; rather, the provided callback
+    /// function should cause the session’s owner to stop presenting it to the user.
+    pub fn quit(mut self, quit_fn: QuitFn) -> Self {
+        self.quit = Some(quit_fn);
         self
     }
 }
@@ -757,6 +771,20 @@ pub enum CursorIcon {
     /// A hand with finger extended as if to press a button.
     PointingHand,
 }
+
+/// TODO: this should be an async fn
+pub(crate) type QuitFn = Arc<dyn Fn() -> Result<QuitSucceeded, QuitCancelled> + Send + Sync>;
+
+/// Return type of a [`SessionBuilder::quit()`] callback on successful quit.
+/// This is uninhabited (cannot happen) since the callback should never be observed to
+/// finish if it successfully quits.
+pub type QuitSucceeded = std::convert::Infallible;
+
+/// Return type of a [`SessionBuilder::quit()`] callback if other considerations cancelled
+/// the quit operation. In this case, the session will return to normal operation.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
+pub struct QuitCancelled;
 
 #[cfg(test)]
 mod tests {

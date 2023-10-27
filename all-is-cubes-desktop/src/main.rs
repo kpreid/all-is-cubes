@@ -163,7 +163,15 @@ fn main() -> Result<(), anyhow::Error> {
     ));
 
     let start_session_time = Instant::now();
-    let session = runtime.block_on(Session::builder().ui(viewport_cell.as_source()).build());
+    let session = runtime.block_on(
+        Session::builder()
+            .ui(viewport_cell.as_source())
+            .quit(Arc::new(|| {
+                // TODO: command the event loop to exit instead
+                std::process::exit(0)
+            }))
+            .build(),
+    );
     session.graphics_options_mut().set(graphics_options);
     let session_done_time = Instant::now();
     log::debug!(

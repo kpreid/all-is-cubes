@@ -23,24 +23,40 @@ pub(super) fn new_paused_widget_tree(
 ) -> Result<WidgetTree, InstallVuiError> {
     use parts::{heading, shrink};
 
+    let mut children = vec![
+        // TODO: establish standard resolutions for logo etc
+        LayoutTree::leaf(shrink(u, R16, LayoutTree::leaf(logo_text()))?),
+        LayoutTree::leaf(shrink(u, R32, heading("Paused"))?),
+        LayoutTree::leaf(open_page_button(
+            hud_inputs,
+            VuiPageState::AboutText,
+            hud_inputs.hud_blocks.blocks[UiBlocks::AboutButtonLabel].clone(),
+        )),
+        LayoutTree::leaf(open_page_button(
+            hud_inputs,
+            VuiPageState::Options,
+            hud_inputs.hud_blocks.blocks[UiBlocks::OptionsButtonLabel].clone(),
+        )),
+        LayoutTree::leaf(pause_toggle_button(hud_inputs)),
+    ];
+    if let Some(quit_fn) = hud_inputs.quit.as_ref().cloned() {
+        children.push(LayoutTree::leaf(widgets::ActionButton::new(
+            hud_inputs.hud_blocks.blocks[UiBlocks::QuitButtonLabel].clone(),
+            &hud_inputs.hud_blocks.blocks,
+            // TODO: quit_fn should be an async function, but we don't have a way to
+            // kick off a “Quitting...” task yet.
+            move || match quit_fn() {
+                Ok(s) => match s {},
+                Err(crate::apps::QuitCancelled) => {
+
+                    // TODO: display message indicating failure
+                }
+            },
+        )))
+    }
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
-        children: vec![
-            // TODO: establish standard resolutions for logo etc
-            LayoutTree::leaf(shrink(u, R16, LayoutTree::leaf(logo_text()))?),
-            LayoutTree::leaf(shrink(u, R32, heading("Paused"))?),
-            LayoutTree::leaf(open_page_button(
-                hud_inputs,
-                VuiPageState::AboutText,
-                hud_inputs.hud_blocks.blocks[UiBlocks::AboutButtonLabel].clone(),
-            )),
-            LayoutTree::leaf(open_page_button(
-                hud_inputs,
-                VuiPageState::Options,
-                hud_inputs.hud_blocks.blocks[UiBlocks::OptionsButtonLabel].clone(),
-            )),
-            LayoutTree::leaf(pause_toggle_button(hud_inputs)),
-        ],
+        children,
     });
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
         hud_inputs
