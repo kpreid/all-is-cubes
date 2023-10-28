@@ -71,7 +71,7 @@ impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for WgpuMt {
 /// to draw on.
 #[derive(Debug)]
 pub struct SurfaceRenderer<I> {
-    surface: wgpu::Surface,
+    surface: wgpu::Surface<'static>,
     device: Arc<wgpu::Device>,
     queue: wgpu::Queue,
 
@@ -88,7 +88,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
     /// and return an error if requesting the device fails.
     pub async fn new(
         cameras: StandardCameras,
-        surface: wgpu::Surface,
+        surface: wgpu::Surface<'static>,
         adapter: &wgpu::Adapter,
     ) -> Result<Self, GraphicsResourceError> {
         let (device, queue) = adapter
@@ -296,8 +296,8 @@ impl<I: time::Instant> EverythingRenderer<I> {
     /// A device descriptor suitable for the expectations of [`EverythingRenderer`].
     pub fn device_descriptor(available_limits: wgpu::Limits) -> wgpu::DeviceDescriptor<'static> {
         wgpu::DeviceDescriptor {
-            features: wgpu::Features::empty(),
-            limits: wgpu::Limits {
+            required_features: wgpu::Features::empty(),
+            required_limits: wgpu::Limits {
                 max_inter_stage_shader_components: 32, // number used by blocks-and-lines shader
                 ..wgpu::Limits::downlevel_webgl2_defaults().using_resolution(available_limits)
             },
@@ -322,6 +322,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             width: viewport.framebuffer_size.x.max(1),
             height: viewport.framebuffer_size.y.max(1),
             present_mode: wgpu::PresentMode::Fifo,
+            desired_maximum_frame_latency: 2,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
         };
 

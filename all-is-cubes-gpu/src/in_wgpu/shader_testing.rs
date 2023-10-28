@@ -66,6 +66,7 @@ where
                 width: output_viewport.framebuffer_size.x,
                 height: output_viewport.framebuffer_size.y,
                 present_mode: wgpu::PresentMode::Fifo,
+                desired_maximum_frame_latency: 2,
                 alpha_mode: wgpu::CompositeAlphaMode::Auto,
             },
             FbtFeatures::new(adapter),

@@ -1,5 +1,6 @@
 //! Glue between [`all_is_cubes`], [`winit`], and `winit`-compatible renderers.
 
+use std::sync::Arc;
 use std::time::Instant;
 
 use winit::event::{DeviceEvent, ElementState, Event, WindowEvent};
@@ -26,8 +27,7 @@ use crate::{choose_graphical_window_size, Session};
 #[derive(Debug)]
 pub struct WinAndState {
     /// The underlying window.
-    /// Safety requirement: This is never overwritten.
-    window: Window,
+    window: Arc<Window>,
 
     /// The last [`winit::WindowEvent::Occluded`] event we received.
     /// Winit gives us no way to query this so we have to remember it.
@@ -71,7 +71,7 @@ impl WinAndState {
             .build(event_loop)?;
 
         Ok(WinAndState {
-            window,
+            window: Arc::new(window),
             occluded: false,
             mouse_position: None,
             cursor_grab_mode: winit::window::CursorGrabMode::None,
@@ -200,7 +200,7 @@ pub async fn create_winit_wgpu_desktop_session(
     // as long as the surface is. We will do that by keeping them both in
     // the `DesktopSession` struct. TODO: Make this more robust by having
     // the renderer jointly own the window via `Arc`.
-    let surface = unsafe { instance.create_surface(&window.window) }?;
+    let surface = instance.create_surface(Arc::clone(&window.window))?;
 
     // Pick an adapter.
     let mut adapter: Option<wgpu::Adapter> =
