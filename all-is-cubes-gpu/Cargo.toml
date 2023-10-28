@@ -78,7 +78,12 @@ gloo-timers = { version = "0.3.0", default-features = false, features = ["future
 # If we don't set this feature, it will try to access files at run time and fail
 # since web wasm has no std::fs.
 resource = { version = "0.5.0", features = ["force-static"] }
-wgpu = { workspace = true, optional = true }
+wasm-bindgen = "0.2.87"
+# For initializing tests on web.
+# Okay that this is a non-dev dependency because wgpu will have the same dep.
+web-sys = { version = "0.3.66", features = ["OffscreenCanvas"]}
+# Enable WebGL compatibility.
+wgpu = { workspace = true, optional = true, features = ["webgl"] }
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_tokio"] }

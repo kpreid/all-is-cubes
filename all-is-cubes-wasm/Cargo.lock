@@ -99,6 +99,7 @@ dependencies = [
  "rand_xoshiro",
  "resource",
  "thiserror",
+ "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
@@ -1135,9 +1136,9 @@ checksum = "bc0287524726960e07b119cebd01678f852f147742ae0d925e6a520dca956126"
 [[package]]
 name = "naga"
 version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8878eb410fc90853da3908aebfe61d73d26d4437ef850b70050461f939509899"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#ac8756c2d3618dddb64afadb5d397ece634691de"
 dependencies = [
+ "arrayvec",
  "bit-set",
  "bitflags 2.4.1",
  "codespan-reporting",
@@ -1911,9 +1912,8 @@ dependencies = [
 
 [[package]]
 name = "wgpu"
-version = "0.19.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bfe9a310dcf2e6b85f00c46059aaeaf4184caa8e29a1ecd4b7a704c3482332d"
+version = "0.19.0"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#ac8756c2d3618dddb64afadb5d397ece634691de"
 dependencies = [
  "arrayvec",
  "cfg-if",
@@ -1936,8 +1936,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b15e451d4060ada0d99a64df44e4d590213496da7c4f245572d51071e8e30ed"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#ac8756c2d3618dddb64afadb5d397ece634691de"
 dependencies = [
  "arrayvec",
  "bit-vec",
@@ -1962,8 +1961,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11f259ceb56727fb097da108d92f8a5cbdb5b74a77f9e396bd43626f67299d61"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#ac8756c2d3618dddb64afadb5d397ece634691de"
 dependencies = [
  "android_system_properties",
  "arrayvec",
@@ -2002,8 +2000,7 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "895fcbeb772bfb049eb80b2d6e47f6c9af235284e9703c96fc0218a42ffd5af2"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#ac8756c2d3618dddb64afadb5d397ece634691de"
 dependencies = [
  "bitflags 2.4.1",
  "js-sys",

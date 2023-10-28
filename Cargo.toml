@@ -96,7 +96,7 @@ trycmd = "0.14.1" # keep in sync with `snapbox`
 unicode-segmentation = { version = "1.10.1", default-features = false }
 wasm-bindgen-futures = "0.4.40"
 web-time = "0.2.3"
-wgpu = { version = "0.19.1", default-features = false, features = ["wgsl"] }
+wgpu = { version = "0.19", default-features = false, features = ["wgsl"] }
 yield-progress = { version = "0.1.5", default-features = false }
 
 # Note: Lints are also necessarily redefined in the workspaces other than this one.
@@ -170,4 +170,4 @@ overflow-checks = true
 [patch.crates-io]
 # Here are some patches we might want to apply for development:
 #
-# wgpu = { git = "https://github.com/gfx-rs/wgpu/", branch = "trunk" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu/", branch = "trunk" }

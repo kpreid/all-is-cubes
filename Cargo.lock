@@ -175,6 +175,7 @@ dependencies = [
  "resource",
  "thiserror",
  "tokio",
+ "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
@@ -7060,3 +7061,8 @@ dependencies = [
  "quote",
  "syn 1.0.109",
 ]
+
+[[patch.unused]]
+name = "wgpu"
+version = "0.19.0"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#ac8756c2d3618dddb64afadb5d397ece634691de"
