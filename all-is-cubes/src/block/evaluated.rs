@@ -94,12 +94,17 @@ impl fmt::Debug for EvaluatedBlock {
             voxel_opacity_mask,
         } = self;
         let mut ds = fmt.debug_struct("EvaluatedBlock");
-        ds.field("attributes", attributes);
+        if *attributes != BlockAttributes::default() {
+            ds.field("attributes", attributes);
+        }
         ds.field("color", color);
-        ds.field("light_emission", light_emission);
-        ds.field("opaque", opaque);
+        if *light_emission != Rgb::ZERO {
+            ds.field("light_emission", light_emission);
+        }
+        // Using format_args! this way turns off "alternate" multi-line format
+        ds.field("opaque", &format_args!("{opaque:?}"));
         ds.field("visible", visible);
-        ds.field("uniform_collision", uniform_collision);
+        ds.field("uniform_collision", &format_args!("{uniform_collision:?}"));
         ds.field("resolution", &self.resolution());
         match voxels {
             Evoxels::One(evoxel) => {
@@ -107,12 +112,12 @@ impl fmt::Debug for EvaluatedBlock {
             }
             Evoxels::Many(_, array) => {
                 // Not printing the entire array which could be huge.
-                ds.field("voxels", &array.bounds());
+                ds.field("voxels", &format_args!("{:?}", array.bounds()));
             }
         }
         ds.field(
             "voxel_opacity_mask",
-            &voxel_opacity_mask.as_ref().map(Vol::bounds),
+            &format_args!("{:?}", voxel_opacity_mask.as_ref().map(Vol::bounds)),
         );
         ds.finish()
     }
@@ -667,8 +672,77 @@ impl MinEval {
 mod tests {
     use super::*;
     use crate::block::{AnimationHint, Block, Resolution, Resolution::R2, AIR};
+    use crate::universe::Universe;
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
     use std::mem::size_of;
+
+    #[test]
+    fn evaluated_block_debug_simple() {
+        let ev = Block::from(Rgba::WHITE).evaluate().unwrap();
+
+        // not testing the one-line version because it'll be not too surprising
+        assert_eq!(
+            format!("{ev:#?}\n"),
+            indoc! {"
+                EvaluatedBlock {
+                    color: Rgba(1.0, 1.0, 1.0, 1.0),
+                    opaque: FaceMap { nx: true, ny: true, nz: true, px: true, py: true, pz: true },
+                    visible: true,
+                    uniform_collision: Some(Hard),
+                    resolution: 1,
+                    voxel: Evoxel {
+                        color: Rgba(1.0, 1.0, 1.0, 1.0),
+                        emission: Rgb(0.0, 0.0, 0.0),
+                        selectable: true,
+                        collision: Hard,
+                    },
+                    voxel_opacity_mask: Some(GridAab(0..1, 0..1, 0..1)),
+                }
+            "}
+        );
+    }
+
+    #[test]
+    fn evaluated_block_debug_complex() {
+        let mut universe = Universe::new();
+        let voxel = Block::builder()
+            .color(Rgba::WHITE)
+            .light_emission(Rgb::new(1.0, 2.0, 3.0))
+            .build();
+        let ev = Block::builder()
+            .display_name("hello")
+            .voxels_fn(&mut universe, R2, |p| {
+                if p == Cube::new(1, 1, 1) {
+                    &AIR
+                } else {
+                    &voxel
+                }
+            })
+            .unwrap()
+            .build()
+            .evaluate()
+            .unwrap();
+
+        assert_eq!(
+            format!("{ev:#?}\n"),
+            indoc! {"
+                EvaluatedBlock {
+                    attributes: BlockAttributes {
+                        display_name: \"hello\",
+                    },
+                    color: Rgba(1.0, 1.0, 1.0, 1.0),
+                    light_emission: Rgb(1.0, 2.0, 3.0),
+                    opaque: FaceMap { nx: true, ny: true, nz: true, px: false, py: false, pz: false },
+                    visible: true,
+                    uniform_collision: None,
+                    resolution: 2,
+                    voxels: GridAab(0..2, 0..2, 0..2),
+                    voxel_opacity_mask: Some(GridAab(0..2, 0..2, 0..2)),
+                }
+            "}
+        );
+    }
 
     /// `Evoxel`s are stored in large quantity, so we should think carefully any time we
     /// might make it bigger. Or maybe even try to make it smaller.
