@@ -206,7 +206,7 @@ fn main() -> Result<(), anyhow::Error> {
     // ever return “successfully”, so no code should follow it.
     match graphics_type {
         GraphicsType::Window => {
-            let event_loop = winit::event_loop::EventLoop::new();
+            let event_loop = winit::event_loop::EventLoop::new()?;
             let dsession = inner_params
                 .runtime
                 .block_on(create_winit_wgpu_desktop_session(
@@ -228,7 +228,7 @@ fn main() -> Result<(), anyhow::Error> {
             )
         }
         GraphicsType::WindowRt => {
-            let event_loop = winit::event_loop::EventLoop::new();
+            let event_loop = winit::event_loop::EventLoop::new()?;
             let dsession = create_winit_rt_desktop_session(
                 session,
                 aic_winit::create_window(

@@ -5,8 +5,8 @@ use std::time::Instant;
 
 use anyhow::anyhow;
 use image::imageops::{self, FilterType};
-use winit::event::{DeviceEvent, ElementState, Event, KeyboardInput, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event::{DeviceEvent, ElementState, Event, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget};
 use winit::window::{CursorGrabMode, Window};
 
 use all_is_cubes::camera::{self, StandardCameras, Viewport};
@@ -121,7 +121,7 @@ pub(crate) fn winit_main_loop<Ren: RendererToWinit + 'static>(
 ) -> Result<(), anyhow::Error> {
     let loop_start_time = Instant::now();
     let mut first_frame = true;
-    event_loop.run(move |event, _, control_flow| {
+    Ok(event_loop.run(move |event, elwt| {
         if first_frame {
             first_frame = false;
             log::debug!(
@@ -138,11 +138,11 @@ pub(crate) fn winit_main_loop<Ren: RendererToWinit + 'static>(
         // Compute when we want to resume.
         // Note that handle_winit_event() might override this.
         if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
-            *control_flow = ControlFlow::WaitUntil(t);
+            elwt.set_control_flow(ControlFlow::WaitUntil(t));
         }
 
-        handle_winit_event(event, &mut dsession, control_flow)
-    })
+        handle_winit_event(event, &mut dsession, elwt)
+    })?)
 }
 
 pub(crate) fn create_window(
@@ -309,29 +309,50 @@ pub(crate) fn create_winit_rt_desktop_session(
 /// This is separated from [`winit_main_loop`] for the sake of readability (more overall structure
 /// fitting on the screen) and possible refactoring towards having a common abstract main-loop.
 fn handle_winit_event<Ren: RendererToWinit>(
-    event: Event<'_, ()>,
+    event: Event<()>,
     dsession: &mut DesktopSession<Ren, WinAndState>,
-    control_flow: &mut ControlFlow,
+    elwt: &EventLoopWindowTarget<()>,
 ) {
     let input_processor = &mut dsession.session.input_processor;
     match event {
         Event::NewEvents(_) => {}
         Event::WindowEvent { window_id, event } if window_id == dsession.window.window.id() => {
             match event {
-                WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                WindowEvent::CloseRequested => elwt.exit(),
+
+                WindowEvent::RedrawRequested => {
+                    if dsession.window.occluded
+                        || dsession.window.window.is_visible() == Some(false)
+                        || dsession.window.window.is_minimized() == Some(true)
+                    {
+                        return;
+                    }
+
+                    dsession.renderer.update_world_camera();
+                    dsession.session.update_cursor(dsession.renderer.cameras());
+                    dsession
+                        .window
+                        .window
+                        .set_cursor_icon(cursor_icon_to_winit(dsession.session.cursor_icon()));
+
+                    dsession
+                        .renderer
+                        .redraw(&dsession.session, &dsession.window.window);
+
+                    dsession.session.frame_clock.did_draw();
+                }
 
                 // Keyboard input
                 WindowEvent::KeyboardInput {
-                    input:
-                        KeyboardInput {
-                            virtual_keycode,
+                    event:
+                        winit::event::KeyEvent {
+                            physical_key,
                             state,
                             ..
                         },
                     ..
                 } => {
-                    // TODO: use KeyboardInput::scancode once we have editable bindings
-                    if let Some(key) = virtual_keycode.and_then(map_key) {
+                    if let Some(key) = map_key(physical_key) {
                         match state {
                             ElementState::Pressed => {
                                 input_processor.key_down(key);
@@ -345,7 +366,6 @@ fn handle_winit_event<Ren: RendererToWinit>(
                 WindowEvent::Ime(ime_event) => {
                     log::warn!("received IME event even though IME not enabled: {ime_event:?}");
                 }
-                WindowEvent::ReceivedCharacter(..) => {}
                 WindowEvent::ModifiersChanged(..) => {}
 
                 // Mouse input
@@ -391,10 +411,11 @@ fn handle_winit_event<Ren: RendererToWinit>(
                 }
                 WindowEvent::ScaleFactorChanged {
                     scale_factor,
-                    new_inner_size,
-                } => dsession
-                    .viewport_cell
-                    .set(physical_size_to_viewport(scale_factor, *new_inner_size)),
+                    inner_size_writer: _,
+                } => dsession.viewport_cell.set(physical_size_to_viewport(
+                    scale_factor,
+                    dsession.window.window.inner_size(),
+                )),
                 WindowEvent::Focused(has_focus) => {
                     input_processor.key_focus(has_focus);
                 }
@@ -415,6 +436,7 @@ fn handle_winit_event<Ren: RendererToWinit>(
                 WindowEvent::HoveredFileCancelled => {}
 
                 // Unused
+                WindowEvent::ActivationTokenDone { .. } => {}
                 WindowEvent::Moved(_) => {}
                 WindowEvent::Destroyed => {}
                 WindowEvent::TouchpadPressure { .. } => {}
@@ -445,13 +467,12 @@ fn handle_winit_event<Ren: RendererToWinit>(
             DeviceEvent::Motion { .. } => {}
             DeviceEvent::Button { .. } => {}
             DeviceEvent::Key(_) => {}
-            DeviceEvent::Text { .. } => {}
         },
         e @ Event::WindowEvent { .. } => {
             log::error!("event for a window we aren't managing: {:?}", e)
         }
 
-        Event::MainEventsCleared => {
+        Event::AboutToWait => {
             // Run simulation if it's time
             dsession.advance_time_and_maybe_step();
             if dsession.session.frame_clock.should_draw() {
@@ -459,36 +480,11 @@ fn handle_winit_event<Ren: RendererToWinit>(
             }
         }
 
-        Event::RedrawRequested(id) if id == dsession.window.window.id() => {
-            if dsession.window.occluded
-                || dsession.window.window.is_visible() == Some(false)
-                || dsession.window.window.is_minimized() == Some(true)
-            {
-                return;
-            }
-
-            dsession.renderer.update_world_camera();
-            dsession.session.update_cursor(dsession.renderer.cameras());
-            dsession
-                .window
-                .window
-                .set_cursor_icon(cursor_icon_to_winit(dsession.session.cursor_icon()));
-
-            dsession
-                .renderer
-                .redraw(&dsession.session, &dsession.window.window);
-
-            dsession.session.frame_clock.did_draw();
-        }
-        e @ Event::RedrawRequested(_) => {
-            log::error!("event for a window we aren't managing: {:?}", e)
-        }
-
         e @ Event::UserEvent(()) => log::error!("unexpected UserEvent: {e:?}"),
         Event::Suspended => {}
         Event::Resumed => {}
-        Event::RedrawEventsCleared => {}
-        Event::LoopDestroyed => {}
+        Event::LoopExiting => {}
+        Event::MemoryWarning => {}
     }
 }
 
