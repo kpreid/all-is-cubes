@@ -114,11 +114,13 @@ impl crate::glue::Window for WinAndState {
 
 /// Run `winit` event loop, using [`RendererToWinit`] to perform rendering.
 ///
-/// Does not return; exits the process instead.
+/// Might not return but exit the process instead.
 pub(crate) fn winit_main_loop<Ren: RendererToWinit + 'static>(
     event_loop: EventLoop<()>,
     mut dsession: DesktopSession<Ren, WinAndState>,
 ) -> Result<(), anyhow::Error> {
+    event_loop.set_control_flow(ControlFlow::Poll);
+
     let loop_start_time = Instant::now();
     let mut first_frame = true;
     Ok(event_loop.run(move |event, elwt| {
@@ -136,7 +138,6 @@ pub(crate) fn winit_main_loop<Ren: RendererToWinit + 'static>(
             .sync_cursor_grab(&mut dsession.session.input_processor);
 
         // Compute when we want to resume.
-        // Note that handle_winit_event() might override this.
         if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
             elwt.set_control_flow(ControlFlow::WaitUntil(t));
         }
