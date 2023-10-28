@@ -102,7 +102,7 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
                         wgpu::Maintain::Poll
                     };
 
-                    let queue_empty = device.poll(maintain);
+                    let queue_empty = device.poll(maintain).is_queue_empty();
                     if queue_empty {
                         to_drop.push(device_ref.clone());
                     }

@@ -8,6 +8,9 @@
 //! so that additional development tools can reuse the same UI code. Use at your own risk.
 //! Documentation is lacking.
 
+// Crate-specific lint settings. (General settings can be found in the workspace manifest.)
+#![forbid(unsafe_code)]
+
 use std::time::Instant;
 
 use anyhow::Context as _;

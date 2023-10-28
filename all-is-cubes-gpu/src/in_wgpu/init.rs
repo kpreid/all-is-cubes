@@ -29,7 +29,7 @@ pub async fn create_instance_and_adapter_for_test(
     let surface = {
         // size shouldn't matter; use a funny noticeable number in case it turns out to
         let canvas = web_sys::OffscreenCanvas::new(143, 217).unwrap();
-        match instance.create_surface_from_offscreen_canvas(canvas) {
+        match instance.create_surface(wgpu::SurfaceTarget::OffscreenCanvas(canvas)) {
             Ok(surface) => Some(surface),
             // If we can't make a surface then we can't make an adapter.
             Err(_) => return (instance, None),
@@ -141,7 +141,7 @@ where
     let format = texture.format();
     let size_of_texel = components * std::mem::size_of::<C>();
     assert_eq!(
-        (format.block_size(None), format.block_dimensions()),
+        (format.block_copy_size(None), format.block_dimensions()),
         (Some(size_of_texel as u32), (1, 1)),
         "Texture format does not match requested size",
     );

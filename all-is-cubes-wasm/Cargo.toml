@@ -48,7 +48,7 @@ send_wrapper = "0.6.0"
 wasm-bindgen = "0.2.89"
 wasm-bindgen-futures = "0.4.34"
 web-time = { version = "0.2.3" }
-wgpu = { version = "0.18.0", features = ["webgl"] }
+wgpu = { version = "0.19.1", default-features = false, features = ["webgl"] }
 # Feature enabling
 yield-progress = { version = "0.1.5", features = ["log_hiccups"] }
 
@@ -144,3 +144,8 @@ overflow-checks = true
 
 [profile.test]
 overflow-checks = true
+
+[patch.crates-io]
+# Here are some patches we might want to apply for development:
+#
+# wgpu = { git = "https://github.com/gfx-rs/wgpu/", branch = "trunk" }

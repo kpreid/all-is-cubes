@@ -1,7 +1,7 @@
 //! Binary for All is Cubes desktop app.
 
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
-// * This crate does not forbid(unsafe_code) because wgpu initialization requires it.
+#![forbid(unsafe_code)]
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
