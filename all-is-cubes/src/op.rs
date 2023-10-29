@@ -30,6 +30,11 @@ type OpTxn = (SpaceTransaction, InventoryTransaction);
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Operation {
+    /// Try applying each of the contained [`Operation`]s and use the first successful one.
+    //---
+    // TODO: provide a way to control what error report is presented
+    Alt(Arc<[Operation]>),
+
     /// Replace the cube's block with the given block.
     ///
     /// In addition to this specific behavior, this has the semantics that it is “this block
@@ -98,6 +103,15 @@ impl Operation {
         transform: Gridgid,
     ) -> Result<OpTxn, OperationError> {
         match self {
+            Operation::Alt(ops) => {
+                for op in ops.iter() {
+                    match op.apply(space, inventory, transform) {
+                        Ok(txns) => return Ok(txns),
+                        Err(_error) => {} // TODO: propagate certain fatal errors?
+                    }
+                }
+                Err(OperationError::Unmatching)
+            }
             Operation::Become(block) => {
                 let target_cube = transform.transform_cube(Cube::ORIGIN);
                 let space_txn = CubeTransaction::replacing(
@@ -184,6 +198,7 @@ impl Operation {
     pub(crate) fn rotationally_symmetric(&self) -> bool {
         match self {
             // TODO: should ask if contained blocks are relevantly symmetric
+            Operation::Alt(ops) => ops.iter().all(Operation::rotationally_symmetric),
             Operation::Become(_) => false,
             Operation::DestroyTo(_) => false,
             Operation::AddModifiers(_) => true, // TODO: there is not a general notion of rotating a modifier, but probably there should be
@@ -198,6 +213,9 @@ impl Operation {
         }
         match self {
             // TODO: need to provide a way for blocks to opt out and have only one rotation
+            Operation::Alt(ops) => {
+                Operation::Alt(ops.iter().map(|op| op.clone().rotate(rotation)).collect())
+            }
             Operation::Become(block) => Operation::Become(block.rotate(rotation)),
             Operation::DestroyTo(block) => Operation::DestroyTo(block.rotate(rotation)),
             // TODO: there is not a general notion of rotating a modifier, but probably there should be
@@ -223,6 +241,7 @@ impl Operation {
 impl VisitHandles for Operation {
     fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
         match self {
+            Operation::Alt(ops) => ops[..].visit_handles(visitor),
             Operation::Become(block) | Operation::DestroyTo(block) => block.visit_handles(visitor),
             Operation::AddModifiers(modifier) => modifier.visit_handles(visitor),
             Operation::StartMove(modifier) => modifier.visit_handles(visitor),
@@ -240,6 +259,10 @@ impl VisitHandles for Operation {
 pub(crate) enum OperationError {
     /// conflict between parts of the operation
     InternalConflict(<OpTxn as Merge>::Conflict),
+
+    /// no rule of this operation matched
+    // TODO: include at least one nested error
+    Unmatching,
 }
 
 crate::util::cfg_should_impl_error! {
@@ -247,7 +270,7 @@ crate::util::cfg_should_impl_error! {
         fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             match self {
                 Self::InternalConflict(e) => Some(e),
-                // _ => None,
+                OperationError::Unmatching => None,
             }
         }
     }

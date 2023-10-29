@@ -9,6 +9,7 @@
         - `block::Block::with_inventory` attaches inventory to a block.
         - `inv::InvInBlock`, stored in `block::BlockAttributes::inventory`, describes the size and rendering such inventories should have.
     - `block::Modifier::Attributes` allows overriding block attributes.
+    - `op::Operation::Alt` allows operations to try alternatives.
 
 ### Changed
 

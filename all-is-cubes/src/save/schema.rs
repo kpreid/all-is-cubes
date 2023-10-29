@@ -376,6 +376,9 @@ type RgbaSer = [NotNan<f32>; 4];
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub(crate) enum OperationSer<'a> {
+    AltV1 {
+        ops: Cow<'a, [op::Operation]>,
+    },
     BecomeV1 {
         block: Block,
     },

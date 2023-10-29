@@ -508,6 +508,7 @@ impl From<op::OperationError> for ToolError {
             // TODO: should not forget source()s but we can't do that generically in no_std for now;
             // need more custom user-facing error processing.
             op::OperationError::InternalConflict(c) => ToolError::Internal(c.to_string()),
+            op::OperationError::Unmatching => ToolError::NotUsable,
         }
     }
 }

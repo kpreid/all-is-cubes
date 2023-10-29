@@ -739,6 +739,9 @@ mod op {
             S: Serializer,
         {
             match self {
+                op::Operation::Alt(ops) => schema::OperationSer::AltV1 {
+                    ops: Cow::Borrowed(&ops[..]),
+                },
                 op::Operation::Become(block) => schema::OperationSer::BecomeV1 {
                     block: block.clone(),
                 },
@@ -771,6 +774,7 @@ mod op {
             D: Deserializer<'de>,
         {
             Ok(match schema::OperationSer::deserialize(deserializer)? {
+                schema::OperationSer::AltV1 { ops } => op::Operation::Alt(ops.into()),
                 schema::OperationSer::BecomeV1 { block } => op::Operation::Become(block),
                 schema::OperationSer::DestroyToV1 { block } => op::Operation::DestroyTo(block),
                 schema::OperationSer::AddModifiersV1 { modifiers } => op::Operation::AddModifiers(
