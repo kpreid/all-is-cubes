@@ -12,7 +12,7 @@ license = "MIT OR Apache-2.0"
 categories = ["games", "graphics", "rendering::engine"]
 
 [package.metadata.docs.rs]
-features = ["arbitrary"]
+features = ["arbitrary", "save", "std"]
 
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.

@@ -13,6 +13,9 @@ license = "MIT OR Apache-2.0"
 categories = ["games", "rendering"]
 exclude = ["*.app", "*.desktop"]
 
+[package.metadata.docs.rs]
+features = []
+
 [[bin]]
 name = "all-is-cubes"
 path = "src/main.rs"
