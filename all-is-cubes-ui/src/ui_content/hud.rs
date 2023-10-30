@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use core::fmt;
 use std::sync::{mpsc, Mutex};
 
-use all_is_cubes::block::{self, Block};
+use all_is_cubes::block::Block;
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::character::Character;
 use all_is_cubes::content::palette;
@@ -10,7 +10,7 @@ use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::Icons;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen::ListenableSource;
-use all_is_cubes::math::{Face6, GridPoint};
+use all_is_cubes::math::Face6;
 use all_is_cubes::universe::{URef, Universe};
 use all_is_cubes::util::YieldProgress;
 
@@ -163,16 +163,7 @@ impl HudBlocks {
             ([0, -1, 0], palette::HUD_TEXT_STROKE.into()),
         ]);
 
-        let dialog_box_style = BoxStyle::from_nine_and_thin(core::array::from_fn(|y| {
-            core::array::from_fn(|x| {
-                ui_blocks[UiBlocks::DialogBackground]
-                    .clone()
-                    .with_modifier(block::Zoom::new(
-                        block::Resolution::R4,
-                        GridPoint::new(x as i32, y as i32, 0),
-                    ))
-            })
-        }));
+        let dialog_box_style = BoxStyle::from_nine_and_thin(&ui_blocks[UiBlocks::DialogBackground]);
 
         Self {
             blocks: ui_blocks,

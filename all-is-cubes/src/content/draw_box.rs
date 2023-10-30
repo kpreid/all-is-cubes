@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use crate::block::{self, Block};
-use crate::math::{Cube, FaceMap, GridAab, GridRotation};
+use crate::math::{Cube, FaceMap, GridAab, GridPoint, GridRotation};
 use crate::space;
 
 /// Set of blocks used to draw 3D boxes of any size, allowing corners and edges to have
@@ -22,12 +22,31 @@ pub struct BoxStyle {
 impl BoxStyle {
     // TODO: Figure out a less complex set of constructors. Allow replacing individual parts.
 
-    /// Construct a `BoxStyle` from a row-major 2D array whose elements are arranged in
-    /// the order `[lower, middle, upper, lower & upper]`.
-    /// The Z axis is filled with all the same blocks.
+    /// Construct a `BoxStyle` from a 2D 4×4×1 multiblock whose components on each axis
+    /// are in the order `[lower, middle, upper, lower & upper]`; that is, this layout
+    /// of blocks:
+    ///
+    /// ```text
+    /// ┊ ┏━━━━━━━━━━━━━┓┏━━━┓
+    /// 3 ┃             ┃┃   ┃
+    /// ┊ ┗━━━━━━━━━━━━━┛┗━━━┛
+    /// ┃ ┏━━━━━━━━━━━━━┓┏━━━┓
+    /// 2 ┃             ┃┃   ┃
+    /// ┃ ┃             ┃┃   ┃
+    /// ┊ ┃             ┃┃   ┃
+    /// 1 ┃             ┃┃   ┃
+    /// ┊ ┃             ┃┃   ┃
+    /// ┃ ┃             ┃┃   ┃
+    /// 0 ┃             ┃┃   ┃
+    /// ┃ ┗━━━━━━━━━━━━━┛┗━━━┛
+    ///   ━━0━━┈┈1┈┈━━2━━┈┈3┈┈
+    /// ```
+    ///
+    /// The resolution is one quarter of the input.
+    /// The Z axis is filled with all the same blocks. TODO: Make it sensitive to the input
+    /// dimensions as defined by multiblock metadata instead.
     // TODO: figure out if this is good public api
-    #[doc(hidden)]
-    pub fn from_nine_and_thin(blocks: [[Block; 4]; 4]) -> Self {
+    pub fn from_nine_and_thin(multiblock: &Block) -> Self {
         use core::array::from_fn;
         fn twiddle(coord: usize) -> usize {
             [1, 0, 2, 3][coord]
@@ -35,7 +54,14 @@ impl BoxStyle {
 
         Self {
             parts: from_fn(|x| {
-                from_fn(|y| from_fn(|_z| Some(blocks[twiddle(y)][twiddle(x)].clone())))
+                from_fn(|y| {
+                    from_fn(|_z| {
+                        Some(multiblock.clone().with_modifier(block::Zoom::new(
+                            block::Resolution::R4,
+                            GridPoint::new(twiddle(x) as i32, twiddle(y) as i32, 0),
+                        )))
+                    })
+                })
             }),
         }
     }
