@@ -385,7 +385,7 @@ mod trace_image {
     /// interactive use.
     #[cfg(feature = "threads")]
     pub(super) fn trace_scene_to_image_impl<P, E, O>(
-        scene: super::RtScene<'_, P>,
+        scene: RtScene<'_, P>,
         encoder: E,
         output: &mut [O],
     ) -> RaytraceInfo
@@ -445,7 +445,7 @@ mod trace_image {
     /// interactive use.
     #[cfg(not(feature = "threads"))]
     pub(super) fn trace_scene_to_image_impl<P, E, O>(
-        scene: super::RtScene<'_, P>,
+        scene: RtScene<'_, P>,
         encoder: E,
         output: &mut [O],
     ) -> RaytraceInfo
@@ -498,7 +498,7 @@ mod eg {
         paint: [T; 2],
         info_text: &str,
     ) {
-        let target = &mut eg::EgImageTarget {
+        let target = &mut EgImageTarget {
             data: output,
             paint,
             size: Size {

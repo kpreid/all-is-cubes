@@ -36,6 +36,7 @@
 #![warn(trivial_numeric_casts)]
 #![warn(unused_extern_crates)]
 #![warn(unused_lifetimes)]
+#![warn(unused_qualifications)]
 // Lenience for tests.
 #![cfg_attr(test,
     allow(clippy::float_cmp), // deterministic tests

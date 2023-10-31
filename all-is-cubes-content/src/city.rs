@@ -405,7 +405,7 @@ async fn place_exhibits_in_city<I: Instant>(
                 .unwrap();
 
             let walkway = entrance_plane.abut(Face6::NY, 1).unwrap();
-            space.fill_uniform(walkway, &demo_blocks[DemoBlocks::Road])?;
+            space.fill_uniform(walkway, &demo_blocks[Road])?;
 
             let walking_volume = entrance_plane.abut(Face6::PY, 2).unwrap();
             space.fill_uniform(walking_volume, &AIR)?;

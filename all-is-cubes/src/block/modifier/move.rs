@@ -181,7 +181,7 @@ impl Move {
     }
 }
 
-impl From<Move> for block::Modifier {
+impl From<Move> for Modifier {
     fn from(value: Move) -> Self {
         Modifier::Move(value)
     }

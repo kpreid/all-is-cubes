@@ -5,7 +5,7 @@ use std::sync::Arc;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
-use all_is_cubes::block::{self, AIR};
+use all_is_cubes::block::AIR;
 use all_is_cubes::util::{assert_send_sync, yield_progress_for_testing};
 
 use crate::file::NonDiskFile;
@@ -41,12 +41,8 @@ async fn import_unknown_format() {
 #[test]
 fn member_export_path() {
     let mut universe = Universe::new();
-    let foo = universe
-        .insert("foo".into(), BlockDef::new(block::AIR))
-        .unwrap();
-    let _bar = universe
-        .insert("bar".into(), BlockDef::new(block::AIR))
-        .unwrap();
+    let foo = universe.insert("foo".into(), BlockDef::new(AIR)).unwrap();
+    let _bar = universe.insert("bar".into(), BlockDef::new(AIR)).unwrap();
 
     assert_eq!(
         ExportSet::all_of_universe(&universe)

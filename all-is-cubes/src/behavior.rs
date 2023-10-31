@@ -4,7 +4,7 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::any::TypeId;
-use core::fmt::{self, Debug};
+use core::fmt;
 
 use downcast_rs::{impl_downcast, Downcast};
 
@@ -17,7 +17,7 @@ use crate::util::maybe_sync::SendSyncIfStd;
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
 /// is invoked.
 pub trait Behavior<H: BehaviorHost>:
-    Debug + SendSyncIfStd + Downcast + VisitRefs + 'static
+    fmt::Debug + SendSyncIfStd + Downcast + VisitRefs + 'static
 {
     /// Computes a transaction to apply the effects of this behavior for one timestep,
     /// and specifies when next to step the behavior again (if ever).
@@ -41,7 +41,7 @@ impl_downcast!(Behavior<H> where H: BehaviorHost);
 pub trait BehaviorHost: transaction::Transactional + 'static {
     /// Additional data about “where” the behavior is attached to the host; what part of
     /// the host should be affected by the behavior.
-    type Attachment: Debug + Clone + Eq + 'static;
+    type Attachment: fmt::Debug + Clone + Eq + 'static;
 }
 
 /// Items available to a [`Behavior`] during [`Behavior::step()`].
@@ -77,7 +77,7 @@ impl<'a, H: BehaviorHost> BehaviorContext<'a, H> {
     }
 }
 
-impl<'a, H: BehaviorHost + Debug> Debug for BehaviorContext<'a, H> {
+impl<'a, H: BehaviorHost + fmt::Debug> fmt::Debug for BehaviorContext<'a, H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // binder functions are not debuggable
         f.debug_struct("BehaviorContext")
@@ -242,7 +242,7 @@ impl<H: BehaviorHost> Default for BehaviorSet<H> {
     }
 }
 
-impl<H: BehaviorHost> core::fmt::Debug for BehaviorSet<H> {
+impl<H: BehaviorHost> fmt::Debug for BehaviorSet<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "BehaviorSet(")?;
         f.debug_map().entries(self.members.iter()).finish()?;
@@ -326,7 +326,7 @@ impl<H: BehaviorHost> Clone for BehaviorSetEntry<H> {
     }
 }
 
-impl<H: BehaviorHost> Debug for BehaviorSetEntry<H> {
+impl<H: BehaviorHost> fmt::Debug for BehaviorSetEntry<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let BehaviorSetEntry {
             attachment,
@@ -367,7 +367,7 @@ impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> Clone for QueryItem<'a, H, B>
     }
 }
 
-impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> Debug for QueryItem<'a, H, B> {
+impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> fmt::Debug for QueryItem<'a, H, B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let QueryItem {
             attachment,
@@ -639,7 +639,7 @@ mod testing {
     #[derive(Clone, Eq, PartialEq)]
     pub(crate) struct NoopBehavior<D>(pub D);
 
-    impl<D: Debug> fmt::Debug for NoopBehavior<D> {
+    impl<D: fmt::Debug> fmt::Debug for NoopBehavior<D> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, "NoopBehavior(")?;
             self.0.fmt(f)?; // inherit Formatter::alternate() flag
@@ -648,7 +648,7 @@ mod testing {
         }
     }
 
-    impl<H: BehaviorHost, D: Debug + Send + Sync + 'static> Behavior<H> for NoopBehavior<D> {
+    impl<H: BehaviorHost, D: fmt::Debug + Send + Sync + 'static> Behavior<H> for NoopBehavior<D> {
         fn step(&self, _context: &BehaviorContext<'_, H>) -> (UniverseTransaction, Then) {
             (UniverseTransaction::default(), Then::Step)
         }

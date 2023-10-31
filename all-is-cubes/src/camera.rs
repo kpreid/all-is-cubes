@@ -423,9 +423,9 @@ pub enum ImagePixel {}
 pub enum Ndc {}
 
 /// Screen-space point in [normalized device coordinates](Ndc), with depth.
-pub type NdcPoint2 = euclid::Point2D<f64, Ndc>;
+pub type NdcPoint2 = Point2D<f64, Ndc>;
 /// Screen-space point in [normalized device coordinates](Ndc), with depth.
-pub type NdcPoint3 = euclid::Point3D<f64, Ndc>;
+pub type NdcPoint3 = Point3D<f64, Ndc>;
 
 /// Width and height of an image, framebuffer, or window, as measured in actual distinct
 /// image pixels.

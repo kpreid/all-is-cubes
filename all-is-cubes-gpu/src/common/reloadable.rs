@@ -15,7 +15,7 @@ use all_is_cubes::listen::{ListenableCell, ListenableSource};
 pub(crate) struct Reloadable(Arc<ReloadableInner>);
 
 pub(crate) struct ReloadableInner {
-    resource: Mutex<resource::Resource<str>>,
+    resource: Mutex<Resource<str>>,
     cell: ListenableCell<Arc<str>>,
 }
 

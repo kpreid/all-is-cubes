@@ -131,7 +131,7 @@ impl SpaceTransaction {
     }
 
     /// Modify the space's [`BehaviorSet`].
-    pub fn behaviors(t: behavior::BehaviorSetTransaction<Space>) -> Self {
+    pub fn behaviors(t: BehaviorSetTransaction<Space>) -> Self {
         Self {
             behaviors: t,
             ..Default::default()

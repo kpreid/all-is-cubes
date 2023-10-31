@@ -435,7 +435,7 @@ mod tests {
     #[test]
     fn blend_over_silly_floats() {
         // We just want to see this does not panic on NaN.
-        CompositeOperator::Over.blend_evoxel(
+        Over.blend_evoxel(
             evcolor(Rgba::new(2e25, 2e25, 2e25, 2e25)),
             evcolor(Rgba::new(2e25, 2e25, 2e25, 2e25)),
         );
@@ -617,7 +617,7 @@ mod tests {
     fn compose_or_replace_source_is_air() {
         let [block] = make_some_blocks();
         assert_eq!(
-            Composite::new(AIR, CompositeOperator::Over).compose_or_replace(block.clone()),
+            Composite::new(AIR, Over).compose_or_replace(block.clone()),
             block
         );
     }
@@ -626,7 +626,7 @@ mod tests {
     fn compose_or_replace_destination_is_air() {
         let [block] = make_some_blocks();
         assert_eq!(
-            Composite::new(block.clone(), CompositeOperator::Over).compose_or_replace(AIR),
+            Composite::new(block.clone(), Over).compose_or_replace(AIR),
             block
         );
     }
@@ -634,18 +634,16 @@ mod tests {
     #[test]
     fn unspecialize_no() {
         let [b1, b2] = make_some_blocks();
-        let composed = b1
-            .clone()
-            .with_modifier(Composite::new(b2.clone(), CompositeOperator::Over));
+        let composed = b1.clone().with_modifier(Composite::new(b2.clone(), Over));
         assert_eq!(composed.unspecialize(), vec![composed]);
     }
 
     #[test]
     fn unspecialize_yes() {
         let [b1, b2] = make_some_blocks();
-        let composed = b1.clone().with_modifier(
-            Composite::new(b2.clone(), CompositeOperator::Over).with_disassemblable(),
-        );
+        let composed = b1
+            .clone()
+            .with_modifier(Composite::new(b2.clone(), Over).with_disassemblable());
         assert_eq!(composed.unspecialize(), vec![b2, b1]);
     }
 }

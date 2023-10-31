@@ -86,13 +86,13 @@ pub(crate) enum PrimitiveSer<'a> {
     RecurV1 {
         #[serde(flatten)]
         attributes: BlockAttributesV1Ser<'a>,
-        space: universe::URef<space::Space>,
+        space: URef<space::Space>,
         #[serde(default, skip_serializing_if = "is_default")]
         offset: [i32; 3],
         resolution: block::Resolution,
     },
     IndirectV1 {
-        definition: universe::URef<block::BlockDef>,
+        definition: URef<block::BlockDef>,
     },
 }
 
@@ -176,7 +176,7 @@ pub(crate) enum ModifierSer {
         rotation: GridRotation,
     },
     CompositeV1 {
-        source: block::Block,
+        source: Block,
         operator: block::CompositeOperator,
         reverse: bool,
         disassemblable: bool,
@@ -295,7 +295,7 @@ pub(crate) enum SpaceSer<'a> {
     SpaceV1 {
         bounds: GridAab,
         physics: SpacePhysicsSerV1,
-        blocks: Vec<block::Block>,
+        blocks: Vec<Block>,
         contents: GzSerde<'a, Leu16>,
         light: Option<GzSerde<'a, LightSerV1>>,
         #[serde(default, skip_serializing_if = "behavior::BehaviorSet::is_empty")]
@@ -368,7 +368,7 @@ pub(crate) struct MemberEntrySer<T> {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "member_type")]
 pub(crate) enum MemberSchema<C, S> {
-    Block { value: block::Block },
+    Block { value: Block },
     Character { value: C },
     Space { value: S },
 }

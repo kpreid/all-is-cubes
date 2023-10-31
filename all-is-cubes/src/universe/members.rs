@@ -413,7 +413,7 @@ impl core::borrow::Borrow<dyn URefErased> for AnyURef {
     }
 }
 
-impl super::URefErased for AnyURef {
+impl URefErased for AnyURef {
     fn name(&self) -> Name {
         let r: &dyn URefErased = &**self;
         r.name()

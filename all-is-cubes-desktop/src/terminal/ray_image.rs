@@ -1,6 +1,6 @@
 use std::fmt;
 
-use all_is_cubes::camera::{self, ImagePixel, Viewport};
+use all_is_cubes::camera::{ImagePixel, Viewport};
 use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::math::VectorOps;
 use all_is_cubes::raytracer::RaytraceInfo;
@@ -33,7 +33,7 @@ impl fmt::Debug for TextRayImage {
 }
 
 impl TextRayImage {
-    pub fn patch_size(&self) -> Vector2D<u8, camera::ImagePixel> {
+    pub fn patch_size(&self) -> Vector2D<u8, ImagePixel> {
         self.options.characters.rays_per_character()
     }
 

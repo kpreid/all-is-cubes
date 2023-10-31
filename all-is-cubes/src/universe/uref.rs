@@ -1,5 +1,4 @@
 use alloc::sync::{Arc, Weak};
-use core::borrow::Borrow;
 use core::fmt;
 use core::hash;
 use core::ops::{Deref, DerefMut};
@@ -523,7 +522,7 @@ impl<T> AsRef<T> for UBorrow<T> {
         self.deref()
     }
 }
-impl<T> Borrow<T> for UBorrow<T> {
+impl<T> core::borrow::Borrow<T> for UBorrow<T> {
     fn borrow(&self) -> &T {
         self.deref()
     }

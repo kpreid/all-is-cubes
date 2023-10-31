@@ -1,3 +1,5 @@
+#![allow(unused_qualifications)] // macro false positive
+
 use core::f64::consts::TAU;
 use core::mem;
 
@@ -183,15 +185,11 @@ impl DemoTheme {
             let gate_side_2 = gate_box.abut(wall_parallel, -1).unwrap();
             space.fill_uniform(
                 gate_side_2,
-                &self.blocks[DungeonBlocks::Gate]
-                    .clone()
-                    .rotate(rotate_nz_to_face),
+                &self.blocks[Gate].clone().rotate(rotate_nz_to_face),
             )?;
             space.fill_uniform(
                 gate_side_1,
-                &self.blocks[DungeonBlocks::GatePocket]
-                    .clone()
-                    .rotate(rotate_nz_to_face),
+                &self.blocks[GatePocket].clone().rotate(rotate_nz_to_face),
             )?;
             // TODO: add opening/closing mechanism and make some of these outright blocked
         }
@@ -266,13 +264,13 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     assert!(!room_data.corridor_only, "{room_data:?}");
                     space.fill_uniform(
                         interior.abut(Face6::NY, -1).unwrap(),
-                        &self.blocks[DungeonBlocks::Spikes],
+                        &self.blocks[Spikes],
                     )?;
                 }
 
                 match room_data.floor {
                     FloorKind::Solid => {
-                        space.fill_uniform(floor_layer, &self.blocks[DungeonBlocks::FloorTile])?;
+                        space.fill_uniform(floor_layer, &self.blocks[FloorTile])?;
                     }
                     FloorKind::Chasm => { /* TODO: little platforms */ }
                     FloorKind::Bridge => {
@@ -286,10 +284,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                 let bridge_box = GridAab::single_cube(midpoint)
                                     .union(GridAab::single_cube(wall_cube))
                                     .unwrap();
-                                space.fill_uniform(
-                                    bridge_box,
-                                    &self.blocks[DungeonBlocks::FloorTile],
-                                )?;
+                                space.fill_uniform(bridge_box, &self.blocks[FloorTile])?;
                             }
                         }
                     }
@@ -640,7 +635,6 @@ pub async fn install_dungeon_blocks(
         .build();
     let spike_metal = Block::from(palette::STEEL);
 
-    use DungeonBlocks::*;
     BlockProvider::<DungeonBlocks>::new(progress, |key| {
         Ok(match key {
             CorridorLight => Block::builder()

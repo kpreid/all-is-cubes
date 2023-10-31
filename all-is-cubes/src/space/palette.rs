@@ -453,7 +453,7 @@ impl SpaceBlockData {
         }
     }
 
-    fn new(block: Block, listener: impl listen::Listener<block::BlockChange> + 'static) -> Self {
+    fn new(block: Block, listener: impl listen::Listener<BlockChange> + 'static) -> Self {
         // Note: Block evaluation also happens in `Space::step()`.
 
         let (gate, block_listener) = listener.gate();

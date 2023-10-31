@@ -15,7 +15,6 @@ use all_is_cubes::fluff::Fluff;
 use all_is_cubes::inv::ToolError;
 use all_is_cubes::listen::{
     self, Listen as _, ListenableCell, ListenableCellWithLocal, ListenableSource, Listener,
-    Notifier,
 };
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::time::{self, Duration};
@@ -58,7 +57,7 @@ pub struct Session<I> {
     /// Outputs [`Fluff`] from the game character's viewpoint and also the session UI.
     //---
     // TODO: should include spatial information and source information
-    fluff_notifier: Arc<Notifier<Fluff>>,
+    fluff_notifier: Arc<listen::Notifier<Fluff>>,
 
     paused: ListenableCell<bool>,
 
@@ -596,7 +595,7 @@ impl<I: time::Instant> SessionBuilder<I> {
             game_universe,
             space_watch_state,
             game_universe_in_progress: None,
-            fluff_notifier: Arc::new(Notifier::new()),
+            fluff_notifier: Arc::new(listen::Notifier::new()),
             paused,
             control_channel: control_recv,
             control_channel_sender: control_send,

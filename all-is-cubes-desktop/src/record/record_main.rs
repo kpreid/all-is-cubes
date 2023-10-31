@@ -141,7 +141,7 @@ pub(crate) fn record_main(
 struct AutoRotate {
     pub rate: NotNan<f64>,
 }
-impl behavior::Behavior<character::Character> for AutoRotate {
+impl behavior::Behavior<Character> for AutoRotate {
     fn step(
         &self,
         context: &behavior::BehaviorContext<'_, Character>,

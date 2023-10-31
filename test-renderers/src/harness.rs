@@ -164,7 +164,7 @@ enum Format {
 }
 
 /// Return type of [`harness_main()`], to be returned from `main()`.
-pub type HarnessResult = std::process::ExitCode;
+pub type HarnessResult = ExitCode;
 
 /// Given a function which generates the tests, run all tests or the subset requested.
 /// Returns success if all of the tests that were run passed.

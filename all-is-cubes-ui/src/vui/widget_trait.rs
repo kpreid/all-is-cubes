@@ -237,7 +237,7 @@ pub enum InstallVuiError {
     },
 }
 
-impl std::error::Error for InstallVuiError {
+impl Error for InstallVuiError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             InstallVuiError::WidgetInitialization { error, .. } => Some(error),

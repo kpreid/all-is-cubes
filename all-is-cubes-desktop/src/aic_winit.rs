@@ -31,7 +31,7 @@ use crate::session::DesktopSession;
 pub(crate) struct WinAndState {
     /// The underlying window.
     /// Safety requirement: This is never overwritten.
-    window: winit::window::Window,
+    window: Window,
 
     /// The last [`winit::WindowEvent::Occluded`] event we received.
     /// Winit gives us no way to query this so we have to remember it.
@@ -41,7 +41,7 @@ pub(crate) struct WinAndState {
     mouse_position: Option<winit::dpi::PhysicalPosition<f64>>,
 
     /// The last cursor grab state we set.
-    cursor_grab_mode: winit::window::CursorGrabMode,
+    cursor_grab_mode: CursorGrabMode,
 
     ignore_next_mouse_move: bool,
 }

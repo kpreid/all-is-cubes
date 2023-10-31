@@ -24,6 +24,7 @@
 #![warn(trivial_numeric_casts)]
 #![warn(unused_extern_crates)]
 #![warn(unused_lifetimes)]
+#![warn(unused_qualifications)]
 // Lenience for tests.
 #![cfg_attr(test,
     allow(clippy::float_cmp), // deterministic tests
@@ -71,7 +72,7 @@ use crate::terminal::{
     create_terminal_session, terminal_main_loop, terminal_print_once, TerminalOptions,
 };
 
-type Session = all_is_cubes_ui::apps::Session<std::time::Instant>;
+type Session = all_is_cubes_ui::apps::Session<Instant>;
 
 // TODO: put version numbers in the title when used as a window title
 static TITLE: &str = "All is Cubes";
@@ -410,7 +411,7 @@ async fn create_universe(
             });
             template
                 .clone()
-                .build::<std::time::Instant>(
+                .build::<Instant>(
                     yield_progress,
                     TemplateParameters {
                         seed: Some(seed),
@@ -509,7 +510,7 @@ fn evaluate_light_with_progress(space: &mut Space) {
     let light_progress = ProgressBar::new(100)
         .with_style(common_progress_style())
         .with_prefix("Lighting");
-    space.evaluate_light::<std::time::Instant>(1, lighting_progress_adapter(&light_progress));
+    space.evaluate_light::<Instant>(1, lighting_progress_adapter(&light_progress));
     light_progress.finish();
 }
 

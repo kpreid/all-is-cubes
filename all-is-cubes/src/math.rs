@@ -178,7 +178,7 @@ pub struct LineVertex {
     ///
     /// If the ends of a line are different colors, color should be interpolated along
     /// the line.
-    pub color: Option<crate::math::Rgba>,
+    pub color: Option<Rgba>,
 }
 
 impl From<FreePoint> for LineVertex {

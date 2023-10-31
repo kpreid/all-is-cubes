@@ -159,7 +159,7 @@ impl Face6 {
     #[must_use]
     pub fn normal_vector<S, U>(self) -> Vector3D<S, U>
     where
-        S: num_traits::Zero + num_traits::One + core::ops::Neg<Output = S>,
+        S: Zero + num_traits::One + core::ops::Neg<Output = S>,
     {
         self.into7().normal_vector()
     }
@@ -331,50 +331,50 @@ impl Face7 {
             (_, Within) => Within,
 
             // Equal vectors
-            (Face7::NX, Face7::NX) => Within,
-            (Face7::NY, Face7::NY) => Within,
-            (Face7::NZ, Face7::NZ) => Within,
-            (Face7::PX, Face7::PX) => Within,
-            (Face7::PY, Face7::PY) => Within,
-            (Face7::PZ, Face7::PZ) => Within,
+            (NX, NX) => Within,
+            (NY, NY) => Within,
+            (NZ, NZ) => Within,
+            (PX, PX) => Within,
+            (PY, PY) => Within,
+            (PZ, PZ) => Within,
 
             // Opposite vectors
-            (Face7::NX, Face7::PX) => Within,
-            (Face7::NY, Face7::PY) => Within,
-            (Face7::NZ, Face7::PZ) => Within,
-            (Face7::PX, Face7::NX) => Within,
-            (Face7::PY, Face7::NY) => Within,
-            (Face7::PZ, Face7::NZ) => Within,
+            (NX, PX) => Within,
+            (NY, PY) => Within,
+            (NZ, PZ) => Within,
+            (PX, NX) => Within,
+            (PY, NY) => Within,
+            (PZ, NZ) => Within,
 
-            (Face7::NX, Face7::NY) => PZ,
-            (Face7::NX, Face7::NZ) => NY,
-            (Face7::NX, Face7::PY) => NZ,
-            (Face7::NX, Face7::PZ) => PY,
+            (NX, NY) => PZ,
+            (NX, NZ) => NY,
+            (NX, PY) => NZ,
+            (NX, PZ) => PY,
 
-            (Face7::NY, Face7::NX) => NZ,
-            (Face7::NY, Face7::NZ) => PX,
-            (Face7::NY, Face7::PX) => PZ,
-            (Face7::NY, Face7::PZ) => NX,
+            (NY, NX) => NZ,
+            (NY, NZ) => PX,
+            (NY, PX) => PZ,
+            (NY, PZ) => NX,
 
-            (Face7::NZ, Face7::NX) => PY,
-            (Face7::NZ, Face7::NY) => NX,
-            (Face7::NZ, Face7::PX) => NY,
-            (Face7::NZ, Face7::PY) => PX,
+            (NZ, NX) => PY,
+            (NZ, NY) => NX,
+            (NZ, PX) => NY,
+            (NZ, PY) => PX,
 
-            (Face7::PX, Face7::NY) => NZ,
-            (Face7::PX, Face7::NZ) => PY,
-            (Face7::PX, Face7::PY) => PZ,
-            (Face7::PX, Face7::PZ) => NY,
+            (PX, NY) => NZ,
+            (PX, NZ) => PY,
+            (PX, PY) => PZ,
+            (PX, PZ) => NY,
 
-            (Face7::PY, Face7::NX) => PZ,
-            (Face7::PY, Face7::NZ) => NX,
-            (Face7::PY, Face7::PX) => NZ,
-            (Face7::PY, Face7::PZ) => PX,
+            (PY, NX) => PZ,
+            (PY, NZ) => NX,
+            (PY, PX) => NZ,
+            (PY, PZ) => PX,
 
-            (Face7::PZ, Face7::NX) => NY,
-            (Face7::PZ, Face7::NY) => PX,
-            (Face7::PZ, Face7::PX) => PY,
-            (Face7::PZ, Face7::PY) => NX,
+            (PZ, NX) => NY,
+            (PZ, NY) => PX,
+            (PZ, PX) => PY,
+            (PZ, PY) => NX,
         }
     }
 
@@ -384,7 +384,7 @@ impl Face7 {
     #[must_use]
     pub fn normal_vector<S, U>(self) -> Vector3D<S, U>
     where
-        S: num_traits::Zero + num_traits::One + core::ops::Neg<Output = S>,
+        S: Zero + num_traits::One + core::ops::Neg<Output = S>,
     {
         match self {
             Face7::Within => Vector3D::new(S::zero(), S::zero(), S::zero()),

@@ -380,7 +380,7 @@ mod tests {
     fn error_context(
         error: &clap::Error,
         wanted_kind: clap::error::ContextKind,
-    ) -> Option<&clap::error::ContextValue> {
+    ) -> Option<&ContextValue> {
         error
             .context()
             .find_map(|(k, v)| if k == wanted_kind { Some(v) } else { None })

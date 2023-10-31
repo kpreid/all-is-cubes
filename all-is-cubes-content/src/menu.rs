@@ -28,10 +28,7 @@ use all_is_cubes::{
     universe::Universe,
 };
 use all_is_cubes_ui::logo::logo_text;
-use all_is_cubes_ui::vui::{
-    self, install_widgets, widgets, Align, LayoutGrant, LayoutRequest, LayoutTree, Layoutable,
-    WidgetController,
-};
+use all_is_cubes_ui::vui::{self, install_widgets, widgets, Align, LayoutTree, Layoutable as _};
 
 use crate::UniverseTemplate;
 
@@ -76,13 +73,13 @@ impl TemplateButton {
 
 impl vui::Layoutable for TemplateButton {
     fn requirements(&self) -> vui::LayoutRequest {
-        LayoutRequest {
+        vui::LayoutRequest {
             minimum: GridVector::new(10, 1, 2),
         }
     }
 }
 impl vui::Widget for TemplateButton {
-    fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn WidgetController> {
+    fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         Box::new(TemplateButtonController {
             definition: self,
             position: *position,
@@ -93,7 +90,7 @@ impl vui::Widget for TemplateButton {
 #[derive(Debug)]
 struct TemplateButtonController {
     definition: Arc<TemplateButton>,
-    position: LayoutGrant,
+    position: vui::LayoutGrant,
 }
 impl vui::WidgetController for TemplateButtonController {
     fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
@@ -146,7 +143,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
     let mut vertical_widgets: Vec<vui::WidgetTree> = Vec::with_capacity(10);
     vertical_widgets.push(LayoutTree::leaf(Arc::new(logo_widget)));
     for template in template_iter {
-        vertical_widgets.push(LayoutTree::spacer(LayoutRequest {
+        vertical_widgets.push(LayoutTree::spacer(vui::LayoutRequest {
             minimum: GridVector::new(1, 1, 1),
         }));
         vertical_widgets.push(LayoutTree::leaf(Arc::new(TemplateButton::new(
@@ -192,7 +189,7 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
         })
         .build();
 
-    install_widgets(LayoutGrant::new(bounds), &tree)?
+    install_widgets(vui::LayoutGrant::new(bounds), &tree)?
         .execute(&mut space, &mut transaction::no_outputs)?;
 
     Ok(space)

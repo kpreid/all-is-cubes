@@ -2,7 +2,7 @@
 //! This module is private but reexported by its parent.
 
 use core::cmp::Ordering;
-use core::ops::{self, Mul};
+use core::ops;
 
 use euclid::Vector3D;
 use num_traits::One;
@@ -204,7 +204,7 @@ impl GridMatrix {
     }
 }
 
-impl Mul<Self> for GridMatrix {
+impl ops::Mul<Self> for GridMatrix {
     type Output = Self;
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {

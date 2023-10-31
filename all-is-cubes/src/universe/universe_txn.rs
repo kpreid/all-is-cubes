@@ -293,7 +293,7 @@ impl UniverseTransaction {
     /// In the future, there may be a policy such that in-use items cannot be deleted.
     ///
     /// [`RefError::Gone`]: crate::universe::RefError::Gone
-    pub fn delete<R: super::URefErased>(member_ref: R) -> Self {
+    pub fn delete<R: URefErased>(member_ref: R) -> Self {
         Self::from_member_txn(member_ref.name(), MemberTxn::Delete)
     }
 

@@ -36,6 +36,7 @@
 #![warn(trivial_numeric_casts)]
 #![warn(unused_extern_crates)]
 #![warn(unused_lifetimes)]
+#![warn(unused_qualifications)]
 // Lenience for tests.
 #![cfg_attr(test,
     allow(clippy::float_cmp), // deterministic tests
@@ -121,7 +122,7 @@ pub async fn export_to_path(
     format: ExportFormat,
     source: ExportSet,
     destination: PathBuf,
-) -> Result<(), crate::ExportError> {
+) -> Result<(), ExportError> {
     match format {
         ExportFormat::AicJson => {
             let mut writer = io::BufWriter::new(fs::File::create(destination)?);

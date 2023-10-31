@@ -352,8 +352,8 @@ mod block {
         }
     }
 
-    impl From<schema::ModifierSer> for Modifier {
-        fn from(value: schema::ModifierSer) -> Self {
+    impl From<ModifierSer> for Modifier {
+        fn from(value: ModifierSer) -> Self {
             match value {
                 ModifierSer::QuoteV1 { suppress_ambient } => {
                     Modifier::Quote(Quote { suppress_ambient })
@@ -393,7 +393,7 @@ mod math {
     impl Serialize for Cube {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
-            S: serde::Serializer,
+            S: Serializer,
         {
             let &Cube { x, y, z } = self;
 
@@ -783,13 +783,13 @@ mod universe {
                     serde::ser::Error::custom(format!("Failed to read universe member {name}: {e}"))
                 })?;
                 let member_repr = schema::MemberSer::from(&*read_guard);
-                Ok(schema::MemberEntrySer {
+                Ok(MemberEntrySer {
                     name: member_ref.name(),
                     value: member_repr,
                 })
             });
             let characters = characters.iter().map(|member_ref: &URef<Character>| {
-                Ok(schema::MemberEntrySer {
+                Ok(MemberEntrySer {
                     name: member_ref.name(),
                     value: schema::MemberSer::Character {
                         value: schema::SerializeRef(member_ref.clone()),
@@ -797,7 +797,7 @@ mod universe {
                 })
             });
             let spaces = spaces.iter().map(|member_ref: &URef<Space>| {
-                Ok(schema::MemberEntrySer {
+                Ok(MemberEntrySer {
                     name: member_ref.name(),
                     value: schema::MemberSer::Space {
                         value: schema::SerializeRef(member_ref.clone()),
@@ -834,7 +834,7 @@ mod universe {
 
             match data {
                 schema::UniverseDe::UniverseV1 { members } => {
-                    for schema::MemberEntrySer { name, value } in members {
+                    for MemberEntrySer { name, value } in members {
                         match value {
                             MemberDe::Block { value: block } => universe
                                 .insert_deserialized(name, BlockDef::new(block))

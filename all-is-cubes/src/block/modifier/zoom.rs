@@ -110,7 +110,7 @@ impl Zoom {
     }
 }
 
-impl From<Zoom> for block::Modifier {
+impl From<Zoom> for Modifier {
     fn from(value: Zoom) -> Self {
         Modifier::Zoom(value)
     }

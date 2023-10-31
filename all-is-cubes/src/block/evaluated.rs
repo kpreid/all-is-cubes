@@ -432,7 +432,7 @@ pub struct Evoxel {
     pub selectable: bool,
 
     /// The effect on a [`Body`](crate::physics::Body) of colliding with this voxel.
-    pub collision: block::BlockCollision,
+    pub collision: BlockCollision,
 }
 
 impl Evoxel {
@@ -444,7 +444,7 @@ impl Evoxel {
         color: Rgba::TRANSPARENT,
         emission: Rgb::ZERO,
         selectable: false,
-        collision: block::BlockCollision::None,
+        collision: BlockCollision::None,
     };
 
     /// Construct an [`Evoxel`] which represents the given evaluated block.
@@ -472,7 +472,7 @@ impl Evoxel {
             color,
             emission: Rgb::ZERO,
             selectable: DA.selectable,
-            collision: block::BlockCollision::DEFAULT_FOR_FROM_COLOR,
+            collision: BlockCollision::DEFAULT_FOR_FROM_COLOR,
         }
     }
 }
@@ -519,7 +519,7 @@ impl Evoxels {
     pub fn single_voxel(&self) -> Option<Evoxel> {
         match *self {
             Evoxels::One(v) => Some(v),
-            Evoxels::Many(Resolution::R1, ref voxels) => {
+            Evoxels::Many(R1, ref voxels) => {
                 Some(voxels.get([0, 0, 0]).copied().unwrap_or(Evoxel::AIR))
             }
             Evoxels::Many(_, _) => None,

@@ -81,7 +81,7 @@ struct TerminalState {
     widths: HashMap<String, u16>,
 }
 enum MaybeTui {
-    Tui(tui::Terminal<CrosstermBackend<io::Stdout>>),
+    Tui(Terminal<CrosstermBackend<io::Stdout>>),
     NoTui(CrosstermBackend<io::Stdout>),
 }
 

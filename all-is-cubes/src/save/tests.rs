@@ -139,7 +139,7 @@ fn behavior_persistent() {
 #[test]
 fn block_air() {
     assert_round_trip_value(
-        &block::AIR,
+        &AIR,
         json!({
             "type": "BlockV1",
             "primitive": { "type": "AirV1" },
@@ -397,7 +397,7 @@ fn dont_care_physics_json() -> serde_json::Value {
 
 /// Produce the compressed `GzSerde` serialization of a space contents array.
 fn space_contents_json(contents: impl IntoIterator<Item = BlockIndex>) -> serde_json::Value {
-    serde_json::to_value(GzSerde(contents.into_iter().map(Leu16::from).collect())).unwrap()
+    to_value(GzSerde(contents.into_iter().map(Leu16::from).collect())).unwrap()
 }
 
 /// Produce the compressed `GzSerde` serialization of a space light array.
@@ -405,7 +405,7 @@ fn space_contents_json(contents: impl IntoIterator<Item = BlockIndex>) -> serde_
 /// Note that the elements are `[u8; 4]`, not `PackedLight`, so that tests are written in
 /// as close to the serialized form as is practical.
 fn space_light_json(light: impl IntoIterator<Item = [u8; 4]>) -> serde_json::Value {
-    serde_json::to_value(GzSerde(light.into_iter().collect())).unwrap()
+    to_value(GzSerde(light.into_iter().collect())).unwrap()
 }
 
 #[test]

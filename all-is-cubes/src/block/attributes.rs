@@ -7,7 +7,6 @@ use arcstr::ArcStr;
 
 use crate::math::{Face6, GridRotation};
 use crate::op::Operation;
-use crate::universe::VisitRefs;
 
 #[cfg(doc)]
 use crate::{
@@ -404,7 +403,7 @@ impl From<Operation> for TickAction {
     }
 }
 
-impl VisitRefs for TickAction {
+impl crate::universe::VisitRefs for TickAction {
     fn visit_refs(&self, visitor: &mut dyn crate::universe::RefVisitor) {
         let Self {
             operation,

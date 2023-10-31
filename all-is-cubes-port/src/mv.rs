@@ -27,7 +27,7 @@ pub(crate) async fn export_dot_vox(
     p: YieldProgress,
     source: ExportSet,
     mut destination: impl std::io::Write,
-) -> Result<(), crate::ExportError> {
+) -> Result<(), ExportError> {
     let data: dot_vox::DotVoxData = export_to_dot_vox_data(p, source).await?;
     data.write_vox(&mut destination)?;
     Ok(())
@@ -91,9 +91,9 @@ pub(crate) async fn dot_vox_data_to_universe(
 ///
 pub(crate) async fn export_to_dot_vox_data(
     p: YieldProgress,
-    source: crate::ExportSet,
+    source: ExportSet,
 ) -> Result<dot_vox::DotVoxData, ExportError> {
-    let crate::ExportSet {
+    let ExportSet {
         contents:
             PartialUniverse {
                 blocks: block_defs,
