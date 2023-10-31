@@ -600,24 +600,23 @@ mod tests {
         ) -> Result<UniverseTransaction, ToolError> {
             // Put the tool in inventory.
             let index = 0;
+            let insert_txn = CharacterTransaction::inventory(InventoryTransaction::replace(
+                index,
+                self.character().inventory().slots[index].clone(),
+                stack.into(),
+            ));
             self.character_ref
-                .try_modify(|c| {
-                    CharacterTransaction::inventory(InventoryTransaction::replace(
-                        index,
-                        c.inventory().slots[index].clone(),
-                        stack.into(),
-                    ))
-                    .execute(&mut *c, &mut transaction::no_outputs)
-                    .unwrap();
+                .execute(&insert_txn, &mut transaction::no_outputs)
+                .unwrap();
 
-                    // Invoke Inventory::use_tool, which knows how to assemble the answer into a single transaction
-                    // (and the result format may change as I'm just getting started with adding transactions as of
-                    // writing this code).
-                    let input = self.input();
-                    c.inventory()
-                        .use_tool(input.cursor().ok(), self.character_ref.clone(), index)
-                })
-                .unwrap()
+            // Invoke Inventory::use_tool, which knows how to assemble the answer into a
+            // single transaction.
+            let input = self.input();
+            self.character().inventory().use_tool(
+                input.cursor().ok(),
+                self.character_ref.clone(),
+                index,
+            )
         }
 
         /// As `equip_and_use_tool`, but also commit the transaction.
