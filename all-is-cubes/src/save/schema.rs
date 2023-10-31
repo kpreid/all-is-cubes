@@ -246,14 +246,28 @@ pub(crate) struct InvStackSer {
 #[serde(tag = "type")]
 pub(crate) enum ToolSer {
     ActivateV1 {},
-    RemoveBlockV1 { keep: bool },
-    BlockV1 { block: Block },
-    InfiniteBlocksV1 { block: Block },
+    RemoveBlockV1 {
+        keep: bool,
+    },
+    BlockV1 {
+        block: Block,
+    },
+    InfiniteBlocksV1 {
+        block: Block,
+    },
     CopyFromSpaceV1 {},
     EditBlockV1 {},
     PushPullV1 {},
-    JetpackV1 { active: bool },
-    ExternalActionV1 { icon: Block },
+    JetpackV1 {
+        active: bool,
+    },
+    CustomV1 {
+        op: crate::op::Operation,
+        icon: Block,
+    },
+    ExternalActionV1 {
+        icon: Block,
+    },
 }
 
 //------------------------------------------------------------------------------------------------//

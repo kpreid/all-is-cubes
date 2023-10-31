@@ -538,6 +538,10 @@ mod inv {
                 Tool::EditBlock => schema::ToolSer::EditBlockV1 {},
                 Tool::PushPull => schema::ToolSer::PushPullV1 {},
                 Tool::Jetpack { active } => schema::ToolSer::JetpackV1 { active },
+                Tool::Custom { ref op, ref icon } => schema::ToolSer::CustomV1 {
+                    op: op.clone(),
+                    icon: icon.clone(),
+                },
                 Tool::ExternalAction {
                     function: _,
                     ref icon,
@@ -561,6 +565,7 @@ mod inv {
                 schema::ToolSer::EditBlockV1 {} => Tool::EditBlock,
                 schema::ToolSer::PushPullV1 {} => Tool::PushPull,
                 schema::ToolSer::JetpackV1 { active } => Tool::Jetpack { active },
+                schema::ToolSer::CustomV1 { op, icon } => Tool::Custom { op, icon },
                 schema::ToolSer::ExternalActionV1 { icon } => Tool::ExternalAction {
                     function: EphemeralOpaque(None),
                     icon,

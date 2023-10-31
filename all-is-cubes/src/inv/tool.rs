@@ -10,10 +10,11 @@ use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::fluff::Fluff;
 use crate::inv::{self, Icons, InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
-use crate::math::{Cube, Face6, GridRotation};
+use crate::math::{Cube, Face6, GridRotation, Gridgid};
+use crate::op::{self, Operation};
 use crate::space::{Space, SpaceTransaction};
 use crate::transaction::{Merge, Transaction};
-use crate::universe::{RefError, RefVisitor, URef, UniverseTransaction, VisitRefs};
+use crate::universe::{RefError, RefVisitor, UBorrow, URef, UniverseTransaction, VisitRefs};
 
 /// A `Tool` is an object which a character can use to have some effect in the game,
 /// such as placing or removing a block. In particular, a tool use usually corresponds
@@ -66,7 +67,19 @@ pub enum Tool {
         active: bool,
     },
 
+    /// A tool which performs an arbitrary [`Operation`].
+    // ---
+    // TODO: Custom tools like this should be able to have their definitions stored in the
+    // Universe. Probably `Operation` should have that and tools become a case of it?
+    Custom {
+        /// Operation to perform when the tool is used.
+        op: Operation,
+        /// Icon for the tool.
+        icon: Block,
+    },
+
     /// A tool which calls an arbitrary function.
+    /// TODO: This is not used and should perhaps be folded into `Custom`
     ExternalAction {
         // TODO: Rework this so that the external component gets to update the icon.
         // (Perhaps that's "a block defined by an external source"?)
@@ -218,6 +231,36 @@ impl Tool {
                 Some(Self::Jetpack { active: !active }),
                 UniverseTransaction::default(),
             )),
+            Self::Custom { ref op, icon: _ } => {
+                // TODO: This is a mess; figure out how much impedance-mismatch we want to fix here.
+
+                let cursor = input.cursor()?; // TODO: allow op to not be spatial, i.e. not always fail here?
+                let character_guard: Option<UBorrow<Character>> =
+                    input.character.as_ref().map(|c| c.read()).transpose()?;
+
+                let (space_txn, inventory_txn) = op.apply(
+                    &*cursor.space().read()?,
+                    character_guard.as_ref().map(|c| c.inventory()),
+                    // TODO: Should there be rotation based on cursor ray direction?
+                    // Or is that a separate input?
+                    // (Should `ToolInput` be merged into `Operation` stuff?)
+                    Gridgid::from_translation(cursor.cube().lower_bounds().to_vector()),
+                )?;
+                let mut txn = space_txn.bind(cursor.space().clone());
+                if inventory_txn != InventoryTransaction::default() {
+                    txn = txn
+                        .merge(CharacterTransaction::inventory(inventory_txn).bind(
+                            input.character.as_ref().cloned().ok_or_else(|| {
+                                ToolError::Internal(format!(
+                                    "operation produced inventory transaction \
+                                    without being given an inventory: {op:?}"
+                                ))
+                            })?,
+                        ))
+                        .unwrap();
+                }
+                Ok((Some(self), txn))
+            }
             Self::ExternalAction { ref function, .. } => {
                 if let Some(f) = function.try_ref() {
                     f(input);
@@ -267,6 +310,7 @@ impl Tool {
             Self::Jetpack { active } => {
                 Cow::Borrowed(&predefined[Icons::Jetpack { active: *active }])
             }
+            Self::Custom { icon, op: _ } => Cow::Borrowed(icon),
             Self::ExternalAction { icon, .. } => Cow::Borrowed(icon),
         }
     }
@@ -284,6 +328,7 @@ impl Tool {
             Tool::EditBlock => One,
             Tool::PushPull => One,
             Tool::Jetpack { .. } => One,
+            Tool::Custom { .. } => One, // TODO: let tool specify
             Tool::ExternalAction { .. } => One,
         }
     }
@@ -300,6 +345,10 @@ impl VisitRefs for Tool {
             Tool::EditBlock => {}
             Tool::PushPull => {}
             Tool::Jetpack { active: _ } => {}
+            Tool::Custom { op, icon } => {
+                op.visit_refs(visitor);
+                icon.visit_refs(visitor);
+            }
             Tool::ExternalAction { function: _, icon } => {
                 icon.visit_refs(visitor);
             }
@@ -455,12 +504,6 @@ impl std::error::Error for ToolError {
     }
 }
 
-impl From<RefError> for ToolError {
-    fn from(value: RefError) -> Self {
-        ToolError::SpaceRef(value)
-    }
-}
-
 impl ToolError {
     /// Return [`Fluff`] to accompany this error.
     ///
@@ -468,6 +511,18 @@ impl ToolError {
     /// character's "hand" or other).
     pub fn fluff(&self) -> impl Iterator<Item = Fluff> {
         core::iter::once(Fluff::Beep)
+    }
+}
+
+impl From<op::OperationError> for ToolError {
+    fn from(value: op::OperationError) -> Self {
+        match value {}
+    }
+}
+
+impl From<RefError> for ToolError {
+    fn from(value: RefError) -> Self {
+        ToolError::SpaceRef(value)
     }
 }
 
@@ -545,6 +600,7 @@ mod tests {
     use crate::block::Primitive;
     use crate::character::cursor_raycast;
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
+    use crate::drawing::VoxelBrush;
     use crate::inv::Slot;
     use crate::math::{FreeCoordinate, GridRotation};
     use crate::raycast::Ray;
@@ -904,6 +960,33 @@ mod tests {
             .unwrap();
         // Space is unmodified
         assert_eq!(&tester.space()[[1, 0, 0]], &existing);
+    }
+
+    #[test]
+    fn use_custom_success() {
+        // TODO: also test an operation that cares about the existing block
+
+        let [existing, icon, placed] = make_some_blocks();
+        let tool = Tool::Custom {
+            op: Operation::Paint(VoxelBrush::single(placed.clone())),
+            icon,
+        };
+        let tester = ToolTester::new(|space| {
+            space.set([0, 0, 0], &existing).unwrap();
+        });
+
+        let transaction = tester.equip_and_use_tool(tool).unwrap();
+
+        assert_eq!(
+            transaction,
+            SpaceTransaction::set_cube(
+                [0, 0, 0],
+                None,
+                Some(placed.clone().rotate(GridRotation::CLOCKWISE)),
+            )
+            .nonconserved() // TODO: this is just because ::Paint does this
+            .bind(tester.space_ref.clone())
+        );
     }
 
     #[test]
