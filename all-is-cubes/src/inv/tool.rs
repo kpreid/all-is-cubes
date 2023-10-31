@@ -568,11 +568,15 @@ mod tests {
             let mut universe = Universe::new();
             let mut space = Space::empty_positive(6, 4, 4);
             f(&mut space);
-            let space_ref = universe.insert_anonymous(space);
+            let space_ref = universe.insert("ToolTester/space".into(), space).unwrap();
 
             Self {
                 character_ref: universe
-                    .insert_anonymous(Character::spawn_default(space_ref.clone())),
+                    .insert(
+                        "ToolTester/character".into(),
+                        Character::spawn_default(space_ref.clone()),
+                    )
+                    .unwrap(),
                 space_ref,
                 universe,
             }
