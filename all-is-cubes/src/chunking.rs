@@ -10,7 +10,7 @@ use core::ops::RangeTo;
 #[cfg(feature = "std")]
 use std::sync::Mutex;
 
-use euclid::{vec3, Vector3D};
+use euclid::{vec3, Point3D, Vector3D};
 
 #[cfg(not(feature = "std"))]
 /// Acts as polyfill for float methods
@@ -26,6 +26,11 @@ use crate::math::{
 #[allow(clippy::exhaustive_enums)]
 #[derive(Debug)]
 enum WholeChunk {}
+
+/// Unit-of-measure/coordinate-system type for cubes within a chunk (range `0..CHUNK_SIZE`)
+#[allow(clippy::exhaustive_enums)]
+#[derive(Debug)]
+pub enum ChunkRelative {}
 
 /// Relative chunk position (coordinates in units of whole chunks)
 type Ccv = Vector3D<i32, WholeChunk>;
@@ -85,12 +90,19 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     }
 }
 
-/// Scale a cube position to obtain the containing chunk.
-pub fn cube_to_chunk<const CHUNK_SIZE: GridCoordinate>(cube: Cube) -> ChunkPos<CHUNK_SIZE> {
-    ChunkPos(Cube::from(
-        cube.lower_bounds().map(|c| c.div_euclid(CHUNK_SIZE)),
-    ))
+/// Scale a cube position to obtain the containing chunk and the cube position within it.
+//---
+// Design note: these operations are combined to allow skipping some numeric overflow cases.
+pub fn cube_to_chunk<const CHUNK_SIZE: GridCoordinate>(
+    cube: Cube,
+) -> (ChunkPos<CHUNK_SIZE>, Point3D<GridCoordinate, ChunkRelative>) {
+    let pos = cube.lower_bounds();
+    (
+        ChunkPos(Cube::from(pos.map(|c| c.div_euclid(CHUNK_SIZE)))),
+        pos.map(|c| c.rem_euclid(CHUNK_SIZE)).cast_unit(),
+    )
 }
+
 /// Scale an arbitrary point to obtain the containing chunk.
 pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(point: FreePoint) -> ChunkPos<CHUNK_SIZE> {
     ChunkPos(
@@ -563,7 +575,12 @@ mod tests {
     fn chunk_consistency() {
         // TODO: this is overkill; sampling the edge cases would be sufficient
         for cube in GridAab::from_lower_size([-1, -1, -1], [32, 32, 32]).interior_iter() {
-            assert!(cube_to_chunk::<16>(cube).bounds().contains_cube(cube));
+            let (chunk, rel) = cube_to_chunk::<16>(cube);
+            assert!(chunk.bounds().contains_cube(cube));
+            assert_eq!(
+                cube,
+                Cube::from(rel.cast_unit::<Cube>()) + chunk.bounds().lower_bounds().to_vector()
+            );
         }
     }
 

@@ -647,10 +647,8 @@ impl<const CHUNK_SIZE: GridCoordinate> CsmTodo<CHUNK_SIZE> {
         // the adjacent chunks will always include it (presuming that the chunk
         // size is greater than 1).
         for direction in Face6::ALL {
-            if let Some(chunk) = self
-                .chunks
-                .get_mut(&cube_to_chunk(cube + direction.normal_vector()))
-            {
+            let (chunk_pos, _) = cube_to_chunk(cube + direction.normal_vector());
+            if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
                 f(chunk);
             }
         }
