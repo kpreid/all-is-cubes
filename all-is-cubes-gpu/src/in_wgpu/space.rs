@@ -630,23 +630,21 @@ struct TodoListener(Weak<Mutex<SpaceRendererTodo>>);
 
 impl Listener<SpaceChange> for TodoListener {
     fn receive(&self, message: SpaceChange) {
-        if let Some(cell) = self.0.upgrade() {
-            if let Ok(mut todo) = cell.lock() {
-                match message {
-                    SpaceChange::EveryBlock => {
-                        todo.light = None;
-                    }
-                    SpaceChange::Lighting(p) => {
-                        // None means we're already at "update everything"
-                        if let Some(set) = &mut todo.light {
-                            set.insert(p);
-                        }
-                    }
-                    SpaceChange::Block(..) => {}
-                    SpaceChange::Number(..) => {}
-                    SpaceChange::BlockValue(..) => {}
+        let Some(cell) = self.0.upgrade() else { return }; // noop if dead listener
+        let Ok(mut todo) = cell.lock() else { return }; // noop if poisoned
+        match message {
+            SpaceChange::EveryBlock => {
+                todo.light = None;
+            }
+            SpaceChange::Lighting(p) => {
+                // None means we're already at "update everything"
+                if let Some(set) = &mut todo.light {
+                    set.insert(p);
                 }
             }
+            SpaceChange::Block(..) => {}
+            SpaceChange::Number(..) => {}
+            SpaceChange::BlockValue(..) => {}
         }
     }
 

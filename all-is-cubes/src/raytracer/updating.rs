@@ -177,21 +177,25 @@ struct TodoListener(Weak<Mutex<SrtTodo>>);
 
 impl Listener<SpaceChange> for TodoListener {
     fn receive(&self, message: SpaceChange) {
-        if let Some(mutex) = self.0.upgrade() {
-            if let Ok(mut todo) = mutex.lock() {
-                match message {
-                    SpaceChange::EveryBlock => {
-                        todo.everything = true;
-                        todo.blocks.clear();
-                        todo.cubes.clear()
-                    }
-                    SpaceChange::Lighting(p) | SpaceChange::Block(p) => {
-                        todo.cubes.insert(p);
-                    }
-                    SpaceChange::Number(index) | SpaceChange::BlockValue(index) => {
-                        todo.blocks.insert(index);
-                    }
-                }
+        let Some(mutex) = self.0.upgrade() else {
+            // noop if dead listener
+            return;
+        };
+        let Ok(mut todo) = mutex.lock() else {
+            // noop if poisoned
+            return;
+        };
+        match message {
+            SpaceChange::EveryBlock => {
+                todo.everything = true;
+                todo.blocks.clear();
+                todo.cubes.clear()
+            }
+            SpaceChange::Lighting(p) | SpaceChange::Block(p) => {
+                todo.cubes.insert(p);
+            }
+            SpaceChange::Number(index) | SpaceChange::BlockValue(index) => {
+                todo.blocks.insert(index);
             }
         }
     }

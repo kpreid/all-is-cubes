@@ -388,12 +388,10 @@ impl Listener<CueMessage> for CueListener {
     fn receive(&self, message: CueMessage) {
         match message {
             CueMessage::Clicked(button) => {
-                if let Some(cell) = self.0.upgrade() {
-                    if let Ok(mut todo) = cell.lock() {
-                        if let Some(t) = todo.button_pressed_decay.get_mut(button) {
-                            *t = Duration::from_millis(200);
-                        }
-                    }
+                let Some(cell) = self.0.upgrade() else { return }; // noop if dead listener
+                let Ok(mut todo) = cell.lock() else { return }; // noop if poisoned
+                if let Some(t) = todo.button_pressed_decay.get_mut(button) {
+                    *t = Duration::from_millis(200);
                 }
             }
         }

@@ -630,32 +630,30 @@ struct TodoListener<const CHUNK_SIZE: GridCoordinate>(Weak<Mutex<CsmTodo<CHUNK_S
 
 impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CHUNK_SIZE> {
     fn receive(&self, message: SpaceChange) {
-        if let Some(cell) = self.0.upgrade() {
-            if let Ok(mut todo) = cell.lock() {
-                match message {
-                    SpaceChange::EveryBlock => {
-                        todo.all_blocks_and_chunks = true;
-                        todo.blocks.clear();
-                        todo.chunks.clear();
-                    }
-                    SpaceChange::Block(p) => {
-                        todo.modify_block_and_adjacent(p, |chunk_todo| {
-                            chunk_todo.recompute_mesh = true;
-                        });
-                    }
-                    SpaceChange::Lighting(_p) => {
-                        // Meshes are not affected by light
-                    }
-                    SpaceChange::Number(index) => {
-                        if !todo.all_blocks_and_chunks {
-                            todo.blocks.insert(index);
-                        }
-                    }
-                    SpaceChange::BlockValue(index) => {
-                        if !todo.all_blocks_and_chunks {
-                            todo.blocks.insert(index);
-                        }
-                    }
+        let Some(cell) = self.0.upgrade() else { return }; // noop if dead listener
+        let Ok(mut todo) = cell.lock() else { return }; // noop if poisoned
+        match message {
+            SpaceChange::EveryBlock => {
+                todo.all_blocks_and_chunks = true;
+                todo.blocks.clear();
+                todo.chunks.clear();
+            }
+            SpaceChange::Block(p) => {
+                todo.modify_block_and_adjacent(p, |chunk_todo| {
+                    chunk_todo.recompute_mesh = true;
+                });
+            }
+            SpaceChange::Lighting(_p) => {
+                // Meshes are not affected by light
+            }
+            SpaceChange::Number(index) => {
+                if !todo.all_blocks_and_chunks {
+                    todo.blocks.insert(index);
+                }
+            }
+            SpaceChange::BlockValue(index) => {
+                if !todo.all_blocks_and_chunks {
+                    todo.blocks.insert(index);
                 }
             }
         }
