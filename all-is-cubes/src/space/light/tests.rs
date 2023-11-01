@@ -121,8 +121,9 @@ fn set_cube_opaque_notification() {
     let mut space = Space::empty_positive(1, 1, 1);
     let sink = Sink::new();
     space.listen(
-        sink.listener()
-            .filter(|change| matches!(change, SpaceChange::Lighting(_)).then_some(change)),
+        sink.listener().filter(|change| {
+            matches!(change, SpaceChange::CubeLight { cube: _ }).then_some(change)
+        }),
     );
     // Self-test that the initial condition is not trivially the answer we're looking for
     assert_ne!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
@@ -132,7 +133,9 @@ fn set_cube_opaque_notification() {
     assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(
         sink.drain(),
-        vec![SpaceChange::Lighting(Cube::new(0, 0, 0))]
+        vec![SpaceChange::CubeLight {
+            cube: Cube::new(0, 0, 0)
+        }]
     );
 }
 

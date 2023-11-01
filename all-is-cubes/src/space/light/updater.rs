@@ -175,7 +175,7 @@ impl Space {
             cost += 200;
             // TODO: compute index only once
             self.lighting[self.bounds().index(cube).unwrap()] = new_light_value;
-            self.change_notifier.notify(SpaceChange::Lighting(cube));
+            self.change_notifier.notify(SpaceChange::CubeLight { cube });
 
             // If neighbors have missing (not just stale) light values, fill them in too.
             for dir in Face6::ALL {
@@ -194,8 +194,9 @@ impl Space {
                             continue;
                         }
                         self.lighting[neighbor_index] = PackedLight::guess(new_light_value.value());
-                        self.change_notifier
-                            .notify(SpaceChange::Lighting(neighbor_cube));
+                        self.change_notifier.notify(SpaceChange::CubeLight {
+                            cube: neighbor_cube,
+                        });
                         // We don't put the neighbor on the update queue because it should
                         // already be there.
                     }

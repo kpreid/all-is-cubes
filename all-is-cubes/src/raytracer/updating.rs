@@ -191,10 +191,10 @@ impl Listener<SpaceChange> for TodoListener {
                 todo.blocks.clear();
                 todo.cubes.clear()
             }
-            SpaceChange::Lighting(p) | SpaceChange::Block(p) => {
-                todo.cubes.insert(p);
+            SpaceChange::CubeLight { cube, .. } | SpaceChange::CubeBlock { cube, .. } => {
+                todo.cubes.insert(cube);
             }
-            SpaceChange::Number(index) | SpaceChange::BlockValue(index) => {
+            SpaceChange::BlockIndex(index) | SpaceChange::BlockEvaluation(index) => {
                 todo.blocks.insert(index);
             }
         }

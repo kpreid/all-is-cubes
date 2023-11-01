@@ -40,11 +40,11 @@ fn update_adjacent_chunk_positive() {
         (ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN),
         (ChunkPos::new(1, 0, 0), ChunkTodo::CLEAN),
     ]);
-    listener.receive(SpaceChange::Block(Cube::new(
-        CHUNK_SIZE - 1,
-        CHUNK_SIZE / 2,
-        CHUNK_SIZE / 2,
-    )));
+    listener.receive(SpaceChange::CubeBlock {
+        cube: Cube::new(CHUNK_SIZE - 1, CHUNK_SIZE / 2, CHUNK_SIZE / 2),
+        old_block_index: 123,
+        new_block_index: 456,
+    });
     assert_eq!(
         read_todo_chunks(&todo),
         vec![
@@ -76,11 +76,11 @@ fn update_adjacent_chunk_negative() {
         (ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN),
         (ChunkPos::new(1, 0, 0), ChunkTodo::CLEAN),
     ]);
-    listener.receive(SpaceChange::Block(Cube::new(
-        0,
-        CHUNK_SIZE / 2,
-        CHUNK_SIZE / 2,
-    )));
+    listener.receive(SpaceChange::CubeBlock {
+        cube: Cube::new(0, CHUNK_SIZE / 2, CHUNK_SIZE / 2),
+        old_block_index: 123,
+        new_block_index: 456,
+    });
     assert_eq!(
         read_todo_chunks(&todo),
         vec![
@@ -108,16 +108,24 @@ fn todo_ignores_absent_chunks() {
     let todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>> = Default::default();
     let listener = TodoListener(Arc::downgrade(&todo));
 
-    let p = Cube::from(GridPoint::new(1, 1, 1) * (CHUNK_SIZE / 2));
+    let cube = Cube::from(GridPoint::new(1, 1, 1) * (CHUNK_SIZE / 2));
     // Nothing happens...
-    listener.receive(SpaceChange::Block(p));
+    listener.receive(SpaceChange::CubeBlock {
+        cube,
+        old_block_index: 0,
+        new_block_index: 0,
+    });
     assert_eq!(read_todo_chunks(&todo), vec![]);
     // until the chunk exists in the table already.
     todo.lock()
         .unwrap()
         .chunks
         .insert(ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN);
-    listener.receive(SpaceChange::Block(p));
+    listener.receive(SpaceChange::CubeBlock {
+        cube,
+        old_block_index: 0,
+        new_block_index: 0,
+    });
     assert_eq!(
         read_todo_chunks(&todo),
         vec![(

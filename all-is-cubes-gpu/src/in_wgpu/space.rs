@@ -636,15 +636,15 @@ impl Listener<SpaceChange> for TodoListener {
             SpaceChange::EveryBlock => {
                 todo.light = None;
             }
-            SpaceChange::Lighting(p) => {
+            SpaceChange::CubeLight { cube } => {
                 // None means we're already at "update everything"
                 if let Some(set) = &mut todo.light {
-                    set.insert(p);
+                    set.insert(cube);
                 }
             }
-            SpaceChange::Block(..) => {}
-            SpaceChange::Number(..) => {}
-            SpaceChange::BlockValue(..) => {}
+            SpaceChange::CubeBlock { .. } => {}
+            SpaceChange::BlockIndex(..) => {}
+            SpaceChange::BlockEvaluation(..) => {}
         }
     }
 

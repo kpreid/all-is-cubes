@@ -488,20 +488,24 @@ impl Block {
                 if let Some(listener) = &filter.listener {
                     block_space.listen(listener.clone().filter(move |msg| {
                         match msg {
-                            SpaceChange::Block(cube)
+                            SpaceChange::CubeBlock { cube, .. }
                                 if full_resolution_bounds.contains_cube(cube) =>
                             {
                                 Some(BlockChange::new())
                             }
-                            SpaceChange::Block(_) => None,
+                            SpaceChange::CubeBlock { .. } => None,
                             SpaceChange::EveryBlock => Some(BlockChange::new()),
 
                             // TODO: It would be nice if the space gave more precise updates
                             // such that we could conclude e.g. "this is a new/removed block
                             // in an unaffected area" without needing to store any data.
-                            SpaceChange::BlockValue(_) => Some(BlockChange::new()),
-                            SpaceChange::Lighting(_) => None,
-                            SpaceChange::Number(_) => None,
+                            SpaceChange::BlockEvaluation(_) => Some(BlockChange::new()),
+
+                            // Light does not matter.
+                            SpaceChange::CubeLight { .. } => None,
+
+                            // Index changes by themselves cannot affect the result.
+                            SpaceChange::BlockIndex(_) => None,
                         }
                     }));
                 }

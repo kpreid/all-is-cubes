@@ -638,20 +638,22 @@ impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CH
                 todo.blocks.clear();
                 todo.chunks.clear();
             }
-            SpaceChange::Block(p) => {
-                todo.modify_block_and_adjacent(p, |chunk_todo| {
+            SpaceChange::CubeBlock {
+                cube,
+                old_block_index: _,
+                new_block_index: _,
+                ..
+            } => {
+                // TODO: use block index information to decide whether the new block
+                // should be rendered as an instanced block rather than chunk mesh
+                todo.modify_block_and_adjacent(cube, |chunk_todo| {
                     chunk_todo.recompute_mesh = true;
                 });
             }
-            SpaceChange::Lighting(_p) => {
+            SpaceChange::CubeLight { .. } => {
                 // Meshes are not affected by light
             }
-            SpaceChange::Number(index) => {
-                if !todo.all_blocks_and_chunks {
-                    todo.blocks.insert(index);
-                }
-            }
-            SpaceChange::BlockValue(index) => {
+            SpaceChange::BlockIndex(index) | SpaceChange::BlockEvaluation(index) => {
                 if !todo.all_blocks_and_chunks {
                     todo.blocks.insert(index);
                 }

@@ -151,16 +151,35 @@ fn set_updates_evaluated_on_added_block() {
     space.consistency_check(); // bonus testing
 }
 
-/// `EvaluatedBlock` data is updated when a block index is reused.
+/// `EvaluatedBlock` data is updated when a block index is reused because the block was unique.
 #[test]
-fn set_updates_evaluated_on_replaced_block() {
+fn set_updates_evaluated_and_notifies_on_replaced_block() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(1, 1, 1);
-    space.set([0, 0, 0], &block).unwrap();
+    let sink = Sink::new();
+    space.listen(sink.listener());
+
+    let cube = Cube::ORIGIN;
+    space.set(cube, &block).unwrap();
+
     // Confirm the expected indices
-    assert_eq!(Some(0), space.get_block_index([0, 0, 0]));
+    assert_eq!(Some(0), space.get_block_index(cube));
     // Confirm the data is correct
-    assert_eq!(space.get_evaluated([0, 0, 0]), &block.evaluate().unwrap());
+    assert_eq!(space.get_evaluated(cube), &block.evaluate().unwrap());
+    // Confirm expected notifications
+    assert_eq!(
+        sink.drain(),
+        vec![
+            SpaceChange::BlockIndex(0),
+            SpaceChange::CubeLight { cube },
+            SpaceChange::CubeBlock {
+                cube,
+                old_block_index: 0,
+                new_block_index: 0,
+            }
+        ]
+    );
+
     space.consistency_check(); // bonus testing
 }
 
@@ -227,7 +246,7 @@ fn removed_blocks_are_forgotten() {
 }
 
 #[test]
-fn change_listener() {
+fn change_listener_simple() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
     let sink = Sink::new();
@@ -237,9 +256,15 @@ fn change_listener() {
     assert_eq!(
         sink.drain(),
         vec![
-            SpaceChange::Number(1),
-            SpaceChange::Lighting(Cube::new(0, 0, 0)),
-            SpaceChange::Block(Cube::new(0, 0, 0)),
+            SpaceChange::BlockIndex(1),
+            SpaceChange::CubeLight {
+                cube: Cube::new(0, 0, 0)
+            },
+            SpaceChange::CubeBlock {
+                cube: Cube::new(0, 0, 0),
+                old_block_index: 0,
+                new_block_index: 1
+            },
         ],
     );
 
@@ -384,7 +409,7 @@ fn listens_to_block_changes() {
     // Instead, it only happens the next time the space is stepped.
     let (_, _) = space.step(None, Tick::arbitrary(), time::DeadlineStd::Whenever);
     // Now we should see a notification and the evaluated block data having changed.
-    assert_eq!(sink.drain(), vec![SpaceChange::BlockValue(0)]);
+    assert_eq!(sink.drain(), vec![SpaceChange::BlockEvaluation(0)]);
     assert_eq!(space.get_evaluated([0, 0, 0]), &new_evaluated);
 }
 
@@ -415,7 +440,7 @@ fn indirect_becomes_evaluation_error() {
     let (_, _) = space.step(None, Tick::arbitrary(), time::DeadlineStd::Whenever);
 
     // Now we should see a notification and the evaluated block data having changed.
-    assert_eq!(sink.drain(), vec![SpaceChange::BlockValue(0)]);
+    assert_eq!(sink.drain(), vec![SpaceChange::BlockEvaluation(0)]);
     assert_eq!(
         space.get_evaluated([0, 0, 0]),
         &block.evaluate().unwrap_err().to_placeholder()

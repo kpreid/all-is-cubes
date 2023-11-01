@@ -152,7 +152,7 @@ impl Palette {
                         );
                         self.block_to_index
                             .insert(block.clone(), new_index as BlockIndex);
-                        notifier.notify(SpaceChange::Number(new_index as BlockIndex));
+                        notifier.notify(SpaceChange::BlockIndex(new_index as BlockIndex));
                         return Ok(new_index as BlockIndex);
                     }
                 }
@@ -166,7 +166,7 @@ impl Palette {
             // Grow the vector.
             self.entries.push(new_data);
             self.block_to_index.insert(block.clone(), new_index);
-            notifier.notify(SpaceChange::Number(new_index));
+            notifier.notify(SpaceChange::BlockIndex(new_index));
             Ok(new_index)
         }
     }
@@ -198,7 +198,7 @@ impl Palette {
             self.block_to_index
                 .insert(new_block.clone(), old_block_index);
 
-            notifier.notify(SpaceChange::Number(old_block_index));
+            notifier.notify(SpaceChange::BlockIndex(old_block_index));
 
             true
         } else {
@@ -247,7 +247,7 @@ impl Palette {
             let mut try_eval_again = hashbrown::HashSet::new();
             let mut todo = self.todo.lock().unwrap();
             for block_index in todo.blocks.drain() {
-                notifier.notify(SpaceChange::BlockValue(block_index));
+                notifier.notify(SpaceChange::BlockEvaluation(block_index));
                 let data: &mut SpaceBlockData = &mut self.entries[usize::from(block_index)];
 
                 // TODO: We may want to have a higher-level error handling by pausing the Space

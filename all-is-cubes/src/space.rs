@@ -347,7 +347,7 @@ impl Space {
 
             // Replacing one unique block with a new one.
             //
-            // This special case is worth having because it means that if a block is
+            // This special case is worth having because it means that if a unique block is
             // *modified* (read-modify-write) then the entry is preserved, and rendering
             // may be able to optimize that case.
             //
@@ -357,7 +357,12 @@ impl Space {
                 .palette
                 .try_replace_unique(old_block_index, block, &self.change_notifier)
             {
-                self.side_effects_of_set(old_block_index, position, contents_index);
+                self.side_effects_of_set(
+                    old_block_index,
+                    old_block_index,
+                    position,
+                    contents_index,
+                );
                 return Ok(true);
             }
 
@@ -373,7 +378,7 @@ impl Space {
             // Write actual space change.
             self.contents[contents_index] = new_block_index;
 
-            self.side_effects_of_set(new_block_index, position, contents_index);
+            self.side_effects_of_set(old_block_index, new_block_index, position, contents_index);
             Ok(true)
         } else {
             Err(SetCubeError::OutOfBounds {
@@ -383,20 +388,21 @@ impl Space {
         }
     }
 
-    /// Implement the consequences of changing a block.
+    /// Implement the consequences of changing what block occupies a cube.
     ///
-    /// `content_index` is redundant with `position` but saves computation.
+    /// `contents_index` is redundant with `position` but saves computation.
     #[inline]
     fn side_effects_of_set(
         &mut self,
-        block_index: BlockIndex,
-        position: Cube,
+        old_block_index: BlockIndex,
+        new_block_index: BlockIndex,
+        cube: Cube,
         contents_index: usize,
     ) {
-        let evaluated = &self.palette.entry(block_index).evaluated;
+        let evaluated = &self.palette.entry(new_block_index).evaluated;
 
         if evaluated.attributes.tick_action.is_some() {
-            self.cubes_wanting_ticks.insert(position);
+            self.cubes_wanting_ticks.insert(cube);
         }
 
         // TODO: Move this into a function in the lighting module since it is so tied to lighting
@@ -413,14 +419,14 @@ impl Space {
                 // (Note: This does not empirically have any significant effect on overall
                 // lighting performance — these trivial updates are not most of the cost.
                 // But it'll at least save a little bit of memory.)
-                self.light_update_queue.remove(position);
+                self.light_update_queue.remove(cube);
 
-                self.change_notifier.notify(SpaceChange::Lighting(position));
+                self.change_notifier.notify(SpaceChange::CubeLight { cube });
             } else {
-                self.light_needs_update(position, light::Priority::NEWLY_VISIBLE);
+                self.light_needs_update(cube, light::Priority::NEWLY_VISIBLE);
             }
             for face in Face6::ALL {
-                if let Some(neighbor) = position.checked_add(face.normal_vector()) {
+                if let Some(neighbor) = cube.checked_add(face.normal_vector()) {
                     // Perform neighbor light updates if they can be affected by us
                     if !self.get_evaluated(neighbor).opaque[face.opposite()] {
                         self.light_needs_update(neighbor, light::Priority::NEWLY_VISIBLE);
@@ -429,7 +435,11 @@ impl Space {
             }
         }
 
-        self.change_notifier.notify(SpaceChange::Block(position));
+        self.change_notifier.notify(SpaceChange::CubeBlock {
+            cube,
+            old_block_index,
+            new_block_index,
+        });
     }
 
     /// Replace blocks in `region` with a block computed by the function.
@@ -1003,23 +1013,45 @@ impl fmt::Display for SetCubeError {
         }
     }
 }
+
 /// Description of a change to a [`Space`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[allow(clippy::exhaustive_enums)] // any change will probably be breaking anyway
 pub enum SpaceChange {
-    // TODO: This set of names is not very clear and self-consistent.
-    /// The block at the given location was replaced.
-    Block(Cube),
+    /// The block occupying the specified cube was replaced.
+    CubeBlock {
+        /// The cube whose contents changed.
+        cube: Cube,
+        /// The index within [`Space::block_data()`] that the space contained prior to this message.
+        old_block_index: BlockIndex,
+        /// The index within [`Space::block_data()`] that the space contains after this message.
+        ///
+        /// Note that it may be the case that `old_block_index == new_block_index`.
+        /// This does not mean that a block is replaced with itself
+        /// (that would not produce any notifications),
+        /// but rather that a block that occurred exactly once in the space was replaced with a
+        /// different block. In this situation, a [`SpaceChange::BlockIndex`] message is also sent.
+        new_block_index: BlockIndex,
+    },
+
     /// The light level value at the given location changed.
-    Lighting(Cube),
+    CubeLight {
+        /// The cube whose light level changed.
+        cube: Cube,
+    },
+
     /// The given block index number was reassigned and now refers to a different
     /// [`Block`] value.
-    Number(BlockIndex),
-    /// The definition of the block referred to by the given block index number was
-    /// changed; the result of [`Space::get_evaluated`] may differ.
-    BlockValue(BlockIndex),
-    /// Equivalent to [`SpaceChange::Block`] for every cube and [`SpaceChange::Number`]
-    /// for every index.
+    BlockIndex(BlockIndex),
+
+    /// The evaluation of the block referred to by the given block index number has
+    /// changed. The result of [`Space::get_evaluated()`] for that index may differ, but
+    /// the [`Block`] value remains equal.
+    BlockEvaluation(BlockIndex),
+
+    /// The space contents were completely overwritten in some way.
+    /// This should be understood as equivalent to [`SpaceChange::CubeBlock`] for every cube
+    /// and [`SpaceChange::BlockIndex`] for every index.
     EveryBlock,
 }
 
