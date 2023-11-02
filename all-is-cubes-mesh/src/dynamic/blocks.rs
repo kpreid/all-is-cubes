@@ -90,33 +90,27 @@ where
                 fast_options.ignore_voxels = true;
 
                 self.meshes.reserve(new_len);
-                for bd in &block_data[self.meshes.len()..new_len] {
+                for (index, bd) in ((old_len as BlockIndex)..).zip(&block_data[old_len..new_len]) {
                     let evaluated = bd.evaluated();
                     self.meshes
                         .push(if evaluated.resolution() > Resolution::R1 {
                             // If the block has voxels, generate a placeholder mesh,
                             // marked as not-ready so it will be replaced eventually.
-                            VersionedBlockMesh {
-                                mesh: BlockMesh::new(
-                                    evaluated,
-                                    block_texture_allocator,
-                                    &fast_options,
-                                ),
-                                version: BlockMeshVersion::NotReady,
-                                instance_data: Default::default(),
-                            }
+                            VersionedBlockMesh::new(
+                                index,
+                                BlockMesh::new(evaluated, block_texture_allocator, &fast_options),
+                                BlockMeshVersion::NotReady,
+                                &mut render_data_updater,
+                            )
                         } else {
                             // If the block does not have voxels, then we can just generate the
                             // final mesh as quick as the placeholder.
-                            VersionedBlockMesh {
-                                mesh: BlockMesh::new(
-                                    evaluated,
-                                    block_texture_allocator,
-                                    mesh_options,
-                                ),
-                                version: current_version_number,
-                                instance_data: Default::default(),
-                            }
+                            VersionedBlockMesh::new(
+                                index,
+                                BlockMesh::new(evaluated, block_texture_allocator, mesh_options),
+                                current_version_number,
+                                &mut render_data_updater,
+                            )
                         });
                 }
             }
@@ -165,27 +159,13 @@ where
                 if new_block_mesh != current_mesh_entry.mesh
                     || current_mesh_entry.version == BlockMeshVersion::NotReady
                 {
-                    *current_mesh_entry = VersionedBlockMesh {
-                        mesh: new_block_mesh,
-                        version: current_version_number,
-                        instance_data: Default::default(), // TODO: reuse old render data
-                    };
-
-                    // TODO(instancing): Enable this for all blocks that we might want to draw
-                    // instances of.
-                    if false {
-                        // TODO: wasteful data copy to make the SpaceMesh
-                        let space_mesh = SpaceMesh::from(&current_mesh_entry.mesh);
-
-                        render_data_updater(super::RenderDataUpdate {
-                            mesh: &space_mesh,
-                            render_data: &mut current_mesh_entry.instance_data.1,
-                            indices_only: false,
-                            mesh_id: super::MeshId(super::MeshIdImpl::Block(index)),
-                        });
-
-                        current_mesh_entry.instance_data.0 = space_mesh.into_meta();
-                    }
+                    // TODO: reuse old render data and allocations
+                    *current_mesh_entry = VersionedBlockMesh::new(
+                        index,
+                        new_block_mesh,
+                        current_version_number,
+                        &mut render_data_updater,
+                    );
                 } else {
                     // The new mesh is identical to the old one (which might happen because
                     // interior voxels or non-rendered attributes were changed), so don't invalidate
@@ -218,12 +198,20 @@ impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for &'a VersionedBlockMeshes<M
         &mut self,
         index: BlockIndex,
         _cube: Cube,
-        _primary: bool,
+        primary: bool,
     ) -> &'a BlockMesh<M> {
-        self.meshes
-            .get(usize::from(index))
-            .map(|vbm| &vbm.mesh)
-            .unwrap_or(BlockMesh::<M>::EMPTY_REF)
+        let Some(mesh) = self.meshes.get(usize::from(index)).map(|vbm| &vbm.mesh) else {
+            return BlockMesh::<M>::EMPTY_REF;
+        };
+
+        if should_use_instances(mesh) {
+            if primary {
+                todo!("TODO(instancing): creating mesh instances not yet supported")
+            }
+            BlockMesh::<M>::EMPTY_REF
+        } else {
+            mesh
+        }
     }
 }
 
@@ -238,9 +226,44 @@ pub(crate) struct VersionedBlockMesh<M: DynamicMeshTypes> {
 
     /// Arbitrary data used for rendering the block in standalone/instanced form
     /// (not part of a larger mesh).
-    ///
-    /// TODO(instancing): This is not yet used.
+    /// TODO(instancing): do we benefit anywhere from this being a tuple?
     pub(crate) instance_data: (crate::MeshMeta<M>, M::RenderData),
+}
+
+impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
+    pub(crate) fn new<F>(
+        block_index: BlockIndex,
+        mesh: BlockMesh<M>,
+        version: BlockMeshVersion,
+        render_data_updater: &mut F,
+    ) -> Self
+    where
+        F: FnMut(super::RenderDataUpdate<'_, M>),
+    {
+        let mut instance_data: (crate::MeshMeta<M>, M::RenderData) = Default::default();
+
+        // TODO(instancing): Once we support actually updating and rendering instances, set this
+        // to either true or should_use_instances(&mesh).
+        if false {
+            // TODO: wasteful data copy to make the SpaceMesh
+            let space_mesh = SpaceMesh::from(&mesh);
+
+            render_data_updater(super::RenderDataUpdate {
+                mesh: &space_mesh,
+                render_data: &mut instance_data.1,
+                indices_only: false,
+                mesh_id: super::MeshId(super::MeshIdImpl::Block(block_index)),
+            });
+
+            instance_data.0 = space_mesh.into_meta();
+        }
+
+        Self {
+            mesh,
+            version,
+            instance_data,
+        }
+    }
 }
 
 /// Together with a [`BlockIndex`], uniquely identifies a block mesh.
@@ -254,4 +277,12 @@ pub(crate) enum BlockMeshVersion {
     /// u32 is sufficient size because we are extremely unlikely to wrap around u32 space
     /// in the course of a single batch of updates unless we're perpetually behind.
     Numbered(NonZeroU32),
+}
+
+pub(crate) fn should_use_instances<M: DynamicMeshTypes>(block_mesh: &BlockMesh<M>) -> bool {
+    // TODO(instancing): Enable this and then tune this value, once instance rendering works.
+    // block_mesh.count_indices() > 400
+    let _ = block_mesh;
+
+    false
 }
