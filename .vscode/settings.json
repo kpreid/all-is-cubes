@@ -1,6 +1,5 @@
 {
     "editor.rulers": [
-        90,
         100
     ],
     "rust-analyzer.cargo.features": "all",
