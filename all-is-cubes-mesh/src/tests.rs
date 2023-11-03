@@ -17,8 +17,8 @@ use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::{notnan, rgba_const};
 
-use crate::testing::{mesh_blocks_and_space, TextureMt};
-use crate::texture::{TestAllocator, TestPoint, TexelUnit};
+use crate::testing::{mesh_blocks_and_space, Allocator, TexPoint, TextureMt};
+use crate::texture::TexelUnit;
 use crate::{
     block_meshes_for_space, BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering,
     IndexSlice, MeshOptions, MeshTypes, SpaceMesh,
@@ -34,7 +34,7 @@ fn v_c<T>(position: [FreeCoordinate; 3], face: Face6, color: [f32; 4]) -> BlockV
 }
 
 /// Shorthand for writing out an entire [`BlockVertex`] with texturing.
-fn v_t(position: [FreeCoordinate; 3], face: Face6, texture: [f32; 3]) -> BlockVertex<TestPoint> {
+fn v_t(position: [FreeCoordinate; 3], face: Face6, texture: [f32; 3]) -> BlockVertex<TexPoint> {
     let texture = texture.into();
     BlockVertex {
         position: position.into(),
@@ -51,7 +51,7 @@ fn v_t(position: [FreeCoordinate; 3], face: Face6, texture: [f32; 3]) -> BlockVe
 pub(crate) fn test_block_mesh(block: Block) -> BlockMesh<TextureMt> {
     BlockMesh::new(
         &block.evaluate().unwrap(),
-        &TestAllocator::new(),
+        &Allocator::new(),
         &MeshOptions {
             transparency: TransparencyOption::Volumetric,
             ..MeshOptions::dont_care_for_test()
@@ -64,7 +64,7 @@ pub(crate) fn test_block_mesh(block: Block) -> BlockMesh<TextureMt> {
 fn test_block_mesh_threshold(block: Block) -> BlockMesh<TextureMt> {
     BlockMesh::new(
         &block.evaluate().unwrap(),
-        &TestAllocator::new(),
+        &Allocator::new(),
         &MeshOptions {
             transparency: TransparencyOption::Threshold(notnan!(0.5)),
             ..MeshOptions::dont_care_for_test()
@@ -104,12 +104,12 @@ fn excludes_hidden_faces_of_blocks() {
     assert_eq!(space_mesh.flaws(), Flaws::empty());
     // The space rendering should be a 2×2×2 cube of tiles, without any hidden interior faces.
     assert_eq!(
-        Vec::<&BlockVertex<TestPoint>>::new(),
+        Vec::<&BlockVertex<TexPoint>>::new(),
         space_mesh
             .vertices()
             .iter()
             .filter(|vertex| (vertex.position - Point3D::new(1., 1., 1.)).square_length() < 0.99)
-            .collect::<Vec<&BlockVertex<TestPoint>>>(),
+            .collect::<Vec<&BlockVertex<TexPoint>>>(),
         "found an interior point"
     );
     assert_eq!(
@@ -128,7 +128,7 @@ fn no_panic_on_missing_blocks() {
     let mut space = Space::empty_positive(2, 1, 1);
     let block_meshes: BlockMeshes<TextureMt> = block_meshes_for_space(
         &space,
-        &TestAllocator::new(),
+        &Allocator::new(),
         &MeshOptions::dont_care_for_test(),
     );
     assert_eq!(block_meshes.len(), 1); // check our assumption
@@ -502,7 +502,7 @@ fn handling_allocation_failure() {
     let mut space = Space::empty_positive(1, 1, 1);
     space.set([0, 0, 0], &complex_block).unwrap();
 
-    let mut tex = TestAllocator::new();
+    let mut tex = Allocator::new();
     tex.set_capacity(0);
     let block_meshes: BlockMeshes<TextureMt> =
         block_meshes_for_space(&space, &tex, &MeshOptions::dont_care_for_test());

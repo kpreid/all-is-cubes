@@ -9,8 +9,8 @@ use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::universe::{Name, URef, Universe};
 
+use all_is_cubes_mesh::testing::Allocator;
 use all_is_cubes_mesh::testing::TextureMt as Mt;
-use all_is_cubes_mesh::texture::TestAllocator;
 use all_is_cubes_mesh::{
     block_meshes_for_space, dynamic, BlockMesh, BlockMeshes, MeshOptions, SpaceMesh,
 };
@@ -35,7 +35,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 
         b.iter_batched_ref(
             || (),
-            |()| BlockMesh::<Mt>::new(&ev, &TestAllocator::new(), options),
+            |()| BlockMesh::<Mt>::new(&ev, &Allocator::new(), options),
             BatchSize::SmallInput,
         );
     });
@@ -49,7 +49,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 
         b.iter_batched_ref(
             || (),
-            |()| shared_mesh.compute(&ev, &TestAllocator::new(), options),
+            |()| shared_mesh.compute(&ev, &Allocator::new(), options),
             BatchSize::SmallInput,
         );
     });
@@ -64,7 +64,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 
         b.iter_batched_ref(
             || (),
-            |()| BlockMesh::<Mt>::new(&ev, &TestAllocator::new(), options),
+            |()| BlockMesh::<Mt>::new(&ev, &Allocator::new(), options),
             BatchSize::SmallInput,
         );
     });
@@ -76,7 +76,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 
         b.iter_batched_ref(
             || (),
-            |()| BlockMesh::<Mt>::new(&ev, &TestAllocator::new(), options),
+            |()| BlockMesh::<Mt>::new(&ev, &Allocator::new(), options),
             BatchSize::SmallInput,
         );
     });
@@ -159,7 +159,7 @@ fn dynamic_benches(c: &mut Criterion) {
             || {
                 let csm: dynamic::ChunkedSpaceMesh<Mt, std::time::Instant, 16> =
                     dynamic::ChunkedSpaceMesh::new(space_ref.clone(), true);
-                let tex = TestAllocator::new();
+                let tex = Allocator::new();
                 (tex, csm)
             },
             |(tex, csm)| {
@@ -230,7 +230,7 @@ struct SpaceMeshIngredients {
 
 impl SpaceMeshIngredients {
     fn new(options: MeshOptions, space: Space) -> Self {
-        let block_meshes = block_meshes_for_space(&space, &TestAllocator::new(), &options);
+        let block_meshes = block_meshes_for_space(&space, &Allocator::new(), &options);
 
         SpaceMeshIngredients {
             space,

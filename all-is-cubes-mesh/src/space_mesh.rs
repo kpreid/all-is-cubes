@@ -924,8 +924,7 @@ impl DepthOrdering {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::{mesh_blocks_and_space, TextureMt};
-    use crate::texture::TestPoint;
+    use crate::testing::{mesh_blocks_and_space, TexPoint, TextureMt};
     use crate::BlockVertex;
     use all_is_cubes::block::Block;
     use all_is_cubes::math::Rgba;
@@ -953,7 +952,7 @@ mod tests {
 
         assert_eq!(mesh.count_indices(), 6 /* faces */ * 6 /* vertices */);
 
-        let expected_data_size = std::mem::size_of_val::<[BlockVertex<TestPoint>]>(mesh.vertices())
+        let expected_data_size = std::mem::size_of_val::<[BlockVertex<TexPoint>]>(mesh.vertices())
             + mesh.indices().as_bytes().len();
 
         let actual_size = dbg!(mesh.total_byte_size());
