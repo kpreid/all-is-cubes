@@ -59,6 +59,8 @@
       The `CustomFormat` trait is now split into two traits, `Fmt` (for implementing) and `Refmt` (extension).
 
 - `all-is-cubes-mesh` library:
+    - The new trait `MeshTypes` is now used to combine declaration of vertex and texture types.
+      `BlockMesh`, `SpaceMesh`, `ChunkedSpaceMesh`, and `GetBlockMesh` all have a single `M: MeshTypes` parameter in place of multiple generics.
     - Renamed `TextureAllocator` to `texture::Allocator`.
     - Renamed `TextureTile` to `texture::Tile`.
     - Renamed `Texel` to `texture::Texel`.
