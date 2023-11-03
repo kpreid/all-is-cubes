@@ -24,8 +24,9 @@ use crate::in_wgpu::glue::{
 };
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::vertex::{WgpuInstanceData, WgpuLinesVertex};
+use crate::in_wgpu::WgpuMt;
 use crate::in_wgpu::{
-    block_texture::{AtlasAllocator, AtlasTile},
+    block_texture::AtlasAllocator,
     camera::ShaderSpaceCamera,
     glue::{to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
     vertex::WgpuBlockVertex,
@@ -65,13 +66,13 @@ pub(crate) struct SpaceRenderer<I> {
     space_bind_group:
         Memo<(wgpu::Id<wgpu::TextureView>, wgpu::Id<wgpu::TextureView>), wgpu::BindGroup>,
 
-    csm: ChunkedSpaceMesh<Option<ChunkBuffers>, WgpuBlockVertex, AtlasAllocator, I, CHUNK_SIZE>,
+    csm: ChunkedSpaceMesh<WgpuMt, I, CHUNK_SIZE>,
 
     interactive: bool,
 }
 
 #[derive(Debug, Default)]
-struct ChunkBuffers {
+pub(super) struct ChunkBuffers {
     vertex_buf: ResizingBuffer,
     index_buf: ResizingBuffer,
     index_format: wgpu::IndexFormat,
@@ -580,7 +581,7 @@ fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuf
 /// Copy [`SpaceMesh`] data to GPU buffers.
 fn update_chunk_buffers(
     mut bwp: BeltWritingParts<'_, '_>,
-    update: RenderDataUpdate<'_, Option<ChunkBuffers>, WgpuBlockVertex, AtlasTile>,
+    update: RenderDataUpdate<'_, WgpuMt>,
     space_label: &str,
 ) {
     if update.mesh.is_empty() {

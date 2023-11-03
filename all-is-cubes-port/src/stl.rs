@@ -62,7 +62,7 @@ pub(crate) async fn export_stl(
 
 pub(crate) fn space_to_stl_triangles(space: &Space) -> Vec<Triangle> {
     let mesh_options = mesh_options_for_stl();
-    let block_meshes: Box<[mesh::BlockMesh<BlockVertex<_>, _>]> =
+    let block_meshes: Box<[mesh::BlockMesh<StlMt>]> =
         mesh::block_meshes_for_space(space, &NoTextures, &mesh_options);
     space_mesh_to_triangles(&mesh::SpaceMesh::new(
         space,
@@ -75,7 +75,7 @@ pub(crate) fn space_to_stl_triangles(space: &Space) -> Vec<Triangle> {
 pub(crate) fn block_to_stl_triangles(
     block: &Block,
 ) -> Result<Vec<Triangle>, block::EvalBlockError> {
-    let block_mesh: mesh::BlockMesh<BlockVertex<_>, _> =
+    let block_mesh: mesh::BlockMesh<StlMt> =
         mesh::BlockMesh::new(&block.evaluate()?, &NoTextures, &mesh_options_for_stl());
     Ok(space_mesh_to_triangles(&mesh::SpaceMesh::from(&block_mesh)))
 }
@@ -86,9 +86,7 @@ fn mesh_options_for_stl() -> mesh::MeshOptions {
     mesh::MeshOptions::new(&g)
 }
 
-fn space_mesh_to_triangles(
-    mesh: &mesh::SpaceMesh<BlockVertex<NoTexture>, NoTexture>,
-) -> Vec<Triangle> {
+fn space_mesh_to_triangles(mesh: &mesh::SpaceMesh<StlMt>) -> Vec<Triangle> {
     let vertices = mesh.vertices();
     mesh.indices()
         .iter_u32()
@@ -110,6 +108,17 @@ fn space_mesh_to_triangles(
 #[inline]
 fn convert_vector(input: Vector3D<FreeCoordinate, Cube>) -> stl_io::Vector<f32> {
     stl_io::Vector::new(input.map(|c| c as f32).into())
+}
+
+#[derive(Debug)]
+#[allow(clippy::exhaustive_enums)]
+enum StlMt {}
+
+impl mesh::MeshTypes for StlMt {
+    // TODO: It'd be more efficient to use a custom vertex type but we're not bothering for now.
+    type Vertex = BlockVertex<NoTexture>;
+    type Alloc = NoTextures;
+    type Tile = NoTexture;
 }
 
 #[cfg(test)]

@@ -19,7 +19,7 @@ use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, ViewTransform};
 use all_is_cubes::math::VectorOps;
 use all_is_cubes::universe::PartialUniverse;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_mesh::{BlockMesh, MeshOptions, SpaceMesh};
+use all_is_cubes_mesh::{BlockMesh, MeshOptions, MeshTypes, SpaceMesh};
 
 mod buffer;
 use buffer::create_buffer_and_accessor;
@@ -38,6 +38,16 @@ pub use vertex::GltfVertex;
 use crate::{ExportError, ExportSet};
 #[cfg(test)]
 mod tests;
+
+/// [`MeshTypes`] implementation for glTF output.
+#[derive(Debug)]
+#[allow(clippy::exhaustive_enums)]
+pub enum GltfMt {}
+impl MeshTypes for GltfMt {
+    type Vertex = GltfVertex;
+    type Alloc = GltfTextureAllocator;
+    type Tile = GltfTile;
+}
 
 /// "This mesh with this translation." A value type that specifies that, in some frame
 /// of the output, the particular mesh should be visible at a particular location.
@@ -174,11 +184,14 @@ impl GltfWriter {
     /// Add one [`SpaceMesh`] to the output.
     ///
     /// The mesh's texture allocator must be [`self.texture_allocator()`].
-    pub fn add_mesh(
+    pub fn add_mesh<M>(
         &mut self,
         name: &dyn fmt::Display,
-        mesh: &SpaceMesh<GltfVertex, GltfTile>,
-    ) -> Option<Index<gltf_json::Mesh>> {
+        mesh: &SpaceMesh<M>,
+    ) -> Option<Index<gltf_json::Mesh>>
+    where
+        M: MeshTypes<Vertex = GltfVertex, Alloc = GltfTextureAllocator>,
+    {
         // TODO: Deduplicate meshes so that we don't have to store the same data twice if
         // a world change is undone, or in a cyclic animation (or if two chunks have the
         // same contents — once we make chunks in relative coordinates).
@@ -386,7 +399,7 @@ pub(crate) async fn export_gltf(
         let name = block_def_ref.name();
         p.set_label(&name);
         p.progress(0.01).await;
-        let mesh = SpaceMesh::from(&BlockMesh::new(
+        let mesh = SpaceMesh::<GltfMt>::from(&BlockMesh::new(
             &block_def
                 .evaluate()
                 .map_err(|eve| ExportError::NotRepresentable {

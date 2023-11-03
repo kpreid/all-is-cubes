@@ -7,19 +7,25 @@ use gltf_json::extras::Void;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
-use all_is_cubes_mesh::{IndexSlice, SpaceMesh};
+use all_is_cubes_mesh::{IndexSlice, MeshTypes, SpaceMesh};
 
-use super::glue::{create_accessor, push_and_return_index, u32size};
-use super::{GltfTile, GltfVertex, GltfWriter};
+use crate::gltf::glue::{create_accessor, push_and_return_index, u32size};
+use crate::gltf::{GltfTextureAllocator, GltfVertex, GltfWriter};
 
 /// Create [`gltf_json::Mesh`] and all its parts (accessors, buffers) from a [`SpaceMesh`].
 ///
 /// If the input is empty, does nothing and returns `None`.
-pub(crate) fn add_mesh(
+pub(crate) fn add_mesh<M>(
     writer: &mut GltfWriter,
     name: &dyn fmt::Display,
-    mesh: &SpaceMesh<GltfVertex, GltfTile>,
-) -> Option<Index<gltf_json::Mesh>> {
+    mesh: &SpaceMesh<M>,
+) -> Option<Index<gltf_json::Mesh>>
+where
+    // TODO: This generic bound (rather than `SpaceMesh<GltfMt>`) is a workaround to allow
+    // `all-is-cubes-port` to define its own `DynamicMeshTypes`. This is a sign that maybe
+    // `DynamicMeshTypes` is designed wrong.
+    M: MeshTypes<Vertex = GltfVertex, Alloc = GltfTextureAllocator>,
+{
     if mesh.is_empty() {
         return None;
     }

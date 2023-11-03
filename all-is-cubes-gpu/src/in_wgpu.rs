@@ -49,6 +49,20 @@ mod space;
 use space::SpaceRenderer;
 mod vertex;
 
+/// [`DynamicMeshTypes`] implementation for this wgpu glue library.
+#[derive(Debug)]
+enum WgpuMt {}
+
+impl all_is_cubes_mesh::MeshTypes for WgpuMt {
+    type Vertex = vertex::WgpuBlockVertex;
+    type Alloc = AtlasAllocator;
+    type Tile = block_texture::AtlasTile;
+}
+
+impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for WgpuMt {
+    type RenderData = Option<space::ChunkBuffers>;
+}
+
 /// Entry point for [`wgpu`] rendering. Construct this and hand it the [`wgpu::Surface`]
 /// to draw on.
 //#[derive(Debug)]

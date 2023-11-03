@@ -11,8 +11,8 @@ use all_is_cubes::universe::{URef, Universe};
 use all_is_cubes::{notnan, rgba_const, time, transaction};
 
 use crate::dynamic;
-use crate::texture::{NoTexture, NoTextures};
-use crate::BlockVertex;
+use crate::testing::NoTextureMt as Mt;
+use crate::texture::NoTextures;
 
 use super::{ChunkTodo, ChunkedSpaceMesh, CsmTodo, CsmUpdateInfo, TodoListener};
 
@@ -144,7 +144,7 @@ struct CsmTester {
     universe: Universe,
     space: URef<Space>,
     camera: Camera,
-    csm: ChunkedSpaceMesh<(), BlockVertex<NoTexture>, NoTextures, std::time::Instant, CHUNK_SIZE>,
+    csm: ChunkedSpaceMesh<Mt, std::time::Instant, CHUNK_SIZE>,
 }
 
 impl CsmTester {
@@ -171,7 +171,7 @@ impl CsmTester {
     /// Call `csm.update_blocks_and_some_chunks()` with the tester's placeholders
     fn update<F>(&mut self, render_data_updater: F) -> CsmUpdateInfo
     where
-        F: FnMut(dynamic::RenderDataUpdate<'_, (), BlockVertex<NoTexture>, NoTexture>),
+        F: FnMut(dynamic::RenderDataUpdate<'_, Mt>),
     {
         self.csm.update_blocks_and_some_chunks(
             &self.camera,

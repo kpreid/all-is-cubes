@@ -11,8 +11,10 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{BlockIndex, Space};
 
-use crate::{texture, VPos};
+#[cfg(doc)]
+use crate::texture;
 use crate::{BlockMesh, GfxVertex, IndexSlice, IndexVec, MeshOptions};
+use crate::{MeshTypes, VPos};
 
 /// A triangle mesh representation of a [`Space`] (or part of it) which may
 /// then be rasterized.
@@ -20,21 +22,19 @@ use crate::{BlockMesh, GfxVertex, IndexSlice, IndexVec, MeshOptions};
 /// A [`SpaceMesh`] may be used multiple times as a [`Space`] is modified.
 /// Currently, the only benefit of this is avoiding reallocating memory.
 ///
-/// The type parameters allow adaptation to the target graphics API:
-/// * `V` is the type of vertices.
-/// * `T` is the type of textures, which come from a [`texture::Allocator`].
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SpaceMesh<V, T> {
-    vertices: Vec<V>,
+/// The type parameter `M` allows generating meshes suitable for the target graphics API by
+/// providing a suitable implementation of [`MeshTypes`].
+pub struct SpaceMesh<M: MeshTypes> {
+    vertices: Vec<M::Vertex>,
     indices: IndexVec,
 
-    meta: MeshMeta<T>,
+    meta: MeshMeta<M>,
 
     /// Set of all [`BlockIndex`]es whose meshes were incorporated into this mesh.
     block_indices_used: BitVec,
 }
 
-impl<V, T> SpaceMesh<V, T> {
+impl<M: MeshTypes> SpaceMesh<M> {
     #[allow(clippy::doc_markdown)] // https://github.com/rust-lang/rust-clippy/issues/9473
     /// Computes a triangle mesh of a [`Space`].
     ///
@@ -46,11 +46,9 @@ impl<V, T> SpaceMesh<V, T> {
         bounds: GridAab,
         options: &MeshOptions,
         block_meshes: P,
-    ) -> SpaceMesh<V, T>
+    ) -> Self
     where
-        V: GfxVertex + 'p,
-        P: GetBlockMesh<'p, V, T>,
-        T: texture::Tile + 'p,
+        P: GetBlockMesh<'p, M>,
     {
         let mut this = Self::default();
         this.compute(space, bounds, options, block_meshes);
@@ -60,7 +58,7 @@ impl<V, T> SpaceMesh<V, T> {
     /// The vertices of the mesh, in an arbitrary order. Use [`indices()`](`Self::indices`)
     /// and the [`MeshMeta`] range methods to determine how to use them.
     #[inline]
-    pub fn vertices(&self) -> &[V] {
+    pub fn vertices(&self) -> &[M::Vertex] {
         &self.vertices
     }
 
@@ -78,7 +76,7 @@ impl<V, T> SpaceMesh<V, T> {
     /// The metadata of the mesh, which describes how to use the indices for drawing,
     /// but does not own them or the vertices.
     #[inline]
-    pub fn meta(&self) -> &MeshMeta<T> {
+    pub fn meta(&self) -> &MeshMeta<M> {
         &self.meta
     }
 
@@ -86,7 +84,7 @@ impl<V, T> SpaceMesh<V, T> {
     /// This is appropriate for use when the data has been copied to a GPU or data file
     /// and is no longer needed in CPU memory.
     #[inline]
-    pub fn into_meta(self) -> MeshMeta<T> {
+    pub fn into_meta(self) -> MeshMeta<M> {
         self.meta
     }
 
@@ -144,14 +142,12 @@ impl<V, T> SpaceMesh<V, T> {
         } = self;
 
         size_of::<Self>()
-            + vertices.capacity() * size_of::<V>()
+            + vertices.capacity() * size_of::<M::Vertex>()
             + indices.capacity_bytes()
             + block_indices_used.capacity() / 8
-            + textures_used.capacity() * size_of::<T>()
+            + textures_used.capacity() * size_of::<M::Tile>()
     }
-}
 
-impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
     /// Computes triangles for the contents of `space` within `bounds` and stores them
     /// in `self`.
     ///
@@ -177,9 +173,7 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
         _options: &MeshOptions,
         mut block_meshes: P,
     ) where
-        P: GetBlockMesh<'p, V, T>,
-        V: 'p,
-        T: 'p,
+        P: GetBlockMesh<'p, M>,
     {
         // use the buffer but not the existing data
         self.vertices.clear();
@@ -289,7 +283,7 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
         I: Ord + bytemuck::Pod + num_traits::NumCast,
         IndexVec: Extend<I>,
     {
-        if !V::WANTS_DEPTH_SORTING || transparent_indices.is_empty() {
+        if !M::Vertex::WANTS_DEPTH_SORTING || transparent_indices.is_empty() {
             // Either there is nothing to sort (and all ranges will be length 0),
             // or the destination doesn't want sorting anyway. In either case, write the
             // indices once and fill out transparent_ranges with copies of that range.
@@ -304,13 +298,14 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
                 midpoint: Point3D<S, Cube>,
             }
             let quads = bytemuck::cast_slice::<I, [I; 6]>(&transparent_indices);
-            let mut sortable_quads: Vec<QuadWithMid<V::Coordinate, I>> = quads
-                .iter()
-                .map(|&indices| QuadWithMid {
-                    indices,
-                    midpoint: Self::midpoint(&self.vertices, indices),
-                })
-                .collect();
+            let mut sortable_quads: Vec<QuadWithMid<<M::Vertex as GfxVertex>::Coordinate, I>> =
+                quads
+                    .iter()
+                    .map(|&indices| QuadWithMid {
+                        indices,
+                        midpoint: Self::midpoint(&self.vertices, indices),
+                    })
+                    .collect();
 
             // Copy unsorted indices into the main array, for later dynamic sorting.
             self.meta.transparent_ranges[DepthOrdering::Within.to_index()] =
@@ -330,11 +325,13 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
 
                 // Note: Benchmarks show that `sort_by_key` is fastest
                 // (not `sort_unstable_by_key`).
-                sortable_quads.sort_by_key(|quad| -> [OrderedFloat<V::Coordinate>; 3] {
-                    basis
-                        .map(|f| OrderedFloat(-f.dot(quad.midpoint.to_vector())))
-                        .into()
-                });
+                sortable_quads.sort_by_key(
+                    |quad| -> [OrderedFloat<<M::Vertex as GfxVertex>::Coordinate>; 3] {
+                        basis
+                            .map(|f| OrderedFloat(-f.dot(quad.midpoint.to_vector())))
+                            .into()
+                    },
+                );
 
                 // Copy the sorted indices into the main array, and set the corresponding
                 // range.
@@ -365,8 +362,8 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
     ///
     /// Note that in the current implementation, the return value is `true` even if no
     /// reordering occurred, unless there is nothing to sort. This may be improved in the future.
-    pub fn depth_sort_for_view(&mut self, view_position: VPos<V>) -> bool {
-        if !V::WANTS_DEPTH_SORTING {
+    pub fn depth_sort_for_view(&mut self, view_position: VPos<M>) -> bool {
+        if !M::Vertex::WANTS_DEPTH_SORTING {
             return false;
         }
         let range = self.transparent_range(DepthOrdering::Within);
@@ -403,14 +400,15 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
 
     /// Compute quad midpoint from quad vertices, for depth sorting.
     #[inline]
-    fn midpoint<I>(vertices: &[V], indices: [I; 6]) -> VPos<V>
+    fn midpoint<I>(vertices: &[M::Vertex], indices: [I; 6]) -> VPos<M>
     where
         I: num_traits::NumCast,
     {
-        let one_half = num_traits::cast::<f32, V::Coordinate>(0.5f32).unwrap();
+        let one_half =
+            num_traits::cast::<f32, <M::Vertex as GfxVertex>::Coordinate>(0.5f32).unwrap();
         // We only need to look at one of the two triangles,
         // because they have the same bounding rectangle.
-        let [v0, v1, v2, ..]: [VPos<V>; 6] =
+        let [v0, v1, v2, ..]: [VPos<M>; 6] =
             indices.map(|i| vertices[num_traits::cast::<I, usize>(i).unwrap()].position());
         let max = v0
             .zip(v1, num_traits::Float::max)
@@ -422,11 +420,54 @@ impl<V: GfxVertex, T: texture::Tile> SpaceMesh<V, T> {
     }
 }
 
-impl<V, T> std::ops::Deref for SpaceMesh<V, T> {
-    type Target = MeshMeta<T>;
+impl<M: MeshTypes> std::ops::Deref for SpaceMesh<M> {
+    type Target = MeshMeta<M>;
 
     fn deref(&self) -> &Self::Target {
         &self.meta
+    }
+}
+
+impl<M: MeshTypes> PartialEq for SpaceMesh<M> {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            vertices,
+            indices,
+            meta,
+            block_indices_used,
+        } = self;
+        *vertices == other.vertices
+            && *indices == other.indices
+            && *meta == other.meta
+            && *block_indices_used == other.block_indices_used
+    }
+}
+
+impl<M: MeshTypes> Debug for SpaceMesh<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            vertices,
+            indices,
+            meta,
+            block_indices_used,
+        } = self;
+        f.debug_struct("SpaceMesh")
+            .field("vertices", vertices)
+            .field("indices", indices)
+            .field("meta", meta)
+            .field("block_indices_used", block_indices_used)
+            .finish()
+    }
+}
+
+impl<M: MeshTypes> Clone for SpaceMesh<M> {
+    fn clone(&self) -> Self {
+        Self {
+            vertices: self.vertices.clone(),
+            indices: self.indices.clone(),
+            meta: self.meta.clone(),
+            block_indices_used: self.block_indices_used.clone(),
+        }
     }
 }
 
@@ -440,10 +481,10 @@ impl<V, T> std::ops::Deref for SpaceMesh<V, T> {
 /// * `neighbor_is_fully_opaque` is called to determine whether this block's faces are
 ///   obscured. It is a function so that lookups can be skipped if their answer would
 ///   make no difference.
-fn write_block_mesh_to_space_mesh<V: GfxVertex, T: texture::Tile>(
-    block_mesh: &BlockMesh<V, T>,
+fn write_block_mesh_to_space_mesh<M: MeshTypes>(
+    block_mesh: &BlockMesh<M>,
     cube: Cube,
-    vertices: &mut Vec<V>,
+    vertices: &mut Vec<M::Vertex>,
     opaque_indices: &mut IndexVec,
     transparent_indices: &mut IndexVec,
     mut neighbor_is_fully_opaque: impl FnMut(Face6) -> bool,
@@ -452,7 +493,7 @@ fn write_block_mesh_to_space_mesh<V: GfxVertex, T: texture::Tile>(
         return;
     }
 
-    let inst = V::instantiate_block(cube);
+    let inst = M::Vertex::instantiate_block(cube);
 
     for (face, face_mesh) in block_mesh.all_face_meshes() {
         if face_mesh.is_empty() {
@@ -492,7 +533,7 @@ fn write_block_mesh_to_space_mesh<V: GfxVertex, T: texture::Tile>(
     }
 }
 
-impl<V, T> Default for SpaceMesh<V, T> {
+impl<M: MeshTypes> Default for SpaceMesh<M> {
     /// Construct an empty [`SpaceMesh`] which draws nothing.
     #[inline]
     fn default() -> Self {
@@ -505,13 +546,13 @@ impl<V, T> Default for SpaceMesh<V, T> {
     }
 }
 
-impl<V: GfxVertex, T: texture::Tile> From<&BlockMesh<V, T>> for SpaceMesh<V, T> {
+impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
     /// Construct a `SpaceMesh` containing the given `BlockMesh`.
     ///
     /// The result will be identical to creating a [`Space`] with bounds
     /// `GridAab::ORIGIN_CUBE` and placing the block in it,
     /// but more efficient.
-    fn from(block_mesh: &BlockMesh<V, T>) -> Self {
+    fn from(block_mesh: &BlockMesh<M>) -> Self {
         let mut block_indices_used = BitVec::new();
         block_indices_used.push(true);
 
@@ -588,7 +629,7 @@ where
 ///
 /// This trait allows the caller of [`SpaceMesh::compute`] to provide an implementation
 /// which, for example, lazily computes meshes, or detects which meshes have been used.
-pub trait GetBlockMesh<'a, V, T> {
+pub trait GetBlockMesh<'a, M: MeshTypes> {
     /// Returns a mesh which depicts the block which is the `index`-th element of
     /// [`Space::block_data()`] in the relevant [`Space`].
     ///
@@ -616,26 +657,21 @@ pub trait GetBlockMesh<'a, V, T> {
     ///
     /// Note that the returned [`BlockMesh`] may have [`Flaws`] which will be incorporated
     /// into the [`SpaceMesh`]'s flaws.
-    fn get_block_mesh(
-        &mut self,
-        index: BlockIndex,
-        cube: Cube,
-        primary: bool,
-    ) -> &'a BlockMesh<V, T>;
+    fn get_block_mesh(&mut self, index: BlockIndex, cube: Cube, primary: bool) -> &'a BlockMesh<M>;
 }
 
 /// Basic implementation of [`GetBlockMesh`] for any slice of meshes.
-impl<'a, V: 'static, T: 'static> GetBlockMesh<'a, V, T> for &'a [BlockMesh<V, T>] {
+impl<'a, M: MeshTypes> GetBlockMesh<'a, M> for &'a [BlockMesh<M>] {
     fn get_block_mesh(
         &mut self,
         index: BlockIndex,
         #[allow(unused)] cube: Cube,
         #[allow(unused)] primary: bool,
-    ) -> &'a BlockMesh<V, T> {
+    ) -> &'a BlockMesh<M> {
         // TODO: Consider changing this out-of-bounds behavior to either panic or return a mesh with
         // some `Flaws` set.
 
-        <[_]>::get(self, usize::from(index)).unwrap_or(BlockMesh::<V, T>::EMPTY_REF)
+        <[_]>::get(self, usize::from(index)).unwrap_or(BlockMesh::<M>::EMPTY_REF)
     }
 }
 
@@ -647,8 +683,7 @@ impl<'a, V: 'static, T: 'static> GetBlockMesh<'a, V, T> for &'a [BlockMesh<V, T>
 ///
 /// In addition to index data, it contains the [`texture::Tile`]s of type `T` for the mesh,
 /// so as to keep them allocated. (Therefore, this type is not [`Copy`].)
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MeshMeta<T> {
+pub struct MeshMeta<M: MeshTypes> {
     /// Where in the index vector the triangles with no partial transparency are arranged.
     opaque_range: Range<usize>,
 
@@ -660,7 +695,7 @@ pub struct MeshMeta<T> {
 
     /// Texture tiles used by the vertices; holding these objects is intended to ensure
     /// the texture coordinates remain allocated to the intended texels.
-    textures_used: Vec<T>,
+    textures_used: Vec<M::Tile>,
 
     /// Flaws in this mesh, that should be reported as flaws in any rendering containing it.
     //
@@ -669,7 +704,7 @@ pub struct MeshMeta<T> {
     flaws: Flaws,
 }
 
-impl<T> MeshMeta<T> {
+impl<M: MeshTypes> MeshMeta<M> {
     /// Reports any flaws in this mesh: reasons why using it to create a rendering would
     /// fail to accurately represent the scene.
     pub fn flaws(&self) -> Flaws {
@@ -719,7 +754,7 @@ impl<T> MeshMeta<T> {
 /// We need a Range constant to be able to initialize arrays.
 const ZERO_RANGE: Range<usize> = 0..0;
 
-impl<T> Default for MeshMeta<T> {
+impl<M: MeshTypes> Default for MeshMeta<M> {
     /// Construct an empty [`MeshMeta`] which designates nothing (using the index range `0..0`).
     #[inline]
     fn default() -> Self {
@@ -729,6 +764,49 @@ impl<T> Default for MeshMeta<T> {
             transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
             textures_used: Vec::new(),
             flaws: Flaws::empty(),
+        }
+    }
+}
+
+impl<M: MeshTypes> PartialEq for MeshMeta<M> {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            opaque_range,
+            transparent_ranges,
+            textures_used,
+            flaws,
+        } = self;
+        *opaque_range == other.opaque_range
+            && *transparent_ranges == other.transparent_ranges
+            && *textures_used == other.textures_used
+            && *flaws == other.flaws
+    }
+}
+
+impl<M: MeshTypes> Debug for MeshMeta<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            opaque_range,
+            transparent_ranges,
+            textures_used,
+            flaws,
+        } = self;
+        f.debug_struct("MeshMeta")
+            .field("opaque_range", opaque_range)
+            .field("transparent_ranges", transparent_ranges)
+            .field("textures_used", textures_used)
+            .field("flaws", flaws)
+            .finish()
+    }
+}
+
+impl<M: MeshTypes> Clone for MeshMeta<M> {
+    fn clone(&self) -> Self {
+        Self {
+            opaque_range: self.opaque_range.clone(),
+            transparent_ranges: self.transparent_ranges.clone(),
+            textures_used: self.textures_used.clone(),
+            flaws: self.flaws,
         }
     }
 }
@@ -846,13 +924,14 @@ impl DepthOrdering {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::texture::{TestPoint, TestTile};
-    use crate::{tests::mesh_blocks_and_space, BlockVertex};
+    use crate::testing::{mesh_blocks_and_space, TextureMt};
+    use crate::texture::TestPoint;
+    use crate::BlockVertex;
     use all_is_cubes::block::Block;
     use all_is_cubes::math::Rgba;
     use std::mem;
 
-    type TestMesh = SpaceMesh<BlockVertex<TestPoint>, TestTile>;
+    type TestMesh = SpaceMesh<TextureMt>;
 
     /// Test that `default()` returns an empty mesh and the characteristics of such a mesh.
     #[test]
@@ -884,7 +963,7 @@ mod tests {
 
     #[test]
     fn slice_get_block_mesh_out_of_bounds() {
-        let mut source: &[BlockMesh<BlockVertex<TestPoint>, TestTile>] = &[];
+        let mut source: &[BlockMesh<TextureMt>] = &[];
         assert_eq!(
             source.get_block_mesh(10, Cube::ORIGIN, true),
             BlockMesh::EMPTY_REF

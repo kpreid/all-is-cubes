@@ -8,18 +8,19 @@ use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::time;
 use all_is_cubes::util::{Refmt as _, StatusText, TimeStats};
 
-use crate::texture;
-use crate::{BlockMesh, GetBlockMesh, GfxVertex, MeshOptions, SpaceMesh};
+use crate::dynamic::DynamicMeshTypes;
+use crate::{texture, GfxVertex};
+use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh};
 
 #[derive(Debug)]
-pub(crate) struct VersionedBlockMeshes<D, Vert, Tile> {
+pub(crate) struct VersionedBlockMeshes<M: DynamicMeshTypes> {
     /// Indices of this vector are block IDs in the Space.
-    pub(crate) meshes: Vec<VersionedBlockMesh<D, Vert, Tile>>,
+    pub(crate) meshes: Vec<VersionedBlockMesh<M>>,
 
     last_version_counter: NonZeroU32,
 }
 
-impl<D, Vert, Tile> VersionedBlockMeshes<D, Vert, Tile> {
+impl<M: DynamicMeshTypes> VersionedBlockMeshes<M> {
     pub fn new() -> Self {
         Self {
             meshes: Vec::new(),
@@ -35,11 +36,10 @@ impl<D, Vert, Tile> VersionedBlockMeshes<D, Vert, Tile> {
     }
 }
 
-impl<D, Vert, Tile> VersionedBlockMeshes<D, Vert, Tile>
+impl<M: DynamicMeshTypes> VersionedBlockMeshes<M>
 where
-    D: Default,
-    Vert: GfxVertex<TexPoint = <Tile as texture::Tile>::Point> + PartialEq,
-    Tile: texture::Tile + PartialEq,
+    M::Vertex: GfxVertex<TexPoint = <M::Tile as texture::Tile>::Point> + PartialEq,
+    M::Tile: texture::Tile + PartialEq,
 {
     /// Update block meshes based on the given [`Space`].
     ///
@@ -48,18 +48,17 @@ where
     /// it will be the correct length.
     ///
     /// Relies on the caller to check if `mesh_options` has changed and fill `todo`.
-    pub(crate) fn update<A, F, I>(
+    pub(crate) fn update<F, I>(
         &mut self,
         todo: &mut FnvHashSet<BlockIndex>,
         space: &Space,
-        block_texture_allocator: &A,
+        block_texture_allocator: &M::Alloc,
         mesh_options: &MeshOptions,
         deadline: time::Deadline<I>,
         mut render_data_updater: F,
     ) -> TimeStats
     where
-        A: texture::Allocator<Tile = Tile>,
-        F: FnMut(super::RenderDataUpdate<'_, D, Vert, Tile>),
+        F: FnMut(super::RenderDataUpdate<'_, M>),
         I: time::Instant,
     {
         if todo.is_empty() {
@@ -133,7 +132,7 @@ where
 
             let bd = &block_data[uindex];
             let new_evaluated_block: &EvaluatedBlock = bd.evaluated();
-            let current_mesh_entry: &mut VersionedBlockMesh<_, _, _> = &mut self.meshes[uindex];
+            let current_mesh_entry: &mut VersionedBlockMesh<_> = &mut self.meshes[uindex];
 
             // TODO: Consider re-introducing approximate cost measurement
             // to hit the deadline better.
@@ -208,32 +207,30 @@ where
     }
 }
 
-impl<D, Vert, Tile> Default for VersionedBlockMeshes<D, Vert, Tile> {
+impl<M: DynamicMeshTypes> Default for VersionedBlockMeshes<M> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a, D, Vert: 'static, Tile: 'static> GetBlockMesh<'a, Vert, Tile>
-    for &'a VersionedBlockMeshes<D, Vert, Tile>
-{
+impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for &'a VersionedBlockMeshes<M> {
     fn get_block_mesh(
         &mut self,
         index: BlockIndex,
         _cube: Cube,
         _primary: bool,
-    ) -> &'a BlockMesh<Vert, Tile> {
+    ) -> &'a BlockMesh<M> {
         self.meshes
             .get(usize::from(index))
             .map(|vbm| &vbm.mesh)
-            .unwrap_or(BlockMesh::<Vert, Tile>::EMPTY_REF)
+            .unwrap_or(BlockMesh::<M>::EMPTY_REF)
     }
 }
 
 /// Entry in [`VersionedBlockMeshes`].
 #[derive(Debug)]
-pub(crate) struct VersionedBlockMesh<D, Vert, Tile> {
-    pub(crate) mesh: BlockMesh<Vert, Tile>,
+pub(crate) struct VersionedBlockMesh<M: DynamicMeshTypes> {
+    pub(crate) mesh: BlockMesh<M>,
 
     /// Version ID used to track whether chunks have stale block meshes (ones that don't
     /// match the current definition of that block-index in the space).
@@ -243,7 +240,7 @@ pub(crate) struct VersionedBlockMesh<D, Vert, Tile> {
     /// (not part of a larger mesh).
     ///
     /// TODO(instancing): This is not yet used.
-    pub(crate) instance_data: (crate::MeshMeta<Tile>, D),
+    pub(crate) instance_data: (crate::MeshMeta<M>, M::RenderData),
 }
 
 /// Together with a [`BlockIndex`], uniquely identifies a block mesh.

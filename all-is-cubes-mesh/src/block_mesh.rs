@@ -14,9 +14,10 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::Space;
 
-use crate::texture;
+use crate::texture::{self, Tile as _};
 use crate::{
-    push_quad, BlockVertex, GreedyMesher, IndexVec, MeshOptions, QuadColoring, QuadTransform,
+    push_quad, GfxVertex, GreedyMesher, IndexVec, MeshOptions, MeshTypes, QuadColoring,
+    QuadTransform,
 };
 
 /// Part of the triangle mesh calculated for a [`Block`], stored in a [`BlockMesh`] keyed
@@ -84,25 +85,21 @@ impl<V> Default for BlockFaceMesh<V> {
 /// Pass it to [`SpaceMesh::new()`](super::SpaceMesh::new) to assemble
 /// blocks into an entire scene or chunk.
 ///
-/// The type parameters allow adaptation to the target graphics API:
-/// * `V` is the type of vertices.
-/// * `T` is the type of textures, which come from a [`texture::Allocator`].
-///
-/// TODO: Add methods so this can be read out directly if you really want to.
+/// The type parameter `M` allows generating meshes suitable for the target graphics API by
+/// providing a suitable implementation of [`MeshTypes`].
 ///
 /// [`Block`]: all_is_cubes::block::Block
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BlockMesh<V, T> {
+pub struct BlockMesh<M: MeshTypes> {
     /// Vertices grouped by which face being obscured would obscure those vertices.
-    pub(super) face_vertices: FaceMap<BlockFaceMesh<V>>,
+    pub(super) face_vertices: FaceMap<BlockFaceMesh<M::Vertex>>,
 
     /// Vertices not fitting into [`Self::face_vertices`] because they may be visible
     /// from multiple directions or when the eye position is inside the block.
-    pub(super) interior_vertices: BlockFaceMesh<V>,
+    pub(super) interior_vertices: BlockFaceMesh<M::Vertex>,
 
     /// Texture used by the vertices;
     /// holding this handle ensures that the texture coordinates stay valid.
-    pub(super) texture_used: Option<T>,
+    pub(super) texture_used: Option<M::Tile>,
 
     /// The [`EvaluatedBlock::voxel_opacity_mask`] that the mesh was constructed from;
     /// if new block data has the same mask, then it is safe to replace the texture
@@ -118,7 +115,10 @@ pub struct BlockMesh<V, T> {
     flaws: Flaws,
 }
 
-impl<V, T> BlockMesh<V, T> {
+impl<M: MeshTypes + 'static> BlockMesh<M> {
+    /// A reference to the mesh with no vertices, which has no effect when drawn.
+    pub const EMPTY_REF: &'static Self = &Self::EMPTY;
+
     /// The mesh with no vertices, which has no effect when drawn.
     ///
     /// This is a `const` equivalent to [`Self::default()`].
@@ -141,7 +141,9 @@ impl<V, T> BlockMesh<V, T> {
     ///
     /// This function is not public because it is mostly a helper for higher-level
     /// operations, and the details of [`BlockFaceMesh`] may change.
-    pub(super) fn all_face_meshes(&self) -> impl Iterator<Item = (Face7, &BlockFaceMesh<V>)> {
+    pub(super) fn all_face_meshes(
+        &self,
+    ) -> impl Iterator<Item = (Face7, &BlockFaceMesh<M::Vertex>)> {
         std::iter::once((Face7::Within, &self.interior_vertices)).chain(
             self.face_vertices
                 .iter()
@@ -153,7 +155,7 @@ impl<V, T> BlockMesh<V, T> {
     /// for as long as the associated vertices are being used, rather than only as long as
     /// the life of this mesh.
     // TODO: revisit this interface design. Maybe callers should just have an Rc<BlockMesh>?
-    pub(crate) fn textures(&self) -> &[T] {
+    pub(crate) fn textures(&self) -> &[M::Tile] {
         match &self.texture_used {
             Some(t) => core::slice::from_ref(t),
             None => &[],
@@ -189,11 +191,8 @@ impl<V, T> BlockMesh<V, T> {
     // TODO: non-public while we decide whether it's a good interface
     #[must_use]
     #[mutants::skip] // optimization, doesn't change things if it fails
-    pub(crate) fn try_update_texture_only(&mut self, block: &EvaluatedBlock) -> bool
-    where
-        T: texture::Tile,
-    {
-        if !T::REUSABLE {
+    pub(crate) fn try_update_texture_only(&mut self, block: &EvaluatedBlock) -> bool {
+        if !<M::Tile as texture::Tile>::REUSABLE {
             return false;
         }
 
@@ -214,25 +213,15 @@ impl<V, T> BlockMesh<V, T> {
             _ => false,
         }
     }
-}
 
-impl<V: 'static, T: 'static> BlockMesh<V, T> {
-    /// A reference to the mesh with no vertices, which has no effect when drawn.
-    pub const EMPTY_REF: &'static Self = &Self::EMPTY;
-}
-
-impl<V, T> BlockMesh<V, T>
-where
-    V: From<BlockVertex<<T as texture::Tile>::Point>>,
-    T: texture::Tile,
-{
     /// Generate the [`BlockMesh`] for a block's current appearance.
     ///
     /// This may then be may be used as input to [`SpaceMesh::new`](super::SpaceMesh::new).
-    pub fn new<A>(block: &EvaluatedBlock, texture_allocator: &A, options: &MeshOptions) -> Self
-    where
-        A: texture::Allocator<Tile = T>,
-    {
+    pub fn new(
+        block: &EvaluatedBlock,
+        texture_allocator: &M::Alloc,
+        options: &MeshOptions,
+    ) -> Self {
         let mut new_self = Self::default();
         new_self.compute(block, texture_allocator, options);
         new_self
@@ -261,14 +250,12 @@ where
     ///
     /// TODO: This does not currently reuse the texture allocation.
     /// Add the capability to do so if the caller requests it.
-    pub fn compute<A>(
+    pub fn compute(
         &mut self,
         block: &EvaluatedBlock,
-        texture_allocator: &A,
+        texture_allocator: &M::Alloc,
         options: &MeshOptions,
-    ) where
-        A: texture::Allocator<Tile = T>,
-    {
+    ) {
         self.clear();
 
         // If this is true, avoid using vertex coloring even on solid rectangles.
@@ -305,7 +292,7 @@ where
                             point2(0., 0.),
                             point2(1., 1.),
                             // TODO: Respect the prefer_textures option.
-                            QuadColoring::<T::Plane>::Solid(block_color),
+                            QuadColoring::<<M::Tile as texture::Tile>::Plane>::Solid(block_color),
                         );
                     }
                     face_mesh.fully_opaque = block_color.fully_opaque();
@@ -338,7 +325,7 @@ where
                 }
                 let mut output_interior = &mut self.interior_vertices;
 
-                let mut texture_if_needed: Option<A::Tile> = None;
+                let mut texture_if_needed: Option<M::Tile> = None;
 
                 // Walk through the planes (layers) of the block, figuring out what geometry to
                 // generate for each layer and whether it needs a texture.
@@ -382,7 +369,8 @@ where
                                 * rotated_voxel_range.y_range().len(),
                         );
 
-                        let mut texture_plane_if_needed: Option<T::Plane> = None;
+                        let mut texture_plane_if_needed: Option<<M::Tile as texture::Tile>::Plane> =
+                            None;
 
                         for t in rotated_voxel_range.y_range() {
                             for s in rotated_voxel_range.x_range() {
@@ -483,7 +471,9 @@ where
                             {
                                 // The quad we're going to draw has identical texels, so we might as
                                 // well use a solid color and skip needing a texture.
-                                QuadColoring::<T::Plane>::Solid(single_color)
+                                QuadColoring::<<M::Tile as texture::Tile>::Plane>::Solid(
+                                    single_color,
+                                )
                             } else {
                                 if texture_plane_if_needed.is_none() {
                                     if texture_if_needed.is_none() {
@@ -510,7 +500,9 @@ where
                                     }
                                 }
                                 if let Some(ref plane) = texture_plane_if_needed {
-                                    QuadColoring::<T::Plane>::Texture(plane)
+                                    QuadColoring::<<M::Tile as texture::Tile>::Plane>::Texture(
+                                        plane,
+                                    )
                                 } else {
                                     // Texture allocation failure.
                                     // Report the flaw and use block color as a fallback.
@@ -519,7 +511,7 @@ where
                                     // * Offer the alternative of generating as much
                                     //   geometry as needed.
                                     *flaws |= Flaws::MISSING_TEXTURES;
-                                    QuadColoring::<T::Plane>::Solid(
+                                    QuadColoring::<<M::Tile as texture::Tile>::Plane>::Solid(
                                         options.transparency.limit_alpha(block.color),
                                     )
                                 }
@@ -559,7 +551,7 @@ where
     }
 }
 
-impl<V, T> Default for BlockMesh<V, T> {
+impl<M: MeshTypes> Default for BlockMesh<M> {
     /// Returns a [`BlockMesh`] that contains no vertices, which has no effect when drawn.
     ///
     /// This is equivalent to [`BlockMesh::EMPTY`].
@@ -576,19 +568,70 @@ impl<V, T> Default for BlockMesh<V, T> {
     }
 }
 
+impl<M: MeshTypes> PartialEq for BlockMesh<M>
+where
+    M::Vertex: PartialEq,
+    M::Tile: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            face_vertices,
+            interior_vertices,
+            texture_used,
+            voxel_opacity_mask,
+            flaws,
+        } = self;
+        *face_vertices == other.face_vertices
+            && *interior_vertices == other.interior_vertices
+            && *texture_used == other.texture_used
+            && *voxel_opacity_mask == other.voxel_opacity_mask
+            && *flaws == other.flaws
+    }
+}
+
+impl<M: MeshTypes> Debug for BlockMesh<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            face_vertices,
+            interior_vertices,
+            texture_used,
+            voxel_opacity_mask,
+            flaws,
+        } = self;
+        f.debug_struct("BlockMesh")
+            .field("face_vertices", face_vertices)
+            .field("interior_vertices", interior_vertices)
+            .field("texture_used", texture_used)
+            .field("voxel_opacity_mask", voxel_opacity_mask)
+            .field("flaws", flaws)
+            .finish()
+    }
+}
+
+impl<M: MeshTypes> Clone for BlockMesh<M> {
+    fn clone(&self) -> Self {
+        Self {
+            face_vertices: self.face_vertices.clone(),
+            interior_vertices: self.interior_vertices.clone(),
+            texture_used: self.texture_used.clone(),
+            voxel_opacity_mask: self.voxel_opacity_mask.clone(),
+            flaws: self.flaws,
+        }
+    }
+}
 /// Computes [`BlockMeshes`] for blocks currently present in a [`Space`].
 /// Pass the result to [`SpaceMesh::new()`](super::SpaceMesh::new) to use it.
 ///
 /// The resulting array is indexed by the `Space`'s
 /// [`BlockIndex`](all_is_cubes::space::BlockIndex) values.
-pub fn block_meshes_for_space<V, A>(
+pub fn block_meshes_for_space<M: MeshTypes>(
     space: &Space,
-    texture_allocator: &A,
+    texture_allocator: &M::Alloc,
     options: &MeshOptions,
-) -> BlockMeshes<V, A::Tile>
+) -> BlockMeshes<M>
 where
-    V: From<BlockVertex<<<A as texture::Allocator>::Tile as texture::Tile>::Point>>,
-    A: texture::Allocator,
+    // These bounds are redundant with `MeshTypes` but the compiler needs to see them
+    M::Vertex: GfxVertex<TexPoint = <M::Tile as texture::Tile>::Point>,
 {
     space
         .block_data()
@@ -600,7 +643,7 @@ where
 /// Array of [`BlockMesh`] indexed by a [`Space`]'s block indices; a convenience
 /// alias for the return type of [`block_meshes_for_space`].
 /// Pass it to [`SpaceMesh::new()`](super::SpaceMesh::new) to use it.
-pub type BlockMeshes<V, A> = Box<[BlockMesh<V, A>]>;
+pub type BlockMeshes<M> = Box<[BlockMesh<M>]>;
 
 #[cfg(test)]
 mod tests {
@@ -609,13 +652,13 @@ mod tests {
 
     use super::*;
     use crate::tests::test_block_mesh;
-    use crate::texture::{NoTexture, NoTextures};
-    use crate::Coloring;
+    use crate::texture::NoTextures;
+    use crate::{BlockVertex, Coloring};
     use all_is_cubes::block::{Block, AIR};
     use all_is_cubes::camera::GraphicsOptions;
     use all_is_cubes::universe::Universe;
 
-    type TestMesh = BlockMesh<BlockVertex<NoTexture>, NoTexture>;
+    type TestMesh = BlockMesh<crate::testing::NoTextureMt>;
 
     /// Test that `default()` returns an empty mesh and the characteristics of such a mesh.
     #[test]

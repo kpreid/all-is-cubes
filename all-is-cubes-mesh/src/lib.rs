@@ -12,10 +12,12 @@
 //! # Getting started
 //!
 //! [`BlockMesh`] and [`SpaceMesh`] are the key types; everything else supports their
-//! creation and usage.
+//! creation and usage. For real-time dynamically modified meshes, use
+//! [`dynamic::ChunkedSpaceMesh`].
 //!
 //! To support a new API/format, you will need to create suitable implementations of the
-//! [`GfxVertex`] and [`texture::Allocator`] traits.
+//! [`GfxVertex`] and [`texture::Allocator`] traits, then implement [`MeshTypes`] to bundle them
+//! together.
 
 // Basic lint settings, which should be identical across all all-is-cubes project crates.
 // This list is sorted.
@@ -53,6 +55,8 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+use core::fmt;
+
 use all_is_cubes::camera::{GraphicsOptions, TransparencyOption};
 
 mod block_vertex;
@@ -66,6 +70,8 @@ mod space_mesh;
 pub use space_mesh::*;
 mod planar;
 use planar::*;
+#[doc(hidden)]
+pub mod testing;
 pub mod texture;
 
 #[cfg(test)]
@@ -107,4 +113,32 @@ impl MeshOptions {
             ignore_voxels: false,
         }
     }
+}
+
+/// Bundle of types chosen to support a specific graphics API or other mesh format.
+///
+/// Implement this trait (using a placeholder type which need not store any data) to choose the
+/// vertex format, texture format, and texture coordinates to be used.
+///
+/// The rationale of this trait existing is to be able to avoid numerous type parameters passed
+/// around separately.
+pub trait MeshTypes: 'static {
+    /// Mesh vertex type.
+    type Vertex: GfxVertex<TexPoint = <Self::Alloc as texture::Allocator>::Point>
+        + fmt::Debug
+        + PartialEq
+        + 'static;
+
+    /// Texture, or texture atlas, allocator.
+    ///
+    /// If texture support is not desired or possible, use [`texture::NoTextures`] here.
+    type Alloc: texture::Allocator<Tile = Self::Tile> + 'static;
+
+    /// Texture handle type.
+    //--
+    // Design note: This `Point` constraint is theoretically redundant with the above `TexPoint`
+    // and `Tile` constraints, but the compiler won't infer it for us.
+    type Tile: texture::Tile<Point = <Self::Alloc as texture::Allocator>::Point>
+        + fmt::Debug
+        + 'static;
 }

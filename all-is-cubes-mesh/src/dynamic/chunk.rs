@@ -1,44 +1,80 @@
+use core::fmt;
+
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::math::{Aab, Geometry, GridCoordinate, LineVertex};
 use all_is_cubes::space::{BlockIndex, Space};
 
-use crate::{dynamic, texture, GfxVertex, MeshOptions, SpaceMesh, VPos};
+use crate::dynamic::{self, DynamicMeshTypes};
+use crate::{MeshOptions, SpaceMesh, VPos};
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
 
 /// Stores a [`SpaceMesh`] covering one [chunk](all_is_cubes::chunking) of a [`Space`],
 /// caller-provided rendering data, and incidentals.
-#[derive(Debug, Eq, PartialEq)]
-pub struct ChunkMesh<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate>
-where
-    Tex: texture::Allocator,
-{
+pub struct ChunkMesh<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> {
     pub(super) position: ChunkPos<CHUNK_SIZE>,
-    mesh: SpaceMesh<Vert, Tex::Tile>,
+    mesh: SpaceMesh<M>,
     block_dependencies: Vec<(BlockIndex, dynamic::BlockMeshVersion)>,
 
     /// Per-chunk data the owner of the [`ChunkedSpaceMesh`]
     /// may use for whatever purpose suits it, such as handles to GPU buffers.
-    pub render_data: D,
+    pub render_data: M::RenderData,
 
     /// Toggled whenever the mesh is updated. Value is arbitrary (this is a looping
     /// 2-state counter).
     update_debug: bool,
 }
 
-impl<D, Vert, Tex, const CHUNK_SIZE: GridCoordinate> ChunkMesh<D, Vert, Tex, CHUNK_SIZE>
+impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> PartialEq for ChunkMesh<M, CHUNK_SIZE>
 where
-    D: Default, // TODO: This is used for initializing `render_data`, but it might not be ideal.
-    Vert: GfxVertex,
-    Tex: texture::Allocator,
-    Tex::Tile: 'static,
+    M::Vertex: PartialEq,
+    M::Tile: PartialEq,
+    M::RenderData: PartialEq,
 {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            position,
+            mesh,
+            block_dependencies,
+            render_data,
+            update_debug,
+        } = self;
+        *position == other.position
+            && *mesh == other.mesh
+            && *block_dependencies == other.block_dependencies
+            && *render_data == other.render_data
+            && *update_debug == other.update_debug
+    }
+}
+
+impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> fmt::Debug
+    for ChunkMesh<M, CHUNK_SIZE>
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            position,
+            mesh,
+            block_dependencies,
+            render_data,
+            update_debug,
+        } = self;
+        f.debug_struct("ChunkMesh")
+            .field("position", &position)
+            .field("mesh", &mesh)
+            .field("block_dependencies", &block_dependencies)
+            .field("render_data", &render_data)
+            .field("update_debug", &update_debug)
+            .finish()
+    }
+}
+
+impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_SIZE> {
     pub(crate) fn new(position: ChunkPos<CHUNK_SIZE>) -> Self {
         Self {
             position,
             mesh: SpaceMesh::default(),
-            render_data: D::default(),
+            render_data: Default::default(),
             block_dependencies: Vec::new(),
             update_debug: false,
         }
@@ -46,7 +82,7 @@ where
 
     /// Returns the current mesh for this chunk.
     #[inline]
-    pub fn mesh(&self) -> &SpaceMesh<Vert, Tex::Tile> {
+    pub fn mesh(&self) -> &SpaceMesh<M> {
         &self.mesh
     }
 
@@ -59,7 +95,7 @@ where
     pub(crate) fn borrow_for_update(
         &mut self,
         indices_only: bool,
-    ) -> dynamic::RenderDataUpdate<'_, D, Vert, Tex::Tile> {
+    ) -> dynamic::RenderDataUpdate<'_, M> {
         dynamic::RenderDataUpdate {
             mesh: &self.mesh,
             render_data: &mut self.render_data,
@@ -73,7 +109,7 @@ where
         chunk_todo: &mut ChunkTodo,
         space: &Space,
         options: &MeshOptions,
-        block_meshes: &dynamic::VersionedBlockMeshes<D, Vert, Tex::Tile>,
+        block_meshes: &dynamic::VersionedBlockMeshes<M>,
     ) {
         // let compute_start: Option<I> = dynamic::LOG_CHUNK_UPDATES.then(Instant::now);
         let bounds = self.position.bounds();
@@ -123,20 +159,17 @@ where
     ///
     /// Returns whether anything was done, i.e. whether the new indices should be copied
     /// to the GPU.
-    pub fn depth_sort_for_view(&mut self, view_position: VPos<Vert>) -> bool {
+    pub fn depth_sort_for_view(&mut self, view_position: VPos<M>) -> bool {
         // Subtract chunk origin because the mesh coordinates are in chunk-relative
         // coordinates but the incoming view position is in world coordinates.
         // TODO: This makes poor use of the precision of Vert::Coordinate (probably f32).
         // Instead we should explicitly accept relative coordinates.
-        let lbp: VPos<Vert> = self.position.bounds().lower_bounds().cast();
+        let lbp: VPos<M> = self.position.bounds().lower_bounds().cast();
         self.mesh
             .depth_sort_for_view(view_position - lbp.to_vector())
     }
 
-    pub(crate) fn stale_blocks(
-        &self,
-        block_meshes: &dynamic::VersionedBlockMeshes<D, Vert, Tex::Tile>,
-    ) -> bool {
+    pub(crate) fn stale_blocks(&self, block_meshes: &dynamic::VersionedBlockMeshes<M>) -> bool {
         self.block_dependencies
             .iter()
             .any(|&(index, version)| block_meshes.meshes[usize::from(index)].version != version)

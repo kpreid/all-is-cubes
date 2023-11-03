@@ -12,22 +12,17 @@ use all_is_cubes::universe::{Name, URef, Universe};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_mesh::{block_meshes_for_space, MeshOptions, SpaceMesh};
 
+use crate::gltf::{GltfDataDestination, GltfMt, GltfWriter, MeshInstance};
 use crate::{ExportError, ExportFormat, ExportSet};
-
-use super::{GltfDataDestination, GltfTile, GltfVertex, GltfWriter, MeshInstance};
 
 /// Test helper to insert one mesh
 pub(crate) fn gltf_mesh(
     space: &Space,
     writer: &mut GltfWriter,
-) -> (
-    SpaceMesh<GltfVertex, GltfTile>,
-    Option<Index<gltf_json::Mesh>>,
-) {
+) -> (SpaceMesh<GltfMt>, Option<Index<gltf_json::Mesh>>) {
     let options = &MeshOptions::new(&GraphicsOptions::default());
     let blocks = block_meshes_for_space(space, &writer.texture_allocator(), options);
-    let mesh: SpaceMesh<GltfVertex, GltfTile> =
-        SpaceMesh::new(space, space.bounds(), options, &*blocks);
+    let mesh: SpaceMesh<GltfMt> = SpaceMesh::new(space, space.bounds(), options, &*blocks);
 
     let index = writer.add_mesh(&"mesh", &mesh);
 

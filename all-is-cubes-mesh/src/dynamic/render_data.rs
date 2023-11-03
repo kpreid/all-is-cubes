@@ -2,8 +2,9 @@ use std::fmt;
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
+use crate::dynamic::DynamicMeshTypes;
 
-/// Provides mutable access to the render data of type `D` in a dynamic mesh.
+/// Provides mutable access to the data of type `M::RenderData` in a dynamic mesh.
 ///
 /// This struct is provided to the callback of
 /// [`ChunkedSpaceMesh::update_blocks_and_some_chunks()`],
@@ -11,12 +12,12 @@ use crate::dynamic::ChunkedSpaceMesh;
 /// suits the application.
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct RenderDataUpdate<'a, D, V, T> {
+pub struct RenderDataUpdate<'a, M: DynamicMeshTypes> {
     /// Fresh data source.
-    pub mesh: &'a crate::SpaceMesh<V, T>,
+    pub mesh: &'a crate::SpaceMesh<M>,
 
     /// Destination to update.
-    pub render_data: &'a mut D,
+    pub render_data: &'a mut M::RenderData,
 
     /// Whether *only* the indices need to be copied (and their length and type has not changed).
     pub indices_only: bool,

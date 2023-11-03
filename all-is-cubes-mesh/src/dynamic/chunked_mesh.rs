@@ -14,9 +14,8 @@ use all_is_cubes::time::{self, Duration};
 use all_is_cubes::universe::URef;
 use all_is_cubes::util::{Fmt, Refmt, StatusText, TimeStats};
 
-use crate::dynamic::{self, ChunkMesh, ChunkTodo};
-use crate::texture;
-use crate::{GfxVertex, MeshOptions};
+use crate::dynamic::{self, ChunkMesh, ChunkTodo, DynamicMeshTypes};
+use crate::{texture, GfxVertex, MeshOptions};
 
 #[cfg(test)]
 mod tests;
@@ -25,22 +24,22 @@ mod tests;
 /// [chunks](all_is_cubes::chunking) which are individually recomputed as the space changes or
 /// its contained blocks do.
 ///
-/// Each chunk, a [`ChunkMesh`], owns a data value of type `D`, which is
-/// initialized using `D::default()`. This value may be a reference to a corresponding
+/// Each chunk, a [`ChunkMesh`], owns a data value of type `M::RenderData`, which is
+/// initialized using [`Default`]. This value may be a reference to a corresponding
 /// GPU buffer, for example. It will usually need to be an [`Option`] of something.
 ///
 /// [`SpaceMesh`]: crate::SpaceMesh
-#[derive(Debug)]
-pub struct ChunkedSpaceMesh<D, Vert, Tex, I, const CHUNK_SIZE: GridCoordinate>
+#[derive(Debug)] // TODO: loosen trait bounds with manual impl
+pub struct ChunkedSpaceMesh<M, I, const CHUNK_SIZE: GridCoordinate>
 where
-    Tex: texture::Allocator,
+    M: DynamicMeshTypes,
 {
     space: URef<Space>,
 
     /// Dirty flags listening to `space`.
     todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>>,
 
-    block_meshes: dynamic::VersionedBlockMeshes<D, Vert, Tex::Tile>,
+    block_meshes: dynamic::VersionedBlockMeshes<M>,
 
     /// Table of all blocks in the space rendered individually (instanced) rather than being merged
     /// into chunk meshes.
@@ -50,7 +49,7 @@ where
 
     /// Invariant: the set of present chunks (keys here) is the same as the set of keys
     /// in `todo.read().unwrap().chunks`.
-    chunks: FnvHashMap<ChunkPos<CHUNK_SIZE>, ChunkMesh<D, Vert, Tex, CHUNK_SIZE>>,
+    chunks: FnvHashMap<ChunkPos<CHUNK_SIZE>, ChunkMesh<M, CHUNK_SIZE>>,
 
     /// Resized as needed upon each [`Self::update_blocks_and_some_chunks()`].
     chunk_chart: ChunkChart<CHUNK_SIZE>,
@@ -78,14 +77,12 @@ where
     complete_time: Option<I>,
 }
 
-impl<D, Vert, Tex, I, const CHUNK_SIZE: GridCoordinate>
-    ChunkedSpaceMesh<D, Vert, Tex, I, CHUNK_SIZE>
+impl<M, I, const CHUNK_SIZE: GridCoordinate> ChunkedSpaceMesh<M, I, CHUNK_SIZE>
 where
-    D: Default,
-    Vert: GfxVertex<TexPoint = <<Tex as texture::Allocator>::Tile as texture::Tile>::Point>
-        + PartialEq,
-    Tex: texture::Allocator,
-    Tex::Tile: PartialEq + 'static,
+    M: DynamicMeshTypes,
+    // These bounds are redundant with `DynamicMeshTypes` but the compiler needs to see them
+    M::Vertex: GfxVertex<TexPoint = <M::Tile as texture::Tile>::Point> + PartialEq,
+    M::Tile: texture::Tile + PartialEq,
     I: time::Instant,
 {
     /// Constructs a new [`ChunkedSpaceMesh`] that will maintain a mesh representation of
@@ -132,7 +129,7 @@ where
     ///
     /// Empty chunks are included; in particular, this will iterate over every `D` value
     /// owned by this [`ChunkedSpaceMesh`].
-    pub fn iter_chunks(&self) -> impl Iterator<Item = &ChunkMesh<D, Vert, Tex, CHUNK_SIZE>> {
+    pub fn iter_chunks(&self) -> impl Iterator<Item = &ChunkMesh<M, CHUNK_SIZE>> {
         self.chunks.values()
     }
 
@@ -143,8 +140,7 @@ where
     pub fn iter_in_view<'a>(
         &'a self,
         camera: &'a Camera,
-    ) -> impl Iterator<Item = &'a ChunkMesh<D, Vert, Tex, CHUNK_SIZE>> + DoubleEndedIterator + 'a
-    {
+    ) -> impl Iterator<Item = &'a ChunkMesh<M, CHUNK_SIZE>> + DoubleEndedIterator + 'a {
         // TODO: can we make fewer details (like view_direction_mask) public, now that this method exists? Should we?
         self.chunk_chart
             .chunks(self.view_chunk(), camera.view_direction_mask())
@@ -161,10 +157,7 @@ where
     ///
     /// Call this while drawing, after [`Self::update_blocks_and_some_chunks`]
     /// has updated/created chunks.
-    pub fn chunk(
-        &self,
-        position: ChunkPos<CHUNK_SIZE>,
-    ) -> Option<&ChunkMesh<D, Vert, Tex, CHUNK_SIZE>> {
+    pub fn chunk(&self, position: ChunkPos<CHUNK_SIZE>) -> Option<&ChunkMesh<M, CHUNK_SIZE>> {
         self.chunks.get(&position)
     }
 
@@ -176,7 +169,7 @@ where
     pub fn get_render_data_for_block(
         &self,
         block_index: BlockIndex,
-    ) -> Option<(&crate::MeshMeta<Tex::Tile>, &D)> {
+    ) -> Option<(&crate::MeshMeta<M>, &M::RenderData)> {
         self.block_meshes
             .meshes
             .get(usize::from(block_index))
@@ -206,12 +199,12 @@ where
     pub fn update_blocks_and_some_chunks<F>(
         &mut self,
         camera: &Camera,
-        block_texture_allocator: &Tex,
+        block_texture_allocator: &M::Alloc,
         deadline: time::Deadline<I>,
         mut render_data_updater: F,
     ) -> CsmUpdateInfo
     where
-        F: FnMut(dynamic::RenderDataUpdate<'_, D, Vert, Tex::Tile>),
+        F: FnMut(dynamic::RenderDataUpdate<'_, M>),
     {
         // if deadline == time::Deadline::Whenever {
         //     // If we have time, don't bother with the startup pass.
@@ -253,12 +246,12 @@ where
     fn update_once<F>(
         &mut self,
         camera: &Camera,
-        block_texture_allocator: &Tex,
+        block_texture_allocator: &M::Alloc,
         deadline: time::Deadline<I>,
         mut render_data_updater: F,
     ) -> (CsmUpdateInfo, bool)
     where
-        F: FnMut(dynamic::RenderDataUpdate<'_, D, Vert, Tex::Tile>),
+        F: FnMut(dynamic::RenderDataUpdate<'_, M>),
     {
         let update_start_time = I::now();
 
@@ -408,7 +401,8 @@ where
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
         let depth_sort_end_time = if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
-            if chunk.depth_sort_for_view(view_point.cast::<Vert::Coordinate>()) {
+            if chunk.depth_sort_for_view(view_point.cast::<<M::Vertex as GfxVertex>::Coordinate>())
+            {
                 render_data_updater(chunk.borrow_for_update(true));
                 Some(I::now())
             } else {

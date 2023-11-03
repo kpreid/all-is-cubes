@@ -11,16 +11,28 @@ use all_is_cubes::space::Space;
 use all_is_cubes::{camera, listen, time, universe};
 use all_is_cubes_mesh as mesh;
 use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, MeshLabel};
+use all_is_cubes_mesh::MeshTypes;
 use all_is_cubes_port::gltf::{
-    json as gltf_json, GltfTextureAllocator, GltfTile, GltfVertex, GltfWriter, MeshInstance,
+    json as gltf_json, GltfMt, GltfTextureAllocator, GltfWriter, MeshInstance,
 };
 
 use crate::record::RecordOptions;
 
 #[derive(Debug)]
+pub(crate) enum RecordGltfMt {}
+impl MeshTypes for RecordGltfMt {
+    type Vertex = <GltfMt as MeshTypes>::Vertex;
+    type Alloc = <GltfMt as MeshTypes>::Alloc;
+    type Tile = <GltfMt as MeshTypes>::Tile;
+}
+impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for RecordGltfMt {
+    type RenderData = MeshIndexCell;
+}
+
+#[derive(Debug)]
 pub(super) struct MeshRecorder {
     cameras: camera::StandardCameras,
-    csm: ChunkedSpaceMesh<MeshIndexCell, GltfVertex, GltfTextureAllocator, std::time::Instant, 32>,
+    csm: ChunkedSpaceMesh<RecordGltfMt, std::time::Instant, 32>,
     tex: GltfTextureAllocator,
     scene_sender: mpsc::SyncSender<MeshRecordMsg>,
 }
@@ -93,11 +105,7 @@ impl MeshRecorder {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum MeshRecordMsg {
-    AddMesh(
-        MeshLabel,
-        mesh::SpaceMesh<GltfVertex, GltfTile>,
-        MeshIndexCell,
-    ),
+    AddMesh(MeshLabel, mesh::SpaceMesh<RecordGltfMt>, MeshIndexCell),
     FinishFrame(
         super::FrameNumber,
         camera::Camera,

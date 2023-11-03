@@ -6,6 +6,8 @@ use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, FreePoint, FreeVector, Rgba};
 use all_is_cubes::util::{ConciseDebug, Fmt, Refmt as _};
 
+use crate::MeshTypes;
+
 /// Basic vertex data type for a [`BlockMesh`].
 /// Implement <code>[`From`]&lt;[`BlockVertex`]&gt;</code> (and usually [`GfxVertex`])
 /// to provide a specialized version fit for the target graphics API.
@@ -182,4 +184,4 @@ impl<T: Copy + 'static> GfxVertex for BlockVertex<T> {
 }
 
 /// A vertex type's position using its coordinate type.
-pub(crate) type VPos<V> = Point3D<<V as GfxVertex>::Coordinate, Cube>;
+pub(crate) type VPos<M> = Point3D<<<M as MeshTypes>::Vertex as GfxVertex>::Coordinate, Cube>;

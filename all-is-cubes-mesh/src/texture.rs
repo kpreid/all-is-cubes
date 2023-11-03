@@ -65,7 +65,7 @@ pub trait Allocator {
 ///
 /// Implement this along with [`Allocator`] and [`Plane`] to provide appropriate texture
 /// storage for a particular graphics system.
-pub trait Tile: Clone {
+pub trait Tile: Clone + PartialEq {
     /// Return type of [`Self::slice()`].
     type Plane: Plane<Point = Self::Point>;
 

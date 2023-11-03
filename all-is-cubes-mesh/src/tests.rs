@@ -5,7 +5,7 @@ use pretty_assertions::assert_eq;
 use all_is_cubes::block::{
     Atom, Block, BlockAttributes, BlockCollision, Primitive, Resolution::*, AIR,
 };
-use all_is_cubes::camera::{Flaws, GraphicsOptions, TransparencyOption};
+use all_is_cubes::camera::{Flaws, TransparencyOption};
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::euclid::{Point3D, Vector3D};
 use all_is_cubes::math::{Cube, Rgb, VectorOps};
@@ -17,10 +17,11 @@ use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::{notnan, rgba_const};
 
-use crate::texture::{TestAllocator, TestPoint, TestTile, TexelUnit};
+use crate::testing::{mesh_blocks_and_space, TextureMt};
+use crate::texture::{TestAllocator, TestPoint, TexelUnit};
 use crate::{
     block_meshes_for_space, BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering,
-    IndexSlice, MeshOptions, SpaceMesh,
+    IndexSlice, MeshOptions, MeshTypes, SpaceMesh,
 };
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.
@@ -47,7 +48,7 @@ fn v_t(position: [FreeCoordinate; 3], face: Face6, texture: [f32; 3]) -> BlockVe
 }
 
 /// Test helper to create [`BlockMesh`] alone without a `Space`.
-pub(crate) fn test_block_mesh(block: Block) -> BlockMesh<BlockVertex<TestPoint>, TestTile> {
+pub(crate) fn test_block_mesh(block: Block) -> BlockMesh<TextureMt> {
     BlockMesh::new(
         &block.evaluate().unwrap(),
         &TestAllocator::new(),
@@ -60,7 +61,7 @@ pub(crate) fn test_block_mesh(block: Block) -> BlockMesh<BlockVertex<TestPoint>,
 
 /// Test helper to create [`BlockMesh`] alone without a `Space`,
 /// and with the transparency option set to `Threshold(0.5)`.
-fn test_block_mesh_threshold(block: Block) -> BlockMesh<BlockVertex<TestPoint>, TestTile> {
+fn test_block_mesh_threshold(block: Block) -> BlockMesh<TextureMt> {
     BlockMesh::new(
         &block.evaluate().unwrap(),
         &TestAllocator::new(),
@@ -69,23 +70,6 @@ fn test_block_mesh_threshold(block: Block) -> BlockMesh<BlockVertex<TestPoint>, 
             ..MeshOptions::dont_care_for_test()
         },
     )
-}
-
-/// Test helper to call [`block_meshes_for_space`] followed directly by [`SpaceMesh::new`].
-#[allow(clippy::type_complexity)]
-pub(crate) fn mesh_blocks_and_space(
-    space: &Space,
-) -> (
-    TestAllocator,
-    BlockMeshes<BlockVertex<TestPoint>, TestTile>,
-    SpaceMesh<BlockVertex<TestPoint>, TestTile>,
-) {
-    let options = &MeshOptions::new(&GraphicsOptions::default());
-    let tex = TestAllocator::new();
-    let block_meshes = block_meshes_for_space(space, &tex, options);
-    let space_mesh: SpaceMesh<BlockVertex<TestPoint>, TestTile> =
-        SpaceMesh::new(space, space.bounds(), options, &*block_meshes);
-    (tex, block_meshes, space_mesh)
 }
 
 fn non_uniform_fill(cube: Cube) -> &'static Block {
@@ -142,7 +126,7 @@ fn excludes_hidden_faces_of_blocks() {
 fn no_panic_on_missing_blocks() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
-    let block_meshes: BlockMeshes<BlockVertex<TestPoint>, _> = block_meshes_for_space(
+    let block_meshes: BlockMeshes<TextureMt> = block_meshes_for_space(
         &space,
         &TestAllocator::new(),
         &MeshOptions::dont_care_for_test(),
@@ -371,7 +355,7 @@ fn shrunken_box_uniform_color() {
     );
 }
 
-fn opacities<V, T>(mesh: &BlockMesh<V, T>) -> FaceMap<bool> {
+fn opacities<M: MeshTypes>(mesh: &BlockMesh<M>) -> FaceMap<bool> {
     assert!(
         !mesh.interior_vertices.fully_opaque,
         "interior opacity should never be true because it doesn't mean anything"
@@ -520,7 +504,7 @@ fn handling_allocation_failure() {
 
     let mut tex = TestAllocator::new();
     tex.set_capacity(0);
-    let block_meshes: BlockMeshes<BlockVertex<TestPoint>, _> =
+    let block_meshes: BlockMeshes<TextureMt> =
         block_meshes_for_space(&space, &tex, &MeshOptions::dont_care_for_test());
 
     // Check results.
@@ -549,7 +533,7 @@ fn handling_allocation_failure() {
 
 #[test]
 fn space_mesh_empty() {
-    let t = SpaceMesh::<BlockVertex<TestPoint>, TestTile>::default();
+    let t = SpaceMesh::<TextureMt>::default();
     assert!(t.is_empty());
     assert_eq!(t.flaws(), Flaws::empty());
     assert_eq!(t.vertices(), &[]);
