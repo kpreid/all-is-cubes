@@ -2,10 +2,10 @@
 
 use std::io;
 
-use all_is_cubes::euclid::Point2D;
 use gltf_json::validation::Checked::Valid;
 
-use all_is_cubes::math::{GridAab, GridRotation, VectorOps};
+use all_is_cubes::euclid::Point2D;
+use all_is_cubes::math::{Axis, GridAab, GridRotation, VectorOps};
 use all_is_cubes_mesh::texture::{self, TilePoint};
 
 use super::glue::push_and_return_index;
@@ -119,10 +119,9 @@ impl texture::Tile for GltfTile {
 
         let rotation = match axis {
             // TODO: decide which exact rotations to use
-            0 => GridRotation::RZYx, // X is flat, so rotate about Y
-            1 => GridRotation::RXZy, // Y is flat, so rotate about X
-            2 => GridRotation::IDENTITY,
-            _ => unreachable!(),
+            Axis::X => GridRotation::RZYx, // X is flat, so rotate about Y
+            Axis::Y => GridRotation::RXZy, // Y is flat, so rotate about X
+            Axis::Z => GridRotation::IDENTITY,
         };
 
         let plane_id = self.gatherer.insert(internal::AtlasEntry {
