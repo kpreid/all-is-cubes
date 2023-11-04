@@ -68,8 +68,8 @@ struct TileBacking {
     ///
     /// Property: `self.handle.unwrap().allocation.volume() == self.data.len()`.
     handle: Option<AlloctreeHandle>,
-    /// Texture data (that might not be sent to the GPU yet).
-    data: Option<Box<[texture::Texel]>>,
+    /// sRGB texture data (that might not be sent to the GPU yet).
+    data: Option<Box<[[u8; 4]]>>,
     /// Whether the data has changed so that we need to send it to the GPU on next
     /// [`AtlasAllocator::flush`].
     dirty: bool,

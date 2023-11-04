@@ -17,10 +17,6 @@ use all_is_cubes::math::GridArray;
 /// dependents’ texture coordinates are not required to be f32.
 pub(crate) type TextureCoordinate = f32;
 
-/// Color data accepted by [`Allocator`].
-/// The components are sRGB `[R, G, B, A]`.
-pub type Texel = [u8; 4];
-
 /// Unit-of-measure identifier used with [`euclid`](all_is_cubes::euclid) for “whole texels”.
 /// TODO(euclid migration): Better name, and a type alias for the point
 #[allow(clippy::exhaustive_enums)]
@@ -179,7 +175,7 @@ pub(super) fn copy_voxels_to_texture<A: Allocator>(
 /// Helper function to implement the typical case of copying voxels into an X-major, sRGB, RGBA
 /// texture.
 #[doc(hidden)]
-pub fn copy_voxels_into_xmaj_texture(voxels: Vol<&[Evoxel]>, texture: &mut [Texel]) {
+pub fn copy_voxels_into_xmaj_texture(voxels: Vol<&[Evoxel]>, texture: &mut [[u8; 4]]) {
     let bounds = voxels.bounds();
     assert_eq!(bounds.volume(), texture.len());
 

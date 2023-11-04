@@ -265,7 +265,7 @@ mod internal {
     use std::sync::{Arc, Mutex, OnceLock};
 
     /// Texels are written here through tiles and read through planes.
-    pub(super) type TexelsCell = Arc<OnceLock<Vec<texture::Texel>>>;
+    pub(super) type TexelsCell = Arc<OnceLock<Vec<[u8; 4]>>>;
 
     /// Interior-mutable accumulator of textures to put in the atlas.
     #[derive(Clone, Debug, Default)]

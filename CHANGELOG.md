@@ -65,7 +65,6 @@
       it is up to the texture implementation to convert and shuffle data as needed.
     - Renamed `TextureAllocator` to `texture::Allocator`.
     - Renamed `TextureTile` to `texture::Tile`.
-    - Renamed `Texel` to `texture::Texel`.
     - Renamed `NoTexture` to `texture::NoTexture`.
     - Renamed `NoTextures` to `texture::NoTextures`.
 
@@ -83,6 +82,7 @@
 - `all-is-cubes-mesh` library:
     - `TextureCoordinate` type alias no longer exists.
       Its only use was when implementing `TextureTile`; simply use `f32` instead.
+    - `Texel` type alias no longer exists; callers are free to choose their own texel data type.
 
 ## 0.6.0 (2023-07-29)
 
