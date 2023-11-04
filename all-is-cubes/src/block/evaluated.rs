@@ -359,6 +359,18 @@ pub enum EvalBlockError {
     DataRefIs(RefError),
 }
 
+impl EvalBlockError {
+    /// Returns whether this error is presumably transient because of simultaneous mutation
+    /// of the underlying data.
+    ///
+    /// This is a simple match, but we declare it as a method to ensure that any future introduced
+    /// variants of [`EvalBlockError`] or [`RefError`], that are similar but not equal,
+    /// don't break the logic depending on this property.
+    pub(crate) fn is_in_use(&self) -> bool {
+        matches!(self, EvalBlockError::DataRefIs(RefError::InUse(_)))
+    }
+}
+
 #[cfg(feature = "std")]
 impl std::error::Error for EvalBlockError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
@@ -668,6 +680,23 @@ impl From<MinEval> for EvaluatedBlock {
         let MinEval { attributes, voxels } = value;
         // TODO: EvaluatedBlock::from* should probably be entirely replaced with this
         EvaluatedBlock::from_voxels(attributes, voxels)
+    }
+}
+
+impl From<&EvaluatedBlock> for MinEval {
+    fn from(value: &EvaluatedBlock) -> Self {
+        Self {
+            attributes: value.attributes.clone(),
+            voxels: value.voxels.clone(),
+        }
+    }
+}
+impl From<EvaluatedBlock> for MinEval {
+    fn from(value: EvaluatedBlock) -> Self {
+        Self {
+            attributes: value.attributes,
+            voxels: value.voxels,
+        }
     }
 }
 

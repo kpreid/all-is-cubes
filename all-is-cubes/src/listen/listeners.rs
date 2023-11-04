@@ -166,11 +166,11 @@ where
 pub struct DirtyFlag {
     flag: Arc<AtomicBool>,
 }
+
 impl fmt::Debug for DirtyFlag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DirtyFlag")
-            .field(&self.flag.load(Ordering::Relaxed))
-            .finish()
+        // never multiline
+        write!(f, "DirtyFlag({:?})", self.flag.load(Ordering::Relaxed))
     }
 }
 

@@ -435,26 +435,7 @@ impl Block {
     #[inline]
     fn evaluate_impl(&self, depth: u8, filter: &EvalFilter) -> Result<MinEval, EvalBlockError> {
         let mut value: MinEval = match *self.primitive() {
-            Primitive::Indirect(ref def_ref) => {
-                let next = next_depth(depth)?;
-                let def = def_ref.read()?;
-
-                if let Some(listener) = &filter.listener {
-                    <BlockDef as Listen>::listen(&*def, listener.clone());
-                }
-
-                if filter.skip_eval {
-                    AIR_EVALUATED_MIN // placeholder value
-                } else {
-                    def.evaluate_impl(
-                        next,
-                        &EvalFilter {
-                            skip_eval: filter.skip_eval,
-                            listener: None,
-                        },
-                    )?
-                }
-            }
+            Primitive::Indirect(ref def_ref) => def_ref.read()?.evaluate_impl(filter)?,
 
             Primitive::Atom(Atom {
                 ref attributes,

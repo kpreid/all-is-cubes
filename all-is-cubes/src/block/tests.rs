@@ -21,8 +21,9 @@ use crate::math::{
     OpacityCategory, Rgb, Rgba, Vol,
 };
 use crate::space::{Space, SpaceTransaction};
+use crate::time::DeadlineNt;
 use crate::transaction;
-use crate::universe::Universe;
+use crate::universe::{Name, RefError, Universe};
 
 /// Just install a listener and discard the [`EvaluatedBlock`].
 ///
@@ -456,27 +457,35 @@ fn listen_indirect_atom() {
 }
 
 /// Testing double indirection not because it's a case we expect to use routinely,
-/// but because it exercises the generality of the notification mechanism.
+/// but because it exercises the generality of the notification and cache mechanisms.
+/// Specifically, `block_def_ref1` is updated by transaction, but `block_def_ref2`
+/// is updated by universe stepping since it was not directly mutated.
 #[test]
 fn listen_indirect_double() {
     let mut universe = Universe::new();
     let block_def_ref1 = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
-    let block_def_ref2 = universe.insert_anonymous(BlockDef::new(Block::from_primitive(
-        Primitive::Indirect(block_def_ref1.clone()),
-    )));
+    let indirect1 = Block::from_primitive(Primitive::Indirect(block_def_ref1.clone()));
+    let block_def_ref2 = universe.insert_anonymous(BlockDef::new(indirect1.clone()));
     let indirect2 = Block::from_primitive(Primitive::Indirect(block_def_ref2.clone()));
-    let sink = Sink::new();
-    listen(indirect2, sink.listener()).unwrap();
-    assert_eq!(sink.drain(), vec![]);
+    let sink1 = Sink::new();
+    let sink2 = Sink::new();
+    listen(indirect1, sink1.listener()).unwrap();
+    listen(indirect2, sink2.listener()).unwrap();
+    assert_eq!(sink1.drain(), vec![]);
+    assert_eq!(sink2.drain(), vec![]);
 
-    // Now mutate the original block and we should see a notification.
+    // Mutate the first BlockDef and we should see a notification for it alone.
     block_def_ref1
         .execute(
             &BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)),
             &mut transaction::no_outputs,
         )
         .unwrap();
-    assert_eq!(sink.drain().len(), 1);
+    assert_eq!([sink1.drain().len(), sink2.drain().len()], [1, 0]);
+
+    // Step and get the other notification.
+    universe.step(false, DeadlineNt::Whenever);
+    assert_eq!([sink1.drain().len(), sink2.drain().len()], [0, 1]);
 
     // Remove block_def_ref1 from the contents of block_def_ref2...
     block_def_ref2
@@ -485,7 +494,7 @@ fn listen_indirect_double() {
             &mut transaction::no_outputs,
         )
         .unwrap();
-    assert_eq!(sink.drain().len(), 1);
+    assert_eq!(sink2.drain().len(), 1);
     // ...and then block_def_ref1's changes should NOT be forwarded.
     block_def_ref1
         .execute(
@@ -493,7 +502,7 @@ fn listen_indirect_double() {
             &mut transaction::no_outputs,
         )
         .unwrap();
-    assert_eq!(sink.drain(), vec![]);
+    assert_eq!(sink2.drain(), vec![]);
 }
 
 /// Test that changes to a `Space` propagate to block listeners.
@@ -528,21 +537,32 @@ fn listen_recur() {
     assert_eq!(sink.drain(), vec![]);
 }
 
+#[ignore = "TODO: we have no protection against stacked modifiers yet, and the depth model no longer catches anything, so nothing can make this test get the error it wants"]
 #[test]
 fn overflow_evaluate() {
-    let mut universe = Universe::new();
-    let block = self_referential_block(&mut universe);
+    let mut block = AIR;
+    block
+        .modifiers_mut()
+        .extend((0..100).map(|_| Modifier::Rotate(GridRotation::CLOCKWISE)));
     assert_eq!(block.evaluate(), Err(EvalBlockError::StackOverflow));
 }
 
 #[test]
-fn overflow_listen() {
+fn self_referential_evaluate() {
     let mut universe = Universe::new();
     let block = self_referential_block(&mut universe);
-    // This does *not* produce an error, because BlockDef manages its own listening.
-    // TODO: Probably Primitive::Indirect needs a recursion limit inside that so it doesn't
-    // fire an infinite cycle of notifications...? Or perhaps we need to make it difficult to
-    // create recursion at all.
+    assert_eq!(
+        block.evaluate(),
+        Err(EvalBlockError::DataRefIs(RefError::InUse(Name::Anonym(0))))
+    );
+}
+
+#[test]
+fn self_referential_listen() {
+    let mut universe = Universe::new();
+    let block = self_referential_block(&mut universe);
+    // This should *not* produce an error, because BlockDef manages its own notifier and we want
+    // it to be possible to listen to a currently-erring BlockDef.
     assert_eq!(listen(block, NullListener), Ok(()));
 }
 

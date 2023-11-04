@@ -23,7 +23,7 @@ use core::sync::atomic::{self, Ordering};
 use arcstr::ArcStr;
 use manyfmt::Fmt;
 
-use crate::block::BlockDef;
+use crate::block::{self, BlockDefStepInfo};
 use crate::character::Character;
 use crate::space::{Space, SpaceStepInfo};
 use crate::time;
@@ -302,6 +302,10 @@ impl Universe {
             self.session_step_time += 1;
         }
 
+        // Update block def caches. This must be done before spaces so that spaces can see the
+        // latest updates.
+        self.sync_block_defs();
+
         // Compute how to divide time among spaces, based on the previous srep
         let budget_per_space: Option<time::Duration> = deadline
             .remaining_since(start_time)
@@ -355,6 +359,48 @@ impl Universe {
         }
 
         info.computation_time = I::now().saturating_duration_since(start_time);
+        info
+    }
+
+    fn sync_block_defs(&self) -> BlockDefStepInfo {
+        // TODO: Implement waking and only step the BlockDefs which know they need it.
+        // This will allow more reliable updates in the presence of interdependencies.
+
+        // If we are allowed to use threads, update in parallel.
+        // This may fail with borrow conflicts if BlockDefs depend on other BlockDefs;
+        // therefore we unconditionally do a synchronous update afterward.
+        #[cfg(feature = "threads")]
+        let mut info: BlockDefStepInfo = {
+            use rayon::prelude::{IntoParallelRefIterator as _, ParallelIterator as _};
+
+            self.tables
+                .blocks
+                .par_iter()
+                .map(
+                    |(_, block_def_root)| match block_def_root.try_modify(block::BlockDef::step) {
+                        Ok(info) => info,
+                        // An in-use error might be due to our own parallel borrows!
+                        // Therefore, treat it as if it were an evaluation in-use instead.
+                        Err(RefError::InUse(_)) => BlockDefStepInfo::IN_USE,
+                        Err(e) => panic!(
+                            "BlockDef ref broken during universe.step():\n{}",
+                            crate::util::ErrorChain(&e)
+                        ),
+                    },
+                )
+                .reduce(BlockDefStepInfo::default, |a, b| a + b)
+        };
+        #[cfg(not(feature = "threads"))]
+        let mut info = BlockDefStepInfo::default();
+
+        // TODO: In the event of dependencies between BlockDefs, this may miss some updates and
+        // defer them to the next step; solve iteratively once we can do that cheaply with waking
+        for block_def_root in self.tables.blocks.values() {
+            info += block_def_root
+                .try_modify(block::BlockDef::step)
+                .expect("BlockDef borrow error during universe.step()");
+        }
+
         info
     }
 
@@ -728,6 +774,7 @@ pub struct UniverseStepInfo {
     active_members: usize,
     /// Number of members which were processed at all.
     total_members: usize,
+    block_def_step: BlockDefStepInfo,
     space_step: SpaceStepInfo,
 }
 impl core::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
@@ -735,6 +782,7 @@ impl core::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
         self.computation_time += other.computation_time;
         self.active_members += other.active_members;
         self.total_members += other.total_members;
+        self.block_def_step += other.block_def_step;
         self.space_step += other.space_step;
     }
 }
@@ -744,6 +792,7 @@ impl Fmt<StatusText> for UniverseStepInfo {
             computation_time,
             active_members,
             total_members,
+            block_def_step,
             space_step,
         } = self;
         writeln!(
@@ -751,6 +800,7 @@ impl Fmt<StatusText> for UniverseStepInfo {
             "Step computation: {t} for {active_members} of {total_members}",
             t = computation_time.refmt(fopt),
         )?;
+        writeln!(fmt, "Block defs: {}", block_def_step.refmt(fopt))?;
         write!(fmt, "{}", space_step.refmt(fopt))?;
         Ok(())
     }
@@ -781,7 +831,7 @@ fn gc_members<T>(table: &mut Storage<T>) {
 pub struct PartialUniverse {
     // TODO: design API that doesn't rely on making these public, but still allows
     // exports to be statically exhaustive.
-    pub blocks: Vec<URef<BlockDef>>,
+    pub blocks: Vec<URef<block::BlockDef>>,
     pub characters: Vec<URef<Character>>,
     pub spaces: Vec<URef<Space>>,
 }

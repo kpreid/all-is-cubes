@@ -767,8 +767,9 @@ mod tests {
                 block: Block { primitive: Atom { \
                     color: Rgba(1.0, 1.0, 1.0, 1.0), \
                     collision: Hard } }, \
-                notifier: Notifier(0), \
-                block_listen_gate: Gate })"
+                cache_dirty: DirtyFlag(false), \
+                listeners_ok: true, \
+                notifier: Notifier(0), .. })"
         );
         assert_eq!(
             format!("{r:#?}"),
@@ -780,8 +781,10 @@ mod tests {
                         collision: Hard,
                     },
                 },
+                cache_dirty: DirtyFlag(false),
+                listeners_ok: true,
                 notifier: Notifier(0),
-                block_listen_gate: Gate,
+                ..
             })"
             }
         );

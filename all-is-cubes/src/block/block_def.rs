@@ -1,26 +1,58 @@
 use alloc::sync::Arc;
-use core::fmt;
-use core::ops::Deref;
+use core::ops::{self, Deref};
+use core::{fmt, mem};
 
-use crate::block::{self, Block, BlockChange, Primitive};
-use crate::listen::{Gate, Listen, Listener, Notifier};
+use crate::block::{self, Block, BlockChange, EvalBlockError, MinEval, Primitive};
+use crate::listen::{self, Gate, Listen, Listener, Notifier};
 use crate::transaction::{self, Transaction};
+#[cfg(doc)]
+use crate::universe::Universe;
 use crate::universe::{RefVisitor, VisitRefs};
 
-/// Contains a [`Block`] and can be stored in a [`Universe`](crate::universe::Universe).
+/// Contains a [`Block`] and can be stored in a [`Universe`].
 /// Together with [`Primitive::Indirect`], this allows mutation of a block definition such
-/// that all its usages follow.
+/// that all its existing usages follow.
 ///
-/// It is a distinct type from [`Block`] in order to ensure that change notifications
-/// will be delivered on any mutation.
+/// To perform such a mutation, use [`BlockDefTransaction`].
 ///
-/// To perform a mutation, use [`BlockDefTransaction`].
-#[derive(Debug)]
+/// Additionally, it caches the results of block evaluation to improve performance.
+/// Note that this cache only updates when the owning [`Universe`] is being stepped, or when
+/// a direct mutation to this [`BlockDef`] is performed, not when the contained [`Block`]
+/// sends a change notification.
 pub struct BlockDef {
+    /// The current value.
     block: Block,
-    // TODO: It might be a good idea to cache EvaluatedBlock here, since we're doing
-    // mutation tracking anyway.
+
+    /// Cache of evaluation results.
+    ///
+    /// If the current value is an `Err`, then it is also the case that `cache_dirty` may not have
+    /// a listener hooked up.
+    ///
+    /// Design rationale for caching and this particular arrangement of caching:
+    ///
+    /// * Deduplicating evaluation calculations, when a block is in multiple spaces,
+    ///   is wrapped with different modifiers, or is removed and reinserted.
+    /// * Moving the cost of evaluation to a consistent, deferred point.
+    /// * Fewer chains of forwarded notifications, improving data and instruction cache locality.
+    /// * Breaking data dependency cycles, so that if a `Space` contains itself
+    ///   via a block definition, this results in iterative convergence rather than an error.
+    cache: Result<MinEval, EvalBlockError>,
+
+    /// Whether the cache needs to be updated.
+    cache_dirty: listen::DirtyFlag,
+
+    /// Whether we have successfully installed a listener on `self.block`.
+    listeners_ok: bool,
+
+    /// Notifier of changes to this `BlockDef`'s evaluation result, either via transaction or via
+    /// the contained block itself changing.
+    ///
+    /// Note that this fires only when the cache is refreshed, not when the underlying block sends
+    /// a change notification.
     notifier: Arc<Notifier<BlockChange>>,
+
+    /// Gate with which to interrupt previous listening to a contained block.
+    #[allow(unused)] // used only for its `Drop` behavior
     block_listen_gate: Gate,
 }
 
@@ -28,31 +60,136 @@ impl BlockDef {
     /// Constructs a new [`BlockDef`] that stores the given block (which may be replaced
     /// in the future).
     pub fn new(block: Block) -> Self {
-        let notifier = Arc::new(Notifier::new());
-        let (gate, block_listener) = Notifier::forwarder(Arc::downgrade(&notifier)).gate();
-        // TODO: Take the evaluation result (if successful) and cache it
-        let _ = block.evaluate2(&block::EvalFilter {
-            skip_eval: true,
-            listener: Some(block_listener.erased()),
-        });
+        Self::with_notifier(block, Arc::new(Notifier::new()))
+    }
+
+    /// Constructs a new [`BlockDef`] that stores the given block, but which reuses an
+    /// existing [`Notifier`]; this is used to share code between creation and mutation.
+    #[inline]
+    fn with_notifier(block: Block, notifier: Arc<Notifier<BlockChange>>) -> Self {
+        let cache_dirty = listen::DirtyFlag::new(false);
+        let (block_listen_gate, block_listener) =
+            Listener::<BlockChange>::gate(cache_dirty.listener());
+
+        let cache = block
+            .evaluate2(&block::EvalFilter {
+                skip_eval: false,
+                listener: Some(block_listener.erased()),
+            })
+            .map(MinEval::from);
+
         BlockDef {
+            listeners_ok: cache.is_ok(),
+
             block,
+            cache,
+            cache_dirty,
             notifier,
-            block_listen_gate: gate,
+            block_listen_gate,
         }
+    }
+
+    /// Implementation of block evaluation used by a [`Primitive::Indirect`] pointing to this.
+    pub(super) fn evaluate_impl(
+        &self,
+        filter: &block::EvalFilter,
+    ) -> Result<MinEval, EvalBlockError> {
+        let &block::EvalFilter {
+            skip_eval,
+            ref listener,
+        } = filter;
+
+        if let Some(listener) = listener {
+            <BlockDef as Listen>::listen(self, listener.clone());
+        }
+
+        if skip_eval {
+            // In this case, don't use the cache, because it might contain an error, which
+            // would imply the *listen* part also failed, which it did not.
+            Ok(block::AIR_EVALUATED_MIN)
+        } else {
+            // TODO: Rework the `MinEval` type or the signatures of evaluation internals
+            // so that we can benefit from caching the `EvaluatedBlock` and not just the `MinEval`.
+            self.cache.clone()
+        }
+    }
+
+    pub(crate) fn step(&mut self) -> BlockDefStepInfo {
+        let mut info = BlockDefStepInfo::default();
+
+        if !self.listeners_ok {
+            info.attempted = 1;
+            // If there was an evaluation error, then we may also be missing listeners.
+            // Start over.
+            *self = BlockDef::with_notifier(self.block.clone(), self.notifier.clone());
+            self.notifier.notify(BlockChange::new());
+            info.updated = 1;
+        } else if self.cache_dirty.get_and_clear() {
+            // We have a cached value, but it is stale.
+
+            info.attempted = 1;
+
+            let new_cache = self
+                .block
+                .evaluate2(&block::EvalFilter {
+                    skip_eval: false,
+                    listener: None, // we already have a listener installed
+                })
+                .map(MinEval::from);
+
+            // Write the new cache data *unless* it is a transient error.
+            if !matches!(self.cache, Err(ref e) if e.is_in_use()) {
+                let old_cache = mem::replace(&mut self.cache, new_cache);
+
+                // In case the definition changed in the way which turned out not to affect the
+                // evaluation, compare old and new before notifying.
+                if old_cache != self.cache {
+                    self.notifier.notify(BlockChange::new());
+                    info.updated = 1;
+                }
+            }
+        }
+
+        if info.attempted > 0 && matches!(self.cache, Err(ref e) if e.is_in_use()) {
+            info.was_in_use = 1;
+        }
+
+        info
+    }
+}
+
+impl fmt::Debug for BlockDef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // TODO: Consider printing the cache, but only if it wouldn't be redundant?
+        let Self {
+            block,
+            cache: _,
+            cache_dirty,
+            listeners_ok,
+            notifier,
+            block_listen_gate: _,
+        } = self;
+        f.debug_struct("BlockDef")
+            .field("block", &block)
+            .field("cache_dirty", &cache_dirty)
+            .field("listeners_ok", &listeners_ok)
+            .field("notifier", &notifier)
+            .finish_non_exhaustive()
     }
 }
 
 impl Listen for BlockDef {
     type Msg = BlockChange;
 
-    /// Registers a listener for mutations of any data sources which may affect the
-    /// [`Block::evaluate`] result from blocks defined using this block definition.
+    /// Registers a listener for whenever the result of evaluation of this block definition changes.
+    /// Note that this only occurs when the owning [`Universe`] is being stepped.
     fn listen<L: Listener<BlockChange> + 'static>(&self, listener: L) {
         self.notifier.listen(listener)
     }
 }
 
+// TODO: Remove this `Deref` impl as it risks confusion between the cached evaluation and the
+// underlying block; add a method to replace
 impl Deref for BlockDef {
     type Target = Block;
 
@@ -192,18 +329,7 @@ impl Transaction<BlockDef> for BlockDefTransaction {
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
         if let Some(new) = &self.new {
-            target.block = new.clone();
-
-            // Swap out the forwarding listener to listen to the new block.
-            let (gate, block_listener) =
-                Notifier::forwarder(Arc::downgrade(&target.notifier)).gate();
-            // TODO: Take the evaluation result (if successful) and cache it
-            let _ = target.block.evaluate2(&block::EvalFilter {
-                skip_eval: true,
-                listener: Some(block_listener.erased()),
-            });
-            target.block_listen_gate = gate; // old gate is now dropped
-
+            *target = BlockDef::with_notifier(new.clone(), target.notifier.clone());
             target.notifier.notify(BlockChange::new());
         }
         Ok(())
@@ -278,5 +404,57 @@ impl fmt::Display for BlockDefConflict {
                 new: false,
             } => unreachable!(),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct BlockDefStepInfo {
+    /// A cache update was attempted.
+    attempted: usize,
+    /// A cache update succeeded.
+    updated: usize,
+    /// A cache update failed because of a [`RefError::InUse`] conflict.
+    was_in_use: usize,
+}
+
+impl BlockDefStepInfo {
+    #[cfg(feature = "threads")]
+    pub(crate) const IN_USE: Self = Self {
+        attempted: 1,
+        updated: 0,
+        was_in_use: 1,
+    };
+}
+
+impl ops::Add for BlockDefStepInfo {
+    type Output = Self;
+    #[inline]
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            attempted: self.attempted + rhs.attempted,
+            updated: self.updated + rhs.updated,
+            was_in_use: self.was_in_use + rhs.was_in_use,
+        }
+    }
+}
+
+impl ops::AddAssign for BlockDefStepInfo {
+    #[inline]
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other;
+    }
+}
+
+impl manyfmt::Fmt<crate::util::StatusText> for BlockDefStepInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &crate::util::StatusText) -> fmt::Result {
+        let Self {
+            attempted,
+            updated,
+            was_in_use,
+        } = self;
+        write!(
+            fmt,
+            "{attempted} attempted, {updated} updated, {was_in_use} were in use"
+        )
     }
 }
