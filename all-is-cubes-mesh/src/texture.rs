@@ -5,7 +5,7 @@ use std::fmt;
 use all_is_cubes::block::{Evoxel, Evoxels};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::Point3D;
-use all_is_cubes::math::{Axis, Cube, GridAab};
+use all_is_cubes::math::{Axis, Cube, GridAab, Vol};
 use all_is_cubes::util::{ConciseDebug, Fmt};
 
 #[cfg(doc)]
@@ -86,18 +86,17 @@ pub trait Tile: Clone + PartialEq {
     /// helper (for 3D texturing) or it may actually allocate a region of 2D texture.
     fn slice(&self, bounds: GridAab) -> Self::Plane;
 
-    /// Write texture data as RGBA color.
+    /// Copy the given voxels' color into this texture volume.
     ///
-    /// `data` must be of length `self.bounds().volume()`, and ordered “X-major”, that is,
-    /// the coordinates of the texels follow the pattern
-    /// `[[0, 0, 0], [1, 0, 0], ..., [0, 1, 0], [1, 1, 0], ..., [0, 0, 1], [1, 0, 1], ...]`.
-    /// Note that this is not the same as the ordering built into [`GridArray`].
+    /// [`data.bounds()`](Vol::bounds) must be equal to [`self.bounds()`](Self::bounds).
     ///
-    /// If `Self::REUSABLE` is false, this must not be called more than once.
+    /// If `Self::REUSABLE` is false, this may not be called more than once; the implementation
+    /// may panic, overwrite, or ignore additional calls.
     //---
-    // TODO: Replace slice with a GridArray (requires changing the ordering of one or the other).
+    // TODO: Make the input be ordered in X-major order so a bulk copy is feasible in typical
+    // texturing systems.
     // TODO: `REUSABLE` is a lousy API because it isn't statically checked
-    fn write(&mut self, data: &[Texel]);
+    fn write(&mut self, data: Vol<&[Evoxel]>);
 }
 
 /// 2D texture slice to use for texturing the surface of a voxel mesh.
@@ -172,30 +171,34 @@ pub(super) fn copy_voxels_to_texture<A: Allocator>(
     texture_allocator
         .allocate(voxels.bounds())
         .map(|mut texture| {
-            copy_voxels_into_existing_texture(voxels, &mut texture);
+            texture.write(voxels.as_vol_ref());
             texture
         })
 }
 
-pub(super) fn copy_voxels_into_existing_texture<T: Tile>(voxels: &Evoxels, texture: &mut T) {
+/// Helper function to implement the typical case of copying voxels into an X-major, sRGB, RGBA
+/// texture.
+#[doc(hidden)]
+pub fn copy_voxels_into_xmaj_texture(voxels: Vol<&[Evoxel]>, texture: &mut [Texel]) {
     let bounds = voxels.bounds();
-    let mut texels: Vec<Texel> = Vec::with_capacity(bounds.volume());
-    // TODO: Teach GridArray about alternate array orderings so that we can express
-    // this as a map-and-shuffle operation instead of a special loop.
+    assert_eq!(bounds.volume(), texture.len());
+
+    // TODO: Consider changing `Evoxels`'s ordering so that this can be a straight copy instead
+    // of a shuffle. Or at least implement the shuffle more efficiently.
+    let mut i = 0;
     for z in bounds.z_range() {
         for y in bounds.y_range() {
             for x in bounds.x_range() {
-                texels.push(
-                    voxels
-                        .get(Cube { x, y, z })
-                        .unwrap_or(Evoxel::from_color(palette::MISSING_VOXEL_ERROR))
-                        .color
-                        .to_srgb8(),
-                );
+                texture[i] = voxels
+                    .get(Cube { x, y, z })
+                    .copied()
+                    .unwrap_or(Evoxel::from_color(palette::MISSING_VOXEL_ERROR))
+                    .color
+                    .to_srgb8();
+                i += 1;
             }
         }
     }
-    texture.write(&texels);
 }
 
 /// Null [`Allocator`]; rejects all allocations.
@@ -235,7 +238,7 @@ impl Tile for NoTexture {
         match *self {}
     }
 
-    fn write(&mut self, _data: &[Texel]) {
+    fn write(&mut self, _data: Vol<&[Evoxel]>) {
         match *self {}
     }
 }

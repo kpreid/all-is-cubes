@@ -61,6 +61,8 @@
 - `all-is-cubes-mesh` library:
     - The new trait `MeshTypes` is now used to combine declaration of vertex and texture types.
       `BlockMesh`, `SpaceMesh`, `ChunkedSpaceMesh`, and `GetBlockMesh` all have a single `M: MeshTypes` parameter in place of multiple generics.
+    - Texture writes are now given data using `Vol<&[Evoxel]>` rather than pre-converted sRGB data;
+      it is up to the texture implementation to convert and shuffle data as needed.
     - Renamed `TextureAllocator` to `texture::Allocator`.
     - Renamed `TextureTile` to `texture::Tile`.
     - Renamed `Texel` to `texture::Texel`.

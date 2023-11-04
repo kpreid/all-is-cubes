@@ -207,7 +207,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                     ..
                 },
             ) if old_mask == new_mask => {
-                texture::copy_voxels_into_existing_texture(voxels, existing_texture);
+                existing_texture.write(voxels.as_vol_ref());
                 true
             }
             _ => false,

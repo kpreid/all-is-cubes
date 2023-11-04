@@ -4,9 +4,10 @@
 
 use core::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 
+use all_is_cubes::block::Evoxel;
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::euclid::Point3D;
-use all_is_cubes::math::GridAab;
+use all_is_cubes::math::{GridAab, Vol};
 use all_is_cubes::space::Space;
 
 use crate::dynamic::DynamicMeshTypes;
@@ -129,12 +130,12 @@ impl texture::Tile for Tile {
         self.clone()
     }
 
-    fn write(&mut self, data: &[texture::Texel]) {
+    fn write(&mut self, data: Vol<&[Evoxel]>) {
         // Validate data size.
         assert_eq!(
-            data.len(),
-            self.bounds.volume(),
-            "tile data did not match resolution"
+            data.bounds(),
+            self.bounds,
+            "given data did not match tile bounds"
         );
     }
 }

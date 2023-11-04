@@ -526,6 +526,28 @@ impl Evoxels {
         }
     }
 
+    /// Returns a [`Vol`] borrowing these voxels.
+    pub fn as_vol_ref(&self) -> Vol<&[Evoxel]> {
+        match self {
+            Evoxels::One(voxel) => {
+                Vol::from_elements(GridAab::ORIGIN_CUBE, core::slice::from_ref(voxel)).unwrap()
+            }
+            Evoxels::Many(_, voxels) => voxels.as_ref(),
+        }
+    }
+
+    /// Returns a [`Vol`] mutably borrowing these voxels.
+    pub fn as_vol_mut(&mut self) -> Vol<&mut [Evoxel]> {
+        match self {
+            Evoxels::One(voxel) => {
+                Vol::from_elements(GridAab::ORIGIN_CUBE, core::slice::from_mut(voxel)).unwrap()
+            }
+            Evoxels::Many(_, voxels) => {
+                Vol::from_elements(voxels.bounds(), voxels.make_linear_mut()).unwrap()
+            }
+        }
+    }
+
     /// Get the single voxel at the specified position, or [`None`] if the position is
     /// out of bounds of the data (which is not necessarily out of bounds of the block;
     /// missing data should be taken as [`Evoxel::AIR`]).
@@ -539,14 +561,6 @@ impl Evoxels {
             (&Evoxels::One(voxel), Cube::ORIGIN) => Some(voxel),
             (Evoxels::One(_), _) => None,
             (Evoxels::Many(_, ref voxels), position) => voxels.get(position).copied(),
-        }
-    }
-
-    // TODO: make public?
-    pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &'_ mut Evoxel> {
-        match self {
-            Evoxels::One(v) => core::slice::from_mut(v).iter_mut(),
-            Evoxels::Many(_, voxels) => voxels.make_linear_mut().iter_mut(),
         }
     }
 

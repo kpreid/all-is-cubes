@@ -2,10 +2,11 @@
 
 use std::io;
 
+use all_is_cubes::block::Evoxel;
 use gltf_json::validation::Checked::Valid;
 
 use all_is_cubes::euclid::Point2D;
-use all_is_cubes::math::{Axis, GridAab, GridRotation, VectorOps};
+use all_is_cubes::math::{Axis, GridAab, GridRotation, VectorOps, Vol};
 use all_is_cubes_mesh::texture::{self, TilePoint};
 
 use super::glue::push_and_return_index;
@@ -101,12 +102,15 @@ impl texture::Tile for GltfTile {
     type Plane = GltfTexturePlane;
     const REUSABLE: bool = false;
 
-    fn write(&mut self, data: &[texture::Texel]) {
-        assert_eq!(data.len(), self.bounds.volume());
+    fn write(&mut self, data: Vol<&[Evoxel]>) {
+        assert_eq!(data.bounds(), self.bounds());
+
+        let mut buffer = vec![[0, 0, 0, 0]; self.bounds().volume()];
+        texture::copy_voxels_into_xmaj_texture(data, &mut buffer);
 
         // OK to panic on failure because if we do, the caller ignored Self::REUSABLE.
         self.texels
-            .set(data.to_owned())
+            .set(buffer)
             .expect("cannot overwrite glTF textures")
     }
 
@@ -423,6 +427,8 @@ mod internal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::block;
+    use all_is_cubes::math::Rgba;
     use all_is_cubes_mesh::texture::{Allocator, Tile};
     use std::fs;
 
@@ -438,7 +444,9 @@ mod tests {
         let mut tile = allocator
             .allocate(GridAab::ORIGIN_CUBE)
             .expect("allocation");
-        tile.write(&[[0, 1, 2, 3]]);
+        tile.write(
+            block::Evoxels::One(Evoxel::from_color(Rgba::from_srgb8([1, 2, 3, 4]))).as_vol_ref(),
+        );
         drop(tile);
 
         allocator.write_png_atlas().unwrap();

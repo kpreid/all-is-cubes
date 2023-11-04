@@ -5,9 +5,10 @@
 
 use std::sync::{Arc, Mutex, Weak};
 
+use all_is_cubes::block::Evoxel;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::Translation3D;
-use all_is_cubes::math::{GridAab, GridCoordinate, VectorOps};
+use all_is_cubes::math::{GridAab, GridCoordinate, VectorOps, Vol};
 use all_is_cubes::time;
 use all_is_cubes_mesh::texture;
 
@@ -314,7 +315,7 @@ impl texture::Tile for AtlasTile {
         }
     }
 
-    fn write(&mut self, data: &[texture::Texel]) {
+    fn write(&mut self, data: Vol<&[Evoxel]>) {
         // Note: acquiring the two locks separately to avoid possible deadlock
         // with another thread trying to flush() (which acquires allocator and
         // then tile locks). I believe that in all possible interleavings, the
@@ -329,7 +330,10 @@ impl texture::Tile for AtlasTile {
         // write the data.
         let allocator_backing_ref = {
             let mut backing = self.backing.lock().unwrap();
-            backing.data = Some(data.into());
+            let buffer = backing.data.get_or_insert_with(|| {
+                vec![[0, 0, 0, 0]; self.bounds().volume()].into_boxed_slice()
+            });
+            texture::copy_voxels_into_xmaj_texture(data, buffer);
             backing.dirty = true;
 
             backing.allocator.upgrade()

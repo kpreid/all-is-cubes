@@ -93,7 +93,7 @@ impl Modifier {
             Modifier::Quote(Quote { suppress_ambient }) => {
                 value.attributes.tick_action = None;
                 if suppress_ambient {
-                    for voxel in value.voxels.iter_mut() {
+                    for voxel in value.voxels.as_vol_mut().as_linear_mut().iter_mut() {
                         voxel.emission = Rgb::ZERO;
                     }
                 }
