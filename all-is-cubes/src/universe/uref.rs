@@ -127,12 +127,9 @@ impl<T: 'static> URef<T> {
     /// This may change from [`Name::Pending`] to another name when the ref is inserted into
     /// a [`Universe`].
     pub fn name(&self) -> Name {
-        match self.state.lock().as_deref() {
-            Ok(State::Pending { name, .. }) => name.clone(),
-            #[cfg(feature = "save")]
-            Ok(State::Deserializing { name, .. }) => name.clone(),
-            Ok(State::Member { name, .. }) => name.clone(),
-            Ok(State::Gone { name }) => name.clone(),
+        // This code is also duplicated as `URootRef::name()`
+        match self.state.lock() {
+            Ok(state) => state.name(),
             Err(_) => Name::Pending,
         }
     }
@@ -475,6 +472,20 @@ impl<'a, T: arbitrary::Arbitrary<'a> + 'static> arbitrary::Arbitrary<'a> for URe
     }
 }
 
+impl<T> State<T> {
+    /// Name by which the [`Universe`] knows the ref with this state.
+    /// This is public as [`URef::name()`].
+    pub(crate) fn name(&self) -> Name {
+        match self {
+            State::Pending { name, .. } => name.clone(),
+            #[cfg(feature = "save")]
+            State::Deserializing { name, .. } => name.clone(),
+            State::Member { name, .. } => name.clone(),
+            State::Gone { name } => name.clone(),
+        }
+    }
+}
+
 /// Errors resulting from attempting to borrow/dereference a [`URef`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
@@ -597,6 +608,13 @@ impl<T> URootRef<T> {
         }
     }
 
+    pub(crate) fn name(&self) -> Name {
+        match self.state.lock() {
+            Ok(state) => state.name(),
+            Err(_) => Name::Pending,
+        }
+    }
+
     /// Convert to `URef`.
     ///
     /// TODO: As we add graph analysis features, this will need additional arguments
@@ -612,6 +630,25 @@ impl<T> URootRef<T> {
     /// or equal to the number of [`URef`]s to it.
     pub(crate) fn weak_ref_count(&self) -> usize {
         Arc::weak_count(&self.strong_ref)
+    }
+
+    /// Apply the given function to the `&mut T` inside.
+    ///
+    /// This implementation is used in the implementation of universe stepping; normal mutations
+    /// should use transactions or, if necessary, [`URef::try_modify()`] instead.
+    pub fn try_modify<F, Out>(&self, function: F) -> Result<Out, RefError>
+    where
+        F: FnOnce(&mut T) -> Out,
+    {
+        let mut guard = self
+            .strong_ref
+            .try_write()
+            .map_err(|_| RefError::InUse(self.name()))?;
+        let data: &mut T = guard
+            .data
+            .as_mut()
+            .ok_or_else(|| RefError::NotReady(self.name()))?;
+        Ok(function(data))
     }
 }
 

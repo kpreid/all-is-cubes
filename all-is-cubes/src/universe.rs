@@ -311,11 +311,11 @@ impl Universe {
         let mut transactions = Vec::new();
 
         for space_root in self.tables.spaces.values() {
-            let space_ref = space_root.downgrade();
-            let (space_info, transaction) = space_ref
+            let (space_info, transaction) = space_root
                 .try_modify(|space| {
                     space.step(
-                        Some(&space_ref),
+                        // TODO: avoid needing downgrade() unless the ref is actually used?
+                        Some(&space_root.downgrade()),
                         tick,
                         match budget_per_space {
                             Some(budget) => deadline.min(time::Deadline::At(I::now() + budget)),
@@ -335,9 +335,11 @@ impl Universe {
         info.active_members += self.spaces_with_work;
 
         for character_root in self.tables.characters.values() {
-            let character_ref = character_root.downgrade();
-            let (_body_step_info, transaction) = character_ref
-                .try_modify(|ch| ch.step(Some(&character_ref), tick))
+            let (_body_step_info, transaction) = character_root
+                .try_modify(|ch| {
+                    // TODO: avoid needing downgrade() unless the ref is actually used?
+                    ch.step(Some(&character_root.downgrade()), tick)
+                })
                 .expect("character borrowed during universe.step()");
             transactions.push(transaction);
             info.total_members += 1;
