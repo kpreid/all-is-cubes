@@ -5,7 +5,7 @@ use std::fmt;
 use all_is_cubes::block::{Evoxel, Evoxels};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::Point3D;
-use all_is_cubes::math::{Axis, Cube, GridAab, Vol};
+use all_is_cubes::math::{Axis, Cube, GridAab, Rgb, Vol};
 use all_is_cubes::util::{ConciseDebug, Fmt};
 
 #[cfg(doc)]
@@ -45,12 +45,17 @@ pub trait Allocator {
     /// Allocate a tile, whose range of texels will be reserved for use as long as the
     /// [`Tile`] value, and its clones, are not dropped.
     ///
-    /// The given [`GridAab`] specifies the desired size of the allocation;
-    /// its translation does not affect the size but may be used to make the resulting
-    /// texture coordinate transformation convenient for the caller.
+    /// * `bounds` specifies the desired size of the allocation;
+    ///   its translation does not affect the size but may be used to make the resulting
+    ///   texture coordinate transformation convenient for the caller.
+    /// * `channels` specifies what types of data the texture should capture from the
+    ///   [`Evoxel`]s that will be provided later to [`Tile::write()`].
+    ///   The allocator may choose to ignore some channels if this suits the
+    ///   limitations of the intended rendering; an allocation should not fail due to
+    ///   unsupported channels.
     ///
     /// Returns [`None`] if no space is available for another region.
-    fn allocate(&self, bounds: GridAab) -> Option<Self::Tile>;
+    fn allocate(&self, bounds: GridAab, channels: Channels) -> Option<Self::Tile>;
 }
 
 /// 3D texture volume provided by an [`Allocator`] to paint a block's voxels in.
@@ -72,6 +77,14 @@ pub trait Tile: Clone + PartialEq {
 
     /// Returns the [`GridAab`] originally passed to the texture allocator for this tile.
     fn bounds(&self) -> GridAab;
+
+    /// Returns the [`Channels`] that this tile is capable of storing or intentionally discarding.
+    /// This should be equal to, or a superset of, the [`Channels`] requested when the texture was
+    /// allocated.
+    ///
+    /// This will be used by mesh algorithms to avoid reallocating unless necessary when new texel
+    /// data is to be displayed.
+    fn channels(&self) -> Channels;
 
     /// Returns a [`Plane`] instance referring to some 2D slice of this 3D texture volume.
     ///
@@ -116,24 +129,50 @@ impl<T: Allocator> Allocator for &T {
     type Tile = T::Tile;
     type Point = T::Point;
     #[mutants::skip] // trivial
-    fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
-        <T as Allocator>::allocate(self, bounds)
+    fn allocate(&self, bounds: GridAab, channels: Channels) -> Option<Self::Tile> {
+        <T as Allocator>::allocate(self, bounds, channels)
     }
 }
 impl<T: Allocator> Allocator for std::sync::Arc<T> {
     type Tile = T::Tile;
     type Point = T::Point;
     #[mutants::skip] // trivial
-    fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
-        <T as Allocator>::allocate(self, bounds)
+    fn allocate(&self, bounds: GridAab, channels: Channels) -> Option<Self::Tile> {
+        <T as Allocator>::allocate(self, bounds, channels)
     }
 }
 impl<T: Allocator> Allocator for std::rc::Rc<T> {
     type Tile = T::Tile;
     type Point = T::Point;
     #[mutants::skip] // trivial
-    fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
-        <T as Allocator>::allocate(self, bounds)
+    fn allocate(&self, bounds: GridAab, channels: Channels) -> Option<Self::Tile> {
+        <T as Allocator>::allocate(self, bounds, channels)
+    }
+}
+
+/// Specifies a combination of data stored per texel that may be requested of an [`Allocator`].
+///
+/// Design note: This is an `enum` rather than a bitmask so that allocators and shaders do not
+/// have to support a large number of cases, but only typical ones.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[allow(clippy::exhaustive_enums)]
+pub enum Channels {
+    /// RGBA color (or perhaps RGB if the target does not support transparency) representing
+    /// reflectance.
+    Reflectance,
+    /// Reflectance as defined above and also RGB light emission.
+    ReflectanceEmission,
+}
+
+impl Channels {
+    /// Returns whether `self` can store everything that `other` can.
+    pub(crate) fn is_superset_of(self, other: Self) -> bool {
+        use Channels::*;
+        match (self, other) {
+            (ReflectanceEmission, _) => true,
+            (Reflectance, Reflectance) => true,
+            (Reflectance, ReflectanceEmission) => false,
+        }
     }
 }
 
@@ -145,7 +184,7 @@ impl<T: Allocator> Allocator for std::rc::Rc<T> {
 ///       (i.e. Z is preferred).
 /// * If invalid, panic.
 ///
-/// This function may be useful to [`Tile`] implementors.
+/// This function may be useful to [`Tile::slice()`] implementors.
 #[track_caller]
 pub fn validate_slice(tile_bounds: GridAab, slice_bounds: GridAab) -> Axis {
     assert!(
@@ -160,16 +199,32 @@ pub fn validate_slice(tile_bounds: GridAab, slice_bounds: GridAab) -> Axis {
     }
 }
 
-pub(super) fn copy_voxels_to_texture<A: Allocator>(
+pub(super) fn copy_voxels_to_new_texture<A: Allocator>(
     texture_allocator: &A,
     voxels: &Evoxels,
 ) -> Option<A::Tile> {
     texture_allocator
-        .allocate(voxels.bounds())
+        .allocate(voxels.bounds(), needed_channels(voxels))
         .map(|mut texture| {
             texture.write(voxels.as_vol_ref());
             texture
         })
+}
+
+/// Determine which [`Channels`] are necessary to store all relevant characteristics of the block.
+pub(super) fn needed_channels(voxels: &Evoxels) -> Channels {
+    // This has false positives because it includes obscured voxels, but that is probably not
+    // worth fixing with a more complex algorithm.
+    if voxels
+        .as_vol_ref()
+        .as_linear()
+        .iter()
+        .any(|voxel| voxel.emission != Rgb::ZERO)
+    {
+        Channels::ReflectanceEmission
+    } else {
+        Channels::Reflectance
+    }
 }
 
 /// Helper function to implement the typical case of copying voxels into an X-major, sRGB, RGBA
@@ -209,7 +264,7 @@ impl Allocator for NoTextures {
     type Tile = NoTexture;
     type Point = NoTexture;
 
-    fn allocate(&self, _: GridAab) -> Option<Self::Tile> {
+    fn allocate(&self, _: GridAab, _: Channels) -> Option<Self::Tile> {
         None
     }
 }
@@ -227,6 +282,10 @@ impl Tile for NoTexture {
     const REUSABLE: bool = true;
 
     fn bounds(&self) -> GridAab {
+        match *self {}
+    }
+
+    fn channels(&self) -> Channels {
         match *self {}
     }
 

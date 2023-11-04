@@ -69,10 +69,16 @@ impl texture::Allocator for GltfTextureAllocator {
     type Tile = GltfTile;
     type Point = GltfAtlasPoint;
 
-    fn allocate(&self, bounds: GridAab) -> Option<GltfTile> {
+    fn allocate(&self, bounds: GridAab, mut channels: texture::Channels) -> Option<GltfTile> {
         if self.enable {
+            // TODO: implement more channels
+            if true {
+                channels = texture::Channels::Reflectance;
+            }
+
             Some(GltfTile {
                 bounds,
+                channels,
                 texels: internal::TexelsCell::default(),
                 gatherer: self.gatherer.clone(),
             })
@@ -93,6 +99,7 @@ impl texture::Allocator for GltfTextureAllocator {
 #[allow(clippy::derive_partial_eq_without_eq)]
 pub struct GltfTile {
     bounds: GridAab,
+    channels: texture::Channels,
     gatherer: internal::Gatherer,
     texels: internal::TexelsCell,
 }
@@ -116,6 +123,10 @@ impl texture::Tile for GltfTile {
 
     fn bounds(&self) -> GridAab {
         self.bounds
+    }
+
+    fn channels(&self) -> texture::Channels {
+        self.channels
     }
 
     fn slice(&self, sliced_bounds: GridAab) -> Self::Plane {
@@ -429,7 +440,7 @@ mod tests {
     use super::*;
     use all_is_cubes::block;
     use all_is_cubes::math::Rgba;
-    use all_is_cubes_mesh::texture::{Allocator, Tile};
+    use all_is_cubes_mesh::texture::{Allocator, Channels, Tile};
     use std::fs;
 
     /// TODO: this is just a smoke-test; add more rigorous tests.
@@ -442,7 +453,7 @@ mod tests {
         let allocator =
             GltfTextureAllocator::new(GltfDataDestination::new(Some(file_base_path), 0), true);
         let mut tile = allocator
-            .allocate(GridAab::ORIGIN_CUBE)
+            .allocate(GridAab::ORIGIN_CUBE, Channels::Reflectance)
             .expect("allocation");
         tile.write(
             block::Evoxels::One(Evoxel::from_color(Rgba::from_srgb8([1, 2, 3, 4]))).as_vol_ref(),

@@ -206,7 +206,11 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                     voxel_opacity_mask: Some(new_mask),
                     ..
                 },
-            ) if old_mask == new_mask => {
+            ) if old_mask == new_mask
+                && existing_texture
+                    .channels()
+                    .is_superset_of(texture::needed_channels(&block.voxels)) =>
+            {
                 existing_texture.write(voxels.as_vol_ref());
                 true
             }
@@ -478,7 +482,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                                 if texture_plane_if_needed.is_none() {
                                     if texture_if_needed.is_none() {
                                         // Try to compute texture (might fail)
-                                        texture_if_needed = texture::copy_voxels_to_texture(
+                                        texture_if_needed = texture::copy_voxels_to_new_texture(
                                             texture_allocator,
                                             voxels,
                                         );

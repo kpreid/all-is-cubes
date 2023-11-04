@@ -271,7 +271,13 @@ impl texture::Allocator for AtlasAllocator {
     type Tile = AtlasTile;
     type Point = TexPoint;
 
-    fn allocate(&self, requested_bounds: GridAab) -> Option<AtlasTile> {
+    fn allocate(
+        &self,
+        requested_bounds: GridAab,
+        _channels: texture::Channels,
+    ) -> Option<AtlasTile> {
+        // TODO: implement channels
+
         let mut allocator_backing = self.backing.lock().unwrap();
 
         // If alloctree grows, the next flush() will take care of reallocating the texture.
@@ -305,6 +311,10 @@ impl texture::Tile for AtlasTile {
 
     fn bounds(&self) -> GridAab {
         self.requested_bounds
+    }
+
+    fn channels(&self) -> texture::Channels {
+        texture::Channels::Reflectance
     }
 
     fn slice(&self, requested_bounds: GridAab) -> Self::Plane {

@@ -93,7 +93,7 @@ impl texture::Allocator for Allocator {
     type Tile = Tile;
     type Point = TexPoint;
 
-    fn allocate(&self, bounds: GridAab) -> Option<Self::Tile> {
+    fn allocate(&self, bounds: GridAab, channels: texture::Channels) -> Option<Self::Tile> {
         self.count_allocated
             .fetch_update(SeqCst, SeqCst, |count| {
                 if count < self.capacity {
@@ -104,7 +104,7 @@ impl texture::Allocator for Allocator {
             })
             .ok()
             .map(|_| ())?;
-        Some(Tile { bounds })
+        Some(Tile { bounds, channels })
     }
 }
 
@@ -114,6 +114,7 @@ impl texture::Allocator for Allocator {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Tile {
     bounds: GridAab,
+    channels: texture::Channels,
 }
 
 impl texture::Tile for Tile {
@@ -123,6 +124,10 @@ impl texture::Tile for Tile {
 
     fn bounds(&self) -> GridAab {
         self.bounds
+    }
+
+    fn channels(&self) -> texture::Channels {
+        self.channels
     }
 
     fn slice(&self, bounds: GridAab) -> Self::Plane {
@@ -153,7 +158,7 @@ pub type TexPoint = Point3D<texture::TextureCoordinate, texture::TexelUnit>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::texture::Allocator as _;
+    use crate::texture::{Allocator as _, Channels};
     use all_is_cubes::block::Resolution::*;
 
     /// Test the test [`Allocator`].
@@ -162,11 +167,11 @@ mod tests {
         let bounds = GridAab::for_block(R8);
         let mut allocator = Allocator::new();
         assert_eq!(allocator.count_allocated(), 0);
-        assert!(allocator.allocate(bounds).is_some());
-        assert!(allocator.allocate(bounds).is_some());
+        assert!(allocator.allocate(bounds, Channels::Reflectance).is_some());
+        assert!(allocator.allocate(bounds, Channels::Reflectance).is_some());
         assert_eq!(allocator.count_allocated(), 2);
         allocator.set_capacity(3);
-        assert!(allocator.allocate(bounds).is_some());
-        assert!(allocator.allocate(bounds).is_none());
+        assert!(allocator.allocate(bounds, Channels::Reflectance).is_some());
+        assert!(allocator.allocate(bounds, Channels::Reflectance).is_none());
     }
 }
