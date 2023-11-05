@@ -91,9 +91,22 @@ impl BlockDef {
         }
     }
 
-    /// Returns the current value.
+    /// Returns the current block value.
+    ///
+    /// Note that if you wish to get the [`EvaluatedBlock`] result, you should obtain the cached
+    /// value by calling `BlockDef.evaluate()`, or by using a [`Primitive::Indirect`],
+    /// not by calling `.block().evaluate()`, which is not cached.
     pub fn block(&self) -> &Block {
         &self.block
+    }
+
+    /// Returns the current cached evaluation of the current block value.
+    ///
+    /// This returns the same success or error as `Block::from(ref_to_self).evaluate()` would, not
+    /// the same as `.block().evaluate()` would.
+    pub fn evaluate(&self) -> Result<block::EvaluatedBlock, EvalBlockError> {
+        self.evaluate_impl(&block::EvalFilter::default())
+            .map(block::EvaluatedBlock::from)
     }
 
     /// Implementation of block evaluation used by a [`Primitive::Indirect`] pointing to this.

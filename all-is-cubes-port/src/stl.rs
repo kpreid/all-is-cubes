@@ -5,7 +5,7 @@ use std::fs;
 use itertools::Itertools as _;
 use stl_io::Triangle;
 
-use all_is_cubes::block::{self, Block};
+use all_is_cubes::block;
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::math::{Cube, FreeCoordinate, VectorOps};
@@ -43,14 +43,16 @@ pub(crate) async fn export_stl(
     }
 
     for block_def in block_defs {
+        let ev = block_def
+            .read()?
+            .evaluate()
+            .map_err(|error| crate::ExportError::Eval {
+                name: block_def.name(),
+                error,
+            })?;
         stl_io::write_stl(
             &mut fs::File::create(source.member_export_path(&destination, block_def))?,
-            block_to_stl_triangles(block_def.read()?.block())
-                .map_err(|error| crate::ExportError::Eval {
-                    name: block_def.name(),
-                    error,
-                })?
-                .into_iter(),
+            block_to_stl_triangles(&ev).into_iter(),
         )?;
     }
 
@@ -72,12 +74,10 @@ pub(crate) fn space_to_stl_triangles(space: &Space) -> Vec<Triangle> {
     ))
 }
 
-pub(crate) fn block_to_stl_triangles(
-    block: &Block,
-) -> Result<Vec<Triangle>, block::EvalBlockError> {
+pub(crate) fn block_to_stl_triangles(block: &block::EvaluatedBlock) -> Vec<Triangle> {
     let block_mesh: mesh::BlockMesh<StlMt> =
-        mesh::BlockMesh::new(&block.evaluate()?, &NoTextures, &mesh_options_for_stl());
-    Ok(space_mesh_to_triangles(&mesh::SpaceMesh::from(&block_mesh)))
+        mesh::BlockMesh::new(block, &NoTextures, &mesh_options_for_stl());
+    space_mesh_to_triangles(&mesh::SpaceMesh::from(&block_mesh))
 }
 
 fn mesh_options_for_stl() -> mesh::MeshOptions {
@@ -125,7 +125,7 @@ impl mesh::MeshTypes for StlMt {
 mod tests {
     use super::*;
     use crate::{ExportFormat, ExportSet};
-    use all_is_cubes::block::BlockDef;
+    use all_is_cubes::block::{Block, BlockDef};
     use all_is_cubes::content::make_some_voxel_blocks;
     use all_is_cubes::content::testing::lighting_bench_space;
     use all_is_cubes::math::GridVector;
