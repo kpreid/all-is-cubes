@@ -7,7 +7,7 @@ use crate::transaction::{self, Transaction};
 use crate::universe::{RefVisitor, VisitRefs};
 
 #[cfg(doc)]
-use crate::block::Primitive;
+use crate::block::{EvaluatedBlock, Primitive};
 #[cfg(doc)]
 use crate::universe::Universe;
 

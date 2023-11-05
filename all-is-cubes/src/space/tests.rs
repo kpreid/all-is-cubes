@@ -385,7 +385,7 @@ fn listens_to_block_changes() {
     // Set up indirect block
     let mut universe = Universe::new();
     let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
-    let indirect = Block::from_primitive(Primitive::Indirect(block_def_ref.clone()));
+    let indirect = Block::from(block_def_ref.clone());
 
     // Set up space and listener
     let mut space = Space::empty_positive(1, 1, 1);
@@ -423,7 +423,7 @@ fn indirect_becomes_evaluation_error() {
     let block_def_ref = universe
         .insert(block_name.clone(), BlockDef::new(Block::from(Rgba::WHITE)))
         .unwrap();
-    let block = Block::from_primitive(Primitive::Indirect(block_def_ref.clone()));
+    let block = Block::from(block_def_ref.clone());
 
     // Set up space and listener
     let mut space = Space::empty_positive(1, 1, 1);

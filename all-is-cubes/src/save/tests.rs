@@ -607,12 +607,7 @@ fn universe_with_one_of_each() -> Universe {
     // Note: space has no light (which simplifies our work here)
     // TODO: Specify spawn explicitly, so these tests do not rely on the default spawn value
     let mut space = Space::for_block(Resolution::R2).build();
-    space
-        .set(
-            [0, 0, 0],
-            Block::from_primitive(block::Primitive::Indirect(block_ref)),
-        )
-        .unwrap();
+    space.set([0, 0, 0], Block::from(block_ref)).unwrap();
     let space_ref = universe.insert("a_space".into(), space).unwrap();
 
     let character = Character::spawn_default(space_ref);

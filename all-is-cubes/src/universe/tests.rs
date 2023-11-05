@@ -4,7 +4,7 @@ use core::any::TypeId;
 
 use indoc::indoc;
 
-use crate::block::{Block, BlockDef, BlockDefTransaction, Primitive, Resolution, TickAction, AIR};
+use crate::block::{Block, BlockDef, BlockDefTransaction, Resolution, TickAction, AIR};
 use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
@@ -352,7 +352,7 @@ fn visit_refs_block_def_indirect() {
     let mut u = Universe::new();
     let b1 = BlockDef::new(AIR);
     let b1_ref = u.insert("destination".into(), b1).unwrap();
-    let b2 = BlockDef::new(Block::from_primitive(Primitive::Indirect(b1_ref)));
+    let b2 = BlockDef::new(Block::from(b1_ref));
     assert_eq!(list_refs(&b2), vec!["destination".into()]);
 }
 
@@ -362,7 +362,7 @@ fn visit_refs_block_tick_action() {
     let b2 = Block::builder()
         .color(Rgba::WHITE)
         .tick_action(Some(TickAction::from(Operation::Paint(
-            crate::drawing::VoxelBrush::single(Block::from_primitive(Primitive::Indirect(b1))),
+            crate::drawing::VoxelBrush::single(Block::from(b1)),
         ))))
         .build();
     assert_eq!(list_refs(&b2), vec!["foo".into()]);
@@ -381,9 +381,9 @@ fn visit_refs_character() {
 
     // A block reference in inventory.
     let block_ref = u.insert("block".into(), BlockDef::new(AIR)).unwrap();
-    CharacterTransaction::inventory(InventoryTransaction::insert([Tool::Block(
-        Block::from_primitive(Primitive::Indirect(block_ref)),
-    )]))
+    CharacterTransaction::inventory(InventoryTransaction::insert([Tool::Block(Block::from(
+        block_ref,
+    ))]))
     .execute(&mut character, &mut drop)
     .unwrap();
 
@@ -396,10 +396,7 @@ fn visit_refs_space() {
     let mut space = Space::empty_positive(1, 1, 1);
     let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
     space
-        .set(
-            [0, 0, 0],
-            Block::from_primitive(Primitive::Indirect(block_def_ref.clone())),
-        )
+        .set([0, 0, 0], Block::from(block_def_ref.clone()))
         .unwrap();
 
     // TODO: Also add a behavior and a spawn inventory item containing refs and check those

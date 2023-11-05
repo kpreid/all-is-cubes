@@ -863,6 +863,27 @@ mod conversions_for_atom {
     }
 }
 
+mod conversions_for_indirect {
+    use super::*;
+
+    impl From<URef<BlockDef>> for Primitive {
+        /// Convert a `URef<BlockDef>` into a [`Primitive::Indirect`] that refers to it.
+        fn from(block_def_ref: URef<BlockDef>) -> Self {
+            Primitive::Indirect(block_def_ref)
+        }
+    }
+
+    impl From<URef<BlockDef>> for Block {
+        /// Convert a `URef<BlockDef>` into a block with [`Primitive::Indirect`] that refers to it.
+        ///
+        /// The returned block will evaluate to the same [`EvaluatedBlock`] as the block contained
+        /// within the given [`BlockDef`] (except in case of errors).
+        fn from(block_def_ref: URef<BlockDef>) -> Self {
+            Block::from_primitive(Primitive::Indirect(block_def_ref))
+        }
+    }
+}
+
 /// Notification when an [`EvaluatedBlock`] result changes.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]

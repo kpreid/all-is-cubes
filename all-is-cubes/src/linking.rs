@@ -17,11 +17,14 @@ use core::ops::Index;
 use exhaust::Exhaust;
 use hashbrown::HashMap as HbHashMap;
 
-use crate::block::{Block, BlockDef, Primitive};
+use crate::block::{Block, BlockDef};
 use crate::space::SetCubeError;
 use crate::transaction::ExecuteError;
 use crate::universe::{InsertError, Name, URef, Universe};
 use crate::util::{ErrorIfStd, YieldProgress};
+
+#[cfg(doc)]
+use crate::block::Primitive;
 
 fn name_in_module<E: BlockModule>(key: &E) -> Name {
     Name::from(format!("{ns}/{key}", ns = E::namespace()))
@@ -145,8 +148,7 @@ where
         Ok(BlockProvider {
             map: E::exhaust()
                 .map(|key| {
-                    let block =
-                        Block::from_primitive(Primitive::Indirect(found.remove(&key).unwrap()));
+                    let block = Block::from(found.remove(&key).unwrap());
                     (key, block)
                 })
                 .collect(),

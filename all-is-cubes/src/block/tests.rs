@@ -407,7 +407,7 @@ mod eval {
             .build();
         let eval_bare = block.evaluate();
         let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
-        let eval_def = Block::from_primitive(Primitive::Indirect(block_def_ref)).evaluate();
+        let eval_def = Block::from(block_def_ref).evaluate();
         assert_eq!(eval_bare, eval_def);
     }
 
@@ -441,7 +441,7 @@ fn listen_atom() {
 fn listen_indirect_atom() {
     let mut universe = Universe::new();
     let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
-    let indirect = Block::from_primitive(Primitive::Indirect(block_def_ref.clone()));
+    let indirect = Block::from(block_def_ref.clone());
     let sink = Sink::new();
     listen(indirect, sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
@@ -464,9 +464,9 @@ fn listen_indirect_atom() {
 fn listen_indirect_double() {
     let mut universe = Universe::new();
     let block_def_ref1 = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
-    let indirect1 = Block::from_primitive(Primitive::Indirect(block_def_ref1.clone()));
+    let indirect1 = Block::from(block_def_ref1.clone());
     let block_def_ref2 = universe.insert_anonymous(BlockDef::new(indirect1.clone()));
-    let indirect2 = Block::from_primitive(Primitive::Indirect(block_def_ref2.clone()));
+    let indirect2 = Block::from(block_def_ref2.clone());
     let sink1 = Sink::new();
     let sink2 = Sink::new();
     listen(indirect1, sink1.listener()).unwrap();
@@ -569,7 +569,7 @@ fn self_referential_listen() {
 /// Helper for overflow_ tests
 fn self_referential_block(universe: &mut Universe) -> Block {
     let block_def = universe.insert_anonymous(BlockDef::new(AIR));
-    let indirect = Block::from_primitive(Primitive::Indirect(block_def.clone()));
+    let indirect = Block::from(block_def.clone());
     block_def
         .execute(
             &BlockDefTransaction::overwrite(indirect.clone()),
@@ -592,7 +592,7 @@ mod txn {
         let [b1, b2] = make_some_blocks();
         let mut universe = Universe::new();
         let block_def_ref = universe.insert_anonymous(BlockDef::new(b1));
-        let indirect = Block::from_primitive(Primitive::Indirect(block_def_ref.clone()));
+        let indirect = Block::from(block_def_ref.clone());
         let sink = Sink::new();
         listen(indirect, sink.listener()).unwrap();
         assert_eq!(sink.drain(), vec![]);
