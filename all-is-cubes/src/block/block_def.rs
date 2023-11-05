@@ -429,3 +429,32 @@ impl manyfmt::Fmt<crate::util::StatusText> for BlockDefStepInfo {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::math::Rgba;
+    use crate::universe::Universe;
+
+    use super::*;
+
+    /// Quick more-than-nothing test for [`BlockDef::evaluate()`] being the same as more usual
+    /// options.
+    ///
+    /// TODO: Test its behavior on failure.
+    #[test]
+    fn evaluate_equivalence() {
+        let mut universe = Universe::new();
+        let block = Block::builder()
+            .color(Rgba::new(1.0, 0.0, 0.0, 1.0))
+            .build();
+
+        let eval_bare = block.evaluate();
+        let block_def = BlockDef::new(block);
+        let eval_def = block_def.evaluate();
+        let block_def_ref = universe.insert_anonymous(block_def);
+        let eval_indirect = Block::from(block_def_ref).evaluate();
+
+        assert_eq!(eval_bare, eval_def);
+        assert_eq!(eval_bare, eval_indirect);
+    }
+}
