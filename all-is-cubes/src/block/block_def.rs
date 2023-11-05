@@ -2,12 +2,15 @@ use alloc::sync::Arc;
 use core::ops::{self, Deref};
 use core::{fmt, mem};
 
-use crate::block::{self, Block, BlockChange, EvalBlockError, MinEval, Primitive};
+use crate::block::{self, Block, BlockChange, EvalBlockError, MinEval};
 use crate::listen::{self, Gate, Listen, Listener, Notifier};
 use crate::transaction::{self, Transaction};
+use crate::universe::{RefVisitor, VisitRefs};
+
+#[cfg(doc)]
+use crate::block::Primitive;
 #[cfg(doc)]
 use crate::universe::Universe;
-use crate::universe::{RefVisitor, VisitRefs};
 
 /// Contains a [`Block`] and can be stored in a [`Universe`].
 /// Together with [`Primitive::Indirect`], this allows mutation of a block definition such
@@ -206,46 +209,6 @@ impl AsRef<Block> for BlockDef {
 impl VisitRefs for BlockDef {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
         self.block.visit_refs(visitor)
-    }
-}
-
-impl VisitRefs for Block {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
-        self.primitive().visit_refs(visitor);
-        for modifier in self.modifiers() {
-            modifier.visit_refs(visitor)
-        }
-    }
-}
-
-impl VisitRefs for Primitive {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
-        match self {
-            Primitive::Indirect(block_ref) => visitor.visit(block_ref),
-            Primitive::Atom(atom) => atom.visit_refs(visitor),
-            Primitive::Air => {}
-            Primitive::Recur {
-                space,
-                attributes,
-                offset: _,
-                resolution: _,
-            } => {
-                visitor.visit(space);
-                attributes.visit_refs(visitor);
-            }
-        }
-    }
-}
-
-impl VisitRefs for block::Atom {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
-        let Self {
-            attributes,
-            color: _,
-            emission: _,
-            collision: _,
-        } = self;
-        attributes.visit_refs(visitor);
     }
 }
 

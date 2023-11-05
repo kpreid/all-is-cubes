@@ -18,7 +18,7 @@ use crate::math::{
 };
 use crate::raycast::Ray;
 use crate::space::{SetCubeError, Space, SpaceChange};
-use crate::universe::URef;
+use crate::universe::{RefVisitor, URef, VisitRefs};
 
 mod attributes;
 pub use attributes::*;
@@ -602,6 +602,15 @@ impl core::hash::Hash for Block {
     }
 }
 
+impl VisitRefs for Block {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        self.primitive().visit_refs(visitor);
+        for modifier in self.modifiers() {
+            modifier.visit_refs(visitor)
+        }
+    }
+}
+
 impl From<&'static Primitive> for Block {
     fn from(r: &'static Primitive) -> Self {
         Block(BlockPtr::Static(r))
@@ -786,6 +795,37 @@ impl fmt::Debug for Atom {
         }
         s.field("collision", &collision);
         s.finish()
+    }
+}
+
+impl VisitRefs for Primitive {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        match self {
+            Primitive::Indirect(block_ref) => visitor.visit(block_ref),
+            Primitive::Atom(atom) => atom.visit_refs(visitor),
+            Primitive::Air => {}
+            Primitive::Recur {
+                space,
+                attributes,
+                offset: _,
+                resolution: _,
+            } => {
+                visitor.visit(space);
+                attributes.visit_refs(visitor);
+            }
+        }
+    }
+}
+
+impl VisitRefs for Atom {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        let Self {
+            attributes,
+            color: _,
+            emission: _,
+            collision: _,
+        } = self;
+        attributes.visit_refs(visitor);
     }
 }
 
