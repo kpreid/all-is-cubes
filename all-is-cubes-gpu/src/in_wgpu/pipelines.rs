@@ -79,23 +79,22 @@ impl Pipelines {
             &BLOCKS_AND_LINES_SHADER,
         );
 
+        let block_texture_entry = |binding| wgpu::BindGroupLayoutEntry {
+            binding,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Texture {
+                multisampled: false,
+                view_dimension: wgpu::TextureViewDimension::D3,
+                sample_type: wgpu::TextureSampleType::Float { filterable: false },
+            },
+            count: None,
+        };
         let space_texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
-                    // Block color texture
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            view_dimension: wgpu::TextureViewDimension::D3,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                        },
-                        count: None,
-                    },
                     // Space light texture
                     wgpu::BindGroupLayoutEntry {
-                        binding: 2,
+                        binding: 0,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
                             multisampled: false,
@@ -104,6 +103,10 @@ impl Pipelines {
                         },
                         count: None,
                     },
+                    // Block texture atlases
+                    block_texture_entry(1), // group 0 reflectivity
+                    block_texture_entry(2), // group 1 reflectivity
+                    block_texture_entry(3), // group 1 emission
                 ],
                 label: Some("Pipelines::space_texture_bind_group_layout"),
             });

@@ -37,8 +37,10 @@ struct WgpuLinesVertex {
 @group(0) @binding(0) var<uniform> camera: ShaderSpaceCamera;
 
 // This group is named space_texture_bind_group_layout in the code.
-@group(1) @binding(0) var block_texture: texture_3d<f32>;
-@group(1) @binding(2) var light_texture: texture_3d<u32>;
+@group(1) @binding(0) var light_texture: texture_3d<u32>;
+@group(1) @binding(1) var block_g0_reflectance: texture_3d<f32>;
+@group(1) @binding(2) var block_g1_reflectance: texture_3d<f32>;
+@group(1) @binding(3) var block_g1_emission: texture_3d<f32>;
 
 // --- Fog computation --------------------------------------------------------
 
@@ -391,11 +393,17 @@ fn lighting(in: BlockFragmentInput) -> vec3<f32> {
     }
 }
 
-// Get the vertex color or texel value to display
-fn get_diffuse_color(in: BlockFragmentInput) -> vec4<f32> {
+struct Material {
+    reflectance: vec4<f32>,
+    emission: vec3<f32>,
+}
+// Get the material details from vertex color or texture lookup.
+fn get_material(in: BlockFragmentInput) -> Material {
     if in.color_or_texture[3] < -0.5 {
         // Texture coordinates.
-        let texcoord: vec3<f32> = clamp(in.color_or_texture.xyz, in.clamp_min, in.clamp_max);
+        let atlas_id = i32(round(-in.color_or_texture[3] - 1.0));
+        let texcoord: vec3<i32> =
+            vec3<i32>(clamp(in.color_or_texture.xyz, in.clamp_min, in.clamp_max));
         
         // If activated, this code will produce an “x-ray” view of all textured surfaces
         // by cutting out all but the clamped border. Other similar changes could be used to
@@ -409,10 +417,26 @@ fn get_diffuse_color(in: BlockFragmentInput) -> vec4<f32> {
         // and we don't want any filtering or wrapping, so using a sampler gives no benefit.
         // Note that coordinate rounding towards zero is effectively floor() since the
         // input is nonnegative.
-        return textureLoad(block_texture, vec3<i32>(texcoord), 0);
+        if atlas_id == 1 {
+            return Material(
+                textureLoad(block_g1_reflectance, texcoord, 0),
+                textureLoad(block_g1_emission, texcoord, 0).rgb,
+            );
+        } else if atlas_id == 0 {
+            return Material(
+                textureLoad(block_g0_reflectance, texcoord, 0),
+                vec3<f32>(0.0),
+            );
+        } else {
+            // Error — incorrect atlas ID.
+            return Material(
+                vec4<f32>(1.0, (-in.color_or_texture[3] - 1.0), 0.0, 1.0),
+                vec3<f32>(0.0),
+            );
+        }
     } else {
         // Solid color.
-        return in.color_or_texture;
+        return Material(in.color_or_texture, vec3<f32>(0.0));
     }
 }
 
@@ -461,14 +485,16 @@ fn volumetric_transparency(in: BlockFragmentInput, starting_alpha: f32) -> f32 {
 // Entry point for opaque geometry.
 @fragment
 fn block_fragment_opaque(in: BlockFragmentInput) -> @location(0) vec4<f32> {
-    let lit_color: vec3<f32> = get_diffuse_color(in).rgb * lighting(in);
+    let material = get_material(in);
+    let lit_color: vec3<f32> = material.reflectance.rgb * lighting(in) + material.emission;
     return vec4<f32>(apply_fog_and_exposure(lit_color, in.fog_mix), 1.0);
 }
 
 // Entry point for transparency under TransparencyOption::Surface.
 @fragment
 fn block_fragment_transparent_surface(in: BlockFragmentInput) -> @location(0) vec4<f32> {
-    let lit_color = get_diffuse_color(in) * vec4<f32>(lighting(in), 1.0);
+    let material = get_material(in);
+    let lit_color = material.reflectance * vec4(lighting(in), 1.0) + vec4(material.emission, 0.0);
     let exposed_color = vec4<f32>(apply_fog_and_exposure(lit_color.rgb, in.fog_mix), lit_color.a);
     return vec4<f32>(exposed_color.rgb * exposed_color.a, exposed_color.a);
 }
@@ -476,9 +502,12 @@ fn block_fragment_transparent_surface(in: BlockFragmentInput) -> @location(0) ve
 // Entry point for transparency under TransparencyOption::Volumetric.
 @fragment
 fn block_fragment_transparent_volumetric(in: BlockFragmentInput) -> @location(0) vec4<f32> {
-    var diffuse_color = get_diffuse_color(in);
-    diffuse_color.a = volumetric_transparency(in, diffuse_color.a);
-    let lit_color = diffuse_color * vec4<f32>(lighting(in), 1.0);
+    var material = get_material(in);
+
+    // Apply volumetric adjustment
+    material.reflectance.a = volumetric_transparency(in, material.reflectance.a);
+
+    let lit_color = material.reflectance * vec4(lighting(in), 1.0) + vec4(material.emission, 0.0);
     let exposed_color = vec4<f32>(apply_fog_and_exposure(lit_color.rgb, in.fog_mix), lit_color.a);
     return vec4<f32>(exposed_color.rgb * exposed_color.a, exposed_color.a);
 }

@@ -18,6 +18,7 @@ use all_is_cubes::universe::URef;
 use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, RenderDataUpdate};
 use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
 
+use crate::in_wgpu::block_texture::BlockTextureViews;
 use crate::in_wgpu::frame_texture::FramebufferTextures;
 use crate::in_wgpu::glue::{
     point_to_origin, size_vector_to_extent, to_wgpu_index_format, write_texture_by_aab,
@@ -63,8 +64,7 @@ pub(crate) struct SpaceRenderer<I> {
     instance_buffer: ResizingBuffer,
 
     /// Bind group containing our block texture and light texture,
-    space_bind_group:
-        Memo<(wgpu::Id<wgpu::TextureView>, wgpu::Id<wgpu::TextureView>), wgpu::BindGroup>,
+    space_bind_group: Memo<[wgpu::Id<wgpu::TextureView>; 3], wgpu::BindGroup>,
 
     csm: ChunkedSpaceMesh<WgpuMt, I, CHUNK_SIZE>,
 
@@ -244,20 +244,22 @@ impl<I: time::Instant> SpaceRenderer<I> {
         // Flush all texture updates to GPU.
         // This must happen after `csm.update_blocks_and_some_chunks` so that the newly
         // generated meshes have the texels they expect.
-        let (block_texture_view, texture_info) = self.block_texture.flush::<I>(device, queue);
+        let (block_texture_views, texture_info) = self.block_texture.flush::<I>(device, queue);
 
         // Update space bind group if needed.
         self.space_bind_group.get_or_insert(
-            (
-                block_texture_view.global_id(),
+            [
+                // This needs one id from each block texture group
+                block_texture_views.g0_reflectance.global_id(),
+                block_texture_views.g1_reflectance.global_id(),
                 self.light_texture.texture_view.global_id(),
-            ),
+            ],
             || {
                 create_space_bind_group(
                     &self.space_label,
                     device,
                     pipelines,
-                    &block_texture_view,
+                    &block_texture_views,
                     &self.light_texture,
                 )
             },
@@ -537,7 +539,7 @@ pub(in crate::in_wgpu) fn create_space_bind_group(
     space_label: &str,
     device: &wgpu::Device,
     pipelines: &Pipelines,
-    block_texture: &wgpu::TextureView,
+    block_textures: &BlockTextureViews,
     light_texture: &SpaceLightTexture,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -545,11 +547,19 @@ pub(in crate::in_wgpu) fn create_space_bind_group(
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::TextureView(block_texture),
+                resource: wgpu::BindingResource::TextureView(&light_texture.texture_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&block_textures.g0_reflectance),
             },
             wgpu::BindGroupEntry {
                 binding: 2,
-                resource: wgpu::BindingResource::TextureView(&light_texture.texture_view),
+                resource: wgpu::BindingResource::TextureView(&block_textures.g1_reflectance),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::TextureView(&block_textures.g1_emission),
             },
         ],
         label: Some(&format!("{space_label} space_bind_group")),

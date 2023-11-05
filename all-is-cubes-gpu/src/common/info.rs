@@ -1,5 +1,5 @@
-use std::fmt;
 use std::time::Duration;
+use std::{fmt, ops};
 
 use all_is_cubes::camera::{Flaws, Layers};
 use all_is_cubes::util::{Fmt, Refmt, StatusText};
@@ -264,6 +264,19 @@ impl Default for BlockTextureInfo {
             in_use_tiles: 0,
             in_use_texels: 0,
             capacity_texels: 0,
+        }
+    }
+}
+
+impl ops::Add for BlockTextureInfo {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        BlockTextureInfo {
+            flushed: self.flushed + rhs.flushed,
+            flush_time: self.flush_time + rhs.flush_time,
+            in_use_tiles: self.in_use_tiles + rhs.in_use_tiles,
+            in_use_texels: self.in_use_texels + rhs.in_use_texels,
+            capacity_texels: self.capacity_texels + rhs.capacity_texels,
         }
     }
 }

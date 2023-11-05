@@ -4,9 +4,17 @@ use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
 
 use crate::DebugLineVertex;
 
-/// Texture coordinates in the 3D atlas texture, in units of texels (i.e. the range is
-/// 0..256 or similar, not 0..1).
-pub(crate) type TexPoint = Point3D<FixTexCoord, AtlasTexel>;
+/// Texture coordinates in the 3D atlas textures.
+///
+/// This type is public out of necessity; you should not need to refer to it.
+#[derive(Debug, Clone, Copy)]
+pub struct TexPoint {
+    // Which texture atlas to use; corresponds to [`all_is_cubes_mesh::texture::Channels`].
+    pub(crate) atlas_id: u8,
+
+    /// Texture coordinates, in units of texels (i.e. the range is 0..256 or similar, not 0..1).
+    pub(crate) tc: Point3D<FixTexCoord, AtlasTexel>,
+}
 
 /// Coordinate system for texels in the 3D atlas texture.
 #[doc(hidden)]
@@ -47,8 +55,9 @@ pub(crate) struct WgpuBlockVertex {
 
     /// Packed format:
     /// * If `[3]` is in the range 0.0 to 1.0, then the attribute is a linear RGBA color.
-    /// * If `[3]` is -1.0, then the first three components are 3D texture coordinates,
-    ///   stored in texel units rather than normalized 0-1 units.
+    /// * If `[3]` is negative, then the first three components are 3D texture coordinates,
+    ///   stored in texel units rather than normalized 0-1 units, and the fourth component
+    ///   is the (-1 - atlas_id) where atlas_id identifies which texture atlas to use.
     ///
     /// TODO: we don't need `f32` precision here.
     color_or_texture: [f32; 4],
@@ -110,14 +119,19 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
                 }
             }
             Coloring::Texture {
-                pos: tc,
+                pos: TexPoint { tc, atlas_id },
                 clamp_min,
                 clamp_max,
             } => Self {
                 cube_packed,
                 position_in_cube_and_normal_packed,
-                color_or_texture: [tc.x.into(), tc.y.into(), tc.z.into(), -1.0],
-                clamp_min_max: clamp_min.zip(clamp_max, FixTexCoord::pack).into(),
+                color_or_texture: [
+                    tc.x.into(),
+                    tc.y.into(),
+                    tc.z.into(),
+                    -1.0 - f32::from(atlas_id),
+                ],
+                clamp_min_max: clamp_min.tc.zip(clamp_max.tc, FixTexCoord::pack).into(),
             },
         }
     }
