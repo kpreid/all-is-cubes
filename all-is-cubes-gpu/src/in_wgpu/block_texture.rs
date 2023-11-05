@@ -119,6 +119,9 @@ impl AtlasAllocator {
     }
 
     /// Copy the texels of all modified and still-referenced tiles to the GPU's texture.
+    ///
+    /// Returns a `wgpu::TextureView` for the texture, which will remain unchanged until the next
+    /// time `flush()` is called.
     pub fn flush<I: time::Instant>(
         &self,
         device: &wgpu::Device,
@@ -253,17 +256,6 @@ impl AtlasAllocator {
                 capacity_texels: backing.alloctree.bounds().volume(),
             },
         )
-    }
-
-    /// Returns a `wgpu::TextureView` that is current as of the last `flush()`, or
-    /// `None` if `flush()` has not been called.
-    pub fn current_texture_view(&self) -> Option<Arc<wgpu::TextureView>> {
-        self.backing
-            .lock()
-            .unwrap()
-            .texture
-            .as_ref()
-            .map(|(_, texture_view)| texture_view.clone())
     }
 }
 

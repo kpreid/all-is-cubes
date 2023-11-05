@@ -257,7 +257,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                     &self.space_label,
                     device,
                     pipelines,
-                    &self.block_texture,
+                    &block_texture_view,
                     &self.light_texture,
                 )
             },
@@ -537,7 +537,7 @@ pub(in crate::in_wgpu) fn create_space_bind_group(
     space_label: &str,
     device: &wgpu::Device,
     pipelines: &Pipelines,
-    block_texture: &AtlasAllocator,
+    block_texture: &wgpu::TextureView,
     light_texture: &SpaceLightTexture,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -545,10 +545,7 @@ pub(in crate::in_wgpu) fn create_space_bind_group(
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
-                // TODO: when resizing we will need to track rebuilding this
-                resource: wgpu::BindingResource::TextureView(
-                    &block_texture.current_texture_view().unwrap(),
-                ),
+                resource: wgpu::BindingResource::TextureView(block_texture),
             },
             wgpu::BindGroupEntry {
                 binding: 2,
