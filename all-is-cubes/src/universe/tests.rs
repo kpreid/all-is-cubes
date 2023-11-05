@@ -119,8 +119,8 @@ fn insert_anonymous_makes_distinct_names() {
         .unwrap();
     assert_ne!(ref_a, ref_b, "not equal");
     assert_ne!(
-        &**ref_a.read().unwrap() as &Block,
-        &**ref_b.read().unwrap(),
+        ref_a.read().unwrap().block(),
+        ref_b.read().unwrap().block(),
         "different values"
     );
 }

@@ -178,7 +178,7 @@ impl Tool {
                 // TODO: this should probably be a utility on Block itself
                 fn find_space(block: &Block) -> Result<Option<URef<Space>>, RefError> {
                     match block.primitive() {
-                        Primitive::Indirect(r) => find_space(&**r.read()?),
+                        Primitive::Indirect(r) => find_space(r.read()?.block()),
                         Primitive::Atom(_) | Primitive::Air => Ok(None),
                         Primitive::Recur { space, .. } => Ok(Some(space.clone())),
                     }

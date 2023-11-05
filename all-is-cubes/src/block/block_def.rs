@@ -1,6 +1,5 @@
 use alloc::sync::Arc;
-use core::ops::{self, Deref};
-use core::{fmt, mem};
+use core::{fmt, mem, ops};
 
 use crate::block::{self, Block, BlockChange, EvalBlockError, MinEval};
 use crate::listen::{self, Gate, Listen, Listener, Notifier};
@@ -90,6 +89,11 @@ impl BlockDef {
             notifier,
             block_listen_gate,
         }
+    }
+
+    /// Returns the current value.
+    pub fn block(&self) -> &Block {
+        &self.block
     }
 
     /// Implementation of block evaluation used by a [`Primitive::Indirect`] pointing to this.
@@ -191,15 +195,6 @@ impl Listen for BlockDef {
     }
 }
 
-// TODO: Remove this `Deref` impl as it risks confusion between the cached evaluation and the
-// underlying block; add a method to replace
-impl Deref for BlockDef {
-    type Target = Block;
-
-    fn deref(&self) -> &Block {
-        &self.block
-    }
-}
 impl AsRef<Block> for BlockDef {
     fn as_ref(&self) -> &Block {
         &self.block
@@ -275,7 +270,7 @@ impl Transaction<BlockDef> for BlockDefTransaction {
         target: &BlockDef,
     ) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
         if let Some(old) = &self.old {
-            if **target != *old {
+            if target.block != *old {
                 return Err(transaction::PreconditionFailed {
                     location: "BlockDef",
                     problem: "existing block not as expected",

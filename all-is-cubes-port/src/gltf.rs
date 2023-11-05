@@ -401,6 +401,7 @@ pub(crate) async fn export_gltf(
         p.progress(0.01).await;
         let mesh = SpaceMesh::<GltfMt>::from(&BlockMesh::new(
             &block_def
+                .block()
                 .evaluate()
                 .map_err(|eve| ExportError::NotRepresentable {
                     name: Some(name.clone()),

@@ -27,7 +27,7 @@ async fn import_export_native_format() {
     // This is *not* a thorough test of `Universe` deserialization.
     // It is just enough to prove that we ran the deserialization code and not something else.
     let uref: URef<block::BlockDef> = universe.get(&Name::from("foo")).unwrap();
-    assert_eq!(**uref.read().unwrap(), block::AIR);
+    assert_eq!(uref.read().unwrap().block(), &block::AIR);
 
     // Export again.
     let destination_dir = tempfile::tempdir().unwrap();

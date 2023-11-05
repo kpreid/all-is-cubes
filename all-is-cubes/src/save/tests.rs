@@ -750,7 +750,7 @@ fn universe_success() {
         .read()
         .unwrap();
 
-    let a_block_ev = a_block.evaluate().unwrap();
+    let a_block_ev = a_block.block().evaluate().unwrap();
     assert_eq!(a_block_ev.attributes.display_name, "0");
 
     assert_eq!(a_space.get_evaluated([0, 0, 0]), &a_block_ev);

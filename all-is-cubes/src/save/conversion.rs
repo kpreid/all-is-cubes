@@ -756,7 +756,7 @@ mod space {
 
 mod universe {
     use super::*;
-    use crate::block::{Block, BlockDef};
+    use crate::block::BlockDef;
     use crate::character::Character;
     use crate::save::schema::MemberEntrySer;
     use crate::space::Space;
@@ -767,9 +767,8 @@ mod universe {
 
     impl From<&BlockDef> for schema::MemberSer {
         fn from(block_def: &BlockDef) -> Self {
-            let block: &Block = block_def;
             schema::MemberSer::Block {
-                value: block.clone(),
+                value: block_def.block().clone(),
             }
         }
     }

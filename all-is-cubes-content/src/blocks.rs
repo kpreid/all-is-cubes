@@ -437,7 +437,7 @@ pub async fn install_demo_blocks(
         .map_err(|e| GenError::failure(e, "TODO: dummy name".into()))?;
     for i in 0..=255 {
         if let Primitive::Indirect(block_def_ref) = provider_for_patch[Explosion(i)].primitive() {
-            let mut block: Block = (*block_def_ref.read().unwrap()).clone();
+            let mut block: Block = block_def_ref.read().unwrap().block().clone();
 
             if let Primitive::Atom(Atom { attributes, .. }) = block.primitive_mut() {
                 let brush = if i > 30 {

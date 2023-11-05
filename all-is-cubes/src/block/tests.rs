@@ -393,7 +393,7 @@ mod eval {
         let resolution = R4;
         let mut universe = Universe::new();
         let mut space = Space::empty(GridAab::for_block(resolution));
-        // TODO: BlockGen should support constructing indirects (by default, even)
+        // TODO: BlockBuilder should support constructing indirects (by default, even)
         // and we can use the more concise version
         space
             .fill(space.bounds(), |point| {
@@ -407,7 +407,7 @@ mod eval {
             .build();
         let eval_bare = block.evaluate();
         let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
-        let eval_def = block_def_ref.read().unwrap().evaluate();
+        let eval_def = Block::from_primitive(Primitive::Indirect(block_def_ref)).evaluate();
         assert_eq!(eval_bare, eval_def);
     }
 
@@ -646,10 +646,10 @@ mod txn {
             .transaction(
                 BlockDefTransaction::replace(b1.clone(), b2.clone()),
                 |before, after| {
-                    if **before != b1 {
+                    if *before.block() != b1 {
                         return Err("did not assert b1".into());
                     }
-                    if **after != b2 {
+                    if *after.block() != b2 {
                         return Err("did not set b2".into());
                     }
                     Ok(())
@@ -658,29 +658,29 @@ mod txn {
             .transaction(
                 BlockDefTransaction::replace(b1.clone(), b3.clone()),
                 |before, after| {
-                    if **before != b1 {
+                    if *before.block() != b1 {
                         return Err("did not assert b1".into());
                     }
-                    if **after != b3 {
+                    if *after.block() != b3 {
                         return Err("did not set b3".into());
                     }
                     Ok(())
                 },
             )
             .transaction(BlockDefTransaction::overwrite(b2.clone()), |_, after| {
-                if **after != b2 {
+                if *after.block() != b2 {
                     return Err("did not set b2".into());
                 }
                 Ok(())
             })
             .transaction(BlockDefTransaction::expect(b2.clone()), |before, _| {
-                if **before != b2 {
+                if *before.block() != b2 {
                     return Err("did not assert b2".into());
                 }
                 Ok(())
             })
             .transaction(BlockDefTransaction::expect(b1.clone()), |before, _| {
-                if **before != b1 {
+                if *before.block() != b1 {
                     return Err("did not assert b1".into());
                 }
                 Ok(())

@@ -45,7 +45,7 @@ pub(crate) async fn export_stl(
     for block_def in block_defs {
         stl_io::write_stl(
             &mut fs::File::create(source.member_export_path(&destination, block_def))?,
-            block_to_stl_triangles(&**block_def.read()?)
+            block_to_stl_triangles(block_def.read()?.block())
                 .map_err(|error| crate::ExportError::Eval {
                     name: block_def.name(),
                     error,

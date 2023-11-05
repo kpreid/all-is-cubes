@@ -502,7 +502,9 @@ impl Universe {
     /// universe.insert(Name::from("b2"), BlockDef::new(block_2.clone()));
     ///
     /// let mut found_blocks = universe.iter_by_type()
-    ///     .map(|(name, value): (Name, URef<BlockDef>)| (name, Block::clone(&value.read().unwrap())))
+    ///     .map(|(name, value): (Name, URef<BlockDef>)| {
+    ///         (name, value.read().unwrap().block().clone())
+    ///     })
     ///     .collect::<Vec<_>>();
     /// found_blocks.sort_by_key(|(name, _)| name.to_string());
     /// assert_eq!(
