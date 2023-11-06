@@ -52,9 +52,7 @@ impl<D: RtBlockData> Surface<'_, D> {
 
         let illumination = self.compute_illumination(rt);
         // Combine reflected and emitted light to produce the outgoing light.
-        // TODO: Light emission is not yet implemented in all renderers and we are
-        // holding off on it here until then, for consistency.
-        let outgoing_rgb = diffuse_color.to_rgb() * illumination /* + self.emission */;
+        let outgoing_rgb = diffuse_color.to_rgb() * illumination + self.emission;
 
         Some(outgoing_rgb.with_alpha(diffuse_color.alpha()))
     }
