@@ -496,19 +496,22 @@ impl ButtonBase for ToggleButtonVisualState {
     fn button_block(&self, universe: &mut Universe) -> Result<Block, InGenError> {
         let label_z = self.button_label_z();
         let active = self.value;
-        let back_block = if active {
-            Block::builder()
-                .color(palette::BUTTON_ACTIVATED_BACK)
-                .light_emission(palette::BUTTON_ACTIVATED_GLOW)
-                .build()
-        } else {
-            Block::from(palette::BUTTON_BACK)
+        let illuminate = move |builder: BlockBuilder<block::builder::BlockBuilderAtom>| {
+            if active {
+                builder.light_emission(palette::BUTTON_ACTIVATED_GLOW)
+            } else {
+                builder
+            }
+            .build()
         };
         let frame_brush = VoxelBrush::single(Block::from(palette::BUTTON_FRAME));
-        let back_brush = VoxelBrush::with_thickness(back_block, 0..label_z);
+        let back_brush = VoxelBrush::with_thickness(
+            illuminate(Block::builder().color(palette::BUTTON_ACTIVATED_BACK)),
+            0..label_z,
+        );
         let cap_rim_brush = VoxelBrush::new([(
             [0, 0, label_z - 1],
-            Block::from(theme::rim_lightening(palette::BUTTON_BACK)),
+            illuminate(Block::builder().color(theme::rim_lightening(palette::BUTTON_BACK))),
         )]);
 
         let outer_inset = 2;

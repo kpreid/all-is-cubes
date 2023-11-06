@@ -681,7 +681,6 @@ async fn install_atrium_blocks(
                 .build(),
             AtriumBlocks::Firepot => Block::builder()
                 .display_name("Firepot")
-                // .light_emission(rgb_const!(1.4, 1.0, 0.8) * 4.0)
                 .voxels_ref(resolution, {
                     let mut space = Space::for_block(resolution).build();
                     // Use a darker color to dampen the effect of interior light

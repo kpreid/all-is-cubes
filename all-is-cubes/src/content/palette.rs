@@ -119,10 +119,10 @@ palette! {
     BUTTON_FRAME = srgb[0x3d 0x3d 0x3d 0xFF];
     BUTTON_BACK = srgb[0xBC 0xBC 0xBC 0xFF];
     BUTTON_LABEL = srgb[0x3d 0x3d 0x3d 0xFF];
-    BUTTON_ACTIVATED_BACK = srgb[0xE1 0xE1 0xE1 0xFF];
+    BUTTON_ACTIVATED_BACK = srgb[0xD1 0xBC 0xBC 0xFF];
     BUTTON_ACTIVATED_LABEL = srgb[0x63 0x63 0x63 0xFF];
 }
-pub const BUTTON_ACTIVATED_GLOW: Rgb = rgb_const!(4.0, 0.8, 0.8); // not representable as integer srgb
+pub const BUTTON_ACTIVATED_GLOW: Rgb = rgb_const!(1.0, 0.2, 0.2);
 
 palette! {
     // In-world debug UI elements (all wireframe)

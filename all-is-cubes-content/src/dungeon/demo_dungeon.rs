@@ -631,7 +631,7 @@ pub async fn install_dungeon_blocks(
 
     let light_voxel = Block::builder()
         .color(Rgba::new(0.7, 0.7, 0.0, 1.0))
-        .light_emission(Rgb::new(8.0, 7.0, 0.7))
+        .light_emission(Rgb::new(8.0, 7.0, 0.7) * 0.5)
         .build();
     let spike_metal = Block::from(palette::STEEL);
 

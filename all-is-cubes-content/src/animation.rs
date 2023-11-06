@@ -121,15 +121,15 @@ impl Fire {
         fn fire_color(color: Rgba) -> Block {
             Block::builder()
                 .color(color)
-                .light_emission(color.to_rgb() * 20.0)
+                .light_emission(color.to_rgb() * 8.0)
                 .collision(BlockCollision::None)
                 .build()
         }
         let blocks = [
             AIR,
-            fire_color(rgba_const!(1.0, 0.5, 0.0, 1.0)),
-            fire_color(rgba_const!(1.0, 0.0, 0.0, 1.0)),
-            fire_color(rgba_const!(1.0, 1.0, 0.0, 1.0)),
+            fire_color(rgba_const!(1.0, 0.5, 0.1, 1.0)),
+            fire_color(rgba_const!(1.0, 0.1, 0.1, 1.0)),
+            fire_color(rgba_const!(1.0, 1.0, 0.1, 1.0)),
         ];
         Self {
             blocks,
