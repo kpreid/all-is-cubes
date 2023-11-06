@@ -200,6 +200,32 @@ fn animated_atom_uses_texture() {
     )
 }
 
+/// We don't encode light emission in vertex colors (because that would lead to bloated vertices),
+/// so a block with light emission will use a texture, even for resolution 1.
+#[test]
+fn emissive_atom_uses_texture() {
+    let atom_block = Block::builder()
+        .color(Rgba::new(0.0, 1.0, 0.0, 1.0))
+        .light_emission(Rgb::ONE)
+        .build();
+
+    let (allocator, _, mesh) = mesh_blocks_and_space(
+        &Space::builder(GridAab::ORIGIN_CUBE)
+            .filled_with(atom_block)
+            .build(),
+    );
+
+    assert_eq!(allocator.count_allocated(), 1);
+    assert_eq!(
+        mesh.vertices()[0].coloring,
+        Coloring::Texture {
+            pos: point3(0.5, 0., 0.),
+            clamp_min: point3(0.5, 0.5, 0.5),
+            clamp_max: point3(0.5, 0.5, 0.5)
+        }
+    )
+}
+
 /// [`SpaceMesh`] of a 1×1×1 space has the same geometry as the contents.
 ///
 /// This test compares 3 different values:

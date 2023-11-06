@@ -9,8 +9,8 @@ use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Reso
 use all_is_cubes::camera::Flaws;
 use all_is_cubes::euclid::point2;
 use all_is_cubes::math::{
-    Cube, Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridCoordinate, OpacityCategory, Rgba,
-    VectorOps, Vol,
+    Cube, Face6, Face7, FaceMap, FreeCoordinate, GridAab, GridCoordinate, OpacityCategory, Rgb,
+    Rgba, VectorOps, Vol,
 };
 use all_is_cubes::space::Space;
 
@@ -263,7 +263,14 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         self.clear();
 
         // If this is true, avoid using vertex coloring even on solid rectangles.
-        let prefer_textures = block.attributes.animation_hint.redefinition != AnimationChange::None;
+        // We do this because:
+        // * the block may be animated such that it is useful to reuse the mesh and change the
+        //   texture, or
+        // * the block has any light emission, which we do not support via vertex coloring.
+        //   (TODO: This isn't quite the right condition, because a block might e.g. have emissive
+        //   voxels only on its interior or something.)
+        let prefer_textures = block.attributes.animation_hint.redefinition != AnimationChange::None
+            || block.light_emission != Rgb::ZERO;
 
         let flaws = &mut self.flaws;
 
