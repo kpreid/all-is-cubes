@@ -144,10 +144,16 @@ impl GreedyMesher {
 
 /// Helper for [`push_quad`] which offers the alternatives of solid color or texturing.
 /// Compared to [`Coloring`], it describes texturing for an entire quad rather than a vertex.
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug)]
 pub(super) enum QuadColoring<'a, T> {
     Solid(Rgba),
     Texture(&'a T),
+}
+impl<T> Copy for QuadColoring<'_, T> {}
+impl<T> Clone for QuadColoring<'_, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 /// Compute vertices for a quad and push them into the supplied vectors.

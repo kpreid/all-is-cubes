@@ -267,6 +267,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
         let flaws = &mut self.flaws;
 
+        // TODO: we can make this less roundabout now with .single_voxel() or .as_vol_ref()
         let tmp_block_color_voxel;
         let voxels = if options.ignore_voxels {
             tmp_block_color_voxel = Evoxels::One(Evoxel::from_color(block.color));
@@ -279,6 +280,22 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                 color: block_color, ..
             }) => {
                 let block_color = options.transparency.limit_alpha(block_color);
+
+                // If we want to use a texture, try to allocate it.
+                self.texture_used = if prefer_textures {
+                    texture::copy_voxels_to_new_texture(texture_allocator, voxels)
+                } else {
+                    None
+                };
+                // If we successfully decided to use a texture, use that.
+                let texture_plane;
+                let coloring = if let Some(tile) = &self.texture_used {
+                    texture_plane = tile.slice(GridAab::ORIGIN_CUBE);
+                    QuadColoring::Texture(&texture_plane)
+                } else {
+                    QuadColoring::Solid(block_color)
+                };
+
                 for (face, face_mesh) in self.face_vertices.iter_mut() {
                     if !block_color.fully_transparent() {
                         face_mesh.vertices.reserve_exact(4);
@@ -295,8 +312,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                             /* depth= */ 0.,
                             point2(0., 0.),
                             point2(1., 1.),
-                            // TODO: Respect the prefer_textures option.
-                            QuadColoring::<<M::Tile as texture::Tile>::Plane>::Solid(block_color),
+                            coloring,
                         );
                     }
                     face_mesh.fully_opaque = block_color.fully_opaque();

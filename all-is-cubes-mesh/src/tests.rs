@@ -3,11 +3,11 @@
 use pretty_assertions::assert_eq;
 
 use all_is_cubes::block::{
-    Atom, Block, BlockAttributes, BlockCollision, Primitive, Resolution::*, AIR,
+    self, Atom, Block, BlockAttributes, BlockCollision, Primitive, Resolution::*, AIR,
 };
 use all_is_cubes::camera::{Flaws, TransparencyOption};
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
-use all_is_cubes::euclid::{Point3D, Vector3D};
+use all_is_cubes::euclid::{point3, Point3D, Vector3D};
 use all_is_cubes::math::{Cube, Rgb, VectorOps};
 use all_is_cubes::math::{
     Face6::{self, *},
@@ -172,6 +172,32 @@ fn trivial_voxels_equals_atom() {
 
     assert_eq!(space_rendered_a, space_rendered_r);
     assert_eq!(tex.count_allocated(), 0);
+}
+
+/// For animated blocks we always prefer textures, even for resolution 1.
+#[test]
+fn animated_atom_uses_texture() {
+    let atom_block = Block::builder()
+        .color(Rgba::new(0.0, 1.0, 0.0, 1.0))
+        .light_emission(Rgb::ONE)
+        .animation_hint(block::AnimationHint::CONTINUOUS)
+        .build();
+
+    let (allocator, _, mesh) = mesh_blocks_and_space(
+        &Space::builder(GridAab::ORIGIN_CUBE)
+            .filled_with(atom_block)
+            .build(),
+    );
+
+    assert_eq!(allocator.count_allocated(), 1);
+    assert_eq!(
+        mesh.vertices()[0].coloring,
+        Coloring::Texture {
+            pos: point3(0.5, 0., 0.),
+            clamp_min: point3(0.5, 0.5, 0.5),
+            clamp_max: point3(0.5, 0.5, 0.5)
+        }
+    )
 }
 
 /// [`SpaceMesh`] of a 1×1×1 space has the same geometry as the contents.
