@@ -6,7 +6,7 @@ use std::sync::Arc;
 use futures_core::future::BoxFuture;
 use futures_util::FutureExt;
 
-use all_is_cubes::block::{Block, Resolution::*};
+use all_is_cubes::block::{Block, Resolution::*, AIR};
 use all_is_cubes::camera::{
     AntialiasingOption, ExposureOption, Flaws, FogOption, GraphicsOptions, LightingOption,
     RenderError, StandardCameras, ToneMappingOperator, TransparencyOption, UiViewState,
@@ -92,7 +92,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert("sky_and_info_text", None, sky_and_info_text);
     c.insert_variants(
         "tone_mapping",
-        light_test_universe,
+        u("tone_mapping", tone_mapping_test_universe()),
         tone_mapping,
         [
             (ToneMappingOperator::Clamp, 0.5),
@@ -734,18 +734,16 @@ async fn sky_and_info_text(mut context: RenderTestContext) {
 }
 
 async fn tone_mapping(mut context: RenderTestContext, (tmo, exposure): (ToneMappingOperator, f32)) {
-    let mut options = light_test_options();
+    let mut options = tone_mapping_test_options();
     options.tone_mapping = tmo;
     options.exposure = ExposureOption::Fixed(NotNan::new(exposure).unwrap());
-    let scene =
-        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
-    // TODO: tighten this comparison threshold after reconciling smooth-lighting styles
+    let scene = StandardCameras::from_constant_for_test(
+        options,
+        Viewport::with_scale(1.0, vec2(256, 320)),
+        context.universe(),
+    );
     context
-        .render_comparison_test(
-            Threshold::new([(3, 2000), (12, 100)]),
-            scene,
-            Overlays::NONE,
-        )
+        .render_comparison_test(Threshold::new([(3, 1000)]), scene, Overlays::NONE)
         .await;
 }
 
@@ -983,7 +981,7 @@ async fn fog_test_universe() -> Arc<Universe> {
     Arc::new(universe)
 }
 
-// Test scene for lighting and tone mapping.
+// Test scene for lighting.
 async fn light_test_universe() -> Arc<Universe> {
     let bounds = GridAab::from_lower_size([-10, -10, -1], [20, 20, 5]);
     let mut space = Space::builder(bounds)
@@ -1024,6 +1022,113 @@ async fn light_test_universe() -> Arc<Universe> {
 fn light_test_options() -> GraphicsOptions {
     let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.lighting_display = LightingOption::Smooth;
+    options.fov_y = NotNan::from(45);
+    options
+}
+
+// Test scene for tone mapping, in particular showing how over-1 values are remapped.
+async fn tone_mapping_test_universe() -> Arc<Universe> {
+    let luminance_ramp = [
+        1. / 64.,
+        1. / 32.,
+        1. / 16.,
+        1. / 4.,
+        1.,
+        4.,
+        16.,
+        32.,
+        64.,
+        128.,
+    ];
+    // Partial hue wheel -- not constant luminance, because we care about channel saturation
+    // behavior more than perceptual brightness.
+    let low = 0.25;
+    let colors = [
+        Rgb::new(1.0, 0.0, 0.0), // red
+        Rgb::new(1.0, low, 0.0),
+        Rgb::new(1.0, 1.0, 0.0), // yellow
+        Rgb::new(low, 1.0, 0.0),
+        Rgb::new(0.0, 1.0, 0.0), // green
+        Rgb::new(0.0, 1.0, low),
+        Rgb::new(0.0, 1.0, 1.0), // cyan
+        Rgb::new(0.0, low, 1.0),
+        Rgb::new(0.0, 0.0, 1.0), // blue
+        Rgb::new(low, 0.0, 1.0),
+        Rgb::new(1.0, 0.0, 1.0), // magenta
+        Rgb::new(1.0, 0.0, low),
+        //
+        Rgb::new(1.0, 1.0, 1.0), // white
+    ];
+    let x_spacing = 4;
+    let y_spacing = 4;
+
+    let bounds = GridAab::from_lower_size(
+        [-1, -1, -1],
+        [
+            luminance_ramp.len() as i32 * x_spacing + 1,
+            colors.len() as i32 * y_spacing + 1,
+            3,
+        ],
+    );
+    let mut space = Space::builder(bounds)
+        // Solid layer we will put holes in, to prevent different compartments from spilling
+        // light into each other.
+        .filled_with(Block::from(palette::ALMOST_BLACK))
+        // .sky_color(rgb_const!(0., 0.5, 0.5))
+        .sky_color(Rgb::ZERO)
+        .spawn_position(bounds.center() + vec3(0., 0., 65.))
+        .build();
+
+    // Back wall
+    space
+        .fill_uniform(
+            bounds.abut(Face6::NZ, -1).unwrap(),
+            &Block::from(rgba_const!(0.5, 0.5, 0.5, 1.0)),
+        )
+        .unwrap();
+
+    // Front air space
+    space
+        .fill_uniform(bounds.abut(Face6::PZ, -1).unwrap(), &AIR)
+        .unwrap();
+
+    for (i, &luminance) in luminance_ramp.iter().enumerate() {
+        let x = i as GridCoordinate * x_spacing;
+        for (j, &color) in colors.iter().enumerate() {
+            let y = j as GridCoordinate * y_spacing;
+            let light_source_block = Block::builder()
+                .color(Rgba::WHITE)
+                .light_emission(color * luminance)
+                .build();
+
+            // An emissive block and air space next to it.
+            space
+                .fill_uniform(
+                    GridAab::from_lower_size([x, y, 0], [x_spacing - 1, y_spacing - 1, 1]),
+                    &AIR,
+                )
+                .unwrap();
+            space.set([x + 1, y, 0], light_source_block).unwrap();
+        }
+    }
+
+    space.fast_evaluate_light();
+    space.evaluate_light::<time::NoTime>(1, |_| {});
+
+    let mut universe = Universe::new();
+    finish_universe_from_space(&mut universe, space);
+    Arc::new(universe)
+}
+
+/// Options to go with [`light_test_universe`].
+fn tone_mapping_test_options() -> GraphicsOptions {
+    let mut options = GraphicsOptions::UNALTERED_COLORS;
+    // Smooth lighting is a complicating factor increasing the number of small errors,
+    // and also makes it harder to visually judge overexposure, so use flat.
+    options.lighting_display = LightingOption::Flat;
+    // TODO: We want to see how bloom looks along with the tone mapping, but raytracer doesn't
+    // support bloom yet and we can't opt out per-test of Flaws matching.
+    // options.bloom_intensity = GraphicsOptions::default().bloom_intensity;
     options.fov_y = NotNan::from(45);
     options
 }
