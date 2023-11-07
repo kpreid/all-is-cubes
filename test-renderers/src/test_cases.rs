@@ -34,7 +34,7 @@ use crate::{
 
 /// Function to be called by the custom test harness to find all tests.
 pub fn all_tests(c: &mut TestCaseCollector<'_>) {
-    let light_test_universe = u(light_test_universe());
+    let light_test_universe = u("light", light_test_universe());
 
     if false {
         c.insert("dummy_failing_test", None, |_| async {
@@ -44,7 +44,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
 
     c.insert_variants(
         "antialias",
-        u(antialias_test_universe()),
+        u("antialias", antialias_test_universe()),
         antialias,
         // Note: if we wanted full coverage of response to graphics options we would
         // also test the "if cheap" logic .
@@ -62,7 +62,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     );
     c.insert_variants(
         "fog",
-        u(fog_test_universe()),
+        u("fog", fog_test_universe()),
         fog,
         [
             FogOption::None,
@@ -105,9 +105,15 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert("zero_viewport", None, zero_viewport);
 }
 
-fn u(f: impl Future<Output = Arc<Universe>> + Send + Sync + 'static) -> Option<UniverseFuture> {
+fn u(
+    label: &str,
+    f: impl Future<Output = Arc<Universe>> + Send + Sync + 'static,
+) -> Option<UniverseFuture> {
     let boxed: BoxFuture<'static, Arc<Universe>> = Box::pin(f);
-    Some(boxed.shared())
+    Some(UniverseFuture {
+        label: label.to_owned(),
+        future: boxed.shared(),
+    })
 }
 
 // --- Test cases ---------------------------------------------------------------------------------

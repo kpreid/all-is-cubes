@@ -1,5 +1,6 @@
-use std::collections::{btree_map, BTreeMap};
+use std::collections::{btree_map, BTreeMap, HashSet};
 use std::io::Write as _;
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -21,11 +22,26 @@ use crate::{
     RendererFactory, RendererId, Scene, TestCaseOutput, TestId, Threshold,
 };
 
-/// The Universe parameter is an optional way to receive a pre-configured universe
-/// whose construction time is not counted against the test case's time.
 type BoxedTestFn = Box<dyn Fn(RenderTestContext) -> BoxFuture<'static, ()> + Send + Sync>;
 
-pub type UniverseFuture = Shared<BoxFuture<'static, Arc<Universe>>>;
+#[derive(Clone, Debug)]
+#[allow(clippy::exhaustive_structs)]
+pub struct UniverseFuture {
+    pub label: String,
+    pub future: Shared<BoxFuture<'static, Arc<Universe>>>,
+}
+impl PartialEq for UniverseFuture {
+    fn eq(&self, other: &Self) -> bool {
+        self.label == other.label && Shared::ptr_eq(&self.future, &other.future)
+    }
+}
+impl Eq for UniverseFuture {}
+impl std::hash::Hash for UniverseFuture {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.label.hash(state);
+        self.future.ptr_hash(state);
+    }
+}
 
 /// Implementation of a particular test case (unique [`TestId`] stored externally).
 struct TestCase {
@@ -55,6 +71,9 @@ impl RenderTestContext {
             .renderer_from_cameras(scene.into_cameras())
     }
 
+    /// Optional way to receive a pre-configured universe
+    /// whose construction time is not counted against the test case's time and which
+    /// may be shared between test cases.
     pub fn universe(&self) -> &Universe {
         self.universe
             .as_ref()
@@ -137,11 +156,6 @@ pub struct HarnessArgs {
     #[arg(long)]
     ignored: bool,
 
-    /// List test names, one per line to stdout, in the same way the standard Rust test
-    /// harness does.
-    #[arg(long)]
-    list: bool,
-
     /// Format in which test results are written to stdout.
     #[arg(long, default_value = "pretty")]
     format: Format,
@@ -155,6 +169,25 @@ pub struct HarnessArgs {
     /// Match filters by exact equality rather than substring.
     #[arg(long)]
     exact: bool,
+
+    #[command(flatten)]
+    action: Action,
+}
+
+#[derive(Debug, clap::Parser)]
+#[group(multiple = false)]
+struct Action {
+    /// List test names, one per line to stdout, in the same way the standard Rust test
+    /// harness does.
+    #[arg(long)]
+    list: bool,
+
+    /// Instead of running tests, save all the test universes to the given directory.
+    ///
+    /// Caution: If running using `cargo test`, the current directory will have been set to
+    /// `<workspace>/test-renderers/`, not left unchanged or set to the workspace root.
+    #[arg(long, value_name = "DIRECTORY")]
+    dump_test_universes: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -185,11 +218,14 @@ where
 {
     let HarnessArgs {
         ignored,
-        list: list_only,
         format,
         nocapture: _, // We never capture
         filters,
         exact,
+        action: Action {
+            list: list_only,
+            dump_test_universes,
+        },
     } = args;
 
     // Gather tests (don't run them yet).
@@ -228,13 +264,36 @@ where
         })
         .collect();
 
+    // Find all unique universe_futures.
+    let universe_future_set: HashSet<UniverseFuture> = filtered_test_table
+        .values()
+        .flat_map(|test_case| test_case.universe_source.clone())
+        .collect();
+
     // Kick off all the universe_futures immediately, without the concurrency limit
     // imposed on the individual tests.
     // (Ideally we'd do them in order of need, but that's probably overkill.)
-    for test_case in filtered_test_table.values() {
-        if let Some(f) = &test_case.universe_source {
-            tokio::spawn(Shared::clone(f));
+    for f in universe_future_set.iter() {
+        tokio::spawn(Shared::clone(&f.future));
+    }
+
+    if let Some(dir_path) = dump_test_universes {
+        for uf in universe_future_set.iter() {
+            let label = &uf.label;
+            let mut file_path = dir_path.join(label);
+            file_path.set_extension("alliscubesjson");
+
+            eprint!("{label:?}...");
+            _ = io::stderr().flush();
+            let universe: Arc<Universe> = uf.future.clone().await;
+            eprintln!("writing to {file_path:?}...");
+
+            let mut file = fs::File::create(file_path).expect("creating dump file failed");
+            serde_json::to_writer(&file, &universe).expect("serializing dump universe failed");
+            file.flush().unwrap();
         }
+        eprintln!("dumped all universes");
+        return ExitCode::SUCCESS;
     }
 
     println!("\nrunning {} tests", filtered_test_table.len());
@@ -256,7 +315,7 @@ where
                         renderer_factory: Box::new(factory_future.await),
                         comparison_log: comparison_log_tc,
                         universe: match universe_future {
-                            Some(f) => Some(f.await),
+                            Some(uf) => Some(uf.future.await),
                             None => None,
                         },
                         image_serial: 0,
