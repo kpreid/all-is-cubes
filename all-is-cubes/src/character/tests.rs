@@ -196,11 +196,11 @@ fn transaction_systematic() {
 #[test]
 fn no_superjumping() {
     let mut universe = Universe::new();
-    let space = universe.insert_anonymous({
-        let mut space = Space::empty_positive(1, 1, 1);
-        space.set([0, 0, 0], Block::from(Rgb::ONE)).unwrap();
-        space
-    });
+    let space = universe.insert_anonymous(
+        Space::builder(GridAab::ORIGIN_CUBE)
+            .filled_with(Block::from(Rgb::ONE))
+            .build(),
+    );
     let mut character = Character::spawn_default(space);
     character.body.position = point3(
         0.,
@@ -230,13 +230,12 @@ fn no_superjumping() {
 fn click_wrong_space_or_correct_space() {
     let mut universe = Universe::new();
     let mut make_space = || {
-        universe.insert_anonymous({
-            let mut sp1 = Space::empty_positive(1, 1, 1);
-            // add something for the raycast to hit
-            sp1.fill_uniform(sp1.bounds(), &Block::from(Rgb::ONE))
-                .unwrap();
-            sp1
-        })
+        // something for the raycast to hit
+        universe.insert_anonymous(
+            Space::builder(GridAab::ORIGIN_CUBE)
+                .filled_with(Block::from(Rgb::ONE))
+                .build(),
+        )
     };
     let sp1 = make_space();
     let sp2 = make_space();

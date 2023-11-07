@@ -265,16 +265,15 @@ mod tests {
     use super::*;
     use crate::gltf::{tests::gltf_mesh, GltfDataDestination};
     use all_is_cubes::block::Block;
-    use all_is_cubes::math::Rgba;
+    use all_is_cubes::math::{GridAab, Rgba};
     use all_is_cubes::space::Space;
     use std::time::Duration;
 
     #[test]
     fn no_extra_indices_when_transparent() {
-        let mut space = Space::empty_positive(1, 1, 1);
-        space
-            .set([0, 0, 0], &Block::from(Rgba::new(0., 0., 0., 0.5)))
-            .unwrap();
+        let space = Space::builder(GridAab::ORIGIN_CUBE)
+            .filled_with(Block::from(Rgba::new(0., 0., 0., 0.5)))
+            .build();
 
         let mut writer = GltfWriter::new(GltfDataDestination::null());
         let (_, mesh_index) = gltf_mesh(&space, &mut writer);

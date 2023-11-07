@@ -388,8 +388,9 @@ fn listens_to_block_changes() {
     let indirect = Block::from(block_def_ref.clone());
 
     // Set up space and listener
-    let mut space = Space::empty_positive(1, 1, 1);
-    space.set([0, 0, 0], indirect).unwrap();
+    let mut space = Space::builder(GridAab::ORIGIN_CUBE)
+        .filled_with(indirect)
+        .build();
     let sink = Sink::new();
     space.listen(sink.listener());
     assert_eq!(sink.drain(), vec![]);

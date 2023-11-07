@@ -159,16 +159,16 @@ fn trivial_voxels_equals_atom() {
         .unwrap()
         .build();
 
-    let (_, _, space_rendered_a) = mesh_blocks_and_space(&{
-        let mut space = Space::empty_positive(1, 1, 1);
-        space.set([0, 0, 0], &atom_block).unwrap();
-        space
-    });
-    let (tex, _, space_rendered_r) = mesh_blocks_and_space(&{
-        let mut space = Space::empty_positive(1, 1, 1);
-        space.set([0, 0, 0], &trivial_recursive_block).unwrap();
-        space
-    });
+    let (_, _, space_rendered_a) = mesh_blocks_and_space(
+        &Space::builder(GridAab::ORIGIN_CUBE)
+            .filled_with(atom_block)
+            .build(),
+    );
+    let (tex, _, space_rendered_r) = mesh_blocks_and_space(
+        &Space::builder(GridAab::ORIGIN_CUBE)
+            .filled_with(trivial_recursive_block)
+            .build(),
+    );
 
     assert_eq!(space_rendered_a, space_rendered_r);
     assert_eq!(tex.count_allocated(), 0);
@@ -220,8 +220,9 @@ fn space_mesh_equals_block_mesh() {
         })
         .unwrap()
         .build();
-    let mut outer_space = Space::empty_positive(1, 1, 1);
-    outer_space.set([0, 0, 0], &recursive_block).unwrap();
+    let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
+        .filled_with(recursive_block)
+        .build();
 
     let (tex, block_meshes, space_rendered) = mesh_blocks_and_space(&outer_space);
 
@@ -252,8 +253,9 @@ fn block_resolution_greater_than_tile() {
         .voxels_fn(&mut u, block_resolution, non_uniform_fill)
         .unwrap()
         .build();
-    let mut outer_space = Space::empty_positive(1, 1, 1);
-    outer_space.set([0, 0, 0], &block).unwrap();
+    let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
+        .filled_with(block)
+        .build();
 
     let (_, _, _) = mesh_blocks_and_space(&outer_space);
     // TODO: Figure out how to make a useful assert. At least this is "it doesn't panic".
@@ -277,8 +279,9 @@ fn shrunken_box_has_no_extras() {
         })
         .unwrap()
         .build();
-    let mut outer_space = Space::empty_positive(1, 1, 1);
-    outer_space.set([0, 0, 0], &less_than_full_block).unwrap();
+    let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
+        .filled_with(less_than_full_block)
+        .build();
 
     let (tex, _, space_rendered) = mesh_blocks_and_space(&outer_space);
 
@@ -339,8 +342,9 @@ fn shrunken_box_uniform_color() {
         })
         .unwrap()
         .build();
-    let mut outer_space = Space::empty_positive(1, 1, 1);
-    outer_space.set([0, 0, 0], &less_than_full_block).unwrap();
+    let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
+        .filled_with(less_than_full_block)
+        .build();
 
     let (tex, _, space_rendered) = mesh_blocks_and_space(&outer_space);
 
@@ -525,8 +529,9 @@ fn handling_allocation_failure() {
         .build();
     let block_derived_color = complex_block.evaluate().unwrap().color;
 
-    let mut space = Space::empty_positive(1, 1, 1);
-    space.set([0, 0, 0], &complex_block).unwrap();
+    let space = Space::builder(GridAab::ORIGIN_CUBE)
+        .filled_with(complex_block)
+        .build();
 
     let mut tex = Allocator::new();
     tex.set_capacity(0);

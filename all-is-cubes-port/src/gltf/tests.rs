@@ -7,6 +7,7 @@ use gltf_json::Index;
 use all_is_cubes::block::{Block, BlockDef, Resolution, AIR};
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
+use all_is_cubes::math::GridAab;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Name, URef, Universe};
 use all_is_cubes::util::yield_progress_for_testing;
@@ -42,8 +43,9 @@ fn gltf_smoke_test() {
         })
         .unwrap()
         .build();
-    let mut outer_space = Space::empty_positive(1, 1, 1);
-    outer_space.set([0, 0, 0], &recursive_block).unwrap();
+    let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
+        .filled_with(recursive_block)
+        .build();
 
     let mut writer = GltfWriter::new(GltfDataDestination::null());
     let (_, mesh_index) = gltf_mesh(&outer_space, &mut writer);
