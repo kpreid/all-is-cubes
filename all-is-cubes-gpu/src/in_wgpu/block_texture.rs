@@ -335,7 +335,7 @@ impl texture::Tile for AtlasTile {
             let buffer = backing.data.get_or_insert_with(|| {
                 vec![[0, 0, 0, 0]; self.bounds().volume()].into_boxed_slice()
             });
-            texture::copy_voxels_into_xmaj_texture(data, buffer);
+            texture::copy_voxels_into_xmaj_texture(data, buffer, None);
             backing.dirty = true;
 
             backing.allocator.upgrade()

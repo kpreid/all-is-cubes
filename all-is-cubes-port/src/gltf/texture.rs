@@ -113,7 +113,7 @@ impl texture::Tile for GltfTile {
         assert_eq!(data.bounds(), self.bounds());
 
         let mut buffer = vec![[0, 0, 0, 0]; self.bounds().volume()];
-        texture::copy_voxels_into_xmaj_texture(data, &mut buffer);
+        texture::copy_voxels_into_xmaj_texture(data, &mut buffer, None);
 
         // OK to panic on failure because if we do, the caller ignored Self::REUSABLE.
         self.texels

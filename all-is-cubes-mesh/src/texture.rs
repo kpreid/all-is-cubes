@@ -174,6 +174,14 @@ impl Channels {
             (Reflectance, ReflectanceEmission) => false,
         }
     }
+
+    /// Returns whether this includes RGB emission channels.
+    pub fn has_emission(&self) -> bool {
+        match self {
+            Channels::Reflectance => false,
+            Channels::ReflectanceEmission => true,
+        }
+    }
 }
 
 /// Validate that the argument to [`Tile::slice()`] is within bounds, and thickness
@@ -230,9 +238,16 @@ pub(super) fn needed_channels(voxels: &Evoxels) -> Channels {
 /// Helper function to implement the typical case of copying voxels into an X-major, sRGB, RGBA
 /// texture.
 #[doc(hidden)]
-pub fn copy_voxels_into_xmaj_texture(voxels: Vol<&[Evoxel]>, texture: &mut [[u8; 4]]) {
+pub fn copy_voxels_into_xmaj_texture(
+    voxels: Vol<&[Evoxel]>,
+    reflectance_texture: &mut [[u8; 4]],
+    emission_texture: Option<&mut [[u8; 4]]>,
+) {
     let bounds = voxels.bounds();
-    assert_eq!(bounds.volume(), texture.len());
+    assert_eq!(bounds.volume(), reflectance_texture.len());
+    if let Some(&mut ref mut t) = emission_texture {
+        assert_eq!(bounds.volume(), t.len());
+    }
 
     // TODO: Consider changing `Evoxels`'s ordering so that this can be a straight copy instead
     // of a shuffle. Or at least implement the shuffle more efficiently.
@@ -240,12 +255,16 @@ pub fn copy_voxels_into_xmaj_texture(voxels: Vol<&[Evoxel]>, texture: &mut [[u8;
     for z in bounds.z_range() {
         for y in bounds.y_range() {
             for x in bounds.x_range() {
-                texture[i] = voxels
+                let voxel = voxels
                     .get(Cube { x, y, z })
                     .copied()
-                    .unwrap_or(Evoxel::from_color(palette::MISSING_VOXEL_ERROR))
-                    .color
-                    .to_srgb8();
+                    .unwrap_or(Evoxel::from_color(palette::MISSING_VOXEL_ERROR));
+                reflectance_texture[i] = voxel.color.to_srgb8();
+
+                if let Some(&mut ref mut t) = emission_texture {
+                    t[i] = voxel.emission.with_alpha_one().to_srgb8();
+                }
+
                 i += 1;
             }
         }
