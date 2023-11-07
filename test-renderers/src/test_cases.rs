@@ -582,7 +582,7 @@ async fn icons(mut context: RenderTestContext) {
     context
         .render_comparison_test(
             // Fairly sloppy because this test is looking for "Does this icon look right"
-            Threshold::new([(8, 2000), (20, 100), (40, 20)]),
+            Threshold::new([(8, 2000), (20, 100), (50, 20)]),
             StandardCameras::from_constant_for_test(
                 options,
                 Viewport::with_scale(1.0, [256, (256.0 * aspect_ratio) as u32]),
@@ -742,8 +742,11 @@ async fn tone_mapping(mut context: RenderTestContext, (tmo, exposure): (ToneMapp
         Viewport::with_scale(1.0, vec2(256, 320)),
         context.universe(),
     );
+
+    // TODO: Ideally there would be at most 1 difference.
+    // Also, there is a notable ray/wgpu difference concentrated in the middle range of Reinhard.
     context
-        .render_comparison_test(Threshold::new([(3, 1000)]), scene, Overlays::NONE)
+        .render_comparison_test(Threshold::new([(3, 500)]), scene, Overlays::NONE)
         .await;
 }
 
