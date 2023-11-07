@@ -41,13 +41,14 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
-use all_is_cubes::camera::Rendering;
 use image::RgbaImage;
 use rendiff::{Histogram, Threshold};
 
+use all_is_cubes::camera::Rendering;
 use all_is_cubes::character::Character;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
+use all_is_cubes_content::free_editing_starter_inventory;
 
 mod harness;
 pub use harness::*;
@@ -65,8 +66,13 @@ pub type TestId = String;
 pub fn finish_universe_from_space(universe: &mut Universe, space: Space) {
     // TODO: "character".into() shouldn't be sprinkled around various universe construction.
     let space_ref = universe.insert("space".into(), space).unwrap();
+
+    // If the universe is dumped, include tools and jetpack
+    let mut spawn = space_ref.read().unwrap().spawn().clone();
+    spawn.set_inventory(free_editing_starter_inventory(true));
+
     let _character_ref = universe
-        .insert("character".into(), Character::spawn_default(space_ref))
+        .insert("character".into(), Character::spawn(&spawn, space_ref))
         .unwrap();
 }
 
