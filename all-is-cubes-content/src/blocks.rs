@@ -431,80 +431,89 @@ pub async fn install_demo_blocks(
     .await?
     .install(universe)?;
 
-    // Kludge to patch up tick action cross-references
+    // Kludge: Grab the installed blocks to patch up inter-block cross-references
     // TODO: This should be possible to do as a built-in feature of the "linking" system
     let provider_for_patch = BlockProvider::using(universe)
         .map_err(|e| GenError::failure(e, "TODO: dummy name".into()))?;
-    for i in 0..=255 {
-        if let Primitive::Indirect(block_def_ref) = provider_for_patch[Explosion(i)].primitive() {
-            let mut block: Block = block_def_ref.read().unwrap().block().clone();
 
-            if let Primitive::Atom(Atom { attributes, .. }) = block.primitive_mut() {
-                let brush = if i > 30 {
-                    // Expire
-                    VoxelBrush::single(AIR)
-                } else {
-                    let next = &provider_for_patch[Explosion(i + 1)];
-                    if i < 15 {
-                        // Expand at first out to ~5 blocks
-                        if i % 3 == 0 {
-                            if i % 6 == 0 {
-                                VoxelBrush::new([
-                                    ([0, 0, 0], next.clone()),
-                                    ([1, 0, 0], next.clone()),
-                                    ([-1, 0, 0], next.clone()),
-                                    ([0, 1, 0], next.clone()),
-                                    ([0, -1, 0], next.clone()),
-                                    ([0, 0, 1], next.clone()),
-                                    ([0, 0, -1], next.clone()),
-                                ])
-                            } else {
-                                VoxelBrush::new([
-                                    ([0, 0, 0], next.clone()),
-                                    ([1, 1, 0], next.clone()),
-                                    ([-1, 1, 0], next.clone()),
-                                    ([0, 1, 1], next.clone()),
-                                    ([0, -1, 1], next.clone()),
-                                    ([1, 0, 1], next.clone()),
-                                    ([1, 0, -1], next.clone()),
-                                    ([1, -1, 0], next.clone()),
-                                    ([-1, -1, 0], next.clone()),
-                                    ([0, 1, -1], next.clone()),
-                                    ([0, -1, -1], next.clone()),
-                                    ([-1, 0, 1], next.clone()),
-                                    ([-1, 0, -1], next.clone()),
-                                ])
-                            }
+    // Join up explosion blocks
+    for i in 0..=255 {
+        modify_def(&provider_for_patch[Explosion(i)], |block| {
+            let Primitive::Atom(Atom { attributes, .. }) = block.primitive_mut() else {
+                panic!("explosion not atom");
+            };
+            let brush = if i > 30 {
+                // Expire
+                VoxelBrush::single(AIR)
+            } else {
+                let next = &provider_for_patch[Explosion(i + 1)];
+                if i < 15 {
+                    // Expand at first out to ~5 blocks
+                    if i % 3 == 0 {
+                        if i % 6 == 0 {
+                            VoxelBrush::new([
+                                ([0, 0, 0], next.clone()),
+                                ([1, 0, 0], next.clone()),
+                                ([-1, 0, 0], next.clone()),
+                                ([0, 1, 0], next.clone()),
+                                ([0, -1, 0], next.clone()),
+                                ([0, 0, 1], next.clone()),
+                                ([0, 0, -1], next.clone()),
+                            ])
                         } else {
-                            VoxelBrush::new([([0, 0, 0], next.clone())])
+                            VoxelBrush::new([
+                                ([0, 0, 0], next.clone()),
+                                ([1, 1, 0], next.clone()),
+                                ([-1, 1, 0], next.clone()),
+                                ([0, 1, 1], next.clone()),
+                                ([0, -1, 1], next.clone()),
+                                ([1, 0, 1], next.clone()),
+                                ([1, 0, -1], next.clone()),
+                                ([1, -1, 0], next.clone()),
+                                ([-1, -1, 0], next.clone()),
+                                ([0, 1, -1], next.clone()),
+                                ([0, -1, -1], next.clone()),
+                                ([-1, 0, 1], next.clone()),
+                                ([-1, 0, -1], next.clone()),
+                            ])
                         }
                     } else {
-                        // Just fade
                         VoxelBrush::new([([0, 0, 0], next.clone())])
                     }
-                };
-                attributes.tick_action = Some({
-                    TickAction {
-                        operation: Operation::Paint(brush),
-                        period: NonZeroU16::new(3).unwrap(),
-                    }
-                });
-            } else {
-                panic!("not atom");
-            }
-
-            block_def_ref
-                .execute(
-                    &BlockDefTransaction::overwrite(block),
-                    &mut transaction::no_outputs,
-                )
-                .unwrap();
-        } else {
-            panic!("not indirect");
-        }
+                } else {
+                    // Just fade
+                    VoxelBrush::new([([0, 0, 0], next.clone())])
+                }
+            };
+            attributes.tick_action = Some(TickAction {
+                operation: Operation::Paint(brush),
+                period: NonZeroU16::new(3).unwrap(),
+            });
+        });
     }
 
     Ok(())
+}
+
+/// Given a block using [`Primitive::Indirect`], apply the function to replace the referenced
+/// [`BlockDef`]'s attributes.
+#[track_caller]
+fn modify_def(indirect: &Block, f: impl FnOnce(&mut Block)) {
+    let Primitive::Indirect(block_def_ref) = indirect.primitive() else {
+        panic!("block not indirect, but {indirect:?}");
+    };
+    let mut block: Block = block_def_ref
+        .read()
+        .expect("could not read BlockDef")
+        .block()
+        .clone();
+    f(&mut block);
+    block_def_ref
+        .execute(
+            &BlockDefTransaction::overwrite(block),
+            &mut transaction::no_outputs,
+        )
+        .expect("BlockDef mutation transaction failed");
 }
 
 #[cfg(test)]
