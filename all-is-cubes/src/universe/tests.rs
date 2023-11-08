@@ -1,4 +1,5 @@
 use alloc::string::ToString;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::any::TypeId;
 
@@ -11,12 +12,13 @@ use crate::inv::{InventoryTransaction, Tool};
 use crate::math::Rgba;
 use crate::op::Operation;
 use crate::space::Space;
-use crate::time;
 use crate::transaction::{self, Transaction};
 use crate::universe::{
-    list_refs, InsertError, InsertErrorKind, Name, RefError, URef, Universe, UniverseTransaction,
+    self, list_refs, InsertError, InsertErrorKind, Name, RefError, URef, Universe,
+    UniverseTransaction,
 };
 use crate::util::assert_conditional_send_sync;
+use crate::{behavior, time};
 
 #[test]
 fn thread_safety() {
@@ -28,13 +30,19 @@ fn thread_safety() {
 fn universe_debug_empty() {
     assert_eq!(
         format!("{:?}", Universe::new()),
-        "Universe { clock: Clock(0/60 of 1s), session_step_time: 0, spaces_with_work: 0 }"
+        "Universe { \
+            clock: Clock(0/60 of 1s), \
+            behaviors: BehaviorSet({}), \
+            session_step_time: 0, \
+            spaces_with_work: 0 \
+        }"
     );
     assert_eq!(
         format!("{:#?}", Universe::new()),
         indoc! {"
             Universe {
                 clock: Clock(0/60 of 1s),
+                behaviors: BehaviorSet({}),
                 session_step_time: 0,
                 spaces_with_work: 0,
             }\
@@ -53,6 +61,7 @@ fn universe_debug_elements() {
         format!("{u:?}"),
         "Universe { \
             clock: Clock(0/60 of 1s), \
+            behaviors: BehaviorSet({}), \
             session_step_time: 0, \
             spaces_with_work: 0, \
             [anonymous #0]: all_is_cubes::block::block_def::BlockDef, \
@@ -64,6 +73,7 @@ fn universe_debug_elements() {
         indoc! {"
             Universe {
                 clock: Clock(0/60 of 1s),
+                behaviors: BehaviorSet({}),
                 session_step_time: 0,
                 spaces_with_work: 0,
                 [anonymous #0]: all_is_cubes::block::block_def::BlockDef,
@@ -296,6 +306,49 @@ fn step_time() {
     assert_eq!(u.session_step_time, 1);
     u.step(true, time::DeadlineStd::Whenever);
     assert_eq!(u.session_step_time, 1);
+}
+
+#[test]
+fn universe_behavior() {
+    #[derive(Clone, Debug, PartialEq)]
+    struct UTestBehavior {}
+    impl behavior::Behavior<Universe> for UTestBehavior {
+        fn step(
+            &self,
+            _context: &behavior::BehaviorContext<'_, Universe>,
+        ) -> (UniverseTransaction, behavior::Then) {
+            (
+                UniverseTransaction::insert(URef::new_pending("foo".into(), BlockDef::new(AIR))),
+                behavior::Then::Drop,
+            )
+        }
+        fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+            None
+        }
+    }
+    impl universe::VisitRefs for UTestBehavior {
+        // No references
+        fn visit_refs(&self, _visitor: &mut dyn universe::RefVisitor) {}
+    }
+
+    // Setup
+    let mut u = Universe::new();
+    UniverseTransaction::behaviors(behavior::BehaviorSetTransaction::insert(
+        (),
+        Arc::new(UTestBehavior {}),
+    ))
+    .execute(&mut u, &mut transaction::no_outputs)
+    .unwrap();
+    dbg!(&u);
+    assert!(u.get_any(&"foo".into()).is_none());
+
+    u.step(false, time::DeadlineStd::Whenever);
+
+    // After stepping, the behavior should have done its thing
+    assert!(u.get_any(&"foo".into()).is_some());
+
+    // A further step should not fail since the behavior removed itself
+    u.step(false, time::DeadlineStd::Whenever);
 }
 
 #[test]

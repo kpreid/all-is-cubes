@@ -25,10 +25,11 @@ use manyfmt::Fmt;
 
 use crate::block::{self, BlockDefStepInfo};
 use crate::character::Character;
+use crate::save::WhenceUniverse;
 use crate::space::{Space, SpaceStepInfo};
-use crate::time;
-use crate::transaction::Transaction as _;
+use crate::transaction::{self, Transaction as _};
 use crate::util::{Refmt as _, StatusText};
+use crate::{behavior, time};
 
 #[cfg(feature = "rerun")]
 use crate::rerun_glue as rg;
@@ -178,6 +179,14 @@ impl UniverseId {
 ///
 /// **Thread-safety caveat:** See the documentation on [avoiding deadlock].
 ///
+/// A `Universe` consists of:
+///
+/// * _members_ of various types, which may be identified using [`Name`]s or [`URef`]s.
+/// * [`Behavior`](behavior::Behavior)s that modify the [`Universe`] itself.
+/// * A [`time::Clock`] defining how time is considered to pass in it.
+/// * A [`WhenceUniverse`] defining where its data is persisted, if anywhere.
+/// * A [`UniverseId`] unique within this process.
+///
 #[doc = include_str!("save/serde-warning.md")]
 ///
 /// [avoiding deadlock]: crate::universe#thread-safety
@@ -200,12 +209,14 @@ pub struct Universe {
     /// back to.
     ///
     /// For universes created by [`Universe::new()`], this is equal to `Arc::new(())`.
-    pub whence: Arc<dyn crate::save::WhenceUniverse>,
+    pub whence: Arc<dyn WhenceUniverse>,
 
     /// State and schedule of in-game time passing.
     //
     // TODO: this is not serialized, and fixing that will require refactoring.
     clock: time::Clock,
+
+    behaviors: behavior::BehaviorSet<Universe>,
 
     /// Number of [`step()`]s which have occurred since this [`Universe`] was created.
     ///
@@ -238,6 +249,7 @@ impl Universe {
             whence: Arc::new(()),
             // TODO: allow nondefault schedules
             clock: time::Clock::new(time::TickSchedule::per_second(60), 0),
+            behaviors: behavior::BehaviorSet::new(),
             session_step_time: 0,
             spaces_with_work: 0,
             #[cfg(feature = "rerun")]
@@ -302,9 +314,27 @@ impl Universe {
             self.session_step_time += 1;
         }
 
+        // --- End of setup; now advance time for our contents. ---
+
         // Update block def caches. This must be done before spaces so that spaces can see the
         // latest updates.
         self.sync_block_defs();
+
+        // Run behaviors attached to the universe itself.
+        if let Err(e) = self
+            .behaviors
+            .step(
+                self,
+                &core::convert::identity,
+                &UniverseTransaction::behaviors,
+                tick,
+            )
+            .execute(self, &mut transaction::no_outputs)
+        {
+            // TODO: Need to report these failures back to the source
+            // ... and perhaps in the UniverseStepInfo
+            log::info!("Transaction failure: {}", e);
+        };
 
         // Compute how to divide time among spaces, based on the previous srep
         let budget_per_space: Option<time::Duration> = deadline
@@ -351,7 +381,7 @@ impl Universe {
 
         // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
         for t in transactions {
-            if let Err(e) = t.execute(self, &mut drop) {
+            if let Err(e) = t.execute(self, &mut transaction::no_outputs) {
                 // TODO: Need to report these failures back to the source
                 // ... and perhaps in the UniverseStepInfo
                 log::info!("Transaction failure: {}", e);
@@ -677,6 +707,7 @@ impl fmt::Debug for Universe {
             wants_gc: _,
             whence,
             clock,
+            behaviors,
             session_step_time,
             spaces_with_work,
             #[cfg(feature = "rerun")]
@@ -688,11 +719,16 @@ impl fmt::Debug for Universe {
             ds.field("whence", &whence);
         }
         ds.field("clock", &clock);
+        ds.field("behaviors", &behaviors);
         ds.field("session_step_time", &session_step_time);
         ds.field("spaces_with_work", &spaces_with_work);
         tables.fmt_members(&mut ds);
         ds.finish()
     }
+}
+
+impl behavior::BehaviorHost for Universe {
+    type Attachment = (); // TODO: store a `BTreeSet<Name>` or something to define a scope
 }
 
 /// Iterator type for [`Universe::iter_by_type`].

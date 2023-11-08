@@ -6,6 +6,7 @@ use core::fmt;
 
 use hashbrown::HashMap as HbHashMap;
 
+use crate::behavior;
 use crate::transaction::{
     self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
 };
@@ -199,6 +200,8 @@ pub struct UniverseTransaction {
     /// Invariant: Every element of this vector is a `MemberTxn::Insert`.
     anonymous_insertions: Vec<MemberTxn>,
 
+    behaviors: behavior::BehaviorSetTransaction<Universe>,
+
     /// Invariant: Has a universe ID if any of the `members` do.
     universe_id: Option<UniverseId>,
 }
@@ -220,12 +223,24 @@ pub struct UniverseCommitCheck {
 pub enum UniverseConflict {
     /// The two transactions modify members of different [`Universe`]s.
     DifferentUniverse(UniverseId, UniverseId),
+
     /// The two transactions attempt to modify a member in conflicting ways.
     Member(transaction::MapConflict<Name, MemberConflict>),
+
+    /// The two transactions attempt to modify a behavior in conflicting ways.
+    Behaviors(behavior::BehaviorTransactionConflict),
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for UniverseConflict {}
+impl std::error::Error for UniverseConflict {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            UniverseConflict::DifferentUniverse(_, _) => None,
+            UniverseConflict::Member(mc) => Some(&mc.conflict),
+            UniverseConflict::Behaviors(c) => Some(c),
+        }
+    }
+}
 
 impl fmt::Display for UniverseConflict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -236,6 +251,7 @@ impl fmt::Display for UniverseConflict {
             UniverseConflict::Member(c) => {
                 write!(f, "transaction conflict at member {key}", key = c.key)
             }
+            UniverseConflict::Behaviors(_) => write!(f, "conflict in behaviors"),
         }
     }
 }
@@ -259,6 +275,7 @@ impl UniverseTransaction {
             universe_id: transaction.universe_id(),
             members: HbHashMap::from([(name, transaction)]),
             anonymous_insertions: Vec::new(),
+            behaviors: Default::default(),
         }
     }
 
@@ -279,6 +296,7 @@ impl UniverseTransaction {
                     reference,
                 ))],
                 universe_id: None,
+                behaviors: Default::default(),
             },
         }
     }
@@ -295,6 +313,16 @@ impl UniverseTransaction {
     /// [`RefError::Gone`]: crate::universe::RefError::Gone
     pub fn delete<R: URefErased>(member_ref: R) -> Self {
         Self::from_member_txn(member_ref.name(), MemberTxn::Delete)
+    }
+
+    /// Modify the [`Behavior`](behavior::Behavior)s of the universe.
+    pub fn behaviors(t: behavior::BehaviorSetTransaction<Universe>) -> Self {
+        Self {
+            behaviors: t,
+            members: HbHashMap::new(),
+            anonymous_insertions: Vec::new(),
+            universe_id: None,
+        }
     }
 
     /// If this transaction contains any operations that are on a specific member of a
@@ -364,20 +392,39 @@ impl Transaction<Universe> for UniverseTransaction {
         checks: Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
+        let Self {
+            members,
+            anonymous_insertions,
+            behaviors,
+            universe_id,
+        } = self;
+
+        // final sanity check so we can't ever modify the wrong universe
+        if let Some(universe_id) = *universe_id {
+            if universe_id != target.id {
+                return Err(CommitError::message::<Self>(
+                    "cannot commit a transaction to a different universe \
+                        than it was constructed for"
+                        .into(),
+                ));
+            }
+        }
+
         for (name, check) in checks.members {
-            self.members[&name]
+            members[&name]
                 .commit(target, &name, check, outputs)
                 .map_err(|e| e.context(format!("universe member {name}")))?;
         }
 
-        for (new_member, check) in self
-            .anonymous_insertions
+        for (new_member, check) in anonymous_insertions
             .iter()
             .cloned()
             .zip(checks.anonymous_insertions)
         {
             new_member.commit(target, &Name::Pending, check, outputs)?;
         }
+
+        behaviors.commit(&mut target.behaviors, (), &mut transaction::no_outputs)?;
 
         Ok(())
     }
@@ -393,11 +440,14 @@ impl Merge for UniverseTransaction {
                 return Err(UniverseConflict::DifferentUniverse(id1, id2));
             }
         }
-        Ok(UniverseMergeCheck(
-            self.members
-                .check_merge(&other.members)
-                .map_err(UniverseConflict::Member)?,
-        ))
+        let members = self
+            .members
+            .check_merge(&other.members)
+            .map_err(UniverseConflict::Member)?;
+        self.behaviors
+            .check_merge(&other.behaviors)
+            .map_err(UniverseConflict::Behaviors)?;
+        Ok(UniverseMergeCheck(members))
     }
 
     fn commit_merge(self, other: Self, UniverseMergeCheck(check): Self::MergeCheck) -> Self
@@ -411,6 +461,7 @@ impl Merge for UniverseTransaction {
             members: self.members.commit_merge(other.members, check),
             universe_id: self.universe_id.or(other.universe_id),
             anonymous_insertions,
+            behaviors: self.behaviors.commit_merge(other.behaviors, ()),
         }
     }
 }
@@ -712,6 +763,7 @@ mod tests {
                 members: HbHashMap::new(),
                 anonymous_insertions: Vec::new(),
                 universe_id: None,
+                behaviors: behavior::BehaviorSetTransaction::default()
             }
         )
     }
