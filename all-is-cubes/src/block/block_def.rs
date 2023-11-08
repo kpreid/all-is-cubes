@@ -22,6 +22,18 @@ use crate::universe::Universe;
 /// a direct mutation to this [`BlockDef`] is performed, not when the contained [`Block`]
 /// sends a change notification.
 pub struct BlockDef {
+    state: BlockDefState,
+
+    /// Notifier of changes to this `BlockDef`'s evaluation result, either via transaction or via
+    /// the contained block itself changing.
+    ///
+    /// Note that this fires only when the cache is refreshed, not when the underlying block sends
+    /// a change notification.
+    notifier: Arc<Notifier<BlockChange>>,
+}
+
+/// Subset of [`BlockDef`] that is constructed anew when its block is replaced.
+struct BlockDefState {
     /// The current value.
     block: Block,
 
@@ -46,13 +58,6 @@ pub struct BlockDef {
     /// Whether we have successfully installed a listener on `self.block`.
     listeners_ok: bool,
 
-    /// Notifier of changes to this `BlockDef`'s evaluation result, either via transaction or via
-    /// the contained block itself changing.
-    ///
-    /// Note that this fires only when the cache is refreshed, not when the underlying block sends
-    /// a change notification.
-    notifier: Arc<Notifier<BlockChange>>,
-
     /// Gate with which to interrupt previous listening to a contained block.
     #[allow(unused)] // used only for its `Drop` behavior
     block_listen_gate: Gate,
@@ -62,32 +67,9 @@ impl BlockDef {
     /// Constructs a new [`BlockDef`] that stores the given block (which may be replaced
     /// in the future).
     pub fn new(block: Block) -> Self {
-        Self::with_notifier(block, Arc::new(Notifier::new()))
-    }
-
-    /// Constructs a new [`BlockDef`] that stores the given block, but which reuses an
-    /// existing [`Notifier`]; this is used to share code between creation and mutation.
-    #[inline]
-    fn with_notifier(block: Block, notifier: Arc<Notifier<BlockChange>>) -> Self {
-        let cache_dirty = listen::DirtyFlag::new(false);
-        let (block_listen_gate, block_listener) =
-            Listener::<BlockChange>::gate(cache_dirty.listener());
-
-        let cache = block
-            .evaluate2(&block::EvalFilter {
-                skip_eval: false,
-                listener: Some(block_listener.erased()),
-            })
-            .map(MinEval::from);
-
         BlockDef {
-            listeners_ok: cache.is_ok(),
-
-            block,
-            cache,
-            cache_dirty,
-            notifier,
-            block_listen_gate,
+            state: BlockDefState::new(block),
+            notifier: Arc::new(Notifier::new()),
         }
     }
 
@@ -97,7 +79,7 @@ impl BlockDef {
     /// value by calling `BlockDef.evaluate()`, or by using a [`Primitive::Indirect`],
     /// not by calling `.block().evaluate()`, which is not cached.
     pub fn block(&self) -> &Block {
-        &self.block
+        &self.state.block
     }
 
     /// Returns the current cached evaluation of the current block value.
@@ -130,19 +112,48 @@ impl BlockDef {
         } else {
             // TODO: Rework the `MinEval` type or the signatures of evaluation internals
             // so that we can benefit from caching the `EvaluatedBlock` and not just the `MinEval`.
-            self.cache.clone()
+            self.state.cache.clone()
         }
     }
 
     pub(crate) fn step(&mut self) -> BlockDefStepInfo {
+        self.state.step(&self.notifier)
+    }
+}
+
+impl BlockDefState {
+    #[inline]
+    fn new(block: Block) -> Self {
+        let cache_dirty = listen::DirtyFlag::new(false);
+        let (block_listen_gate, block_listener) =
+            Listener::<BlockChange>::gate(cache_dirty.listener());
+
+        let cache = block
+            .evaluate2(&block::EvalFilter {
+                skip_eval: false,
+                listener: Some(block_listener.erased()),
+            })
+            .map(MinEval::from);
+
+        BlockDefState {
+            listeners_ok: cache.is_ok(),
+
+            block,
+            cache,
+            cache_dirty,
+            block_listen_gate,
+        }
+    }
+
+    fn step(&mut self, notifier: &Notifier<BlockChange>) -> BlockDefStepInfo {
         let mut info = BlockDefStepInfo::default();
 
         if !self.listeners_ok {
             info.attempted = 1;
             // If there was an evaluation error, then we may also be missing listeners.
             // Start over.
-            *self = BlockDef::with_notifier(self.block.clone(), self.notifier.clone());
-            self.notifier.notify(BlockChange::new());
+            *self = BlockDefState::new(self.block.clone());
+            notifier.notify(BlockChange::new());
             info.updated = 1;
         } else if self.cache_dirty.get_and_clear() {
             // We have a cached value, but it is stale.
@@ -164,7 +175,7 @@ impl BlockDef {
                 // In case the definition changed in the way which turned out not to affect the
                 // evaluation, compare old and new before notifying.
                 if old_cache != self.cache {
-                    self.notifier.notify(BlockChange::new());
+                    notifier.notify(BlockChange::new());
                     info.updated = 1;
                 }
             }
@@ -182,12 +193,15 @@ impl fmt::Debug for BlockDef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO: Consider printing the cache, but only if it wouldn't be redundant?
         let Self {
-            block,
-            cache: _,
-            cache_dirty,
-            listeners_ok,
+            state:
+                BlockDefState {
+                    block,
+                    cache: _,
+                    cache_dirty,
+                    listeners_ok,
+                    block_listen_gate: _,
+                },
             notifier,
-            block_listen_gate: _,
         } = self;
         f.debug_struct("BlockDef")
             .field("block", &block)
@@ -210,13 +224,26 @@ impl Listen for BlockDef {
 
 impl AsRef<Block> for BlockDef {
     fn as_ref(&self) -> &Block {
-        &self.block
+        &self.state.block
     }
 }
 
 impl VisitRefs for BlockDef {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
-        self.block.visit_refs(visitor)
+        let Self {
+            state:
+                BlockDefState {
+                    block,
+                    // Not 100% sure we shouldn't visit the cache too, but
+                    // it's not serialized, at least, which is a sign that no.
+                    cache: _,
+                    cache_dirty: _,
+                    listeners_ok: _,
+                    block_listen_gate: _,
+                },
+            notifier: _,
+        } = self;
+        block.visit_refs(visitor);
     }
 }
 
@@ -283,7 +310,7 @@ impl Transaction<BlockDef> for BlockDefTransaction {
         target: &BlockDef,
     ) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
         if let Some(old) = &self.old {
-            if target.block != *old {
+            if target.state.block != *old {
                 return Err(transaction::PreconditionFailed {
                     location: "BlockDef",
                     problem: "existing block not as expected",
@@ -300,7 +327,7 @@ impl Transaction<BlockDef> for BlockDefTransaction {
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
         if let Some(new) = &self.new {
-            *target = BlockDef::with_notifier(new.clone(), target.notifier.clone());
+            target.state = BlockDefState::new(new.clone());
             target.notifier.notify(BlockChange::new());
         }
         Ok(())
