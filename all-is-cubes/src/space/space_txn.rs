@@ -139,7 +139,7 @@ impl SpaceTransaction {
         for &cube_array in cubes.keys() {
             let cube = Cube::from(cube_array);
             if let Some(bounds) = &mut bounds {
-                *bounds = (*bounds).union_box(GridAab::single_cube(cube));
+                *bounds = (*bounds).union_cube(cube);
             } else {
                 bounds = Some(GridAab::single_cube(cube));
             }

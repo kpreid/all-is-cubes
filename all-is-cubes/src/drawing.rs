@@ -440,11 +440,11 @@ impl<'a> VoxelBrush<'a> {
     pub fn bounds(&self) -> Option<GridAab> {
         let mut bounds: Option<GridAab> = None;
         for &(offset, _) in self.0.iter() {
-            let cube = Cube::from(offset.to_point()).grid_aab();
+            let cube = Cube::from(offset.to_point());
             if let Some(bounds) = &mut bounds {
-                *bounds = (*bounds).union_box(cube);
+                *bounds = (*bounds).union_cube(cube);
             } else {
-                bounds = Some(cube);
+                bounds = Some(GridAab::single_cube(cube));
             }
         }
         bounds

@@ -545,6 +545,33 @@ impl GridAab {
         Self::from_lower_size(lower, upper - lower)
     }
 
+    /// Extend the bounds of `self` as needed to enclose `other`.
+    ///
+    /// Equivalent to `self.union_box(GridAab::single_cube(other))`.
+    /// Note in particular that it does not discard the bounds of an empty `self`,
+    /// like [`GridAab::union_cubes()`] would.
+    ///
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{Cube, GridAab};
+    ///
+    /// let accumulation =
+    ///     GridAab::single_cube(Cube::new(1, 10, 7))
+    ///         .union_cube(Cube::new(2, 5, 10));
+    /// assert_eq!(accumulation, GridAab::from_lower_upper([1, 5, 7], [3, 11, 11]));
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn union_cube(self, other: Cube) -> GridAab {
+        let lower = self.lower_bounds().min(other.lower_bounds());
+        let upper = self.upper_bounds().max(other.upper_bounds());
+        Self {
+            lower_bounds: lower,
+            sizes: Size3D::from(upper - lower),
+        }
+    }
+
     #[doc(hidden)] // TODO: good public API?
     #[inline]
     pub fn minkowski_sum(self, other: GridAab) -> Result<GridAab, GridOverflowError> {

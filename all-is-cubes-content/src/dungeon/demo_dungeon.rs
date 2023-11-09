@@ -281,8 +281,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                     floor_layer.abut(direction, -1).unwrap().center(),
                                 )
                                 .unwrap();
-                                let bridge_box = GridAab::single_cube(midpoint)
-                                    .union_box(GridAab::single_cube(wall_cube));
+                                let bridge_box =
+                                    GridAab::single_cube(midpoint).union_cube(wall_cube);
                                 space.fill_uniform(bridge_box, &self.blocks[FloorTile])?;
                             }
                         }
