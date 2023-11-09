@@ -16,6 +16,9 @@ use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{RefVisitor, UniverseTransaction, VisitRefs};
 use all_is_cubes::{behavior, rgba_const};
 
+#[cfg(doc)]
+use all_is_cubes::time::TickSchedule;
+
 /// A [`Behavior`] which animates a recursive block by periodically recomputing all of its
 /// voxels.
 // TODO: This was thrown together as a test/demo and may be too specific or too general.
@@ -23,25 +26,19 @@ use all_is_cubes::{behavior, rgba_const};
 pub(crate) struct AnimatedVoxels<F> {
     /// The function to compute the voxels.
     function: F,
-    /// The frame number, periodically incremented and fed to the function.
+    /// The animation frame number, periodically incremented and fed to the function.
     frame: u64,
-    /// How much time to wait before incrementing the frame counter.
-    frame_period: Duration,
-    /// Time accumulation not yet equal to a whole frame.
-    /// Always less than `frame_period`.
-    /// TODO: Give [`Tick`] a concept of discrete time units we can reuse instead of
-    /// separate things having their own float-based clocks.
-    accumulator: Duration,
+
+    /// How much time to wait before incrementing the frame counter, measured in [`TickSchedule`] ticks (i.e. steps).
+    frame_period: u16,
 }
 
 impl<F: Fn(Cube, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
     pub(crate) fn new(function: F) -> Self {
-        let frame_period = Duration::from_nanos(1_000_000_000 / 16);
         Self {
             function,
             frame: 0,
-            frame_period,
-            accumulator: frame_period,
+            frame_period: 4,
         }
     }
 
@@ -62,23 +59,21 @@ impl<F: Fn(Cube, u64) -> Block + Clone + Send + Sync + 'static> behavior::Behavi
         &self,
         context: &behavior::BehaviorContext<'_, Space>,
     ) -> (UniverseTransaction, behavior::Then) {
-        let mut mut_self: AnimatedVoxels<F> = self.clone();
-        // TODO: replace this accumulator with asking the behavior set to schedule for us
-        mut_self.accumulator += context.tick.delta_t();
-        let txn = if mut_self.accumulator >= mut_self.frame_period {
-            mut_self.accumulator -= mut_self.frame_period;
+        let txn = if context.tick.prev_phase().rem_euclid(self.frame_period) == 0 {
+            let mut mut_self: AnimatedVoxels<F> = self.clone();
             mut_self.frame = mut_self.frame.wrapping_add(1);
 
-            // TODO: should be using the attachment bounds instead of space bounds
-            let paint_txn = mut_self.paint(context.host.bounds());
+            let paint_txn = mut_self.paint(context.attachment.bounds());
             context
                 .replace_self(mut_self)
                 .merge(context.bind_host(paint_txn))
                 .unwrap()
         } else {
-            context.replace_self(mut_self)
+            UniverseTransaction::default()
         };
 
+        // TODO: ask the behavior set to schedule a callback for us at our desired period
+        // instead of immediately (this is not possible yet)
         (txn, behavior::Then::Step)
     }
 
