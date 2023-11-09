@@ -1,5 +1,5 @@
-//! Axis-aligned integer-coordinate box volumes ([`GridAab`]), arrays bounded by them
-//! ([`GridArray`]), and related.
+//! Axis-aligned integer-coordinate box volumes ([`GridAab`]), three-dimensional data within those
+//! volumes ([`Vol`]), and related.
 
 use alloc::string::String;
 use core::fmt;

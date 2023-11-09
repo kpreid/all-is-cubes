@@ -83,7 +83,7 @@ where
     // Note that the Deref bound is necessary to give this a unique `V`.
     C: Deref<Target = [V]> + FromIterator<V>,
 {
-    /// Constructs a `Vol<Box<[V]>>` by using the provided function to compute a value
+    /// Constructs a `Vol<C>` by using the provided function to compute a value
     /// for each point.
     pub fn from_fn<F>(bounds: GridAab, f: F) -> Self
     where
@@ -322,7 +322,7 @@ where
             &self.contents[index]
         } else {
             panic!(
-                "GridArray position out of range {:?} in {:?}",
+                "position {:?} out of Vol bounds {:?}",
                 position, self.bounds
             )
         }
@@ -343,7 +343,7 @@ where
             &mut self.contents[index]
         } else {
             panic!(
-                "GridArray position out of range {:?} in {:?}",
+                "position {:?} out of Vol bounds {:?}",
                 position, self.bounds
             )
         }
@@ -424,24 +424,25 @@ fn arc_make_mut_slice<T: Clone>(mut arc: &mut Arc<[T]>) -> &mut [T] {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use alloc::string::String;
 
-    use super::*;
+    type VolBox<T> = Vol<Box<[T]>>;
 
     #[test]
-    fn array_from_elements() {
+    fn from_elements() {
         let bounds = GridAab::from_lower_size([10, 0, 0], [4, 1, 1]);
         assert_eq!(
-            GridArray::from_fn(bounds, |p| p.x),
-            GridArray::from_elements(bounds, vec![10i32, 11, 12, 13]).unwrap(),
+            VolBox::from_fn(bounds, |p| p.x),
+            VolBox::from_elements(bounds, vec![10i32, 11, 12, 13]).unwrap(),
         );
     }
 
     #[test]
-    fn array_from_elements_error() {
+    fn from_elements_error() {
         let bounds = GridAab::from_lower_size([10, 0, 0], [4, 1, 1]);
         assert_eq!(
-            GridArray::from_elements(bounds, vec![10i32, 11, 12]),
+            VolBox::from_elements(bounds, vec![10i32, 11, 12]),
             Err(VolLengthError {
                 input_length: 3,
                 bounds
@@ -450,32 +451,32 @@ mod tests {
     }
 
     #[test]
-    fn array_repeat() {
+    fn repeat() {
         let bounds = GridAab::from_lower_size([10, 0, 0], [2, 2, 1]);
         assert_eq!(
-            GridArray::repeat(bounds, 9),
-            GridArray::from_elements(bounds, vec![9, 9, 9, 9]).unwrap(),
+            VolBox::repeat(bounds, 9),
+            VolBox::from_elements(bounds, vec![9, 9, 9, 9]).unwrap(),
         );
     }
 
     #[test]
-    fn array_from_element() {
+    fn from_element() {
         let element = String::from("x");
         assert_eq!(
-            GridArray::from_element(element.clone()),
-            GridArray::from_elements(GridAab::ORIGIN_CUBE, [element]).unwrap(),
+            VolBox::from_element(element.clone()),
+            VolBox::from_elements(GridAab::ORIGIN_CUBE, [element]).unwrap(),
         );
     }
 
     #[test]
-    fn array_from_y_flipped() {
-        let array = GridArray::from_y_flipped_array([
+    fn from_y_flipped() {
+        let array = VolBox::from_y_flipped_array([
             [*b"abcd", *b"efgh", *b"ijkl"],
             [*b"mnop", *b"qrst", *b"uvwx"],
         ]);
         assert_eq!(
             array,
-            GridArray::from_elements(
+            Vol::from_elements(
                 GridAab::from_lower_size([0, 0, 0], [4, 3, 2]),
                 *b"iueqamjvfrbnkwgscolxhtdp"
             )

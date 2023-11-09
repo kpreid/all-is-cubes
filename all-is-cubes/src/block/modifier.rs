@@ -105,7 +105,7 @@ impl Modifier {
                     // Skip computation of transforms
                     value
                 } else {
-                    // TODO: Add a shuffle-in-place rotation operation to GridArray and try implementing this using that, which should have less arithmetic involved than these matrix ops
+                    // TODO: Add a shuffle-in-place rotation operation to Vol and try implementing this using that, which should have less arithmetic involved than these matrix ops
                     let resolution = value.resolution();
                     let inner_to_outer = rotation.to_positive_octant_transform(resolution.into());
                     let outer_to_inner = rotation

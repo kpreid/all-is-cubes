@@ -610,7 +610,7 @@ mod op {
 
 mod space {
     use super::*;
-    use crate::math::GridArray;
+    use crate::math::Vol;
     use crate::save::compress::{GzSerde, Leu16};
     use crate::space::{self, LightPhysics, Space, SpacePhysics};
 
@@ -668,7 +668,7 @@ mod space {
                     spawn,
                 } => {
                     // Convert data representations
-                    let contents = GridArray::from_elements(
+                    let contents = Vol::from_elements(
                         bounds,
                         Vec::from(contents)
                             .into_iter()
@@ -678,7 +678,7 @@ mod space {
                     .map_err(serde::de::Error::custom)?;
                     let light = light
                         .map(|GzSerde(data)| {
-                            GridArray::from_elements(
+                            Vol::from_elements(
                                 bounds,
                                 Vec::from(data)
                                     .into_iter()
