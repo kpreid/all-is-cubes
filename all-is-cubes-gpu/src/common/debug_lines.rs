@@ -32,7 +32,7 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
         // Show light update debug info.
         // This is enabled/disabled inside the lighting algorithm, not as a graphics
         // option.
-        for cube in space.last_light_updates.iter().copied() {
+        for cube in space.last_light_updates() {
             wireframe_vertices(v, Rgba::new(1.0, 1.0, 0.0, 1.0), &cube.aab().expand(0.005));
         }
 

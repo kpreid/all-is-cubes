@@ -48,7 +48,7 @@ fn initial_value_initialized_after_creation() {
     // Note: this is pretty specific to the `fast_evaluate_light()` algorithm
     // and will probably break when we improve it.
     assert_eq!(
-        space.packed_sky_color,
+        space.light.packed_sky_color,
         space.get_lighting([1, 2, 1]),
         "sky above obstacle"
     );
@@ -265,7 +265,9 @@ fn disabled_lighting_returns_one_always() {
 #[test]
 fn disabled_lighting_does_not_update() {
     let mut space = space_with_disabled_light();
-    space.light_needs_update(Cube::new(0, 0, 0), Priority::UNINIT);
+    space
+        .light
+        .light_needs_update(Cube::new(0, 0, 0), Priority::UNINIT);
     assert_eq!(
         space
             .step(None, time::Tick::arbitrary(), time::DeadlineStd::Whenever)

@@ -4,7 +4,7 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
-use core::fmt;
+use core::{fmt, mem};
 
 use euclid::{Point3D, Vector3D};
 use manyfmt::Fmt;
@@ -13,14 +13,17 @@ use manyfmt::Fmt;
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use super::debug::LightComputeOutput;
-use crate::block::EvaluatedBlock;
+use crate::block::{self, EvaluatedBlock};
+use crate::listen;
 use crate::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, Geometry, NotNan, OpacityCategory, Rgb, VectorOps,
+    Cube, Face6, FaceMap, FreeCoordinate, Geometry, NotNan, OpacityCategory, Rgb, VectorOps, Vol,
 };
 use crate::raycast::{Ray, RaycastStep};
-use crate::space::light::{LightUpdateRayInfo, LightUpdateRequest, Priority};
+use crate::space::light::{LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority};
+use crate::space::palette::Palette;
 use crate::space::{
-    GridAab, LightPhysics, LightStatus, PackedLight, PackedLightScalar, Space, SpaceChange,
+    BlockIndex, GridAab, LightPhysics, LightStatus, PackedLight, PackedLightScalar, SpaceChange,
+    SpacePhysics,
 };
 use crate::time::{Duration, Instant};
 use crate::util::StatusText;
@@ -42,16 +45,128 @@ struct LightRayData {
 // static LIGHT_RAYS: &[LightRayData] = &[...
 include!(concat!(env!("OUT_DIR"), "/light_ray_pattern.rs"));
 
+/// Storage and update queue for a [`Space`]'s light.
+///
+/// Design note: Currently this is simply owned by the [`Space`], but eventually we want to make
+/// it accessible by a background thread which can continuously update it.
+pub(crate) struct LightStorage {
+    /// Per-cube light data.
+    ///
+    /// The bounds of this are always either equal to the owning [`Space`]'s,
+    /// or zero if light is disabled. Therefore, the same cube indices may be used.
+    // ---
+    // TODO: stop making this pub
+    pub(crate) contents: Vol<Box<[PackedLight]>>,
+
+    /// Queue of cubes whose light values should be updated.
+    pub(in crate::space) light_update_queue: LightUpdateQueue,
+
+    /// Debug log of the updated cubes from last frame.
+    /// Empty unless this debug function is enabled.
+    pub(crate) last_light_updates: Vec<Cube>,
+
+    /// Estimated ratio of (wall-time seconds / light update cost units).
+    light_cost_scale: f32,
+
+    /// Redundant copy of `SpacePhysics::light` for local access.
+    /// The Space will keep this updated via  [`Self::reinitialize_for_physics_change()`].
+    physics: LightPhysics,
+
+    pub(in crate::space) packed_sky_color: PackedLight,
+    pub(in crate::space) sky_color: Rgb,
+}
+
 /// Methods on Space that specifically implement the lighting algorithm.
-impl Space {
+impl LightStorage {
+    pub(crate) fn new(
+        physics: &SpacePhysics,
+        contents: Vol<Box<[PackedLight]>>,
+        light_update_queue: LightUpdateQueue,
+    ) -> Self {
+        Self {
+            contents,
+            light_update_queue,
+            last_light_updates: Vec::new(),
+            light_cost_scale: 1e-6,
+            physics: physics.light.clone(),
+            packed_sky_color: physics.sky_color.into(),
+            sky_color: physics.sky_color,
+        }
+    }
+
+    pub(in crate::space) fn maybe_reinitialize_for_physics_change(
+        &mut self,
+        uc: UpdateCtx<'_>,
+        physics: &SpacePhysics,
+        opacity: OpacityCategory,
+    ) {
+        let old_physics = mem::replace(&mut self.physics, physics.light.clone());
+        self.packed_sky_color = physics.sky_color.into();
+        self.sky_color = physics.sky_color;
+
+        if self.physics != old_physics {
+            // TODO: If the new physics is broadly similar, then reuse the old data as a
+            // starting point instead of immediately throwing it out.
+            self.contents = self
+                .physics
+                .initialize_lighting(uc.contents.bounds(), opacity);
+
+            match self.physics {
+                LightPhysics::None => {
+                    self.light_update_queue.clear();
+                }
+                LightPhysics::Rays { .. } => {
+                    self.fast_evaluate_light(uc);
+                }
+            }
+        } else {
+            // TODO: if only sky color is different, trigger light updates
+        }
+    }
+
     pub(crate) fn light_needs_update(&mut self, cube: Cube, priority: Priority) {
-        if self.physics.light == LightPhysics::None {
+        if self.contents.bounds().contains_cube(cube) {
+            self.light_update_queue
+                .insert(LightUpdateRequest { priority, cube });
+        }
+    }
+
+    pub(in crate::space) fn modified_cube_needs_update(
+        &mut self,
+        uc: UpdateCtx<'_>,
+        cube: Cube,
+        evaluated: &EvaluatedBlock,
+        contents_index: usize,
+    ) {
+        if self.physics == LightPhysics::None {
             return;
         }
 
-        if self.bounds().contains_cube(cube) {
-            self.light_update_queue
-                .insert(LightUpdateRequest { priority, cube });
+        if opaque_for_light_computation(evaluated) {
+            // Since we already have the information, immediately update light value
+            // to zero rather than putting it in the queue.
+            // (It would be mostly okay to skip doing this entirely, but doing it gives
+            // more determinism, and the old value could be temporarily revealed when
+            // the block is removed.)
+            self.contents.as_linear_mut()[contents_index] = PackedLight::OPAQUE;
+
+            // Cancel any previously scheduled light update.
+            // (Note: This does not empirically have any significant effect on overall
+            // lighting performance — these trivial updates are not most of the cost.
+            // But it'll at least save a little bit of memory.)
+            self.light_update_queue.remove(cube);
+
+            uc.change_notifier.notify(SpaceChange::CubeLight { cube });
+        } else {
+            self.light_needs_update(cube, Priority::NEWLY_VISIBLE);
+        }
+        for face in Face6::ALL {
+            if let Some(neighbor) = cube.checked_add(face.normal_vector()) {
+                // Perform neighbor light updates if they can be affected by us
+                if !uc.get_evaluated(neighbor).opaque[face.opposite()] {
+                    self.light_needs_update(neighbor, Priority::NEWLY_VISIBLE);
+                }
+            }
         }
     }
 
@@ -62,15 +177,16 @@ impl Space {
 
     /// Do some lighting updates.
     #[doc(hidden)] // TODO: eliminate calls outside the crate
-    pub fn update_lighting_from_queue<I: Instant>(
+    pub(in crate::space) fn update_lighting_from_queue<I: Instant>(
         &mut self,
+        uc: UpdateCtx<'_>,
         budget: Option<Duration>,
     ) -> LightUpdatesInfo {
         let mut light_update_count: usize = 0;
         self.last_light_updates.clear();
         let mut max_difference: PackedLightScalar = 0;
 
-        if self.physics.light != LightPhysics::None && !budget.is_some_and(|d| d.is_zero()) {
+        if self.physics != LightPhysics::None && !budget.is_some_and(|d| d.is_zero()) {
             let t0 = I::now();
             let mut cost = 0;
             // We convert the time budget to an arbitrary cost value in order to avoid
@@ -100,7 +216,7 @@ impl Space {
                     .as_slice()
                     .into_par_iter()
                     .flatten()
-                    .map(|&LightUpdateRequest { cube, .. }| self.compute_lighting(cube))
+                    .map(|&LightUpdateRequest { cube, .. }| self.compute_lighting(uc, cube))
                     .collect::<Vec<ComputedLight<()>>>();
                 for output in outputs {
                     if false {
@@ -108,7 +224,7 @@ impl Space {
                         self.last_light_updates.push(output.cube);
                     }
                     light_update_count += 1;
-                    let (difference, cube_cost) = self.apply_lighting_update(output);
+                    let (difference, cube_cost) = self.apply_lighting_update(uc, output);
                     max_difference = max_difference.max(difference);
                     cost += cube_cost;
                 }
@@ -126,9 +242,9 @@ impl Space {
                 }
                 light_update_count += 1;
 
-                let computation = self.compute_lighting(cube);
+                let computation = self.compute_lighting(uc, cube);
 
-                let (difference, cube_cost) = self.apply_lighting_update(computation);
+                let (difference, cube_cost) = self.apply_lighting_update(uc, computation);
                 max_difference = max_difference.max(difference);
                 cost += cube_cost;
                 if cost >= max_cost {
@@ -157,6 +273,7 @@ impl Space {
     #[inline]
     fn apply_lighting_update(
         &mut self,
+        uc: UpdateCtx<'_>,
         computation: ComputedLight<()>,
     ) -> (PackedLightScalar, usize) {
         let ComputedLight {
@@ -167,34 +284,34 @@ impl Space {
             debug: (),
         } = computation;
 
-        let old_light_value: PackedLight = self.get_lighting(cube);
+        let old_light_value: PackedLight = self.contents[cube];
         // Compare and set new value. Note that we MUST compare only the packed value so
         // that changes are detected in terms of that rounding, not float values.
         let difference_priority = new_light_value.difference_priority(old_light_value);
         if difference_priority > 0 {
             cost += 200;
-            // TODO: compute index only once
-            self.lighting[self.bounds().index(cube).unwrap()] = new_light_value;
-            self.change_notifier.notify(SpaceChange::CubeLight { cube });
+            // TODO: compute volume index of the cube only once
+            self.contents[cube] = new_light_value;
+            uc.change_notifier.notify(SpaceChange::CubeLight { cube });
 
             // If neighbors have missing (not just stale) light values, fill them in too.
             for dir in Face6::ALL {
                 let neighbor_cube = cube + dir.normal_vector();
-                let Some(neighbor_index) = self.bounds().index(neighbor_cube) else {
+                let Some(neighbor_light) = self.contents.get_mut(neighbor_cube) else {
                     // neighbor is out of bounds
                     continue;
                 };
-                match self.lighting[neighbor_index].status() {
+                match neighbor_light.status() {
                     LightStatus::Uninitialized => {
-                        if self.lighting[neighbor_index] == new_light_value {
+                        if *neighbor_light == new_light_value {
                             continue;
                         }
-                        if self.get_evaluated(neighbor_cube).opaque == FaceMap::repeat(true) {
+                        if uc.get_evaluated(neighbor_cube).opaque == FaceMap::repeat(true) {
                             // neighbor is fully opaque — don't light it
                             continue;
                         }
-                        self.lighting[neighbor_index] = PackedLight::guess(new_light_value.value());
-                        self.change_notifier.notify(SpaceChange::CubeLight {
+                        *neighbor_light = PackedLight::guess(new_light_value.value());
+                        uc.change_notifier.notify(SpaceChange::CubeLight {
                             cube: neighbor_cube,
                         });
                         // We don't put the neighbor on the update queue because it should
@@ -229,11 +346,15 @@ impl Space {
     /// (imprecisely; empty cubes passed through are not listed).
     #[inline]
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu for debugging
-    pub fn compute_lighting<D>(&self, cube: Cube) -> ComputedLight<D>
+    pub(in crate::space) fn compute_lighting<D>(
+        &self,
+        uc: UpdateCtx<'_>,
+        cube: Cube,
+    ) -> ComputedLight<D>
     where
         D: LightComputeOutput,
     {
-        let maximum_distance = match self.physics.light {
+        let maximum_distance = match self.physics {
             LightPhysics::None => {
                 panic!("Light is disabled; should not reach here");
             }
@@ -243,7 +364,7 @@ impl Space {
         let mut cube_buffer = LightBuffer::new();
         let mut info_rays = D::RayInfoBuffer::default();
 
-        let ev_origin = self.get_evaluated(cube);
+        let ev_origin = uc.get_evaluated(cube);
         let origin_is_opaque = ev_origin.opaque == FaceMap::repeat(true);
         if origin_is_opaque {
             // Opaque blocks are always dark inside — unless they are light sources.
@@ -252,7 +373,7 @@ impl Space {
             }
         } else {
             let ev_neighbors =
-                FaceMap::from_fn(|face| self.get_evaluated(cube + face.normal_vector()));
+                FaceMap::from_fn(|face| uc.get_evaluated(cube + face.normal_vector()));
             let direction_weights = directions_to_seek_light(ev_origin, ev_neighbors);
 
             // TODO: Choose a ray pattern that suits the maximum_distance.
@@ -268,7 +389,10 @@ impl Space {
                     continue;
                 }
                 let mut ray_state = LightRayState::new(cube, ray, ray_weight_by_faces);
-                let raycaster = ray_state.translated_ray.cast().within(self.bounds());
+                let raycaster = ray_state
+                    .translated_ray
+                    .cast()
+                    .within(self.contents.bounds());
 
                 'raycast: for hit in raycaster {
                     cube_buffer.cost += 1;
@@ -278,12 +402,12 @@ impl Space {
                         // indoor spaces.
                         break 'raycast;
                     }
-                    cube_buffer.traverse::<D>(&mut ray_state, &mut info_rays, self, hit);
+                    cube_buffer.traverse::<D>(&mut ray_state, &mut info_rays, self, uc, hit);
                     if ray_state.alpha.partial_cmp(&0.0) != Some(Ordering::Greater) {
                         break;
                     }
                 }
-                cube_buffer.end_of_ray(&ray_state, self);
+                cube_buffer.end_of_ray(&ray_state, self.sky_color);
             }
         }
 
@@ -302,14 +426,14 @@ impl Space {
     /// results suitable for flat landscapes mostly lit from above (the +Y axis).
     ///
     /// TODO: Revisit whether this is a good public API.
-    pub fn fast_evaluate_light(&mut self) {
+    pub(in crate::space) fn fast_evaluate_light(&mut self, uc: UpdateCtx<'_>) {
         self.light_update_queue.clear(); // Going to refill it
 
-        if self.physics.light == LightPhysics::None {
+        if self.physics == LightPhysics::None {
             return;
         }
 
-        let bounds = self.bounds();
+        let bounds = self.contents.bounds();
         for x in bounds.x_range() {
             for z in bounds.z_range() {
                 let mut covered = false;
@@ -317,37 +441,85 @@ impl Space {
                     let cube = Cube::new(x, y, z);
                     let index = bounds.index(cube).unwrap();
 
-                    let this_cube_evaluated = &self.palette.entry(self.contents[index]).evaluated;
-                    self.lighting[index] = if opaque_for_light_computation(this_cube_evaluated) {
-                        covered = true;
-                        PackedLight::OPAQUE
-                    } else {
-                        if this_cube_evaluated.visible_or_animated()
-                            || Face6::ALL.into_iter().any(|face| {
-                                self.get_evaluated(cube + face.normal_vector())
-                                    .visible_or_animated()
-                            })
-                        {
-                            // In this case (and only this case), we are guessing rather than being certain,
-                            // so we need to schedule a proper update.
-                            // (Bypassing `self.light_needs_update()` to skip bounds checks).
-                            self.light_update_queue.insert(LightUpdateRequest {
-                                priority: Priority::ESTIMATED,
-                                cube,
-                            });
-
-                            if covered {
-                                PackedLight::UNINITIALIZED_AND_BLACK
-                            } else {
-                                self.packed_sky_color
-                            }
+                    let this_cube_evaluated = uc.get_evaluated_by_index(index);
+                    self.contents.as_linear_mut()[index] =
+                        if opaque_for_light_computation(this_cube_evaluated) {
+                            covered = true;
+                            PackedLight::OPAQUE
                         } else {
-                            PackedLight::NO_RAYS
-                        }
-                    };
+                            if this_cube_evaluated.visible_or_animated()
+                                || Face6::ALL.into_iter().any(|face| {
+                                    uc.get_evaluated(cube + face.normal_vector())
+                                        .visible_or_animated()
+                                })
+                            {
+                                // In this case (and only this case), we are guessing rather than being certain,
+                                // so we need to schedule a proper update.
+                                // (Bypassing `self.light_needs_update()` to skip bounds checks).
+                                self.light_update_queue.insert(LightUpdateRequest {
+                                    priority: Priority::ESTIMATED,
+                                    cube,
+                                });
+
+                                if covered {
+                                    PackedLight::UNINITIALIZED_AND_BLACK
+                                } else {
+                                    self.packed_sky_color
+                                }
+                            } else {
+                                PackedLight::NO_RAYS
+                            }
+                        };
                 }
             }
         }
+    }
+
+    #[inline(always)]
+    pub fn get(&self, cube: Cube) -> PackedLight {
+        match self.physics {
+            LightPhysics::None => PackedLight::ONE,
+            _ => self
+                .contents
+                .get(cube)
+                .copied()
+                .unwrap_or(self.packed_sky_color),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn consistency_check(&self) {
+        if self.physics == LightPhysics::None {
+            assert_eq!(self.contents.bounds().volume(), 0);
+        }
+
+        // TODO: validate light update queue
+        // - consistency with space bounds
+        // - contains all cubes with LightStatus::UNINIT
+    }
+}
+
+/// Argument passed to [`LightStorage`] methods to provide access to the rest of the space.
+#[derive(Copy, Clone, Debug)]
+pub(in crate::space) struct UpdateCtx<'a> {
+    pub(in crate::space) contents: Vol<&'a [BlockIndex]>,
+    pub(in crate::space) palette: &'a Palette,
+    pub(in crate::space) change_notifier: &'a listen::Notifier<SpaceChange>,
+}
+
+impl<'a> UpdateCtx<'a> {
+    fn get_evaluated(&self, cube: Cube) -> &'a EvaluatedBlock {
+        if let Some(&block_index) = self.contents.get(cube) {
+            self.palette.entry(block_index).evaluated()
+        } else {
+            block::AIR_EVALUATED_REF
+        }
+    }
+
+    fn get_evaluated_by_index(&self, cube_index: usize) -> &'a EvaluatedBlock {
+        self.palette
+            .entry(self.contents.as_linear()[cube_index])
+            .evaluated()
     }
 }
 
@@ -362,16 +534,19 @@ impl LightPhysics {
         &self,
         bounds: GridAab,
         opacity: OpacityCategory,
-    ) -> Box<[PackedLight]> {
+    ) -> Vol<Box<[PackedLight]>> {
         match self {
-            LightPhysics::None => Box::new([]),
+            LightPhysics::None => Vol::repeat(
+                GridAab::from_lower_size([0, 0, 0], [0, 0, 0]),
+                PackedLight::UNINITIALIZED_AND_BLACK,
+            ),
             LightPhysics::Rays { .. } => {
                 let value = match opacity {
                     OpacityCategory::Invisible => PackedLight::NO_RAYS,
                     OpacityCategory::Partial => PackedLight::UNINITIALIZED_AND_BLACK,
                     OpacityCategory::Opaque => PackedLight::OPAQUE,
                 };
-                vec![value; bounds.volume()].into_boxed_slice()
+                Vol::repeat(bounds, value)
             }
         }
     }
@@ -475,12 +650,13 @@ impl LightBuffer {
         &mut self,
         ray_state: &mut LightRayState,
         info: &mut D::RayInfoBuffer,
-        space: &Space,
+        current_light: &LightStorage,
+        uc: UpdateCtx<'_>,
         hit: RaycastStep,
     ) where
         D: LightComputeOutput,
     {
-        let ev_hit = space.get_evaluated(hit.cube_ahead());
+        let ev_hit = uc.get_evaluated(hit.cube_ahead());
         if !ev_hit.visible_or_animated() {
             // Completely transparent block is passed through.
             return;
@@ -510,7 +686,7 @@ impl LightBuffer {
                 ray_state.alpha = 0.0;
                 return;
             }
-            let stored_light = space.get_lighting(light_cube);
+            let stored_light = current_light.get(light_cube);
 
             let surface_color = ev_hit.color.clamp().to_rgb() * SURFACE_ABSORPTION
                 + Rgb::ONE * (1. - SURFACE_ABSORPTION);
@@ -546,7 +722,7 @@ impl LightBuffer {
                 // Don't read the value we're trying to recalculate.
                 Rgb::ZERO
             } else {
-                space.get_lighting(light_cube).value()
+                current_light.get(light_cube).value()
             };
             // 'coverage' is what fraction of the light ray we assume to hit this block,
             // as opposed to passing through it.
@@ -570,7 +746,7 @@ impl LightBuffer {
 
     /// The raycast exited the world or hit an opaque block; finish up by applying
     /// sky and incrementing the count.
-    fn end_of_ray(&mut self, ray_state: &LightRayState, space: &Space) {
+    fn end_of_ray(&mut self, ray_state: &LightRayState, sky_color: Rgb) {
         // TODO: set *info even if we hit the sky
 
         // Note: this condition is key to allowing some cases to
@@ -578,10 +754,7 @@ impl LightBuffer {
         // TODO: clarify signaling flow?
         if ray_state.ray_weight_by_faces > 0. {
             // Note that if ray_state.alpha has reached zero, the sky color has no effect.
-            self.add_weighted_light(
-                space.physics.sky_color * ray_state.alpha,
-                ray_state.ray_weight_by_faces,
-            );
+            self.add_weighted_light(sky_color * ray_state.alpha, ray_state.ray_weight_by_faces);
         }
     }
 

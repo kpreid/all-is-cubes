@@ -491,10 +491,10 @@ fn space_debug() {
 fn set_physics_light_none() {
     let mut space = Space::empty_positive(1, 1, 1);
     space.set([0, 0, 0], Rgba::new(1.0, 1.0, 1.0, 0.5)).unwrap();
-    assert_eq!(space.light_update_queue.len(), 1);
+    assert_eq!(space.light.light_update_queue.len(), 1);
     // Check that a no-op update doesn't clear
     space.set_physics(SpacePhysics::default());
-    assert_eq!(space.light_update_queue.len(), 1);
+    assert_eq!(space.light.light_update_queue.len(), 1);
 
     space.set_physics(SpacePhysics {
         light: LightPhysics::None,
@@ -502,8 +502,8 @@ fn set_physics_light_none() {
     });
 
     // No light data and no queue
-    assert_eq!(space.light_update_queue.len(), 0);
-    assert_eq!(space.lighting.len(), 0);
+    assert_eq!(space.light.light_update_queue.len(), 0);
+    assert_eq!(space.light.contents.volume(), 0);
     // TODO: test what change notifications are sent
 }
 
@@ -516,7 +516,7 @@ fn set_physics_light_rays() {
         light: LightPhysics::None,
         ..SpacePhysics::default()
     });
-    assert_eq!(space.light_update_queue.len(), 0);
+    assert_eq!(space.light.light_update_queue.len(), 0);
 
     // This is the set_physics we're actually testing
     space.set_physics(SpacePhysics {
@@ -526,10 +526,10 @@ fn set_physics_light_rays() {
         ..SpacePhysics::default()
     });
 
-    assert_eq!(space.lighting.len(), 2);
-    assert_eq!(space.get_lighting([0, 0, 0]), space.packed_sky_color);
+    assert_eq!(space.light.contents.volume(), 2);
+    assert_eq!(space.get_lighting([0, 0, 0]), space.light.packed_sky_color);
     assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::OPAQUE);
-    assert_eq!(space.light_update_queue.len(), 1);
+    assert_eq!(space.light.light_update_queue.len(), 1);
     // TODO: test what change notifications are sent
 }
 

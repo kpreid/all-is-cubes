@@ -4,14 +4,14 @@ pub(crate) use data::{LightStatus, PackedLightScalar};
 
 mod debug;
 #[doc(hidden)] // pub only for visualization by all-is-cubes-gpu
-pub use debug::{LightUpdateCubeInfo, LightUpdateRayInfo};
+pub use debug::{LightComputeOutput, LightUpdateCubeInfo, LightUpdateRayInfo};
 
 mod queue;
 pub(crate) use queue::{LightUpdateQueue, LightUpdateRequest, Priority};
 
 mod updater;
-pub(crate) use updater::opaque_for_light_computation;
 pub use updater::LightUpdatesInfo;
+pub(in crate::space) use updater::{ComputedLight, LightStorage, UpdateCtx};
 
 #[cfg(test)]
 mod tests;

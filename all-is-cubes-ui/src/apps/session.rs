@@ -470,7 +470,7 @@ impl<I: time::Instant> Session<I> {
                 if let Some(space_ref) = self.cursor_result.as_ref().map(Cursor::space) {
                     // TODO: make this a kind of SpaceTransaction, eliminating this try_modify.
                     let _ = space_ref.try_modify(|space| {
-                        space.update_lighting_from_queue::<I>(Some(Duration::from_millis(1)));
+                        space.evaluate_light_for_time::<I>(Duration::from_millis(1));
                     });
                 }
 
