@@ -3,9 +3,7 @@ use euclid::Vector3D;
 
 use crate::block::{recursive_ray, Evoxel, Evoxels};
 use crate::camera::LightingOption;
-use crate::math::{
-    Cube, Face7, FaceMap, FreeCoordinate, FreePoint, GridArray, Rgb, Rgba, VectorOps, Vol,
-};
+use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, FreePoint, Rgb, Rgba, VectorOps, Vol};
 use crate::raycast::{Ray, Raycaster};
 use crate::raytracer::{RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData};
 
@@ -125,7 +123,7 @@ pub(crate) struct SurfaceIter<'a, D> {
     // TODO: Should `current_block` become part of the state?
     current_block: Option<VoxelSurfaceIter<'a, D>>,
     blocks: &'a [TracingBlock<D>],
-    array: &'a GridArray<TracingCubeData>,
+    array: Vol<&'a [TracingCubeData]>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -147,7 +145,7 @@ impl<'a, D: RtBlockData> SurfaceIter<'a, D> {
             state: SurfaceIterState::Initial,
             current_block: None,
             blocks: &rt.blocks,
-            array: &rt.cubes,
+            array: rt.cubes.as_ref(),
         }
     }
 }
