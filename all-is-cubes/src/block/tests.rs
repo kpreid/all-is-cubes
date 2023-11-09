@@ -85,6 +85,8 @@ fn block_debug_with_modifiers() {
 }
 
 mod eval {
+    use crate::block::{AnimationChange, AnimationHint};
+
     use super::{assert_eq, *};
 
     #[test]
@@ -386,6 +388,40 @@ mod eval {
 
         let e = block_at_offset.evaluate().unwrap();
         assert!(!e.visible);
+    }
+
+    #[test]
+    fn recur_animation_hint_propagation() {
+        let mut universe = Universe::new();
+        let voxel = Block::builder()
+            .color(Rgba::WHITE)
+            .animation_hint(AnimationHint {
+                redefinition: AnimationChange::None,
+                replacement: AnimationChange::ColorSameCategory,
+            })
+            .build();
+        let block = Block::builder()
+            .voxels_fn(&mut universe, R4, |cube| {
+                if cube == Cube::ORIGIN {
+                    &voxel
+                } else {
+                    &AIR
+                }
+            })
+            .unwrap()
+            .build();
+
+        let e = block.evaluate().unwrap();
+        assert_eq!(
+            e.attributes.animation_hint,
+            AnimationHint {
+                // Note that what was replacement becomes redefinition,
+                // because replacement in the space is redefinition in the block
+                // derived from the space.
+                redefinition: AnimationChange::ColorSameCategory,
+                replacement: AnimationChange::None,
+            }
+        );
     }
 
     #[test]

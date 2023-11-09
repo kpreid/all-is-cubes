@@ -1,7 +1,7 @@
 //! [`BlockAttributes`] and closely related types.
 
-use core::fmt;
 use core::num::NonZeroU16;
+use core::{fmt, ops};
 
 use arcstr::ArcStr;
 
@@ -47,6 +47,9 @@ pub struct BlockAttributes {
 
     /// Advice to the renderer about how to expect this block to change, and hence
     /// what rendering strategy to use.
+    ///
+    /// Note: This is automatically augmented for [`Primitive::Recur`] blocks if they
+    /// contain voxels with animation hints themselves.
     pub animation_hint: AnimationHint,
     //
     // Reminder: When adding new fields, add them to BlockBuilder too.
@@ -265,6 +268,8 @@ impl RotationPlacementRule {
 /// fashion, or for which it is especially important that the specified changes are handled
 /// efficiently, at the possible cost of spending more resources on those blocks. Blocks
 /// which merely might change in response to user action should not set this hint.
+///
+/// The `|` operator may be used to combine multiple hints into “both of these will happen”.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
@@ -324,6 +329,23 @@ impl Default for AnimationHint {
     }
 }
 
+impl ops::BitOr for AnimationHint {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self {
+            redefinition: self.redefinition | rhs.redefinition,
+            replacement: self.replacement | rhs.replacement,
+        }
+    }
+}
+impl ops::BitOrAssign for AnimationHint {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = *self | rhs;
+    }
+}
+
 /// Component of [`AnimationHint`], describing the type of change predicted.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -355,6 +377,19 @@ impl AnimationChange {
             // same category implies not becoming visible if invisible
             AnimationChange::ColorSameCategory => false,
             AnimationChange::Shape => true,
+        }
+    }
+}
+
+impl ops::BitOr for AnimationChange {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self::Output {
+        use AnimationChange::*;
+        match (self, rhs) {
+            (Shape, _) | (_, Shape) => Shape,
+            (ColorSameCategory, _) | (_, ColorSameCategory) => ColorSameCategory,
+            (None, None) => None,
         }
     }
 }

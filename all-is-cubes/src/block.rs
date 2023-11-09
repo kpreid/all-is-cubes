@@ -492,6 +492,7 @@ impl Block {
                 }
 
                 // Intersect that region with the actual bounds of `space`.
+                let mut voxels_animation_hint = AnimationHint::UNCHANGING;
                 let voxels: Vol<Arc<[Evoxel]>> = match full_resolution_bounds
                     .intersection(block_space.bounds())
                     .filter(|_| !filter.skip_eval)
@@ -500,7 +501,11 @@ impl Block {
                         .extract(
                             occupied_bounds,
                             #[inline(always)]
-                            |e| Evoxel::from_block(e.block_data().evaluated()),
+                            |extract| {
+                                let ev = extract.block_data().evaluated();
+                                voxels_animation_hint |= ev.attributes.animation_hint;
+                                Evoxel::from_block(ev)
+                            },
                         )
                         .translate(-offset.to_vector()),
                     None => {
@@ -516,7 +521,17 @@ impl Block {
                 };
 
                 MinEval {
-                    attributes: attributes.clone(),
+                    attributes: BlockAttributes {
+                        // Translate the voxels' animation hints into their effect on
+                        // the outer block.
+                        animation_hint: attributes.animation_hint
+                            | AnimationHint {
+                                redefinition: voxels_animation_hint.redefinition
+                                    | voxels_animation_hint.replacement,
+                                replacement: AnimationChange::None,
+                            },
+                        ..attributes.clone()
+                    },
                     voxels: Evoxels::Many(resolution, voxels),
                 }
             }
