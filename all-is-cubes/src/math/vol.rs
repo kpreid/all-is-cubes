@@ -152,9 +152,30 @@ impl<C, O> Vol<C, O> {
         self.bounds
     }
 
+    /// Returns the volume, also known as the number of elements.
+    pub fn volume(&self) -> usize {
+        // Ideally, we could specialize on C and return self.contents.len() if possible,
+        // as it doesn't require doing any multiplications, but that's not currently possible
+        // in Rust.
+
+        let size = self.bounds.size();
+        // This will not overflow, as an invariant of the `Vol` type.
+        size.x as usize * size.y as usize * size.z as usize
+    }
+
     /// Returns the linear contents without copying.
     pub(crate) fn into_elements(self) -> C {
         self.contents
+    }
+
+    /// Determines whether a unit cube lies within this volume and, if it does, returns the
+    /// linearized slice index into it.
+    ///
+    /// The linearized element order is defined by the `O` type.
+    #[inline(always)] // very hot code
+    pub fn index(&self, cube: Cube) -> Option<usize> {
+        // TODO: get rid of GridAab::index and keep the implementation here on Vol
+        self.bounds.index(cube)
     }
 
     /// Translates the volume without affecting its contents.
