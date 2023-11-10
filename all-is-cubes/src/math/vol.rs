@@ -41,7 +41,7 @@ pub type GridArray<V> = Vol<Box<[V]>, ZMaj>;
 /// length-mutating operations is irrelevant because no `&mut Vec<T>` is exposed.
 ///
 /// A [`Vol`] whose volume exceeds [`usize::MAX`] cannot exist.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)] // TODO: nondefault Debug
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)] // TODO: nondefault Debug
 pub struct Vol<C, O = ZMaj> {
     /// Invariant: `bounds` has a volume that is at most [`usize::MAX`].
     bounds: GridAab,

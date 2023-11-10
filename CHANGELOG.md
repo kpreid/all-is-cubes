@@ -16,6 +16,8 @@
         - `math::Face6::face_transform()`
         - `math::GridRotation::to_positive_octant_transform()`
     
+    - `math::Vol` is a more general replacement for `math::GridArray` which allows choice of the data container type (including `&[T]` for borrowing without additional indirection).
+
     - `block::BlockAttributes::tick_action` can now specify a time period rather than always occurring on the next tick.
 
 ### Changed
