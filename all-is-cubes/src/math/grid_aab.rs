@@ -11,7 +11,7 @@ use euclid::{Point3D, Vector3D};
 use crate::block::Resolution;
 use crate::math::{
     sort_two, Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridCoordinate,
-    GridPoint, GridVector, Gridgid, VectorOps,
+    GridPoint, GridVector, Gridgid, VectorOps, Vol,
 };
 
 /// An axis-aligned box with integer coordinates, whose volume is no larger than [`usize::MAX`].
@@ -522,6 +522,14 @@ impl GridAab {
                 rng.gen_range(self.z_range()),
             ))
         }
+    }
+
+    /// Creates a [`Vol`] with `self` as the bounds and no data.
+    ///
+    /// This introduces a particular linear ordering of the cubes in the volume.
+    #[inline]
+    pub fn to_vol<O: Default>(self) -> Result<Vol<(), O>, GridOverflowError> {
+        Ok(Vol::new_dataless(self, O::default()))
     }
 
     /// Displaces the box by the given `offset`, leaving its size unchanged

@@ -50,6 +50,17 @@ pub struct Vol<C, O = ZMaj> {
     contents: C,
 }
 
+impl<O> Vol<(), O> {
+    /// Use `GridAab::to_vol()` to call this.
+    pub(crate) fn new_dataless(bounds: GridAab, ordering: O) -> Self {
+        Self {
+            bounds,
+            ordering,
+            contents: (),
+        }
+    }
+}
+
 /// Constructors from linear containers.
 impl<C, O: Default, V> Vol<C, O>
 where
