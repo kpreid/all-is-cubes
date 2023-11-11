@@ -396,8 +396,7 @@ impl GridAab {
         GridIter::new(self)
     }
 
-    /// Returns whether the box includes the cube with the given coordinates in its
-    /// volume.
+    /// Returns whether the box includes the given cube position in its volume.
     ///
     /// ```
     /// let b = all_is_cubes::math::GridAab::from_lower_size([4, 4, 4], [6, 6, 6]);
@@ -408,7 +407,11 @@ impl GridAab {
     /// ```
     #[inline]
     pub fn contains_cube(&self, cube: Cube) -> bool {
-        self.index(cube).is_some()
+        let self_upper = self.upper_bounds();
+        let cube_lower = cube.lower_bounds();
+        Axis::ALL.into_iter().all(|axis| {
+            cube_lower[axis] >= self.lower_bounds[axis] && cube_lower[axis] < self_upper[axis]
+        })
     }
 
     /// Returns whether this box includes every cube in the other box.
