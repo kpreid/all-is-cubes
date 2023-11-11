@@ -312,7 +312,10 @@ impl GridAab {
     /// box.
     #[inline]
     pub fn upper_bounds(&self) -> GridPoint {
-        self.lower_bounds + self.sizes
+        // Cannot overflow due to constructor-enforced invariants,
+        // so always use un-checked arithmetic
+        self.lower_bounds
+            .zip(self.sizes.to_point(), GridCoordinate::wrapping_add)
     }
 
     /// Size of the box in each axis; equivalent to
