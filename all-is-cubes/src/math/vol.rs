@@ -284,7 +284,7 @@ where
     /// of bounds.
     #[inline]
     pub fn get(&self, position: impl Into<Cube>) -> Option<&V> {
-        let index = self.bounds.index(position.into())?;
+        let index = self.index(position.into())?;
         Some(&self.as_linear()[index])
     }
 
@@ -295,7 +295,7 @@ where
     where
         C: DerefMut,
     {
-        let index = self.bounds.index(position.into())?;
+        let index = self.index(position.into())?;
         Some(&mut self.as_linear_mut()[index])
     }
 
@@ -305,7 +305,7 @@ where
     where
         V: 's,
     {
-        self.bounds.interior_iter().zip(self.as_linear().iter())
+        self.iter_cubes().zip(self.as_linear().iter())
     }
 
     /// Iterates by mutable reference over all the cubes and values in this volume data,
@@ -335,11 +335,10 @@ impl<V, O> Vol<Box<[V]>, O> {
     }
 }
 
-impl<P, C, O, V> core::ops::Index<P> for Vol<C, O>
+impl<P, C, V> core::ops::Index<P> for Vol<C, ZMaj>
 where
     P: Into<Cube>,
     C: Deref<Target = [V]>,
-    O: Copy,
 {
     type Output = V;
 
@@ -350,7 +349,7 @@ where
     #[inline(always)] // measured faster on wasm32 in worldgen
     fn index(&self, position: P) -> &Self::Output {
         let position: Cube = position.into();
-        if let Some(index) = self.bounds.index(position) {
+        if let Some(index) = self.index(position) {
             &self.contents[index]
         } else {
             panic!(
@@ -360,18 +359,17 @@ where
         }
     }
 }
-impl<P, C, O, V> core::ops::IndexMut<P> for Vol<C, O>
+impl<P, C, V> core::ops::IndexMut<P> for Vol<C, ZMaj>
 where
     P: Into<Cube>,
     C: DerefMut<Target = [V]>,
-    O: Copy,
 {
     /// Returns the element at `position` of this volume data,
     /// or panics if `position` is out of bounds.
     #[inline(always)]
     fn index_mut(&mut self, position: P) -> &mut Self::Output {
         let position: Cube = position.into();
-        if let Some(index) = self.bounds.index(position) {
+        if let Some(index) = self.index(position) {
             &mut self.contents[index]
         } else {
             panic!(
