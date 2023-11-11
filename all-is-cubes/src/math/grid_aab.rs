@@ -287,9 +287,9 @@ impl GridAab {
         // * We just checked it is not negative
         // * We just checked it is not greater than `self.sizes[i]`, which is an `i32`
         // * We don't support platforms with `usize` smaller than 32 bits
-        let ixvec: Point3D<usize, _> = deoffsetted.to_usize();
+        let ixvec: Point3D<usize, _> = deoffsetted.map(|coord| coord as usize);
 
-        let usizes = sizes.to_usize();
+        let usizes = sizes.map(|s| s as usize);
 
         // Compute index.
         // Always use wrapping (rather than maybe-checked) arithmetic, because we
