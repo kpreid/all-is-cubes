@@ -64,10 +64,11 @@ jobs:
         ref: unstable-rust
 
     - name: Set Rust toolchain
-      # The rust-toolchain.toml file specifies the targets and components we need.
-      # Therefore, CI only needs to set the toolchain override.
+      # The rust-toolchain.toml file specifies the targets and components we need,
+      # but we may want to override the toolchain.
+      if: ${{ matrix.toolchain != 'stable' }}
       run: |
-          rustup override set "${{ matrix.toolchain }}"
+          sed -i "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
           rustup show  # triggers installation of selected toolchain
 
     - name: Install native libraries
