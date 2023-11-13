@@ -145,27 +145,14 @@ jobs:
 
     - run: df -h .
 
-    # Run tests in `test-more` mode in the "primary" matrix configuration, and
-    # run them in the faster mode (which does not try disabling/enabling
-    # features) for all other variations.
-    # This is because the exhaustive tests are intended to catch bugs in our own
-    # code (a miswritten `cfg` or similar), and the testing against nightly and
-    # latest versions is intended to catch bugs in *our dependencies*; and the
-    # two are sufficiently unlikely to interact that it doesn't seem worth
-    # spending the CI latency to do both.
-    - name: Compile basic tests
+    - name: Compile tests
       # compile is broken out so we have visibility into compile vs. run times
       run: cargo xtask --scope=only-normal test --timings --no-run
-    - name: Run basic tests
-      if: ${{ !matrix.primary }}
+    - name: Run tests
       run: cargo xtask --scope=only-normal test --timings
 
     - run: df -h .
 
-    - name: Run exhaustive tests
-      if: ${{ matrix.primary }}
-      run: cargo xtask --scope=only-normal test-more --timings
-    
     # Save the test-renderers results so we can download and view them
     - name: Save test-renderers output
       if: ${{ always() }}
@@ -232,6 +219,69 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Run `xtask test-more` to look for broken `features`.
+  features:
+    # Don't spend time on this if the normal builds failed.
+    needs: build
+    runs-on: ubuntu-latest
+    continue-on-error: false
+
+    steps:
+    # Free some disk space so our largest builds can complete reliably.
+    - uses: jlumbroso/free-disk-space@v1.2.0
+      with:
+        large-packages: false # slow
+        swap-storage: false
+
+    - uses: actions/checkout@v3.1.0
+
+    - name: Install native libraries
+      if: ${{ runner.os == 'Linux' }}
+      run: |
+          sudo apt update
+          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev
+      # libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev: needed for windowing
+      # Note that `libwayland-dev` provides the library called `wayland-client`
+      # libasound2-dev: needed for audio via `kira`
+
+    # Load cache before doing any Rust builds
+    # TODO: Do we actually want to cache this, or let it be slow but low storage?
+    - uses: Swatinem/rust-cache@v2.0.2
+
+    # break this out as a separate non-silenced build step
+    - name: Compile xtask
+      run: cargo build --package xtask
+
+    - name: Install wasm-pack
+      run: cargo install wasm-pack@0.11.1
+      # Use workspace target dir for cargo install's build, so that the build will be cached.
+      env:
+        CARGO_TARGET_DIR: target/
+
+    - name: Install cargo-about
+      run: cargo install cargo-about@0.5.6
+      # Use workspace target dir for cargo install's build, so that the build will be cached.
+      env:
+        CARGO_TARGET_DIR: target/
+
+    - run: df -h .
+
+    # Run tests in `test-more` mode which exercises each library's features.
+    - name: Run exhaustive tests
+      run: cargo xtask --scope=only-normal test-more --timings
+
+    - run: df -h .
+
+    # Save timing reports so we can download and view them
+    # (for understanding build performance in CI)
+    - name: Save cargo --timings output
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: cargo-timings features
+        path: |
+          target/cargo-timings/cargo-timing-*.html
+      
   miri:
     runs-on: ubuntu-latest
 
