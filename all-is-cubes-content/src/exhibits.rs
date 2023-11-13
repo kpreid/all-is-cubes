@@ -7,26 +7,24 @@ use alloc::vec::Vec;
 use core::convert::TryFrom as _;
 use core::f64::consts::PI;
 
-use all_is_cubes::euclid::{Point3D, Rotation2D, Vector2D, Vector3D};
 use exhaust::Exhaust as _;
 use rand::SeedableRng as _;
 
+use all_is_cubes::arcstr::literal;
+use all_is_cubes::block;
 use all_is_cubes::content::load_image::{default_srgb, space_from_image};
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::drawing::{
     draw_to_blocks,
     embedded_graphics::{
         geometry::Point,
-        mono_font::{
-            iso_8859_1::{FONT_6X10, FONT_8X13_BOLD},
-            MonoTextStyle,
-        },
-        pixelcolor::Rgb888,
+        mono_font::{iso_8859_1::FONT_6X10, MonoTextStyle},
         prelude::Size,
         primitives::{PrimitiveStyle, Rectangle, StyledDrawable},
         text::{Baseline, Text},
     },
 };
+use all_is_cubes::euclid::{Point3D, Rotation2D, Vector2D, Vector3D};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
@@ -293,24 +291,54 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
 
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
-    name: "Text",
+    name: "Primitive::Text",
     subtitle: "",
     placement: Placement::Surface,
 )]
-async fn TEXT(_: &Exhibit, universe: &mut Universe) {
-    let space = draw_to_blocks(
-        universe,
-        R16,
-        8,
-        8..9,
-        BlockAttributes::default(),
-        &Text::with_baseline(
-            "Hello block world",
-            Point::new(0, 0),
-            MonoTextStyle::new(&FONT_8X13_BOLD, Rgb888::new(120, 100, 200)),
-            Baseline::Bottom,
+async fn TEXT(_: &Exhibit, _universe: &mut Universe) {
+    use all_is_cubes::block::text;
+
+    let texts = [
+        text::Text::new(
+            literal!("right aligned"),
+            text::Font::System16,
+            text::Positioning {
+                x: text::PositioningX::Right,
+                line_y: text::PositioningY::BodyBottom,
+                z: 0,
+            },
         ),
-    )?;
+        text::Text::new(
+            literal!("left aligned"),
+            text::Font::System16,
+            text::Positioning {
+                x: text::PositioningX::Left,
+                line_y: text::PositioningY::BodyBottom,
+                z: -1,
+            },
+        ),
+    ];
+
+    let bounds_for_text = texts
+        .iter()
+        .map(|t| t.bounding_blocks())
+        .reduce(|a, b| a.union(b).unwrap())
+        .unwrap();
+
+    let mut space = Space::builder(bounds_for_text).build();
+
+    for text in texts {
+        space
+            .fill(text.bounding_blocks(), |cube| {
+                // TODO: should be able to make the translation happen smoothly
+                Some(Block::from_primitive(block::Primitive::Text {
+                    text: text.clone(),
+                    offset: cube.lower_bounds().to_vector(),
+                }))
+            })
+            .unwrap();
+    }
+
     Ok(space)
 }
 
