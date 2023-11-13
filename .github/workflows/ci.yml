@@ -116,7 +116,14 @@ jobs:
     - run: df -h .
 
     # Load cache before doing any Rust builds
-    - uses: Swatinem/rust-cache@v2.0.2
+    - uses: Swatinem/rust-cache@v2.7.0
+      with:
+        # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
+        prefix-key: "v1-rust-${{ matrix.os }}-${{ matrix.toolchain }}-${{ matrix.depversions }}"
+        # Override the default job-id-based key explicitly so that our dependent jobs can
+        # reuse this cache.
+        shared-key: "build"
+        
 
     - run: df -h .
 
@@ -245,8 +252,14 @@ jobs:
       # libasound2-dev: needed for audio via `kira`
 
     # Load cache before doing any Rust builds
-    # TODO: Do we actually want to cache this, or let it be slow but low storage?
-    - uses: Swatinem/rust-cache@v2.0.2
+    - uses: Swatinem/rust-cache@v2.7.0
+      with:
+        # Reuse the cache from the normal `build` job instead of creating an independent one,
+        # to reduce redundant work and save disk space — but don't *write* to that cache, so
+        # we don't bloat it.
+        prefix-key: "v1-rust-ubuntu-stable-locked"
+        shared-key: "build"
+        save-if: false
 
     # break this out as a separate non-silenced build step
     - name: Compile xtask
@@ -288,8 +301,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3.1.0
 
-    - uses: Swatinem/rust-cache@v2.0.2
-    
+    - uses: Swatinem/rust-cache@v2.7.0
+
     - name: Install Rust toolchain
       run: |
         rustup toolchain install nightly --component miri
@@ -311,7 +324,7 @@ jobs:
     - uses: actions/checkout@v3.1.0
 
     # The build is faster *without* this cache.
-    # - uses: Swatinem/rust-cache@v2.0.2
+    # - uses: Swatinem/rust-cache@v2.7.0
 
     - name: Install Rust toolchain
       run: |
@@ -335,7 +348,7 @@ jobs:
     - uses: actions/checkout@v3.1.0
 
     # Cache both the main workspace (for xtask builds) and the fuzzing workspace
-    - uses: Swatinem/rust-cache@v2.0.2
+    - uses: Swatinem/rust-cache@v2.7.0
       with:
         workspaces: |
           .

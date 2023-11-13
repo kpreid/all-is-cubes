@@ -81,7 +81,10 @@ jobs:
       # libasound2-dev: needed for audio via `kira`
 
     # Load cache before doing any Rust builds
-    - uses: Swatinem/rust-cache@v2.0.2
+    - uses: Swatinem/rust-cache@v2.7.0
+      with:
+        # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
+        prefix-key: "v1-rust-unstablefeatures-${{ matrix.os }}-${{ matrix.depversions }}"
 
     # break this out as a separate non-silenced build step
     - name: Compile xtask
@@ -138,8 +141,11 @@ jobs:
     steps:
     - uses: actions/checkout@v3.1.0
 
-    - uses: Swatinem/rust-cache@v2.0.2
-    
+    - uses: Swatinem/rust-cache@v2.7.0
+      with:
+        # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
+        prefix-key: "v1-rust-unstablefeatures-ubuntu-locked"
+
     - name: Install Rust toolchain
       run: |
         rustup toolchain install nightly --component miri
