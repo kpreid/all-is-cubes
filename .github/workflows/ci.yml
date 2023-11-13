@@ -139,7 +139,7 @@ jobs:
     - run: df -h .
 
     - name: Install wasm-pack
-      run: cargo install wasm-pack@0.11.1
+      run: cargo install wasm-pack@0.12.1
       # Use workspace target dir for cargo install's build, so that the build will be cached.
       env:
         CARGO_TARGET_DIR: target/
@@ -266,7 +266,7 @@ jobs:
       run: cargo build --package xtask
 
     - name: Install wasm-pack
-      run: cargo install wasm-pack@0.11.1
+      run: cargo install wasm-pack@0.12.1
       # Use workspace target dir for cargo install's build, so that the build will be cached.
       env:
         CARGO_TARGET_DIR: target/
