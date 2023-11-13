@@ -97,7 +97,7 @@ jobs:
       # but we may want to override the toolchain.
       if: ${{ matrix.toolchain != 'stable' }}
       run: |
-          sed -i "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
+          sed -i.origstable "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
           rustup show  # triggers installation of selected toolchain
 
     - name: Install nightly for -Z direct-minimal-versions
