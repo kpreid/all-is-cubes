@@ -21,6 +21,7 @@ env:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         # This matrix doesn't do any actual Cartesian products, but instead has a
         # basic configuration (Linux, stable Rust, using lockfile) and also tries
@@ -73,7 +74,6 @@ jobs:
             toolchain: stable
             depversions: minimal
             primary: false
-
 
     runs-on: ${{ matrix.os }}-latest
     continue-on-error: ${{ !matrix.primary }}
