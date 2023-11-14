@@ -360,7 +360,7 @@ async fn create_universe(
     precompute_light: bool,
 ) -> Result<Universe, anyhow::Error> {
     let start_time = Instant::now();
-    let universe_progress_bar = ProgressBar::new(100)
+    let universe_progress_bar = logging::new_progress_bar(100)
         .with_style(
             logging::common_progress_style()
                 .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}% {msg:36}")
@@ -482,9 +482,7 @@ fn connect_rerun(universe: &mut Universe) {
 }
 
 fn evaluate_light_with_progress(space: &mut Space) {
-    let light_progress = ProgressBar::new(100)
-        .with_style(logging::common_progress_style())
-        .with_prefix("Lighting");
+    let light_progress = logging::new_progress_bar(100).with_prefix("Lighting");
     space.evaluate_light::<Instant>(1, lighting_progress_adapter(&light_progress));
     light_progress.finish();
 }
