@@ -6,6 +6,8 @@ use core::ops::{Deref, DerefMut};
 #[cfg(doc)]
 use alloc::vec::Vec;
 
+use manyfmt::Refmt as _;
+
 use crate::math::{Cube, GridAab, GridCoordinate, GridIter, GridVector};
 
 // #[derive(Clone, Copy, Debug)]
@@ -41,7 +43,7 @@ pub type GridArray<V> = Vol<Box<[V]>, ZMaj>;
 /// length-mutating operations is irrelevant because no `&mut Vec<T>` is exposed.
 ///
 /// A [`Vol`] whose volume exceeds [`usize::MAX`] cannot exist.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)] // TODO: nondefault Debug
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Vol<C, O = ZMaj> {
     /// Invariant: `bounds` has a volume that is at most [`usize::MAX`].
     bounds: GridAab,
@@ -335,6 +337,38 @@ impl<V, O> Vol<Box<[V]>, O> {
     }
 }
 
+impl<C: fmt::Debug, O: fmt::Debug> fmt::Debug for Vol<C, O> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Note: If specialization was available we'd like to use it to print the elements under
+        // our own control if there are elements, but as it is, we'd rather preserve functionality
+        // for `Vol<()>`, which means we always print self.contents as a whole or not at all.
+
+        let Self {
+            bounds,
+            ordering,
+            contents,
+        } = self;
+
+        let mut ds = f.debug_struct(&format!(
+            "Vol<{contents_type}, {ordering:?}>",
+            contents_type = core::any::type_name::<C>(),
+        ));
+        ds.field("bounds", &bounds);
+        let volume = self.volume();
+        if core::any::type_name::<C>() == core::any::type_name::<()>() {
+            // don't print "contents: ()"
+        } else if volume > 32 {
+            ds.field(
+                "contents",
+                &format!("[...{volume} elements]").refmt(&manyfmt::formats::Unquote),
+            );
+        } else {
+            ds.field("contents", &contents);
+        }
+        ds.finish()
+    }
+}
+
 impl<P, C, V> core::ops::Index<P> for Vol<C, ZMaj>
 where
     P: Into<Cube>,
@@ -456,8 +490,69 @@ fn arc_make_mut_slice<T: Clone>(mut arc: &mut Arc<[T]>) -> &mut [T] {
 mod tests {
     use super::*;
     use alloc::string::String;
+    use pretty_assertions::assert_eq;
 
     type VolBox<T> = Vol<Box<[T]>>;
+
+    #[test]
+    fn debug_no_elements() {
+        let vol = GridAab::from_lower_size([10, 0, 0], [4, 1, 1])
+            .to_vol::<ZMaj>()
+            .unwrap();
+        assert_eq!(
+            format!("{vol:#?}"),
+            indoc::indoc! {"
+            Vol<(), ZMaj> {
+                bounds: GridAab(
+                    10..14 (4),
+                    0..1 (1),
+                    0..1 (1),
+                ),
+            }\
+        "}
+        )
+    }
+
+    #[test]
+    fn debug_with_contents() {
+        let vol = VolBox::from_fn(GridAab::from_lower_size([10, 0, 0], [4, 1, 1]), |p| p.x);
+        assert_eq!(
+            format!("{vol:#?}"),
+            indoc::indoc! {"
+            Vol<alloc::boxed::Box<[i32]>, ZMaj> {
+                bounds: GridAab(
+                    10..14 (4),
+                    0..1 (1),
+                    0..1 (1),
+                ),
+                contents: [
+                    10,
+                    11,
+                    12,
+                    13,
+                ],
+            }\
+        "}
+        )
+    }
+
+    #[test]
+    fn debug_without_contents() {
+        let vol = VolBox::from_fn(GridAab::from_lower_size([0, 0, 0], [64, 1, 1]), |p| p.x);
+        assert_eq!(
+            format!("{vol:#?}"),
+            indoc::indoc! {"
+            Vol<alloc::boxed::Box<[i32]>, ZMaj> {
+                bounds: GridAab(
+                    0..64 (64),
+                    0..1 (1),
+                    0..1 (1),
+                ),
+                contents: [...64 elements],
+            }\
+        "}
+        )
+    }
 
     #[test]
     fn from_elements() {
