@@ -10,14 +10,16 @@
 use pretty_assertions::assert_eq;
 
 use crate::block::{
-    self, modifier, Atom, Block, BlockAttributes, BlockChange, BlockCollision, BlockDef,
-    BlockDefTransaction, EvalBlockError, Evoxel, Evoxels, Modifier, Primitive, Resolution,
-    Resolution::*, AIR, AIR_EVALUATED,
+    self, modifier, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockChange,
+    BlockCollision, BlockDef, BlockDefTransaction, EvalBlockError, Evoxel, Evoxels, Modifier,
+    Primitive,
+    Resolution::{self, *},
+    AIR, AIR_EVALUATED,
 };
 use crate::content::make_some_blocks;
 use crate::listen::{self, NullListener, Sink};
 use crate::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector,
+    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, NotNan,
     OpacityCategory, Rgb, Rgba, Vol,
 };
 use crate::space::{Space, SpaceTransaction};
@@ -85,8 +87,6 @@ fn block_debug_with_modifiers() {
 }
 
 mod eval {
-    use crate::block::{AnimationChange, AnimationHint};
-
     use super::{assert_eq, *};
 
     #[test]
@@ -237,19 +237,15 @@ mod eval {
     fn transparent_voxels() {
         let mut universe = Universe::new();
         let resolution = R4;
+        let voxel_color = Rgb::new(1.0, 0.5, 0.0);
         let alpha = 0.5;
         let block = Block::builder()
             .voxels_fn(&mut universe, resolution, |point| {
-                Block::from(Rgba::new(
-                    0.0,
-                    0.0,
-                    0.0,
-                    if point.x == 0 && point.z == 0 {
-                        alpha
-                    } else {
-                        1.0
-                    },
-                ))
+                Block::from(voxel_color.with_alpha(if point.x == 0 && point.z == 0 {
+                    NotNan::new(alpha).unwrap()
+                } else {
+                    notnan!(1.0)
+                }))
             })
             .unwrap()
             .build();
@@ -260,11 +256,8 @@ mod eval {
         // the light paths with opaque surfaces.
         assert_eq!(
             e.color,
-            Rgba::new(
-                0.0,
-                0.0,
-                0.0,
-                1.0 - (alpha / (f32::from(resolution).powi(2) * 3.0))
+            voxel_color.with_alpha(
+                NotNan::new(1.0 - (alpha / (f32::from(resolution).powi(2) * 3.0))).unwrap()
             )
         );
         assert_eq!(
