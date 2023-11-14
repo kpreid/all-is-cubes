@@ -203,6 +203,7 @@ mod tests {
     use crate::block::{Block, Composite, EvaluatedBlock, Evoxel, Resolution::*};
     use crate::content::make_some_blocks;
     use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgb, Rgba};
+    use crate::notnan;
     use crate::space::Space;
     use crate::time;
     use crate::universe::Universe;
@@ -226,6 +227,14 @@ mod tests {
             EvaluatedBlock {
                 attributes: ev_original.attributes.clone(),
                 color: color.to_rgb().with_alpha(NotNan::new(2. / 3.).unwrap()),
+                face_colors: FaceMap {
+                    nx: color.to_rgb().with_alpha(notnan!(0.5)),
+                    ny: color.to_rgb().with_alpha(notnan!(1.0)),
+                    nz: color.to_rgb().with_alpha(notnan!(0.5)),
+                    px: color.to_rgb().with_alpha(notnan!(0.5)),
+                    py: color.to_rgb().with_alpha(notnan!(1.0)),
+                    pz: color.to_rgb().with_alpha(notnan!(0.5)),
+                },
                 light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(
                     R16,
@@ -263,6 +272,14 @@ mod tests {
             EvaluatedBlock {
                 attributes: ev_original.attributes.clone(),
                 color: color.to_rgb().with_alpha(NotNan::new(2. / 3.).unwrap()),
+                face_colors: FaceMap {
+                    nx: color.to_rgb().with_alpha(notnan!(0.5)),
+                    ny: color.to_rgb().with_alpha(notnan!(1.0)),
+                    nz: color.to_rgb().with_alpha(notnan!(0.5)),
+                    px: color.to_rgb().with_alpha(notnan!(0.5)),
+                    py: color.to_rgb().with_alpha(notnan!(1.0)),
+                    pz: color.to_rgb().with_alpha(notnan!(0.5)),
+                },
                 light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(
                     resolution,

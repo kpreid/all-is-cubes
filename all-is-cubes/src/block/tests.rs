@@ -140,7 +140,8 @@ mod eval {
         });
         let e = block.evaluate().unwrap();
         assert_eq!(e.attributes, attributes);
-        assert_eq!(e.color, block.color());
+        assert_eq!(e.color, color);
+        assert_eq!(e.face_colors, FaceMap::repeat(color));
         assert_eq!(
             e.voxels,
             Evoxels::One(Evoxel {
@@ -164,7 +165,8 @@ mod eval {
         let color = Rgba::new(1.0, 2.0, 3.0, 0.5);
         let block = Block::from(color);
         let e = block.evaluate().unwrap();
-        assert_eq!(e.color, block.color());
+        assert_eq!(e.color, color);
+        assert_eq!(e.face_colors, FaceMap::repeat(color));
         assert!(matches!(e.voxels, Evoxels::One(_)));
         assert_eq!(e.opaque, FaceMap::repeat(false));
         assert_eq!(e.visible, true);
@@ -179,6 +181,7 @@ mod eval {
         let block = Block::from(Rgba::TRANSPARENT);
         let e = block.evaluate().unwrap();
         assert_eq!(e.color, Rgba::TRANSPARENT);
+        assert_eq!(e.face_colors, FaceMap::repeat(Rgba::TRANSPARENT));
         assert!(matches!(e.voxels, Evoxels::One(_)));
         assert_eq!(e.opaque, FaceMap::repeat(false));
         assert_eq!(e.visible, false);
@@ -221,6 +224,17 @@ mod eval {
             )
         );
         assert_eq!(e.color, Rgba::new(0.5, 0.5, 0.5, 1.0));
+        assert_eq!(
+            e.face_colors,
+            FaceMap {
+                nx: Rgba::new(0.0, 0.5, 0.5, 1.0),
+                ny: Rgba::new(0.5, 0.0, 0.5, 1.0),
+                nz: Rgba::new(0.5, 0.5, 0.0, 1.0),
+                px: Rgba::new(1.0, 0.5, 0.5, 1.0),
+                py: Rgba::new(0.5, 1.0, 0.5, 1.0),
+                pz: Rgba::new(0.5, 0.5, 1.0, 1.0),
+            }
+        );
         assert_eq!(e.resolution(), resolution);
         assert_eq!(e.opaque, FaceMap::repeat(true));
         assert_eq!(e.visible, true);
@@ -259,6 +273,20 @@ mod eval {
             voxel_color.with_alpha(
                 NotNan::new(1.0 - (alpha / (f32::from(resolution).powi(2) * 3.0))).unwrap()
             )
+        );
+        // This is the sum of the transparency of one voxel on one of the six faces
+        let one_face_transparency = voxel_color
+            .with_alpha(NotNan::new(1.0 - (alpha / f32::from(resolution).powi(2))).unwrap());
+        assert_eq!(
+            e.face_colors,
+            FaceMap {
+                nx: voxel_color.with_alpha_one(),
+                ny: one_face_transparency,
+                nz: voxel_color.with_alpha_one(),
+                px: voxel_color.with_alpha_one(),
+                py: one_face_transparency,
+                pz: voxel_color.with_alpha_one(),
+            }
         );
         assert_eq!(
             e.opaque,

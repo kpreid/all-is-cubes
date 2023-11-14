@@ -242,6 +242,7 @@ mod tests {
             re,
             EvaluatedBlock {
                 color: be.color,
+                face_colors: be.face_colors.rotate(rotation),
                 light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(
                     R2,

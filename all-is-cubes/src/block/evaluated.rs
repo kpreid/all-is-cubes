@@ -39,6 +39,9 @@ pub struct EvaluatedBlock {
     /// color.
     pub color: Rgba,
 
+    /// The average color of the block as viewed from each axis-aligned direction.
+    pub face_colors: FaceMap<Rgba>,
+
     /// The overall light emission aggregated from individual voxels.
     /// This should be interpreted in the same way as the emission field of
     /// [`block::Primitive::Atom`].
@@ -86,6 +89,7 @@ impl fmt::Debug for EvaluatedBlock {
         let Self {
             attributes,
             color,
+            face_colors,
             light_emission,
             voxels,
             opaque,
@@ -98,6 +102,9 @@ impl fmt::Debug for EvaluatedBlock {
             ds.field("attributes", attributes);
         }
         ds.field("color", color);
+        if *face_colors != FaceMap::repeat(*color) {
+            ds.field("face_colors", face_colors);
+        }
         if *light_emission != Rgb::ZERO {
             ds.field("light_emission", light_emission);
         }
@@ -143,6 +150,7 @@ impl EvaluatedBlock {
             return EvaluatedBlock {
                 attributes,
                 color,
+                face_colors: FaceMap::repeat(color),
                 light_emission: emission,
                 voxels,
                 opaque: FaceMap::repeat(color.fully_opaque()),
@@ -169,12 +177,14 @@ impl EvaluatedBlock {
         // This is actually a sort of mini-raytracer, in that it computes the appearance
         // of all six faces by tracing in from the edges, and then averages them.
         // TODO: Account for reduced bounds being smaller
-        let (color, emission): (Rgba, Rgb) = {
+        let (color, face_colors, emission): (Rgba, FaceMap<Rgba>, Rgb) = {
             let mut all_faces_sum = VoxSum::default();
+            let mut face_colors = FaceMap::repeat(Rgba::TRANSPARENT);
 
             // Loop over all face voxels.
             // (This is a similar structure to the algorithm we use for mesh generation.)
             for face in Face6::ALL {
+                let mut face_sum = VoxSum::default();
                 let transform = face.face_transform(resolution.into());
                 let rotated_voxel_range = voxels.bounds().transform(transform.inverse()).unwrap();
 
@@ -187,14 +197,17 @@ impl EvaluatedBlock {
                         ));
                         debug_assert!(voxels.bounds().contains_cube(cube));
 
-                        all_faces_sum +=
+                        face_sum +=
                             raytracer::trace_for_eval(&voxels, cube, face.opposite(), resolution);
                     }
                 }
+                all_faces_sum += face_sum;
+                face_colors[face] = face_sum.color(usize::from(resolution).pow(2))
             }
             let surface_area = full_block_bounds.surface_area();
             (
                 all_faces_sum.color(surface_area),
+                face_colors,
                 all_faces_sum.emission(surface_area),
             )
         };
@@ -248,6 +261,7 @@ impl EvaluatedBlock {
         EvaluatedBlock {
             attributes,
             color,
+            face_colors,
             light_emission: emission,
             opaque: FaceMap::from_fn(|face| {
                 // TODO: This test should be refined by flood-filling in from the face,
@@ -693,6 +707,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
 pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     attributes: AIR_ATTRIBUTES,
     color: Rgba::TRANSPARENT,
+    face_colors: FaceMap::repeat_copy(Rgba::TRANSPARENT),
     light_emission: Rgb::ZERO,
     voxels: Evoxels::One(Evoxel::AIR),
     opaque: FaceMap::repeat_copy(false),
@@ -885,6 +900,7 @@ mod tests {
             EvaluatedBlock {
                 attributes,
                 color: Rgba::TRANSPARENT,
+                face_colors: FaceMap::repeat(Rgba::TRANSPARENT),
                 light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(resolution, Vol::from_fn(bounds, |_| unreachable!())),
                 opaque: FaceMap::repeat(false),
