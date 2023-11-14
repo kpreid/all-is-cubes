@@ -129,16 +129,8 @@ pub(crate) struct AicDesktopArgs {
     #[arg(long = "duration", value_name = "SECONDS", verbatim_doc_comment)]
     pub(crate) duration: Option<f64>,
 
-    /// Additional logging to stderr.
-    #[arg(long = "verbose", short = 'v')]
-    pub(crate) verbose: bool,
-
-    /// Remove timestamps from logs so that they are closer to deterministic.
-    /// (Note that some logs will still contain timing data.)
-    ///
-    /// This option is intended for internal tests only.
-    #[arg(long = "simplify-log-format", hide = true)]
-    pub(crate) simplify_log_format: bool,
+    #[command(flatten)]
+    pub(crate) logging: LoggingArgs,
 
     /// Ignore all configuration files, using only defaults and command-line options.
     #[arg(long = "no-config-files")]
@@ -161,6 +153,20 @@ pub(crate) struct AicDesktopArgs {
     /// Activate logging to Rerun
     #[arg(hide = true, long = "rerun")]
     pub(crate) rerun: bool,
+}
+
+#[derive(Clone, Debug, clap::Args)]
+pub(crate) struct LoggingArgs {
+    /// Additional logging to stderr.
+    #[arg(long = "verbose", short = 'v')]
+    pub(crate) verbose: bool,
+
+    /// Remove timestamps from logs so that they are closer to deterministic.
+    /// (Note that some logs will still contain timing data.)
+    ///
+    /// This option is intended for internal tests only.
+    #[arg(long = "simplify-log-format", hide = true)]
+    pub(crate) simplify_log_format: bool,
 }
 
 impl AicDesktopArgs {

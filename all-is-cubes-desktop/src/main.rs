@@ -41,7 +41,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context;
 use clap::{CommandFactory as _, Parser as _};
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::ProgressBar;
 use rand::Rng;
 
 use all_is_cubes::camera::{self, GraphicsOptions, Viewport};
@@ -59,6 +59,7 @@ use command_options::GraphicsType;
 mod audio;
 mod config_files;
 mod glue;
+mod logging;
 mod record;
 mod session;
 mod terminal;
@@ -100,40 +101,14 @@ fn main() -> Result<(), anyhow::Error> {
         output_file,
         save_all: _, // used in RecordOptions
         duration,
-        verbose,
-        simplify_log_format,
+        logging: logging_args,
         no_config_files,
         rerun,
     } = options.clone();
 
     // Initialize logging -- but only if it won't interfere.
-    if graphics_type != GraphicsType::Terminal || verbose {
-        // Note: Something like this log configuration also appears in other binaries.
-        // Unclear how to deduplicate since we don't want to have a library-level dep on
-        // simplelog. For now, just remember to consider updating other instances.
-        use simplelog::LevelFilter::{Debug, Error, Off, Trace};
-        simplelog::TermLogger::init(
-            match verbose {
-                // TODO: When we're closer to 1.0, change the default level to `Info`
-                false => Debug,
-                true => Trace,
-            },
-            simplelog::ConfigBuilder::new()
-                .set_target_level(Off)
-                .set_location_level(Off)
-                .set_time_level(if simplify_log_format { Off } else { Error })
-                .add_filter_ignore_str("wgpu") // noisy
-                .add_filter_ignore_str("naga") // noisy
-                .add_filter_ignore_str("winit") // noisy at Trace level only
-                .build(),
-            simplelog::TerminalMode::Stderr,
-            if simplify_log_format {
-                simplelog::ColorChoice::Never
-            } else {
-                simplelog::ColorChoice::Auto
-            },
-        )
-        .context("failed to initialize logging")?;
+    if graphics_type != GraphicsType::Terminal || logging_args.verbose {
+        logging::install(logging_args)?;
     }
 
     // After setting up logging, do other option interpretation steps.
@@ -387,7 +362,7 @@ async fn create_universe(
     let start_time = Instant::now();
     let universe_progress_bar = ProgressBar::new(100)
         .with_style(
-            common_progress_style()
+            logging::common_progress_style()
                 .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}% {msg:36}")
                 .unwrap(),
         )
@@ -508,7 +483,7 @@ fn connect_rerun(universe: &mut Universe) {
 
 fn evaluate_light_with_progress(space: &mut Space) {
     let light_progress = ProgressBar::new(100)
-        .with_style(common_progress_style())
+        .with_style(logging::common_progress_style())
         .with_prefix("Lighting");
     space.evaluate_light::<Instant>(1, lighting_progress_adapter(&light_progress));
     light_progress.finish();
@@ -523,13 +498,6 @@ fn lighting_progress_adapter(progress: &ProgressBar) -> impl FnMut(LightUpdatesI
         progress.set_length(worst as u64);
         progress.set_position((worst - info.queue_count) as u64);
     }
-}
-
-/// [`ProgressStyle`] for progress bars we display.
-fn common_progress_style() -> ProgressStyle {
-    ProgressStyle::default_bar()
-        .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6} {msg:30}")
-        .unwrap()
 }
 
 /// Choose a window size (in terms of viewport size) when the user did not request one.
