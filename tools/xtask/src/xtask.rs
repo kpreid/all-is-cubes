@@ -246,6 +246,8 @@ fn main() -> Result<(), ActionError> {
                     // that deterministically limits how much time is spent on one
                     // (just like the recursion limit currently does).
                     "fuzz_block_eval" => 15,
+                    // also does a bunch of block eval stuff
+                    "fuzz_mesh" => 30,
                     _ => 5,
                 };
 
