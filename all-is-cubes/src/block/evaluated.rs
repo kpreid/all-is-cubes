@@ -7,7 +7,7 @@ use euclid::Vector3D;
 use ordered_float::NotNan;
 
 use crate::content::palette;
-use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgb, Rgba, Vol};
+use crate::math::{Cube, Face6, Face7, FaceMap, GridAab, OpacityCategory, Rgb, Rgba, Vol};
 use crate::raytracer;
 use crate::universe::RefError;
 use crate::{
@@ -312,6 +312,13 @@ impl EvaluatedBlock {
     #[doc(hidden)]
     pub fn voxels_bounds(&self) -> GridAab {
         self.voxels.bounds()
+    }
+
+    pub(crate) fn face7_color(&self, face: Face7) -> Rgba {
+        match Face6::try_from(face) {
+            Ok(face) => self.face_colors[face],
+            Err(_) => self.color,
+        }
     }
 
     /// Expresses the opacity of the block as an [`OpacityCategory`].

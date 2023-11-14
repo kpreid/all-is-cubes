@@ -688,7 +688,8 @@ impl LightBuffer {
             }
             let stored_light = current_light.get(light_cube);
 
-            let surface_color = ev_hit.color.clamp().to_rgb() * SURFACE_ABSORPTION
+            let surface_color = ev_hit.face7_color(hit.face()).clamp().to_rgb()
+                * SURFACE_ABSORPTION
                 + Rgb::ONE * (1. - SURFACE_ABSORPTION);
             let light_from_struck_face =
                 ev_hit.light_emission + stored_light.value() * surface_color;
@@ -728,7 +729,11 @@ impl LightBuffer {
             // as opposed to passing through it.
             // The block evaluation algorithm incidentally computes a suitable
             // approximation as an alpha value.
-            let coverage = ev_hit.color.alpha().into_inner().clamp(0.0, 1.0);
+            let coverage = ev_hit
+                .face7_color(hit.face())
+                .alpha()
+                .into_inner()
+                .clamp(0.0, 1.0);
             self.incoming_light += (ev_hit.light_emission + stored_light)
                 * coverage
                 * ray_state.alpha
