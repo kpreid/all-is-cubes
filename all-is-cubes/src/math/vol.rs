@@ -502,14 +502,14 @@ mod tests {
         assert_eq!(
             format!("{vol:#?}"),
             indoc::indoc! {"
-            Vol<(), ZMaj> {
-                bounds: GridAab(
-                    10..14 (4),
-                    0..1 (1),
-                    0..1 (1),
-                ),
-            }\
-        "}
+                Vol<(), ZMaj> {
+                    bounds: GridAab(
+                        10..14 (4),
+                        0..1 (1),
+                        0..1 (1),
+                    ),
+                }\
+            "}
         )
     }
 
@@ -519,20 +519,20 @@ mod tests {
         assert_eq!(
             format!("{vol:#?}"),
             indoc::indoc! {"
-            Vol<alloc::boxed::Box<[i32]>, ZMaj> {
-                bounds: GridAab(
-                    10..14 (4),
-                    0..1 (1),
-                    0..1 (1),
-                ),
-                contents: [
-                    10,
-                    11,
-                    12,
-                    13,
-                ],
-            }\
-        "}
+                Vol<alloc::boxed::Box<[i32]>, ZMaj> {
+                    bounds: GridAab(
+                        10..14 (4),
+                        0..1 (1),
+                        0..1 (1),
+                    ),
+                    contents: [
+                        10,
+                        11,
+                        12,
+                        13,
+                    ],
+                }\
+            "}
         )
     }
 
@@ -542,15 +542,15 @@ mod tests {
         assert_eq!(
             format!("{vol:#?}"),
             indoc::indoc! {"
-            Vol<alloc::boxed::Box<[i32]>, ZMaj> {
-                bounds: GridAab(
-                    0..64 (64),
-                    0..1 (1),
-                    0..1 (1),
-                ),
-                contents: [...64 elements],
-            }\
-        "}
+                Vol<alloc::boxed::Box<[i32]>, ZMaj> {
+                    bounds: GridAab(
+                        0..64 (64),
+                        0..1 (1),
+                        0..1 (1),
+                    ),
+                    contents: [...64 elements],
+                }\
+            "}
         )
     }
 
