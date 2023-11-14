@@ -246,7 +246,7 @@ mod eval {
     }
 
     #[test]
-    fn transparent_voxels() {
+    fn transparent_voxels_simple() {
         let mut universe = Universe::new();
         let resolution = R4;
         let voxel_color = Rgb::new(1.0, 0.5, 0.0);
@@ -298,6 +298,48 @@ mod eval {
             }
         );
         assert_eq!(e.visible, true);
+    }
+
+    /// Check that when a block has different transparent parts with different colors, the colors
+    /// are correctly weighted with respect to each other.
+    ///
+    /// TODO: This test doesn't pass and I'm not sure why.
+    #[test]
+    #[ignore = "not sure if code or test is wrong"]
+    fn transparent_voxels_weighted() {
+        let mut universe = Universe::new();
+        let c1 = Rgb::new(1.0, 0.0, 0.0);
+        let c2 = Rgb::new(0.0, 1.0, 0.0);
+        let colors = [c1.with_alpha_one(), c2.with_alpha(notnan!(0.5))];
+        let block = Block::builder()
+            .voxels_fn(&mut universe, R2, |cube| {
+                Block::from(colors[cube.y as usize])
+            })
+            .unwrap()
+            .build();
+        let surface_area: f32 = 4. * 6.;
+
+        let e = block.evaluate().unwrap();
+
+        // for debugging, print the color multiplied by the surface area so that the
+        // components end up round numbers
+        dbg!(e.color.to_rgb() * surface_area);
+        dbg!(e.face_colors.map(|_, c| c.to_rgb() * 4.));
+
+        // each semitransparent voxel is 1/2 of a full block so its opacity is ^(1/2)
+        let half_semi_alpha = 0.5_f32.powf(0.5);
+        let semi_on_opaque_blend = dbg!(c1 * (1. - half_semi_alpha) + c2 * half_semi_alpha);
+
+        assert_eq!(
+            e.color.to_rgb(), // don't bother checking alpha; other tests do that
+            (
+                c1 * 4. // -Y face
+                + semi_on_opaque_blend * 4. // +Y face
+                + c1 * 8. // opaque half of other 4 faces
+                + c2 * 4.
+                // semitransparent half of other 4 faces
+            ) * surface_area.recip()
+        );
     }
 
     #[test]
