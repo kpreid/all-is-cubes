@@ -35,7 +35,6 @@
 // Crate-specific lint settings.
 // * This crate does not forbid(unsafe_code) because wgpu initialization requires it.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -129,6 +128,18 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Done with options; now start creating the session.
 
+    // Kick off constructing the universe in the background.
+    let universe_future = {
+        // TODO: refactor this to work through RecordOptions
+        let precompute_light = precompute_light
+            || (graphics_type == GraphicsType::Record
+                && output_file.as_ref().map_or(false, |file| {
+                    determine_record_format(file).map_or(false, |fmt| fmt.includes_light())
+                }));
+
+        runtime.spawn(create_universe(input_source, precompute_light))
+    };
+
     // This cell will be moved into the session after (possibly) being reset to the actual
     // window size. This is a kludge because the `Session`'s `Vui` wants to be able to track
     // the viewport aspect ratio. It would be nice to have a better strategy, but at least
@@ -162,10 +173,7 @@ fn main() -> Result<(), anyhow::Error> {
     let inner_params = InnerMainParams {
         runtime,
         before_loop_time: Instant::now(),
-        graphics_type,
-        input_source,
-        output_file,
-        precompute_light,
+        universe_future,
         headless: options.is_headless(),
         rerun,
     };
@@ -282,11 +290,8 @@ fn inner_main<Ren, Win>(
     let InnerMainParams {
         runtime,
         before_loop_time,
-        graphics_type,
-        input_source,
-        output_file,
+        universe_future,
         headless,
-        precompute_light,
         rerun,
     } = params;
 
@@ -311,14 +316,11 @@ fn inner_main<Ren, Win>(
         };
     }
 
-    // TODO: refactor this to work through RecordOptions
-    let precompute_light = precompute_light
-        || (graphics_type == GraphicsType::Record
-            && output_file.as_ref().map_or(false, |file| {
-                determine_record_format(file).map_or(false, |fmt| fmt.includes_light())
-            }));
-    let mut universe = runtime
-        .block_on(create_universe(input_source, precompute_light))
+    // TODO: don't do this as a block_on, but await it from inside of the event loop
+    // (this will require further work on the record event loop)
+    let mut universe: Universe = runtime
+        .block_on(universe_future)
+        .context("internal error inside of universe creation/loading task")?
         .context("failed to create universe from requested template or file")?;
 
     if rerun {
@@ -346,11 +348,8 @@ fn inner_main<Ren, Win>(
 struct InnerMainParams {
     runtime: tokio::runtime::Runtime,
     before_loop_time: Instant,
-    graphics_type: GraphicsType,
-    input_source: UniverseSource,
-    output_file: Option<PathBuf>,
+    universe_future: tokio::task::JoinHandle<Result<Universe, anyhow::Error>>,
     headless: bool,
-    precompute_light: bool,
     rerun: bool,
 }
 
