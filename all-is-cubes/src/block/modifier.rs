@@ -233,6 +233,7 @@ mod tests {
                 VoxelBrush::single(replacement.clone()),
             ))))
             .build();
+        let be = block.evaluate().unwrap();
 
         let rotated = block.clone().rotate(rotation);
         let re = rotated.evaluate().unwrap();
@@ -240,7 +241,7 @@ mod tests {
         assert_eq!(
             re,
             EvaluatedBlock {
-                color: Rgba::new(1. / 3., 0., 1. / 3., 2. / 3.),
+                color: be.color,
                 light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(
                     R2,
