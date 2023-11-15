@@ -1,7 +1,6 @@
 //! Miscellanous demonstrations of capability and manual test-cases.
 //! The exhibits defined in this file are combined into [`crate::demo_city`].
 
-use all_is_cubes::listen::ListenableSource;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -27,10 +26,10 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{size3, vec3, Point3D, Rotation2D, Vector2D, Vector3D};
 use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::Gridgid;
+use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
-    GridVector, NotNan, Rgb, Rgba, VectorOps,
+    GridVector, Gridgid, NotNan, Rgb, Rgba, VectorOps,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpaceBuilder, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -65,6 +64,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     TREES,
     CHUNK_CHART,
     COLOR_LIGHTS,
+    COLORED_BOUNCE,
     IMAGES,
     SMALLEST,
     SWIMMING_POOL,
@@ -1052,6 +1052,80 @@ fn COLOR_LIGHTS(_: Context<'_>) {
 
     // TODO: Add an RGBCMY section, and also a color-temperature section (or maybe different buildings)
     // sRGB white is D65, or approximately 6500 K.
+
+    Ok((space, txn))
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "Colored Reflections",
+    subtitle: "Light colored by surface reflections",
+    placement: Placement::Underground,
+)]
+fn COLORED_BOUNCE(_: Context<'_>) {
+    let mut txn = ExhibitTransaction::default();
+
+    let interior_radius = 3;
+    let wall_thickness = 3;
+    let total_radius = interior_radius + wall_thickness;
+    let brightness = 50.0;
+
+    // --- Blocks ---
+
+    let reflecting_block = {
+        let rbbs = crate::BoxStyle::from_whole_blocks_for_walls(
+            Some(rgba_const!(1.0, 0.0, 0.0, 1.0).into()),
+            Some(rgba_const!(0.0, 1.0, 0.0, 1.0).into()),
+            Some(rgba_const!(0.0, 0.0, 1.0, 1.0).into()),
+            Some(rgba_const!(0.0, 1.0, 1.0, 1.0).into()),
+        );
+        let rbbounds = GridAab::for_block(R32);
+        Block::builder()
+            .voxels_fn(R32, |cube| rbbs.cube_at(rbbounds, cube).unwrap_or(&AIR))?
+            .build_txn(&mut txn)
+    };
+
+    let light_block = Block::builder()
+        .color(Rgba::WHITE)
+        .light_emission(Rgb::ONE * brightness)
+        .build();
+
+    let wall_block = Block::from(rgb_const!(0.25, 0.25, 0.25)); // fairly absorbing
+
+    // --- Space ---
+
+    let interior = GridAab::from_lower_size(
+        GridPoint::splat(-interior_radius),
+        GridVector::splat(interior_radius * 2 + 1),
+    );
+    let mut space = Space::empty(interior.expand(FaceMap::repeat(wall_thickness)));
+
+    // Thick walls + interior cavity
+    space.fill_uniform(space.bounds(), &wall_block).unwrap();
+    space.fill_uniform(interior, &AIR).unwrap();
+
+    // Dig pockets for lights to be in
+    for dir in Face6::ALL {
+        let far_end = GridAab::ORIGIN_CUBE.translate(dir.normal_vector() * (total_radius - 1));
+        space
+            .fill_uniform(GridAab::ORIGIN_CUBE.union(far_end).unwrap(), &AIR)
+            .unwrap();
+        space.fill_uniform(far_end, &light_block).unwrap();
+    }
+
+    // Central reflecting block
+    space.fill_uniform(
+        GridAab::ORIGIN_CUBE.expand(FaceMap::repeat(1)),
+        &reflecting_block,
+    )?;
+
+    // Hole to look in through
+    space
+        .fill_uniform(
+            GridAab::from_lower_upper([2, 0, interior_radius + 1], [3, 2, total_radius + 1]),
+            &AIR,
+        )
+        .unwrap();
 
     Ok((space, txn))
 }
