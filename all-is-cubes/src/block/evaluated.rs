@@ -344,10 +344,14 @@ impl VoxSum {
     /// `surface_area` should be the area in pixels (voxel faces) of the full block/face, not the
     /// area which had actual data.
     fn color(&self, surface_area: usize) -> Rgba {
-        if self.count == 0 {
+        // Dividing by alpha_sum to un-"premultiply" the weighted data from when it was added.
+        // This also has the effect of scaling the value appropriately to make it an average.
+        let color_scale = self.alpha_sum;
+        if color_scale.partial_cmp(&0.0) != Some(core::cmp::Ordering::Greater) {
+            // If there are zero things, the result should be transparent (not divide-by-zero)
             Rgba::TRANSPARENT
         } else {
-            Rgb::try_from(self.color_sum / self.count as f32)
+            Rgb::try_from(self.color_sum / color_scale)
                 .expect("Recursive block color computation produced NaN")
                 .with_alpha(
                     // Note that by dividing the alpha by the full surface area, not the count,
@@ -376,7 +380,8 @@ impl ops::AddAssign<raytracer::EvalTrace> for VoxSum {
     fn add_assign(&mut self, rhs: raytracer::EvalTrace) {
         let raytracer::EvalTrace { color, emission } = rhs;
         let alpha = color.alpha().into_inner();
-        self.color_sum += Vector3D::from(color.to_rgb());
+        // Multiply by alpha to produce an appropriately weighted sum
+        self.color_sum += Vector3D::from(color.to_rgb()) * alpha;
         self.alpha_sum += alpha;
         self.emission_sum += emission;
         self.count += 1;
@@ -767,7 +772,9 @@ impl MinEval {
 mod tests {
     use super::*;
     use crate::block::{AnimationHint, Block, Resolution, Resolution::R2, AIR};
+    use crate::raytracer::EvalTrace;
     use crate::universe::Universe;
+    use euclid::vec3;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
     use std::mem::size_of;
@@ -962,5 +969,39 @@ mod tests {
                 "Input color {color:?}"
             );
         }
+    }
+
+    /// Unit tests for `VoxSum`'s math. `VoxSum` is an internal helper type, so if there is reason
+    /// to change it, these tests should be freely discarded; the point of these tests is to help
+    /// directly test the arithmetic without the complication of setting up a voxel block scenario.
+
+    #[test]
+    fn voxsum_simple_opaque() {
+        let mut v = VoxSum::default();
+        v += EvalTrace {
+            color: Rgba::new(1., 0., 0., 1.),
+            emission: vec3(0., 0., 1.),
+        };
+        v += EvalTrace {
+            color: Rgba::new(0., 1., 0., 1.),
+            emission: vec3(0., 0., 1.),
+        };
+        assert_eq!(v.color(2), Rgba::new(0.5, 0.5, 0., 1.));
+        assert_eq!(v.emission(2), Rgb::new(0., 0., 1.));
+    }
+
+    #[test]
+    fn voxsum_weighted_transparency() {
+        let mut v = VoxSum::default();
+        v += EvalTrace {
+            color: Rgba::new(1., 0., 0., 0.25),
+            emission: vec3(0., 0., 1.),
+        };
+        v += EvalTrace {
+            color: Rgba::new(0., 1., 0., 0.75),
+            emission: vec3(0., 0., 1.),
+        };
+        assert_eq!(v.color(2), Rgba::new(0.25, 0.75, 0., 0.5));
+        assert_eq!(v.emission(2), Rgb::new(0., 0., 1.));
     }
 }
