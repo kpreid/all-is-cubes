@@ -1,6 +1,6 @@
 //! [`EvaluatedBlock`] and [`Evoxel`].
 
-use core::fmt;
+use core::{fmt, ops};
 
 use alloc::sync::Arc;
 use euclid::Vector3D;
@@ -170,10 +170,8 @@ impl EvaluatedBlock {
         // of all six faces by tracing in from the edges, and then averages them.
         // TODO: Account for reduced bounds being smaller
         let (color, emission): (Rgba, Rgb) = {
-            let mut color_sum: Vector3D<f32, Intensity> = Vector3D::zero();
-            let mut alpha_sum: f32 = 0.0;
-            let mut emission_sum: Vector3D<f32, Intensity> = Vector3D::zero();
-            let mut count = 0;
+            let mut all_faces_sum = VoxSum::default();
+
             // Loop over all face voxels.
             // (This is a similar structure to the algorithm we use for mesh generation.)
             for face in Face6::ALL {
@@ -189,31 +187,16 @@ impl EvaluatedBlock {
                         ));
                         debug_assert!(voxels.bounds().contains_cube(cube));
 
-                        let raytracer::EvalTrace { color, emission } =
+                        all_faces_sum +=
                             raytracer::trace_for_eval(&voxels, cube, face.opposite(), resolution);
-                        color_sum += color.to_rgb().into();
-                        alpha_sum += color.alpha().into_inner();
-                        emission_sum += emission;
-                        count += 1;
                     }
                 }
             }
-            if count == 0 {
-                (Rgba::TRANSPARENT, Rgb::ZERO)
-            } else {
-                // Note the divisors —- this adds transparency to compensate for when the
-                // voxel data doesn't cover the full_block_bounds.
-                (
-                    Rgb::try_from(color_sum / (count as f32))
-                        .expect("Recursive block color computation produced NaN")
-                        .with_alpha(
-                            NotNan::new(alpha_sum / (full_block_bounds.surface_area() as f32))
-                                .expect("Recursive block alpha computation produced NaN"),
-                        ),
-                    Rgb::try_from(emission_sum / full_block_bounds.surface_area() as f32)
-                        .expect("Recursive block emission computation produced NaN"),
-                )
-            }
+            let surface_area = full_block_bounds.surface_area();
+            (
+                all_faces_sum.color(surface_area),
+                all_faces_sum.emission(surface_area),
+            )
         };
 
         // Compute if the collision is uniform in all voxels.
@@ -342,6 +325,75 @@ impl EvaluatedBlock {
     pub fn consistency_check(&self) {
         let regenerated = EvaluatedBlock::from_voxels(self.attributes.clone(), self.voxels.clone());
         assert_eq!(self, &regenerated);
+    }
+}
+
+/// Accumulator of surface properties of faces of a cube.
+/// Used internally by evaluation to produce average colors.
+#[derive(Clone, Copy, Default)]
+struct VoxSum {
+    /// Color multiplied by its alpha (i.e. "premultiplied")
+    color_sum: Vector3D<f32, Intensity>,
+    alpha_sum: f32,
+    emission_sum: Vector3D<f32, Intensity>,
+    count: usize,
+}
+impl VoxSum {
+    /// Retures the reflectance color.
+    ///
+    /// `surface_area` should be the area in pixels (voxel faces) of the full block/face, not the
+    /// area which had actual data.
+    fn color(&self, surface_area: usize) -> Rgba {
+        if self.count == 0 {
+            Rgba::TRANSPARENT
+        } else {
+            Rgb::try_from(self.color_sum / self.count as f32)
+                .expect("Recursive block color computation produced NaN")
+                .with_alpha(
+                    // Note that by dividing the alpha by the full surface area, not the count,
+                    // we handle the case where the voxel data doesn't cover the full block and
+                    // uncounted pixels should act as if they are transparent.
+                    NotNan::new(self.alpha_sum / (surface_area as f32))
+                        .expect("Recursive block alpha computation produced NaN"),
+                )
+        }
+    }
+
+    /// Returns the aggregate light emission.
+    ///
+    /// `surface_area` should be the area in pixels (voxel faces) of the full block/face, not the
+    /// area which had actual data.
+    fn emission(&self, surface_area: usize) -> Rgb {
+        if self.count == 0 {
+            Rgb::ZERO
+        } else {
+            Rgb::try_from(self.emission_sum / surface_area as f32)
+                .expect("Recursive block emission computation produced NaN")
+        }
+    }
+}
+impl ops::AddAssign<raytracer::EvalTrace> for VoxSum {
+    fn add_assign(&mut self, rhs: raytracer::EvalTrace) {
+        let raytracer::EvalTrace { color, emission } = rhs;
+        let alpha = color.alpha().into_inner();
+        self.color_sum += Vector3D::from(color.to_rgb());
+        self.alpha_sum += alpha;
+        self.emission_sum += emission;
+        self.count += 1;
+    }
+}
+impl ops::AddAssign for VoxSum {
+    fn add_assign(&mut self, rhs: VoxSum) {
+        let Self {
+            color_sum,
+            alpha_sum,
+            emission_sum,
+            count,
+        } = rhs;
+        self.color_sum += color_sum;
+        self.alpha_sum += alpha_sum;
+        self.emission_sum += emission_sum;
+        self.count += count;
     }
 }
 
