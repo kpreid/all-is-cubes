@@ -48,3 +48,6 @@ async_fn_traits = { workspace = true }
 reqwest = { version = "0.11.11", default-features = false }
 # add "process" feature for tests to spawn the server
 tokio = { workspace = true, features = ["process"] }
+
+[lints]
+workspace = true

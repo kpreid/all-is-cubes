@@ -30,3 +30,6 @@ futures-channel = { workspace = true }
 pretty_assertions = { workspace = true }
 # Using tokio for async test-running.
 tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true

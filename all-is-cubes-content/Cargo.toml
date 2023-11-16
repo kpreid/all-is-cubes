@@ -48,3 +48,6 @@ pretty_assertions = { workspace = true }
 # Using tokio for async test-running.
 tokio = { workspace = true, features = ["macros", "rt"] }
 yield-progress = { workspace = true }
+
+[lints]
+workspace = true

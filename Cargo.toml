@@ -85,6 +85,36 @@ wasm-bindgen-futures = "0.4.34"
 wgpu = { version = "0.18.0", features = ["expose-ids"] }
 yield-progress = { version = "0.1.4", default-features = false }
 
+[workspace.lints]
+rust.rust_2018_idioms = "deny"
+rust.unsafe_op_in_unsafe_fn = "deny"
+
+rust.explicit_outlives_requirements = "warn"
+rust.missing_debug_implementations = "warn"
+rust.noop_method_call = "warn"
+rust.trivial_numeric_casts = "warn"
+rust.unused_extern_crates = "warn"
+rust.unused_lifetimes = "warn"
+rust.unused_qualifications = "warn"
+# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
+# rust.unused_crate_dependencies = "warn"
+
+clippy.collapsible_else_if = "allow"
+clippy.collapsible_if = "allow"
+clippy.needless_update = "allow"
+clippy.single_match = "allow"
+
+clippy.cast_lossless = "warn"
+clippy.doc_markdown = "warn"
+clippy.exhaustive_enums = "warn"
+clippy.exhaustive_structs = "warn"
+clippy.modulo_arithmetic = "warn"
+clippy.return_self_not_must_use = "warn"
+clippy.undocumented_unsafe_blocks = "warn"
+clippy.uninlined_format_args = "warn"
+clippy.unnecessary_self_imports = "warn"
+clippy.wrong_self_convention = "warn"
+
 [profile.dev]
 # Enable some optimization to improve interactive performance in manual testing/experimenting.
 # In particular, inlining is crucial.

@@ -50,3 +50,6 @@ pretty_assertions = { workspace = true }
 tempfile = { workspace = true }
 # for async tests
 tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true

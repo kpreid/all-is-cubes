@@ -69,3 +69,6 @@ gltf = "1.3.0" # for round-trip test; must match version of gltf-json
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros"] }
 trycmd = { workspace = true }
+
+[lints]
+workspace = true

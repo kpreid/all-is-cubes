@@ -50,3 +50,6 @@ tinytemplate = "1.2.1"
 # Using tokio for async test-running.
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
 wgpu = { workspace = true }
+
+[lints]
+workspace = true
