@@ -1,5 +1,7 @@
 //! Graphical test cases that can be run in any renderer.
 
+#![allow(clippy::unused_async)]
+
 use std::future::Future;
 use std::sync::Arc;
 

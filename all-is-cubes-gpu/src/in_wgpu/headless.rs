@@ -172,7 +172,7 @@ impl RendererImpl {
     async fn handle(&mut self, msg: RenderMsg) {
         match msg {
             RenderMsg::Update(cursor, reply) => {
-                _ = reply.send(self.update(cursor.as_ref()).await);
+                _ = reply.send(self.update(cursor.as_ref()));
             }
             RenderMsg::Render(info_text, reply) => {
                 _ = reply.send(self.draw(&info_text).await);
@@ -180,7 +180,7 @@ impl RendererImpl {
         }
     }
 
-    async fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), camera::RenderError> {
+    fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), camera::RenderError> {
         let info = self
             .everything
             .update(&self.queue, cursor, &FrameBudget::PRACTICALLY_INFINITE)

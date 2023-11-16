@@ -117,6 +117,7 @@ clippy.suboptimal_flops = "warn"
 clippy.undocumented_unsafe_blocks = "warn"
 clippy.uninlined_format_args = "warn"
 clippy.unnecessary_self_imports = "warn"
+clippy.unused_async = "warn"
 clippy.wrong_self_convention = "warn"
 
 [profile.dev]
