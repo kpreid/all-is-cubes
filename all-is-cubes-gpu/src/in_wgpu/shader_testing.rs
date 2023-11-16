@@ -41,7 +41,7 @@ where
 {
     let (device, queue) = adapter
         .request_device(
-            &in_wgpu::EverythingRenderer::<time::NoTime>::device_descriptor(),
+            &in_wgpu::EverythingRenderer::<time::NoTime>::device_descriptor(adapter.limits()),
             None,
         )
         .await

@@ -26,7 +26,7 @@ impl Builder {
     ) -> Result<Self, wgpu::RequestDeviceError> {
         let (device, queue) = adapter
             .request_device(
-                &in_wgpu::EverythingRenderer::<AdaptedInstant>::device_descriptor(),
+                &in_wgpu::EverythingRenderer::<AdaptedInstant>::device_descriptor(adapter.limits()),
                 None,
             )
             .await?;

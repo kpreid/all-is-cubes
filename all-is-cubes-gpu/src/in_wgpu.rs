@@ -85,7 +85,10 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         adapter: &wgpu::Adapter,
     ) -> Result<Self, GraphicsResourceError> {
         let (device, queue) = adapter
-            .request_device(&EverythingRenderer::<I>::device_descriptor(), None)
+            .request_device(
+                &EverythingRenderer::<I>::device_descriptor(adapter.limits()),
+                None,
+            )
             .await
             .map_err(|e| {
                 GraphicsResourceError::new(
@@ -232,13 +235,12 @@ pub struct EverythingRenderer<I> {
 
 impl<I: time::Instant> EverythingRenderer<I> {
     /// A device descriptor suitable for the expectations of [`EverythingRenderer`].
-    pub fn device_descriptor() -> wgpu::DeviceDescriptor<'static> {
+    pub fn device_descriptor(available_limits: wgpu::Limits) -> wgpu::DeviceDescriptor<'static> {
         wgpu::DeviceDescriptor {
             features: wgpu::Features::empty(),
             limits: wgpu::Limits {
                 max_inter_stage_shader_components: 32, // number used by blocks-and-lines shader
-                ..wgpu::Limits::downlevel_webgl2_defaults()
-                    .using_resolution(wgpu::Limits::default())
+                ..wgpu::Limits::downlevel_webgl2_defaults().using_resolution(available_limits)
             },
             label: None,
         }
