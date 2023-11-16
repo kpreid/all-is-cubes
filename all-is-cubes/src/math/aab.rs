@@ -434,12 +434,11 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn expand_negative_success() {
         let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
         assert_eq!(
             aab.expand(-0.25),
-            Aab::new(1.25, 2.25, 3.25, 3.75, 4.75, 5.75),
+            Aab::new(1.25, 1.75, 3.25, 3.75, 5.25, 5.75),
         );
     }
 
