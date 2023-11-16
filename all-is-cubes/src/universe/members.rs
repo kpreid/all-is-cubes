@@ -262,7 +262,7 @@ macro_rules! member_enums_and_impls {
 
             fn deref(&self) -> &Self::Target {
                 match self {
-                    $( Self::$member_type(r) => r as &dyn $crate::universe::URefErased, )*
+                    $( Self::$member_type(r) => r, )*
                 }
             }
         }
