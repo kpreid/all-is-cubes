@@ -800,6 +800,8 @@ mod tests {
 
     #[test]
     fn query() {
+        #![allow(trivial_casts)]
+
         #[derive(Debug, Eq, PartialEq)]
         struct Expected;
         #[derive(Debug, Eq, PartialEq)]

@@ -9,7 +9,6 @@
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 // * TODO: warn(missing_docs), eventually.
 #![forbid(unsafe_code)]
-#![warn(trivial_casts)]
 
 #[cfg_attr(not(feature = "wgpu"), allow(unused))]
 mod common;
