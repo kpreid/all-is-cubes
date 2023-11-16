@@ -305,7 +305,7 @@ mod tests {
     fn fix_tex_coord() {
         for int_part in 0..=256u16 {
             for frac_part in 0..=1 {
-                let float = f32::from(int_part) + f32::from(frac_part) * 0.5;
+                let float = f32::from(frac_part).mul_add(0.5, f32::from(int_part));
                 let fix = FixTexCoord::from_float(float);
                 assert_eq!(fix.0, int_part * 2 + frac_part);
                 assert_eq!(float, f32::from(fix));

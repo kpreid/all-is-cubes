@@ -296,10 +296,14 @@ impl InputProcessor {
                     character.set_velocity_input(movement);
 
                     let turning = Vector2D::<_, ()>::new(
-                        key_turning_step * self.net_movement(Key::Left, Key::Right)
-                            + self.mouselook_buffer.x,
-                        key_turning_step * self.net_movement(Key::Up, Key::Down)
-                            + self.mouselook_buffer.y,
+                        key_turning_step.mul_add(
+                            self.net_movement(Key::Left, Key::Right),
+                            self.mouselook_buffer.x,
+                        ),
+                        key_turning_step.mul_add(
+                            self.net_movement(Key::Up, Key::Down),
+                            self.mouselook_buffer.y,
+                        ),
                     );
                     character.body.yaw = (character.body.yaw + turning.x).rem_euclid(360.0);
                     character.body.pitch = (character.body.pitch + turning.y).clamp(-90.0, 90.0);
