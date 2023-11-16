@@ -98,9 +98,7 @@ impl Tool {
     ) -> Self {
         Tool::ExternalAction {
             icon,
-            function: EphemeralOpaque::from(
-                Arc::new(function) as Arc<dyn Fn(&ToolInput) + Send + Sync>
-            ),
+            function: EphemeralOpaque::new(Arc::new(function)),
         }
     }
 
@@ -536,6 +534,11 @@ impl From<RefError> for ToolError {
 pub struct EphemeralOpaque<T: ?Sized>(pub(crate) Option<Arc<T>>);
 
 impl<T: ?Sized> EphemeralOpaque<T> {
+    /// Constructs an [`EphemeralOpaque`] that holds the given value.
+    pub fn new(contents: Arc<T>) -> Self {
+        Self(Some(contents))
+    }
+
     /// Get a reference to the value if it still exists.
     pub fn try_ref(&self) -> Option<&T> {
         self.0.as_deref()

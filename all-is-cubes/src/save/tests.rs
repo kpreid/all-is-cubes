@@ -16,7 +16,7 @@ use crate::block::{
 use crate::character::{Character, Spawn};
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
-use crate::inv::Tool;
+use crate::inv::{EphemeralOpaque, Tool};
 use crate::math::{Cube, Face6, GridAab, GridRotation, Rgb, Rgba};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
@@ -93,7 +93,7 @@ fn behavior_not_persistent() {
     behavior::BehaviorSetTransaction::insert(
         space::SpaceBehaviorAttachment::new(GridAab::ORIGIN_CUBE),
         Arc::new(space::ActivatableRegion {
-            effect: (Arc::new(|| {}) as Arc<dyn Fn() + Send + Sync>).into(),
+            effect: EphemeralOpaque::new(Arc::new(|| {})),
         }),
     )
     .execute(&mut set, &mut drop)

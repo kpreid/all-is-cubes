@@ -760,12 +760,12 @@ mod tests {
             GridAab::single_cube(cube),
             ActivatableRegion {
                 // TODO: This sure is clunky
-                effect: EphemeralOpaque::from(Arc::new({
+                effect: EphemeralOpaque::new(Arc::new({
                     let signal = signal.clone();
                     move || {
                         signal.fetch_add(1, Ordering::Relaxed);
                     }
-                }) as Arc<dyn Fn() + Send + Sync>),
+                })),
             },
         )
         .execute(&mut space, &mut no_outputs)

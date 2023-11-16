@@ -64,7 +64,7 @@ impl ActionButton {
             .map(|state, base_block| assemble_button(state, base_block.clone(), label.clone()));
         Arc::new(Self {
             block: blocks[state].clone(),
-            action: EphemeralOpaque::from(Arc::new(action) as Arc<dyn Fn() + Send + Sync>),
+            action: EphemeralOpaque::new(Arc::new(action)),
         })
     }
 }
@@ -168,7 +168,7 @@ impl<D> ToggleButton<D> {
             blocks,
             data_source,
             projection: Arc::new(projection),
-            action: EphemeralOpaque::from(Arc::new(action) as Arc<dyn Fn() + Send + Sync>),
+            action: EphemeralOpaque::new(Arc::new(action)),
         })
     }
 }
@@ -274,12 +274,12 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
                     // TODO: awkward lack of composability here.
                     // Perhaps ActivatableRegion should be replaced with being able to
                     // activate any behavior, i.e. this WidgetBehavior?
-                    EphemeralOpaque::from(Arc::new(move || {
+                    EphemeralOpaque::new(Arc::new(move || {
                         recently_pressed.store(10, Relaxed);
                         if let Some(f) = action.try_ref() {
                             f();
                         }
-                    }) as Arc<dyn Fn() + Send + Sync>)
+                    }))
                 },
             }),
         ));
