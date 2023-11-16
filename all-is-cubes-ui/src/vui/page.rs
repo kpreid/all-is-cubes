@@ -151,10 +151,9 @@ pub(crate) fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
                 // where all edges of the space spill off the window.
                 minimum: GridVector::new(0, 0, UiSize::DEPTH_BEHIND_VIEW_PLANE + 2),
             })),
-            LayoutTree::leaf(
-                widgets::Frame::with_block(Block::from(Rgba::new(0., 0., 0., 0.7)))
-                    as Arc<dyn Widget>,
-            ),
+            LayoutTree::leaf(widgets::Frame::with_block(Block::from(Rgba::new(
+                0., 0., 0., 0.7,
+            )))),
             foreground,
         ],
     })

@@ -54,7 +54,7 @@ impl Frame {
 
         Arc::new(vui::LayoutTree::Stack {
             direction: Face6::PZ,
-            children: vec![vui::LayoutTree::leaf(self as Arc<dyn vui::Widget>), tree],
+            children: vec![vui::LayoutTree::leaf(self), tree],
         })
     }
 }
