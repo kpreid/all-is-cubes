@@ -29,7 +29,7 @@ fn clone_block_attributes() {
 }
 
 /// Test that cloning an `EvaluatedBlock`, with voxels, allocates nothing (except
-/// BlockAttributes as tested above).
+/// `BlockAttributes` as tested above).
 #[test]
 fn clone_evaluated_block() {
     let universe = &mut Universe::new();

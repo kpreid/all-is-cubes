@@ -28,7 +28,7 @@ pub fn to_wgsl<T: Fmt<ToWgsl>>(value: T) -> String {
 
 impl Fmt<ToWgsl> for f32 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &ToWgsl) -> fmt::Result {
-        write!(fmt, "{:?}", self)
+        write!(fmt, "{self:?}")
     }
 }
 

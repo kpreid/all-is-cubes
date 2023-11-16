@@ -54,7 +54,7 @@ impl TestData {
         renderer
     }
 
-    fn bench(&self, b: &mut Bencher<WallTime>, options_fn: impl FnOnce(&mut GraphicsOptions)) {
+    fn bench(&self, b: &mut Bencher<'_, WallTime>, options_fn: impl FnOnce(&mut GraphicsOptions)) {
         let renderer = self.renderer(options_fn);
         b.iter_with_large_drop(|| renderer.draw_rgba(|_| String::new()))
     }
