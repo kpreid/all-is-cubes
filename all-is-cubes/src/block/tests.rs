@@ -12,9 +12,7 @@ use pretty_assertions::assert_eq;
 use crate::block::{
     self, modifier, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockChange,
     BlockCollision, BlockDef, BlockDefTransaction, EvalBlockError, Evoxel, Evoxels, Modifier,
-    Primitive,
-    Resolution::{self, *},
-    AIR, AIR_EVALUATED,
+    Primitive, Resolution::*, AIR, AIR_EVALUATED,
 };
 use crate::content::make_some_blocks;
 use crate::listen::{self, NullListener, Sink};
@@ -340,7 +338,7 @@ mod eval {
             .unwrap();
         let space_ref = universe.insert_anonymous(space);
         let block = Block::builder()
-            .voxels_ref(resolution as Resolution, space_ref.clone())
+            .voxels_ref(resolution, space_ref.clone())
             .build();
 
         let e = block.evaluate().unwrap();
@@ -378,7 +376,7 @@ mod eval {
             e.voxels,
             Evoxels::Many(
                 resolution,
-                Vol::from_fn(GridAab::for_block(resolution as Resolution), |point| {
+                Vol::from_fn(GridAab::for_block(resolution), |point| {
                     let point = (point.lower_bounds() + offset).cast::<f32>();
                     Evoxel {
                         color: Rgba::new(point.x, point.y, point.z, 1.0),
@@ -460,7 +458,7 @@ mod eval {
             .unwrap();
         let space_ref = universe.insert_anonymous(space);
         let block = Block::builder()
-            .voxels_ref(resolution as Resolution, space_ref.clone())
+            .voxels_ref(resolution, space_ref.clone())
             .build();
         let eval_bare = block.evaluate();
         let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
