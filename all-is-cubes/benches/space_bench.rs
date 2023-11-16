@@ -7,7 +7,7 @@ use all_is_cubes::math::GridAab;
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 
-pub fn space_bulk_mutation(c: &mut Criterion) {
+fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("space-bulk-mutation");
 
     for &mutation_size in &[1, 4, 64] {

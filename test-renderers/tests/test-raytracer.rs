@@ -1,3 +1,5 @@
+//! Runs [`test_renderers::harness_main`] against [`all_is_cubes::raytracer`].
+
 use clap::Parser as _;
 
 use all_is_cubes::camera::{HeadlessRenderer, StandardCameras};
@@ -6,7 +8,7 @@ use all_is_cubes::raytracer::RtRenderer;
 use test_renderers::{RendererFactory, RendererId};
 
 #[tokio::main]
-pub async fn main() -> test_renderers::HarnessResult {
+async fn main() -> test_renderers::HarnessResult {
     test_renderers::initialize_logging();
 
     test_renderers::harness_main(

@@ -1,3 +1,5 @@
+//! Runs [`test_renderers::harness_main`] against [`all_is_cubes_gpu::in_wgpu`].
+
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -9,7 +11,7 @@ use all_is_cubes_gpu::in_wgpu::{headless, init};
 use test_renderers::{RendererFactory, RendererId};
 
 #[tokio::main]
-pub async fn main() -> test_renderers::HarnessResult {
+async fn main() -> test_renderers::HarnessResult {
     test_renderers::initialize_logging();
 
     let (_instance, adapter) =

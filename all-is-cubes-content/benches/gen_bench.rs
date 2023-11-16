@@ -12,7 +12,7 @@ use strum::IntoEnumIterator as _;
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 
-pub fn template_bench(c: &mut Criterion) {
+fn template_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("template");
     // These benchmarks are slow and noisy. Parameters adjusted so the overall run time
     // is not too long and there won't be too many false reports of change.

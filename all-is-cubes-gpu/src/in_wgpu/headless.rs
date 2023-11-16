@@ -1,3 +1,5 @@
+//! Implementation of [`HeadlessRenderer`] using [`wgpu`].
+
 use std::sync::Arc;
 
 use futures_channel::oneshot;

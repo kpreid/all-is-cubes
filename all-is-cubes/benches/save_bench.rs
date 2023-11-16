@@ -10,7 +10,7 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::yield_progress_for_testing;
 
 #[tokio::main]
-pub async fn save_space(c: &mut Criterion) {
+async fn save_space(c: &mut Criterion) {
     // TODO: add significant content beyond the `Space` (or maybe separate benches)
     let universe_to_save = {
         let mut u = Universe::new();

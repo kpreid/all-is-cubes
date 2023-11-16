@@ -14,6 +14,7 @@ pub struct RenderInfo {
     pub(crate) waiting_for_gpu: Duration,
     pub(crate) update: UpdateInfo,
     pub(crate) draw: DrawInfo,
+    /// [Flaws] in the rendering.
     pub flaws: Flaws,
 }
 
@@ -52,7 +53,7 @@ impl UpdateInfo {
 
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
-pub struct DrawInfo {
+pub(crate) struct DrawInfo {
     /// Total time taken by drawing each layer.
     pub(crate) times: Layers<Duration>,
     pub(crate) space_info: Layers<SpaceDrawInfo>,

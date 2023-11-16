@@ -79,6 +79,10 @@ pub struct SurfaceRenderer<I> {
 }
 
 impl<I: time::Instant> SurfaceRenderer<I> {
+    /// Constructs a renderer owning and operating on `surface`.
+    ///
+    /// This will create a dedicated [`wgpu::Device`] using the provided [`wgpu::Adapter`],
+    /// and return an error if requesting the device fails.
     pub async fn new(
         cameras: StandardCameras,
         surface: wgpu::Surface,
@@ -116,6 +120,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         })
     }
 
+    /// Returns a clonable handle to the device this renderer owns.
     pub fn device(&self) -> &Arc<wgpu::Device> {
         &self.device
     }
@@ -130,10 +135,13 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         self.everything.cameras.update();
     }
 
+    /// Returns the [`StandardCameras`] which control what is rendered by this renderer.
     pub fn cameras(&self) -> &StandardCameras {
         &self.everything.cameras
     }
 
+    /// Renders one frame to the surface, using the current contents of [`Self::cameras()`] and
+    /// the given cursor and overlay text.
     pub fn render_frame(
         &mut self,
         cursor_result: Option<&Cursor>,
@@ -197,7 +205,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
 /// scene and UI, but not the surface it's drawn on. This may be used in tests or
 /// to support
 #[derive(Debug)]
-pub struct EverythingRenderer<I> {
+struct EverythingRenderer<I> {
     device: Arc<wgpu::Device>,
 
     staging_belt: wgpu::util::StagingBelt,
@@ -582,8 +590,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
     /// Render the current scene content to the linear scene texture,
     /// in linear color values without tone mapping.
-    // TODO: stop making this public
-    pub fn draw_frame_linear(
+    pub(crate) fn draw_frame_linear(
         &mut self,
         queue: &wgpu::Queue,
     ) -> Result<DrawInfo, GraphicsResourceError> {
