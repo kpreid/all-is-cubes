@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
 use all_is_cubes::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};

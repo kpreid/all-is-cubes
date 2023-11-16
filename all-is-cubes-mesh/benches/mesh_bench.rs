@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::{Block, Resolution::R16, AIR};

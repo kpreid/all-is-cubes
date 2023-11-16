@@ -138,7 +138,6 @@
 // * This crate contains some unsafe code and therefore does not `forbid(unsafe_code)`.
 //   The majority of it is trivial unchecked constructors that are run at compile time;
 //   `universe::owning_guard` contains the scary part.
-#![warn(missing_docs)]
 #![cfg_attr(
     not(any(test, feature = "arbitrary")),
     warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)

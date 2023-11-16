@@ -2,7 +2,7 @@
 //! image outputs of various renderers with each other and reference images.
 
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
-#![allow(missing_docs)]
+#![allow(missing_docs)] // library for internal use only
 #![forbid(unsafe_code)]
 
 use std::fs;

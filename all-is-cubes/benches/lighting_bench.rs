@@ -1,7 +1,9 @@
-use all_is_cubes::math::GridVector;
+#![allow(missing_docs)]
+
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::content::testing::lighting_bench_space;
+use all_is_cubes::math::GridVector;
 use all_is_cubes::time;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::yield_progress_for_testing;

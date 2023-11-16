@@ -2,7 +2,6 @@
 
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
 
 mod webserver;
 pub use webserver::start_server;

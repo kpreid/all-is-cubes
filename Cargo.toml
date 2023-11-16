@@ -91,6 +91,7 @@ rust.unsafe_op_in_unsafe_fn = "deny"
 
 rust.explicit_outlives_requirements = "warn"
 rust.missing_debug_implementations = "warn"
+rust.missing_docs = "warn"
 rust.noop_method_call = "warn"
 rust.trivial_numeric_casts = "warn"
 rust.unused_extern_crates = "warn"

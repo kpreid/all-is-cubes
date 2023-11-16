@@ -4,7 +4,6 @@
 //! most of the modules excluded from compilation.
 
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
-// * TODO: warn(missing_docs), eventually.
 #![forbid(unsafe_code)]
 
 use core::ops;

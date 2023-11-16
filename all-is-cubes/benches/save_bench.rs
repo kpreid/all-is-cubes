@@ -1,5 +1,7 @@
 //! Benchmarks for serialization.
 
+#![allow(missing_docs)]
+
 use core::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};

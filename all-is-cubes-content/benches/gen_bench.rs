@@ -3,6 +3,8 @@
 //! These are directly relevant to app startup performance, and also may be useful
 //! for testing changes to the underlying data structures being built.
 
+#![allow(missing_docs)]
+
 use criterion::{async_executor::FuturesExecutor, criterion_group, criterion_main, Criterion};
 
 use std::time::Duration;

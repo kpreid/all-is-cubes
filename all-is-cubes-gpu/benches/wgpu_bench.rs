@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use std::sync::{Arc, Mutex};
 
 use all_is_cubes::block;
