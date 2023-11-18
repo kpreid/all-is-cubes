@@ -5,7 +5,7 @@
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Resolution};
+use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
 use all_is_cubes::camera::Flaws;
 use all_is_cubes::euclid::point2;
 use all_is_cubes::math::{
@@ -275,7 +275,17 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         let flaws = &mut self.flaws;
 
         let resolution = block.resolution();
-        let voxels = &block.voxels;
+
+        // If `options.ignore_voxels` is set, substitute the block color for the
+        // actual voxels.
+        let tmp_block_color_voxel: Evoxels;
+        let voxels: &Evoxels = if options.ignore_voxels {
+            tmp_block_color_voxel = Evoxels::One(Evoxel::from_color(block.color));
+            &tmp_block_color_voxel
+        } else {
+            &block.voxels
+        };
+
         if let Some(Evoxel {
             color: block_color, ..
         }) = voxels.single_voxel()
