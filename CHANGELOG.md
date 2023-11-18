@@ -5,6 +5,10 @@
 ### Added
 
 - `all-is-cubes` library:
+    - `block::Primitive::Text` allows displaying text as part of a block, without having to separately draw the text as blocks first.
+
+    - `block::BlockAttributes::tick_action` can now specify a time period rather than always occurring on the next tick.
+
     - `math::Axis` is an enum of coordinate axes.
 
     - `math::Cube` represents a unit cube on the grid; it replaces many previous uses of `GridPoint` to identify cubes.
@@ -17,8 +21,6 @@
         - `math::GridRotation::to_positive_octant_transform()`
     
     - `math::Vol` is a more general replacement for `math::GridArray` which allows choice of the data container type (including `&[T]` for borrowing without additional indirection).
-
-    - `block::BlockAttributes::tick_action` can now specify a time period rather than always occurring on the next tick.
 
 ### Changed
 
