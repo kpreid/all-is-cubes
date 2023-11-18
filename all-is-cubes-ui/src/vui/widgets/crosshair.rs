@@ -5,7 +5,6 @@ use all_is_cubes::block::{Block, AIR};
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use all_is_cubes::math::{Cube, GridVector};
 use all_is_cubes::space::SpaceTransaction;
-use all_is_cubes::time::Tick;
 
 use crate::vui;
 
@@ -54,9 +53,9 @@ pub(crate) struct CrosshairController {
 impl vui::WidgetController for CrosshairController {
     fn step(
         &mut self,
-        _tick: Tick,
-    ) -> Result<vui::WidgetTransaction, Box<dyn Error + Send + Sync>> {
-        Ok(if self.todo.get_and_clear() {
+        _: &vui::WidgetContext<'_>,
+    ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
+        let txn = if self.todo.get_and_clear() {
             let d = &*self.definition;
             SpaceTransaction::set_cube(
                 self.position,
@@ -69,6 +68,8 @@ impl vui::WidgetController for CrosshairController {
             )
         } else {
             SpaceTransaction::default()
-        })
+        };
+
+        Ok((txn, vui::Then::Step))
     }
 }

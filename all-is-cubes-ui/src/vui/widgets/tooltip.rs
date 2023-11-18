@@ -18,7 +18,7 @@ use all_is_cubes::time::{Duration, Tick};
 use all_is_cubes::universe::{URef, Universe};
 
 use crate::ui_content::hud::{HudBlocks, HudFont};
-use crate::vui::{LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction};
+use crate::vui::{self, LayoutRequest, Layoutable, Widget, WidgetController};
 
 #[derive(Debug)]
 pub(crate) struct TooltipState {
@@ -238,7 +238,7 @@ struct TooltipController {
 }
 
 impl WidgetController for TooltipController {
-    fn initialize(&mut self) -> Result<WidgetTransaction, crate::vui::InstallVuiError> {
+    fn initialize(&mut self) -> Result<vui::WidgetTransaction, crate::vui::InstallVuiError> {
         let toolbar_text_blocks = space_to_blocks(
             Tooltip::RESOLUTION,
             BlockAttributes {
@@ -272,14 +272,17 @@ impl WidgetController for TooltipController {
         Ok(txn)
     }
 
-    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
+    fn step(
+        &mut self,
+        context: &vui::WidgetContext<'_>,
+    ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
         // None if no update is needed
         let text_update: Option<ArcStr> = self
             .definition
             .state
             .try_lock()
             .ok()
-            .and_then(|mut state| state.step(&self.definition.hud_blocks, tick));
+            .and_then(|mut state| state.step(&self.definition.hud_blocks, context.tick()));
 
         if let Some(text) = text_update {
             self.definition.text_space.try_modify(|text_space| {
@@ -303,7 +306,7 @@ impl WidgetController for TooltipController {
                 Ok::<(), Box<dyn Error + Send + Sync>>(())
             })??;
         }
-        Ok(WidgetTransaction::default())
+        Ok((vui::WidgetTransaction::default(), vui::Then::Step))
     }
 }
 

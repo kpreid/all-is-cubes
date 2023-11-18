@@ -30,7 +30,6 @@ use all_is_cubes::linking::{self, InGenError};
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use all_is_cubes::math::{Cube, Face6, GridAab, GridCoordinate, GridVector, Gridgid, Rgba};
 use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
-use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{URef, Universe};
 
@@ -288,14 +287,18 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
             .map_err(|error| vui::InstallVuiError::Conflict { error })
     }
 
-    fn step(&mut self, _: Tick) -> Result<vui::WidgetTransaction, Box<dyn Error + Send + Sync>> {
-        Ok(
+    fn step(
+        &mut self,
+        _: &vui::WidgetContext<'_>,
+    ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
+        Ok((
             if self.todo.get_and_clear() || self.recently_pressed.load(Relaxed) > 0 {
                 self.icon_txn()
             } else {
                 SpaceTransaction::default()
             },
-        )
+            vui::Then::Step,
+        ))
     }
 }
 

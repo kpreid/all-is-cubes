@@ -15,14 +15,14 @@ use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
 use all_is_cubes::listen::{DirtyFlag, Gate, Listen as _, ListenableSource, Listener};
 use all_is_cubes::math::{Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid};
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
-use all_is_cubes::time::{Duration, Tick};
+use all_is_cubes::time::Duration;
 use all_is_cubes::transaction::Merge as _;
 use all_is_cubes::universe::{URef, Universe};
 
 use crate::ui_content::{hud::HudBlocks, CueMessage, CueNotifier};
 use crate::vui::blocks::ToolbarButtonState;
 use crate::vui::{
-    InstallVuiError, LayoutRequest, Layoutable, UiBlocks, Widget, WidgetController,
+    self, InstallVuiError, LayoutRequest, Layoutable, UiBlocks, Widget, WidgetController,
     WidgetTransaction,
 };
 
@@ -318,7 +318,10 @@ impl WidgetController for ToolbarController {
         Ok(txn)
     }
 
-    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
+    fn step(
+        &mut self,
+        context: &vui::WidgetContext<'_>,
+    ) -> Result<(WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
         if self.todo_change_character.get_and_clear() {
             self.character = self.definition.character_source.snapshot();
 
@@ -340,7 +343,7 @@ impl WidgetController for ToolbarController {
                     // include a final goes-to-zero update
                     should_update_pointers = true;
                 }
-                *t = t.saturating_sub(tick.delta_t());
+                *t = t.saturating_sub(context.tick().delta_t());
                 pressed_buttons[i] = *t != Duration::ZERO;
             }
         }
@@ -354,10 +357,10 @@ impl WidgetController for ToolbarController {
                 self.write_items(&character.inventory().slots)?
             } else {
                 // TODO: clear toolbar ... once self.inventory_source can transition from Some to None at all
-                WidgetTransaction::default()
+                vui::WidgetTransaction::default()
             }
         } else {
-            WidgetTransaction::default()
+            vui::WidgetTransaction::default()
         };
 
         // should_update_inventory is currently true when the selected_slots value changes.
@@ -370,10 +373,10 @@ impl WidgetController for ToolbarController {
                 self.write_pointers(&[], pressed_buttons)?
             }
         } else {
-            WidgetTransaction::default()
+            vui::WidgetTransaction::default()
         };
 
-        Ok(slots_txn.merge(pointers_txn).unwrap())
+        Ok((slots_txn.merge(pointers_txn).unwrap(), vui::Then::Step))
     }
 }
 

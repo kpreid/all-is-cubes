@@ -1,5 +1,6 @@
 //! UI [`Widget`] trait and related glue.
 
+use all_is_cubes::time::Tick;
 use alloc::sync::Arc;
 use core::fmt::Debug;
 use std::error::Error;
@@ -8,10 +9,12 @@ use std::sync::Mutex;
 use all_is_cubes::behavior::{self, Behavior};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::{self, Space, SpaceTransaction};
-use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::{self, Merge as _};
 use all_is_cubes::universe::{RefVisitor, UniverseTransaction, VisitRefs};
 use all_is_cubes::util::maybe_sync::SendSyncIfStd;
+
+// reused for WidgetController
+pub use all_is_cubes::behavior::Then;
 
 use crate::vui::{validate_widget_transaction, LayoutGrant, Layoutable, Positioned};
 
@@ -89,20 +92,25 @@ pub trait WidgetController: Debug + SendSyncIfStd + 'static {
     /// Called every frame to update the state of the space to match the current state of
     /// the widget's data sources or user interaction.
     ///
-    /// TODO: Arrange a waking mechanism so that the widget need not be called every frame.
+    /// If this is not overridden, it will do nothing and the controller will be dropped.
     ///
     /// TODO: Be more specific than `Box<dyn Error>`
     ///
-    /// TODO: If this is not overridden, arrange to automatically drop the controller for efficiency
-    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
-        let _ = tick;
-        Ok(WidgetTransaction::default())
+    fn step(
+        &mut self,
+        context: &WidgetContext<'_>,
+    ) -> Result<(WidgetTransaction, Then), Box<dyn Error + Send + Sync>> {
+        let _ = context;
+        Ok((WidgetTransaction::default(), Then::Drop))
     }
 }
 
 impl WidgetController for Box<dyn WidgetController> {
-    fn step(&mut self, tick: Tick) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
-        (**self).step(tick)
+    fn step(
+        &mut self,
+        context: &WidgetContext<'_>,
+    ) -> Result<(WidgetTransaction, Then), Box<dyn Error + Send + Sync>> {
+        (**self).step(context)
     }
 
     fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
@@ -159,25 +167,36 @@ impl VisitRefs for WidgetBehavior {
 }
 
 impl Behavior<Space> for WidgetBehavior {
-    fn step(
-        &self,
-        context: &behavior::BehaviorContext<'_, Space>,
-    ) -> (UniverseTransaction, behavior::Then) {
-        // TODO: pass waker to the widget controller and change `Then` to `Sleep`.
-        let txn = self
+    fn step(&self, context: &behavior::BehaviorContext<'_, Space>) -> (UniverseTransaction, Then) {
+        let (txn, then) = self
             .controller
             .lock()
             .unwrap()
-            .step(context.tick)
+            .step(&WidgetContext {
+                behavior_context: context,
+            })
             .expect("TODO: behaviors should have an error reporting path");
         // TODO: should be using the attachment bounds instead of the layout grant to validate bounds
         validate_widget_transaction(&self.widget.value, &txn, &self.widget.position)
             .expect("transaction validation failed");
-        (context.bind_host(txn), behavior::Then::Step)
+        (context.bind_host(txn), then)
     }
 
     fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
         None
+    }
+}
+
+/// Context passed to [`WidgetController::step()`].
+#[derive(Debug)]
+pub struct WidgetContext<'a> {
+    behavior_context: &'a behavior::BehaviorContext<'a, Space>,
+}
+
+impl<'a> WidgetContext<'a> {
+    /// The time tick that is currently passing, causing this step.
+    pub fn tick(&self) -> Tick {
+        self.behavior_context.tick
     }
 }
 
