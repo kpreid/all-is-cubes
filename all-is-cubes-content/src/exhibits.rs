@@ -11,7 +11,6 @@ use exhaust::Exhaust as _;
 use rand::SeedableRng as _;
 
 use all_is_cubes::arcstr::literal;
-use all_is_cubes::block;
 use all_is_cubes::content::load_image::{default_srgb, space_from_image};
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::drawing::{
@@ -328,14 +327,8 @@ async fn TEXT(_: &Exhibit, _universe: &mut Universe) {
     let mut space = Space::builder(bounds_for_text).build();
 
     for text in texts {
-        space
-            .fill(text.bounding_blocks(), |cube| {
-                // TODO: should be able to make the translation happen smoothly
-                Some(Block::from_primitive(block::Primitive::Text {
-                    text: text.clone(),
-                    offset: cube.lower_bounds().to_vector(),
-                }))
-            })
+        text.installation(Gridgid::IDENTITY, core::convert::identity)
+            .execute(&mut space, &mut transaction::no_outputs)
             .unwrap();
     }
 

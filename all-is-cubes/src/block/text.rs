@@ -7,10 +7,11 @@ use embedded_graphics as eg;
 use embedded_graphics::{prelude::Dimensions as _, Drawable as _};
 use euclid::vec3;
 
-use crate::block::{self, BlockAttributes, EvalBlockError, Evoxel, MinEval, Resolution};
+use crate::block::{self, Block, BlockAttributes, EvalBlockError, Evoxel, MinEval, Resolution};
 use crate::content::palette;
 use crate::drawing::{rectangle_to_aab, DrawingPlane};
 use crate::math::{GridAab, GridCoordinate, GridPoint, GridVector, Gridgid, Rgb, Vol};
+use crate::space::{self, SpaceTransaction};
 use crate::universe;
 
 #[cfg(doc)]
@@ -85,6 +86,37 @@ impl Text {
                 text_aab.divide(resolution.into())
             },
         )
+    }
+
+    /// Returns a transaction which places [`Primitive::Text`] blocks containing this text.
+    ///
+    /// The text lies within the volume [`Self::bounding_blocks()`] transformed by `transform`.
+    ///
+    /// Each individual block is given to `block_fn` to allow alterations.
+    ///
+    /// The transaction has no preconditions.
+    pub fn installation(
+        &self,
+        transform: Gridgid,
+        block_fn: impl Fn(Block) -> Block,
+    ) -> SpaceTransaction {
+        let dst_to_src_transform = transform.inverse();
+        let block_rotation = transform.rotation;
+        SpaceTransaction::filling(self.bounding_blocks(), |cube| {
+            space::CubeTransaction::replacing(
+                None,
+                Some(block_fn(
+                    Block::from_primitive(block::Primitive::Text {
+                        text: self.clone(),
+                        offset: dst_to_src_transform
+                            .transform_cube(cube)
+                            .lower_bounds()
+                            .to_vector(),
+                    })
+                    .rotate(block_rotation),
+                )),
+            )
+        })
     }
 
     pub(crate) fn evaluate(
