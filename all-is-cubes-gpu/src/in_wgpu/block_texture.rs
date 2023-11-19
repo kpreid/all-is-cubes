@@ -351,18 +351,8 @@ impl AllocatorBacking {
                 });
                 fn copy(encoder: &mut wgpu::CommandEncoder, old: &GpuTexture, new: &GpuTexture) {
                     encoder.copy_texture_to_texture(
-                        wgpu::ImageCopyTexture {
-                            texture: &old.texture,
-                            mip_level: 0,
-                            origin: wgpu::Origin3d::ZERO,
-                            aspect: wgpu::TextureAspect::default(),
-                        },
-                        wgpu::ImageCopyTexture {
-                            texture: &new.texture,
-                            mip_level: 0,
-                            origin: wgpu::Origin3d::ZERO,
-                            aspect: wgpu::TextureAspect::default(),
-                        },
+                        old.texture.as_image_copy(),
+                        new.texture.as_image_copy(),
                         old.texture.size(),
                     );
                 }

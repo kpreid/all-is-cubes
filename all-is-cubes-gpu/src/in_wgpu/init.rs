@@ -157,12 +157,7 @@ where
     {
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         encoder.copy_texture_to_buffer(
-            wgpu::ImageCopyTexture {
-                texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
+            texture.as_image_copy(),
             wgpu::ImageCopyBuffer {
                 buffer: &temp_buffer,
                 layout: wgpu::ImageDataLayout {
