@@ -124,26 +124,23 @@ impl Tool {
             }
             Self::RemoveBlock { keep } => {
                 let cursor = input.cursor()?;
-                let deletion = input.set_cube(cursor.cube(), cursor.hit().block.clone(), AIR)?;
-                Ok((
-                    Some(self),
-                    if keep {
-                        deletion
-                            .merge(
-                                input.produce_items(
-                                    cursor
-                                        .hit()
-                                        .block
-                                        .unspecialize()
-                                        .into_iter()
-                                        .map(Tool::Block),
-                                )?,
-                            )
-                            .unwrap()
-                    } else {
-                        deletion
-                    },
-                ))
+                let mut deletion =
+                    input.set_cube(cursor.cube(), cursor.hit().block.clone(), AIR)?;
+                if keep {
+                    deletion
+                        .merge_from(
+                            input.produce_items(
+                                cursor
+                                    .hit()
+                                    .block
+                                    .unspecialize()
+                                    .into_iter()
+                                    .map(Tool::Block),
+                            )?,
+                        )
+                        .unwrap();
+                }
+                Ok((Some(self), deletion))
             }
             Self::Block(ref block) => {
                 let cursor = input.cursor()?;
@@ -246,16 +243,15 @@ impl Tool {
                 )?;
                 let mut txn = space_txn.bind(cursor.space().clone());
                 if inventory_txn != InventoryTransaction::default() {
-                    txn = txn
-                        .merge(CharacterTransaction::inventory(inventory_txn).bind(
-                            input.character.as_ref().cloned().ok_or_else(|| {
-                                ToolError::Internal(format!(
-                                    "operation produced inventory transaction \
+                    txn.merge_from(CharacterTransaction::inventory(inventory_txn).bind(
+                        input.character.as_ref().cloned().ok_or_else(|| {
+                            ToolError::Internal(format!(
+                                "operation produced inventory transaction \
                                     without being given an inventory: {op:?}"
-                                ))
-                            })?,
-                        ))
-                        .unwrap();
+                            ))
+                        })?,
+                    ))
+                    .unwrap();
                 }
                 Ok((Some(self), txn))
             }
@@ -756,24 +752,20 @@ mod tests {
                 .equip_and_use_tool(Tool::RemoveBlock { keep })
                 .unwrap();
 
-            let expected_delete =
+            let mut expected_delete =
                 SpaceTransaction::set_cube([1, 0, 0], Some(existing.clone()), Some(AIR))
                     .bind(tester.space_ref.clone());
-            assert_eq!(
-                actual_transaction,
-                if keep {
-                    expected_delete
-                        .merge(
-                            CharacterTransaction::inventory(InventoryTransaction::insert([
-                                Tool::Block(existing),
-                            ]))
-                            .bind(tester.character_ref.clone()),
-                        )
-                        .unwrap()
-                } else {
-                    expected_delete
-                }
-            );
+            if keep {
+                expected_delete
+                    .merge_from(
+                        CharacterTransaction::inventory(InventoryTransaction::insert([
+                            Tool::Block(existing),
+                        ]))
+                        .bind(tester.character_ref.clone()),
+                    )
+                    .unwrap();
+            }
+            assert_eq!(actual_transaction, expected_delete);
 
             actual_transaction
                 .execute(&mut tester.universe, &mut drop)
@@ -819,25 +811,21 @@ mod tests {
             let mut expected_cube_transaction =
                 SpaceTransaction::set_cube(Cube::ORIGIN, Some(AIR), Some(tool_block.clone()));
             expected_cube_transaction.add_fluff(Cube::ORIGIN, Fluff::PlaceBlockGeneric);
-            let expected_cube_transaction =
+            let mut expected_cube_transaction =
                 expected_cube_transaction.bind(tester.space_ref.clone());
-            assert_eq!(
-                transaction,
-                if expect_consume {
-                    expected_cube_transaction
-                        .merge(
-                            CharacterTransaction::inventory(InventoryTransaction::replace(
-                                0,
-                                Slot::from(tool.clone()),
-                                Slot::Empty,
-                            ))
-                            .bind(tester.character_ref.clone()),
-                        )
-                        .unwrap()
-                } else {
-                    expected_cube_transaction
-                }
-            );
+            if expect_consume {
+                expected_cube_transaction
+                    .merge_from(
+                        CharacterTransaction::inventory(InventoryTransaction::replace(
+                            0,
+                            Slot::from(tool.clone()),
+                            Slot::Empty,
+                        ))
+                        .bind(tester.character_ref.clone()),
+                    )
+                    .unwrap();
+            }
+            assert_eq!(transaction, expected_cube_transaction);
 
             transaction
                 .execute(&mut tester.universe, &mut drop)

@@ -3,7 +3,7 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::any::type_name;
-use core::fmt;
+use core::{fmt, mem};
 
 use crate::universe::{URef, UTransactional, UniverseTransaction};
 use crate::util::ErrorIfStd;
@@ -32,7 +32,7 @@ pub use tester::*;
 /// work may include building on this to provide undo/redo functionality.
 ///
 /// If a transaction implements [`Default`], then the default value should be a
-/// transaction which has no effects and always succeeds.
+/// transaction which has no effects and always succeeds, and is cheap to create.
 #[must_use]
 pub trait Transaction<T: ?Sized>: Merge {
     /// Type of a value passed from [`Transaction::check`] to [`Transaction::commit`].
@@ -175,6 +175,23 @@ pub trait Merge {
     {
         let check = self.check_merge(&other)?;
         Ok(self.commit_merge(other, check))
+    }
+
+    /// Combines two transactions into one which has both effects simultaneously, if possible.
+    ///
+    /// If successful, then `self` now includes `other`. If unsuccessful, `self` is unchanged.
+    ///
+    /// This is a shortcut for calling [`Self::check_merge`] followed by [`Self::commit_merge`].
+    /// It should not be necessary to override the provided implementation.
+    fn merge_from(&mut self, other: Self) -> Result<(), Self::Conflict>
+    where
+        Self: Default,
+    {
+        let check = self.check_merge(&other)?;
+        // TODO: redefine commit_merge() in terms of &mut self so we don't need a Default
+        let this = mem::take(self);
+        *self = this.commit_merge(other, check);
+        Ok(())
     }
 }
 

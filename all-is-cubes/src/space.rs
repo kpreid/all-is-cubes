@@ -572,8 +572,8 @@ impl Space {
                 ) {
                     Ok((space_txn, inventory_txn)) => {
                         assert_eq!(inventory_txn, InventoryTransaction::default());
-                        tick_txn = tick_txn
-                            .merge(space_txn)
+                        tick_txn
+                            .merge_from(space_txn)
                             .expect("TODO: don't panic on tick conflict");
                     }
                     Err(_) => {

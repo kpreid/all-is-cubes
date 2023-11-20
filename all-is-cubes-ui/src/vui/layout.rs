@@ -445,8 +445,7 @@ impl LayoutTree<Positioned<Arc<dyn Widget>>> {
                 widget.controller(position),
             )?;
             validate_widget_transaction(value, &controller_installation, position)?;
-            txn = txn
-                .merge(controller_installation)
+            txn.merge_from(controller_installation)
                 .map_err(|error| InstallVuiError::Conflict { error })?;
         }
         Ok(txn)

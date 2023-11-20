@@ -53,8 +53,7 @@ mod behavior {
                         attachment,
                     } in behaviors
                     {
-                        txn = txn
-                            .merge(BehaviorSetTransaction::insert(attachment, behavior.into()))
+                        txn.merge_from(BehaviorSetTransaction::insert(attachment, behavior.into()))
                             .expect("BehaviorSet merge failure");
                     }
 

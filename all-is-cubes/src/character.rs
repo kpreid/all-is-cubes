@@ -345,8 +345,8 @@ impl Character {
                     fluff,
                 ))
             }) {
-                result_transaction = result_transaction
-                    .merge(txn.bind(self.space.clone()))
+                result_transaction
+                    .merge_from(txn.bind(self.space.clone()))
                     .unwrap(); // cannot fail
             }
 
@@ -362,14 +362,14 @@ impl Character {
             if self.velocity_input.y > 0. {
                 if let Some((slot_index, false)) = find_jetpacks(&self.inventory).next() {
                     if let Ok(t) = self.inventory.use_tool(None, self_ref, slot_index) {
-                        result_transaction = result_transaction.merge(t).unwrap();
+                        result_transaction.merge_from(t).unwrap();
                     }
                 }
             } else if self.is_on_ground() {
                 for (slot_index, active) in find_jetpacks(&self.inventory) {
                     if active {
                         if let Ok(t) = self.inventory.use_tool(None, self_ref.clone(), slot_index) {
-                            result_transaction = result_transaction.merge(t).unwrap();
+                            result_transaction.merge_from(t).unwrap();
                         }
                     }
                 }
@@ -386,8 +386,8 @@ impl Character {
                 CharacterTransaction::behaviors,
                 tick,
             );
-            result_transaction = result_transaction
-                .merge(t)
+            result_transaction
+                .merge_from(t)
                 .expect("TODO: we should be applying these transactions separately");
         };
 

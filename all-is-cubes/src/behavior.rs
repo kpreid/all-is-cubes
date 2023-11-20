@@ -864,12 +864,11 @@ mod tests {
                 delta_yaw: FreeCoordinate::from(self.foo),
             }));
             if self.then != Then::Drop {
-                txn = txn
-                    .merge(context.replace_self(SelfModifyingBehavior {
-                        foo: self.foo + 1,
-                        ..self.clone()
-                    }))
-                    .unwrap();
+                txn.merge_from(context.replace_self(SelfModifyingBehavior {
+                    foo: self.foo + 1,
+                    ..self.clone()
+                }))
+                .unwrap();
             }
             (txn, self.then.clone())
         }
