@@ -439,10 +439,9 @@ impl Merge for InventoryTransaction {
         Ok(())
     }
 
-    fn commit_merge(mut self, other: Self, (): Self::MergeCheck) -> Self {
+    fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
         self.replace.extend(other.replace);
         self.insert.extend(other.insert);
-        self
     }
 }
 

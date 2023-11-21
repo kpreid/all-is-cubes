@@ -97,9 +97,8 @@ where
         self.transaction.check_merge(&other.transaction)
     }
 
-    fn commit_merge(mut self, other: Self, check: Self::MergeCheck) -> Self {
-        self.transaction = self.transaction.commit_merge(other.transaction, check);
-        self
+    fn commit_merge(&mut self, other: Self, check: Self::MergeCheck) {
+        self.transaction.commit_merge(other.transaction, check);
     }
 }
 
@@ -149,16 +148,14 @@ impl fmt::Debug for AnyTransaction {
 
 /// Called from `impl Merge for AnyTransaction`
 pub(in crate::universe) fn anytxn_merge_helper<O>(
-    t1: TransactionInUniverse<O>,
+    t1: &mut TransactionInUniverse<O>,
     t2: TransactionInUniverse<O>,
-    rewrapper: fn(TransactionInUniverse<O>) -> AnyTransaction,
     check: AnyTransactionCheck, // contains <TransactionInUniverse<O> as Transaction<()>>::MergeCheck,
-) -> AnyTransaction
-where
+) where
     O: Transactional,
     TransactionInUniverse<O>: Transaction<()>,
 {
-    rewrapper(t1.commit_merge(t2, *check.downcast().unwrap()))
+    t1.commit_merge(t2, *check.downcast().unwrap())
 }
 
 /// Called from `impl Commit for AnyTransaction`
@@ -450,19 +447,22 @@ impl Merge for UniverseTransaction {
         Ok(UniverseMergeCheck(members))
     }
 
-    fn commit_merge(self, other: Self, UniverseMergeCheck(check): Self::MergeCheck) -> Self
-    where
-        Self: Sized,
-    {
-        let mut anonymous_insertions = self.anonymous_insertions;
-        anonymous_insertions.extend(other.anonymous_insertions);
-
-        UniverseTransaction {
-            members: self.members.commit_merge(other.members, check),
-            universe_id: self.universe_id.or(other.universe_id),
+    fn commit_merge(&mut self, other: Self, UniverseMergeCheck(check): Self::MergeCheck) {
+        let Self {
+            members,
             anonymous_insertions,
-            behaviors: self.behaviors.commit_merge(other.behaviors, ()),
-        }
+            behaviors,
+            universe_id,
+        } = self;
+
+        members.commit_merge(other.members, check);
+        anonymous_insertions.extend(other.anonymous_insertions);
+        behaviors.commit_merge(other.behaviors, ());
+        transaction::merge_option(
+            universe_id,
+            other.universe_id,
+            transaction::panic_if_not_equal,
+        );
     }
 }
 
@@ -662,20 +662,23 @@ impl Merge for MemberTxn {
         }
     }
 
-    fn commit_merge(self, other: Self, MemberMergeCheck(check): Self::MergeCheck) -> Self
+    fn commit_merge(&mut self, other: Self, MemberMergeCheck(check): Self::MergeCheck)
     where
         Self: Sized,
     {
         use MemberTxn::*;
         match (self, other) {
-            (Noop, t) | (t, Noop) => {
+            (t1 @ Noop, t2) => {
                 assert!(check.is_none());
-                t
+                *t1 = t2;
+            }
+            (_, Noop) => {
+                assert!(check.is_none());
             }
             (Modify(t1), Modify(t2)) => {
-                Modify(t1.commit_merge(t2, check.expect("missing check value")))
+                t1.commit_merge(t2, check.expect("missing check value"));
             }
-            (t @ Delete, Delete) => t,
+            (Delete, Delete) => {}
             (a @ Insert(_), b) | (a, b @ Insert(_)) | (a @ Delete, b) | (a, b @ Delete) => {
                 panic!(
                     "Invalid merge check: tried to merge {a:?} with {b:?}, \

@@ -723,9 +723,9 @@ impl transaction::Merge for BodyTransaction {
         Ok(())
     }
 
-    fn commit_merge(mut self, other: Self, (): Self::MergeCheck) -> Self {
-        self.delta_yaw += other.delta_yaw;
-        self
+    fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
+        let Self { delta_yaw } = self;
+        *delta_yaw += other.delta_yaw;
     }
 }
 

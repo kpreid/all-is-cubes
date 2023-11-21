@@ -123,7 +123,7 @@ pub trait Transaction<T: ?Sized>: Merge {
 /// implementation `.merge()` refers to.
 ///
 /// TODO: Generalize to different RHS types for convenient combination?
-pub trait Merge {
+pub trait Merge: Sized {
     /// Type of a value passed from [`Merge::check_merge`] to [`Merge::commit_merge`].
     /// This may be used to pass precalculated values to speed up the merge phase,
     /// but also makes it difficult to accidentally merge without checking.
@@ -143,7 +143,7 @@ pub trait Merge {
     type Conflict: fmt::Debug + fmt::Display + 'static;
 
     /// Checks whether two transactions can be merged into a single transaction.
-    /// If so, returns [`Ok`] containing data which may be passed to [`Self::merge`].
+    /// If so, returns [`Ok`] containing data which may be passed to [`Self::commit_merge()`].
     ///
     /// Generally, “can be merged” means that the two transactions do not have mutually
     /// exclusive preconditions and are not specify conflicting mutations. However, the
@@ -151,30 +151,24 @@ pub trait Merge {
     /// velocity” transactions may produce an “add 2 to velocity” transaction.
     ///
     /// This is not necessarily the same as either ordering of applying the two
-    /// transactions sequentially. See [`Self::commit_merge`] for more details.
+    /// transactions sequentially. See [`Self::commit_merge()`] for more details.
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict>;
 
-    /// Combines two transactions into one which has both effects simultaneously.
+    /// Combines `other` into `self` so that it has both effects simultaneously.
     /// This operation must be commutative and have [`Default::default()`] as the identity.
     ///
     /// May panic if `check` is not the result of a previous call to
     /// `self.check_merge(&other)` or if either transaction was mutated in the intervening
     /// time.
-    #[must_use]
-    fn commit_merge(self, other: Self, check: Self::MergeCheck) -> Self
-    where
-        Self: Sized;
+    fn commit_merge(&mut self, other: Self, check: Self::MergeCheck);
 
     /// Combines two transactions into one which has both effects simultaneously, if possible.
     ///
     /// This is a shortcut for calling [`Self::check_merge`] followed by [`Self::commit_merge`].
     /// It should not be necessary to override the provided implementation.
-    fn merge(self, other: Self) -> Result<Self, Self::Conflict>
-    where
-        Self: Sized,
-    {
-        let check = self.check_merge(&other)?;
-        Ok(self.commit_merge(other, check))
+    fn merge(mut self, other: Self) -> Result<Self, Self::Conflict> {
+        self.merge_from(other)?;
+        Ok(self)
     }
 
     /// Combines two transactions into one which has both effects simultaneously, if possible.
@@ -183,14 +177,9 @@ pub trait Merge {
     ///
     /// This is a shortcut for calling [`Self::check_merge`] followed by [`Self::commit_merge`].
     /// It should not be necessary to override the provided implementation.
-    fn merge_from(&mut self, other: Self) -> Result<(), Self::Conflict>
-    where
-        Self: Default,
-    {
+    fn merge_from(&mut self, other: Self) -> Result<(), Self::Conflict> {
         let check = self.check_merge(&other)?;
-        // TODO: redefine commit_merge() in terms of &mut self so we don't need a Default
-        let this = mem::take(self);
-        *self = this.commit_merge(other, check);
+        self.commit_merge(other, check);
         Ok(())
     }
 }
@@ -333,3 +322,24 @@ pub type NoOutput = core::convert::Infallible; // TODO: use `!` never type if it
 /// Output callback function for committing a [`Transaction`] whose `Output` type is
 /// [`NoOutput`] and therefore cannot produce any outputs.
 pub fn no_outputs(_: NoOutput) {}
+
+/// Implementation of committing a merge for two [`Option`]al fields.
+///
+/// `if_both` is called in the case where both Options have a value.
+pub(crate) fn merge_option<T>(this: &mut Option<T>, other: Option<T>, if_both: fn(T, T) -> T) {
+    match (this, other) {
+        (None, None) => {}
+        (this @ None, other @ Some(_)) => *this = other,
+        (Some(_), None) => {}
+        (this @ Some(_), Some(other)) => *this = Some(if_both(mem::take(this).unwrap(), other)),
+    }
+}
+
+/// For use with `merge_option()`.
+pub(crate) fn panic_if_not_equal<T: PartialEq>(a: T, b: T) -> T {
+    if a == b {
+        a
+    } else {
+        panic!("transaction being merged contains conflicting elements");
+    }
+}

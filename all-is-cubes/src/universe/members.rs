@@ -343,12 +343,12 @@ macro_rules! member_enums_and_impls {
                 }
             }
 
-            fn commit_merge(self, other: Self, check: Self::MergeCheck) -> Self {
+            fn commit_merge(&mut self, other: Self, check: Self::MergeCheck) {
                 match (self, other) {
-                    (t1, Self::Noop) => t1,
-                    (Self::Noop, t2) => t2,
+                    (_t1, Self::Noop) => {},
+                    (t1 @ Self::Noop, t2) => *t1 = t2,
                     $( (Self::$member_type(t1), Self::$member_type(t2)) => {
-                        ut::anytxn_merge_helper(t1, t2, Self::$member_type, check)
+                        ut::anytxn_merge_helper(t1, t2, check)
                     } )*
                     (_, _) => panic!("Mismatched transaction target types"),
                 }

@@ -62,24 +62,22 @@ where
         Ok(checks)
     }
 
-    fn commit_merge(mut self, mut other: Self, mut check: Self::MergeCheck) -> Self {
+    fn commit_merge(&mut self, mut other: Self, mut check: Self::MergeCheck) {
         if other.len() > self.len() {
-            mem::swap(&mut self, &mut other);
+            mem::swap(self, &mut other);
         }
         for (k, v2) in other {
             use alloc::collections::btree_map::Entry::*;
             match self.entry(k) {
                 Occupied(mut entry) => {
-                    let v1 = mem::take(entry.get_mut());
                     let entry_check = check.remove(entry.key()).unwrap();
-                    *entry.get_mut() = v1.commit_merge(v2, entry_check);
+                    entry.get_mut().commit_merge(v2, entry_check);
                 }
                 Vacant(entry) => {
                     entry.insert(v2);
                 }
             }
         }
-        self
     }
 }
 
@@ -118,24 +116,22 @@ macro_rules! hashmap_merge {
                 Ok(checks)
             }
 
-            fn commit_merge(mut self, mut other: Self, mut check: Self::MergeCheck) -> Self {
+            fn commit_merge(&mut self, mut other: Self, mut check: Self::MergeCheck) {
                 if other.len() > self.len() {
-                    mem::swap(&mut self, &mut other);
+                    mem::swap(self, &mut other);
                 }
                 for (k, v2) in other {
                     use $module::Entry::*;
                     match self.entry(k) {
                         Occupied(mut entry) => {
-                            let v1 = mem::take(entry.get_mut());
                             let entry_check = check.remove(entry.key()).unwrap();
-                            *entry.get_mut() = v1.commit_merge(v2, entry_check);
+                            entry.get_mut().commit_merge(v2, entry_check);
                         }
                         Vacant(entry) => {
                             entry.insert(v2);
                         }
                     }
                 }
-                self
             }
         }
     };

@@ -356,14 +356,10 @@ impl transaction::Merge for BlockDefTransaction {
         }
     }
 
-    fn commit_merge(self, other: Self, (): Self::MergeCheck) -> Self
-    where
-        Self: Sized,
-    {
-        Self {
-            old: self.old.or(other.old),
-            new: self.new.or(other.new),
-        }
+    fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
+        let Self { old, new } = self;
+        transaction::merge_option(old, other.old, |a, _| a);
+        transaction::merge_option(new, other.new, |a, _| a);
     }
 }
 

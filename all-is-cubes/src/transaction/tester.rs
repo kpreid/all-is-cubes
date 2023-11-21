@@ -145,12 +145,12 @@ where
     Tr: Transaction<Ta>,
     Ta: 'a,
 {
-    fn try_merge(self, other: Self) -> Option<Self> {
+    fn try_merge(mut self, other: Self) -> Option<Self> {
         let merge_check = self.transaction.check_merge(&other.transaction).ok()?;
+        self.transaction
+            .commit_merge(other.transaction, merge_check);
         Some(TransactionAndPredicate {
-            transaction: self
-                .transaction
-                .commit_merge(other.transaction, merge_check),
+            transaction: self.transaction,
             predicate: {
                 let p1 = Rc::clone(&self.predicate);
                 let p2 = Rc::clone(&other.predicate);

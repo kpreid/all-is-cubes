@@ -14,7 +14,7 @@ use crate::fluff::Fluff;
 use crate::math::{Cube, GridCoordinate, GridPoint, Gridgid};
 use crate::space::{ActivatableRegion, GridAab, SetCubeError, Space};
 use crate::transaction::{
-    no_outputs, CommitError, Merge, NoOutput, PreconditionFailed, Transaction, Transactional,
+    self, no_outputs, CommitError, Merge, NoOutput, PreconditionFailed, Transaction, Transactional,
 };
 use crate::util::{ConciseDebug, Refmt as _};
 
@@ -75,11 +75,11 @@ impl SpaceTransaction {
                 Ok(())
             }
             Occupied(mut entry) => {
-                let existing_ref = entry.get_mut();
+                let existing_ref: &mut CubeTransaction = entry.get_mut();
                 let check = existing_ref
                     .check_merge(&ct)
                     .map_err(|conflict| SpaceTransactionConflict::Cube { cube, conflict })?;
-                *existing_ref = mem::take(existing_ref).commit_merge(ct, check);
+                existing_ref.commit_merge(ct, check);
                 Ok(())
             }
         }
@@ -374,23 +374,25 @@ impl Merge for SpaceTransaction {
             .map_err(SpaceTransactionConflict::Behaviors)
     }
 
-    fn commit_merge(mut self, mut other: Self, check: Self::MergeCheck) -> Self {
-        if other.cubes.len() > self.cubes.len() {
-            mem::swap(&mut self, &mut other);
+    fn commit_merge(&mut self, mut other: Self, check: Self::MergeCheck) {
+        let Self { cubes, behaviors } = self;
+
+        if other.cubes.len() > cubes.len() {
+            // Whichever cube set is shorter, iterate that one
+            mem::swap(cubes, &mut other.cubes);
         }
         for (cube, t2) in other.cubes {
-            match self.cubes.entry(cube) {
+            match cubes.entry(cube) {
                 Occupied(mut entry) => {
-                    let t1_ref = entry.get_mut();
-                    *t1_ref = mem::take(t1_ref).commit_merge(t2, CubeMergeCheck {});
+                    entry.get_mut().commit_merge(t2, CubeMergeCheck {});
                 }
                 Vacant(entry) => {
                     entry.insert(t2);
                 }
             }
         }
-        self.behaviors = self.behaviors.commit_merge(other.behaviors, check);
-        self
+
+        behaviors.commit_merge(other.behaviors, check);
     }
 }
 
@@ -531,22 +533,24 @@ impl Merge for CubeTransaction {
         }
     }
 
-    fn commit_merge(self, other: Self, CubeMergeCheck {}: Self::MergeCheck) -> Self
-where {
-        CubeTransaction {
-            // This would be more elegant if `conserved` was within the `self.new` Option.
-            conserved: (self.conserved && self.new.is_some())
-                || (other.conserved && other.new.is_some()),
+    fn commit_merge(&mut self, other: Self, CubeMergeCheck {}: Self::MergeCheck) {
+        let Self {
+            old,
+            new,
+            conserved,
+            activate,
+            fluff,
+        } = self;
 
-            old: self.old.or(other.old),
-            new: self.new.or(other.new),
-            activate: self.activate || other.activate,
-            fluff: {
-                let mut fluff = self.fluff;
-                fluff.extend(other.fluff);
-                fluff
-            },
-        }
+        // This would be more elegant if `conserved` was within the `self.new` Option.
+        *conserved = (*conserved && new.is_some()) || (other.conserved && other.new.is_some());
+
+        transaction::merge_option(old, other.old, transaction::panic_if_not_equal);
+        transaction::merge_option(new, other.new, transaction::panic_if_not_equal);
+
+        *activate |= other.activate;
+
+        fluff.extend(other.fluff);
     }
 }
 

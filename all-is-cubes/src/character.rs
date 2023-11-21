@@ -834,20 +834,20 @@ impl Merge for CharacterTransaction {
     }
 
     fn commit_merge(
-        self,
+        &mut self,
         other: Self,
         (body_check, inventory_check, behaviors_check): Self::MergeCheck,
-    ) -> Self {
-        Self {
-            set_space: self.set_space.or(other.set_space),
-            body: self.body.commit_merge(other.body, body_check),
-            inventory: self
-                .inventory
-                .commit_merge(other.inventory, inventory_check),
-            behaviors: self
-                .behaviors
-                .commit_merge(other.behaviors, behaviors_check),
-        }
+    ) {
+        let Self {
+            set_space,
+            body,
+            inventory,
+            behaviors,
+        } = self;
+        transaction::merge_option(set_space, other.set_space, |_, _| panic!());
+        body.commit_merge(other.body, body_check);
+        inventory.commit_merge(other.inventory, inventory_check);
+        behaviors.commit_merge(other.behaviors, behaviors_check);
     }
 }
 
