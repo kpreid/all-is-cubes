@@ -31,6 +31,20 @@ pub struct SpaceTransaction {
 }
 
 impl SpaceTransaction {
+    /// Allows modifying the part of this transaction which is a [`CubeTransaction`] at the given
+    /// cube, creating it if necessary (as [`CubeTransaction::default()`]).
+    ///
+    /// You can replace the transaction or use [`CubeTransaction::merge_from()`] to merge in
+    /// another transaction.
+    ///
+    /// This is for incremental construction of a complex transaction;
+    /// to create a transaction affecting a single cube, [`CubeTransaction::at()`] will be more
+    /// convenient.
+    pub fn at(&mut self, cube: Cube) -> &mut CubeTransaction {
+        let cube: GridPoint = cube.into();
+        self.cubes.entry(cube.into()).or_default()
+    }
+
     /// Construct a [`SpaceTransaction`] for a single cube.
     ///
     /// If `old` is not [`None`], requires that the existing block is that block or the
@@ -39,15 +53,13 @@ impl SpaceTransaction {
     ///
     /// TODO: This name is a poor name now that [`Self::set`] exists.
     pub fn set_cube(cube: impl Into<Cube>, old: Option<Block>, new: Option<Block>) -> Self {
-        Self::single(
-            cube.into(),
-            CubeTransaction {
-                old,
-                new,
-                conserved: true,
-                ..Default::default()
-            },
-        )
+        CubeTransaction {
+            old,
+            new,
+            conserved: true,
+            ..Default::default()
+        }
+        .at(cube.into())
     }
 
     /// Expand this transaction to include modifying the given cube, or return an error if
@@ -121,15 +133,6 @@ impl SpaceTransaction {
         self
     }
 
-    fn single(cube: Cube, transaction: CubeTransaction) -> Self {
-        let mut cubes = BTreeMap::new();
-        cubes.insert(cube.into(/* array */), transaction);
-        SpaceTransaction {
-            cubes,
-            ..Default::default()
-        }
-    }
-
     /// Modify the space's [`BehaviorSet`].
     pub fn behaviors(t: BehaviorSetTransaction<Space>) -> Self {
         Self {
@@ -148,10 +151,6 @@ impl SpaceTransaction {
             super::SpaceBehaviorAttachment::new(bounds),
             Arc::new(behavior),
         ))
-    }
-
-    pub(crate) fn activate_block(cube: Cube) -> Self {
-        Self::single(cube, CubeTransaction::ACTIVATE)
     }
 
     /// Emit [`Fluff`] (sound/particle effects) located at the given cube when this
@@ -219,17 +218,6 @@ impl SpaceTransaction {
         }
 
         bounds
-    }
-
-    /// Returns the [`CubeTransaction`] at the given cube, creating it if necessary.
-    ///
-    /// This is used for in-place mutation; to create a transaction affecting a single
-    /// cube, use [`SpaceTransaction::single()`].
-    ///
-    /// TODO: decide whether to make this and `CubeTransaction` public
-    fn at(&mut self, cube: Cube) -> &mut CubeTransaction {
-        let cube: GridPoint = cube.into();
-        self.cubes.entry(cube.into()).or_default()
     }
 }
 
@@ -444,10 +432,13 @@ impl fmt::Display for SpaceTransactionConflict {
     }
 }
 
-/// Data for a single cube in a [`SpaceTransaction`]. This does not function as a
-/// transaction on its own, though it does implement [`Merge`].
+/// A modification to the contents of single cube of a [`Space`].
+///
+/// To make use of this, insert it into a [`SpaceTransaction`] to specify _which_ cube is
+/// modified. This type does not function directly as a [`Transaction`] (though it does
+/// implement [`Merge`]).
 #[derive(Clone, Default, Eq, PartialEq)]
-struct CubeTransaction {
+pub struct CubeTransaction {
     /// Previous block which must occupy this cube.
     /// If `None`, no precondition.
     old: Option<Block>,
@@ -499,7 +490,15 @@ impl fmt::Debug for CubeTransaction {
 }
 
 impl CubeTransaction {
-    const ACTIVATE: Self = Self {
+    /// Creates a [`SpaceTransaction`] that applies `self` to the given cube of the space.
+    pub fn at(self, cube: Cube) -> SpaceTransaction {
+        SpaceTransaction {
+            cubes: BTreeMap::from([(<[i32; 3]>::from(cube), self)]),
+            ..Default::default()
+        }
+    }
+
+    pub(crate) const ACTIVATE: Self = Self {
         old: None,
         new: None,
         conserved: false,
@@ -554,13 +553,17 @@ impl Merge for CubeTransaction {
     }
 }
 
-struct CubeMergeCheck {
+#[doc(hidden)]
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct CubeMergeCheck {
     // This might end up having some data later.
     // For now, it's a placeholder to avoid passing () around
     // and getting clippy::let_unit_value warnings
 }
 
-/// Transaction conflict error type for a single cube of a [`SpaceTransaction`].
+/// Transaction conflict error type for a single [`CubeTransaction`] within a
+/// [`SpaceTransaction`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct CubeConflict {
@@ -775,7 +778,8 @@ mod tests {
         .execute(&mut space, &mut no_outputs)
         .unwrap();
 
-        SpaceTransaction::activate_block(cube)
+        CubeTransaction::ACTIVATE
+            .at(cube)
             .execute(&mut space, &mut drop)
             .unwrap();
         assert_eq!(signal.load(Ordering::Relaxed), 1);
@@ -822,12 +826,12 @@ mod tests {
                 |_, _| Ok(()),
             )
             .transaction(
-                SpaceTransaction::activate_block(Cube::new(0, 0, 0)),
+                CubeTransaction::ACTIVATE.at(Cube::new(0, 0, 0)),
                 // TODO: Add a test that activation happened once that's possible
                 |_, _| Ok(()),
             )
             .transaction(
-                SpaceTransaction::activate_block(Cube::new(1, 0, 0)),
+                CubeTransaction::ACTIVATE.at(Cube::new(1, 0, 0)),
                 // TODO: Add a test that activation happened once that's possible
                 |_, _| Ok(()),
             )

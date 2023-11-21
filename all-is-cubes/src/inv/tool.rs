@@ -12,7 +12,7 @@ use crate::inv::{self, Icons, InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
 use crate::math::{Cube, Face6, GridRotation, Gridgid};
 use crate::op::{self, Operation};
-use crate::space::{Space, SpaceTransaction};
+use crate::space::{CubeTransaction, Space, SpaceTransaction};
 use crate::transaction::{Merge, Transaction};
 use crate::universe::{RefError, RefVisitor, UBorrow, URef, UniverseTransaction, VisitRefs};
 
@@ -119,7 +119,9 @@ impl Tool {
                 // TODO: cursor is probably not _exactly_ the right set of data that should be passed on
                 Ok((
                     Some(self),
-                    SpaceTransaction::activate_block(cursor.cube()).bind(cursor.space().clone()),
+                    CubeTransaction::ACTIVATE
+                        .at(cursor.cube())
+                        .bind(cursor.space().clone()),
                 ))
             }
             Self::RemoveBlock { keep } => {
@@ -725,7 +727,9 @@ mod tests {
         });
         assert_eq!(
             tester.equip_and_use_tool(Tool::Activate),
-            Ok(SpaceTransaction::activate_block(Cube::new(1, 0, 0)).bind(tester.space_ref.clone()))
+            Ok(CubeTransaction::ACTIVATE
+                .at(Cube::new(1, 0, 0))
+                .bind(tester.space_ref.clone()))
         );
 
         // Tool::Activate currently has no cases where it fails
