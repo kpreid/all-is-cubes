@@ -227,15 +227,14 @@ pub fn initialize_logging() {
     // so we can inspect logs but don't have per-renderer-setup spam
     if false {
         // Note: Something like this log configuration also appears in all-is-cubes-desktop.
-        simplelog::TermLogger::init(
+        simplelog::WriteLogger::init(
             simplelog::LevelFilter::Debug,
             simplelog::ConfigBuilder::new()
                 .add_filter_ignore_str("wgpu") // noisy
                 .add_filter_ignore_str("naga") // noisy
                 .add_filter_ignore_str("winit") // noisy at Trace level only
                 .build(),
-            simplelog::TerminalMode::Stderr,
-            simplelog::ColorChoice::Auto,
+            std::io::stderr(),
         )
         .unwrap();
     }

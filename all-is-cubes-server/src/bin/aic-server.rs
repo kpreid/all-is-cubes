@@ -49,7 +49,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // Unclear how to deduplicate since we don't want to have a library-level dep on
     // simplelog. For now, just remember to consider updating other instances.
     use simplelog::LevelFilter::{Debug, Off, Trace};
-    simplelog::TermLogger::init(
+    simplelog::WriteLogger::init(
         match verbose {
             false => Debug,
             true => Trace,
@@ -61,8 +61,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .add_filter_ignore_str("hyper") // noisy
             .add_filter_ignore_str("mio") // uninteresting
             .build(),
-        simplelog::TerminalMode::Stderr,
-        simplelog::ColorChoice::Auto,
+        std::io::stderr(),
     )?;
 
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port.unwrap_or(0)));
