@@ -14,7 +14,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
 use all_is_cubes::listen::{DirtyFlag, Gate, Listen as _, ListenableSource, Listener};
 use all_is_cubes::math::{Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid};
-use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
+use all_is_cubes::space::{CubeTransaction, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time::Duration;
 use all_is_cubes::transaction::Merge as _;
 use all_is_cubes::universe::{URef, Universe};
@@ -196,12 +196,14 @@ impl ToolbarController {
                 break;
             }
 
-            let position = self.slot_position(index);
+            let cube = self.slot_position(index);
             // Draw icon
-            txn.set(
-                position,
-                None,
-                Some(stack.icon(&self.definition.hud_blocks.icons).into_owned()),
+            txn.merge_from(
+                CubeTransaction::replacing(
+                    None,
+                    Some(stack.icon(&self.definition.hud_blocks.icons).into_owned()),
+                )
+                .at(cube),
             )?;
         }
 

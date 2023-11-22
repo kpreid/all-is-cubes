@@ -66,27 +66,9 @@ impl SpaceTransaction {
     /// transaction will fail.
     /// If `new` is not [`None`], replaces the existing block with `new`.
     ///
-    /// TODO: This name is a poor name now that [`Self::set`] exists.
+    /// TODO: Consider replacing all uses of this with `CubeTransaction::replacing()`.
     pub fn set_cube(cube: impl Into<Cube>, old: Option<Block>, new: Option<Block>) -> Self {
         CubeTransaction::replacing(old, new).at(cube.into())
-    }
-
-    /// Expand this transaction to include modifying the given cube, or return an error if
-    /// that would conflict (by the same definition as transaction merging).
-    ///
-    /// If `old` is not [`None`], requires that the existing block is that block or the
-    /// transaction will fail.
-    /// If `new` is not [`None`], replaces the existing block with `new`.
-    pub fn set(
-        &mut self,
-        cube: impl Into<Cube>,
-        old: Option<Block>,
-        new: Option<Block>,
-    ) -> Result<(), SpaceTransactionConflict> {
-        let cube: Cube = cube.into();
-        self.at(cube)
-            .merge_from(CubeTransaction::replacing(old, new))
-            .map_err(|conflict| SpaceTransactionConflict::Cube { cube, conflict })
     }
 
     /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
@@ -651,40 +633,6 @@ mod tests {
             .nonconserved()
             .check(&Space::empty_positive(1, 1, 1))
             .unwrap_err();
-    }
-
-    #[test]
-    fn set_cube_mutate_equivalent_to_merge() {
-        let [b1, b2, b3] = make_some_blocks();
-
-        // A basic single-cube transaction is the same either way.
-        let mut t = SpaceTransaction::default();
-        t.set([0, 0, 0], Some(b1.clone()), Some(b2.clone()))
-            .unwrap();
-        assert_eq!(
-            t,
-            SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), Some(b2.clone())),
-        );
-
-        // Two-cube transaction.
-        let prev = t.clone();
-        t.set([1, 0, 0], Some(b2.clone()), Some(b3.clone()))
-            .unwrap();
-        assert_eq!(
-            t,
-            prev.merge(SpaceTransaction::set_cube(
-                [1, 0, 0],
-                Some(b2.clone()),
-                Some(b3.clone())
-            ))
-            .unwrap(),
-        );
-
-        // Conflict
-        let prev = t.clone();
-        t.set([0, 0, 0], Some(b1.clone()), Some(b3.clone()))
-            .expect_err("should have merge failure");
-        assert_eq!(t, prev,);
     }
 
     #[test]
