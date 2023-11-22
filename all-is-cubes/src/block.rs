@@ -579,9 +579,8 @@ impl Block {
 }
 
 /// Parameters to [`Block::evaluate2()`] to choose which information to compute.
-#[allow(missing_debug_implementations)] // TODO: Debug for DynListener
 #[allow(clippy::exhaustive_structs)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct EvalFilter {
     /// If true, don't actually evaluate, but return a placeholder value and do listen.
     ///

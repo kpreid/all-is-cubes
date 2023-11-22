@@ -1,6 +1,9 @@
 use alloc::sync::{Arc, Weak};
 use core::fmt;
 
+use manyfmt::formats::Unquote;
+use manyfmt::Refmt as _;
+
 use crate::listen::{Listener, Notifier};
 
 /// A [`Listener`] which transforms or discards messages before passing them on.
@@ -9,13 +12,23 @@ use crate::listen::{Listener, Notifier};
 /// This may be used to drop uninteresting messages or reduce their granularity.
 ///
 /// TODO: add doc test
-#[derive(Debug)]
 pub struct Filter<F, T> {
     /// The function to transform and possibly discard each message.
     pub(super) function: F,
     /// The recipient of the messages.
     pub(super) target: T,
 }
+
+impl<F, T: fmt::Debug> fmt::Debug for Filter<F, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Filter")
+            // function's type name may be the function name
+            .field("function", &core::any::type_name::<F>().refmt(&Unquote))
+            .field("target", &self.target)
+            .finish()
+    }
+}
+
 impl<MI, MO, F, T> Listener<MI> for Filter<F, T>
 where
     F: Fn(MI) -> Option<MO> + Send + Sync,
@@ -81,8 +94,15 @@ where
 
 /// A [`Listener`] which forwards messages through a [`Notifier`] to its listeners.
 /// Constructed by [`Notifier::forwarder()`].
-#[derive(Debug)]
 pub struct NotifierForwarder<M>(pub(super) Weak<Notifier<M>>);
+
+impl<M> fmt::Debug for NotifierForwarder<M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("NotifierForwarder")
+            .field("alive(shallow)", &(self.0.strong_count() > 0))
+            .finish_non_exhaustive()
+    }
+}
 
 impl<M: Clone + Send> Listener<M> for NotifierForwarder<M> {
     fn receive(&self, message: M) {

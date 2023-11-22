@@ -178,7 +178,7 @@ impl<M> fmt::Debug for Notifier<M> {
 ///
 /// Implementors must also implement [`Send`] and [`Sync`] if the `std` feature of
 /// `all-is-cubes` is enabled.
-pub trait Listener<M>: SendSyncIfStd {
+pub trait Listener<M>: fmt::Debug + SendSyncIfStd {
     /// Process and store a message.
     ///
     /// Note that, since this method takes `&Self`, a `Listener` must use interior
@@ -322,5 +322,14 @@ mod tests {
         // Should report dead
         drop(sink);
         assert!(!listener.alive());
+    }
+
+    /// Demonstrate that [`DynListener`] implements [`fmt::Debug`].
+    #[test]
+    fn erased_debug() {
+        let sink: Sink<&str> = Sink::new();
+        let listener: DynListener<&str> = Arc::new(sink.listener());
+
+        assert_eq!(format!("{listener:?}"), "SinkListener { alive: true }");
     }
 }

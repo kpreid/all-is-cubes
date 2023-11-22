@@ -1,3 +1,4 @@
+use std::fmt;
 use std::time::Duration;
 
 use all_is_cubes::character::{self, Character};
@@ -176,6 +177,13 @@ impl<M: Send> ChannelListener<M> {
         Self { sender }
     }
 }
+
+impl<M> fmt::Debug for ChannelListener<M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ChannelListener").finish_non_exhaustive()
+    }
+}
+
 impl<M: Send> listen::Listener<M> for ChannelListener<M> {
     fn receive(&self, message: M) {
         _ = self.sender.send(message);

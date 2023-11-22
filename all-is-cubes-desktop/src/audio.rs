@@ -144,6 +144,14 @@ impl FluffListener {
     }
 }
 
+impl fmt::Debug for FluffListener {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FluffListener")
+            .field("alive", &self.alive)
+            .finish_non_exhaustive()
+    }
+}
+
 impl Listener<Fluff> for FluffListener {
     fn receive(&self, fluff: Fluff) {
         match self.sender.try_send(AudioCommand::Fluff(fluff)) {

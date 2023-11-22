@@ -1,5 +1,6 @@
 use alloc::sync::{Arc, Weak};
 use std::error::Error;
+use std::fmt;
 use std::sync::Mutex;
 
 use all_is_cubes::block::{self, Block, BlockAttributes, Primitive, Resolution, AIR};
@@ -401,5 +402,11 @@ impl Listener<CueMessage> for CueListener {
 
     fn alive(&self) -> bool {
         self.0.strong_count() > 0
+    }
+}
+
+impl fmt::Debug for CueListener {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CueListener").finish_non_exhaustive()
     }
 }
