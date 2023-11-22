@@ -357,18 +357,14 @@ impl BoxStyle {
     //
     // TODO: allow specifying what happens to existing blocks.
     pub fn create_box(&self, bounds: GridAab) -> space::SpaceTransaction {
-        let mut txn = space::SpaceTransaction::default();
-        // TODO: This would ideally be a set of fill() operations instead of iteration
-        for cube in bounds.interior_iter() {
-            if let Some(part) = self.cube_at(bounds, cube) {
-                // TODO: give transactions the ability to compose with already-present blocks
-                // so that this can be no-precondition but also no-overwrite? will need
-                // allowed-composition-rule work.
-                txn.set(cube, None, Some(part.clone())).unwrap();
-            }
-        }
-
-        txn
+        // TODO: this could be sometimes more efficiently done as up to 27 fill operations
+        // rather than one big one
+        space::SpaceTransaction::filling(bounds, |cube| {
+            // TODO: give transactions the ability to compose with already-present blocks
+            // so that this can be no-precondition but also no-overwrite? will need
+            // allowed-composition-rule work.
+            space::CubeTransaction::replacing(None, self.cube_at(bounds, cube).cloned())
+        })
     }
 
     /// Returns the block that is the part of this box at the specified `cube`.

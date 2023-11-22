@@ -6,7 +6,7 @@ use criterion::{
 
 use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::math::GridAab;
-use all_is_cubes::space::{Space, SpaceTransaction};
+use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 
 fn space_bulk_mutation(c: &mut Criterion) {
@@ -103,14 +103,9 @@ fn space_bulk_mutation(c: &mut Criterion) {
                 b.iter_batched(
                     || Space::empty(bounds),
                     |mut space| {
-                        let mut txn = SpaceTransaction::default();
-                        for x in 0..mutation_size {
-                            for y in 0..mutation_size {
-                                for z in 0..mutation_size {
-                                    txn.set([x, y, z], None, Some(block.clone())).unwrap();
-                                }
-                            }
-                        }
+                        let txn = SpaceTransaction::filling(bounds, |_| {
+                            CubeTransaction::replacing(None, Some(block.clone()))
+                        });
                         txn.execute(&mut space, &mut transaction::no_outputs)
                             .unwrap();
                     },

@@ -11,7 +11,7 @@ use all_is_cubes::math::{
     Cube, CubeFace, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridArray, GridCoordinate,
     GridPoint, GridVector, Gridgid, NotNan, VectorOps as _,
 };
-use all_is_cubes::space::{SetCubeError, Space, SpaceTransaction};
+use all_is_cubes::space::{CubeTransaction, SetCubeError, Space, SpaceTransaction};
 
 mod noise;
 pub(crate) use noise::*;
@@ -152,19 +152,21 @@ pub(crate) fn space_to_transaction_copy(
     src_bounds: GridAab,
     src_to_dst_transform: Gridgid,
 ) -> SpaceTransaction {
+    let dst_to_src_transform = src_to_dst_transform.inverse();
     let block_rotation = src_to_dst_transform.rotation;
-
-    let mut txn = SpaceTransaction::default();
-    for cube in src_bounds.interior_iter() {
-        // TODO: provide control over what the old-values are
-        txn.set(
-            src_to_dst_transform.transform_cube(cube),
-            None,
-            Some(src[cube].clone().rotate(block_rotation)),
-        )
-        .unwrap();
-    }
-    txn
+    SpaceTransaction::filling(
+        src_bounds.transform(src_to_dst_transform).unwrap(),
+        |cube| {
+            CubeTransaction::replacing(
+                None, // TODO: provide control over what the old-values are
+                Some(
+                    src[dst_to_src_transform.transform_cube(cube)]
+                        .clone()
+                        .rotate(block_rotation),
+                ),
+            )
+        },
+    )
 }
 
 /// Generate a copy of a [`Primitive::Atom`] block with its color scaled by the given scalar.

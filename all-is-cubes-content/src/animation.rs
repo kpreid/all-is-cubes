@@ -10,7 +10,7 @@ use rand_xoshiro::Xoshiro256Plus;
 use all_is_cubes::block::{Block, BlockCollision, AIR};
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{Cube, GridAab, GridArray, GridPoint, GridVector, Rgba};
-use all_is_cubes::space::{Space, SpaceTransaction};
+use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{RefVisitor, UniverseTransaction, VisitRefs};
@@ -43,12 +43,10 @@ impl<F: Fn(Cube, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
     }
 
     fn paint(&self, bounds: GridAab) -> SpaceTransaction {
-        let mut txn = SpaceTransaction::default();
-        for cube in bounds.interior_iter() {
+        SpaceTransaction::filling(bounds, |cube| {
             let block = (self.function)(cube, self.frame);
-            txn.set(cube, None, Some(block.clone())).unwrap();
-        }
-        txn
+            CubeTransaction::replacing(None, Some(block.clone()))
+        })
     }
 }
 
@@ -170,12 +168,12 @@ impl Fire {
     }
 
     fn paint(&self) -> SpaceTransaction {
-        let mut txn = SpaceTransaction::default();
-        for cube in self.fire_state.bounds().interior_iter() {
-            let block: &Block = &self.blocks[self.fire_state[cube] as usize];
-            txn.set(cube, None, Some(block.clone())).unwrap();
-        }
-        txn
+        SpaceTransaction::filling(self.fire_state.bounds(), |cube| {
+            CubeTransaction::replacing(
+                None,
+                Some(self.blocks[self.fire_state[cube] as usize].clone()),
+            )
+        })
     }
 }
 
@@ -242,47 +240,42 @@ impl Clock {
         let time_angle = self.ticks.rem_euclid(60) as f64 / 60.0;
         let frame_angle = self.ticks.rem_euclid(4) as f64 / 4.0;
 
-        let mut txn = SpaceTransaction::default();
-        for x in 0..16 {
-            for y in 0..16 {
-                let cube = Cube::new(x, y, 0);
-                let centered_point = (cube - GridVector::new(8, 8, 0)).midpoint();
-                let r = centered_point.to_vector().length();
-                let block = {
-                    let base_angle = centered_point.x.atan2(centered_point.y) / TAU;
-                    if r > 8.0 {
-                        // Surrounding area — do nothing
-                        continue;
-                    } else if r > 7.0 {
-                        // Outside edge
-                        rim.clone()
-                    } else if r > 2.5 {
-                        // Big sweep hand
-                        let clock_angle = (time_angle - base_angle).rem_euclid(1.0);
-                        if clock_angle < 0.03 {
-                            marks.clone()
-                        } else if clock_angle < 0.06 {
-                            trail.clone()
-                        } else {
-                            background.clone()
-                        }
-                    } else if r > 1.5 {
-                        // Border
-                        background.clone()
+        SpaceTransaction::filling(GridAab::from_lower_size([0, 0, 0], [16, 16, 1]), |cube| {
+            let centered_point = (cube - GridVector::new(8, 8, 0)).midpoint();
+            let r = centered_point.to_vector().length();
+            let block = {
+                let base_angle = centered_point.x.atan2(centered_point.y) / TAU;
+                if r > 8.0 {
+                    // Surrounding area — do nothing
+                    return CubeTransaction::default();
+                } else if r > 7.0 {
+                    // Outside edge
+                    rim.clone()
+                } else if r > 2.5 {
+                    // Big sweep hand
+                    let clock_angle = (time_angle - base_angle).rem_euclid(1.0);
+                    if clock_angle < 0.03 {
+                        marks.clone()
+                    } else if clock_angle < 0.06 {
+                        trail.clone()
                     } else {
-                        // Advances 1 tick per frame in one of 4 patches
-                        let clock_angle = (base_angle - frame_angle).rem_euclid(1.0);
-                        if clock_angle < 0.25 {
-                            marks.clone()
-                        } else {
-                            background.clone()
-                        }
+                        background.clone()
                     }
-                };
-                txn.set(cube, None, Some(block)).unwrap();
-            }
-        }
-        txn
+                } else if r > 1.5 {
+                    // Border
+                    background.clone()
+                } else {
+                    // Advances 1 tick per frame in one of 4 patches
+                    let clock_angle = (base_angle - frame_angle).rem_euclid(1.0);
+                    if clock_angle < 0.25 {
+                        marks.clone()
+                    } else {
+                        background.clone()
+                    }
+                }
+            };
+            CubeTransaction::replacing(None, Some(block))
+        })
     }
 }
 

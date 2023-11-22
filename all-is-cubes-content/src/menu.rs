@@ -1,3 +1,4 @@
+use all_is_cubes::space::CubeTransaction;
 use alloc::string::ToString as _;
 use alloc::sync::Arc;
 use alloc::{boxed::Box, vec::Vec};
@@ -94,19 +95,16 @@ struct TemplateButtonController {
 }
 impl vui::WidgetController for TemplateButtonController {
     fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
-        let mut txn = SpaceTransaction::default();
-
         // TODO: propagate error
         let bounds = &mut self.position.bounds;
         let background_bounds = bounds.abut(Face6::NZ, -1).unwrap();
         let text_bounds = bounds.abut(Face6::PZ, -1).unwrap();
 
         // Fill background
-        // TODO: give SpaceTransaction a fill_uniform() analogue
         let background_block = &self.definition.background_block;
-        for cube in background_bounds.interior_iter() {
-            txn.set(cube, None, Some(background_block.clone())).unwrap();
-        }
+        let mut txn = SpaceTransaction::filling(background_bounds, |_| {
+            CubeTransaction::replacing(None, Some(background_block.clone()))
+        });
 
         // Fill text
         let text_dest_origin = GridVector::new(
