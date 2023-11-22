@@ -19,7 +19,7 @@ use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::time;
 use all_is_cubes::universe::{Name, URef, Universe};
-use all_is_cubes::util::YieldProgress;
+use all_is_cubes::util::{ErrorIfStd, YieldProgress};
 
 use crate::fractal::menger_sponge;
 use crate::menu::template_menu;
@@ -271,10 +271,8 @@ impl WhenceUniverse for TemplateAndParameters {
     fn load(
         &self,
         progress: YieldProgress,
-    ) -> futures_core::future::BoxFuture<
-        'static,
-        Result<Universe, Box<dyn std::error::Error + Send + Sync>>,
-    > {
+    ) -> futures_core::future::BoxFuture<'static, Result<Universe, Box<dyn ErrorIfStd + Send + Sync>>>
+    {
         let ingredients = self.clone();
         Box::pin(async move {
             ingredients
@@ -294,10 +292,8 @@ impl WhenceUniverse for TemplateAndParameters {
         &self,
         universe: &Universe,
         progress: YieldProgress,
-    ) -> futures_core::future::BoxFuture<
-        'static,
-        Result<(), Box<dyn std::error::Error + Send + Sync>>,
-    > {
+    ) -> futures_core::future::BoxFuture<'static, Result<(), Box<dyn ErrorIfStd + Send + Sync>>>
+    {
         // Delegate to the same error as () would produce. TODO: Have an error enum instead
         <() as WhenceUniverse>::save(&(), universe, progress)
     }

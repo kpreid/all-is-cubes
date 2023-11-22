@@ -144,12 +144,11 @@
 )]
 #![cfg_attr(not(feature = "std"), allow(clippy::arc_with_non_send_sync))]
 
-#[allow(unused_imports)] // false positive unused macro_use
-#[macro_use]
-extern crate alloc;
 #[cfg(any(feature = "std", test))]
 #[cfg_attr(test, macro_use)]
 extern crate std;
+#[macro_use]
+extern crate alloc;
 
 #[macro_use]
 pub mod math;

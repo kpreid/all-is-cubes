@@ -17,9 +17,11 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+#[cfg(test)]
+#[macro_use]
+extern crate std;
 #[macro_use]
 extern crate alloc;
-extern crate std;
 
 mod alg;
 mod animation;

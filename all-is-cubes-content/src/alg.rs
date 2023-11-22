@@ -3,7 +3,7 @@
 //! They are gathered in this module to encourage noting similarities rather than writing
 //! near-duplicate code.
 
-use std::collections::HashSet;
+use hashbrown::HashSet;
 
 use all_is_cubes::block::{Atom, Block, Primitive, Resolution, AIR};
 use all_is_cubes::euclid::vec3;
