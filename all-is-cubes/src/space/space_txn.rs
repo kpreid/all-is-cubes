@@ -53,13 +53,7 @@ impl SpaceTransaction {
     ///
     /// TODO: This name is a poor name now that [`Self::set`] exists.
     pub fn set_cube(cube: impl Into<Cube>, old: Option<Block>, new: Option<Block>) -> Self {
-        CubeTransaction {
-            old,
-            new,
-            conserved: true,
-            ..Default::default()
-        }
-        .at(cube.into())
+        CubeTransaction::replacing(old, new).at(cube.into())
     }
 
     /// Expand this transaction to include modifying the given cube, or return an error if
@@ -75,26 +69,9 @@ impl SpaceTransaction {
         new: Option<Block>,
     ) -> Result<(), SpaceTransactionConflict> {
         let cube: Cube = cube.into();
-        let ct = CubeTransaction {
-            old,
-            new,
-            conserved: true,
-            ..Default::default()
-        };
-        match self.cubes.entry(cube.into()) {
-            Vacant(entry) => {
-                entry.insert(ct);
-                Ok(())
-            }
-            Occupied(mut entry) => {
-                let existing_ref: &mut CubeTransaction = entry.get_mut();
-                let check = existing_ref
-                    .check_merge(&ct)
-                    .map_err(|conflict| SpaceTransactionConflict::Cube { cube, conflict })?;
-                existing_ref.commit_merge(ct, check);
-                Ok(())
-            }
-        }
+        self.at(cube)
+            .merge_from(CubeTransaction::replacing(old, new))
+            .map_err(|conflict| SpaceTransactionConflict::Cube { cube, conflict })
     }
 
     /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
@@ -478,6 +455,20 @@ impl CubeTransaction {
         activate: true,
         fluff: Vec::new(),
     };
+
+    /// Construct a [`CubeTransaction`] that may check and may replace the block in the cube.
+    ///
+    /// If `old` is not [`None`], requires that the existing block is that block or the
+    /// transaction will fail.
+    /// If `new` is not [`None`], replaces the existing block with `new`.
+    pub fn replacing(old: Option<Block>, new: Option<Block>) -> Self {
+        CubeTransaction {
+            old,
+            new,
+            conserved: true,
+            ..Default::default()
+        }
+    }
 
     /// Sets the block to be placed at this cube, replacing any existing modification instruction
     /// This does not affect a precondition on the existing block, or the conservative option.
