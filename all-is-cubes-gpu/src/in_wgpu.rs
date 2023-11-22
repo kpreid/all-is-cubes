@@ -65,8 +65,7 @@ impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for WgpuMt {
 
 /// Entry point for [`wgpu`] rendering. Construct this and hand it the [`wgpu::Surface`]
 /// to draw on.
-//#[derive(Debug)]
-#[allow(missing_debug_implementations)] // TODO: wgpu::util::StagingBelt isn't Debug (will be in the future)
+#[derive(Debug)]
 pub struct SurfaceRenderer<I> {
     surface: wgpu::Surface,
     device: Arc<wgpu::Device>,
