@@ -45,6 +45,21 @@ impl SpaceTransaction {
         self.cubes.entry(cube.into()).or_default()
     }
 
+    /// Construct a [`SpaceTransaction`] which modifies a volume by applying a [`CubeTransaction`]
+    /// computed by `function` to each cube.
+    pub fn filling<F>(region: GridAab, mut function: F) -> Self
+    where
+        F: FnMut(Cube) -> CubeTransaction,
+    {
+        // TODO: Try having a compact `Vol<Box<[CubeTransaction]>>` representation for this kind of
+        // transaction with uniformly shaped contents.
+        let mut txn = SpaceTransaction::default();
+        for cube in region.interior_iter() {
+            *txn.at(cube) = function(cube);
+        }
+        txn
+    }
+
     /// Construct a [`SpaceTransaction`] for a single cube.
     ///
     /// If `old` is not [`None`], requires that the existing block is that block or the
