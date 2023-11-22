@@ -16,11 +16,11 @@ use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::fluff::Fluff;
 use crate::listen::{Listen as _, Sink};
-use crate::math::{Cube, GridArray, GridCoordinate, GridPoint, Rgba};
+use crate::math::{Cube, GridAab, GridArray, GridCoordinate, GridPoint, Rgba};
 use crate::op::Operation;
 use crate::space::{
-    GridAab, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpaceFluff, SpacePhysics,
-    SpaceTransaction,
+    CubeTransaction, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpaceFluff,
+    SpacePhysics,
 };
 use crate::time::{self, Tick};
 use crate::transaction::{self, Transaction as _};
@@ -276,8 +276,7 @@ fn change_listener_simple() {
 #[test]
 fn fluff_listener() {
     let mut space = Space::empty_positive(1, 1, 1);
-    let mut txn = SpaceTransaction::default();
-    txn.add_fluff(Cube::ORIGIN, Fluff::Happened);
+    let txn = CubeTransaction::fluff(Fluff::Happened).at(Cube::ORIGIN);
     let sink = Sink::new();
     space.fluff().listen(sink.listener());
 

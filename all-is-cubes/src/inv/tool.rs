@@ -421,13 +421,17 @@ impl ToolInput {
                     .unwrap_or(GridRotation::IDENTITY)
             }
         };
-        let txn = self.set_cube(affected_cube, old_block, new_block.rotate(rotation))?;
-        let txn = txn
-            .merge(
-                SpaceTransaction::fluff(affected_cube, Fluff::PlaceBlockGeneric)
-                    .bind(self.cursor()?.space().clone()),
-            )
-            .expect("fluff never fails to merge");
+
+        let mut txn = self.set_cube(affected_cube, old_block, new_block.rotate(rotation))?;
+
+        // Add fluff. TODO: This should probably be part of set_cube()?
+        txn.merge_from(
+            CubeTransaction::fluff(Fluff::PlaceBlockGeneric)
+                .at(affected_cube)
+                .bind(self.cursor()?.space().clone()),
+        )
+        .expect("fluff never fails to merge");
+
         Ok(txn)
     }
 
@@ -814,7 +818,9 @@ mod tests {
 
             let mut expected_cube_transaction =
                 SpaceTransaction::set_cube(Cube::ORIGIN, Some(AIR), Some(tool_block.clone()));
-            expected_cube_transaction.add_fluff(Cube::ORIGIN, Fluff::PlaceBlockGeneric);
+            expected_cube_transaction
+                .at(Cube::ORIGIN)
+                .add_fluff(Fluff::PlaceBlockGeneric);
             let mut expected_cube_transaction =
                 expected_cube_transaction.bind(tester.space_ref.clone());
             if expect_consume {
@@ -867,11 +873,11 @@ mod tests {
             transaction,
             {
                 let mut t = SpaceTransaction::set_cube(
-                    [0, 0, 0],
+                    Cube::ORIGIN,
                     Some(AIR),
                     Some(tool_block.clone().rotate(GridRotation::CLOCKWISE)),
                 );
-                t.add_fluff(Cube::ORIGIN, Fluff::PlaceBlockGeneric);
+                t.at(Cube::ORIGIN).add_fluff(Fluff::PlaceBlockGeneric);
                 t
             }
             .bind(tester.space_ref.clone())

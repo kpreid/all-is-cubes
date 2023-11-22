@@ -153,24 +153,6 @@ impl SpaceTransaction {
         ))
     }
 
-    /// Emit [`Fluff`] (sound/particle effects) located at the given cube when this
-    /// transaction is committed, in addition to other effects of the transaction.
-    ///
-    /// TODO: will eventually need rotation.
-    pub fn add_fluff(&mut self, cube: Cube, fluff: Fluff) {
-        self.at(cube).fluff.push(fluff);
-    }
-
-    /// Emit [`Fluff`] (sound/particle effects) located at the given cube when this
-    /// transaction is committed.
-    ///
-    /// TODO: will eventually need rotation.
-    pub fn fluff(cube: Cube, fluff: Fluff) -> Self {
-        let mut txn = Self::default();
-        txn.at(cube).fluff.push(fluff);
-        txn
-    }
-
     /// Computes the region of cubes directly affected by this transaction.
     /// Ignores behaviors.
     ///
@@ -515,6 +497,19 @@ impl CubeTransaction {
     // TODO: no tests
     pub fn overwrite(&mut self, block: Block) {
         self.new = Some(block);
+    }
+
+    /// Emit [`Fluff`] (sound/particle effects) at this cube when the transaction is committed.
+    pub fn fluff(fluff: Fluff) -> Self {
+        let mut this = Self::default();
+        this.add_fluff(fluff);
+        this
+    }
+
+    /// Emit [`Fluff`] (sound/particle effects) at this cube when the transaction is committed,
+    /// in addition to its other effects.
+    pub fn add_fluff(&mut self, fluff: Fluff) {
+        self.fluff.push(fluff)
     }
 }
 

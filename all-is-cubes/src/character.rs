@@ -23,7 +23,7 @@ use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};
 use crate::raycast::Ray;
 #[cfg(feature = "save")]
 use crate::save::schema;
-use crate::space::{LightPhysics, Space, SpaceTransaction};
+use crate::space::{CubeTransaction, LightPhysics, Space};
 use crate::time::Tick;
 use crate::transaction::{
     self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
@@ -339,14 +339,11 @@ impl Character {
                 self.eye_displacement_pos -= push_out_displacement;
             }
 
-            if let Some(txn) = info.impact_fluff().and_then(|fluff| {
-                Some(SpaceTransaction::fluff(
-                    Cube::containing(self.body.position)?,
-                    fluff,
-                ))
+            if let Some(fluff_txn) = info.impact_fluff().and_then(|fluff| {
+                Some(CubeTransaction::fluff(fluff).at(Cube::containing(self.body.position)?))
             }) {
                 result_transaction
-                    .merge_from(txn.bind(self.space.clone()))
+                    .merge_from(fluff_txn.bind(self.space.clone()))
                     .unwrap(); // cannot fail
             }
 

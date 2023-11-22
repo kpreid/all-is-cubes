@@ -790,7 +790,7 @@ mod tests {
     use super::*;
     use all_is_cubes::character::CharacterTransaction;
     use all_is_cubes::math::Cube;
-    use all_is_cubes::space::{Space, SpaceTransaction};
+    use all_is_cubes::space::Space;
     use all_is_cubes::transaction::no_outputs;
     use all_is_cubes::universe::{Name, Universe};
     use futures_channel::oneshot;
@@ -802,7 +802,7 @@ mod tests {
         let space1 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let space2 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let character = u.insert_anonymous(Character::spawn_default(space1.clone()));
-        let st = SpaceTransaction::fluff(Cube::ORIGIN, Fluff::Happened);
+        let st = space::CubeTransaction::fluff(Fluff::Happened).at(Cube::ORIGIN);
 
         // Create session
         let mut session = Session::<std::time::Instant>::builder().build().await;
