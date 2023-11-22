@@ -103,7 +103,7 @@ impl SpaceTransaction {
     /// transaction.
     // TODO: no tests
     pub fn set_overwrite(&mut self, cube: impl Into<Cube>, block: Block) {
-        self.at(cube.into()).new = Some(block);
+        self.at(cube.into()).overwrite(block);
     }
 
     /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
@@ -505,6 +505,17 @@ impl CubeTransaction {
         activate: true,
         fluff: Vec::new(),
     };
+
+    /// Sets the block to be placed at this cube, replacing any existing modification instruction
+    /// This does not affect a precondition on the existing block, or the conservative option.
+    ///
+    /// This is thus comparable to the effect of a direct [`Space::set()`] after the rest of the
+    /// transaction.
+    //---
+    // TODO: no tests
+    pub fn overwrite(&mut self, block: Block) {
+        self.new = Some(block);
+    }
 }
 
 impl Merge for CubeTransaction {

@@ -264,10 +264,8 @@ impl WidgetController for TooltipController {
         // to implement this systematically
         for i in 0..self.position.size().x {
             let offset = GridVector::new(i, 0, 0);
-            txn.set_overwrite(
-                origin + offset,
-                toolbar_text_blocks[offset.to_point()].clone(),
-            );
+            txn.at((origin + offset).into())
+                .overwrite(toolbar_text_blocks[offset.to_point()].clone());
         }
         Ok(txn)
     }

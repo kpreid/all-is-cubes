@@ -198,7 +198,7 @@ pub(crate) fn make_tree(
     let mut txn = SpaceTransaction::default();
     for (cube, log) in graph.logs(blocks) {
         if log != AIR && bounds.contains_cube(cube) {
-            txn.set_overwrite(cube, log);
+            txn.at(cube).overwrite(log);
         }
     }
     Ok(txn)

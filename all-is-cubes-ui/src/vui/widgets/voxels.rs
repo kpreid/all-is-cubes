@@ -89,17 +89,15 @@ impl vui::Widget for Voxels {
 
         let mut txn = SpaceTransaction::default();
         for cube in position.bounds.interior_iter() {
-            txn.set_overwrite(
-                cube,
-                Block::from_primitive(Primitive::Recur {
+            txn.at(cube)
+                .overwrite(Block::from_primitive(Primitive::Recur {
                     attributes: self.block_attributes.clone(),
                     offset: block_to_voxels_transform
                         .transform_cube(cube)
                         .lower_bounds(),
                     resolution: self.scale,
                     space: self.space.clone(),
-                }),
-            )
+                }));
         }
         super::OneshotController::new(txn)
     }

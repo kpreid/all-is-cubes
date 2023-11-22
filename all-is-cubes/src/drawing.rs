@@ -383,13 +383,15 @@ impl<'a> VoxelBrush<'a> {
     }
 
     /// Like [`Self::paint_transaction()`] but modifies an existing transaction (as per
-    /// [`SpaceTransaction::set_overwrite()`]).
+    /// [`CubeTransaction::overwrite()`]).
     ///
     /// Note that [`VoxelBrush::paint`] or using it in a [`DrawTarget`] ignores
     /// out-of-bounds drawing, but transactions do not support this and will fail instead.
     pub fn paint_transaction_mut(&self, transaction: &mut SpaceTransaction, origin: Cube) {
         for &(offset, ref block) in &self.0 {
-            transaction.set_overwrite(origin + offset, Block::clone(block));
+            transaction
+                .at(origin + offset)
+                .overwrite(Block::clone(block));
         }
     }
 

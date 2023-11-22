@@ -232,8 +232,7 @@ impl ToolbarController {
                     ToolbarButtonState::Unmapped
                 }
             });
-            txn.set_overwrite(
-                position + GridVector::new(0, 1, 0),
+            txn.at(position + GridVector::new(0, 1, 0)).overwrite(
                 self.definition.hud_blocks.blocks
                     [UiBlocks::ToolbarPointer(this_slot_selected_mask)]
                 .clone(),
@@ -296,14 +295,13 @@ impl WidgetController for ToolbarController {
             } else {
                 left_or_middle
             };
-            txn.set_overwrite(cube, frame_part);
+            txn.at(cube).overwrite(frame_part);
         }
 
         // Place stack-count text blocks.
         for index in 0..slot_count {
-            txn.set_overwrite(
-                self.slot_position(index) + GridVector::new(-1, 0, 0),
-                Block::from_primitive(Primitive::Recur {
+            txn.at(self.slot_position(index) + GridVector::new(-1, 0, 0))
+                .overwrite(Block::from_primitive(Primitive::Recur {
                     attributes: BlockAttributes::default(),
                     offset: GridPoint::new(
                         index as GridCoordinate * GridCoordinate::from(slot_text_resolution),
@@ -312,8 +310,7 @@ impl WidgetController for ToolbarController {
                     ),
                     resolution: slot_text_resolution,
                     space: self.definition.slot_text_space.clone(),
-                }),
-            );
+                }));
         }
         Ok(txn)
     }
