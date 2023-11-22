@@ -36,6 +36,9 @@ use crate::math::{
 use crate::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use crate::universe::Universe;
 
+#[cfg(doc)]
+use crate::space::CubeTransaction;
+
 /// Convert a bounding-box rectangle, as from [`embedded_graphics::geometry::Dimensions`],
 /// to a [`GridAab`] which encloses the voxels that would be affected by drawing a
 /// [`Drawable`] with those bounds on a [`DrawingPlane`] with the given `transform`.

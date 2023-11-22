@@ -97,15 +97,6 @@ impl SpaceTransaction {
         }
     }
 
-    /// Expand this transaction to include modifying the given cube, replacing any
-    /// existing modification instruction (but not an existing `old` block precondition).
-    /// This is thus comparable to a direct [`Space::set()`] after the rest of the
-    /// transaction.
-    // TODO: no tests
-    pub fn set_overwrite(&mut self, cube: impl Into<Cube>, block: Block) {
-        self.at(cube.into()).overwrite(block);
-    }
-
     /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
     /// adapter for 2.5D drawing.
     ///
