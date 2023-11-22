@@ -2,15 +2,13 @@
 
 // Mirrors `struct ShaderSpaceCamera` on the Rust side.
 struct ShaderSpaceCamera {
-    // TODO: Due to <https://github.com/gfx-rs/naga/issues/2000>
-    // we must avoid any situation where a scalar is packed after a vec3 because
-    // that will be mis-translated to Metal as having padding.
-    // Once that is fixed, we can split apart these awkwardly combined vec4s.
     projection: mat4x4<f32>,
     view_matrix: mat4x4<f32>,
     view_position: vec3<f32>,
-    light_lookup_offset_and_option: vec4<i32>, // vec3 + 1
-    fog_color_and_fog_mode_blend: vec4<f32>, // vec3 + 1
+    light_lookup_offset: vec3<i32>,
+    light_option: i32,
+    fog_color: vec3<f32>,
+    fog_mode_blend: f32,
     fog_distance_and_exposure: vec4<f32>, // last two components unused
 };
 
@@ -59,7 +57,7 @@ fn fog_exp_fudged(distance: f32) -> f32 {
 fn fog_combo(distance: f32) -> f32 {
     // Combination of realistic exponential (constant density) fog,
     // and slower-starting fog so nearby stuff is clearer.
-    return mix(fog_exp_fudged(distance), pow(distance, 4.0), camera.fog_color_and_fog_mode_blend.w);
+    return mix(fog_exp_fudged(distance), pow(distance, 4.0), camera.fog_mode_blend);
 }
 
 // Returns the opacity (0 to 1) of the fog.
@@ -245,7 +243,7 @@ fn partial_scale_to_integer_step(s_in: f32, ds_in: f32) -> f32 {
 // excluding opaque blocks, while the -1 value indicates values that should be
 // truly ignored.
 fn light_texture_fetch(fragment_position: vec3<f32>) -> vec4<f32> {
-    var lookup_position = vec3<i32>(floor(fragment_position)) + camera.light_lookup_offset_and_option.xyz;
+    var lookup_position = vec3<i32>(floor(fragment_position)) + camera.light_lookup_offset;
     
     // Implement wrapping (not automatic since we're not using a sampler).
     // Wrapping is used to handle sky light and in the future will be used for
@@ -373,7 +371,7 @@ fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
 
 // Compute light intensity applying to the fragment.
 fn lighting(in: BlockFragmentInput) -> vec3<f32> {
-    switch camera.light_lookup_offset_and_option.w {
+    switch camera.light_option {
         // LightingOption::None or fallback: no lighting
         default: {
             return vec3<f32>(1.0);
@@ -444,7 +442,7 @@ fn get_material(in: BlockFragmentInput) -> Material {
 // These effects are independent of alpha and therefore the input and output is RGB.
 fn apply_fog_and_exposure(lit_color: vec3<f32>, fog_mix: f32) -> vec3<f32> {
     // Fog
-    let fogged_color = mix(lit_color, camera.fog_color_and_fog_mode_blend.rgb, fog_mix);
+    let fogged_color = mix(lit_color, camera.fog_color, fog_mix);
 
     // Exposure/eye adaptation
     let exposed_color = fogged_color.rgb * camera.fog_distance_and_exposure[1];
@@ -540,7 +538,7 @@ fn lines_fragment(input: LinesFragmentInput) -> @location(0) vec4<f32> {
     let color = input.color;
     
     // Fog
-    let fogged_color = vec4<f32>(mix(color.rgb, camera.fog_color_and_fog_mode_blend.rgb, input.fog_mix), color.a);
+    let fogged_color = vec4<f32>(mix(color.rgb, camera.fog_color, input.fog_mix), color.a);
 
     return fogged_color;
 }
