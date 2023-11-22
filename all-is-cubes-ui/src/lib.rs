@@ -15,6 +15,8 @@
 //! [`Session::input_processor`]: crate::apps::Session::input_processor
 //! [`Universe`]: all_is_cubes::universe::Universe
 
+// This crate is not `no_std` because it currently uses `std::sync::mpsc`.
+
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 
