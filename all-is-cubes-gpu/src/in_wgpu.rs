@@ -219,9 +219,7 @@ struct EverythingRenderer<I> {
     /// Pipelines and layouts for rendering Space content
     pipelines: Pipelines,
 
-    space_renderers: Layers<Option<SpaceRenderer<I>>>,
-    /// Texture atlas shared between all space renderers.
-    block_texture: AtlasAllocator,
+    space_renderers: Layers<SpaceRenderer<I>>,
 
     /// Cursor and debug lines are written to this buffer.
     lines_buffer: ResizingBuffer,
@@ -285,6 +283,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             postprocess::create_postprocess_bind_group_layout(&device);
 
         let pipelines = Pipelines::new(&device, &fb, cameras.graphics_options_source());
+        let block_texture = AtlasAllocator::new("EverythingRenderer");
 
         let mut new_self = EverythingRenderer {
             staging_belt: wgpu::util::StagingBelt::new(
@@ -301,9 +300,18 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
             fb,
 
-            space_renderers: Default::default(),
-            #[allow(clippy::arc_with_non_send_sync)]
-            block_texture: AtlasAllocator::new("EverythingRenderer"),
+            space_renderers: Layers {
+                world: SpaceRenderer::new(
+                    "world".into(),
+                    &device,
+                    &pipelines,
+                    block_texture.clone(),
+                    true,
+                )
+                .unwrap(), // TODO: can't actually fail I think
+                ui: SpaceRenderer::new("ui".into(), &device, &pipelines, block_texture, true)
+                    .unwrap(),
+            },
 
             lines_buffer: ResizingBuffer::default(),
             lines_vertex_count: 0,
@@ -423,20 +431,16 @@ impl<I: time::Instant> EverythingRenderer<I> {
         // Ensure SpaceRenderers are pointing at those spaces
         // TODO: we should be able to express this as something like "Layers::for_each_zip()"
         Self::update_space_renderer(
-            "world",
             &mut self.space_renderers.world,
             spaces_to_render.world,
             &self.device,
             &self.pipelines,
-            &self.block_texture,
         )?;
         Self::update_space_renderer(
-            "ui",
             &mut self.space_renderers.ui,
             spaces_to_render.ui,
             &self.device,
             &self.pipelines,
-            &self.block_texture,
         )?;
 
         let mut encoder = self
@@ -458,38 +462,22 @@ impl<I: time::Instant> EverythingRenderer<I> {
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
 
         let space_infos: Layers<SpaceUpdateInfo> = Layers {
-            world: self
-                .space_renderers
-                .world
-                .as_mut()
-                .map(|sr| {
-                    sr.update(
-                        world_deadline,
-                        &self.device,
-                        queue,
-                        &self.pipelines,
-                        &self.cameras.cameras().world,
-                        bwp.reborrow(),
-                    )
-                })
-                .transpose()?
-                .unwrap_or_default(),
-            ui: self
-                .space_renderers
-                .ui
-                .as_mut()
-                .map(|sr| {
-                    sr.update(
-                        ui_deadline,
-                        &self.device,
-                        queue,
-                        &self.pipelines,
-                        &self.cameras.cameras().ui,
-                        bwp.reborrow(),
-                    )
-                })
-                .transpose()?
-                .unwrap_or_default(),
+            world: self.space_renderers.world.update(
+                world_deadline,
+                &self.device,
+                queue,
+                &self.pipelines,
+                &self.cameras.cameras().world,
+                bwp.reborrow(),
+            )?,
+            ui: self.space_renderers.ui.update(
+                ui_deadline,
+                &self.device,
+                queue,
+                &self.pipelines,
+                &self.cameras.cameras().ui,
+                bwp.reborrow(),
+            )?,
         };
 
         let space_update_to_lines_time = I::now();
@@ -523,9 +511,9 @@ impl<I: time::Instant> EverythingRenderer<I> {
             );
 
             // Chunk debug -- not currently part of gather_debug_lines
-            if let Some(r) = &self.space_renderers.world {
-                r.debug_lines(&self.cameras.cameras().world, &mut v);
-            }
+            self.space_renderers
+                .world
+                .debug_lines(&self.cameras.cameras().world, &mut v);
 
             self.lines_buffer.write_with_resizing(
                 bwp.reborrow(),
@@ -557,34 +545,16 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
     /// Create, or set the space of, a [`SpaceRenderer`].
     fn update_space_renderer(
-        label: &str,
-        renderer: &mut Option<SpaceRenderer<I>>,
+        renderer: &mut SpaceRenderer<I>,
         space: Option<&URef<Space>>,
         device: &wgpu::Device,
         pipelines: &Pipelines,
-        block_texture: &AtlasAllocator,
     ) -> Result<(), GraphicsResourceError> {
-        match (renderer, space) {
-            (None, None) => {}
-            (r @ None, Some(space)) => {
-                *r = Some(SpaceRenderer::new(
-                    space.clone(),
-                    String::from(label),
-                    device,
-                    pipelines,
-                    block_texture.clone(),
-                    true,
-                )?);
-            }
-            (Some(r), Some(space)) => {
-                r.set_space(device, pipelines, space);
-            }
-            (r @ Some(_), None) => {
-                // TODO: Make SpaceRenderer able to handle nonexistence of a space
-                *r = None;
-            }
-        }
-        Ok(())
+        // TODO: this is obsolete since SpaceRenderer is now optional
+        renderer
+            .set_space(device, pipelines, space)
+            // we don't need to add context because RefError has got the space name .. or do we?
+            .map_err(GraphicsResourceError::read_err)
     }
 
     /// Render the current scene content to the linear scene texture,
@@ -606,8 +576,9 @@ impl<I: time::Instant> EverythingRenderer<I> {
         let mut output_needs_clearing = true;
 
         let start_draw_time = I::now();
-        let world_draw_info = if let Some(sr) = &self.space_renderers.world {
+        let world_draw_info = {
             let camera = &self.cameras.cameras().world;
+            let sr = &self.space_renderers.world;
             sr.draw(
                 &self.fb,
                 queue,
@@ -628,13 +599,11 @@ impl<I: time::Instant> EverythingRenderer<I> {
                     false => wgpu::StoreOp::Discard,
                 },
             )?
-        } else {
-            SpaceDrawInfo::default()
         };
         let world_to_lines_time = I::now();
 
         // Lines pass (if there are any lines)
-        if let (Some(sr), 1..) = (&self.space_renderers.world, self.lines_vertex_count) {
+        if let (sr, 1..) = (&self.space_renderers.world, self.lines_vertex_count) {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("debug lines"),
                 color_attachments: &[Some(self.fb.color_attachment_for_scene(wgpu::LoadOp::Load))],
@@ -661,23 +630,19 @@ impl<I: time::Instant> EverythingRenderer<I> {
         }
 
         let lines_to_ui_time = I::now();
-        let ui_draw_info = if let Some(sr) = &self.space_renderers.ui {
-            sr.draw(
-                &self.fb,
-                queue,
-                &mut encoder,
-                &self.pipelines,
-                &self.cameras.cameras().ui,
-                if mem::take(&mut output_needs_clearing) {
-                    wgpu::LoadOp::Clear(to_wgpu_color(palette::NO_WORLD_TO_SHOW))
-                } else {
-                    wgpu::LoadOp::Load
-                },
-                wgpu::StoreOp::Discard, // nothing uses the ui depth buffer
-            )?
-        } else {
-            SpaceDrawInfo::default()
-        };
+        let ui_draw_info = self.space_renderers.ui.draw(
+            &self.fb,
+            queue,
+            &mut encoder,
+            &self.pipelines,
+            &self.cameras.cameras().ui,
+            if mem::take(&mut output_needs_clearing) {
+                wgpu::LoadOp::Clear(to_wgpu_color(palette::NO_WORLD_TO_SHOW))
+            } else {
+                wgpu::LoadOp::Load
+            },
+            wgpu::StoreOp::Discard, // nothing uses the ui depth buffer
+        )?;
         let ui_to_postprocess_time = I::now();
 
         // Write the postprocess camera data.

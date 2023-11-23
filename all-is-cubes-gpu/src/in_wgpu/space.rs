@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, Weak};
+use std::time::Duration;
 
 use all_is_cubes::camera::{Camera, Flaws};
 use all_is_cubes::chunking::ChunkPos;
@@ -14,7 +15,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{Space, SpaceChange};
 use all_is_cubes::time;
-use all_is_cubes::universe::URef;
+use all_is_cubes::universe::{RefError, URef};
 use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, RenderDataUpdate};
 use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
 
@@ -38,6 +39,8 @@ const CHUNK_SIZE: GridCoordinate = 16;
 
 /// Manages cached data and GPU resources for drawing a single [`Space`] and
 /// following its changes.
+///
+/// Can be given a new [`Space`] or have none.
 #[derive(Debug)]
 pub(crate) struct SpaceRenderer<I> {
     space_label: String,
@@ -66,7 +69,10 @@ pub(crate) struct SpaceRenderer<I> {
     /// Bind group containing our block texture and light texture,
     space_bind_group: Memo<[wgpu::Id<wgpu::TextureView>; 3], wgpu::BindGroup>,
 
-    csm: ChunkedSpaceMesh<WgpuMt, I, CHUNK_SIZE>,
+    /// Mesh generator and updater.
+    ///
+    /// If [`None`], then we currently have no [`Space`].
+    csm: Option<ChunkedSpaceMesh<WgpuMt, I, CHUNK_SIZE>>,
 
     interactive: bool,
 }
@@ -79,38 +85,32 @@ pub(super) struct ChunkBuffers {
 }
 
 impl<I: time::Instant> SpaceRenderer<I> {
-    /// TODO: Simplify callers by making it possible to create a `SpaceRenderer` without a space.
-    /// Besides simpler initialization, this will also allow reusing allocated resources across a
-    /// period of no space.
+    /// Constructs a new [`SpaceRenderer`] with no space to render yet.
     pub fn new(
-        space: URef<Space>,
         space_label: String,
         device: &wgpu::Device,
         pipelines: &Pipelines,
         block_texture: AtlasAllocator,
         interactive: bool,
     ) -> Result<Self, GraphicsResourceError> {
-        let space_borrowed = space.read().map_err(GraphicsResourceError::read_err)?;
-
-        let light_texture = SpaceLightTexture::new(&space_label, device, space_borrowed.bounds());
+        let light_texture = SpaceLightTexture::new(&space_label, device, GridAab::ORIGIN_CUBE); // dummy
 
         let camera_buffer = SpaceCameraBuffer::new(&space_label, device, pipelines);
 
         let todo = Arc::new(Mutex::new(SpaceRendererTodo::default()));
-        space_borrowed.listen(TodoListener(Arc::downgrade(&todo)));
 
         Ok(SpaceRenderer {
             todo,
             render_pass_label: format!("{space_label} render_pass"),
             instance_buffer_label: format!("{space_label} instances"),
             space_label,
-            sky_color: space_borrowed.physics().sky_color,
+            sky_color: palette::NO_WORLD_TO_SHOW.to_rgb(),
             block_texture,
             light_texture,
             space_bind_group: Memo::new(),
             camera_buffer,
             instance_buffer: ResizingBuffer::default(),
-            csm: ChunkedSpaceMesh::new(space, interactive),
+            csm: None,
             interactive,
         })
     }
@@ -120,15 +120,26 @@ impl<I: time::Instant> SpaceRenderer<I> {
     /// This is not a minimum-effort operation and should be thought of as an optimized
     /// variant of building a new [`SpaceRenderer`] from scratch. However, it does check if the
     /// given space is equal to the current space before doing anything.
+    ///
+    /// Returns an error if reading the space fails. In that case, the state will be as if
+    /// `set_space(..., None)` was called.
     pub(crate) fn set_space(
         &mut self,
         device: &wgpu::Device,
         _pipelines: &Pipelines,
-        space: &URef<Space>,
-    ) {
-        if self.csm.space() == space {
-            return;
+        space: Option<&URef<Space>>,
+    ) -> Result<(), RefError> {
+        if self.csm.as_ref().map(|csm| csm.space()) == space {
+            // No change.
+            return Ok(());
         }
+
+        let Some(space) = space else {
+            self.clear_space();
+            return Ok(());
+        };
+
+        let space_borrowed = space.read()?;
 
         // Destructuring to explicitly skip or handle each field.
         let SpaceRenderer {
@@ -146,18 +157,40 @@ impl<I: time::Instant> SpaceRenderer<I> {
             interactive,
         } = self;
 
-        let space_borrowed = space.read().unwrap();
-
         *todo = {
             let todo = Arc::new(Mutex::new(SpaceRendererTodo::default()));
             space_borrowed.listen(TodoListener(Arc::downgrade(&todo)));
             todo
         };
         // TODO: rescue ChunkChart and maybe block meshes from the old `csm`.
-        *csm = ChunkedSpaceMesh::new(space.clone(), *interactive);
+        *csm = Some(ChunkedSpaceMesh::new(space.clone(), *interactive));
         *sky_color = space_borrowed.physics().sky_color;
         // TODO: don't replace light texture if the size is the same
         *light_texture = SpaceLightTexture::new(space_label, device, space_borrowed.bounds());
+
+        Ok(())
+    }
+
+    // Helper for set_space(), implementing the `space == None`` case.
+    fn clear_space(&mut self) {
+        let SpaceRenderer {
+            space_label: _,
+            render_pass_label: _,
+            instance_buffer_label: _,
+            todo,
+            sky_color,
+            block_texture: _,
+            light_texture: _,
+            camera_buffer: _,
+            instance_buffer: _,
+            space_bind_group: _,
+            csm,
+            interactive: _,
+        } = self;
+
+        *todo = Default::default(); // detach from space notifier
+        *csm = None;
+        *sky_color = palette::NO_WORLD_TO_SHOW.to_rgb();
     }
 
     /// Update renderer internal state from the given [`Camera`] and referenced [`Space`],
@@ -176,8 +209,10 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         let mut todo = self.todo.lock().unwrap();
 
-        let space = &*self
-            .csm
+        let Some(csm) = &mut self.csm else {
+            return Ok(SpaceUpdateInfo::default());
+        };
+        let space = &*csm
             .space()
             .read()
             .map_err(GraphicsResourceError::read_err)?;
@@ -200,7 +235,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let end_light_update = I::now();
 
         // Update chunks
-        let csm_info = self.csm.update_blocks_and_some_chunks(
+        let csm_info = csm.update_blocks_and_some_chunks(
             camera,
             &self.block_texture,
             deadline, // TODO: decrease deadline by some guess at texture writing time
@@ -233,7 +268,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             &wgpu::BufferDescriptor {
                 label: Some(&self.instance_buffer_label),
                 size: u64::try_from(
-                    self.csm.chunk_chart().count_all() * std::mem::size_of::<WgpuInstanceData>(),
+                    csm.chunk_chart().count_all() * std::mem::size_of::<WgpuInstanceData>(),
                 )
                 .expect("instance buffer size overflow"),
                 usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX,
@@ -292,11 +327,38 @@ impl<I: time::Instant> SpaceRenderer<I> {
         store_depth: wgpu::StoreOp,
     ) -> Result<SpaceDrawInfo, GraphicsResourceError> {
         let start_time = I::now();
-
-        let csm = &self.csm;
-        let view_chunk = csm.view_chunk();
-
         let mut flaws = Flaws::empty();
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some(&self.render_pass_label),
+            color_attachments: &[Some(fb.color_attachment_for_scene(color_load_op))],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &fb.depth_texture_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: store_depth,
+                }),
+                stencil_ops: None,
+            }),
+            ..Default::default()
+        });
+
+        // Check if we actually have a space to render.
+        let Some(csm) = &self.csm else {
+            // If we have no space to render, then only let the render pass perform its clear,
+            // and do nothing else.
+
+            return Ok(SpaceDrawInfo {
+                draw_init_time: Duration::ZERO,
+                draw_opaque_time: Duration::ZERO,
+                draw_transparent_time: Duration::ZERO,
+                squares_drawn: 0,
+                chunks_drawn: 0,
+                flaws,
+            });
+        };
+
+        let view_chunk = csm.view_chunk();
 
         // Accumulates instance data for meshes, which we will then write as part of this
         // submission. (Draw commands always happen after buffer writes even if they
@@ -317,19 +379,6 @@ impl<I: time::Instant> SpaceRenderer<I> {
             )),
         );
 
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some(&self.render_pass_label),
-            color_attachments: &[Some(fb.color_attachment_for_scene(color_load_op))],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &fb.depth_texture_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: store_depth,
-                }),
-                stencil_ops: None,
-            }),
-            ..Default::default()
-        });
         render_pass.set_bind_group(0, &self.camera_buffer.bind_group, &[]);
         if let Some(space_bind_group) = self.space_bind_group.get() {
             render_pass.set_bind_group(1, space_bind_group, &[]);
@@ -463,15 +512,18 @@ impl<I: time::Instant> SpaceRenderer<I> {
     /// Generate debug lines for the current state of the renderer, assuming
     /// draw() was just called.
     pub(crate) fn debug_lines(&self, camera: &Camera, v: &mut Vec<WgpuLinesVertex>) {
+        let Some(csm) = &self.csm else {
+            return;
+        };
+
         if camera.options().debug_chunk_boxes {
-            self.csm.chunk_debug_lines(
+            csm.chunk_debug_lines(
                 camera,
                 &mut crate::map_line_vertices::<WgpuLinesVertex>(v, palette::DEBUG_CHUNK_MAJOR),
             );
 
             // Frame the nearest chunk in detail
-            let chunk_origin = self
-                .csm
+            let chunk_origin = csm
                 .view_chunk()
                 .bounds()
                 .lower_bounds()
