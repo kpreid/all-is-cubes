@@ -10,7 +10,7 @@ use all_is_cubes::behavior::BehaviorSetTransaction;
 use all_is_cubes::block::builder::BlockBuilderVoxels;
 use all_is_cubes::block::{
     self, Block, BlockBuilder,
-    Resolution::{self, R32},
+    Resolution::{self, *},
 };
 use all_is_cubes::content::load_image::{default_srgb, DecodedPng, PngAdapter};
 use all_is_cubes::content::palette;
@@ -18,9 +18,7 @@ use all_is_cubes::drawing::embedded_graphics::{
     image::Image as EgImage,
     mono_font::{MonoFont, MonoTextStyle},
     prelude::{Dimensions, PixelColor, Point, Size},
-    primitives::{
-        Circle, Primitive, PrimitiveStyleBuilder, Rectangle, RoundedRectangle, StrokeAlignment,
-    },
+    primitives::{Primitive, PrimitiveStyleBuilder, Rectangle, RoundedRectangle, StrokeAlignment},
     text::{Alignment, Baseline, Text, TextStyleBuilder},
     Drawable,
 };
@@ -28,26 +26,31 @@ use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
 use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking::{self, InGenError};
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
-use all_is_cubes::math::{Cube, Face6, GridAab, GridCoordinate, GridVector, Gridgid, Rgba};
+use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridVector, Gridgid, Rgba};
 use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{URef, Universe};
 
 use crate::vui;
-use crate::vui::widgets::{WidgetBlocks, WidgetTheme};
+use crate::vui::widgets::{BoxStyle, WidgetBlocks, WidgetTheme};
 
 type Action = EphemeralOpaque<dyn Fn() + Send + Sync>;
 
+/// Layout requirement for all buttons.
+/// TODO: This will need to be dynamic once buttons have text labels.
 const REQUIREMENT: vui::LayoutRequest = vui::LayoutRequest {
     minimum: GridVector::new(1, 1, 1),
 };
+
+fn shrink_button_bounds(grant: vui::LayoutGrant) -> vui::LayoutGrant {
+    grant.shrink_to(REQUIREMENT.minimum, false)
+}
 
 /// A single-block button that reacts to activations (clicks) but does not change
 /// otherwise.
 #[derive(Clone, Debug)]
 pub struct ActionButton {
-    // TODO: this will eventually want hover + pressed state blocks
-    block: Block,
+    appearance: linking::Provider<ButtonVisualState, BoxStyle>,
     action: Action,
 }
 
@@ -58,13 +61,12 @@ impl ActionButton {
         theme: &WidgetTheme,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Arc<Self> {
-        let state = ButtonVisualState::default();
-        let blocks = theme
+        let appearance = theme
             .widget_blocks
             .subset(WidgetBlocks::ActionButton)
             .map(|state, base_block| assemble_button(state, base_block.clone(), label.clone()));
         Arc::new(Self {
-            block: blocks[state].clone(),
+            appearance,
             action: EphemeralOpaque::new(Arc::new(action)),
         })
     }
@@ -115,17 +117,18 @@ impl vui::WidgetController for ActionButtonController {
         &mut self,
         context: &vui::WidgetContext<'_>,
     ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
-        let Some(position) = context.grant().shrink_to_cube() else {
-            return Ok(vui::WidgetTransaction::default());
-        };
-        let icon = SpaceTransaction::set_cube(position, None, Some(self.definition.block.clone()));
+        let grant = shrink_button_bounds(*context.grant());
+
+        // TODO: we never draw the pressed state
+        let draw = self.definition.appearance[ButtonVisualState { pressed: false }]
+            .create_box(grant.bounds);
         let activatable = space::SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
-            space::SpaceBehaviorAttachment::new(GridAab::single_cube(position)),
+            space::SpaceBehaviorAttachment::new(grant.bounds),
             Arc::new(space::ActivatableRegion {
                 effect: self.definition.action.clone(),
             }),
         ));
-        icon.merge(activatable)
+        draw.merge(activatable)
             .map_err(|error| vui::InstallVuiError::Conflict { error })
     }
 }
@@ -134,7 +137,7 @@ impl vui::WidgetController for ActionButtonController {
 /// [`ListenableSource`] and can be clicked.
 #[derive(Clone)]
 pub struct ToggleButton<D> {
-    blocks: linking::BlockProvider<ToggleButtonVisualState>,
+    appearance: linking::Provider<ToggleButtonVisualState, BoxStyle>,
     data_source: ListenableSource<D>,
     projection: Arc<dyn Fn(&D) -> bool + Send + Sync>,
     action: Action,
@@ -143,7 +146,7 @@ pub struct ToggleButton<D> {
 impl<D: Clone + Sync + fmt::Debug> fmt::Debug for ToggleButton<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ToggleButton")
-            .field("blocks", &self.blocks)
+            .field("appearance", &self.appearance)
             .field("data_source", &self.data_source)
             .field(
                 "projection(data_source)",
@@ -163,12 +166,12 @@ impl<D> ToggleButton<D> {
         theme: &WidgetTheme,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Arc<Self> {
-        let blocks = theme
+        let appearance = theme
             .widget_blocks
             .subset(WidgetBlocks::ToggleButton)
             .map(|state, base_block| assemble_button(state, base_block.clone(), label.clone()));
         Arc::new(Self {
-            blocks,
+            appearance,
             data_source,
             projection: Arc::new(projection),
             action: EphemeralOpaque::new(Arc::new(action)),
@@ -241,9 +244,11 @@ struct ToggleButtonController<D: Clone + Send + Sync> {
 }
 
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> ToggleButtonController<D> {
-    fn icon_txn(&self, position: Cube) -> vui::WidgetTransaction {
+    fn draw_txn(&self, grant: &vui::LayoutGrant) -> vui::WidgetTransaction {
+        let grant = shrink_button_bounds(*grant);
+
         let value = (self.definition.projection)(&self.definition.data_source.get());
-        let block = self.definition.blocks[ToggleButtonVisualState {
+        self.definition.appearance[ToggleButtonVisualState {
             value,
             // TODO: once cursor/click system supports mousedown and up, use that instead
             // of this crude animation behavior (but maybe *also* have a post-press
@@ -256,8 +261,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> ToggleButtonController<D> {
                     > 1,
             },
         }]
-        .clone();
-        SpaceTransaction::set_cube(position, None, Some(block))
+        .create_box(grant.bounds)
     }
 }
 
@@ -268,11 +272,10 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
         &mut self,
         context: &vui::WidgetContext<'_>,
     ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
-        let Some(position) = context.grant().shrink_to_cube() else {
-            return Ok(vui::WidgetTransaction::default());
-        };
+        let grant = shrink_button_bounds(*context.grant());
+
         let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
-            SpaceBehaviorAttachment::new(position.grid_aab()),
+            SpaceBehaviorAttachment::new(grant.bounds),
             Arc::new(space::ActivatableRegion {
                 effect: {
                     let action = self.definition.action.clone();
@@ -290,8 +293,8 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
                 },
             }),
         ));
-        let icon = self.icon_txn(position);
-        icon.merge(activatable)
+        self.draw_txn(context.grant())
+            .merge(activatable)
             .map_err(|error| vui::InstallVuiError::Conflict { error })
     }
 
@@ -299,13 +302,9 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
         &mut self,
         context: &vui::WidgetContext<'_>,
     ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
-        let Some(position) = context.grant().shrink_to_cube() else {
-            return Ok((vui::WidgetTransaction::default(), vui::Then::Drop));
-        };
-
         Ok((
             if self.todo.get_and_clear() || self.recently_pressed.load(Relaxed) > 0 {
-                self.icon_txn(position)
+                self.draw_txn(context.grant())
             } else {
                 SpaceTransaction::default()
             },
@@ -314,23 +313,35 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
     }
 }
 
-/// Composite a button shape and a button label.
+/// Composite a button shape multiblock and a button label to make the labeled button to be drawn.
 ///
 /// Not public because it is only used by button widgets.
 ///
-/// `base` mus be the `ButtonBase` that produced `base_block`.
+/// `base` must be the `ButtonBase` that produced `base_block`.
 /// TODO: Find a non-redundant way to pass this information.
-fn assemble_button(base: &dyn ButtonBase, base_block: Block, label_block: Block) -> Block {
+fn assemble_button(
+    base: &dyn ButtonBase,
+    base_multiblock: Block,
+    label_block: Block,
+    //grant: &vui::LayoutGrant,
+) -> BoxStyle {
     let shifted_label = label_block.with_modifier(block::Move::new(
         Face6::PZ,
         (base.button_label_z() * 256 / theme::RESOLUTION_G) as u16,
         0,
     ));
 
-    base_block.with_modifier(block::Composite::new(
-        shifted_label,
-        block::CompositeOperator::Over,
-    ))
+    let unlabeled_box_style = BoxStyle::from_nine_and_thin(&base_multiblock);
+
+    // TODO: We need to produce a transaction or VoxelBrush rather than a BoxStyle for this to work
+    // properly. The label should be composed with the button at its final size and shape, not
+    // duplicated into every block of the label.
+    unlabeled_box_style.map_blocks(|base_block| {
+        base_block.with_modifier(block::Composite::new(
+            shifted_label.clone(),
+            block::CompositeOperator::Over,
+        ))
+    })
 }
 
 /// Returns a [`DrawTarget`] for drawing the button label, with a
@@ -404,15 +415,18 @@ mod theme {
     use super::*;
     pub const RESOLUTION: Resolution = R32;
     pub const RESOLUTION_G: GridCoordinate = RESOLUTION.to_grid();
+    /// Resolution to use for button base multiblock
+    pub const MULTI_RESOLUTION: Resolution = R128 /* RESOLUTION * 4 */;
     pub const UNPRESSED_Z: GridCoordinate = 12;
     pub fn rim_lightening(color: Rgba) -> Rgba {
         color.map_rgb(|rgb| rgb * 1.1)
     }
 
     pub fn create_space(max_z: GridCoordinate) -> Space {
+        let multi_resolution_g = MULTI_RESOLUTION.to_grid();
         Space::builder(GridAab::from_lower_size(
             [0, 0, 0],
-            [RESOLUTION_G, RESOLUTION_G, max_z],
+            [multi_resolution_g, multi_resolution_g, max_z],
         ))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build()
@@ -422,7 +436,7 @@ mod theme {
     pub fn common_block(space: URef<Space>, name: &str) -> Block {
         Block::builder()
             .display_name(name.to_string())
-            .voxels_ref(RESOLUTION, space)
+            .voxels_ref(MULTI_RESOLUTION, space)
             .build()
     }
 }
@@ -434,9 +448,13 @@ mod theme {
 ///
 /// These shapes are used in button widgets like [`ActionButton`] and [`ToggleButton`].
 pub(crate) trait ButtonBase {
-    /// Constructs the block for this kind of button in this state, without any label.
+    /// Constructs the block shape for this kind of button in this state, without any label.
+    ///
+    /// The block is a multiblock shape suitable for [`BoxStyle::from_nine_and_thin()`].
     ///
     /// TODO: switch from `&mut Universe` to transactions
+    ///
+    /// TODO: more type-safe result while still cooperating with `linking`
     fn button_block(&self, universe: &mut Universe) -> Result<Block, InGenError>;
 
     /// Where within the [`Self::button_block()`] the label should be positioned.
@@ -462,36 +480,37 @@ impl ButtonBase for ButtonVisualState {
         )]);
 
         let outer_inset = 2; // TODO duplicate number
-        let circle = |inset: i32| {
-            let inset = outer_inset + inset;
-            Circle::new(
-                Point::new(inset, inset),
-                (theme::RESOLUTION_G - inset * 2) as u32,
+        let rr = |bounding_box: GridAab, inset: i32| {
+            RoundedRectangle::with_equal_corners(
+                aab_xy_to_rectangle(bounding_box).offset(-(outer_inset + inset)),
+                Size::new_equal((theme::RESOLUTION_G / 2 - outer_inset - inset) as u32),
             )
         };
 
         let mut space = theme::create_space(label_z);
         let draw_target = &mut space.draw_target(Gridgid::IDENTITY);
 
-        circle(0)
-            .into_styled(
-                PrimitiveStyleBuilder::new()
-                    .fill_color(&back_brush)
-                    .stroke_color(&frame_brush)
-                    .stroke_width(2)
-                    .stroke_alignment(StrokeAlignment::Inside)
-                    .build(),
-            )
-            .draw(draw_target)?;
-        circle(2)
-            .into_styled(
-                PrimitiveStyleBuilder::new()
-                    .stroke_color(&cap_rim_brush)
-                    .stroke_width(1)
-                    .stroke_alignment(StrokeAlignment::Inside)
-                    .build(),
-            )
-            .draw(draw_target)?;
+        for b in BoxStyle::nine_boxes(theme::RESOLUTION) {
+            rr(b, 0)
+                .into_styled(
+                    PrimitiveStyleBuilder::new()
+                        .fill_color(&back_brush)
+                        .stroke_color(&frame_brush)
+                        .stroke_width(2)
+                        .stroke_alignment(StrokeAlignment::Inside)
+                        .build(),
+                )
+                .draw(draw_target)?;
+            rr(b, 2)
+                .into_styled(
+                    PrimitiveStyleBuilder::new()
+                        .stroke_color(&cap_rim_brush)
+                        .stroke_width(1)
+                        .stroke_alignment(StrokeAlignment::Inside)
+                        .build(),
+                )
+                .draw(draw_target)?;
+        }
 
         Ok(theme::common_block(
             universe.insert_anonymous(space),
@@ -528,17 +547,9 @@ impl ButtonBase for ToggleButtonVisualState {
         )]);
 
         let outer_inset = 2;
-        let outer_rectangle = Rectangle::with_corners(
-            Point::new(outer_inset, outer_inset),
-            Point::new(
-                // - 1 because e-g rectangles are specified in terms of their outermost pixels
-                theme::RESOLUTION_G - outer_inset - 1,
-                theme::RESOLUTION_G - outer_inset - 1,
-            ),
-        );
-        let rr = |inset: i32| {
+        let rr = |bounding_box: GridAab, inset: i32| {
             RoundedRectangle::with_equal_corners(
-                outer_rectangle.offset(-inset),
+                aab_xy_to_rectangle(bounding_box).offset(-(outer_inset + inset)),
                 Size::new(5 - inset as u32, 5 - inset as u32),
             )
         };
@@ -546,30 +557,42 @@ impl ButtonBase for ToggleButtonVisualState {
         let mut space = theme::create_space(label_z);
         let draw_target = &mut space.draw_target(Gridgid::IDENTITY);
 
-        // unwrap()s because if this drawing fails, tests will catch that — no parameters
-        rr(0)
-            .into_styled(
-                PrimitiveStyleBuilder::new()
-                    .fill_color(&back_brush)
-                    .stroke_color(&frame_brush)
-                    .stroke_width(2)
-                    .stroke_alignment(StrokeAlignment::Inside)
-                    .build(),
-            )
-            .draw(draw_target)?;
-        rr(2)
-            .into_styled(
-                PrimitiveStyleBuilder::new()
-                    .stroke_color(&cap_rim_brush)
-                    .stroke_width(1)
-                    .stroke_alignment(StrokeAlignment::Inside)
-                    .build(),
-            )
-            .draw(draw_target)?;
+        for b in BoxStyle::nine_boxes(theme::RESOLUTION) {
+            rr(b, 0)
+                .into_styled(
+                    PrimitiveStyleBuilder::new()
+                        .fill_color(&back_brush)
+                        .stroke_color(&frame_brush)
+                        .stroke_width(2)
+                        .stroke_alignment(StrokeAlignment::Inside)
+                        .build(),
+                )
+                .draw(draw_target)?;
+            rr(b, 2)
+                .into_styled(
+                    PrimitiveStyleBuilder::new()
+                        .stroke_color(&cap_rim_brush)
+                        .stroke_width(1)
+                        .stroke_alignment(StrokeAlignment::Inside)
+                        .build(),
+                )
+                .draw(draw_target)?;
+        }
 
         Ok(theme::common_block(
             universe.insert_anonymous(space),
             &format!("Toggle Button {self}"),
         ))
     }
+}
+
+fn aab_xy_to_rectangle(bounding_box: GridAab) -> Rectangle {
+    Rectangle::with_corners(
+        Point::new(bounding_box.lower_bounds().x, bounding_box.lower_bounds().y),
+        Point::new(
+            // - 1 because e-g rectangles are specified in terms of their outermost pixels
+            bounding_box.upper_bounds().x - 1,
+            bounding_box.upper_bounds().y - 1,
+        ),
+    )
 }

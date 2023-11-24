@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
-use crate::block::{self, Block};
-use crate::math::{Cube, FaceMap, GridAab, GridPoint, GridRotation};
+use crate::block::{self, Block, Resolution};
+use crate::math::{Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation};
 use crate::space;
 
 /// Set of blocks used to draw 3D boxes of any size, allowing corners and edges to have
@@ -64,6 +64,26 @@ impl BoxStyle {
                 })
             }),
         }
+    }
+
+    /// Returns the [`GridAab`]s giving the bounds of the individual regions that should be
+    /// drawn in voxels to create the multiblock input to [`BoxStyle::from_nine_and_thin()`],
+    /// and the single [`GridAab`] bounding all of thewm.
+    ///
+    /// This function is a convenience for setup and not mandatory.
+    #[doc(hidden)] // TODO: good public api? or ad-hoc?
+    pub fn nine_boxes(
+        resolution: Resolution,
+    ) -> impl Iterator<Item = GridAab> + Clone + Send + 'static {
+        let resolution = GridCoordinate::from(resolution);
+        let ranges = [0..resolution * 3, resolution * 3..resolution * 4];
+
+        ranges.clone().into_iter().flat_map(move |y_range| {
+            ranges
+                .clone()
+                .into_iter()
+                .map(move |x_range| GridAab::from_ranges([x_range, y_range.clone(), 0..resolution]))
+        })
     }
 
     /// Construct a `BoxStyle` that uses the given blocks for
@@ -347,6 +367,17 @@ impl BoxStyle {
     #[must_use]
     pub fn with_interior(mut self, interior: Option<Block>) -> Self {
         self.parts[0][0][0] = interior;
+        self
+    }
+
+    /// Applies the given function to every block present in this.
+    #[must_use]
+    pub fn map_blocks(mut self, mut block_fn: impl FnMut(Block) -> Block) -> Self {
+        for block in self.parts.iter_mut().flatten().flatten() {
+            if let Some(old_block) = block.take() {
+                *block = Some(block_fn(old_block));
+            }
+        }
         self
     }
 
