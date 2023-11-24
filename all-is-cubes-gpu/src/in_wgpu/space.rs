@@ -263,6 +263,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         );
 
         // Ensure instance buffer is big enough.
+        // TODO(instancing): This doesn't account for non-chunk instances.
         self.instance_buffer.resize_at_least(
             bwp.device,
             &wgpu::BufferDescriptor {
@@ -483,13 +484,16 @@ impl<I: time::Instant> SpaceRenderer<I> {
             }
         }
 
-        queue.write_buffer(
-            self.instance_buffer
-                .get()
-                .expect("SpaceRenderer::instance_buffer should have been created but wasn't"),
-            0,
-            bytemuck::cast_slice::<WgpuInstanceData, u8>(instance_data.as_slice()),
-        );
+        if let Some(buffer) = self.instance_buffer.get() {
+            queue.write_buffer(
+                buffer,
+                0,
+                bytemuck::cast_slice::<WgpuInstanceData, u8>(instance_data.as_slice()),
+            );
+        } else {
+            // TODO: remember needed size for the next frame (perhaps as instance_data's len)
+            flaws |= Flaws::UNFINISHED;
+        }
 
         let end_time = I::now();
 
