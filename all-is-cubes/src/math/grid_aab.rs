@@ -127,6 +127,18 @@ impl GridAab {
         GridAab::from_lower_size(lower_bounds, upper_bounds.into() - lower_bounds)
     }
 
+    /// Constructs a [`GridAab`] from [`Range`]s.
+    ///
+    /// This is identical to [`GridAab::from_lower_upper()`] except for the input type.
+    #[track_caller]
+    pub fn from_ranges(ranges: impl Into<Vector3D<Range<GridCoordinate>, Cube>>) -> GridAab {
+        let ranges = ranges.into();
+        GridAab::from_lower_upper(
+            ranges.clone().map(|r| r.start).to_point(),
+            ranges.map(|r| r.end).to_point(),
+        )
+    }
+
     /// Constructs a [`GridAab`] from inclusive lower bounds and exclusive upper bounds.
     ///
     /// Returns [`Err`] if the bounds are reversed or the resulting range would cause
