@@ -29,8 +29,8 @@ pub(crate) fn graphics_options_widgets(
         w.push(LayoutTree::leaf(widgets::ToggleButton::new(
             hud_inputs.fullscreen_mode.clone(),
             |opt_value| opt_value.unwrap_or(false),
-            hud_inputs.hud_blocks.blocks[UiBlocks::FullscreenButtonLabel].clone(),
-            &hud_inputs.hud_blocks.blocks,
+            hud_inputs.hud_blocks.ui_blocks[UiBlocks::FullscreenButtonLabel].clone(),
+            &hud_inputs.hud_blocks.widget_theme,
             {
                 let cell = hud_inputs.fullscreen_mode.clone();
                 move || {
@@ -104,13 +104,13 @@ fn graphics_toggle_button(
     getter: fn(&GraphicsOptions) -> bool,
     setter: fn(&mut GraphicsOptions, bool),
 ) -> WidgetTree {
-    let icon = hud_inputs.hud_blocks.blocks[icon_key].clone();
+    let icon = hud_inputs.hud_blocks.ui_blocks[icon_key].clone();
     let text_label = icon.evaluate().unwrap().attributes.display_name.clone();
     let button: Arc<dyn Widget> = widgets::ToggleButton::new(
         hud_inputs.graphics_options.clone(),
         getter,
         icon,
-        &hud_inputs.hud_blocks.blocks,
+        &hud_inputs.hud_blocks.widget_theme,
         {
             let cc = hud_inputs.app_control_channel.clone();
             move || {
@@ -163,8 +163,8 @@ pub(crate) fn pause_toggle_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
     widgets::ToggleButton::new(
         hud_inputs.paused.clone(),
         |&value| value,
-        hud_inputs.hud_blocks.blocks[UiBlocks::PauseButtonLabel].clone(),
-        &hud_inputs.hud_blocks.blocks,
+        hud_inputs.hud_blocks.ui_blocks[UiBlocks::PauseButtonLabel].clone(),
+        &hud_inputs.hud_blocks.widget_theme,
         {
             let cc = hud_inputs.app_control_channel.clone();
             move || {

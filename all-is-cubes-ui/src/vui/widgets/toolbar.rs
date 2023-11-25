@@ -21,10 +21,9 @@ use all_is_cubes::transaction::Merge as _;
 use all_is_cubes::universe::{URef, Universe};
 
 use crate::ui_content::{hud::HudBlocks, CueMessage, CueNotifier};
-use crate::vui::blocks::ToolbarButtonState;
+use crate::vui::widgets::{ToolbarButtonState, WidgetBlocks};
 use crate::vui::{
-    self, InstallVuiError, LayoutRequest, Layoutable, UiBlocks, Widget, WidgetController,
-    WidgetTransaction,
+    self, InstallVuiError, LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction,
 };
 
 /// Widget that displays inventory contents in toolbar format.
@@ -49,6 +48,7 @@ impl Toolbar {
 
     pub fn new(
         character_source: ListenableSource<Option<URef<Character>>>,
+        // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
         hud_blocks: Arc<HudBlocks>,
         slot_count: usize,
         universe: &mut Universe,
@@ -236,8 +236,8 @@ impl ToolbarController {
                 }
             });
             txn.at(position + GridVector::new(0, 1, 0)).overwrite(
-                self.definition.hud_blocks.blocks
-                    [UiBlocks::ToolbarPointer(this_slot_selected_mask)]
+                self.definition.hud_blocks.widget_theme.widget_blocks
+                    [WidgetBlocks::ToolbarPointer(this_slot_selected_mask)]
                 .clone(),
             );
         }
@@ -270,7 +270,8 @@ impl WidgetController for ToolbarController {
                 .clone()
                 .with_modifier(block::Zoom::new(block::Resolution::R4, pos))
         }
-        let frame_multiblock = &self.definition.hud_blocks.blocks[UiBlocks::ToolbarSlotFrame];
+        let frame_multiblock =
+            &self.definition.hud_blocks.widget_theme.widget_blocks[WidgetBlocks::ToolbarSlotFrame];
         for cube in frame_region.interior_iter() {
             let relative = cube - self.first_slot_position;
             let x = relative.x;

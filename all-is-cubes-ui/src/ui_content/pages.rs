@@ -30,19 +30,19 @@ pub(super) fn new_paused_widget_tree(
         LayoutTree::leaf(open_page_button(
             hud_inputs,
             VuiPageState::AboutText,
-            hud_inputs.hud_blocks.blocks[UiBlocks::AboutButtonLabel].clone(),
+            hud_inputs.hud_blocks.ui_blocks[UiBlocks::AboutButtonLabel].clone(),
         )),
         LayoutTree::leaf(open_page_button(
             hud_inputs,
             VuiPageState::Options,
-            hud_inputs.hud_blocks.blocks[UiBlocks::OptionsButtonLabel].clone(),
+            hud_inputs.hud_blocks.ui_blocks[UiBlocks::OptionsButtonLabel].clone(),
         )),
         LayoutTree::leaf(pause_toggle_button(hud_inputs)),
     ];
     if let Some(quit_fn) = hud_inputs.quit.as_ref().cloned() {
         children.push(LayoutTree::leaf(widgets::ActionButton::new(
-            hud_inputs.hud_blocks.blocks[UiBlocks::QuitButtonLabel].clone(),
-            &hud_inputs.hud_blocks.blocks,
+            hud_inputs.hud_blocks.ui_blocks[UiBlocks::QuitButtonLabel].clone(),
+            &hud_inputs.hud_blocks.widget_theme,
             // TODO: quit_fn should be an async function, but we don't have a way to
             // kick off a “Quitting...” task yet.
             move || match quit_fn() {
@@ -61,6 +61,7 @@ pub(super) fn new_paused_widget_tree(
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
         hud_inputs
             .hud_blocks
+            .widget_theme
             .dialog_background()
             .as_background_of(contents),
     ))))
@@ -87,6 +88,7 @@ pub(super) fn new_options_widget_tree(
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
         hud_inputs
             .hud_blocks
+            .widget_theme
             .dialog_background()
             .as_background_of(contents),
     ))))
@@ -138,6 +140,7 @@ pub(super) fn new_about_widget_tree(
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
         hud_inputs
             .hud_blocks
+            .widget_theme
             .dialog_background()
             .as_background_of(contents),
     ))))
@@ -161,6 +164,7 @@ pub(super) fn new_message_widget_tree(
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
         hud_inputs
             .hud_blocks
+            .widget_theme
             .dialog_background()
             .as_background_of(contents),
     ))))
@@ -182,7 +186,7 @@ pub(crate) fn open_page_button(
             move |page_state| *page_state == page
         },
         label,
-        &hud_inputs.hud_blocks.blocks,
+        &hud_inputs.hud_blocks.widget_theme,
         {
             let cc = hud_inputs.vui_control_channel.clone();
             move || {
@@ -198,8 +202,8 @@ pub(crate) fn back_button(hud_inputs: &HudInputs) -> WidgetTree {
     // TODO: define a narrower set of inputs than HudInputs
     // TODO: this function should maybe live in a 'UI mid-level components' module?
     LayoutTree::leaf(widgets::ActionButton::new(
-        hud_inputs.hud_blocks.blocks[UiBlocks::BackButtonLabel].clone(),
-        &hud_inputs.hud_blocks.blocks,
+        hud_inputs.hud_blocks.ui_blocks[UiBlocks::BackButtonLabel].clone(),
+        &hud_inputs.hud_blocks.widget_theme,
         {
             let cc = hud_inputs.vui_control_channel.clone();
             move || {

@@ -456,8 +456,10 @@ async fn icons(mut context: RenderTestContext) {
     use all_is_cubes::linking::{BlockModule, BlockProvider};
     use all_is_cubes_ui::vui::{
         self,
-        blocks::{ToolbarButtonState, UiBlocks},
-        widgets, Align,
+        blocks::UiBlocks,
+        widgets,
+        widgets::{ToolbarButtonState, WidgetBlocks, WidgetTheme},
+        Align,
     };
 
     let universe = &mut Universe::new();
@@ -468,6 +470,9 @@ async fn icons(mut context: RenderTestContext) {
     let ui_blocks_p = UiBlocks::new(universe, yield_progress_for_testing())
         .await
         .install(universe)
+        .unwrap();
+    let widget_theme = WidgetTheme::new(universe, yield_progress_for_testing())
+        .await
         .unwrap();
 
     fn get_blocks<E: BlockModule + 'static>(
@@ -489,12 +494,12 @@ async fn icons(mut context: RenderTestContext) {
         ],
     );
 
-    let ui_blocks = get_blocks(
+    let widget_blocks = get_blocks(
         universe,
         [
-            UiBlocks::Crosshair,
-            UiBlocks::ToolbarSlotFrame,
-            UiBlocks::ToolbarPointer([
+            WidgetBlocks::Crosshair,
+            WidgetBlocks::ToolbarSlotFrame,
+            WidgetBlocks::ToolbarPointer([
                 ToolbarButtonState::Unmapped,
                 ToolbarButtonState::Mapped,
                 ToolbarButtonState::Pressed,
@@ -516,7 +521,7 @@ async fn icons(mut context: RenderTestContext) {
     let action_widgets = [UiBlocks::BackButtonLabel].map(|label_key| {
         block_from_widget(vui::LayoutTree::leaf(widgets::ActionButton::new(
             ui_blocks_p[label_key].clone(),
-            &ui_blocks_p,
+            &widget_theme,
             || { /* do nothing */ },
         )))
     });
@@ -532,13 +537,13 @@ async fn icons(mut context: RenderTestContext) {
             ListenableSource::constant(state),
             |state| *state,
             ui_blocks_p[label_key].clone(),
-            &ui_blocks_p,
+            &widget_theme,
             || { /* do nothing */ },
         )))
     });
 
     let all_blocks: Vec<Block> = icons
-        .chain(ui_blocks)
+        .chain(widget_blocks)
         .chain(action_widgets)
         .chain(toggle_widgets)
         .collect();

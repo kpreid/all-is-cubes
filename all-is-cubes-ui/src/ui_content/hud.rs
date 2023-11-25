@@ -18,7 +18,7 @@ use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
 use crate::ui_content::options::{graphics_options_widgets, pause_toggle_button, OptionsStyle};
 use crate::ui_content::pages::open_page_button;
 use crate::ui_content::{CueNotifier, VuiMessage, VuiPageState};
-use crate::vui::widgets::{self, BoxStyle, TooltipState};
+use crate::vui::widgets::{self, TooltipState, WidgetBlocks};
 use crate::vui::{LayoutTree, UiBlocks, Widget, WidgetTree};
 
 pub(crate) use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
@@ -72,7 +72,7 @@ pub(super) fn new_hud_widget_tree(
     );
     let hud_widget_tree: WidgetTree = Arc::new(LayoutTree::Hud {
         crosshair: LayoutTree::leaf(widgets::Crosshair::new(
-            hud_inputs.hud_blocks.blocks[UiBlocks::Crosshair].clone(),
+            hud_inputs.hud_blocks.widget_theme.widget_blocks[WidgetBlocks::Crosshair].clone(),
             hud_inputs.mouselook_mode.clone(),
         )),
         toolbar: Arc::new(LayoutTree::Stack {
@@ -97,15 +97,15 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
             LayoutTree::leaf(open_page_button(
                 hud_inputs,
                 VuiPageState::AboutText,
-                hud_inputs.hud_blocks.blocks[UiBlocks::AboutButtonLabel].clone(),
+                hud_inputs.hud_blocks.ui_blocks[UiBlocks::AboutButtonLabel].clone(),
             )),
             LayoutTree::leaf(pause_toggle_button(hud_inputs)),
             LayoutTree::leaf(save_button(hud_inputs)),
             LayoutTree::leaf(widgets::ToggleButton::new(
                 hud_inputs.mouselook_mode.clone(),
                 |&value| value,
-                hud_inputs.hud_blocks.blocks[UiBlocks::MouselookButtonLabel].clone(),
-                &hud_inputs.hud_blocks.blocks,
+                hud_inputs.hud_blocks.ui_blocks[UiBlocks::MouselookButtonLabel].clone(),
+                &hud_inputs.hud_blocks.widget_theme,
                 {
                     let cc = hud_inputs.app_control_channel.clone();
                     move || {
@@ -120,7 +120,7 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
         Arc::new(LayoutTree::Stack {
             direction: Face6::PZ,
             children: vec![
-                LayoutTree::leaf(hud_inputs.hud_blocks.dialog_background()),
+                LayoutTree::leaf(hud_inputs.hud_blocks.widget_theme.dialog_background()),
                 control_bar_widgets,
             ],
         })
@@ -132,8 +132,8 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
 fn save_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
     let cc = hud_inputs.app_control_channel.clone();
     widgets::ActionButton::new(
-        hud_inputs.hud_blocks.blocks[UiBlocks::SaveButtonLabel].clone(),
-        &hud_inputs.hud_blocks.blocks,
+        hud_inputs.hud_blocks.ui_blocks[UiBlocks::SaveButtonLabel].clone(),
+        &hud_inputs.hud_blocks.widget_theme,
         move || {
             let _ignore_errors = cc.send(ControlMessage::Save);
         },
@@ -143,17 +143,19 @@ fn save_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
 // TODO: Unclear if HudBlocks should exist; maybe it should be reworked into a BlockProvider for widget graphics instead.
 #[derive(Debug, Clone)]
 pub(crate) struct HudBlocks {
-    pub(crate) blocks: BlockProvider<UiBlocks>,
+    pub(crate) widget_theme: widgets::WidgetTheme,
+    pub(crate) ui_blocks: BlockProvider<UiBlocks>,
     pub(crate) icons: BlockProvider<Icons>,
     pub(crate) text: VoxelBrush<'static>,
-    pub(crate) dialog_box_style: BoxStyle,
 }
 
 impl HudBlocks {
     pub(crate) async fn new(universe: &mut Universe, p: YieldProgress) -> Self {
-        let [p1, p2] = p.split(0.5);
-        let ui_blocks = UiBlocks::new(universe, p1).await.install(universe).unwrap();
-        let icons = Icons::new(universe, p2).await.install(universe).unwrap();
+        let [p12, p3] = p.split(0.667);
+        let [p1, p2] = p12.split(0.5);
+        let widget_theme = widgets::WidgetTheme::new(universe, p1).await.unwrap();
+        let ui_blocks = UiBlocks::new(universe, p2).await.install(universe).unwrap();
+        let icons = Icons::new(universe, p3).await.install(universe).unwrap();
 
         let text_brush = VoxelBrush::new::<_, Block>([
             ([0, 0, 1], palette::HUD_TEXT_FILL.into()),
@@ -163,17 +165,11 @@ impl HudBlocks {
             ([0, -1, 0], palette::HUD_TEXT_STROKE.into()),
         ]);
 
-        let dialog_box_style = BoxStyle::from_nine_and_thin(&ui_blocks[UiBlocks::DialogBackground]);
-
         Self {
-            blocks: ui_blocks,
+            widget_theme,
+            ui_blocks,
             icons,
             text: text_brush,
-            dialog_box_style,
         }
-    }
-
-    pub fn dialog_background(&self) -> Arc<widgets::Frame> {
-        widgets::Frame::new(self.dialog_box_style.clone())
     }
 }

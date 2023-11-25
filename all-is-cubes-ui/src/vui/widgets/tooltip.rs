@@ -191,6 +191,7 @@ impl Tooltip {
 
     pub(crate) fn new(
         state: Arc<Mutex<TooltipState>>,
+        // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
         hud_blocks: Arc<HudBlocks>,
         universe: &mut Universe,
     ) -> Arc<Self> {

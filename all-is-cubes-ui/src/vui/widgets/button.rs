@@ -33,7 +33,8 @@ use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, Sp
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{URef, Universe};
 
-use crate::vui::{self, UiBlocks};
+use crate::vui;
+use crate::vui::widgets::{WidgetBlocks, WidgetTheme};
 
 type Action = EphemeralOpaque<dyn Fn() + Send + Sync>;
 
@@ -54,12 +55,13 @@ impl ActionButton {
     #[allow(missing_docs)]
     pub fn new(
         label: Block,
-        theme: &linking::BlockProvider<UiBlocks>,
+        theme: &WidgetTheme,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Arc<Self> {
         let state = ButtonVisualState::default();
         let blocks = theme
-            .subset(UiBlocks::ActionButton)
+            .widget_blocks
+            .subset(WidgetBlocks::ActionButton)
             .map(|state, base_block| assemble_button(state, base_block.clone(), label.clone()));
         Arc::new(Self {
             block: blocks[state].clone(),
@@ -157,11 +159,12 @@ impl<D> ToggleButton<D> {
         data_source: ListenableSource<D>,
         projection: impl Fn(&D) -> bool + Send + Sync + 'static,
         label: Block,
-        theme: &linking::BlockProvider<UiBlocks>,
+        theme: &WidgetTheme,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Arc<Self> {
         let blocks = theme
-            .subset(UiBlocks::ToggleButton)
+            .widget_blocks
+            .subset(WidgetBlocks::ToggleButton)
             .map(|state, base_block| assemble_button(state, base_block.clone(), label.clone()));
         Arc::new(Self {
             blocks,

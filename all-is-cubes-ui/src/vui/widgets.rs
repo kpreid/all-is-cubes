@@ -16,6 +16,8 @@ mod text;
 pub use text::*;
 mod button;
 pub use button::*;
+mod theme;
+pub use theme::*;
 mod toolbar;
 pub(crate) use toolbar::*;
 mod tooltip;

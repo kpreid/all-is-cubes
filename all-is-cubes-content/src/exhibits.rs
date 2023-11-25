@@ -1166,27 +1166,31 @@ async fn UI_BLOCKS(_: &Exhibit, universe: &mut Universe) {
     // TODO: This was designed for a render test and is still shaped for that rather than
     // any-viewpoint examination.
 
-    use all_is_cubes_ui::vui::blocks::{ToolbarButtonState, UiBlocks};
+    use all_is_cubes_ui::vui::blocks::UiBlocks;
+    use all_is_cubes_ui::vui::widgets::{ToolbarButtonState, WidgetBlocks};
 
     let icons = BlockProvider::<all_is_cubes::inv::Icons>::using(universe)?;
     let icons = icons.iter().map(|(_, block)| block.clone());
 
-    let ui_blocks = BlockProvider::<UiBlocks>::using(universe)?;
-    let ui_blocks = ui_blocks
+    let widget_blocks = BlockProvider::<WidgetBlocks>::using(universe)?;
+    let widget_blocks = widget_blocks
             .iter()
             .filter(|&(key, _)| match key {
                 // Filter out large number of pointer blocks
-                UiBlocks::ToolbarPointer([
+                WidgetBlocks::ToolbarPointer([
                     ToolbarButtonState::Unmapped,
                     ToolbarButtonState::Mapped,
                     ToolbarButtonState::Pressed
                 ]) => true,
-                UiBlocks::ToolbarPointer(_) => false,
+                WidgetBlocks::ToolbarPointer(_) => false,
                 _ => true,
             })
             .map(|(_, block)| block.clone());
 
-    let all_blocks: Vec<Block> = icons.chain(ui_blocks).collect();
+    let ui_blocks = BlockProvider::<UiBlocks>::using(universe)?;
+    let ui_blocks = ui_blocks.iter().map(|(_, block)| block.clone());
+
+    let all_blocks: Vec<Block> = icons.chain(widget_blocks).chain(ui_blocks).collect();
 
     // Compute layout
     let count = all_blocks.len() as GridCoordinate;

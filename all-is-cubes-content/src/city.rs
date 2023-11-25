@@ -50,6 +50,10 @@ pub(crate) async fn demo_city<I: Instant>(
     // Also install blocks some exhibits want.
     // We do this once so that if multiple exhibits end up wanting them there are no conflicts.
     // TODO: We want a "module loading" system that allows expressing dependencies.
+    let widget_theme_progress = p.start_and_cut(0.05, "WidgetTheme").await;
+    all_is_cubes_ui::vui::widgets::WidgetTheme::new(universe, widget_theme_progress)
+        .await
+        .unwrap();
     let ui_blocks_progress = p.start_and_cut(0.05, "UiBlocks").await;
     all_is_cubes_ui::vui::blocks::UiBlocks::new(universe, ui_blocks_progress)
         .await
