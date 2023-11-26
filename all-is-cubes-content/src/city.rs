@@ -129,24 +129,18 @@ pub(crate) async fn demo_city<I: Instant>(
             .set_bias(0.0)
             .set_scale(8.0);
         let grass_threshold = 1.2;
-        space.fill(
-            GridAab::from_lower_upper(
-                [bounds.lower_bounds().x, 1, bounds.lower_bounds().z],
-                [bounds.upper_bounds().x, 2, bounds.upper_bounds().z],
-            ),
-            |cube| {
-                if cube.x.abs() <= road_radius || cube.z.abs() <= road_radius {
-                    return None;
-                }
-                if grass_noise.at_cube(cube) > grass_threshold * 2. {
-                    Some(&landscape_blocks[GrassBlades { variant: true }])
-                } else if grass_noise.at_cube(cube) > grass_threshold {
-                    Some(&landscape_blocks[GrassBlades { variant: false }])
-                } else {
-                    None
-                }
-            },
-        )?;
+        space.fill(planner.y_range(1, 2), |cube| {
+            if cube.x.abs() <= road_radius || cube.z.abs() <= road_radius {
+                return None;
+            }
+            if grass_noise.at_cube(cube) > grass_threshold * 2. {
+                Some(&landscape_blocks[GrassBlades { variant: true }])
+            } else if grass_noise.at_cube(cube) > grass_threshold {
+                Some(&landscape_blocks[GrassBlades { variant: false }])
+            } else {
+                None
+            }
+        })?;
     }
     p.progress(0.3).await;
 
@@ -793,10 +787,10 @@ impl CityPlanner {
     }
 
     fn y_range(&self, lower_y: GridCoordinate, upper_y: GridCoordinate) -> GridAab {
-        let mut lower = self.space_bounds.lower_bounds();
-        let mut upper = self.space_bounds.upper_bounds();
-        lower.y = lower_y;
-        upper.y = upper_y;
-        GridAab::from_lower_upper(lower, upper)
+        GridAab::from_ranges([
+            self.space_bounds.x_range(),
+            lower_y..upper_y,
+            self.space_bounds.z_range(),
+        ])
     }
 }

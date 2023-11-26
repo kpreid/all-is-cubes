@@ -518,12 +518,11 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                                     // Compute the exact texture slice we will be accessing.
                                     // TODO: It would be better if this were shrunk to the visible voxels
                                     // in this specific layer, not just all voxels.
-                                    let rx = rotated_voxel_range.x_range();
-                                    let ry = rotated_voxel_range.y_range();
-                                    let slice_range = GridAab::from_lower_upper(
-                                        [rx.start, ry.start, layer],
-                                        [rx.end, ry.end, layer + 1],
-                                    )
+                                    let slice_range = GridAab::from_ranges([
+                                        rotated_voxel_range.x_range(),
+                                        rotated_voxel_range.y_range(),
+                                        layer..layer + 1,
+                                    ])
                                     .transform(face.face_transform(block_resolution))
                                     .unwrap();
 
