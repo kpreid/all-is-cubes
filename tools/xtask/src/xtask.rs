@@ -409,8 +409,8 @@ const ALL_NONTEST_PACKAGES: [&str; 9] = [
     "all-is-cubes-content",
     "all-is-cubes-port",
     "all-is-cubes-desktop",
-    "all-is-cubes-wasm",
     "all-is-cubes-server",
+    "all-is-cubes-wasm",
 ];
 
 const CHECK_SUBCMD: &str = "clippy";
@@ -554,6 +554,12 @@ fn do_for_all_packages(
                 // To test with limited features, we need to run commands separately for each
                 // package, as otherwise they will enable dependencies' features.
                 for package_name in ALL_NONTEST_PACKAGES {
+                    if package_name == "all-is-cubes-wasm" {
+                        // not in main workspace, and incidentally also has no features to test
+                        // TODO: make this exemption data-driven
+                        continue;
+                    }
+
                     let _t = CaptureTime::new(time_log, format!("{op:?} --package {package_name}"));
                     op.cargo_cmd(config)
                         .args(["--package", package_name, "--no-default-features"])
