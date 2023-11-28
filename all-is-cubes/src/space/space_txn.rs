@@ -185,11 +185,16 @@ impl Transaction<Space> for SpaceTransaction {
             },
         ) in &self.cubes
         {
-            if let Some(cube_index) = space.bounds().index(cube.into()) {
+            if let Some(cube_index) = space.contents.index(cube.into()) {
                 if let Some(old) = old {
                     // Raw lookup because we already computed the index for a bounds check
                     // (TODO: Put this in a function, like get_block_index)
-                    if space.palette.entry(space.contents[cube_index]).block() != old {
+                    if space
+                        .palette
+                        .entry(space.contents.as_linear()[cube_index])
+                        .block()
+                        != old
+                    {
                         return Err(PreconditionFailed {
                             location: "Space",
                             problem: "existing block not as expected",

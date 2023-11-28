@@ -109,7 +109,7 @@ impl LightStorage {
             // starting point instead of immediately throwing it out.
             self.contents = self
                 .physics
-                .initialize_lighting(uc.contents.bounds(), opacity);
+                .initialize_lighting(uc.contents.without_elements(), opacity);
 
             match self.physics {
                 LightPhysics::None => {
@@ -439,7 +439,7 @@ impl LightStorage {
                 let mut covered = false;
                 for y in bounds.y_range().rev() {
                     let cube = Cube::new(x, y, z);
-                    let index = bounds.index(cube).unwrap();
+                    let index = self.contents.index(cube).unwrap();
 
                     let this_cube_evaluated = uc.get_evaluated_by_index(index);
                     self.contents.as_linear_mut()[index] =
@@ -532,7 +532,7 @@ impl LightPhysics {
     /// TODO: Also return whether light updates are needed.
     pub(crate) fn initialize_lighting(
         &self,
-        bounds: GridAab,
+        bounds: Vol<()>,
         opacity: OpacityCategory,
     ) -> Vol<Box<[PackedLight]>> {
         match self {
@@ -546,7 +546,7 @@ impl LightPhysics {
                     OpacityCategory::Partial => PackedLight::UNINITIALIZED_AND_BLACK,
                     OpacityCategory::Opaque => PackedLight::OPAQUE,
                 };
-                Vol::repeat(bounds, value)
+                Vol::repeat(bounds.bounds(), value)
             }
         }
     }

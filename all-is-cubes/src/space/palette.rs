@@ -639,7 +639,7 @@ mod tests {
         let cloned = space.palette.clone();
 
         // The clone should be consistent internally and with the space data.
-        cloned.consistency_check(&space.contents);
+        cloned.consistency_check(space.contents.as_linear());
 
         let extract = |p: &Palette| {
             p.entries()

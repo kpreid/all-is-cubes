@@ -57,18 +57,16 @@ mod tests;
 ///
 #[doc = include_str!("save/serde-warning.md")]
 pub struct Space {
-    bounds: GridAab,
-
     palette: Palette,
 
-    /// The blocks in the space, stored compactly:
+    /// The blocks in the space, stored as indices into [`Self::palette`].
     ///
-    /// * Coordinates are transformed to indices by [`GridAab::index`].
-    /// * Each element is an index into [`Self::block_data`].
+    /// This field also stores the bounds of the space.
+    //---
     // TODO: Consider making this use different integer types depending on how
     // many blocks there are, so we can save memory in simple spaces but not have
     // a cap on complex ones.
-    contents: Box<[BlockIndex]>,
+    contents: Vol<Box<[BlockIndex]>>,
 
     /// The light reflected from or emitted by each cube,
     /// and the information for continuously updating it.
@@ -97,7 +95,7 @@ impl fmt::Debug for Space {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Make the assumption that a Space is too big to print in its entirety.
         fmt.debug_struct("Space")
-            .field("bounds", &self.bounds)
+            .field("bounds", &self.contents.bounds())
             .field("palette", &self.palette)
             .field("physics", &self.physics)
             .field("behaviors", &self.behaviors)
@@ -143,6 +141,9 @@ impl Space {
             behaviors,
             contents,
         } = builder;
+
+        // TODO: make this conversion checked by the builder
+        let bounds = bounds.to_vol().unwrap();
 
         let (palette, contents, light) = match contents {
             builder::Fill::Block(block) => {
@@ -197,14 +198,13 @@ impl Space {
         };
 
         Space {
-            bounds,
             palette,
-            contents,
+            contents: bounds.with_elements(contents).unwrap(),
             light,
 
             physics,
             behaviors,
-            spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(bounds)),
+            spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(bounds.bounds())),
             cubes_wanting_ticks: Default::default(),
             change_notifier: Notifier::new(),
             fluff_notifier: Notifier::new(),
@@ -220,7 +220,7 @@ impl Space {
     /// Returns the [`GridAab`] describing the bounds of this space; no blocks may exist
     /// outside it.
     pub fn bounds(&self) -> GridAab {
-        self.bounds
+        self.contents.bounds()
     }
 
     /// Returns the internal unstable numeric ID for the block at the given position,
@@ -232,9 +232,7 @@ impl Space {
     /// may be renumbered after any mutation.
     #[inline(always)]
     pub fn get_block_index(&self, position: impl Into<Cube>) -> Option<BlockIndex> {
-        self.bounds
-            .index(position.into())
-            .map(|contents_index| self.contents[contents_index])
+        self.contents.get(position.into()).copied()
     }
 
     /// Copy data out of a portion of the space in a caller-chosen format.
@@ -248,7 +246,7 @@ impl Space {
     where
         C: ops::Deref<Target = [V]> + FromIterator<V>,
     {
-        assert!(self.bounds.contains_box(bounds));
+        assert!(self.bounds().contains_box(bounds));
 
         // TODO: Implement an iterator over the indexes (which is not just
         // interior_iter().enumerate() because it's a sub-region) so that we don't
@@ -258,17 +256,19 @@ impl Space {
             extractor(Extract {
                 space: self,
                 cube,
-                cube_index: self.bounds.index(cube).unwrap(),
+                cube_index: self.contents.index(cube).unwrap(),
                 block_index: Default::default(),
             })
         })
     }
 
-    /// Gets the [`EvaluatedBlock`] of the block in this space at the given position.
+    /// Returns the [`EvaluatedBlock`] of the block in this space at the given position.
+    ///
+    /// If out of bounds, returns the evaluation of [`AIR`].
     #[inline(always)]
     pub fn get_evaluated(&self, position: impl Into<Cube>) -> &EvaluatedBlock {
-        if let Some(index) = self.bounds.index(position.into()) {
-            self.palette.entry(self.contents[index]).evaluated()
+        if let Some(block_index) = self.get_block_index(position.into()) {
+            self.palette.entry(block_index).evaluated()
         } else {
             AIR_EVALUATED_REF
         }
@@ -324,8 +324,8 @@ impl Space {
     }
 
     fn set_impl(&mut self, position: Cube, block: &Block) -> Result<bool, SetCubeError> {
-        if let Some(contents_index) = self.bounds.index(position) {
-            let old_block_index = self.contents[contents_index];
+        if let Some(contents_index) = self.contents.index(position) {
+            let old_block_index = self.contents.as_linear()[contents_index];
             let old_block = self.palette.entry(old_block_index).block();
             if *old_block == *block {
                 // No change.
@@ -363,14 +363,14 @@ impl Space {
             self.palette.increment(new_block_index);
 
             // Write actual space change.
-            self.contents[contents_index] = new_block_index;
+            self.contents.as_linear_mut()[contents_index] = new_block_index;
 
             self.side_effects_of_set(old_block_index, new_block_index, position, contents_index);
             Ok(true)
         } else {
             Err(SetCubeError::OutOfBounds {
                 modification: GridAab::single_cube(position),
-                space_bounds: self.bounds,
+                space_bounds: self.bounds(),
             })
         }
     }
@@ -397,7 +397,7 @@ impl Space {
             let (light, uc) = (
                 &mut self.light,
                 light::UpdateCtx {
-                    contents: Vol::from_elements(self.bounds, &self.contents[..]).unwrap(),
+                    contents: self.contents.as_ref(),
                     palette: &self.palette,
                     change_notifier: &self.change_notifier,
                 },
@@ -446,10 +446,10 @@ impl Space {
         F: FnMut(Cube) -> Option<B>,
         B: core::borrow::Borrow<Block>,
     {
-        if !self.bounds.contains_box(region) {
+        if !self.bounds().contains_box(region) {
             return Err(SetCubeError::OutOfBounds {
                 modification: region,
-                space_bounds: self.bounds,
+                space_bounds: self.bounds(),
             });
         }
         for cube in region.interior_iter() {
@@ -483,16 +483,16 @@ impl Space {
     ///
     /// See also [`Space::fill`] for non-uniform fill and bulk copies.
     pub fn fill_uniform(&mut self, region: GridAab, block: &Block) -> Result<(), SetCubeError> {
-        if !self.bounds.contains_box(region) {
+        if !self.bounds().contains_box(region) {
             Err(SetCubeError::OutOfBounds {
                 modification: region,
-                space_bounds: self.bounds,
+                space_bounds: self.bounds(),
             })
         } else if self.bounds() == region {
             // We're overwriting the entire space, so we might as well re-initialize it.
             let volume = self.bounds().volume();
             self.palette = Palette::new(block.clone(), volume);
-            self.contents.fill(/* block index = */ 0);
+            self.contents.as_linear_mut().fill(/* block index = */ 0);
             // TODO: also need to reset lighting and activate tick_action.
             // And see if we can share more of the logic of this with new_from_builder().
             self.change_notifier.notify(SpaceChange::EveryBlock);
@@ -741,7 +741,7 @@ impl Space {
             (
                 &self.light,
                 light::UpdateCtx {
-                    contents: Vol::from_elements(self.bounds, &self.contents[..]).unwrap(),
+                    contents: self.contents.as_ref(),
                     palette: &self.palette,
                     change_notifier: &self.change_notifier,
                 },
@@ -760,7 +760,7 @@ impl Space {
         (
             &mut self.light,
             light::UpdateCtx {
-                contents: Vol::from_elements(self.bounds, &self.contents[..]).unwrap(),
+                contents: self.contents.as_ref(),
                 palette: &self.palette,
                 change_notifier: &self.change_notifier,
             },
@@ -770,7 +770,7 @@ impl Space {
     #[cfg(test)]
     #[track_caller]
     pub(crate) fn consistency_check(&self) {
-        self.palette.consistency_check(&self.contents);
+        self.palette.consistency_check(self.contents.as_linear());
         self.light.consistency_check();
     }
 }
@@ -786,8 +786,8 @@ impl<T: Into<Cube>> core::ops::Index<T> for Space {
     /// use [`Space::set`] or [`Space::fill`] to modify blocks.
     #[inline(always)]
     fn index(&self, position: T) -> &Self::Output {
-        if let Some(index) = self.bounds.index(position.into()) {
-            self.palette.entry(self.contents[index]).block()
+        if let Some(&block_index) = self.contents.get(position.into()) {
+            self.palette.entry(block_index).block()
         } else {
             &AIR
         }
@@ -797,7 +797,6 @@ impl<T: Into<Cube>> core::ops::Index<T> for Space {
 impl VisitRefs for Space {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
         let Space {
-            bounds: _,
             palette,
             contents: _,
             light: _,
@@ -1216,7 +1215,7 @@ impl<'s> Extract<'s> {
     pub fn block_index(&self) -> BlockIndex {
         *self
             .block_index
-            .get_or_init(|| self.space.contents[self.cube_index])
+            .get_or_init(|| self.space.contents.as_linear()[self.cube_index])
     }
 
     /// Returns the [`SpaceBlockData`] for the block present in this cube.

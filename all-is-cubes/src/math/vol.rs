@@ -207,6 +207,20 @@ impl<C, O> Vol<C, O> {
         self.contents
     }
 
+    /// Returns a `Vol` with the same bounds and ordering but no data.
+    ///
+    /// This is the inverse operation to [`Vol::with_elements()`].
+    pub fn without_elements(&self) -> Vol<(), O>
+    where
+        O: Clone,
+    {
+        Vol {
+            bounds: self.bounds,
+            ordering: self.ordering.clone(),
+            contents: (),
+        }
+    }
+
     /// Translates the volume without affecting its contents.
     ///
     /// Panics if this would cause numeric overflow.
