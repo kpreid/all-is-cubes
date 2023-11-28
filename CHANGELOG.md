@@ -20,7 +20,7 @@
         - `math::Face6::face_transform()`
         - `math::GridRotation::to_positive_octant_transform()`
     
-    - `math::Vol` is a more general replacement for `math::GridArray` which allows choice of the data container type (including `&[T]` for borrowing without additional indirection).
+    - `math::Vol` is a more general replacement for `math::GridArray` which allows choice of the data container type (including `&[T]` for borrowing without additional indirection), and also a replacement for uses of `math::GridAab` which care about volume and linearization.
 
 ### Changed
 
@@ -77,8 +77,9 @@
 - `all-is-cubes` library:
     - `math::Aab::from_cube()` no longer exists. Use `Cube::aab()` instead.
     - `math::Face7::matrix()` no longer exists. Use `Face6::face_transform()` instead.
-    - `math::GridAab::index()` and `contains_cube()` no longer accept `impl Into<GridPoint>`.
+    - `math::GridAab::contains_cube()` no longer accepts `impl Into<GridPoint>`.
       Call sites should be changed to pass only `Cube`.
+    - `math::GridAab::index()` no longer exists. Use `Vol::index()` instead.
     - `math::GridRotation::to_positive_octant_matrix()` no longer exists. Use `to_positive_octant_transform()` instead.
     - `math::cube_to_midpoint()` no longer exists. Use `Cube::midpoint()` instead.
     - `math::point_to_enclosing_cube()` no longer exists. Use `Cube::containing()` instead.

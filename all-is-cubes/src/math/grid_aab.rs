@@ -11,7 +11,7 @@ use euclid::Vector3D;
 use crate::block::Resolution;
 use crate::math::{
     sort_two, Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridCoordinate,
-    GridPoint, GridVector, Gridgid, VectorOps as _, Vol, ZMaj,
+    GridPoint, GridVector, Gridgid, VectorOps as _, Vol,
 };
 
 /// An axis-aligned box with integer coordinates, whose volume is no larger than [`usize::MAX`].
@@ -260,20 +260,6 @@ impl GridAab {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.sizes.x == 0 || self.sizes.y == 0 || self.sizes.z == 0
-    }
-
-    /// Determines whether a unit cube lies within this box and, if it does, returns the
-    /// flattened array index for it.
-    ///
-    /// The flattening is currently X major, Z minor, but this is not guaranteed to be
-    /// the same in future versions; profiling may lead us to choose to place the Y axis
-    /// first or last.
-    ///
-    //---
-    // TODO: #[deprecated] to use Vol instead for all linear-indexing operations
-    #[inline(always)] // very hot code
-    pub fn index(&self, cube: Cube) -> Option<usize> {
-        self.to_vol::<ZMaj>().unwrap().index(cube)
     }
 
     /// Inclusive upper bounds on cube coordinates, or the most negative corner of the
