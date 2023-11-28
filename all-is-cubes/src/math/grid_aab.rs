@@ -6,12 +6,12 @@ use core::fmt;
 use core::iter::FusedIterator;
 use core::ops::Range;
 
-use euclid::{Point3D, Vector3D};
+use euclid::Vector3D;
 
 use crate::block::Resolution;
 use crate::math::{
     sort_two, Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridCoordinate,
-    GridPoint, GridVector, Gridgid, VectorOps, Vol,
+    GridPoint, GridVector, Gridgid, VectorOps as _, Vol, ZMaj,
 };
 
 /// An axis-aligned box with integer coordinates, whose volume is no larger than [`usize::MAX`].
@@ -243,6 +243,8 @@ impl GridAab {
     /// let b = GridAab::from_lower_size([0, 0, 0], [100, 200, 0]);
     /// assert_eq!(b.volume(), 0);
     /// ```
+    //---
+    // TODO: make this fallible instead of guaranteed to fit
     pub fn volume(&self) -> usize {
         Self::checked_volume_helper(self.sizes).unwrap()
     }
@@ -267,50 +269,11 @@ impl GridAab {
     /// the same in future versions; profiling may lead us to choose to place the Y axis
     /// first or last.
     ///
-    /// ```
-    /// let bounds = all_is_cubes::math::GridAab::from_lower_size([0, 0, 0], [10, 10, 10]);
-    /// assert_eq!(bounds.index([0, 0, 0].into()), Some(0));
-    /// assert_eq!(bounds.index([1, 2, 3].into()), Some(123));
-    /// assert_eq!(bounds.index([9, 9, 9].into()), Some(999));
-    /// assert_eq!(bounds.index([0, 0, -1].into()), None);
-    /// assert_eq!(bounds.index([0, 0, 10].into()), None);
-    /// ```
+    //---
+    // TODO: #[deprecated] to use Vol instead for all linear-indexing operations
     #[inline(always)] // very hot code
     pub fn index(&self, cube: Cube) -> Option<usize> {
-        let sizes = self.sizes;
-
-        // This might overflow and wrap, but if it does, the result will still be out
-        // of bounds, just in the other direction, because wrapping subtraction is an
-        // injective mapping of integers, and every in-bounds maps to in-bounds, so
-        // every out-of-bounds must also map to out-of-bounds.
-        let deoffsetted: GridPoint =
-            GridPoint::from(cube).zip(self.lower_bounds, GridCoordinate::wrapping_sub);
-
-        // Bounds check, expressed as a single unsigned comparison.
-        if (deoffsetted.x as u32 >= sizes.x as u32)
-            | (deoffsetted.y as u32 >= sizes.y as u32)
-            | (deoffsetted.z as u32 >= sizes.z as u32)
-        {
-            return None;
-        }
-
-        // Convert to usize for indexing.
-        // This cannot overflow because:
-        // * We just checked it is not negative
-        // * We just checked it is not greater than `self.sizes[i]`, which is an `i32`
-        // * We don't support platforms with `usize` smaller than 32 bits
-        let ixvec: Point3D<usize, _> = deoffsetted.map(|coord| coord as usize);
-
-        let usizes = sizes.map(|s| s as usize);
-
-        // Compute index.
-        // Always use wrapping (rather than maybe-checked) arithmetic, because we
-        // checked the criteria for it to not overflow.
-        Some(
-            (ixvec.x.wrapping_mul(usizes.y).wrapping_add(ixvec.y))
-                .wrapping_mul(usizes.z)
-                .wrapping_add(ixvec.z),
-        )
+        self.to_vol::<ZMaj>().unwrap().index(cube)
     }
 
     /// Inclusive upper bounds on cube coordinates, or the most negative corner of the
@@ -921,10 +884,6 @@ mod tests {
     use alloc::vec::Vec;
     use indoc::indoc;
 
-    fn cube(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate) -> Cube {
-        Cube::new(x, y, z)
-    }
-
     #[test]
     fn zero_is_valid() {
         assert_eq!(
@@ -948,39 +907,6 @@ mod tests {
         assert_eq!(
             GridAab::for_block(R128),
             GridAab::from_lower_size([0, 0, 0], [128, 128, 128])
-        );
-    }
-
-    #[test]
-    fn index_overflow_low() {
-        // Indexing calculates (point - lower_bounds), so this would overflow in the negative direction if the overflow weren't checked.
-        // Note that MAX - 1 is the highest allowed lower bound since the exclusive upper bound must be representable.
-        let low = GridAab::from_lower_size([GridCoordinate::MAX - 1, 0, 0], [1, 1, 1]);
-        assert_eq!(low.index(cube(0, 0, 0)), None);
-        assert_eq!(low.index(cube(-1, 0, 0)), None);
-        assert_eq!(low.index(cube(-2, 0, 0)), None);
-        assert_eq!(low.index(cube(GridCoordinate::MIN, 0, 0)), None);
-        // But, an actually in-bounds cube should still work.
-        assert_eq!(low.index(cube(GridCoordinate::MAX - 1, 0, 0)), Some(0));
-    }
-
-    #[test]
-    fn index_overflow_high() {
-        let high = GridAab::from_lower_size([GridCoordinate::MAX - 1, 0, 0], [1, 1, 1]);
-        assert_eq!(high.index(cube(0, 0, 0)), None);
-        assert_eq!(high.index(cube(1, 0, 0)), None);
-        assert_eq!(high.index(cube(2, 0, 0)), None);
-        assert_eq!(high.index(cube(GridCoordinate::MAX - 1, 0, 0)), Some(0));
-    }
-
-    #[test]
-    fn index_not_overflow_large_volume() {
-        let aab = GridAab::from_lower_size([0, 0, 0], [2000, 2000, 2000]);
-        // This value fits in a 32-bit `usize` and is therefore a valid index,
-        // but it does not fit in a `GridCoordinate` = `i32`.
-        assert_eq!(
-            aab.index(cube(1500, 1500, 1500)),
-            Some(((1500 * 2000) + 1500) * 2000 + 1500)
         );
     }
 

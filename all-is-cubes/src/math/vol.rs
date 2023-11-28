@@ -6,9 +6,10 @@ use core::ops::{Deref, DerefMut};
 #[cfg(doc)]
 use alloc::vec::Vec;
 
+use euclid::Point3D;
 use manyfmt::Refmt as _;
 
-use crate::math::{Cube, GridAab, GridCoordinate, GridIter, GridVector};
+use crate::math::{Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector, VectorOps as _};
 
 // #[derive(Clone, Copy, Debug)]
 // pub struct XMaj;
@@ -181,16 +182,6 @@ impl<C, O> Vol<C, O> {
         self.contents
     }
 
-    /// Determines whether a unit cube lies within this volume and, if it does, returns the
-    /// linearized slice index into it.
-    ///
-    /// The linearized element order is defined by the `O` type.
-    #[inline(always)] // very hot code
-    pub fn index(&self, cube: Cube) -> Option<usize> {
-        // TODO: get rid of GridAab::index and keep the implementation here on Vol
-        self.bounds.index(cube)
-    }
-
     /// Translates the volume without affecting its contents.
     ///
     /// Panics if this would cause numeric overflow.
@@ -244,6 +235,64 @@ impl<C> Vol<C, ZMaj> {
     /// without including the stored data (if there is any).
     pub fn iter_cubes(&self) -> GridIter {
         self.bounds.interior_iter()
+    }
+
+    /// Determines whether a unit cube lies within this volume and, if it does, returns the
+    /// linearized slice index into it.
+    ///
+    /// The linearized element order is defined by the `O` type.
+    ///
+    /// ```
+    /// use all_is_cubes::math::{Vol, GridAab};
+    ///
+    /// let vol = GridAab::from_lower_size([0, 0, 0], [10, 10, 10]).to_vol().unwrap();
+    ///
+    /// assert_eq!(vol.index([0, 0, 0].into()), Some(0));
+    /// assert_eq!(vol.index([1, 2, 3].into()), Some(123));
+    /// assert_eq!(vol.index([9, 9, 9].into()), Some(999));
+    /// assert_eq!(vol.index([0, 0, -1].into()), None);
+    /// assert_eq!(vol.index([0, 0, 10].into()), None);
+    /// ```
+    ///
+    /// TODO: more example, less unit-test
+    #[inline(always)] // very hot code
+    pub fn index(&self, cube: Cube) -> Option<usize> {
+        let sizes = self.bounds.size();
+
+        // This might overflow and wrap, but if it does, the result will still be out
+        // of bounds, just in the other direction, because wrapping subtraction is an
+        // injective mapping of integers, and every in-bounds maps to in-bounds, so
+        // every out-of-bounds must also map to out-of-bounds.
+        let deoffsetted: GridPoint =
+            GridPoint::from(cube).zip(self.bounds.lower_bounds(), GridCoordinate::wrapping_sub);
+
+        // Bounds check, expressed as a single unsigned comparison.
+        if (deoffsetted.x as u32 >= sizes.x as u32)
+            | (deoffsetted.y as u32 >= sizes.y as u32)
+            | (deoffsetted.z as u32 >= sizes.z as u32)
+        {
+            return None;
+        }
+
+        // Convert to usize for indexing.
+        // This cannot overflow because:
+        // * We just checked it is not negative
+        // * We just checked it is not greater than `self.sizes[i]`, which is an `i32`
+        // * We don't support platforms with `usize` smaller than 32 bits
+        // We use `as usize` rather than `deoffsetted.to_usize()` because the latter has an
+        // overflow check.
+        let ixvec: Point3D<usize, _> = deoffsetted.map(|s| s as usize);
+
+        let usizes = sizes.map(|s| s as usize);
+
+        // Compute index.
+        // Always use wrapping (rather than maybe-checked) arithmetic, because we
+        // checked the criteria for it to not overflow.
+        Some(
+            (ixvec.x.wrapping_mul(usizes.y).wrapping_add(ixvec.y))
+                .wrapping_mul(usizes.z)
+                .wrapping_add(ixvec.z),
+        )
     }
 }
 
@@ -518,6 +567,10 @@ mod tests {
 
     type VolBox<T> = Vol<Box<[T]>>;
 
+    fn cube(x: GridCoordinate, y: GridCoordinate, z: GridCoordinate) -> Cube {
+        Cube::new(x, y, z)
+    }
+
     #[test]
     fn debug_no_elements() {
         let vol = GridAab::from_lower_size([10, 0, 0], [4, 1, 1])
@@ -630,6 +683,45 @@ mod tests {
                 *b"iueqamjvfrbnkwgscolxhtdp"
             )
             .unwrap()
+        );
+    }
+
+    #[test]
+    fn index_overflow_low() {
+        // Indexing calculates (point - lower_bounds), so this would overflow in the negative direction if the overflow weren't checked.
+        // Note that MAX - 1 is the highest allowed lower bound since the exclusive upper bound must be representable.
+        let low = GridAab::from_lower_size([GridCoordinate::MAX - 1, 0, 0], [1, 1, 1])
+            .to_vol::<ZMaj>()
+            .unwrap();
+        assert_eq!(low.index(cube(0, 0, 0)), None);
+        assert_eq!(low.index(cube(-1, 0, 0)), None);
+        assert_eq!(low.index(cube(-2, 0, 0)), None);
+        assert_eq!(low.index(cube(GridCoordinate::MIN, 0, 0)), None);
+        // But, an actually in-bounds cube should still work.
+        assert_eq!(low.index(cube(GridCoordinate::MAX - 1, 0, 0)), Some(0));
+    }
+
+    #[test]
+    fn index_overflow_high() {
+        let high = GridAab::from_lower_size([GridCoordinate::MAX - 1, 0, 0], [1, 1, 1])
+            .to_vol::<ZMaj>()
+            .unwrap();
+        assert_eq!(high.index(cube(0, 0, 0)), None);
+        assert_eq!(high.index(cube(1, 0, 0)), None);
+        assert_eq!(high.index(cube(2, 0, 0)), None);
+        assert_eq!(high.index(cube(GridCoordinate::MAX - 1, 0, 0)), Some(0));
+    }
+
+    #[test]
+    fn index_not_overflow_large_volume() {
+        let vol = GridAab::from_lower_size([0, 0, 0], [2000, 2000, 2000])
+            .to_vol::<ZMaj>()
+            .unwrap();
+        // This value fits in a 32-bit `usize` and is therefore a valid index,
+        // but it does not fit in a `GridCoordinate` = `i32`.
+        assert_eq!(
+            vol.index(cube(1500, 1500, 1500)),
+            Some(((1500 * 2000) + 1500) * 2000 + 1500)
         );
     }
 }
