@@ -33,7 +33,7 @@ embed = []
 # TODO: server doesn't actually have any game-server functionality so this is unnecessary
 # all-is-cubes = { path = "../all-is-cubes", version = "0.6.0", features = ["threads"] }
 anyhow = { workspace = true }
-axum = { version = "0.6.2", features = ["tower-log"] }
+axum = { version = "0.7.1", features = ["tower-log"] }
 clap = { workspace = true }
 include_dir = "0.7.2"
 mime_guess = "2.0.4" # also used indirectly by tower-http
