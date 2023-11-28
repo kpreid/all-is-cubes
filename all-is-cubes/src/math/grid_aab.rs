@@ -354,6 +354,9 @@ impl GridAab {
 
     /// Iterate over all cubes that this contains.
     ///
+    /// The order of iteration is deterministic, but not guaranteed to be anything in particular,
+    /// and may change in later versions. If order matters, use [`Vol::iter_cubes()`] instead.
+    ///
     /// ```
     /// use all_is_cubes::math::{GridAab, Cube};
     ///
@@ -764,7 +767,7 @@ pub struct GridIter {
 
 impl GridIter {
     #[inline]
-    fn new(bounds: GridAab) -> Self {
+    pub(in crate::math) fn new(bounds: GridAab) -> Self {
         Self {
             x_range: bounds.x_range(),
             y_range: bounds.y_range(),

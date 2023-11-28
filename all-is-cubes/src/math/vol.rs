@@ -62,6 +62,28 @@ impl<O> Vol<(), O> {
             contents: (),
         }
     }
+
+    /// Attach some data to this dataless `Vol`.
+    ///
+    /// Returns a [`VolLengthError`] if the number of elements does not match
+    /// [`bounds.volume()`](GridAab::volume).
+    pub fn with_elements<C, V>(self, elements: C) -> Result<Vol<C, O>, VolLengthError>
+    where
+        C: Deref<Target = [V]>,
+    {
+        if elements.len() == self.volume() {
+            Ok(Vol {
+                bounds: self.bounds,
+                ordering: self.ordering,
+                contents: elements,
+            })
+        } else {
+            Err(VolLengthError {
+                input_length: elements.len(),
+                bounds: self.bounds,
+            })
+        }
+    }
 }
 
 /// Constructors from linear containers.
@@ -74,6 +96,8 @@ where
     ///
     /// Returns a [`VolLengthError`] if the number of elements does not match
     /// [`bounds.volume()`](GridAab::volume).
+    //---
+    // TODO: Remove this in favor of with_elements()?
     pub fn from_elements(bounds: GridAab, elements: impl Into<C>) -> Result<Self, VolLengthError> {
         let elements = elements.into();
         if elements.len() == bounds.volume() {
@@ -92,7 +116,9 @@ where
 }
 
 /// Constructors from elements.
-impl<C, O: Default, V> Vol<C, O>
+//---
+// TODO: This should be `O: Ordering` instead of `ZMaj` once we have alternative orderings
+impl<C, V> Vol<C, ZMaj>
 where
     // Note that the Deref bound is necessary to give this a unique `V`.
     C: Deref<Target = [V]> + FromIterator<V>,
@@ -103,11 +129,10 @@ where
     where
         F: FnMut(Cube) -> V,
     {
-        Vol {
-            bounds,
-            ordering: O::default(),
-            contents: bounds.interior_iter().map(f).collect(),
-        }
+        let bounds = bounds.to_vol::<ZMaj>().unwrap(); // TODO: shouldn't unwrap. For now, this will not fail
+        bounds
+            .with_elements(bounds.iter_cubes().map(f).collect())
+            .unwrap()
     }
 
     /// Constructs a `Vol<C>` by cloning the provided value for each point.
@@ -206,6 +231,7 @@ impl<C, O> Vol<C, O> {
     }
 
     // TODO: good public api?
+    // TODO: reconcile this with from_elements() — should only be implemented once.
     pub(crate) fn map_container<C2, V2, F>(self, f: F) -> Vol<C2, O>
     where
         F: FnOnce(C) -> C2,
@@ -234,7 +260,7 @@ impl<C> Vol<C, ZMaj> {
     /// Iterate over all cubes that this contains, in the order of the linearization,
     /// without including the stored data (if there is any).
     pub fn iter_cubes(&self) -> GridIter {
-        self.bounds.interior_iter()
+        GridIter::new(self.bounds)
     }
 
     /// Determines whether a unit cube lies within this volume and, if it does, returns the
@@ -390,9 +416,7 @@ where
         C: DerefMut,
         V: 's,
     {
-        self.bounds
-            .interior_iter()
-            .zip(self.as_linear_mut().iter_mut())
+        self.iter_cubes().zip(self.as_linear_mut().iter_mut())
     }
 }
 
