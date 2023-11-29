@@ -220,10 +220,7 @@ impl EvaluatedBlock {
                 None
             };
             let mut collision_unequal = false;
-            // TODO: use Vol iter
-            for position in voxels.bounds().interior_iter() {
-                let voxel: Evoxel = voxels[position];
-
+            for voxel in voxels.as_vol_ref().as_linear().iter() {
                 match (collision, collision_unequal) {
                     // Already unequal
                     (_, true) => {}
@@ -242,9 +239,9 @@ impl EvaluatedBlock {
             collision
         };
 
-        let visible = voxels.bounds().interior_iter().any(
+        let visible = voxels.as_vol_ref().as_linear().iter().any(
             #[inline(always)]
-            |p| !voxels[p].color.fully_transparent(),
+            |voxel| !voxel.color.fully_transparent(),
         );
 
         // Generate mask only if the block is not invisible, because it will never be
@@ -253,8 +250,11 @@ impl EvaluatedBlock {
         let voxel_opacity_mask = if !visible {
             None
         } else {
-            Some(Vol::from_fn(voxels.bounds(), |p| {
-                voxels[p].color.opacity_category()
+            Some(voxels.as_vol_ref().map_container(|voxels| {
+                voxels
+                    .iter()
+                    .map(|voxel| voxel.color.opacity_category())
+                    .collect()
             }))
         };
 
