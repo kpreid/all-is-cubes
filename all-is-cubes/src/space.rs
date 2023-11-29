@@ -113,7 +113,7 @@ impl Space {
     ///
     /// This means that its bounds are as per [`GridAab::for_block()`], and its
     /// [`physics`](Self::physics) is [`SpacePhysics::DEFAULT_FOR_BLOCK`].
-    pub fn for_block(resolution: Resolution) -> SpaceBuilder<GridAab> {
+    pub fn for_block(resolution: Resolution) -> SpaceBuilder<Vol<()>> {
         SpaceBuilder::new()
             .bounds(GridAab::for_block(resolution))
             .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
@@ -121,7 +121,7 @@ impl Space {
 
     /// Returns a [`SpaceBuilder`] with the given bounds and all default values,
     /// which may be used to construct a new [`Space`].
-    pub fn builder(bounds: GridAab) -> SpaceBuilder<GridAab> {
+    pub fn builder(bounds: GridAab) -> SpaceBuilder<Vol<()>> {
         SpaceBuilder::new().bounds(bounds)
     }
 
@@ -133,7 +133,7 @@ impl Space {
     }
 
     /// Implementation of [`SpaceBuilder`]'s terminal methods.
-    fn new_from_builder(builder: SpaceBuilder<GridAab>) -> Self {
+    fn new_from_builder(builder: SpaceBuilder<Vol<()>>) -> Self {
         let SpaceBuilder {
             bounds,
             spawn,
@@ -141,9 +141,6 @@ impl Space {
             behaviors,
             contents,
         } = builder;
-
-        // TODO: make this conversion checked by the builder
-        let bounds = bounds.to_vol().unwrap();
 
         let (palette, contents, light) = match contents {
             builder::Fill::Block(block) => {

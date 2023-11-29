@@ -1,7 +1,7 @@
 use crate::behavior::BehaviorSet;
 use crate::block::{Block, AIR};
 use crate::character::Spawn;
-use crate::math::{FreePoint, GridArray, Rgb};
+use crate::math::{FreePoint, GridArray, Rgb, Vol};
 use crate::space::{
     BlockIndex, GridAab, LightPhysics, PackedLight, Palette, PaletteError, Space, SpacePhysics,
 };
@@ -14,7 +14,7 @@ use crate::space::{
 ///
 /// # Type parameters
 ///
-/// * `B` is either `()` or `GridAab` according to whether the bounds have been specified.
+/// * `B` is either `()` or `Vol<()>` according to whether the bounds have been specified.
 #[derive(Clone, Debug)]
 #[must_use]
 pub struct SpaceBuilder<B> {
@@ -86,7 +86,7 @@ impl<B> SpaceBuilder<B> {
 
 impl<B: SpaceBuilderBounds> SpaceBuilder<B> {
     /// Set the bounds unless they have already been set.
-    pub fn bounds_if_not_set(self, bounds_fn: impl FnOnce() -> GridAab) -> SpaceBuilder<GridAab> {
+    pub fn bounds_if_not_set(self, bounds_fn: impl FnOnce() -> GridAab) -> SpaceBuilder<Vol<()>> {
         // Delegate to the trait. (This method exists so the trait need not be imported.)
         SpaceBuilderBounds::bounds_if_not_set(self, bounds_fn)
     }
@@ -105,9 +105,9 @@ impl SpaceBuilder<()> {
     }
 
     /// Set the bounds of the space, outside which no blocks may be placed.
-    pub fn bounds(self, bounds: GridAab) -> SpaceBuilder<GridAab> {
+    pub fn bounds(self, bounds: GridAab) -> SpaceBuilder<Vol<()>> {
         SpaceBuilder {
-            bounds,
+            bounds: bounds.to_vol().unwrap(), // TODO: Document this panic once it can panic
             spawn: self.spawn,
             physics: self.physics,
             behaviors: self.behaviors,
@@ -116,7 +116,7 @@ impl SpaceBuilder<()> {
     }
 }
 
-impl SpaceBuilder<GridAab> {
+impl SpaceBuilder<Vol<()>> {
     /// Sets the default spawn location of new characters.
     ///
     /// Panics if any of the given coordinates is infinite or NaN.
@@ -127,10 +127,9 @@ impl SpaceBuilder<GridAab> {
             "spawn_position must be finite"
         );
 
-        let bounds = self.bounds;
         let mut spawn = self
             .spawn
-            .unwrap_or_else(|| Spawn::default_for_new_space(bounds));
+            .unwrap_or_else(|| Spawn::default_for_new_space(self.bounds.bounds()));
         spawn.set_eye_position(position);
         self.spawn = Some(spawn);
         self
@@ -178,14 +177,14 @@ impl SpaceBuilder<GridAab> {
         // Validate bounds.
         if contents.bounds() != self.bounds {
             return Err(PaletteError::WrongDataBounds {
-                expected: self.bounds,
+                expected: self.bounds.bounds(),
                 actual: contents.bounds(),
             });
         }
         if let Some(light) = light.as_ref() {
             if light.bounds() != self.bounds {
                 return Err(PaletteError::WrongDataBounds {
-                    expected: self.bounds,
+                    expected: self.bounds.bounds(),
                     actual: light.bounds(),
                 });
             }
@@ -245,23 +244,23 @@ pub trait SpaceBuilderBounds: sbb::SbbSealed + Sized {
     fn bounds_if_not_set(
         builder: SpaceBuilder<Self>,
         bounds_fn: impl FnOnce() -> GridAab,
-    ) -> SpaceBuilder<GridAab>;
+    ) -> SpaceBuilder<Vol<()>>;
 }
 
 impl SpaceBuilderBounds for () {
     fn bounds_if_not_set(
         builder: SpaceBuilder<Self>,
         bounds_fn: impl FnOnce() -> GridAab,
-    ) -> SpaceBuilder<GridAab> {
+    ) -> SpaceBuilder<Vol<()>> {
         builder.bounds(bounds_fn())
     }
 }
 
-impl SpaceBuilderBounds for GridAab {
+impl SpaceBuilderBounds for Vol<()> {
     fn bounds_if_not_set(
         builder: SpaceBuilder<Self>,
         _bounds_fn: impl FnOnce() -> GridAab,
-    ) -> SpaceBuilder<GridAab> {
+    ) -> SpaceBuilder<Vol<()>> {
         builder
     }
 }
@@ -272,7 +271,7 @@ mod sbb {
     #[doc(hidden)]
     pub trait SbbSealed {}
     impl SbbSealed for () {}
-    impl SbbSealed for GridAab {}
+    impl SbbSealed for Vol<()> {}
 }
 
 #[cfg(feature = "arbitrary")]
