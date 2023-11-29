@@ -176,7 +176,6 @@ impl EvaluatedBlock {
         // Compute color sum from voxels.
         // This is actually a sort of mini-raytracer, in that it computes the appearance
         // of all six faces by tracing in from the edges, and then averages them.
-        // TODO: Account for reduced bounds being smaller
         let (color, face_colors, emission): (Rgba, FaceMap<Rgba>, Rgb) = {
             let mut all_faces_sum = VoxSum::default();
             let mut face_colors = FaceMap::repeat(Rgba::TRANSPARENT);
