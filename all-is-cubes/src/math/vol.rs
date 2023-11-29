@@ -525,6 +525,24 @@ where
     }
 }
 
+mod aab_compat {
+    use super::*;
+
+    impl<O> PartialEq<GridAab> for Vol<(), O> {
+        #[inline]
+        fn eq(&self, other: &GridAab) -> bool {
+            self.bounds() == *other
+        }
+    }
+
+    impl<O> PartialEq<Vol<(), O>> for GridAab {
+        #[inline]
+        fn eq(&self, other: &Vol<(), O>) -> bool {
+            *self == other.bounds()
+        }
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 mod vol_arb {
     use super::*;
