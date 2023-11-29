@@ -59,7 +59,7 @@ jobs:
     runs-on: ${{ matrix.os }}-latest
 
     steps:
-    - uses: actions/checkout@v3.1.0
+    - uses: actions/checkout@v4
       with:
         ref: unstable-rust
 
@@ -139,7 +139,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3.1.0
+    - uses: actions/checkout@v4
 
     - uses: Swatinem/rust-cache@v2.7.0
       with:
