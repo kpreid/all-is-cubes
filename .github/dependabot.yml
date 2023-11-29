@@ -1,5 +1,11 @@
 version: 2
 updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      time: "17:00"
+      timezone: "America/Los_Angeles"
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
