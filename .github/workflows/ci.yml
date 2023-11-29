@@ -212,7 +212,7 @@ jobs:
 
     steps:
     - name: Download wasm dist artifact
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: wasm-dist
         path: dist-for-deploy
