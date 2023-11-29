@@ -583,7 +583,6 @@ fn do_for_all_packages(
 
                 // TODO: control over choice of browser
                 cmd!("wasm-pack test --headless --firefox").run()?;
-                cmd!("wasm-pack test --headless --firefox").run()?;
             }
             TestOrCheck::BuildTests | TestOrCheck::Lint => {
                 let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
