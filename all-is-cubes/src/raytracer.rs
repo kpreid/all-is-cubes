@@ -669,3 +669,42 @@ mod rayon_helper {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn apply_transmittance_identity() {
+        let color = rgba_const!(1.0, 0.5, 0.0, 0.5);
+        assert_eq!(apply_transmittance(color, 1.0), color);
+    }
+
+    /// `apply_transmittance` + `ColorBuf` accumulation should add up to the identity function for
+    /// any unit thickness (except for rounding error, which we are avoiding for this test case).
+    #[test]
+    fn apply_transmittance_equivalence() {
+        fn case(color: Rgba, count: usize) {
+            let modified_color = apply_transmittance(color, (count as f32).recip());
+            let mut color_buf = ColorBuf::default();
+            for _ in 0..count {
+                color_buf.add(modified_color, &());
+            }
+            let actual = Rgba::from(color_buf);
+            let error: Vec<f32> = <[f32; 4]>::from(actual)
+                .into_iter()
+                .zip(<[f32; 4]>::from(color))
+                .map(|(a, b)| a - b)
+                .collect();
+            assert!(
+                error.iter().sum::<f32>() < 0.00001,
+                "count {count}, color {color:?}, actual {actual:?}, error {error:?}"
+            );
+        }
+
+        let color = rgba_const!(1.0, 0.5, 0.0, 0.5);
+        case(color, 1);
+        case(color, 2);
+        case(color, 8);
+    }
+}
