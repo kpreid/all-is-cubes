@@ -490,7 +490,7 @@ impl LightStorage {
     #[cfg(test)]
     pub fn consistency_check(&self) {
         if self.physics == LightPhysics::None {
-            assert_eq!(self.contents.bounds().volume(), 0);
+            assert_eq!(self.contents.volume(), 0);
         }
 
         // TODO: validate light update queue

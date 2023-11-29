@@ -490,9 +490,10 @@ impl Space {
             })
         } else if self.bounds() == region {
             // We're overwriting the entire space, so we might as well re-initialize it.
-            let volume = self.bounds().volume();
+            let linear = self.contents.as_linear_mut();
+            let volume = linear.len();
             self.palette = Palette::new(block.clone(), volume);
-            self.contents.as_linear_mut().fill(/* block index = */ 0);
+            linear.fill(/* block index = */ 0);
             // TODO: also need to reset lighting and activate tick_action.
             // And see if we can share more of the logic of this with new_from_builder().
             self.change_notifier.notify(SpaceChange::EveryBlock);

@@ -130,7 +130,7 @@ pub async fn build_dungeon<Room, ThemeT: Theme<Room>>(
         for (room_position, mut progress) in map
             .bounds()
             .interior_iter()
-            .zip(progress.split_evenly(map.bounds().volume()))
+            .zip(progress.split_evenly(map.volume()))
         {
             progress.set_label(format_args!(
                 "pass {pass} @ {room_position:?}",
