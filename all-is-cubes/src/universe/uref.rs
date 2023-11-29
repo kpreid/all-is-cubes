@@ -154,6 +154,7 @@ impl<T: 'static> URef<T> {
     /// [`std::sync::RwLock::try_read()`].
     ///
     /// TODO: There is not currently any way to block on / wait for read access.
+    #[inline(never)]
     pub fn read(&self) -> Result<UBorrow<T>, RefError> {
         let inner = owning_guard::UBorrowImpl::new(self.upgrade()?)
             .map_err(|_| RefError::InUse(self.name()))?;
@@ -172,6 +173,7 @@ impl<T: 'static> URef<T> {
     /// only use the mutation operations provided by `T`.
     ///
     /// TODO: If possible, completely replace this operation with transactions.
+    #[inline(never)]
     pub fn try_modify<F, Out>(&self, function: F) -> Result<Out, RefError>
     where
         F: FnOnce(&mut T) -> Out,
@@ -217,6 +219,7 @@ impl<T: 'static> URef<T> {
     /// Returns an error if the transaction's preconditions were not met, if the
     /// referent was already borrowed (which is denoted as an [`ExecuteError::Check`]),
     /// or if the transaction encountered an unexpected error.
+    #[inline(never)]
     pub fn execute(
         &self,
         transaction: &<T as Transactional>::Transaction,
