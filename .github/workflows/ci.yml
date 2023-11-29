@@ -88,7 +88,7 @@ jobs:
 
     - run: df -h .
 
-    - uses: actions/checkout@v3.1.0
+    - uses: actions/checkout@v4
 
     - run: df -h .
 
@@ -240,7 +240,7 @@ jobs:
         large-packages: false # slow
         swap-storage: false
 
-    - uses: actions/checkout@v3.1.0
+    - uses: actions/checkout@v4
 
     - name: Install native libraries
       if: ${{ runner.os == 'Linux' }}
@@ -299,7 +299,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3.1.0
+    - uses: actions/checkout@v4
 
     - uses: Swatinem/rust-cache@v2.7.0
 
@@ -321,7 +321,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3.1.0
+    - uses: actions/checkout@v4
 
     # The build is faster *without* this cache.
     # - uses: Swatinem/rust-cache@v2.7.0
@@ -345,7 +345,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3.1.0
+    - uses: actions/checkout@v4
 
     # Cache both the main workspace (for xtask builds) and the fuzzing workspace
     - uses: Swatinem/rust-cache@v2.7.0
