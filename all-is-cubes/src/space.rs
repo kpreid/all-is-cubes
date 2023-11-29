@@ -487,11 +487,16 @@ impl Space {
             })
         } else if self.bounds() == region {
             // We're overwriting the entire space, so we might as well re-initialize it.
-            let linear = self.contents.as_linear_mut();
-            let volume = linear.len();
-            self.palette = Palette::new(block.clone(), volume);
-            linear.fill(/* block index = */ 0);
-            // TODO: also need to reset lighting and activate tick_action.
+            {
+                let linear = self.contents.as_linear_mut();
+                let volume = linear.len();
+                self.palette = Palette::new(block.clone(), volume);
+                linear.fill(/* block index = */ 0);
+            }
+            // TODO: if opaque, don't schedule updates
+            self.light
+                .light_needs_update_in_region(region, light::Priority::UNINIT);
+            // TODO: also need to activate tick_action if present.
             // And see if we can share more of the logic of this with new_from_builder().
             self.change_notifier.notify(SpaceChange::EveryBlock);
             Ok(())

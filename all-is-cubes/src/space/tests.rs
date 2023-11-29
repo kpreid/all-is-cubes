@@ -336,13 +336,19 @@ fn fill_out_of_bounds() {
 /// Test filling an entire space with one block using [`Space::fill`].
 #[test]
 fn fill_entire_space() {
-    let [block] = make_some_blocks();
+    let block = Block::from(Rgba::new(0., 0., 0., 0.5)); // transparent so light gets involved
     let bounds = GridAab::from_lower_size([0, 3, 0], [25 * 16, 16, 2]);
     let mut space = Space::empty(bounds);
+
     space.fill(bounds, |_| Some(&block)).unwrap();
+
     space.consistency_check();
     for cube in bounds.interior_iter() {
         assert_eq!(&space[cube], &block);
+        assert!(
+            space.in_light_update_queue(cube),
+            "{cube:?} in light update queue"
+        );
     }
 }
 
@@ -362,6 +368,10 @@ fn fill_uniform_entire_space() {
     space.consistency_check();
     for cube in bounds.interior_iter() {
         assert_eq!(&space[cube], &block);
+        assert!(
+            space.in_light_update_queue(cube),
+            "{cube:?} in light update queue"
+        );
     }
 }
 

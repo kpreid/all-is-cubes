@@ -131,6 +131,19 @@ impl LightStorage {
         }
     }
 
+    pub(crate) fn light_needs_update_in_region(&mut self, region: GridAab, priority: Priority) {
+        let Some(region) = region.intersection(self.contents.bounds()) else {
+            return;
+        };
+        if region.volume() > 400 {
+            self.light_update_queue.sweep(region, priority);
+        } else {
+            for cube in region.interior_iter() {
+                self.light_needs_update(cube, priority);
+            }
+        }
+    }
+
     pub(in crate::space) fn modified_cube_needs_update(
         &mut self,
         uc: UpdateCtx<'_>,
