@@ -52,6 +52,7 @@ pub enum DemoBlocks {
     Signboard,
     LabelTextVoxel,
     Clock,
+    BecomeBlinker(bool),
     Explosion(u8),
 }
 impl BlockModule for DemoBlocks {
@@ -63,6 +64,7 @@ impl fmt::Display for DemoBlocks {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let variant = <&str>::from(self); // borrow strum::IntoStaticStr to do the base work
         match self {
+            DemoBlocks::BecomeBlinker(state) => write!(f, "{variant}/{state}"),
             DemoBlocks::Explosion(i) => write!(f, "{variant}/{i}"),
             _ => write!(f, "{variant}"),
         }
@@ -424,6 +426,11 @@ pub async fn install_demo_blocks(
                     .build()
             }
 
+            BecomeBlinker(state) => Block::builder()
+                .color(if state { Rgba::WHITE } else { Rgba::BLACK })
+                .display_name(format!("Blinker {state:?}"))
+                .build(),
+
             Explosion(timer) => {
                 let decay = (f32::from(timer) * -0.1).exp();
                 Block::builder()
@@ -443,8 +450,21 @@ pub async fn install_demo_blocks(
     let provider_for_patch = BlockProvider::using(universe)
         .map_err(|e| GenError::failure(e, "TODO: dummy name".into()))?;
 
+    // Join up blinker blocks
+    for state in bool::exhaust() {
+        modify_def(&provider_for_patch[BecomeBlinker(state)], |block| {
+            let Primitive::Atom(Atom { attributes, .. }) = block.primitive_mut() else {
+                panic!("blinker not atom");
+            };
+            attributes.tick_action = Some(TickAction {
+                operation: Operation::Become(provider_for_patch[BecomeBlinker(!state)].clone()),
+                period: NonZeroU16::new(60).unwrap(),
+            });
+        });
+    }
+
     // Join up explosion blocks
-    for i in 0..=255 {
+    for i in u8::exhaust() {
         modify_def(&provider_for_patch[Explosion(i)], |block| {
             let Primitive::Atom(Atom { attributes, .. }) = block.primitive_mut() else {
                 panic!("explosion not atom");
