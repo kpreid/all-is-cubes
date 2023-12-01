@@ -13,7 +13,6 @@ use crate::block::{
     TickAction, AIR,
 };
 use crate::content::make_some_blocks;
-use crate::drawing::VoxelBrush;
 use crate::fluff::Fluff;
 use crate::listen::{Listen as _, Sink};
 use crate::math::{Cube, GridAab, GridArray, GridCoordinate, GridPoint, Rgba};
@@ -550,7 +549,7 @@ fn block_tick_action() {
     fn connect(from: &mut Block, to: &Block) {
         if let Primitive::Atom(Atom { attributes, .. }) = from.primitive_mut() {
             attributes.tick_action = Some({
-                let operation = Operation::Paint(VoxelBrush::single(to.clone()));
+                let operation = Operation::Become(to.clone());
                 TickAction {
                     operation,
                     period: NonZeroU16::new(2).unwrap(),

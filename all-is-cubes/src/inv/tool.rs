@@ -605,7 +605,6 @@ mod tests {
     use crate::block::Primitive;
     use crate::character::cursor_raycast;
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
-    use crate::drawing::VoxelBrush;
     use crate::inv::Slot;
     use crate::math::{FreeCoordinate, GridRotation};
     use crate::raycast::Ray;
@@ -969,7 +968,7 @@ mod tests {
 
         let [existing, icon, placed] = make_some_blocks();
         let tool = Tool::Custom {
-            op: Operation::Paint(VoxelBrush::single(placed.clone())),
+            op: Operation::Become(placed.clone()),
             icon,
         };
         let tester = ToolTester::new(|space| {
@@ -982,10 +981,9 @@ mod tests {
             transaction,
             SpaceTransaction::set_cube(
                 [0, 0, 0],
-                None,
+                Some(existing.clone()),
                 Some(placed.clone().rotate(GridRotation::CLOCKWISE)),
             )
-            .nonconserved() // TODO: this is just because ::Paint does this
             .bind(tester.space_ref.clone())
         );
     }

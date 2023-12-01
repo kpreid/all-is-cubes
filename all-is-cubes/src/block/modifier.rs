@@ -193,7 +193,6 @@ mod tests {
     use crate::block::{BlockAttributes, TickAction};
     use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Primitive, Resolution::R2};
     use crate::content::make_some_voxel_blocks;
-    use crate::drawing::VoxelBrush;
     use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgba, Vol};
     use crate::op::Operation;
     use crate::universe::Universe;
@@ -229,8 +228,8 @@ mod tests {
             })
             .unwrap()
             .rotation_rule(block::RotationPlacementRule::Attach { by: Face6::PX })
-            .tick_action(Some(TickAction::from(Operation::Paint(
-                VoxelBrush::single(replacement.clone()),
+            .tick_action(Some(TickAction::from(Operation::Become(
+                replacement.clone(),
             ))))
             .build();
         let be = block.evaluate().unwrap();
@@ -267,9 +266,9 @@ mod tests {
                 })),
                 attributes: BlockAttributes {
                     display_name: "foo".into(),
-                    tick_action: Some(TickAction::from(Operation::Paint(VoxelBrush::single(
+                    tick_action: Some(TickAction::from(Operation::Become(
                         replacement.rotate(rotation).clone()
-                    )))),
+                    ))),
                     rotation_rule: block::RotationPlacementRule::Attach { by: Face6::PY },
                     ..BlockAttributes::default()
                 },

@@ -401,6 +401,19 @@ fn cube() {
 // Tests corresponding to the `ops` module
 
 #[test]
+fn operation_become() {
+    assert_round_trip_value(
+        &op::Operation::Become(AIR),
+        json!({
+            "type": "BecomeV1",
+            "block": {
+                "type": "BlockV1",
+                "primitive": {"type": "AirV1"},
+            }
+        }),
+    );
+}
+#[test]
 fn operation_paint() {
     assert_round_trip_value(
         &op::Operation::Paint(VoxelBrush::new([([0, 0, 0], AIR)])),
