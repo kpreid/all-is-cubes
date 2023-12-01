@@ -319,6 +319,12 @@ impl Block {
     /// ```
     #[must_use]
     pub fn rotate(mut self, rotation: GridRotation) -> Self {
+        if rotation == GridRotation::IDENTITY {
+            // TODO: Should we *remove* any identity rotation already present,
+            // to make a fully canonical result?
+            return self;
+        }
+
         match (self.primitive(), self.modifiers().is_empty()) {
             (Primitive::Atom(_) | Primitive::Air, true) => {
                 // TODO: Just checking for Primitive::Atom doesn't help when the atom

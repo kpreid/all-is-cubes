@@ -301,4 +301,14 @@ mod tests {
             two_rotations.evaluate().unwrap()
         );
     }
+
+    /// `.rotate(IDENTITY)` does nothing.
+    #[test]
+    fn rotate_by_identity() {
+        let universe = &mut Universe::new();
+        let [block] = make_some_voxel_blocks(universe);
+        assert_eq!(block, block.clone().rotate(GridRotation::IDENTITY));
+        // prove that the test didn't trivially pass by applying to a symmetric block
+        assert_ne!(block, block.clone().rotate(GridRotation::CLOCKWISE));
+    }
 }
