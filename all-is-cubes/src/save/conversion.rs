@@ -695,6 +695,7 @@ mod op {
             S: Serializer,
         {
             match self {
+                op::Operation::Become(block) => schema::OperationSer::BecomeV1 { block: block.clone() },
                 op::Operation::Paint(brush) => schema::OperationSer::PaintV1 {
                     blocks: brush.entries_for_serialization(),
                 },
@@ -709,6 +710,9 @@ mod op {
             D: Deserializer<'de>,
         {
             Ok(match schema::OperationSer::deserialize(deserializer)? {
+                schema::OperationSer::BecomeV1 { block } => {
+                    op::Operation::Become(block)
+                }
                 schema::OperationSer::PaintV1 { blocks } => {
                     op::Operation::Paint(VoxelBrush::new(blocks))
                 }

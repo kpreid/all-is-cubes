@@ -1,9 +1,10 @@
 //! [`Operation`]s that modify the world due to player or world actions.
 
+use crate::block::Block;
 use crate::drawing::VoxelBrush;
 use crate::inv::{Inventory, InventoryTransaction};
 use crate::math::{GridRotation, Gridgid};
-use crate::space::{Space, SpaceTransaction};
+use crate::space::{CubeTransaction, Space, SpaceTransaction};
 use crate::universe::VisitRefs;
 
 /// A template for something that can happen to a location in [`Space`] and possibly an inventory.
@@ -15,7 +16,7 @@ use crate::universe::VisitRefs;
 ///
 /// TODO: The current representation as an enum is a temporary measure to replace a
 /// bunch of existing mechanics. In the future it will be something somewhat more like a
-/// general functional programming language.
+/// general functional programming language, and the representation might be more elaborate.
 ///
 /// TODO: Ensure that cloning this type is O(1) and doesn't duplicate memory, because as a
 /// part of `BlockAttribtes` and `EvaluatedBlock` it is cloned a lot.
@@ -24,6 +25,14 @@ use crate::universe::VisitRefs;
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Operation {
+    /// Replace the cube's block with another block.
+    ///
+    /// In addition to this specific behavior, this has the semantics that it is “this block
+    /// becoming another block”, meaning that circumstances which modify the block the operation
+    /// applies to may also modify the operation's block in the same way. For example, a rotated
+    /// block with a tick action will become a rotated block.
+    Become(Block),
+
     /// Apply the brush centered on the cube.
     Paint(VoxelBrush<'static>),
 }
@@ -44,17 +53,28 @@ impl Operation {
     /// succeed. TODO: Explain how the two kinds of errors should be reported.
     pub(crate) fn apply(
         &self,
-        _space: &Space,
+        space: &Space,
         _inventory: Option<&Inventory>,
         transform: Gridgid,
     ) -> Result<(SpaceTransaction, InventoryTransaction), OperationError> {
+        let target_cube = transform.translation.to_point().into();
+
         match self {
+            Operation::Become(block) => {
+                let space_txn = CubeTransaction::replacing(
+                    Some(space[target_cube].clone()),
+                    Some(block.clone().rotate(transform.rotation)),
+                )
+                .at(target_cube);
+
+                Ok((space_txn, InventoryTransaction::default()))
+            }
             Operation::Paint(brush) => {
                 // TODO: avoid clone
                 let space_txn = brush
                     .clone()
                     .rotate(transform.rotation)
-                    .paint_transaction(transform.translation.to_point().into())
+                    .paint_transaction(target_cube)
                     .nonconserved();
 
                 Ok((space_txn, InventoryTransaction::default()))
@@ -64,12 +84,16 @@ impl Operation {
 
     pub(crate) fn rotationally_symmetric(&self) -> bool {
         match self {
-            Operation::Paint(_) => false, // TODO
+            // TODO: need to ask if blocks are relevantly symmetric
+            Operation::Become(_) => false,
+            Operation::Paint(_) => false,
         }
     }
 
     pub(crate) fn rotate(self, rotation: GridRotation) -> Self {
         match self {
+            // TODO: need to provide a way for blocks to opt out
+            Operation::Become(block) => Operation::Become(block.rotate(rotation)),
             Operation::Paint(brush) => Operation::Paint(brush.rotate(rotation)),
         }
     }
@@ -78,9 +102,8 @@ impl Operation {
 impl VisitRefs for Operation {
     fn visit_refs(&self, visitor: &mut dyn crate::universe::RefVisitor) {
         match self {
-            Operation::Paint(brush) => {
-                brush.visit_refs(visitor);
-            }
+            Operation::Become(block) => block.visit_refs(visitor),
+            Operation::Paint(brush) => brush.visit_refs(visitor),
         }
     }
 }
@@ -91,3 +114,17 @@ pub(crate) enum OperationError {}
 
 #[cfg(feature = "std")]
 impl std::error::Error for OperationError {}
+
+#[cfg(test)]
+mod tests {
+    use crate::content::make_some_blocks;
+
+    use super::*;
+
+    #[test]
+    fn rotated_become_atom() {
+        let [atom] = make_some_blocks();
+        let op = Operation::Become(atom);
+        assert_eq!(op.clone(), op.rotate(GridRotation::CLOCKWISE));
+    }
+}

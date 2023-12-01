@@ -338,6 +338,7 @@ type RgbaSer = [NotNan<f32>; 4];
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub(crate) enum OperationSer {
+    BecomeV1 { block: Block },
     PaintV1 { blocks: Vec<([i32; 3], Block)> },
 }
 
