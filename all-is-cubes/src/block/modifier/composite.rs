@@ -160,8 +160,8 @@ impl Composite {
         let dst_scale =
             GridCoordinate::from(effective_resolution) / GridCoordinate::from(dst_resolution);
 
-        let src_bounds_scaled = src_voxels.bounds().multiply(src_scale);
-        let dst_bounds_scaled = dst_voxels.bounds().multiply(dst_scale);
+        let src_bounds_scaled = bounds_excluding_air(&src_voxels, src_scale);
+        let dst_bounds_scaled = bounds_excluding_air(&dst_voxels, dst_scale);
 
         let output_bounds = operator.bounds(src_bounds_scaled, dst_bounds_scaled);
 
@@ -212,6 +212,17 @@ impl Composite {
         } else {
             block::ModifierUnspecialize::Keep
         }
+    }
+}
+
+/// Rescale the bounds of the input to the resolution of the output, but also, if the voxels are
+/// [`Evoxel::AIR`] and thus equivalent to out-of-bounds, substitute empty bounds.
+/// This way, we produce suitably tight bounds when one of the blocks is AIR.
+fn bounds_excluding_air(voxels: &Evoxels, src_scale: i32) -> GridAab {
+    if voxels.single_voxel() == Some(Evoxel::AIR) {
+        GridAab::ORIGIN_EMPTY
+    } else {
+        voxels.bounds().multiply(src_scale)
     }
 }
 
@@ -382,8 +393,7 @@ impl CompositeOperator {
     /// Compute the bounds of the result given the bounds of the source and destination.
     fn bounds(&self, source: GridAab, destination: GridAab) -> GridAab {
         match self {
-            // TODO: to be precise, use a "union ignoring empty volumes" operator
-            Self::Over => source.union(destination).unwrap(),
+            Self::Over => union_ignoring_empty(source, destination),
             Self::In => source
                 .intersection(destination)
                 .unwrap_or(GridAab::ORIGIN_EMPTY),
@@ -393,11 +403,24 @@ impl CompositeOperator {
     }
 }
 
+/// Union but tighter, ignoring the edges of empty volumes and only caring about included cubes.
+/// TODO: Make this a method on [`GridAab`]?
+fn union_ignoring_empty(a: GridAab, b: GridAab) -> GridAab {
+    if b.is_empty() {
+        a
+    } else if a.is_empty() {
+        b
+    } else {
+        a.union(b).unwrap()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::block::EvaluatedBlock;
     use crate::block::Resolution::*;
+    use crate::content::make_slab;
     use crate::content::make_some_blocks;
     use crate::math::{Rgb, Rgba};
     use crate::space::Space;
@@ -462,7 +485,7 @@ mod tests {
     // --- Tests ---
 
     #[test]
-    fn bounding_volume() {
+    fn bounding_volume_combination() {
         let universe = &mut Universe::new();
         // Two spaces for blocks that overlap in Venn diagram fashion
         let bounds1 = GridAab::from_lower_size([0, 0, 0], [2, 1, 1]);
@@ -489,6 +512,34 @@ mod tests {
             eval_compose(&block1, Atop, &block2).voxels_bounds(),
             bounds2,
             "Atop"
+        );
+    }
+
+    #[test]
+    fn bounding_volume_when_one_is_air() {
+        let universe = &mut Universe::new();
+        let slab = make_slab(universe, 1, R2);
+        let slab_bounds = slab.evaluate().unwrap().voxels_bounds();
+
+        assert_eq!(
+            eval_compose(&slab, Over, &AIR).voxels_bounds(),
+            slab_bounds,
+            "Over",
+        );
+        assert_eq!(
+            eval_compose(&slab, In, &AIR).voxels_bounds(),
+            GridAab::ORIGIN_EMPTY,
+            "In",
+        );
+        assert_eq!(
+            eval_compose(&slab, Atop, &AIR).voxels_bounds(),
+            GridAab::ORIGIN_EMPTY,
+            "Atop AIR",
+        );
+        assert_eq!(
+            eval_compose(&AIR, Atop, &slab).voxels_bounds(),
+            slab_bounds,
+            "AIR Atop",
         );
     }
 
