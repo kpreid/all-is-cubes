@@ -116,15 +116,32 @@ impl PageInst {
 
         // Size didn't match, so recreate the space.
         // TODO: Resize in-place instead, once `Space` supports that.
+        match self.create_space(size, universe) {
+            Ok(space) => {
+                self.space = Some(space.clone());
+                space
+            }
+            Err(error) => {
+                // TODO: Recover by using old space or by popping the page state stack if possible
+                panic!(
+                    "VUI page construction failure:\n{error}",
+                    error = all_is_cubes::util::ErrorChain(&error),
+                );
+            }
+        }
+    }
+
+    fn create_space(
+        &self,
+        size: UiSize,
+        universe: &mut Universe,
+    ) -> Result<URef<Space>, InstallVuiError> {
         let space = universe.insert_anonymous(size.create_space());
         // TODO: error handling for layout
+        let txn = install_widgets(LayoutGrant::new(size.space_bounds()), &self.tree)?;
         space
-            .execute(
-                &install_widgets(LayoutGrant::new(size.space_bounds()), &self.tree)
-                    .expect("layout/widget error"),
-                &mut transaction::no_outputs,
-            )
-            .expect("transaction error");
+            .execute(&txn, &mut transaction::no_outputs)
+            .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;
 
         // Initialize lighting
         space
@@ -134,8 +151,7 @@ impl PageInst {
             })
             .unwrap();
 
-        self.space = Some(space.clone());
-        space
+        Ok(space)
     }
 }
 
