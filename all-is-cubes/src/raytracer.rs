@@ -8,6 +8,7 @@
 //! it is much simpler. It continues to serve as a “reference implementation” and is used
 //! by the terminal UI and in unit tests via [`print_space`].
 
+use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
@@ -28,8 +29,8 @@ use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 #[cfg(not(feature = "std"))]
 use crate::math::Euclid as _;
 use crate::math::{
-    smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, GridArray,
-    GridMatrix, Intensity, Rgb, Rgba, VectorOps,
+    smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, GridMatrix,
+    Intensity, Rgb, Rgba, VectorOps, Vol,
 };
 use crate::raycast::Ray;
 use crate::space::{BlockIndex, PackedLight, Space, SpaceBlockData};
@@ -51,7 +52,7 @@ mod updating;
 /// the methods for actually performing raytracing.
 pub struct SpaceRaytracer<D: RtBlockData> {
     blocks: Vec<TracingBlock<D>>,
-    cubes: GridArray<TracingCubeData>,
+    cubes: Vol<Box<[TracingCubeData]>>,
 
     graphics_options: GraphicsOptions,
     custom_options: D::Options,
@@ -100,7 +101,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         };
         SpaceRaytracer {
             blocks: Vec::new(),
-            cubes: GridArray::from_elements(GridAab::ORIGIN_EMPTY, []).unwrap(),
+            cubes: Vol::from_elements(GridAab::ORIGIN_EMPTY, []).unwrap(),
             sky_color,
             sky_data: D::sky(options),
             packed_sky_color: sky_color.into(),
@@ -440,7 +441,7 @@ impl Fmt<StatusText> for RaytraceInfo {
 
 /// Get cube data out of [`Space`].
 #[inline]
-fn prepare_cubes(space: &Space) -> GridArray<TracingCubeData> {
+fn prepare_cubes(space: &Space) -> Vol<Box<[TracingCubeData]>> {
     space.extract(space.bounds(), |e| TracingCubeData {
         block_index: e.block_index(),
         lighting: e.light(),

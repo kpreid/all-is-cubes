@@ -1,7 +1,9 @@
+use alloc::boxed::Box;
+
 use crate::behavior::BehaviorSet;
 use crate::block::{Block, AIR};
 use crate::character::Spawn;
-use crate::math::{FreePoint, GridArray, Rgb, Vol};
+use crate::math::{FreePoint, Rgb, Vol};
 use crate::space::{
     BlockIndex, GridAab, LightPhysics, PackedLight, Palette, PaletteError, Space, SpacePhysics,
 };
@@ -31,8 +33,8 @@ pub(super) enum Fill {
     Data {
         /// Note: this palette has its block counts already set to match contents
         palette: Palette,
-        contents: GridArray<BlockIndex>,
-        light: Option<GridArray<PackedLight>>,
+        contents: Vol<Box<[BlockIndex]>>,
+        light: Option<Vol<Box<[PackedLight]>>>,
     },
 }
 
@@ -155,8 +157,8 @@ impl SpaceBuilder<Vol<()>> {
     pub fn palette_and_contents<P>(
         self,
         palette: P,
-        contents: GridArray<BlockIndex>,
-        light: Option<GridArray<PackedLight>>,
+        contents: Vol<Box<[BlockIndex]>>,
+        light: Option<Vol<Box<[PackedLight]>>>,
     ) -> Result<Self, PaletteError>
     where
         P: IntoIterator,
@@ -168,8 +170,8 @@ impl SpaceBuilder<Vol<()>> {
     fn palette_and_contents_impl(
         mut self,
         palette: &mut dyn ExactSizeIterator<Item = Block>,
-        mut contents: GridArray<BlockIndex>,
-        light: Option<GridArray<PackedLight>>,
+        mut contents: Vol<Box<[BlockIndex]>>,
+        light: Option<Vol<Box<[PackedLight]>>>,
     ) -> Result<Self, PaletteError> {
         // Validate palette.
         let (mut palette, remapping) = Palette::from_blocks(palette)?;
@@ -280,7 +282,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         use crate::content::make_some_blocks;
 
-        // TODO: Should be reusing GridArray as Arbitrary for this.
+        // TODO: Should be reusing Vol as Arbitrary for this.
 
         let bounds = GridAab::arbitrary_with_max_volume(u, 2048)?;
         let mut space = Space::builder(bounds)
@@ -376,7 +378,7 @@ mod tests {
         let bounds = GridAab::ORIGIN_CUBE;
         assert_eq!(
             Space::builder(bounds)
-                .palette_and_contents(vec![AIR; 65537], GridArray::from_element(2), None,)
+                .palette_and_contents(vec![AIR; 65537], Vol::from_element(2), None,)
                 .unwrap_err(),
             PaletteError::PaletteTooLarge { len: 65537 }
         );
@@ -387,7 +389,7 @@ mod tests {
         let bounds = GridAab::ORIGIN_CUBE;
         assert_eq!(
             Space::builder(bounds)
-                .palette_and_contents(&mut [AIR].into_iter(), GridArray::from_element(2), None,)
+                .palette_and_contents(&mut [AIR].into_iter(), Vol::from_element(2), None,)
                 .unwrap_err(),
             PaletteError::Index {
                 index: 2,
@@ -401,7 +403,7 @@ mod tests {
     fn palette_err_contents_wrong_bounds() {
         assert_eq!(
             Space::builder(GridAab::single_cube(Cube::new(1, 0, 0)))
-                .palette_and_contents([AIR], GridArray::from_element(0), None)
+                .palette_and_contents([AIR], Vol::from_element(0), None)
                 .unwrap_err(),
             PaletteError::WrongDataBounds {
                 expected: GridAab::single_cube(Cube::new(1, 0, 0)),
@@ -421,7 +423,7 @@ mod tests {
         let space = Space::builder(bounds)
             .palette_and_contents(
                 [block0.clone(), block1.clone(), block0.clone()],
-                GridArray::from_elements(bounds, [0, 1, 2]).unwrap(),
+                Vol::from_elements(bounds, [0, 1, 2]).unwrap(),
                 None,
             )
             .unwrap()
@@ -444,7 +446,7 @@ mod tests {
         let space = Space::builder(bounds)
             .palette_and_contents(
                 blocks.clone(),
-                GridArray::from_elements(bounds, [0, 2]).unwrap(),
+                Vol::from_elements(bounds, [0, 2]).unwrap(),
                 None,
             )
             .unwrap()

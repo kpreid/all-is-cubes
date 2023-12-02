@@ -618,7 +618,7 @@ impl From<TooManyBlocks> for SetCubeError {
 mod tests {
     use super::*;
     use crate::content::make_some_blocks;
-    use crate::math::{GridAab, GridArray};
+    use crate::math::{GridAab, Vol};
     use crate::space::Space;
     use pretty_assertions::assert_eq;
 
@@ -630,7 +630,7 @@ mod tests {
         let space = Space::builder(bounds)
             .palette_and_contents(
                 blocks.clone(),
-                GridArray::from_elements(bounds, [0, 1, 0]).unwrap(),
+                Vol::from_elements(bounds, [0, 1, 0]).unwrap(),
                 None,
             )
             .unwrap()

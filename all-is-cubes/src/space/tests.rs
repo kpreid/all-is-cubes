@@ -2,6 +2,7 @@
 //!
 //! Note that some sub-modules have their own test modules.
 
+use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::num::NonZeroU16;
@@ -15,7 +16,7 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::fluff::Fluff;
 use crate::listen::{Listen as _, Sink};
-use crate::math::{Cube, GridAab, GridArray, GridCoordinate, GridPoint, Rgba};
+use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, Rgba, Vol};
 use crate::op::Operation;
 use crate::space::{
     CubeTransaction, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpaceFluff,
@@ -299,7 +300,7 @@ fn extract() {
     space.set([1, 0, 0], &block_1).unwrap();
 
     let extract_bounds = GridAab::from_lower_size([1, 0, 0], [1, 1, 1]);
-    let extracted: GridArray<Block> = space.extract(extract_bounds, |e| {
+    let extracted: Vol<Box<[Block]>> = space.extract(extract_bounds, |e| {
         // TODO: arrange to sanity check index and lighting
         let block = e.block_data().block().clone();
         assert_eq!(block.evaluate().unwrap(), e.block_data().evaluated);
@@ -315,7 +316,7 @@ fn extract() {
 fn extract_out_of_bounds() {
     let space = Space::empty_positive(2, 1, 1);
     let extract_bounds = GridAab::from_lower_size([1, 0, 0], [1, 2, 1]);
-    let _: GridArray<()> = space.extract(extract_bounds, |_| ());
+    let _: Vol<Box<[()]>> = space.extract(extract_bounds, |_| ());
 }
 
 #[test]
