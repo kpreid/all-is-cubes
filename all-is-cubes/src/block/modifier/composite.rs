@@ -161,7 +161,7 @@ impl Composite {
         let src_bounds_scaled = src_voxels.bounds().multiply(src_scale);
         let dst_bounds_scaled = dst_voxels.bounds().multiply(dst_scale);
 
-        let output_bounds = src_bounds_scaled.union(dst_bounds_scaled).unwrap();
+        let output_bounds = operator.bounds(src_bounds_scaled, dst_bounds_scaled);
 
         let attributes = block::BlockAttributes {
             display_name: dst_att.display_name, // TODO merge
@@ -363,6 +363,18 @@ impl CompositeOperator {
             Self::Atop => destination,
         }
     }
+
+    /// Compute the bounds of the result given the bounds of the source and destination.
+    fn bounds(&self, source: GridAab, destination: GridAab) -> GridAab {
+        match self {
+            // TODO: to be precise, use a "union ignoring empty volumes" operator
+            Self::Over => source.union(destination).unwrap(),
+            Self::In => source
+                .intersection(destination)
+                .unwrap_or(GridAab::ORIGIN_EMPTY),
+            Self::Atop => destination,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -370,8 +382,9 @@ mod tests {
     use super::*;
     use crate::block::EvaluatedBlock;
     use crate::block::Resolution::*;
-    use crate::content::{make_slab, make_some_blocks};
+    use crate::content::make_some_blocks;
     use crate::math::{Rgb, Rgba};
+    use crate::space::Space;
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
     use BlockCollision::{Hard, None as CNone};
@@ -433,17 +446,35 @@ mod tests {
     // --- Tests ---
 
     #[test]
-    fn bounding_volume_over() {
+    fn bounding_volume() {
         let universe = &mut Universe::new();
-        let slab = make_slab(universe, 1, R2);
+        // Two spaces for blocks that overlap in Venn diagram fashion
+        let bounds1 = GridAab::from_lower_size([0, 0, 0], [2, 1, 1]);
+        let bounds2 = GridAab::from_lower_size([1, 0, 0], [2, 1, 1]);
+        let space1 = universe.insert_anonymous(Space::builder(bounds1).build());
+        let space2 = universe.insert_anonymous(Space::builder(bounds2).build());
+        let block1 = Block::builder().voxels_ref(R4, space1).build();
+        let block2 = Block::builder().voxels_ref(R4, space2).build();
 
-        let ev = eval_compose(&slab, Over, &slab);
+        let union = GridAab::from_lower_size([0, 0, 0], [3, 1, 1]);
+        let intersection = GridAab::from_lower_size([1, 0, 0], [1, 1, 1]);
 
-        // Bounds are not larger than original
-        assert_eq!(ev.voxels_bounds(), slab.evaluate().unwrap().voxels_bounds());
+        assert_eq!(
+            eval_compose(&block1, Over, &block2).voxels_bounds(),
+            union,
+            "Over"
+        );
+        assert_eq!(
+            eval_compose(&block1, In, &block2).voxels_bounds(),
+            intersection,
+            "In"
+        );
+        assert_eq!(
+            eval_compose(&block1, Atop, &block2).voxels_bounds(),
+            bounds2,
+            "Atop"
+        );
     }
-
-    // TODO: Test bounding volumes more thoroughly; some should be intersection or asymmetric
 
     #[test]
     fn blend_over_silly_floats() {
