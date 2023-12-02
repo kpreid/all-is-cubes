@@ -158,6 +158,11 @@ impl Composite {
         let dst_scale =
             GridCoordinate::from(effective_resolution) / GridCoordinate::from(dst_resolution);
 
+        let src_bounds_scaled = src_voxels.bounds().multiply(src_scale);
+        let dst_bounds_scaled = dst_voxels.bounds().multiply(dst_scale);
+
+        let output_bounds = src_bounds_scaled.union(dst_bounds_scaled).unwrap();
+
         let attributes = block::BlockAttributes {
             display_name: dst_att.display_name, // TODO merge
             selectable: src_att.selectable | dst_att.selectable,
@@ -166,16 +171,15 @@ impl Composite {
             animation_hint: src_att.animation_hint | dst_att.animation_hint, // TODO: some operators should ignore some hints (e.g. `In` should ignore destination color changes)
         };
 
-        let voxels = if effective_resolution == R1 {
+        let voxels = if effective_resolution == R1 && output_bounds == GridAab::ORIGIN_CUBE {
             Evoxels::One(operator.blend_evoxel(
                 src_voxels.single_voxel().unwrap(),
                 dst_voxels.single_voxel().unwrap(),
             ))
         } else {
-            // TODO: use narrower array bounds (union of both inputs' bounds)
             Evoxels::Many(
                 effective_resolution,
-                Vol::from_fn(GridAab::for_block(effective_resolution), |cube| {
+                Vol::from_fn(output_bounds, |cube| {
                     let p = cube.lower_bounds();
                     operator.blend_evoxel(
                         src_voxels
@@ -365,8 +369,10 @@ impl CompositeOperator {
 mod tests {
     use super::*;
     use crate::block::EvaluatedBlock;
-    use crate::content::make_some_blocks;
+    use crate::block::Resolution::*;
+    use crate::content::{make_slab, make_some_blocks};
     use crate::math::{Rgb, Rgba};
+    use crate::universe::Universe;
     use pretty_assertions::assert_eq;
     use BlockCollision::{Hard, None as CNone};
     use CompositeOperator::{Atop, In, Over};
@@ -425,6 +431,19 @@ mod tests {
     }
 
     // --- Tests ---
+
+    #[test]
+    fn bounding_volume_over() {
+        let universe = &mut Universe::new();
+        let slab = make_slab(universe, 1, R2);
+
+        let ev = eval_compose(&slab, Over, &slab);
+
+        // Bounds are not larger than original
+        assert_eq!(ev.voxels_bounds(), slab.evaluate().unwrap().voxels_bounds());
+    }
+
+    // TODO: Test bounding volumes more thoroughly; some should be intersection or asymmetric
 
     #[test]
     fn blend_over_silly_floats() {
