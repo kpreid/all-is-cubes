@@ -55,6 +55,15 @@ impl GridAab {
     ///
     pub const ORIGIN_CUBE: GridAab = GridAab::for_block(Resolution::R1);
 
+    /// Box of zero size at `[0, 0, 0]`.
+    ///
+    /// Use this box as the canonical placeholder “nothing” value when it is necessary to
+    /// have *some* box.
+    pub const ORIGIN_EMPTY: GridAab = GridAab {
+        lower_bounds: GridPoint::new(0, 0, 0),
+        sizes: GridVector::new(0, 0, 0),
+    };
+
     /// Constructs a [`GridAab`] from coordinate lower bounds and sizes.
     ///
     /// For example, if on one axis the lower bound is 5 and the size is 10,
@@ -1087,10 +1096,16 @@ mod tests {
         let mut iter = b.interior_iter();
         for current in 0..expected_sequence.len() {
             for &cube in &expected_sequence[..current] {
-                assert!(!iter.contains_cube(cube), "{cube:?} should be absent at {current}");
+                assert!(
+                    !iter.contains_cube(cube),
+                    "{cube:?} should be absent at {current}"
+                );
             }
             for &cube in &expected_sequence[current..] {
-                assert!(iter.contains_cube(cube), "{cube:?} should be present at {current}");
+                assert!(
+                    iter.contains_cube(cube),
+                    "{cube:?} should be present at {current}"
+                );
             }
 
             let item = iter.next();

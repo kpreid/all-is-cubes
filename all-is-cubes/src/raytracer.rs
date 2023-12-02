@@ -100,8 +100,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         };
         SpaceRaytracer {
             blocks: Vec::new(),
-            cubes: GridArray::from_elements(GridAab::from_lower_upper([0, 0, 0], [0, 0, 0]), [])
-                .unwrap(),
+            cubes: GridArray::from_elements(GridAab::ORIGIN_EMPTY, []).unwrap(),
             sky_color,
             sky_data: D::sky(options),
             packed_sky_color: sky_color.into(),

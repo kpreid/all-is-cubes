@@ -549,10 +549,9 @@ impl LightPhysics {
         opacity: OpacityCategory,
     ) -> Vol<Box<[PackedLight]>> {
         match self {
-            LightPhysics::None => Vol::repeat(
-                GridAab::from_lower_size([0, 0, 0], [0, 0, 0]),
-                PackedLight::UNINITIALIZED_AND_BLACK,
-            ),
+            LightPhysics::None => {
+                Vol::repeat(GridAab::ORIGIN_EMPTY, PackedLight::UNINITIALIZED_AND_BLACK)
+            }
             LightPhysics::Rays { .. } => {
                 let value = match opacity {
                     OpacityCategory::Invisible => PackedLight::NO_RAYS,

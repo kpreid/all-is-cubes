@@ -137,7 +137,7 @@ impl Text {
                 let mut voxels: Vol<Box<[Evoxel]>> = Vol::from_fn(
                     text_aab
                         .intersection(GridAab::for_block(resolution))
-                        .unwrap_or(GridAab::from_lower_size([0, 0, 0], [0, 0, 0])),
+                        .unwrap_or(GridAab::ORIGIN_EMPTY),
                     |_| Evoxel::AIR,
                 );
 

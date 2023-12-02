@@ -50,7 +50,7 @@ impl MeshRecorder {
                 cameras.world_space().snapshot().unwrap_or_else(|| {
                     universe::URef::new_pending(
                         universe::Name::from("empty-space-placeholder"),
-                        Space::builder(GridAab::from_lower_size([0, 0, 0], [0, 0, 0])).build(),
+                        Space::builder(GridAab::ORIGIN_EMPTY).build(),
                     )
                 }),
                 false,

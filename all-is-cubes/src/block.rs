@@ -535,11 +535,8 @@ impl Block {
                         // If there is no intersection, then return an empty voxel array,
                         // with an arbitrary position.
                         // Also applies when skip_eval is true
-                        Vol::from_elements(
-                            GridAab::from_lower_size([0, 0, 0], [0, 0, 0]),
-                            Box::<[Evoxel]>::default(),
-                        )
-                        .unwrap()
+                        Vol::from_elements(GridAab::ORIGIN_EMPTY, Box::<[Evoxel]>::default())
+                            .unwrap()
                     }
                 };
 
