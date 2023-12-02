@@ -168,34 +168,30 @@ impl Composite {
             animation_hint: dst_att.animation_hint, // TODO: merge
         };
 
-        Ok(if effective_resolution == R1 {
-            MinEval {
-                attributes,
-                voxels: Evoxels::One(operator.blend_evoxel(
-                    src_voxels.single_voxel().unwrap(),
-                    dst_voxels.single_voxel().unwrap(),
-                )),
-            }
+        let voxels = if effective_resolution == R1 {
+            Evoxels::One(operator.blend_evoxel(
+                src_voxels.single_voxel().unwrap(),
+                dst_voxels.single_voxel().unwrap(),
+            ))
         } else {
-            MinEval {
-                attributes,
-                // TODO: use narrower array bounds (union of both inputs' bounds)
-                voxels: Evoxels::Many(
-                    effective_resolution,
-                    Vol::from_fn(GridAab::for_block(effective_resolution), |cube| {
-                        let p = cube.lower_bounds();
-                        operator.blend_evoxel(
-                            src_voxels
-                                .get(Cube::from(p / src_scale))
-                                .unwrap_or(Evoxel::AIR),
-                            dst_voxels
-                                .get(Cube::from(p / dst_scale))
-                                .unwrap_or(Evoxel::AIR),
-                        )
-                    }),
-                ),
-            }
-        })
+            // TODO: use narrower array bounds (union of both inputs' bounds)
+            Evoxels::Many(
+                effective_resolution,
+                Vol::from_fn(GridAab::for_block(effective_resolution), |cube| {
+                    let p = cube.lower_bounds();
+                    operator.blend_evoxel(
+                        src_voxels
+                            .get(Cube::from(p / src_scale))
+                            .unwrap_or(Evoxel::AIR),
+                        dst_voxels
+                            .get(Cube::from(p / dst_scale))
+                            .unwrap_or(Evoxel::AIR),
+                    )
+                }),
+            )
+        };
+
+        Ok(MinEval { attributes, voxels })
     }
 
     /// Called by [`Modifier::unspecialize()`].
