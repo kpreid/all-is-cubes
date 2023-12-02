@@ -8,9 +8,6 @@ use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{Axis, Cube, GridAab, Rgb, Vol};
 use all_is_cubes::util::{ConciseDebug, Fmt};
 
-#[cfg(doc)]
-use all_is_cubes::math::GridArray;
-
 /// Numeric type used to calculate texture coordinates and store them in [`BlockVertex`].
 ///
 /// Note that this type is only exposed publicly within [`texture::Tile::grid_to_texcoord()`];

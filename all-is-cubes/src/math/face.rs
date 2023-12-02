@@ -669,7 +669,7 @@ impl<V> FaceMap<V> {
     #[must_use]
     pub fn rotate(self, rotation: GridRotation) -> Self {
         // TODO: Can we make this cleaner? (If GridRotation had a way to ask it what swaps
-        // it corresponds to, that might also be useful for GridArray rotations.)
+        // it corresponds to, that might also be useful for Vol rotations.)
         let to_source = rotation.inverse();
         let mut source = self.map(|_, value| Some(value));
         Self::from_fn(|face| source[to_source.transform(face)].take().unwrap())

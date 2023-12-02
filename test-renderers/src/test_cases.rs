@@ -18,8 +18,8 @@ use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::euclid::{point3, vec2, vec3, Point2D, Vector2D, Vector3D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint, GridRotation,
-    GridVector, NotNan, Rgb, Rgba, VectorOps,
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector,
+    NotNan, Rgb, Rgba, VectorOps, Vol,
 };
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder};
 use all_is_cubes::time;
@@ -243,7 +243,7 @@ async fn emission(mut context: RenderTestContext) {
     let white = Block::builder().color(Rgba::WHITE).build();
 
     #[rustfmt::skip]
-    let block_shape = GridArray::from_y_flipped_array([[
+    let block_shape: Vol<Box<[u8]>> = Vol::from_y_flipped_array([[
         *b"....",
         *b".E..",
         *b"..e.",

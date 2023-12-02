@@ -32,7 +32,7 @@
 
     - All vector and matrix types from the library `cgmath` have been replaced with the library `euclid`.
 
-    - All functions manipulating volume data in `Space`, `GridArray`, `Evoxels`, etc. have changed signature to use the new type `math::Cube` instead of `math::GridPoint`.
+    - All functions manipulating volume data in `Space`, `GridArray`/`Vol`, `Evoxels`, etc. have changed signature to use the new type `math::Cube` instead of `math::GridPoint`.
 
     - All functions using `usize` to identify a coordinate axis now use `math::Axis` instead.
       `Face6::axis_number()` and `Face7::axis_number()` are now called `axis()`.
