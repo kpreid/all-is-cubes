@@ -1,18 +1,11 @@
 use alloc::sync::Arc;
 
-use all_is_cubes::block;
 use all_is_cubes::camera::{AntialiasingOption, GraphicsOptions};
-use all_is_cubes::content::palette;
-use all_is_cubes::drawing::embedded_graphics::{mono_font::iso_8859_1 as font, text::TextStyle};
-use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::math::Face6;
-use all_is_cubes::space::{SpaceBuilder, SpacePhysics};
-use all_is_cubes::universe::{Name, URef};
 
 use crate::apps::ControlMessage;
 use crate::ui_content::hud::HudInputs;
-use crate::vui::{self, widgets};
-use crate::vui::{LayoutTree, UiBlocks, Widget, WidgetTree};
+use crate::vui::{widgets, LayoutTree, UiBlocks, Widget, WidgetTree};
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum OptionsStyle {
@@ -129,32 +122,10 @@ fn graphics_toggle_button(
         OptionsStyle::CompactRow => LayoutTree::leaf(button),
         OptionsStyle::LabeledColumn => Arc::new(LayoutTree::Stack {
             direction: Face6::PX,
-            children: vec![LayoutTree::leaf(button), {
-                // TODO: extract this for general use and reconcile with pages::parts::shrink()
-                let text: WidgetTree = LayoutTree::leaf(Arc::new(widgets::LargeText {
-                    text: text_label,
-                    font: || &font::FONT_6X10,
-                    brush: VoxelBrush::single(block::Block::from(palette::ALMOST_BLACK)),
-                    text_style: TextStyle::default(),
-                }));
-                let space = text
-                    .to_space(
-                        SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
-                        vui::Gravity::new(vui::Align::Low, vui::Align::Center, vui::Align::Low),
-                    )
-                    .unwrap();
-                LayoutTree::leaf(Arc::new(widgets::Voxels::new(
-                    space.bounds(),
-                    // TODO: Using a pending ref is working only by accident here.
-                    // The space is never actually inserted, so `Anonym(0)` is never
-                    // rejected as it should be, and only this widget itself is keeping
-                    // the space alive -- but we don't yet have the ability to ask for
-                    // an anonymous pending ref and actually insert it.
-                    URef::new_pending(Name::Anonym(0), space),
-                    block::Resolution::R32,
-                    block::BlockAttributes::default(),
-                )))
-            }],
+            children: vec![
+                LayoutTree::leaf(button),
+                LayoutTree::leaf(Arc::new(widgets::Label::new(text_label))),
+            ],
         }),
     }
 }

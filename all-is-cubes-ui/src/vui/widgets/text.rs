@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::text::{self, Text as BlockText};
+use all_is_cubes::block::Resolution::*;
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::{MonoFont, MonoTextStyle},
     prelude::{Dimensions, Point},
@@ -131,7 +132,7 @@ impl Widget for Label {
 }
 
 fn text_for_widget(text: ArcStr, font: text::Font, gravity: vui::Gravity) -> text::Text {
-    text::Text::new(
+    let mut text = text::Text::new(
         text,
         font,
         text::Positioning {
@@ -141,13 +142,19 @@ fn text_for_widget(text: ArcStr, font: text::Font, gravity: vui::Gravity) -> tex
                 vui::Align::High => text::PositioningX::Right,
             },
             // TODO: need to be able to set the anchor to produce middle-of-block
-            line_y: text::PositioningY::BodyBottom,
+            line_y: match gravity.y {
+                vui::Align::Low => text::PositioningY::BodyBottom,
+                vui::Align::Center => text::PositioningY::BodyMiddle,
+                vui::Align::High => text::PositioningY::BodyTop,
+            },
             z: match gravity.z {
                 vui::Align::Low | vui::Align::Center => text::PositioningZ::Back,
                 vui::Align::High => text::PositioningZ::Front,
             },
         },
-    )
+    );
+    text.set_layout_bounds(R32, GridAab::for_block(R32));
+    text
 }
 
 fn draw_text_txn(text: &BlockText, grant: &LayoutGrant) -> SpaceTransaction {
