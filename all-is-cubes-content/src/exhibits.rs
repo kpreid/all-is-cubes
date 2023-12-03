@@ -304,7 +304,7 @@ async fn TEXT(_: &Exhibit, _universe: &mut Universe) {
             text::Positioning {
                 x: text::PositioningX::Right,
                 line_y: text::PositioningY::BodyBottom,
-                z: 0,
+                z: text::PositioningZ::Back,
             },
         ),
         text::Text::new(
@@ -313,7 +313,7 @@ async fn TEXT(_: &Exhibit, _universe: &mut Universe) {
             text::Positioning {
                 x: text::PositioningX::Left,
                 line_y: text::PositioningY::BodyBottom,
-                z: -1,
+                z: text::PositioningZ::Front,
             },
         ),
     ];
@@ -326,6 +326,7 @@ async fn TEXT(_: &Exhibit, _universe: &mut Universe) {
 
     let mut space = Space::builder(bounds_for_text).build();
 
+    // TODO: detect collisions
     for text in texts {
         text.installation(Gridgid::IDENTITY, core::convert::identity)
             .execute(&mut space, &mut transaction::no_outputs)

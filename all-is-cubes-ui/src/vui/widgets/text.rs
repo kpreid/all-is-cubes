@@ -142,7 +142,10 @@ fn text_for_widget(text: ArcStr, font: text::Font, gravity: vui::Gravity) -> tex
             },
             // TODO: need to be able to set the anchor to produce middle-of-block
             line_y: text::PositioningY::BodyBottom,
-            z: 0,
+            z: match gravity.z {
+                vui::Align::Low | vui::Align::Center => text::PositioningZ::Back,
+                vui::Align::High => text::PositioningZ::Front,
+            },
         },
     )
 }

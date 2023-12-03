@@ -215,7 +215,7 @@ pub(crate) enum FontSer {
 pub(crate) struct PositioningSerV1 {
     pub(crate) x: PositioningXSer,
     pub(crate) line_y: PositioningYSer,
-    pub(crate) z: i8,
+    pub(crate) z: PositioningZSer,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -231,6 +231,12 @@ pub(crate) enum PositioningYSer {
     BodyMiddleV1,
     BaselineV1,
     BodyBottomV1,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) enum PositioningZSer {
+    BackV1,
+    FrontV1,
 }
 
 //------------------------------------------------------------------------------------------------//

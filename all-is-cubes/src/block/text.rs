@@ -198,7 +198,10 @@ impl Text {
                 PositioningY::BodyMiddle => lb.center().y as GridCoordinate,
                 PositioningY::BodyTop => lb.upper_bounds().y,
             },
-            GridCoordinate::from(positioning_z),
+            match positioning_z {
+                PositioningZ::Back => lb.lower_bounds().z,
+                PositioningZ::Front => lb.upper_bounds().z - 1,
+            },
         );
 
         let drawing_transform =
@@ -305,7 +308,7 @@ pub struct Positioning {
     /// This is in units of whatever voxel resolution the font itself uses. Therefore, it should
     /// not be used for positioning the text overall,
     /// but rather for voxel-level effects like engraving vs. embossing.
-    pub z: i8,
+    pub z: PositioningZ,
 }
 
 /// How a [`Text`] is to be positioned within the layout bounds, along the X axis (horizontally).
@@ -356,6 +359,19 @@ pub enum PositioningY {
     BodyBottom,
 }
 
+/// How a [`Text`] is to be positioned within the layout bounds, along the Z axis (depth).
+///
+/// A component of [`Positioning`].
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum PositioningZ {
+    /// Against the back (negative Z) face of the layout bounds.
+    Back,
+
+    /// Against the front (positive Z) face of the layout bounds.
+    Front,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -402,7 +418,7 @@ mod tests {
             Positioning {
                 x: PositioningX::Left,
                 line_y: PositioningY::BodyBottom,
-                z: 0,
+                z: PositioningZ::Back,
             },
         );
 

@@ -433,7 +433,7 @@ mod block {
             schema::PositioningSerV1 {
                 x: x.into(),
                 line_y: line_y.into(),
-                z,
+                z: z.into(),
             }
         }
     }
@@ -444,7 +444,7 @@ mod block {
             text::Positioning {
                 x: x.into(),
                 line_y: line_y.into(),
-                z,
+                z: z.into(),
             }
         }
     }
@@ -487,6 +487,24 @@ mod block {
                 schema::PositioningYSer::BodyMiddleV1 => text::PositioningY::BodyMiddle,
                 schema::PositioningYSer::BaselineV1 => text::PositioningY::Baseline,
                 schema::PositioningYSer::BodyBottomV1 => text::PositioningY::BodyBottom,
+            }
+        }
+    }
+
+    impl From<text::PositioningZ> for schema::PositioningZSer {
+        fn from(value: text::PositioningZ) -> Self {
+            match value {
+                text::PositioningZ::Front => schema::PositioningZSer::FrontV1,
+                text::PositioningZ::Back => schema::PositioningZSer::BackV1,
+            }
+        }
+    }
+
+    impl From<schema::PositioningZSer> for text::PositioningZ {
+        fn from(value: schema::PositioningZSer) -> Self {
+            match value {
+                schema::PositioningZSer::FrontV1 => text::PositioningZ::Front,
+                schema::PositioningZSer::BackV1 => text::PositioningZ::Back,
             }
         }
     }
@@ -695,7 +713,9 @@ mod op {
             S: Serializer,
         {
             match self {
-                op::Operation::Become(block) => schema::OperationSer::BecomeV1 { block: block.clone() },
+                op::Operation::Become(block) => schema::OperationSer::BecomeV1 {
+                    block: block.clone(),
+                },
                 op::Operation::Paint(brush) => schema::OperationSer::PaintV1 {
                     blocks: brush.entries_for_serialization(),
                 },
@@ -710,9 +730,7 @@ mod op {
             D: Deserializer<'de>,
         {
             Ok(match schema::OperationSer::deserialize(deserializer)? {
-                schema::OperationSer::BecomeV1 { block } => {
-                    op::Operation::Become(block)
-                }
+                schema::OperationSer::BecomeV1 { block } => op::Operation::Become(block),
                 schema::OperationSer::PaintV1 { blocks } => {
                     op::Operation::Paint(VoxelBrush::new(blocks))
                 }

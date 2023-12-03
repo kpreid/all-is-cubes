@@ -231,7 +231,7 @@ fn block_text() {
                 text::Positioning {
                     x: text::PositioningX::Center,
                     line_y: text::PositioningY::BodyTop,
-                    z: 7,
+                    z: text::PositioningZ::Front,
                 },
             ),
             offset: vec3(100, 0, 0),
@@ -247,7 +247,7 @@ fn block_text() {
                     "positioning": {
                         "x": "CenterV1",
                         "line_y": "BodyTopV1",
-                        "z": 7,
+                        "z": "FrontV1",
                     }
                 },
                 "offset": [100, 0, 0],
