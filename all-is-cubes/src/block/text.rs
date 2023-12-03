@@ -10,7 +10,7 @@ use euclid::vec3;
 use crate::block::{self, Block, BlockAttributes, EvalBlockError, Evoxel, MinEval, Resolution};
 use crate::content::palette;
 use crate::drawing::{rectangle_to_aab, DrawingPlane};
-use crate::math::{GridAab, GridCoordinate, GridPoint, GridVector, Gridgid, Rgb, Vol};
+use crate::math::{GridAab, GridCoordinate, GridVector, Gridgid, Rgb, Vol};
 use crate::space::{self, SpaceTransaction};
 use crate::universe;
 
@@ -25,7 +25,9 @@ use super::Evoxels;
 ///
 /// * A string, as [`ArcStr`].
 /// * A [`Font`].
-/// * A [`Positioning`] specifying how the text is positioned given its size.
+/// * A [`Resolution`] defining the font size.
+/// * A bounding box within which the text is positioned (but may overflow).
+/// * A [`Positioning`] specifying how the text is positioned within the box.
 ///
 /// To create a block or multiblock group from this, use [`Primitive::Text`].
 /// To combine the text with other shapes, use [`Modifier::Composite`].
@@ -35,16 +37,14 @@ use super::Evoxels;
 // blocks. We don't really have much to do there yet, though.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Text {
-    font: Font,
-
     string: ArcStr,
 
-    /// Point within the cube to which the text is positioned relative.
-    ///
-    /// Scaled down by 1/128. TODO: declare a type for that
-    ///
-    /// TODO: this is not yet controllable
-    anchor_point: GridPoint,
+    font: Font,
+
+    resolution: Resolution,
+
+    /// Voxel-scale bounds in which the text is positioned (not necessarily actual drawing bounds).
+    layout_bounds: GridAab,
 
     positioning: Positioning,
 }
@@ -54,10 +54,12 @@ impl Text {
     ///
     /// TODO: these arguments are incomplete and unstable.
     pub fn new(string: ArcStr, font: Font, positioning: Positioning) -> Self {
+        let resolution = Resolution::R16;
         Self {
-            font,
             string,
-            anchor_point: GridPoint::origin(), // TODO: how should we expose this?
+            font,
+            resolution,
+            layout_bounds: GridAab::for_block(resolution),
             positioning,
         }
     }
@@ -72,6 +74,18 @@ impl Text {
         &self.font
     }
 
+    /// Returns the voxel resolution which the text blocks will have.
+    pub fn resolution(&self) -> &Font {
+        &self.font
+    }
+
+    /// Returns the bounding box, within the blocks at the specified resolution, of the text.
+    ///
+    /// The text may overflow this bounding box depending on the length and positioning.
+    pub fn layout_bounds(&self) -> GridAab {
+        self.layout_bounds
+    }
+
     /// Returns the [`Positioning`] parameters this uses.
     pub fn positioning(&self) -> Positioning {
         self.positioning
@@ -82,9 +96,7 @@ impl Text {
     pub fn bounding_blocks(&self) -> GridAab {
         self.with_transform_and_drawable(
             GridVector::zero(),
-            |_text_obj, resolution, text_aab, _drawing_transform| {
-                text_aab.divide(resolution.into())
-            },
+            |_text_obj, text_aab, _drawing_transform| text_aab.divide(self.resolution.into()),
         )
     }
 
@@ -136,29 +148,26 @@ impl Text {
             return Ok(block::AIR_EVALUATED_MIN); // placeholder value
         }
 
-        self.with_transform_and_drawable(
-            block_offset,
-            |text_obj, resolution, text_aab, drawing_transform| {
-                let mut voxels: Vol<Box<[Evoxel]>> = Vol::from_fn(
-                    text_aab
-                        .intersection(GridAab::for_block(resolution))
-                        .unwrap_or(GridAab::ORIGIN_EMPTY),
-                    |_| Evoxel::AIR,
-                );
+        self.with_transform_and_drawable(block_offset, |text_obj, text_aab, drawing_transform| {
+            let mut voxels: Vol<Box<[Evoxel]>> = Vol::from_fn(
+                text_aab
+                    .intersection(GridAab::for_block(self.resolution))
+                    .unwrap_or(GridAab::ORIGIN_EMPTY),
+                |_| Evoxel::AIR,
+            );
 
-                text_obj
-                    .draw(&mut DrawingPlane::new(&mut voxels, drawing_transform))
-                    .unwrap();
+            text_obj
+                .draw(&mut DrawingPlane::new(&mut voxels, drawing_transform))
+                .unwrap();
 
-                Ok(MinEval {
-                    voxels: Evoxels::Many(resolution, voxels.map_container(Into::into)),
-                    attributes: BlockAttributes {
-                        display_name: self.string.clone(),
-                        ..BlockAttributes::default()
-                    },
-                })
-            },
-        )
+            Ok(MinEval {
+                voxels: Evoxels::Many(self.resolution, voxels.map_container(Into::into)),
+                attributes: BlockAttributes {
+                    display_name: self.string.clone(),
+                    ..BlockAttributes::default()
+                },
+            })
+        })
     }
 
     fn with_transform_and_drawable<R>(
@@ -166,24 +175,35 @@ impl Text {
         block_offset: GridVector,
         f: impl FnOnce(
             &'_ eg::text::Text<'_, eg::mono_font::MonoTextStyle<'_, Evoxel>>,
-            Resolution,
             GridAab,
             Gridgid,
         ) -> R,
     ) -> R {
-        let resolution = Resolution::R16; // TODO: allow specifying resolution or deriving it from font choice
-                                          //let resolution_g = GridCoordinate::from(resolution);
+        let resolution_g = GridCoordinate::from(self.resolution);
         let Positioning {
             x: positioning_x,
             line_y,
             z: positioning_z,
         } = self.positioning;
-        // TODO: transform should not be rounded to font resolution
-        let drawing_transform = Gridgid::from_translation(
-            block_offset * -16
-                + self.anchor_point.to_vector() / 8
-                + vec3(0, 0, GridCoordinate::from(positioning_z)),
-        ) * Gridgid::FLIP_Y;
+
+        let lb = self.layout_bounds;
+        let layout_offset = vec3(
+            match positioning_x {
+                PositioningX::Left => lb.lower_bounds().x,
+                PositioningX::Center => lb.center().x as GridCoordinate,
+                PositioningX::Right => lb.upper_bounds().x,
+            },
+            match line_y {
+                PositioningY::BodyBottom | PositioningY::Baseline => lb.lower_bounds().y,
+                PositioningY::BodyMiddle => lb.center().y as GridCoordinate,
+                PositioningY::BodyTop => lb.upper_bounds().y,
+            },
+            GridCoordinate::from(positioning_z),
+        );
+
+        let drawing_transform =
+            Gridgid::from_translation(layout_offset - (block_offset * resolution_g))
+                * Gridgid::FLIP_Y;
 
         let character_style = eg::mono_font::MonoTextStyle::new(
             self.font.eg_font(),
@@ -219,16 +239,17 @@ impl Text {
             GridAab::ORIGIN_CUBE,
         );
 
-        f(text_obj, resolution, text_aab, drawing_transform)
+        f(text_obj, text_aab, drawing_transform)
     }
 }
 
 impl universe::VisitRefs for Text {
     fn visit_refs(&self, visitor: &mut dyn universe::RefVisitor) {
         let Self {
-            font,
             string: _,
-            anchor_point: _,
+            font,
+            resolution: _,
+            layout_bounds: _,
             positioning: _,
         } = self;
         font.visit_refs(visitor);
@@ -287,37 +308,51 @@ pub struct Positioning {
     pub z: i8,
 }
 
-/// How a [`Text`] is to be positioned within a block, along the X axis (horizontally).
+/// How a [`Text`] is to be positioned within the layout bounds, along the X axis (horizontally).
 ///
 /// A component of [`Positioning`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum PositioningX {
-    // TODO: Distinguish 'end of graphic' from 'nominal character spacing'?
-    /// Left (most negative X) end of the line of text.
-    /// This is not necessarily the start of the text.
+    // TODO: Distinguish 'end of graphic' (last bit of ink) from 'nominal character spacing'?
+    /// Left (most negative X) end of the line of text is positioned at the left edge of the
+    /// layout bounds.
+    ///
+    /// In the event that RTL text support is added, this is not necessarily the start of the text.
     Left,
-    /// Halfway between `Left` and `Right`.
+
+    /// Center the text within the layout bounds.
     Center,
-    /// Right (most positive X) end of the line of text.
-    /// This is not necessarily the end of the text.
+
+    /// Right (most positive X) end of the line of text is positioned at the right edge of the
+    /// layout bounds.
+    ///
+    /// In the event that RTL text support is added, this is not necessarily the end of the text.
     Right,
 }
 
-/// How a [`Text`] is to be positioned within a block, along the Y axis (vertically).
+/// How a [`Text`] is to be positioned within the layout bounds, along the Y axis (vertically).
 ///
 /// A component of [`Positioning`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum PositioningY {
-    /// Top edge of the uppermost edge of a line of text; no voxels extend above this line.
+    /// The top of a line of text (past which no voxels extend) is aligned with the top edge
+    /// of the layout bounds.
     BodyTop,
-    /// Halfway between BodyTop and BodyMiddle. This may not necessarily visually
-    /// center the font, but it will leave the most actually blank margin.
+
+    /// The text is positioned halfway between `BodyTop` and `BodyMiddle`, centered within the
+    /// layout bounds.
+    /// This may not necessarily visually center the font, but it will leave the most actually
+    /// blank margin.
     BodyMiddle,
-    /// Bottom edge of most characters, excluding descenders and accents.
+
+    /// The bottom edge (of most characters, excluding descenders and accents) is positioned
+    /// at the bottom edge of the layout bounds.
     Baseline,
-    /// Bottom edge of the uppermost edge of a line of text; no voxels extend below this line.
+
+    /// The bottom of a line of text (past which no voxels extend) is aligned with the bottom edge
+    /// of the layout bounds.
     BodyBottom,
 }
 
@@ -361,16 +396,15 @@ mod tests {
 
     #[test]
     fn text_smoke_test() {
-        let text = Text {
-            font: Font::System16,
-            string: arcstr::literal!("ab"),
-            anchor_point: GridPoint::origin(),
-            positioning: Positioning {
+        let text = Text::new(
+            arcstr::literal!("ab"),
+            Font::System16,
+            Positioning {
                 x: PositioningX::Left,
                 line_y: PositioningY::BodyBottom,
                 z: 0,
             },
-        };
+        );
 
         assert_eq!(text.bounding_blocks(), GridAab::ORIGIN_CUBE);
 
