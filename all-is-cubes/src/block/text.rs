@@ -95,6 +95,8 @@ impl Text {
     /// Each individual block is given to `block_fn` to allow alterations.
     ///
     /// The transaction has no preconditions.
+    ///
+    /// Panics if `transform` causes coordinate overflow.
     pub fn installation(
         &self,
         transform: Gridgid,
@@ -102,21 +104,24 @@ impl Text {
     ) -> SpaceTransaction {
         let dst_to_src_transform = transform.inverse();
         let block_rotation = transform.rotation;
-        SpaceTransaction::filling(self.bounding_blocks(), |cube| {
-            space::CubeTransaction::replacing(
-                None,
-                Some(block_fn(
-                    Block::from_primitive(block::Primitive::Text {
-                        text: self.clone(),
-                        offset: dst_to_src_transform
-                            .transform_cube(cube)
-                            .lower_bounds()
-                            .to_vector(),
-                    })
-                    .rotate(block_rotation),
-                )),
-            )
-        })
+        SpaceTransaction::filling(
+            self.bounding_blocks().transform(transform).unwrap(),
+            |cube| {
+                space::CubeTransaction::replacing(
+                    None,
+                    Some(block_fn(
+                        Block::from_primitive(block::Primitive::Text {
+                            text: self.clone(),
+                            offset: dst_to_src_transform
+                                .transform_cube(cube)
+                                .lower_bounds()
+                                .to_vector(),
+                        })
+                        .rotate(block_rotation),
+                    )),
+                )
+            },
+        )
     }
 
     pub(crate) fn evaluate(
