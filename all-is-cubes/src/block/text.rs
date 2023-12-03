@@ -69,9 +69,19 @@ impl Text {
         &self.string
     }
 
+    #[allow(missing_docs)]
+    pub fn set_string(&mut self, value: ArcStr) {
+        self.string = value;
+    }
+
     /// Returns the font which this uses to display the text.
     pub fn font(&self) -> &Font {
         &self.font
+    }
+
+    #[allow(missing_docs)]
+    pub fn set_font(&mut self, value: Font) {
+        self.font = value;
     }
 
     /// Returns the voxel resolution which the text blocks will have.
@@ -86,9 +96,24 @@ impl Text {
         self.layout_bounds
     }
 
+    /// Set the bounds within which the text is positioned, and the resolution of their coordinates
+    /// and the text voxels.
+    ///
+    /// The text may overflow this bounding box depending on the length and positioning.
+
+    pub fn set_layout_bounds(&mut self, resolution: Resolution, layout_bounds: GridAab) {
+        self.resolution = resolution;
+        self.layout_bounds = layout_bounds;
+    }
+
     /// Returns the [`Positioning`] parameters this uses.
     pub fn positioning(&self) -> Positioning {
         self.positioning
+    }
+
+    #[allow(missing_docs)]
+    pub fn set_positioning(&mut self, value: Positioning) {
+        self.positioning = value;
     }
 
     /// Returns the bounding box of the text, in blocks — the set of [`Primitive::Text`] offsets
