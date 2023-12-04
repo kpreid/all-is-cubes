@@ -661,6 +661,17 @@ impl Evoxels {
             Evoxels::Many(_, ref voxels) => voxels.bounds(),
         }
     }
+
+    #[cfg(debug_assertions)]
+    fn consistency_check(&self) {
+        let allowed_bounds = GridAab::for_block(self.resolution());
+        let actual_bounds = self.bounds();
+        assert!(
+            allowed_bounds.contains_box(actual_bounds),
+            "Evoxels contains out of bounds voxels {actual_bounds:?} \
+                within allowed {allowed_bounds:?}"
+        );
+    }
 }
 
 impl core::ops::Index<Cube> for Evoxels {
@@ -786,6 +797,11 @@ impl MinEval {
     pub(crate) fn rotationally_symmetric(&self) -> bool {
         let Self { attributes, voxels } = self;
         attributes.rotationally_symmetric() && voxels.resolution() == R1
+    }
+
+    #[cfg(debug_assertions)]
+    pub(crate) fn consistency_check(&self) {
+        self.voxels.consistency_check();
     }
 }
 

@@ -559,9 +559,15 @@ impl Block {
             Primitive::Text { ref text, offset } => text.evaluate(offset, depth, filter)?,
         };
 
+        #[cfg(debug_assertions)]
+        value.consistency_check();
+
         for (index, modifier) in self.modifiers().iter().enumerate() {
             // TODO: Extend recursion depth model to catch stacking up lots of modifiers
             value = modifier.evaluate(self, index, value, depth, filter)?;
+
+            #[cfg(debug_assertions)]
+            value.consistency_check();
         }
 
         Ok(value)
