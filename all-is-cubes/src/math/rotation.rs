@@ -358,14 +358,28 @@ impl GridRotation {
     /// Rotate the vector by this rotation.
     ///
     /// May panic or wrap if `vector` has any components equal to [`GridCoordinate::MIN`].
-    // TODO: add tests
     #[inline]
     pub fn transform_vector(self, vector: GridVector) -> GridVector {
         let basis = self.to_basis();
 
-        basis.x.normal_vector() * vector.x
-            + basis.y.normal_vector() * vector.y
-            + basis.z.normal_vector() * vector.z
+        let mut result = GridVector::zero();
+        result[basis.x.axis()] = vector.x * basis.x.signum();
+        result[basis.y.axis()] = vector.y * basis.y.signum();
+        result[basis.z.axis()] = vector.z * basis.z.signum();
+        result
+
+        // Implementation note: The following code would seem to be simpler and avoid
+        // a zero initialization,
+        //
+        // let inverse_basis = self.inverse().to_basis();
+        // GridVector {
+        //     x: inverse_basis.x.dot(vector),
+        //     y: inverse_basis.y.dot(vector),
+        //     z: inverse_basis.z.dot(vector),
+        //     _unit: PhantomData,
+        // }
+        //
+        // but the actual generated machine code is larger and involves computed jumps.
     }
 
     /// Returns whether this is a reflection.
@@ -609,6 +623,7 @@ mod tests {
         );
     }
 
+    /// Test that `transform_vector()` and `to_rotation_matrix()` do the same thing.
     #[test]
     fn equivalent_rotation_matrix() {
         for rot in GridRotation::ALL {

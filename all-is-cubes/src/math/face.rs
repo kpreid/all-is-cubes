@@ -133,6 +133,14 @@ impl Face6 {
         matches!(self, Self::NX | Self::NY | Self::NZ)
     }
 
+    #[inline]
+    pub(crate) fn signum(self) -> GridCoordinate {
+        match self {
+            Self::NX | Self::NY | Self::NZ => -1,
+            Self::PX | Self::PY | Self::PZ => 1,
+        }
+    }
+
     /// Returns the opposite face (maps [`PX`](Self::PX) to [`NX`](Self::NX) and so on).
     #[inline]
     #[must_use]
