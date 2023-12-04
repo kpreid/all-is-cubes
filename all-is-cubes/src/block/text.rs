@@ -369,7 +369,7 @@ pub enum PositioningY {
     /// of the layout bounds.
     BodyTop,
 
-    /// The text is positioned halfway between `BodyTop` and `BodyMiddle`, centered within the
+    /// The text is positioned halfway between `BodyTop` and `BodyBottom`, centered within the
     /// layout bounds.
     /// This may not necessarily visually center the font, but it will leave the most actually
     /// blank margin.
