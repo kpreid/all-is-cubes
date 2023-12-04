@@ -26,7 +26,7 @@ pub(super) fn new_paused_widget_tree(
     let mut children = vec![
         // TODO: establish standard resolutions for logo etc
         LayoutTree::leaf(shrink(u, R16, LayoutTree::leaf(logo_text()))?),
-        LayoutTree::leaf(shrink(u, R32, heading("Paused"))?),
+        heading("Paused"),
         LayoutTree::leaf(open_page_button(
             hud_inputs,
             VuiPageState::AboutText,
@@ -77,7 +77,7 @@ pub(super) fn new_options_widget_tree(
         direction: Face6::NY,
         children: vec![
             LayoutTree::leaf(shrink(u, R32, LayoutTree::leaf(logo_text()))?),
-            LayoutTree::leaf(shrink(u, R32, heading("Options"))?),
+            heading("Options"),
             back_button(hud_inputs),
             Arc::new(LayoutTree::Stack {
                 direction: Face6::NY,
@@ -129,12 +129,12 @@ pub(super) fn new_about_widget_tree(
         children: vec![
             LayoutTree::leaf(shrink(u, R8, LayoutTree::leaf(logo_text()))?),
             back_button(hud_inputs),
-            LayoutTree::leaf(shrink(u, R32, heading("Controls"))?),
-            LayoutTree::leaf(shrink(u, R32, paragraph(controls_text))?),
-            LayoutTree::leaf(shrink(u, R32, heading("About"))?),
-            LayoutTree::leaf(shrink(u, R32, paragraph(about_text))?),
-            // LayoutTree::leaf(shrink(u, R32, heading("License"))?),
-            // LayoutTree::leaf(shrink(u, R32, paragraph("TODO"))?),
+            heading("Controls"),
+            paragraph(controls_text),
+            heading("About"),
+            paragraph(about_text),
+            // heading("License"),
+            // paragraph("TODO"),
         ],
     });
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
@@ -148,18 +148,14 @@ pub(super) fn new_about_widget_tree(
 
 /// A message in a "modal dialog box".
 pub(super) fn new_message_widget_tree(
-    u: &mut Universe,
     message: ArcStr,
     hud_inputs: &HudInputs,
 ) -> Result<WidgetTree, InstallVuiError> {
-    use parts::{paragraph, shrink};
+    use parts::paragraph;
 
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
-        children: vec![
-            LayoutTree::leaf(shrink(u, R32, paragraph(message))?),
-            back_button(hud_inputs),
-        ],
+        children: vec![paragraph(message), back_button(hud_inputs)],
     });
     Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
         hud_inputs

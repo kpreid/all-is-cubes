@@ -108,7 +108,6 @@ impl Label {
     /// Constructs a [`Label`] that draws the given text, with a specified font.
     //---
     // TODO: undecided what's a good API
-    #[allow(unused)] // TODO: will be used shortly
     pub(crate) fn with_font(
         string: ArcStr,
         font: text::Font,

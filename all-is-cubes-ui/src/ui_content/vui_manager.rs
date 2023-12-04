@@ -325,7 +325,7 @@ impl Vui {
 
     pub fn show_modal_message(&mut self, message: ArcStr) {
         let content = EphemeralOpaque::from(Arc::new(
-            pages::new_message_widget_tree(&mut self.universe, message, &self.hud_inputs).unwrap(),
+            pages::new_message_widget_tree(message, &self.hud_inputs).unwrap(),
         ));
         self.set_state(VuiPageState::Dump {
             previous: self.state.get(),

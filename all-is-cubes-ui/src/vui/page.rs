@@ -1,12 +1,10 @@
 use alloc::sync::Arc;
 
 use all_is_cubes::arcstr::ArcStr;
-use all_is_cubes::block::AIR;
+use all_is_cubes::block::{text, AIR};
 use all_is_cubes::block::{Block, BlockAttributes, Resolution};
 use all_is_cubes::camera;
 use all_is_cubes::content::palette;
-use all_is_cubes::drawing::embedded_graphics::{mono_font::iso_8859_1 as font, text::TextStyle};
-use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{vec2, Vector2D};
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgba};
 use all_is_cubes::space::{Space, SpaceBuilder, SpacePhysics};
@@ -195,6 +193,8 @@ pub(crate) mod parts {
     use super::*;
 
     /// Construct a [`Voxels`] widget around a widget tree containing [`LargeText`] or similar.
+    ///
+    /// TODO: Replace all uses of this with the new block-based text rendering.
     pub fn shrink(
         universe: &mut Universe,
         resolution: Resolution,
@@ -213,21 +213,21 @@ pub(crate) mod parts {
     }
 
     pub fn heading(text: impl Into<ArcStr>) -> WidgetTree {
-        LayoutTree::leaf(Arc::new(widgets::LargeText {
-            text: text.into(),
-            font: || &font::FONT_9X15_BOLD,
-            brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
-            text_style: TextStyle::default(),
-        }))
+        LayoutTree::leaf(Arc::new(widgets::Label::new(text.into())))
     }
 
     pub fn paragraph(text: impl Into<ArcStr>) -> WidgetTree {
-        LayoutTree::leaf(Arc::new(widgets::LargeText {
-            text: text.into(),
-            font: || &font::FONT_6X10,
-            brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
-            text_style: TextStyle::default(),
-        }))
+        // TODO: the layout of this is suboptimal, with an extra blank block row at the top
+        // in the about-box usage; the cause is not yet diagnosed.
+        LayoutTree::leaf(Arc::new(widgets::Label::with_font(
+            text.into(),
+            text::Font::SmallerBodyText,
+            text::Positioning {
+                x: text::PositioningX::Left,
+                line_y: text::PositioningY::BodyTop,
+                z: text::PositioningZ::Back,
+            },
+        )))
     }
 }
 
