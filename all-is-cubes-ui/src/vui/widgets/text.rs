@@ -126,7 +126,7 @@ impl Label {
             self.text.clone(),
             self.font.clone(),
             self.positioning
-                .unwrap_or_else(|| gravity_to_positioning(gravity)),
+                .unwrap_or_else(|| gravity_to_positioning(gravity, true)),
         )
     }
 }
@@ -167,17 +167,21 @@ fn text_for_widget(text: ArcStr, font: text::Font, positioning: text::Positionin
     text
 }
 
-fn gravity_to_positioning(gravity: vui::Gravity) -> text::Positioning {
+fn gravity_to_positioning(gravity: vui::Gravity, ignore_y: bool) -> text::Positioning {
     text::Positioning {
         x: match gravity.x {
             vui::Align::Low => text::PositioningX::Left,
             vui::Align::Center => text::PositioningX::Center,
             vui::Align::High => text::PositioningX::Right,
         },
-        line_y: match gravity.y {
-            vui::Align::Low => text::PositioningY::BodyBottom,
-            vui::Align::Center => text::PositioningY::BodyMiddle,
-            vui::Align::High => text::PositioningY::BodyTop,
+        line_y: if ignore_y {
+            text::PositioningY::BodyMiddle
+        } else {
+            match gravity.y {
+                vui::Align::Low => text::PositioningY::BodyBottom,
+                vui::Align::Center => text::PositioningY::BodyMiddle,
+                vui::Align::High => text::PositioningY::BodyTop,
+            }
         },
         z: match gravity.z {
             vui::Align::Low | vui::Align::Center => text::PositioningZ::Back,
