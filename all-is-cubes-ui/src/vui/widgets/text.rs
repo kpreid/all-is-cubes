@@ -134,9 +134,18 @@ impl Label {
 impl Layoutable for Label {
     fn requirements(&self) -> LayoutRequest {
         // TODO: memoize
+
+        // Note that we use `Align::Low` (or we could equivalently use `Align::High`).
+        // If we were to use `Center`, then we might create bounds 1 block wider than is actually
+        // needed because the underlying text rendering is (by default) centering within a cube,
+        // so for example a 1.5-cube-long text would occupy 3 cubes by sticking out 0.25 on each
+        // end, when it would actually fit in 2.
+        //
+        // When we actually go to render text, we'll use the actual gravity and bounds, so this
+        // alignment choice won't matter.
         LayoutRequest {
             minimum: self
-                .text(vui::Gravity::splat(vui::Align::Center))
+                .text(vui::Gravity::splat(vui::Align::Low))
                 .bounding_blocks()
                 .size(),
         }
@@ -206,7 +215,8 @@ mod tests {
     use all_is_cubes::arcstr::literal;
     use all_is_cubes::block::Block;
     use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1::FONT_9X15_BOLD;
-    use all_is_cubes::math::{GridVector, Rgba};
+    use all_is_cubes::euclid::vec3;
+    use all_is_cubes::math::Rgba;
     use all_is_cubes::space::{SpaceBuilder, SpacePhysics};
 
     #[test]
@@ -221,7 +231,7 @@ mod tests {
         assert_eq!(
             widget.requirements(),
             LayoutRequest {
-                minimum: GridVector::new(9 * text.len() as i32, 15, 1)
+                minimum: vec3(9 * text.len() as i32, 15, 1)
             }
         );
     }
@@ -236,5 +246,21 @@ mod tests {
             vui::Gravity::new(vui::Align::Center, vui::Align::Center, vui::Align::Low),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn label_requirements() {
+        // In the current system font and scale, this is exactly 1.5 blocks wide.
+        let string = literal!("abcdef");
+
+        let tree: vui::WidgetTree = vui::LayoutTree::leaf(Arc::new(Label::new(string)));
+
+        // A previous bug would cause this to be 3 wide.
+        assert_eq!(
+            tree.requirements(),
+            LayoutRequest {
+                minimum: vec3(2, 1, 1)
+            }
+        );
     }
 }
