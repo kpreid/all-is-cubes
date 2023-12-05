@@ -4,7 +4,7 @@
 use alloc::boxed::Box;
 use alloc::string::ToString as _;
 use alloc::vec::Vec;
-use core::convert::TryFrom as _;
+use core::convert::{identity, TryFrom as _};
 use core::f64::consts::PI;
 
 use exhaust::Exhaust as _;
@@ -23,7 +23,7 @@ use all_is_cubes::drawing::{
         text::{Baseline, Text},
     },
 };
-use all_is_cubes::euclid::{Point3D, Rotation2D, Vector2D, Vector3D};
+use all_is_cubes::euclid::{vec3, Point3D, Rotation2D, Vector2D, Vector3D};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
@@ -297,38 +297,70 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
 async fn TEXT(_: &Exhibit, _universe: &mut Universe) {
     use all_is_cubes::block::text;
 
+    struct Texhibit {
+        text: text::Text,
+        f: Box<dyn Fn(Block) -> Block>,
+        offset: GridVector,
+    }
+
     let texts = [
-        text::Text::new(
-            literal!("right aligned"),
-            text::Font::System16,
-            text::Positioning {
-                x: text::PositioningX::Right,
-                line_y: text::PositioningY::BodyBottom,
-                z: text::PositioningZ::Back,
-            },
-        ),
-        text::Text::new(
-            literal!("left aligned"),
-            text::Font::System16,
-            text::Positioning {
-                x: text::PositioningX::Left,
-                line_y: text::PositioningY::BodyBottom,
-                z: text::PositioningZ::Front,
-            },
-        ),
+        Texhibit {
+            text: text::Text::new(
+                literal!("right back"),
+                text::Font::System16,
+                text::Positioning {
+                    x: text::PositioningX::Right,
+                    line_y: text::PositioningY::BodyBottom,
+                    z: text::PositioningZ::Back,
+                },
+            ),
+            f: Box::new(identity),
+            offset: vec3(0, 0, 0),
+        },
+        Texhibit {
+            text: text::Text::new(
+                literal!("left front"),
+                text::Font::System16,
+                text::Positioning {
+                    x: text::PositioningX::Left,
+                    line_y: text::PositioningY::BodyBottom,
+                    z: text::PositioningZ::Front,
+                },
+            ),
+            f: Box::new(identity),
+            offset: vec3(0, 1, 0),
+        },
+        {
+            let mut text = text::Text::new(
+                literal!("engraved"),
+                text::Font::System16,
+                text::Positioning {
+                    x: text::PositioningX::Center,
+                    line_y: text::PositioningY::BodyMiddle,
+                    z: text::PositioningZ::Front,
+                },
+            );
+            text.set_layout_bounds(R32, GridAab::for_block(R32));
+            let op = Composite::new(Block::from(palette::MENU_BACK), CompositeOperator::Out);
+            Texhibit {
+                text,
+                f: Box::new(move |text_block| op.clone().compose_or_replace(text_block)),
+                offset: vec3(0, 2, 0),
+            }
+        },
     ];
 
     let bounds_for_text = texts
         .iter()
-        .map(|t| t.bounding_blocks())
+        .map(|ex| ex.text.bounding_blocks().translate(ex.offset))
         .reduce(|a, b| a.union(b).unwrap())
         .unwrap();
 
     let mut space = Space::builder(bounds_for_text).build();
 
     // TODO: detect collisions
-    for text in texts {
-        text.installation(Gridgid::IDENTITY, core::convert::identity)
+    for Texhibit { text, f, offset } in texts {
+        text.installation(Gridgid::from_translation(offset), f)
             .execute(&mut space, &mut transaction::no_outputs)
             .unwrap();
     }
