@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::text::{self, Text as BlockText};
-use all_is_cubes::block::Resolution::*;
+use all_is_cubes::block::{self, Resolution::*};
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::{MonoFont, MonoTextStyle},
     prelude::{Dimensions, Point},
@@ -11,7 +11,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 };
 use all_is_cubes::drawing::{rectangle_to_aab, VoxelBrush};
 use all_is_cubes::math::{GridAab, Gridgid};
-use all_is_cubes::space::SpaceTransaction;
+use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 
 use crate::vui::{self, widgets, LayoutGrant, LayoutRequest, Layoutable, Widget, WidgetController};
 
@@ -160,9 +160,22 @@ fn text_for_widget(text: ArcStr, font: text::Font, gravity: vui::Gravity) -> tex
 fn draw_text_txn(text: &BlockText, grant: &LayoutGrant) -> SpaceTransaction {
     let text_aabb = text.bounding_blocks();
     let grant = grant.shrink_to(text_aabb.size(), true);
-    text.installation(
-        Gridgid::from_translation(grant.bounds.lower_bounds() - text_aabb.lower_bounds()),
-        core::convert::identity,
+    let translation = grant.bounds.lower_bounds() - text_aabb.lower_bounds();
+
+    // This is like `BlockText::installation()` but if the text ends up too big it is truncated.
+    // TODO: But it shouldn't necessarily be truncated to the lower-left corner which is what
+    // our choice of translation calculation is doing
+    SpaceTransaction::filling(
+        grant.bounds, // doesn't over-fill because it's been shrunk
+        |cube| {
+            CubeTransaction::replacing(
+                None,
+                Some(block::Block::from_primitive(block::Primitive::Text {
+                    text: text.clone(),
+                    offset: cube.lower_bounds().to_vector() - translation,
+                })),
+            )
+        },
     )
 }
 
@@ -197,7 +210,7 @@ mod tests {
     fn label_layout() {
         let tree: vui::WidgetTree = vui::LayoutTree::leaf(Arc::new(Label::new(literal!("hi"))));
 
-        // to_space() serves as a transaction sanity check. TODO: make a proper tester
+        // to_space() serves as a widget building sanity check. TODO: make a proper widget tester
         tree.to_space(
             SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
             vui::Gravity::new(vui::Align::Center, vui::Align::Center, vui::Align::Low),
