@@ -5,15 +5,12 @@
 
 use std::sync::Arc;
 
-use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
-// use web_sys::{Element, HtmlCanvasElement};
+use wasm_bindgen_test::wasm_bindgen_test;
 
 use all_is_cubes::camera::{GraphicsOptions, HeadlessRenderer as _, StandardCameras, Viewport};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{palette, TemplateParameters, UniverseTemplate};
 use all_is_cubes_gpu::in_wgpu::init;
-
-wasm_bindgen_test_configure!(run_in_browser);
 
 #[wasm_bindgen_test]
 async fn renderer_test() {
