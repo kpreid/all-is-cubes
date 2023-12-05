@@ -664,6 +664,7 @@ async fn COMPOSITE(_: &Exhibit, universe: &mut Universe) {
     let operators = [
         CompositeOperator::Over,
         CompositeOperator::In,
+        CompositeOperator::Out,
         CompositeOperator::Atop,
     ];
 

@@ -252,6 +252,12 @@ pub enum CompositeOperator {
     /// The destination's color is not used.
     In,
 
+    /// Porter-Duff “out”. If both source and destination are opaque, the result is transparent;
+    /// otherwise the source is taken. Thus the destination acts as a mask removing portions
+    /// of the source.
+    /// The destination's color is not used.
+    Out,
+
     /// Porter-Duff “atop”. If both source and destination are opaque, the source is taken;
     /// otherwise the destination is taken. Thus the source is painted onto the destination's
     /// substance.
@@ -338,6 +344,10 @@ impl CompositeOperator {
             }
 
             Self::In => (source, sa * da),
+            Self::Out => {
+                let da_complement = NotNan::new(1. - da.into_inner()).unwrap();
+                (source, sa * da_complement)
+            }
 
             Self::Atop => {
                 let sa_complement = NotNan::new(1. - sa.into_inner()).unwrap();
@@ -360,6 +370,7 @@ impl CompositeOperator {
         match self {
             Self::Over => source | destination,
             Self::In => source & destination,
+            Self::Out => source & !destination,
             Self::Atop => destination,
         }
     }
@@ -372,6 +383,7 @@ impl CompositeOperator {
             Self::In => source
                 .intersection(destination)
                 .unwrap_or(GridAab::ORIGIN_EMPTY),
+            Self::Out => source,
             Self::Atop => destination,
         }
     }
