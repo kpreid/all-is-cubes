@@ -1,5 +1,6 @@
 use alloc::rc::Rc;
 use alloc::sync::Arc;
+use core::fmt;
 
 use all_is_cubes::euclid;
 use all_is_cubes::euclid::Vector3D;
@@ -8,6 +9,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{Space, SpaceBuilder, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _, Transaction as _};
+use all_is_cubes::util::{ConciseDebug, Fmt};
 
 use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
 
@@ -57,6 +59,13 @@ impl LayoutRequest {
     pub const EMPTY: Self = Self {
         minimum: GridVector::new(0, 0, 0),
     };
+}
+
+impl Fmt<ConciseDebug> for LayoutRequest {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &ConciseDebug) -> core::fmt::Result {
+        let &Self { minimum } = self;
+        write!(fmt, "{:?}", minimum.to_array())
+    }
 }
 
 /// Region a widget has been given by the layout algorithm, based on its

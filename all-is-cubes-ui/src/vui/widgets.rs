@@ -16,6 +16,8 @@ mod text;
 pub use text::*;
 mod button;
 pub use button::*;
+mod debug;
+pub use debug::*;
 mod theme;
 pub use theme::*;
 mod toolbar;

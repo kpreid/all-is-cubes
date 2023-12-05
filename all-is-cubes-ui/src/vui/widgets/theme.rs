@@ -23,6 +23,7 @@ use crate::vui::widgets::{BoxStyle, ButtonBase as _, ButtonVisualState, ToggleBu
 pub struct WidgetTheme {
     pub(crate) widget_blocks: BlockProvider<WidgetBlocks>,
     pub(crate) dialog_box_style: BoxStyle,
+    pub(crate) layout_debug_box_style: BoxStyle,
 }
 
 impl WidgetTheme {
@@ -37,10 +38,15 @@ impl WidgetTheme {
 
         let dialog_box_style =
             BoxStyle::from_nine_and_thin(&widget_blocks[WidgetBlocks::DialogBackground]);
+        let layout_debug_box_style = BoxStyle::from_composited_corner_and_edge(
+            widget_blocks[WidgetBlocks::LayoutDebugBoxCorner].clone(),
+            widget_blocks[WidgetBlocks::LayoutDebugBoxEdge].clone(),
+        );
 
         Ok(Self {
             widget_blocks,
             dialog_box_style,
+            layout_debug_box_style,
         })
     }
 
@@ -75,6 +81,9 @@ pub enum WidgetBlocks {
     ActionButton(ButtonVisualState),
     /// Appearance of a [`widgets::ToggleButton`] without label.
     ToggleButton(ToggleButtonVisualState),
+
+    LayoutDebugBoxCorner,
+    LayoutDebugBoxEdge,
 }
 
 impl BlockModule for WidgetBlocks {
@@ -94,6 +103,8 @@ impl fmt::Display for WidgetBlocks {
             WidgetBlocks::DialogBackground => write!(f, "dialog-background"),
             WidgetBlocks::ActionButton(state) => write!(f, "action-button/{state}"),
             WidgetBlocks::ToggleButton(state) => write!(f, "toggle-button/{state}"),
+            WidgetBlocks::LayoutDebugBoxCorner => write!(f, "layout-debug-box-corner"),
+            WidgetBlocks::LayoutDebugBoxEdge => write!(f, "layout-debug-box-edge"),
         }
     }
 }
@@ -169,6 +180,29 @@ impl WidgetBlocks {
 
                 WidgetBlocks::ActionButton(state) => state.button_block(universe)?,
                 WidgetBlocks::ToggleButton(state) => state.button_block(universe)?,
+
+                WidgetBlocks::LayoutDebugBoxCorner => Block::builder()
+                    .display_name("LayoutDebugBoxCorner")
+                    .voxels_ref(
+                        R32,
+                        universe.insert_anonymous(space_from_image(
+                            include_image!("theme/layout-debug-box-corner.png"),
+                            GridRotation::RXyZ,
+                            default_srgb,
+                        )?),
+                    )
+                    .build(),
+                WidgetBlocks::LayoutDebugBoxEdge => Block::builder()
+                    .display_name("LayoutDebugBoxEdge")
+                    .voxels_ref(
+                        R32,
+                        universe.insert_anonymous(space_from_image(
+                            include_image!("theme/layout-debug-box-edge.png"),
+                            GridRotation::RZyX,
+                            default_srgb,
+                        )?),
+                    )
+                    .build(),
             })
         })
         .await
