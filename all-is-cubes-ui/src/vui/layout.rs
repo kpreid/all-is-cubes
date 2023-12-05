@@ -333,11 +333,21 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 direction,
                 ref children,
             } => {
+                let axis = direction.axis();
+                let gravity = {
+                    let mut g = grant.gravity;
+                    g[direction.axis()] = if direction.is_positive() {
+                        Align::Low
+                    } else {
+                        Align::High
+                    };
+                    g
+                };
+
                 let mut positioned_children = Vec::with_capacity(children.len());
                 let mut bounds = grant.bounds;
                 for child in children {
                     let requirements = child.requirements();
-                    let axis = direction.axis();
                     let size_on_axis = requirements.minimum[axis];
                     let available_size = bounds.size()[axis];
                     if size_on_axis > available_size {
@@ -353,7 +363,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
 
                     positioned_children.push(child.perform_layout(LayoutGrant {
                         bounds: child_bounds,
-                        gravity: grant.gravity,
+                        gravity,
                     })?);
                     bounds = remainder_bounds;
                 }
@@ -534,6 +544,7 @@ pub(super) fn validate_widget_transaction(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::euclid::vec3;
     use all_is_cubes::math::Face6;
     use pretty_assertions::assert_eq;
 
@@ -572,6 +583,7 @@ mod tests {
             ],
         };
         let grant = LayoutGrant::new(GridAab::from_lower_size([10, 10, 10], [10, 10, 10]));
+        let stack_gravity = vec3(Align::Low, Align::Center, Align::Center);
         assert_eq!(
             tree.perform_layout(grant)
                 .unwrap()
@@ -582,21 +594,21 @@ mod tests {
                     value: LT::new("a", [1, 1, 1]),
                     position: LayoutGrant {
                         bounds: GridAab::from_lower_size([10, 10, 10], [1, 10, 10]),
-                        gravity: grant.gravity,
+                        gravity: stack_gravity,
                     },
                 },
                 &Positioned {
                     value: LT::new("b", [1, 1, 1]),
                     position: LayoutGrant {
                         bounds: GridAab::from_lower_size([11, 10, 10], [1, 10, 10]),
-                        gravity: grant.gravity,
+                        gravity: stack_gravity,
                     },
                 },
                 &Positioned {
                     value: LT::new("c", [1, 1, 1]),
                     position: LayoutGrant {
                         bounds: GridAab::from_lower_size([12, 10, 10], [1, 10, 10]),
-                        gravity: grant.gravity,
+                        gravity: stack_gravity,
                     },
                 }
             ]
@@ -616,6 +628,7 @@ mod tests {
             ],
         };
         let grant = LayoutGrant::new(GridAab::from_lower_size([10, 10, 10], [10, 10, 10]));
+        let stack_gravity = vec3(Align::Low, Align::Center, Align::Center);
         assert_eq!(
             tree.perform_layout(grant)
                 .unwrap()
@@ -626,14 +639,14 @@ mod tests {
                     value: LT::new("a", [1, 1, 1]),
                     position: LayoutGrant {
                         bounds: GridAab::from_lower_size([10, 10, 10], [1, 10, 10]),
-                        gravity: grant.gravity,
+                        gravity: stack_gravity,
                     },
                 },
                 &Positioned {
                     value: LT::new("b", [1, 1, 1]),
                     position: LayoutGrant {
                         bounds: GridAab::from_lower_size([14, 10, 10], [1, 10, 10]),
-                        gravity: grant.gravity,
+                        gravity: stack_gravity,
                     },
                 }
             ]
