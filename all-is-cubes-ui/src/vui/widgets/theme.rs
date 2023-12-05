@@ -198,7 +198,7 @@ impl WidgetBlocks {
                         R32,
                         universe.insert_anonymous(space_from_image(
                             include_image!("theme/layout-debug-box-edge.png"),
-                            GridRotation::RZyX,
+                            GridRotation::RZYX,
                             default_srgb,
                         )?),
                     )
