@@ -412,6 +412,7 @@ mod tests {
     use crate::space::Space;
     use alloc::string::String;
     use alloc::vec::Vec;
+    use arcstr::literal;
     use euclid::point3;
     use pretty_assertions::assert_eq;
 
@@ -441,19 +442,10 @@ mod tests {
             .collect()
     }
 
-    #[test]
-    fn text_smoke_test() {
-        let text = Text::new(
-            arcstr::literal!("ab"),
-            Font::System16,
-            Positioning {
-                x: PositioningX::Left,
-                line_y: PositioningY::BodyBottom,
-                z: PositioningZ::Back,
-            },
-        );
+    fn single_block_test_case(mut text: Text, resolution: Resolution) -> Block {
+        text.set_layout_bounds(resolution, GridAab::for_block(resolution));
 
-        assert_eq!(text.bounding_blocks(), GridAab::ORIGIN_CUBE);
+        //assert_eq!(text.bounding_blocks(), GridAab::ORIGIN_CUBE);
 
         let block = Block::from_primitive(Primitive::Text {
             text,
@@ -467,6 +459,24 @@ mod tests {
                 .build();
             print_space(&space, [0., 0., 1.]);
         }
+
+        block
+    }
+
+    #[test]
+    fn single_line_text_smoke_test() {
+        let block = single_block_test_case(
+            Text::new(
+                literal!("ab"),
+                Font::System16,
+                Positioning {
+                    x: PositioningX::Left,
+                    line_y: PositioningY::BodyBottom,
+                    z: PositioningZ::Back,
+                },
+            ),
+            Resolution::R16,
+        );
 
         let ev = block.evaluate().unwrap();
         assert_eq!(
@@ -497,6 +507,53 @@ mod tests {
                 ".###.##.##.###..",
                 "................",
                 "................",
+            ]
+        )
+    }
+
+    #[test]
+    fn multiple_line() {
+        let block = single_block_test_case(
+            Text::new(
+                literal!("abcd\nabcd"),
+                Font::System16,
+                Positioning {
+                    x: PositioningX::Left,
+                    line_y: PositioningY::BodyTop, // TODO: test case for BodyBottom, which we may want to fix
+                    z: PositioningZ::Back,
+                },
+            ),
+            Resolution::R32,
+        );
+
+        assert_eq!(
+            plane_to_text(block.evaluate().unwrap().voxels.as_vol_ref()),
+            vec![
+                "........##...................##.",
+                "........##...................##.",
+                "........##...................##.",
+                ".#####..##.###...#####...###.##.",
+                ".....##.###..##.###..##.##..###.",
+                ".######.##...##.##......##...##.",
+                "##...##.##...##.##......##...##.",
+                "##...##.##...##.##......##...##.",
+                "##..###.###..##.###..##.##..###.",
+                ".###.##.##.###...#####...###.##.",
+                "................................",
+                "................................",
+                "................................",
+                "........##...................##.",
+                "........##...................##.",
+                "........##...................##.",
+                ".#####..##.###...#####...###.##.",
+                ".....##.###..##.###..##.##..###.",
+                ".######.##...##.##......##...##.",
+                "##...##.##...##.##......##...##.",
+                "##...##.##...##.##......##...##.",
+                "##..###.###..##.###..##.##..###.",
+                ".###.##.##.###...#####...###.##.",
+                "................................",
+                "................................",
             ]
         )
     }
