@@ -92,15 +92,42 @@ impl Widget for LargeText {
 pub struct Label {
     text: ArcStr,
     font: text::Font,
+    positioning: Option<text::Positioning>,
 }
 
 impl Label {
-    /// Constructs a [`Label`] that draws the given text.
-    pub fn new(text: ArcStr) -> Self {
+    /// Constructs a [`Label`] that draws the given text, with the standard UI label font.
+    pub fn new(string: ArcStr) -> Self {
         Self {
-            text,
+            text: string,
             font: text::Font::System16,
+            positioning: None,
         }
+    }
+
+    /// Constructs a [`Label`] that draws the given text, with a specified font.
+    //---
+    // TODO: undecided what's a good API
+    #[allow(unused)] // TODO: will be used shortly
+    pub(crate) fn with_font(
+        string: ArcStr,
+        font: text::Font,
+        positioning: text::Positioning,
+    ) -> Self {
+        Self {
+            text: string,
+            font,
+            positioning: Some(positioning),
+        }
+    }
+
+    fn text(&self, gravity: vui::Gravity) -> text::Text {
+        text_for_widget(
+            self.text.clone(),
+            self.font.clone(),
+            self.positioning
+                .unwrap_or_else(|| gravity_to_positioning(gravity)),
+        )
     }
 }
 
@@ -108,13 +135,10 @@ impl Layoutable for Label {
     fn requirements(&self) -> LayoutRequest {
         // TODO: memoize
         LayoutRequest {
-            minimum: text_for_widget(
-                self.text.clone(),
-                self.font.clone(),
-                vui::Gravity::splat(vui::Align::Center),
-            )
-            .bounding_blocks()
-            .size(),
+            minimum: self
+                .text(vui::Gravity::splat(vui::Align::Center))
+                .bounding_blocks()
+                .size(),
         }
     }
 }
@@ -124,37 +148,33 @@ impl Widget for Label {
         // TODO: memoize `Text` construction for slightly more efficient reuse of widget
         // (this will only matter once `Text` memoizes glyph layout)
 
-        widgets::OneshotController::new(draw_text_txn(
-            &text_for_widget(self.text.clone(), self.font.clone(), grant.gravity),
-            grant,
-        ))
+        widgets::OneshotController::new(draw_text_txn(&self.text(grant.gravity), grant))
     }
 }
 
-fn text_for_widget(text: ArcStr, font: text::Font, gravity: vui::Gravity) -> text::Text {
-    let mut text = text::Text::new(
-        text,
-        font,
-        text::Positioning {
-            x: match gravity.x {
-                vui::Align::Low => text::PositioningX::Left,
-                vui::Align::Center => text::PositioningX::Center,
-                vui::Align::High => text::PositioningX::Right,
-            },
-            // TODO: need to be able to set the anchor to produce middle-of-block
-            line_y: match gravity.y {
-                vui::Align::Low => text::PositioningY::BodyBottom,
-                vui::Align::Center => text::PositioningY::BodyMiddle,
-                vui::Align::High => text::PositioningY::BodyTop,
-            },
-            z: match gravity.z {
-                vui::Align::Low | vui::Align::Center => text::PositioningZ::Back,
-                vui::Align::High => text::PositioningZ::Front,
-            },
-        },
-    );
+fn text_for_widget(text: ArcStr, font: text::Font, positioning: text::Positioning) -> text::Text {
+    let mut text = text::Text::new(text, font, positioning);
     text.set_layout_bounds(R32, GridAab::for_block(R32));
     text
+}
+
+fn gravity_to_positioning(gravity: vui::Gravity) -> text::Positioning {
+    text::Positioning {
+        x: match gravity.x {
+            vui::Align::Low => text::PositioningX::Left,
+            vui::Align::Center => text::PositioningX::Center,
+            vui::Align::High => text::PositioningX::Right,
+        },
+        line_y: match gravity.y {
+            vui::Align::Low => text::PositioningY::BodyBottom,
+            vui::Align::Center => text::PositioningY::BodyMiddle,
+            vui::Align::High => text::PositioningY::BodyTop,
+        },
+        z: match gravity.z {
+            vui::Align::Low | vui::Align::Center => text::PositioningZ::Back,
+            vui::Align::High => text::PositioningZ::Front,
+        },
+    }
 }
 
 fn draw_text_txn(text: &BlockText, grant: &LayoutGrant) -> SpaceTransaction {
