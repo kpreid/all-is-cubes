@@ -209,6 +209,8 @@ pub(crate) enum TextSer {
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) enum FontSer {
     System16V1,
+    #[doc(hidden)] // experimental, and not intended to be actually serialized
+    UnstableSmallerBodyTextV1,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -294,12 +294,18 @@ pub enum Font {
     ///
     /// This is a placeholder for further improvement in the font system.
     System16,
+
+    #[doc(hidden)]
+    // experimental while we figure things out. Probably to be replaced with fonts stored in Universe
+    SmallerBodyText,
 }
 impl Font {
     fn eg_font(&self) -> &eg::mono_font::MonoFont<'static> {
+        use eg::mono_font::iso_8859_1 as f;
         match self {
-            //Self::System16 => &eg::mono_font::iso_8859_1::FONT_9X15,
-            Self::System16 => &eg::mono_font::iso_8859_1::FONT_8X13_BOLD,
+            //Self::System16 => &f::FONT_9X15,
+            Self::System16 => &f::FONT_8X13_BOLD,
+            Self::SmallerBodyText => &f::FONT_6X10,
         }
     }
 }
@@ -307,7 +313,7 @@ impl Font {
 impl universe::VisitRefs for Font {
     fn visit_refs(&self, _: &mut dyn universe::RefVisitor) {
         match self {
-            Self::System16 => {}
+            Self::System16 | Self::SmallerBodyText => {}
         }
     }
 }

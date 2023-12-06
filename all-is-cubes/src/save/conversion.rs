@@ -415,6 +415,7 @@ mod block {
         fn from(value: &text::Font) -> Self {
             match value {
                 text::Font::System16 => schema::FontSer::System16V1,
+                text::Font::SmallerBodyText => schema::FontSer::UnstableSmallerBodyTextV1,
             }
         }
     }
@@ -423,6 +424,7 @@ mod block {
         fn from(value: schema::FontSer) -> Self {
             match value {
                 schema::FontSer::System16V1 => text::Font::System16,
+                schema::FontSer::UnstableSmallerBodyTextV1 => text::Font::SmallerBodyText,
             }
         }
     }
