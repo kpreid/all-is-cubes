@@ -1,8 +1,8 @@
 //! Miscellanous demonstrations of capability and manual test-cases.
 //! The exhibits defined in this file are combined into [`crate::demo_city`].
 
+use all_is_cubes::block::text;
 use alloc::boxed::Box;
-use alloc::string::ToString as _;
 use alloc::vec::Vec;
 use core::convert::{identity, TryFrom as _};
 use core::f64::consts::PI;
@@ -10,19 +10,14 @@ use core::f64::consts::PI;
 use exhaust::Exhaust as _;
 use rand::SeedableRng as _;
 
-use all_is_cubes::arcstr::literal;
+use all_is_cubes::arcstr::{self, literal};
 use all_is_cubes::content::load_image::{default_srgb, space_from_image};
-use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::drawing::{
-    draw_to_blocks,
-    embedded_graphics::{
-        geometry::Point,
-        mono_font::{iso_8859_1::FONT_6X10, MonoTextStyle},
-        prelude::Size,
-        primitives::{PrimitiveStyle, Rectangle, StyledDrawable},
-        text::{Baseline, Text},
-    },
+use all_is_cubes::drawing::embedded_graphics::{
+    geometry::Point,
+    prelude::Size,
+    primitives::{PrimitiveStyle, Rectangle, StyledDrawable},
 };
+use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{vec3, Point3D, Rotation2D, Vector2D, Vector3D};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
@@ -527,22 +522,14 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
                         Block::from(color)
                     })?
                     .build(),
-                &draw_to_blocks(
-                    universe,
-                    R32,
-                    0,
-                    0..1,
-                    BlockAttributes {
-                        display_name: resolution.to_string().into(),
-                        ..BlockAttributes::default()
-                    },
-                    &Text::with_baseline(
-                        &resolution.to_string(),
-                        Point::new(0, -1),
-                        MonoTextStyle::new(&FONT_6X10, &non_colliding_text_pixel()),
-                        Baseline::Bottom,
-                    ),
-                )?[GridPoint::origin()],
+                &text::Text::builder()
+                    .resolution(R32)
+                    .string(arcstr::format!("{resolution}"))
+                    .font(text::Font::SmallerBodyText)
+                    .foreground(demo_blocks[DemoBlocks::LabelTextVoxel].clone())
+                    .positioning(text::Positioning::LOW)
+                    .build()
+                    .single_block(),
             ],
         )?;
     }
@@ -605,19 +592,14 @@ async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
             pos,
             [
                 &pointing_block.clone().rotate(rot),
-                &draw_to_blocks(
-                    universe,
-                    R32,
-                    0,
-                    0..1,
-                    BlockAttributes::default(),
-                    &Text::with_baseline(
-                        &format!("{rot:?}"),
-                        Point::new(0, -1),
-                        MonoTextStyle::new(&FONT_6X10, &non_colliding_text_pixel()),
-                        Baseline::Bottom,
-                    ),
-                )?[GridPoint::origin()],
+                &text::Text::builder()
+                    .string(arcstr::format!("{rot:?}"))
+                    .font(text::Font::SmallerBodyText)
+                    .foreground(demo_blocks[DemoBlocks::LabelTextVoxel].clone())
+                    .resolution(R32)
+                    .positioning(text::Positioning::LOW)
+                    .build()
+                    .single_block(),
             ],
         )?;
         Ok(())
@@ -714,30 +696,23 @@ async fn COMPOSITE(_: &Exhibit, universe: &mut Universe) {
                     operator,
                 ));
 
-                // TODO: stop using draw_to_blocks for these in favor of widgets?
-                // or at least extract this to a function since 3 exhibits have them
-                let label_str = format!(
+                let label_str = arcstr::format!(
                     "{s}\n{operator:?}\n{d}",
                     s = source.evaluate().unwrap().attributes.display_name,
                     d = destination.evaluate().unwrap().attributes.display_name
                 );
-                let label = draw_to_blocks(
-                    universe,
-                    R64,
-                    0,
-                    0..1,
-                    BlockAttributes {
-                        display_name: label_str.clone().into(),
-                        ..BlockAttributes::default()
-                    },
-                    &Text::with_baseline(
-                        &label_str,
-                        Point::new(0, -(1 + 10 * 3)), // 3 lines above the bottom
-                        MonoTextStyle::new(&FONT_6X10, &non_colliding_text_pixel()),
-                        Baseline::Top,
-                    ),
-                )?[GridPoint::origin()]
-                .clone();
+                let label = text::Text::builder()
+                    .string(label_str)
+                    .resolution(R64)
+                    .font(text::Font::SmallerBodyText)
+                    .foreground(demo_blocks[DemoBlocks::LabelTextVoxel].clone())
+                    .positioning(text::Positioning {
+                        // TODO: this should be "last line at the bottom" but that isn't implemented
+                        line_y: text::PositioningY::BodyTop,
+                        ..text::Positioning::LOW
+                    })
+                    .build()
+                    .single_block();
 
                 stack(
                     &mut space,
@@ -796,6 +771,8 @@ async fn MOVED_BLOCKS(_: &Exhibit, universe: &mut Universe) {
     placement: Placement::Surface,
 )]
 async fn COLORS(_: &Exhibit, universe: &mut Universe) {
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+
     let gradient_resolution = 5;
     let mut space = Space::empty(GridAab::from_lower_size(
         [0, 0, 0],
@@ -817,7 +794,7 @@ async fn COLORS(_: &Exhibit, universe: &mut Universe) {
                 .cast_unit(),
         );
         let color_srgb = color.with_alpha_one().to_srgb8();
-        let description = format!(
+        let description = arcstr::format!(
             "Linear\n  {:0.2}\n  {:0.2}\n  {:0.2}\nsRGB\n  #{:02x}{:02x}{:02x}",
             color.red(),
             color.green(),
@@ -834,26 +811,18 @@ async fn COLORS(_: &Exhibit, universe: &mut Universe) {
                     .build(),
             ),
             [0, 1, 0] => Some({
-                let resolution = R64;
-                draw_to_blocks(
-                    universe,
-                    resolution,
-                    0,
-                    0..1,
-                    BlockAttributes {
-                        display_name: description.clone().into(),
-                        ..BlockAttributes::default()
-                    },
-                    &Text::with_baseline(
-                        &description,
-                        Point::new(0, -i32::from(resolution)),
-                        MonoTextStyle::new(&FONT_6X10, &non_colliding_text_pixel()),
-                        Baseline::Top,
-                    ),
-                )
-                .unwrap()[GridPoint::origin()] // TODO: Give Space an into_single_element() ?
-                .clone()
-                .rotate(GridRotation::RXzY)
+                text::Text::builder()
+                    .string(description)
+                    .font(text::Font::SmallerBodyText)
+                    .foreground(demo_blocks[DemoBlocks::LabelTextVoxel].clone())
+                    .resolution(R64)
+                    .positioning(text::Positioning {
+                        line_y: text::PositioningY::BodyTop,
+                        ..text::Positioning::LOW
+                    })
+                    .build()
+                    .single_block()
+                    .rotate(GridRotation::RXzY)
             }),
             _ => None,
         }
@@ -1369,16 +1338,6 @@ async fn DESTRUCTION(_: &Exhibit, universe: &mut Universe) {
     }
 
     Ok(space)
-}
-
-/// TODO: is this really the strategy we want to take?
-/// It is a quick replacement for having discarded `BlockAttributes::collision`
-/// that could override voxel collision.
-fn non_colliding_text_pixel() -> Block {
-    Block::builder()
-        .color(palette::ALMOST_BLACK.with_alpha_one())
-        .collision(BlockCollision::None)
-        .build()
 }
 
 /// Place a series of blocks on top of each other, starting at the specified point.

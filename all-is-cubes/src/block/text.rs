@@ -167,6 +167,15 @@ impl Text {
         )
     }
 
+    /// Returns a `Block` whose primitive is this text with no offset,
+    /// for quickly creating blocks from text that fits in one block.
+    pub fn single_block(self) -> Block {
+        Block::from_primitive(block::Primitive::Text {
+            text: self.clone(),
+            offset: GridVector::zero(),
+        })
+    }
+
     pub(crate) fn evaluate(
         &self,
         block_offset: GridVector,
@@ -569,6 +578,15 @@ mod serialization {
             }
         }
     }
+}
+
+impl Positioning {
+    #[doc(hidden)] // not sure if good idea
+    pub const LOW: Self = Positioning {
+        x: PositioningX::Left,
+        line_y: PositioningY::BodyBottom,
+        z: PositioningZ::Back,
+    };
 }
 
 #[cfg(test)]

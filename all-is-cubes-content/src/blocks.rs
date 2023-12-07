@@ -50,6 +50,7 @@ pub enum DemoBlocks {
     ExhibitBackground,
     Pedestal,
     Signboard,
+    LabelTextVoxel,
     Clock,
     Explosion(u8),
 }
@@ -400,6 +401,12 @@ pub async fn install_demo_blocks(
                     .voxels_ref(resolution, universe.insert_anonymous(space))
                     .build()
             }
+
+            // TODO: not all text that should use this does yet
+            LabelTextVoxel => Block::builder()
+                .color(palette::ALMOST_BLACK.with_alpha_one())
+                .collision(BlockCollision::None)
+                .build(),
 
             Clock => {
                 let resolution = R16;
