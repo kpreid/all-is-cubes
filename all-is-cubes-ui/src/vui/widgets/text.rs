@@ -162,9 +162,12 @@ impl Widget for Label {
 }
 
 fn text_for_widget(text: ArcStr, font: text::Font, positioning: text::Positioning) -> text::Text {
-    let mut text = text::Text::new(text, font, positioning);
-    text.set_layout_bounds(R32, GridAab::for_block(R32));
-    text
+    text::Text::builder()
+        .resolution(R32)
+        .string(text)
+        .font(font)
+        .positioning(positioning)
+        .build()
 }
 
 fn gravity_to_positioning(gravity: vui::Gravity, ignore_y: bool) -> text::Positioning {

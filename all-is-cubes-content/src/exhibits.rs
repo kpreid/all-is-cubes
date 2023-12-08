@@ -305,45 +305,41 @@ async fn TEXT(_: &Exhibit, _universe: &mut Universe) {
 
     let texts = [
         Texhibit {
-            text: text::Text::new(
-                literal!("right back"),
-                text::Font::System16,
-                text::Positioning {
+            text: text::Text::builder()
+                .string(literal!("right back"))
+                .positioning(text::Positioning {
                     x: text::PositioningX::Right,
                     line_y: text::PositioningY::BodyBottom,
                     z: text::PositioningZ::Back,
-                },
-            ),
+                })
+                .build(),
             f: Box::new(identity),
             offset: vec3(0, 0, 0),
         },
         Texhibit {
-            text: text::Text::new(
-                literal!("left front"),
-                text::Font::System16,
-                text::Positioning {
+            text: text::Text::builder()
+                .string(literal!("left front"))
+                .positioning(text::Positioning {
                     x: text::PositioningX::Left,
                     line_y: text::PositioningY::BodyBottom,
                     z: text::PositioningZ::Front,
-                },
-            ),
+                })
+                .build(),
             f: Box::new(identity),
             offset: vec3(0, 1, 0),
         },
         {
-            let mut text = text::Text::new(
-                literal!("engraved"),
-                text::Font::System16,
-                text::Positioning {
-                    x: text::PositioningX::Center,
-                    line_y: text::PositioningY::BodyMiddle,
-                    z: text::PositioningZ::Front,
-                },
-            );
-            text.set_layout_bounds(R32, GridAab::for_block(R32));
             let op = Composite::new(Block::from(palette::MENU_BACK), CompositeOperator::Out);
             Texhibit {
-                text,
+                text: text::Text::builder()
+                    .string(literal!("engraved"))
+                    .resolution(R32)
+                    .positioning(text::Positioning {
+                        x: text::PositioningX::Center,
+                        line_y: text::PositioningY::BodyMiddle,
+                        z: text::PositioningZ::Front,
+                    })
+                    .build(),
                 f: Box::new(move |text_block| op.clone().compose_or_replace(text_block)),
                 offset: vec3(0, 2, 0),
             }

@@ -225,15 +225,18 @@ fn block_text() {
 
     assert_round_trip_value(
         &Block::from_primitive(block::Primitive::Text {
-            text: text::Text::new(
-                literal!("hello"),
-                text::Font::System16,
-                text::Positioning {
-                    x: text::PositioningX::Center,
-                    line_y: text::PositioningY::BodyTop,
-                    z: text::PositioningZ::Front,
-                },
-            ),
+            text: {
+                text::Text::builder()
+                    .resolution(Resolution::R16)
+                    .string(literal!("hello"))
+                    .font(text::Font::System16)
+                    .positioning(text::Positioning {
+                        x: text::PositioningX::Center,
+                        line_y: text::PositioningY::BodyTop,
+                        z: text::PositioningZ::Front,
+                    })
+                    .build()
+            },
             offset: vec3(100, 0, 0),
         }),
         json!({

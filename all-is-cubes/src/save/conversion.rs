@@ -406,7 +406,11 @@ mod block {
                     string,
                     font,
                     positioning,
-                } => text::Text::new(string, font.into(), positioning.into()),
+                } => text::Text::builder()
+                    .string(string)
+                    .font(font.into())
+                    .positioning(positioning.into())
+                    .build(),
             }
         }
     }

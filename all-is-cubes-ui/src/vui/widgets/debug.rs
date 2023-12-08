@@ -1,4 +1,3 @@
-use all_is_cubes::math::GridAab;
 use alloc::sync::Arc;
 
 use all_is_cubes::block::{self, text, Block, Resolution::R64};
@@ -34,21 +33,21 @@ impl vui::Widget for LayoutDebugFrame {
         let box_style = &self.theme.layout_debug_box_style;
         let bounds = grant.bounds;
 
-        let mut info_text = text::Text::new(
-            all_is_cubes::arcstr::format!(
+        let info_text = text::Text::builder()
+            .string(all_is_cubes::arcstr::format!(
                 "Req {:?}\nGrant {:?}\nGrav {:?}",
                 self.requirements().refmt(&ConciseDebug),
                 grant.bounds,
                 grant.gravity.to_array(),
-            ),
-            text::Font::System16,
-            text::Positioning {
+            ))
+            .font(text::Font::System16)
+            .resolution(R64)
+            .positioning(text::Positioning {
                 x: text::PositioningX::Left,
                 line_y: text::PositioningY::BodyMiddle,
                 z: text::PositioningZ::Front,
-            },
-        );
-        info_text.set_layout_bounds(R64, GridAab::for_block(R64));
+            })
+            .build();
 
         super::OneshotController::new(SpaceTransaction::filling(bounds, |cube| {
             // not bothering to skip outside text bounds.

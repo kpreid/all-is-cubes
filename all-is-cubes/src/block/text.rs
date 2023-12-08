@@ -49,17 +49,42 @@ pub struct Text {
     positioning: Positioning,
 }
 
+/// Builder for [`Text`] values.
+#[derive(Debug, Clone)]
+#[must_use]
+pub struct TextBuilder {
+    string: ArcStr,
+
+    font: Font,
+
+    resolution: Resolution,
+
+    layout_bounds: Option<GridAab>,
+
+    positioning: Positioning,
+}
+
 impl Text {
-    /// Create a new [`Text`] value containing the given string.
-    ///
-    /// TODO: these arguments are incomplete and unstable.
-    pub fn new(string: ArcStr, font: Font, positioning: Positioning) -> Self {
-        let resolution = Resolution::R16;
-        Self {
+    /// Returns a [`TextBuilder`] which may be used to construct a [`Text`] value with explicit
+    /// or default options.
+    pub fn builder() -> TextBuilder {
+        TextBuilder::default()
+    }
+
+    /// Converts this into a [`TextBuilder`] so that it may be modified.
+    pub fn to_builder(self) -> TextBuilder {
+        let Self {
             string,
             font,
             resolution,
-            layout_bounds: GridAab::for_block(resolution),
+            layout_bounds,
+            positioning,
+        } = self;
+        TextBuilder {
+            string,
+            font,
+            resolution,
+            layout_bounds: Some(layout_bounds),
             positioning,
         }
     }
@@ -68,20 +93,9 @@ impl Text {
     pub fn string(&self) -> &ArcStr {
         &self.string
     }
-
-    #[allow(missing_docs)]
-    pub fn set_string(&mut self, value: ArcStr) {
-        self.string = value;
-    }
-
     /// Returns the font which this uses to display the text.
     pub fn font(&self) -> &Font {
         &self.font
-    }
-
-    #[allow(missing_docs)]
-    pub fn set_font(&mut self, value: Font) {
-        self.font = value;
     }
 
     /// Returns the voxel resolution which the text blocks will have.
@@ -96,24 +110,9 @@ impl Text {
         self.layout_bounds
     }
 
-    /// Set the bounds within which the text is positioned, and the resolution of their coordinates
-    /// and the text voxels.
-    ///
-    /// The text may overflow this bounding box depending on the length and positioning.
-
-    pub fn set_layout_bounds(&mut self, resolution: Resolution, layout_bounds: GridAab) {
-        self.resolution = resolution;
-        self.layout_bounds = layout_bounds;
-    }
-
     /// Returns the [`Positioning`] parameters this uses.
     pub fn positioning(&self) -> Positioning {
         self.positioning
-    }
-
-    #[allow(missing_docs)]
-    pub fn set_positioning(&mut self, value: Positioning) {
-        self.positioning = value;
     }
 
     /// Returns the bounding box of the text, in blocks — the set of [`Primitive::Text`] offsets
@@ -284,6 +283,103 @@ impl universe::VisitRefs for Text {
     }
 }
 
+impl TextBuilder {
+    /// Converts this builder into a [`Text`] value.
+    pub fn build(self) -> Text {
+        let Self {
+            string,
+            font,
+            resolution,
+            layout_bounds,
+            positioning,
+        } = self;
+        Text {
+            string,
+            font,
+            resolution,
+            layout_bounds: layout_bounds.unwrap_or(GridAab::for_block(resolution)),
+            positioning,
+        }
+    }
+
+    /// Sets the string to be displayed.
+    ///
+    /// The string may contain newlines, but is not automatically wrapped beyond that.
+    ///
+    /// The default is the empty string.
+    pub fn string(mut self, string: ArcStr) -> Self {
+        self.string = string;
+        self
+    }
+
+    /// Sets the font to use.
+    ///
+    /// The default is [`Font::System16`].
+    pub fn font(mut self, font: Font) -> Self {
+        self.font = font;
+        self
+    }
+
+    /// Sets the voxel resolution to use.
+    ///
+    /// This affects the size of the text, including its thickness, and the units of
+    /// [`layout_bounds`](Self::layout_bounds).
+    ///
+    /// The default is [16](Resolution::R16).
+    pub fn resolution(mut self, resolution: Resolution) -> Self {
+        self.resolution = resolution;
+        self
+    }
+
+    /// Sets the position of the text within (or extending out of) the
+    /// [`layout_bounds`](Self::layout_bounds).
+    ///
+    /// The default is:
+    ///
+    /// ```rust
+    /// # use all_is_cubes::block::text::*;
+    /// # let p =
+    /// Positioning {
+    ///     x: PositioningX::Center,
+    ///     line_y: PositioningY::BodyMiddle,
+    ///     z: PositioningZ::Back,
+    /// }
+    /// # ;
+    /// # assert_eq!(p, TextBuilder::default().build().positioning());
+    /// ```
+    pub fn positioning(mut self, positioning: Positioning) -> Self {
+        self.positioning = positioning;
+        self
+    }
+
+    /// Sets the voxel bounding box within which the text is positioned,
+    /// as well as the resolution since that determines the coordinate system scale.
+    ///
+    /// The text might overflow this box; it is currently used only to choose the positioning of the
+    /// text and cannot constrain it.
+    pub fn layout_bounds(mut self, resolution: Resolution, bounds: GridAab) -> Self {
+        self.layout_bounds = Some(bounds);
+        self.resolution = resolution;
+        self
+    }
+}
+
+impl Default for TextBuilder {
+    fn default() -> Self {
+        Self {
+            string: ArcStr::new(),
+            font: Font::System16,
+            resolution: Resolution::R16,
+            layout_bounds: None,
+            positioning: Positioning {
+                x: PositioningX::Center,
+                line_y: PositioningY::BodyMiddle,
+                z: PositioningZ::Back,
+            },
+        }
+    }
+}
+
 /// A font that may be used with [`Text`] blocks.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
@@ -442,9 +538,7 @@ mod tests {
             .collect()
     }
 
-    fn single_block_test_case(mut text: Text, resolution: Resolution) -> Block {
-        text.set_layout_bounds(resolution, GridAab::for_block(resolution));
-
+    fn single_block_test_case(text: Text) -> Block {
         //assert_eq!(text.bounding_blocks(), GridAab::ORIGIN_CUBE);
 
         let block = Block::from_primitive(Primitive::Text {
@@ -465,18 +559,18 @@ mod tests {
 
     #[test]
     fn single_line_text_smoke_test() {
-        let block = single_block_test_case(
-            Text::new(
-                literal!("ab"),
-                Font::System16,
-                Positioning {
+        let block = single_block_test_case({
+            Text::builder()
+                .string(literal!("ab"))
+                .font(Font::System16)
+                .resolution(Resolution::R16)
+                .positioning(Positioning {
                     x: PositioningX::Left,
                     line_y: PositioningY::BodyBottom,
                     z: PositioningZ::Back,
-                },
-            ),
-            Resolution::R16,
-        );
+                })
+                .build()
+        });
 
         let ev = block.evaluate().unwrap();
         assert_eq!(
@@ -514,16 +608,16 @@ mod tests {
     #[test]
     fn multiple_line() {
         let block = single_block_test_case(
-            Text::new(
-                literal!("abcd\nabcd"),
-                Font::System16,
-                Positioning {
+            Text::builder()
+                .resolution(Resolution::R32)
+                .string(literal!("abcd\nabcd"))
+                .font(Font::System16)
+                .positioning(Positioning {
                     x: PositioningX::Left,
                     line_y: PositioningY::BodyTop, // TODO: test case for BodyBottom, which we may want to fix
                     z: PositioningZ::Back,
-                },
-            ),
-            Resolution::R32,
+                })
+                .build(),
         );
 
         assert_eq!(
