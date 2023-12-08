@@ -116,7 +116,7 @@ jobs:
     - run: df -h .
 
     # Load cache before doing any Rust builds
-    - uses: Swatinem/rust-cache@v2.7.0
+    - uses: Swatinem/rust-cache@v2.7.1
       with:
         # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
         prefix-key: "v1-rust-${{ matrix.os }}-${{ matrix.toolchain }}-${{ matrix.depversions }}"
@@ -252,7 +252,7 @@ jobs:
       # libasound2-dev: needed for audio via `kira`
 
     # Load cache before doing any Rust builds
-    - uses: Swatinem/rust-cache@v2.7.0
+    - uses: Swatinem/rust-cache@v2.7.1
       with:
         # Reuse the cache from the normal `build` job instead of creating an independent one,
         # to reduce redundant work and save disk space — but don't *write* to that cache, so
@@ -301,7 +301,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: Swatinem/rust-cache@v2.7.0
+    - uses: Swatinem/rust-cache@v2.7.1
 
     - name: Install Rust toolchain
       run: |
@@ -324,7 +324,7 @@ jobs:
     - uses: actions/checkout@v4
 
     # The build is faster *without* this cache.
-    # - uses: Swatinem/rust-cache@v2.7.0
+    # - uses: Swatinem/rust-cache@v2.7.1
 
     - name: Install Rust toolchain
       run: |
@@ -348,7 +348,7 @@ jobs:
     - uses: actions/checkout@v4
 
     # Cache both the main workspace (for xtask builds) and the fuzzing workspace
-    - uses: Swatinem/rust-cache@v2.7.0
+    - uses: Swatinem/rust-cache@v2.7.1
       with:
         workspaces: |
           .
