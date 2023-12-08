@@ -97,3 +97,10 @@ pub fn info_text_drawable<C: PixelColor + 'static>(
         Baseline::Top,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn _headless_renderer_is_object_safe(_: &dyn HeadlessRenderer) {}
+}
