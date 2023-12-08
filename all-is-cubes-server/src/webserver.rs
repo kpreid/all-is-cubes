@@ -7,7 +7,7 @@ use std::net::SocketAddr;
 /// Run the All is Cubes web server on an arbitrary local port.
 ///
 /// Returns the base URL to access it, and [TODO: explain the future, and have a shutdown plan]
-pub fn start_server(
+pub async fn start_server(
     bind_addr: SocketAddr,
     client_source: &crate::client_static::AicClientSource,
 ) -> Result<(String, impl Future<Output = Result<(), anyhow::Error>>), anyhow::Error> {
@@ -17,9 +17,9 @@ pub fn start_server(
     // more division of responsibility in which urls mean what
     let app = static_router;
 
-    let server = axum::Server::bind(&bind_addr).serve(app.into_make_service());
-    // TODO: refactor so stdout writing isn't hardcoded into this function
-    let url = format!("http://{}/", server.local_addr());
+    let listener = tokio::net::TcpListener::bind(bind_addr).await?;
+    let url = format!("http://{}/", listener.local_addr()?);
+    let server = axum::serve(listener, app.into_make_service());
 
     Ok((url, async move { Ok(server.await?) }))
 }

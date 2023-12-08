@@ -59,7 +59,7 @@ mod embedded {
         match CLIENT_STATIC.get_file(path) {
             None => Response::builder()
                 .status(StatusCode::NOT_FOUND)
-                .body(body::boxed(body::Body::from(String::from("Not found"))))
+                .body(body::Body::from(String::from("Not found")))
                 .unwrap(),
             Some(file) => {
                 // Note that we're matching the *file's statically known path*, not the provided URL,
@@ -72,7 +72,7 @@ mod embedded {
                     .status(StatusCode::OK)
                     .header("Content-Type", content_type.as_ref())
                     // TODO: caching headers
-                    .body(body::boxed(body::Full::from(file.contents())))
+                    .body(body::Body::from(file.contents()))
                     .unwrap()
             }
         }

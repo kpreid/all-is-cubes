@@ -67,7 +67,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port.unwrap_or(0)));
 
-    let (url, finished) = start_server(addr, &client_source)?;
+    let (url, finished) = start_server(addr, &client_source).await?;
     println!("{url}"); // note: printed *to stdout* for the use of tests
 
     finished.await?;
