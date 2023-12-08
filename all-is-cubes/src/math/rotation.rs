@@ -359,6 +359,7 @@ impl GridRotation {
     ///
     /// May panic or wrap if `vector` has any components equal to [`GridCoordinate::MIN`].
     #[inline]
+    #[track_caller] // TODO: temporary for troubleshooting a panic in fuzzing
     pub fn transform_vector(self, vector: GridVector) -> GridVector {
         let basis = self.to_basis();
 
