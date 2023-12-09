@@ -389,31 +389,7 @@ mod block {
         }
     }
 
-    impl From<&text::Text> for schema::TextSer {
-        fn from(value: &text::Text) -> Self {
-            schema::TextSer::TextV1 {
-                string: value.string().clone(),
-                font: value.font().into(),
-                positioning: value.positioning().into(),
-            }
-        }
-    }
-
-    impl From<schema::TextSer> for text::Text {
-        fn from(value: schema::TextSer) -> Self {
-            match value {
-                schema::TextSer::TextV1 {
-                    string,
-                    font,
-                    positioning,
-                } => text::Text::builder()
-                    .string(string)
-                    .font(font.into())
-                    .positioning(positioning.into())
-                    .build(),
-            }
-        }
-    }
+    // Since `Text` has private fields, its `From` impls are in its module.
 
     impl From<&text::Font> for schema::FontSer {
         fn from(value: &text::Font) -> Self {

@@ -202,6 +202,8 @@ pub(crate) enum TextSer {
     TextV1 {
         string: ArcStr,
         font: FontSer,
+        resolution: block::Resolution,
+        layout_bounds: GridAab,
         positioning: PositioningSerV1,
     },
 }

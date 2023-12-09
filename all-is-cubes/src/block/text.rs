@@ -499,6 +499,50 @@ pub enum PositioningZ {
     Front,
 }
 
+#[cfg(feature = "save")]
+mod serialization {
+    use crate::block::text;
+    use crate::save::schema;
+
+    impl From<&text::Text> for schema::TextSer {
+        fn from(value: &text::Text) -> Self {
+            let &text::Text {
+                ref string,
+                ref font,
+                resolution,
+                layout_bounds,
+                positioning,
+            } = value;
+            schema::TextSer::TextV1 {
+                string: string.clone(),
+                font: font.into(),
+                resolution,
+                layout_bounds,
+                positioning: positioning.into(),
+            }
+        }
+    }
+
+    impl From<schema::TextSer> for text::Text {
+        fn from(value: schema::TextSer) -> Self {
+            match value {
+                schema::TextSer::TextV1 {
+                    string,
+                    font,
+                    resolution,
+                    layout_bounds,
+                    positioning,
+                } => text::Text::builder()
+                    .string(string)
+                    .font(font.into())
+                    .layout_bounds(resolution, layout_bounds)
+                    .positioning(positioning.into())
+                    .build(),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

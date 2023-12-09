@@ -227,9 +227,12 @@ fn block_text() {
         &Block::from_primitive(block::Primitive::Text {
             text: {
                 text::Text::builder()
-                    .resolution(Resolution::R16)
                     .string(literal!("hello"))
-                    .font(text::Font::System16)
+                    .font(text::Font::System16) // TODO: use a nondefault font once such are stable
+                    .layout_bounds(
+                        Resolution::R32,
+                        GridAab::from_lower_upper([0, 1, 2], [3, 4, 5]),
+                    )
                     .positioning(text::Positioning {
                         x: text::PositioningX::Center,
                         line_y: text::PositioningY::BodyTop,
@@ -247,6 +250,11 @@ fn block_text() {
                     "type": "TextV1",
                     "string": "hello",
                     "font": "System16V1",
+                    "resolution": 32,
+                    "layout_bounds":{
+                        "lower": [0, 1, 2],
+                        "upper": [3, 4, 5],
+                    },
                     "positioning": {
                         "x": "CenterV1",
                         "line_y": "BodyTopV1",
