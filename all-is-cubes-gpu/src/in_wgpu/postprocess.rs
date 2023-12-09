@@ -196,40 +196,46 @@ pub(crate) fn postprocess<I: time::Instant>(
         render_pass.set_pipeline(&ev.postprocess_render_pipeline);
         render_pass.set_bind_group(
             0,
-            ev.postprocess_bind_group.get_or_insert_with(|| {
-                ev.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    layout: &ev.postprocess_bind_group_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(
-                                ev.info_text_texture.view().unwrap(), // TODO: have a better plan than unwrap
-                            ),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(&ev.info_text_sampler),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 2,
-                            resource: wgpu::BindingResource::TextureView(
-                                ev.fb.scene_for_postprocessing_input(),
-                            ),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 3,
-                            resource: ev.postprocess_camera_buffer.as_entire_binding(),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 4,
-                            resource: wgpu::BindingResource::TextureView(
-                                ev.fb.bloom_data_texture(),
-                            ),
-                        },
-                    ],
-                    label: Some("EverythingRenderer::postprocess_bind_group"),
-                })
-            }),
+            ev.postprocess_bind_group.get_or_insert(
+                (
+                    ev.info_text_texture.view().unwrap().global_id(),
+                    ev.fb.global_id(),
+                ),
+                || {
+                    ev.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        layout: &ev.postprocess_bind_group_layout,
+                        entries: &[
+                            wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::TextureView(
+                                    ev.info_text_texture.view().unwrap(), // TODO: have a better plan than unwrap
+                                ),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 1,
+                                resource: wgpu::BindingResource::Sampler(&ev.info_text_sampler),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 2,
+                                resource: wgpu::BindingResource::TextureView(
+                                    ev.fb.scene_for_postprocessing_input(),
+                                ),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 3,
+                                resource: ev.postprocess_camera_buffer.as_entire_binding(),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 4,
+                                resource: wgpu::BindingResource::TextureView(
+                                    ev.fb.bloom_data_texture(),
+                                ),
+                            },
+                        ],
+                        label: Some("EverythingRenderer::postprocess_bind_group"),
+                    })
+                },
+            ),
             &[],
         );
         render_pass.draw(0..3, 0..1);

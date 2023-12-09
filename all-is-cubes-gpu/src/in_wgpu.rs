@@ -25,8 +25,8 @@ use crate::{
         postprocess::PostprocessUniforms,
         vertex::WgpuLinesVertex,
     },
-    wireframe_vertices, DrawInfo, FrameBudget, GraphicsResourceError, RenderInfo, SpaceDrawInfo,
-    SpaceUpdateInfo, UpdateInfo,
+    wireframe_vertices, DrawInfo, FrameBudget, GraphicsResourceError, Memo, RenderInfo,
+    SpaceDrawInfo, SpaceUpdateInfo, UpdateInfo,
 };
 
 mod block_texture;
@@ -226,7 +226,8 @@ struct EverythingRenderer<I> {
 
     /// Pipeline for the color postprocessing + info text layer drawing.
     postprocess_render_pipeline: wgpu::RenderPipeline,
-    postprocess_bind_group: Option<wgpu::BindGroup>,
+    postprocess_bind_group:
+        Memo<(wgpu::Id<wgpu::TextureView>, frame_texture::FbtId), wgpu::BindGroup>,
     postprocess_bind_group_layout: wgpu::BindGroupLayout,
     postprocess_shader_dirty: DirtyFlag,
     postprocess_camera_buffer: wgpu::Buffer,
@@ -324,7 +325,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 config.format,
             ),
             postprocess_bind_group_layout,
-            postprocess_bind_group: None,
+            postprocess_bind_group: Memo::new(),
             postprocess_camera_buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("EverythingRenderer::postprocess_camera_buffer"),
                 size: std::mem::size_of::<PostprocessUniforms>()
@@ -399,13 +400,8 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
             // Might need updates based on size or options, so ask it to check unconditionally.
             // Note: this must happen before `self.pipelines` is updated!
-            if self.fb.rebuild_if_changed(
-                &self.device,
-                &self.config,
-                self.cameras.graphics_options(),
-            ) {
-                self.postprocess_bind_group = None;
-            }
+            self.fb
+                .rebuild_if_changed(&self.device, &self.config, self.cameras.graphics_options());
         }
 
         // Recompile shaders and pipeline if needed.

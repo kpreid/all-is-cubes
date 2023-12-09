@@ -352,6 +352,19 @@ impl FramebufferTextures {
             .expect("TODO: disabling bloom not implemented")
             .bloom_output_texture_view
     }
+
+    pub(crate) fn global_id(&self) -> FbtId {
+        FbtId {
+            scene_id: self.linear_scene_view.global_id(),
+        }
+    }
+}
+
+/// An ID whose comparison is sufficient to identify whether a [`FramebufferTextures`]
+/// has the same GPU resources or not, for [`common::Memo`] purposes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct FbtId {
+    scene_id: wgpu::Id<wgpu::TextureView>,
 }
 
 /// A decision about what texture format [`FramebufferTextures`] should employ,
