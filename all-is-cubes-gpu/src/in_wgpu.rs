@@ -1,6 +1,4 @@
 //! Rendering via the [`wgpu`] WebGPU-in-Rust graphics library.
-//!
-//! TODO: This code is experimental and not feature-complete.
 
 use std::mem;
 use std::sync::Arc;
