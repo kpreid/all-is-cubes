@@ -733,7 +733,7 @@ mod arbitrary_block {
     // Manual impl because `GridPoint` doesn't impl Arbitrary.
     impl<'a> Arbitrary<'a> for Primitive {
         fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-            Ok(match u.int_in_range(0..=3)? {
+            Ok(match u.int_in_range(0..=4)? {
                 0 => Primitive::Air,
                 1 => Primitive::Atom(Atom {
                     attributes: BlockAttributes::arbitrary(u)?,
@@ -747,6 +747,11 @@ mod arbitrary_block {
                     offset: GridPoint::from(<[i32; 3]>::arbitrary(u)?),
                     resolution: Resolution::arbitrary(u)?,
                     space: URef::arbitrary(u)?,
+                },
+                4 => Primitive::Text {
+                    text: text::Text::arbitrary(u)?,
+                    // TODO: fix unhandled overflows so this can be full i32 range
+                    offset: GridVector::from(<[i16; 3]>::arbitrary(u)?.map(i32::from)),
                 },
                 _ => unreachable!(),
             })
@@ -767,6 +772,10 @@ mod arbitrary_block {
                         <[i32; 3]>::size_hint(depth),
                         Resolution::size_hint(depth),
                         URef::<Space>::size_hint(depth),
+                    ]),
+                    size_hint::and_all(&[
+                        text::Text::size_hint(depth),
+                        <[i16; 3]>::size_hint(depth),
                     ]),
                 ])
             })

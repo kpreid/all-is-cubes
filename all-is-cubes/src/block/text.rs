@@ -300,6 +300,45 @@ impl universe::VisitRefs for Text {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Text {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // As a temporary measure, restrict GridAab coordinate range to avoid overflows.
+        // Eventually we should fix the overflows, but let's do that after we build our own
+        // text rendering because that'll be easier.
+        // (Another possibility would be to actually restrict `layout_bounds` itself,)
+        let layout_bounds = GridAab::checked_from_lower_upper(
+            // euclid::Point3D doesn't implement Arbitrary (just an oversight apparently)
+            <[i16; 3]>::arbitrary(u)?.map(i32::from),
+            <[u16; 3]>::arbitrary(u)?.map(i32::from),
+        )
+        .map_err(|_volume_error| arbitrary::Error::IncorrectFormat)?;
+
+        Ok(Self {
+            // ArcStr doesn't implement Arbitrary
+            string: alloc::string::String::arbitrary(u)?.into(),
+            font: Font::arbitrary(u)?,
+            foreground: Block::arbitrary(u)?,
+            resolution: Resolution::arbitrary(u)?,
+            layout_bounds,
+            positioning: Positioning::arbitrary(u)?,
+        })
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        arbitrary::size_hint::recursion_guard(depth, |depth| {
+            arbitrary::size_hint::and_all(&[
+                alloc::string::String::size_hint(depth),
+                Font::size_hint(depth),
+                Block::size_hint(depth),
+                Resolution::size_hint(depth),
+                GridAab::size_hint(depth),
+                Positioning::size_hint(depth),
+            ])
+        })
+    }
+}
+
 impl TextBuilder {
     /// Converts this builder into a [`Text`] value.
     pub fn build(self) -> Text {
@@ -415,6 +454,7 @@ impl Default for TextBuilder {
 
 /// A font that may be used with [`Text`] blocks.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Font {
     /// A font whose characteristics are unspecified, other than that it is general-purpose and
@@ -449,6 +489,7 @@ impl universe::VisitRefs for Font {
 
 /// How a [`Text`] is to be positioned within a block.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[allow(clippy::exhaustive_structs)] // TODO: probably want to do something else
 pub struct Positioning {
     /// How to place the text horizontally relative to the anchor point.
@@ -475,6 +516,7 @@ pub struct Positioning {
 ///
 /// A component of [`Positioning`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum PositioningX {
     // TODO: Distinguish 'end of graphic' (last bit of ink) from 'nominal character spacing'?
@@ -498,6 +540,7 @@ pub enum PositioningX {
 ///
 /// A component of [`Positioning`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum PositioningY {
     /// The top of a line of text (past which no voxels extend) is aligned with the top edge
@@ -523,6 +566,7 @@ pub enum PositioningY {
 ///
 /// A component of [`Positioning`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum PositioningZ {
     /// Against the back (negative Z) face of the layout bounds.
