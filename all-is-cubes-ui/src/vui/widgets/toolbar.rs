@@ -1,21 +1,15 @@
+use all_is_cubes::arcstr;
 use alloc::sync::{Arc, Weak};
 use std::error::Error;
 use std::fmt;
 use std::sync::Mutex;
 
-use all_is_cubes::block::{self, Block, BlockAttributes, Primitive, Resolution, AIR};
+use all_is_cubes::block::{self, text, Block, Resolution};
 use all_is_cubes::character::Character;
-use all_is_cubes::content::palette;
-use all_is_cubes::drawing::embedded_graphics::{
-    mono_font::{iso_8859_1, MonoTextStyle},
-    prelude::Point,
-    text::{Alignment, Baseline, Text, TextStyleBuilder},
-    Drawable,
-};
 use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
 use all_is_cubes::listen::{DirtyFlag, Gate, Listen as _, ListenableSource, Listener};
-use all_is_cubes::math::{Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid};
-use all_is_cubes::space::{CubeTransaction, Space, SpacePhysics, SpaceTransaction};
+use all_is_cubes::math::{Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::time::Duration;
 use all_is_cubes::transaction::Merge as _;
 use all_is_cubes::universe::{URef, Universe};
@@ -37,9 +31,8 @@ pub(crate) struct Toolbar {
     cue_channel: CueNotifier,
 
     slot_count: usize,
-    /// Space for drawing per-slot text labels
-    slot_text_space: URef<Space>,
-    slot_text_resolution: Resolution,
+
+    slot_info_text_template: text::TextBuilder,
 }
 
 impl Toolbar {
@@ -51,30 +44,26 @@ impl Toolbar {
         // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
         hud_blocks: Arc<HudBlocks>,
         slot_count: usize,
-        universe: &mut Universe,
+        _universe: &mut Universe,
         cue_channel: CueNotifier,
     ) -> Arc<Self> {
-        let slot_text_resolution = Resolution::R32;
-        let slot_text_space = universe.insert_anonymous(
-            Space::builder(GridAab::from_lower_size(
-                GridPoint::origin(),
-                // TODO: shrink vertical axis to fit text, once we've debugged it
-                GridVector::new(
-                    GridCoordinate::from(slot_text_resolution) * slot_count as GridCoordinate,
-                    GridCoordinate::from(slot_text_resolution),
-                    1,
-                ),
-            ))
-            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-            .build(),
-        );
         Arc::new(Self {
             hud_blocks,
             character_source,
             cue_channel,
-            slot_text_resolution,
-            slot_text_space,
             slot_count,
+            slot_info_text_template: text::Text::builder()
+                .resolution(Resolution::R32)
+                .font(text::Font::SmallerBodyText)
+                .positioning(text::Positioning {
+                    x: text::PositioningX::Right,
+                    line_y: text::PositioningY::BodyBottom,
+                    z: text::PositioningZ::Front,
+                })
+                .layout_bounds(
+                    Resolution::R32,
+                    GridAab::from_lower_upper([0, 4, 0], [30, 32, 32]),
+                ),
         })
     }
 }
@@ -155,41 +144,6 @@ impl ToolbarController {
         &self,
         slots: &[Slot],
     ) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
-        // Update stack count text.
-        // TODO: This needs to stop being direct modification, eventually, at least if
-        // we want to have parallel updates.
-        // Also, trouble with multiple controllers sharing the same space...
-        self.definition.slot_text_space.try_modify(|text_space| {
-            // Erase old text.
-            // TODO: Do this incrementally and only-if-different.
-            // Maybe we should have a text-updating abstraction for this *and* the tooltip?
-            text_space.fill_uniform(text_space.bounds(), &AIR).unwrap();
-
-            let plane = &mut text_space.draw_target(Gridgid::FLIP_Y);
-            for index in 0..self.definition.slot_count {
-                Text::with_text_style(
-                    &match slots.get(index).unwrap_or(&Slot::Empty).count() {
-                        0 | 1 => String::default(),
-                        count => format!("{count}"),
-                    },
-                    Point::new(
-                        // index + 1 locates the right edge of the space for index
-                        (index as i32 + 1) * i32::from(self.definition.slot_text_resolution),
-                        // baseline tweak to taste
-                        -4,
-                    ),
-                    // TODO: review font choices
-                    MonoTextStyle::new(&iso_8859_1::FONT_6X10, palette::ALMOST_BLACK),
-                    TextStyleBuilder::new()
-                        .baseline(Baseline::Bottom)
-                        .alignment(Alignment::Right)
-                        .build(),
-                )
-                .draw(plane)
-                .unwrap();
-            }
-        })?;
-
         let mut txn = SpaceTransaction::default();
         for (index, stack) in slots.iter().enumerate() {
             if index >= self.definition.slot_count {
@@ -197,14 +151,35 @@ impl ToolbarController {
                 break;
             }
 
-            let cube = self.slot_position(index);
+            let icon_cube = self.slot_position(index);
+            let info_cube = icon_cube + GridVector::new(-1, 0, 0);
+
             // Draw icon
             txn.merge_from(
                 CubeTransaction::replacing(
                     None,
                     Some(stack.icon(&self.definition.hud_blocks.icons).into_owned()),
                 )
-                .at(cube),
+                .at(icon_cube),
+            )?;
+
+            // Draw stack count text
+            txn.merge_from(
+                CubeTransaction::replacing(
+                    None,
+                    Some(
+                        self.definition
+                            .slot_info_text_template
+                            .clone()
+                            .string(match slots.get(index).unwrap_or(&Slot::Empty).count() {
+                                0 | 1 => arcstr::ArcStr::default(),
+                                count => arcstr::format!("{count}"),
+                            })
+                            .build()
+                            .single_block(),
+                    ),
+                )
+                .at(info_cube),
             )?;
         }
 
@@ -249,7 +224,6 @@ impl ToolbarController {
 impl WidgetController for ToolbarController {
     fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
         let slot_count = self.definition.slot_count;
-        let slot_text_resolution = self.definition.slot_text_resolution;
 
         let mut txn = SpaceTransaction::default();
 
@@ -302,20 +276,6 @@ impl WidgetController for ToolbarController {
             txn.at(cube).overwrite(frame_part);
         }
 
-        // Place stack-count text blocks.
-        for index in 0..slot_count {
-            txn.at(self.slot_position(index) + GridVector::new(-1, 0, 0))
-                .overwrite(Block::from_primitive(Primitive::Recur {
-                    attributes: BlockAttributes::default(),
-                    offset: GridPoint::new(
-                        index as GridCoordinate * GridCoordinate::from(slot_text_resolution),
-                        0,
-                        1 - GridCoordinate::from(slot_text_resolution), // align to front face
-                    ),
-                    resolution: slot_text_resolution,
-                    space: self.definition.slot_text_space.clone(),
-                }));
-        }
         Ok(txn)
     }
 
