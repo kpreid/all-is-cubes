@@ -10,7 +10,7 @@ use euclid::vec3;
 use crate::block::{self, Block, BlockAttributes, EvalBlockError, Evoxel, MinEval, Resolution};
 use crate::content::palette;
 use crate::drawing::{rectangle_to_aab, DrawingPlane};
-use crate::math::{GridAab, GridCoordinate, GridVector, Gridgid, Rgb, Vol};
+use crate::math::{GridAab, GridCoordinate, GridVector, Gridgid, Rgba, Vol};
 use crate::space::{self, SpaceTransaction};
 use crate::universe;
 
@@ -41,6 +41,8 @@ pub struct Text {
 
     font: Font,
 
+    foreground: Block,
+
     resolution: Resolution,
 
     /// Voxel-scale bounds in which the text is positioned (not necessarily actual drawing bounds).
@@ -56,6 +58,8 @@ pub struct TextBuilder {
     string: ArcStr,
 
     font: Font,
+
+    foreground: Block,
 
     resolution: Resolution,
 
@@ -76,6 +80,7 @@ impl Text {
         let Self {
             string,
             font,
+            foreground,
             resolution,
             layout_bounds,
             positioning,
@@ -83,6 +88,7 @@ impl Text {
         TextBuilder {
             string,
             font,
+            foreground,
             resolution,
             layout_bounds: Some(layout_bounds),
             positioning,
@@ -119,6 +125,7 @@ impl Text {
     /// that will render all of it.
     pub fn bounding_blocks(&self) -> GridAab {
         self.with_transform_and_drawable(
+            Evoxel::from_color(Rgba::BLACK), // could be anything
             GridVector::zero(),
             |_text_obj, text_aab, _drawing_transform| text_aab.divide(self.resolution.into()),
         )
@@ -172,30 +179,37 @@ impl Text {
             return Ok(block::AIR_EVALUATED_MIN); // placeholder value
         }
 
-        self.with_transform_and_drawable(block_offset, |text_obj, text_aab, drawing_transform| {
-            let mut voxels: Vol<Box<[Evoxel]>> = Vol::from_fn(
-                text_aab
-                    .intersection(GridAab::for_block(self.resolution))
-                    .unwrap_or(GridAab::ORIGIN_EMPTY),
-                |_| Evoxel::AIR,
-            );
+        let voxel = Evoxel::from_block(&self.foreground.evaluate2(filter)?);
 
-            text_obj
-                .draw(&mut DrawingPlane::new(&mut voxels, drawing_transform))
-                .unwrap();
+        self.with_transform_and_drawable(
+            voxel,
+            block_offset,
+            |text_obj, text_aab, drawing_transform| {
+                let mut voxels: Vol<Box<[Evoxel]>> = Vol::from_fn(
+                    text_aab
+                        .intersection(GridAab::for_block(self.resolution))
+                        .unwrap_or(GridAab::ORIGIN_EMPTY),
+                    |_| Evoxel::AIR,
+                );
 
-            Ok(MinEval {
-                voxels: Evoxels::Many(self.resolution, voxels.map_container(Into::into)),
-                attributes: BlockAttributes {
-                    display_name: self.string.clone(),
-                    ..BlockAttributes::default()
-                },
-            })
-        })
+                text_obj
+                    .draw(&mut DrawingPlane::new(&mut voxels, drawing_transform))
+                    .unwrap();
+
+                Ok(MinEval {
+                    voxels: Evoxels::Many(self.resolution, voxels.map_container(Into::into)),
+                    attributes: BlockAttributes {
+                        display_name: self.string.clone(),
+                        ..BlockAttributes::default()
+                    },
+                })
+            },
+        )
     }
 
     fn with_transform_and_drawable<R>(
         &self,
+        voxel: Evoxel,
         block_offset: GridVector,
         f: impl FnOnce(
             &'_ eg::text::Text<'_, eg::mono_font::MonoTextStyle<'_, Evoxel>>,
@@ -232,15 +246,7 @@ impl Text {
             Gridgid::from_translation(layout_offset - (block_offset * resolution_g))
                 * Gridgid::FLIP_Y;
 
-        let character_style = eg::mono_font::MonoTextStyle::new(
-            self.font.eg_font(),
-            Evoxel {
-                color: palette::ALMOST_BLACK.with_alpha_one(),
-                selectable: false,
-                collision: block::BlockCollision::Hard,
-                emission: Rgb::ZERO,
-            },
-        );
+        let character_style = eg::mono_font::MonoTextStyle::new(self.font.eg_font(), voxel);
         let text_style = eg::text::TextStyleBuilder::new()
             .alignment(match positioning_x {
                 PositioningX::Left => eg::text::Alignment::Left,
@@ -275,11 +281,13 @@ impl universe::VisitRefs for Text {
         let Self {
             string: _,
             font,
+            foreground,
             resolution: _,
             layout_bounds: _,
             positioning: _,
         } = self;
         font.visit_refs(visitor);
+        foreground.visit_refs(visitor);
     }
 }
 
@@ -289,6 +297,7 @@ impl TextBuilder {
         let Self {
             string,
             font,
+            foreground,
             resolution,
             layout_bounds,
             positioning,
@@ -296,6 +305,7 @@ impl TextBuilder {
         Text {
             string,
             font,
+            foreground,
             resolution,
             layout_bounds: layout_bounds.unwrap_or(GridAab::for_block(resolution)),
             positioning,
@@ -362,6 +372,19 @@ impl TextBuilder {
         self.resolution = resolution;
         self
     }
+
+    /// Sets the “foreground color”, or rather voxel, for the text.
+    ///
+    /// This block is interpreted as a voxel in the same way as a block in a [`Primitive::Recur`]
+    /// space would be. However, the result of evaluating this block not cached. Therefore, it is
+    /// highly recommended that the block be stored in a [`block::BlockDef`] (which does cache)
+    /// if it is not trivial, particularly if this text is going to span multiple blocks.
+    ///
+    /// The default value is `Block::from(all_is_cubes_content::palette::ALMOST_BLACK)`.
+    pub fn foreground(mut self, foreground: Block) -> Self {
+        self.foreground = foreground;
+        self
+    }
 }
 
 impl Default for TextBuilder {
@@ -369,6 +392,7 @@ impl Default for TextBuilder {
         Self {
             string: ArcStr::new(),
             font: Font::System16,
+            foreground: Block::from(palette::ALMOST_BLACK), // TODO: wish this wasn't a repeated allocation
             resolution: Resolution::R16,
             layout_bounds: None,
             positioning: Positioning {
@@ -509,6 +533,7 @@ mod serialization {
             let &text::Text {
                 ref string,
                 ref font,
+                ref foreground,
                 resolution,
                 layout_bounds,
                 positioning,
@@ -516,6 +541,7 @@ mod serialization {
             schema::TextSer::TextV1 {
                 string: string.clone(),
                 font: font.into(),
+                foreground: foreground.clone(),
                 resolution,
                 layout_bounds,
                 positioning: positioning.into(),
@@ -529,12 +555,14 @@ mod serialization {
                 schema::TextSer::TextV1 {
                     string,
                     font,
+                    foreground,
                     resolution,
                     layout_bounds,
                     positioning,
                 } => text::Text::builder()
                     .string(string)
                     .font(font.into())
+                    .foreground(foreground)
                     .layout_bounds(resolution, layout_bounds)
                     .positioning(positioning.into())
                     .build(),
@@ -695,4 +723,6 @@ mod tests {
             ]
         )
     }
+
+    // TODO: test that voxel attributes are as expected
 }

@@ -229,6 +229,7 @@ fn block_text() {
                 text::Text::builder()
                     .string(literal!("hello"))
                     .font(text::Font::System16) // TODO: use a nondefault font once such are stable
+                    .foreground(Block::from(rgba_const!(1.0, 0.0, 0.0, 1.0)))
                     .layout_bounds(
                         Resolution::R32,
                         GridAab::from_lower_upper([0, 1, 2], [3, 4, 5]),
@@ -250,6 +251,13 @@ fn block_text() {
                     "type": "TextV1",
                     "string": "hello",
                     "font": "System16V1",
+                    "foreground": {
+                        "type": "BlockV1",
+                        "primitive": {
+                            "type": "AtomV1",
+                            "color": [1.0, 0.0, 0.0, 1.0],
+                        },
+                    },
                     "resolution": 32,
                     "layout_bounds":{
                         "lower": [0, 1, 2],
