@@ -1,3 +1,5 @@
+use all_is_cubes::arcstr;
+use all_is_cubes::block::{text, Primitive};
 use all_is_cubes::space::CubeTransaction;
 use alloc::string::ToString as _;
 use alloc::sync::Arc;
@@ -8,22 +10,14 @@ use strum::IntoEnumIterator;
 use all_is_cubes::{
     block::{
         Block, BlockAttributes,
-        Resolution::{self, R16},
+        Resolution::{self},
     },
     character::Spawn,
     content::palette,
-    drawing::{
-        draw_to_blocks,
-        embedded_graphics::{
-            mono_font::{iso_8859_1::FONT_9X18_BOLD, MonoTextStyle},
-            prelude::Point,
-            text::{Baseline, Text},
-        },
-    },
     euclid::Vector3D,
     inv::Tool,
     linking::InGenError,
-    math::{Face6, GridAab, GridVector, Gridgid},
+    math::{Face6, GridAab, GridVector},
     space::{Space, SpaceBuilder, SpacePhysics, SpaceTransaction},
     transaction::{self, Merge, Transaction as _},
     universe::Universe,
@@ -37,37 +31,29 @@ use crate::UniverseTemplate;
 struct TemplateButton {
     // template: UniverseTemplate,
     background_block: Block,
-    /// TODO: Instead of pregenerated text we should be able to synthesize it as-needed,
-    /// but that requires new facilities in the Universe (insert transactions and GC)
-    text_blocks: Space,
+    text: text::Text,
 }
 
 impl TemplateButton {
-    fn new(universe: &mut Universe, template: UniverseTemplate) -> Result<Self, InGenError> {
+    fn new(_universe: &mut Universe, template: UniverseTemplate) -> Result<Self, InGenError> {
         let background_block = Block::builder()
             .display_name(template.to_string())
             .color(palette::MENU_FRAME)
             .build();
 
-        // TODO: We should be doing this when the widget is instantiated, not now, but that's not yet possible.
-        let text_blocks = draw_to_blocks(
-            universe,
-            R16,
-            0,
-            0..1,
-            BlockAttributes::default(),
-            &Text::with_baseline(
-                &template.to_string(),
-                Point::new(0, 0),
-                MonoTextStyle::new(&FONT_9X18_BOLD, palette::ALMOST_BLACK),
-                Baseline::Bottom,
-            ),
-        )?;
+        let text = text::Text::builder()
+            .string(arcstr::format!("{template}"))
+            .positioning(text::Positioning {
+                x: text::PositioningX::Left,
+                line_y: text::PositioningY::BodyMiddle,
+                z: text::PositioningZ::Back,
+            })
+            .build();
 
         Ok(Self {
             // template,
             background_block,
-            text_blocks,
+            text,
         })
     }
 }
@@ -95,6 +81,7 @@ struct TemplateButtonController {
 }
 impl vui::WidgetController for TemplateButtonController {
     fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
+        let text = &self.definition.text;
         // TODO: propagate error
         let bounds = &mut self.position.bounds;
         let background_bounds = bounds.abut(Face6::NZ, -1).unwrap();
@@ -107,16 +94,15 @@ impl vui::WidgetController for TemplateButtonController {
         });
 
         // Fill text
-        let text_dest_origin = GridVector::new(
-            bounds.lower_bounds().x,
-            bounds.lower_bounds().y,
-            bounds.upper_bounds().z - 1,
-        );
-        txn.merge_from(crate::alg::space_to_transaction_copy(
-            &self.definition.text_blocks,
-            text_bounds.translate(-text_dest_origin),
-            Gridgid::from_translation(text_dest_origin),
-        ))
+        txn.merge_from(SpaceTransaction::filling(text_bounds, |cube| {
+            CubeTransaction::replacing(
+                None,
+                Some(Block::from_primitive(Primitive::Text {
+                    text: text.clone(),
+                    offset: cube.lower_bounds() - text_bounds.lower_bounds(),
+                })),
+            )
+        }))
         .unwrap();
 
         Ok(txn)
