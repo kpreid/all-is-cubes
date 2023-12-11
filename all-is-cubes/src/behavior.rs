@@ -563,7 +563,7 @@ impl<H: BehaviorHost> BehaviorSetTransaction<H> {
 }
 
 impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
-    type CommitCheck = ();
+    type CommitCheck = CommitCheck;
     type Output = transaction::NoOutput;
 
     #[allow(clippy::vtable_address_comparisons)] // The hazards should be okay for this use case
@@ -603,13 +603,13 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
         // Currently, insertions always succeed.
         let _ = insert;
 
-        Ok(())
+        Ok(CommitCheck { _private: () })
     }
 
     fn commit(
         &self,
         target: &mut BehaviorSet<H>,
-        (): Self::CommitCheck,
+        _: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
         for (key, replacement) in &self.replace {
@@ -667,7 +667,7 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
 }
 
 impl<H: BehaviorHost> transaction::Merge for BehaviorSetTransaction<H> {
-    type MergeCheck = ();
+    type MergeCheck = MergeCheck;
     type Conflict = BehaviorTransactionConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
@@ -679,10 +679,10 @@ impl<H: BehaviorHost> transaction::Merge for BehaviorSetTransaction<H> {
         {
             return Err(BehaviorTransactionConflict { key });
         }
-        Ok(())
+        Ok(MergeCheck { _private: () })
     }
 
-    fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
+    fn commit_merge(&mut self, other: Self, _: Self::MergeCheck) {
         self.replace.extend(other.replace);
         self.insert.extend(other.insert);
     }
@@ -749,6 +749,17 @@ impl<H: BehaviorHost> Clone for Replace<H> {
             new: self.new.clone(),
         }
     }
+}
+
+#[derive(Debug)]
+#[doc(hidden)] // not interesting
+pub struct CommitCheck {
+    _private: (),
+}
+#[derive(Debug)]
+#[doc(hidden)] // not interesting
+pub struct MergeCheck {
+    _private: (),
 }
 
 /// Transaction conflict error type for a [`BehaviorSet`].

@@ -206,12 +206,16 @@ pub struct UniverseTransaction {
 // TODO: Benchmark cheaper HashMaps / using BTreeMap here
 #[doc(hidden)] // Almost certainly will never need to be used explicitly
 #[derive(Debug)]
-pub struct UniverseMergeCheck(HbHashMap<Name, MemberMergeCheck>);
+pub struct UniverseMergeCheck {
+    members: HbHashMap<Name, MemberMergeCheck>,
+    behaviors: behavior::MergeCheck,
+}
 #[doc(hidden)] // Almost certainly will never need to be used explicitly
 #[derive(Debug)]
 pub struct UniverseCommitCheck {
     members: HbHashMap<Name, MemberCommitCheck>,
     anonymous_insertions: Vec<MemberCommitCheck>,
+    behaviors: behavior::CommitCheck,
 }
 
 /// Transaction conflict error type for [`UniverseTransaction`].
@@ -380,6 +384,7 @@ impl Transaction<Universe> for UniverseTransaction {
         Ok(UniverseCommitCheck {
             members: member_checks,
             anonymous_insertions: insert_checks,
+            behaviors: self.behaviors.check(&target.behaviors)?,
         })
     }
 
@@ -395,6 +400,11 @@ impl Transaction<Universe> for UniverseTransaction {
             behaviors,
             universe_id,
         } = self;
+        let UniverseCommitCheck {
+            members: check_members,
+            anonymous_insertions: check_anon,
+            behaviors: check_behaviors,
+        } = checks;
 
         // final sanity check so we can't ever modify the wrong universe
         if let Some(universe_id) = *universe_id {
@@ -407,21 +417,21 @@ impl Transaction<Universe> for UniverseTransaction {
             }
         }
 
-        for (name, check) in checks.members {
+        for (name, check) in check_members {
             members[&name]
                 .commit(target, &name, check, outputs)
                 .map_err(|e| e.context(format!("universe member {name}")))?;
         }
 
-        for (new_member, check) in anonymous_insertions
-            .iter()
-            .cloned()
-            .zip(checks.anonymous_insertions)
-        {
+        for (new_member, check) in anonymous_insertions.iter().cloned().zip(check_anon) {
             new_member.commit(target, &Name::Pending, check, outputs)?;
         }
 
-        behaviors.commit(&mut target.behaviors, (), &mut transaction::no_outputs)?;
+        behaviors.commit(
+            &mut target.behaviors,
+            check_behaviors,
+            &mut transaction::no_outputs,
+        )?;
 
         Ok(())
     }
@@ -437,17 +447,19 @@ impl Merge for UniverseTransaction {
                 return Err(UniverseConflict::DifferentUniverse(id1, id2));
             }
         }
-        let members = self
-            .members
-            .check_merge(&other.members)
-            .map_err(UniverseConflict::Member)?;
-        self.behaviors
-            .check_merge(&other.behaviors)
-            .map_err(UniverseConflict::Behaviors)?;
-        Ok(UniverseMergeCheck(members))
+        Ok(UniverseMergeCheck {
+            members: self
+                .members
+                .check_merge(&other.members)
+                .map_err(UniverseConflict::Member)?,
+            behaviors: self
+                .behaviors
+                .check_merge(&other.behaviors)
+                .map_err(UniverseConflict::Behaviors)?,
+        })
     }
 
-    fn commit_merge(&mut self, other: Self, UniverseMergeCheck(check): Self::MergeCheck) {
+    fn commit_merge(&mut self, other: Self, check: Self::MergeCheck) {
         let Self {
             members,
             anonymous_insertions,
@@ -455,9 +467,9 @@ impl Merge for UniverseTransaction {
             universe_id,
         } = self;
 
-        members.commit_merge(other.members, check);
+        members.commit_merge(other.members, check.members);
         anonymous_insertions.extend(other.anonymous_insertions);
-        behaviors.commit_merge(other.behaviors, ());
+        behaviors.commit_merge(other.behaviors, check.behaviors);
         transaction::merge_option(
             universe_id,
             other.universe_id,
