@@ -35,6 +35,9 @@ pub struct SpaceTransaction {
     behaviors: BehaviorSetTransaction<Space>,
 }
 
+#[derive(Debug)]
+struct SpaceTransactionCheck(<BehaviorSetTransaction<Space> as Transaction>::CommitCheck);
+
 impl SpaceTransaction {
     /// Allows modifying the part of this transaction which is a [`CubeTransaction`] at the given
     /// cube, creating it if necessary (as [`CubeTransaction::default()`]).
@@ -181,8 +184,7 @@ impl SpaceTransaction {
         palette: &space::Palette,
         contents: Vol<&[space::BlockIndex]>,
         behaviors: &behavior::BehaviorSet<Space>,
-    ) -> Result<<BehaviorSetTransaction<Space> as Transaction>::CommitCheck, SpaceTransactionMismatch>
-    {
+    ) -> Result<SpaceTransactionCheck, SpaceTransactionMismatch> {
         for (
             &cube,
             CubeTransaction {
@@ -217,15 +219,16 @@ impl SpaceTransaction {
                 }
             }
         }
-        self.behaviors
-            .check(behaviors)
-            .map_err(SpaceTransactionMismatch::Behaviors)
+        match self.behaviors.check(behaviors) {
+            Ok(c) => Ok(SpaceTransactionCheck(c)),
+            Err(e) => Err(SpaceTransactionMismatch::Behaviors(e)),
+        }
     }
 
     fn commit_common(
         &self,
         m: &mut Mutation<'_, '_>,
-        check: behavior::CommitCheck,
+        SpaceTransactionCheck(check): SpaceTransactionCheck,
     ) -> Result<(), CommitError> {
         let mut to_activate = Vec::new();
 
@@ -304,7 +307,7 @@ impl SpaceTransaction {
 impl Transaction for SpaceTransaction {
     type Target = Space;
     type Context<'a> = ReadTicket<'a>;
-    type CommitCheck = <BehaviorSetTransaction<Space> as Transaction>::CommitCheck;
+    type CommitCheck = impl fmt::Debug;
     type Output = NoOutput;
     type Mismatch = SpaceTransactionMismatch;
 
@@ -324,7 +327,7 @@ impl Transaction for SpaceTransaction {
 }
 
 impl Merge for SpaceTransaction {
-    type MergeCheck = <BehaviorSetTransaction<Space> as Merge>::MergeCheck;
+    type MergeCheck = impl fmt::Debug;
     type Conflict = SpaceTransactionConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
@@ -590,6 +593,7 @@ impl CubeTransaction {
 }
 
 impl Merge for CubeTransaction {
+    /// Not opaque because [`SpaceTransaction`] uses it
     type MergeCheck = CubeMergeCheck;
     type Conflict = CubeConflict;
 
