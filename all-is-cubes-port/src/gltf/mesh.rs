@@ -3,7 +3,6 @@ use std::fmt;
 use std::mem::size_of;
 
 use bytemuck::offset_of;
-use gltf_json::extras::Void;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
@@ -250,8 +249,9 @@ impl Materials {
                             transmission_factor:
                                 gltf_json::extensions::material::TransmissionFactor::default(),
                             transmission_texture: None,
-                            extras: Void::default(),
+                            extras: Default::default(), // feature-variable type
                         }),
+                        ..Default::default() // feature-variable additional fields
                     }),
                     ..gltf_json::Material::default()
                 },
