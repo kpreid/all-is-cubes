@@ -151,8 +151,7 @@ impl Aab {
     /// The ordering is deterministic but not currently declared stable.
     pub(crate) fn corner_points(
         self,
-    ) -> impl Iterator<Item = FreePoint> + DoubleEndedIterator + ExactSizeIterator + FusedIterator
-    {
+    ) -> impl DoubleEndedIterator<Item = FreePoint> + ExactSizeIterator + FusedIterator {
         let l = self.lower_bounds;
         let u = self.upper_bounds;
         (0..8).map(move |i| {

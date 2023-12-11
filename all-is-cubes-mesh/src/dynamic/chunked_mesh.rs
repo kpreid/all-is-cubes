@@ -140,7 +140,7 @@ where
     pub fn iter_in_view<'a>(
         &'a self,
         camera: &'a Camera,
-    ) -> impl Iterator<Item = &'a ChunkMesh<M, CHUNK_SIZE>> + DoubleEndedIterator + 'a {
+    ) -> impl DoubleEndedIterator<Item = &'a ChunkMesh<M, CHUNK_SIZE>> + 'a {
         // TODO: can we make fewer details (like view_direction_mask) public, now that this method exists? Should we?
         self.chunk_chart
             .chunks(self.view_chunk(), camera.view_direction_mask())

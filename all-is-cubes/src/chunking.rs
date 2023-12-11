@@ -216,7 +216,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
         &self,
         origin: ChunkPos<CHUNK_SIZE>,
         mask: OctantMask,
-    ) -> impl Iterator<Item = ChunkPos<CHUNK_SIZE>> + DoubleEndedIterator + FusedIterator + '_ {
+    ) -> impl DoubleEndedIterator<Item = ChunkPos<CHUNK_SIZE>> + FusedIterator + '_ {
         self.octant_chunks[self.octant_range]
             .iter()
             .copied()
