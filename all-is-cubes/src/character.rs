@@ -725,11 +725,7 @@ impl CharacterTransaction {
 #[allow(clippy::type_complexity)]
 impl Transaction for CharacterTransaction {
     type Target = Character;
-    type CommitCheck = (
-        <BodyTransaction as Transaction>::CommitCheck,
-        <InventoryTransaction as Transaction>::CommitCheck,
-        <BehaviorSetTransaction<Character> as Transaction>::CommitCheck,
-    );
+    type CommitCheck = impl fmt::Debug;
     type Output = transaction::NoOutput;
     type Mismatch = CharacterTransactionMismatch;
 
@@ -781,11 +777,7 @@ impl Transaction for CharacterTransaction {
 }
 
 impl Merge for CharacterTransaction {
-    type MergeCheck = (
-        <BodyTransaction as Merge>::MergeCheck,
-        <InventoryTransaction as Merge>::MergeCheck,
-        <BehaviorSetTransaction<Character> as Merge>::MergeCheck,
-    );
+    type MergeCheck = impl fmt::Debug;
     type Conflict = CharacterTransactionConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {

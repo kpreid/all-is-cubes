@@ -173,7 +173,7 @@ impl SpaceTransaction {
 
 impl Transaction for SpaceTransaction {
     type Target = Space;
-    type CommitCheck = <BehaviorSetTransaction<Space> as Transaction>::CommitCheck;
+    type CommitCheck = impl fmt::Debug;
     type Output = NoOutput;
     type Mismatch = SpaceTransactionMismatch;
 
@@ -298,7 +298,7 @@ impl Transaction for SpaceTransaction {
 }
 
 impl Merge for SpaceTransaction {
-    type MergeCheck = <BehaviorSetTransaction<Space> as Merge>::MergeCheck;
+    type MergeCheck = impl fmt::Debug;
     type Conflict = SpaceTransactionConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
@@ -566,6 +566,7 @@ impl CubeTransaction {
 }
 
 impl Merge for CubeTransaction {
+    /// Not opaque because [`SpaceTransaction`] uses it
     type MergeCheck = CubeMergeCheck;
     type Conflict = CubeConflict;
 
