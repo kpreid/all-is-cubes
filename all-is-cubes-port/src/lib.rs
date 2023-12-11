@@ -105,7 +105,7 @@ pub async fn export_to_path(
 }
 
 /// Selection of the data to be exported.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ExportSet {
     /// `PartialUniverse` is defined in the `all_is_cubes` crate so that it can get access
     /// to the same serialization helpers as `Universe` and be guaranteed to serialize the
@@ -114,6 +114,11 @@ pub struct ExportSet {
 }
 
 impl ExportSet {
+    /// Set containing no elements.
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
     /// Construct an [`ExportSet`] specifying exporting all members of the universe
     /// (insofar as that is possible).
     ///
