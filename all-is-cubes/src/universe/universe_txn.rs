@@ -84,6 +84,15 @@ where
     check: <O::Transaction as Transaction<O>>::CommitCheck,
 }
 
+impl<O> fmt::Debug for TransactionInUniverseCheck<O>
+where
+    O: Transactional + 'static,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.check.fmt(f)
+    }
+}
+
 impl<O> Merge for TransactionInUniverse<O>
 where
     O: Transactional + 'static,
@@ -206,18 +215,20 @@ pub struct UniverseTransaction {
 }
 
 // TODO: Benchmark cheaper HashMaps / using BTreeMap here
-#[doc(hidden)] // Almost certainly will never need to be used explicitly
 #[derive(Debug)]
+#[doc(hidden)] // Almost certainly will never need to be used explicitly
 pub struct UniverseMergeCheck {
     members: HbHashMap<Name, MemberMergeCheck>,
-    behaviors: behavior::MergeCheck,
+    behaviors: <behavior::BehaviorSetTransaction<Universe> as Merge>::MergeCheck,
 }
 #[doc(hidden)] // Almost certainly will never need to be used explicitly
 #[derive(Debug)]
-pub struct UniverseCommitCheck {
+struct UniverseCommitCheck {
     members: HbHashMap<Name, MemberCommitCheck>,
     anonymous_insertions: Vec<MemberCommitCheck>,
-    behaviors: behavior::CommitCheck,
+    behaviors: <behavior::BehaviorSetTransaction<Universe> as Transaction<
+        behavior::BehaviorSet<Universe>,
+    >>::CommitCheck,
 }
 
 /// Transaction conflict error type for [`UniverseTransaction`].
@@ -397,7 +408,7 @@ impl From<AnyTransaction> for UniverseTransaction {
 }
 
 impl Transaction<Universe> for UniverseTransaction {
-    type CommitCheck = UniverseCommitCheck;
+    type CommitCheck = impl fmt::Debug;
     type Output = transaction::NoOutput;
 
     fn check(&self, target: &Universe) -> Result<Self::CommitCheck, PreconditionFailed> {
@@ -490,7 +501,7 @@ impl Transaction<Universe> for UniverseTransaction {
 }
 
 impl Merge for UniverseTransaction {
-    type MergeCheck = UniverseMergeCheck;
+    type MergeCheck = impl fmt::Debug;
     type Conflict = UniverseConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
@@ -518,10 +529,14 @@ impl Merge for UniverseTransaction {
             behaviors,
             universe_id,
         } = self;
+        let UniverseMergeCheck {
+            members: check_members,
+            behaviors: check_behaviors,
+        } = check;
 
-        members.commit_merge(other.members, check.members);
+        members.commit_merge(other.members, check_members);
         anonymous_insertions.extend(other.anonymous_insertions);
-        behaviors.commit_merge(other.behaviors, check.behaviors);
+        behaviors.commit_merge(other.behaviors, check_behaviors);
         transaction::merge_option(
             universe_id,
             other.universe_id,

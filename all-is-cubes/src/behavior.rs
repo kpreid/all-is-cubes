@@ -563,7 +563,7 @@ impl<H: BehaviorHost> BehaviorSetTransaction<H> {
 }
 
 impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
-    type CommitCheck = CommitCheck;
+    type CommitCheck = impl fmt::Debug;
     type Output = transaction::NoOutput;
 
     #[allow(ambiguous_wide_pointer_comparisons)] // The hazards should be okay for this use case
@@ -667,7 +667,7 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
 }
 
 impl<H: BehaviorHost> transaction::Merge for BehaviorSetTransaction<H> {
-    type MergeCheck = MergeCheck;
+    type MergeCheck = impl fmt::Debug;
     type Conflict = BehaviorTransactionConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {

@@ -7,7 +7,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::{fmt, mem};
 
-use crate::behavior::{self, BehaviorSet, BehaviorSetTransaction};
+use crate::behavior::{self, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::drawing::DrawingPlane;
 use crate::fluff::Fluff;
@@ -169,8 +169,7 @@ impl SpaceTransaction {
 }
 
 impl Transaction<Space> for SpaceTransaction {
-    type CommitCheck =
-        <BehaviorSetTransaction<Space> as Transaction<BehaviorSet<Space>>>::CommitCheck;
+    type CommitCheck = impl fmt::Debug;
     type Output = NoOutput;
 
     fn check(&self, space: &Space) -> Result<Self::CommitCheck, PreconditionFailed> {
@@ -294,7 +293,7 @@ impl Transaction<Space> for SpaceTransaction {
 }
 
 impl Merge for SpaceTransaction {
-    type MergeCheck = <BehaviorSetTransaction<Space> as Merge>::MergeCheck;
+    type MergeCheck = impl fmt::Debug;
     type Conflict = SpaceTransactionConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
@@ -513,6 +512,7 @@ impl CubeTransaction {
 }
 
 impl Merge for CubeTransaction {
+    /// Not opaque because [`SpaceTransaction`] uses it
     type MergeCheck = CubeMergeCheck;
     type Conflict = CubeConflict;
 
