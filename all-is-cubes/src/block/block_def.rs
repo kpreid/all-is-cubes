@@ -319,7 +319,7 @@ impl BlockDefTransaction {
 
 impl Transaction for BlockDefTransaction {
     type Target = BlockDef;
-    type CommitCheck = ();
+    type CommitCheck = impl fmt::Debug;
     type Output = transaction::NoOutput;
     type Mismatch = BlockDefMismatch;
 
@@ -332,9 +332,10 @@ impl Transaction for BlockDefTransaction {
     fn commit(
         &self,
         target: &mut BlockDef,
-        (): Self::CommitCheck,
+        check: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
+        let (): () = check; // https://github.com/rust-lang/rust/issues/113596
         if let Equal(Some(new)) = &self.new {
             target.state = BlockDefState::new(new.clone());
             target.notifier.notify(&BlockChange::new());
@@ -344,7 +345,7 @@ impl Transaction for BlockDefTransaction {
 }
 
 impl transaction::Merge for BlockDefTransaction {
-    type MergeCheck = ();
+    type MergeCheck = impl fmt::Debug;
     type Conflict = BlockDefConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
@@ -365,7 +366,8 @@ impl transaction::Merge for BlockDefTransaction {
         }
     }
 
-    fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
+    fn commit_merge(&mut self, other: Self, check: Self::MergeCheck) {
+        let (): () = check; // https://github.com/rust-lang/rust/issues/113596
         let Self { old, new } = self;
         old.commit_merge(other.old, ());
         new.commit_merge(other.new, ());
