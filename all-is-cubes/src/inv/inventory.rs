@@ -399,14 +399,14 @@ impl InventoryTransaction {
 
 impl Transaction for InventoryTransaction {
     type Target = Inventory;
-    type CommitCheck = Option<InventoryCheck>;
+    type CommitCheck = impl fmt::Debug;
     type Output = InventoryChange;
     type Mismatch = InventoryMismatch;
 
     fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, Self::Mismatch> {
         // Don't do the expensive copy if we have one already
         if self.replace.is_empty() && self.insert.is_empty() {
-            return Ok(None);
+            return Ok(None::<InventoryCheck>);
         }
 
         // The simplest bulletproof algorithm to ensure we're stacking everything right
@@ -474,7 +474,7 @@ impl Transaction for InventoryTransaction {
 }
 
 impl Merge for InventoryTransaction {
-    type MergeCheck = ();
+    type MergeCheck = impl fmt::Debug;
     type Conflict = InventoryConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
