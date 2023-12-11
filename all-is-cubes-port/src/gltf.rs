@@ -19,7 +19,7 @@ use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, ViewTransform};
 use all_is_cubes::math::VectorOps;
 use all_is_cubes::universe::PartialUniverse;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_mesh::{BlockMesh, MeshOptions, MeshTypes, SpaceMesh};
+use all_is_cubes_mesh::{block_meshes_for_space, BlockMesh, MeshOptions, MeshTypes, SpaceMesh};
 
 mod buffer;
 use buffer::create_buffer_and_accessor;
@@ -378,12 +378,6 @@ pub(crate) async fn export_gltf(
     } = source;
 
     // If unsupported list is nonempty, fail.
-    if let Some(first) = spaces.first() {
-        return Err(ExportError::NotRepresentable {
-            name: Some(first.name()),
-            reason: "Exporting spaces to glTF is not yet supported".into(),
-        });
-    }
     if let Some(first) = characters.first() {
         return Err(ExportError::NotRepresentable {
             name: Some(first.name()),
@@ -391,10 +385,15 @@ pub(crate) async fn export_gltf(
         });
     }
 
+    let [block_def_progress, space_progress] = progress.split(0.5); // TODO: ratio
+
     let mut writer = GltfWriter::new(GltfDataDestination::new(Some(destination.clone()), 2000));
     let mesh_options = MeshOptions::new(&GraphicsOptions::default());
 
-    for (mut p, block_def_ref) in progress.split_evenly(block_defs.len()).zip(block_defs) {
+    for (mut p, block_def_ref) in block_def_progress
+        .split_evenly(block_defs.len())
+        .zip(block_defs)
+    {
         let name = block_def_ref.name();
         p.set_label(&name);
         p.progress(0.01).await;
@@ -423,7 +422,44 @@ pub(crate) async fn export_gltf(
             );
 
             writer.root.scenes.push(json::Scene {
-                name: Some(format!("{name} display scene")),
+                name: Some(format!("{name} block display scene")),
+                nodes: vec![mesh_node],
+                extensions: None,
+                extras: Default::default(),
+            });
+        }
+
+        p.finish().await;
+    }
+
+    for (mut p, space_ref) in space_progress.split_evenly(spaces.len()).zip(spaces) {
+        let name = space_ref.name();
+        p.set_label(&name);
+        p.progress(0.01).await;
+        {
+            // constrained scope so we don't hold UBorrow over an await
+            let space = space_ref.read()?;
+            let block_meshes = block_meshes_for_space::<GltfMt>(
+                &space,
+                &writer.texture_allocator(),
+                &mesh_options,
+            );
+            let mesh: SpaceMesh<GltfMt> =
+                SpaceMesh::new(&space, space.bounds(), &mesh_options, &block_meshes[..]);
+
+            // TODO: everything after here is duplicated vs. the blockdef code above
+
+            let mesh_index = writer.add_mesh(&name, &mesh);
+            let mesh_node = push_and_return_index(
+                &mut writer.root.nodes,
+                gltf_json::Node {
+                    mesh: mesh_index,
+                    ..empty_node(Some(name.to_string()))
+                },
+            );
+
+            writer.root.scenes.push(json::Scene {
+                name: Some(format!("{name} space scene")),
                 nodes: vec![mesh_node],
                 extensions: None,
                 extras: Default::default(),
