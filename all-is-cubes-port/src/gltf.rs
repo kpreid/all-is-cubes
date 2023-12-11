@@ -395,37 +395,40 @@ pub(crate) async fn export_gltf(
     let mesh_options = MeshOptions::new(&GraphicsOptions::default());
 
     for (mut p, block_def_ref) in progress.split_evenly(block_defs.len()).zip(block_defs) {
-        let block_def = block_def_ref.read()?;
         let name = block_def_ref.name();
         p.set_label(&name);
         p.progress(0.01).await;
-        let mesh = SpaceMesh::<GltfMt>::from(&BlockMesh::new(
-            &block_def
-                .evaluate()
-                .map_err(|eve| ExportError::NotRepresentable {
-                    name: Some(name.clone()),
-                    reason: format!("block evaluation failed: {eve}"),
-                })?,
-            &writer.texture_allocator(),
-            &mesh_options,
-        ));
+        {
+            // constrained scope so we don't hold UBorrow over an await
+            let block_def = block_def_ref.read()?;
+            let mesh = SpaceMesh::<GltfMt>::from(&BlockMesh::new(
+                &block_def
+                    .evaluate()
+                    .map_err(|eve| ExportError::NotRepresentable {
+                        name: Some(name.clone()),
+                        reason: format!("block evaluation failed: {eve}"),
+                    })?,
+                &writer.texture_allocator(),
+                &mesh_options,
+            ));
 
-        let mesh_index = writer.add_mesh(&name, &mesh);
-        // TODO: if the mesh is empty/None, should we include the node anyway or not?
-        let mesh_node = push_and_return_index(
-            &mut writer.root.nodes,
-            gltf_json::Node {
-                mesh: mesh_index,
-                ..empty_node(Some(name.to_string()))
-            },
-        );
+            let mesh_index = writer.add_mesh(&name, &mesh);
+            // TODO: if the mesh is empty/None, should we include the node anyway or not?
+            let mesh_node = push_and_return_index(
+                &mut writer.root.nodes,
+                gltf_json::Node {
+                    mesh: mesh_index,
+                    ..empty_node(Some(name.to_string()))
+                },
+            );
 
-        writer.root.scenes.push(json::Scene {
-            name: Some(format!("{name} display scene")),
-            nodes: vec![mesh_node],
-            extensions: None,
-            extras: Default::default(),
-        });
+            writer.root.scenes.push(json::Scene {
+                name: Some(format!("{name} display scene")),
+                nodes: vec![mesh_node],
+                extensions: None,
+                extras: Default::default(),
+            });
+        }
 
         p.finish().await;
     }

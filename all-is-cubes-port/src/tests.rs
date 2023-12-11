@@ -20,6 +20,12 @@ fn errors_are_send_sync() {
     assert_send_sync::<ExportError>();
 }
 
+/// This function won't compile if `load_universe_from_file`'s future isn't Send
+fn _load_universe_from_file_future_is_send() {
+    #![allow(unreachable_code, clippy::diverging_sub_expression)]
+    tokio::spawn(load_universe_from_file(unreachable!(), unreachable!()));
+}
+
 #[tokio::test]
 async fn import_unknown_format() {
     let error = load_universe_from_file(
@@ -36,6 +42,17 @@ async fn import_unknown_format() {
         error.source().unwrap().to_string(),
         "the data is not in a recognized format"
     );
+}
+
+/// This function won't compile if `export_to_path`'s future isn't Send
+fn _export_to_path_future_is_send() {
+    #![allow(unreachable_code, clippy::diverging_sub_expression)]
+    tokio::spawn(export_to_path(
+        unreachable!(),
+        unreachable!(),
+        unreachable!(),
+        unreachable!(),
+    ));
 }
 
 #[test]
