@@ -5,6 +5,7 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::num::NonZeroU16;
+use core::fmt;
 
 use crate::block::Block;
 use crate::character::{Character, CharacterTransaction, Cursor};
@@ -359,13 +360,13 @@ impl InventoryTransaction {
 }
 
 impl Transaction<Inventory> for InventoryTransaction {
-    type CommitCheck = Option<InventoryCheck>;
+    type CommitCheck = impl fmt::Debug;
     type Output = InventoryChange;
 
     fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, PreconditionFailed> {
         // Don't do the expensive copy if we have one already
         if self.replace.is_empty() && self.insert.is_empty() {
-            return Ok(None);
+            return Ok(None::<InventoryCheck>);
         }
 
         // The simplest bulletproof algorithm to ensure we're stacking everything right
@@ -442,7 +443,7 @@ impl Transaction<Inventory> for InventoryTransaction {
 }
 
 impl Merge for InventoryTransaction {
-    type MergeCheck = ();
+    type MergeCheck = impl fmt::Debug;
     type Conflict = InventoryConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {

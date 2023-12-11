@@ -574,7 +574,7 @@ impl<H: BehaviorHost> BehaviorSetTransaction<H> {
 }
 
 impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
-    type CommitCheck = CommitCheck;
+    type CommitCheck = impl fmt::Debug;
     type Output = transaction::NoOutput;
 
     #[allow(ambiguous_wide_pointer_comparisons)] // The hazards should be okay for this use case
@@ -620,9 +620,11 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
     fn commit(
         &self,
         target: &mut BehaviorSet<H>,
-        _: Self::CommitCheck,
+        check: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
+        let CommitCheck { _private: () } = check;
+
         for (key, replacement) in &self.replace {
             match &replacement.new {
                 Some(new) => {
@@ -678,7 +680,7 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
 }
 
 impl<H: BehaviorHost> transaction::Merge for BehaviorSetTransaction<H> {
-    type MergeCheck = MergeCheck;
+    type MergeCheck = impl fmt::Debug;
     type Conflict = BehaviorTransactionConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
@@ -693,7 +695,9 @@ impl<H: BehaviorHost> transaction::Merge for BehaviorSetTransaction<H> {
         Ok(MergeCheck { _private: () })
     }
 
-    fn commit_merge(&mut self, other: Self, _: Self::MergeCheck) {
+    fn commit_merge(&mut self, other: Self, check: Self::MergeCheck) {
+        let MergeCheck { _private: () } = check;
+
         self.replace.extend(other.replace);
         self.insert.extend(other.insert);
     }

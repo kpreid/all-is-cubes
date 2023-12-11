@@ -315,7 +315,7 @@ impl BlockDefTransaction {
 }
 
 impl Transaction<BlockDef> for BlockDefTransaction {
-    type CommitCheck = ();
+    type CommitCheck = impl fmt::Debug;
     type Output = transaction::NoOutput;
 
     fn check(
@@ -348,7 +348,7 @@ impl Transaction<BlockDef> for BlockDefTransaction {
 }
 
 impl transaction::Merge for BlockDefTransaction {
-    type MergeCheck = ();
+    type MergeCheck = impl fmt::Debug;
     type Conflict = BlockDefConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {

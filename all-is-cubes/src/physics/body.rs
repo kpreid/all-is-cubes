@@ -701,7 +701,7 @@ impl transaction::Transactional for Body {
 }
 
 impl Transaction<Body> for BodyTransaction {
-    type CommitCheck = ();
+    type CommitCheck = impl fmt::Debug;
     type Output = transaction::NoOutput;
 
     fn check(&self, _body: &Body) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
@@ -721,7 +721,7 @@ impl Transaction<Body> for BodyTransaction {
 }
 
 impl transaction::Merge for BodyTransaction {
-    type MergeCheck = ();
+    type MergeCheck = impl fmt::Debug;
     type Conflict = core::convert::Infallible;
 
     fn check_merge(&self, _other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
