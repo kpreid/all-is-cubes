@@ -20,6 +20,12 @@ test = false
 doctest = false
 
 [[test]]
+name = "gltf-render"
+doctest = false
+harness = false
+required-features = ["gltf"]
+
+[[test]]
 name = "ray-render"
 doctest = false
 harness = false
@@ -29,10 +35,23 @@ name = "wgpu-render"
 doctest = false
 harness = false
 
+[features]
+default = []
+gltf = [
+    "dep:all-is-cubes-port",
+    "dep:rend3",
+    "dep:rend3-gltf",
+    "dep:rend3-routine",
+    "dep:glam", # activates mint feature for interop
+    "dep:mint",
+    "tokio/fs",
+]
+
 [dependencies]
 all-is-cubes = { path = "../all-is-cubes", features = ["save", "threads"] }
 all-is-cubes-content = { path = "../all-is-cubes-content" }
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", features = ["wgpu"] }
+all-is-cubes-port = { path = "../all-is-cubes-port", optional = true, features = [] }
 all-is-cubes-ui = { path = "../all-is-cubes-ui" }
 async_fn_traits = { workspace = true }
 bytemuck = { workspace = true }
@@ -41,13 +60,20 @@ clap = { workspace = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }
 futures-util = { workspace = true, features = ["std"] }
+# Must be the same version of glam as rend3 uses
+glam = { version = "0.24", optional = true, features = ["mint"] }
 image = { workspace = true, features = ["png"] }
 itertools = { workspace = true }
+mint = { version = "0.5.9", optional = true }
+rend3 = { git = "https://github.com/BVE-Reborn/rend3/", rev = "a68c76a2809cf545484d727e32a222400134d085", optional = true }
+rend3-gltf = { git = "https://github.com/BVE-Reborn/rend3/", rev = "a68c76a2809cf545484d727e32a222400134d085", optional = true, default-features = false }
+rend3-routine = { git = "https://github.com/BVE-Reborn/rend3/", rev = "a68c76a2809cf545484d727e32a222400134d085", optional = true }
 rendiff = { workspace = true }
 send_wrapper = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 simplelog = { workspace = true }
+tempfile = { workspace = true }
 # tinytemplate is already in the workspace's dependency tree via criterion,
 # so let's use it for our output report template.
 tinytemplate = "1.2.1"

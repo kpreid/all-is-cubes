@@ -18,15 +18,21 @@ pub struct ImageId {
 #[allow(clippy::exhaustive_enums)]
 pub enum RendererId {
     /// A single expected output expected to be equal for all renderers.
+    /// No renderer uses this value.
     All,
 
+    /// Used by tests/gltf-render.rs
+    Gltf,
+    /// Used by tests/ray-render.rs
     Raytracer,
+    /// Used by tests/wgpu-render.rs
     Wgpu,
 }
 impl RendererId {
     fn as_str(&self) -> &'static str {
         match self {
             RendererId::All => "all",
+            RendererId::Gltf => "gltf",
             RendererId::Raytracer => "ray",
             RendererId::Wgpu => "wgpu",
         }
@@ -34,7 +40,12 @@ impl RendererId {
 }
 impl clap::ValueEnum for RendererId {
     fn value_variants<'a>() -> &'a [Self] {
-        &[RendererId::All, RendererId::Raytracer, RendererId::Wgpu]
+        &[
+            RendererId::All,
+            RendererId::Gltf,
+            RendererId::Raytracer,
+            RendererId::Wgpu,
+        ]
     }
 
     fn to_possible_value(&self) -> Option<PossibleValue> {

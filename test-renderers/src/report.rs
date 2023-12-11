@@ -27,6 +27,7 @@ pub(crate) fn write_report_file() -> PathBuf {
         // These must be in the same order that the template displays columns
         RendererId::Raytracer,
         RendererId::Wgpu,
+        RendererId::Gltf,
     ]
     .into_iter()
     .map(|id| match fs::File::open(results_json_path(id)) {
