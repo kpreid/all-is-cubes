@@ -292,6 +292,9 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
 async fn TEXT(_: &Exhibit, _universe: &mut Universe) {
     use all_is_cubes::block::text;
 
+    let foreground_block = Block::from(palette::HUD_TEXT_FILL);
+    let outline_block = Block::from(palette::HUD_TEXT_STROKE);
+
     struct Texhibit {
         text: text::Text,
         f: Box<dyn Fn(Block) -> Block>,
@@ -338,6 +341,20 @@ async fn TEXT(_: &Exhibit, _universe: &mut Universe) {
                 f: Box::new(move |text_block| op.clone().compose_or_replace(text_block)),
                 offset: vec3(0, 2, 0),
             }
+        },
+        Texhibit {
+            text: text::Text::builder()
+                .string(literal!("left back outline"))
+                .foreground(foreground_block)
+                .outline(Some(outline_block))
+                .positioning(text::Positioning {
+                    x: text::PositioningX::Left,
+                    line_y: text::PositioningY::BodyBottom,
+                    z: text::PositioningZ::Back,
+                })
+                .build(),
+            f: Box::new(identity),
+            offset: vec3(0, 3, 0),
         },
     ];
 
