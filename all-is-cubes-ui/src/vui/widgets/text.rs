@@ -158,7 +158,7 @@ impl Widget for Label {
         // TODO: memoize `Text` construction for slightly more efficient reuse of widget
         // (this will only matter once `Text` memoizes glyph layout)
 
-        widgets::OneshotController::new(draw_text_txn(&self.text(grant.gravity), grant))
+        widgets::OneshotController::new(draw_text_txn(&self.text(grant.gravity), grant, true))
     }
 }
 
@@ -201,24 +201,39 @@ fn gravity_to_positioning(gravity: vui::Gravity, ignore_y: bool) -> text::Positi
     }
 }
 
-fn draw_text_txn(text: &BlockText, grant: &LayoutGrant) -> SpaceTransaction {
+/// Produce a transaction for a widget to draw text in its grant.
+///
+/// If `shrink` is true, does not affect cubes outside the bounds of the text.
+/// If `shrink` is false, draws to the entire grant.
+pub(crate) fn draw_text_txn(
+    text: &BlockText,
+    full_grant: &LayoutGrant,
+    shrink: bool,
+) -> SpaceTransaction {
     let text_aabb = text.bounding_blocks();
-    let grant = grant.shrink_to(text_aabb.size(), true);
-    let translation = grant.bounds.lower_bounds() - text_aabb.lower_bounds();
+    let shrunk_grant = full_grant.shrink_to(text_aabb.size(), true);
+    let translation = shrunk_grant.bounds.lower_bounds() - text_aabb.lower_bounds();
 
     // This is like `BlockText::installation()` but if the text ends up too big it is truncated.
     // TODO: But it shouldn't necessarily be truncated to the lower-left corner which is what
     // our choice of translation calculation is doing
     SpaceTransaction::filling(
-        grant.bounds, // doesn't over-fill because it's been shrunk
+        if shrink {
+            shrunk_grant.bounds
+        } else {
+            full_grant.bounds
+        },
         |cube| {
-            CubeTransaction::replacing(
-                None,
-                Some(block::Block::from_primitive(block::Primitive::Text {
+            let block = if !shrink && !shrunk_grant.bounds.contains_cube(cube) {
+                // The text doesn't touch this cube, so don't use the text primitive.
+                block::AIR
+            } else {
+                block::Block::from_primitive(block::Primitive::Text {
                     text: text.clone(),
                     offset: cube.lower_bounds().to_vector() - translation,
-                })),
-            )
+                })
+            };
+            CubeTransaction::replacing(None, Some(block))
         },
     )
 }

@@ -2,11 +2,8 @@ use alloc::sync::Arc;
 use core::fmt;
 use std::sync::Mutex;
 
-use all_is_cubes::block::Block;
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::character::Character;
-use all_is_cubes::content::palette;
-use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::Icons;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen::ListenableSource;
@@ -20,8 +17,6 @@ use crate::ui_content::pages::open_page_button;
 use crate::ui_content::{CueNotifier, VuiMessage, VuiPageState};
 use crate::vui::widgets::{self, TooltipState, WidgetBlocks};
 use crate::vui::{self, LayoutTree, UiBlocks, Widget, WidgetTree};
-
-pub(crate) use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
 pub(crate) const TOOLBAR_POSITIONS: usize = 10;
 
@@ -65,7 +60,7 @@ pub(super) fn new_hud_widget_tree(
         universe,
         hud_inputs.cue_channel.clone(),
     );
-    let tooltip = widgets::Tooltip::new(tooltip_state, hud_inputs.hud_blocks.clone(), universe);
+    let tooltip = widgets::Tooltip::new(tooltip_state, hud_inputs.hud_blocks.clone());
     let hud_widget_tree: WidgetTree = Arc::new(LayoutTree::Hud {
         crosshair: vui::leaf_widget(widgets::Crosshair::new(
             hud_inputs.hud_blocks.widget_theme.widget_blocks[WidgetBlocks::Crosshair].clone(),
@@ -142,7 +137,6 @@ pub(crate) struct HudBlocks {
     pub(crate) widget_theme: widgets::WidgetTheme,
     pub(crate) ui_blocks: BlockProvider<UiBlocks>,
     pub(crate) icons: BlockProvider<Icons>,
-    pub(crate) text: VoxelBrush<'static>,
 }
 
 impl HudBlocks {
@@ -150,22 +144,12 @@ impl HudBlocks {
         let [p12, p3] = p.split(0.667);
         let [p1, p2] = p12.split(0.5);
         let widget_theme = widgets::WidgetTheme::new(txn, p1).await.unwrap();
-        let ui_blocks = UiBlocks::new(txn, p2).await.install(&mut *txn).unwrap();
+        let ui_blocks = UiBlocks::new(txn, p2).await.install(txn).unwrap();
         let icons = Icons::new(txn, p3).await.install(txn).unwrap();
-
-        let text_brush = VoxelBrush::new::<_, Block>([
-            ([0, 0, 1], palette::HUD_TEXT_FILL.into()),
-            ([1, 0, 0], palette::HUD_TEXT_STROKE.into()),
-            ([-1, 0, 0], palette::HUD_TEXT_STROKE.into()),
-            ([0, 1, 0], palette::HUD_TEXT_STROKE.into()),
-            ([0, -1, 0], palette::HUD_TEXT_STROKE.into()),
-        ]);
-
         Self {
             widget_theme,
             ui_blocks,
             icons,
-            text: text_brush,
         }
     }
 }

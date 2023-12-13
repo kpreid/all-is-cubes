@@ -363,6 +363,21 @@ fn TEXT(_: Context<'_>) {
             f: Box::new(identity),
             offset: vec3(0, 3, 0),
         },
+        Texhibit {
+            text: text::Text::builder()
+                .string(literal!("weird vert bounds"))
+                .layout_bounds(R16, GridAab::from_lower_upper([0, 16, 0], [64, 64, 64]))
+                // .foreground(foreground_block)
+                // .outline(Some(outline_block))
+                .positioning(text::Positioning {
+                    x: text::PositioningX::Left,
+                    line_y: text::PositioningY::BodyMiddle,
+                    z: text::PositioningZ::Back,
+                })
+                .build(),
+            f: Box::new(identity),
+            offset: vec3(0, 4, 0),
+        },
     ];
 
     let bounds_for_text = texts

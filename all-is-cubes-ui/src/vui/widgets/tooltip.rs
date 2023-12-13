@@ -3,23 +3,17 @@ use std::error::Error;
 use std::sync::Mutex;
 
 use all_is_cubes::arcstr::{literal, ArcStr};
-use all_is_cubes::block::{self, space_to_blocks, BlockAttributes, Resolution, AIR};
+use all_is_cubes::block::{self, text, Block};
 use all_is_cubes::character::{Character, CharacterChange};
-use all_is_cubes::drawing::embedded_graphics::{
-    mono_font::MonoTextStyle,
-    prelude::Point,
-    text::{Alignment, Baseline, Text, TextStyleBuilder},
-    Drawable as _,
-};
+use all_is_cubes::content::palette;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::listen::{FnListener, Gate, Listen, Listener};
-use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridVector, Gridgid};
-use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
+use all_is_cubes::math::GridCoordinate;
 use all_is_cubes::time::{Duration, Tick};
-use all_is_cubes::universe::{Handle, Universe};
+use all_is_cubes::universe::Handle;
 
-use crate::ui_content::hud::{HudBlocks, HudFont};
-use crate::vui::{self, LayoutRequest, Layoutable, Widget, WidgetController};
+use crate::ui_content::hud::HudBlocks;
+use crate::vui::{self, widgets, LayoutRequest, Layoutable, Widget, WidgetController};
 
 #[derive(Debug)]
 pub(crate) struct TooltipState {
@@ -30,8 +24,6 @@ pub(crate) struct TooltipState {
 
     /// Whether the tool we should be displaying might have changed.
     dirty_inventory: bool,
-    /// Whether the `current_contents` has changed and should be drawn.
-    dirty_text: bool,
     /// Text to actually show on screen.
     current_contents: TooltipContents,
     /// Last value of `current_contents` that was an inventory item.
@@ -71,13 +63,12 @@ impl TooltipState {
     }
 
     fn set_contents(&mut self, contents: TooltipContents) {
-        self.dirty_text = true;
         self.current_contents = contents;
         self.age = Some(Duration::ZERO);
     }
 
     /// Advances time and returns the string that should be newly written to the screen, if different than the previous call.
-    fn step(&mut self, hud_blocks: &HudBlocks, tick: Tick) -> Option<ArcStr> {
+    fn step(&mut self, hud_blocks: &HudBlocks, tick: Tick) -> &TooltipContents {
         if let Some(ref mut age) = self.age {
             *age += tick.delta_t();
             if *age > Duration::from_secs(1) {
@@ -124,12 +115,7 @@ impl TooltipState {
             }
         }
 
-        if self.dirty_text {
-            self.dirty_text = false;
-            Some(self.current_contents.text().clone())
-        } else {
-            None
-        }
+        &self.current_contents
     }
 }
 
@@ -139,7 +125,6 @@ impl Default for TooltipState {
             character: None,
             character_gate: Gate::default(),
             dirty_inventory: false,
-            dirty_text: false,
             current_contents: TooltipContents::JustStartedExisting,
             last_inventory_message: TooltipContents::JustStartedExisting,
             age: None,
@@ -166,7 +151,7 @@ enum TooltipContents {
 }
 
 impl TooltipContents {
-    fn text(&self) -> &ArcStr {
+    fn string(&self) -> &ArcStr {
         static EMPTY: ArcStr = literal!("");
 
         match self {
@@ -181,37 +166,31 @@ impl TooltipContents {
 pub(crate) struct Tooltip {
     width_in_hud: GridCoordinate,
     hud_blocks: Arc<HudBlocks>,
+
+    text_builder: text::TextBuilder,
     /// Tracks what we should be displaying and serves as dirty flag.
     state: Arc<Mutex<TooltipState>>,
-    /// Space we write the text into.
-    text_space: Handle<Space>,
 }
 
 impl Tooltip {
-    const RESOLUTION: Resolution = Resolution::R16;
-
     pub(crate) fn new(
         state: Arc<Mutex<TooltipState>>,
         // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
         hud_blocks: Arc<HudBlocks>,
-        universe: &mut Universe,
     ) -> Arc<Self> {
-        let width_in_hud = 25; // TODO: magic number
-        let text_space = Space::builder(GridAab::from_lower_size(
-            GridPoint::origin(),
-            GridVector::new(
-                width_in_hud * GridCoordinate::from(Self::RESOLUTION),
-                GridCoordinate::from(Self::RESOLUTION),
-                2,
-            ),
-        ))
-        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build();
         Arc::new(Self {
-            width_in_hud,
+            width_in_hud: 25, // TODO: magic number
             hud_blocks,
+            text_builder: text::Text::builder()
+                .foreground(Block::from(palette::HUD_TEXT_FILL))
+                .outline(Some(Block::from(palette::HUD_TEXT_STROKE)))
+                .font(text::Font::System16)
+                .positioning(text::Positioning {
+                    x: text::PositioningX::Center,
+                    line_y: text::PositioningY::BodyMiddle,
+                    z: text::PositioningZ::Back,
+                }),
             state,
-            text_space: universe.insert_anonymous(text_space),
         })
     }
 }
@@ -226,87 +205,61 @@ impl Layoutable for Tooltip {
 
 impl Widget for Tooltip {
     fn controller(self: Arc<Self>, _: &vui::LayoutGrant) -> Box<dyn WidgetController> {
-        Box::new(TooltipController { definition: self })
+        Box::new(TooltipController {
+            definition: self,
+            currently_displayed: TooltipContents::JustStartedExisting,
+        })
     }
 }
 
 #[derive(Debug)]
 struct TooltipController {
     definition: Arc<Tooltip>,
+    currently_displayed: TooltipContents,
 }
 
 impl WidgetController for TooltipController {
-    fn initialize(
-        &mut self,
-        context: &vui::WidgetContext<'_>,
-    ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
-        let position = context.grant().bounds;
-        let toolbar_text_blocks = space_to_blocks(
-            Tooltip::RESOLUTION,
-            BlockAttributes {
-                // TODO: We need an animation_hint that describes the thing that the text does:
-                // toggling visible/invisible and not wanting to get lighting artifacts that might
-                // result from that. (Though I have a notion to add fade-out, which wants CONTINUOUS
-                // anyway.)
-                //
-                // ...wait, maybe tooltip vanishing should be based on removing the blocks entirely,
-                // instead of _just_ changing the text space. That would cooperate with light
-                // more straightforwardly.
-                animation_hint: block::AnimationHint::redefinition(block::AnimationChange::Shape),
-                ..BlockAttributes::default()
-            },
-            self.definition.text_space.clone(),
-        )
-        .unwrap(); // TODO: should be InstallVuiError but we don't have a good way of constructing it
-
-        let mut txn = SpaceTransaction::default();
-        let origin: GridPoint = position.lower_bounds();
-
-        // TODO: there should be a space_to_transaction_copy function or something
-        // to implement this systematically
-        for i in 0..position.size().width {
-            let offset = GridVector::new(i, 0, 0);
-            txn.at((origin + offset).into())
-                .overwrite(toolbar_text_blocks[offset.to_point()].clone());
-        }
-        Ok(txn)
-    }
-
     fn step(
         &mut self,
         context: &vui::WidgetContext<'_>,
     ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
         // None if no update is needed
-        let text_update: Option<ArcStr> = self
-            .definition
-            .state
-            .try_lock()
-            .ok()
-            .and_then(|mut state| state.step(&self.definition.hud_blocks, context.tick()));
+        let new_contents: Option<TooltipContents> =
+            self.definition.state.try_lock().ok().and_then(|mut state| {
+                let contents = state.step(&self.definition.hud_blocks, context.tick());
+                if *contents != self.currently_displayed {
+                    Some(contents.clone())
+                } else {
+                    None
+                }
+            });
 
-        if let Some(text) = text_update {
-            self.definition.text_space.try_modify(|text_space| {
-                let bounds = text_space.bounds();
-                text_space.fill_uniform(bounds, &AIR).unwrap();
+        let txn = if let Some(new_contents) = new_contents {
+            let grant = context.grant();
+            let text = self
+                .definition
+                .text_builder
+                .clone()
+                .layout_bounds(
+                    block::Resolution::R16,
+                    grant
+                        .bounds
+                        .translate(-grant.bounds.lower_bounds().to_vector())
+                        .multiply(16),
+                )
+                .string(new_contents.string().clone())
+                .build();
+            let txn = widgets::text::draw_text_txn(&text, grant, false);
 
-                // Note on dimensions: HudFont is currently 13 pixels tall, and we're using
-                // the standard 16-voxel space resolution, and hud_blocks.text has a 1-pixel border,
-                // so we have 16 - (13 + 2) = 1 voxel of free alignment, which I've chosen to put on
-                // the top edge.
-                let text_obj = Text::with_text_style(
-                    &text,
-                    Point::new(bounds.size().width / 2, -1),
-                    MonoTextStyle::new(&HudFont, &self.definition.hud_blocks.text),
-                    TextStyleBuilder::new()
-                        .baseline(Baseline::Bottom)
-                        .alignment(Alignment::Center)
-                        .build(),
-                );
-                text_obj.draw(&mut text_space.draw_target(Gridgid::FLIP_Y))?;
-                Ok::<(), Box<dyn Error + Send + Sync>>(())
-            })??;
-        }
-        Ok((vui::WidgetTransaction::default(), vui::Then::Step))
+            // Remember what we are about to draw so we know we don't need to redraw it.
+            // TODO: We should do this only if the transaction doesn't fail, but there's no way to express that yet.
+            self.currently_displayed = new_contents;
+
+            txn
+        } else {
+            vui::WidgetTransaction::default()
+        };
+        Ok((txn, vui::Then::Step))
     }
 }
 
@@ -314,11 +267,11 @@ impl WidgetController for TooltipController {
 mod tests {
     use super::*;
     use all_is_cubes::transaction::{self, Transaction as _};
-    use all_is_cubes::universe::UniverseTransaction;
+    use all_is_cubes::universe::{Universe, UniverseTransaction};
     use all_is_cubes::util::yield_progress_for_testing;
 
     #[tokio::test]
-    async fn tooltip_timeout_and_dirty_text() {
+    async fn tooltip_timeout() {
         // TODO: reduce boilerplate
 
         let mut universe = Universe::new();
@@ -330,27 +283,25 @@ mod tests {
 
         // Initial state: no update.
         let mut t = TooltipState::default();
-        assert_eq!(t.step(hud_blocks, Tick::from_seconds(0.5)), None);
+        assert_eq!(
+            t.step(hud_blocks, Tick::from_seconds(0.5)),
+            &TooltipContents::JustStartedExisting
+        );
         assert_eq!(t.age, None);
 
         // Add a message.
         t.set_message("Hello world".into());
         assert_eq!(t.age, Some(Duration::ZERO));
         assert_eq!(
-            t.step(hud_blocks, Tick::from_seconds(0.25)),
-            Some("Hello world".into())
+            t.step(hud_blocks, Tick::from_seconds(0.5)),
+            &TooltipContents::Message(literal!("Hello world"))
         );
-        // Message is only emitted from step() once.
-        assert_eq!(t.step(hud_blocks, Tick::from_seconds(0.25)), None);
-        assert_eq!(t.age, Some(Duration::from_millis(500)));
 
         // Advance time until it should time out.
         assert_eq!(
             t.step(hud_blocks, Tick::from_seconds(0.501)),
-            Some("".into())
+            &TooltipContents::Blanked
         );
         assert_eq!(t.age, None);
-        // Empty string is only emitted from step() once.
-        assert_eq!(t.step(hud_blocks, Tick::from_seconds(2.00)), None);
     }
 }
