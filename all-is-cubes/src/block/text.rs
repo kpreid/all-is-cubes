@@ -1,6 +1,7 @@
 //! Support for [`Primitive::Text`].
 
 use alloc::boxed::Box;
+use core::iter;
 
 use arcstr::ArcStr;
 use embedded_graphics as eg;
@@ -10,7 +11,7 @@ use euclid::vec3;
 use crate::block::{self, Block, BlockAttributes, EvalBlockError, Evoxel, MinEval, Resolution};
 use crate::content::palette;
 use crate::drawing::{rectangle_to_aab, DrawingPlane};
-use crate::math::{GridAab, GridCoordinate, GridVector, Gridgid, Rgba, Vol};
+use crate::math::{FaceMap, GridAab, GridCoordinate, GridVector, Gridgid, Rgba, Vol};
 use crate::space::{self, SpaceTransaction};
 use crate::universe;
 
@@ -25,6 +26,7 @@ use super::Evoxels;
 ///
 /// * A string, as [`ArcStr`].
 /// * A [`Font`].
+/// * [`Block`]s defining voxel colors and attributes used.
 /// * A [`Resolution`] defining the font size.
 /// * A bounding box within which the text is positioned (but may overflow).
 /// * A [`Positioning`] specifying how the text is positioned within the box.
@@ -43,6 +45,8 @@ pub struct Text {
 
     foreground: Block,
 
+    outline: Option<Block>,
+
     resolution: Resolution,
 
     /// Voxel-scale bounds in which the text is positioned (not necessarily actual drawing bounds).
@@ -60,6 +64,8 @@ pub struct TextBuilder {
     font: Font,
 
     foreground: Block,
+
+    outline: Option<Block>,
 
     resolution: Resolution,
 
@@ -81,6 +87,7 @@ impl Text {
             string,
             font,
             foreground,
+            outline,
             resolution,
             layout_bounds,
             positioning,
@@ -89,6 +96,7 @@ impl Text {
             string,
             font,
             foreground,
+            outline,
             resolution,
             layout_bounds: Some(layout_bounds),
             positioning,
@@ -124,8 +132,15 @@ impl Text {
     /// Returns the bounding box of the text, in blocks — the set of [`Primitive::Text`] offsets
     /// that will render all of it.
     pub fn bounding_blocks(&self) -> GridAab {
+        let dummy_voxel = Evoxel::from_color(Rgba::BLACK); // could be anything
         self.with_transform_and_drawable(
-            Evoxel::from_color(Rgba::BLACK), // could be anything
+            match self.outline {
+                Some(_) => Brush::Outline {
+                    foreground: dummy_voxel,
+                    outline: dummy_voxel,
+                },
+                None => Brush::Plain(dummy_voxel),
+            },
             GridVector::zero(),
             |_text_obj, text_aab, _drawing_transform| text_aab.divide(self.resolution.into()),
         )
@@ -188,10 +203,17 @@ impl Text {
             return Ok(block::AIR_EVALUATED_MIN); // placeholder value
         }
 
-        let voxel = Evoxel::from_block(&self.foreground.evaluate2(filter)?);
+        let ev_foreground = Evoxel::from_block(&self.foreground.evaluate2(filter)?);
+        let brush = match self.outline {
+            Some(ref block) => Brush::Outline {
+                foreground: ev_foreground,
+                outline: Evoxel::from_block(&block.evaluate2(filter)?),
+            },
+            None => Brush::Plain(ev_foreground),
+        };
 
         self.with_transform_and_drawable(
-            voxel,
+            brush,
             block_offset,
             |text_obj, text_aab, drawing_transform| {
                 let mut voxels: Vol<Box<[Evoxel]>> = Vol::from_fn(
@@ -216,12 +238,19 @@ impl Text {
         )
     }
 
+    fn thickness(&self) -> GridCoordinate {
+        match self.outline {
+            Some(_) => 2,
+            None => 1,
+        }
+    }
+
     fn with_transform_and_drawable<R>(
         &self,
-        voxel: Evoxel,
+        brush: Brush,
         block_offset: GridVector,
         f: impl FnOnce(
-            &'_ eg::text::Text<'_, eg::mono_font::MonoTextStyle<'_, Evoxel>>,
+            &'_ eg::text::Text<'_, eg::mono_font::MonoTextStyle<'_, Brush>>,
             GridAab,
             Gridgid,
         ) -> R,
@@ -247,7 +276,7 @@ impl Text {
             },
             match positioning_z {
                 PositioningZ::Back => lb.lower_bounds().z,
-                PositioningZ::Front => lb.upper_bounds().z - 1,
+                PositioningZ::Front => lb.upper_bounds().z.saturating_sub(self.thickness()),
             },
         );
 
@@ -255,7 +284,7 @@ impl Text {
             Gridgid::from_translation(layout_offset - (block_offset * resolution_g))
                 * Gridgid::FLIP_Y;
 
-        let character_style = eg::mono_font::MonoTextStyle::new(self.font.eg_font(), voxel);
+        let character_style = eg::mono_font::MonoTextStyle::new(self.font.eg_font(), brush);
         let text_style = eg::text::TextStyleBuilder::new()
             .alignment(match positioning_x {
                 PositioningX::Left => eg::text::Alignment::Left,
@@ -275,11 +304,11 @@ impl Text {
             character_style,
             text_style,
         );
-        let text_aab = rectangle_to_aab(
+        let text_aab = brush.expand(rectangle_to_aab(
             text_obj.bounding_box(),
             drawing_transform,
             GridAab::ORIGIN_CUBE,
-        );
+        ));
 
         f(text_obj, text_aab, drawing_transform)
     }
@@ -291,12 +320,14 @@ impl universe::VisitRefs for Text {
             string: _,
             font,
             foreground,
+            outline,
             resolution: _,
             layout_bounds: _,
             positioning: _,
         } = self;
         font.visit_refs(visitor);
         foreground.visit_refs(visitor);
+        outline.visit_refs(visitor);
     }
 }
 
@@ -319,6 +350,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Text {
             string: alloc::string::String::arbitrary(u)?.into(),
             font: Font::arbitrary(u)?,
             foreground: Block::arbitrary(u)?,
+            outline: Option::<Block>::arbitrary(u)?,
             resolution: Resolution::arbitrary(u)?,
             layout_bounds,
             positioning: Positioning::arbitrary(u)?,
@@ -331,6 +363,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Text {
                 alloc::string::String::size_hint(depth),
                 Font::size_hint(depth),
                 Block::size_hint(depth),
+                Option::<Block>::size_hint(depth),
                 Resolution::size_hint(depth),
                 GridAab::size_hint(depth),
                 Positioning::size_hint(depth),
@@ -346,6 +379,7 @@ impl TextBuilder {
             string,
             font,
             foreground,
+            outline,
             resolution,
             layout_bounds,
             positioning,
@@ -354,6 +388,7 @@ impl TextBuilder {
             string,
             font,
             foreground,
+            outline,
             resolution,
             layout_bounds: layout_bounds.unwrap_or(GridAab::for_block(resolution)),
             positioning,
@@ -375,6 +410,32 @@ impl TextBuilder {
     /// The default is [`Font::System16`].
     pub fn font(mut self, font: Font) -> Self {
         self.font = font;
+        self
+    }
+
+    /// Sets the “foreground color”, or rather voxel, for the text.
+    ///
+    /// This block is interpreted as a voxel in the same way as a block in a [`Primitive::Recur`]
+    /// space would be. However, the result of evaluating this block not cached. Therefore, it is
+    /// highly recommended that the block be stored in a [`block::BlockDef`] (which does cache)
+    /// if it is not trivial, particularly if this text is going to span multiple blocks.
+    ///
+    /// The default value is `Block::from(all_is_cubes_content::palette::ALMOST_BLACK)`.
+    pub fn foreground(mut self, foreground: Block) -> Self {
+        self.foreground = foreground;
+        self
+    }
+
+    /// Sets the outline color for the text.
+    ///
+    /// This appears 1 voxel behind and to the side of the main color; making the overall text
+    /// 2 voxels thick.
+    ///
+    /// See [`Self::foreground()`] for information about how the block is used.
+    ///
+    /// The default value is [`None`].
+    pub fn outline(mut self, outline: Option<Block>) -> Self {
+        self.outline = outline;
         self
     }
 
@@ -420,19 +481,6 @@ impl TextBuilder {
         self.resolution = resolution;
         self
     }
-
-    /// Sets the “foreground color”, or rather voxel, for the text.
-    ///
-    /// This block is interpreted as a voxel in the same way as a block in a [`Primitive::Recur`]
-    /// space would be. However, the result of evaluating this block not cached. Therefore, it is
-    /// highly recommended that the block be stored in a [`block::BlockDef`] (which does cache)
-    /// if it is not trivial, particularly if this text is going to span multiple blocks.
-    ///
-    /// The default value is `Block::from(all_is_cubes_content::palette::ALMOST_BLACK)`.
-    pub fn foreground(mut self, foreground: Block) -> Self {
-        self.foreground = foreground;
-        self
-    }
 }
 
 impl Default for TextBuilder {
@@ -441,6 +489,7 @@ impl Default for TextBuilder {
             string: ArcStr::new(),
             font: Font::System16,
             foreground: Block::from(palette::ALMOST_BLACK), // TODO: wish this wasn't a repeated allocation
+            outline: None,
             resolution: Resolution::R16,
             layout_bounds: None,
             positioning: Positioning {
@@ -587,6 +636,7 @@ mod serialization {
                 ref string,
                 ref font,
                 ref foreground,
+                ref outline,
                 resolution,
                 layout_bounds,
                 positioning,
@@ -595,6 +645,7 @@ mod serialization {
                 string: string.clone(),
                 font: font.into(),
                 foreground: foreground.clone(),
+                outline: outline.clone(),
                 resolution,
                 layout_bounds,
                 positioning: positioning.into(),
@@ -609,6 +660,7 @@ mod serialization {
                     string,
                     font,
                     foreground,
+                    outline,
                     resolution,
                     layout_bounds,
                     positioning,
@@ -616,6 +668,7 @@ mod serialization {
                     .string(string)
                     .font(font.into())
                     .foreground(foreground)
+                    .outline(outline)
                     .layout_bounds(resolution, layout_bounds)
                     .positioning(positioning.into())
                     .build(),
@@ -631,6 +684,53 @@ impl Positioning {
         line_y: PositioningY::BodyBottom,
         z: PositioningZ::Back,
     };
+}
+
+/// Type which can be used on a `DrawingPlane` of `Evoxel`s to render text.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Brush {
+    Plain(Evoxel),
+    Outline { foreground: Evoxel, outline: Evoxel },
+}
+
+impl Brush {
+    fn expand(&self, aab: GridAab) -> GridAab {
+        match self {
+            Brush::Plain(_) => aab,
+            Brush::Outline { .. } => aab.expand(FaceMap {
+                // TODO: This *should* expand bounds left, right, up, and down, but for now, that
+                // causes way too much trouble with positioning. As a workaround, pretend those
+                // expansions don't exist.
+                nx: 0, // should be 1
+                ny: 0, // should be 1
+                nz: 0,
+                px: 0, // should be 1
+                py: 0, // should be 1
+                pz: 1,
+            }),
+        }
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (GridVector, Evoxel)> + '_ {
+        use itertools::Either::{Left, Right};
+        match *self {
+            Brush::Plain(foreground) => Left(iter::once((GridVector::zero(), foreground))),
+            Brush::Outline {
+                foreground,
+                outline,
+            } => Right(
+                [
+                    (vec3(0, 0, 1), foreground),
+                    (vec3(0, 0, 0), outline),
+                    (vec3(-1, 0, 0), outline),
+                    (vec3(1, 0, 0), outline),
+                    (vec3(0, -1, 0), outline),
+                    (vec3(0, 1, 0), outline),
+                ]
+                .into_iter(),
+            ),
+        }
+    }
 }
 
 #[cfg(test)]

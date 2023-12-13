@@ -220,7 +220,7 @@ fn block_atom_with_all_attributes() {
 }
 
 #[test]
-fn block_text() {
+fn block_text_without_optional() {
     use block::text;
 
     assert_round_trip_value(
@@ -256,6 +256,70 @@ fn block_text() {
                         "primitive": {
                             "type": "AtomV1",
                             "color": [1.0, 0.0, 0.0, 1.0],
+                        },
+                    },
+                    "resolution": 32,
+                    "layout_bounds":{
+                        "lower": [0, 1, 2],
+                        "upper": [3, 4, 5],
+                    },
+                    "positioning": {
+                        "x": "CenterV1",
+                        "line_y": "BodyTopV1",
+                        "z": "FrontV1",
+                    }
+                },
+                "offset": [100, 0, 0],
+            },
+        }),
+    );
+}
+
+#[test]
+fn block_text_with_optional() {
+    use block::text;
+
+    assert_round_trip_value(
+        &Block::from_primitive(block::Primitive::Text {
+            text: {
+                text::Text::builder()
+                    .string(literal!("hello"))
+                    .font(text::Font::System16) // TODO: use a nondefault font once such are stable
+                    .foreground(Block::from(rgba_const!(1.0, 0.0, 0.0, 1.0)))
+                    .outline(Some(Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0))))
+                    .layout_bounds(
+                        Resolution::R32,
+                        GridAab::from_lower_upper([0, 1, 2], [3, 4, 5]),
+                    )
+                    .positioning(text::Positioning {
+                        x: text::PositioningX::Center,
+                        line_y: text::PositioningY::BodyTop,
+                        z: text::PositioningZ::Front,
+                    })
+                    .build()
+            },
+            offset: vec3(100, 0, 0),
+        }),
+        json!({
+            "type": "BlockV1",
+            "primitive": {
+                "type": "TextPrimitiveV1",
+                "text": {
+                    "type": "TextV1",
+                    "string": "hello",
+                    "font": "System16V1",
+                    "foreground": {
+                        "type": "BlockV1",
+                        "primitive": {
+                            "type": "AtomV1",
+                            "color": [1.0, 0.0, 0.0, 1.0],
+                        },
+                    },
+                    "outline": {
+                        "type": "BlockV1",
+                        "primitive": {
+                            "type": "AtomV1",
+                            "color": [0.0, 1.0, 0.0, 1.0],
                         },
                     },
                     "resolution": 32,

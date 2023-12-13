@@ -203,6 +203,8 @@ pub(crate) enum TextSer {
         string: ArcStr,
         font: FontSer,
         foreground: Block,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        outline: Option<Block>,
         resolution: block::Resolution,
         layout_bounds: GridAab,
         positioning: PositioningSerV1,

@@ -28,7 +28,7 @@ use embedded_graphics::primitives::Rectangle;
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
 
-use crate::block::{self, space_to_blocks, Block, BlockAttributes, Resolution};
+use crate::block::{self, space_to_blocks, text, Block, BlockAttributes, Evoxel, Resolution};
 use crate::math::{
     Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid,
     Rgb, Rgba, Vol,
@@ -189,22 +189,24 @@ where
     }
 }
 
-impl<Container, Color> DrawTarget for DrawingPlane<'_, Vol<Container>, Color>
+impl<Container> DrawTarget for DrawingPlane<'_, Vol<Container>, text::Brush>
 where
-    Container: core::ops::DerefMut<Target = [Color]>,
-    Color: PixelColor,
+    Container: core::ops::DerefMut<Target = [Evoxel]>,
 {
-    type Color = Color;
+    type Color = text::Brush;
     type Error = core::convert::Infallible;
 
     fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
-        for Pixel(point, color) in pixels.into_iter() {
+        for Pixel(point, brush) in pixels.into_iter() {
             let point3d = self.convert_point(point);
-            if let Some(vox) = self.space.get_mut(point3d) {
-                *vox = color;
+            for (offset, ev) in brush.iter() {
+                let offset = self.transform.rotation.transform_vector(offset);
+                if let Some(vox) = self.space.get_mut(point3d + offset) {
+                    *vox = ev;
+                }
             }
         }
         Ok(())
@@ -305,7 +307,7 @@ impl<'a> VoxelColor<'a> for Rgba {
     }
 }
 
-impl PixelColor for block::Evoxel {
+impl PixelColor for block::text::Brush {
     type Raw = ();
 }
 
