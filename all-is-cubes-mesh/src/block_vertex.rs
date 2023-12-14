@@ -128,14 +128,7 @@ pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized + 'static 
     const WANTS_DEPTH_SORTING: bool;
 
     /// Number type for the vertex position coordinates.
-    // ---
-    // Explanation for this trait bound: `ordered_float` conditionally depending on features
-    // requires either `Float` or `FloatCore.
-    //
-    // (I've put in a PR to make the dependency *unconditional*,
-    // <https://github.com/reem/rust-ordered-float/pull/138>,
-    // but that's not yet released.)
-    type Coordinate: num_traits::float::Float + num_traits::float::FloatCore;
+    type Coordinate: num_traits::float::FloatCore;
 
     /// Point type identifying a point in the block's texture.
     type TexPoint: Copy;
