@@ -172,6 +172,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             todo
         };
 
+        #[allow(unused_mut)]
         let mut new_csm = ChunkedSpaceMesh::new(space.clone(), *interactive);
         // TODO: rescue ChunkChart and maybe block meshes from the old `csm`.
         #[cfg(feature = "rerun")]

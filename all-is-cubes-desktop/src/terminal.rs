@@ -75,6 +75,8 @@ pub(crate) struct TerminalRenderer {
     render_pipe_out: mpsc::Receiver<TextRayImage>,
 }
 
+impl crate::glue::Renderer for TerminalRenderer {}
+
 struct FrameInput {
     options: TerminalOptions,
     scene: RtRenderer<CharacterRtData>,

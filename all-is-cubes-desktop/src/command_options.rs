@@ -150,9 +150,10 @@ pub(crate) struct AicDesktopArgs {
     )]
     pub(crate) input_file: Option<PathBuf>,
 
-    /// Activate logging to Rerun
-    #[arg(hide = true, long = "rerun")]
-    pub(crate) rerun: bool,
+    /// Activate logging to Rerun (connecting to the default viewer address) and
+    /// log the specified kinds of data.
+    #[arg(hide = true, long = "rerun", value_enum, value_delimiter=',', action = clap::ArgAction::Append)]
+    pub(crate) rerun: Vec<RerunDataKind>,
 }
 
 #[derive(Clone, Debug, clap::Args)]
@@ -371,6 +372,12 @@ pub(crate) fn parse_universe_source(
     } else {
         UniverseSource::Template(template, TemplateParameters { seed, size })
     }
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, clap::ValueEnum)]
+pub(crate) enum RerunDataKind {
+    World,
+    Renderer,
 }
 
 #[cfg(test)]

@@ -490,7 +490,7 @@ fn handle_winit_event<Ren: RendererToWinit>(
 }
 
 /// TODO: Give this a better name and definition
-pub(crate) trait RendererToWinit: 'static {
+pub(crate) trait RendererToWinit: crate::glue::Renderer + 'static {
     fn update_world_camera(&mut self);
     fn cameras(&self) -> &StandardCameras;
     fn redraw(&mut self, session: &Session, window: &Window);
@@ -520,6 +520,8 @@ pub(crate) struct RtToSoftbuffer {
     surface: softbuffer::Surface,
     resize: DirtyFlag,
 }
+
+impl crate::glue::Renderer for RtToSoftbuffer {}
 
 impl RendererToWinit for RtToSoftbuffer {
     fn update_world_camera(&mut self) {

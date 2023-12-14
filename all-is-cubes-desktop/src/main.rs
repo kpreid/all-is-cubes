@@ -3,6 +3,7 @@
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 // * This crate does not forbid(unsafe_code) because wgpu initialization requires it.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -22,7 +23,7 @@ use all_is_cubes_content::TemplateParameters;
 mod aic_winit;
 use aic_winit::winit_main_loop;
 mod command_options;
-use command_options::GraphicsType;
+use command_options::{GraphicsType, RerunDataKind};
 mod audio;
 mod config_files;
 mod glue;
@@ -143,7 +144,7 @@ fn main() -> Result<(), anyhow::Error> {
         before_loop_time: Instant::now(),
         universe_future,
         headless: options.is_headless(),
-        rerun,
+        rerun: HashSet::from_iter(rerun),
     };
 
     // The graphics type selects not only the kind of 'window' we create, but also the
@@ -250,7 +251,7 @@ fn main() -> Result<(), anyhow::Error> {
 /// of main operations.
 ///
 /// This function may or may not ever return, depending on the type of event loop.
-fn inner_main<Ren, Win>(
+fn inner_main<Ren: glue::Renderer, Win: glue::Window>(
     params: InnerMainParams,
     looper: impl FnOnce(DesktopSession<Ren, Win>) -> Result<(), anyhow::Error>,
     mut dsession: DesktopSession<Ren, Win>,
@@ -291,10 +292,10 @@ fn inner_main<Ren, Win>(
         .context("internal error inside of universe creation/loading task")?
         .context("failed to create universe from requested template or file")?;
 
-    if rerun {
+    if !rerun.is_empty() {
         cfg_if::cfg_if! {
             if #[cfg(feature = "rerun")] {
-                connect_rerun(&mut universe);
+                connect_rerun(&rerun, &mut universe, &mut dsession);
             } else {
                 // suppress warning
                 let _ = &mut universe;
@@ -318,7 +319,7 @@ struct InnerMainParams {
     before_loop_time: Instant,
     universe_future: tokio::task::JoinHandle<Result<Universe, anyhow::Error>>,
     headless: bool,
-    rerun: bool,
+    rerun: HashSet<RerunDataKind>,
 }
 
 /// Perform and log the creation of the universe.
@@ -423,7 +424,11 @@ fn headless_main_loop(
 }
 
 #[cfg(feature = "rerun")]
-fn connect_rerun(universe: &mut Universe) {
+fn connect_rerun<Ren: glue::Renderer, Win>(
+    kinds: &HashSet<RerunDataKind>,
+    universe: &mut Universe,
+    dsession: &mut DesktopSession<Ren, Win>,
+) {
     use all_is_cubes::rerun_glue as rg;
 
     let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes")
@@ -441,10 +446,18 @@ fn connect_rerun(universe: &mut Universe) {
     destination.log_initialization();
 
     // Attach to universe elements
-    universe.log_to_rerun(destination.clone());
-    if let Some(c) = universe.get_default_character() {
-        c.try_modify(|c| c.log_to_rerun(destination.child(&rg::entity_path!["character"])))
-            .unwrap();
+    // TODO: We need a solution for worlds loaded after app start
+    if kinds.contains(&RerunDataKind::World) {
+        universe.log_to_rerun(destination.clone());
+        if let Some(c) = universe.get_default_character() {
+            c.try_modify(|c| c.log_to_rerun(destination.child(&rg::entity_path!["character"])))
+                .unwrap();
+        }
+    }
+
+    // Attach to renderer
+    if kinds.contains(&RerunDataKind::Renderer) {
+        dsession.renderer.log_to_rerun(destination.clone());
     }
 }
 
