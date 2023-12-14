@@ -11,6 +11,8 @@ use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::math::VectorOps;
 use all_is_cubes::notnan;
+#[cfg(feature = "rerun")]
+use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::time;
 
 use crate::{
@@ -193,6 +195,12 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         );
         output.present();
         Ok(info)
+    }
+
+    /// Activate logging performance information state to a Rerun stream.
+    #[cfg(feature = "rerun")]
+    pub fn log_to_rerun(&mut self, destination: rg::Destination) {
+        self.everything.log_to_rerun(destination)
     }
 }
 
@@ -678,6 +686,17 @@ impl<I: time::Instant> EverythingRenderer<I> {
         }
 
         postprocess::postprocess(self, queue, output);
+    }
+
+    /// Activate logging performance information to a Rerun stream.
+    #[cfg(feature = "rerun")]
+    pub fn log_to_rerun(&mut self, destination: rg::Destination) {
+        self.space_renderers
+            .world
+            .log_to_rerun(destination.child(&rg::entity_path!["world"]));
+        self.space_renderers
+            .ui
+            .log_to_rerun(destination.child(&rg::entity_path!["ui"]));
     }
 }
 

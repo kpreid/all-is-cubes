@@ -56,6 +56,10 @@ impl Destination {
         });
     }
 
+    pub fn is_enabled(&self) -> bool {
+        self.stream.is_enabled()
+    }
+
     fn catch(&self, f: impl FnOnce() -> RecordingStreamResult<()>) {
         match f() {
             Ok(()) => (),
@@ -153,6 +157,17 @@ pub fn convert_aabs(
         })
         .unzip();
     archetypes::Boxes3D::from_half_sizes(half_sizes).with_centers(centers)
+}
+
+pub fn milliseconds(d: core::time::Duration) -> archetypes::TimeSeriesScalar {
+    archetypes::TimeSeriesScalar::new(d.as_secs_f64() * 1000.0)
+}
+
+/// Create a dummy datapoint which acts to mark an event.
+pub fn time_series_marker(label: impl Into<components::Text>) -> archetypes::TimeSeriesScalar {
+    archetypes::TimeSeriesScalar::new(-10.0)
+        .with_scattered(true)
+        .with_label(label)
 }
 
 impl From<math::Face6> for view_coordinates::SignedAxis3 {

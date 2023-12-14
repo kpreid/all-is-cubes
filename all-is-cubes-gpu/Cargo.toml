@@ -30,6 +30,8 @@ name = "wgpu_bench"
 harness = false
 
 [features]
+# Adds support for render info logging to Rerun.
+rerun = ["all-is-cubes/rerun", "all-is-cubes-mesh/rerun"]
 # Enable wgpu support.
 # (The library is useless without this, but we used to have multiple GPU API support
 # and I don't want to go entirely deleting it quite yet.)

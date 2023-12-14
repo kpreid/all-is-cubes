@@ -2,6 +2,8 @@ use std::time::Duration;
 use std::{fmt, ops};
 
 use all_is_cubes::camera::{Flaws, Layers};
+#[cfg(feature = "rerun")]
+use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::util::{Fmt, Refmt, StatusText};
 use all_is_cubes_mesh::dynamic::CsmUpdateInfo;
 
@@ -162,6 +164,32 @@ pub struct SpaceUpdateInfo {
 impl SpaceUpdateInfo {
     pub(crate) fn flaws(&self) -> Flaws {
         self.chunk_info.flaws
+    }
+
+    #[cfg(feature = "rerun")]
+    pub(crate) fn write_to_rerun(&self, destination: &rg::Destination) {
+        // TODO: include everything we can; make names more consistent
+        let &Self {
+            total_time,
+            chunk_info:
+                CsmUpdateInfo {
+                    total_time: chunk_total_time,
+                    ..
+                },
+            texture_info: _,
+            light_update_time,
+            light_update_count: _,
+        } = self;
+
+        destination.log(&"update_total_time".into(), &rg::milliseconds(total_time));
+        destination.log(
+            &"chunk_total_time".into(),
+            &rg::milliseconds(chunk_total_time),
+        );
+        destination.log(
+            &"light_update_time".into(),
+            &rg::milliseconds(light_update_time),
+        );
     }
 }
 

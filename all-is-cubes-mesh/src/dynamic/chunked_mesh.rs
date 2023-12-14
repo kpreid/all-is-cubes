@@ -9,6 +9,8 @@ use all_is_cubes::camera::{Camera, Flaws};
 use all_is_cubes::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex};
+#[cfg(feature = "rerun")]
+use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
 use all_is_cubes::time::{self, Duration};
 use all_is_cubes::universe::URef;
@@ -75,6 +77,9 @@ where
     zero_time: I,
     /// Earliest time prior to `zero_time` at which we finished everything in the queues.
     complete_time: Option<I>,
+
+    #[cfg(feature = "rerun")]
+    rerun_destination: all_is_cubes::rerun_glue::Destination,
 }
 
 impl<M, I, const CHUNK_SIZE: GridCoordinate> ChunkedSpaceMesh<M, I, CHUNK_SIZE>
@@ -110,6 +115,8 @@ where
             last_mesh_options: None,
             zero_time: I::now(),
             complete_time: None,
+            #[cfg(feature = "rerun")]
+            rerun_destination: Default::default(),
         }
     }
 
@@ -385,12 +392,25 @@ where
                 );
                 let compute_end_update_start = I::now();
                 render_data_updater(chunk.borrow_for_update(false));
+                let update_end = I::now();
 
-                chunk_mesh_generation_times += TimeStats::one(
-                    compute_end_update_start.saturating_duration_since(this_chunk_start_time),
-                );
-                chunk_mesh_callback_times +=
-                    TimeStats::one(I::now().saturating_duration_since(compute_end_update_start));
+                let compute_time =
+                    compute_end_update_start.saturating_duration_since(this_chunk_start_time);
+                let update_time = update_end.saturating_duration_since(compute_end_update_start);
+                chunk_mesh_generation_times += TimeStats::one(compute_time);
+                chunk_mesh_callback_times += TimeStats::one(update_time);
+
+                #[cfg(feature = "rerun")]
+                if self.rerun_destination.is_enabled() {
+                    self.rerun_destination.log(
+                        &"one_chunk_compute_ms".into(),
+                        &rg::milliseconds(compute_time).with_scattered(true),
+                    );
+                    self.rerun_destination.log(
+                        &"one_chunk_update_ms".into(),
+                        &rg::milliseconds(update_time).with_scattered(true),
+                    );
+                }
             }
         }
         self.did_not_finish_chunks = did_not_finish;
@@ -424,6 +444,13 @@ where
                     .saturating_duration_since(self.zero_time)
                     .refmt(&StatusText)
             );
+            #[cfg(feature = "rerun")]
+            if self.rerun_destination.is_enabled() {
+                self.rerun_destination.log(
+                    &"all_meshes_done".into(),
+                    &rg::time_series_marker("all meshes done"),
+                );
+            }
             self.complete_time = Some(end_all_time);
         }
 
@@ -475,6 +502,12 @@ where
         for chunk_mesh in self.iter_in_view(camera) {
             chunk_mesh.chunk_debug_lines(output);
         }
+    }
+
+    /// Activate logging performance information to a Rerun stream.
+    #[cfg(feature = "rerun")]
+    pub fn log_to_rerun(&mut self, destination: rg::Destination) {
+        self.rerun_destination = destination;
     }
 }
 

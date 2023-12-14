@@ -13,6 +13,8 @@ use all_is_cubes::math::{
     Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, Rgb,
     VectorOps,
 };
+#[cfg(feature = "rerun")]
+use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{Space, SpaceChange};
 use all_is_cubes::time;
 use all_is_cubes::universe::{RefError, URef};
@@ -75,6 +77,9 @@ pub(crate) struct SpaceRenderer<I> {
     csm: Option<ChunkedSpaceMesh<WgpuMt, I, CHUNK_SIZE>>,
 
     interactive: bool,
+
+    #[cfg(feature = "rerun")]
+    rerun_destination: all_is_cubes::rerun_glue::Destination,
 }
 
 #[derive(Debug, Default)]
@@ -112,6 +117,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
             instance_buffer: ResizingBuffer::default(),
             csm: None,
             interactive,
+            #[cfg(feature = "rerun")]
+            rerun_destination: Default::default(),
         })
     }
 
@@ -155,6 +162,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
             space_bind_group: _, // will be updated later
             csm,
             interactive,
+            #[cfg(feature = "rerun")]
+                rerun_destination: _,
         } = self;
 
         *todo = {
@@ -162,8 +171,16 @@ impl<I: time::Instant> SpaceRenderer<I> {
             space_borrowed.listen(TodoListener(Arc::downgrade(&todo)));
             todo
         };
+
+        let mut new_csm = ChunkedSpaceMesh::new(space.clone(), *interactive);
         // TODO: rescue ChunkChart and maybe block meshes from the old `csm`.
-        *csm = Some(ChunkedSpaceMesh::new(space.clone(), *interactive));
+        #[cfg(feature = "rerun")]
+        {
+            new_csm.log_to_rerun(self.rerun_destination.clone());
+        }
+
+        *csm = Some(new_csm);
+
         *sky_color = space_borrowed.physics().sky_color;
         // TODO: don't replace light texture if the size is the same
         *light_texture = SpaceLightTexture::new(space_label, device, space_borrowed.bounds());
@@ -186,6 +203,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
             space_bind_group: _,
             csm,
             interactive: _,
+            #[cfg(feature = "rerun")]
+                rerun_destination: _,
         } = self;
 
         *todo = Default::default(); // detach from space notifier
@@ -303,13 +322,19 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         let end_time = I::now();
 
-        Ok(SpaceUpdateInfo {
+        let info = SpaceUpdateInfo {
             total_time: end_time.saturating_duration_since(start_time),
             light_update_time: end_light_update.saturating_duration_since(start_light_update),
             light_update_count,
             chunk_info: csm_info,
             texture_info,
-        })
+        };
+
+        #[cfg(feature = "rerun")]
+        if self.rerun_destination.is_enabled() {
+            info.write_to_rerun(&self.rerun_destination);
+        }
+        Ok(info)
     }
 
     /// Draw the space as of the last [`Self::update`].
@@ -549,6 +574,15 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 }
             }
         }
+    }
+
+    /// Activate logging performance information to a Rerun stream.
+    #[cfg(feature = "rerun")]
+    pub fn log_to_rerun(&mut self, destination: rg::Destination) {
+        if let Some(csm) = &mut self.csm {
+            csm.log_to_rerun(destination.clone());
+        }
+        self.rerun_destination = destination;
     }
 }
 

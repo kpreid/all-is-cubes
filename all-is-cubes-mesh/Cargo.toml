@@ -26,6 +26,8 @@ harness = false
 
 [features]
 default = []
+# Adds support for mesh generation performance logging to Rerun.
+rerun = ["all-is-cubes/rerun"]
 # Adds `impl arbitrary::Arbitrary for ...`
 arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary", "ordered-float/arbitrary"]
 
