@@ -11,9 +11,7 @@ use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::math::VectorOps;
 use all_is_cubes::notnan;
-use all_is_cubes::space::Space;
 use all_is_cubes::time;
-use all_is_cubes::universe::URef;
 
 use crate::{
     gather_debug_lines,
@@ -423,19 +421,15 @@ impl<I: time::Instant> EverythingRenderer<I> {
         };
 
         // Ensure SpaceRenderers are pointing at those spaces
-        // TODO: we should be able to express this as something like "Layers::for_each_zip()"
-        Self::update_space_renderer(
-            &mut self.space_renderers.world,
-            spaces_to_render.world,
-            &self.device,
-            &self.pipelines,
-        )?;
-        Self::update_space_renderer(
-            &mut self.space_renderers.ui,
-            spaces_to_render.ui,
-            &self.device,
-            &self.pipelines,
-        )?;
+        // TODO: we should be able to express this as something like "Layers::zip()"
+        self.space_renderers
+            .world
+            .set_space(&self.device, &self.pipelines, spaces_to_render.world)
+            .map_err(GraphicsResourceError::read_err)?;
+        self.space_renderers
+            .ui
+            .set_space(&self.device, &self.pipelines, spaces_to_render.ui)
+            .map_err(GraphicsResourceError::read_err)?;
 
         let mut encoder = self
             .device
@@ -535,20 +529,6 @@ impl<I: time::Instant> EverythingRenderer<I> {
             submit_time: Some(finish_update_time.saturating_duration_since(lines_to_submit_time)),
             spaces: space_infos,
         })
-    }
-
-    /// Create, or set the space of, a [`SpaceRenderer`].
-    fn update_space_renderer(
-        renderer: &mut SpaceRenderer<I>,
-        space: Option<&URef<Space>>,
-        device: &wgpu::Device,
-        pipelines: &Pipelines,
-    ) -> Result<(), GraphicsResourceError> {
-        // TODO: this is obsolete since SpaceRenderer is now optional
-        renderer
-            .set_space(device, pipelines, space)
-            // we don't need to add context because RefError has got the space name .. or do we?
-            .map_err(GraphicsResourceError::read_err)
     }
 
     /// Render the current scene content to the linear scene texture,
