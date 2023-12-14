@@ -68,7 +68,12 @@ save = [
     "ordered-float/serde",
 ]
 # Adds rerun logging support
-rerun = ["std", "dep:re_sdk", "dep:re_log_types"]
+rerun = [
+    "std",
+    "dep:re_log_types",
+    "dep:re_sdk",
+    "dep:re_types",
+]
 # Adds automatic parallelism to some algorithms.
 # If disabled, `std::thread` is never used.
 threads = ["std", "dep:rayon"]
@@ -107,6 +112,7 @@ rayon = { workspace = true, optional = true }
 # development of All is Cubes itself.
 re_log_types = { workspace = true, optional = true }
 re_sdk = { workspace = true, optional = true }
+re_types = { workspace = true, optional = true }
 # rc feature needed because we are [de]serializing `Arc`s
 serde = { workspace = true, optional = true, features = ["derive", "rc"] }
 serde_repr = { version = "0.1.12", optional = true, default-features = false }

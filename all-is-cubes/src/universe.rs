@@ -303,7 +303,7 @@ impl Universe {
         #[cfg(feature = "rerun")]
         self.rerun_destination
             .stream
-            .set_time_sequence("session_step_time", Some(self.session_step_time as i64));
+            .set_time_sequence("session_step_time", self.session_step_time as i64);
 
         if self.wants_gc {
             self.gc();
@@ -690,7 +690,7 @@ impl Universe {
                 &rg::archetypes::ViewCoordinates::new(
                     rg::components::ViewCoordinates::from_up_and_handedness(
                         crate::math::Face6::PY.into(),
-                        re_sdk::coordinates::Handedness::Right,
+                        rg::view_coordinates::Handedness::Right,
                     ),
                 ),
             )

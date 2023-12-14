@@ -1,13 +1,14 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use re_sdk::{datatypes, RecordingStream, RecordingStreamResult};
+use re_sdk::{RecordingStream, RecordingStreamResult};
+use re_types::datatypes;
 
 use crate::math;
 
 // To support concise conditional debugging, this module re-exports many items from rerun.
 pub use re_log_types::{entity_path, EntityPath, Index};
-pub use re_sdk::{archetypes, components};
+pub use re_types::{archetypes, components, view_coordinates};
 
 /// Information that an entity or parent of entities can store in order to know where to
 /// send their Rerun logging data.
@@ -47,7 +48,7 @@ impl Destination {
                 &archetypes::ViewCoordinates::new(
                     components::ViewCoordinates::from_up_and_handedness(
                         crate::math::Face6::PY.into(),
-                        re_sdk::coordinates::Handedness::Right,
+                        view_coordinates::Handedness::Right,
                     ),
                 ),
             )?;
@@ -98,7 +99,7 @@ impl From<ClassId> for datatypes::ClassId {
     }
 }
 
-fn annotation_context() -> re_sdk::archetypes::AnnotationContext {
+fn annotation_context() -> archetypes::AnnotationContext {
     use crate::content::palette as p;
     use ClassId as C;
 
@@ -110,7 +111,7 @@ fn annotation_context() -> re_sdk::archetypes::AnnotationContext {
         (C::SpaceBlock, "", rgba_const!(0.15, 0.15, 0.15, 1.0)),
     ];
 
-    re_sdk::archetypes::AnnotationContext::new(descs.into_iter().map(|(id, label, color)| {
+    archetypes::AnnotationContext::new(descs.into_iter().map(|(id, label, color)| {
         datatypes::AnnotationInfo {
             id: id as u16,
             label: Some(label)
@@ -154,10 +155,10 @@ pub fn convert_aabs(
     archetypes::Boxes3D::from_half_sizes(half_sizes).with_centers(centers)
 }
 
-impl From<math::Face6> for re_sdk::coordinates::SignedAxis3 {
+impl From<math::Face6> for view_coordinates::SignedAxis3 {
     fn from(face: math::Face6) -> Self {
         use math::Face6;
-        use re_sdk::coordinates::{Axis3, Sign, SignedAxis3};
+        use view_coordinates::{Axis3, Sign, SignedAxis3};
         match face {
             Face6::NX => SignedAxis3 {
                 sign: Sign::Negative,

@@ -76,8 +76,9 @@ pretty_assertions = "1.2.0"
 rand = { version = "0.8.2", default-features = false }
 rand_xoshiro = "0.6.0"
 rayon = { version = "1.8.0" }
-re_log_types = { version = "0.9.0", default-features = false }
-re_sdk = { version = "0.9.0", default-features = false }
+re_log_types = { version = "0.11.0", default-features = false }
+re_sdk = { version = "0.11.0", default-features = false }
+re_types = { version = "0.11.0", default-features = false }
 rendiff = { version = "0.1.0" }
 send_wrapper = "0.6.0"
 serde = { version = "1.0.160", default-features = false, features = ["derive"] }

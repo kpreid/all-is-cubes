@@ -428,7 +428,7 @@ fn connect_rerun(universe: &mut Universe) {
 
     let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes")
         .default_enabled(true)
-        .connect(re_sdk::default_server_addr(), Some(Duration::from_secs(1)))
+        .connect()
         .unwrap();
     let destination = rg::Destination {
         stream,
