@@ -1,5 +1,6 @@
-use std::fmt;
-use std::ops::Range;
+use alloc::vec::Vec;
+use core::ops::Range;
+use core::{fmt, ops};
 
 use bitvec::vec::BitVec;
 use ordered_float::OrderedFloat;
@@ -126,7 +127,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     /// Returns the total memory (not counting allocator overhead) occupied by this
     /// [`SpaceMesh`] value and all its owned objects.
     pub fn total_byte_size(&self) -> usize {
-        use std::mem::size_of;
+        use core::mem::size_of;
 
         let SpaceMesh {
             vertices,
@@ -418,7 +419,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     }
 }
 
-impl<M: MeshTypes> std::ops::Deref for SpaceMesh<M> {
+impl<M: MeshTypes> ops::Deref for SpaceMesh<M> {
     type Target = MeshMeta<M>;
 
     fn deref(&self) -> &Self::Target {
@@ -926,7 +927,7 @@ mod tests {
     use crate::BlockVertex;
     use all_is_cubes::block::Block;
     use all_is_cubes::math::Rgba;
-    use std::mem;
+    use core::mem;
 
     type TestMesh = SpaceMesh<TextureMt>;
 

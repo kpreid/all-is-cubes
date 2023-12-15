@@ -1,6 +1,7 @@
 //! Triangulator's 2D plane operations (sliced voxels to texels and meshes).
 
-use std::ops::Range;
+use alloc::vec::Vec;
+use core::ops::Range;
 
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D};

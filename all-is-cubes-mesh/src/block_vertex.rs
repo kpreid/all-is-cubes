@@ -1,6 +1,6 @@
 //! Mesh vertices.
 
-use std::fmt;
+use core::fmt;
 
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, FreePoint, FreeVector, Rgba};

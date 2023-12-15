@@ -1,4 +1,5 @@
-use std::mem;
+use alloc::vec::Vec;
+use core::{mem, ops};
 
 use either::Either;
 
@@ -44,8 +45,8 @@ impl IndexVec {
     #[inline]
     pub fn as_slice<R>(&self, range: R) -> IndexSlice<'_>
     where
-        [u16]: std::ops::Index<R, Output = [u16]>,
-        [u32]: std::ops::Index<R, Output = [u32]>,
+        [u16]: ops::Index<R, Output = [u16]>,
+        [u32]: ops::Index<R, Output = [u32]>,
     {
         match self {
             IndexVec::U16(vec) => IndexSlice::U16(&vec.as_slice()[range]),

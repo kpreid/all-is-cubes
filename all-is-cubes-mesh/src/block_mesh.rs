@@ -2,7 +2,7 @@
 //!
 //! This module is internal and reexported by its parent.
 
-use std::fmt;
+use core::fmt;
 use std::sync::Arc;
 
 use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
@@ -144,7 +144,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     pub(super) fn all_face_meshes(
         &self,
     ) -> impl Iterator<Item = (Face7, &BlockFaceMesh<M::Vertex>)> {
-        std::iter::once((Face7::Within, &self.interior_vertices)).chain(
+        core::iter::once((Face7::Within, &self.interior_vertices)).chain(
             self.face_vertices
                 .iter()
                 .map(|(f, mesh)| (Face7::from(f), mesh)),

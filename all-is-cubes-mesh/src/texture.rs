@@ -1,6 +1,6 @@
 //! Traits for textures used by the meshes this library generates.
 
-use std::fmt;
+use core::fmt;
 
 use all_is_cubes::block::{Evoxel, Evoxels};
 use all_is_cubes::content::palette;
@@ -130,7 +130,7 @@ impl<T: Allocator> Allocator for &T {
         <T as Allocator>::allocate(self, bounds, channels)
     }
 }
-impl<T: Allocator> Allocator for std::sync::Arc<T> {
+impl<T: Allocator> Allocator for alloc::sync::Arc<T> {
     type Tile = T::Tile;
     type Point = T::Point;
     #[mutants::skip] // trivial
@@ -138,7 +138,7 @@ impl<T: Allocator> Allocator for std::sync::Arc<T> {
         <T as Allocator>::allocate(self, bounds, channels)
     }
 }
-impl<T: Allocator> Allocator for std::rc::Rc<T> {
+impl<T: Allocator> Allocator for alloc::rc::Rc<T> {
     type Tile = T::Tile;
     type Point = T::Point;
     #[mutants::skip] // trivial

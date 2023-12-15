@@ -1,9 +1,9 @@
 use std::num::NonZeroU32;
 
-use all_is_cubes::math::Cube;
 use fnv::FnvHashSet;
 
 use all_is_cubes::block::{EvaluatedBlock, Resolution};
+use all_is_cubes::math::Cube;
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::time;
 use all_is_cubes::util::{Refmt as _, StatusText, TimeStats};

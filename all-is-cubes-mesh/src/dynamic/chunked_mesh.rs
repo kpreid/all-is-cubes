@@ -1,5 +1,5 @@
+use core::fmt;
 use std::collections::{hash_map::Entry::*, HashMap, HashSet};
-use std::fmt;
 use std::sync::{Arc, Mutex, Weak};
 
 use fnv::{FnvHashMap, FnvHashSet};
@@ -572,7 +572,7 @@ impl CsmUpdateInfo {
         *depth_sort_time = [*depth_sort_time, other.depth_sort_time]
             .into_iter()
             .flatten()
-            .reduce(std::ops::Add::add);
+            .reduce(core::ops::Add::add);
         *block_updates += other.block_updates;
         *chunk_count = other.chunk_count; // replace!
         *chunk_total_cpu_byte_size = other.chunk_total_cpu_byte_size; // replace!

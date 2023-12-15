@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
