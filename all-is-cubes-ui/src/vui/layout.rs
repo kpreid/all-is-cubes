@@ -62,7 +62,7 @@ impl LayoutRequest {
 }
 
 impl Fmt<ConciseDebug> for LayoutRequest {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &ConciseDebug) -> core::fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &ConciseDebug) -> fmt::Result {
         let &Self { minimum } = self;
         write!(fmt, "{:?}", minimum.to_array())
     }

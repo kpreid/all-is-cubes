@@ -35,7 +35,7 @@ mod error_chain {
     /// Formatting wrapper which prints an [`Error`] together with its
     /// `source()` chain, with at least one newline between each.
     ///
-    /// The text begins with the [`core::fmt::Display`] format of the error.
+    /// The text begins with the [`fmt::Display`] format of the error.
     ///
     /// Design note: This is not a [`manyfmt::Fmt`] because that has a blanket implementation
     /// which interferes with this one for [`Error`].

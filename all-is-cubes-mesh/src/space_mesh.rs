@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt;
 use std::ops::Range;
 
 use bitvec::vec::BitVec;
@@ -441,8 +441,8 @@ impl<M: MeshTypes> PartialEq for SpaceMesh<M> {
     }
 }
 
-impl<M: MeshTypes> Debug for SpaceMesh<M> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<M: MeshTypes> fmt::Debug for SpaceMesh<M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             vertices,
             indices,
@@ -781,8 +781,8 @@ impl<M: MeshTypes> PartialEq for MeshMeta<M> {
     }
 }
 
-impl<M: MeshTypes> Debug for MeshMeta<M> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<M: MeshTypes> fmt::Debug for MeshMeta<M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             opaque_range,
             transparent_ranges,

@@ -3,6 +3,7 @@
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::fmt;
 use core::iter::FusedIterator;
 use core::ops::RangeTo;
 
@@ -42,8 +43,8 @@ type Ccv = Vector3D<i32, WholeChunk>;
 #[allow(clippy::exhaustive_structs)]
 pub struct ChunkPos<const CHUNK_SIZE: GridCoordinate>(pub Cube);
 
-impl<const CHUNK_SIZE: GridCoordinate> core::fmt::Debug for ChunkPos<CHUNK_SIZE> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl<const CHUNK_SIZE: GridCoordinate> fmt::Debug for ChunkPos<CHUNK_SIZE> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self(Cube { x, y, z }) = *self;
         write!(f, "ChunkPos<{CHUNK_SIZE}>({x}, {y}, {z})")
     }
@@ -126,8 +127,8 @@ pub struct Distance {
     off_plane_count: u8,
 }
 
-impl core::fmt::Debug for Distance {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Debug for Distance {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Distance {
             nearest_approach_squared,
             off_plane_count,
@@ -386,8 +387,8 @@ pub struct OctantMask {
     flags: u8,
 }
 
-impl core::fmt::Debug for OctantMask {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Debug for OctantMask {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "OctantMask[")?;
         let mut first = true;
         for i in 0..8 {

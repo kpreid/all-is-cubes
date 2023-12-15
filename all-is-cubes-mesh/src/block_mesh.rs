@@ -2,7 +2,7 @@
 //!
 //! This module is internal and reexported by its parent.
 
-use std::fmt::Debug;
+use std::fmt;
 use std::sync::Arc;
 
 use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
@@ -615,8 +615,8 @@ where
     }
 }
 
-impl<M: MeshTypes> Debug for BlockMesh<M> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<M: MeshTypes> fmt::Debug for BlockMesh<M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             face_vertices,
             interior_vertices,
