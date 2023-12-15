@@ -5014,9 +5014,9 @@ dependencies = [
 
 [[package]]
 name = "softbuffer"
-version = "0.3.2"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0c651aec504a26e45df1f8c8df237ee7eef8e31b3f13b267a69a374adafbbd1"
+checksum = "dfa97594e034a52bfc0f7a2764f0445bd6dcf1c27136779b244473f9c24f9c5e"
 dependencies = [
  "as-raw-xcb-connection",
  "bytemuck",
@@ -5028,7 +5028,7 @@ dependencies = [
  "js-sys",
  "log",
  "objc",
- "raw-window-handle 0.5.2",
+ "raw-window-handle 0.6.0",
  "redox_syscall 0.4.1",
  "rustix 0.38.20",
  "tiny-xlib",
