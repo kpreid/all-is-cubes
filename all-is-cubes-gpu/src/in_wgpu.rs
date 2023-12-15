@@ -239,7 +239,7 @@ struct EverythingRenderer<I> {
     postprocess_camera_buffer: wgpu::Buffer,
 
     /// Debug overlay text is uploaded via this texture
-    info_text_texture: DrawableTexture,
+    info_text_texture: DrawableTexture<Rgb888, [u8; 4]>,
     info_text_sampler: wgpu::Sampler,
 }
 
@@ -341,7 +341,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 mapped_at_creation: false,
             }),
 
-            info_text_texture: DrawableTexture::new(),
+            info_text_texture: DrawableTexture::new(wgpu::TextureFormat::Rgba8UnormSrgb),
             info_text_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
                 label: Some("EverythingRenderer::info_text_sampler"),
                 address_mode_u: wgpu::AddressMode::ClampToEdge,

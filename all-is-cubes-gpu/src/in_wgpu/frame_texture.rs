@@ -1,5 +1,5 @@
-use std::fmt;
 use std::sync::atomic::AtomicBool;
+use std::{fmt, mem};
 
 use all_is_cubes::camera::{Flaws, GraphicsOptions, ImagePixel};
 use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
@@ -8,17 +8,21 @@ use all_is_cubes::euclid::Vector2D;
 use super::bloom;
 use crate::EgFramebuffer;
 
-/// A RGBA [`wgpu::Texture`] with a local buffer that can be drawn on.
-pub(crate) struct DrawableTexture {
+/// A RGBA [`wgpu::Texture`] with a CPU-side buffer that can be drawn on.
+pub(crate) struct DrawableTexture<In, Out> {
+    texture_format: wgpu::TextureFormat,
     texture: Option<wgpu::Texture>,
     texture_view: Option<wgpu::TextureView>,
     size: wgpu::Extent3d,
-    local_buffer: EgFramebuffer,
+    local_buffer: EgFramebuffer<In, Out>,
 }
 
-impl DrawableTexture {
-    pub fn new() -> Self {
+impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
+    /// `texture_format` must be an uncompressed format and the same bytes-per-texel as the
+    /// `Out` generic parameter.
+    pub fn new(texture_format: wgpu::TextureFormat) -> Self {
         Self {
+            texture_format,
             texture: None,
             texture_view: None,
             size: wgpu::Extent3d {
@@ -55,12 +59,13 @@ impl DrawableTexture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            format: self.texture_format,
             view_formats: &[],
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         });
 
         *self = Self {
+            texture_format: self.texture_format,
             local_buffer: EgFramebuffer::new(Size {
                 width: new_extent.width,
                 height: new_extent.height,
@@ -71,7 +76,7 @@ impl DrawableTexture {
         };
     }
 
-    pub fn draw_target(&mut self) -> &mut EgFramebuffer {
+    pub fn draw_target(&mut self) -> &mut EgFramebuffer<In, Out> {
         &mut self.local_buffer
     }
 
@@ -106,7 +111,9 @@ impl DrawableTexture {
                     ),
                     wgpu::ImageDataLayout {
                         offset: 0,
-                        bytes_per_row: Some(4 * full_width),
+                        bytes_per_row: Some(
+                            u32::try_from(mem::size_of::<Out>()).unwrap() * full_width,
+                        ),
                         rows_per_image: None,
                     },
                     wgpu::Extent3d {
@@ -122,7 +129,7 @@ impl DrawableTexture {
     }
 }
 
-impl fmt::Debug for DrawableTexture {
+impl<In, Out> fmt::Debug for DrawableTexture<In, Out> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DrawableTexture")
             .field("texture", &self.texture.is_some())
@@ -132,7 +139,7 @@ impl fmt::Debug for DrawableTexture {
     }
 }
 
-impl OriginDimensions for DrawableTexture {
+impl<In, Out> OriginDimensions for DrawableTexture<In, Out> {
     fn size(&self) -> Size {
         Size {
             width: self.size.width,

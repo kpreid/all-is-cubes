@@ -1,8 +1,10 @@
 //! Drawing to a CPU-side image buffer which is going to be transferred to the GPU.
 
+use std::marker::PhantomData;
+
 use all_is_cubes::drawing::embedded_graphics::{
     draw_target::DrawTarget,
-    pixelcolor::Rgb888,
+    pixelcolor::{self, PixelColor},
     prelude::{OriginDimensions, Point, RgbColor, Size},
     primitives::Rectangle,
     Pixel,
@@ -11,28 +13,30 @@ use all_is_cubes::drawing::embedded_graphics::{
 /// Storage for an image which can be written to using [`DrawTarget`].
 ///
 /// This storage tracks a “dirty rectangle” so that copying can be limited to affected areas.
-pub(crate) struct EgFramebuffer {
+pub(crate) struct EgFramebuffer<In, Out> {
     /// RGBA image buffer. Row-major, Y-up.
-    data: Vec<[u8; 4]>,
+    data: Vec<Out>,
     /// Size of the buffer.
     size: Size,
     /// Region of the buffer not yet copied to the GPU.
     dirty: Rectangle,
     /// Region of the buffer that is not entirely zeroes.
     nonzero: Rectangle,
+    _phantom_pixel_type: PhantomData<fn(In)>,
 }
 
-impl EgFramebuffer {
+impl<In, Out: Copy + Default> EgFramebuffer<In, Out> {
     pub fn new(size: Size) -> Self {
         Self {
-            data: vec![[0, 0, 0, 0]; size.width as usize * size.height as usize],
+            data: vec![Out::default(); size.width as usize * size.height as usize],
             size,
             dirty: Rectangle::zero(),
             nonzero: Rectangle::zero(),
+            _phantom_pixel_type: PhantomData,
         }
     }
 
-    pub fn data(&self) -> &[[u8; 4]] {
+    pub fn data(&self) -> &[Out] {
         &self.data
     }
 
@@ -45,7 +49,7 @@ impl EgFramebuffer {
     }
 
     pub fn clear_transparent(&mut self) {
-        self.data.fill([0, 0, 0, 0]);
+        self.data.fill(Out::default());
         // Everything that wasn't zero is now dirty.
         if let Some(bottom_right) = self.nonzero.bottom_right() {
             expand_rectangle(&mut self.dirty, self.nonzero.top_left);
@@ -59,14 +63,14 @@ impl EgFramebuffer {
     }
 }
 
-impl DrawTarget for EgFramebuffer {
-    type Color = Rgb888; // TODO: generalize
+impl<In: ToTexel<Out>, Out> DrawTarget for EgFramebuffer<In, Out> {
+    type Color = In;
     type Error = std::convert::Infallible;
 
     #[inline]
     fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
     where
-        I: IntoIterator<Item = Pixel<Self::Color>>,
+        I: IntoIterator<Item = Pixel<In>>,
     {
         let bounds = Rectangle {
             top_left: Point::zero(),
@@ -75,7 +79,7 @@ impl DrawTarget for EgFramebuffer {
         for Pixel(point, color) in pixels.into_iter() {
             if bounds.contains(point) {
                 self.data[point.y as usize * self.size.width as usize + point.x as usize] =
-                    [color.r(), color.g(), color.b(), 255];
+                    color.to_texel();
                 expand_rectangle(&mut self.dirty, point);
                 expand_rectangle(&mut self.nonzero, point);
             }
@@ -86,9 +90,22 @@ impl DrawTarget for EgFramebuffer {
     // TODO: implement other ops
 }
 
-impl OriginDimensions for EgFramebuffer {
+impl<In, Out> OriginDimensions for EgFramebuffer<In, Out> {
     fn size(&self) -> Size {
         self.size
+    }
+}
+
+/// A [`PixelColor`] that can be converted into data accepted as a GPU texture format.
+///
+/// The reason this isn't `From` is so that it can be implemented for foreign types.
+trait ToTexel<T>: PixelColor + Copy {
+    fn to_texel(self) -> T;
+}
+
+impl ToTexel<[u8; 4]> for pixelcolor::Rgb888 {
+    fn to_texel(self) -> [u8; 4] {
+        [self.r(), self.g(), self.b(), 255]
     }
 }
 
