@@ -6,7 +6,7 @@ use euclid::{point2, vec2};
 use ordered_float::NotNan;
 
 use crate::camera::{
-    AntialiasingOption, Camera, Flaws, FogOption, GraphicsOptions, HeadlessRenderer, Layers,
+    AntialiasingOption, Camera, Flaws, FogOption, GraphicsOptions, HeadlessRenderer, Layers, Ndc,
     NdcPoint2, RenderError, Rendering, StandardCameras, Viewport,
 };
 use crate::character::Cursor;
@@ -336,7 +336,7 @@ fn trace_patch_in_one_space<P: Accumulate>(
             let mut info = RaytraceInfo::default();
             let samples: [P; N] = core::array::from_fn(|i| {
                 let (p, i) = space.trace_ray(
-                    camera.project_ndc_into_world(patch.point_within(SAMPLE_POINTS[i])),
+                    camera.project_ndc_into_world(point_within_patch(patch, SAMPLE_POINTS[i])),
                     include_sky,
                 );
                 info += i;
@@ -348,20 +348,10 @@ fn trace_patch_in_one_space<P: Accumulate>(
 }
 
 /// A rectangle in normalized device coordinates (-1 to 1 is the viewport).
-// TODO(euclid migration): use euclid::Box2D
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct NdcRect {
-    low: NdcPoint2,
-    high: NdcPoint2,
-}
-impl NdcRect {
-    fn center(self) -> NdcPoint2 {
-        (self.low + self.high.to_vector()) / 2.
-    }
+type NdcRect = euclid::Box2D<f64, Ndc>;
 
-    fn point_within(self, uv: euclid::default::Vector2D<f64>) -> NdcPoint2 {
-        self.low + (self.high - self.low).component_mul(uv.cast_unit())
-    }
+fn point_within_patch(patch: NdcRect, uv: euclid::default::Vector2D<f64>) -> NdcPoint2 {
+    patch.min + (patch.max - patch.min).component_mul(uv.cast_unit())
 }
 
 /// Threaded and non-threaded implementations of generating a full image.
@@ -418,8 +408,8 @@ mod trace_image {
                         let x0 = viewport.normalize_fb_x_edge(xch);
                         let x1 = viewport.normalize_fb_x_edge(xch + 1);
                         let (pixel, info) = scene.trace_patch(NdcRect {
-                            low: point2(x0, y0),
-                            high: point2(x1, y1),
+                            min: point2(x0, y0),
+                            max: point2(x1, y1),
                         });
                         *pixel_out = encoder(pixel);
                         info
@@ -466,8 +456,8 @@ mod trace_image {
             for x_edge in 1..=viewport_size.x {
                 let x1 = viewport.normalize_fb_x_edge(x_edge);
                 let (pixel, info) = scene.trace_patch(NdcRect {
-                    low: point2(x0, y0),
-                    high: point2(x1, y1),
+                    min: point2(x0, y0),
+                    max: point2(x1, y1),
                 });
                 output[index] = encoder(pixel);
                 total_info += info;
