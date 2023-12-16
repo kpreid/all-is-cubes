@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
-use tui::layout::Rect;
+use ratatui::layout::Rect;
 
 use all_is_cubes::arcstr::literal_substr;
 use all_is_cubes::camera::{self, Camera, StandardCameras, Viewport};
@@ -235,6 +235,8 @@ fn run(
                         MouseEventKind::Up(_)
                         | MouseEventKind::Drag(_)
                         | MouseEventKind::Moved
+                        | MouseEventKind::ScrollLeft
+                        | MouseEventKind::ScrollRight
                         | MouseEventKind::ScrollDown
                         | MouseEventKind::ScrollUp => {}
                     }

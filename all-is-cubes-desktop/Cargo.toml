@@ -36,8 +36,8 @@ anyhow = { workspace = true }
 bytemuck = { workspace = true }
 cfg-if = { workspace = true }
 clap = { workspace = true }
-# Note: keep crossterm in sync with tui's crossterm dependency.
-crossterm = "0.25.0"
+# Note: keep crossterm in sync with ratatui's crossterm dependency.
+crossterm = "0.27.0"
 directories-next = "2.0.0"
 indicatif = { version = "0.17.0", default-features = false }
 kira = { version = "0.8.3", default-features = false, features = ["cpal"] }
@@ -54,7 +54,7 @@ simplelog = { workspace = true }
 strum = { workspace = true, features = ["derive", "std"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "sync"] }
-tui = { version = "0.19.0", default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.24.0", default-features = false, features = ["crossterm"] }
 unicode-width = { version = "0.1.9", default-features = false }
 # Note on feature selection: winit requires either "x11" or "wayland" to build at all on Linux, which is harmless elsewhere. I picked x11 because it should be the most compatible.
 # TODO: drop rwh_05 when wgpu is updated

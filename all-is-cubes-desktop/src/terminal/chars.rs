@@ -9,6 +9,7 @@ use crossterm::QueueableCommand as _;
 use all_is_cubes::camera::ImagePixel;
 use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::math::{Rgb, Rgba};
+use ratatui::backend::Backend;
 
 use super::options::{CharacterMode, ColorMode};
 use super::{TextAndColor, TextRayImage};
@@ -190,7 +191,7 @@ const BRAILLE_TABLE: [&str; 256] = [
     "⣰","⣱","⣲","⣳","⣴","⣵","⣶","⣷","⣸","⣹","⣺","⣻","⣼","⣽","⣾","⣿",
 ];
 
-pub(crate) fn write_colored_and_measure<B: tui::backend::Backend + io::Write>(
+pub(crate) fn write_colored_and_measure<B: Backend + io::Write>(
     backend: &mut B,
     has_terminal_stdin: bool,
     width_table: &mut HashMap<String, u16>,
@@ -214,7 +215,7 @@ pub(crate) fn write_colored_and_measure<B: tui::backend::Backend + io::Write>(
 ///
 /// Returns an error if the string could not be written. If an error was encountered
 /// measuring the width, returns an estimate instead.
-fn write_and_measure<B: tui::backend::Backend + io::Write>(
+fn write_and_measure<B: Backend + io::Write>(
     backend: &mut B,
     has_terminal_stdin: bool,
     width_table: &mut HashMap<String, u16>,

@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::io::{self, Write as _};
 use std::sync::mpsc;
 
@@ -8,12 +7,12 @@ use anyhow::Context as _;
 use crossterm::cursor::{self, MoveTo};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
 use crossterm::QueueableCommand as _;
-use tui::backend::CrosstermBackend;
-use tui::layout::{Constraint, Direction, Layout, Rect};
-use tui::style::{Color as TuiColor, Modifier, Style};
-use tui::text::{Span, Spans};
-use tui::widgets::{Borders, Paragraph};
-use tui::Terminal;
+use ratatui::backend::CrosstermBackend;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color as TuiColor, Modifier, Style};
+use ratatui::text::Span;
+use ratatui::widgets::{Borders, Paragraph};
+use ratatui::Terminal;
 
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::euclid::Vector2D;
@@ -250,7 +249,7 @@ impl TerminalState {
     }
 
     /// Reset terminal state, as before exiting.
-    fn clean_up_terminal(&mut self) -> crossterm::Result<()> {
+    fn clean_up_terminal(&mut self) -> io::Result<()> {
         if self.terminal_state_dirty {
             fn log_if_fails<T, E: std::error::Error>(r: Result<T, E>) {
                 match r {
@@ -276,7 +275,7 @@ impl TerminalState {
     ///
     /// If `draw_into_rect` is true, moves the cursor to fit into `self.viewport_position`.
     /// If it is false, does not affect the cursor position and uses newlines.
-    fn write_frame(&mut self, image: &TextRayImage, draw_into_rect: bool) -> crossterm::Result<()> {
+    fn write_frame(&mut self, image: &TextRayImage, draw_into_rect: bool) -> io::Result<()> {
         // Now separately draw the frame data. This is done because we want to use a precise
         // strategy for measuring the width of characters (draw them and read back the cursor
         // position) whereas tui-rs assumes that `unicode_width`'s answers match the terminal.
@@ -358,8 +357,8 @@ impl TerminalState {
                 Term color: N   Term chars: M\n\
                 Quit: Esc, ^C, or ^D";
 
-            let [viewport_rect_tmp, toolbar_rect, gfx_info_rect, cursor_and_help_rect]: [Rect; 4] =
-                Layout::default()
+            let [viewport_rect_tmp, toolbar_rect, gfx_info_rect, cursor_and_help_rect] =
+                *Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([
                         Constraint::Min(1),
@@ -368,14 +367,16 @@ impl TerminalState {
                         Constraint::Length(3),
                     ])
                     .split(f.size())
-                    .try_into()
-                    .unwrap();
-            let [cursor_rect, help_rect]: [Rect; 2] = Layout::default()
+            else {
+                unreachable!()
+            };
+            let [cursor_rect, help_rect] = *Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Min(0), Constraint::Length(30)])
                 .split(cursor_and_help_rect)
-                .try_into()
-                .unwrap();
+            else {
+                unreachable!()
+            };
             // Toolbar
             {
                 const SLOTS: usize = InventoryDisplay::SLOTS;
@@ -407,12 +408,10 @@ impl TerminalState {
                     .split(toolbar_rect);
 
                 let selected_slots = ui_frame.inventory.selected_slots;
-                for ((i, rect), slot) in slot_rects
-                    .into_iter()
-                    .enumerate()
-                    .zip(&ui_frame.inventory.slots)
+                for ((i, &rect), slot) in
+                    slot_rects.iter().enumerate().zip(&ui_frame.inventory.slots)
                 {
-                    let slot_info = Spans::from(vec![
+                    let slot_info: Vec<Span<'_>> = vec![
                         if selected_slots[0] == i {
                             SELECTED_0
                         } else {
@@ -424,8 +423,8 @@ impl TerminalState {
                         } else {
                             SELECTED_BLANK
                         },
-                    ]);
-                    let block = tui::widgets::Block::default()
+                    ];
+                    let block = ratatui::widgets::Block::default()
                         .title(slot_info)
                         .borders(Borders::ALL);
                     f.render_widget(
@@ -452,17 +451,17 @@ impl TerminalState {
 
             // Graphics info line
             {
-                let [frame_info_rect, colors_info_rect, render_info_rect]: [Rect; 3] =
-                    Layout::default()
-                        .direction(Direction::Horizontal)
-                        .constraints([
-                            Constraint::Percentage(30),
-                            Constraint::Percentage(30),
-                            Constraint::Percentage(30),
-                        ])
-                        .split(gfx_info_rect)
-                        .try_into()
-                        .unwrap();
+                let [frame_info_rect, colors_info_rect, render_info_rect] = *Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Percentage(30),
+                        Constraint::Percentage(30),
+                        Constraint::Percentage(30),
+                    ])
+                    .split(gfx_info_rect)
+                else {
+                    unreachable!()
+                };
 
                 f.render_widget(
                     Paragraph::new(format!("{:5.1} FPS", ui_frame.frames_per_second)),
