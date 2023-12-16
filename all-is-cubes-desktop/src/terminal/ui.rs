@@ -355,7 +355,7 @@ impl TerminalState {
             const HELP_TEXT: &str = "\
                 Move: WS AD EC  Turn: ←→ ↑↓\n\
                 Term color: N   Term chars: M\n\
-                Quit: Esc, ^C, or ^D";
+                Quit: ^C, or ^D";
 
             let [viewport_rect_tmp, toolbar_rect, gfx_info_rect, cursor_and_help_rect] =
                 *Layout::default()

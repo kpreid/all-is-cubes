@@ -185,16 +185,11 @@ fn run(
             }
             let options = &mut dsession.renderer.options;
             match event {
-                Event::Key(
-                    KeyEvent {
-                        code: KeyCode::Esc, ..
-                    }
-                    | KeyEvent {
-                        code: KeyCode::Char('c' | 'd'),
-                        modifiers: KeyModifiers::CONTROL,
-                        ..
-                    },
-                ) => {
+                Event::Key(KeyEvent {
+                    code: KeyCode::Char('c' | 'd'),
+                    modifiers: KeyModifiers::CONTROL,
+                    ..
+                }) => {
                     return Ok(());
                 }
                 Event::Key(KeyEvent {
