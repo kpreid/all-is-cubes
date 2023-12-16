@@ -32,7 +32,7 @@ mod record;
 mod session;
 mod terminal;
 
-use crate::aic_winit::{create_winit_rt_desktop_session, create_winit_wgpu_desktop_session};
+use crate::aic_winit::create_winit_wgpu_desktop_session;
 use crate::command_options::{
     determine_record_format, parse_universe_source, AicDesktopArgs, DisplaySizeArg, UniverseSource,
 };
@@ -158,7 +158,7 @@ fn main() -> Result<(), anyhow::Error> {
     // Note that while its return type is nominally Result<()>, it does not necessarily
     // ever return “successfully”, so no code should follow it.
     match graphics_type {
-        GraphicsType::Window => {
+        GraphicsType::Window | GraphicsType::WindowRt => {
             let event_loop = winit::event_loop::EventLoop::new()?;
             let dsession = inner_params
                 .runtime
@@ -174,26 +174,12 @@ fn main() -> Result<(), anyhow::Error> {
                     viewport_cell,
                 ))
                 .context("failed to create session")?;
-            inner_main(
-                inner_params,
-                move |dsession| winit_main_loop(event_loop, dsession),
-                dsession,
-            )
-        }
-        GraphicsType::WindowRt => {
-            let event_loop = winit::event_loop::EventLoop::new()?;
-            let dsession = create_winit_rt_desktop_session(
-                session,
-                aic_winit::create_window(
-                    &event_loop,
-                    &title_and_version(),
-                    display_size,
-                    fullscreen,
-                )
-                .context("failed to create window")?,
-                viewport_cell,
-            )
-            .context("failed to create session")?;
+            if graphics_type == GraphicsType::WindowRt {
+                // TODO: improve on this kludge by just having a general cmdline graphics config
+                dsession.session.graphics_options_mut().update_mut(|o| {
+                    o.render_method = all_is_cubes::camera::RenderMethod::Reference;
+                });
+            }
             inner_main(
                 inner_params,
                 move |dsession| winit_main_loop(event_loop, dsession),

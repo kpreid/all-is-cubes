@@ -1,19 +1,14 @@
 //! Glue between [`all_is_cubes`], [`winit`], and `winit`-compatible renderers.
 
-use std::num::NonZeroU32;
 use std::time::Instant;
 
-use anyhow::anyhow;
-use image::imageops::{self, FilterType};
 use winit::event::{DeviceEvent, ElementState, Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget};
 use winit::window::{CursorGrabMode, Window};
 
 use all_is_cubes::camera::{self, StandardCameras, Viewport};
 use all_is_cubes::euclid::{Point2D, Vector2D};
-use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource};
-use all_is_cubes::math::VectorOps;
-use all_is_cubes::raytracer::RtRenderer;
+use all_is_cubes::listen::ListenableCell;
 use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
 use all_is_cubes_gpu::wgpu;
 use all_is_cubes_ui::apps::InputProcessor;
@@ -239,69 +234,6 @@ pub(crate) async fn create_winit_wgpu_desktop_session(
     Ok(dsession)
 }
 
-pub(crate) fn create_winit_rt_desktop_session(
-    session: Session,
-    window: WinAndState,
-    viewport_cell: ListenableCell<Viewport>,
-) -> Result<DesktopSession<RtToSoftbuffer, WinAndState>, anyhow::Error> {
-    let start_time = Instant::now();
-
-    viewport_cell.set(physical_size_to_viewport(
-        window.window.scale_factor(),
-        window.window.inner_size(),
-    ));
-
-    let surface = {
-        // Safety:
-        // Per <https://github.com/rust-windowing/softbuffer/issues/75> we only need this to
-        // be alive till we create the `Surface`, and `window` will outlive everything in
-        // this function.
-        let context = unsafe { softbuffer::Context::new(&window.window) }
-            .map_err(|_| anyhow!("Failed to initialize softbuffer Context"))?;
-
-        // Safety:
-        // `DesktopSession` will own `context` and `window` and drop the context first.
-        // Surface::new says "Ensure that the passed handles are valid to draw a 2D buffer to".
-        // What does that mean? Well, we're not doing anything *else*...
-        unsafe { softbuffer::Surface::new(&context, &window.window) }
-            .map_err(|_| anyhow!("Failed to initialize softbuffer Surface"))?
-    };
-
-    fn raytracer_size_policy(mut viewport: Viewport) -> Viewport {
-        // use 2x2 nominal pixels
-        viewport.framebuffer_size = viewport
-            .nominal_size
-            .map(|c| (c / 2.0).round() as u32)
-            .cast_unit();
-        viewport
-    }
-
-    let renderer = RtRenderer::new(
-        session.create_cameras(viewport_cell.as_source()),
-        Box::new(raytracer_size_policy),
-        ListenableSource::constant(()),
-    );
-
-    let dsession = DesktopSession::new(
-        RtToSoftbuffer {
-            renderer,
-            surface,
-            resize: DirtyFlag::listening(true, viewport_cell.as_source()),
-        },
-        window,
-        session,
-        viewport_cell,
-    );
-
-    let ready_time = Instant::now();
-    log::debug!(
-        "Renderer and window initialized in {:.3} s",
-        ready_time.duration_since(start_time).as_secs_f32()
-    );
-
-    Ok(dsession)
-}
-
 /// Handle one winit event.
 ///
 /// Modifies `control_flow` if an event indicates the application should exit.
@@ -511,74 +443,5 @@ impl RendererToWinit for SurfaceRenderer<Instant> {
                 format!("{}", session.info_text(render_info))
             })
             .unwrap();
-    }
-}
-
-/// Ingredients to display [`RtRenderer`] via [`softbuffer`].
-pub(crate) struct RtToSoftbuffer {
-    renderer: RtRenderer,
-    surface: softbuffer::Surface,
-    resize: DirtyFlag,
-}
-
-impl crate::glue::Renderer for RtToSoftbuffer {}
-
-impl RendererToWinit for RtToSoftbuffer {
-    fn update_world_camera(&mut self) {
-        // TODO: implement this or eliminate its necessity...
-    }
-
-    fn cameras(&self) -> &StandardCameras {
-        self.renderer.cameras()
-    }
-
-    fn redraw(&mut self, session: &Session, window: &Window) {
-        self.renderer.update(session.cursor_result()).unwrap(/* TODO: fix */);
-
-        let sb_image_size = window.inner_size();
-        if self.resize.get_and_clear() {
-            if let (Some(w), Some(h)) = (
-                NonZeroU32::new(sb_image_size.width),
-                NonZeroU32::new(sb_image_size.height),
-            ) {
-                self.surface.resize(w, h).unwrap(/* TODO: fix */);
-            }
-        }
-
-        // TODO: reduce number of image copies and allocations here
-
-        let (image, _render_info) = self
-            .renderer
-            .draw_rgba(|render_info| session.info_text(render_info).to_string());
-
-        let image = image::RgbaImage::from_raw(
-            image.size.x,
-            image.size.y,
-            bytemuck::cast_vec::<[u8; 4], u8>(image.data),
-        )
-        .unwrap();
-        let scaled_image = imageops::resize(
-            &image,
-            sb_image_size.width,
-            sb_image_size.height,
-            FilterType::Triangle,
-        );
-
-        let mut surface_buffer = self.surface.buffer_mut().unwrap(/* TODO: fix */);
-
-        // Shuffle and copy bytes to produce softbuffer's expected format of "0RGB" u32s
-        for (inpix, outpix) in std::iter::zip(
-            bytemuck::cast_slice::<u8, [u8; 4]>(scaled_image.as_ref()),
-            &mut *surface_buffer,
-        ) {
-            // Note: we work in terms of arrays and not u32s to avoid imposing an alignment
-            // requirement.
-            // Start with an array in guaranteed R, G, B, A order...
-            let &[r, g, b, _a] = inpix;
-            // ...then pack them into a u32 as specified by softbuffer.
-            *outpix = u32::from_be_bytes([0, r, g, b]);
-        }
-
-        surface_buffer.present().unwrap(/* TODO: fix */);
     }
 }
