@@ -34,6 +34,8 @@ pub struct RtRenderer<D: RtBlockData = ()> {
 
     custom_options: ListenableSource<D::Options>,
 
+    custom_options_cache: D::Options,
+
     /// Whether there was a [`Cursor`] to be drawn.
     /// Raytracing doesn't yet support cursors but we need to report that.
     had_cursor: bool,
@@ -57,6 +59,7 @@ where
             rts: Layers::<Option<_>>::default(),
             cameras,
             size_policy,
+            custom_options_cache: custom_options.snapshot(),
             custom_options,
             had_cursor: false,
         }
@@ -148,31 +151,16 @@ where
         O: Clone + Send + Sync, // Clone is used in the no-data case
         IF: FnOnce(&RaytraceInfo) -> String,
     {
-        let mut cameras = self.cameras.cameras().clone();
-        let viewport = (self.size_policy)(cameras.world.viewport());
-        cameras.world.set_viewport(viewport);
-        cameras.ui.set_viewport(viewport);
+        let scene = self.scene();
+        let viewport = scene.cameras.world.viewport();
+
         assert_eq!(
             viewport.pixel_count(),
             Some(output.len()),
             "Viewport size does not match output buffer length",
         );
 
-        let options = RtOptionsRef {
-            graphics_options: self.cameras.graphics_options(),
-            custom_options: &*self.custom_options.get(),
-        };
-
-        let scene = RtScene {
-            rts: self
-                .rts
-                .as_refs()
-                .map(|opt_urt| opt_urt.as_ref().map(|urt| urt.get())),
-            cameras: &cameras,
-            options,
-        };
-
-        let info = trace_image::trace_scene_to_image_impl(scene, &encoder, output);
+        let info = trace_image::trace_scene_to_image_impl(&scene, &encoder, output);
 
         let info_text: String = info_text_fn(&info);
         if !info_text.is_empty() && self.cameras.cameras().world.options().debug_info_text {
@@ -180,14 +168,42 @@ where
                 output,
                 viewport,
                 [
-                    encoder(P::paint(Rgba::BLACK, options)),
-                    encoder(P::paint(Rgba::WHITE, options)),
+                    encoder(P::paint(Rgba::BLACK, scene.options)),
+                    encoder(P::paint(Rgba::WHITE, scene.options)),
                 ],
                 &info_text,
             );
         }
 
         info
+    }
+
+    /// Returns a [`RtScene`] which may be used to compute individual image pixels.
+    ///
+    /// This is the setup operation which [`RtRenderer::draw()`] is built upon;
+    /// use it if you want to render partially or incrementally.
+    pub fn scene<P>(&self) -> RtScene<'_, P>
+    where
+        P: Accumulate<BlockData = D>,
+    {
+        let mut cameras = self.cameras.cameras().clone();
+        let viewport = (self.size_policy)(cameras.world.viewport());
+        cameras.world.set_viewport(viewport);
+        cameras.ui.set_viewport(viewport);
+
+        let options = RtOptionsRef {
+            graphics_options: self.cameras.graphics_options(),
+            custom_options: &self.custom_options_cache,
+        };
+
+        RtScene {
+            rts: self
+                .rts
+                .as_refs()
+                .map(|opt_urt| opt_urt.as_ref().map(|urt| urt.get())),
+            cameras,
+            options,
+        }
     }
 
     /// Returns the [`StandardCameras`] this renderer contains.
@@ -207,7 +223,7 @@ where
 }
 
 impl RtRenderer<()> {
-    /// As [`Self::draw()`], but the output is an [`Rendering`], and
+    /// As [`Self::draw()`], but the output is a [`Rendering`], and
     /// [`Camera::post_process_color()`] is applied to the pixels.
     ///
     ///  [`Camera::post_process_color()`]: crate::camera::Camera::post_process_color
@@ -274,28 +290,46 @@ impl HeadlessRenderer for RtRenderer<()> {
 
 /// Bundle of references to the current scene data in a [`RtRenderer`],
 /// used to implement tracing individual rays independent of how they
-/// are assembled into an image. Differs from [`SpaceRaytracer::trace_ray`]
+/// are assembled into an image. Differs from [`SpaceRaytracer::trace_ray()`]
 /// in that it includes the cameras (thus accepting screen-space coordinates
-/// rather than a lay) and [`Layers`] rather than one space.
-struct RtScene<'a, P: Accumulate> {
+/// rather than a ray) and [`Layers`] rather than one space.
+///
+/// Obtain this by calling [`RtRenderer::scene()`].
+pub struct RtScene<'a, P: Accumulate> {
     rts: Layers<Option<&'a SpaceRaytracer<P::BlockData>>>,
     /// Cameras *with* size_policy applied.
-    cameras: &'a Layers<Camera>,
+    cameras: Layers<Camera>,
     options: RtOptionsRef<'a, <P::BlockData as RtBlockData>::Options>,
+}
+
+impl<'a, P: Accumulate> fmt::Debug for RtScene<'a, P>
+where
+    <P::BlockData as RtBlockData>::Options: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RtScene")
+            .field("rts", &self.rts)
+            .field("cameras", &self.cameras)
+            .field("options", &self.options)
+            .finish()
+    }
 }
 
 impl<'a, P: Accumulate> Clone for RtScene<'a, P> {
     fn clone(&self) -> Self {
-        *self
+        Self {
+            rts: self.rts,
+            cameras: self.cameras.clone(),
+            options: self.options,
+        }
     }
 }
-impl<P: Accumulate> Copy for RtScene<'_, P> {}
 
 impl<P: Accumulate> RtScene<'_, P> {
-    /// Called from threaded or non-threaded `trace_scene_to_image()` implementations
-    /// to produce a single image pixel.
+    /// Given the `patch` which is the bounding box of a single image pixel in normalized device
+    /// coordinates (range -1 to 1), produce the [`Accumulate`]d value of that pixel in this scene.
     #[inline]
-    fn trace_patch(&self, patch: NdcRect) -> (P, RaytraceInfo) {
+    pub fn trace_patch(&self, patch: NdcRect) -> (P, RaytraceInfo) {
         if let Some(ui) = self.rts.ui {
             let (pixel, info): (P, RaytraceInfo) =
                 trace_patch_in_one_space(ui, &self.cameras.ui, patch, false);
@@ -375,7 +409,7 @@ mod trace_image {
     /// interactive use.
     #[cfg(feature = "threads")]
     pub(super) fn trace_scene_to_image_impl<P, E, O>(
-        scene: RtScene<'_, P>,
+        scene: &RtScene<'_, P>,
         encoder: E,
         output: &mut [O],
     ) -> RaytraceInfo
@@ -435,7 +469,7 @@ mod trace_image {
     /// interactive use.
     #[cfg(not(feature = "threads"))]
     pub(super) fn trace_scene_to_image_impl<P, E, O>(
-        scene: RtScene<'_, P>,
+        scene: &RtScene<'_, P>,
         encoder: E,
         output: &mut [O],
     ) -> RaytraceInfo
