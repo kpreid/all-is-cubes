@@ -191,6 +191,8 @@ impl Text {
         })
     }
 
+    /// Called by [`Primitive::Text`] evaluation to actually produce the voxels for a specific
+    /// [`Block`] of text.
     pub(crate) fn evaluate(
         &self,
         block_offset: GridVector,
@@ -216,19 +218,24 @@ impl Text {
             brush,
             block_offset,
             |text_obj, text_aab, drawing_transform| {
-                let mut voxels: Vol<Box<[Evoxel]>> = Vol::from_fn(
-                    text_aab
-                        .intersection(GridAab::for_block(self.resolution))
-                        .unwrap_or(GridAab::ORIGIN_EMPTY),
-                    |_| Evoxel::AIR,
-                );
+                let voxels: Evoxels =
+                    match text_aab.intersection(GridAab::for_block(self.resolution)) {
+                        Some(bounds_in_this_block) => {
+                            let mut voxels: Vol<Box<[Evoxel]>> =
+                                Vol::from_fn(bounds_in_this_block, |_| Evoxel::AIR);
 
-                text_obj
-                    .draw(&mut DrawingPlane::new(&mut voxels, drawing_transform))
-                    .unwrap();
+                            text_obj
+                                .draw(&mut DrawingPlane::new(&mut voxels, drawing_transform))
+                                .unwrap();
+
+                            Evoxels::Many(self.resolution, voxels.map_container(Into::into))
+                        }
+
+                        None => Evoxels::One(Evoxel::AIR),
+                    };
 
                 Ok(MinEval {
-                    voxels: Evoxels::Many(self.resolution, voxels.map_container(Into::into)),
+                    voxels,
                     attributes: BlockAttributes {
                         display_name: self.string.clone(),
                         ..BlockAttributes::default()
@@ -884,6 +891,31 @@ mod tests {
                 "................................",
             ]
         )
+    }
+
+    #[test]
+    fn no_intersection_with_block() {
+        let block = single_block_test_case({
+            Text::builder()
+                .string(literal!("ab"))
+                .font(Font::System16)
+                .layout_bounds(
+                    Resolution::R16,
+                    GridAab::from_lower_size([100000, 0, 0], [16, 16, 16]),
+                )
+                .build()
+        });
+
+        let ev = block.evaluate().unwrap();
+        assert_eq!(
+            ev.attributes,
+            BlockAttributes {
+                display_name: arcstr::literal!("ab"),
+                ..BlockAttributes::default()
+            }
+        );
+        assert_eq!(ev.resolution(), Resolution::R1);
+        assert!(!ev.visible);
     }
 
     // TODO: test that voxel attributes are as expected
