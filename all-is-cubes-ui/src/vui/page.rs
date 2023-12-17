@@ -16,7 +16,7 @@ use all_is_cubes::universe::{URef, Universe};
 
 use crate::vui::{
     install_widgets, widgets, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest,
-    LayoutTree, Widget, WidgetTree,
+    LayoutTree, Layoutable, Widget, WidgetTree,
 };
 
 /// Bounds for UI display; a choice of scale and aspect ratio based on the viewport size
@@ -106,12 +106,27 @@ impl PageInst {
         Self { tree, space: None }
     }
 
-    pub fn get_or_create_space(&mut self, size: UiSize, universe: &mut Universe) -> URef<Space> {
+    pub fn get_or_create_space(
+        &mut self,
+        mut size: UiSize,
+        universe: &mut Universe,
+    ) -> URef<Space> {
         if let Some(space) = self.space.as_ref() {
             // TODO: We will need to be comparing the entire size if it gains other fields
             if space.read().unwrap().bounds() == size.space_bounds() {
                 return space.clone();
             }
+        }
+
+        // If necessary, enlarge the proposed dimensions.
+        // The camera may be bad but at least the widgets won't be missing parts.
+        // TODO: We need overall better handling of this; for example, we should be able to
+        // pan ("scroll") the camera over a tall dialog box.
+        // Also, this doesn't handle Z size.
+        let fitting_size = size.size.max(self.tree.requirements().minimum.xy());
+        if fitting_size != size.size {
+            log::debug!("VUI page had to enlarge proposed size {size:?} to {fitting_size:?}");
+            size.size = fitting_size;
         }
 
         // Size didn't match, so recreate the space.
