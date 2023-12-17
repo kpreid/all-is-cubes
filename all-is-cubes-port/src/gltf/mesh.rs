@@ -3,12 +3,14 @@ use std::fmt;
 use std::mem::size_of;
 
 use bytemuck::offset_of;
+use gltf_json::buffer::Stride;
 use gltf_json::validation::Checked::Valid;
+use gltf_json::validation::USize64;
 use gltf_json::Index;
 
 use all_is_cubes_mesh::{IndexSlice, MeshTypes, SpaceMesh};
 
-use crate::gltf::glue::{create_accessor, push_and_return_index, u32size};
+use crate::gltf::glue::{create_accessor, push_and_return_index};
 use crate::gltf::{GltfTextureAllocator, GltfVertex, GltfWriter};
 
 /// Create [`gltf_json::Mesh`] and all its parts (accessors, buffers) from a [`SpaceMesh`].
@@ -66,9 +68,9 @@ where
         &mut writer.root.buffer_views,
         gltf_json::buffer::View {
             buffer: buffer_index,
-            byte_length: u32size(vertex_bytes.len()),
+            byte_length: USize64::from(vertex_bytes.len()),
             byte_offset: None,
-            byte_stride: Some(u32size(size_of::<GltfVertex>())),
+            byte_stride: Some(Stride(size_of::<GltfVertex>())),
             name: Some(format!("{name} vertex")),
             target: Some(Valid(gltf_json::buffer::Target::ArrayBuffer)),
             extensions: Default::default(),
@@ -79,9 +81,9 @@ where
         &mut writer.root.buffer_views,
         gltf_json::buffer::View {
             buffer: buffer_index,
-            byte_length: u32size(mesh.indices().as_bytes().len()),
+            byte_length: USize64::from(mesh.indices().as_bytes().len()),
             // Indexes are packed into the same buffer, so they start at the end of the vertex bytes
-            byte_offset: Some(u32size(vertex_bytes.len())),
+            byte_offset: Some(USize64::from(vertex_bytes.len())),
             byte_stride: None,
             name: Some(format!("{name} index")),
             // ElementArrayBuffer means index buffer
@@ -159,8 +161,10 @@ where
                             &mut writer.root.accessors,
                             gltf_json::Accessor {
                                 buffer_view: Some(index_buffer_view),
-                                byte_offset: Some(u32size(index_range.start * index_type.size())),
-                                count: u32size(index_range.len()),
+                                byte_offset: Some(USize64::from(
+                                    index_range.start * index_type.size(),
+                                )),
+                                count: USize64::from(index_range.len()),
                                 component_type: Valid(gltf_json::accessor::GenericComponentType(
                                     index_type,
                                 )),
@@ -301,15 +305,15 @@ mod tests {
             6 * 6 * index_size,
         );
         // Six faces each with four vertices and six indices. No extras.
-        assert_eq!(vertex_accessor.count, 4 * 6, "vertex count");
-        assert_eq!(index_accessor.count, 6 * 6, "index count");
+        assert_eq!(vertex_accessor.count, USize64(4 * 6), "vertex count");
+        assert_eq!(index_accessor.count, USize64(6 * 6), "index count");
         // Buffer size should be exactly as big as needed to hold both
         assert_eq!(
             vertex_buffer_view.buffer.value(),
             index_buffer_view.buffer.value()
         );
         assert_eq!(
-            vertex_buffer.byte_length as usize,
+            vertex_buffer.byte_length.0 as usize,
             6 * 6 * index_size + 4 * 6 * size_of::<GltfVertex>(),
             "buffer size"
         );

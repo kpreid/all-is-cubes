@@ -14,15 +14,6 @@ pub(crate) fn push_and_return_index<T>(vec: &mut Vec<T>, value: T) -> Index<T> {
     Index::new(index)
 }
 
-/// Convert to a `gltf_json` size value.
-///
-/// Note: the glTF standard does not actually impose this limit
-pub(crate) fn u32size(size: usize) -> u32 {
-    // TODO: worth making this a Result?
-    size.try_into()
-        .expect("Data overflowed 32-bit maximum size")
-}
-
 /// For a [`gltf_json::Accessor`], find the elementwise minimum and maximum values
 /// in a slice of arrays of some kind of value.
 pub(crate) fn accessor_minmax<I, const N: usize>(items: I) -> [Option<serde_json::Value>; 2]
@@ -129,7 +120,7 @@ where
     I::IntoIter: ExactSizeIterator,
 {
     let iter = data_view.into_iter();
-    let count = u32size(iter.len());
+    let count = iter.len();
     let [min, max] = accessor_minmax(iter);
 
     // Catch bug early rather than generating bad data
@@ -140,8 +131,8 @@ where
 
     gltf_json::Accessor {
         buffer_view: Some(buffer_view),
-        byte_offset: Some(u32size(byte_offset)),
-        count,
+        byte_offset: Some(byte_offset.into()),
+        count: count.into(),
         component_type: Valid(gltf_json::accessor::GenericComponentType(
             gltf_json::accessor::ComponentType::F32,
         )),

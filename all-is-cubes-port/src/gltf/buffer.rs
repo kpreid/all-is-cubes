@@ -8,9 +8,10 @@ use std::mem::size_of;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use gltf_json::validation::USize64;
 use gltf_json::Index;
 
-use super::glue::{create_accessor, push_and_return_index, u32size, Lef32};
+use super::glue::{create_accessor, push_and_return_index, Lef32};
 
 /// Designates the location where glTF buffer data (meshes, textures) should be written
 /// (either to disk files or inline in the glTF JSON).
@@ -167,7 +168,7 @@ impl GltfDataDestination {
         let (uri, byte_length) = implementation.close()?;
 
         Ok(gltf_json::Buffer {
-            byte_length: u32size(byte_length),
+            byte_length: USize64::from(byte_length),
             name: Some(buffer_entity_name),
             uri,
             extensions: Default::default(),
@@ -329,7 +330,7 @@ where
         &mut root.buffer_views,
         gltf_json::buffer::View {
             buffer: buffer_index,
-            byte_length: u32size(length * size_of::<[Lef32; COMPONENTS]>()),
+            byte_length: (length * size_of::<[Lef32; COMPONENTS]>()).into(),
             byte_offset: None,
             byte_stride: None,
             name: Some(name.clone()),
@@ -368,6 +369,7 @@ fn make_unique_name(proposed: &str, used: &mut HashSet<String>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gltf_json::validation::USize64;
 
     #[test]
     fn discard() {
@@ -377,7 +379,7 @@ mod tests {
             .unwrap();
         assert_eq!(buffer_entity.name, Some("foo".into()));
         assert_eq!(buffer_entity.uri, None);
-        assert_eq!(buffer_entity.byte_length, 3);
+        assert_eq!(buffer_entity.byte_length, USize64(3));
     }
 
     #[test]
@@ -391,7 +393,7 @@ mod tests {
             buffer_entity.uri.as_deref(),
             Some("data:application/gltf-buffer;base64,AQL/") // AQL/ = 000000 010000 001011 111111
         );
-        assert_eq!(buffer_entity.byte_length, 3);
+        assert_eq!(buffer_entity.byte_length, USize64(3));
     }
 
     #[test]
@@ -424,7 +426,7 @@ mod tests {
         assert_eq!(buffer_entity.name, Some("foo".into()));
         // Note that the URL is relative, not including the temp dir.
         assert_eq!(buffer_entity.uri.as_deref(), Some("basepath-bar.glbin"));
-        assert_eq!(buffer_entity.byte_length, 6);
+        assert_eq!(buffer_entity.byte_length, USize64(6));
     }
 
     #[test]
