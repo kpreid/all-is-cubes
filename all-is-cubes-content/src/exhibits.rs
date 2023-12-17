@@ -71,6 +71,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     COLORS,
     TEXT,
     ZOOM,
+    BECOME,
 ];
 
 macro_rules! exhibit {
@@ -781,6 +782,27 @@ async fn MOVED_BLOCKS(_: &Exhibit, universe: &mut Universe) {
     Ok(space)
 }
 
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "Operation::Become",
+    subtitle: "",
+    placement: Placement::Surface,
+)]
+async fn BECOME(_: &Exhibit, universe: &mut Universe) {
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+    let pedestal = &demo_blocks[DemoBlocks::Pedestal];
+
+    let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 3])).build();
+    for (state, z) in [(false, 0), (true, 2)] {
+        stack(
+            &mut space,
+            [0, 0, z],
+            [pedestal, &demo_blocks[DemoBlocks::BecomeBlinker(state)]],
+        )?;
+    }
+
+    Ok(space)
+}
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Colors",
