@@ -268,6 +268,8 @@ pub enum ExportFormat {
 
 impl ExportFormat {
     /// Whether exporting to this format is capable of including [`Space`] light data.
+    ///
+    /// This may be used to decide whether to wait for light calculations before exporting.
     pub fn includes_light(self) -> bool {
         match self {
             ExportFormat::AicJson => true,

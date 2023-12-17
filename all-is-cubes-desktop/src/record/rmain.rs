@@ -60,7 +60,8 @@ where
     Ok(())
 }
 
-pub(crate) fn record_main(
+/// Main loop which drives a headless session and then returns when the recording is complete.
+pub fn record_main(
     mut dsession: DesktopSession<(), ()>,
     options: RecordOptions,
     runtime_handle: &tokio::runtime::Handle,

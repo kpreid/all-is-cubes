@@ -10,7 +10,8 @@ pub(crate) mod crossterm;
 pub(crate) mod winit;
 
 /// Abstraction over different window types.
-pub(crate) trait Window {
+// TODO: seal this trait
+pub trait Window {
     fn set_title(&self, title: String);
 }
 
@@ -18,7 +19,8 @@ impl Window for () {
     fn set_title(&self, _title: String) {}
 }
 
-pub(crate) trait Renderer {
+// TODO: seal this trait
+pub trait Renderer {
     #[cfg(feature = "rerun")]
     fn log_to_rerun(&mut self, destination: rg::Destination) {
         let _ = destination;

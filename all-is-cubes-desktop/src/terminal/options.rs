@@ -4,13 +4,13 @@ use all_is_cubes::camera::{ImagePixel, Viewport};
 use all_is_cubes::euclid::{Vector2D, Vector3D};
 use all_is_cubes::math::{FreeCoordinate, Rgba, VectorOps};
 
-/// Options for the terminal UI.
+/// Options specific to the terminal UI.
 ///
 /// TODO: Migrate all of this into `GraphicsOptions`? Add an extension mechanism?
 /// In any case, we shouldn't have two separately-designed mechanisms, but at most two
 /// parallel ones.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct TerminalOptions {
+pub struct TerminalOptions {
     /// Color escapes supported by the terminal.
     pub(crate) colors: ColorMode,
 

@@ -4,6 +4,8 @@ use std::time::{Duration, Instant};
 
 use all_is_cubes::camera::Viewport;
 use all_is_cubes::listen::{DirtyFlag, ListenableCell, Listener};
+#[cfg(doc)]
+use all_is_cubes::universe::Universe;
 use all_is_cubes::universe::UniverseStepInfo;
 
 use crate::record;
@@ -16,13 +18,16 @@ use crate::Session;
 /// This type guarantees that the `renderer` will be dropped before the `window`;
 /// `unsafe` graphics code may rely on this.
 #[derive(Debug)]
-pub(crate) struct DesktopSession<Ren, Win> {
-    pub(crate) session: Session,
+pub struct DesktopSession<Ren, Win> {
+    #[allow(missing_docs)]
+    pub session: Session,
+
     // TODO: Instead of being generic over the renderer, be generic over
     // the window-system-type such that we can accept any
     // "dyn DesktopRenderer<Window = Win>" which supports the current type
     // of main-loop.
-    pub(crate) renderer: Ren,
+    #[allow(missing_docs)]
+    pub renderer: Ren,
     /// Whatever handle or other state is needed to maintain the window or interact with the event loop.
     pub(crate) window: Win,
 
@@ -35,7 +40,11 @@ pub(crate) struct DesktopSession<Ren, Win> {
 
     /// If present, connection to system audio output.
     /// If absent, sound is not produced
-    pub(crate) audio: Option<crate::audio::AudioOut>,
+    pub audio: Option<crate::audio::AudioOut>,
+
+    /// Portion of window title that describes the application rather than the session's current
+    /// universe.
+    fixed_title: String,
 
     /// Flag for when the `Session` might have changed its `Universe`, or similar changes.
     ///
@@ -44,6 +53,7 @@ pub(crate) struct DesktopSession<Ren, Win> {
 }
 
 impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
+    #[allow(missing_docs)]
     pub fn new(
         renderer: Ren,
         window: Win,
@@ -58,6 +68,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
             clock_source: ClockSource::Instant,
             recorder: None,
             audio: None,
+            fixed_title: String::new(),
             session_altered: DirtyFlag::new(false),
         };
 
@@ -66,6 +77,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         new_self
     }
 
+    /// Steps the [`Universe`] if the [`ClockSource`] says to.
     pub fn advance_time_and_maybe_step(&mut self) -> Option<UniverseStepInfo> {
         match self.clock_source {
             ClockSource::Instant => {
@@ -119,7 +131,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
 
     /// Replace the session's universe with one whose contents are the given file.
     ///
-    /// See [`crate::data_files::load_universe_from_file`] for supported formats.
+    /// See [`all_is_cubes_port::load_universe_from_file`] for supported formats.
     ///
     /// TODO: Instead of specifying exactly “replace universe”, we should have a
     /// general application concept of “open a provided file” which matches the
@@ -148,19 +160,36 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         })
     }
 
+    /// Set the “fixed” window title — the portion of the title not determined by the universe,
+    /// such as the application name.
+    ///
+    /// TODO: need a better name for this concept
+    pub fn set_fixed_title(&mut self, title: String) {
+        self.fixed_title = title;
+    }
+
     fn sync_title(&self) {
-        self.window
-            .set_title(match self.session.universe().whence.document_name() {
-                Some(dn) => format!("{} — {dn}", super::title_and_version()),
-                None => super::title_and_version(),
-            });
+        let fixed_title = &self.fixed_title;
+        self.window.set_title(
+            match (
+                fixed_title.is_empty(),
+                self.session.universe().whence.document_name(),
+            ) {
+                (false, Some(dn)) => format!("{fixed_title} — {dn}"),
+                (true, Some(dn)) => dn,
+                (false, None) => fixed_title.clone(),
+                // If we have no text at all to show, then at least use a nonempty string:
+                (true, None) => String::from("all-is-cubes based application"),
+            },
+        );
     }
 }
 
-/// Defines the clock for time passing in the simulation.
+/// Defines the clock for time passing in the simulation managed by a [`DesktopSession`].
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum ClockSource {
-    /// Use [`instant::Instant::now()`].
+#[non_exhaustive]
+pub enum ClockSource {
+    /// Use [`std::time::Instant::now()`].
     Instant,
     /// Every time [`DesktopSession::advance_time_and_maybe_step`] is called, advance time
     /// by the specified amount.

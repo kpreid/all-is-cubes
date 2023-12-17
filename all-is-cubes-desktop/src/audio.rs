@@ -11,7 +11,8 @@ use kira::sound::static_sound::StaticSoundData;
 
 use crate::Session;
 
-pub(crate) struct AudioOut {
+/// Fills the audio slot in a `DesktopSession` to actually produce audio.
+pub struct AudioOut {
     #[allow(dead_code)] // eventually we're going to need this for volume control etc.
     sender: mpsc::SyncSender<AudioCommand>,
 }

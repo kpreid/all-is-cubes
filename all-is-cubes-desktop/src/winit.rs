@@ -13,17 +13,18 @@ use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
 use all_is_cubes_gpu::wgpu;
 use all_is_cubes_ui::apps::InputProcessor;
 
-use crate::Session;
-
-use crate::choose_graphical_window_size;
 use crate::glue::winit::{
     cursor_icon_to_winit, logical_size_from_vec, map_key, map_mouse_button,
     monitor_size_for_window, physical_size_to_viewport,
 };
 use crate::session::DesktopSession;
+use crate::{choose_graphical_window_size, Session};
 
-/// Wrapper for [`winit::Window`] that carries the extra state we need to track.
-pub(crate) struct WinAndState {
+/// Wrapper for [`::winit::window::Window`] that carries the extra state we need to track.
+///
+/// TODO: give this a better name.
+#[derive(Debug)]
+pub struct WinAndState {
     /// The underlying window.
     /// Safety requirement: This is never overwritten.
     window: Window,
@@ -42,6 +43,42 @@ pub(crate) struct WinAndState {
 }
 
 impl WinAndState {
+    /// Creates a window.
+    pub fn new(
+        event_loop: &EventLoopWindowTarget<()>,
+        window_title: &str,
+        requested_size: Option<Vector2D<u32, camera::NominalPixel>>,
+        fullscreen: bool,
+    ) -> Result<WinAndState, winit::error::OsError> {
+        // Pick a window size.
+        let inner_size = if let Some(size) = requested_size {
+            logical_size_from_vec(size)
+        } else {
+            // TODO: Does this strategy actually best reflect what monitor the window is
+            // going to appear on?
+            let maybe_monitor = event_loop
+                .primary_monitor()
+                .or_else(|| event_loop.available_monitors().next());
+            logical_size_from_vec(choose_graphical_window_size(
+                maybe_monitor.map(monitor_size_for_window),
+            ))
+        };
+
+        let window = winit::window::WindowBuilder::new()
+            .with_inner_size(inner_size)
+            .with_title(window_title)
+            .with_fullscreen(fullscreen.then_some(winit::window::Fullscreen::Borderless(None)))
+            .build(event_loop)?;
+
+        Ok(WinAndState {
+            window,
+            occluded: false,
+            mouse_position: None,
+            cursor_grab_mode: winit::window::CursorGrabMode::None,
+            ignore_next_mouse_move: false,
+        })
+    }
+
     fn sync_cursor_grab(&mut self, input_processor: &mut InputProcessor) {
         let wants = input_processor.wants_pointer_lock();
 
@@ -110,7 +147,7 @@ impl crate::glue::Window for WinAndState {
 /// Run `winit` event loop, using [`RendererToWinit`] to perform rendering.
 ///
 /// Might not return but exit the process instead.
-pub(crate) fn winit_main_loop<Ren: RendererToWinit + 'static>(
+pub fn winit_main_loop<Ren: RendererToWinit + 'static>(
     event_loop: EventLoop<()>,
     mut dsession: DesktopSession<Ren, WinAndState>,
 ) -> Result<(), anyhow::Error> {
@@ -141,42 +178,8 @@ pub(crate) fn winit_main_loop<Ren: RendererToWinit + 'static>(
     })?)
 }
 
-pub(crate) fn create_window(
-    event_loop: &EventLoop<()>,
-    window_title: &str,
-    requested_size: Option<Vector2D<u32, camera::NominalPixel>>,
-    fullscreen: bool,
-) -> Result<WinAndState, winit::error::OsError> {
-    // Pick a window size.
-    let inner_size = if let Some(size) = requested_size {
-        logical_size_from_vec(size)
-    } else {
-        // TODO: Does this strategy actually best reflect what monitor the window is
-        // going to appear on?
-        let maybe_monitor = event_loop
-            .primary_monitor()
-            .or_else(|| event_loop.available_monitors().next());
-        logical_size_from_vec(choose_graphical_window_size(
-            maybe_monitor.map(monitor_size_for_window),
-        ))
-    };
-
-    let window = winit::window::WindowBuilder::new()
-        .with_inner_size(inner_size)
-        .with_title(window_title)
-        .with_fullscreen(fullscreen.then_some(winit::window::Fullscreen::Borderless(None)))
-        .build(event_loop)?;
-
-    Ok(WinAndState {
-        window,
-        occluded: false,
-        mouse_position: None,
-        cursor_grab_mode: winit::window::CursorGrabMode::None,
-        ignore_next_mouse_move: false,
-    })
-}
-
-pub(crate) async fn create_winit_wgpu_desktop_session(
+/// Creates a [`DesktopSession`] that can be run in an [`winit`] event loop.
+pub async fn create_winit_wgpu_desktop_session(
     session: Session,
     window: WinAndState,
     viewport_cell: ListenableCell<Viewport>,
@@ -421,10 +424,15 @@ fn handle_winit_event<Ren: RendererToWinit>(
     }
 }
 
-/// TODO: Give this a better name and definition
-pub(crate) trait RendererToWinit: crate::glue::Renderer + 'static {
+/// TODO: Give this a better name and definition.
+/// Or remove it entirely since we no longer have multiple renderers targeting winit windows.
+#[doc(hidden)]
+pub trait RendererToWinit: crate::glue::Renderer + 'static {
+    #[doc(hidden)]
     fn update_world_camera(&mut self);
+    #[doc(hidden)]
     fn cameras(&self) -> &StandardCameras;
+    #[doc(hidden)]
     fn redraw(&mut self, session: &Session, window: &Window);
 }
 

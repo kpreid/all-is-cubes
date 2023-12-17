@@ -7,9 +7,10 @@ use std::time::Duration;
 
 use all_is_cubes::camera::{self, Viewport};
 
-/// Options for recording and output in [`record_main`].
+/// Options for recording and output in [`record_main`](super::record_main).
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[non_exhaustive]
+#[allow(clippy::exhaustive_structs)] // TODO: make fields private again
+#[allow(missing_docs)]
 pub struct RecordOptions {
     pub output_path: PathBuf,
     pub output_format: RecordFormat,
@@ -19,18 +20,22 @@ pub struct RecordOptions {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[non_exhaustive]
+#[allow(clippy::exhaustive_structs)] // TODO: make fields private again
+#[allow(missing_docs)]
 pub struct RecordAnimationOptions {
     pub frame_count: usize,
     pub frame_period: Duration,
 }
 
+/// File format to write a recording as.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum RecordFormat {
-    // PNG and Animated-PNG are (currently) the same implementation, just with multiple frames or not
+    /// PNG and Animated-PNG are the same except for having multiple frames or not.
     PngOrApng,
+    /// glTF recordings contain a scene with an animated world.
     Gltf,
+    /// Any [`all_is_cubes_port`] export format may be written via the recording feature.
     Export(all_is_cubes_port::ExportFormat),
 }
 
@@ -54,7 +59,12 @@ impl RecordAnimationOptions {
 }
 
 impl RecordFormat {
-    pub(crate) fn includes_light(&self) -> bool {
+    /// Whether this format is capable of including [`Space`] light data.
+    ///
+    /// This may be used to decide whether to wait for light calculations before starting the
+    /// recording.
+    #[doc(hidden)]
+    pub fn includes_light(&self) -> bool {
         match self {
             RecordFormat::PngOrApng => true,
             RecordFormat::Gltf => false,

@@ -14,14 +14,15 @@ use all_is_cubes::camera;
 use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::math::{GridCoordinate, GridVector};
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
+use all_is_cubes_desktop::logging::LoggingArgs;
 use all_is_cubes_port::ExportFormat;
 
-use crate::record::{RecordAnimationOptions, RecordFormat, RecordOptions};
-use crate::TITLE;
+use all_is_cubes_desktop::record::{RecordAnimationOptions, RecordFormat, RecordOptions};
+use all_is_cubes_desktop::UniverseSource;
 
 #[derive(Clone, Debug, Parser)]
 #[command(
-    name = TITLE, author, about, version,
+    name = crate::TITLE, author, about, version,
     next_display_order = None, // causes alphabetical sorting -- TODO: revisit
     help_template = "\
 {name} {version}
@@ -149,25 +150,6 @@ pub(crate) struct AicDesktopArgs {
         value_name = "FILE"
     )]
     pub(crate) input_file: Option<PathBuf>,
-
-    /// Activate logging to Rerun (connecting to the default viewer address) and
-    /// log the specified kinds of data.
-    #[arg(hide = true, long = "rerun", value_enum, value_delimiter=',', action = clap::ArgAction::Append)]
-    pub(crate) rerun: Vec<RerunDataKind>,
-}
-
-#[derive(Clone, Debug, clap::Args)]
-pub(crate) struct LoggingArgs {
-    /// Additional logging to stderr.
-    #[arg(long = "verbose", short = 'v')]
-    pub(crate) verbose: bool,
-
-    /// Remove timestamps from logs so that they are closer to deterministic.
-    /// (Note that some logs will still contain timing data.)
-    ///
-    /// This option is intended for internal tests only.
-    #[arg(long = "simplify-log-format", hide = true)]
-    pub(crate) simplify_log_format: bool,
 }
 
 impl AicDesktopArgs {
@@ -350,16 +332,6 @@ pub fn determine_record_format(output_path: &Path) -> Result<RecordFormat, &'sta
     )
 }
 
-/// Source of the universe to create/load
-///
-/// TODO: we will eventually want to support new/open while running and this will
-/// no longer be about command line exactly, so it should move.
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) enum UniverseSource {
-    Template(UniverseTemplate, TemplateParameters),
-    File(PathBuf),
-}
-
 // TODO: express the inputs here as a sub-struct of AicDesktopArgs
 pub(crate) fn parse_universe_source(
     input_file: Option<PathBuf>,
@@ -372,12 +344,6 @@ pub(crate) fn parse_universe_source(
     } else {
         UniverseSource::Template(template, TemplateParameters { seed, size })
     }
-}
-
-#[derive(Debug, Clone, Eq, Hash, PartialEq, clap::ValueEnum)]
-pub(crate) enum RerunDataKind {
-    World,
-    Renderer,
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-//! Headless image (and someday video) generation.
+//! Headless output of images, video, or export data formats.
 
 use std::fs::File;
 use std::sync::mpsc;
@@ -14,9 +14,9 @@ use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
 use all_is_cubes_port::{ExportFormat, ExportSet};
 
 mod options;
-pub(crate) use options::*;
-mod record_main;
-pub(crate) use record_main::record_main;
+pub use options::*;
+mod rmain;
+pub use rmain::record_main;
 mod write_gltf;
 mod write_png;
 
@@ -54,6 +54,7 @@ enum RecorderInner {
 /// Per-frame status reports from [`Recorder`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
+#[doc(hidden)] // TODO: shouldn't need to be public
 pub struct Status {
     pub frame_number: FrameNumber,
 

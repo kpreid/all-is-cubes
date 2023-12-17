@@ -23,10 +23,11 @@ use all_is_cubes::util::{Refmt as _, StatusText};
 use crate::terminal::chars::{image_patch_to_character, write_colored_and_measure};
 use crate::terminal::TextRayImage;
 
-/// Fills the window slot of [`DesktopSession`].
+/// Fills the window slot of [`DesktopSession`] for terminal sessions.
+///
 /// Tracks the terminal state and acts as communication channel.
 #[derive(Debug)]
-pub(crate) struct TerminalWindow {
+pub struct TerminalWindow {
     out_sender: Option<mpsc::SyncSender<OutMsg>>,
     in_receiver: mpsc::Receiver<InMsg>,
     thread: Option<std::thread::JoinHandle<()>>,

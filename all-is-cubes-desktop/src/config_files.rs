@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::fs::create_dir_all;
 use std::fs::File;
 use std::io::BufReader;
@@ -9,10 +8,12 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use all_is_cubes::camera::GraphicsOptions;
 
-pub fn load_config() -> Result<GraphicsOptions, Box<dyn Error>> {
+/// Load preferences/settings/config files from a platform-appropriate read/write location.
+pub fn load_config() -> Result<GraphicsOptions, anyhow::Error> {
     // TODO: make testable
+    // TODO: allow users of this library function to pick their own config dir
     let project_dirs = ProjectDirs::from("org.switchb", "", "all-is-cubes")
-        .ok_or_else(|| <Box<dyn Error>>::from("could not find configuration directory"))?;
+        .ok_or_else(|| anyhow::anyhow!("could not find configuration directory"))?;
     create_dir_all(project_dirs.config_dir())?;
 
     let graphics_options = read_or_create_default_json_file(

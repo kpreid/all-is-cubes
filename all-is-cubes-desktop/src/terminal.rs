@@ -1,4 +1,4 @@
-//! Rendering as terminal text. Why not? Turn cubes into rectangles.
+//! Rendering as styled terminal text.
 
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
@@ -20,7 +20,7 @@ use crate::Session;
 
 mod chars;
 mod options;
-pub(crate) use options::TerminalOptions;
+pub use options::TerminalOptions;
 mod ray_image;
 use ray_image::TextRayImage;
 mod ui;
@@ -30,7 +30,7 @@ use ui::{InventoryDisplay, OutMsg, TerminalWindow, UiFrame};
 ///
 /// TODO: This shouldn't need to take ownership of the `session`; it does so because it is
 /// built on the same components as [`terminal_main_loop`].
-pub(crate) fn terminal_print_once(
+pub fn terminal_print_once(
     mut dsession: DesktopSession<TerminalRenderer, TerminalWindow>,
     display_size: Vector2D<u16, camera::ImagePixel>,
 ) -> Result<(), anyhow::Error> {
@@ -56,11 +56,9 @@ pub(crate) fn terminal_print_once(
     Ok(())
 }
 
-/// Fills the renderer slot of [`DesktopSession`].
-///
-/// TODO: Refactor this 'till we can merge it with the record mode
-/// raytracing.
-pub(crate) struct TerminalRenderer {
+/// Fills the renderer slot of [`DesktopSession`] for terminal sessions.
+#[derive(Debug)]
+pub struct TerminalRenderer {
     /// Redundant with the RtRenderer's cameras, but is a copy that
     /// isn't hopping around threads.
     cameras: StandardCameras,
@@ -82,7 +80,8 @@ struct FrameInput {
     scene: RtRenderer<CharacterRtData>,
 }
 
-pub(crate) fn create_terminal_session(
+/// Creates a [`DesktopSession`] which can be used with [`terminal_main_loop`].
+pub fn create_terminal_session(
     session: Session,
     options: TerminalOptions,
     viewport_cell: ListenableCell<Viewport>,
@@ -154,7 +153,7 @@ pub(crate) fn create_terminal_session(
 }
 
 /// Run the simulation and interactive UI. Returns after user's quit command.
-pub(crate) fn terminal_main_loop(
+pub fn terminal_main_loop(
     mut dsession: DesktopSession<TerminalRenderer, TerminalWindow>,
 ) -> Result<(), anyhow::Error> {
     run(&mut dsession)?;
