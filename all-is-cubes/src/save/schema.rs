@@ -208,6 +208,8 @@ pub(crate) enum TextSer {
         resolution: block::Resolution,
         layout_bounds: GridAab,
         positioning: PositioningSerV1,
+        #[serde(default, skip_serializing_if = "is_default")]
+        debug: bool,
     },
 }
 

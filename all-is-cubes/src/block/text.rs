@@ -11,7 +11,7 @@ use euclid::vec3;
 use crate::block::{self, Block, BlockAttributes, EvalBlockError, Evoxel, MinEval, Resolution};
 use crate::content::palette;
 use crate::drawing::{rectangle_to_aab, DrawingPlane};
-use crate::math::{FaceMap, GridAab, GridCoordinate, GridVector, Gridgid, Rgba, Vol};
+use crate::math::{FaceMap, GridAab, GridCoordinate, GridVector, Gridgid, Rgb, Rgba, Vol};
 use crate::space::{self, SpaceTransaction};
 use crate::universe;
 
@@ -53,6 +53,8 @@ pub struct Text {
     layout_bounds: GridAab,
 
     positioning: Positioning,
+
+    debug: bool,
 }
 
 /// Builder for [`Text`] values.
@@ -72,6 +74,8 @@ pub struct TextBuilder {
     layout_bounds: Option<GridAab>,
 
     positioning: Positioning,
+
+    debug: bool,
 }
 
 impl Text {
@@ -91,6 +95,7 @@ impl Text {
             resolution,
             layout_bounds,
             positioning,
+            debug,
         } = self;
         TextBuilder {
             string,
@@ -100,6 +105,7 @@ impl Text {
             resolution,
             layout_bounds: Some(layout_bounds),
             positioning,
+            debug,
         }
     }
 
@@ -127,6 +133,11 @@ impl Text {
     /// Returns the [`Positioning`] parameters this uses.
     pub fn positioning(&self) -> Positioning {
         self.positioning
+    }
+
+    /// Returns the debug-rendering flag.
+    pub fn debug(&self) -> bool {
+        self.debug
     }
 
     /// Returns the bounding box of the text, in blocks — the set of [`Primitive::Text`] offsets
@@ -221,8 +232,13 @@ impl Text {
                 let voxels: Evoxels =
                     match text_aab.intersection(GridAab::for_block(self.resolution)) {
                         Some(bounds_in_this_block) => {
+                            let fill = if self.debug {
+                                DEBUG_TEXT_BOUNDS_VOXEL
+                            } else {
+                                Evoxel::AIR
+                            };
                             let mut voxels: Vol<Box<[Evoxel]>> =
-                                Vol::from_fn(bounds_in_this_block, |_| Evoxel::AIR);
+                                Vol::from_fn(bounds_in_this_block, |_| fill);
 
                             text_obj
                                 .draw(&mut DrawingPlane::new(&mut voxels, drawing_transform))
@@ -231,7 +247,11 @@ impl Text {
                             Evoxels::Many(self.resolution, voxels.map_container(Into::into))
                         }
 
-                        None => Evoxels::One(Evoxel::AIR),
+                        None => Evoxels::One(if self.debug {
+                            DEBUG_NO_INTERSECTION_VOXEL
+                        } else {
+                            Evoxel::AIR
+                        }),
                     };
 
                 Ok(MinEval {
@@ -331,6 +351,7 @@ impl universe::VisitRefs for Text {
             resolution: _,
             layout_bounds: _,
             positioning: _,
+            debug: _,
         } = self;
         font.visit_refs(visitor);
         foreground.visit_refs(visitor);
@@ -361,6 +382,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Text {
             resolution: Resolution::arbitrary(u)?,
             layout_bounds,
             positioning: Positioning::arbitrary(u)?,
+            debug: bool::arbitrary(u)?,
         })
     }
 
@@ -373,7 +395,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Text {
                 Option::<Block>::size_hint(depth),
                 Resolution::size_hint(depth),
                 GridAab::size_hint(depth),
-                Positioning::size_hint(depth),
+                bool::size_hint(depth),
             ])
         })
     }
@@ -390,6 +412,7 @@ impl TextBuilder {
             resolution,
             layout_bounds,
             positioning,
+            debug,
         } = self;
         Text {
             string,
@@ -399,6 +422,7 @@ impl TextBuilder {
             resolution,
             layout_bounds: layout_bounds.unwrap_or(GridAab::for_block(resolution)),
             positioning,
+            debug,
         }
     }
 
@@ -488,6 +512,20 @@ impl TextBuilder {
         self.resolution = resolution;
         self
     }
+    /// Sets the debug-rendering flag.
+    ///
+    /// If true, then the text rendering is modified in an unspecified way which is intended to
+    /// assist in diagnosing issues with text layout configuration. In particular, this currently
+    /// includes:
+    ///
+    /// * The region which is in bounds but not filled by a character is filled with a
+    ///   semi-transparent marker color instead of being transparent.
+    /// * If a [`Primitive::Text`] block's bounds fail to intersect its [`Text`], then the block
+    ///   is filled with a marker color.
+    pub fn debug(mut self, debug: bool) -> Self {
+        self.debug = debug;
+        self
+    }
 }
 
 impl Default for TextBuilder {
@@ -504,6 +542,7 @@ impl Default for TextBuilder {
                 line_y: PositioningY::BodyMiddle,
                 z: PositioningZ::Back,
             },
+            debug: false,
         }
     }
 }
@@ -647,6 +686,7 @@ mod serialization {
                 resolution,
                 layout_bounds,
                 positioning,
+                debug,
             } = value;
             schema::TextSer::TextV1 {
                 string: string.clone(),
@@ -656,6 +696,7 @@ mod serialization {
                 resolution,
                 layout_bounds,
                 positioning: positioning.into(),
+                debug,
             }
         }
     }
@@ -671,6 +712,7 @@ mod serialization {
                     resolution,
                     layout_bounds,
                     positioning,
+                    debug,
                 } => text::Text::builder()
                     .string(string)
                     .font(font.into())
@@ -678,6 +720,7 @@ mod serialization {
                     .outline(outline)
                     .layout_bounds(resolution, layout_bounds)
                     .positioning(positioning.into())
+                    .debug(debug)
                     .build(),
             }
         }
@@ -692,6 +735,19 @@ impl Positioning {
         z: PositioningZ::Back,
     };
 }
+
+const DEBUG_NO_INTERSECTION_VOXEL: Evoxel = Evoxel {
+    color: rgba_const!(1.0, 0.0, 0.0, 0.5),
+    emission: Rgb::ZERO,
+    selectable: true,
+    collision: block::BlockCollision::None,
+};
+const DEBUG_TEXT_BOUNDS_VOXEL: Evoxel = Evoxel {
+    color: rgba_const!(0.0, 1.0, 0.0, 0.5),
+    emission: Rgb::ZERO,
+    selectable: true,
+    collision: block::BlockCollision::None,
+};
 
 /// Type which can be used on a `DrawingPlane` of `Evoxel`s to render text.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

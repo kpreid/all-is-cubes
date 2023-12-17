@@ -296,6 +296,7 @@ fn block_text_with_optional() {
                         line_y: text::PositioningY::BodyTop,
                         z: text::PositioningZ::Front,
                     })
+                    .debug(true)
                     .build()
             },
             offset: vec3(100, 0, 0),
@@ -331,7 +332,8 @@ fn block_text_with_optional() {
                         "x": "CenterV1",
                         "line_y": "BodyTopV1",
                         "z": "FrontV1",
-                    }
+                    },
+                    "debug": true,
                 },
                 "offset": [100, 0, 0],
             },
