@@ -166,6 +166,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
     /// TODO: need a better name for this concept
     pub fn set_fixed_title(&mut self, title: String) {
         self.fixed_title = title;
+        self.sync_title();
     }
 
     fn sync_title(&self) {
