@@ -187,49 +187,6 @@ impl GridAab {
         }
     }
 
-    /// Generate a [`GridAab`] whose volume is as specified or smaller.
-    #[cfg(feature = "arbitrary")]
-    pub(crate) fn arbitrary_with_max_volume(
-        u: &mut arbitrary::Unstructured<'_>,
-        volume: usize,
-    ) -> arbitrary::Result<Self> {
-        // Pick sizes within the volume constraint.
-        let mut limit: GridCoordinate = volume.try_into().unwrap_or(GridCoordinate::MAX);
-        let size_1 = u.int_in_range(0..=limit)?;
-        limit /= size_1.max(1);
-        let size_2 = u.int_in_range(0..=limit)?;
-        limit /= size_2.max(1);
-        let size_3 = u.int_in_range(0..=limit)?;
-
-        // Shuffle the sizes to remove any bias.
-        let sizes = *u.choose(&[
-            GridVector::new(size_1, size_2, size_3),
-            GridVector::new(size_1, size_3, size_2),
-            GridVector::new(size_2, size_1, size_3),
-            GridVector::new(size_2, size_3, size_1),
-            GridVector::new(size_3, size_1, size_2),
-            GridVector::new(size_3, size_2, size_1),
-        ])?;
-
-        // Compute lower bounds that are valid for the sizes.
-        let lower_bounds = GridPoint::new(
-            u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes.x)?,
-            u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes.y)?,
-            u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes.z)?,
-        );
-
-        Ok(Self::from_lower_size(lower_bounds, sizes))
-    }
-
-    #[cfg(feature = "arbitrary")]
-    const ARBITRARY_SIZE_HINT: (usize, Option<usize>) = {
-        // 6 bounding coordinates plus one permutation selection.
-        // Depending on the volume we could *maybe* end up consuming only 1 byte each
-        // for the sizes.
-        let gc = core::mem::size_of::<GridCoordinate>();
-        ((gc + 1) * 3 + 1, Some(gc * 6 + 1))
-    };
-
     /// Compute volume with checked arithmetic. In a function solely for the convenience
     /// of the `?` operator without which this is even worse.
     fn checked_volume_helper(sizes: GridVector) -> Result<usize, ()> {
@@ -744,11 +701,11 @@ impl From<GridAab> for Aab {
 #[mutants::skip]
 impl<'a> arbitrary::Arbitrary<'a> for GridAab {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Self::arbitrary_with_max_volume(u, usize::MAX)
+        Ok(Vol::<()>::arbitrary_with_max_volume(u, usize::MAX)?.bounds())
     }
 
     fn size_hint(_depth: usize) -> (usize, Option<usize>) {
-        GridAab::ARBITRARY_SIZE_HINT
+        crate::math::vol::vol_arb::ARBITRARY_BOUNDS_SIZE_HINT
     }
 }
 
@@ -1112,51 +1069,5 @@ mod tests {
 
             assert_eq!(item, Some(expected_sequence[current])); // sanity check, not what we're testing
         }
-    }
-
-    #[cfg(feature = "arbitrary")]
-    #[test]
-    fn arbitrary_grid_aab_size_hint() {
-        use arbitrary::{Arbitrary, Unstructured};
-        let hint = GridAab::ARBITRARY_SIZE_HINT;
-        let most_bytes_used = (0..=255)
-            .map(|byte| {
-                // TODO: sketchy coverage; would be better to generate some random/hashed data
-                let data = [byte; 1000];
-                let mut u = Unstructured::new(&data);
-                GridAab::arbitrary(&mut u).unwrap();
-                let bytes_used = 1000 - u.len();
-                assert!(
-                    bytes_used >= hint.0,
-                    "used {}, less than {}",
-                    bytes_used,
-                    hint.0
-                );
-                bytes_used
-            })
-            .max();
-        assert_eq!(most_bytes_used, hint.1);
-
-        // TODO: Also look at the resulting Grids and see if they're good coverage.
-    }
-
-    #[cfg(feature = "arbitrary")]
-    #[test]
-    fn arbitrary_grid_aab_volume() {
-        use arbitrary::Unstructured;
-        use itertools::Itertools as _;
-        let max_volume = 100;
-        let minmax = (0..=255)
-            .map(|byte| {
-                // TODO: sketchy coverage; would be better to generate some random/hashed data
-                let data = [byte; 25];
-                let mut u = Unstructured::new(&data);
-                GridAab::arbitrary_with_max_volume(&mut u, max_volume)
-                    .unwrap()
-                    .volume()
-            })
-            .minmax()
-            .into_option();
-        assert_eq!(minmax, Some((0, max_volume)));
     }
 }

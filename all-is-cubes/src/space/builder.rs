@@ -284,8 +284,8 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
 
         // TODO: Should be reusing Vol as Arbitrary for this.
 
-        let bounds = GridAab::arbitrary_with_max_volume(u, 2048)?;
-        let mut space = Space::builder(bounds)
+        let bounds = Vol::<()>::arbitrary_with_max_volume(u, 2048)?;
+        let mut space = Space::builder(bounds.bounds()) // TODO: builder should accept Vol
             .physics(u.arbitrary()?)
             .spawn(u.arbitrary()?)
             .build();
