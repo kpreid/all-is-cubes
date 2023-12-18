@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use core::future::Future;
 use std::sync::mpsc::TryRecvError;
 use std::sync::{mpsc, Mutex};
 
@@ -14,7 +15,10 @@ use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
 
-use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState, InputProcessor, QuitFn};
+use crate::apps::{
+    ControlMessage, FullscreenSetter, FullscreenState, InputProcessor, QuitCancelled, QuitFn,
+    QuitResult,
+};
 use crate::ui_content::hud::{HudBlocks, HudInputs};
 use crate::ui_content::pages;
 use crate::vui::widgets::TooltipState;
@@ -403,6 +407,24 @@ impl Vui {
             VuiPageState::Dump { ref previous, .. } => {
                 self.set_state(Arc::clone(previous));
             }
+        }
+    }
+
+    /// Perform the quit action.
+    ///
+    /// This may be used in response to a window's close button, for example.
+    ///
+    /// The UI state *may* decline to react, such as if there are unsaved changes, but it should
+    /// be expected to prompt the user in that case.
+    ///
+    /// The returned future will produce a [`QuitCancelled`] value if quitting was unsuccessful for
+    /// any reason. If it is successful, the future never resolves. It is not necessary to poll
+    /// the future if the result value is not wanted.
+    pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static {
+        if let Some(quit_fn) = self.hud_inputs.quit.as_ref() {
+            std::future::ready(quit_fn())
+        } else {
+            std::future::ready(Err(QuitCancelled::Unsupported))
         }
     }
 }

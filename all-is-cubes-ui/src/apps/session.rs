@@ -70,6 +70,8 @@ pub struct Session<I> {
     control_channel: mpsc::Receiver<ControlMessage>,
     control_channel_sender: mpsc::SyncSender<ControlMessage>,
 
+    quit_fn: Option<QuitFn>,
+
     /// Last cursor raycast result.
     /// TODO: This needs to handle clicking on the HUD and thus explicitly point into
     /// one of two different spaces.
@@ -95,6 +97,7 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
             ui,
             control_channel: _,
             control_channel_sender: _,
+            quit_fn,
             cursor_result,
             last_step_info,
             tick_counter_for_logging,
@@ -114,6 +117,10 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
             .field("fluff_notifier", fluff_notifier)
             .field("paused", &paused)
             .field("ui", &ui)
+            .field(
+                "quit_fn",
+                &quit_fn.as_ref().map(|_cant_print_a_function| ()),
+            )
             .field("cursor_result", &cursor_result)
             .field("last_step_info", &last_step_info)
             .field("tick_counter_for_logging", &tick_counter_for_logging)
@@ -481,6 +488,26 @@ impl<I: time::Instant> Session<I> {
         }
     }
 
+    /// Invoke the [`SessionBuilder::quit()`] callback as if the user clicked a quit button inside
+    /// our UI.
+    ///
+    /// This may be used in response to a window's close button, for example.
+    ///
+    /// The session state *may* decline to actually call the callback, such as if there are
+    /// user-visible unsaved changes.
+    ///
+    /// The returned future will produce a [`QuitCancelled`] value if quitting was unsuccessful for
+    /// any reason. If it is successful, the future never resolves. It is not necessary to poll
+    /// the future if the result value is not wanted.
+    pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static {
+        let fut: BoxFuture<'static, QuitResult> = match (&self.ui, &self.quit_fn) {
+            (Some(ui), _) => Box::pin(ui.quit()),
+            (None, Some(quit_fn)) => Box::pin(std::future::ready(quit_fn())),
+            (None, None) => Box::pin(std::future::ready(Err(QuitCancelled::Unsupported))),
+        };
+        fut
+    }
+
     /// Check if the current game character's current space differs from the current
     /// `SpaceWatchState`, and update the latter if so.
     fn sync_character_space(&mut self) {
@@ -558,7 +585,7 @@ impl<I: time::Instant> SessionBuilder<I> {
             viewport_for_ui,
             fullscreen_state,
             set_fullscreen,
-            quit,
+            quit: quit_fn,
             _instant: _,
         } = self;
         let game_universe = Universe::new();
@@ -582,7 +609,7 @@ impl<I: time::Instant> SessionBuilder<I> {
                         viewport,
                         fullscreen_state,
                         set_fullscreen,
-                        quit,
+                        quit_fn.clone(),
                     )
                     .await,
                 ),
@@ -599,6 +626,7 @@ impl<I: time::Instant> SessionBuilder<I> {
             paused,
             control_channel: control_recv,
             control_channel_sender: control_send,
+            quit_fn,
             cursor_result: None,
             last_step_info: UniverseStepInfo::default(),
             tick_counter_for_logging: 0,
@@ -635,7 +663,8 @@ impl<I: time::Instant> SessionBuilder<I> {
     /// Enable a “quit”/“exit” command in the session's user interface.
     ///
     /// This does not cause the session to self-destruct; rather, the provided callback
-    /// function should cause the session’s owner to stop presenting it to the user.
+    /// function should cause the session’s owner to stop presenting it to the user (and
+    /// be dropped). It may also report that the quit was cancelled for whatever reason.
     pub fn quit(mut self, quit_fn: QuitFn) -> Self {
         self.quit = Some(quit_fn);
         self
@@ -772,7 +801,8 @@ pub enum CursorIcon {
 }
 
 /// TODO: this should be an async fn
-pub(crate) type QuitFn = Arc<dyn Fn() -> Result<QuitSucceeded, QuitCancelled> + Send + Sync>;
+pub(crate) type QuitFn = Arc<dyn Fn() -> QuitResult + Send + Sync>;
+pub(crate) type QuitResult = Result<QuitSucceeded, QuitCancelled>;
 
 /// Return type of a [`SessionBuilder::quit()`] callback on successful quit.
 /// This is uninhabited (cannot happen) since the callback should never be observed to
@@ -782,8 +812,18 @@ pub type QuitSucceeded = std::convert::Infallible;
 /// Return type of a [`SessionBuilder::quit()`] callback if other considerations cancelled
 /// the quit operation. In this case, the session will return to normal operation.
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
-pub struct QuitCancelled;
+#[non_exhaustive]
+pub enum QuitCancelled {
+    /// Quitting is not a supported operation.
+    ///
+    /// [`SessionBuilder::quit()`] callback functions should not usually return this; this value is
+    /// primarily for when there is no callback to call.
+    Unsupported,
+
+    /// Some user interaction occurred before quitting, and the user indicated that the quit
+    /// should be cancelled (for example, due to unsaved changes).
+    UserCancelled,
+}
 
 #[cfg(test)]
 mod tests {

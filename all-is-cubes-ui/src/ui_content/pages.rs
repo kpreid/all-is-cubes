@@ -47,7 +47,7 @@ pub(super) fn new_paused_widget_tree(
             // kick off a “Quitting...” task yet.
             move || match quit_fn() {
                 Ok(s) => match s {},
-                Err(crate::apps::QuitCancelled) => {
+                Err(_cancelled) => {
 
                     // TODO: display message indicating failure
                 }

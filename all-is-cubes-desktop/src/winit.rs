@@ -174,7 +174,7 @@ pub fn winit_main_loop<Ren: RendererToWinit + 'static>(
             elwt.set_control_flow(ControlFlow::WaitUntil(t));
         }
 
-        handle_winit_event(event, &mut dsession, elwt)
+        handle_winit_event(event, &mut dsession)
     })?)
 }
 
@@ -247,14 +247,13 @@ pub async fn create_winit_wgpu_desktop_session(
 fn handle_winit_event<Ren: RendererToWinit>(
     event: Event<()>,
     dsession: &mut DesktopSession<Ren, WinAndState>,
-    elwt: &EventLoopWindowTarget<()>,
 ) {
     let input_processor = &mut dsession.session.input_processor;
     match event {
         Event::NewEvents(_) => {}
         Event::WindowEvent { window_id, event } if window_id == dsession.window.window.id() => {
             match event {
-                WindowEvent::CloseRequested => elwt.exit(),
+                WindowEvent::CloseRequested => drop(dsession.session.quit()),
 
                 WindowEvent::RedrawRequested => {
                     if dsession.window.occluded
