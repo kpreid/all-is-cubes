@@ -95,7 +95,7 @@ pub fn write_texture_by_aab<T: Pod>(
     region: GridAab,
     data: &[T],
 ) {
-    let volume = region.volume();
+    let volume = region.volume().unwrap();
     assert_eq!(
         volume,
         data.len(),

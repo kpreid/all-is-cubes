@@ -250,7 +250,7 @@ impl LightUpdateQueue {
             Some(sweep) => {
                 sweep.len()
                     + if self.sweep_again {
-                        sweep.bounds().volume()
+                        sweep.bounds().volume().unwrap_or(usize::MAX)
                     } else {
                         0
                     }

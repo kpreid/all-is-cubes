@@ -50,7 +50,7 @@ impl Alloctree {
         let handle = self
             .root
             .allocate(self.size_exponent, GridPoint::origin(), request)?;
-        self.occupied_volume += request.volume();
+        self.occupied_volume += request.volume().unwrap();
         Some(handle)
     }
 
@@ -109,7 +109,7 @@ impl Alloctree {
     pub fn free(&mut self, handle: AlloctreeHandle) {
         self.root
             .free(self.size_exponent, handle.allocation.lower_bounds());
-        self.occupied_volume -= handle.allocation.volume();
+        self.occupied_volume -= handle.allocation.volume().unwrap();
     }
 
     /// Enlarge the bounds to be as if this tree had been allocated with
@@ -371,7 +371,7 @@ mod tests {
             for existing in &handles {
                 if let Some(intersection) = handle.allocation.intersection(existing.allocation) {
                     assert!(
-                        intersection.volume() == 0,
+                        intersection.volume() == Some(0),
                         "intersection between\n{:?} and {:?}\n",
                         existing.allocation,
                         handle.allocation

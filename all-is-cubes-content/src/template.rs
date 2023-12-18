@@ -350,7 +350,7 @@ async fn islands(
             let occupied_bounds = cell_bounds.expand(FaceMap::repeat(-10).with(Face6::PY, -25));
             wavy_landscape(occupied_bounds, &mut space, &landscape_blocks, 0.5)?;
         }
-        p.progress(i as f32 / island_grid.volume() as f32).await;
+        p.progress(i as f32 / island_grid.volume_f64() as f32).await;
     }
 
     Ok(space)

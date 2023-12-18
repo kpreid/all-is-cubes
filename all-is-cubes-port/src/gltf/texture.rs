@@ -112,7 +112,7 @@ impl texture::Tile for GltfTile {
     fn write(&mut self, data: Vol<&[Evoxel]>) {
         assert_eq!(data.bounds(), self.bounds());
 
-        let mut buffer = vec![[0, 0, 0, 0]; self.bounds().volume()];
+        let mut buffer = vec![[0, 0, 0, 0]; self.bounds().volume().unwrap()];
         texture::copy_voxels_into_xmaj_texture(data, &mut buffer, None);
 
         // OK to panic on failure because if we do, the caller ignored Self::REUSABLE.

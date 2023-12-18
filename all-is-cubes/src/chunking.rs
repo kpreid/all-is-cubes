@@ -333,10 +333,12 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<
     let candidates = GridAab::from_lower_size(
         [0, 0, 0],
         vec3(1, 1, 1) * (view_distance_in_squared_chunks + 1),
-    );
+    )
+    .to_vol()
+    .unwrap();
     let mut octant_chunks: Vec<Ccv> = Vec::with_capacity(candidates.volume());
     // (This for loop has been measured as slightly faster than a .filter().collect().)
-    for chunk_cube in candidates.interior_iter() {
+    for chunk_cube in candidates.iter_cubes() {
         let chunk = chunk_cube.lower_bounds().to_vector().cast_unit();
         if chunk_distance_squared_for_view(chunk).nearest_approach_squared
             <= view_distance_in_squared_chunks

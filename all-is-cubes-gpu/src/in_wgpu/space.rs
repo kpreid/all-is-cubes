@@ -806,7 +806,7 @@ impl SpaceLightTexture {
 
     /// Copy the specified region of light data.
     pub fn update(&mut self, queue: &wgpu::Queue, space: &Space, region: GridAab) -> usize {
-        let mut data: Vec<[u8; Self::COMPONENTS]> = Vec::with_capacity(region.volume());
+        let mut data: Vec<[u8; Self::COMPONENTS]> = Vec::with_capacity(region.volume().unwrap());
         // TODO: Enable circular operation and eliminate the need for the offset of the
         // coordinates (texture_bounds.lower_bounds() and light_offset in the shader)
         // by doing a coordinate wrap-around -- the shader and the Space will agree
@@ -827,12 +827,12 @@ impl SpaceLightTexture {
             &data,
         );
 
-        region.volume()
+        region.volume().unwrap_or(usize::MAX)
     }
 
     pub fn update_all(&mut self, queue: &wgpu::Queue, space: &Space) -> usize {
         self.update(queue, space, self.texture_bounds);
-        self.texture_bounds.volume()
+        self.texture_bounds.volume().unwrap()
     }
 
     /// Copy many individual cubes of light data.

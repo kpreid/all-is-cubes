@@ -255,7 +255,7 @@ impl texture::Tile for AtlasTile {
         // write the data.
         let allocator_backing_ref = {
             let tile_backing = &mut *self.backing.lock().unwrap();
-            let volume = self.bounds().volume();
+            let volume = self.bounds().volume().unwrap(); // TODO: tile bounds should be `Vol<(), XMaj>` and we won't need this unwrap
 
             texture::copy_voxels_into_xmaj_texture(
                 data,
@@ -419,8 +419,10 @@ impl AllocatorBacking {
                         let region = weak_tile.allocated_bounds;
 
                         // TODO: keep a preallocated GPU buffer instead
-                        let data =
-                            vec![palette::UNALLOCATED_TEXELS_ERROR.to_srgb8(); region.volume()];
+                        let data = vec![
+                            palette::UNALLOCATED_TEXELS_ERROR.to_srgb8();
+                            region.volume().unwrap()
+                        ];
 
                         write_texture_by_aab(queue, &textures.reflectance.texture, region, &data);
                         if let Some(t) = &textures.emission {
@@ -444,7 +446,7 @@ impl AllocatorBacking {
                 flush_time: time::Duration::ZERO,
                 in_use_tiles: backing.in_use.len(),
                 in_use_texels: backing.alloctree.occupied_volume(),
-                capacity_texels: backing.alloctree.bounds().volume(),
+                capacity_texels: backing.alloctree.bounds().volume().unwrap(),
             },
         )
     }

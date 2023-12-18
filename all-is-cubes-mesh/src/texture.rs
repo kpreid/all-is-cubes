@@ -1,5 +1,7 @@
 //! Traits for textures used by the meshes this library generates.
 
+// TODO: texture tile bounds should be `Vol<(), XMaj>` instead of `GridAab`, but we don't have `XMaj` ordering yet.
+
 use core::fmt;
 
 use all_is_cubes::block::{Evoxel, Evoxels};
@@ -241,9 +243,9 @@ pub fn copy_voxels_into_xmaj_texture(
     emission_texture: Option<&mut [[u8; 4]]>,
 ) {
     let bounds = voxels.bounds();
-    assert_eq!(bounds.volume(), reflectance_texture.len());
+    assert_eq!(voxels.volume(), reflectance_texture.len());
     if let Some(&mut ref mut t) = emission_texture {
-        assert_eq!(bounds.volume(), t.len());
+        assert_eq!(voxels.volume(), t.len());
     }
 
     // TODO: Consider changing `Evoxels`'s ordering so that this can be a straight copy instead

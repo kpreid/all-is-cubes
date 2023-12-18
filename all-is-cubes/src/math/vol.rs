@@ -80,7 +80,7 @@ impl<O> Vol<(), O> {
         } else {
             Err(VolLengthError {
                 input_length: elements.len(),
-                bounds: self.bounds,
+                bounds: self.bounds(),
             })
         }
     }
@@ -100,7 +100,7 @@ where
     // TODO: Remove this in favor of with_elements()?
     pub fn from_elements(bounds: GridAab, elements: impl Into<C>) -> Result<Self, VolLengthError> {
         let elements = elements.into();
-        if elements.len() == bounds.volume() {
+        if Some(elements.len()) == bounds.volume() {
             Ok(Vol {
                 bounds,
                 ordering: O::default(),
@@ -237,7 +237,7 @@ impl<C, O> Vol<C, O> {
         let new_bounds = self.bounds.translate(offset);
         if new_bounds.size() != self.bounds.size() {
             // We can't just continue like `GridAab::translate` does, because that would
-            // break the invariant that self.bounds.volume() == self.contents.len().
+            // break the invariant that self.volume() == self.contents.len().
             panic!("Vol::translate() offset caused numeric overflow");
         }
         self.bounds = new_bounds;
@@ -252,13 +252,14 @@ impl<C, O> Vol<C, O> {
         C2: Deref<Target = [V2]>,
     {
         let bounds = self.bounds;
+        let volume = self.volume();
         let contents = f(self.contents);
-        if contents.len() != bounds.volume() {
+        if contents.len() != volume {
             panic!(
                 "{}",
                 VolLengthError {
                     input_length: contents.len(),
-                    bounds,
+                    bounds: self.bounds,
                 }
             )
         }
@@ -366,7 +367,7 @@ where
     /// Returns the linear contents viewed as a slice.
     pub fn as_linear(&self) -> &[V] {
         let s = &*self.contents;
-        debug_assert_eq!(s.len(), self.bounds.volume());
+        debug_assert_eq!(s.len(), self.volume());
         s
     }
 
@@ -376,7 +377,7 @@ where
         C: DerefMut,
     {
         let s = &mut *self.contents;
-        debug_assert_eq!(s.len(), self.bounds.volume());
+        debug_assert_eq!(s.len(), self.bounds.volume().unwrap());
         s
     }
 }
@@ -385,7 +386,7 @@ impl<V: Clone, O> Vol<Arc<[V]>, O> {
     /// Returns the linear contents viewed as a mutable slice, as if by [`Arc::make_mut()`].
     pub(crate) fn make_linear_mut(&mut self) -> &mut [V] {
         let slice: &mut [V] = arc_make_mut_slice(&mut self.contents);
-        debug_assert_eq!(slice.len(), self.bounds.volume());
+        debug_assert_eq!(slice.len(), self.bounds.volume().unwrap());
         slice
     }
 }
@@ -644,11 +645,18 @@ impl fmt::Display for VolLengthError {
             input_length,
             bounds,
         } = self;
-        write!(
-            f,
-            "data of length {input_length} cannot fill volume {v} of {bounds:?}",
-            v = self.bounds.volume()
-        )
+        match bounds.volume() {
+            Some(volume) => write!(
+                f,
+                "data of length {input_length} cannot fill volume {volume} of {bounds:?}",
+            ),
+
+            None => write!(
+                f,
+                "data of length {input_length} cannot fill {bounds:?}, \
+                    which is too large to be represented",
+            ),
+        }
     }
 }
 
@@ -754,7 +762,7 @@ mod tests {
             VolBox::from_elements(bounds, vec![10i32, 11, 12]),
             Err(VolLengthError {
                 input_length: 3,
-                bounds
+                bounds,
             })
         );
     }

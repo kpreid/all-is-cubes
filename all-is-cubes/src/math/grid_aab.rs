@@ -201,19 +201,29 @@ impl GridAab {
 
     /// Computes the volume of this box in cubes, i.e. the product of all sizes.
     ///
+    /// Returns [`None`] if the volume does not fit in a `usize`.
+    /// (If this fallibility is undesirable, consider using a [`Vol<()>`] instead of [`GridAab.`])
+    ///
     /// ```
     /// use all_is_cubes::math::GridAab;
     ///
     /// let a = GridAab::from_lower_size([-10, 3, 7], [100, 200, 300]);
-    /// assert_eq!(a.volume(), 6_000_000);
+    /// assert_eq!(a.volume(), Some(6_000_000));
     ///
     /// let b = GridAab::from_lower_size([0, 0, 0], [100, 200, 0]);
-    /// assert_eq!(b.volume(), 0);
+    /// assert_eq!(b.volume(), Some(0));
     /// ```
     //---
-    // TODO: make this fallible instead of guaranteed to fit
-    pub fn volume(&self) -> usize {
-        Self::checked_volume_helper(self.sizes).unwrap()
+    // TODO: add doctest example of failure
+    pub fn volume(&self) -> Option<usize> {
+        Self::checked_volume_helper(self.sizes).ok()
+    }
+
+    /// Computes the approximate volume of this box in cubes, i.e. the product of all sizes
+    /// converted to [`f64`].
+    pub fn volume_f64(&self) -> f64 {
+        let size = self.size().to_f64();
+        size.x * size.y * size.z
     }
 
     pub(crate) fn surface_area(&self) -> usize {
@@ -878,7 +888,10 @@ mod tests {
             GridAab::from_lower_upper([1, 2, 3], [1, 3, 4]),
         );
 
-        assert_eq!(GridAab::from_lower_size([1, 2, 3], [0, 1, 1]).volume(), 0,);
+        assert_eq!(
+            GridAab::from_lower_size([1, 2, 3], [0, 1, 1]).volume(),
+            Some(0)
+        );
     }
 
     #[test]
@@ -1010,7 +1023,7 @@ mod tests {
     #[test]
     fn grid_iter_size_hint() {
         let b = GridAab::from_lower_size([0, 0, 0], [12, 34, 56]);
-        let expected_size = b.volume();
+        let expected_size = b.volume().unwrap();
         let mut iter = b.interior_iter();
 
         // Exact at start
@@ -1032,7 +1045,7 @@ mod tests {
         let b = GridAab::from_lower_size([0, -1, 7], [3, 3, 3]);
         println!("Aab = {b:?}");
 
-        for start_point in 0..=b.volume() {
+        for start_point in 0..=b.volume().unwrap() {
             println!("\nSkipping {start_point}:");
             let mut iter_to_next = b.interior_iter().skip(start_point);
             let iter_to_fold = b.interior_iter().skip(start_point);
