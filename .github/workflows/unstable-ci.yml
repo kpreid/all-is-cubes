@@ -116,7 +116,7 @@ jobs:
     # Save the test-renderers results so we can download and view them
     - name: Save test-renderers output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: test-renderers-output ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
@@ -129,7 +129,7 @@ jobs:
     # (for understanding build performance in CI)
     - name: Save cargo --timings output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: cargo-timings ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
