@@ -6,7 +6,6 @@ use std::sync::LazyLock as Lazy;
 use std::task;
 
 use futures_core::future::BoxFuture;
-use futures_util::task::noop_waker_ref;
 
 use all_is_cubes::listen;
 
@@ -163,7 +162,7 @@ impl ReloadableShader {
         if let Some(f) = self.next_module.as_mut() {
             if let task::Poll::Ready(result) = f
                 .as_mut()
-                .poll(&mut task::Context::from_waker(noop_waker_ref()))
+                .poll(&mut task::Context::from_waker(task::Waker::noop()))
             {
                 self.next_module = None;
                 match result {

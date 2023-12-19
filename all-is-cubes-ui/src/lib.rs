@@ -1,4 +1,5 @@
 #![feature(never_type)]
+#![feature(noop_waker)]
 
 //! User interface framework and screens for [`all_is_cubes`].
 //!
