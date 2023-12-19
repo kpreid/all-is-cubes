@@ -583,7 +583,7 @@ mod tests {
         }
     }
 
-    /// We can compute the inverse via iterate().
+    /// We can compute the inverse via `iterate()`.
     /// This test also serves to regenerate the inverse table.
     #[test]
     fn inverse_from_iterate() {

@@ -374,7 +374,7 @@ impl crate::universe::VisitRefs for Palette {
 impl Clone for Palette {
     /// Cloning a [`Palette`] produces a copy which is independently mutable and
     /// independently tracks block changes, but initially has the same state. It will
-    /// reevaluate on the next step().
+    /// reevaluate on the next `step()`.
     fn clone(&self) -> Self {
         // Construct the new set with a full todo so that it establishes listeners.
         // This will unfortunately also cause a reevaluation, but avoiding that would

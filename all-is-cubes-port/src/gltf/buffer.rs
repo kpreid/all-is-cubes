@@ -187,7 +187,7 @@ impl PartialEq for GltfDataDestination {
 /// an in-memory buffer to a file based on the length, and in any case
 /// remembers the length written and encodes the final URI of the data.
 ///
-/// Does not guarantee the length is correct if write() is called after
+/// Does not guarantee the length is correct if `write()` is called after
 /// an IO error was previously returned.
 #[derive(Debug)]
 enum SwitchingWriter {

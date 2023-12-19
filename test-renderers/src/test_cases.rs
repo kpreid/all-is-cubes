@@ -694,9 +694,9 @@ async fn light(mut context: RenderTestContext, option: LightingOption) {
         .await;
 }
 
-/// Test calling renderer's draw() without update().
+/// Test calling renderer's `draw()` without `update()`.
 /// This is not directly useful/plausible by itself, but is intended to
-/// exercise robustness in the presence of errors that stop update() from
+/// exercise robustness in the presence of errors that stop `update()` from
 /// completing.
 async fn no_update(mut context: RenderTestContext) {
     let mut universe = Universe::new();

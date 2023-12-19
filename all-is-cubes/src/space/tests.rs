@@ -45,7 +45,7 @@ fn initial_state_consistency() {
         .consistency_check();
 }
 
-/// set() returns Ok when the cube was changed or already equal.
+/// `set()` returns Ok when the cube was changed or already equal.
 #[test]
 fn set_success() {
     let [first, second] = make_some_blocks();
@@ -61,7 +61,7 @@ fn set_success() {
     space.consistency_check(); // bonus testing
 }
 
-/// Test set() with a block that fails evaluation.
+/// Test `set()` with a block that fails evaluation.
 /// This should succeed but leave a placeholder.
 ///
 /// This test case should also cover `RefError::InUse` and other evaluation errors.

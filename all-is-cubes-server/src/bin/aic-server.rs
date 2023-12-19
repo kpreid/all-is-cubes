@@ -1,4 +1,4 @@
-//! main() for a server that serves the All is Cubes client as well as being a game
+//! `main()` for a server that serves the All is Cubes client as well as being a game
 //! server.
 
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)

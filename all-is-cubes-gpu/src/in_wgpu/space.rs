@@ -540,7 +540,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
     }
 
     /// Generate debug lines for the current state of the renderer, assuming
-    /// draw() was just called.
+    /// `draw()` was just called.
     pub(crate) fn debug_lines(&self, camera: &Camera, v: &mut Vec<WgpuLinesVertex>) {
         let Some(csm) = &self.csm else {
             return;

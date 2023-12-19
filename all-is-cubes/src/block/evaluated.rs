@@ -712,6 +712,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
     }
 }
 
+#[allow(clippy::doc_markdown)] // https://github.com/rust-lang/rust-clippy/issues/9473
 /// The result of <code>[AIR].[evaluate()](Block::evaluate)</code>, as a constant.
 /// This may be used when an [`EvaluatedBlock`] value is needed but there is no block
 /// value.

@@ -1058,7 +1058,7 @@ mod tests {
     }
 
     /// Regression test (found by fuzzing) for being outside of integer
-    /// range while also using within().
+    /// range while also using `within()`.
     #[test]
     fn start_outside_of_integer_range_with_bounds() {
         let bounds = GridAab::from_lower_size([0, 0, 0], [10, 10, 10]);
@@ -1146,7 +1146,7 @@ mod tests {
         );
     }
 
-    /// within() wasn't working for axis-aligned rays that don't intersect the world,
+    /// `within()` wasn't working for axis-aligned rays that don't intersect the world,
     /// which should produce zero steps.
     #[test]
     fn regression_test_2() {

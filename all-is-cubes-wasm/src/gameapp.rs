@@ -106,7 +106,7 @@ impl WebSession {
         self_rc
     }
 
-    /// This method is broken out of new() so we can just use `self`. Well, some of the time.
+    /// This method is broken out of `new()` so we can just use `self`. Well, some of the time.
     /// TODO: reconsider
     fn init_dom(self: Rc<Self>) {
         self.add_canvas_to_self_event_listener(
