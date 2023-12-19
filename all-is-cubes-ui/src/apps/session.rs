@@ -3,12 +3,11 @@ use core::fmt;
 use core::future::Future;
 use core::marker::PhantomData;
 use core::mem;
-use core::task::{Context, Poll};
+use core::task;
 use std::sync::mpsc::{self, TryRecvError};
 use std::sync::Mutex;
 
 use futures_core::future::BoxFuture;
-use futures_task::noop_waker_ref;
 
 use all_is_cubes::arcstr::{self, ArcStr};
 use all_is_cubes::camera::{GraphicsOptions, Layers, StandardCameras, UiViewState, Viewport};
@@ -277,10 +276,10 @@ impl<I: time::Instant> Session<I> {
 
             match future
                 .as_mut()
-                .poll(&mut Context::from_waker(noop_waker_ref()))
+                .poll(&mut task::Context::from_waker(task::Waker::noop()))
             {
-                Poll::Pending => {}
-                Poll::Ready(ExitMainTask) => {
+                task::Poll::Pending => {}
+                task::Poll::Ready(ExitMainTask) => {
                     self.main_task = None;
                 }
             }
