@@ -1,4 +1,5 @@
 #![feature(never_type)]
+#![feature(noop_waker)]
 
 //! Algorithms for rendering [All is Cubes] content using a GPU, via
 //! the [`wgpu`] graphics library.
