@@ -78,6 +78,9 @@ enum XtaskCommand {
     /// Format code (as `cargo fmt` but covering all packages)
     Fmt,
 
+    /// Remove build files (as `cargo clean` but covering all packages)
+    Clean,
+
     /// Fuzz: run all fuzz targets, with a chosen duration for each.
     Fuzz {
         duration: f64,
@@ -192,6 +195,13 @@ fn main() -> Result<(), ActionError> {
                 cargo().arg("fmt").run()?;
                 Ok(())
             })?;
+        }
+        XtaskCommand::Clean => {
+            config.do_for_all_workspaces(|| {
+                cargo().arg("clean").run()?;
+                Ok(())
+            })?;
+            // TODO: also remove all-is-cubes-wasm/{dist,pkg}, but do it with more sanity checks
         }
         XtaskCommand::Fuzz { duration } => {
             assert!(config.scope.includes_fuzz_workspace());
