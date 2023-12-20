@@ -1,8 +1,9 @@
+#[cfg(test)]
 use alloc::vec::Vec;
 
-use crate::universe::URefErased;
 #[cfg(doc)]
-use crate::universe::{URef, Universe};
+use crate::universe::Universe;
+use crate::universe::{self, URef, URefErased};
 
 /// Allows finding all of the [`URef`]s inside a data structure.
 ///
@@ -33,6 +34,12 @@ where
     }
 }
 
+impl<T: universe::UniverseMember> VisitRefs for URef<T> {
+    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+        visitor.visit(self)
+    }
+}
+
 impl<T: VisitRefs> VisitRefs for Option<T> {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
         if let Some(element) = self {
@@ -41,9 +48,9 @@ impl<T: VisitRefs> VisitRefs for Option<T> {
     }
 }
 
-impl<T: VisitRefs> VisitRefs for Vec<T> {
+impl<T: VisitRefs> VisitRefs for [T] {
     fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
-        for element in self {
+        for element in self.iter() {
             element.visit_refs(visitor);
         }
     }
