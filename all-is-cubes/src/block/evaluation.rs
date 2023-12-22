@@ -5,7 +5,9 @@ use core::cell::Cell;
 
 #[cfg(doc)]
 use crate::block::Block;
-use crate::block::{BlockAttributes, BlockChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
+use crate::block::{
+    self, BlockAttributes, BlockChange, EvaluatedBlock, Evoxel, Evoxels, Resolution,
+};
 use crate::content::palette;
 use crate::listen;
 use crate::math::{GridAab, Rgba, Vol};
@@ -121,6 +123,15 @@ impl Budget {
         cell.set(recursed);
         Ok(BudgetRecurseGuard { cell })
     }
+
+    /// Express a budget as a [`Cost`] value, for public consumption.
+    pub(in crate::block) fn to_cost(self) -> Cost {
+        Cost {
+            components: self.components,
+            voxels: self.voxels,
+            recursion: self.recursion_used,
+        }
+    }
 }
 
 impl Default for Budget {
@@ -157,18 +168,18 @@ impl Drop for BudgetRecurseGuard<'_> {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Cost {
     /// Number of [`Primitive`]s and [`Modifier`]s evaluated.
-    components: u32,
+    pub(crate) components: u32,
 
     /// Number of individual voxels produced (e.g. by a `Primitive::Recur`]) or altered
     /// (e.g. by a [`Modifier::Composite`]).
-    voxels: u32,
+    pub(crate) voxels: u32,
 
     /// Number of recursion levels used by the evaluation.
     ///
     /// Recursion occurs when a primitive or modifier which itself contains  [`Block`] is
     /// evaluated; currently, these are [`Primitive::Text`] and `Modifier::Composite`].
     /// If there are none of those, then this will be zero.
-    recursion: u8,
+    pub(crate) recursion: u8,
 }
 
 impl Cost {
@@ -182,21 +193,21 @@ impl Cost {
     };
 
     /// Compute a cost from change in budget.
-    pub(crate) fn new(original_budget: Budget, final_budget: Budget) -> Self {
-        Self {
-            components: final_budget
-                .components
-                .checked_sub(original_budget.components)
-                .unwrap(),
-            voxels: final_budget
-                .voxels
-                .checked_sub(original_budget.voxels)
-                .unwrap(),
-            recursion: final_budget
-                .recursion_used
-                .checked_sub(original_budget.recursion_used)
-                .unwrap(),
-        }
+    pub(crate) fn from_difference(original_budget: Budget, final_budget: Budget) -> Self {
+        let Some(new_self) = (|| {
+            Some(Self {
+                components: original_budget
+                    .components
+                    .checked_sub(final_budget.components)?,
+                voxels: original_budget.voxels.checked_sub(final_budget.voxels)?,
+                recursion: original_budget
+                    .recursion_used
+                    .checked_sub(final_budget.recursion_used)?,
+            })
+        })() else {
+            panic!("overflow computing budget difference: {final_budget:#?} - {original_budget:#?}")
+        };
+        new_self
     }
 }
 
@@ -204,12 +215,25 @@ impl Cost {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 pub enum EvalBlockError {
-    /// The block definition contained recursion that exceeded the evaluation limit.
-    //---
-    // TODO: This is misnamed, but we're going to be changing it shortly to have
-    // some details, so rename it then.
-    #[displaydoc("block definition contains too much recursion")]
-    StackOverflow,
+    /// The evaluation budget was exceeded.
+    #[displaydoc("block definition exceeded evaluation budget; used {used:?} so far and only {budget:?} available")]
+    BudgetExceeded {
+        /// Budget that was available for the evaluation.
+        budget: Cost,
+        /// Computation steps actually used before failure.
+        used: Cost,
+    },
+
+    /// The evaluation budget was exceeded, in a previous cached evaluation.
+    /// rather than the current one (so the current evaluation's budget
+    /// could not have affected the outcome).
+    #[displaydoc("cached block definition exceeded evaluation budget; used {used:?} so far and only {budget:?} available")]
+    PriorBudgetExceeded {
+        /// Budget that was available for the evaluation.
+        budget: Cost,
+        /// Computation steps actually used before failure.
+        used: Cost,
+    },
 
     /// Data referenced by the block definition was not available to read.
     ///
@@ -223,6 +247,7 @@ pub enum EvalBlockError {
 #[derive(Debug)]
 pub(in crate::block) enum InEvalError {
     BudgetExceeded,
+    PriorBudgetExceeded { budget: Cost, used: Cost },
     DataRefIs(RefError),
 }
 
@@ -230,7 +255,8 @@ pub(in crate::block) enum InEvalError {
 impl std::error::Error for EvalBlockError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            EvalBlockError::StackOverflow => None,
+            EvalBlockError::BudgetExceeded { .. } => None,
+            EvalBlockError::PriorBudgetExceeded { .. } => None,
             EvalBlockError::DataRefIs(e) => Some(e),
         }
     }
@@ -243,9 +269,12 @@ impl From<RefError> for InEvalError {
 }
 
 impl InEvalError {
-    pub(in crate::block) fn into_eval_error(self) -> EvalBlockError {
+    pub(in crate::block) fn into_eval_error(self, budget: Cost, used: Cost) -> EvalBlockError {
         match self {
-            InEvalError::BudgetExceeded => EvalBlockError::StackOverflow,
+            InEvalError::BudgetExceeded => EvalBlockError::BudgetExceeded { budget, used },
+            InEvalError::PriorBudgetExceeded { budget, used } => {
+                EvalBlockError::PriorBudgetExceeded { budget, used }
+            }
             InEvalError::DataRefIs(e) => EvalBlockError::DataRefIs(e),
         }
     }
@@ -254,7 +283,10 @@ impl InEvalError {
 impl EvalBlockError {
     pub(in crate::block) fn into_internal_error_for_block_def(self) -> InEvalError {
         match self {
-            EvalBlockError::StackOverflow => InEvalError::BudgetExceeded,
+            EvalBlockError::PriorBudgetExceeded { budget, used } => {
+                InEvalError::PriorBudgetExceeded { budget, used }
+            }
+            EvalBlockError::BudgetExceeded { .. } => InEvalError::BudgetExceeded,
             EvalBlockError::DataRefIs(e) => InEvalError::DataRefIs(e),
         }
     }
@@ -291,6 +323,28 @@ impl EvalBlockError {
                     pattern[((cube.x + cube.y + cube.z).rem_euclid(2)) as usize]
                 }),
             ),
+            match *self {
+                EvalBlockError::BudgetExceeded { used, .. } => used,
+                EvalBlockError::PriorBudgetExceeded { .. } => Cost::ZERO,
+                EvalBlockError::DataRefIs(_) => Cost::ZERO,
+            },
         )
+    }
+}
+
+/// Convert intermediate evaluation result to final evaluation result,
+/// including calculating the evaluation cost.
+///
+/// Note that the order of operands is such that the original budget may
+/// be passed in the form `filter.budget.get()` without a temporary variable.
+pub(in crate::block) fn finish_evaluation(
+    original_budget: Budget,
+    result: Result<block::MinEval, InEvalError>,
+    filter: &EvalFilter,
+) -> Result<EvaluatedBlock, EvalBlockError> {
+    let cost = Cost::from_difference(original_budget, filter.budget.get());
+    match result {
+        Ok(ev) => Ok(ev.finish(cost)),
+        Err(err) => Err(err.into_eval_error(original_budget.to_cost(), cost)),
     }
 }

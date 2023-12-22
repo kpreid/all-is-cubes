@@ -7,7 +7,7 @@ use euclid::Vector3D;
 use ordered_float::NotNan;
 
 use crate::block::{
-    self, BlockAttributes, BlockCollision,
+    self, BlockAttributes, BlockCollision, Cost,
     Resolution::{self, R1},
 };
 use crate::math::{
@@ -79,6 +79,9 @@ pub struct EvaluatedBlock {
     /// It doesn't harm normal operation because the point of having this is to compare
     /// block shapes, which is trivial if the block is invisible.)
     pub voxel_opacity_mask: Option<Vol<Arc<[OpacityCategory]>>>,
+
+    /// Cost of performing the evaluation.
+    pub(crate) cost: Cost,
 }
 
 impl fmt::Debug for EvaluatedBlock {
@@ -93,6 +96,7 @@ impl fmt::Debug for EvaluatedBlock {
             visible,
             uniform_collision,
             voxel_opacity_mask,
+            cost,
         } = self;
         let mut ds = fmt.debug_struct("EvaluatedBlock");
         if *attributes != BlockAttributes::default() {
@@ -123,6 +127,7 @@ impl fmt::Debug for EvaluatedBlock {
             "voxel_opacity_mask",
             &format_args!("{:?}", voxel_opacity_mask.as_ref().map(Vol::bounds)),
         );
+        ds.field("cost", cost);
         ds.finish()
     }
 }
@@ -132,8 +137,12 @@ impl EvaluatedBlock {
 
     /// Computes the derived values of a voxel block.
     ///
-    /// This is also available as `impl From<MinEval> for EvaluatedBlock`.
-    pub(crate) fn from_voxels(attributes: BlockAttributes, voxels: Evoxels) -> EvaluatedBlock {
+    /// This is also available as [`MinEval::finish()`].
+    pub(crate) fn from_voxels(
+        attributes: BlockAttributes,
+        voxels: Evoxels,
+        cost: Cost,
+    ) -> EvaluatedBlock {
         // Optimization for single voxels:
         // don't allocate any `Vol`s or perform any generalized scans.
         if let Some(Evoxel {
@@ -163,6 +172,7 @@ impl EvaluatedBlock {
                 } else {
                     Some(Vol::from_element(color.opacity_category()))
                 },
+                cost,
             };
         }
 
@@ -277,6 +287,7 @@ impl EvaluatedBlock {
             uniform_collision,
             voxel_opacity_mask,
             voxels,
+            cost,
         }
     }
 
@@ -340,7 +351,8 @@ impl EvaluatedBlock {
     #[doc(hidden)]
     #[track_caller]
     pub fn consistency_check(&self) {
-        let regenerated = EvaluatedBlock::from_voxels(self.attributes.clone(), self.voxels.clone());
+        let regenerated =
+            EvaluatedBlock::from_voxels(self.attributes.clone(), self.voxels.clone(), self.cost);
         assert_eq!(self, &regenerated);
     }
 }
@@ -668,6 +680,11 @@ pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     visible: false,
     uniform_collision: Some(BlockCollision::None),
     voxel_opacity_mask: None,
+    cost: Cost {
+        components: 1,
+        voxels: 0,
+        recursion: 0,
+    },
 };
 
 /// This separate item is needed to convince the compiler that `AIR_ATTRIBUTES.display_name`
@@ -701,14 +718,6 @@ pub(crate) struct MinEval {
     pub(crate) voxels: Evoxels,
 }
 
-impl From<MinEval> for EvaluatedBlock {
-    fn from(value: MinEval) -> Self {
-        let MinEval { attributes, voxels } = value;
-        // TODO: EvaluatedBlock::from* should probably be entirely replaced with this
-        EvaluatedBlock::from_voxels(attributes, voxels)
-    }
-}
-
 impl From<&EvaluatedBlock> for MinEval {
     fn from(value: &EvaluatedBlock) -> Self {
         Self {
@@ -727,6 +736,13 @@ impl From<EvaluatedBlock> for MinEval {
 }
 
 impl MinEval {
+    /// Converts this into an [`EvaluatedBlock`], computing the derived values.
+    pub(crate) fn finish(self, cost: Cost) -> EvaluatedBlock {
+        let MinEval { attributes, voxels } = self;
+        // TODO: EvaluatedBlock::from* should probably be entirely replaced with this
+        EvaluatedBlock::from_voxels(attributes, voxels, cost)
+    }
+
     pub fn resolution(&self) -> Resolution {
         self.voxels.resolution()
     }
@@ -774,6 +790,11 @@ mod tests {
                         collision: Hard,
                     },
                     voxel_opacity_mask: Some(GridAab(0..1, 0..1, 0..1)),
+                    cost: Cost {
+                        components: 1,
+                        voxels: 0,
+                        recursion: 0,
+                    },
                 }
             "}
         );
@@ -815,6 +836,11 @@ mod tests {
                     resolution: 2,
                     voxels: GridAab(0..2, 0..2, 0..2),
                     voxel_opacity_mask: Some(GridAab(0..2, 0..2, 0..2)),
+                    cost: Cost {
+                        components: 1,
+                        voxels: 8,
+                        recursion: 0,
+                    },
                 }
             "}
         );
@@ -854,7 +880,8 @@ mod tests {
         assert_eq!(
             EvaluatedBlock::from_voxels(
                 attributes.clone(),
-                Evoxels::Many(resolution, Vol::from_fn(bounds, |_| unreachable!()))
+                Evoxels::Many(resolution, Vol::from_fn(bounds, |_| unreachable!())),
+                Cost::ZERO
             ),
             EvaluatedBlock {
                 attributes,
@@ -865,7 +892,8 @@ mod tests {
                 opaque: FaceMap::repeat(false),
                 visible: false,
                 uniform_collision: Some(BlockCollision::None),
-                voxel_opacity_mask: None
+                voxel_opacity_mask: None,
+                cost: Cost::ZERO, // TODO wrong
             }
         );
     }
@@ -882,10 +910,12 @@ mod tests {
             Rgba::new(0.0, 0.5, 1.0, 0.5),
         ] {
             let voxel = Evoxel::from_color(color);
-            let ev_one = EvaluatedBlock::from_voxels(attributes.clone(), Evoxels::One(voxel));
+            let ev_one =
+                EvaluatedBlock::from_voxels(attributes.clone(), Evoxels::One(voxel), Cost::ZERO);
             let ev_many = EvaluatedBlock::from_voxels(
                 attributes.clone(),
                 Evoxels::Many(R2, Vol::from_fn(GridAab::for_block(R2), |_| voxel)),
+                Cost::ZERO,
             );
 
             // Check that they are identical except for the voxel data
@@ -925,7 +955,7 @@ mod tests {
         );
 
         // The inner_color should be ignored because it is not visible.
-        let ev = EvaluatedBlock::from_voxels(BlockAttributes::default(), voxels);
+        let ev = EvaluatedBlock::from_voxels(BlockAttributes::default(), voxels, Cost::ZERO);
 
         assert_eq!(ev.color, outer_color);
     }

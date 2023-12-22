@@ -265,6 +265,11 @@ mod tests {
                     rotation_rule: block::RotationPlacementRule::Attach { by: Face6::PY },
                     ..BlockAttributes::default()
                 },
+                cost: block::Cost {
+                    components: 2,
+                    voxels: 2u32.pow(3) * 2, // original + rotation
+                    recursion: 0
+                }
             }
         );
     }
@@ -288,9 +293,15 @@ mod tests {
             .extend([Modifier::Rotate(rotation_1), Modifier::Rotate(rotation_2)]);
         assert_ne!(rotated_twice, two_rotations, "Oops; test is ineffective");
 
+        let ev_rotated_twice = rotated_twice.evaluate().unwrap();
+        let ev_two_rotations = two_rotations.evaluate().unwrap();
+
         assert_eq!(
-            rotated_twice.evaluate().unwrap(),
-            two_rotations.evaluate().unwrap()
+            EvaluatedBlock {
+                cost: ev_rotated_twice.cost,
+                ..ev_two_rotations
+            },
+            ev_rotated_twice,
         );
     }
 

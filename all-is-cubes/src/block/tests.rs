@@ -86,6 +86,8 @@ fn block_debug_with_modifiers() {
 }
 
 mod eval {
+    use crate::block::{Cost, EvaluatedBlock};
+
     use super::{assert_eq, *};
 
     #[test]
@@ -243,7 +245,15 @@ mod eval {
                 GridAab::for_block(resolution),
                 OpacityCategory::Opaque,
             ))
-        )
+        );
+        assert_eq!(
+            e.cost,
+            Cost {
+                components: 1,
+                voxels: 8,
+                recursion: 0
+            }
+        );
     }
 
     #[test]
@@ -503,10 +513,26 @@ mod eval {
         let block = Block::builder()
             .voxels_ref(resolution, space_ref.clone())
             .build();
-        let eval_bare = block.evaluate();
+
+        let eval_bare = block.evaluate().unwrap();
         let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
-        let eval_def = Block::from(block_def_ref).evaluate();
-        assert_eq!(eval_bare, eval_def);
+        let eval_def = Block::from(block_def_ref).evaluate().unwrap();
+
+        assert_eq!(
+            eval_bare,
+            EvaluatedBlock {
+                cost: eval_bare.cost,
+                ..eval_def.clone()
+            }
+        );
+        assert_eq!(
+            eval_def.cost,
+            Cost {
+                components: 1,
+                voxels: 0, // zero because the voxels were _already_ evaluated
+                recursion: 0
+            }
+        )
     }
 
     /// Fuzz-discovered test case for panic during evaluation,
@@ -642,7 +668,17 @@ fn overflow_evaluate() {
     block
         .modifiers_mut()
         .extend((0..100).map(|_| Modifier::Rotate(GridRotation::CLOCKWISE)));
-    assert_eq!(block.evaluate(), Err(EvalBlockError::StackOverflow));
+    assert_eq!(
+        block.evaluate(),
+        Err(EvalBlockError::BudgetExceeded {
+            budget: block::Budget::default().to_cost(),
+            used: block::Cost {
+                components: 2,
+                voxels: 8,
+                recursion: 0
+            }
+        })
+    );
 }
 
 #[test]

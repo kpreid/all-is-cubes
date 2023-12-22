@@ -201,6 +201,7 @@ mod tests {
     use crate::time;
     use crate::universe::Universe;
     use ordered_float::NotNan;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn move_atom_block_evaluation() {
@@ -237,6 +238,11 @@ mod tests {
                 visible: true,
                 uniform_collision: None,
                 voxel_opacity_mask: Some(Vol::repeat(expected_bounds, OpacityCategory::Opaque)),
+                cost: block::Cost {
+                    components: ev_original.cost.components + 1,
+                    voxels: expected_bounds.volume_f64() as u32,
+                    recursion: 0
+                }
             }
         );
     }
@@ -282,6 +288,11 @@ mod tests {
                 visible: true,
                 uniform_collision: None,
                 voxel_opacity_mask: Some(Vol::repeat(expected_bounds, OpacityCategory::Opaque)),
+                cost: block::Cost {
+                    components: ev_original.cost.components + 1,
+                    voxels: 2u32.pow(3) * 3 / 2, // original recur + 1/2 block of Move
+                    recursion: 0
+                }
             }
         );
     }

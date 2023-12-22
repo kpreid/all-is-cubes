@@ -457,24 +457,20 @@ impl Block {
     /// TODO: Placeholder name. At some point we may expose `EvalFilter` directly and make
     /// this be just `evaluate()`.
     pub(crate) fn evaluate2(&self, filter: &EvalFilter) -> Result<EvaluatedBlock, EvalBlockError> {
-        match self.evaluate_impl(filter) {
-            Ok(ev) => Ok(ev.into()),
-            Err(err) => Err(err.into_eval_error()),
-        }
+        finish_evaluation(filter.budget.get(), self.evaluate_impl(filter), filter)
     }
 
     /// Equivalent to `Evoxel::from_block(block.evaluate2(filter))` except for the error type.
     /// For use when blocks contain other blocks as voxels.
     fn evaluate_to_evoxel_internal(&self, filter: &EvalFilter) -> Result<Evoxel, InEvalError> {
-        match self.evaluate_impl(filter) {
-            // TODO: Make this more efficient by not building the full `EvaluatedBlock`
-            Ok(ev) => Ok(Evoxel::from_block(&ev.into())),
-            Err(err) => Err(err),
-        }
+        // TODO: Make this more efficient by not building the full `EvaluatedBlock`
+        self.evaluate_impl(filter)
+            .map(|minev| Evoxel::from_block(&minev.finish(Cost::ZERO /* ignored */)))
     }
 
     #[inline]
     fn evaluate_impl(&self, filter: &EvalFilter) -> Result<MinEval, InEvalError> {
+        // The block's primitive counts as 1 component.
         Budget::decrement_components(&filter.budget)?;
 
         let mut value: MinEval = match *self.primitive() {

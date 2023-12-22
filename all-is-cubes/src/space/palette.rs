@@ -1,5 +1,6 @@
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
+use core::cell::Cell;
 use core::fmt;
 
 use itertools::Itertools as _;
@@ -458,11 +459,14 @@ impl SpaceBlockData {
 
         let (gate, block_listener) = listener.gate();
         let block_listener = block_listener.erased();
-        let evaluated = match block.evaluate2(&block::EvalFilter {
+
+        let original_budget = block::Budget::default();
+        let filter = block::EvalFilter {
             skip_eval: false,
             listener: Some(block_listener.clone()),
-            budget: Default::default(),
-        }) {
+            budget: Cell::new(original_budget),
+        };
+        let evaluated = match block.evaluate2(&filter) {
             Ok(ev) => ev,
             Err(err) => {
                 // Trigger retrying evaluation at next step.

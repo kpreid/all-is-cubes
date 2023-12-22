@@ -87,10 +87,18 @@ impl BlockDef {
     /// This returns the same success or error as `Block::from(ref_to_self).evaluate()` would, not
     /// the same as `.block().evaluate()` would.
     pub fn evaluate(&self) -> Result<block::EvaluatedBlock, EvalBlockError> {
-        match self.evaluate_impl(&block::EvalFilter::default()) {
-            Ok(t) => Ok(block::EvaluatedBlock::from(t)),
-            Err(e) => Err(e.into_eval_error()),
-        }
+        let filter = block::EvalFilter::default();
+        block::finish_evaluation(
+            filter.budget.get(),
+            {
+                // This decrement makes the cost consistent with evaluating a
+                // block with Primitive::Indirect.
+                block::Budget::decrement_components(&filter.budget).unwrap();
+
+                self.evaluate_impl(&filter)
+            },
+            &filter,
+        )
     }
 
     /// Implementation of block evaluation used by a [`Primitive::Indirect`] pointing to this.
@@ -460,10 +468,10 @@ impl manyfmt::Fmt<crate::util::StatusText> for BlockDefStepInfo {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::math::Rgba;
     use crate::universe::Universe;
-
-    use super::*;
+    use pretty_assertions::assert_eq;
 
     /// Quick more-than-nothing test for [`BlockDef::evaluate()`] being the same as more usual
     /// options.
@@ -476,13 +484,23 @@ mod tests {
             .color(Rgba::new(1.0, 0.0, 0.0, 1.0))
             .build();
 
-        let eval_bare = block.evaluate();
+        let eval_bare = block.evaluate().unwrap();
         let block_def = BlockDef::new(block);
-        let eval_def = block_def.evaluate();
+        let eval_def = block_def.evaluate().unwrap();
         let block_def_ref = universe.insert_anonymous(block_def);
-        let eval_indirect = Block::from(block_def_ref).evaluate();
+        let eval_indirect = Block::from(block_def_ref).evaluate().unwrap();
 
-        assert_eq!(eval_bare, eval_def);
-        assert_eq!(eval_bare, eval_indirect);
+        assert_eq!(
+            eval_def, eval_indirect,
+            "BlockDef::evaluate() same as Primitive::Indirect"
+        );
+        assert_eq!(
+            block::EvaluatedBlock {
+                cost: eval_bare.cost,
+                ..eval_def
+            },
+            eval_bare,
+            "BlockDef::evaluate() same except for cost as the def block"
+        );
     }
 }
