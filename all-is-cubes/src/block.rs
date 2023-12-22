@@ -9,6 +9,7 @@ use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::cell::Cell;
 use core::fmt;
 
 use crate::listen::{self, Listen, Listener};
@@ -421,6 +422,7 @@ impl Block {
         self.evaluate2(&EvalFilter {
             skip_eval: false,
             listener: None,
+            budget: Default::default(),
         })
     }
 
@@ -444,6 +446,7 @@ impl Block {
         self.evaluate2(&EvalFilter {
             skip_eval: false,
             listener: Some(listener.erased()),
+            budget: Default::default(),
         })
     }
 
@@ -452,11 +455,13 @@ impl Block {
     /// TODO: Placeholder name. At some point we may expose `EvalFilter` directly and make
     /// this be just `evaluate()`.
     pub(crate) fn evaluate2(&self, filter: &EvalFilter) -> Result<EvaluatedBlock, EvalBlockError> {
-        Ok(EvaluatedBlock::from(self.evaluate_impl(0, filter)?))
+        Ok(EvaluatedBlock::from(self.evaluate_impl(filter)?))
     }
 
     #[inline]
-    fn evaluate_impl(&self, depth: u8, filter: &EvalFilter) -> Result<MinEval, EvalBlockError> {
+    fn evaluate_impl(&self, filter: &EvalFilter) -> Result<MinEval, EvalBlockError> {
+        Budget::decrement_components(&filter.budget)?;
+
         let mut value: MinEval = match *self.primitive() {
             Primitive::Indirect(ref def_ref) => def_ref.read()?.evaluate_impl(filter)?,
 
@@ -520,17 +525,24 @@ impl Block {
                     .intersection(block_space.bounds())
                     .filter(|_| !filter.skip_eval)
                 {
-                    Some(occupied_bounds) => block_space
-                        .extract(
-                            occupied_bounds,
-                            #[inline(always)]
-                            |extract| {
-                                let ev = extract.block_data().evaluated();
-                                voxels_animation_hint |= ev.attributes.animation_hint;
-                                Evoxel::from_block(ev)
-                            },
-                        )
-                        .translate(-offset.to_vector()),
+                    Some(occupied_bounds) => {
+                        Budget::decrement_voxels(
+                            &filter.budget,
+                            occupied_bounds.volume().unwrap(),
+                        )?;
+
+                        block_space
+                            .extract(
+                                occupied_bounds,
+                                #[inline(always)]
+                                |extract| {
+                                    let ev = extract.block_data().evaluated();
+                                    voxels_animation_hint |= ev.attributes.animation_hint;
+                                    Evoxel::from_block(ev)
+                                },
+                            )
+                            .translate(-offset.to_vector())
+                    }
                     None => {
                         // If there is no intersection, then return an empty voxel array,
                         // with an arbitrary position.
@@ -556,15 +568,14 @@ impl Block {
                 }
             }
 
-            Primitive::Text { ref text, offset } => text.evaluate(offset, depth, filter)?,
+            Primitive::Text { ref text, offset } => text.evaluate(offset, filter)?,
         };
 
         #[cfg(debug_assertions)]
         value.consistency_check();
 
         for (index, modifier) in self.modifiers().iter().enumerate() {
-            // TODO: Extend recursion depth model to catch stacking up lots of modifiers
-            value = modifier.evaluate(self, index, value, depth, filter)?;
+            value = modifier.evaluate(self, index, value, filter)?;
 
             #[cfg(debug_assertions)]
             value.consistency_check();
@@ -607,6 +618,13 @@ pub(crate) struct EvalFilter {
     /// such as the [`Space`] referred to by a [`Primitive::Recur`] or the [`BlockDef`]
     /// referred to by a [`Primitive::Indirect`].
     pub listener: Option<listen::DynListener<BlockChange>>,
+
+    /// How much computation may be spent on performing the evaluation.
+    ///
+    /// If the budget is exhausted, evaluation returns [`EvalBlockError::StackOverflow`].
+    ///
+    /// Outside of special circumstances, use [`Budget::default()`] here.
+    pub budget: Cell<Budget>,
 }
 
 impl Default for EvalFilter {
@@ -616,16 +634,8 @@ impl Default for EvalFilter {
         Self {
             skip_eval: Default::default(),
             listener: Default::default(),
+            budget: Default::default(),
         }
-    }
-}
-
-/// Recursion limiter helper for evaluate.
-fn next_depth(depth: u8) -> Result<u8, EvalBlockError> {
-    if depth > 32 {
-        Err(EvalBlockError::StackOverflow)
-    } else {
-        Ok(depth + 1)
     }
 }
 
@@ -938,6 +948,100 @@ mod conversions_for_indirect {
         fn from(block_def_ref: URef<BlockDef>) -> Self {
             Block::from_primitive(Primitive::Indirect(block_def_ref))
         }
+    }
+}
+
+/// Computation budget for block evaluations.
+///
+/// This is used inside an [`EvalFilter`].
+///
+/// In principle, what we want is a time budget, but in order to offer determinism and
+/// comprehensibility, it is instead made up of multiple discrete quantities.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct Budget {
+    /// Number of [`Primitive`]s and [`Modifier`]s.
+    components: u32,
+
+    /// Number of individual voxels produced (e.g. by a [`Primitive::Recur`]) or altered
+    /// (e.g. by a [`Modifier::Composite`]).
+    voxels: u32,
+
+    /// Number of levels of evaluation recursion permitted.
+    ///
+    /// Recursion occurs when a primitive or modifier which itself contains a [`Block`] is
+    /// evaluated; currently, these are [`Primitive::Text`] and [`Modifier::Composite`].
+    ///
+    /// This must be set low enough to avoid Rust stack overflows which cannot be recovered from.
+    /// Unlike the other budget parameters, this is not cumulative over the entire evaluation.
+    recursion: u8,
+
+    /// Number of recursion levels actually used by the evaluation.
+    /// This is tracked separately so that it can be reported afterward,
+    /// whereas the other counters are only ever decremented and so a subtraction suffices.
+    recursion_used: u8,
+}
+
+impl Budget {
+    pub(crate) fn decrement_components(cell: &Cell<Budget>) -> Result<(), EvalBlockError> {
+        let mut budget = cell.get();
+        match budget.components.checked_sub(1) {
+            Some(updated) => budget.components = updated,
+            None => return Err(EvalBlockError::StackOverflow),
+        }
+        cell.set(budget);
+        Ok(())
+    }
+
+    pub(crate) fn decrement_voxels(
+        cell: &Cell<Budget>,
+        amount: usize,
+    ) -> Result<(), EvalBlockError> {
+        let mut budget = cell.get();
+        match u32::try_from(amount)
+            .ok()
+            .and_then(|amount| budget.voxels.checked_sub(amount))
+        {
+            Some(updated) => budget.voxels = updated,
+            None => return Err(EvalBlockError::StackOverflow),
+        }
+        cell.set(budget);
+        Ok(())
+    }
+
+    pub(crate) fn recurse(cell: &Cell<Budget>) -> Result<BudgetRecurseGuard<'_>, EvalBlockError> {
+        let current = cell.get();
+        let mut recursed = current;
+        match recursed.recursion.checked_sub(1) {
+            Some(updated) => recursed.recursion = updated,
+            None => return Err(EvalBlockError::StackOverflow),
+        }
+        cell.set(recursed);
+        Ok(BudgetRecurseGuard { cell })
+    }
+}
+
+impl Default for Budget {
+    /// Returns the standard budget for starting any evaluation.
+    fn default() -> Self {
+        Self {
+            components: 1000,
+            voxels: 64 * 64 * 128,
+            recursion: 30,
+            recursion_used: 0,
+        }
+    }
+}
+
+#[must_use]
+pub(crate) struct BudgetRecurseGuard<'a> {
+    cell: &'a Cell<Budget>,
+}
+
+impl Drop for BudgetRecurseGuard<'_> {
+    fn drop(&mut self) {
+        let mut budget = self.cell.get();
+        budget.recursion = budget.recursion.checked_add(1).unwrap();
+        self.cell.set(budget);
     }
 }
 

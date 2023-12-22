@@ -68,7 +68,6 @@ impl Move {
         block: &Block,
         this_modifier_index: usize,
         mut input: MinEval,
-        depth: u8,
         filter: &block::EvalFilter,
     ) -> Result<MinEval, block::EvalBlockError> {
         let Move {
@@ -81,11 +80,11 @@ impl Move {
         // don't interfere with movement or cause duplication.
         // (In the future we may want a more nuanced policy that allows internal changes,
         // but that will probably involve refining tick_action processing.)
+        // TODO: This can be done more cleanly by having an evaluate function on Quote itself.
         input = Modifier::from(block::Quote::default()).evaluate(
             block,
             this_modifier_index,
             input,
-            depth,
             filter,
         )?;
 
@@ -148,6 +147,11 @@ impl Move {
 
         Ok(match displaced_bounds {
             Some(displaced_bounds) => {
+                block::Budget::decrement_voxels(
+                    &filter.budget,
+                    displaced_bounds.volume().unwrap(),
+                )?;
+
                 let displaced_voxels = match &input.voxels {
                     Evoxels::Many(_, voxels) => Evoxels::Many(
                         effective_resolution,

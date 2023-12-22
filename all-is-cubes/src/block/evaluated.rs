@@ -602,6 +602,14 @@ impl Evoxels {
         }
     }
 
+    /// Returns the count of voxels, aka [`Vol::volume()`] at the resolution.
+    pub fn count(&self) -> usize {
+        match self {
+            Evoxels::One(_) => 1,
+            Evoxels::Many(_, voxels) => voxels.volume(),
+        }
+    }
+
     /// If this has a resolution of 1, then return that single voxel.
     #[inline]
     pub fn single_voxel(&self) -> Option<Evoxel> {

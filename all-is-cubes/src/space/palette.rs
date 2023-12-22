@@ -461,6 +461,7 @@ impl SpaceBlockData {
         let evaluated = match block.evaluate2(&block::EvalFilter {
             skip_eval: false,
             listener: Some(block_listener.clone()),
+            budget: Default::default(),
         }) {
             Ok(ev) => ev,
             Err(err) => {

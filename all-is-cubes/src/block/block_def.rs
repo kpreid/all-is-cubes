@@ -99,6 +99,7 @@ impl BlockDef {
         let &block::EvalFilter {
             skip_eval,
             ref listener,
+            budget: _, // already accounted in the caller
         } = filter;
 
         if let Some(listener) = listener {
@@ -132,6 +133,7 @@ impl BlockDefState {
             .evaluate2(&block::EvalFilter {
                 skip_eval: false,
                 listener: Some(block_listener.erased()),
+                budget: Default::default(),
             })
             .map(MinEval::from);
 
@@ -165,6 +167,7 @@ impl BlockDefState {
                 .evaluate2(&block::EvalFilter {
                     skip_eval: false,
                     listener: None, // we already have a listener installed
+                    budget: Default::default(),
                 })
                 .map(MinEval::from);
 

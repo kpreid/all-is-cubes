@@ -37,6 +37,7 @@ fn listen(
         .evaluate2(&block::EvalFilter {
             skip_eval: true,
             listener: Some(listener.erased()),
+            budget: Default::default(),
         })
         .map(|_| ())
 }

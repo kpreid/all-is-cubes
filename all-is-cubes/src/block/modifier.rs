@@ -79,20 +79,23 @@ impl Modifier {
     /// * `this_modifier_index` is the index in `block.modifiers()` of `self`.
     /// * `value` is the output of the preceding modifier or primitive, which is what the
     ///   current modifier should be applied to.
-    /// * `depth` is the current block evaluation recursion depth (which is *not*
-    ///   incremented by modifiers; TODO: define a computation limit strategy).
+    /// * `filter` controls evaluation options and listening, and its budget is decremented by
+    ///   1 component (the modifier itself) plus as many voxels and additional components as the
+    ///   particular modifier needs to calculate.
     pub(crate) fn evaluate(
         &self,
         block: &Block,
         this_modifier_index: usize,
         mut value: MinEval,
-        depth: u8,
         filter: &block::EvalFilter,
     ) -> Result<MinEval, block::EvalBlockError> {
+        block::Budget::decrement_components(&filter.budget)?;
+
         Ok(match *self {
             Modifier::Quote(Quote { suppress_ambient }) => {
                 value.attributes.tick_action = None;
                 if suppress_ambient {
+                    block::Budget::decrement_voxels(&filter.budget, value.voxels.count())?;
                     for voxel in value.voxels.as_vol_mut().as_linear_mut().iter_mut() {
                         voxel.emission = Rgb::ZERO;
                     }
@@ -105,6 +108,7 @@ impl Modifier {
                     // Skip computation of transforms
                     value
                 } else {
+                    block::Budget::decrement_voxels(&filter.budget, value.voxels.count())?;
                     // TODO: Add a shuffle-in-place rotation operation to Vol and try implementing this using that, which should have less arithmetic involved than these matrix ops
                     let resolution = value.resolution();
                     let inner_to_outer = rotation.to_positive_octant_transform(resolution.into());
@@ -130,13 +134,11 @@ impl Modifier {
                 }
             }
 
-            Modifier::Composite(ref c) => c.evaluate(value, depth, filter)?,
+            Modifier::Composite(ref c) => c.evaluate(value, filter)?,
 
-            Modifier::Zoom(ref z) => z.evaluate(value)?,
+            Modifier::Zoom(ref z) => z.evaluate(value, filter)?,
 
-            Modifier::Move(ref m) => {
-                m.evaluate(block, this_modifier_index, value, depth, filter)?
-            }
+            Modifier::Move(ref m) => m.evaluate(block, this_modifier_index, value, filter)?,
         })
     }
 

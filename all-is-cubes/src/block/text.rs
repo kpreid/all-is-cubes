@@ -207,7 +207,6 @@ impl Text {
     pub(crate) fn evaluate(
         &self,
         block_offset: GridVector,
-        _depth: u8,
         filter: &super::EvalFilter,
     ) -> Result<MinEval, EvalBlockError> {
         if filter.skip_eval {
@@ -216,13 +215,18 @@ impl Text {
             return Ok(block::AIR_EVALUATED_MIN); // placeholder value
         }
 
-        let ev_foreground = Evoxel::from_block(&self.foreground.evaluate2(filter)?);
-        let brush = match self.outline {
-            Some(ref block) => Brush::Outline {
-                foreground: ev_foreground,
-                outline: Evoxel::from_block(&block.evaluate2(filter)?),
-            },
-            None => Brush::Plain(ev_foreground),
+        // Evaluate blocks making up the brush
+        let brush = {
+            let _recursion_scope = block::Budget::recurse(&filter.budget)?;
+
+            let ev_foreground = Evoxel::from_block(&self.foreground.evaluate2(filter)?);
+            match self.outline {
+                Some(ref block) => Brush::Outline {
+                    foreground: ev_foreground,
+                    outline: Evoxel::from_block(&block.evaluate2(filter)?),
+                },
+                None => Brush::Plain(ev_foreground),
+            }
         };
 
         self.with_transform_and_drawable(

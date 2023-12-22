@@ -118,7 +118,6 @@ impl Composite {
     pub(super) fn evaluate(
         &self,
         mut dst_evaluated: MinEval,
-        depth: u8,
         filter: &block::EvalFilter,
     ) -> Result<MinEval, block::EvalBlockError> {
         let Composite {
@@ -130,7 +129,10 @@ impl Composite {
 
         // The destination block is already evaluated (it is the input to this
         // modifier), but we need to evaluate the source block.
-        let mut src_evaluated = source.evaluate_impl(block::next_depth(depth)?, filter)?;
+        let mut src_evaluated = {
+            let _recursion_scope = block::Budget::recurse(&filter.budget)?;
+            source.evaluate_impl(filter)?
+        };
 
         if filter.skip_eval {
             return Ok(dst_evaluated);
@@ -162,6 +164,8 @@ impl Composite {
         let dst_bounds_scaled = dst_voxels.bounds().multiply(dst_scale);
 
         let output_bounds = operator.bounds(src_bounds_scaled, dst_bounds_scaled);
+
+        block::Budget::decrement_voxels(&filter.budget, output_bounds.volume().unwrap())?;
 
         let attributes = block::BlockAttributes {
             display_name: dst_att.display_name, // TODO merge

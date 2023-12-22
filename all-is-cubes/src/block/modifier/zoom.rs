@@ -59,11 +59,17 @@ impl Zoom {
         }
     }
 
-    pub(super) fn evaluate(&self, input: MinEval) -> Result<MinEval, block::EvalBlockError> {
+    pub(super) fn evaluate(
+        &self,
+        input: MinEval,
+        filter: &block::EvalFilter,
+    ) -> Result<MinEval, block::EvalBlockError> {
         let Zoom {
             offset: offset_in_zoomed_blocks,
             scale,
         } = *self;
+
+        // TODO: respect filter.skip_eval
 
         // TODO: To efficiently implement this, we should be able to run in a phase
         // *before* the `Primitive` evaluation, which allows us to reduce how many
@@ -97,13 +103,19 @@ impl Zoom {
                         attributes,
                         voxels: Evoxels::One(Evoxel::AIR),
                     },
-                    Some(intersected_bounds) => MinEval {
-                        attributes,
-                        voxels: Evoxels::Many(
-                            zoom_resolution,
-                            Vol::from_fn(intersected_bounds, |p| voxels[p + voxel_offset]),
-                        ),
-                    },
+                    Some(intersected_bounds) => {
+                        block::Budget::decrement_voxels(
+                            &filter.budget,
+                            intersected_bounds.volume().unwrap(),
+                        )?;
+                        MinEval {
+                            attributes,
+                            voxels: Evoxels::Many(
+                                zoom_resolution,
+                                Vol::from_fn(intersected_bounds, |p| voxels[p + voxel_offset]),
+                            ),
+                        }
+                    }
                 }
             }
         })
