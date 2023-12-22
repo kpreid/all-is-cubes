@@ -6,17 +6,16 @@ use alloc::sync::Arc;
 use euclid::Vector3D;
 use ordered_float::NotNan;
 
+use crate::block::{
+    self, BlockAttributes, BlockCollision,
+    Resolution::{self, R1},
+};
 use crate::content::palette;
-use crate::math::{Cube, Face6, Face7, FaceMap, GridAab, OpacityCategory, Rgb, Rgba, Vol};
+use crate::math::{
+    Cube, Face6, Face7, FaceMap, GridAab, Intensity, OpacityCategory, Rgb, Rgba, Vol,
+};
 use crate::raytracer;
 use crate::universe::RefError;
-use crate::{
-    block::{
-        self, BlockAttributes, BlockCollision,
-        Resolution::{self, R1},
-    },
-    math::Intensity,
-};
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
