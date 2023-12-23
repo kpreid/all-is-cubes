@@ -63,7 +63,7 @@ impl Zoom {
         &self,
         input: MinEval,
         filter: &block::EvalFilter,
-    ) -> Result<MinEval, block::EvalBlockError> {
+    ) -> Result<MinEval, block::InEvalError> {
         let Zoom {
             offset: offset_in_zoomed_blocks,
             scale,

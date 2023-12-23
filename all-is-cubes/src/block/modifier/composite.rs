@@ -119,7 +119,7 @@ impl Composite {
         &self,
         mut dst_evaluated: MinEval,
         filter: &block::EvalFilter,
-    ) -> Result<MinEval, block::EvalBlockError> {
+    ) -> Result<MinEval, block::InEvalError> {
         let Composite {
             ref source,
             operator,

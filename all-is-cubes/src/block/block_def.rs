@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use core::{fmt, mem, ops};
 
-use crate::block::{self, Block, BlockChange, EvalBlockError, MinEval};
+use crate::block::{self, Block, BlockChange, EvalBlockError, InEvalError, MinEval};
 use crate::listen::{self, Gate, Listen, Listener, Notifier};
 use crate::transaction::{self, Transaction};
 use crate::universe::{RefVisitor, VisitRefs};
@@ -87,15 +87,14 @@ impl BlockDef {
     /// This returns the same success or error as `Block::from(ref_to_self).evaluate()` would, not
     /// the same as `.block().evaluate()` would.
     pub fn evaluate(&self) -> Result<block::EvaluatedBlock, EvalBlockError> {
-        self.evaluate_impl(&block::EvalFilter::default())
-            .map(block::EvaluatedBlock::from)
+        match self.evaluate_impl(&block::EvalFilter::default()) {
+            Ok(t) => Ok(block::EvaluatedBlock::from(t)),
+            Err(e) => Err(e.into_eval_error()),
+        }
     }
 
     /// Implementation of block evaluation used by a [`Primitive::Indirect`] pointing to this.
-    pub(super) fn evaluate_impl(
-        &self,
-        filter: &block::EvalFilter,
-    ) -> Result<MinEval, EvalBlockError> {
+    pub(super) fn evaluate_impl(&self, filter: &block::EvalFilter) -> Result<MinEval, InEvalError> {
         let &block::EvalFilter {
             skip_eval,
             ref listener,
@@ -113,7 +112,10 @@ impl BlockDef {
         } else {
             // TODO: Rework the `MinEval` type or the signatures of evaluation internals
             // so that we can benefit from caching the `EvaluatedBlock` and not just the `MinEval`.
-            self.state.cache.clone()
+            self.state
+                .cache
+                .clone()
+                .map_err(block::EvalBlockError::into_internal_error_for_block_def)
         }
     }
 

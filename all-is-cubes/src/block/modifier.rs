@@ -82,13 +82,13 @@ impl Modifier {
     /// * `filter` controls evaluation options and listening, and its budget is decremented by
     ///   1 component (the modifier itself) plus as many voxels and additional components as the
     ///   particular modifier needs to calculate.
-    pub(crate) fn evaluate(
+    pub(in crate::block) fn evaluate(
         &self,
         block: &Block,
         this_modifier_index: usize,
         value: MinEval,
         filter: &block::EvalFilter,
-    ) -> Result<MinEval, block::EvalBlockError> {
+    ) -> Result<MinEval, block::InEvalError> {
         block::Budget::decrement_components(&filter.budget)?;
 
         Ok(match *self {

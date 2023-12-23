@@ -83,38 +83,40 @@ pub(crate) struct Budget {
 }
 
 impl Budget {
-    pub(crate) fn decrement_components(cell: &Cell<Budget>) -> Result<(), EvalBlockError> {
+    pub(in crate::block) fn decrement_components(cell: &Cell<Budget>) -> Result<(), InEvalError> {
         let mut budget = cell.get();
         match budget.components.checked_sub(1) {
             Some(updated) => budget.components = updated,
-            None => return Err(EvalBlockError::StackOverflow),
+            None => return Err(InEvalError::BudgetExceeded),
         }
         cell.set(budget);
         Ok(())
     }
 
-    pub(crate) fn decrement_voxels(
+    pub(in crate::block) fn decrement_voxels(
         cell: &Cell<Budget>,
         amount: usize,
-    ) -> Result<(), EvalBlockError> {
+    ) -> Result<(), InEvalError> {
         let mut budget = cell.get();
         match u32::try_from(amount)
             .ok()
             .and_then(|amount| budget.voxels.checked_sub(amount))
         {
             Some(updated) => budget.voxels = updated,
-            None => return Err(EvalBlockError::StackOverflow),
+            None => return Err(InEvalError::BudgetExceeded),
         }
         cell.set(budget);
         Ok(())
     }
 
-    pub(crate) fn recurse(cell: &Cell<Budget>) -> Result<BudgetRecurseGuard<'_>, EvalBlockError> {
+    pub(in crate::block) fn recurse(
+        cell: &Cell<Budget>,
+    ) -> Result<BudgetRecurseGuard<'_>, InEvalError> {
         let current = cell.get();
         let mut recursed = current;
         match recursed.recursion.checked_sub(1) {
             Some(updated) => recursed.recursion = updated,
-            None => return Err(EvalBlockError::StackOverflow),
+            None => return Err(InEvalError::BudgetExceeded),
         }
         cell.set(recursed);
         Ok(BudgetRecurseGuard { cell })
@@ -151,8 +153,12 @@ impl Drop for BudgetRecurseGuard<'_> {
 #[non_exhaustive]
 pub enum EvalBlockError {
     /// The block definition contained recursion that exceeded the evaluation limit.
+    //---
+    // TODO: This is misnamed, but we're going to be changing it shortly to have
+    // some details, so rename it then.
     #[displaydoc("block definition contains too much recursion")]
     StackOverflow,
+
     /// Data referenced by the block definition was not available to read.
     ///
     /// This may be temporary or permanent; consult the [`RefError`] to determine that.
@@ -160,16 +166,12 @@ pub enum EvalBlockError {
     DataRefIs(RefError),
 }
 
-impl EvalBlockError {
-    /// Returns whether this error is presumably transient because of simultaneous mutation
-    /// of the underlying data.
-    ///
-    /// This is a simple match, but we declare it as a method to ensure that any future introduced
-    /// variants of [`EvalBlockError`] or [`RefError`], that are similar but not equal,
-    /// don't break the logic depending on this property.
-    pub(crate) fn is_in_use(&self) -> bool {
-        matches!(self, EvalBlockError::DataRefIs(RefError::InUse(_)))
-    }
+/// Intra-evaluation error type; corresponds to [`EvalBlockError`]
+/// as `MinEval` corresponds to `EvaluatedBlock`.
+#[derive(Debug)]
+pub(in crate::block) enum InEvalError {
+    BudgetExceeded,
+    DataRefIs(RefError),
 }
 
 #[cfg(feature = "std")]
@@ -182,13 +184,39 @@ impl std::error::Error for EvalBlockError {
     }
 }
 
-impl From<RefError> for EvalBlockError {
+impl From<RefError> for InEvalError {
     fn from(value: RefError) -> Self {
-        EvalBlockError::DataRefIs(value)
+        InEvalError::DataRefIs(value)
+    }
+}
+
+impl InEvalError {
+    pub(in crate::block) fn into_eval_error(self) -> EvalBlockError {
+        match self {
+            InEvalError::BudgetExceeded => EvalBlockError::StackOverflow,
+            InEvalError::DataRefIs(e) => EvalBlockError::DataRefIs(e),
+        }
     }
 }
 
 impl EvalBlockError {
+    pub(in crate::block) fn into_internal_error_for_block_def(self) -> InEvalError {
+        match self {
+            EvalBlockError::StackOverflow => InEvalError::BudgetExceeded,
+            EvalBlockError::DataRefIs(e) => InEvalError::DataRefIs(e),
+        }
+    }
+
+    /// Returns whether this error is presumably transient because of simultaneous mutation
+    /// of the underlying data.
+    ///
+    /// This is a simple match, but we declare it as a method to ensure that any future introduced
+    /// variants of [`EvalBlockError`] or [`RefError`], that are similar but not equal,
+    /// don't break the logic depending on this property.
+    pub(crate) fn is_in_use(&self) -> bool {
+        matches!(self, EvalBlockError::DataRefIs(RefError::InUse(_)))
+    }
+
     /// Convert this error into an [`EvaluatedBlock`] which represents that an error has
     /// occurred.
     ///

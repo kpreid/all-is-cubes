@@ -69,7 +69,7 @@ impl Move {
         this_modifier_index: usize,
         mut input: MinEval,
         filter: &block::EvalFilter,
-    ) -> Result<MinEval, block::EvalBlockError> {
+    ) -> Result<MinEval, block::InEvalError> {
         let Move {
             direction,
             distance,

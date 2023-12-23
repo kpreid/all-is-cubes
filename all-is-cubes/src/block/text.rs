@@ -8,7 +8,7 @@ use embedded_graphics as eg;
 use embedded_graphics::{prelude::Dimensions as _, Drawable as _};
 use euclid::vec3;
 
-use crate::block::{self, Block, BlockAttributes, EvalBlockError, Evoxel, MinEval, Resolution};
+use crate::block::{self, Block, BlockAttributes, Evoxel, MinEval, Resolution};
 use crate::content::palette;
 use crate::drawing::{rectangle_to_aab, DrawingPlane};
 use crate::math::{FaceMap, GridAab, GridCoordinate, GridVector, Gridgid, Rgb, Rgba, Vol};
@@ -204,11 +204,11 @@ impl Text {
 
     /// Called by [`Primitive::Text`] evaluation to actually produce the voxels for a specific
     /// [`Block`] of text.
-    pub(crate) fn evaluate(
+    pub(in crate::block) fn evaluate(
         &self,
         block_offset: GridVector,
         filter: &super::EvalFilter,
-    ) -> Result<MinEval, EvalBlockError> {
+    ) -> Result<MinEval, block::InEvalError> {
         if filter.skip_eval {
             // TODO: Once we have a `URef<FontDef>` or something, this will need to
             // check  that before returning.
@@ -219,11 +219,13 @@ impl Text {
         let brush = {
             let _recursion_scope = block::Budget::recurse(&filter.budget)?;
 
-            let ev_foreground = Evoxel::from_block(&self.foreground.evaluate2(filter)?);
+            // TODO: We could save a small amount of work by not building the full
+            // `EvaluatedBlock` here and throwing it away.
+            let ev_foreground = self.foreground.evaluate_to_evoxel_internal(filter)?;
             match self.outline {
                 Some(ref block) => Brush::Outline {
                     foreground: ev_foreground,
-                    outline: Evoxel::from_block(&block.evaluate2(filter)?),
+                    outline: block.evaluate_to_evoxel_internal(filter)?,
                 },
                 None => Brush::Plain(ev_foreground),
             }

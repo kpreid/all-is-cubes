@@ -23,7 +23,7 @@ impl Quote {
         &self,
         mut value: block::MinEval,
         filter: &block::EvalFilter,
-    ) -> Result<block::MinEval, block::EvalBlockError> {
+    ) -> Result<block::MinEval, block::InEvalError> {
         let &Quote { suppress_ambient } = self;
 
         value.attributes.tick_action = None;
