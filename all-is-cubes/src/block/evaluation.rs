@@ -148,6 +148,58 @@ impl Drop for BudgetRecurseGuard<'_> {
     }
 }
 
+/// The cost of evaluating a [`Block`].
+///
+/// In principle, what we want is a time budget, but in order to offer determinism and
+/// comprehensibility, it is instead measured in discrete quantities
+/// such as the number of voxels processed.
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub struct Cost {
+    /// Number of [`Primitive`]s and [`Modifier`]s evaluated.
+    components: u32,
+
+    /// Number of individual voxels produced (e.g. by a `Primitive::Recur`]) or altered
+    /// (e.g. by a [`Modifier::Composite`]).
+    voxels: u32,
+
+    /// Number of recursion levels used by the evaluation.
+    ///
+    /// Recursion occurs when a primitive or modifier which itself contains  [`Block`] is
+    /// evaluated; currently, these are [`Primitive::Text`] and `Modifier::Composite`].
+    /// If there are none of those, then this will be zero.
+    recursion: u8,
+}
+
+impl Cost {
+    /// Zero cost.
+    pub const ZERO: Self = {
+        Self {
+            components: 0,
+            voxels: 0,
+            recursion: 0,
+        }
+    };
+
+    /// Compute a cost from change in budget.
+    pub(crate) fn new(original_budget: Budget, final_budget: Budget) -> Self {
+        Self {
+            components: final_budget
+                .components
+                .checked_sub(original_budget.components)
+                .unwrap(),
+            voxels: final_budget
+                .voxels
+                .checked_sub(original_budget.voxels)
+                .unwrap(),
+            recursion: final_budget
+                .recursion_used
+                .checked_sub(original_budget.recursion_used)
+                .unwrap(),
+        }
+    }
+}
+
 /// Errors resulting from [`Block::evaluate()`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
