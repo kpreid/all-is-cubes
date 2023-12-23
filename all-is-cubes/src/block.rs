@@ -9,10 +9,9 @@ use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::cell::Cell;
 use core::fmt;
 
-use crate::listen::{self, Listen, Listener};
+use crate::listen::{Listen as _, Listener};
 use crate::math::{
     Cube, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba,
     VectorOps, Vol,
@@ -33,6 +32,9 @@ pub use builder::BlockBuilder;
 
 mod evaluated;
 pub use evaluated::*;
+
+mod evaluation;
+pub use evaluation::*;
 
 mod modifier;
 pub use modifier::*;
@@ -598,47 +600,6 @@ impl Block {
     }
 }
 
-/// Parameters to [`Block::evaluate2()`] to choose which information to compute.
-#[allow(clippy::exhaustive_structs)]
-#[derive(Clone, Debug)]
-pub(crate) struct EvalFilter {
-    /// If true, don't actually evaluate, but return a placeholder value and do listen.
-    ///
-    /// TODO: All of the use cases where this is useful should actually be replaced with
-    /// combined eval+listen, but we will also want to have a "evaluate only this region"
-    /// mode which will be somewhat analogous.
-    pub skip_eval: bool,
-
-    /// A [`Listener`] which will be notified of changes in all data sources that might
-    /// affect the evaluation result.
-    ///
-    /// Note that this does not listen for mutations of the [`Block`] value itself, in the
-    /// sense that none of the methods on [`Block`] will cause this listener to fire.
-    /// Rather, it listens for changes in by-reference-to-interior-mutable-data sources
-    /// such as the [`Space`] referred to by a [`Primitive::Recur`] or the [`BlockDef`]
-    /// referred to by a [`Primitive::Indirect`].
-    pub listener: Option<listen::DynListener<BlockChange>>,
-
-    /// How much computation may be spent on performing the evaluation.
-    ///
-    /// If the budget is exhausted, evaluation returns [`EvalBlockError::StackOverflow`].
-    ///
-    /// Outside of special circumstances, use [`Budget::default()`] here.
-    pub budget: Cell<Budget>,
-}
-
-impl Default for EvalFilter {
-    /// Returns a default `EvalFilter` which requests a complete result and installs no
-    /// listener.
-    fn default() -> Self {
-        Self {
-            skip_eval: Default::default(),
-            listener: Default::default(),
-            budget: Default::default(),
-        }
-    }
-}
-
 // Manual implementations of Eq and Hash ensure that the [`BlockPtr`] storage
 // choices do not affect equality.
 impl PartialEq for Block {
@@ -948,100 +909,6 @@ mod conversions_for_indirect {
         fn from(block_def_ref: URef<BlockDef>) -> Self {
             Block::from_primitive(Primitive::Indirect(block_def_ref))
         }
-    }
-}
-
-/// Computation budget for block evaluations.
-///
-/// This is used inside an [`EvalFilter`].
-///
-/// In principle, what we want is a time budget, but in order to offer determinism and
-/// comprehensibility, it is instead made up of multiple discrete quantities.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct Budget {
-    /// Number of [`Primitive`]s and [`Modifier`]s.
-    components: u32,
-
-    /// Number of individual voxels produced (e.g. by a [`Primitive::Recur`]) or altered
-    /// (e.g. by a [`Modifier::Composite`]).
-    voxels: u32,
-
-    /// Number of levels of evaluation recursion permitted.
-    ///
-    /// Recursion occurs when a primitive or modifier which itself contains a [`Block`] is
-    /// evaluated; currently, these are [`Primitive::Text`] and [`Modifier::Composite`].
-    ///
-    /// This must be set low enough to avoid Rust stack overflows which cannot be recovered from.
-    /// Unlike the other budget parameters, this is not cumulative over the entire evaluation.
-    recursion: u8,
-
-    /// Number of recursion levels actually used by the evaluation.
-    /// This is tracked separately so that it can be reported afterward,
-    /// whereas the other counters are only ever decremented and so a subtraction suffices.
-    recursion_used: u8,
-}
-
-impl Budget {
-    pub(crate) fn decrement_components(cell: &Cell<Budget>) -> Result<(), EvalBlockError> {
-        let mut budget = cell.get();
-        match budget.components.checked_sub(1) {
-            Some(updated) => budget.components = updated,
-            None => return Err(EvalBlockError::StackOverflow),
-        }
-        cell.set(budget);
-        Ok(())
-    }
-
-    pub(crate) fn decrement_voxels(
-        cell: &Cell<Budget>,
-        amount: usize,
-    ) -> Result<(), EvalBlockError> {
-        let mut budget = cell.get();
-        match u32::try_from(amount)
-            .ok()
-            .and_then(|amount| budget.voxels.checked_sub(amount))
-        {
-            Some(updated) => budget.voxels = updated,
-            None => return Err(EvalBlockError::StackOverflow),
-        }
-        cell.set(budget);
-        Ok(())
-    }
-
-    pub(crate) fn recurse(cell: &Cell<Budget>) -> Result<BudgetRecurseGuard<'_>, EvalBlockError> {
-        let current = cell.get();
-        let mut recursed = current;
-        match recursed.recursion.checked_sub(1) {
-            Some(updated) => recursed.recursion = updated,
-            None => return Err(EvalBlockError::StackOverflow),
-        }
-        cell.set(recursed);
-        Ok(BudgetRecurseGuard { cell })
-    }
-}
-
-impl Default for Budget {
-    /// Returns the standard budget for starting any evaluation.
-    fn default() -> Self {
-        Self {
-            components: 1000,
-            voxels: 64 * 64 * 128,
-            recursion: 30,
-            recursion_used: 0,
-        }
-    }
-}
-
-#[must_use]
-pub(crate) struct BudgetRecurseGuard<'a> {
-    cell: &'a Cell<Budget>,
-}
-
-impl Drop for BudgetRecurseGuard<'_> {
-    fn drop(&mut self) {
-        let mut budget = self.cell.get();
-        budget.recursion = budget.recursion.checked_add(1).unwrap();
-        self.cell.set(budget);
     }
 }
 

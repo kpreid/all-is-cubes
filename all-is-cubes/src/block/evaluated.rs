@@ -10,12 +10,10 @@ use crate::block::{
     self, BlockAttributes, BlockCollision,
     Resolution::{self, R1},
 };
-use crate::content::palette;
 use crate::math::{
     Cube, Face6, Face7, FaceMap, GridAab, Intensity, OpacityCategory, Rgb, Rgba, Vol,
 };
 use crate::raytracer;
-use crate::universe::RefError;
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
@@ -418,75 +416,6 @@ impl ops::AddAssign for VoxSum {
         self.alpha_sum += alpha_sum;
         self.emission_sum += emission_sum;
         self.count += count;
-    }
-}
-
-/// Errors resulting from [`Block::evaluate()`].
-#[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
-#[non_exhaustive]
-pub enum EvalBlockError {
-    /// The block definition contained recursion that exceeded the evaluation limit.
-    #[displaydoc("block definition contains too much recursion")]
-    StackOverflow,
-    /// Data referenced by the block definition was not available to read.
-    ///
-    /// This may be temporary or permanent; consult the [`RefError`] to determine that.
-    #[displaydoc("block data inaccessible: {0}")]
-    DataRefIs(RefError),
-}
-
-impl EvalBlockError {
-    /// Returns whether this error is presumably transient because of simultaneous mutation
-    /// of the underlying data.
-    ///
-    /// This is a simple match, but we declare it as a method to ensure that any future introduced
-    /// variants of [`EvalBlockError`] or [`RefError`], that are similar but not equal,
-    /// don't break the logic depending on this property.
-    pub(crate) fn is_in_use(&self) -> bool {
-        matches!(self, EvalBlockError::DataRefIs(RefError::InUse(_)))
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for EvalBlockError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            EvalBlockError::StackOverflow => None,
-            EvalBlockError::DataRefIs(e) => Some(e),
-        }
-    }
-}
-
-impl From<RefError> for EvalBlockError {
-    fn from(value: RefError) -> Self {
-        EvalBlockError::DataRefIs(value)
-    }
-}
-
-impl EvalBlockError {
-    /// Convert this error into an [`EvaluatedBlock`] which represents that an error has
-    /// occurred.
-    ///
-    /// This block is fully opaque and as inert to game mechanics as currently possible.
-    // TODO: test this
-    pub fn to_placeholder(&self) -> EvaluatedBlock {
-        let resolution = Resolution::R8;
-        // TODO: indicate type of error or at least have some kind of icon,
-        let pattern = [palette::BLOCK_EVAL_ERROR, Rgba::BLACK].map(Evoxel::from_color);
-
-        EvaluatedBlock::from_voxels(
-            BlockAttributes {
-                display_name: format!("Block error: {self}").into(),
-                selectable: false, // TODO: make this selectable but immutable
-                ..Default::default()
-            },
-            Evoxels::Many(
-                resolution,
-                Vol::from_fn(GridAab::for_block(resolution), |cube| {
-                    pattern[((cube.x + cube.y + cube.z).rem_euclid(2)) as usize]
-                }),
-            ),
-        )
     }
 }
 
