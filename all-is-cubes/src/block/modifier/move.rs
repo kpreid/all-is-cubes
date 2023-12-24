@@ -79,14 +79,8 @@ impl Move {
         // Apply Quote to ensure that the block's own `tick_action` and other effects
         // don't interfere with movement or cause duplication.
         // (In the future we may want a more nuanced policy that allows internal changes,
-        // but that will probably involve refining tick_action processing.)
-        // TODO: This can be done more cleanly by having an evaluate function on Quote itself.
-        input = Modifier::from(block::Quote::default()).evaluate(
-            block,
-            this_modifier_index,
-            input,
-            filter,
-        )?;
+        // but that will involve some sort of predicate and transformation on tick actions.)
+        input = block::Quote::default().evaluate(input, filter)?;
 
         let (original_bounds, effective_resolution) = match input.voxels {
             Evoxels::Many(resolution, ref array) => (array.bounds(), resolution),

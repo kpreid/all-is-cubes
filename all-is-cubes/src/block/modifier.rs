@@ -1,5 +1,5 @@
 use crate::block::{self, Block, Evoxels, MinEval};
-use crate::math::{GridRotation, Rgb, Vol};
+use crate::math::{GridRotation, Vol};
 use crate::universe::{RefVisitor, VisitRefs};
 
 mod composite;
@@ -86,22 +86,13 @@ impl Modifier {
         &self,
         block: &Block,
         this_modifier_index: usize,
-        mut value: MinEval,
+        value: MinEval,
         filter: &block::EvalFilter,
     ) -> Result<MinEval, block::EvalBlockError> {
         block::Budget::decrement_components(&filter.budget)?;
 
         Ok(match *self {
-            Modifier::Quote(Quote { suppress_ambient }) => {
-                value.attributes.tick_action = None;
-                if suppress_ambient {
-                    block::Budget::decrement_voxels(&filter.budget, value.voxels.count())?;
-                    for voxel in value.voxels.as_vol_mut().as_linear_mut().iter_mut() {
-                        voxel.emission = Rgb::ZERO;
-                    }
-                }
-                value
-            }
+            Modifier::Quote(ref quote) => quote.evaluate(value, filter)?,
 
             Modifier::Rotate(rotation) => {
                 if filter.skip_eval || value.rotationally_symmetric() {
@@ -195,7 +186,7 @@ mod tests {
     use crate::block::{BlockAttributes, TickAction};
     use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Primitive, Resolution::R2};
     use crate::content::make_some_voxel_blocks;
-    use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgba, Vol};
+    use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgb, Rgba, Vol};
     use crate::op::Operation;
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;

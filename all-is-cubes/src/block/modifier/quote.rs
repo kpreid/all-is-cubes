@@ -1,4 +1,5 @@
 use crate::block;
+use crate::math::Rgb;
 use crate::universe;
 
 /// Data for [`Modifier::Quote`](block::Modifier::Quote).
@@ -16,6 +17,24 @@ impl Quote {
     /// Construct an instance of [`Quote`], the same as [`Quote::default()`].
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub(in crate::block) fn evaluate(
+        &self,
+        mut value: block::MinEval,
+        filter: &block::EvalFilter,
+    ) -> Result<block::MinEval, block::EvalBlockError> {
+        let &Quote { suppress_ambient } = self;
+
+        value.attributes.tick_action = None;
+        if suppress_ambient && !filter.skip_eval {
+            block::Budget::decrement_voxels(&filter.budget, value.voxels.count())?;
+            for voxel in value.voxels.as_vol_mut().as_linear_mut().iter_mut() {
+                voxel.emission = Rgb::ZERO;
+            }
+        }
+
+        Ok(value)
     }
 
     // The evaluation implementation is simple enough that it's in `Modifier::evaluate`
