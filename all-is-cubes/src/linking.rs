@@ -58,10 +58,12 @@ pub trait BlockModule: Exhaust + fmt::Debug + fmt::Display + Eq + Hash + Clone {
     fn namespace() -> &'static str;
 }
 
+/// An instance of a [`BlockModule`]; a container of a `Block` for every possible `E`.
+///
 /// TODO: Deprecate and remove this alias.
 pub type BlockProvider<E> = Provider<E, Block>;
 
-/// TODO: document
+/// Key-value container of a `V` value for every possible `E`.
 #[derive(Clone, Debug)]
 pub struct Provider<E, V> {
     /// Guaranteed to contain an entry for every variant of `E` if `E`'s
