@@ -190,7 +190,7 @@ impl<E: Exhaust + fmt::Debug + Clone + Eq + Hash, V> Provider<E, V> {
 
     /// Create another [`Provider`] with a modification to each value.
     #[must_use]
-    pub fn map(&self, mut function: impl FnMut(&E, &V) -> V) -> Self {
+    pub fn map<V2>(&self, mut function: impl FnMut(&E, &V) -> V2) -> Provider<E, V2> {
         Provider {
             map: self
                 .map
