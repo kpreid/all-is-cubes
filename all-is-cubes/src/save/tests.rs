@@ -878,7 +878,7 @@ fn universe_success() {
     let a_character = deserialized_universe
         .get::<Character>(&"a_character".into())
         .unwrap()
-        . read()
+        .read()
         .unwrap();
 
     let a_block_ev = a_block.evaluate().unwrap();

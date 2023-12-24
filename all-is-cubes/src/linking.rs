@@ -155,33 +155,11 @@ where
         })
     }
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "std")] {
-            /// Iterate over the entire contents of this.
-            pub fn iter(&self) -> impl Iterator<Item = (E, &Block)> + Send
-            where
-                E: Sync,
-                <E as Exhaust>::Iter: Send,
-            {
-                E::exhaust().map(|key| {
-                    let block: &Block = &self.map[&key];
-                    (key, block)
-                })
-            }
-        } else {
-            // `Block` is not `Sync` here, so this can't be `Send`.
-
-            /// Iterate over the entire contents of this.
-            pub fn iter(&self) -> impl Iterator<Item = (E, &Block)>
-            where
-                E: Sync,
-                <E as Exhaust>::Iter: Send,
-            {
-                E::exhaust().map(|key| {
-                    let block: &Block = &self.map[&key];
-                    (key, block)
-                })
-            }
+    /// Iterate over the entire contents of this.
+    pub fn iter(&self) -> ModuleIter<'_, E> {
+        ModuleIter {
+            key_iter: E::exhaust(),
+            map: &self.map,
         }
     }
 }
@@ -246,6 +224,33 @@ impl<E: Eq + Hash> Index<E> for BlockProvider<E> {
         &self.map[&index]
     }
 }
+
+/// Iterator returned by [`BlockProvider::iter()`].
+#[allow(missing_debug_implementations)]
+pub struct ModuleIter<'provider, E: Exhaust> {
+    /// Using the `Exhaust` iterator instead of the `HashMap` iterator guarantees a deterministic
+    /// iteration order. (We don't currently publicly promise that, though.)
+    key_iter: <E as Exhaust>::Iter,
+    map: &'provider HbHashMap<E, Block>,
+}
+
+impl<'provider, E: Exhaust + Eq + Hash> Iterator for ModuleIter<'provider, E> {
+    type Item = (E, &'provider Block);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.key_iter.next().map(|key| {
+            let block: &Block = &self.map[&key];
+            (key, block)
+        })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.key_iter.size_hint()
+    }
+}
+
+impl<E: Exhaust + Eq + Hash> ExactSizeIterator for ModuleIter<'_, E> where E::Iter: ExactSizeIterator
+{}
 
 /// Error when a [`BlockProvider`] could not be created because the definitions of some
 /// of its blocks are missing.
