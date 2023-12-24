@@ -68,8 +68,8 @@ impl BlockModule for LandscapeBlocks {
 }
 
 /// Provides a bland instance of [`LandscapeBlocks`] with single color blocks.
-impl DefaultProvision for LandscapeBlocks {
-    fn default(self) -> Block {
+impl DefaultProvision<Block> for LandscapeBlocks {
+    fn module_default(self) -> Block {
         fn color_and_name(color: Rgb, name: &'static str) -> Block {
             Block::builder()
                 .display_name(name)

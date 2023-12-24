@@ -30,15 +30,14 @@ fn name_in_module<E: BlockModule>(key: &E) -> Name {
     Name::from(format!("{ns}/{key}", ns = E::namespace()))
 }
 
-/// Allows the use of [`BlockProvider::default`] to construct a [`BlockProvider`]
-/// using this type as its set of keys. [`Self::default`] will be called once for
+/// Allows the use of [`Provider::default`] to construct a [`Provider`]
+/// using this type as its set of keys. [`Self::module_default()`] will be called once for
 /// each value of [`Self`].
 ///
 /// See [`BlockModule`] for related expectations.
-pub trait DefaultProvision {
-    /// Returns the default block value to use for the given key. This will typically
-    /// have to be a [`Primitive::Atom`] block.
-    fn default(self) -> Block;
+pub trait DefaultProvision<T> {
+    /// Returns the default value to use for the given key.
+    fn module_default(self) -> T;
 }
 
 /// Types whose values identify blocks in a set of related blocks, which may be
@@ -59,61 +58,65 @@ pub trait BlockModule: Exhaust + fmt::Debug + fmt::Display + Eq + Hash + Clone {
     fn namespace() -> &'static str;
 }
 
+/// TODO: Deprecate and remove this alias.
+pub type BlockProvider<E> = Provider<E, Block>;
+
 /// TODO: document
 #[derive(Clone, Debug)]
-pub struct BlockProvider<E> {
+pub struct Provider<E, V> {
     /// Guaranteed to contain an entry for every variant of `E` if `E`'s
     /// [`Exhaust`] implementation is accurate.
-    map: HbHashMap<E, Block>,
+    map: HbHashMap<E, V>,
 }
 
-impl<E> Default for BlockProvider<E>
+impl<E, V> Default for Provider<E, V>
 where
-    E: DefaultProvision + Exhaust + Eq + Hash + Clone,
+    E: DefaultProvision<V> + Exhaust + Eq + Hash + Clone,
 {
     fn default() -> Self {
         Self {
             map: E::exhaust()
                 .map(|key| {
-                    let block = DefaultProvision::default(key.clone());
-                    (key, block)
+                    let value = DefaultProvision::module_default(key.clone());
+                    (key, value)
                 })
                 .collect(),
         }
     }
 }
 
-impl<E> BlockProvider<E>
+impl<E, V> Provider<E, V>
 where
     E: BlockModule,
 {
-    /// Constructs a `BlockProvider` with block definitions computed by the given function.
+    /// Constructs a `Provider` with values computed by the given function.
     ///
     /// This is an async function for the sake of cancellation and optional cooperative
     /// multitasking. It may be blocked on from a synchronous context.
-    pub async fn new<F, B>(progress: YieldProgress, mut definer: F) -> Result<Self, GenError>
+    pub async fn new<F>(progress: YieldProgress, mut definer: F) -> Result<Self, GenError>
     where
-        F: FnMut(E) -> Result<B, InGenError>,
-        B: Into<Block>,
+        F: FnMut(E) -> Result<V, InGenError>,
     {
         let count = E::exhaust().count();
         let mut map = HbHashMap::with_capacity(count);
         for (key, progress) in E::exhaust().zip(progress.split_evenly(count)) {
-            let block: Block = definer(key.clone())
-                .map_err(|e| GenError::failure(e, name_in_module(&key)))?
-                .into();
-            map.insert(key, block);
+            let value: V =
+                definer(key.clone()).map_err(|e| GenError::failure(e, name_in_module(&key)))?;
+            map.insert(key, value);
             progress.finish().await;
         }
         Ok(Self { map })
     }
+}
 
+// TODO: Generalize these to non-blocks however makes sense
+impl<E: BlockModule> Provider<E, Block> {
     /// Add the block definitions stored in this [`BlockProvider`] into `universe` as
     /// [`BlockDef`]s, returning a new [`BlockProvider`] whose blocks refer to those
     /// definitions (via [`Primitive::Indirect`]).
     ///
     /// TODO: Migrate this to operate via `UniverseTransaction` instead.
-    pub fn install(&self, universe: &mut Universe) -> Result<BlockProvider<E>, InsertError> {
+    pub fn install(&self, universe: &mut Universe) -> Result<Self, InsertError> {
         for key in E::exhaust() {
             // TODO: the &* mess should not be required
             universe.insert(name_in_module(&key), BlockDef::new(self[key].clone()))?;
@@ -126,7 +129,7 @@ where
     /// [`Primitive::Indirect`]).
     ///
     /// Returns an error if any of the blocks are not defined in that universe.
-    pub fn using(universe: &Universe) -> Result<BlockProvider<E>, ProviderError>
+    pub fn using(universe: &Universe) -> Result<Self, ProviderError>
     where
         E: Eq + Hash + fmt::Display,
     {
@@ -145,7 +148,7 @@ where
                 missing: missing.into(),
             });
         }
-        Ok(BlockProvider {
+        Ok(Provider {
             map: E::exhaust()
                 .map(|key| {
                     let block = Block::from(found.remove(&key).unwrap());
@@ -154,54 +157,52 @@ where
                 .collect(),
         })
     }
-
-    /// Iterate over the entire contents of this.
-    pub fn iter(&self) -> ModuleIter<'_, E> {
-        ModuleIter {
-            key_iter: E::exhaust(),
-            map: &self.map,
-        }
-    }
 }
 
 /// These methods do not require `E` to be a [`BlockModule`].
-impl<E: Exhaust + fmt::Debug + Clone + Eq + Hash> BlockProvider<E> {
+impl<E: Exhaust + fmt::Debug + Clone + Eq + Hash, V> Provider<E, V> {
     /// Alternative to [`Self::new()`] which is neither async nor fallible.
     fn new_sync<F>(mut definer: F) -> Self
     where
-        F: FnMut(E) -> Block,
+        F: FnMut(E) -> V,
     {
-        BlockProvider {
+        Provider {
             map: E::exhaust()
                 .map(|key| (key.clone(), definer(key)))
                 .collect(),
         }
     }
 
-    /// Create another [`BlockProvider`] with different keys that map into a subset of
+    /// Create another [`Provider`] with different keys that map into a subset of
     /// this provider's keys.
     ///
     /// TODO: add a test
     #[must_use]
-    pub fn subset<K: Exhaust + fmt::Debug + Clone + Eq + Hash>(
-        &self,
-        function: impl Fn(K) -> E,
-    ) -> BlockProvider<K> {
-        BlockProvider::new_sync(|key: K| self[function(key)].clone())
+    pub fn subset<K>(&self, function: impl Fn(K) -> E) -> Provider<K, V>
+    where
+        K: Exhaust + fmt::Debug + Clone + Eq + Hash,
+        V: Clone,
+    {
+        Provider::new_sync(|key: K| self[function(key)].clone())
     }
 
-    /// Create another [`BlockProvider`] with a modification to each block.
+    /// Create another [`Provider`] with a modification to each value.
     #[must_use]
-    pub fn map(&self, mut function: impl FnMut(&E, &Block) -> Block) -> Self {
-        BlockProvider {
+    pub fn map(&self, mut function: impl FnMut(&E, &V) -> V) -> Self {
+        Provider {
             map: self
                 .map
                 .iter()
-                .map(|(key, block)| {
-                    let block = function(key, block);
-                    (key.clone(), block)
-                })
+                .map(|(key, value)| (key.clone(), function(key, value)))
                 .collect(),
+        }
+    }
+
+    /// Iterate over the entire contents of this.
+    pub fn iter(&self) -> ModuleIter<'_, E, V> {
+        ModuleIter {
+            key_iter: E::exhaust(),
+            map: &self.map,
         }
     }
 
@@ -212,35 +213,35 @@ impl<E: Exhaust + fmt::Debug + Clone + Eq + Hash> BlockProvider<E> {
         let actual_keys: HashSet<E> = self.map.keys().cloned().collect();
         assert_eq!(
             expected_keys, actual_keys,
-            "BlockProvider keys are not as expected"
+            "Provider keys are not as expected"
         );
     }
 }
 
-impl<E: Eq + Hash> Index<E> for BlockProvider<E> {
-    type Output = Block;
+impl<E: Eq + Hash, V> Index<E> for Provider<E, V> {
+    type Output = V;
 
     fn index(&self, index: E) -> &Self::Output {
         &self.map[&index]
     }
 }
 
-/// Iterator returned by [`BlockProvider::iter()`].
+/// Iterator returned by [`Provider::iter()`].
 #[allow(missing_debug_implementations)]
-pub struct ModuleIter<'provider, E: Exhaust> {
+pub struct ModuleIter<'provider, E: Exhaust, V> {
     /// Using the `Exhaust` iterator instead of the `HashMap` iterator guarantees a deterministic
     /// iteration order. (We don't currently publicly promise that, though.)
     key_iter: <E as Exhaust>::Iter,
-    map: &'provider HbHashMap<E, Block>,
+    map: &'provider HbHashMap<E, V>,
 }
 
-impl<'provider, E: Exhaust + Eq + Hash> Iterator for ModuleIter<'provider, E> {
-    type Item = (E, &'provider Block);
+impl<'provider, E: Exhaust + Eq + Hash, V> Iterator for ModuleIter<'provider, E, V> {
+    type Item = (E, &'provider V);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.key_iter.next().map(|key| {
-            let block: &Block = &self.map[&key];
-            (key, block)
+            let value: &V = &self.map[&key];
+            (key, value)
         })
     }
 
@@ -249,13 +250,15 @@ impl<'provider, E: Exhaust + Eq + Hash> Iterator for ModuleIter<'provider, E> {
     }
 }
 
-impl<E: Exhaust + Eq + Hash> ExactSizeIterator for ModuleIter<'_, E> where E::Iter: ExactSizeIterator
-{}
+impl<E: Exhaust + Eq + Hash, V> ExactSizeIterator for ModuleIter<'_, E, V> where
+    E::Iter: ExactSizeIterator
+{
+}
 
-/// Error when a [`BlockProvider`] could not be created because the definitions of some
-/// of its blocks are missing.
+/// Error when a [`Provider`] could not be created because the definitions of some
+/// of its members are missing.
 #[derive(Clone, Debug, Eq, displaydoc::Display, PartialEq)]
-#[displaydoc("missing block definitions: {missing:?}")] // TODO: use Name's Display within the list
+#[displaydoc("module definitions missing from universe: {missing:?}")] // TODO: use Name's Display within the list
 pub struct ProviderError {
     missing: Box<[Name]>,
 }
