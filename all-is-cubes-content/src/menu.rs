@@ -66,24 +66,23 @@ impl vui::Layoutable for TemplateButton {
     }
 }
 impl vui::Widget for TemplateButton {
-    fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
-        Box::new(TemplateButtonController {
-            definition: self,
-            position: *position,
-        })
+    fn controller(self: Arc<Self>, _: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
+        Box::new(TemplateButtonController { definition: self })
     }
 }
 
 #[derive(Debug)]
 struct TemplateButtonController {
     definition: Arc<TemplateButton>,
-    position: vui::LayoutGrant,
 }
 impl vui::WidgetController for TemplateButtonController {
-    fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
+    fn initialize(
+        &mut self,
+        context: &vui::WidgetContext<'_>,
+    ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         let text = &self.definition.text;
         // TODO: propagate error
-        let bounds = &mut self.position.bounds;
+        let bounds = context.grant().bounds;
         let background_bounds = bounds.abut(Face6::NZ, -1).unwrap();
         let text_bounds = bounds.abut(Face6::PZ, -1).unwrap();
 

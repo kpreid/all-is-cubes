@@ -3,7 +3,7 @@ use std::error::Error;
 
 use all_is_cubes::block::{Block, AIR};
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
-use all_is_cubes::math::{Cube, GridVector};
+use all_is_cubes::math::GridVector;
 use all_is_cubes::space::SpaceTransaction;
 
 use crate::vui;
@@ -32,10 +32,8 @@ impl vui::Layoutable for Crosshair {
 }
 
 impl vui::Widget for Crosshair {
-    fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
-        let position = position.shrink_to_cube().unwrap();
+    fn controller(self: Arc<Self>, _: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         Box::new(CrosshairController {
-            position,
             todo: DirtyFlag::listening(false, &self.mouselook_mode),
             definition: self,
         })
@@ -46,19 +44,22 @@ impl vui::Widget for Crosshair {
 #[derive(Debug)]
 pub(crate) struct CrosshairController {
     definition: Arc<Crosshair>,
-    position: Cube,
     todo: DirtyFlag,
 }
 
 impl vui::WidgetController for CrosshairController {
     fn step(
         &mut self,
-        _: &vui::WidgetContext<'_>,
+        context: &vui::WidgetContext<'_>,
     ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
+        let Some(position) = context.grant().shrink_to_cube() else {
+            return Ok((vui::WidgetTransaction::default(), vui::Then::Drop));
+        };
+
         let txn = if self.todo.get_and_clear() {
             let d = &*self.definition;
             SpaceTransaction::set_cube(
-                self.position,
+                position,
                 None,
                 Some(if *d.mouselook_mode.get() {
                     d.icon.clone()

@@ -224,22 +224,22 @@ impl Layoutable for Tooltip {
 }
 
 impl Widget for Tooltip {
-    fn controller(self: Arc<Self>, grant: &crate::vui::LayoutGrant) -> Box<dyn WidgetController> {
-        Box::new(TooltipController {
-            definition: self,
-            position: grant.bounds,
-        })
+    fn controller(self: Arc<Self>, _: &crate::vui::LayoutGrant) -> Box<dyn WidgetController> {
+        Box::new(TooltipController { definition: self })
     }
 }
 
 #[derive(Debug)]
 struct TooltipController {
     definition: Arc<Tooltip>,
-    position: GridAab,
 }
 
 impl WidgetController for TooltipController {
-    fn initialize(&mut self) -> Result<vui::WidgetTransaction, crate::vui::InstallVuiError> {
+    fn initialize(
+        &mut self,
+        context: &vui::WidgetContext<'_>,
+    ) -> Result<vui::WidgetTransaction, crate::vui::InstallVuiError> {
+        let position = context.grant().bounds;
         let toolbar_text_blocks = space_to_blocks(
             Tooltip::RESOLUTION,
             BlockAttributes {
@@ -259,11 +259,11 @@ impl WidgetController for TooltipController {
         .unwrap(); // TODO: should be InstallVuiError but we don't have a good way of constructing it
 
         let mut txn = SpaceTransaction::default();
-        let origin: GridPoint = self.position.lower_bounds();
+        let origin: GridPoint = position.lower_bounds();
 
         // TODO: there should be a space_to_transaction_copy function or something
         // to implement this systematically
-        for i in 0..self.position.size().x {
+        for i in 0..position.size().x {
             let offset = GridVector::new(i, 0, 0);
             txn.at((origin + offset).into())
                 .overwrite(toolbar_text_blocks[offset.to_point()].clone());

@@ -42,7 +42,10 @@ impl OneshotController {
 }
 
 impl vui::WidgetController for OneshotController {
-    fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
+    fn initialize(
+        &mut self,
+        _: &vui::WidgetContext<'_>,
+    ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         Ok(self.0.take().unwrap_or_default())
     }
 

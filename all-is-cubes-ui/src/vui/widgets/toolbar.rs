@@ -222,7 +222,10 @@ impl ToolbarController {
 }
 
 impl WidgetController for ToolbarController {
-    fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
+    fn initialize(
+        &mut self,
+        _: &vui::WidgetContext<'_>,
+    ) -> Result<WidgetTransaction, InstallVuiError> {
         let slot_count = self.definition.slot_count;
 
         let mut txn = SpaceTransaction::default();

@@ -77,11 +77,8 @@ impl vui::Layoutable for ActionButton {
 }
 
 impl vui::Widget for ActionButton {
-    fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
-        Box::new(ActionButtonController {
-            position: position.shrink_to_cube().unwrap(),
-            definition: self,
-        })
+    fn controller(self: Arc<Self>, _: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
+        Box::new(ActionButtonController { definition: self })
     }
 }
 
@@ -111,15 +108,19 @@ impl fmt::Display for ButtonVisualState {
 #[derive(Debug)]
 struct ActionButtonController {
     definition: Arc<ActionButton>,
-    position: Cube,
 }
 
 impl vui::WidgetController for ActionButtonController {
-    fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
-        let icon =
-            SpaceTransaction::set_cube(self.position, None, Some(self.definition.block.clone()));
+    fn initialize(
+        &mut self,
+        context: &vui::WidgetContext<'_>,
+    ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
+        let Some(position) = context.grant().shrink_to_cube() else {
+            return Ok(vui::WidgetTransaction::default());
+        };
+        let icon = SpaceTransaction::set_cube(position, None, Some(self.definition.block.clone()));
         let activatable = space::SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
-            space::SpaceBehaviorAttachment::new(GridAab::single_cube(self.position)),
+            space::SpaceBehaviorAttachment::new(GridAab::single_cube(position)),
             Arc::new(space::ActivatableRegion {
                 effect: self.definition.action.clone(),
             }),
@@ -184,10 +185,9 @@ impl<D> vui::Layoutable for ToggleButton<D> {
 // TODO: Mess of generic bounds due to the combination of Widget and ListenableSource
 // requirements -- should we make a trait alias for these?
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton<D> {
-    fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
+    fn controller(self: Arc<Self>, _: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         Box::new(ToggleButtonController {
             todo: DirtyFlag::listening(true, &self.data_source),
-            position: position.shrink_to_cube().unwrap(),
             definition: self,
             recently_pressed: Arc::new(AtomicU8::new(0)),
         })
@@ -236,13 +236,12 @@ impl ToggleButtonVisualState {
 #[derive(Debug)]
 struct ToggleButtonController<D: Clone + Send + Sync> {
     definition: Arc<ToggleButton<D>>,
-    position: Cube,
     todo: DirtyFlag,
     recently_pressed: Arc<AtomicU8>,
 }
 
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> ToggleButtonController<D> {
-    fn icon_txn(&self) -> vui::WidgetTransaction {
+    fn icon_txn(&self, position: Cube) -> vui::WidgetTransaction {
         let value = (self.definition.projection)(&self.definition.data_source.get());
         let block = self.definition.blocks[ToggleButtonVisualState {
             value,
@@ -258,16 +257,22 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> ToggleButtonController<D> {
             },
         }]
         .clone();
-        SpaceTransaction::set_cube(self.position, None, Some(block))
+        SpaceTransaction::set_cube(position, None, Some(block))
     }
 }
 
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
     for ToggleButtonController<D>
 {
-    fn initialize(&mut self) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
+    fn initialize(
+        &mut self,
+        context: &vui::WidgetContext<'_>,
+    ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
+        let Some(position) = context.grant().shrink_to_cube() else {
+            return Ok(vui::WidgetTransaction::default());
+        };
         let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
-            SpaceBehaviorAttachment::new(self.position.grid_aab()),
+            SpaceBehaviorAttachment::new(position.grid_aab()),
             Arc::new(space::ActivatableRegion {
                 effect: {
                     let action = self.definition.action.clone();
@@ -285,18 +290,22 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
                 },
             }),
         ));
-        let icon = self.icon_txn();
+        let icon = self.icon_txn(position);
         icon.merge(activatable)
             .map_err(|error| vui::InstallVuiError::Conflict { error })
     }
 
     fn step(
         &mut self,
-        _: &vui::WidgetContext<'_>,
+        context: &vui::WidgetContext<'_>,
     ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
+        let Some(position) = context.grant().shrink_to_cube() else {
+            return Ok((vui::WidgetTransaction::default(), vui::Then::Drop));
+        };
+
         Ok((
             if self.todo.get_and_clear() || self.recently_pressed.load(Relaxed) > 0 {
-                self.icon_txn()
+                self.icon_txn(position)
             } else {
                 SpaceTransaction::default()
             },

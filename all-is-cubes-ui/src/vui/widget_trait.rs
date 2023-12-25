@@ -85,7 +85,11 @@ pub trait Widget: Layoutable + Debug + SendSyncIfStd {
 pub trait WidgetController: Debug + SendSyncIfStd + 'static {
     /// Write the initial state of the widget to the space.
     /// This is called at most once.
-    fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
+    fn initialize(
+        &mut self,
+        context: &WidgetContext<'_>,
+    ) -> Result<WidgetTransaction, InstallVuiError> {
+        let _ = context;
         Ok(WidgetTransaction::default())
     }
 
@@ -113,8 +117,11 @@ impl WidgetController for Box<dyn WidgetController> {
         (**self).step(context)
     }
 
-    fn initialize(&mut self) -> Result<WidgetTransaction, InstallVuiError> {
-        (**self).initialize()
+    fn initialize(
+        &mut self,
+        context: &WidgetContext<'_>,
+    ) -> Result<WidgetTransaction, InstallVuiError> {
+        (**self).initialize(context)
     }
 }
 
@@ -137,7 +144,10 @@ impl WidgetBehavior {
         widget: Positioned<Arc<dyn Widget>>,
         mut controller: Box<dyn WidgetController>,
     ) -> Result<SpaceTransaction, InstallVuiError> {
-        let init_txn = match controller.initialize() {
+        let init_txn = match controller.initialize(&WidgetContext {
+            behavior_context: None,
+            grant: &widget.position,
+        }) {
             Ok(t) => t,
             Err(e) => {
                 return Err(InstallVuiError::WidgetInitialization {
@@ -173,7 +183,8 @@ impl Behavior<Space> for WidgetBehavior {
             .lock()
             .unwrap()
             .step(&WidgetContext {
-                behavior_context: context,
+                behavior_context: Some(context),
+                grant: &self.widget.position,
             })
             .expect("TODO: behaviors should have an error reporting path");
         // TODO: should be using the attachment bounds instead of the layout grant to validate bounds
@@ -190,13 +201,27 @@ impl Behavior<Space> for WidgetBehavior {
 /// Context passed to [`WidgetController::step()`].
 #[derive(Debug)]
 pub struct WidgetContext<'a> {
-    behavior_context: &'a behavior::BehaviorContext<'a, Space>,
+    behavior_context: Option<&'a behavior::BehaviorContext<'a, Space>>,
+    grant: &'a LayoutGrant,
 }
 
 impl<'a> WidgetContext<'a> {
     /// The time tick that is currently passing, causing this step.
     pub fn tick(&self) -> Tick {
-        self.behavior_context.tick
+        match self.behavior_context {
+            Some(context) => context.tick,
+            None => {
+                // In this case we are initializing the widget
+                // TODO: This violates Tick::from_paused's documented "This should only be used in tests"
+                Tick::from_seconds(0.0)
+            }
+        }
+    }
+
+    /// Returns the [`LayoutGrant`] given to this widget; the same value as when
+    /// [`Widget::controller()`] was called.
+    pub fn grant(&self) -> &LayoutGrant {
+        self.grant
     }
 }
 
