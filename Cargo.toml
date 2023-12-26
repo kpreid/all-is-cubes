@@ -62,7 +62,6 @@ futures-util = { version = "0.3.28", default-features = false, features = ["allo
 hashbrown = { version = "0.14.0", default-features = false, features = ["ahash", "inline-more"] }
 image = { version = "0.24.6", default-features = false }
 indoc = "2.0.1"
-instant = "0.1.12"
 itertools = { version = "0.11.0", default-features = false, features = ["use_alloc"] }
 log = { version = "0.4.17", default-features = false }
 macro_rules_attribute = "0.2.0"
@@ -94,9 +93,10 @@ tokio = { version = "1.28.0", default-features = false }
 trycmd = "0.14.1" # keep in sync with `snapbox`
 unicode-segmentation = { version = "1.10.1", default-features = false }
 wasm-bindgen-futures = "0.4.34"
+web-time = "0.2.3"
 # Note: "expose_ids" feature is not needed globally but is enabled to avoid compiling two versions
 wgpu = { version = "0.18.0", features = ["expose-ids"] }
-yield-progress = { version = "0.1.4", default-features = false }
+yield-progress = { version = "0.1.5", default-features = false }
 
 # Note: Lints are also necessarily redefined in the workspaces other than this one.
 [workspace.lints]

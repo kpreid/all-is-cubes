@@ -1,11 +1,11 @@
 //! Runs the software raytracer and writes the results into a texture.
 
 use half::f16;
-use instant::{Duration, Instant};
 use rand::prelude::SliceRandom as _;
 use rand::SeedableRng as _;
 #[cfg(feature = "threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
+use web_time::{Duration, Instant};
 
 use all_is_cubes::camera::{Camera, GraphicsOptions, RenderError};
 use all_is_cubes::camera::{StandardCameras, Viewport};

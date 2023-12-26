@@ -162,7 +162,6 @@ dependencies = [
  "futures-util",
  "half 2.3.1",
  "image",
- "instant",
  "itertools 0.11.0",
  "log",
  "once_cell",
@@ -175,6 +174,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+ "web-time",
  "wgpu",
 ]
 
@@ -2744,9 +2744,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a5bbe824c507c5da5956355e86a746d82e0e1464f65d862cc5e71da70e94b2c"
 dependencies = [
  "cfg-if",
- "js-sys",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -6344,12 +6341,12 @@ checksum = "09041cd90cf85f7f8b2df60c646f853b7f535ce68f85244eb6731cf89fa498ec"
 
 [[package]]
 name = "yield-progress"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c71a863acf6eaa1ea43685d651fc12efa0ab89f8e747ab008dd6a647d08f6cf"
+checksum = "47617d3de0d5d22d008ea6abb7561db939c3a352a4bd6a5d831d5f6721e689f2"
 dependencies = [
- "instant",
  "log",
+ "web-time",
 ]
 
 [[package]]

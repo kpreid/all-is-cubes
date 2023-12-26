@@ -21,22 +21,20 @@ mod url_params;
 #[cfg_attr(not(target_family = "wasm"), allow(unused))]
 mod web_glue;
 
-/// Wrapper to implement [`all_is_cubes::time::Instant`] for [`instant::Instant`].
+/// Wrapper to implement [`all_is_cubes::time::Instant`] for [`web_time::Instant`].
 ///
 /// Note: This code exists in multiple locations because duplicating it is easier than
 /// arranging for a shared dependency.
-///
-/// TODO: Replace this with just a direct web API binding, not [`instant`]?
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct AdaptedInstant(instant::Instant);
+pub struct AdaptedInstant(web_time::Instant);
 
 impl all_is_cubes::time::Instant for AdaptedInstant {
     fn now() -> Self {
-        Self(instant::Instant::now())
+        Self(web_time::Instant::now())
     }
 
     fn saturating_duration_since(self, other: Self) -> Duration {
-        instant::Instant::saturating_duration_since(&self.0, other.0)
+        web_time::Instant::saturating_duration_since(&self.0, other.0)
     }
 }
 impl ops::Add<Duration> for AdaptedInstant {

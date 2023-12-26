@@ -2,12 +2,12 @@
 
 use std::sync::Mutex;
 
-use instant::{Duration, Instant};
 use js_sys::{Error, Function};
 use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast; // dyn_into()
 use web_sys::{AddEventListenerOptions, Document, Element, Event, EventTarget, Text};
+use web_time::{Duration, Instant};
 
 pub fn get_mandatory_element<E: JsCast>(document: &Document, id: &'static str) -> Result<E, Error> {
     document

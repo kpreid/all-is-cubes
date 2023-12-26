@@ -98,7 +98,6 @@ dependencies = [
  "futures-core",
  "futures-util",
  "half",
- "instant",
  "itertools 0.11.0",
  "log",
  "once_cell",
@@ -109,6 +108,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+ "web-time",
  "wgpu",
 ]
 
@@ -179,7 +179,6 @@ dependencies = [
  "futures-channel",
  "getrandom 0.1.16",
  "getrandom 0.2.11",
- "instant",
  "js-sys",
  "log",
  "once_cell",
@@ -189,6 +188,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "web-sys",
+ "web-time",
  "wgpu",
  "yield-progress",
 ]
@@ -954,18 +954,6 @@ name = "inflections"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a257582fdcde896fd96463bf2d40eefea0580021c0712a0e2b028b60b47a837a"
-
-[[package]]
-name = "instant"
-version = "0.1.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a5bbe824c507c5da5956355e86a746d82e0e1464f65d862cc5e71da70e94b2c"
-dependencies = [
- "cfg-if",
- "js-sys",
- "wasm-bindgen",
- "web-sys",
-]
 
 [[package]]
 name = "itertools"
@@ -1964,6 +1952,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "web-time"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa30049b1c872b72c89866d458eae9f20380ab280ffd1b1e18df2d3e2d98cfe0"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "wgpu"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2204,12 +2202,12 @@ checksum = "0fcb9cbac069e033553e8bb871be2fbdffcab578eb25bd0f7c508cedc6dcd75a"
 
 [[package]]
 name = "yield-progress"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c71a863acf6eaa1ea43685d651fc12efa0ab89f8e747ab008dd6a647d08f6cf"
+checksum = "47617d3de0d5d22d008ea6abb7561db939c3a352a4bd6a5d831d5f6721e689f2"
 dependencies = [
- "instant",
  "log",
+ "web-time",
 ]
 
 [[package]]

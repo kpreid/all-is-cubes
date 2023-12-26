@@ -48,7 +48,6 @@ futures-core = { workspace = true }
 futures-util = { workspace = true, features = ["sink"] }
 # f16 support for working with floating point textures.
 half = { version = "2.3.1", features = ["bytemuck"] }
-instant = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }
@@ -58,6 +57,7 @@ rayon = { workspace = true, optional = true }
 resource = "0.5.0"
 thiserror = { workspace = true }
 wasm-bindgen-futures = { workspace = true }
+web-time = { workspace = true }
 wgpu = { workspace = true, optional = true, features = ["expose-ids"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
@@ -67,7 +67,6 @@ crossbeam-channel = { workspace = true }
 [target.'cfg(target_family = "wasm")'.dependencies]
 # If we don't set this feature, it will try to access files at run time and fail
 # since web wasm has no std::fs.
-instant = { workspace = true, features = ["wasm-bindgen"] }
 resource = { version = "0.5.0", features = ["force-static"] }
 wasm-bindgen = "0.2.87"
 # For initializing tests on web.
