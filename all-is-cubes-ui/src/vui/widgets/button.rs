@@ -471,9 +471,7 @@ impl ButtonBase for ButtonVisualState {
         };
 
         let mut space = theme::create_space(label_z);
-        let draw_target = &mut space.draw_target(
-            Gridgid::from_translation([0, theme::RESOLUTION_G - 1, 0]) * Gridgid::FLIP_Y,
-        );
+        let draw_target = &mut space.draw_target(Gridgid::IDENTITY);
 
         circle(0)
             .into_styled(
@@ -546,9 +544,7 @@ impl ButtonBase for ToggleButtonVisualState {
         };
 
         let mut space = theme::create_space(label_z);
-        let draw_target = &mut space.draw_target(
-            Gridgid::from_translation([0, theme::RESOLUTION_G - 1, 0]) * Gridgid::FLIP_Y,
-        );
+        let draw_target = &mut space.draw_target(Gridgid::IDENTITY);
 
         // unwrap()s because if this drawing fails, tests will catch that — no parameters
         rr(0)
