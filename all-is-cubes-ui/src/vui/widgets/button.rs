@@ -46,11 +46,49 @@ fn shrink_button_bounds(grant: vui::LayoutGrant) -> vui::LayoutGrant {
     grant.shrink_to(REQUIREMENT.minimum, false)
 }
 
+/// Common elements of button widgets.
+/// A button widget is a widget that displays a single clickable shape that can have a finite set
+/// of possible appearances (on/off, pressed, etc).
+///
+/// TODO: Better name for this.
+#[derive(Clone, Debug)]
+struct ButtonCommon<St> {
+    /// Button shape, indicating what kind of button it is.
+    shape: linking::Provider<St, BoxStyle>,
+    // TODO: need to separate shape from label
+    // /// Label to be put on top of the shape.
+    // /// TODO: Needs to be able to be text or text and icon.
+    // label_block: Block,
+}
+
+impl<St: ButtonBase + Eq + Hash> ButtonCommon<St> {
+    fn new(shape: linking::Provider<St, Block>, label: Block) -> Self
+    where
+        St: Exhaust + Clone + fmt::Debug,
+    {
+        let shape = shape
+            .map(|state, base_block| assemble_button(state, base_block.clone(), label.clone()));
+        Self { shape }
+    }
+
+    fn draw_txn(&self, grant: &vui::LayoutGrant, state: St) -> vui::WidgetTransaction {
+        let grant = shrink_button_bounds(*grant);
+
+        self.shape[state].create_box(grant.bounds)
+    }
+}
+
+impl<St> vui::Layoutable for ButtonCommon<St> {
+    fn requirements(&self) -> vui::LayoutRequest {
+        REQUIREMENT
+    }
+}
+
 /// A single-block button that reacts to activations (clicks) but does not change
 /// otherwise.
 #[derive(Clone, Debug)]
 pub struct ActionButton {
-    appearance: linking::Provider<ButtonVisualState, BoxStyle>,
+    common: ButtonCommon<ButtonVisualState>,
     action: Action,
 }
 
@@ -61,12 +99,11 @@ impl ActionButton {
         theme: &WidgetTheme,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Arc<Self> {
-        let appearance = theme
-            .widget_blocks
-            .subset(WidgetBlocks::ActionButton)
-            .map(|state, base_block| assemble_button(state, base_block.clone(), label.clone()));
         Arc::new(Self {
-            appearance,
+            common: ButtonCommon::new(
+                theme.widget_blocks.subset(WidgetBlocks::ActionButton),
+                label,
+            ),
             action: EphemeralOpaque::new(Arc::new(action)),
         })
     }
@@ -74,7 +111,7 @@ impl ActionButton {
 
 impl vui::Layoutable for ActionButton {
     fn requirements(&self) -> vui::LayoutRequest {
-        REQUIREMENT
+        self.common.requirements()
     }
 }
 
@@ -120,8 +157,10 @@ impl vui::WidgetController for ActionButtonController {
         let grant = shrink_button_bounds(*context.grant());
 
         // TODO: we never draw the pressed state
-        let draw = self.definition.appearance[ButtonVisualState { pressed: false }]
-            .create_box(grant.bounds);
+        let draw = self
+            .definition
+            .common
+            .draw_txn(&grant, ButtonVisualState { pressed: false });
         let activatable = space::SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             space::SpaceBehaviorAttachment::new(grant.bounds),
             Arc::new(space::ActivatableRegion {
@@ -137,7 +176,7 @@ impl vui::WidgetController for ActionButtonController {
 /// [`ListenableSource`] and can be clicked.
 #[derive(Clone)]
 pub struct ToggleButton<D> {
-    appearance: linking::Provider<ToggleButtonVisualState, BoxStyle>,
+    common: ButtonCommon<ToggleButtonVisualState>,
     data_source: ListenableSource<D>,
     projection: Arc<dyn Fn(&D) -> bool + Send + Sync>,
     action: Action,
@@ -146,7 +185,7 @@ pub struct ToggleButton<D> {
 impl<D: Clone + Sync + fmt::Debug> fmt::Debug for ToggleButton<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ToggleButton")
-            .field("appearance", &self.appearance)
+            .field("common", &self.common)
             .field("data_source", &self.data_source)
             .field(
                 "projection(data_source)",
@@ -166,12 +205,11 @@ impl<D> ToggleButton<D> {
         theme: &WidgetTheme,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Arc<Self> {
-        let appearance = theme
-            .widget_blocks
-            .subset(WidgetBlocks::ToggleButton)
-            .map(|state, base_block| assemble_button(state, base_block.clone(), label.clone()));
         Arc::new(Self {
-            appearance,
+            common: ButtonCommon::new(
+                theme.widget_blocks.subset(WidgetBlocks::ToggleButton),
+                label,
+            ),
             data_source,
             projection: Arc::new(projection),
             action: EphemeralOpaque::new(Arc::new(action)),
@@ -245,23 +283,23 @@ struct ToggleButtonController<D: Clone + Send + Sync> {
 
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> ToggleButtonController<D> {
     fn draw_txn(&self, grant: &vui::LayoutGrant) -> vui::WidgetTransaction {
-        let grant = shrink_button_bounds(*grant);
-
         let value = (self.definition.projection)(&self.definition.data_source.get());
-        self.definition.appearance[ToggleButtonVisualState {
-            value,
-            // TODO: once cursor/click system supports mousedown and up, use that instead
-            // of this crude animation behavior (but maybe *also* have a post-press
-            // animation, possibly based on block tick_actions instead).
-            common: ButtonVisualState {
-                pressed: self
-                    .recently_pressed
-                    .fetch_update(Relaxed, Relaxed, |counter| Some(counter.saturating_sub(1)))
-                    .unwrap()
-                    > 1,
+        self.definition.common.draw_txn(
+            grant,
+            ToggleButtonVisualState {
+                value,
+                // TODO: once cursor/click system supports mousedown and up, use that instead
+                // of this crude animation behavior (but maybe *also* have a post-press
+                // animation, possibly based on block tick_actions instead).
+                common: ButtonVisualState {
+                    pressed: self
+                        .recently_pressed
+                        .fetch_update(Relaxed, Relaxed, |counter| Some(counter.saturating_sub(1)))
+                        .unwrap()
+                        > 1,
+                },
             },
-        }]
-        .create_box(grant.bounds)
+        )
     }
 }
 
