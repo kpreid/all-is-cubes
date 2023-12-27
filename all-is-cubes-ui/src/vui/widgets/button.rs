@@ -26,7 +26,7 @@ use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
 use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking::{self, InGenError};
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
-use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridVector, Gridgid, Rgba};
+use all_is_cubes::math::{Cube, Face6, GridAab, GridCoordinate, GridVector, Gridgid, Rgba};
 use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{URef, Universe};
@@ -55,26 +55,45 @@ fn shrink_button_bounds(grant: vui::LayoutGrant) -> vui::LayoutGrant {
 struct ButtonCommon<St> {
     /// Button shape, indicating what kind of button it is.
     shape: linking::Provider<St, BoxStyle>,
-    // TODO: need to separate shape from label
-    // /// Label to be put on top of the shape.
-    // /// TODO: Needs to be able to be text or text and icon.
-    // label_block: Block,
+
+    /// Label to be put on top of the shape.
+    /// TODO: Needs to be able to be text or text and icon, not just one single block
+    label: Block,
 }
 
-impl<St: ButtonBase + Eq + Hash> ButtonCommon<St> {
+impl<St: ButtonBase + Clone + Eq + Hash> ButtonCommon<St> {
     fn new(shape: linking::Provider<St, Block>, label: Block) -> Self
     where
-        St: Exhaust + Clone + fmt::Debug,
+        St: Exhaust + fmt::Debug,
     {
-        let shape = shape
-            .map(|state, base_block| assemble_button(state, base_block.clone(), label.clone()));
-        Self { shape }
+        let shape = shape.map(|_, base_multiblock| BoxStyle::from_nine_and_thin(base_multiblock));
+        Self { shape, label }
     }
 
     fn draw_txn(&self, grant: &vui::LayoutGrant, state: St) -> vui::WidgetTransaction {
         let grant = shrink_button_bounds(*grant);
 
-        self.shape[state].create_box(grant.bounds)
+        let shifted_label = self.label.clone().with_modifier(block::Move::new(
+            Face6::PZ,
+            (state.button_label_z() * 256 / theme::RESOLUTION_G) as u16,
+            0,
+        ));
+
+        // Create transaction for the button shape of the required size *without label*.
+        let mut shape_txn = self.shape[state].create_box(grant.bounds);
+
+        // Composite label and shape
+        {
+            let label_cube_txn = shape_txn.at(Cube::from(grant.bounds.lower_bounds())); // TODO: centered
+            if let Some(result_block) = label_cube_txn.new_mut() {
+                *result_block = result_block.clone().with_modifier(block::Composite::new(
+                    shifted_label.clone(),
+                    block::CompositeOperator::Over,
+                ))
+            }
+        }
+
+        shape_txn
     }
 }
 
@@ -349,37 +368,6 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
             vui::Then::Step,
         ))
     }
-}
-
-/// Composite a button shape multiblock and a button label to make the labeled button to be drawn.
-///
-/// Not public because it is only used by button widgets.
-///
-/// `base` must be the `ButtonBase` that produced `base_block`.
-/// TODO: Find a non-redundant way to pass this information.
-fn assemble_button(
-    base: &dyn ButtonBase,
-    base_multiblock: Block,
-    label_block: Block,
-    //grant: &vui::LayoutGrant,
-) -> BoxStyle {
-    let shifted_label = label_block.with_modifier(block::Move::new(
-        Face6::PZ,
-        (base.button_label_z() * 256 / theme::RESOLUTION_G) as u16,
-        0,
-    ));
-
-    let unlabeled_box_style = BoxStyle::from_nine_and_thin(&base_multiblock);
-
-    // TODO: We need to produce a transaction or VoxelBrush rather than a BoxStyle for this to work
-    // properly. The label should be composed with the button at its final size and shape, not
-    // duplicated into every block of the label.
-    unlabeled_box_style.map_blocks(|base_block| {
-        base_block.with_modifier(block::Composite::new(
-            shifted_label.clone(),
-            block::CompositeOperator::Over,
-        ))
-    })
 }
 
 /// Returns a [`DrawTarget`] for drawing the button label, with a

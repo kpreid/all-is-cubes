@@ -483,6 +483,11 @@ impl CubeTransaction {
         self.new = Some(block);
     }
 
+    #[doc(hidden)] // TODO: good public API?
+    pub fn new_mut(&mut self) -> Option<&mut Block> {
+        self.new.as_mut()
+    }
+
     /// Emit [`Fluff`] (sound/particle effects) at this cube when the transaction is committed.
     pub fn fluff(fluff: Fluff) -> Self {
         let mut this = Self::default();
