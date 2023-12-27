@@ -61,16 +61,15 @@ struct ButtonCommon<St> {
     label: Block,
 }
 
-impl<St: ButtonBase + Clone + Eq + Hash> ButtonCommon<St> {
-    fn new(shape: linking::Provider<St, Block>, label: Block) -> Self
-    where
-        St: Exhaust + fmt::Debug,
-    {
+impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St> {
+    fn new(shape: linking::Provider<St, Block>, label: Block) -> Self {
         let shape = shape.map(|_, base_multiblock| BoxStyle::from_nine_and_thin(base_multiblock));
         Self { shape, label }
     }
 
-    fn draw_txn(&self, grant: &vui::LayoutGrant, state: St) -> vui::WidgetTransaction {
+    /// For a specific layout grant, generate the transaction which draws the button in a specific
+    /// state.
+    fn create_draw_txn(&self, grant: &vui::LayoutGrant, state: St) -> vui::WidgetTransaction {
         let grant = shrink_button_bounds(*grant);
 
         let shifted_label = self.label.clone().with_modifier(block::Move::new(
@@ -94,6 +93,15 @@ impl<St: ButtonBase + Clone + Eq + Hash> ButtonCommon<St> {
         }
 
         shape_txn
+    }
+
+    fn create_draw_txns(
+        &self,
+        grant: &vui::LayoutGrant,
+    ) -> linking::Provider<St, vui::WidgetTransaction> {
+        self.shape
+            .clone()
+            .map(|state, _| self.create_draw_txn(grant, state.clone()))
     }
 }
 
@@ -135,8 +143,11 @@ impl vui::Layoutable for ActionButton {
 }
 
 impl vui::Widget for ActionButton {
-    fn controller(self: Arc<Self>, _: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
-        Box::new(ActionButtonController { definition: self })
+    fn controller(self: Arc<Self>, grant: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
+        Box::new(ActionButtonController {
+            txns: self.common.create_draw_txns(grant),
+            definition: self,
+        })
     }
 }
 
@@ -166,6 +177,7 @@ impl fmt::Display for ButtonVisualState {
 #[derive(Debug)]
 struct ActionButtonController {
     definition: Arc<ActionButton>,
+    txns: linking::Provider<ButtonVisualState, vui::WidgetTransaction>,
 }
 
 impl vui::WidgetController for ActionButtonController {
@@ -176,10 +188,7 @@ impl vui::WidgetController for ActionButtonController {
         let grant = shrink_button_bounds(*context.grant());
 
         // TODO: we never draw the pressed state
-        let draw = self
-            .definition
-            .common
-            .draw_txn(&grant, ButtonVisualState { pressed: false });
+        let draw = self.txns[ButtonVisualState { pressed: false }].clone();
         let activatable = space::SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             space::SpaceBehaviorAttachment::new(grant.bounds),
             Arc::new(space::ActivatableRegion {
@@ -245,9 +254,10 @@ impl<D> vui::Layoutable for ToggleButton<D> {
 // TODO: Mess of generic bounds due to the combination of Widget and ListenableSource
 // requirements -- should we make a trait alias for these?
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton<D> {
-    fn controller(self: Arc<Self>, _: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
+    fn controller(self: Arc<Self>, grant: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         Box::new(ToggleButtonController {
             todo: DirtyFlag::listening(true, &self.data_source),
+            txns: self.common.create_draw_txns(grant),
             definition: self,
             recently_pressed: Arc::new(AtomicU8::new(0)),
         })
@@ -296,29 +306,28 @@ impl ToggleButtonVisualState {
 #[derive(Debug)]
 struct ToggleButtonController<D: Clone + Send + Sync> {
     definition: Arc<ToggleButton<D>>,
+    txns: linking::Provider<ToggleButtonVisualState, vui::WidgetTransaction>,
     todo: DirtyFlag,
     recently_pressed: Arc<AtomicU8>,
 }
 
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> ToggleButtonController<D> {
-    fn draw_txn(&self, grant: &vui::LayoutGrant) -> vui::WidgetTransaction {
+    fn draw_txn(&self) -> vui::WidgetTransaction {
         let value = (self.definition.projection)(&self.definition.data_source.get());
-        self.definition.common.draw_txn(
-            grant,
-            ToggleButtonVisualState {
-                value,
-                // TODO: once cursor/click system supports mousedown and up, use that instead
-                // of this crude animation behavior (but maybe *also* have a post-press
-                // animation, possibly based on block tick_actions instead).
-                common: ButtonVisualState {
-                    pressed: self
-                        .recently_pressed
-                        .fetch_update(Relaxed, Relaxed, |counter| Some(counter.saturating_sub(1)))
-                        .unwrap()
-                        > 1,
-                },
+        self.txns[ToggleButtonVisualState {
+            value,
+            // TODO: once cursor/click system supports mousedown and up, use that instead
+            // of this crude animation behavior (but maybe *also* have a post-press
+            // animation, possibly based on block tick_actions instead).
+            common: ButtonVisualState {
+                pressed: self
+                    .recently_pressed
+                    .fetch_update(Relaxed, Relaxed, |counter| Some(counter.saturating_sub(1)))
+                    .unwrap()
+                    > 1,
             },
-        )
+        }]
+        .clone()
     }
 }
 
@@ -350,18 +359,18 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
                 },
             }),
         ));
-        self.draw_txn(context.grant())
+        self.draw_txn()
             .merge(activatable)
             .map_err(|error| vui::InstallVuiError::Conflict { error })
     }
 
     fn step(
         &mut self,
-        context: &vui::WidgetContext<'_>,
+        _: &vui::WidgetContext<'_>,
     ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
         Ok((
             if self.todo.get_and_clear() || self.recently_pressed.load(Relaxed) > 0 {
-                self.draw_txn(context.grant())
+                self.draw_txn()
             } else {
                 SpaceTransaction::default()
             },
