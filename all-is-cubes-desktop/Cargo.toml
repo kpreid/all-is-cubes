@@ -53,7 +53,7 @@ simplelog = { workspace = true }
 strum = { workspace = true, features = ["derive", "std"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "sync"] }
-ratatui = { version = "0.24.0", default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.25.0", default-features = false, features = ["crossterm"] }
 unicode-width = { version = "0.1.9", default-features = false }
 # Note on feature selection: winit requires either "x11" or "wayland" to build at all on Linux, which is harmless elsewhere. I picked x11 because it should be the most compatible.
 # TODO: drop rwh_05 when wgpu is updated
