@@ -12,6 +12,9 @@ use crate::universe::RefError;
 use crate::util::maybe_sync::BoxFuture;
 
 /// Rendering a previously-specified scene to an in-memory image.
+///
+/// This trait is object-safe so that different renderers can be used without generics.
+/// Therefore, all its `async` methods use boxed futures.
 pub trait HeadlessRenderer {
     /// Update the renderer's internal copy of the scene from the data sources
     /// (`URef<Character>` etc.) it is tracking.
