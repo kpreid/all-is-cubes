@@ -228,6 +228,16 @@ impl<E: Eq + Hash, V> Index<E> for Provider<E, V> {
     }
 }
 
+impl<'provider, E: Exhaust + fmt::Debug + Clone + Eq + Hash, V> IntoIterator
+    for &'provider Provider<E, V>
+{
+    type Item = (E, &'provider V);
+    type IntoIter = ModuleIter<'provider, E, V>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 /// Iterator returned by [`Provider::iter()`].
 #[allow(missing_debug_implementations)]
 pub struct ModuleIter<'provider, E: Exhaust, V> {
