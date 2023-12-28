@@ -1,3 +1,5 @@
+use all_is_cubes::arcstr::ArcStr;
+use all_is_cubes::euclid::vec3;
 use alloc::sync::Arc;
 use core::fmt;
 use core::hash::Hash;
@@ -31,19 +33,102 @@ use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, Sp
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{URef, Universe};
 
-use crate::vui;
 use crate::vui::widgets::{BoxStyle, WidgetBlocks, WidgetTheme};
+use crate::vui::{self, Layoutable as _};
 
 type Action = EphemeralOpaque<dyn Fn() + Send + Sync>;
 
-/// Layout requirement for all buttons.
-/// TODO: This will need to be dynamic once buttons have text labels.
-const REQUIREMENT: vui::LayoutRequest = vui::LayoutRequest {
-    minimum: GridVector::new(1, 1, 1),
-};
+/// What is displayed on the face of a button widget.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct ButtonLabel {
+    /// Picture stuck to the front face of the button. It should be flat against the -Z face and
+    /// only a few voxels thick.
+    /// Specific button types have more specific requirements for margin.
+    pub icon: Option<Block>,
 
-fn shrink_button_bounds(grant: vui::LayoutGrant) -> vui::LayoutGrant {
-    grant.shrink_to(REQUIREMENT.minimum, false)
+    /// Text to display.
+    pub text: Option<vui::widgets::Label>,
+}
+
+impl ButtonLabel {
+    /// Return an iterator of the blocks in the label, increasing along the X axis.
+    /// Always has as many elements as `requirements().minimum`.
+    fn blocks(&self, mut gravity: vui::Gravity) -> impl Iterator<Item = Block> + '_ {
+        // TODO: need a better plan for how gravity interacts with icons;
+        // this is a kludge to get okay layout of the text for now
+        gravity.x = vui::Align::Low;
+
+        self.icon
+            .clone()
+            .into_iter()
+            .chain(
+                self.text
+                    .as_ref()
+                    .into_iter()
+                    .flat_map(move |label_widget| {
+                        let text = label_widget.text(gravity);
+                        let bb = text.bounding_blocks();
+                        bb.x_range().map(move |x| {
+                            Block::from_primitive(block::Primitive::Text {
+                                text: text.clone(),
+                                offset: GridVector::new(
+                                    x,
+                                    bb.lower_bounds().y,
+                                    bb.lower_bounds().z,
+                                ),
+                            })
+                        })
+                    }),
+            )
+    }
+}
+
+impl From<Block> for ButtonLabel {
+    fn from(icon: Block) -> Self {
+        ButtonLabel {
+            icon: Some(icon),
+            text: None,
+        }
+    }
+}
+impl From<vui::widgets::Label> for ButtonLabel {
+    fn from(text: vui::widgets::Label) -> Self {
+        ButtonLabel {
+            icon: None,
+            text: Some(text),
+        }
+    }
+}
+impl From<ArcStr> for ButtonLabel {
+    fn from(string: ArcStr) -> Self {
+        ButtonLabel {
+            icon: None,
+            text: Some(vui::widgets::Label::new(string)),
+        }
+    }
+}
+
+impl vui::Layoutable for ButtonLabel {
+    fn requirements(&self) -> vui::LayoutRequest {
+        let Self { icon, text } = self;
+        let text_size = text
+            .as_ref()
+            .map_or(GridVector::zero(), |text| text.requirements().minimum);
+        let icon_size = if icon.is_some() {
+            GridVector::one()
+        } else {
+            GridVector::zero()
+        };
+        vui::LayoutRequest {
+            minimum: GridVector::new(
+                // TODO: consider using LayoutTree to execute the layout
+                text_size.x + icon_size.x,
+                text_size.y.max(icon_size.y),
+                text_size.z.max(icon_size.z),
+            ),
+        }
+    }
 }
 
 /// Common elements of button widgets.
@@ -57,12 +142,11 @@ struct ButtonCommon<St> {
     shape: linking::Provider<St, BoxStyle>,
 
     /// Label to be put on top of the shape.
-    /// TODO: Needs to be able to be text or text and icon, not just one single block
-    label: Block,
+    label: ButtonLabel,
 }
 
 impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St> {
-    fn new(shape: linking::Provider<St, Block>, label: Block) -> Self {
+    fn new(shape: linking::Provider<St, Block>, label: ButtonLabel) -> Self {
         let shape = shape.map(|_, base_multiblock| BoxStyle::from_nine_and_thin(base_multiblock));
         Self { shape, label }
     }
@@ -70,23 +154,20 @@ impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St>
     /// For a specific layout grant, generate the transaction which draws the button in a specific
     /// state.
     fn create_draw_txn(&self, grant: &vui::LayoutGrant, state: St) -> vui::WidgetTransaction {
-        let grant = shrink_button_bounds(*grant);
-
-        let shifted_label = self.label.clone().with_modifier(block::Move::new(
-            Face6::PZ,
-            (state.button_label_z() * 256 / theme::RESOLUTION_G) as u16,
-            0,
-        ));
+        let grant = self.shrink_bounds(*grant);
 
         // Create transaction for the button shape of the required size *without label*.
-        let mut shape_txn = self.shape[state].create_box(grant.bounds);
+        let mut shape_txn = self.shape[state.clone()].create_box(grant.bounds);
 
         // Composite label and shape
-        {
-            let label_cube_txn = shape_txn.at(Cube::from(grant.bounds.lower_bounds())); // TODO: centered
-            if let Some(result_block) = label_cube_txn.new_mut() {
+        for (x, label_block) in (0..).zip(self.label.blocks(grant.gravity)) {
+            // TODO: centered in case the button is larger
+            let cube = Cube::from(grant.bounds.lower_bounds() + vec3(x, 0, 0));
+
+            if let Some(result_block) = shape_txn.at(cube).new_mut() {
+                let shifted_label = shift_label_block(&state, label_block);
                 *result_block = result_block.clone().with_modifier(block::Composite::new(
-                    shifted_label.clone(),
+                    shifted_label,
                     block::CompositeOperator::Over,
                 ))
             }
@@ -103,11 +184,17 @@ impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St>
             .clone()
             .map(|state, _| self.create_draw_txn(grant, state.clone()))
     }
+
+    fn shrink_bounds(&self, grant: vui::LayoutGrant) -> vui::LayoutGrant {
+        grant.shrink_to(self.requirements().minimum, true)
+    }
 }
 
 impl<St> vui::Layoutable for ButtonCommon<St> {
     fn requirements(&self) -> vui::LayoutRequest {
-        REQUIREMENT
+        let mut req = self.label.requirements();
+        req.minimum.z = req.minimum.z.max(1);
+        req
     }
 }
 
@@ -120,16 +207,16 @@ pub struct ActionButton {
 }
 
 impl ActionButton {
-    #[allow(missing_docs)]
+    #[allow(missing_docs)] // TODO
     pub fn new(
-        label: Block,
+        label: impl Into<ButtonLabel>,
         theme: &WidgetTheme,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Arc<Self> {
         Arc::new(Self {
             common: ButtonCommon::new(
                 theme.widget_blocks.subset(WidgetBlocks::ActionButton),
-                label,
+                label.into(),
             ),
             action: EphemeralOpaque::new(Arc::new(action)),
         })
@@ -185,7 +272,7 @@ impl vui::WidgetController for ActionButtonController {
         &mut self,
         context: &vui::WidgetContext<'_>,
     ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
-        let grant = shrink_button_bounds(*context.grant());
+        let grant = self.definition.common.shrink_bounds(*context.grant());
 
         // TODO: we never draw the pressed state
         let draw = self.txns[ButtonVisualState { pressed: false }].clone();
@@ -229,14 +316,14 @@ impl<D> ToggleButton<D> {
     pub fn new(
         data_source: ListenableSource<D>,
         projection: impl Fn(&D) -> bool + Send + Sync + 'static,
-        label: Block,
+        label: impl Into<ButtonLabel>,
         theme: &WidgetTheme,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Arc<Self> {
         Arc::new(Self {
             common: ButtonCommon::new(
                 theme.widget_blocks.subset(WidgetBlocks::ToggleButton),
-                label,
+                label.into(),
             ),
             data_source,
             projection: Arc::new(projection),
@@ -247,7 +334,7 @@ impl<D> ToggleButton<D> {
 
 impl<D> vui::Layoutable for ToggleButton<D> {
     fn requirements(&self) -> vui::LayoutRequest {
-        REQUIREMENT
+        self.common.requirements()
     }
 }
 
@@ -338,7 +425,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
         &mut self,
         context: &vui::WidgetContext<'_>,
     ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
-        let grant = shrink_button_bounds(*context.grant());
+        let grant = self.definition.common.shrink_bounds(*context.grant());
 
         let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             SpaceBehaviorAttachment::new(grant.bounds),
@@ -619,6 +706,15 @@ impl ButtonBase for ToggleButtonVisualState {
             &format!("Toggle Button {self}"),
         ))
     }
+}
+
+// Move a block that's part of a button label so that its z=0 aligns with the button's face.
+fn shift_label_block(state: &impl ButtonBase, block: Block) -> Block {
+    block.with_modifier(block::Move::new(
+        Face6::PZ,
+        (state.button_label_z() * 256 / theme::RESOLUTION_G) as u16,
+        0,
+    ))
 }
 
 fn aab_xy_to_rectangle(bounding_box: GridAab) -> Rectangle {

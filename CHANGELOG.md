@@ -22,6 +22,9 @@
     
     - `math::Vol` is a more general replacement for `math::GridArray` which allows choice of the data container type (including `&[T]` for borrowing without additional indirection), and also a replacement for uses of `math::GridAab` which care about volume and linearization.
 
+- `all-is-cubes-ui` library:
+    - New type `vui::widgets::ButtonLabel` allows giving `ActionButton` and `ToggleButton` text labels in addition to or instead of icons.
+
 ### Changed
 
 - `all-is-cubes` library:

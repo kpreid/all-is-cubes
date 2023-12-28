@@ -87,8 +87,10 @@ impl Widget for LargeText {
 
 /// Widget which draws a static [`Text`](BlockText) for use as a text label in UI.
 ///
-/// This cannot be used for dynamic text.
-#[derive(Clone, Debug)]
+/// It is also used as part of [`ButtonLabel`](crate::vui::widgets::ButtonLabel)s.
+///
+/// It cannot be used for dynamic text.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Label {
     text: ArcStr,
     font: text::Font,
@@ -120,7 +122,8 @@ impl Label {
         }
     }
 
-    fn text(&self, gravity: vui::Gravity) -> text::Text {
+    /// Creates and returns the [`Text`] object this widget displays.
+    pub(crate) fn text(&self, gravity: vui::Gravity) -> text::Text {
         text_for_widget(
             self.text.clone(),
             self.font.clone(),
@@ -157,6 +160,13 @@ impl Widget for Label {
         // (this will only matter once `Text` memoizes glyph layout)
 
         widgets::OneshotController::new(draw_text_txn(&self.text(grant.gravity), grant))
+    }
+}
+
+impl From<ArcStr> for Label {
+    /// Constructs a [`Label`] that draws the given text, with the standard UI label font.
+    fn from(value: ArcStr) -> Self {
+        Self::new(value)
     }
 }
 
