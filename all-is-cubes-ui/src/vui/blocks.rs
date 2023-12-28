@@ -22,7 +22,6 @@ pub enum UiBlocks {
     AboutButtonLabel,
     PauseButtonLabel,
     SaveButtonLabel,
-    QuitButtonLabel,
     OptionsButtonLabel,
     MouselookButtonLabel,
     FullscreenButtonLabel,
@@ -48,7 +47,6 @@ impl fmt::Display for UiBlocks {
             UiBlocks::AboutButtonLabel => write!(f, "about-button"),
             UiBlocks::PauseButtonLabel => write!(f, "pause-button"),
             UiBlocks::SaveButtonLabel => write!(f, "save-button"),
-            UiBlocks::QuitButtonLabel => write!(f, "quit-button"),
             UiBlocks::OptionsButtonLabel => write!(f, "options-button"),
             UiBlocks::MouselookButtonLabel => write!(f, "mouselook-button"),
             UiBlocks::FullscreenButtonLabel => write!(f, "fullscreen-button"),
@@ -95,13 +93,6 @@ impl UiBlocks {
                     universe,
                     "Save",
                     ButtonIcon::Icon(include_image!("icons/button-save.png")),
-                )?
-                .build(),
-
-                UiBlocks::QuitButtonLabel => make_button_label_block(
-                    universe,
-                    "Quit",
-                    ButtonIcon::Text(&font::FONT_7X13, "Quit"),
                 )?
                 .build(),
 

@@ -2,8 +2,8 @@
 
 use alloc::sync::Arc;
 
-use all_is_cubes::arcstr::ArcStr;
-use all_is_cubes::block::{Block, Resolution::*};
+use all_is_cubes::arcstr::{literal, ArcStr};
+use all_is_cubes::block::Resolution::*;
 use all_is_cubes::math::Face6;
 use all_is_cubes::universe::Universe;
 
@@ -11,6 +11,7 @@ use crate::logo::logo_text;
 use crate::ui_content::hud::HudInputs;
 use crate::ui_content::options::{graphics_options_widgets, pause_toggle_button, OptionsStyle};
 use crate::ui_content::{VuiMessage, VuiPageState};
+use crate::vui::widgets::ButtonLabel;
 use crate::vui::{
     page_modal_backdrop, parts, widgets, InstallVuiError, LayoutTree, UiBlocks, Widget, WidgetTree,
 };
@@ -30,18 +31,24 @@ pub(super) fn new_paused_widget_tree(
         LayoutTree::leaf(open_page_button(
             hud_inputs,
             VuiPageState::AboutText,
-            hud_inputs.hud_blocks.ui_blocks[UiBlocks::AboutButtonLabel].clone(),
+            ButtonLabel {
+                icon: Some(hud_inputs.hud_blocks.ui_blocks[UiBlocks::AboutButtonLabel].clone()),
+                text: Some(literal!("About").into()),
+            },
         )),
         LayoutTree::leaf(open_page_button(
             hud_inputs,
             VuiPageState::Options,
-            hud_inputs.hud_blocks.ui_blocks[UiBlocks::OptionsButtonLabel].clone(),
+            ButtonLabel {
+                icon: Some(hud_inputs.hud_blocks.ui_blocks[UiBlocks::OptionsButtonLabel].clone()),
+                text: Some(literal!("Options").into()),
+            },
         )),
-        LayoutTree::leaf(pause_toggle_button(hud_inputs)),
+        LayoutTree::leaf(pause_toggle_button(hud_inputs, OptionsStyle::LabeledColumn)),
     ];
     if let Some(quit_fn) = hud_inputs.quit.as_ref().cloned() {
         children.push(LayoutTree::leaf(widgets::ActionButton::new(
-            hud_inputs.hud_blocks.ui_blocks[UiBlocks::QuitButtonLabel].clone(),
+            literal!("Quit"),
             &hud_inputs.hud_blocks.widget_theme,
             // TODO: quit_fn should be an async function, but we don't have a way to
             // kick off a “Quitting...” task yet.
@@ -170,7 +177,7 @@ pub(super) fn new_message_widget_tree(
 pub(crate) fn open_page_button(
     hud_inputs: &HudInputs,
     page: VuiPageState,
-    label: Block,
+    label: impl Into<ButtonLabel>,
 ) -> Arc<dyn Widget> {
     // TODO: For some purposes this should not be a toggle button, and for some it should,
     // depending on whether the outcome is still having such a button. Even then, it should
@@ -181,7 +188,7 @@ pub(crate) fn open_page_button(
             let page = page.clone();
             move |page_state| *page_state == page
         },
-        label,
+        label.into(),
         &hud_inputs.hud_blocks.widget_theme,
         {
             let cc = hud_inputs.vui_control_channel.clone();

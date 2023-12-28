@@ -1,7 +1,7 @@
+use all_is_cubes::arcstr::literal;
 use alloc::sync::Arc;
 
 use all_is_cubes::camera::{AntialiasingOption, GraphicsOptions};
-use all_is_cubes::math::Face6;
 
 use crate::apps::ControlMessage;
 use crate::ui_content::hud::HudInputs;
@@ -98,11 +98,25 @@ fn graphics_toggle_button(
     setter: fn(&mut GraphicsOptions, bool),
 ) -> WidgetTree {
     let icon = hud_inputs.hud_blocks.ui_blocks[icon_key].clone();
-    let text_label = icon.evaluate().unwrap().attributes.display_name.clone();
+    let text: Option<widgets::Label> = match style {
+        OptionsStyle::CompactRow => None,
+        OptionsStyle::LabeledColumn => Some(
+            icon.evaluate()
+                .unwrap()
+                .attributes
+                .display_name
+                .clone()
+                .into(),
+        ),
+    };
+    let label = widgets::ButtonLabel {
+        icon: Some(icon),
+        text,
+    };
     let button: Arc<dyn Widget> = widgets::ToggleButton::new(
         hud_inputs.graphics_options.clone(),
         getter,
-        icon,
+        label,
         &hud_inputs.hud_blocks.widget_theme,
         {
             let cc = hud_inputs.app_control_channel.clone();
@@ -117,24 +131,20 @@ fn graphics_toggle_button(
             }
         },
     );
-
-    match style {
-        OptionsStyle::CompactRow => LayoutTree::leaf(button),
-        OptionsStyle::LabeledColumn => Arc::new(LayoutTree::Stack {
-            direction: Face6::PX,
-            children: vec![
-                LayoutTree::leaf(button),
-                LayoutTree::leaf(Arc::new(widgets::Label::new(text_label))),
-            ],
-        }),
-    }
+    LayoutTree::leaf(button)
 }
 
-pub(crate) fn pause_toggle_button(hud_inputs: &HudInputs) -> Arc<dyn Widget> {
+pub(crate) fn pause_toggle_button(hud_inputs: &HudInputs, style: OptionsStyle) -> Arc<dyn Widget> {
     widgets::ToggleButton::new(
         hud_inputs.paused.clone(),
         |&value| value,
-        hud_inputs.hud_blocks.ui_blocks[UiBlocks::PauseButtonLabel].clone(),
+        widgets::ButtonLabel {
+            icon: Some(hud_inputs.hud_blocks.ui_blocks[UiBlocks::PauseButtonLabel].clone()),
+            text: match style {
+                OptionsStyle::CompactRow => None,
+                OptionsStyle::LabeledColumn => Some(literal!("Pause").into()),
+            },
+        },
         &hud_inputs.hud_blocks.widget_theme,
         {
             let cc = hud_inputs.app_control_channel.clone();

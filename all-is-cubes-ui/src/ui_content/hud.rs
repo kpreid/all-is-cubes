@@ -99,7 +99,7 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
                 VuiPageState::AboutText,
                 hud_inputs.hud_blocks.ui_blocks[UiBlocks::AboutButtonLabel].clone(),
             )),
-            LayoutTree::leaf(pause_toggle_button(hud_inputs)),
+            LayoutTree::leaf(pause_toggle_button(hud_inputs, OptionsStyle::CompactRow)),
             LayoutTree::leaf(save_button(hud_inputs)),
             LayoutTree::leaf(widgets::ToggleButton::new(
                 hud_inputs.mouselook_mode.clone(),
