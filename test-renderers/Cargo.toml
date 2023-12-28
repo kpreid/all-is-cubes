@@ -1,9 +1,8 @@
 [package]
 name = "test-renderers"
-version = "0.0.1"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2021"
-rust-version = "1.65"
+rust-version = "1.75"
 description = "Rendering tests for all-is-cubes."
 publish = false
 

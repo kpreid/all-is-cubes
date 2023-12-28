@@ -5190,7 +5190,7 @@ dependencies = [
 
 [[package]]
 name = "test-renderers"
-version = "0.0.1"
+version = "0.0.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-content",
@@ -6322,7 +6322,7 @@ checksum = "7e2c411759b501fb9501aac2b1b2d287a6e93e5bdcf13c25306b23e1b716dd0e"
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "cargo_metadata 0.8.2",
