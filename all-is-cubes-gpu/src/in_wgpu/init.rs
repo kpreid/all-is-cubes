@@ -3,6 +3,7 @@
 //! These are appropriate for the all-is-cubes project's tests, but may not be appropriate
 //! for downstream users of the libraries.
 
+use std::future::Future;
 use std::sync::Arc;
 
 use all_is_cubes::camera::{self, Rendering};
@@ -94,16 +95,24 @@ fn shortened_adapter_info(info: &wgpu::AdapterInfo) -> String {
 ///
 /// Panics if the pixel type or viewport size are incorrect.
 #[doc(hidden)]
-pub async fn get_image_from_gpu(
+pub fn get_image_from_gpu(
     device: Arc<wgpu::Device>,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     flaws: camera::Flaws,
-) -> Rendering {
-    Rendering {
-        size: camera::ImageSize::new(texture.width(), texture.height()),
-        data: get_texels_from_gpu::<[u8; 4]>(device, queue, texture, 1).await,
-        flaws,
+) -> impl Future<Output = Rendering> + 'static {
+    // By making this an explicit `Future` return we avoid capturing the queue and texture
+    // references.
+
+    let size = camera::ImageSize::new(texture.width(), texture.height());
+    let data_future = get_texels_from_gpu::<[u8; 4]>(device, queue, texture, 1);
+
+    async move {
+        Rendering {
+            size,
+            data: data_future.await,
+            flaws,
+        }
     }
 }
 
@@ -113,15 +122,18 @@ pub async fn get_image_from_gpu(
 ///
 /// Panics if the provided sizes are incorrect.
 #[doc(hidden)]
-pub async fn get_texels_from_gpu<C>(
+pub fn get_texels_from_gpu<C>(
     device: Arc<wgpu::Device>,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     components: usize,
-) -> Vec<C>
+) -> impl Future<Output = Vec<C>> + 'static
 where
     C: bytemuck::AnyBitPattern,
 {
+    // By making this an explicit `Future` return we avoid capturing the queue and texture
+    // references.
+
     let dimensions = camera::ImageSize::new(texture.width(), texture.height());
 
     let size_of_texel = components * std::mem::size_of::<C>();
@@ -176,21 +188,22 @@ where
         queue.submit(Some(encoder.finish()));
     }
 
-    let texels_vec: Vec<C> = {
-        let (sender, receiver) = futures_channel::oneshot::channel();
-        temp_buffer
-            .slice(..)
-            .map_async(wgpu::MapMode::Read, |result| {
-                let _ = sender.send(result);
-            });
-        super::poll::ensure_polled(Arc::downgrade(&device));
+    // Start the buffer mapping
+    let (sender, receiver) = futures_channel::oneshot::channel();
+    temp_buffer
+        .slice(..)
+        .map_async(wgpu::MapMode::Read, |result| {
+            let _ = sender.send(result);
+        });
+    super::poll::ensure_polled(Arc::downgrade(&device));
+
+    // Await the buffer being available and build the image.
+    async move {
         receiver
             .await
             .expect("communication failed")
             .expect("buffer reading failed");
         let slice: &[u8] = &temp_buffer.slice(..).get_mapped_range();
         bytemuck::cast_slice::<u8, C>(slice).to_vec()
-    };
-
-    texels_vec
+    }
 }
