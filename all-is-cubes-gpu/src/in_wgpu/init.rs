@@ -135,34 +135,17 @@ where
     // references.
 
     let dimensions = camera::ImageSize::new(texture.width(), texture.height());
+    assert_eq!(texture.depth_or_array_layers(), 1);
 
     let size_of_texel = components * std::mem::size_of::<C>();
 
-    let bytes_per_row = if dimensions.y > 1 {
-        Some(dimensions.x * u32::try_from(size_of_texel).unwrap())
-    } else {
-        None
-    };
-
-    // Check alignment
-    if let Some(bytes_per_row) = bytes_per_row {
-        let alignment = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-        if bytes_per_row % alignment != 0 {
-            // Produce a more helpful error than wgpu's validation error.
-            // TODO: Repack the bytes instead.
-            panic!(
-                "cannot copy {width} texels of {size_of_texel} bytes = \
-                {bytes_per_row} bytes per row, which is not aligned to {alignment}",
-                width = texture.width(),
-            );
-        }
-    }
+    let dense_bytes_per_row = dimensions.x * u32::try_from(size_of_texel).unwrap();
+    let padded_bytes_per_row = dense_bytes_per_row.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT)
+        * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
 
     let temp_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("GPU-to-CPU image copy buffer"),
-        size: u64::from(dimensions.x)
-            * u64::from(dimensions.y)
-            * u64::try_from(size_of_texel).unwrap(),
+        size: u64::from(padded_bytes_per_row) * u64::from(dimensions.y),
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
         mapped_at_creation: false,
     });
@@ -175,15 +158,11 @@ where
                 buffer: &temp_buffer,
                 layout: wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row,
+                    bytes_per_row: Some(padded_bytes_per_row),
                     rows_per_image: None,
                 },
             },
-            wgpu::Extent3d {
-                width: dimensions.x,
-                height: dimensions.y,
-                depth_or_array_layers: 1,
-            },
+            texture.size(),
         );
         queue.submit(Some(encoder.finish()));
     }
@@ -203,7 +182,20 @@ where
             .await
             .expect("communication failed")
             .expect("buffer reading failed");
-        let slice: &[u8] = &temp_buffer.slice(..).get_mapped_range();
-        bytemuck::cast_slice::<u8, C>(slice).to_vec()
+        let mapped: &[u8] = &temp_buffer.slice(..).get_mapped_range();
+
+        let element_count = usize::try_from(dimensions.x * dimensions.y).unwrap() * components;
+
+        // Copy the mapped buffer data into a Rust vector, removing row padding if present
+        // by copying it one row at a time.
+        let mut texel_vector: Vec<C> = Vec::with_capacity(element_count);
+        for row in 0..dimensions.y {
+            let byte_start_of_row = padded_bytes_per_row * row;
+            texel_vector.extend(bytemuck::cast_slice::<u8, C>(
+                &mapped[byte_start_of_row as usize..][..dense_bytes_per_row as usize],
+            ));
+        }
+        debug_assert_eq!(texel_vector.len(), element_count);
+        texel_vector
     }
 }

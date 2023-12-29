@@ -104,7 +104,8 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         ],
     );
     c.insert_variants("transparent_one", None, transparent_one, ["surf", "vol"]);
-    c.insert("zero_viewport", None, zero_viewport);
+    c.insert("viewport_zero", None, viewport_zero);
+    c.insert("viewport_prime", None, viewport_prime);
 }
 
 fn u(
@@ -785,7 +786,7 @@ async fn transparent_one(mut context: RenderTestContext, transparency_option: &s
 
 /// Renderer should not crash if given a zero-size viewport,
 /// either at initialization time or afterward.
-async fn zero_viewport(mut context: RenderTestContext) {
+async fn viewport_zero(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, one_cube_space());
     let zero = Viewport::with_scale(1.00, [0, 0]);
@@ -828,6 +829,25 @@ async fn zero_viewport(mut context: RenderTestContext) {
     viewport_cell.set(COMMON_VIEWPORT);
     context
         .render_comparison_test_with_renderer(TEXT_MAX_DIFF, &mut renderer, overlays)
+        .await;
+}
+
+/// Renderer should not require the viewport to be a multiple of a certain size.
+/// (The `wgpu` implementation has to do extra work to support this.)
+async fn viewport_prime(mut context: RenderTestContext) {
+    let mut universe = Universe::new();
+    finish_universe_from_space(&mut universe, one_cube_space());
+
+    context
+        .render_comparison_test(
+            1,
+            StandardCameras::from_constant_for_test(
+                GraphicsOptions::UNALTERED_COLORS,
+                Viewport::with_scale(1.0, [101, 37]),
+                &universe,
+            ),
+            Overlays::NONE,
+        )
         .await;
 }
 
