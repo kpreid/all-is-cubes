@@ -98,12 +98,11 @@ pub async fn get_image_from_gpu(
     device: Arc<wgpu::Device>,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
-    size: camera::ImageSize,
     flaws: camera::Flaws,
 ) -> Rendering {
     Rendering {
-        size,
-        data: get_texels_from_gpu::<[u8; 4]>(device, queue, texture, size, 1).await,
+        size: camera::ImageSize::new(texture.width(), texture.height()),
+        data: get_texels_from_gpu::<[u8; 4]>(device, queue, texture, 1).await,
         flaws,
     }
 }
@@ -118,29 +117,31 @@ pub async fn get_texels_from_gpu<C>(
     device: Arc<wgpu::Device>,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
-    dimensions: camera::ImageSize,
     components: usize,
 ) -> Vec<C>
 where
     C: bytemuck::AnyBitPattern,
 {
-    if dimensions.x == 0 || dimensions.y == 0 {
-        return Vec::new();
-    }
+    let dimensions = camera::ImageSize::new(texture.width(), texture.height());
 
     let size_of_texel = components * std::mem::size_of::<C>();
 
+    let bytes_per_row = if dimensions.y > 1 {
+        Some(dimensions.x * u32::try_from(size_of_texel).unwrap())
+    } else {
+        None
+    };
+
     // Check alignment
-    {
-        let alignment = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
-        let width = usize::try_from(dimensions.x).unwrap();
-        let bytes_per_row = width * size_of_texel;
+    if let Some(bytes_per_row) = bytes_per_row {
+        let alignment = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
         if bytes_per_row % alignment != 0 {
             // Produce a more helpful error than wgpu's validation error.
             // TODO: Repack the bytes instead.
             panic!(
-                "Cannot copy {width} texels of {size_of_texel} bytes = \
-                {bytes_per_row} bytes per row, which is not aligned to {alignment}"
+                "cannot copy {width} texels of {size_of_texel} bytes = \
+                {bytes_per_row} bytes per row, which is not aligned to {alignment}",
+                width = texture.width(),
             );
         }
     }
@@ -162,7 +163,7 @@ where
                 buffer: &temp_buffer,
                 layout: wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some(dimensions.x * u32::try_from(size_of_texel).unwrap()),
+                    bytes_per_row,
                     rows_per_image: None,
                 },
             },

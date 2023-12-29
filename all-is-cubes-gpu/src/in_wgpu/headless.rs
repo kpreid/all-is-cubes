@@ -192,6 +192,17 @@ impl RendererImpl {
     async fn draw(&mut self, info_text: &str) -> Result<camera::Rendering, camera::RenderError> {
         // TODO: refactor so that this viewport read is done synchronously, outside the RendererImpl
         let viewport = self.viewport_source.snapshot();
+
+        if viewport.framebuffer_size.x == 0 || viewport.framebuffer_size.y == 0 {
+            // GPU doesn't accept zero size, so we have to short-circuit it at this layer or we will
+            // get a placeholder at-least-1-pixel size that EverythingRenderer uses internally.
+            return Ok(camera::Rendering {
+                size: viewport.framebuffer_size,
+                data: Vec::new(),
+                flaws: Flaws::empty(),
+            });
+        }
+
         if self.viewport_dirty.get_and_clear() {
             self.color_texture = create_color_texture(&self.device, viewport);
         }
@@ -203,10 +214,10 @@ impl RendererImpl {
             self.device.clone(),
             &self.queue,
             &self.color_texture,
-            viewport.framebuffer_size,
             self.flaws,
         )
         .await;
+        debug_assert_eq!(viewport.framebuffer_size, image.size);
         Ok(image)
     }
 }
