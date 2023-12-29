@@ -295,6 +295,21 @@ impl FramebufferTextures {
         }
     }
 
+    /// Returns the depth attachment for rendering the scene
+    pub(crate) fn depth_attachment_for_scene(
+        &self,
+        mut operations: wgpu::Operations<f32>,
+    ) -> wgpu::RenderPassDepthStencilAttachment<'_> {
+        if self.config.enable_copy_out {
+            // Then always store depth
+            operations.store = wgpu::StoreOp::Store;
+        }
+        wgpu::RenderPassDepthStencilAttachment {
+            view: &self.depth_texture_view,
+            depth_ops: Some(operations),
+            stencil_ops: None,
+        }
+    }
     pub(crate) fn scene_for_postprocessing_input(&self) -> &wgpu::TextureView {
         if let Some(resolved) = &self.linear_scene_resolved_view {
             resolved

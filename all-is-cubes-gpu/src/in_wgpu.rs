@@ -571,7 +571,6 @@ impl<I: time::Instant> EverythingRenderer<I> {
     ) -> Result<DrawInfo, GraphicsResourceError> {
         let start_draw_time = I::now();
 
-        let depth_texture_view = &self.fb.depth_texture_view;
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -638,14 +637,12 @@ impl<I: time::Instant> EverythingRenderer<I> {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("debug lines"),
                 color_attachments: &[Some(self.fb.color_attachment_for_scene(wgpu::LoadOp::Load))],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: depth_texture_view,
-                    depth_ops: Some(wgpu::Operations {
+                depth_stencil_attachment: Some(self.fb.depth_attachment_for_scene(
+                    wgpu::Operations {
                         load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Discard, // nothing uses the depth buffer after this
-                    }),
-                    stencil_ops: None,
-                }),
+                        store: wgpu::StoreOp::Discard,
+                    },
+                )),
                 ..Default::default()
             });
             render_pass.set_pipeline(&self.pipelines.lines_render_pipeline);

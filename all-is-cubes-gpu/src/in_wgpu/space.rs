@@ -359,14 +359,10 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some(&self.render_pass_label),
             color_attachments: &[Some(fb.color_attachment_for_scene(color_load_op))],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &fb.depth_texture_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: store_depth,
-                }),
-                stencil_ops: None,
-            }),
+            depth_stencil_attachment: Some(fb.depth_attachment_for_scene(wgpu::Operations {
+                load: wgpu::LoadOp::Clear(1.0),
+                store: store_depth,
+            })),
             ..Default::default()
         });
 
