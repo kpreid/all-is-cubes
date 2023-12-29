@@ -137,7 +137,14 @@ where
     let dimensions = camera::ImageSize::new(texture.width(), texture.height());
     assert_eq!(texture.depth_or_array_layers(), 1);
 
+    // Check that the format matches
+    let format = texture.format();
     let size_of_texel = components * std::mem::size_of::<C>();
+    assert_eq!(
+        (format.block_size(None), format.block_dimensions()),
+        (Some(size_of_texel as u32), (1, 1)),
+        "Texture format does not match requested size",
+    );
 
     let dense_bytes_per_row = dimensions.x * u32::try_from(size_of_texel).unwrap();
     let padded_bytes_per_row = dense_bytes_per_row.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT)
