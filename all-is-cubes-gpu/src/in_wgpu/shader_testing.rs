@@ -198,10 +198,13 @@ where
             color_attachments: &[Some(
                 fbt.color_attachment_for_scene(wgpu::LoadOp::Clear(wgpu::Color::BLUE)),
             )],
-            depth_stencil_attachment: Some(fbt.depth_attachment_for_scene(wgpu::Operations {
-                load: wgpu::LoadOp::Clear(1.0),
-                store: wgpu::StoreOp::Discard,
-            })),
+            depth_stencil_attachment: Some(fbt.depth_attachment_for_scene(
+                wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Discard,
+                },
+                false,
+            )),
             ..Default::default()
         });
         render_pass.set_bind_group(0, &camera_buffer.bind_group, &[]);

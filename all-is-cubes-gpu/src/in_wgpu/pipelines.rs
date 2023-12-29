@@ -56,6 +56,14 @@ pub(crate) struct Pipelines {
     /// Pipeline for the `frame-copy` shader.
     pub(crate) frame_copy_pipeline: wgpu::RenderPipeline,
 
+    /// Bind group layout for the `rerun-copy` shader's inputs.
+    #[cfg(feature = "rerun")]
+    pub(crate) rerun_copy_layout: wgpu::BindGroupLayout,
+
+    /// Pipeline for the `rerun-copy` shader.
+    #[cfg(feature = "rerun")]
+    pub(crate) rerun_copy_pipeline: wgpu::RenderPipeline,
+
     /// A sampler configured for linear, non-mipmapped sampling, for use in resampling frames.
     pub(crate) linear_sampler: wgpu::Sampler,
 }
@@ -68,6 +76,9 @@ pub(crate) static BLOCKS_AND_LINES_SHADER: Lazy<Reloadable> =
 
 static FRAME_COPY_SHADER: Lazy<Reloadable> =
     Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/frame-copy.wgsl"));
+#[cfg(feature = "rerun")]
+static RERUN_COPY_SHADER: Lazy<Reloadable> =
+    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/rerun-copy.wgsl"));
 
 impl Pipelines {
     /// * `device` is used to create pipelines.
@@ -93,6 +104,9 @@ impl Pipelines {
 
         let frame_copy_shader =
             create_wgsl_module_from_reloadable(device, "frame-copy", &FRAME_COPY_SHADER);
+        #[cfg(feature = "rerun")]
+        let rerun_copy_shader =
+            create_wgsl_module_from_reloadable(device, "rerun-copy", &RERUN_COPY_SHADER);
 
         let block_texture_entry = |binding| wgpu::BindGroupLayoutEntry {
             binding,
@@ -336,6 +350,92 @@ impl Pipelines {
             multiview: None,
         });
 
+        #[cfg(feature = "rerun")]
+        let rerun_copy_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Pipelines::rerun_copy_layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        // We have to do our own "resolving" multisampled depth, because
+                        // it's not built in, because it's an arbitrary wrong choice.
+                        multisampled: true,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Depth,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+
+        #[cfg(feature = "rerun")]
+        let rerun_copy_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Pipelines::rerun_copy_pipeline"),
+            layout: Some(
+                &device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("Pipelines::rerun_copy_pipeline_layout"),
+                    bind_group_layouts: &[&rerun_copy_layout],
+                    push_constant_ranges: &[],
+                }),
+            ),
+            vertex: wgpu::VertexState {
+                module: &rerun_copy_shader,
+                entry_point: "rerun_frame_copy_vertex",
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &rerun_copy_shader,
+                entry_point: "rerun_frame_copy_fragment",
+                targets: &[
+                    Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                    Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::R32Float,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                ],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                ..<_>::default()
+            },
+            depth_stencil: None,
+            // we're writing *to* a non-multisampled texture
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+        });
+
         let linear_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Pipelines::linear_sampler"),
             // TODO: evaluate which address mode produces the best appearance
@@ -351,6 +451,8 @@ impl Pipelines {
         let dirty = DirtyFlag::new(false);
         BLOCKS_AND_LINES_SHADER.as_source().listen(dirty.listener());
         FRAME_COPY_SHADER.as_source().listen(dirty.listener());
+        #[cfg(feature = "rerun")]
+        RERUN_COPY_SHADER.as_source().listen(dirty.listener());
         graphics_options.listen(dirty.listener());
 
         Self {
@@ -364,6 +466,10 @@ impl Pipelines {
             lines_render_pipeline,
             frame_copy_layout,
             frame_copy_pipeline,
+            #[cfg(feature = "rerun")]
+            rerun_copy_layout,
+            #[cfg(feature = "rerun")]
+            rerun_copy_pipeline,
             linear_sampler,
         }
     }

@@ -2,12 +2,13 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use re_sdk::{RecordingStream, RecordingStreamResult};
-use re_types::datatypes;
 
 use crate::math;
 
 // To support concise conditional debugging, this module re-exports many items from rerun.
 pub use re_log_types::{entity_path, EntityPath, Index};
+pub use re_types::datatypes;
+pub use re_types::external::arrow2::types::f16;
 pub use re_types::{archetypes, components, view_coordinates};
 
 /// Information that an entity or parent of entities can store in order to know where to

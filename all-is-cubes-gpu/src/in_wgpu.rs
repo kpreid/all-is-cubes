@@ -16,6 +16,8 @@ use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::time;
 
 use crate::in_wgpu::raytrace_to_texture::RaytraceToTexture;
+#[cfg(feature = "rerun")]
+use crate::RerunFilter;
 use crate::{
     gather_debug_lines,
     in_wgpu::{
@@ -43,6 +45,8 @@ mod pipelines;
 mod poll;
 mod postprocess;
 mod raytrace_to_texture;
+#[cfg(feature = "rerun")]
+mod rerun_image;
 #[doc(hidden)] // public for tests/shader_tests.rs
 pub mod shader_testing;
 mod space;
@@ -201,15 +205,14 @@ impl<I: time::Instant> SurfaceRenderer<I> {
 
     /// Activate logging performance information state to a Rerun stream.
     #[cfg(feature = "rerun")]
-    pub fn log_to_rerun(&mut self, destination: rg::Destination) {
-        self.everything.log_to_rerun(destination)
+    pub fn log_to_rerun(&mut self, destination: rg::Destination, filter: RerunFilter) {
+        self.everything.log_to_rerun(destination, filter)
     }
 }
 
 /// All the state, both CPU and GPU-side, that is needed for drawing a complete
 /// scene and UI, but not the surface it's drawn on. This may be used in tests or
 /// to support
-#[derive(Debug)]
 struct EverythingRenderer<I> {
     device: Arc<wgpu::Device>,
 
@@ -247,6 +250,46 @@ struct EverythingRenderer<I> {
     /// Debug overlay text is uploaded via this texture
     info_text_texture: DrawableTexture<Rgb888, [u8; 4]>,
     info_text_sampler: wgpu::Sampler,
+
+    /// If active, then we read the scene out of `self.fb` and include it in the rerun log.
+    #[cfg(feature = "rerun")]
+    rerun_image: rerun_image::RerunImageExport,
+}
+
+impl<I: std::fmt::Debug> std::fmt::Debug for EverythingRenderer<I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // not at all clear how much is useful to print...
+        let Self {
+            device,
+            staging_belt,
+            cameras,
+            config,
+            fb: _,
+            pipelines: _,
+            space_renderers,
+            rt: _,
+            lines_buffer: _,
+            lines_vertex_count,
+            postprocess_render_pipeline: _,
+            postprocess_bind_group: _,
+            postprocess_bind_group_layout: _,
+            postprocess_shader_dirty,
+            postprocess_camera_buffer: _,
+            info_text_texture: _,
+            info_text_sampler: _,
+            #[cfg(feature = "rerun")]
+                rerun_image: _,
+        } = self;
+        f.debug_struct("EverythingRenderer")
+            .field("device", &device)
+            .field("staging_belt", &staging_belt)
+            .field("cameras", &cameras)
+            .field("config", &config)
+            .field("space_renderers", &space_renderers)
+            .field("lines_vertex_count", &lines_vertex_count)
+            .field("postprocess_shader_dirty", &postprocess_shader_dirty)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<I: time::Instant> EverythingRenderer<I> {
@@ -362,6 +405,9 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 ..Default::default()
             }),
 
+            #[cfg(feature = "rerun")]
+            rerun_image: rerun_image::RerunImageExport::new(device.clone()),
+
             device,
             config,
             cameras,
@@ -413,6 +459,13 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 );
             }
 
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "rerun")] {
+                    let enable_copy_out = self.rerun_image.is_enabled();
+                } else {
+                    let enable_copy_out = false;
+                }
+            }
             // Might need updates based on size or options, so ask it to check unconditionally.
             // Note: this must happen before `self.pipelines` is updated!
             self.fb.rebuild_if_changed(
@@ -421,7 +474,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                     &self.config,
                     self.fb.config().features,
                     self.cameras.graphics_options(),
-                    false,
+                    enable_copy_out,
                 ),
             );
         }
@@ -632,11 +685,12 @@ impl<I: time::Instant> EverythingRenderer<I> {
                     wgpu::LoadOp::Load
                 },
                 // We need to store the depth buffer if and only if we are going to do
-                // the lines pass.
-                match self.lines_vertex_count > 0 {
+                // the lines pass or read the scene afterward
+                match self.lines_vertex_count > 0 || self.fb.copy_out_enabled() {
                     true => wgpu::StoreOp::Store,
                     false => wgpu::StoreOp::Discard,
                 },
+                false,
             )?
         };
         let world_to_lines_time = I::now();
@@ -651,6 +705,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                         load: wgpu::LoadOp::Load,
                         store: wgpu::StoreOp::Discard,
                     },
+                    false,
                 )),
                 ..Default::default()
             });
@@ -679,6 +734,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 wgpu::LoadOp::Load
             },
             wgpu::StoreOp::Discard, // nothing uses the ui depth buffer
+            true,
         )?;
         let ui_to_postprocess_time = I::now();
 
@@ -692,6 +748,17 @@ impl<I: time::Instant> EverythingRenderer<I> {
                     self.cameras.graphics_options(),
                     !output_needs_clearing,
                 )),
+            );
+        }
+
+        // If we're copying the scene image to Rerun, then start that copy now.
+        #[cfg(feature = "rerun")]
+        if self.rerun_image.is_enabled() {
+            self.rerun_image.start_frame_copy(
+                queue,
+                &self.cameras.cameras().world,
+                &self.pipelines,
+                &self.fb,
             );
         }
 
@@ -743,17 +810,26 @@ impl<I: time::Instant> EverythingRenderer<I> {
         }
 
         postprocess::postprocess(self, queue, output);
+
+        #[cfg(feature = "rerun")]
+        self.rerun_image.finish_frame();
     }
 
     /// Activate logging performance information to a Rerun stream.
     #[cfg(feature = "rerun")]
-    pub fn log_to_rerun(&mut self, destination: rg::Destination) {
-        self.space_renderers
-            .world
-            .log_to_rerun(destination.child(&rg::entity_path!["world"]));
-        self.space_renderers
-            .ui
-            .log_to_rerun(destination.child(&rg::entity_path!["ui"]));
+    pub fn log_to_rerun(&mut self, destination: rg::Destination, filter: RerunFilter) {
+        if filter.performance {
+            self.space_renderers
+                .world
+                .log_to_rerun(destination.child(&rg::entity_path!["world"]));
+            self.space_renderers
+                .ui
+                .log_to_rerun(destination.child(&rg::entity_path!["ui"]));
+        }
+        if filter.image {
+            self.rerun_image
+                .log_to_rerun(destination.child(&rg::entity_path!["image"]));
+        }
     }
 }
 

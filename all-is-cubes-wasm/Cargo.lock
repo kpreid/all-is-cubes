@@ -93,6 +93,7 @@ dependencies = [
  "all-is-cubes",
  "all-is-cubes-mesh",
  "bytemuck",
+ "cfg-if",
  "crossbeam-channel",
  "futures-channel",
  "futures-core",

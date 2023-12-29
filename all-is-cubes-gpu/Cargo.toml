@@ -31,7 +31,7 @@ harness = false
 
 [features]
 # Adds support for render info logging to Rerun.
-rerun = ["all-is-cubes/rerun", "all-is-cubes-mesh/rerun"]
+rerun = ["all-is-cubes/rerun", "all-is-cubes-mesh/rerun", "pollster"]
 # Enable wgpu support.
 # (The library is useless without this, but we used to have multiple GPU API support
 # and I don't want to go entirely deleting it quite yet.)
@@ -43,6 +43,7 @@ threads = ["dep:rayon"]
 all-is-cubes = { path = "../all-is-cubes", version = "0.6.0" }
 all-is-cubes-mesh = { path = "../all-is-cubes-mesh", version = "0.6.0" }
 bytemuck = { workspace = true, features = ["derive"] }
+cfg-if = { workspace = true }
 futures-channel = { workspace = true, features = ["sink"] }
 futures-core = { workspace = true }
 futures-util = { workspace = true, features = ["sink"] }
@@ -51,6 +52,7 @@ half = { version = "2.3.1", features = ["bytemuck"] }
 itertools = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }
+pollster = { workspace = true, optional = true }
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }
 rayon = { workspace = true, optional = true }

@@ -178,7 +178,11 @@ pub(crate) struct FramebufferTextures {
     linear_scene_resolved_view: Option<wgpu::TextureView>,
 
     /// Depth texture to pair with `linear_scene_texture`.
-    pub(crate) depth_texture_view: wgpu::TextureView,
+    depth_texture_view: wgpu::TextureView,
+
+    /// If `enable_copy_out`, then we keep a separate depth texture for world and UI, rather
+    /// than clearing and reusing a single one.
+    ui_depth_texture_view: Option<wgpu::TextureView>,
 
     /// Resources necessary for computing bloom if enabled.
     pub(crate) bloom: Option<bloom::BloomResources>,
@@ -231,8 +235,26 @@ impl FramebufferTextures {
             dimension: wgpu::TextureDimension::D2,
             format: Self::DEPTH_FORMAT,
             view_formats: &[],
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            usage: Self::LINEAR_SCENE_TEXTURE_USAGES,
         });
+        let ui_depth_texture_view = if config.enable_copy_out {
+            Some(
+                device
+                    .create_texture(&wgpu::TextureDescriptor {
+                        label: Some("ui_depth_texture"),
+                        size: config.size,
+                        mip_level_count: 1,
+                        sample_count: config.sample_count,
+                        dimension: wgpu::TextureDimension::D2,
+                        format: Self::DEPTH_FORMAT,
+                        view_formats: &[],
+                        usage: Self::LINEAR_SCENE_TEXTURE_USAGES,
+                    })
+                    .create_view(&Default::default()),
+            )
+        } else {
+            None
+        };
 
         let linear_scene_view = linear_scene_tex.create_view(&Default::default());
         let linear_scene_resolved_view = linear_scene_resolved_tex
@@ -258,6 +280,7 @@ impl FramebufferTextures {
             linear_scene_view,
             linear_scene_resolved_view,
             depth_texture_view: depth_texture.create_view(&Default::default()),
+            ui_depth_texture_view,
 
             config,
             linear_scene_tex,
@@ -285,13 +308,18 @@ impl FramebufferTextures {
     pub(crate) fn depth_attachment_for_scene(
         &self,
         mut operations: wgpu::Operations<f32>,
+        is_ui_layer: bool,
     ) -> wgpu::RenderPassDepthStencilAttachment<'_> {
         if self.config.enable_copy_out {
             // Then always store depth
             operations.store = wgpu::StoreOp::Store;
         }
         wgpu::RenderPassDepthStencilAttachment {
-            view: &self.depth_texture_view,
+            view: self
+                .ui_depth_texture_view
+                .as_ref()
+                .filter(|_| is_ui_layer)
+                .unwrap_or(&self.depth_texture_view),
             depth_ops: Some(operations),
             stencil_ops: None,
         }
@@ -304,13 +332,25 @@ impl FramebufferTextures {
         }
     }
 
-    #[allow(unused)] // Used only in cfg(test) and so are the fields; this is simple.
+    pub(crate) fn copy_out_enabled(&self) -> bool {
+        self.config.enable_copy_out
+    }
+
+    #[allow(unused)] // Used only in special cases such as cfg(test) and cfg(feature = "rerun")
     pub(crate) fn scene_for_test_copy(&self) -> &wgpu::Texture {
+        debug_assert!(self.config.enable_copy_out);
         if let Some(resolved) = &self.linear_scene_resolved_tex {
             resolved
         } else {
             &self.linear_scene_tex
         }
+    }
+
+    /// May be used only if `enable_copy_out`
+    #[allow(unused)]
+    pub(crate) fn scene_depth_for_test(&self) -> &wgpu::TextureView {
+        debug_assert!(self.config.enable_copy_out);
+        &self.depth_texture_view
     }
 
     pub(crate) fn linear_scene_multisample_state(&self) -> wgpu::MultisampleState {

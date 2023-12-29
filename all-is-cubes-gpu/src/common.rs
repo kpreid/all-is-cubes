@@ -125,6 +125,17 @@ impl ops::Sub<Duration> for AdaptedInstant {
     }
 }
 
+#[cfg(feature = "rerun")]
+#[doc(hidden)] // not stable, just exists to support config from desktop cmdline
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct RerunFilter {
+    /// Log performance info
+    pub performance: bool,
+    /// Log the rendered image.
+    pub image: bool,
+}
+
 /// Single-entry cache.
 #[derive(Clone, Debug)]
 pub(crate) struct Memo<K, V> {
@@ -159,6 +170,18 @@ impl<K: Eq, V> Memo<K, V> {
 
     pub(crate) fn get(&self) -> Option<&V> {
         self.data.as_ref().map(|(_k, v)| v)
+    }
+
+    /// Drop the stored value, if any.
+    #[cfg_attr(not(feature = "rerun"), allow(unused))] // currently not otherwise used
+    pub fn clear(&mut self) {
+        self.data = None;
+    }
+}
+
+impl<K, V> Default for Memo<K, V> {
+    fn default() -> Self {
+        Self { data: None }
     }
 }
 

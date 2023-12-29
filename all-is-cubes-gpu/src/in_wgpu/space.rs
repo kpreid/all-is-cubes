@@ -352,6 +352,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         camera: &Camera,
         color_load_op: wgpu::LoadOp<wgpu::Color>,
         store_depth: wgpu::StoreOp,
+        is_ui: bool,
     ) -> Result<SpaceDrawInfo, GraphicsResourceError> {
         let start_time = I::now();
         let mut flaws = Flaws::empty();
@@ -359,10 +360,13 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some(&self.render_pass_label),
             color_attachments: &[Some(fb.color_attachment_for_scene(color_load_op))],
-            depth_stencil_attachment: Some(fb.depth_attachment_for_scene(wgpu::Operations {
-                load: wgpu::LoadOp::Clear(1.0),
-                store: store_depth,
-            })),
+            depth_stencil_attachment: Some(fb.depth_attachment_for_scene(
+                wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: store_depth,
+                },
+                is_ui,
+            )),
             ..Default::default()
         });
 

@@ -109,7 +109,8 @@ pub fn common_progress_style() -> indicatif::ProgressStyle {
 #[derive(Debug, Clone, Eq, Hash, PartialEq, clap::ValueEnum)]
 pub(crate) enum RerunDataKind {
     World,
-    Renderer,
+    RenderPerf,
+    RenderImage,
 }
 
 #[cfg(feature = "rerun")]
@@ -119,6 +120,7 @@ pub(crate) fn connect_rerun<Ren: crate::glue::Renderer, Win>(
     dsession: &mut crate::DesktopSession<Ren, Win>,
 ) {
     use all_is_cubes::rerun_glue as rg;
+    use all_is_cubes_gpu::RerunFilter;
 
     let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes")
         .default_enabled(true)
@@ -145,7 +147,16 @@ pub(crate) fn connect_rerun<Ren: crate::glue::Renderer, Win>(
     }
 
     // Attach to renderer
-    if kinds.contains(&RerunDataKind::Renderer) {
-        dsession.renderer.log_to_rerun(destination.clone());
+    let mut render_filter = RerunFilter::default();
+    if kinds.contains(&RerunDataKind::RenderPerf) {
+        render_filter.performance = true;
+    }
+    if kinds.contains(&RerunDataKind::RenderImage) {
+        render_filter.image = true;
+    }
+    if render_filter != RerunFilter::default() {
+        dsession
+            .renderer
+            .log_to_rerun(destination.clone(), render_filter);
     }
 }
