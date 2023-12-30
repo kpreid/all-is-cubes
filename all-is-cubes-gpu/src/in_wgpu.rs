@@ -283,11 +283,13 @@ impl<I: time::Instant> EverythingRenderer<I> {
         };
 
         let fb = FramebufferTextures::new(
-            FbtFeatures::new(adapter),
             &device,
-            &config,
-            cameras.graphics_options(),
-            false,
+            frame_texture::FbtConfig::new(
+                &config,
+                FbtFeatures::new(adapter),
+                cameras.graphics_options(),
+                false,
+            ),
         );
 
         let postprocess_bind_group_layout =
@@ -413,8 +415,15 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
             // Might need updates based on size or options, so ask it to check unconditionally.
             // Note: this must happen before `self.pipelines` is updated!
-            self.fb
-                .rebuild_if_changed(&self.device, &self.config, self.cameras.graphics_options());
+            self.fb.rebuild_if_changed(
+                &self.device,
+                frame_texture::FbtConfig::new(
+                    &self.config,
+                    self.fb.config().features,
+                    self.cameras.graphics_options(),
+                    false,
+                ),
+            );
         }
 
         // Recompile shaders and pipeline if needed.

@@ -10,7 +10,7 @@
 
 use std::sync::Arc;
 
-use wgpu::util::DeviceExt;
+use wgpu::util::DeviceExt as _;
 
 use all_is_cubes::block::Resolution;
 use all_is_cubes::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
@@ -23,7 +23,7 @@ use all_is_cubes_mesh::{BlockVertex, Coloring};
 use crate::in_wgpu::{
     self,
     camera::ShaderSpaceCamera,
-    frame_texture::FbtFeatures,
+    frame_texture::{FbtConfig, FbtFeatures},
     init::get_texels_from_gpu,
     space::SpaceCameraBuffer,
     vertex::{WgpuBlockVertex, WgpuInstanceData},
@@ -56,20 +56,22 @@ where
         + test_wgsl;
 
     let fbt = FramebufferTextures::new(
-        FbtFeatures::new(adapter),
         &device,
-        // TODO: We don't actually need a SurfaceConfiguration here, only its size.
-        &wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: wgpu::TextureFormat::Rgba16Float,
-            view_formats: vec![],
-            width: output_viewport.framebuffer_size.x,
-            height: output_viewport.framebuffer_size.y,
-            present_mode: wgpu::PresentMode::Fifo,
-            alpha_mode: wgpu::CompositeAlphaMode::Auto,
-        },
-        &GraphicsOptions::default(),
-        true,
+        FbtConfig::new(
+            // TODO: We don't actually need a SurfaceConfiguration here, only its size.
+            &wgpu::SurfaceConfiguration {
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                format: wgpu::TextureFormat::Rgba16Float,
+                view_formats: vec![],
+                width: output_viewport.framebuffer_size.x,
+                height: output_viewport.framebuffer_size.y,
+                present_mode: wgpu::PresentMode::Fifo,
+                alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            },
+            FbtFeatures::new(adapter),
+            &GraphicsOptions::default(),
+            true,
+        ),
     );
 
     let pipelines = in_wgpu::pipelines::Pipelines::new(

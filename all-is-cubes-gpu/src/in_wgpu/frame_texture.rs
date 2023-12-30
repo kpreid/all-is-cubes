@@ -155,7 +155,7 @@ impl<In, Out> OriginDimensions for DrawableTexture<In, Out> {
 /// [`super::EverythingRenderer`]. TODO: Find a better code organization.
 #[derive(Debug)]
 pub(crate) struct FramebufferTextures {
-    /// Pure-data (no GPU resources) record of what format we chose.
+    /// Pure-data (no GPU resources) record of what format and size we chose.
     config: FbtConfig,
 
     /// Texture into which geometry is drawn before postprocessing.
@@ -192,21 +192,7 @@ impl FramebufferTextures {
     pub const LINEAR_SCENE_TEXTURE_USAGES: wgpu::TextureUsages =
         wgpu::TextureUsages::RENDER_ATTACHMENT.union(wgpu::TextureUsages::TEXTURE_BINDING);
 
-    /// `config` must be valid (in particular, not zero sized).
-    pub(crate) fn new(
-        features: FbtFeatures,
-        device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
-        options: &GraphicsOptions,
-        enable_copy_out: bool,
-    ) -> Self {
-        Self::new_from_config(
-            device,
-            FbtConfig::new(config, features, options, enable_copy_out),
-        )
-    }
-
-    fn new_from_config(device: &wgpu::Device, config: FbtConfig) -> Self {
+    pub fn new(device: &wgpu::Device, config: FbtConfig) -> Self {
         let mut linear_scene_texture_usages_with_copy = Self::LINEAR_SCENE_TEXTURE_USAGES;
         if config.enable_copy_out {
             linear_scene_texture_usages_with_copy |= wgpu::TextureUsages::COPY_SRC;
@@ -340,27 +326,25 @@ impl FramebufferTextures {
     }
 
     /// Update `self` to be as if it had been recreated with [`Self::new()`]
-    /// if any input is different in a way that requires it.
+    /// if any part of the needed configuration is different in a way that requires it.
     ///
     /// Returns whether any update was made.
     pub(crate) fn rebuild_if_changed(
         &mut self,
         device: &wgpu::Device,
-        surface_config: &wgpu::SurfaceConfiguration,
-        options: &GraphicsOptions,
+        new_config: FbtConfig,
     ) -> bool {
-        let new_config = FbtConfig::new(
-            surface_config,
-            self.config.features,
-            options,
-            self.config.enable_copy_out,
-        );
         if new_config != self.config {
-            *self = Self::new_from_config(device, new_config);
+            *self = Self::new(device, new_config);
             true
         } else {
             false
         }
+    }
+
+    /// Returns the [`FbtConfig`] this was constructed with.
+    pub(crate) fn config(&self) -> &FbtConfig {
+        &self.config
     }
 
     pub(crate) fn flaws(&self) -> Flaws {
@@ -389,14 +373,13 @@ pub(crate) struct FbtId {
     scene_id: wgpu::Id<wgpu::TextureView>,
 }
 
-/// A decision about what texture format [`FramebufferTextures`] should employ,
-/// separated from the format itself.
+/// Pure-data inputs to [`FramebufferTextures`]'s choice of texture format and size.
 ///
 /// This struct's `==` can be used to decide whether re-creation is needed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct FbtConfig {
     /// Features remembered for future use.
-    features: FbtFeatures,
+    pub(crate) features: FbtFeatures,
 
     /// Size of all textures.
     pub(crate) size: wgpu::Extent3d,
@@ -419,7 +402,8 @@ pub(crate) struct FbtConfig {
 }
 
 impl FbtConfig {
-    fn new(
+    /// `surface_config` must be valid (in particular, not zero sized).
+    pub fn new(
         surface_config: &wgpu::SurfaceConfiguration,
         features: FbtFeatures,
         options: &GraphicsOptions,
