@@ -45,12 +45,7 @@ impl Destination {
                 .log_timeless(path.clone(), &annotation_context())?;
             self.stream.log_timeless(
                 path.clone(),
-                &archetypes::ViewCoordinates::new(
-                    components::ViewCoordinates::from_up_and_handedness(
-                        crate::math::Face6::PY.into(),
-                        view_coordinates::Handedness::Right,
-                    ),
-                ),
+                &archetypes::ViewCoordinates::new(OUR_VIEW_COORDINATES),
             )?;
             Ok(())
         });
@@ -86,6 +81,8 @@ impl Destination {
 }
 
 // --- Timeless configuration ---
+
+const OUR_VIEW_COORDINATES: components::ViewCoordinates = components::ViewCoordinates::RUB;
 
 /// Enum describing class id numbers we use in our rerun streams.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -142,6 +139,32 @@ where
     let array: [f32; 3] = v.cast::<f32>().into();
     datatypes::Vec3D::from(array)
 }
+pub fn convert_quaternion<S, Src, Dst>(
+    rot: euclid::Rotation3D<S, Src, Dst>,
+) -> datatypes::Quaternion
+where
+    S: num_traits::NumCast,
+{
+    let rot = [rot.i, rot.j, rot.k, rot.r];
+    datatypes::Quaternion(rot.map(|c| c.to_f32().unwrap()))
+}
+
+pub fn convert_transform<S, Src, Dst>(
+    t: euclid::RigidTransform3D<S, Src, Dst>,
+    from_parent: bool,
+) -> datatypes::Transform3D
+where
+    S: num_traits::NumCast + Copy,
+{
+    datatypes::Transform3D::TranslationRotationScale(datatypes::TranslationRotationScale3D {
+        translation: Some(convert_vec(t.translation)),
+        rotation: Some(datatypes::Rotation3D::Quaternion(convert_quaternion(
+            t.rotation,
+        ))),
+        scale: None,
+        from_parent,
+    })
+}
 
 pub fn convert_aabs(
     aabs: impl IntoIterator<Item = math::Aab>,
@@ -157,6 +180,35 @@ pub fn convert_aabs(
         })
         .unzip();
     archetypes::Boxes3D::from_half_sizes(half_sizes).with_centers(centers)
+}
+
+pub fn convert_camera_to_pinhole(
+    camera: &crate::camera::Camera,
+) -> (archetypes::Pinhole, archetypes::Transform3D) {
+    let size = camera.viewport().framebuffer_size.to_f32();
+    let half_size = size * 0.5;
+    let aspect = size.x / size.y;
+    // tangent of the half-field of view, which is the ratio of the image half-size to the focal length
+    let tan_fov_y = (camera.fov_y() * 0.5).to_radians().tan() as f32;
+    let tan_fov_x = tan_fov_y * aspect;
+    #[rustfmt::skip]
+    let pinhole_matrix = datatypes::Mat3x3([
+        // column major
+        half_size.x / tan_fov_x,  0.,          0.,
+        0.,          half_size.y / tan_fov_y,  0.,
+        half_size.x, half_size.y,              1.,
+    ]);
+    (
+        archetypes::Pinhole {
+            image_from_camera: components::PinholeProjection(pinhole_matrix),
+            resolution: Some(components::Resolution(datatypes::Vec2D(size.into()))),
+            camera_xyz: Some(OUR_VIEW_COORDINATES),
+        },
+        archetypes::Transform3D {
+            // TODO: shouldn't from_parent be true?
+            transform: convert_transform(camera.get_view_transform(), false).into(),
+        },
+    )
 }
 
 pub fn milliseconds(d: core::time::Duration) -> archetypes::TimeSeriesScalar {
