@@ -212,6 +212,7 @@ pub(crate) enum RerunDataKind {
     World,
     RenderPerf,
     RenderImage,
+    RenderMesh,
 }
 
 /// Input for logging-like initialization that needs to happen later when we have more information.
@@ -230,48 +231,84 @@ impl LateLogging {
         universe: &mut all_is_cubes::universe::Universe,
         dsession: &mut crate::DesktopSession<Ren, Win>,
     ) {
-        let LateLogging {
-            kinds,
-            #[cfg(feature = "rerun")]
-                rerun_destination: destination,
-        } = self;
-
         cfg_if::cfg_if! {
             if #[cfg(feature = "rerun")] {
-                use all_is_cubes_gpu::RerunFilter;
-
-                // Attach to universe elements
-                // TODO: We need a solution for worlds loaded after app start
-                if kinds.contains(&RerunDataKind::World) {
-                    universe.log_to_rerun(destination.clone());
-                    if let Some(c) = universe.get_default_character() {
-                        c.try_modify(|c| c.log_to_rerun(destination.child(&rg::entity_path!["character"])))
-                            .unwrap();
-                    }
-                }
-
-                // Attach to renderer
-                let mut render_filter = RerunFilter::default();
-                if kinds.contains(&RerunDataKind::RenderPerf) {
-                    render_filter.performance = true;
-                }
-                if kinds.contains(&RerunDataKind::RenderImage) {
-                    render_filter.image = true;
-                }
-                if render_filter != RerunFilter::default() {
-                    dsession
-                        .renderer
-                        .log_to_rerun(destination.clone(), render_filter);
-                }
+                // split out into a function so rustfmt isn't interfered with by the macro
+                actually_log_to_rerun(&self, universe, dsession);
             } else {
                 // suppress warning
                 let _ = (universe, dsession);
 
-                if !kinds.is_empty() {
+                if !self.kinds.is_empty() {
                     // TODO: cleaner error handling from this point
                     panic!("not compiled with rerun logging support");
                 }
             }
         }
+    }
+}
+
+#[cfg(feature = "rerun")]
+fn actually_log_to_rerun<Ren: crate::glue::Renderer, Win>(
+    this: &LateLogging,
+    universe: &mut all_is_cubes::universe::Universe,
+    dsession: &mut crate::DesktopSession<Ren, Win>,
+) {
+    use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport};
+    use all_is_cubes_gpu::RerunFilter;
+
+    let LateLogging {
+        kinds,
+        #[cfg(feature = "rerun")]
+            rerun_destination: destination,
+    } = this;
+
+    // Attach to universe elements
+    // Note that this starts the `session_step_time` timeline, so it should happen
+    // before other initial logging.
+    // TODO: We need a solution for worlds loaded after app start
+    if kinds.contains(&RerunDataKind::World) {
+        universe.log_to_rerun(destination.clone());
+        if let Some(c) = universe.get_default_character() {
+            c.try_modify(|c| {
+                c.log_to_rerun(destination.child(&rg::entity_path!["character"]));
+            })
+            .unwrap();
+        }
+    }
+
+    if kinds.contains(&RerunDataKind::RenderMesh) {
+        if let Some(c) = universe.get_default_character() {
+            c.try_modify(|c| {
+                // TODO: implement live updates -- need to permanently attach this to the session
+                // as another renderer, sort of.
+                let mut rm = crate::glue::rerun_mesh::RerunMesher::new(
+                    destination.child(&rg::entity_path!("world-mesh")),
+                    c.space.clone(),
+                );
+                rm.update(&Camera::new(
+                    GraphicsOptions::default(),
+                    Viewport::with_scale(1.0, [1, 1]),
+                ));
+                core::mem::forget(rm);
+            })
+            .unwrap();
+        } else {
+            panic!("no character to render mesh from");
+        }
+    }
+
+    // Attach to renderer
+    let mut render_filter = RerunFilter::default();
+    if kinds.contains(&RerunDataKind::RenderPerf) {
+        render_filter.performance = true;
+    }
+    if kinds.contains(&RerunDataKind::RenderImage) {
+        render_filter.image = true;
+    }
+    if render_filter != RerunFilter::default() {
+        dsession
+            .renderer
+            .log_to_rerun(destination.clone(), render_filter);
     }
 }

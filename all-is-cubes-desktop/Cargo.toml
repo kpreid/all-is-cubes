@@ -39,6 +39,7 @@ clap = { workspace = true }
 crossterm = "0.27.0"
 directories-next = "2.0.0"
 indicatif = { version = "0.17.0", default-features = false }
+itertools = { workspace = true }
 kira = { version = "0.8.3", default-features = false, features = ["cpal"] }
 log = { workspace = true }
 once_cell = { workspace = true }

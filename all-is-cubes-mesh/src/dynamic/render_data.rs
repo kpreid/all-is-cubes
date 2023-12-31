@@ -1,5 +1,8 @@
 use core::fmt;
 
+use all_is_cubes::euclid::Vector3D;
+use all_is_cubes::math::{FreeVector, GridCoordinate};
+
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
 use crate::dynamic::DynamicMeshTypes;
@@ -52,6 +55,30 @@ pub struct MeshId(pub(crate) MeshIdImpl);
 pub(crate) enum MeshIdImpl {
     Chunk([i32; 3]),
     Block(all_is_cubes::space::BlockIndex),
+}
+
+impl MeshId {
+    /// If the identified mesh is to be rendered exactly once in the scene at a fixed location,
+    /// then this method returns the translation from world coordinates to vertex coordinates.
+    /// If the mesh is to be rendered multiple times, returns [`None`].
+    ///
+    /// In cases where the mesh data is being used in a “retained mode” fashion,
+    /// this may be used as a shortcut to not need to separately consult the [`ChunkedSpaceMesh`]
+    /// for what meshes to render where. However, instanced meshes (for which this method returns
+    /// `None`) still require separate handling.
+    ///
+    /// You must pass the `CHUNK_SIZE` value from the [`ChunkedSpaceMesh`].
+    #[inline]
+    pub fn singleton_translation(&self, chunk_size: GridCoordinate) -> Option<FreeVector> {
+        match self.0 {
+            MeshIdImpl::Chunk(chunk_pos) => {
+                let chunk_pos = Vector3D::from(chunk_pos).to_f64();
+                let translation = chunk_pos * f64::from(chunk_size);
+                Some(translation)
+            }
+            MeshIdImpl::Block(_) => None,
+        }
+    }
 }
 
 impl fmt::Display for MeshId {
