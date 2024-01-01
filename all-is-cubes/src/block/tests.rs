@@ -116,9 +116,9 @@ mod eval {
     fn air_in_recursive_block() {
         let mut universe = Universe::new();
         let block = Block::builder()
-            .voxels_fn(&mut universe, R1, |_| AIR)
+            .voxels_fn(R1, |_| AIR)
             .unwrap()
-            .build();
+            .build_into(&mut universe);
         assert_eq!(
             block.evaluate().unwrap().voxels.single_voxel().unwrap(),
             Evoxel::AIR
@@ -200,12 +200,12 @@ mod eval {
         };
         let block = Block::builder()
             .attributes(attributes.clone())
-            .voxels_fn(&mut universe, resolution, |point| {
+            .voxels_fn(resolution, |point| {
                 let point = point.lower_bounds().cast::<f32>();
                 Block::from(Rgba::new(point.x, point.y, point.z, 1.0))
             })
             .unwrap()
-            .build();
+            .build_into(&mut universe);
 
         let e = block.evaluate().unwrap();
         assert_eq!(e.attributes, attributes);
@@ -263,7 +263,7 @@ mod eval {
         let voxel_color = Rgb::new(1.0, 0.5, 0.0);
         let alpha = 0.5;
         let block = Block::builder()
-            .voxels_fn(&mut universe, resolution, |point| {
+            .voxels_fn(resolution, |point| {
                 Block::from(voxel_color.with_alpha(if point.x == 0 && point.z == 0 {
                     NotNan::new(alpha).unwrap()
                 } else {
@@ -271,7 +271,7 @@ mod eval {
                 }))
             })
             .unwrap()
-            .build();
+            .build_into(&mut universe);
 
         let e = block.evaluate().unwrap();
         // Transparency is (currently) computed by an orthographic view through all six
@@ -323,11 +323,9 @@ mod eval {
         let c2 = Rgb::new(0.0, 1.0, 0.0);
         let colors = [c1.with_alpha_one(), c2.with_alpha(notnan!(0.5))];
         let block = Block::builder()
-            .voxels_fn(&mut universe, R2, |cube| {
-                Block::from(colors[cube.y as usize])
-            })
+            .voxels_fn(R2, |cube| Block::from(colors[cube.y as usize]))
             .unwrap()
-            .build();
+            .build_into(&mut universe);
         let surface_area: f32 = 4. * 6.;
 
         let e = block.evaluate().unwrap();
@@ -358,7 +356,7 @@ mod eval {
         let resolution = R4;
         let mut universe = Universe::new();
         let block = Block::builder()
-            .voxels_fn(&mut universe, resolution, |cube| {
+            .voxels_fn(resolution, |cube| {
                 Block::from(Rgba::new(
                     0.0,
                     0.0,
@@ -367,7 +365,7 @@ mod eval {
                 ))
             })
             .unwrap()
-            .build();
+            .build_into(&mut universe);
 
         let e = block.evaluate().unwrap();
         assert_eq!(
@@ -473,15 +471,9 @@ mod eval {
             })
             .build();
         let block = Block::builder()
-            .voxels_fn(&mut universe, R4, |cube| {
-                if cube == Cube::ORIGIN {
-                    &voxel
-                } else {
-                    &AIR
-                }
-            })
+            .voxels_fn(R4, |cube| if cube == Cube::ORIGIN { &voxel } else { &AIR })
             .unwrap()
-            .build();
+            .build_into(&mut universe);
 
         let e = block.evaluate().unwrap();
         assert_eq!(

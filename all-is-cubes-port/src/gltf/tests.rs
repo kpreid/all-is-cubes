@@ -38,11 +38,11 @@ fn gltf_smoke_test() {
     let mut blocks = Vec::from(make_some_blocks::<2>());
     blocks.push(AIR);
     let recursive_block = Block::builder()
-        .voxels_fn(&mut u, resolution, |p| {
+        .voxels_fn(resolution, |p| {
             &blocks[(p.x as usize).rem_euclid(blocks.len())]
         })
         .unwrap()
-        .build();
+        .build_into(&mut u);
     let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
         .filled_with(recursive_block)
         .build();

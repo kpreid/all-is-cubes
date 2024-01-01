@@ -251,7 +251,7 @@ async fn emission(mut context: RenderTestContext) {
         *b"....",
     ]]);
     let block = Block::builder()
-        .voxels_fn(&mut universe, R4, |mut p| {
+        .voxels_fn(R4, |mut p| {
             p.z = 0;
             match block_shape[p] {
                 b'.' => &white,
@@ -261,7 +261,7 @@ async fn emission(mut context: RenderTestContext) {
             }
         })
         .unwrap()
-        .build();
+        .build_into(&mut universe);
 
     // TODO: use voxels
     space.set([0, 0, 0], block).unwrap();
@@ -901,7 +901,7 @@ async fn antialias_test_universe() -> Arc<Universe> {
     let large_block = Block::from(rgba_const!(1., 0., 0., 1.));
     let voxel_part = Block::from(rgba_const!(0.5, 0., 1., 1.));
     let voxel_block_1 = Block::builder()
-        .voxels_fn(&mut universe, R2, |p| {
+        .voxels_fn(R2, |p| {
             if (p.x + p.y + p.z).rem_euclid(2) == 0 {
                 &voxel_part
             } else {
@@ -909,7 +909,7 @@ async fn antialias_test_universe() -> Arc<Universe> {
             }
         })
         .unwrap()
-        .build();
+        .build_into(&mut universe);
     let [voxel_block_2] = make_some_voxel_blocks(&mut universe);
     let voxel_block_2 = voxel_block_2.rotate(GridRotation::RZyX);
 

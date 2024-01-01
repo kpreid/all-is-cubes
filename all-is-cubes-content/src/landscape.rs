@@ -166,7 +166,7 @@ pub async fn install_landscape_blocks(
                         .map_err(InGenError::other)?
                         .attributes,
                 )
-                .voxels_fn(universe, resolution, |cube| {
+                .voxels_fn(resolution, |cube| {
                     if f64::from(cube.y)
                         < blade_noise[cube
                             + GridVector::new(
@@ -180,7 +180,7 @@ pub async fn install_landscape_blocks(
                         AIR
                     }
                 })?
-                .build())
+                .build_into(universe))
         };
 
         Ok(match key {
@@ -191,8 +191,8 @@ pub async fn install_landscape_blocks(
                         .map_err(InGenError::other)?
                         .attributes,
                 )
-                .voxels_fn(universe, resolution, &stone_pattern)?
-                .build(),
+                .voxels_fn(resolution, &stone_pattern)?
+                .build_into(universe),
 
             Grass => Block::builder()
                 .attributes(
@@ -201,14 +201,14 @@ pub async fn install_landscape_blocks(
                         .map_err(InGenError::other)?
                         .attributes,
                 )
-                .voxels_fn(universe, resolution, |cube| {
+                .voxels_fn(resolution, |cube| {
                     if f64::from(cube.y) >= overhang_noise[cube] {
                         scale_color(colors[Grass].clone(), blade_color_noise(cube), 0.02)
                     } else {
                         dirt_pattern(cube).clone()
                     }
                 })?
-                .build(),
+                .build_into(universe),
 
             GrassBlades { variant } => grass_blades(universe, variant.into())?,
 
@@ -219,8 +219,8 @@ pub async fn install_landscape_blocks(
                         .map_err(InGenError::other)?
                         .attributes,
                 )
-                .voxels_fn(universe, resolution, &dirt_pattern)?
-                .build(),
+                .voxels_fn(resolution, &dirt_pattern)?
+                .build_into(universe),
 
             key @ Log(growth) => {
                 let resolution = R16;
@@ -238,7 +238,7 @@ pub async fn install_landscape_blocks(
                             .map_err(InGenError::other)?
                             .attributes,
                     )
-                    .voxels_fn(universe, resolution, |cube| {
+                    .voxels_fn(resolution, |cube| {
                         if trunk_box.contains_cube(cube) {
                             // TODO: separate bark from inner wood
                             scale_color(color_block.clone(), bark_noise(cube), 0.05)
@@ -246,7 +246,7 @@ pub async fn install_landscape_blocks(
                             AIR
                         }
                     })?
-                    .build()
+                    .build_into(universe)
             }
 
             key @ Leaves(growth) => Block::builder()
@@ -256,7 +256,7 @@ pub async fn install_landscape_blocks(
                         .map_err(InGenError::other)?
                         .attributes,
                 )
-                .voxels_fn(universe, resolution, |cube| {
+                .voxels_fn(resolution, |cube| {
                     // Distance this cube is from the center.
                     // TODO: This is the same computation as done by square_radius() but
                     // not with the same output. Can we share some logic there?
@@ -283,7 +283,7 @@ pub async fn install_landscape_blocks(
                         &AIR
                     }
                 })?
-                .build(),
+                .build_into(universe),
         })
     })
     .await?

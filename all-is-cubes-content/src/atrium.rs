@@ -574,17 +574,17 @@ async fn install_atrium_blocks(
 
             AtriumBlocks::GroundFloor => Block::builder()
                 .display_name("Atrium Ground Floor")
-                .voxels_fn(universe, resolution, |p| {
+                .voxels_fn(resolution, |p| {
                     if p.x == 0 {
                         &heavy_grout_base
                     } else {
                         brick_pattern(p)
                     }
                 })?
-                .build(),
+                .build_into(universe),
             AtriumBlocks::UpperFloor => Block::builder()
                 .display_name("Atrium Upper Floor")
-                .voxels_fn(universe, resolution, |p| {
+                .voxels_fn(resolution, |p| {
                     // Add a white ceiling
                     if p.y == 0 {
                         &ceiling_paint
@@ -592,11 +592,11 @@ async fn install_atrium_blocks(
                         brick_pattern(p)
                     }
                 })?
-                .build(),
+                .build_into(universe),
             AtriumBlocks::SolidBricks => Block::builder()
                 .display_name("Atrium Wall Bricks")
-                .voxels_fn(universe, resolution, brick_pattern)?
-                .build(),
+                .voxels_fn(resolution, brick_pattern)?
+                .build_into(universe),
             AtriumBlocks::GroundArch => {
                 generate_arch(universe, &stone_range, brick_pattern, resolution, 7, 3)?
             }
@@ -606,7 +606,7 @@ async fn install_atrium_blocks(
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                .voxels_fn(universe, resolution, |p| {
+                .voxels_fn(resolution, |p| {
                     let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x + mid.z < resolution_g * 6 / 4 {
                         bottom_grout_pattern(p)
@@ -614,11 +614,11 @@ async fn install_atrium_blocks(
                         &AIR
                     }
                 })?
-                .build(),
+                .build_into(universe),
             AtriumBlocks::SquareColumn => Block::builder()
                 .display_name("Square Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                .voxels_fn(universe, resolution, |p| {
+                .voxels_fn(resolution, |p| {
                     let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x.max(p.z) < resolution_g * 6 / 4 {
                         bottom_grout_pattern(p)
@@ -626,11 +626,11 @@ async fn install_atrium_blocks(
                         &AIR
                     }
                 })?
-                .build(),
+                .build_into(universe),
             AtriumBlocks::SmallColumn => Block::builder()
                 .display_name("Round Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                .voxels_fn(universe, resolution, |p| {
+                .voxels_fn(resolution, |p| {
                     let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x.pow(2) + mid.z.pow(2) < (resolution_g * 3 / 4).pow(2) {
                         bottom_grout_pattern(p)
@@ -638,16 +638,16 @@ async fn install_atrium_blocks(
                         &AIR
                     }
                 })?
-                .build(),
+                .build_into(universe),
             AtriumBlocks::Molding => Block::builder()
                 .display_name("Atrium Top Edge Molding")
                 // TODO: rotation rule
-                .voxels_fn(universe, resolution, molding_fn)?
-                .build(),
+                .voxels_fn(resolution, molding_fn)?
+                .build_into(universe),
 
             AtriumBlocks::Banner(color) => Block::builder()
                 .display_name(format!("Atrium Banner {color}"))
-                .voxels_fn(universe, resolution, |p| {
+                .voxels_fn(resolution, |p| {
                     // wavy banner shape
                     let wave = (f64::from(p.x) * (TAU / f64::from(resolution))).sin() * 2.2;
                     if p.z == i32::from(resolution) / 2 + wave as i32 {
@@ -656,29 +656,25 @@ async fn install_atrium_blocks(
                         AIR
                     }
                 })?
-                .build(),
+                .build_into(universe),
             AtriumBlocks::BannerBottomAccent => {
                 let accent_color = Block::from(rgba_const!(0.95, 0.89, 0.05, 1.0));
                 Block::builder()
                     .display_name("Banner Accent")
-                    .voxels_fn(universe, resolution, |p| {
+                    .voxels_fn(resolution, |p| {
                         if [0, 1, 2, 6, 8].contains(&p.y) {
                             &accent_color
                         } else {
                             &AIR
                         }
                     })?
-                    .build()
+                    .build_into(universe)
             }
 
             AtriumBlocks::Pole => Block::builder()
                 .display_name("Pole")
-                .voxels_fn(
-                    universe,
-                    (Resolution::R16 * MULTIBLOCK_SCALE).unwrap(),
-                    &pole_fn,
-                )?
-                .build(),
+                .voxels_fn((Resolution::R16 * MULTIBLOCK_SCALE).unwrap(), &pole_fn)?
+                .build_into(universe),
             AtriumBlocks::Firepot => Block::builder()
                 .display_name("Firepot")
                 .voxels_ref(resolution, {

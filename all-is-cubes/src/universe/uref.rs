@@ -92,8 +92,6 @@ impl<T: 'static> URef<T> {
     ///
     /// Note that specifying a [`Name::Anonym`] will create a `URef` which cannot actually
     /// be inserted into another [`Universe`], even if the specified number is free.
-    ///
-    /// TODO: Actually inserting these into a [`Universe`] is not yet implemented.
     pub fn new_pending(name: Name, initial_value: T) -> Self {
         let strong_ref = Arc::new(RwLock::new(UEntry {
             data: Some(initial_value),

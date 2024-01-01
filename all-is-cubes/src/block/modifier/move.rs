@@ -253,9 +253,9 @@ mod tests {
         let resolution = R2;
         let color = rgba_const!(1.0, 0.0, 0.0, 1.0);
         let original = Block::builder()
-            .voxels_fn(&mut universe, resolution, |_| Block::from(color))
+            .voxels_fn(resolution, |_| Block::from(color))
             .unwrap()
-            .build();
+            .build_into(&mut universe);
 
         let moved = original.clone().with_modifier(Move {
             direction: Face6::PY,

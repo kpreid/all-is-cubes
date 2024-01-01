@@ -493,7 +493,7 @@ pub(crate) fn make_button_label_block(
     universe: &mut Universe,
     name: &str,
     icon: ButtonIcon<'_>,
-) -> Result<BlockBuilder<BlockBuilderVoxels>, InGenError> {
+) -> Result<BlockBuilder<BlockBuilderVoxels, ()>, InGenError> {
     let mut space = Space::builder(GridAab::from_lower_size(
         [0, 0, 0],
         [theme::RESOLUTION_G, theme::RESOLUTION_G, 1],
@@ -650,7 +650,7 @@ impl ButtonBase for ToggleButtonVisualState {
     fn button_block(&self, universe: &mut Universe) -> Result<Block, InGenError> {
         let label_z = self.button_label_z();
         let active = self.value;
-        let illuminate = move |builder: BlockBuilder<block::builder::BlockBuilderAtom>| {
+        let illuminate = move |builder: BlockBuilder<block::builder::BlockBuilderAtom, ()>| {
             if active {
                 builder.light_emission(palette::BUTTON_ACTIVATED_GLOW)
             } else {

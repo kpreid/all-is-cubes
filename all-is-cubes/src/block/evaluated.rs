@@ -809,7 +809,7 @@ mod tests {
             .build();
         let ev = Block::builder()
             .display_name("hello")
-            .voxels_fn(&mut universe, R2, |p| {
+            .voxels_fn(R2, |p| {
                 if p == Cube::new(1, 1, 1) {
                     &AIR
                 } else {
@@ -817,7 +817,7 @@ mod tests {
                 }
             })
             .unwrap()
-            .build()
+            .build_into(&mut universe)
             .evaluate()
             .unwrap();
 

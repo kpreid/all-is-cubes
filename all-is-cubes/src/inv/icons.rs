@@ -241,7 +241,7 @@ impl Icons {
                         } else {
                             "Jetpack (off)"
                         })
-                        .voxels_fn(universe, resolution, |cube| {
+                        .voxels_fn(resolution, |cube| {
                             let (shape_radius, block) =
                                 shape[((GridCoordinate::from(resolution) - 1) - cube.y) as usize];
                             let centered_p =
@@ -263,7 +263,7 @@ impl Icons {
                                 &AIR
                             }
                         })?
-                        .build()
+                        .build_into(universe)
                 }
             })
         })

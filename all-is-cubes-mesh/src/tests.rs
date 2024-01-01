@@ -155,9 +155,9 @@ fn trivial_voxels_equals_atom() {
     let mut u = Universe::new();
     let atom_block = Block::from(Rgba::new(0.0, 1.0, 0.0, 1.0));
     let trivial_recursive_block = Block::builder()
-        .voxels_fn(&mut u, R1, |_| &atom_block)
+        .voxels_fn(R1, |_| &atom_block)
         .unwrap()
-        .build();
+        .build_into(&mut u);
 
     let (_, _, space_rendered_a) = mesh_blocks_and_space(
         &Space::builder(GridAab::ORIGIN_CUBE)
@@ -241,11 +241,11 @@ fn space_mesh_equals_block_mesh() {
     let mut blocks = Vec::from(make_some_blocks::<2>());
     blocks.push(AIR);
     let recursive_block = Block::builder()
-        .voxels_fn(&mut u, resolution, |p| {
+        .voxels_fn(resolution, |p| {
             &blocks[(p.x as usize).rem_euclid(blocks.len())]
         })
         .unwrap()
-        .build();
+        .build_into(&mut u);
     let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
         .filled_with(recursive_block)
         .build();
@@ -276,9 +276,9 @@ fn block_resolution_greater_than_tile() {
     let block_resolution = R32;
     let mut u = Universe::new();
     let block = Block::builder()
-        .voxels_fn(&mut u, block_resolution, non_uniform_fill)
+        .voxels_fn(block_resolution, non_uniform_fill)
         .unwrap()
-        .build();
+        .build_into(&mut u);
     let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
         .filled_with(block)
         .build();
@@ -296,7 +296,7 @@ fn shrunken_box_has_no_extras() {
     let resolution = R8;
     let mut u = Universe::new();
     let less_than_full_block = Block::builder()
-        .voxels_fn(&mut u, resolution, |cube| {
+        .voxels_fn( resolution, |cube| {
             if GridAab::from_lower_size([2, 2, 2], [4, 4, 4]).contains_cube(cube) {
                 non_uniform_fill(cube)
             } else {
@@ -304,7 +304,7 @@ fn shrunken_box_has_no_extras() {
             }
         })
         .unwrap()
-        .build();
+        .build_into(&mut u,);
     let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
         .filled_with(less_than_full_block)
         .build();
@@ -359,7 +359,7 @@ fn shrunken_box_uniform_color() {
     let mut u = Universe::new();
     let filler_block = Block::from(Rgba::new(0.0, 1.0, 0.5, 1.0));
     let less_than_full_block = Block::builder()
-        .voxels_fn(&mut u, resolution, |cube| {
+        .voxels_fn(resolution, |cube| {
             if GridAab::from_lower_size([2, 2, 2], [4, 4, 4]).contains_cube(cube) {
                 &filler_block
             } else {
@@ -367,7 +367,7 @@ fn shrunken_box_uniform_color() {
             }
         })
         .unwrap()
-        .build();
+        .build_into(&mut u, );
     let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
         .filled_with(less_than_full_block)
         .build();
@@ -457,7 +457,7 @@ fn fully_opaque_voxels() {
     let resolution = R8;
     let mut u = Universe::new();
     let block = Block::builder()
-        .voxels_fn(&mut u, resolution, |cube| {
+        .voxels_fn(resolution, |cube| {
             // Make a cube-corner shape
             // TODO: Also test partial alpha
             if cube.x < 1 || cube.y < 1 || cube.z < 1 {
@@ -467,7 +467,7 @@ fn fully_opaque_voxels() {
             }
         })
         .unwrap()
-        .build();
+        .build_into(&mut u);
     assert_eq!(
         opacities(&test_block_mesh(block)),
         FaceMap {
@@ -544,7 +544,7 @@ fn handling_allocation_failure() {
     let mut u = Universe::new();
     let [atom1, atom2] = make_some_blocks();
     let complex_block = Block::builder()
-        .voxels_fn(&mut u, resolution, |cube| {
+        .voxels_fn(resolution, |cube| {
             if (cube.x + cube.y + cube.z).rem_euclid(2) == 0 {
                 &atom1
             } else {
@@ -552,7 +552,7 @@ fn handling_allocation_failure() {
             }
         })
         .unwrap()
-        .build();
+        .build_into(&mut u);
     let block_derived_color = complex_block.evaluate().unwrap().color;
 
     let space = Space::builder(GridAab::ORIGIN_CUBE)

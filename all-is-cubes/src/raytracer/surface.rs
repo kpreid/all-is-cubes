@@ -368,7 +368,7 @@ mod tests {
 
         // This block has some AIR in it that the iterator will traverse
         let slab_with_extra_space = Block::builder()
-            .voxels_fn(universe, R4, |cube| {
+            .voxels_fn(R4, |cube| {
                 if cube.y >= 2 {
                     &AIR
                 } else {
@@ -376,7 +376,7 @@ mod tests {
                 }
             })
             .unwrap()
-            .build();
+            .build_into(universe);
 
         space.set([0, 1, 0], Block::from(solid_test_color)).unwrap();
         space.set([0, 2, 0], slab_with_extra_space).unwrap();

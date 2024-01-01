@@ -136,7 +136,7 @@ pub async fn install_demo_blocks(
 
                 Block::builder()
                     .display_name("Glass Block")
-                    .voxels_fn(universe, resolution, |cube| {
+                    .voxels_fn(resolution, |cube| {
                         let unit_radius_point = cube
                             .midpoint()
                             .map(|c| c / (FreeCoordinate::from(resolution_g) / 2.0) - 1.0);
@@ -147,7 +147,7 @@ pub async fn install_demo_blocks(
                             .dot(Vector3D::new(1.0, 1.0, 1.0));
                         gradient_lookup(&glass_densities, (1.0 - r as f32) * 2.0)
                     })?
-                    .build()
+                    .build_into(universe)
             }
 
             Road => {
@@ -167,17 +167,17 @@ pub async fn install_demo_blocks(
 
                 Block::builder()
                     .display_name("Road")
-                    .voxels_fn(universe, output_resolution, |cube| {
+                    .voxels_fn(output_resolution, |cube| {
                         let y = (i32::from(output_resolution) - 1 - cube.y) / 2;
                         let x = rng.gen_range(range.clone());
                         palette_image.get_brush(x, y).origin_block().unwrap_or(&AIR)
                     })?
-                    .build()
+                    .build_into(universe)
             }
 
             Lamp => Block::builder()
                 .display_name("Lamp")
-                .voxels_fn(universe, resolution, |cube| {
+                .voxels_fn(resolution, |cube| {
                     if (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
                         .square_length()
                         <= resolution_g.pow(2)
@@ -187,12 +187,12 @@ pub async fn install_demo_blocks(
                         &AIR
                     }
                 })?
-                .build(),
+                .build_into(universe),
 
             LamppostSegment => Block::builder()
                 .display_name("Lamppost")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                .voxels_fn(universe, resolution, |cube| {
+                .voxels_fn(resolution, |cube| {
                     if (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
                         .component_mul(GridVector::new(1, 0, 1))
                         .square_length()
@@ -203,12 +203,12 @@ pub async fn install_demo_blocks(
                         &AIR
                     }
                 })?
-                .build(),
+                .build_into(universe),
 
             LamppostBase => Block::builder()
                 .display_name("Lamppost Base")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                .voxels_fn(universe, resolution, |cube| {
+                .voxels_fn(resolution, |cube| {
                     let shape: [GridCoordinate; 16] =
                         [8, 8, 7, 7, 6, 6, 6, 5, 5, 5, 6, 6, 5, 4, 4, 3];
                     let [radius, secondary] = square_radius(resolution, cube);
@@ -222,12 +222,12 @@ pub async fn install_demo_blocks(
                         &AIR
                     }
                 })?
-                .build(),
+                .build_into(universe),
 
             LamppostTop => Block::builder()
                 .display_name("Lamppost Top")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                .voxels_fn(universe, resolution, |cube| {
+                .voxels_fn(resolution, |cube| {
                     let shape: [GridCoordinate; 16] =
                         [4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 7, 8];
                     let r2 = (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
@@ -239,12 +239,12 @@ pub async fn install_demo_blocks(
                         &AIR
                     }
                 })?
-                .build(),
+                .build_into(universe),
 
             Sconce => Block::builder()
                 .display_name("Sconce")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
-                .voxels_fn(universe, resolution, |cube| {
+                .voxels_fn(resolution, |cube| {
                     // TODO: fancier/tidier appearance; this was just some tinkering from the original `Lamp` sphere
                     let r2 = (cube.lower_bounds() * 2 + one_diagonal
                         - center_point_doubled
@@ -261,7 +261,7 @@ pub async fn install_demo_blocks(
                         &AIR
                     }
                 })?
-                .build(),
+                .build_into(universe),
 
             Arrow => {
                 let mut space = Space::for_block(resolution).build();
@@ -315,8 +315,8 @@ pub async fn install_demo_blocks(
                 .display_name("Curb")
                 // TODO: rotation should specify curb line direction
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                .voxels_fn(universe, resolution, curb_fn)?
-                .build(),
+                .voxels_fn(resolution, curb_fn)?
+                .build_into(universe),
 
             ExhibitBackground => {
                 let colors = [
@@ -325,16 +325,16 @@ pub async fn install_demo_blocks(
                 ];
                 Block::builder()
                     .display_name("Exhibit Background")
-                    .voxels_fn(universe, R4, |cube| {
+                    .voxels_fn(R4, |cube| {
                         &colors[(cube.x + cube.y + cube.z).rem_euclid(2) as usize]
                     })?
-                    .build()
+                    .build_into(universe)
             }
 
             Pedestal => Block::builder()
                 .display_name("Pedestal")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                .voxels_fn(universe, resolution, |cube| {
+                .voxels_fn(resolution, |cube| {
                     // TODO: fancier shape
                     let shape: [GridCoordinate; 16] =
                         [6, 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 7, 8, 8];
@@ -346,7 +346,7 @@ pub async fn install_demo_blocks(
                         &AIR
                     }
                 })?
-                .build(),
+                .build_into(universe),
 
             Signboard => {
                 let sign_board = Block::from(palette::PLANK);

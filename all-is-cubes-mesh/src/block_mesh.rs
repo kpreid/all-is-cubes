@@ -715,7 +715,7 @@ mod tests {
         let mut universe = Universe::new();
         // Define a block which has only solid colored faces, so gets vertex colors
         let block = Block::builder()
-            .voxels_fn(&mut universe, Resolution::R2, |cube| {
+            .voxels_fn(Resolution::R2, |cube| {
                 if cube == Cube::ORIGIN {
                     AIR
                 } else {
@@ -723,7 +723,7 @@ mod tests {
                 }
             })
             .unwrap()
-            .build();
+            .build_into(&mut universe);
 
         let mesh = test_block_mesh(block);
         // Check our setup is correct: the mesh has only vertex colors.

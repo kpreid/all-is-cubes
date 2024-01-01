@@ -6,12 +6,13 @@ use alloc::vec::Vec;
 use arcstr::ArcStr;
 
 use crate::block::{
-    AnimationHint, Atom, Block, BlockAttributes, BlockCollision, BlockDef, BlockParts, BlockPtr,
-    Modifier, Primitive, Resolution, RotationPlacementRule, AIR,
+    AnimationHint, Atom, Block, BlockAttributes, BlockCollision, BlockParts, BlockPtr, Modifier,
+    Primitive, Resolution, RotationPlacementRule, AIR,
 };
 use crate::math::{Cube, GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
-use crate::universe::{Name, URef, Universe};
+use crate::transaction::{self, Transaction};
+use crate::universe::{Name, URef, Universe, UniverseTransaction};
 
 /// Tool for constructing [`Block`] values conveniently.
 ///
@@ -35,30 +36,35 @@ use crate::universe::{Name, URef, Universe};
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[must_use]
-pub struct BlockBuilder<P> {
+pub struct BlockBuilder<P, Txn> {
     attributes: BlockAttributes,
     primitive_builder: P,
     modifiers: Vec<Modifier>,
+
+    /// If this is a [`UniverseTransaction`], then it must be produced for the caller to execute.
+    /// If this is `()`, then it may be disregarded.
+    transaction: Txn,
 }
 
-impl Default for BlockBuilder<NeedsPrimitive> {
+impl Default for BlockBuilder<NeedsPrimitive, ()> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl BlockBuilder<NeedsPrimitive> {
+impl BlockBuilder<NeedsPrimitive, ()> {
     /// Common implementation of [`Block::builder`] and [`Default::default`]; use one of those to call this.
-    pub(super) const fn new() -> BlockBuilder<NeedsPrimitive> {
+    pub(super) const fn new() -> Self {
         BlockBuilder {
             attributes: BlockAttributes::default(),
             primitive_builder: NeedsPrimitive,
             modifiers: Vec::new(),
+            transaction: (),
         }
     }
 }
 
-impl<C> BlockBuilder<C> {
+impl<P, Txn> BlockBuilder<P, Txn> {
     // TODO: When #![feature(const_precise_live_drops)] becomes stable, we can make
     // this builder mostly usable in const contexts.
     // https://github.com/rust-lang/rust/issues/73255
@@ -113,7 +119,7 @@ impl<C> BlockBuilder<C> {
     /// Sets the color value for building a [`Primitive::Atom`].
     ///
     /// This will replace any previous color **or voxels.**
-    pub fn color(self, color: impl Into<Rgba>) -> BlockBuilder<BlockBuilderAtom> {
+    pub fn color(self, color: impl Into<Rgba>) -> BlockBuilder<BlockBuilderAtom, ()> {
         BlockBuilder {
             attributes: self.attributes,
             primitive_builder: BlockBuilderAtom {
@@ -122,6 +128,10 @@ impl<C> BlockBuilder<C> {
                 collision: BlockCollision::Hard,
             },
             modifiers: Vec::new(),
+            // TODO: This might not be the right thing in more general transaction usage.
+            // For now, it's OK that we discard the transaction because it can only ever be
+            // inserting a `Space`.
+            transaction: (),
         }
     }
 
@@ -132,7 +142,7 @@ impl<C> BlockBuilder<C> {
         self,
         resolution: Resolution,
         space: URef<Space>,
-    ) -> BlockBuilder<BlockBuilderVoxels> {
+    ) -> BlockBuilder<BlockBuilderVoxels, ()> {
         BlockBuilder {
             attributes: self.attributes,
             primitive_builder: BlockBuilderVoxels {
@@ -141,24 +151,22 @@ impl<C> BlockBuilder<C> {
                 offset: GridPoint::origin(),
             },
             modifiers: Vec::new(),
+            transaction: (),
         }
     }
 
     /// Constructs a `Space` for building a [`Primitive::Recur`], and calls
     /// the given function to fill it with blocks, in the manner of [`Space::fill`].
     ///
-    /// Note that the resulting builder is cloned, all clones will share the same
+    /// Note that if the resulting builder is cloned, all clones will share the same
     /// space.
     // TODO: (doc) test for this
     pub fn voxels_fn<F, B>(
         self,
-        // TODO: awkward requirement for universe; defer computation instead, or
-        // add a `.universe()` method to provide it once.
-        universe: &mut Universe,
         // TODO: Maybe resolution should be a separate method? Check usage patterns later.
         resolution: Resolution,
         mut function: F,
-    ) -> Result<BlockBuilder<BlockBuilderVoxels>, SetCubeError>
+    ) -> Result<BlockBuilder<BlockBuilderVoxels, UniverseTransaction>, SetCubeError>
     where
         F: FnMut(Cube) -> B,
         B: core::borrow::Borrow<Block>,
@@ -166,15 +174,26 @@ impl<C> BlockBuilder<C> {
         let mut space = Space::for_block(resolution).build();
         // TODO: Teach the SpaceBuilder to accept a function in the same way?
         space.fill(space.bounds(), |point| Some(function(point)))?;
-        Ok(self.voxels_ref(resolution, universe.insert_anonymous(space)))
+
+        let space_ref = URef::new_pending(Name::Pending, space);
+
+        Ok(BlockBuilder {
+            attributes: self.attributes,
+            primitive_builder: BlockBuilderVoxels {
+                space: space_ref.clone(),
+                resolution,
+                offset: GridPoint::origin(),
+            },
+            modifiers: Vec::new(),
+            transaction: UniverseTransaction::insert(space_ref),
+        })
     }
 
-    /// Converts this builder into a block value.
-    pub fn build(self) -> Block
+    fn build_block_ignoring_transaction(self) -> Block
     where
-        C: BuildPrimitiveIndependent,
+        P: BuildPrimitive,
     {
-        let primitive = self.primitive_builder.build_i(self.attributes);
+        let primitive = self.primitive_builder.build_primitive(self.attributes);
         if matches!(primitive, Primitive::Air) && self.modifiers.is_empty() {
             // Avoid allocating an Arc.
             AIR
@@ -185,32 +204,41 @@ impl<C> BlockBuilder<C> {
             })))
         }
     }
+}
 
-    /// Converts this builder into a block value and stores it as a [`BlockDef`] in
-    /// the given [`Universe`] with the given name, then returns a [`Primitive::Indirect`]
-    /// block referring to it.
-    // TODO: This is not being used, because most named block definitions use BlockProvider,
-    // and complicates the builder unnecessarily. Remove it or figure out how it aligns with
-    // BlockProvider.
-    pub fn into_named_definition(
-        self,
-        universe: &mut Universe,
-        name: impl Into<Name>,
-    ) -> Result<Block, crate::universe::InsertError>
+impl<P> BlockBuilder<P, ()> {
+    /// Converts this builder into a block value.
+    ///
+    /// This method may only be used when the builder has *not* been used with `voxels_fn()`,
+    /// since in that case a universe transaction must be executed.
+    pub fn build(self) -> Block
     where
-        C: BuildPrimitiveInUniverse,
+        P: BuildPrimitive,
     {
-        let block = Block(BlockPtr::Owned(Arc::new(BlockParts {
-            primitive: self.primitive_builder.build_u(self.attributes, universe),
-            modifiers: self.modifiers,
-        })));
-        let def_ref = universe.insert(name.into(), BlockDef::new(block))?;
-        Ok(Block::from_primitive(Primitive::Indirect(def_ref)))
+        self.build_block_ignoring_transaction()
+    }
+}
+
+impl<P> BlockBuilder<P, UniverseTransaction> {
+    // TODO: Also allow extracting the transaction for later use
+
+    /// Converts this builder into a block value, and inserts its associated [`Space`] into the
+    /// given universe.
+    pub fn build_into(self, universe: &mut Universe) -> Block
+    where
+        P: BuildPrimitive,
+    {
+        // The transaction is always an insert_anonymous, which cannot fail.
+        self.transaction
+            .execute(universe, &mut transaction::no_outputs)
+            .unwrap();
+
+        self.build_block_ignoring_transaction()
     }
 }
 
 /// Atom-specific builder methods.
-impl BlockBuilder<BlockBuilderAtom> {
+impl<Txn> BlockBuilder<BlockBuilderAtom, Txn> {
     /// Sets the collision behavior of a [`Primitive::Atom`] block.
     pub const fn collision(mut self, collision: BlockCollision) -> Self {
         self.primitive_builder.collision = collision;
@@ -233,7 +261,7 @@ impl BlockBuilder<BlockBuilderAtom> {
 }
 
 /// Voxel-specific builder methods.
-impl BlockBuilder<BlockBuilderVoxels> {
+impl<Txn> BlockBuilder<BlockBuilderVoxels, Txn> {
     /// Sets the coordinate offset for building a [`Primitive::Recur`]:
     /// the lower-bound corner of the region of the [`Space`]
     /// which will be used for block voxels. The default is zero.
@@ -247,19 +275,19 @@ impl BlockBuilder<BlockBuilderVoxels> {
 }
 
 /// Allows implicitly converting `BlockBuilder` to the block it would build.
-impl<C: BuildPrimitiveIndependent> From<BlockBuilder<C>> for Block {
-    fn from(builder: BlockBuilder<C>) -> Self {
+impl<C: BuildPrimitive> From<BlockBuilder<C, ()>> for Block {
+    fn from(builder: BlockBuilder<C, ()>) -> Self {
         builder.build()
     }
 }
 /// Equivalent to `Block::builder().color(color)`.
-impl From<Rgba> for BlockBuilder<BlockBuilderAtom> {
+impl From<Rgba> for BlockBuilder<BlockBuilderAtom, ()> {
     fn from(color: Rgba) -> Self {
         Block::builder().color(color)
     }
 }
 /// Equivalent to `Block::builder().color(color.with_alpha_one())`.
-impl From<Rgb> for BlockBuilder<BlockBuilderAtom> {
+impl From<Rgb> for BlockBuilder<BlockBuilderAtom, ()> {
     fn from(color: Rgb) -> Self {
         Block::builder().color(color.with_alpha_one())
     }
@@ -271,21 +299,10 @@ impl From<Rgb> for BlockBuilder<BlockBuilderAtom> {
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct NeedsPrimitive;
 
-/// Primitive-builder of a [`BlockBuilder`] that can build a block without a [`Universe`].
+/// Something that a parameterized [`BlockBuilder`] can use to construct a block's primitive.
 #[doc(hidden)]
-pub trait BuildPrimitiveIndependent {
-    fn build_i(self, attributes: BlockAttributes) -> Primitive;
-}
-/// Primitive-builder of a [`BlockBuilder`] that can only build a block with a [`Universe`].
-#[doc(hidden)]
-pub trait BuildPrimitiveInUniverse {
-    fn build_u(self, attributes: BlockAttributes, universe: &mut Universe) -> Primitive;
-}
-/// Every [`BuildPrimitiveIndependent`] can act as [`BuildPrimitiveInUniverse`].
-impl<T: BuildPrimitiveIndependent> BuildPrimitiveInUniverse for T {
-    fn build_u(self, attributes: BlockAttributes, _: &mut Universe) -> Primitive {
-        self.build_i(attributes)
-    }
+pub trait BuildPrimitive {
+    fn build_primitive(self, attributes: BlockAttributes) -> Primitive;
 }
 
 /// Parameter type for [`BlockBuilder::color`], building [`Primitive::Atom`].
@@ -295,8 +312,8 @@ pub struct BlockBuilderAtom {
     emission: Rgb,
     collision: BlockCollision,
 }
-impl BuildPrimitiveIndependent for BlockBuilderAtom {
-    fn build_i(self, attributes: BlockAttributes) -> Primitive {
+impl BuildPrimitive for BlockBuilderAtom {
+    fn build_primitive(self, attributes: BlockAttributes) -> Primitive {
         Primitive::Atom(Atom {
             attributes,
             color: self.color,
@@ -314,8 +331,8 @@ pub struct BlockBuilderVoxels {
     resolution: Resolution,
     offset: GridPoint,
 }
-impl BuildPrimitiveIndependent for BlockBuilderVoxels {
-    fn build_i(self, attributes: BlockAttributes) -> Primitive {
+impl BuildPrimitive for BlockBuilderVoxels {
+    fn build_primitive(self, attributes: BlockAttributes) -> Primitive {
         Primitive::Recur {
             attributes,
             offset: self.offset,
@@ -351,8 +368,8 @@ mod tests {
     #[test]
     fn default_equivalent() {
         assert_eq!(
-            BlockBuilder::<NeedsPrimitive>::new(),
-            <BlockBuilder<NeedsPrimitive> as Default>::default()
+            BlockBuilder::new(),
+            <BlockBuilder<NeedsPrimitive, ()> as Default>::default()
         );
     }
 
@@ -417,9 +434,9 @@ mod tests {
         let resolution = R8;
         let block = Block::builder()
             .display_name("hello world")
-            .voxels_fn(&mut universe, resolution, |_cube| &AIR)
+            .voxels_fn(resolution, |_cube| &AIR)
             .unwrap()
-            .build();
+            .build_into(&mut universe);
 
         // Extract the implicitly constructed space reference
         let space_ref = if let Primitive::Recur { space, .. } = block.primitive() {

@@ -52,6 +52,9 @@
         - `space::Space::draw_target()`
         - `space::SpaceTransaction::draw_target()`
 
+    - `block::BlockBuilder::voxels_fn()` no longer takes a `&mut Universe` parameter.
+      Instead, the universe must be supplied through a call to `.build_into()` (replacing `.build()` in this case).
+
     - `math::GridArray` is now `math::Vol` and allows choice of the data container type.
 
     - `camera::HeadlessRenderer` now returns a custom image container type `Rendering` instead of using `image::RgbaImage`.
@@ -78,6 +81,8 @@
 ### Removed
 
 - `all-is-cubes` library:
+    - `block::BlockBuilder::into_named_definition()` no longer exists.
+      Instead, create the `BlockDef` separately after using the builder.
     - `math::Aab::from_cube()` no longer exists. Use `Cube::aab()` instead.
     - `math::Face7::matrix()` no longer exists. Use `Face6::face_transform()` instead.
     - `math::GridAab::contains_cube()` no longer accepts `impl Into<GridPoint>`.

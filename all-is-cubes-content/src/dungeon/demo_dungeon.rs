@@ -634,7 +634,7 @@ pub async fn install_dungeon_blocks(
             CorridorLight => Block::builder()
                 .display_name("Corridor Light")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::PY })
-                .voxels_fn(universe, resolution, |cube| {
+                .voxels_fn(resolution, |cube| {
                     let centered = cube.lower_bounds() * 2 - center_point_doubled;
                     if centered.y > centered.x.abs() && centered.y > centered.z.abs() {
                         &light_voxel
@@ -642,7 +642,7 @@ pub async fn install_dungeon_blocks(
                         &AIR
                     }
                 })?
-                .build(),
+                .build_into(universe),
 
             FloorTile => {
                 let resolution = R32;
@@ -660,7 +660,7 @@ pub async fn install_dungeon_blocks(
 
             Spikes => Block::builder()
                 .display_name("Spikes")
-                .voxels_fn(universe, resolution, |Cube { x, y, z }| {
+                .voxels_fn(resolution, |Cube { x, y, z }| {
                     let resolution = f64::from(resolution);
                     let bsin = |x| (f64::from(x) * TAU / resolution * 2.0).sin();
                     if f64::from(y) / resolution < bsin(x) * bsin(z) {
@@ -669,7 +669,7 @@ pub async fn install_dungeon_blocks(
                         &AIR
                     }
                 })?
-                .build(),
+                .build_into(universe),
 
             Gate => {
                 let space =

@@ -147,12 +147,12 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
         .build();
 
     let water_surface_block = Block::builder()
-        .voxels_fn(universe, R8, |p| match p.y {
+        .voxels_fn(R8, |p| match p.y {
             0..=3 => &water_voxel,
             4 => &water_surface_voxel,
             _ => &AIR,
         })?
-        .build();
+        .build_into(universe);
 
     let window_block = {
         let window_pane_resolution = R32;
@@ -164,7 +164,7 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
 
         Block::builder()
             .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
-            .voxels_fn(universe, window_pane_resolution, |p| {
+            .voxels_fn(window_pane_resolution, |p| {
                 if p.z >= depth {
                     return &AIR;
                 }
@@ -181,7 +181,7 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
                     &window_glass_inner_block
                 }
             })?
-            .build()
+            .build_into(universe)
     };
 
     four_walls(
@@ -519,7 +519,7 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
             [
                 pedestal,
                 &Block::builder()
-                    .voxels_fn(universe, resolution, |p| {
+                    .voxels_fn(resolution, |p| {
                         if p.x + p.y + p.z >= GridCoordinate::from(resolution) {
                             return AIR.clone();
                         }
@@ -539,7 +539,7 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
                         );
                         Block::from(color)
                     })?
-                    .build(),
+                    .build_into(universe),
                 &text::Text::builder()
                     .resolution(R32)
                     .string(arcstr::format!("{resolution}"))
@@ -949,14 +949,14 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
     let corner = Block::builder()
         .display_name("Color room wall corner")
         .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ }) // TODO: more specific
-        .voxels_fn(universe, wall_resolution, |p| {
+        .voxels_fn(wall_resolution, |p| {
             if p.x.pow(2) + p.z.pow(2) < GridCoordinate::from(wall_resolution).pow(2) {
                 &wall_color_block
             } else {
                 &AIR
             }
         })?
-        .build();
+        .build_into(universe);
 
     // Construct room.
     crate::BoxStyle::from_whole_blocks_for_walls(
@@ -1089,7 +1089,7 @@ async fn DASHED_BOXES(_: &Exhibit, universe: &mut Universe) {
     let corner_brush = Block::from(color * 0.6);
     let line_segment = Block::builder()
         .display_name("Dashed Box Segment")
-        .voxels_fn(universe, R16, |p| {
+        .voxels_fn(R16, |p| {
             let zmod = p.z.rem_euclid(4);
             if p.x == 0 && p.y == 0 && zmod > 0 && zmod < 3 {
                 &brush
@@ -1097,17 +1097,17 @@ async fn DASHED_BOXES(_: &Exhibit, universe: &mut Universe) {
                 &AIR
             }
         })?
-        .build();
+        .build_into(universe);
     let corner = Block::builder()
         .display_name("Dashed Box Corner")
-        .voxels_fn(universe, R16, |p| {
+        .voxels_fn(R16, |p| {
             if p.x < 2 && p.z < 2 && p.y < 2 {
                 &corner_brush
             } else {
                 &AIR
             }
         })?
-        .build();
+        .build_into(universe);
     let style = crate::BoxStyle::from_composited_corner_and_edge(corner, line_segment);
 
     let mut space = Space::empty_positive(7, 3, 3);
@@ -1358,8 +1358,8 @@ async fn DESTRUCTION(_: &Exhibit, universe: &mut Universe) {
         let pattern = voronoi_pattern(resolution, false, &points);
 
         Ok(Block::builder()
-            .voxels_fn(universe, resolution, pattern)?
-            .build())
+            .voxels_fn(resolution, pattern)?
+            .build_into(universe))
     }
 
     for stage in 0i32..width {

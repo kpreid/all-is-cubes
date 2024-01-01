@@ -215,7 +215,7 @@ mod tests {
         };
         let block = Block::builder()
             .display_name("foo")
-            .voxels_fn(&mut universe, resolution, |cube| {
+            .voxels_fn(resolution, |cube| {
                 // Construct a lower half block with all voxels distinct
                 Block::from(color_fn(cube))
             })
@@ -224,7 +224,7 @@ mod tests {
             .tick_action(Some(TickAction::from(Operation::Become(
                 replacement.clone(),
             ))))
-            .build();
+            .build_into(&mut universe);
         let be = block.evaluate().unwrap();
 
         let rotated = block.clone().rotate(rotation);
