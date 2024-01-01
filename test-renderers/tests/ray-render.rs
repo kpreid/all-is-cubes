@@ -16,6 +16,7 @@ async fn main() -> test_renderers::HarnessResult {
         RendererId::Raytracer,
         test_renderers::test_cases::all_tests,
         || std::future::ready(RtFactory),
+        None,
     )
     .await
 }

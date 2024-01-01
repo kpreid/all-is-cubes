@@ -210,6 +210,7 @@ pub async fn harness_main<Factory, Ff>(
     renderer_id: RendererId,
     test_suite: fn(&mut TestCaseCollector<'_>),
     factory_factory: Ff, // TODO: better name
+    max_parallelism: Option<usize>,
 ) -> HarnessResult
 where
     Factory: RendererFactory + 'static,
@@ -335,7 +336,7 @@ where
             }
             .boxed()
         })
-        .buffer_unordered(4);
+        .buffer_unordered(max_parallelism.unwrap_or(4));
 
     let mut per_test_output = BTreeMap::new();
     let mut count_passed = 0;

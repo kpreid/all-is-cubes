@@ -23,11 +23,20 @@ async fn main() -> test_renderers::HarnessResult {
         return ExitCode::SUCCESS;
     };
 
+    let parallelism = if option_env!("CI").is_some() && cfg!(target_os = "macos") {
+        // Attempted workaround for out-of-memory on macOS CI. If this doesn't help then
+        // the problem must be a leak, not concurrency.
+        Some(1)
+    } else {
+        None
+    };
+
     test_renderers::harness_main(
         test_renderers::HarnessArgs::parse(),
         RendererId::Wgpu,
         test_renderers::test_cases::all_tests,
         get_factory,
+        parallelism,
     )
     .await
 }
