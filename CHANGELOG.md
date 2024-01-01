@@ -55,7 +55,7 @@
         - `space::SpaceTransaction::draw_target()`
 
     - `block::BlockBuilder::voxels_fn()` no longer takes a `&mut Universe` parameter.
-      Instead, the universe must be supplied through a call to `.build_into()` (replacing `.build()` in this case).
+      Instead, either the universe or a transaction must be supplied through a call to `.build_into()` or `.build_txn()`.
 
     - `math::GridArray` is now `math::Vol` and allows choice of the data container type.
 

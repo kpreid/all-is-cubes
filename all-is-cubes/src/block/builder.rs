@@ -11,7 +11,7 @@ use crate::block::{
 };
 use crate::math::{Cube, GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
-use crate::transaction::{self, Transaction};
+use crate::transaction::{self, Merge, Transaction};
 use crate::universe::{Name, URef, Universe, UniverseTransaction};
 
 /// Tool for constructing [`Block`] values conveniently.
@@ -189,12 +189,12 @@ impl<P, Txn> BlockBuilder<P, Txn> {
         })
     }
 
-    fn build_block_ignoring_transaction(self) -> Block
+    fn build_block_and_txn_internal(self) -> (Block, Txn)
     where
         P: BuildPrimitive,
     {
         let primitive = self.primitive_builder.build_primitive(self.attributes);
-        if matches!(primitive, Primitive::Air) && self.modifiers.is_empty() {
+        let block = if matches!(primitive, Primitive::Air) && self.modifiers.is_empty() {
             // Avoid allocating an Arc.
             AIR
         } else {
@@ -202,38 +202,44 @@ impl<P, Txn> BlockBuilder<P, Txn> {
                 primitive,
                 modifiers: self.modifiers,
             })))
-        }
+        };
+        (block, self.transaction)
     }
 }
 
-impl<P> BlockBuilder<P, ()> {
+impl<P: BuildPrimitive> BlockBuilder<P, ()> {
     /// Converts this builder into a block value.
     ///
     /// This method may only be used when the builder has *not* been used with `voxels_fn()`,
     /// since in that case a universe transaction must be executed.
-    pub fn build(self) -> Block
-    where
-        P: BuildPrimitive,
-    {
-        self.build_block_ignoring_transaction()
+    pub fn build(self) -> Block {
+        let (block, ()) = self.build_block_and_txn_internal();
+        block
     }
 }
 
-impl<P> BlockBuilder<P, UniverseTransaction> {
+impl<P: BuildPrimitive> BlockBuilder<P, UniverseTransaction> {
     // TODO: Also allow extracting the transaction for later use
 
     /// Converts this builder into a block value, and inserts its associated [`Space`] into the
     /// given universe.
-    pub fn build_into(self, universe: &mut Universe) -> Block
-    where
-        P: BuildPrimitive,
-    {
+    pub fn build_into(self, universe: &mut Universe) -> Block {
+        let (block, transaction) = self.build_block_and_txn_internal();
+
         // The transaction is always an insert_anonymous, which cannot fail.
-        self.transaction
+        transaction
             .execute(universe, &mut transaction::no_outputs)
             .unwrap();
 
-        self.build_block_ignoring_transaction()
+        block
+    }
+
+    /// Converts this builder into a [`Block`] value, and modifies the given transaction to include
+    /// inserting the associated space into the universe the block is to be used in.
+    pub fn build_txn(self, transaction: &mut UniverseTransaction) -> Block {
+        let (block, txn) = self.build_block_and_txn_internal();
+        transaction.merge_from(txn).unwrap();
+        block
     }
 }
 
@@ -469,5 +475,21 @@ mod tests {
         );
 
         // TODO: assert the voxels are correct
+    }
+
+    #[test]
+    fn explicit_txn() {
+        let resolution = R8;
+        let mut txn = UniverseTransaction::default();
+        let _block = Block::builder()
+            .display_name("hello world")
+            .voxels_fn(resolution, |_cube| &AIR)
+            .unwrap()
+            .build_txn(&mut txn);
+        let mut universe = Universe::new();
+        txn.execute(&mut universe, &mut transaction::no_outputs)
+            .unwrap();
+
+        assert_eq!(universe.iter_by_type::<Space>().count(), 1);
     }
 }
