@@ -41,8 +41,8 @@ use all_is_cubes::{include_image, rgb_const, rgba_const};
 use crate::alg::{four_walls, voronoi_pattern};
 use crate::city::{Exhibit, Placement};
 use crate::{
-    make_slab, make_some_blocks, make_some_voxel_blocks, palette, tree, AnimatedVoxels, DemoBlocks,
-    Fire, LandscapeBlocks,
+    make_slab_txn, make_some_blocks, make_some_voxel_blocks_txn, palette, tree, AnimatedVoxels,
+    DemoBlocks, Fire, LandscapeBlocks,
 };
 
 type ExhibitTransaction = all_is_cubes::universe::UniverseTransaction;
@@ -134,7 +134,9 @@ async fn TRANSPARENCY_LARGE(_: &Exhibit, _universe: &mut Universe) {
         We also need something for surface properties.",
     placement: Placement::Surface,
 )]
-async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
+async fn TRANSPARENCY_SMALL(_: &Exhibit, _universe: &mut Universe) {
+    let mut txn = ExhibitTransaction::default();
+
     let footprint = GridAab::from_lower_size([0, 0, 0], [7, 4, 7]);
     let pool = GridAab::from_lower_size([1, 0, 1], [5, 2, 5]);
     let mut space = Space::empty(footprint);
@@ -154,7 +156,7 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
             4 => &water_surface_voxel,
             _ => &AIR,
         })?
-        .build_into(universe);
+        .build_txn(&mut txn);
 
     let window_block = {
         let window_pane_resolution = R32;
@@ -183,7 +185,7 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
                     &window_glass_inner_block
                 }
             })?
-            .build_into(universe)
+            .build_txn(&mut txn)
     };
 
     four_walls(
@@ -205,10 +207,10 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
     )?;
     space.fill_uniform(pool.abut(Face6::PY, -1).unwrap(), &water_surface_block)?;
 
-    let [floater] = make_some_voxel_blocks(universe);
+    let [floater] = make_some_voxel_blocks_txn(&mut txn);
     space.set([3, 1, 3], floater)?;
 
-    Ok((space, ExhibitTransaction::default()))
+    Ok((space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -217,7 +219,8 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
     subtitle: "Complex voxel shape",
     placement: Placement::Surface,
 )]
-async fn KNOT(this: &Exhibit, universe: &mut Universe) {
+async fn KNOT(this: &Exhibit, _universe: &mut Universe) {
+    let mut txn = ExhibitTransaction::default();
     let footprint = GridAab::from_lower_size([-2, -2, -1], [5, 5, 3]);
     let resolution = R32;
     let resf = FreeCoordinate::from(resolution);
@@ -281,9 +284,9 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
             display_name: this.name.into(),
             ..BlockAttributes::default()
         },
-        universe.insert_anonymous(drawing_space),
+        txn.insert_anonymous(drawing_space),
     )?;
-    Ok((space, ExhibitTransaction::default()))
+    Ok((space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -390,6 +393,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
 
     let footprint = GridAab::from_lower_size([0, 0, -1], [3, 2, 3]);
     let mut space = Space::empty(footprint);
+    let mut txn = ExhibitTransaction::default();
 
     let sweep_block = {
         let resolution = R8;
@@ -424,7 +428,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
         .execute(&mut block_space, &mut transaction::no_outputs)?;
         Block::builder()
             .animation_hint(AnimationHint::CONTINUOUS)
-            .voxels_ref(resolution, universe.insert_anonymous(block_space))
+            .voxels_ref(resolution, txn.insert_anonymous(block_space))
             .build()
     };
 
@@ -439,7 +443,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
                 SpaceTransaction::add_behavior(fire_bounds, Fire::new(fire_bounds))
                     .execute(&mut space, &mut transaction::no_outputs)
                     .unwrap();
-                universe.insert_anonymous(space)
+                txn.insert_anonymous(space)
             })
             .build()
     };
@@ -448,7 +452,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
     space.set([2, 0, 0], fire_block)?;
     space.set([1, 1, -1], &demo_blocks[DemoBlocks::Clock])?;
 
-    Ok((space, ExhibitTransaction::default()))
+    Ok((space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -457,11 +461,12 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
     subtitle: "Test cases for character/world collision",
     placement: Placement::Surface,
 )]
-async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
-    let half_block = make_slab(universe, 2, R4);
-
+async fn COLLISION(_: &Exhibit, _universe: &mut Universe) {
     let footprint = GridAab::from_lower_size([0, 0, 0], [5, 2, 4]);
+    let mut txn = ExhibitTransaction::default();
     let mut space = Space::empty(footprint);
+
+    let half_block = make_slab_txn(&mut txn, 2, R4);
 
     for dx in -1..=1 {
         for dz in -1..=1 {
@@ -492,11 +497,11 @@ async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
     for i in 0..(range.len() as GridCoordinate) {
         space.set(
             [4, 0, range.start + i],
-            make_slab(universe, range.end - i, range.len().try_into().unwrap()),
+            make_slab_txn(&mut txn, range.end - i, range.len().try_into().unwrap()),
         )?;
     }
 
-    Ok((space, ExhibitTransaction::default()))
+    Ok((space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -508,6 +513,8 @@ async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
     placement: Placement::Surface,
 )]
 async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
+    let mut txn = ExhibitTransaction::default();
+
     let footprint = GridAab::from_lower_size([0, 0, 0], [5, 3, 3]);
     let mut space = Space::empty(footprint);
 
@@ -541,7 +548,7 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
                         );
                         Block::from(color)
                     })?
-                    .build_into(universe),
+                    .build_txn(&mut txn),
                 &text::Text::builder()
                     .resolution(R32)
                     .string(arcstr::format!("{resolution}"))
@@ -554,7 +561,7 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
         )?;
     }
 
-    Ok((space, ExhibitTransaction::default()))
+    Ok((space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -564,6 +571,7 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
     placement: Placement::Surface,
 )]
 async fn SMALLEST(_: &Exhibit, universe: &mut Universe) {
+    let mut txn = ExhibitTransaction::default();
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
@@ -582,12 +590,12 @@ async fn SMALLEST(_: &Exhibit, universe: &mut Universe) {
             pedestal,
             &Block::builder()
                 .display_name("World's Smallest Voxel")
-                .voxels_ref(resolution, universe.insert_anonymous(block_space))
+                .voxels_ref(resolution, txn.insert_anonymous(block_space))
                 .build(),
         ],
     )?;
 
-    Ok((exhibit_space, ExhibitTransaction::default()))
+    Ok((exhibit_space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -597,10 +605,11 @@ async fn SMALLEST(_: &Exhibit, universe: &mut Universe) {
     placement: Placement::Surface,
 )]
 async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
+    let mut txn = ExhibitTransaction::default();
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
     let mut space = Space::empty(GridAab::from_lower_size([-2, 0, -2], [5, 5, 5]));
 
-    let [_, central_block] = make_some_voxel_blocks(universe);
+    let [_, central_block] = make_some_voxel_blocks_txn(&mut txn);
     let pointing_block = &demo_blocks[DemoBlocks::Arrow];
 
     let center = GridPoint::new(0, 0, 0);
@@ -632,7 +641,7 @@ async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
         )?;
     }
 
-    Ok((space, ExhibitTransaction::default()))
+    Ok((space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -755,10 +764,11 @@ async fn COMPOSITE(_: &Exhibit, universe: &mut Universe) {
     subtitle: "Stationary but not animated cases.",
     placement: Placement::Surface,
 )]
-async fn MOVED_BLOCKS(_: &Exhibit, universe: &mut Universe) {
+async fn MOVED_BLOCKS(_: &Exhibit, _universe: &mut Universe) {
+    let mut txn = ExhibitTransaction::default();
     let mut space = Space::empty(GridAab::from_lower_upper([0, 0, -3], [16, 2, 3]));
 
-    let blocks: [Block; 16] = make_some_voxel_blocks(universe);
+    let blocks: [Block; 16] = make_some_voxel_blocks_txn(&mut txn);
     for x in 0..8 {
         for z in 0..2 {
             let i = x + z * 8;
@@ -781,7 +791,7 @@ async fn MOVED_BLOCKS(_: &Exhibit, universe: &mut Universe) {
             space.set([i, 0, -1], block.clone().with_modifier(move_in))?;
         }
     }
-    Ok((space, ExhibitTransaction::default()))
+    Ok((space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -878,7 +888,9 @@ async fn COLORS(_: &Exhibit, universe: &mut Universe) {
     subtitle: "RGBCMY lights in an enclosed room",
     placement: Placement::Surface,
 )]
-async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
+async fn COLOR_LIGHTS(_: &Exhibit, _universe: &mut Universe) {
+    let mut txn = ExhibitTransaction::default();
+
     let room_width = 11;
     let room_length = 16;
     let room_height = 7;
@@ -943,7 +955,7 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
 
         Block::builder()
             .display_name("Color room wall")
-            .voxels_ref(wall_resolution, universe.insert_anonymous(wall_block_space))
+            .voxels_ref(wall_resolution, txn.insert_anonymous(wall_block_space))
             .build()
     };
 
@@ -958,7 +970,7 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
                 &AIR
             }
         })?
-        .build_into(universe);
+        .build_txn(&mut txn);
 
     // Construct room.
     crate::BoxStyle::from_whole_blocks_for_walls(
@@ -1031,7 +1043,7 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
     // TODO: Add an RGBCMY section, and also a color-temperature section (or maybe different buildings)
     // sRGB white is D65, or approximately 6500 K.
 
-    Ok((space, ExhibitTransaction::default()))
+    Ok((space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -1055,20 +1067,22 @@ async fn CHUNK_CHART(_: &Exhibit, _: &mut Universe) {
     subtitle: "",
     placement: Placement::Surface,
 )]
-async fn MAKE_SOME_BLOCKS(_: &Exhibit, universe: &mut Universe) {
+async fn MAKE_SOME_BLOCKS(_: &Exhibit, _universe: &mut Universe) {
+    let mut txn = ExhibitTransaction::default();
+
     const ROWS: GridCoordinate = 5;
-    fn make_both_blocks<const N: usize>(universe: &mut Universe) -> (Vec<Block>, Vec<Block>) {
+    fn make_both_blocks<const N: usize>(txn: &mut ExhibitTransaction) -> (Vec<Block>, Vec<Block>) {
         (
             Vec::from(make_some_blocks::<N>()),
-            Vec::from(make_some_voxel_blocks::<N>(universe)),
+            Vec::from(make_some_voxel_blocks_txn::<N>(txn)),
         )
     }
     let rows: [(Vec<Block>, Vec<Block>); ROWS as usize] = [
-        make_both_blocks::<5>(universe),
-        make_both_blocks::<4>(universe),
-        make_both_blocks::<3>(universe),
-        make_both_blocks::<2>(universe),
-        make_both_blocks::<1>(universe),
+        make_both_blocks::<5>(&mut txn),
+        make_both_blocks::<4>(&mut txn),
+        make_both_blocks::<3>(&mut txn),
+        make_both_blocks::<2>(&mut txn),
+        make_both_blocks::<1>(&mut txn),
     ];
     let mut space = Space::empty_positive(3, ROWS, ROWS);
     for (y, (blocks_a, blocks_v)) in rows.into_iter().enumerate() {
@@ -1077,7 +1091,7 @@ async fn MAKE_SOME_BLOCKS(_: &Exhibit, universe: &mut Universe) {
             space.set([2, y as GridCoordinate, h as GridCoordinate], block_v)?;
         }
     }
-    Ok((space, ExhibitTransaction::default()))
+    Ok((space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -1086,7 +1100,9 @@ async fn MAKE_SOME_BLOCKS(_: &Exhibit, universe: &mut Universe) {
     subtitle: "",
     placement: Placement::Surface,
 )]
-async fn DASHED_BOXES(_: &Exhibit, universe: &mut Universe) {
+async fn DASHED_BOXES(_: &Exhibit, _universe: &mut Universe) {
+    let mut txn = ExhibitTransaction::default();
+
     let color = Rgb::new(1.0, 0.5, 0.5);
     let brush = Block::from(color);
     let corner_brush = Block::from(color * 0.6);
@@ -1100,7 +1116,7 @@ async fn DASHED_BOXES(_: &Exhibit, universe: &mut Universe) {
                 &AIR
             }
         })?
-        .build_into(universe);
+        .build_txn(&mut txn);
     let corner = Block::builder()
         .display_name("Dashed Box Corner")
         .voxels_fn(R16, |p| {
@@ -1110,7 +1126,7 @@ async fn DASHED_BOXES(_: &Exhibit, universe: &mut Universe) {
                 &AIR
             }
         })?
-        .build_into(universe);
+        .build_txn(&mut txn);
     let style = crate::BoxStyle::from_composited_corner_and_edge(corner, line_segment);
 
     let mut space = Space::empty_positive(7, 3, 3);
@@ -1127,7 +1143,7 @@ async fn DASHED_BOXES(_: &Exhibit, universe: &mut Universe) {
         .create_box(GridAab::from_lower_size([4, 0, 0], [3, 3, 3]))
         .execute(&mut space, &mut transaction::no_outputs)?;
 
-    Ok((space, ExhibitTransaction::default()))
+    Ok((space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -1161,6 +1177,7 @@ async fn SWIMMING_POOL(_: &Exhibit, _: &mut Universe) {
 async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
     // TODO: it would be nice if this exhibit visualized the generated bounding box somehow
 
+    let mut txn = ExhibitTransaction::default();
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
@@ -1178,8 +1195,8 @@ async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
         };
 
         let image = include_image!("exhibits/terrain-image.png");
-        let image_space = universe
-            .insert_anonymous(space_from_image(image, rotation, terrain_map_function).unwrap());
+        let image_space =
+            txn.insert_anonymous(space_from_image(image, rotation, terrain_map_function).unwrap());
         let block = Block::builder()
             .display_name(format!("{rotation:?}"))
             .voxels_ref(R16, image_space)
@@ -1193,7 +1210,7 @@ async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
     place([2, 0, 0], GridRotation::RXZY)?;
     place([3, 0, 0], GridRotation::RxYZ)?;
 
-    Ok((outer_space, ExhibitTransaction::default()))
+    Ok((outer_space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -1330,6 +1347,8 @@ async fn TREES(_: &Exhibit, universe: &mut Universe) {
     placement: Placement::Surface,
 )]
 async fn DESTRUCTION(_: &Exhibit, universe: &mut Universe) {
+    let mut txn = ExhibitTransaction::default();
+
     let width = 7;
 
     let footprint = GridAab::from_lower_size([0, 0, 0], [width, 3, 1]);
@@ -1341,7 +1360,7 @@ async fn DESTRUCTION(_: &Exhibit, universe: &mut Universe) {
     let block_to_destroy = &landscape_blocks[LandscapeBlocks::Grass];
 
     fn generate_destruction_mask(
-        universe: &mut Universe,
+        txn: &mut ExhibitTransaction,
         resolution: Resolution,
         fraction: f64,
     ) -> Result<Block, InGenError> {
@@ -1362,12 +1381,12 @@ async fn DESTRUCTION(_: &Exhibit, universe: &mut Universe) {
 
         Ok(Block::builder()
             .voxels_fn(resolution, pattern)?
-            .build_into(universe))
+            .build_txn(txn))
     }
 
     for stage in 0i32..width {
         let mask =
-            generate_destruction_mask(universe, R16, (f64::from(stage) + 0.5) / f64::from(width))?;
+            generate_destruction_mask(&mut txn, R16, (f64::from(stage) + 0.5) / f64::from(width))?;
         let destroyed = block_to_destroy
             .clone()
             .with_modifier(Composite::new(mask, CompositeOperator::In).reversed());
@@ -1379,7 +1398,7 @@ async fn DESTRUCTION(_: &Exhibit, universe: &mut Universe) {
         )?;
     }
 
-    Ok((space, ExhibitTransaction::default()))
+    Ok((space, txn))
 }
 
 /// Place a series of blocks on top of each other, starting at the specified point.
