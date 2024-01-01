@@ -7,9 +7,12 @@ use futures_core::future::BoxFuture;
 use itertools::Itertools;
 use rand::{Rng, SeedableRng as _};
 
-use all_is_cubes::drawing::embedded_graphics::{
-    mono_font::iso_8859_1 as font,
-    text::{Alignment, Baseline, TextStyleBuilder},
+use all_is_cubes::{
+    drawing::embedded_graphics::{
+        mono_font::iso_8859_1 as font,
+        text::{Alignment, Baseline, TextStyleBuilder},
+    },
+    universe::UniverseTransaction,
 };
 
 use all_is_cubes::block::{self, Block, BlockAttributes, Resolution::*, AIR};
@@ -337,7 +340,9 @@ async fn place_exhibits_in_city<I: Instant>(
 
         // Execute the exhibit factory function.
         // TODO: Factory should be given a YieldProgress.
-        let exhibit_space = match (exhibit.factory)(exhibit, universe).await {
+        // TODO: stop handing out mutable Universe access, so we can parallelize this loop
+        let (exhibit_space, exhibit_transaction) = match (exhibit.factory)(exhibit, universe).await
+        {
             Ok(s) => s,
             Err(error) => {
                 // TODO: put the error on a sign in place of the exhibit
@@ -483,6 +488,21 @@ async fn place_exhibits_in_city<I: Instant>(
         }
         exhibit_progress.progress(0.66).await;
 
+        // As the last step before we actually copy the exhibit into the city,
+        // execute its transaction.
+        match exhibit_transaction.execute(universe, &mut transaction::no_outputs) {
+            Ok(()) => {}
+            Err(error) => {
+                // TODO: put the error on a sign in place of the exhibit
+                log::error!(
+                    "Exhibit transaction failure.\nExhibit: {name}\nError: {error}",
+                    name = exhibit.name,
+                    error = all_is_cubes::util::ErrorChain(&error),
+                );
+                continue 'exhibit;
+            }
+        }
+
         // Place exhibit content
         space_to_space_copy(&exhibit_space, exhibit_footprint, space, plot_transform)?; // TODO: on failure, place an error marker and continue
 
@@ -590,8 +610,10 @@ pub(crate) struct Exhibit {
     pub name: &'static str,
     pub subtitle: &'static str,
     pub placement: Placement,
-    pub factory:
-        for<'a> fn(&'a Exhibit, &'a mut Universe) -> BoxFuture<'a, Result<Space, InGenError>>,
+    pub factory: for<'a> fn(
+        &'a Exhibit,
+        &'a mut Universe,
+    ) -> BoxFuture<'a, Result<(Space, UniverseTransaction), InGenError>>,
 }
 
 #[derive(Clone, Copy, Debug)]

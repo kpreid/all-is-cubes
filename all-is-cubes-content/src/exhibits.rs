@@ -45,6 +45,8 @@ use crate::{
     Fire, LandscapeBlocks,
 };
 
+type ExhibitTransaction = all_is_cubes::universe::UniverseTransaction;
+
 /// All exhibits which will show up in [`crate::UniverseTemplate::DemoCity`].
 ///
 /// Ordered by distance from the center.
@@ -121,7 +123,7 @@ async fn TRANSPARENCY_LARGE(_: &Exhibit, _universe: &mut Universe) {
         )?;
     }
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -206,7 +208,7 @@ async fn TRANSPARENCY_SMALL(_: &Exhibit, universe: &mut Universe) {
     let [floater] = make_some_voxel_blocks(universe);
     space.set([3, 1, 3], floater)?;
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -281,7 +283,7 @@ async fn KNOT(this: &Exhibit, universe: &mut Universe) {
         },
         universe.insert_anonymous(drawing_space),
     )?;
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -374,7 +376,7 @@ async fn TEXT(_: &Exhibit, _universe: &mut Universe) {
             .unwrap();
     }
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -446,7 +448,7 @@ async fn ANIMATION(_: &Exhibit, universe: &mut Universe) {
     space.set([2, 0, 0], fire_block)?;
     space.set([1, 1, -1], &demo_blocks[DemoBlocks::Clock])?;
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -494,7 +496,7 @@ async fn COLLISION(_: &Exhibit, universe: &mut Universe) {
         )?;
     }
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -552,7 +554,7 @@ async fn RESOLUTIONS(_: &Exhibit, universe: &mut Universe) {
         )?;
     }
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -585,7 +587,7 @@ async fn SMALLEST(_: &Exhibit, universe: &mut Universe) {
         ],
     )?;
 
-    Ok(exhibit_space)
+    Ok((exhibit_space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -630,7 +632,7 @@ async fn ROTATIONS(_: &Exhibit, universe: &mut Universe) {
         )?;
     }
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -667,7 +669,7 @@ async fn ZOOM(_: &Exhibit, universe: &mut Universe) {
         }
     }
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -744,7 +746,7 @@ async fn COMPOSITE(_: &Exhibit, universe: &mut Universe) {
             }
         }
     }
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -779,7 +781,7 @@ async fn MOVED_BLOCKS(_: &Exhibit, universe: &mut Universe) {
             space.set([i, 0, -1], block.clone().with_modifier(move_in))?;
         }
     }
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -801,7 +803,7 @@ async fn BECOME(_: &Exhibit, universe: &mut Universe) {
         )?;
     }
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
@@ -867,7 +869,7 @@ async fn COLORS(_: &Exhibit, universe: &mut Universe) {
         }
     })?;
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -1029,7 +1031,7 @@ async fn COLOR_LIGHTS(_: &Exhibit, universe: &mut Universe) {
     // TODO: Add an RGBCMY section, and also a color-temperature section (or maybe different buildings)
     // sRGB white is D65, or approximately 6500 K.
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -1043,7 +1045,8 @@ async fn CHUNK_CHART(_: &Exhibit, _: &mut Universe) {
 
     // TODO: Show more than one size.
     let chart = ChunkChart::<16>::new(16. * 4.99);
-    Ok(chart.visualization())
+
+    Ok((chart.visualization(), ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -1074,7 +1077,7 @@ async fn MAKE_SOME_BLOCKS(_: &Exhibit, universe: &mut Universe) {
             space.set([2, y as GridCoordinate, h as GridCoordinate], block_v)?;
         }
     }
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -1124,7 +1127,7 @@ async fn DASHED_BOXES(_: &Exhibit, universe: &mut Universe) {
         .create_box(GridAab::from_lower_size([4, 0, 0], [3, 3, 3]))
         .execute(&mut space, &mut transaction::no_outputs)?;
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -1146,7 +1149,7 @@ async fn SWIMMING_POOL(_: &Exhibit, _: &mut Universe) {
             .collision(BlockCollision::None)
             .build(),
     )?;
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -1190,7 +1193,7 @@ async fn IMAGES(_: &Exhibit, universe: &mut Universe) {
     place([2, 0, 0], GridRotation::RXZY)?;
     place([3, 0, 0], GridRotation::RxYZ)?;
 
-    Ok(outer_space)
+    Ok((outer_space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -1260,7 +1263,7 @@ async fn UI_BLOCKS(_: &Exhibit, universe: &mut Universe) {
             .unwrap();
     }
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -1317,7 +1320,7 @@ async fn TREES(_: &Exhibit, universe: &mut Universe) {
         )?;
     }
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -1376,7 +1379,7 @@ async fn DESTRUCTION(_: &Exhibit, universe: &mut Universe) {
         )?;
     }
 
-    Ok(space)
+    Ok((space, ExhibitTransaction::default()))
 }
 
 /// Place a series of blocks on top of each other, starting at the specified point.
