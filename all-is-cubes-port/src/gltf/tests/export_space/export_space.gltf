@@ -1,0 +1,174 @@
+{
+  "accessors": [
+    {
+      "bufferView": 0,
+      "byteOffset": 0,
+      "count": 24,
+      "componentType": 5126,
+      "type": "VEC3",
+      "min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "name": "'x' position"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 12,
+      "count": 24,
+      "componentType": 5126,
+      "type": "VEC4",
+      "min": [
+        0.5,
+        0.5,
+        0.5,
+        1.0
+      ],
+      "max": [
+        0.5,
+        0.5,
+        0.5,
+        1.0
+      ],
+      "name": "'x' base color"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 28,
+      "count": 24,
+      "componentType": 5126,
+      "type": "VEC2",
+      "min": [
+        0.0,
+        0.0
+      ],
+      "max": [
+        0.0,
+        0.0
+      ],
+      "name": "'x' base color texcoords"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 0,
+      "count": 36,
+      "componentType": 5123,
+      "type": "SCALAR",
+      "name": "'x' opaque index"
+    }
+  ],
+  "asset": {
+    "generator": "all-is-cubes",
+    "version": "2.0"
+  },
+  "buffers": [
+    {
+      "byteLength": 936,
+      "name": "'x' data",
+      "uri": "data:application/gltf-buffer;base64,AAAAAAAAAAAAAAAAAAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAAAAAAAAgD8AAIA/AAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAACAPwAAAAAAAIA/AAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAACAPwAAgD8AAAAAAAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAACAPwAAgD8AAAAAAAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAACAPwAAgD8AAIA/AAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAACAPwAAAAAAAIA/AAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAACAPwAAgD8AAAAAAAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAACAPwAAgD8AAIA/AAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAAAAAAAAgD8AAIA/AAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAAAAAAAAgD8AAIA/AAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAACAPwAAgD8AAIA/AAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAACAPwAAAAAAAIA/AAAAPwAAAD8AAAA/AACAPwAAAAAAAAAAAAABAAIAAgABAAMABAAFAAYABgAFAAcACAAJAAoACgAJAAsADAANAA4ADgANAA8AEAARABIAEgARABMAFAAVABYAFgAVABcA"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 864,
+      "byteStride": 36,
+      "name": "'x' vertex",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 72,
+      "byteOffset": 864,
+      "name": "'x' index",
+      "target": 34963
+    }
+  ],
+  "extensionsUsed": [
+    "KHR_materials_transmission",
+    "KHR_materials_volume"
+  ],
+  "materials": [
+    {
+      "alphaMode": "OPAQUE",
+      "doubleSided": false,
+      "name": "aic-vertex-opaque",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 1.0
+      },
+      "emissiveFactor": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": false,
+      "name": "aic-vertex-transparent",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 1.0
+      },
+      "emissiveFactor": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "extensions": {
+        "KHR_materials_transmission": {
+          "transmissionFactor": 0.0
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "'x' mesh",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "COLOR_0": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "'x'"
+    }
+  ],
+  "scenes": [
+    {
+      "name": "'x' space scene",
+      "nodes": [
+        0
+      ]
+    }
+  ]
+}

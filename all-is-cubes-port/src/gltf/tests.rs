@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use all_is_cubes::character::Character;
 use gltf_json::validation::Validate;
 use gltf_json::Index;
 
@@ -71,6 +72,27 @@ fn gltf_smoke_test() {
     });
 }
 
+async fn export_snapshot_test(test_name: &'static str, export_set: ExportSet) {
+    let destination_dir = tempfile::tempdir().unwrap();
+    let destination: PathBuf = destination_dir.path().join(format!("{test_name}.gltf"));
+
+    crate::export_to_path(
+        yield_progress_for_testing(),
+        ExportFormat::Gltf,
+        export_set,
+        PathBuf::from(&destination),
+    )
+    .await
+    .unwrap();
+
+    snapbox::Assert::new().action_env("AICSNAP").subset_eq(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/gltf/tests/")
+            .join(test_name),
+        destination_dir.path(),
+    );
+}
+
 #[tokio::test]
 async fn export_block_defs() {
     let mut universe = Universe::new();
@@ -85,30 +107,34 @@ async fn export_block_defs() {
                 .unwrap()
         })
         .collect();
-    let destination_dir = tempfile::tempdir().unwrap();
-    let destination: PathBuf = destination_dir.path().join("export_block_defs.gltf");
 
-    crate::export_to_path(
-        yield_progress_for_testing(),
-        ExportFormat::Gltf,
-        ExportSet::from_block_defs(block_defs),
-        PathBuf::from(&destination),
-    )
-    .await
-    .unwrap();
-
-    snapbox::Assert::new().action_env("AICSNAP").subset_eq(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("src/gltf/tests/"),
-        destination_dir.path(),
-    );
+    export_snapshot_test("export_block_defs", ExportSet::from_block_defs(block_defs)).await;
 }
 
 #[tokio::test]
-async fn export_space_not_supported() {
+async fn export_space() {
+    let [block] = make_some_blocks();
     let mut universe = Universe::new();
     universe
-        .insert("x".into(), Space::empty_positive(1, 1, 1))
+        .insert(
+            "x".into(),
+            Space::builder(GridAab::ORIGIN_CUBE)
+                .filled_with(block)
+                .build(),
+        )
         .unwrap();
+
+    export_snapshot_test("export_space", ExportSet::all_of_universe(&universe)).await;
+}
+
+#[tokio::test]
+async fn export_character_not_supported() {
+    let mut universe = Universe::new();
+    let space = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+    universe
+        .insert("x".into(), Character::spawn_default(space))
+        .unwrap();
+
     let destination_dir = tempfile::tempdir().unwrap();
     let destination: PathBuf = destination_dir.path().join("foo.gltf");
 

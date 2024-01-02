@@ -264,13 +264,13 @@
   ],
   "scenes": [
     {
-      "name": "'block0' display scene",
+      "name": "'block0' block display scene",
       "nodes": [
         0
       ]
     },
     {
-      "name": "'block1' display scene",
+      "name": "'block1' block display scene",
       "nodes": [
         1
       ]
