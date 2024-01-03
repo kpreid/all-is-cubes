@@ -168,7 +168,13 @@ impl SpaceUpdateInfo {
 
     #[cfg(feature = "rerun")]
     pub(crate) fn write_to_rerun(&self, destination: &rg::Destination) {
-        // TODO: include everything we can; make names more consistent
+        destination.log(
+            &"info".into(),
+            &rg::archetypes::TextDocument::new(self.refmt(&StatusText).to_string())
+                .with_media_type(rg::components::MediaType::TEXT),
+        );
+
+        // TODO: include every useful number we can; make names more consistent
         let &Self {
             total_time,
             chunk_info:
