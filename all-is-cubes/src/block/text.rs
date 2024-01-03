@@ -125,7 +125,10 @@ impl Text {
 
     /// Returns the bounding box, within the blocks at the specified resolution, of the text.
     ///
-    /// The text may overflow this bounding box depending on the length and positioning.
+    /// This does not reflect the actual size of the text but the configuration with which this
+    /// [`Text`] value was constructed.
+    /// The text may overflow this bounding box depending on its length and the
+    /// [`positioning()`](Self::positioning).
     pub fn layout_bounds(&self) -> GridAab {
         self.layout_bounds
     }
@@ -140,9 +143,14 @@ impl Text {
         self.debug
     }
 
-    /// Returns the bounding box of the text, in blocks — the set of [`Primitive::Text`] offsets
-    /// that will render all of it.
-    pub fn bounding_blocks(&self) -> GridAab {
+    /// Returns the bounding box of the text as displayed, in voxels at the
+    /// [`resolution()`](Self::resolution).
+    ///
+    /// This box is in the same units as [`Self::layout_bounds()`] but reflects the actual text
+    /// layout rather than the configuration.
+    pub fn bounding_voxels(&self) -> GridAab {
+        // TODO: Memoize this “layout calculation”.
+
         let dummy_voxel = Evoxel::from_color(Rgba::BLACK); // could be anything
         self.with_transform_and_drawable(
             match self.outline {
@@ -153,8 +161,15 @@ impl Text {
                 None => Brush::Plain(dummy_voxel),
             },
             GridVector::zero(),
-            |_text_obj, text_aab, _drawing_transform| text_aab.divide(self.resolution.into()),
+            |_text_obj, text_aab, _drawing_transform| text_aab,
         )
+    }
+    /// Returns the bounding box of the text, in blocks — the set of [`Primitive::Text`] offsets
+    /// that will render all of it.
+    ///
+    /// This is identical to [`Self::bounding_voxels()`] scaled down by [`Self::resolution()`].
+    pub fn bounding_blocks(&self) -> GridAab {
+        self.bounding_voxels().divide(self.resolution.into())
     }
 
     /// Returns a transaction which places [`Primitive::Text`] blocks containing this text.
@@ -862,18 +877,17 @@ mod tests {
 
     #[test]
     fn single_line_text_smoke_test() {
-        let block = single_block_test_case({
-            Text::builder()
-                .string(literal!("ab"))
-                .font(Font::System16)
-                .resolution(Resolution::R16)
-                .positioning(Positioning {
-                    x: PositioningX::Left,
-                    line_y: PositioningY::BodyBottom,
-                    z: PositioningZ::Back,
-                })
-                .build()
-        });
+        let text = Text::builder()
+            .string(literal!("ab"))
+            .font(Font::System16)
+            .resolution(Resolution::R16)
+            .positioning(Positioning {
+                x: PositioningX::Left,
+                line_y: PositioningY::BodyBottom,
+                z: PositioningZ::Back,
+            })
+            .build();
+        let block = single_block_test_case(text.clone());
 
         let ev = block.evaluate().unwrap();
         assert_eq!(
@@ -887,6 +901,7 @@ mod tests {
             ev.voxels.bounds(),
             GridAab::from_lower_size([0, 0, 0], [16, 13, 1])
         );
+        assert_eq!(ev.voxels.bounds(), text.bounding_voxels());
 
         assert_eq!(
             plane_to_text(ev.voxels.as_vol_ref()),
