@@ -153,6 +153,13 @@ impl Camera {
         self.options.view_distance.into_inner()
     }
 
+    /// Returns the position of the near plane of the projection matrix.
+    /// This is not currently configurable.
+    pub fn near_plane_distance(&self) -> FreeCoordinate {
+        // half a voxel at resolution=16
+        (32.0f64).recip()
+    }
+
     /// Sets the view transform.
     ///
     /// Besides controlling rendering, this is used to determine world coordinates for purposes
@@ -351,7 +358,7 @@ impl Camera {
         let fov_cot = (self.fov_y() / 2.).to_radians().tan().recip();
         let aspect = self.viewport.nominal_aspect_ratio();
 
-        let near = 1. / 32.; // half a voxel at resolution=16
+        let near = self.near_plane_distance();
         let far = self.view_distance();
 
         // Rationale for this particular matrix formula: "that's what `cgmath` does".
