@@ -302,6 +302,21 @@ impl UniverseTransaction {
         }
     }
 
+    /// Adds an insertion of an anonymous universe member to the transaction, and returns the
+    /// pending reference to that member.
+    ///
+    /// These steps are combined together because anonymous insertion is special, in that it cannot
+    /// fail to merge with the current state of the transaction, and it is a commonly needed
+    /// operation.
+    pub fn insert_anonymous<T: UniverseMember>(&mut self, value: T) -> URef<T> {
+        let reference = URef::new_pending(Name::Pending, value);
+        self.anonymous_insertions
+            .push(MemberTxn::Insert(UniverseMember::into_any_ref(
+                reference.clone(),
+            )));
+        reference
+    }
+
     /// Delete this member from the universe.
     ///
     /// All existing references will become [`RefError::Gone`], even if a new member by
@@ -910,6 +925,15 @@ mod tests {
         assert_eq!(u.get(&foo.name()).unwrap(), foo);
         assert_eq!(u.get(&bar.name()).unwrap(), bar);
         assert_ne!(foo, bar);
+    }
+
+    #[test]
+    fn insert_anonymous_equivalence() {
+        let mut  txn = UniverseTransaction::default();
+        let r = txn.insert_anonymous(Space::empty_positive(1, 1, 1));
+
+        assert_eq!(r.name(), Name::Pending);
+        assert_eq!(txn, UniverseTransaction::insert(r));
     }
 
     #[test]

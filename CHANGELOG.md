@@ -22,6 +22,8 @@
     
     - `math::Vol` is a more general replacement for `math::GridArray` which allows choice of the data container type (including `&[T]` for borrowing without additional indirection), and also a replacement for uses of `math::GridAab` which care about volume and linearization.
 
+    - `universe::UniverseTransaction::insert_anonymous()` has the same function as the same-named method on `Universe`, but does not require having an `&mut Universe` on hand.
+
 - `all-is-cubes-ui` library:
     - New type `vui::widgets::ButtonLabel` allows giving `ActionButton` and `ToggleButton` text labels in addition to or instead of icons.
 
