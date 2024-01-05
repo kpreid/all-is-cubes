@@ -612,7 +612,7 @@ pub(crate) struct Exhibit {
     pub placement: Placement,
     pub factory: for<'a> fn(
         &'a Exhibit,
-        &'a mut Universe,
+        &'a Universe,
     ) -> BoxFuture<'a, Result<(Space, UniverseTransaction), InGenError>>,
 }
 
