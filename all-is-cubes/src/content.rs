@@ -20,7 +20,8 @@ use crate::inv::{Slot, Tool};
 use crate::math::{Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, Rgb, Rgba};
 use crate::raycast::Raycaster;
 use crate::space::{SetCubeError, Space};
-use crate::universe::Universe;
+use crate::transaction::{self, Transaction as _};
+use crate::universe::{Universe, UniverseTransaction};
 
 mod draw_box;
 #[doc(hidden)] // public for exhibit testing
@@ -79,6 +80,16 @@ pub fn make_some_blocks<const COUNT: usize>() -> [Block; COUNT] {
 ///
 /// [`Primitive::Recur`]: crate::block::Primitive::Recur
 pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [Block; COUNT] {
+    let mut txn = UniverseTransaction::default();
+    let blocks = make_some_voxel_blocks_txn(&mut txn);
+    txn.execute(universe, &mut transaction::no_outputs).unwrap();
+    blocks
+}
+
+#[doc(hidden)] // TODO: make this replace the other version once we've confirmed that `&mut SomeTransaction` is the direction we want to go for composing worldgen transactions
+pub fn make_some_voxel_blocks_txn<const COUNT: usize>(
+    transaction: &mut UniverseTransaction,
+) -> [Block; COUNT] {
     let resolution = R16;
     color_sequence_for_make_blocks(COUNT)
         .map(|(i, color)| {
@@ -102,10 +113,9 @@ pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [B
                 )
                 .unwrap();
             }
-
             Block::builder()
                 .display_name(i.to_string())
-                .voxels_ref(resolution, universe.insert_anonymous(block_space))
+                .voxels_ref(resolution, transaction.insert_anonymous(block_space))
                 .build()
         })
         .collect::<Vec<_>>()
@@ -131,9 +141,21 @@ fn color_sequence_for_make_blocks(n: usize) -> impl Iterator<Item = (usize, Rgba
 ///
 /// TODO: Allow caller-provided colors/pattern.
 /// TODO: Consider writing the size on the faces.
-#[doc(hidden)] // exported for all-is-cubes-content
+#[doc(hidden)] // exported for all-is-cubes-content usage, not reexport
 pub fn make_slab(
     universe: &mut Universe,
+    numerator: GridCoordinate,
+    denominator: Resolution,
+) -> Block {
+    let mut txn = UniverseTransaction::default();
+    let slab = make_slab_txn(&mut txn, numerator, denominator);
+    txn.execute(universe, &mut transaction::no_outputs).unwrap();
+    slab
+}
+
+#[doc(hidden)] // exported for all-is-cubes-content usage, not reexport
+pub fn make_slab_txn(
+    txn: &mut UniverseTransaction,
     numerator: GridCoordinate,
     denominator: Resolution,
 ) -> Block {
@@ -157,7 +179,7 @@ pub fn make_slab(
     Block::builder()
         .display_name(format!("Slab {numerator}/{denominator}"))
         .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-        .voxels_ref(denominator, universe.insert_anonymous(space))
+        .voxels_ref(denominator, txn.insert_anonymous(space))
         .build()
 }
 
