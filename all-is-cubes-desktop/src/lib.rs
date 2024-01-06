@@ -26,8 +26,6 @@ pub mod terminal;
 mod universe_source;
 pub mod winit;
 
-use logging::LoggingArgs;
-
 pub use config_files::load_config;
 pub use session::{ClockSource, DesktopSession};
 pub use universe_source::UniverseSource;
@@ -52,7 +50,7 @@ pub fn inner_main<Ren: glue::Renderer, Win: glue::Window>(
         before_loop_time,
         universe_future,
         headless,
-        logging: LoggingArgs { rerun, .. },
+        logging,
     } = params;
 
     // At this point we have just finished whatever the GraphicsType did before calling
@@ -85,20 +83,7 @@ pub fn inner_main<Ren: glue::Renderer, Win: glue::Window>(
         .context("internal error inside of universe creation/loading task")?
         .context("failed to create universe from requested template or file")?;
 
-    if !rerun.is_empty() {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "rerun")] {
-                use std::collections::HashSet;
-                logging::connect_rerun(&HashSet::from_iter(rerun), &mut universe, &mut dsession);
-            } else {
-                // suppress warning
-                let _ = &mut universe;
-
-                // TODO: cleaner error handling from this point
-                panic!("not compiled with rerun logging support");
-            }
-        }
-    }
+    logging.finish(&mut universe, &mut dsession);
 
     dsession.session.set_universe(universe);
 
@@ -118,9 +103,8 @@ pub struct InnerMainParams {
     pub before_loop_time: Instant,
     pub universe_future: tokio::task::JoinHandle<Result<Universe, anyhow::Error>>,
     pub headless: bool,
-    /// [`LoggingArgs`] from the command line. Note that calling [`inner_main()`] does not
-    /// itself initialize logging. TODO: change that?
-    pub logging: LoggingArgs,
+    /// Result of calling [`logging::install()`], which should be done as early as feasible.
+    pub logging: logging::LateLogging,
 }
 
 /// Choose a window size (in terms of viewport size) when the user did not request one.

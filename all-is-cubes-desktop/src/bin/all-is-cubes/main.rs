@@ -58,7 +58,7 @@ fn main() -> Result<(), anyhow::Error> {
     } = options.clone();
 
     // Initialize logging -- telling it to suppress actual output in terminal mode.
-    logging::install(&logging_args, graphics_type == GraphicsType::Terminal)?;
+    let late_logging = logging::install(&logging_args, graphics_type == GraphicsType::Terminal)?;
 
     // After setting up logging, do other option interpretation steps.
 
@@ -126,7 +126,7 @@ fn main() -> Result<(), anyhow::Error> {
         before_loop_time: Instant::now(),
         universe_future,
         headless: options.is_headless(),
-        logging: logging_args,
+        logging: late_logging,
     };
 
     // The graphics type selects not only the kind of 'window' we create, but also the

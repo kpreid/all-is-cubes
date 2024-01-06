@@ -1,7 +1,12 @@
 //! Logging. And terminal progress bars. And their cooperation.
 
+use std::collections::HashSet;
+
 use anyhow::Context as _;
 use once_cell::sync::Lazy;
+
+#[cfg(feature = "rerun")]
+use all_is_cubes::rerun_glue as rg;
 
 /// A [`clap::Args`] struct for options controlling log output to stderr and Rerun.
 #[derive(Clone, Debug, clap::Args)]
@@ -24,13 +29,16 @@ pub struct LoggingArgs {
 }
 
 /// Install a [`log`] global logger based on user-provided `options`.
-pub fn install(options: &LoggingArgs, suppress_unless_explicit: bool) -> Result<(), anyhow::Error> {
+pub fn install(
+    options: &LoggingArgs,
+    suppress_unless_explicit: bool,
+) -> Result<LateLogging, anyhow::Error> {
     use log::LevelFilter::{Debug, Error, Off, Trace};
 
     let &LoggingArgs {
         verbose,
         simplify_log_format,
-        rerun: _,
+        ref rerun,
     } = options;
 
     let (max_level, stderr_logger): (log::LevelFilter, Option<simplelog::TermLogger>) =
@@ -65,12 +73,39 @@ pub fn install(options: &LoggingArgs, suppress_unless_explicit: bool) -> Result<
             (Off, None)
         };
 
+    // If we're going to construct a Rerun recording stream, because the user passed at least
+    // one `--rerun=` arg, do so now.
+    #[cfg(feature = "rerun")]
+    let rerun_destination = if !rerun.is_empty() {
+        let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes")
+            .default_enabled(true)
+            .connect()
+            .unwrap();
+        let destination = rg::Destination {
+            stream,
+            // Note: This must not be empty for ViewCoordinates to work
+            // https://github.com/rerun-io/rerun/issues/3538
+            path: rg::entity_path!["dt"],
+        };
+
+        // Log timeless configuration
+        destination.log_initialization();
+
+        destination
+    } else {
+        rg::Destination::default()
+    };
+
     // Install the logger with our wrapper around it.
     log::set_boxed_logger(Box::new(AicLogger { stderr_logger }))
         .context("failed to initialize logging")?;
     log::set_max_level(max_level);
 
-    Ok(())
+    Ok(LateLogging {
+        kinds: HashSet::from_iter(rerun.iter().cloned()),
+        #[cfg(feature = "rerun")]
+        rerun_destination,
+    })
 }
 
 struct AicLogger {
@@ -130,50 +165,64 @@ pub(crate) enum RerunDataKind {
     RenderImage,
 }
 
-#[cfg(feature = "rerun")]
-pub(crate) fn connect_rerun<Ren: crate::glue::Renderer, Win>(
-    kinds: &std::collections::HashSet<RerunDataKind>,
-    universe: &mut all_is_cubes::universe::Universe,
-    dsession: &mut crate::DesktopSession<Ren, Win>,
-) {
-    use all_is_cubes::rerun_glue as rg;
-    use all_is_cubes_gpu::RerunFilter;
+/// Input for logging-like initialization that needs to happen later when we have more information.
+/// Produced by [`install()`] and used by calling [`inner_main()`](crate::inner_main).
+#[derive(Debug)]
+#[must_use]
+pub struct LateLogging {
+    kinds: HashSet<RerunDataKind>,
+    #[cfg(feature = "rerun")]
+    rerun_destination: rg::Destination,
+}
 
-    let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes")
-        .default_enabled(true)
-        .connect()
-        .unwrap();
-    let destination = rg::Destination {
-        stream,
-        // Note: This must not be empty for ViewCoordinates to work
-        // https://github.com/rerun-io/rerun/issues/3538
-        path: rg::entity_path!["dt"],
-    };
+impl LateLogging {
+    pub(crate) fn finish<Ren: crate::glue::Renderer, Win>(
+        self: LateLogging,
+        universe: &mut all_is_cubes::universe::Universe,
+        dsession: &mut crate::DesktopSession<Ren, Win>,
+    ) {
+        let LateLogging {
+            kinds,
+            #[cfg(feature = "rerun")]
+                rerun_destination: destination,
+        } = self;
 
-    // Log timeless configuration
-    destination.log_initialization();
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "rerun")] {
+                use all_is_cubes_gpu::RerunFilter;
 
-    // Attach to universe elements
-    // TODO: We need a solution for worlds loaded after app start
-    if kinds.contains(&RerunDataKind::World) {
-        universe.log_to_rerun(destination.clone());
-        if let Some(c) = universe.get_default_character() {
-            c.try_modify(|c| c.log_to_rerun(destination.child(&rg::entity_path!["character"])))
-                .unwrap();
+                // Attach to universe elements
+                // TODO: We need a solution for worlds loaded after app start
+                if kinds.contains(&RerunDataKind::World) {
+                    universe.log_to_rerun(destination.clone());
+                    if let Some(c) = universe.get_default_character() {
+                        c.try_modify(|c| c.log_to_rerun(destination.child(&rg::entity_path!["character"])))
+                            .unwrap();
+                    }
+                }
+
+                // Attach to renderer
+                let mut render_filter = RerunFilter::default();
+                if kinds.contains(&RerunDataKind::RenderPerf) {
+                    render_filter.performance = true;
+                }
+                if kinds.contains(&RerunDataKind::RenderImage) {
+                    render_filter.image = true;
+                }
+                if render_filter != RerunFilter::default() {
+                    dsession
+                        .renderer
+                        .log_to_rerun(destination.clone(), render_filter);
+                }
+            } else {
+                // suppress warning
+                let _ = (universe, dsession);
+
+                if !kinds.is_empty() {
+                    // TODO: cleaner error handling from this point
+                    panic!("not compiled with rerun logging support");
+                }
+            }
         }
-    }
-
-    // Attach to renderer
-    let mut render_filter = RerunFilter::default();
-    if kinds.contains(&RerunDataKind::RenderPerf) {
-        render_filter.performance = true;
-    }
-    if kinds.contains(&RerunDataKind::RenderImage) {
-        render_filter.image = true;
-    }
-    if render_filter != RerunFilter::default() {
-        dsession
-            .renderer
-            .log_to_rerun(destination.clone(), render_filter);
     }
 }
