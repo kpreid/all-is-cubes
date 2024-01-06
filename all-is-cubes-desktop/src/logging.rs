@@ -24,59 +24,76 @@ pub struct LoggingArgs {
 }
 
 /// Install a [`log`] global logger based on user-provided `options`.
-pub fn install(options: &LoggingArgs) -> Result<(), anyhow::Error> {
+pub fn install(options: &LoggingArgs, suppress_unless_explicit: bool) -> Result<(), anyhow::Error> {
+    use log::LevelFilter::{Debug, Error, Off, Trace};
+
     let &LoggingArgs {
         verbose,
         simplify_log_format,
         rerun: _,
     } = options;
-    // Note: Something like this log configuration also appears in other binaries.
-    // Unclear how to deduplicate since we don't want to have a library-level dep on
-    // simplelog. For now, just remember to consider updating other instances.
-    use simplelog::LevelFilter::{Debug, Error, Off, Trace};
-    let logger = *simplelog::TermLogger::new(
-        match verbose {
-            // TODO: When we're closer to 1.0, change the default level to `Info`
-            false => Debug,
-            true => Trace,
-        },
-        simplelog::ConfigBuilder::new()
-            .set_target_level(Off)
-            .set_location_level(Off)
-            .set_time_level(if simplify_log_format { Off } else { Error })
-            .add_filter_ignore_str("wgpu") // noisy
-            .add_filter_ignore_str("naga") // noisy
-            .add_filter_ignore_str("winit") // noisy at Trace level only
-            .build(),
-        simplelog::TerminalMode::Stderr,
-        if simplify_log_format {
-            simplelog::ColorChoice::Never
+
+    let (max_level, stderr_logger): (log::LevelFilter, Option<simplelog::TermLogger>) =
+        if options.verbose || !suppress_unless_explicit {
+            // Note: Something like this log configuration also appears in other binaries.
+            // Unclear how to deduplicate since we don't want to have a library-level dep on
+            // simplelog. For now, just remember to consider updating other instances.
+            let logger = *simplelog::TermLogger::new(
+                match verbose {
+                    // TODO: When we're closer to 1.0, change the default level to `Info`
+                    false => Debug,
+                    true => Trace,
+                },
+                simplelog::ConfigBuilder::new()
+                    .set_target_level(Off)
+                    .set_location_level(Off)
+                    .set_time_level(if simplify_log_format { Off } else { Error })
+                    .add_filter_ignore_str("wgpu") // noisy
+                    .add_filter_ignore_str("naga") // noisy
+                    .add_filter_ignore_str("winit") // noisy at Trace level only
+                    .build(),
+                simplelog::TerminalMode::Stderr,
+                if simplify_log_format {
+                    simplelog::ColorChoice::Never
+                } else {
+                    simplelog::ColorChoice::Auto
+                },
+            );
+
+            (simplelog::SharedLogger::level(&logger), Some(logger))
         } else {
-            simplelog::ColorChoice::Auto
-        },
-    );
+            (Off, None)
+        };
 
     // Install the logger with our wrapper around it.
-    let max_level = simplelog::SharedLogger::level(&logger);
-    log::set_boxed_logger(Box::new(AicLogger(logger))).context("failed to initialize logging")?;
+    log::set_boxed_logger(Box::new(AicLogger { stderr_logger }))
+        .context("failed to initialize logging")?;
     log::set_max_level(max_level);
 
     Ok(())
 }
 
-struct AicLogger(simplelog::TermLogger);
+struct AicLogger {
+    stderr_logger: Option<simplelog::TermLogger>,
+}
 
 impl log::Log for AicLogger {
     fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
-        self.0.enabled(metadata)
+        self.stderr_logger
+            .as_ref()
+            .is_some_and(|l| l.enabled(metadata))
     }
 
     fn log(&self, record: &log::Record<'_>) {
-        suspend_indicatif_in(|| self.0.log(record))
+        if let Some(stderr_logger) = &self.stderr_logger {
+            suspend_indicatif_in(|| stderr_logger.log(record))
+        }
     }
 
     fn flush(&self) {
-        suspend_indicatif_in(|| self.0.flush())
+        if let Some(stderr_logger) = &self.stderr_logger {
+            suspend_indicatif_in(|| stderr_logger.flush())
+        }
     }
 }
 

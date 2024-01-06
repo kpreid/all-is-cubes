@@ -57,10 +57,8 @@ fn main() -> Result<(), anyhow::Error> {
         no_config_files,
     } = options.clone();
 
-    // Initialize logging -- but only if it won't interfere.
-    if graphics_type != GraphicsType::Terminal || logging_args.verbose {
-        logging::install(&logging_args)?;
-    }
+    // Initialize logging -- telling it to suppress actual output in terminal mode.
+    logging::install(&logging_args, graphics_type == GraphicsType::Terminal)?;
 
     // After setting up logging, do other option interpretation steps.
 
