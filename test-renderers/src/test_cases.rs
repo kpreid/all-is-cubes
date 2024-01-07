@@ -399,15 +399,22 @@ async fn follow_character_change(context: RenderTestContext) {
 
     // Draw the first character
     renderer.update(None).await.unwrap();
-    let _ = renderer.draw("").await.unwrap();
+    let image1 = renderer.draw("").await.unwrap();
+
+    // It'd be surprising if this fails, but we should validate our premises.
+    assert_eq!(
+        image1.data[0],
+        [255, 0, 0, 255],
+        "Should be looking at c1 (red)"
+    );
 
     // Switch characters and draw the second -- the resulting sky color should be from it
     character_cell.set(Some(c2));
     renderer.update(None).await.unwrap();
-    let image = renderer.draw("").await.unwrap();
+    let image2 = renderer.draw("").await.unwrap();
 
     assert_eq!(
-        image.data[0],
+        image2.data[0],
         [0, 255, 0, 255],
         "Should be looking at c2 (green)"
     );
