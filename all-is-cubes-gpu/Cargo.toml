@@ -31,7 +31,7 @@ harness = false
 
 [features]
 # Adds support for render info logging to Rerun.
-rerun = ["all-is-cubes/rerun", "all-is-cubes-mesh/rerun", "pollster"]
+rerun = ["all-is-cubes/rerun", "all-is-cubes-mesh/rerun"]
 # Enable wgpu support.
 # (The library is useless without this, but we used to have multiple GPU API support
 # and I don't want to go entirely deleting it quite yet.)
@@ -48,13 +48,19 @@ cfg-if = { workspace = true }
 flume = { workspace = true }
 futures-channel = { workspace = true, features = ["sink"] }
 futures-core = { workspace = true }
-futures-util = { workspace = true, features = ["sink"] }
+futures-util = { workspace = true, features = [
+    "async-await", # needed for select!
+    "async-await-macro", # needed for select!
+    "std", # needed for select!
+    "sink"
+] }
 # f16 support for working with floating point textures.
 half = { version = "2.3.1", features = ["bytemuck"] }
 itertools = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }
-pollster = { workspace = true, optional = true }
+# Used to implement ensure_polled on non-Wasm targets, and in the `rerun` support.
+pollster = { workspace = true }
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }
 rayon = { workspace = true, optional = true }
@@ -65,6 +71,8 @@ web-time = { workspace = true }
 wgpu = { workspace = true, optional = true, features = ["expose-ids"] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
+# Used in the `poll` module to implement timeout
+gloo-timers = { version = "0.3.0", default-features = false, features = ["futures"]}
 # If we don't set this feature, it will try to access files at run time and fail
 # since web wasm has no std::fs.
 resource = { version = "0.5.0", features = ["force-static"] }

@@ -59,6 +59,7 @@ futures-channel = { version = "0.3.28", default-features = false, features = ["a
 futures-core = { version = "0.3.28", default-features = false, features = ["alloc"] }
 futures-task = { version = "0.3.28", default-features = false }
 futures-util = { version = "0.3.28", default-features = false, features = ["alloc"] }
+gloo-timers = { version = "0.3.0", default-features = false }
 hashbrown = { version = "0.14.0", default-features = false, features = ["ahash", "inline-more"] }
 image = { version = "0.24.6", default-features = false }
 indoc = "2.0.1"
