@@ -369,7 +369,8 @@ mod tests {
         // This block has some AIR in it that the iterator will traverse
         let slab_with_extra_space = Block::builder()
             .voxels_fn(R4, |cube| {
-                if cube.y >= 2 {
+                // the x part of the condition prevents voxels_fn() auto-bounds-shrinking
+                if cube.y >= 2 && cube.x != 0 {
                     &AIR
                 } else {
                     &slab_test_color_block
@@ -384,7 +385,7 @@ mod tests {
         let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
 
         assert_eq!(
-            SurfaceIter::new(&rt, Ray::new([0.5, -0.5, 0.5], [0., 1., 0.]))
+            SurfaceIter::new(&rt, Ray::new([0.25, -0.5, 0.25], [0., 1., 0.]))
                 .collect::<Vec<TraceStep<'_, ()>>>(),
             vec![
                 Invisible { t_distance: 0.5 }, // Cube [0, 0, 0] is empty
@@ -394,7 +395,7 @@ mod tests {
                     emission: Rgb::ZERO,
                     cube: Cube::new(0, 1, 0),
                     t_distance: 1.5, // half-block starting point + 1 empty block
-                    intersection_point: point3(0.5, 1.0, 0.5),
+                    intersection_point: point3(0.25, 1.0, 0.25),
                     normal: Face7::NY
                 }),
                 EnterBlock { t_distance: 2.5 },
@@ -404,7 +405,7 @@ mod tests {
                     emission: Rgb::ZERO,
                     cube: Cube::new(0, 2, 0),
                     t_distance: 2.5,
-                    intersection_point: point3(0.5, 2.0, 0.5),
+                    intersection_point: point3(0.25, 2.0, 0.25),
                     normal: Face7::NY
                 }),
                 // Second layer of slab.
@@ -414,7 +415,7 @@ mod tests {
                     emission: Rgb::ZERO,
                     cube: Cube::new(0, 2, 0),
                     t_distance: 2.75, // previous surface + 1/4 block of depth
-                    intersection_point: point3(0.5, 2.25, 0.5),
+                    intersection_point: point3(0.25, 2.25, 0.25),
                     normal: Face7::NY
                 }),
                 // Two top layers of slab.

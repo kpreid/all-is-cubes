@@ -9,7 +9,7 @@ use crate::block::{
     AnimationHint, Atom, Block, BlockAttributes, BlockCollision, BlockParts, BlockPtr, Modifier,
     Primitive, Resolution, RotationPlacementRule, AIR,
 };
-use crate::math::{Cube, GridPoint, Rgb, Rgba};
+use crate::math::{Cube, GridAab, GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
 use crate::transaction::{self, Merge, Transaction};
 use crate::universe::{Name, URef, Universe, UniverseTransaction};
@@ -158,6 +158,13 @@ impl<P, Txn> BlockBuilder<P, Txn> {
     /// Constructs a `Space` for building a [`Primitive::Recur`], and calls
     /// the given function to fill it with blocks, in the manner of [`Space::fill`].
     ///
+    /// If the voxels do not fill the entire volume of the block being built — that is, there is
+    /// some smaller region outside of which they are all [`AIR`] — then the [`Space`] will be
+    /// shrunk to tightly enclose that region, to improve performance. However, this still requires
+    /// the function to be called on all positions within the full block bounds, so for very high
+    /// ratios of resolution to actual content, it may be wise to use
+    /// [`voxels_ref()`](Self::voxels_ref) instead.
+    ///
     /// Note that if the resulting builder is cloned, all clones will share the same
     /// space.
     // TODO: (doc) test for this
@@ -171,9 +178,39 @@ impl<P, Txn> BlockBuilder<P, Txn> {
         F: FnMut(Cube) -> B,
         B: core::borrow::Borrow<Block>,
     {
+        let mut not_air_bounds: Option<GridAab> = None;
+
         let mut space = Space::for_block(resolution).build();
         // TODO: Teach the SpaceBuilder to accept a function in the same way?
-        space.fill(space.bounds(), |point| Some(function(point)))?;
+        space.fill(space.bounds(), |cube| {
+            let block = function(cube);
+
+            // Track which of the blocks are not equal to AIR, for later use.
+            if block.borrow() != &AIR {
+                let cube_bb = cube.grid_aab();
+                not_air_bounds = Some(if let Some(bounds) = not_air_bounds {
+                    bounds.union(cube_bb).unwrap()
+                } else {
+                    cube_bb
+                });
+            }
+
+            Some(block)
+        })?;
+
+        // If the block bounding box is not full of non-AIR blocks, then construct a replacement
+        // Space that is smaller. This is equivalent, but improves the performance of all future
+        // uses of this block.
+        let not_air_bounds = not_air_bounds.unwrap_or(GridAab::ORIGIN_EMPTY);
+        if space.bounds() != not_air_bounds {
+            // TODO: Eventually we should be able to ask the Space to resize itself,
+            // but that is not yet an available operation.
+            let mut shrunk = Space::builder(not_air_bounds)
+                .physics(space.physics().clone())
+                .build();
+            shrunk.fill(not_air_bounds, |cube| Some(&space[cube]))?;
+            space = shrunk;
+        }
 
         let space_ref = URef::new_pending(Name::Pending, space);
 
@@ -350,8 +387,11 @@ impl BuildPrimitive for BlockBuilderVoxels {
 
 #[cfg(test)]
 mod tests {
+    use alloc::boxed::Box;
+
     use crate::block::{Resolution::*, TickAction, AIR};
-    use crate::math::{Face6, GridAab};
+    use crate::content::palette;
+    use crate::math::{Face6, GridAab, Vol};
     use crate::op::Operation;
     use crate::space::SpacePhysics;
 
@@ -434,13 +474,15 @@ mod tests {
     }
 
     #[test]
-    fn voxels_from_fn() {
+    fn voxels_from_fn_basic() {
         let mut universe = Universe::new();
 
-        let resolution = R8;
+        let resolution = R4;
+        let expected_bounds = GridAab::for_block(resolution);
+        let atom = Block::from(palette::DIRT);
         let block = Block::builder()
             .display_name("hello world")
-            .voxels_fn(resolution, |_cube| &AIR)
+            .voxels_fn(resolution, |_cube| &atom)
             .unwrap()
             .build_into(&mut universe);
 
@@ -465,16 +507,51 @@ mod tests {
         );
 
         // Check the space's characteristics
+        let space = space_ref.read().unwrap();
+        assert_eq!(space.bounds(), expected_bounds);
+        assert_eq!(space.physics(), &SpacePhysics::DEFAULT_FOR_BLOCK);
         assert_eq!(
-            space_ref.read().unwrap().bounds(),
-            GridAab::for_block(resolution)
+            space.extract(expected_bounds, |e| e.block_data().block()),
+            Vol::<Box<[&Block]>>::from_fn(expected_bounds, |_| &atom)
         );
-        assert_eq!(
-            space_ref.read().unwrap().physics(),
-            &SpacePhysics::DEFAULT_FOR_BLOCK
-        );
+    }
 
-        // TODO: assert the voxels are correct
+    /// `voxels_fn()` automatically shrinks the space bounds to fit only the nonair blocks.
+    #[test]
+    fn voxels_from_fn_shrinkwrap() {
+        let mut universe = Universe::new();
+
+        let resolution = R4;
+        let expected_bounds = GridAab::from_lower_upper([0, 0, 0], [2, 4, 4]);
+        let atom = Block::from(palette::DIRT);
+        let block = Block::builder()
+            .display_name("hello world")
+            .voxels_fn(resolution, |cube| {
+                if expected_bounds.contains_cube(cube) {
+                    &atom
+                } else {
+                    &AIR
+                }
+            })
+            .unwrap()
+            .build_into(&mut universe);
+
+        // Extract the implicitly constructed space reference
+        let space_ref = if let Primitive::Recur { space, .. } = block.primitive() {
+            space.clone()
+        } else {
+            panic!("expected Recur, found {block:?}");
+        };
+
+        // Check the space's characteristics; not just that it has the smaller bounds, but that
+        // it has the expected physics and contents.
+        let space = space_ref.read().unwrap();
+        assert_eq!(space.bounds(), expected_bounds);
+        assert_eq!(space.physics(), &SpacePhysics::DEFAULT_FOR_BLOCK);
+        assert_eq!(
+            space.extract(expected_bounds, |e| e.block_data().block()),
+            Vol::<Box<[&Block]>>::from_fn(expected_bounds, |_| &atom)
+        );
     }
 
     #[test]
