@@ -193,7 +193,7 @@ impl RendererImpl {
         // TODO: refactor so that this viewport read is done synchronously, outside the RendererImpl
         let viewport = self.viewport_source.snapshot();
 
-        if viewport.framebuffer_size.x == 0 || viewport.framebuffer_size.y == 0 {
+        if viewport.is_empty() {
             // GPU doesn't accept zero size, so we have to short-circuit it at this layer or we will
             // get a placeholder at-least-1-pixel size that EverythingRenderer uses internally.
             return Ok(camera::Rendering {

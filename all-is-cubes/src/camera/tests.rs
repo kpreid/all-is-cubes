@@ -1,4 +1,4 @@
-use euclid::{point3, vec3, Point3D, Rotation3D, Vector2D};
+use euclid::{point3, vec3, Point3D, Rotation3D, Vector2D, vec2};
 use pretty_assertions::assert_eq;
 use rand::SeedableRng;
 
@@ -152,4 +152,17 @@ fn look_at_direction_consistency() {
             "{direction:?} -> {rotated_eye_vector:?}"
         );
     }
+}
+
+#[test]
+fn viewport_is_empty() {
+    assert!(Viewport::with_scale(1.0, vec2(0, 1)).is_empty());
+    assert!(Viewport::with_scale(1.0, vec2(1, 0)).is_empty());
+    assert!(Viewport::with_scale(1.0, vec2(100, 0)).is_empty());
+
+    assert!(!Viewport::with_scale(1.0, vec2(100, 1)).is_empty());
+    assert!(!Viewport::with_scale(1.0, vec2(10, 10)).is_empty());
+
+    // nominal size does not matter
+    assert!(!Viewport::with_scale(0.0, vec2(10, 10)).is_empty());
 }

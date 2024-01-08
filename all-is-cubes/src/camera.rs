@@ -539,8 +539,21 @@ impl Viewport {
         )
     }
 
+    /// Returns whether the viewport contains no physical pixels, that is,
+    /// whether either `framebuffer_size.x` or `framebuffer_size.y` is zero.
+    ///
+    /// If this returns `false`, then both `framebuffer_size.x` and `framebuffer_size.y` must be
+    /// positive.
+    ///
+    /// Ignores `self.nominal_size`.
+    pub fn is_empty(&self) -> bool {
+        self.framebuffer_size.x == 0 || self.framebuffer_size.y == 0
+    }
+
     /// Computes the number of pixels in the framebuffer.
     /// Returns [`None`] if that number does not fit in a [`usize`].
+    ///
+    /// Whenever [`Viewport::is_empty()`] returns `true`, this returns `Some(0)`.
     pub fn pixel_count(&self) -> Option<usize> {
         let w: usize = self.framebuffer_size.x.try_into().ok()?;
         let h: usize = self.framebuffer_size.y.try_into().ok()?;
@@ -659,3 +672,5 @@ fn projected_range(
         .into_option()
         .unwrap()
 }
+
+
