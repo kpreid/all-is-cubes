@@ -3,6 +3,7 @@
 #![allow(clippy::unused_async)]
 
 use std::future::Future;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use futures_core::future::BoxFuture;
@@ -27,7 +28,7 @@ use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{RefError, URef, Universe, UniverseTransaction};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes::{notnan, rgb_const, rgba_const};
-use all_is_cubes_content::{make_some_voxel_blocks, palette};
+use all_is_cubes_content::{make_some_voxel_blocks, palette, UniverseTemplate};
 
 use crate::{
     finish_universe_from_space, Overlays, RenderTestContext, TestCaseCollector, Threshold,
@@ -92,6 +93,20 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     );
     c.insert("no_update", None, no_update);
     c.insert("sky_and_info_text", None, sky_and_info_text);
+    c.insert_variants(
+        "template",
+        None,
+        template,
+        // This list contains only templates which we expect to not change very much, so we don't
+        // have to frequently update the render tests.
+        // The goals of this are both to test the content of the templates, and to test the
+        // renderers against more complex content.
+        [
+            "atrium",
+            "cornell-box", // not super interesting till we enable lighting
+            "lighting-bench",
+        ],
+    );
     c.insert_variants(
         "tone_mapping",
         u("tone_mapping", tone_mapping_test_universe()),
@@ -738,6 +753,44 @@ async fn sky_and_info_text(mut context: RenderTestContext) {
 
     context
         .render_comparison_test(TEXT_MAX_DIFF, &universe, overlays)
+        .await;
+}
+
+async fn template(mut context: RenderTestContext, template_name: &'static str) {
+    let template = UniverseTemplate::from_str(template_name).unwrap();
+    let universe = template
+        .build::<std::time::Instant>(
+            yield_progress_for_testing(),
+            all_is_cubes_content::TemplateParameters {
+                seed: Some(0),
+                size: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    // TODO: Lighting is too slow to be reasonable to run in these tests.
+    // Fix that by adding a feature to precalculate lighting for specific templates and store
+    // the light data to be loaded when the template is instantiated.
+    if false {
+        universe
+            .get_default_character()
+            .unwrap()
+            .read()
+            .unwrap()
+            .space
+            .try_modify(|space| {
+                space.evaluate_light::<time::NoTime>(1, |_| {});
+            })
+            .unwrap();
+    }
+
+    // TODO: add more features (fog, lighting) as long as all renderers support them
+    let options = GraphicsOptions::UNALTERED_COLORS;
+
+    let scene = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
+    context
+        .render_comparison_test(Threshold::new([(30, 50)]), scene, Overlays::NONE)
         .await;
 }
 
