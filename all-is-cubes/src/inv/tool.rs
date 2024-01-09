@@ -700,6 +700,7 @@ mod tests {
     }
 
     #[derive(Clone, Debug)]
+    #[allow(dead_code)] // fields only used in Debug if an expect() fails
     enum EucError {
         Use(ToolError),
         Commit(transaction::ExecuteError),

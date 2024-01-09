@@ -49,7 +49,10 @@ where
 /// Construct this using [`Listener::gate`], or if a placeholder instance with no
 /// effect is required, [`Gate::default`].
 #[derive(Clone, Default)]
-pub struct Gate(Arc<()>);
+pub struct Gate {
+    /// By owning this we keep its [`Weak`] peers alive, and thus the GateListener active.
+    _strong: Arc<()>,
+}
 
 impl fmt::Debug for Gate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -62,7 +65,7 @@ impl Gate {
         let signaller = Arc::new(());
         let weak = Arc::downgrade(&signaller);
         (
-            Gate(signaller),
+            Gate { _strong: signaller },
             GateListener {
                 weak,
                 target: listener,
