@@ -14,6 +14,11 @@ doctest = false
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
 bench = false
 
+[[bin]]
+name = "bless-render"
+test = false
+doctest = false
+
 [[test]]
 name = "ray-render"
 doctest = false

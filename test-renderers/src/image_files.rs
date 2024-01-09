@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use std::{fmt, io};
 
+use clap::builder::PossibleValue;
+
 use crate::TestId;
 
 // TODO: better name
@@ -21,21 +23,38 @@ pub enum RendererId {
     Raytracer,
     Wgpu,
 }
+impl RendererId {
+    fn as_str(&self) -> &'static str {
+        match self {
+            RendererId::All => "all",
+            RendererId::Raytracer => "ray",
+            RendererId::Wgpu => "wgpu",
+        }
+    }
+}
+impl clap::ValueEnum for RendererId {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[RendererId::All, RendererId::Raytracer, RendererId::Wgpu]
+    }
 
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        Some(PossibleValue::new(self.as_str()))
+    }
+}
 impl fmt::Display for RendererId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            RendererId::All => write!(f, "all"),
-            RendererId::Raytracer => write!(f, "ray"),
-            RendererId::Wgpu => write!(f, "wgpu"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
 /// Selector for [`test_data_dir_path`].
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum Version {
+#[non_exhaustive]
+pub enum Version {
+    /// Version-controlled expected image files.
     ExpectedSrc,
+    /// Copy of `ExpectedSrc` captured at the same time as the actual files.
+    /// This copy makes the output self-contained and consistent.
     ExpectedSnapshot,
     Actual,
     Diff,
@@ -47,7 +66,9 @@ pub(crate) enum Version {
 ///
 /// This does not check whether the file exists, but it does have the side effect of
 /// ensuring the directory exists.
-pub(crate) fn image_path(test: &ImageId, version: Version) -> PathBuf {
+///
+/// Public so bless-render can sue it.
+pub fn image_path(test: &ImageId, version: Version) -> PathBuf {
     let mut path = test_data_dir_path(version);
 
     // Convenience kludge: ensure the directory exists
