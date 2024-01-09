@@ -306,7 +306,7 @@ macro_rules! member_enums_and_impls {
                 &self,
                 _target: &(),
             ) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
-                Ok(match self {
+                Ok::<Self::CommitCheck, transaction::PreconditionFailed>(match self {
                     Self::Noop => Box::new(()),
                     $(  Self::$member_type(t) => Box::new(t.check(&())?), )*
                 })
