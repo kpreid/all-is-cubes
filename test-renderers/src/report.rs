@@ -57,16 +57,20 @@ pub(crate) fn write_report_file() -> PathBuf {
                             outcome,
                             test_id: _,
                             comparisons,
-                        }) => tmpl::StatusCell {
-                            test_outcome: match outcome {
-                                Ok(()) => "✅".to_owned(),
-                                Err(e) => format!("❌ {e}"),
-                            },
-                            comparisons: comparisons
-                                .iter()
-                                .map(tmpl::TmplComparison::from)
-                                .collect(),
-                        },
+                        }) => {
+                            let flawed = comparisons.iter().any(|c| c.outcome.is_flawed());
+                            tmpl::StatusCell {
+                                test_outcome: match outcome {
+                                    Ok(()) if flawed => "⚠️".to_owned(),
+                                    Ok(()) => "✅".to_owned(),
+                                    Err(e) => format!("❌ {e}"),
+                                },
+                                comparisons: comparisons
+                                    .iter()
+                                    .map(tmpl::TmplComparison::from)
+                                    .collect(),
+                            }
+                        }
                         None => tmpl::StatusCell {
                             test_outcome: "Not run".into(),
                             comparisons: vec![],
@@ -144,10 +148,11 @@ mod tmpl {
                     ComparisonOutcome::Unfinished => true,
                 },
                 // Show histogram details but only if not flawed
-                diffcount: match &input.outcome {
-                    ComparisonOutcome::Flawed(_) => "".into(),
+                diffcount: if input.outcome.is_flawed() {
+                    "".into()
+                } else {
                     // TODO: make this the `impl Display for Histogram`
-                    _ => input
+                    input
                         .diff_histogram
                         .iter()
                         .copied()
@@ -155,7 +160,7 @@ mod tmpl {
                         .rev() // list biggest first
                         .filter(|&(delta, count)| count > 0 && delta > 0)
                         .map(|(delta, count)| format!("Δ{delta}\u{00A0}×{count}"))
-                        .join(", "),
+                        .join(", ")
                 },
                 flawedness: match &input.outcome {
                     ComparisonOutcome::Flawed(flaws) => format!("Flaws: {flaws}"),

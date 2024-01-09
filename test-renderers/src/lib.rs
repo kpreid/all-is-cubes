@@ -70,6 +70,20 @@ pub enum ComparisonOutcome {
     /// The flaws included Flaws::UNFINISHED, which shouldn't happen.
     Unfinished,
 }
+impl ComparisonOutcome {
+    /// Check if the outcome is flawed, that is, a comparison failure occurred but should be disregarded.|
+    /// This method exists to centralize a couple of cases where we make this check
+    pub fn is_flawed(&self) -> bool {
+        match self {
+            ComparisonOutcome::Flawed(_) => true,
+
+            ComparisonOutcome::Equal => false,
+            ComparisonOutcome::Different { amount: _ } => false,
+            ComparisonOutcome::NoExpected => false,
+            ComparisonOutcome::Unfinished => false,
+        }
+    }
+}
 
 impl ComparisonRecord {
     fn from_paths(
