@@ -789,7 +789,6 @@ fn generate_arch<'b>(
     };
     Ok(Block::builder()
         .display_name("Atrium Upper Floor Arch")
-        // TODO: multiplication operation on Resolution
         .voxels_ref((resolution * MULTIBLOCK_SCALE).unwrap(), space)
         .build())
 }
