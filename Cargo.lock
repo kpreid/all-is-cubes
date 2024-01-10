@@ -157,7 +157,7 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "criterion",
- "crossbeam-channel",
+ "flume",
  "futures-channel",
  "futures-core",
  "futures-util",

@@ -44,6 +44,8 @@ all-is-cubes = { path = "../all-is-cubes", version = "0.6.0" }
 all-is-cubes-mesh = { path = "../all-is-cubes-mesh", version = "0.6.0" }
 bytemuck = { workspace = true, features = ["derive"] }
 cfg-if = { workspace = true }
+# Used to implement ensure_polled(). Also a `wgpu` dependency already.
+flume = { workspace = true }
 futures-channel = { workspace = true, features = ["sink"] }
 futures-core = { workspace = true }
 futures-util = { workspace = true, features = ["sink"] }
@@ -61,10 +63,6 @@ thiserror = { workspace = true }
 wasm-bindgen-futures = { workspace = true }
 web-time = { workspace = true }
 wgpu = { workspace = true, optional = true, features = ["expose-ids"] }
-
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-# Used to implement ensure_polled() on non-Wasm targets.
-crossbeam-channel = { workspace = true }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 # If we don't set this feature, it will try to access files at run time and fail

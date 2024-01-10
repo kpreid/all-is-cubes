@@ -51,10 +51,10 @@ clap = { version = "4.2.4", default-features = false, features = ["cargo", "depr
 # Note: async_tokio feature is not needed globally but is enabled to avoid compiling two versions
 # when benching/testing specific packages
 criterion = { version = "0.5.1", features = ["async_tokio", "cargo_bench_support", "html_reports"] }
-crossbeam-channel = { version = "0.5.8" }
 displaydoc = { version = "0.2.4", default-features = false}
 either = { version = "1.8.0", default-features = false }
 exhaust = { version = "0.1.0", default-features = false }
+flume = { version = "0.11.0", default-features = false, features = ["async"] }
 futures-channel = { version = "0.3.28", default-features = false, features = ["alloc"] }
 futures-core = { version = "0.3.28", default-features = false, features = ["alloc"] }
 futures-task = { version = "0.3.28", default-features = false }

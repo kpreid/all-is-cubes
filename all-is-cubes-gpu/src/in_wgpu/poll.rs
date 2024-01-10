@@ -27,8 +27,9 @@ mod inner {
     use std::sync::{OnceLock, Weak};
     use std::time::Duration;
 
-    /// Crossbeam, unlike `std::sync::mpsc`, has a `Sender` that is `Sync`.
-    use crossbeam_channel as channel;
+    // `flume` is our choice of channel because it has a `Sender` that is `Sync`,
+    // and also supports mixed blocking/async usage which will be useful for implementing
+    // polling on wasm too. Also, it's already in our dependencies via `wgpu`.
 
     pub(crate) fn ensure_polled(device: Weak<wgpu::Device>) {
         POLLER_THREAD
@@ -37,10 +38,10 @@ mod inner {
             .unwrap()
     }
 
-    static POLLER_THREAD: OnceLock<channel::Sender<Weak<wgpu::Device>>> = OnceLock::new();
+    static POLLER_THREAD: OnceLock<flume::Sender<Weak<wgpu::Device>>> = OnceLock::new();
 
-    fn init_poller_thread() -> channel::Sender<Weak<wgpu::Device>> {
-        let (tx, rx) = channel::bounded(4);
+    fn init_poller_thread() -> flume::Sender<Weak<wgpu::Device>> {
+        let (tx, rx) = flume::bounded(4);
         std::thread::Builder::new()
             .name("all-is-cubes wgpu poller".into())
             .spawn(move || {
@@ -73,7 +74,7 @@ mod inner {
                     let recv_result = if to_poll.is_empty() {
                         // If we have nothing to poll, then we don't need to wake up.
                         // eprintln!("poller: sleeping indefinitely");
-                        rx.recv().map_err(channel::RecvTimeoutError::from)
+                        rx.recv().map_err(flume::RecvTimeoutError::from)
                     } else {
                         rx.recv_timeout(Duration::from_millis(1))
                     };
@@ -83,10 +84,10 @@ mod inner {
                             // eprintln!("poller: got another device");
                             to_poll.insert(WeakIdentityDevice(device));
                         }
-                        Err(channel::RecvTimeoutError::Disconnected) => {
+                        Err(flume::RecvTimeoutError::Disconnected) => {
                             log::warn!("shouldn't happen: wgpu poller thread disconnected");
                         }
-                        Err(channel::RecvTimeoutError::Timeout) => {
+                        Err(flume::RecvTimeoutError::Timeout) => {
                             // eprintln!("poller: time to poll");
                             // continue to poll
                         }
