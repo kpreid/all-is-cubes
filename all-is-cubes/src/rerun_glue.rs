@@ -6,7 +6,7 @@ use re_sdk::{RecordingStream, RecordingStreamResult};
 use crate::math;
 
 // To support concise conditional debugging, this module re-exports many items from rerun.
-pub use re_log_types::{entity_path, EntityPath, Index};
+pub use re_log_types::{entity_path, EntityPath};
 pub use re_types::datatypes;
 pub use re_types::external::arrow2::types::f16;
 pub use re_types::{archetypes, components, view_coordinates};

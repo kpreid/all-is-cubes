@@ -1,4 +1,6 @@
 #[cfg(feature = "rerun")]
+use alloc::string::ToString;
+#[cfg(feature = "rerun")]
 use alloc::vec::Vec;
 use core::fmt;
 
