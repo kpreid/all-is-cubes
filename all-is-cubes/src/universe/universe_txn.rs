@@ -6,14 +6,14 @@ use core::fmt;
 
 use hashbrown::HashMap as HbHashMap;
 
-use crate::behavior;
 use crate::transaction::{
     self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
 };
 use crate::universe::{
-    AnyURef, Name, UBorrowMut, URef, URefErased, Universe, UniverseId, UniverseMember,
+    AnyURef, InsertError, Name, UBorrowMut, URef, URefErased, Universe, UniverseId, UniverseMember,
     UniverseTable,
 };
+use crate::{behavior, universe};
 
 // Reëxports for macro-generated types
 #[doc(inline)]
@@ -299,6 +299,43 @@ impl UniverseTransaction {
                 universe_id: None,
                 behaviors: Default::default(),
             },
+        }
+    }
+
+    /// Adds an insertion of a universe member to the transaction.
+    ///
+    /// This is equivalent to [`Self::insert()`] but allows efficiently accumulating a transaction,
+    /// and producing [`InsertError`](crate::universe::InsertError)s on failure rather than a more
+    /// general error.
+    ///
+    /// If the member is to be anonymous, consider using [`Self::insert_anonymous()`] instead.
+    ///
+    /// TODO: Give this a better name by renaming `insert()`.
+    /// TODO: Is `InsertError` actually desirable, or legacy from before transactions?
+    pub fn insert_mut<T: UniverseMember>(&mut self, reference: URef<T>) -> Result<(), InsertError> {
+        let insertion = MemberTxn::Insert(UniverseMember::into_any_ref(reference.clone()));
+
+        // TODO: fail right away if the ref is already in a universe or if it is Anonym?
+        match reference.name() {
+            name @ (Name::Specific(_) | Name::Anonym(_)) => {
+                match self.members.entry(name.clone()) {
+                    hashbrown::hash_map::Entry::Occupied(_) => {
+                        // Equivalent to how transaction merge would fail
+                        Err(InsertError {
+                            name: name.clone(),
+                            kind: universe::InsertErrorKind::AlreadyExists,
+                        })
+                    }
+                    hashbrown::hash_map::Entry::Vacant(ve) => {
+                        ve.insert(insertion);
+                        Ok(())
+                    }
+                }
+            }
+            Name::Pending => {
+                self.anonymous_insertions.push(insertion);
+                Ok(())
+            }
         }
     }
 
@@ -929,7 +966,7 @@ mod tests {
 
     #[test]
     fn insert_anonymous_equivalence() {
-        let mut  txn = UniverseTransaction::default();
+        let mut txn = UniverseTransaction::default();
         let r = txn.insert_anonymous(Space::empty_positive(1, 1, 1));
 
         assert_eq!(r.name(), Name::Pending);
