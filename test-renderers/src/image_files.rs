@@ -47,7 +47,8 @@ impl fmt::Display for RendererId {
     }
 }
 
-/// Selector for [`test_data_dir_path`].
+#[allow(rustdoc::private_intra_doc_links)]
+/// Selector of which image role is wanted from [`image_path`] and [`test_data_dir_path`].
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Version {
@@ -56,7 +57,9 @@ pub enum Version {
     /// Copy of `ExpectedSrc` captured at the same time as the actual files.
     /// This copy makes the output self-contained and consistent.
     ExpectedSnapshot,
+    /// Image produced by this run.
     Actual,
+    /// Diff between `ExpectedSnapshot` and `Actual` images.
     Diff,
     /// Output root directory, for writing the report files.
     Root,
