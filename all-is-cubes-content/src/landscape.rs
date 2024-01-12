@@ -1,6 +1,7 @@
 use core::array;
 use core::fmt;
 
+use all_is_cubes::universe::UniverseTransaction;
 use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
@@ -8,7 +9,6 @@ use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenErr
 use all_is_cubes::math::{FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb};
 use all_is_cubes::notnan;
 use all_is_cubes::space::{SetCubeError, Space};
-use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{
     block::{
@@ -106,7 +106,7 @@ impl DefaultProvision<Block> for LandscapeBlocks {
 /// This is an async function for the sake of cancellation and optional cooperative
 /// multitasking. It may be blocked on from a synchronous context.
 pub async fn install_landscape_blocks(
-    universe: &mut Universe,
+    txn: &mut UniverseTransaction,
     resolution: Resolution,
     progress: YieldProgress,
 ) -> Result<(), GenError> {
@@ -158,7 +158,7 @@ pub async fn install_landscape_blocks(
     };
 
     BlockProvider::<LandscapeBlocks>::new(progress, |key| {
-        let grass_blades = |universe, index: GridCoordinate| -> Result<Block, InGenError> {
+        let grass_blades = |txn, index: GridCoordinate| -> Result<Block, InGenError> {
             Ok(Block::builder()
                 .attributes(
                     grass_blade_atom
@@ -180,7 +180,7 @@ pub async fn install_landscape_blocks(
                         AIR
                     }
                 })?
-                .build_into(universe))
+                .build_txn(txn))
         };
 
         Ok(match key {
@@ -192,7 +192,7 @@ pub async fn install_landscape_blocks(
                         .attributes,
                 )
                 .voxels_fn(resolution, &stone_pattern)?
-                .build_into(universe),
+                .build_txn(txn),
 
             Grass => Block::builder()
                 .attributes(
@@ -208,9 +208,9 @@ pub async fn install_landscape_blocks(
                         dirt_pattern(cube).clone()
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
 
-            GrassBlades { variant } => grass_blades(universe, variant.into())?,
+            GrassBlades { variant } => grass_blades(txn, variant.into())?,
 
             Dirt => Block::builder()
                 .attributes(
@@ -220,7 +220,7 @@ pub async fn install_landscape_blocks(
                         .attributes,
                 )
                 .voxels_fn(resolution, &dirt_pattern)?
-                .build_into(universe),
+                .build_txn(txn),
 
             key @ Log(growth) => {
                 let resolution = R16;
@@ -246,7 +246,7 @@ pub async fn install_landscape_blocks(
                             AIR
                         }
                     })?
-                    .build_into(universe)
+                    .build_txn(txn)
             }
 
             key @ Leaves(growth) => Block::builder()
@@ -283,11 +283,11 @@ pub async fn install_landscape_blocks(
                         &AIR
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
         })
     })
     .await?
-    .install(universe)?;
+    .install(txn)?;
     Ok(())
 }
 

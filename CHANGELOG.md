@@ -9,6 +9,8 @@
 
     - `block::BlockAttributes::tick_action` can now specify a time period rather than always occurring on the next tick.
 
+    - `linking::Provider` is `BlockProvider` but generalized to non-block types.
+
     - `math::Axis` is an enum of coordinate axes.
 
     - `math::Cube` represents a unit cube on the grid; it replaces many previous uses of `GridPoint` to identify cubes.
@@ -61,6 +63,8 @@
 
     - `camera::HeadlessRenderer` now returns a custom image container type `Rendering` instead of using `image::RgbaImage`.
       (This way, no dependency on `image` is needed.)
+
+    - `linking::BlockProvider::install()` now requires a `&mut UniverseTransaction` instead of a `&mut Universe`.
 
     - `drawing::VoxelBrush::transform()` is renamed to `rotate()` and only accepts a rotation.
       This avoids confusion between points in space and cube-identifying coordinates.

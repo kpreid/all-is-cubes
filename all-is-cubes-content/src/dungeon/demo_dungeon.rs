@@ -23,7 +23,7 @@ use all_is_cubes::math::{
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{include_image, rgb_const};
 
@@ -403,8 +403,12 @@ pub(crate) async fn demo_dungeon(
     } = params;
     let seed = seed.unwrap_or(0);
 
-    let blocks_progress = progress.start_and_cut(0.2, "dungeon blocks").await;
-    install_dungeon_blocks(universe, blocks_progress).await?;
+    {
+        let mut install_txn = UniverseTransaction::default();
+        let blocks_progress = progress.start_and_cut(0.2, "dungeon blocks").await;
+        install_dungeon_blocks(&mut install_txn, blocks_progress).await?;
+        install_txn.execute(universe, &mut transaction::no_outputs)?;
+    }
 
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
 
@@ -615,7 +619,7 @@ use DungeonBlocks::*;
 
 /// Add [`DungeonBlocks`] to the universe.
 pub async fn install_dungeon_blocks(
-    universe: &mut Universe,
+    txn: &mut UniverseTransaction,
     progress: YieldProgress,
 ) -> Result<(), GenError> {
     let resolution = R16;
@@ -642,7 +646,7 @@ pub async fn install_dungeon_blocks(
                         &AIR
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
 
             FloorTile => {
                 let resolution = R32;
@@ -654,7 +658,7 @@ pub async fn install_dungeon_blocks(
                     })?;
                 Block::builder()
                     .display_name("Floor Tile")
-                    .voxels_ref(resolution, universe.insert_anonymous(space))
+                    .voxels_ref(resolution, txn.insert_anonymous(space))
                     .build()
             }
 
@@ -669,7 +673,7 @@ pub async fn install_dungeon_blocks(
                         &AIR
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
 
             Gate => {
                 let space =
@@ -681,7 +685,7 @@ pub async fn install_dungeon_blocks(
                     })?;
                 Block::builder()
                     .display_name("Gate")
-                    .voxels_ref(R16, universe.insert_anonymous(space))
+                    .voxels_ref(R16, txn.insert_anonymous(space))
                     .build()
             }
 
@@ -697,13 +701,13 @@ pub async fn install_dungeon_blocks(
                 )?;
                 Block::builder()
                     .display_name("Gate Pocket")
-                    .voxels_ref(R16, universe.insert_anonymous(space))
+                    .voxels_ref(R16, txn.insert_anonymous(space))
                     .build()
             }
         })
     })
     .await?
-    .install(universe)?;
+    .install(txn)?;
 
     Ok(())
 }

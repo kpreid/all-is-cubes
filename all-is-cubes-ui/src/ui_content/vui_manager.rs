@@ -13,7 +13,7 @@ use all_is_cubes::math::{FreeVector, NotNan};
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
-use all_is_cubes::universe::{URef, Universe, UniverseStepInfo};
+use all_is_cubes::universe::{URef, Universe, UniverseStepInfo, UniverseTransaction};
 
 use crate::apps::{
     ControlMessage, FullscreenSetter, FullscreenState, InputProcessor, QuitCancelled, QuitFn,
@@ -87,14 +87,19 @@ impl Vui {
         quit: Option<QuitFn>,
     ) -> Self {
         let mut universe = Universe::new();
+
+        let mut content_txn = UniverseTransaction::default();
         // TODO: take YieldProgress as a parameter
         let hud_blocks = Arc::new(
             HudBlocks::new(
-                &mut universe,
+                &mut content_txn,
                 all_is_cubes::util::YieldProgressBuilder::new().build(),
             )
             .await,
         );
+        content_txn
+            .execute(&mut universe, &mut transaction::no_outputs)
+            .unwrap();
 
         let (control_send, control_recv) = mpsc::sync_channel(100);
         let state = ListenableCell::new(VuiPageState::Hud);

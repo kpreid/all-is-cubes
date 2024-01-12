@@ -17,9 +17,10 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{LightPhysics, Space};
-use all_is_cubes::time;
-use all_is_cubes::universe::{Name, URef, Universe};
+use all_is_cubes::transaction::Transaction as _;
+use all_is_cubes::universe::{Name, URef, Universe, UniverseTransaction};
 use all_is_cubes::util::{ErrorIfStd, YieldProgress};
+use all_is_cubes::{time, transaction};
 
 use crate::fractal::menger_sponge;
 use crate::menu::template_menu;
@@ -148,7 +149,11 @@ impl UniverseTemplate {
         // TODO: Later we want a "module loading" system that can lazily bring in content.
         // For now, unconditionally add all these blocks.
         let [demo_blocks_progress, p] = p.split(0.1);
-        install_demo_blocks(&mut universe, demo_blocks_progress).await?;
+        {
+            let mut install_txn = UniverseTransaction::default();
+            install_demo_blocks(&mut install_txn, demo_blocks_progress).await?;
+            install_txn.execute(&mut universe, &mut transaction::no_outputs)?;
+        }
         p.progress(0.).await;
 
         let default_space_name: Name = "space".into();

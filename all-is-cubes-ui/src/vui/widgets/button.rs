@@ -31,7 +31,7 @@ use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use all_is_cubes::math::{Cube, Face6, GridAab, GridCoordinate, GridVector, Gridgid, Rgba};
 use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::Merge;
-use all_is_cubes::universe::{URef, Universe};
+use all_is_cubes::universe::{URef, UniverseTransaction};
 
 use crate::vui::widgets::{BoxStyle, WidgetBlocks, WidgetTheme};
 use crate::vui::{self, Layoutable as _};
@@ -490,7 +490,7 @@ pub(crate) enum ButtonIcon<'a> {
 
 /// TODO: document, refine, and make public
 pub(crate) fn make_button_label_block(
-    universe: &mut Universe,
+    txn: &mut UniverseTransaction,
     name: &str,
     icon: ButtonIcon<'_>,
 ) -> Result<BlockBuilder<BlockBuilderVoxels, ()>, InGenError> {
@@ -524,7 +524,7 @@ pub(crate) fn make_button_label_block(
             .draw(&mut draw_target)?;
         }
     }
-    let space = universe.insert_anonymous(space);
+    let space = txn.insert_anonymous(space);
     Ok(Block::builder()
         // .animation_hint(Replace)
         .display_name(name.to_owned())
@@ -574,10 +574,11 @@ pub(crate) trait ButtonBase {
     ///
     /// The block is a multiblock shape suitable for [`BoxStyle::from_nine_and_thin()`].
     ///
-    /// TODO: switch from `&mut Universe` to transactions
+    /// `txn` will be extended to insert the block's dependencies.
+    /// It must be committed to the relevant universe afterward.
     ///
     /// TODO: more type-safe result while still cooperating with `linking`
-    fn button_block(&self, universe: &mut Universe) -> Result<Block, InGenError>;
+    fn button_block(&self, txn: &mut UniverseTransaction) -> Result<Block, InGenError>;
 
     /// Where within the [`Self::button_block()`] the label should be positioned.
     ///
@@ -591,7 +592,7 @@ impl ButtonBase for ButtonVisualState {
         theme::UNPRESSED_Z + if self.pressed { -2 } else { 0 }
     }
 
-    fn button_block(&self, universe: &mut Universe) -> Result<Block, InGenError> {
+    fn button_block(&self, txn: &mut UniverseTransaction) -> Result<Block, InGenError> {
         let label_z = self.button_label_z();
         let back_block = palette::BUTTON_BACK; // TODO: different color theme for action than toggle?
         let frame_brush = VoxelBrush::single(Block::from(palette::BUTTON_FRAME));
@@ -635,7 +636,7 @@ impl ButtonBase for ButtonVisualState {
         }
 
         Ok(theme::common_block(
-            universe.insert_anonymous(space),
+            txn.insert_anonymous(space),
             "Action Button",
         ))
     }
@@ -647,7 +648,7 @@ impl ButtonBase for ToggleButtonVisualState {
         self.common.button_label_z()
     }
 
-    fn button_block(&self, universe: &mut Universe) -> Result<Block, InGenError> {
+    fn button_block(&self, txn: &mut UniverseTransaction) -> Result<Block, InGenError> {
         let label_z = self.button_label_z();
         let active = self.value;
         let illuminate = move |builder: BlockBuilder<block::builder::BlockBuilderAtom, ()>| {
@@ -702,7 +703,7 @@ impl ButtonBase for ToggleButtonVisualState {
         }
 
         Ok(theme::common_block(
-            universe.insert_anonymous(space),
+            txn.insert_anonymous(space),
             &format!("Toggle Button {self}"),
         ))
     }

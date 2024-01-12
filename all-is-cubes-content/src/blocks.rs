@@ -25,7 +25,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{rgb_const, rgba_const};
 
@@ -75,7 +75,7 @@ impl fmt::Display for DemoBlocks {
 ///
 /// [`LandscapeBlocks`]: crate::landscape::LandscapeBlocks
 pub async fn install_demo_blocks(
-    universe: &mut Universe,
+    txn: &mut UniverseTransaction,
     p: YieldProgress,
 ) -> Result<(), GenError> {
     let resolution = R16;
@@ -90,7 +90,7 @@ pub async fn install_demo_blocks(
     let center_point_doubled = (one_diagonal * resolution_g).to_point();
 
     let [landscape_p, p] = p.split(0.5);
-    install_landscape_blocks(universe, resolution, landscape_p).await?;
+    install_landscape_blocks(txn, resolution, landscape_p).await?;
     p.progress(0.0).await;
 
     let curb_color: Block = Rgba::new(0.788, 0.765, 0.741, 1.0).into();
@@ -122,7 +122,7 @@ pub async fn install_demo_blocks(
     let pedestal_voxel = Block::from(palette::STONE);
 
     use DemoBlocks::*;
-    BlockProvider::<DemoBlocks>::new(p, |key| {
+    let provider_for_patch = BlockProvider::<DemoBlocks>::new(p, |key| {
         Ok(match key {
             GlassBlock => {
                 let glass_densities = [
@@ -147,7 +147,7 @@ pub async fn install_demo_blocks(
                             .dot(Vector3D::new(1.0, 1.0, 1.0));
                         gradient_lookup(&glass_densities, (1.0 - r as f32) * 2.0)
                     })?
-                    .build_into(universe)
+                    .build_txn(txn)
             }
 
             Road => {
@@ -172,7 +172,7 @@ pub async fn install_demo_blocks(
                         let x = rng.gen_range(range.clone());
                         palette_image.get_brush(x, y).origin_block().unwrap_or(&AIR)
                     })?
-                    .build_into(universe)
+                    .build_txn(txn)
             }
 
             Lamp => Block::builder()
@@ -187,7 +187,7 @@ pub async fn install_demo_blocks(
                         &AIR
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
 
             LamppostSegment => Block::builder()
                 .display_name("Lamppost")
@@ -203,7 +203,7 @@ pub async fn install_demo_blocks(
                         &AIR
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
 
             LamppostBase => Block::builder()
                 .display_name("Lamppost Base")
@@ -222,7 +222,7 @@ pub async fn install_demo_blocks(
                         &AIR
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
 
             LamppostTop => Block::builder()
                 .display_name("Lamppost Top")
@@ -239,7 +239,7 @@ pub async fn install_demo_blocks(
                         &AIR
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
 
             Sconce => Block::builder()
                 .display_name("Sconce")
@@ -261,7 +261,7 @@ pub async fn install_demo_blocks(
                         &AIR
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
 
             Arrow => {
                 let mut space = Space::for_block(resolution).build();
@@ -307,7 +307,7 @@ pub async fn install_demo_blocks(
                 Block::builder()
                     .display_name("Arrow")
                     .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                    .voxels_ref(resolution, universe.insert_anonymous(space))
+                    .voxels_ref(resolution, txn.insert_anonymous(space))
                     .build()
             }
 
@@ -316,7 +316,7 @@ pub async fn install_demo_blocks(
                 // TODO: rotation should specify curb line direction
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
                 .voxels_fn(resolution, curb_fn)?
-                .build_into(universe),
+                .build_txn(txn),
 
             ExhibitBackground => {
                 let colors = [
@@ -328,7 +328,7 @@ pub async fn install_demo_blocks(
                     .voxels_fn(R4, |cube| {
                         &colors[(cube.x + cube.y + cube.z).rem_euclid(2) as usize]
                     })?
-                    .build_into(universe)
+                    .build_txn(txn)
             }
 
             Pedestal => Block::builder()
@@ -346,7 +346,7 @@ pub async fn install_demo_blocks(
                         &AIR
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
 
             Signboard => {
                 let sign_board = Block::from(palette::PLANK);
@@ -400,7 +400,7 @@ pub async fn install_demo_blocks(
                 Block::builder()
                     .display_name("Signboard")
                     .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                    .voxels_ref(resolution, universe.insert_anonymous(space))
+                    .voxels_ref(resolution, txn.insert_anonymous(space))
                     .build()
             }
 
@@ -422,7 +422,7 @@ pub async fn install_demo_blocks(
                     .display_name("Clock")
                     .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
                     .animation_hint(AnimationHint::CONTINUOUS)
-                    .voxels_ref(resolution, universe.insert_anonymous(space))
+                    .voxels_ref(resolution, txn.insert_anonymous(space))
                     .build()
             }
 
@@ -443,12 +443,7 @@ pub async fn install_demo_blocks(
         })
     })
     .await?
-    .install(universe)?;
-
-    // Kludge: Grab the installed blocks to patch up inter-block cross-references
-    // TODO: This should be possible to do as a built-in feature of the "linking" system
-    let provider_for_patch = BlockProvider::using(universe)
-        .map_err(|e| GenError::failure(e, "TODO: dummy name".into()))?;
+    .install(txn)?;
 
     // Join up blinker blocks
     for state in bool::exhaust() {
@@ -550,10 +545,11 @@ mod tests {
 
     #[tokio::test]
     pub async fn install_demo_blocks_test() {
-        let mut universe = Universe::new();
-        install_demo_blocks(&mut universe, yield_progress_for_testing())
-            .await
-            .unwrap();
-        // TODO: assert what entries were created, once Universe has iteration
+        install_demo_blocks(
+            &mut UniverseTransaction::default(),
+            yield_progress_for_testing(),
+        )
+        .await
+        .unwrap();
     }
 }

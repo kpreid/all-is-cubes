@@ -20,7 +20,7 @@ use hashbrown::HashMap as HbHashMap;
 use crate::block::{Block, BlockDef};
 use crate::space::SetCubeError;
 use crate::transaction::ExecuteError;
-use crate::universe::{InsertError, Name, URef, Universe};
+use crate::universe::{InsertError, Name, URef, Universe, UniverseTransaction};
 use crate::util::{ErrorIfStd, YieldProgress};
 
 #[cfg(doc)]
@@ -116,14 +116,15 @@ impl<E: BlockModule> Provider<E, Block> {
     /// Add the block definitions stored in this [`BlockProvider`] into `universe` as
     /// [`BlockDef`]s, returning a new [`BlockProvider`] whose blocks refer to those
     /// definitions (via [`Primitive::Indirect`]).
-    ///
-    /// TODO: Migrate this to operate via `UniverseTransaction` instead.
-    pub fn install(&self, universe: &mut Universe) -> Result<Self, InsertError> {
+    pub fn install(&self, txn: &mut UniverseTransaction) -> Result<Self, InsertError> {
+        let mut map = HbHashMap::new();
         for key in E::exhaust() {
-            // TODO: the &* mess should not be required
-            universe.insert(name_in_module(&key), BlockDef::new(self[key].clone()))?;
+            let block_def_ref =
+                URef::new_pending(name_in_module(&key), BlockDef::new(self[&key].clone()));
+            txn.insert_mut(block_def_ref.clone())?;
+            map.insert(key, Block::from(block_def_ref));
         }
-        Ok(Self::using(universe).expect("failed to retrieve names we just inserted??"))
+        Ok(Self { map })
     }
 
     /// Obtain the definitions of `E`'s blocks from `universe`, returning a new
@@ -220,11 +221,26 @@ impl<E: Exhaust + fmt::Debug + Clone + Eq + Hash, V> Provider<E, V> {
     }
 }
 
+impl<E: Eq + Hash, V: PartialEq> PartialEq for Provider<E, V> {
+    fn eq(&self, other: &Self) -> bool {
+        let Self { map } = self;
+        *map == other.map
+    }
+}
+impl<E: Eq + Hash, V: PartialEq> Eq for Provider<E, V> {}
+
 impl<E: Eq + Hash, V> Index<E> for Provider<E, V> {
     type Output = V;
 
     fn index(&self, index: E) -> &Self::Output {
         &self.map[&index]
+    }
+}
+impl<E: Eq + Hash, V> Index<&E> for Provider<E, V> {
+    type Output = V;
+
+    fn index(&self, index: &E) -> &Self::Output {
+        &self.map[index]
     }
 }
 
@@ -445,6 +461,7 @@ mod tests {
     use crate::block::{Quote, Resolution::*};
     use crate::content::make_some_blocks;
     use crate::math::GridAab;
+    use crate::transaction::{self, Transaction as _};
     use crate::util::assert_send_sync;
     use alloc::string::ToString;
     use std::error::Error;
@@ -454,6 +471,16 @@ mod tests {
         A,
         B,
         C,
+    }
+    impl fmt::Display for Key {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{self:?}")
+        }
+    }
+    impl BlockModule for Key {
+        fn namespace() -> &'static str {
+            "test-key"
+        }
     }
 
     fn test_provider() -> ([Block; 3], BlockProvider<Key>) {
@@ -466,6 +493,19 @@ mod tests {
         provider.consistency_check();
 
         (blocks, provider)
+    }
+
+    #[test]
+    fn provider_install() {
+        let mut universe = Universe::new();
+        let (_, provider) = test_provider();
+
+        let mut txn = UniverseTransaction::default();
+        let installed = provider.install(&mut txn).unwrap();
+        txn.execute(&mut universe, &mut transaction::no_outputs)
+            .unwrap();
+
+        assert_eq!(installed, BlockProvider::using(&universe).unwrap());
     }
 
     #[test]

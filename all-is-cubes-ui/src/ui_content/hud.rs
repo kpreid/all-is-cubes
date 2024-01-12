@@ -11,7 +11,7 @@ use all_is_cubes::inv::Icons;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::Face6;
-use all_is_cubes::universe::{URef, Universe};
+use all_is_cubes::universe::{URef, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
 use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
@@ -150,12 +150,12 @@ pub(crate) struct HudBlocks {
 }
 
 impl HudBlocks {
-    pub(crate) async fn new(universe: &mut Universe, p: YieldProgress) -> Self {
+    pub(crate) async fn new(txn: &mut UniverseTransaction, p: YieldProgress) -> Self {
         let [p12, p3] = p.split(0.667);
         let [p1, p2] = p12.split(0.5);
-        let widget_theme = widgets::WidgetTheme::new(universe, p1).await.unwrap();
-        let ui_blocks = UiBlocks::new(universe, p2).await.install(universe).unwrap();
-        let icons = Icons::new(universe, p3).await.install(universe).unwrap();
+        let widget_theme = widgets::WidgetTheme::new(txn, p1).await.unwrap();
+        let ui_blocks = UiBlocks::new(txn, p2).await.install(&mut *txn).unwrap();
+        let icons = Icons::new(txn, p3).await.install(txn).unwrap();
 
         let text_brush = VoxelBrush::new::<_, Block>([
             ([0, 0, 1], palette::HUD_TEXT_FILL.into()),

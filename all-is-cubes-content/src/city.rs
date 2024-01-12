@@ -53,20 +53,22 @@ pub(crate) async fn demo_city<I: Instant>(
     // Also install blocks some exhibits want.
     // We do this once so that if multiple exhibits end up wanting them there are no conflicts.
     // TODO: We want a "module loading" system that allows expressing dependencies.
+    let mut install_txn = UniverseTransaction::default();
     let widget_theme_progress = p.start_and_cut(0.05, "WidgetTheme").await;
-    all_is_cubes_ui::vui::widgets::WidgetTheme::new(universe, widget_theme_progress)
+    all_is_cubes_ui::vui::widgets::WidgetTheme::new(&mut install_txn, widget_theme_progress)
         .await
         .unwrap();
     let ui_blocks_progress = p.start_and_cut(0.05, "UiBlocks").await;
-    all_is_cubes_ui::vui::blocks::UiBlocks::new(universe, ui_blocks_progress)
+    all_is_cubes_ui::vui::blocks::UiBlocks::new(&mut install_txn, ui_blocks_progress)
         .await
-        .install(universe)
+        .install(&mut install_txn)
         .unwrap();
     let icons_blocks_progress = p.start_and_cut(0.05, "Icons").await;
-    all_is_cubes::inv::Icons::new(universe, icons_blocks_progress)
+    all_is_cubes::inv::Icons::new(&mut install_txn, icons_blocks_progress)
         .await
-        .install(universe)
+        .install(&mut install_txn)
         .unwrap();
+    install_txn.execute(universe, &mut transaction::no_outputs)?;
 
     // Layout parameters
     // TODO: move to CityPlanner

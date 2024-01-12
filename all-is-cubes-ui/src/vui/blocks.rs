@@ -5,7 +5,7 @@ use exhaust::Exhaust;
 use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1 as font;
 use all_is_cubes::include_image;
 use all_is_cubes::linking::{BlockModule, BlockProvider};
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
 
 use crate::vui::widgets::{make_button_label_block, ButtonIcon};
@@ -65,95 +65,93 @@ impl fmt::Display for UiBlocks {
 }
 
 impl UiBlocks {
-    pub async fn new(universe: &mut Universe, p: YieldProgress) -> BlockProvider<UiBlocks> {
+    pub async fn new(txn: &mut UniverseTransaction, p: YieldProgress) -> BlockProvider<UiBlocks> {
         BlockProvider::new(p, |key| {
             Ok(match key {
                 UiBlocks::BackButtonLabel => make_button_label_block(
-                    universe,
+                    txn,
                     "Back",
                     ButtonIcon::Icon(include_image!("icons/button-back.png")),
                 )?
                 .build(),
 
-                UiBlocks::AboutButtonLabel => make_button_label_block(
-                    universe,
-                    "About",
-                    ButtonIcon::Text(&font::FONT_10X20, "?"),
-                )?
-                .build(),
+                UiBlocks::AboutButtonLabel => {
+                    make_button_label_block(txn, "About", ButtonIcon::Text(&font::FONT_10X20, "?"))?
+                        .build()
+                }
 
                 UiBlocks::PauseButtonLabel => make_button_label_block(
-                    universe,
+                    txn,
                     "Pause",
                     ButtonIcon::Icon(include_image!("icons/button-pause.png")),
                 )?
                 .build(),
 
                 UiBlocks::SaveButtonLabel => make_button_label_block(
-                    universe,
+                    txn,
                     "Save",
                     ButtonIcon::Icon(include_image!("icons/button-save.png")),
                 )?
                 .build(),
 
                 UiBlocks::OptionsButtonLabel => make_button_label_block(
-                    universe,
+                    txn,
                     "Options",
                     ButtonIcon::Icon(include_image!("icons/button-options.png")),
                 )?
                 .build(),
 
                 UiBlocks::MouselookButtonLabel => make_button_label_block(
-                    universe,
+                    txn,
                     "Mouselook",
                     ButtonIcon::Icon(include_image!("icons/button-mouselook.png")),
                 )?
                 .build(),
 
                 UiBlocks::FullscreenButtonLabel => make_button_label_block(
-                    universe,
+                    txn,
                     "Fullscreen",
                     ButtonIcon::Icon(include_image!("icons/button-fullscreen.png")),
                 )?
                 .build(),
 
                 UiBlocks::AntialiasButtonLabel => make_button_label_block(
-                    universe,
+                    txn,
                     "Antialiasing",
                     ButtonIcon::Icon(include_image!("icons/button-antialias.png")),
                 )?
                 .build(),
 
                 UiBlocks::DebugInfoTextButtonLabel => make_button_label_block(
-                    universe,
+                    txn,
                     "Debug: Info Text",
                     ButtonIcon::Icon(include_image!("icons/button-debug-info-text.png")),
                 )?
                 .build(),
 
                 UiBlocks::DebugChunkBoxesButtonLabel => make_button_label_block(
-                    universe,
+                    txn,
                     "Debug: Chunk Boxes",
                     ButtonIcon::Icon(include_image!("icons/button-debug-chunk-boxes.png")),
                 )?
                 .build(),
 
                 UiBlocks::DebugBehaviorsButtonLabel => make_button_label_block(
-                    universe,
+                    txn,
                     "Debug: Behaviors",
                     ButtonIcon::Icon(include_image!("icons/button-debug-behaviors.png")),
                 )?
                 .build(),
 
                 UiBlocks::DebugCollisionBoxesButtonLabel => make_button_label_block(
-                    universe,
+                    txn,
                     "Debug: Collision Boxes",
                     ButtonIcon::Icon(include_image!("icons/button-debug-collision-boxes.png")),
                 )?
                 .build(),
 
                 UiBlocks::DebugLightRaysButtonLabel => make_button_label_block(
-                    universe,
+                    txn,
                     "Debug: Light Rays at Cursor",
                     ButtonIcon::Icon(include_image!("icons/button-debug-light-rays.png")),
                 )?
@@ -172,6 +170,10 @@ mod tests {
 
     #[tokio::test]
     async fn blocks_smoke_test() {
-        UiBlocks::new(&mut Universe::new(), yield_progress_for_testing()).await;
+        UiBlocks::new(
+            &mut UniverseTransaction::default(),
+            yield_progress_for_testing(),
+        )
+        .await;
     }
 }

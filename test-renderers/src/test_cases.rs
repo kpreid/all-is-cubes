@@ -486,16 +486,20 @@ async fn icons(mut context: RenderTestContext) {
     };
 
     let universe = &mut Universe::new();
-    Icons::new(universe, yield_progress_for_testing())
+    let mut install_txn = UniverseTransaction::default();
+    Icons::new(&mut install_txn, yield_progress_for_testing())
         .await
-        .install(universe)
+        .install(&mut install_txn)
         .unwrap();
-    let ui_blocks_p = UiBlocks::new(universe, yield_progress_for_testing())
+    let ui_blocks_p = UiBlocks::new(&mut install_txn, yield_progress_for_testing())
         .await
-        .install(universe)
+        .install(&mut install_txn)
         .unwrap();
-    let widget_theme = WidgetTheme::new(universe, yield_progress_for_testing())
+    let widget_theme = WidgetTheme::new(&mut install_txn, yield_progress_for_testing())
         .await
+        .unwrap();
+    install_txn
+        .execute(universe, &mut transaction::no_outputs)
         .unwrap();
 
     fn get_blocks<E: BlockModule + 'static>(

@@ -17,7 +17,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{rgb_const, rgba_const};
 
@@ -31,8 +31,13 @@ pub(crate) async fn atrium(
     universe: &mut Universe,
     progress: YieldProgress,
 ) -> Result<Space, InGenError> {
-    // TODO: subdivide progress
-    let blocks = install_atrium_blocks(universe, progress).await?;
+    // TODO: subdivide and report further progress
+    let blocks = {
+        let mut install_txn = UniverseTransaction::default();
+        let blocks = install_atrium_blocks(&mut install_txn, progress).await?;
+        install_txn.execute(universe, &mut transaction::no_outputs)?;
+        blocks
+    };
 
     let ceiling_height = 6;
     let between_small_arches = 3;
@@ -464,7 +469,7 @@ impl BannerColor {
 }
 
 async fn install_atrium_blocks(
-    universe: &mut Universe,
+    txn: &mut UniverseTransaction,
     progress: YieldProgress,
 ) -> Result<BlockProvider<AtriumBlocks>, InGenError> {
     let resolution = Resolution::R16;
@@ -564,7 +569,7 @@ async fn install_atrium_blocks(
     let one_diagonal = GridVector::new(1, 1, 1);
     let center_point_doubled = (one_diagonal * resolution_g).to_point();
 
-    BlockProvider::<AtriumBlocks>::new(progress, |key| {
+    Ok(BlockProvider::<AtriumBlocks>::new(progress, |key| {
         Ok(match key {
             AtriumBlocks::Sun => Block::builder()
                 .display_name("Sun")
@@ -581,7 +586,7 @@ async fn install_atrium_blocks(
                         brick_pattern(p)
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
             AtriumBlocks::UpperFloor => Block::builder()
                 .display_name("Atrium Upper Floor")
                 .voxels_fn(resolution, |p| {
@@ -592,16 +597,16 @@ async fn install_atrium_blocks(
                         brick_pattern(p)
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
             AtriumBlocks::SolidBricks => Block::builder()
                 .display_name("Atrium Wall Bricks")
                 .voxels_fn(resolution, brick_pattern)?
-                .build_into(universe),
+                .build_txn(txn),
             AtriumBlocks::GroundArch => {
-                generate_arch(universe, &stone_range, brick_pattern, resolution, 7, 3)?
+                generate_arch(txn, &stone_range, brick_pattern, resolution, 7, 3)?
             }
             AtriumBlocks::UpperArch => {
-                generate_arch(universe, &stone_range, brick_pattern, resolution, 3, 2)?
+                generate_arch(txn, &stone_range, brick_pattern, resolution, 3, 2)?
             }
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
@@ -614,7 +619,7 @@ async fn install_atrium_blocks(
                         &AIR
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
             AtriumBlocks::SquareColumn => Block::builder()
                 .display_name("Square Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
@@ -626,7 +631,7 @@ async fn install_atrium_blocks(
                         &AIR
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
             AtriumBlocks::SmallColumn => Block::builder()
                 .display_name("Round Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
@@ -638,12 +643,12 @@ async fn install_atrium_blocks(
                         &AIR
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
             AtriumBlocks::Molding => Block::builder()
                 .display_name("Atrium Top Edge Molding")
                 // TODO: rotation rule
                 .voxels_fn(resolution, molding_fn)?
-                .build_into(universe),
+                .build_txn(txn),
 
             AtriumBlocks::Banner(color) => Block::builder()
                 .display_name(format!("Atrium Banner {color}"))
@@ -656,7 +661,7 @@ async fn install_atrium_blocks(
                         AIR
                     }
                 })?
-                .build_into(universe),
+                .build_txn(txn),
             AtriumBlocks::BannerBottomAccent => {
                 let accent_color = Block::from(rgba_const!(0.95, 0.89, 0.05, 1.0));
                 Block::builder()
@@ -668,13 +673,13 @@ async fn install_atrium_blocks(
                             &AIR
                         }
                     })?
-                    .build_into(universe)
+                    .build_txn(txn)
             }
 
             AtriumBlocks::Pole => Block::builder()
                 .display_name("Pole")
                 .voxels_fn((Resolution::R16 * MULTIBLOCK_SCALE).unwrap(), &pole_fn)?
-                .build_into(universe),
+                .build_txn(txn),
             AtriumBlocks::Firepot => Block::builder()
                 .display_name("Firepot")
                 .voxels_ref(resolution, {
@@ -712,20 +717,19 @@ async fn install_atrium_blocks(
                             .execute(&mut space, &mut transaction::no_outputs)
                             .unwrap();
                     }
-                    universe.insert_anonymous(space)
+                    txn.insert_anonymous(space)
                 })
                 .build(),
         })
     })
     .await?
-    .install(universe)?;
-    Ok(BlockProvider::<AtriumBlocks>::using(universe)?)
+    .install(txn)?)
 }
 
 const MULTIBLOCK_SCALE: Resolution = Resolution::R8;
 
 fn generate_arch<'b>(
-    universe: &mut Universe,
+    txn: &mut UniverseTransaction,
     stone_range: &[Block], // TODO: clarify
     brick_pattern: impl Fn(Cube) -> &'b Block,
     resolution: Resolution,
@@ -785,7 +789,7 @@ fn generate_arch<'b>(
                 Some(brick_pattern(p))
             }
         })?;
-        universe.insert_anonymous(space)
+        txn.insert_anonymous(space)
     };
     Ok(Block::builder()
         .display_name("Atrium Upper Floor Arch")

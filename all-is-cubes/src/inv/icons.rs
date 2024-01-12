@@ -18,7 +18,7 @@ use crate::math::{
     Face6, FreeCoordinate, GridCoordinate, GridRotation, GridVector, Gridgid, Rgba, VectorOps,
 };
 use crate::space::Space;
-use crate::universe::Universe;
+use crate::universe::UniverseTransaction;
 
 #[cfg(doc)]
 use crate::inv::Tool;
@@ -73,10 +73,9 @@ impl fmt::Display for Icons {
 }
 
 impl Icons {
-    /// Construct the standard icons, inserting block definitions into the given [`Universe`].
-    ///
-    /// TODO: Replace `&mut Universe` parameter with a transaction return value.
-    pub async fn new(universe: &mut Universe, p: YieldProgress) -> BlockProvider<Icons> {
+    /// Construct the standard icons, inserting block definitions into the given
+    /// [`UniverseTransaction`].
+    pub async fn new(txn: &mut UniverseTransaction, p: YieldProgress) -> BlockProvider<Icons> {
         let resolution = R16;
 
         BlockProvider::new(p, |key| {
@@ -91,7 +90,7 @@ impl Icons {
                     .display_name("Activate")
                     .voxels_ref(
                         R16, // TODO: get resolution from image file
-                        universe.insert_anonymous(space_from_image(
+                        txn.insert_anonymous(space_from_image(
                             include_image!("icons/hand.png"),
                             GridRotation::RXyZ,
                             default_srgb,
@@ -147,7 +146,7 @@ impl Icons {
 
                     Block::builder()
                         .display_name("Delete Block")
-                        .voxels_ref(resolution, universe.insert_anonymous(space))
+                        .voxels_ref(resolution, txn.insert_anonymous(space))
                         .build()
                 }
 
@@ -170,7 +169,7 @@ impl Icons {
                         .display_name("Push/Pull")
                         .voxels_ref(
                             R32, // TODO: get resolution from image file,
-                            universe.insert_anonymous(space_from_image(
+                            txn.insert_anonymous(space_from_image(
                                 include_image!("icons/push.png"),
                                 GridRotation::RXZY,
                                 |color| {
@@ -263,7 +262,7 @@ impl Icons {
                                 &AIR
                             }
                         })?
-                        .build_into(universe)
+                        .build_txn(txn)
                 }
             })
         })
@@ -279,6 +278,10 @@ mod tests {
 
     #[tokio::test]
     async fn icons_smoke_test() {
-        Icons::new(&mut Universe::new(), yield_progress_for_testing()).await;
+        Icons::new(
+            &mut UniverseTransaction::default(),
+            yield_progress_for_testing(),
+        )
+        .await;
     }
 }

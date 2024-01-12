@@ -10,7 +10,7 @@ use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::TOOL_SELECTIONS;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
 use all_is_cubes::math::GridRotation;
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{include_image, rgba_const};
 
@@ -27,14 +27,16 @@ pub struct WidgetTheme {
 }
 
 impl WidgetTheme {
-    /// Generate the default theme and install its components in `universe`, which should
-    /// be the same universe as the widgets using this theme are to be installed in.
+    /// Generate the default theme and install its components in `txn`, which should be a
+    /// transaction that will be committed to the same universe as the widgets using this theme
+    /// are to be installed in.
     ///
     /// Returns an error if the universe already contains the items that were to be installed.
-    pub async fn new(universe: &mut Universe, progress: YieldProgress) -> Result<Self, GenError> {
-        let widget_blocks = WidgetBlocks::new(universe, progress)
-            .await
-            .install(universe)?;
+    pub async fn new(
+        txn: &mut UniverseTransaction,
+        progress: YieldProgress,
+    ) -> Result<Self, GenError> {
+        let widget_blocks = WidgetBlocks::new(txn, progress).await.install(txn)?;
 
         let dialog_box_style =
             BoxStyle::from_nine_and_thin(&widget_blocks[WidgetBlocks::DialogBackground]);
@@ -110,14 +112,14 @@ impl fmt::Display for WidgetBlocks {
 }
 
 impl WidgetBlocks {
-    pub async fn new(universe: &mut Universe, p: YieldProgress) -> BlockProvider<Self> {
+    pub async fn new(txn: &mut UniverseTransaction, p: YieldProgress) -> BlockProvider<Self> {
         BlockProvider::new(p, |key| {
             Ok(match key {
                 WidgetBlocks::Crosshair => Block::builder()
                     .display_name("Crosshair")
                     .voxels_ref(
                         R64, // TODO: get resolution from image file
-                        universe.insert_anonymous(space_from_image(
+                        txn.insert_anonymous(space_from_image(
                             include_image!("theme/crosshair.png"),
                             GridRotation::RXyZ,
                             default_srgb,
@@ -130,7 +132,7 @@ impl WidgetBlocks {
                         .display_name("Toolbar Slot Frame")
                         .voxels_ref(
                             R64,
-                            universe.insert_anonymous(space_from_image(
+                            txn.insert_anonymous(space_from_image(
                                 include_image!("theme/toolbar-slot.png"),
                                 GridRotation::RXZY,
                                 // TODO: better way to do translations
@@ -150,7 +152,7 @@ impl WidgetBlocks {
                     .display_name("Selected")
                     .voxels_ref(
                         R32, // TODO: get resolution from image file
-                        universe.insert_anonymous(space_from_image(
+                        txn.insert_anonymous(space_from_image(
                             include_image!("theme/toolbar-sel-cursor.png"),
                             GridRotation::RXyZ,
                             |color| match color {
@@ -169,7 +171,7 @@ impl WidgetBlocks {
                         .display_name("Dialog Background")
                         .voxels_ref(
                             R64, // 16 res × 4 tiles
-                            universe.insert_anonymous(space_from_image(
+                            txn.insert_anonymous(space_from_image(
                                 include_image!("theme/dialog-background.png"),
                                 GridRotation::IDENTITY,
                                 default_srgb,
@@ -178,14 +180,14 @@ impl WidgetBlocks {
                         .build()
                 }
 
-                WidgetBlocks::ActionButton(state) => state.button_block(universe)?,
-                WidgetBlocks::ToggleButton(state) => state.button_block(universe)?,
+                WidgetBlocks::ActionButton(state) => state.button_block(txn)?,
+                WidgetBlocks::ToggleButton(state) => state.button_block(txn)?,
 
                 WidgetBlocks::LayoutDebugBoxCorner => Block::builder()
                     .display_name("LayoutDebugBoxCorner")
                     .voxels_ref(
                         R32,
-                        universe.insert_anonymous(space_from_image(
+                        txn.insert_anonymous(space_from_image(
                             include_image!("theme/layout-debug-box-corner.png"),
                             GridRotation::RXyZ,
                             default_srgb,
@@ -196,7 +198,7 @@ impl WidgetBlocks {
                     .display_name("LayoutDebugBoxEdge")
                     .voxels_ref(
                         R32,
-                        universe.insert_anonymous(space_from_image(
+                        txn.insert_anonymous(space_from_image(
                             include_image!("theme/layout-debug-box-edge.png"),
                             GridRotation::RZYX,
                             default_srgb,
@@ -254,6 +256,10 @@ mod tests {
 
     #[tokio::test]
     async fn blocks_smoke_test() {
-        WidgetBlocks::new(&mut Universe::new(), yield_progress_for_testing()).await;
+        WidgetBlocks::new(
+            &mut UniverseTransaction::default(),
+            yield_progress_for_testing(),
+        )
+        .await;
     }
 }
