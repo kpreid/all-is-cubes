@@ -1,5 +1,6 @@
 //! Lesser-used helpers for [`BlockBuilder`].
 
+use alloc::borrow::Cow;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -168,7 +169,7 @@ impl<P, Txn> BlockBuilder<P, Txn> {
     /// Note that if the resulting builder is cloned, all clones will share the same
     /// space.
     // TODO: (doc) test for this
-    pub fn voxels_fn<F, B>(
+    pub fn voxels_fn<'a, F, B>(
         self,
         // TODO: Maybe resolution should be a separate method? Check usage patterns later.
         resolution: Resolution,
@@ -176,53 +177,68 @@ impl<P, Txn> BlockBuilder<P, Txn> {
     ) -> Result<BlockBuilder<BlockBuilderVoxels, UniverseTransaction>, SetCubeError>
     where
         F: FnMut(Cube) -> B,
-        B: core::borrow::Borrow<Block>,
+        B: Into<Cow<'a, Block>>,
     {
-        let mut not_air_bounds: Option<GridAab> = None;
+        // This is a worldgen convenience, not the most efficient possible path (which would be
+        // `SpaceBuilder::palette_and_contents()`), so save quite a lot of code generation
+        // by keeping it monomorphic and not inlined.
+        #[inline(never)]
+        fn voxels_fn_impl<'a>(
+            attributes: BlockAttributes,
+            modifiers: Vec<Modifier>,
+            resolution: Resolution,
+            function: &mut dyn FnMut(Cube) -> Cow<'a, Block>,
+        ) -> Result<BlockBuilder<BlockBuilderVoxels, UniverseTransaction>, SetCubeError> {
+            let mut not_air_bounds: Option<GridAab> = None;
 
-        let mut space = Space::for_block(resolution).build();
-        // TODO: Teach the SpaceBuilder to accept a function in the same way?
-        space.fill(space.bounds(), |cube| {
-            let block = function(cube);
+            let mut space = Space::for_block(resolution).build();
+            // TODO: Teach the SpaceBuilder to accept a function in the same way?
+            space.fill(space.bounds(), |cube| {
+                let block = function(cube);
 
-            // Track which of the blocks are not equal to AIR, for later use.
-            if block.borrow() != &AIR {
-                let cube_bb = cube.grid_aab();
-                not_air_bounds = Some(if let Some(bounds) = not_air_bounds {
-                    bounds.union(cube_bb).unwrap()
-                } else {
-                    cube_bb
-                });
+                // Track which of the blocks are not equal to AIR, for later use.
+                if block.as_ref() != &AIR {
+                    let cube_bb = cube.grid_aab();
+                    not_air_bounds = Some(if let Some(bounds) = not_air_bounds {
+                        bounds.union(cube_bb).unwrap()
+                    } else {
+                        cube_bb
+                    });
+                }
+
+                Some(block)
+            })?;
+
+            // If the block bounding box is not full of non-AIR blocks, then construct a replacement
+            // Space that is smaller. This is equivalent, but improves the performance of all future
+            // uses of this block.
+            let not_air_bounds = not_air_bounds.unwrap_or(GridAab::ORIGIN_EMPTY);
+            if space.bounds() != not_air_bounds {
+                // TODO: Eventually we should be able to ask the Space to resize itself,
+                // but that is not yet an available operation.
+                let mut shrunk = Space::builder(not_air_bounds)
+                    .physics(space.physics().clone())
+                    .build();
+                shrunk.fill(not_air_bounds, |cube| Some(&space[cube]))?;
+                space = shrunk;
             }
 
-            Some(block)
-        })?;
+            let space_ref = URef::new_pending(Name::Pending, space);
 
-        // If the block bounding box is not full of non-AIR blocks, then construct a replacement
-        // Space that is smaller. This is equivalent, but improves the performance of all future
-        // uses of this block.
-        let not_air_bounds = not_air_bounds.unwrap_or(GridAab::ORIGIN_EMPTY);
-        if space.bounds() != not_air_bounds {
-            // TODO: Eventually we should be able to ask the Space to resize itself,
-            // but that is not yet an available operation.
-            let mut shrunk = Space::builder(not_air_bounds)
-                .physics(space.physics().clone())
-                .build();
-            shrunk.fill(not_air_bounds, |cube| Some(&space[cube]))?;
-            space = shrunk;
+            Ok(BlockBuilder {
+                attributes,
+                primitive_builder: BlockBuilderVoxels {
+                    space: space_ref.clone(),
+                    resolution,
+                    offset: GridPoint::origin(),
+                },
+                modifiers,
+                transaction: UniverseTransaction::insert(space_ref),
+            })
         }
 
-        let space_ref = URef::new_pending(Name::Pending, space);
-
-        Ok(BlockBuilder {
-            attributes: self.attributes,
-            primitive_builder: BlockBuilderVoxels {
-                space: space_ref.clone(),
-                resolution,
-                offset: GridPoint::origin(),
-            },
-            modifiers: Vec::new(),
-            transaction: UniverseTransaction::insert(space_ref),
+        voxels_fn_impl(self.attributes, self.modifiers, resolution, &mut |cube| {
+            function(cube).into()
         })
     }
 
