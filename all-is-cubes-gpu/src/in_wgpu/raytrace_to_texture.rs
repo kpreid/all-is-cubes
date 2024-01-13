@@ -1,5 +1,10 @@
 //! Runs the software raytracer and writes the results into a texture.
 
+use std::sync::{Arc, Mutex};
+// TODO: if not using threads, don't even use a Mutex as it's entirely wasted
+#[cfg(feature = "threads")]
+use std::sync::Weak;
+
 use half::f16;
 use rand::prelude::SliceRandom as _;
 use rand::SeedableRng as _;
@@ -7,13 +12,13 @@ use rand::SeedableRng as _;
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use web_time::{Duration, Instant};
 
-use all_is_cubes::camera::{Camera, GraphicsOptions, RenderError};
+use all_is_cubes::camera::{Camera, RenderError};
 use all_is_cubes::camera::{StandardCameras, Viewport};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::drawing::embedded_graphics::pixelcolor::PixelColor;
 use all_is_cubes::drawing::embedded_graphics::{draw_target::DrawTarget, prelude::Point, Pixel};
 use all_is_cubes::euclid::{point2, vec2, Box2D};
-use all_is_cubes::listen::{ListenableCellWithLocal, ListenableSource};
+use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::{Rgb, Rgba, VectorOps as _};
 use all_is_cubes::raytracer::{ColorBuf, RtRenderer};
 
@@ -23,33 +28,65 @@ use crate::{GraphicsResourceError, Memo, ToTexel};
 
 #[derive(Debug)]
 pub(crate) struct RaytraceToTexture {
-    graphics_options: ListenableCellWithLocal<GraphicsOptions>,
-    rtr: RtRenderer,
-    render_target: DrawableTexture<Rgbf16, [f16; 4]>,
+    inner: Arc<Mutex<Inner>>,
     frame_copy_bind_group: Memo<wgpu::Id<wgpu::TextureView>, wgpu::BindGroup>,
+}
+
+/// State for the possibly-asynchronous tracing job.
+#[derive(Debug)]
+struct Inner {
+    rtr: RtRenderer,
+    render_viewport: Viewport,
     pixel_picker: PixelPicker,
+    dirty_pixels: usize,
     rays_per_frame: usize,
+    render_target: DrawableTexture<Rgbf16, [f16; 4]>,
 }
 
 impl RaytraceToTexture {
     pub fn new(cameras: StandardCameras) -> Self {
-        Self {
-            graphics_options: ListenableCellWithLocal::new(GraphicsOptions::default()),
+        let initial_viewport = Viewport::with_scale(1.0, vec2(1, 1));
+        let inner = Arc::new(Mutex::new(Inner {
+            render_viewport: initial_viewport,
             rtr: RtRenderer::new(
                 cameras,
                 Box::new(raytracer_size_policy),
                 ListenableSource::constant(()),
             ),
-            render_target: DrawableTexture::new(wgpu::TextureFormat::Rgba16Float),
-            frame_copy_bind_group: Memo::new(),
-            pixel_picker: PixelPicker::new(Viewport::with_scale(1.0, vec2(1, 1)), false),
+            pixel_picker: PixelPicker::new(initial_viewport, false),
+            dirty_pixels: initial_viewport.pixel_count().unwrap(),
             rays_per_frame: 50000,
+            render_target: DrawableTexture::new(wgpu::TextureFormat::Rgba16Float),
+        }));
+
+        #[cfg(feature = "threads")]
+        {
+            let weak_inner = Arc::downgrade(&inner);
+            match std::thread::Builder::new()
+                .name("RaytraceToTexture".into())
+                .spawn(move || background_tracing_task(weak_inner))
+            {
+                Ok(_) => {
+                    // The thread will stop itself when its weak reference breaks.
+                }
+                Err(e) => {
+                    log::error!(
+                        "RaytraceToTexture failed to create background tracing thread: {e}. \
+                            Tracing will proceed synchronously."
+                    )
+                }
+            };
+        }
+
+        Self {
+            frame_copy_bind_group: Memo::new(),
+            inner,
         }
     }
 
-    /// Copy [`Space`] data from the camera spaces.
+    /// Copy [`Space`] data from the camera spaces, and camera state from the [`StandardCameras`].
     pub fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), RenderError> {
-        self.rtr.update(cursor)
+        self.inner.lock().unwrap().update_inputs(cursor)
     }
 
     /// Trace a frame's worth of rays (which may be less than the scene) and update the texture.
@@ -60,17 +97,12 @@ impl RaytraceToTexture {
         pipelines: &Pipelines,
         camera: &Camera,
     ) -> Result<(), GraphicsResourceError> {
-        if camera.options() != self.graphics_options.borrow() {
-            self.graphics_options.set(camera.options().clone());
-        }
-        let render_viewport = raytracer_size_policy(camera.viewport());
-        self.render_target.resize(
-            device,
-            Some("RaytraceToTexture::render_target"),
-            render_viewport.framebuffer_size,
-        );
-        self.pixel_picker.resize(render_viewport);
-        let rt_texture_view = self.render_target.view().unwrap(); // guaranteed
+        let inner = &mut *self.inner.lock().unwrap(); // not handling poisoning, just fail
+
+        inner.set_viewport(device, raytracer_size_policy(camera.viewport()));
+
+        // Update bind group if needed
+        let rt_texture_view: &wgpu::TextureView = inner.render_target.view().unwrap();
         self.frame_copy_bind_group
             .get_or_insert(rt_texture_view.global_id(), || {
                 device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -89,14 +121,54 @@ impl RaytraceToTexture {
                 })
             });
 
-        // TODO: Instead of the whole size policy business, maybe we should just expect
-        // camera.viewport() to have a "reasonable" framebuffer size. Or, just construct
-        // a copy of the Camera with an adjusted viewport.
+        inner.do_some_tracing();
+        inner.render_target.upload(queue);
+
+        Ok(())
+    }
+
+    pub fn frame_copy_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        self.frame_copy_bind_group.get()
+    }
+}
+
+impl Inner {
+    fn update_inputs(&mut self, cursor: Option<&Cursor>) -> Result<(), RenderError> {
+        self.rtr.update(cursor)?;
+        self.dirty();
+        Ok(())
+    }
+
+    fn set_viewport(&mut self, device: &wgpu::Device, render_viewport: Viewport) {
+        self.render_viewport = render_viewport;
+        self.render_target.resize(
+            device,
+            Some("RaytraceToTexture::render_target"),
+            render_viewport.framebuffer_size,
+        );
+        self.pixel_picker.resize(render_viewport);
+        self.dirty();
+    }
+
+    fn dirty(&mut self) {
+        self.dirty_pixels = self.render_viewport.pixel_count().unwrap_or(usize::MAX);
+    }
+
+    fn do_some_tracing(&mut self) {
+        if self.dirty_pixels == 0 {
+            // We've traced the entire frame buffer area, and no changes have occurred,
+            // so we have no need to trace again.
+            return;
+        }
+
+        let render_viewport = self.render_viewport;
 
         #[allow(clippy::needless_collect)] // needed with rayon and not without
         let this_frame_pixels: Vec<Point> = (0..self.rays_per_frame)
             .map(|_i| self.pixel_picker.next().unwrap())
             .collect();
+
+        self.dirty_pixels = self.dirty_pixels.saturating_sub(this_frame_pixels.len());
 
         let start_time = Instant::now();
         let scene = self.rtr.scene::<ColorBuf>();
@@ -125,7 +197,7 @@ impl RaytraceToTexture {
 
         let tracing_duration = Instant::now().duration_since(start_time);
 
-        match tracing_duration.cmp(&Duration::from_millis(10)) {
+        match tracing_duration.cmp(&Duration::from_millis(2)) {
             std::cmp::Ordering::Greater => {
                 self.rays_per_frame = (self.rays_per_frame.saturating_sub(5000)).max(100);
             }
@@ -138,13 +210,17 @@ impl RaytraceToTexture {
         }
 
         self.render_target.draw_target().draw_iter(traces).unwrap();
-        self.render_target.upload(queue);
-
-        Ok(())
     }
+}
 
-    pub fn frame_copy_bind_group(&self) -> Option<&wgpu::BindGroup> {
-        self.frame_copy_bind_group.get()
+#[cfg(feature = "threads")]
+/// Runs raytracing, periodically releasing the lock to allow updating input and retrieving output.
+fn background_tracing_task(weak_inner: Weak<Mutex<Inner>>) {
+    // By using a weak reference, we arrange for this task to stop itself when it is no longer
+    // relevant.
+    while let Some(strong_inner) = weak_inner.upgrade() {
+        strong_inner.lock().unwrap().do_some_tracing();
+        std::thread::yield_now();
     }
 }
 
