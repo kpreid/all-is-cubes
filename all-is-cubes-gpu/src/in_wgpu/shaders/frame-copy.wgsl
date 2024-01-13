@@ -32,5 +32,8 @@ fn frame_copy_vertex(
 @fragment
 fn frame_copy_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let texcoord: vec2<f32> = in.tc.xy;
-    return textureSampleLevel(input_texture, input_sampler, texcoord, 0.0);
+    let sample = textureSampleLevel(input_texture, input_sampler, texcoord, 0.0);
+    // Discard alpha channel so that we're not writing transparent output that would be
+    // processed nonsensically. (Also, the alpha is non-premultiplied so doesn't make sense.)
+    return vec4(sample.rgb, 1.0);
 }
