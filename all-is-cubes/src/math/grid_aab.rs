@@ -226,11 +226,13 @@ impl GridAab {
         size.x * size.y * size.z
     }
 
-    pub(crate) fn surface_area(&self) -> usize {
-        // can't fail because it would fail the volume check
-        let size = self.sizes.to_usize();
-
-        size.x * size.y * 2 + size.x * size.z * 2 + size.y * size.z * 2
+    /// Computes the surface area of this box; 1 unit of area = 1 cube-face.
+    ///
+    /// Returns `f64` to avoid needing overflow considerations, and because all internal uses
+    /// want float anyway.
+    pub fn surface_area_f64(&self) -> f64 {
+        let size = self.sizes.to_f64();
+        size.x * size.y * 2. + size.x * size.z * 2. + size.y * size.z * 2.
     }
 
     /// Returns whether the box contains no cubes (its volume is zero).

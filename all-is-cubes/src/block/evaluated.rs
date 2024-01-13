@@ -1,10 +1,14 @@
 //! [`EvaluatedBlock`] and [`Evoxel`].
 
+use alloc::sync::Arc;
 use core::{fmt, ops};
 
-use alloc::sync::Arc;
 use euclid::Vector3D;
 use ordered_float::NotNan;
+
+#[cfg(not(feature = "std"))]
+/// Acts as polyfill for float methods
+use num_traits::float::FloatCore as _;
 
 use crate::block::{
     self, BlockAttributes, BlockCollision, Cost,
@@ -208,9 +212,9 @@ impl EvaluatedBlock {
                     }
                 }
                 all_faces_sum += face_sum;
-                face_colors[face] = face_sum.color(usize::from(resolution).pow(2))
+                face_colors[face] = face_sum.color(f32::from(resolution).powi(2))
             }
-            let surface_area = full_block_bounds.surface_area();
+            let surface_area = full_block_bounds.surface_area_f64() as f32;
             (
                 all_faces_sum.color(surface_area),
                 face_colors,
@@ -372,7 +376,7 @@ impl VoxSum {
     ///
     /// `surface_area` should be the area in pixels (voxel faces) of the full block/face, not the
     /// area which had actual data.
-    fn color(&self, surface_area: usize) -> Rgba {
+    fn color(&self, surface_area: f32) -> Rgba {
         // Dividing by alpha_sum to un-"premultiply" the weighted data from when it was added.
         // This also has the effect of scaling the value appropriately to make it an average.
         let color_scale = self.alpha_sum;
@@ -386,7 +390,7 @@ impl VoxSum {
                     // Note that by dividing the alpha by the full surface area, not the count,
                     // we handle the case where the voxel data doesn't cover the full block and
                     // uncounted pixels should act as if they are transparent.
-                    NotNan::new(self.alpha_sum / (surface_area as f32))
+                    NotNan::new(self.alpha_sum / (surface_area))
                         .expect("Recursive block alpha computation produced NaN"),
                 )
         }
@@ -396,11 +400,11 @@ impl VoxSum {
     ///
     /// `surface_area` should be the area in pixels (voxel faces) of the full block/face, not the
     /// area which had actual data.
-    fn emission(&self, surface_area: usize) -> Rgb {
+    fn emission(&self, surface_area: f32) -> Rgb {
         if self.count == 0 {
             Rgb::ZERO
         } else {
-            Rgb::try_from(self.emission_sum / surface_area as f32)
+            Rgb::try_from(self.emission_sum / surface_area)
                 .expect("Recursive block emission computation produced NaN")
         }
     }
@@ -991,8 +995,8 @@ mod tests {
             color: Rgba::new(0., 1., 0., 1.),
             emission: vec3(0., 0., 1.),
         };
-        assert_eq!(v.color(2), Rgba::new(0.5, 0.5, 0., 1.));
-        assert_eq!(v.emission(2), Rgb::new(0., 0., 1.));
+        assert_eq!(v.color(2.), Rgba::new(0.5, 0.5, 0., 1.));
+        assert_eq!(v.emission(2.), Rgb::new(0., 0., 1.));
     }
 
     #[test]
@@ -1006,7 +1010,7 @@ mod tests {
             color: Rgba::new(0., 1., 0., 0.75),
             emission: vec3(0., 0., 1.),
         };
-        assert_eq!(v.color(2), Rgba::new(0.25, 0.75, 0., 0.5));
-        assert_eq!(v.emission(2), Rgb::new(0., 0., 1.));
+        assert_eq!(v.color(2.), Rgba::new(0.25, 0.75, 0., 0.5));
+        assert_eq!(v.emission(2.), Rgb::new(0., 0., 1.));
     }
 }
