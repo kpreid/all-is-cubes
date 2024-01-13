@@ -329,6 +329,18 @@ impl From<InsertError> for GenError {
     }
 }
 
+impl From<ExecuteError> for GenError {
+    // TODO: Ideally, this works only for `UniverseTransaction` errors, which relate to
+    // specific members, but we don't have a static distinction between different transactions'
+    // errors yet.
+    fn from(error: ExecuteError) -> Self {
+        GenError {
+            for_object: None,
+            detail: error.into(),
+        }
+    }
+}
+
 /// Aggregation of types of errors that might occur in “world generation”.
 ///
 /// This is distinct from [`GenError`] in that this type is returned from functions
