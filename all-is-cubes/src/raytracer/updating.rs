@@ -101,8 +101,8 @@ where
         // so no deadlock can actually occur. If we change this to block on the space lock,
         // we must reorder the actions here (or perhaps acquire the todo lock twice) to
         // avoid deadlock.
-        let mut todo = self.todo.lock().unwrap();
-        if !todo.listener && !todo.everything && todo.blocks.is_empty() && todo.cubes.is_empty() {
+        let todo: &mut SrtTodo = &mut self.todo.lock().unwrap();
+        if todo.is_empty() {
             // Nothing to do
             return Ok(());
         }
@@ -169,6 +169,19 @@ struct SrtTodo {
     // TODO: Benchmark using a BitVec instead.
     blocks: HbHashSet<BlockIndex>,
     cubes: HbHashSet<Cube>,
+}
+
+impl SrtTodo {
+    #[mutants::skip] // hard to test, and designed to be hard to get wrong
+    fn is_empty(&self) -> bool {
+        let Self {
+            listener,
+            everything,
+            blocks,
+            cubes,
+        } = self;
+        !listener && !everything && blocks.is_empty() && cubes.is_empty()
+    }
 }
 
 /// [`Listener`] adapter for [`SpaceRendererTodo`].
