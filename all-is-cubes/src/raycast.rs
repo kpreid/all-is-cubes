@@ -644,6 +644,7 @@ impl RaycastStep {
 
     /// The distance traversed so far, as measured in multiples of the ray's direction vector.
     #[inline]
+    #[mutants::skip] // trivial, but modifying it can cause test hangs
     pub fn t_distance(&self) -> FreeCoordinate {
         self.t_distance
     }
