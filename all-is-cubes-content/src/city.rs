@@ -3,7 +3,6 @@
 
 use alloc::{sync::Arc, vec::Vec};
 
-use futures_core::future::BoxFuture;
 use itertools::Itertools;
 use rand::{Rng, SeedableRng as _};
 
@@ -341,10 +340,8 @@ async fn place_exhibits_in_city<I: Instant>(
         let start_exhibit_time = I::now();
 
         // Execute the exhibit factory function.
-        // TODO: Factory should be given a YieldProgress.
         // TODO: stop handing out mutable Universe access, so we can parallelize this loop
-        let (exhibit_space, exhibit_transaction) = match (exhibit.factory)(exhibit, universe).await
-        {
+        let (exhibit_space, exhibit_transaction) = match (exhibit.factory)(exhibit, universe) {
             Ok(s) => s,
             Err(error) => {
                 // TODO: put the error on a sign in place of the exhibit
@@ -612,10 +609,8 @@ pub(crate) struct Exhibit {
     pub name: &'static str,
     pub subtitle: &'static str,
     pub placement: Placement,
-    pub factory: for<'a> fn(
-        &'a Exhibit,
-        &'a Universe,
-    ) -> BoxFuture<'a, Result<(Space, UniverseTransaction), InGenError>>,
+    pub factory:
+        for<'a> fn(&'a Exhibit, &'a Universe) -> Result<(Space, UniverseTransaction), InGenError>,
 }
 
 #[derive(Clone, Copy, Debug)]

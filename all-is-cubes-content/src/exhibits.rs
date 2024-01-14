@@ -84,7 +84,7 @@ macro_rules! exhibit {
         }
     ) => {
         const $name: Exhibit = Exhibit {
-            factory: |$( $args )*| Box::pin(async move { $( $body )* }),
+            factory: |$( $args )*| { $( $body )* },
             $( $fields )*
         };
     }
