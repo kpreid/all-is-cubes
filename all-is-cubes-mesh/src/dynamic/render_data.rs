@@ -22,29 +22,72 @@ pub struct RenderDataUpdate<'a, M: DynamicMeshTypes> {
     /// Whether *only* the indices need to be copied (and their length and type has not changed).
     pub indices_only: bool,
 
-    /// Diagnostic label for this mesh; is stable across all updates for the same mesh,
-    /// but should not be relied on for equality or anything like that.
-    pub mesh_label: MeshLabel,
+    /// Unique identifier for this mesh. See the type documentation for details.
+    pub mesh_id: MeshId,
 }
 
-/// Debugging label identifying a mesh that is passing through [`RenderDataUpdate`].
+/// Unique identifier for a mesh that is owned by a [`ChunkedSpaceMesh`] and is passing through
+/// [`RenderDataUpdate`].
 ///
-/// Use the [`fmt::Debug`] implementation to produce a textual label for e.g. a GPU buffer
-/// or object in an exported file.
+/// Will always be distinct between any two meshes (more precisely, any two
+/// [`DynamicMeshTypes::RenderData`] values) that are alive at the same time and are managed by the
+/// same [`ChunkedSpaceMesh`]. If a mesh is recreated (e.g. as the viewing position changes) then
+/// the previous render data will have been dropped before then. However, this does not mean that
+/// the mesh is to be only rendered once, as some may be destined for [instanced rendering].
+///
+/// You may use this identifier for comparison and transmission via:
+///
+/// * Its `PartialEq + Eq + Hash` implementations, to use it as a `HashMap` key or similar.
+/// * Its [`fmt::Display`] implementation, to produce a short string suitable for a map key
+///   that must be a string; the produced string uses only alphanumeric characters and `'-'`.
+/// * Its [`fmt::Debug`] implementation, to produce a diagnostic label for e.g. a GPU buffer
+///   or object in an exported file. This string is not restricted like the `Display` string,
+///   and so may be more legible.
+///
+/// [instanced rendering]: https://en.wikipedia.org/wiki/Geometry_instancing
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct MeshLabel(pub(crate) MeshLabelImpl);
+pub struct MeshId(pub(crate) MeshIdImpl);
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub(crate) enum MeshLabelImpl {
+pub(crate) enum MeshIdImpl {
     Chunk([i32; 3]),
     Block(all_is_cubes::space::BlockIndex),
 }
 
-impl fmt::Debug for MeshLabel {
+impl fmt::Display for MeshId {
+    /// Produces a short string which is suitable for use as a unique identifier.
+    ///
+    /// * Two of these strings will be equal if and only if the two [`MeshId`]s are equal.
+    /// * The strings use only alphanumeric characters and `'-'`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
-            MeshLabelImpl::Chunk(p) => write!(f, "chunk {p:?}"),
-            MeshLabelImpl::Block(i) => write!(f, "block {i:?}"),
+            MeshIdImpl::Chunk([x, y, z]) => write!(f, "cx{x}y{y}z{z}"),
+            MeshIdImpl::Block(i) => write!(f, "b{i}"),
         }
+    }
+}
+impl fmt::Debug for MeshId {
+    /// Produces a diagnostic label fit for for e.g. a GPU buffer or object in an exported file.
+    /// This string is not restricted like the `Display` string and so may be more legible.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            MeshIdImpl::Chunk(p) => write!(f, "chunk {p:?}"),
+            MeshIdImpl::Block(i) => write!(f, "block {i:?}"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mesh_id_strings() {
+        assert_eq!(MeshId(MeshIdImpl::Chunk([0, 0, 0])).to_string(), "cx0y0z0");
+        assert_eq!(
+            MeshId(MeshIdImpl::Chunk([123, -456, 9999])).to_string(),
+            "cx123y-456z9999"
+        );
+        assert_eq!(MeshId(MeshIdImpl::Block(7)).to_string(), "b7");
     }
 }

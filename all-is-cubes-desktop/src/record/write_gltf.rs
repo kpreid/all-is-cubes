@@ -10,7 +10,7 @@ use all_is_cubes::math::{GridAab, GridVector};
 use all_is_cubes::space::Space;
 use all_is_cubes::{camera, listen, time, universe};
 use all_is_cubes_mesh as mesh;
-use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, MeshLabel};
+use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, MeshId};
 use all_is_cubes_mesh::MeshTypes;
 use all_is_cubes_port::gltf::{
     json as gltf_json, GltfMt, GltfTextureAllocator, GltfWriter, MeshInstance,
@@ -76,7 +76,7 @@ impl MeshRecorder {
                 let new_cell = MeshIndexCell::default();
                 // Ignore error since finish_frame() will catch it anyway
                 let _ = self.scene_sender.send(MeshRecordMsg::AddMesh(
-                    u.mesh_label,
+                    u.mesh_id,
                     u.mesh.clone(),
                     Arc::clone(&new_cell),
                 ));
@@ -105,7 +105,7 @@ impl MeshRecorder {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum MeshRecordMsg {
-    AddMesh(MeshLabel, mesh::SpaceMesh<RecordGltfMt>, MeshIndexCell),
+    AddMesh(MeshId, mesh::SpaceMesh<RecordGltfMt>, MeshIndexCell),
     FinishFrame(
         super::FrameNumber,
         camera::Camera,

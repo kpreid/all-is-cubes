@@ -15,8 +15,8 @@ mod chunked_mesh;
 pub use chunked_mesh::{ChunkedSpaceMesh, CsmUpdateInfo};
 
 mod render_data;
-use render_data::MeshLabelImpl;
-pub use render_data::{MeshLabel, RenderDataUpdate};
+use render_data::MeshIdImpl;
+pub use render_data::{MeshId, RenderDataUpdate};
 
 /// Bundle of types chosen to support dynamically-updating meshes within a specific graphics API.
 ///

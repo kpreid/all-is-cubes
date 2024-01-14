@@ -100,7 +100,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
             mesh: &self.mesh,
             render_data: &mut self.render_data,
             indices_only,
-            mesh_label: dynamic::MeshLabel(dynamic::MeshLabelImpl::Chunk(self.position.0.into())),
+            mesh_id: dynamic::MeshId(dynamic::MeshIdImpl::Chunk(self.position.0.into())),
         }
     }
 

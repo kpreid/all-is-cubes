@@ -181,7 +181,7 @@ where
                             mesh: &space_mesh,
                             render_data: &mut current_mesh_entry.instance_data.1,
                             indices_only: false,
-                            mesh_label: super::MeshLabel(super::MeshLabelImpl::Block(index)),
+                            mesh_id: super::MeshId(super::MeshIdImpl::Block(index)),
                         });
 
                         current_mesh_entry.instance_data.0 = space_mesh.into_meta();

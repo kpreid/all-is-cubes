@@ -692,12 +692,12 @@ fn update_chunk_buffers(
     // TODO: assert INDEX_FORMAT matches this type
     let new_indices: IndexSlice<'_> = update.mesh.indices();
 
-    let mesh_label = &update.mesh_label;
+    let mesh_id = &update.mesh_id;
     let buffers = update.render_data.get_or_insert_with(ChunkBuffers::default);
     buffers.vertex_buf.write_with_resizing(
         bwp.reborrow(),
         &wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("{space_label} vertex {mesh_label:?}")),
+            label: Some(&format!("{space_label} vertex {mesh_id:?}")),
             contents: new_vertices_data,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         },
@@ -705,7 +705,7 @@ fn update_chunk_buffers(
     buffers.index_buf.write_with_resizing(
         bwp.reborrow(),
         &wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("{space_label} index {mesh_label:?}")),
+            label: Some(&format!("{space_label} index {mesh_id:?}")),
             contents: new_indices.as_bytes(),
             usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
         },
