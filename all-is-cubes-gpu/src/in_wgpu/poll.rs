@@ -66,7 +66,7 @@ mod inner {
         // Using unbounded channel does no harm since we have only one thread, so
         // cannot have any relevantly unfair scheduling between sender and receiver.
         let (tx, rx) = flume::unbounded();
-        wasm_bindgen_futures::spawn_local(async move { polling_task(rx).await });
+        wasm_bindgen_futures::spawn_local(polling_task(rx));
         tx
     }
 }
