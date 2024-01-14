@@ -20,13 +20,13 @@ jobs:
         run: rustup toolchain install stable --profile=minimal
 
       - name: Install cargo-mutants
-        run: cargo install --version 1.2.1 cargo-mutants
+        run: cargo install --version 24.1.0 cargo-mutants
 
       - name: Run mutation testing for all-is-cubes
         timeout-minutes: 60
         # TODO: un-exclude src/vui eventually
         # TODO: maybe un-exclude fmt()
-        run: cargo mutants -d all-is-cubes/ --exclude-re '::fmt ->' --exclude tests.rs --exclude src/vui* -- --all-features
+        run: cargo mutants --package all-is-cubes --exclude-re '::fmt ->' --exclude tests.rs --exclude src/vui* -- --all-features
         # TODO: Other crates' reasons for non-inclusion:
         #   all-is-cubes-content: insufficient test coverage
         #   all-is-cubes-desktop: insufficient test coverage, unclear if even feasible
