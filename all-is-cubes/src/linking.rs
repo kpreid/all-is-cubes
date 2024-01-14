@@ -102,10 +102,13 @@ where
         let count = E::exhaust().count();
         let mut map = HbHashMap::with_capacity(count);
         for (key, progress) in E::exhaust().zip(progress.split_evenly(count)) {
-            let value: V =
-                definer(key.clone()).map_err(|e| GenError::failure(e, name_in_module(&key)))?;
-            map.insert(key, value);
-            progress.finish().await;
+            match definer(key.clone()) {
+                Ok(value) => {
+                    map.insert(key, value);
+                    progress.finish().await;
+                }
+                Err(e) => return Err(GenError::failure(e, name_in_module(&key))),
+            };
         }
         Ok(Self { map })
     }
