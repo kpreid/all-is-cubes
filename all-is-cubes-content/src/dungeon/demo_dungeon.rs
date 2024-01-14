@@ -651,7 +651,7 @@ pub async fn install_dungeon_blocks(
             FloorTile => {
                 let resolution = R32;
                 let space =
-                    space_from_image(include_image!("floor.png"), GridRotation::RXZY, |pixel| {
+                    space_from_image(include_image!("floor.png"), GridRotation::RXZY, &|pixel| {
                         let block = Block::from(Rgba::from_srgb8(pixel));
                         VoxelBrush::with_thickness(block, 0..resolution.into())
                             .rotate(GridRotation::RXZY)
@@ -677,7 +677,7 @@ pub async fn install_dungeon_blocks(
 
             Gate => {
                 let space =
-                    space_from_image(include_image!("fence.png"), GridRotation::RXyZ, |pixel| {
+                    space_from_image(include_image!("fence.png"), GridRotation::RXyZ, &|pixel| {
                         // Note that this produces selectable collidable transparent blocks --
                         // that's preferred here.
                         let block = Block::builder().color(Rgba::from_srgb8(pixel)).build();
@@ -694,7 +694,7 @@ pub async fn install_dungeon_blocks(
                 let space = space_from_image(
                     include_image!("fence-pocket.png"),
                     GridRotation::RXyZ,
-                    |pixel| {
+                    &|pixel| {
                         let block = Block::builder().color(Rgba::from_srgb8(pixel)).build();
                         VoxelBrush::new([([0, 0, 6], block.clone()), ([0, 0, 9], block)])
                     },

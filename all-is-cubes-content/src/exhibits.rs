@@ -1196,7 +1196,7 @@ async fn IMAGES(_: &Exhibit, universe: &Universe) {
 
         let image = include_image!("exhibits/terrain-image.png");
         let image_space =
-            txn.insert_anonymous(space_from_image(image, rotation, terrain_map_function).unwrap());
+            txn.insert_anonymous(space_from_image(image, rotation, &terrain_map_function).unwrap());
         let block = Block::builder()
             .display_name(format!("{rotation:?}"))
             .voxels_ref(R16, image_space)

@@ -161,7 +161,7 @@ pub async fn install_demo_blocks(
 
                 let palette_image = PngAdapter::adapt(
                     all_is_cubes::include_image!("blocks/road-palette.png"),
-                    default_srgb,
+                    &default_srgb,
                 );
                 let range = 0..palette_image.size().width;
 

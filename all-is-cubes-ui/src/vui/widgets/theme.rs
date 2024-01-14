@@ -122,7 +122,7 @@ impl WidgetBlocks {
                         txn.insert_anonymous(space_from_image(
                             include_image!("theme/crosshair.png"),
                             GridRotation::RXyZ,
-                            default_srgb,
+                            &default_srgb,
                         )?),
                     )
                     .build(),
@@ -136,7 +136,7 @@ impl WidgetBlocks {
                                 include_image!("theme/toolbar-slot.png"),
                                 GridRotation::RXZY,
                                 // TODO: better way to do translations
-                                |pixel| default_srgb(pixel).translate([0, 16 - 1, 0]),
+                                &|pixel| default_srgb(pixel).translate([0, 16 - 1, 0]),
                             )?),
                         )
                         .build()
@@ -155,7 +155,7 @@ impl WidgetBlocks {
                         txn.insert_anonymous(space_from_image(
                             include_image!("theme/toolbar-sel-cursor.png"),
                             GridRotation::RXyZ,
-                            |color| match color {
+                            &|color| match color {
                                 // Map placeholder colors to the color for each button's state.
                                 [255, 0, 0, 255] => buttons[0].brush(),
                                 [0, 255, 0, 255] => buttons[1].brush(),
@@ -174,7 +174,7 @@ impl WidgetBlocks {
                             txn.insert_anonymous(space_from_image(
                                 include_image!("theme/dialog-background.png"),
                                 GridRotation::IDENTITY,
-                                default_srgb,
+                                &default_srgb,
                             )?),
                         )
                         .build()
@@ -190,7 +190,7 @@ impl WidgetBlocks {
                         txn.insert_anonymous(space_from_image(
                             include_image!("theme/layout-debug-box-corner.png"),
                             GridRotation::RXyZ,
-                            default_srgb,
+                            &default_srgb,
                         )?),
                     )
                     .build(),
@@ -201,7 +201,7 @@ impl WidgetBlocks {
                         txn.insert_anonymous(space_from_image(
                             include_image!("theme/layout-debug-box-edge.png"),
                             GridRotation::RZYX,
-                            default_srgb,
+                            &default_srgb,
                         )?),
                     )
                     .build(),

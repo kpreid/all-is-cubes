@@ -504,7 +504,7 @@ pub(crate) fn make_button_label_block(
 
     match icon {
         ButtonIcon::Icon(icon) => {
-            let id = &PngAdapter::adapt(icon, default_srgb);
+            let id = &PngAdapter::adapt(icon, &default_srgb);
             EgImage::new(&id, -id.bounding_box().center() - Point::new(1, 1))
                 .draw(&mut draw_target)?;
         }

@@ -36,9 +36,11 @@ pub struct PngAdapter<'a> {
 }
 
 impl<'a> PngAdapter<'a> {
+    #[inline(never)]
     pub fn adapt<'png: 'a, 'brush: 'a>(
         (header, data): &'png DecodedPng,
-        mut pixel_function: impl FnMut(Srgba) -> VoxelBrush<'brush>,
+        // Note: this could be FnMut, at the price of forcing all callers to write `&mut`
+        pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'brush>,
     ) -> Self {
         // Group into whole pixels
         let rgba_image_data = bytemuck::cast_slice::<u8, [u8; 4]>(data);
@@ -130,14 +132,13 @@ impl embedded_graphics::geometry::OriginDimensions for &'_ PngAdapter<'_> {
 /// TODO: Allow `SpaceBuilder` controls somehow. Maybe this belongs as a method on SpaceBuilder.
 /// TODO: pixel_function should have a Result return
 #[doc(hidden)] // still experimental API
-pub fn space_from_image<'b, F>(
+#[inline(never)]
+pub fn space_from_image<'b>(
     png: &DecodedPng,
     rotation: GridRotation,
-    pixel_function: F,
-) -> Result<Space, SetCubeError>
-where
-    F: FnMut(Srgba) -> VoxelBrush<'b>,
-{
+    // Note: this could be FnMut, at the price of forcing all callers to write `&mut`
+    pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'b>,
+) -> Result<Space, SetCubeError> {
     let header = &png.0;
 
     // TODO: let caller control the transform offsets (not necessarily positive-octant)
@@ -166,6 +167,7 @@ where
 /// All pixels with 0 alpha (regardless of other channel values) are converted to
 /// [`AIR`], to meet normal expectations about collision, selection, and equality.
 #[doc(hidden)] // still experimental API
+#[inline(never)]
 pub fn default_srgb(pixel: Srgba) -> VoxelBrush<'static> {
     VoxelBrush::single(if pixel[3] == 0 {
         AIR
@@ -176,6 +178,7 @@ pub fn default_srgb(pixel: Srgba) -> VoxelBrush<'static> {
 
 /// Helper for [`include_image`] macro.
 #[doc(hidden)]
+#[inline(never)]
 pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DecodedPng {
     match png_decoder::decode(bytes) {
         Ok(i) => i,
@@ -242,7 +245,7 @@ mod tests {
     #[test]
     fn basic_image() {
         let image = test_image();
-        let space = space_from_image(&image, GridRotation::IDENTITY, default_srgb).unwrap();
+        let space = space_from_image(&image, GridRotation::IDENTITY, &default_srgb).unwrap();
         assert_eq!(
             space.bounds(),
             GridAab::from_lower_upper([0, 0, 0], [2, 2, 1])
@@ -253,7 +256,7 @@ mod tests {
     #[test]
     fn basic_image_transformed() {
         let image = test_image();
-        let space = space_from_image(&image, GridRotation::RxZY, default_srgb).unwrap();
+        let space = space_from_image(&image, GridRotation::RxZY, &default_srgb).unwrap();
         assert_eq!(
             space.bounds(),
             GridAab::from_lower_upper([0, 0, 0], [2, 1, 2])
@@ -274,7 +277,7 @@ mod tests {
     #[test]
     fn bounds_are_affected_by_brush() {
         let image = test_image();
-        let space = space_from_image(&image, GridRotation::IDENTITY, |pixel| {
+        let space = space_from_image(&image, GridRotation::IDENTITY, &|pixel| {
             default_srgb(pixel).translate([10, 0, 0])
         })
         .unwrap();

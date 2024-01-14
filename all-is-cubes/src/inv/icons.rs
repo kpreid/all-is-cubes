@@ -93,7 +93,7 @@ impl Icons {
                         txn.insert_anonymous(space_from_image(
                             include_image!("icons/hand.png"),
                             GridRotation::RXyZ,
-                            default_srgb,
+                            &default_srgb,
                         )?),
                     )
                     .build(),
@@ -172,7 +172,7 @@ impl Icons {
                             txn.insert_anonymous(space_from_image(
                                 include_image!("icons/push.png"),
                                 GridRotation::RXZY,
-                                |color| {
+                                &|color| {
                                     // TODO: Figure out abstractions to not need so much fiddly custom code
                                     let bcolor = Block::from(Rgba::from_srgb8(color));
                                     match color {
