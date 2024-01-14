@@ -49,16 +49,15 @@ pub mod testing;
 ///
 /// [`Primitive::Atom`]: crate::block::Primitive::Atom
 pub fn make_some_blocks<const COUNT: usize>() -> [Block; COUNT] {
-    color_sequence_for_make_blocks(COUNT)
-        .map(|(i, color)| {
-            Block::builder()
-                .display_name(i.to_string())
-                .color(color)
-                .build()
-        })
-        .collect::<Vec<_>>()
-        .try_into() // convert to array
-        .unwrap()
+    core::array::from_fn(|i| make_one_block(i, COUNT))
+}
+
+#[inline(never)] // discourage unnecessarily repeated code
+fn make_one_block(i: usize, n: usize) -> Block {
+    Block::builder()
+        .display_name(i.to_string())
+        .color(color_for_make_blocks(i, n))
+        .build()
 }
 
 /// Generate a set of distinct [`Primitive::Recur`] blocks for use in tests.
@@ -90,48 +89,45 @@ pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [B
 pub fn make_some_voxel_blocks_txn<const COUNT: usize>(
     transaction: &mut UniverseTransaction,
 ) -> [Block; COUNT] {
-    let resolution = R16;
-    color_sequence_for_make_blocks(COUNT)
-        .map(|(i, color)| {
-            let mut block_space = Space::for_block(resolution)
-                .filled_with(Block::from(color))
-                .build();
-            axes(&mut block_space).unwrap();
-            for face in Face6::ALL {
-                Text::with_text_style(
-                    &i.to_string(),
-                    Point::new(i32::from(resolution) / 2, i32::from(resolution) / 2),
-                    MonoTextStyle::new(&FONT_9X15_BOLD, palette::ALMOST_BLACK),
-                    TextStyleBuilder::new()
-                        .baseline(Baseline::Middle)
-                        .alignment(Alignment::Center)
-                        .build(),
-                )
-                .draw(
-                    &mut block_space
-                        .draw_target(face.face_transform(GridCoordinate::from(resolution) - 1)),
-                )
-                .unwrap();
-            }
-            Block::builder()
-                .display_name(i.to_string())
-                .voxels_ref(resolution, transaction.insert_anonymous(block_space))
-                .build()
-        })
-        .collect::<Vec<_>>()
-        .try_into() // convert to array
-        .unwrap()
+    core::array::from_fn(|i| make_one_voxel_block(transaction, i, COUNT))
 }
 
-fn color_sequence_for_make_blocks(n: usize) -> impl Iterator<Item = (usize, Rgba)> {
-    (0..n).map(move |i| {
-        let luminance = if n > 1 {
-            i as f32 / (n - 1) as f32
-        } else {
-            0.5
-        };
-        (i, Rgba::new(luminance, luminance, luminance, 1.0))
-    })
+#[inline(never)] // discourage unnecessarily repeated code
+fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usize) -> Block {
+    let resolution = R16;
+    let color = color_for_make_blocks(i, n);
+    let mut block_space = Space::for_block(resolution)
+        .filled_with(Block::from(color))
+        .build();
+    axes(&mut block_space).unwrap();
+    for face in Face6::ALL {
+        Text::with_text_style(
+            &i.to_string(),
+            Point::new(i32::from(resolution) / 2, i32::from(resolution) / 2),
+            MonoTextStyle::new(&FONT_9X15_BOLD, palette::ALMOST_BLACK),
+            TextStyleBuilder::new()
+                .baseline(Baseline::Middle)
+                .alignment(Alignment::Center)
+                .build(),
+        )
+        .draw(
+            &mut block_space.draw_target(face.face_transform(GridCoordinate::from(resolution) - 1)),
+        )
+        .unwrap();
+    }
+    Block::builder()
+        .display_name(i.to_string())
+        .voxels_ref(resolution, transaction.insert_anonymous(block_space))
+        .build()
+}
+
+fn color_for_make_blocks(i: usize, n: usize) -> Rgba {
+    let luminance = if n > 1 {
+        i as f32 / (n - 1) as f32
+    } else {
+        0.5
+    };
+    Rgba::new(luminance, luminance, luminance, 1.0)
 }
 
 /// Generate a block which fills some fraction of its cube volume, from the bottom (−Y) up.
