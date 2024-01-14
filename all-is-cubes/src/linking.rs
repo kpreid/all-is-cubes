@@ -120,12 +120,24 @@ impl<E: BlockModule> Provider<E, Block> {
     /// [`BlockDef`]s, returning a new [`BlockProvider`] whose blocks refer to those
     /// definitions (via [`Primitive::Indirect`]).
     pub fn install(&self, txn: &mut UniverseTransaction) -> Result<Self, InsertError> {
-        let mut map = HbHashMap::new();
-        for key in E::exhaust() {
-            let block_def_ref =
-                URef::new_pending(name_in_module(&key), BlockDef::new(self[&key].clone()));
+        // The non-generic part of the code.
+        #[inline(never)]
+        fn create_block_def_and_indirect(
+            txn: &mut UniverseTransaction,
+            name: Name,
+            block: &Block,
+        ) -> Result<Block, InsertError> {
+            let block_def_ref = URef::new_pending(name, BlockDef::new(block.clone()));
             txn.insert_mut(block_def_ref.clone())?;
-            map.insert(key, Block::from(block_def_ref));
+            let indirect_block = Block::from(block_def_ref);
+            Ok(indirect_block)
+        }
+
+        let mut map = HbHashMap::with_capacity(self.map.len());
+        for key in E::exhaust() {
+            let indirect_block =
+                create_block_def_and_indirect(txn, name_in_module(&key), &self[&key])?;
+            map.insert(key, indirect_block);
         }
         Ok(Self { map })
     }
