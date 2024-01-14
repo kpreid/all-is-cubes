@@ -109,6 +109,12 @@ impl ToTexel<[u8; 4]> for pixelcolor::Rgb888 {
     }
 }
 
+impl ToTexel<u8> for pixelcolor::Gray8 {
+    fn to_texel(self) -> u8 {
+        pixelcolor::GrayColor::luma(&self)
+    }
+}
+
 fn expand_rectangle(rectangle: &mut Rectangle, point: Point) {
     let relative = Point {
         x: point.x - rectangle.top_left.x,

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use all_is_cubes::camera::{info_text_drawable, Layers, RenderMethod, StandardCameras};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
-use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Rgb888, Drawable};
+use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Gray8, Drawable};
 use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::math::VectorOps;
@@ -248,7 +248,7 @@ struct EverythingRenderer<I> {
     postprocess_camera_buffer: wgpu::Buffer,
 
     /// Debug overlay text is uploaded via this texture
-    info_text_texture: DrawableTexture<Rgb888, [u8; 4]>,
+    info_text_texture: DrawableTexture<Gray8, u8>,
     info_text_sampler: wgpu::Sampler,
 
     /// If active, then we read the scene out of `self.fb` and include it in the rerun log.
@@ -393,7 +393,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 mapped_at_creation: false,
             }),
 
-            info_text_texture: DrawableTexture::new(wgpu::TextureFormat::Rgba8UnormSrgb),
+            info_text_texture: DrawableTexture::new(wgpu::TextureFormat::R8Unorm),
             info_text_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
                 label: Some("EverythingRenderer::info_text_sampler"),
                 address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -803,7 +803,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         // Update info text texture if there is text to draw or if there *was* text that we need to clear.
         if !text.is_empty() || info_text_texture.is_nonzero() {
             info_text_texture.draw_target().clear_transparent();
-            info_text_drawable(text, Rgb888::new(0, 0, 0))
+            info_text_drawable(text, Gray8::new(255))
                 .draw(info_text_texture.draw_target())
                 .unwrap(); // TODO: use .into_ok() when stable
             info_text_texture.upload(queue);

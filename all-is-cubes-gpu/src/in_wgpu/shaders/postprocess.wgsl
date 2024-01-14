@@ -10,7 +10,7 @@ struct PostprocessUniforms {
 
 
 // This group is named postprocess_bind_group_layout in the code.
-@group(0) @binding(0) var text_texture: texture_2d<f32>;
+@group(0) @binding(0) var text_texture: texture_2d<f32>; // red-only
 @group(0) @binding(1) var text_sampler: sampler;
 @group(0) @binding(2) var linear_scene_texture: texture_2d<f32>;
 @group(0) @binding(3) var<uniform> camera: PostprocessUniforms;
@@ -108,14 +108,14 @@ fn text_shadow_alpha(texcoord: vec2<f32>) -> f32 {
         let dy: i32 = index / diameter - radius;
 
         let offset: vec2<f32> = vec2<f32>(vec2<i32>(dx, dy));
-        let offset_alpha: f32 = textureSampleLevel(
+        let offset_sample: f32 = textureSampleLevel(
             text_texture,
             text_sampler,
             texcoord + offset * derivatives,
             0.0
-        ).a;
+        ).r;
         let weight: f32 = 0.35 / max(0.001, length(offset));
-        accumulator = accumulator + offset_alpha * weight;
+        accumulator = accumulator + offset_sample * weight;
     }
     return pow(clamp(accumulator, 0.0, 1.0), 0.7);
 }
@@ -131,12 +131,12 @@ fn postprocess_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let tone_mapped_scene = vec4<f32>(tone_map(scene_color.rgb * scene_color.a) / scene_color.a, scene_color.a);
 
     let shadowing = text_shadow_alpha(texcoord);
-    let foreground_texel = textureSampleLevel(text_texture, text_sampler, texcoord, 0.0);
+    let foreground_texel = textureSampleLevel(text_texture, text_sampler, texcoord, 0.0).r;
 
     // Final compositing:
     // 1. Shadow layer on scene
     var color: vec4<f32> = mix(tone_mapped_scene, vec4<f32>(vec3<f32>(0.0), 1.0), shadowing);
-    // 2. Blend foreground layer (ignoring texture color on shadow)
-    color = mix(color, vec4<f32>(vec3<f32>(1.0), 1.0), foreground_texel.a);
+    // 2. Blend foreground layer
+    color = mix(color, vec4<f32>(vec3<f32>(1.0), 1.0), foreground_texel);
     return color;
 }
