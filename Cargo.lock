@@ -58,6 +58,7 @@ dependencies = [
  "exhaust",
  "flate2",
  "futures-core",
+ "futures-util",
  "hashbrown 0.14.3",
  "indoc",
  "itertools 0.12.0",

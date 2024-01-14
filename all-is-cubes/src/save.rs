@@ -77,6 +77,8 @@ pub trait WhenceUniverse: fmt::Debug + Send + Sync + downcast_rs::Downcast + 'st
 downcast_rs::impl_downcast!(WhenceUniverse);
 
 /// Implementation of [`WhenceUniverse`] used by [`Universe`]s freshly created.
+//---
+// Tests for this implementation may be found in `crate::universe::tests`.
 impl WhenceUniverse for () {
     fn document_name(&self) -> Option<String> {
         None

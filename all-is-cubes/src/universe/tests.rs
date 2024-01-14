@@ -3,6 +3,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::any::TypeId;
 
+use futures_util::FutureExt as _;
 use indoc::indoc;
 
 use crate::block::{Block, BlockDef, BlockDefTransaction, Resolution, TickAction, AIR};
@@ -17,7 +18,7 @@ use crate::universe::{
     self, list_refs, InsertError, InsertErrorKind, Name, RefError, URef, Universe,
     UniverseTransaction,
 };
-use crate::util::assert_conditional_send_sync;
+use crate::util::{assert_conditional_send_sync, yield_progress_for_testing};
 use crate::{behavior, time};
 
 #[test]
@@ -80,6 +81,33 @@ fn universe_debug_elements() {
                 'foo': all_is_cubes::space::Space,
             }\
         "}
+    );
+}
+
+#[test]
+fn universe_default_whence() {
+    let u = Universe::new();
+    let whence = &u.whence;
+    assert_eq!(whence.document_name(), None);
+    assert!(!whence.can_load());
+    assert!(!whence.can_save());
+    assert_eq!(
+        whence
+            .load(yield_progress_for_testing())
+            .now_or_never()
+            .unwrap()
+            .unwrap_err()
+            .to_string(),
+        "this universe cannot be reloaded because it has no source"
+    );
+    assert_eq!(
+        whence
+            .save(&u, yield_progress_for_testing())
+            .now_or_never()
+            .unwrap()
+            .unwrap_err()
+            .to_string(),
+        "this universe cannot be saved because a destination has not been specified"
     );
 }
 
