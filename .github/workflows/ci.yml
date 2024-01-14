@@ -138,17 +138,12 @@ jobs:
 
     - run: df -h .
 
-    - name: Install wasm-pack
-      run: cargo install wasm-pack@0.12.1
-      # Use workspace target dir for cargo install's build, so that the build will be cached.
-      env:
-        CARGO_TARGET_DIR: target/
+    - name: Install tools
+      # Note: Swatinem/rust-cache will cache these installed binaries, so we don't have to worry
+      # about caching the builds of them.
+      run: |
+        cargo install wasm-pack@0.12.1 cargo-about@0.5.6 cargo-mutants@24.1.0
 
-    - name: Install cargo-about
-      run: cargo install cargo-about@0.5.6
-      # Use workspace target dir for cargo install's build, so that the build will be cached.
-      env:
-        CARGO_TARGET_DIR: target/
 
     - run: df -h .
 
@@ -265,17 +260,10 @@ jobs:
     - name: Compile xtask
       run: cargo build --package xtask
 
-    - name: Install wasm-pack
-      run: cargo install wasm-pack@0.12.1
-      # Use workspace target dir for cargo install's build, so that the build will be cached.
-      env:
-        CARGO_TARGET_DIR: target/
-
-    - name: Install cargo-about
-      run: cargo install cargo-about@0.5.6
-      # Use workspace target dir for cargo install's build, so that the build will be cached.
-      env:
-        CARGO_TARGET_DIR: target/
+    - name: Install tools
+      # These should already be installed but we might have a cache miss, so don't fail in that case.
+      run: |
+        cargo install wasm-pack@0.12.1 cargo-about@0.5.6
 
     - run: df -h .
 
@@ -294,7 +282,50 @@ jobs:
         name: cargo-timings features
         path: |
           target/cargo-timings/cargo-timing-*.html
+    
+  # Run mutation testing against the changed code
+  # Based on example from https://mutants.rs/pr-diff.html
+  incremental-mutants:
+    runs-on: ubuntu-latest
+    # Running on push would require more work to determine the base revision
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Needed to ensure `main` branch is needed
+          fetch-depth: 0
+
+      # Load cache before doing any Rust builds
+      # Note: we aren't depending on the build job so this cache might be stale, but the
+      # shorter time-to-useful-results seems worth it.
+      - uses: Swatinem/rust-cache@v2.7.1
+        with:
+          # Reuse the cache from the normal `build` job instead of creating an independent one,
+          # to reduce redundant work and save disk space — but don't *write* to that cache, so
+          # we don't bloat it.
+          prefix-key: "v1-rust-ubuntu-stable-locked"
+          shared-key: "build"
+          save-if: false
+
+      # Install cargo-mutants
+      # This should usually be already installed, but is present in case of cache miss
+      - run: cargo install --version 24.1.0 cargo-mutants
+
+      - name: Relative diff
+        run: |
+          git branch -av
+          git diff origin/${{ github.base_ref }}.. | tee git.diff
       
+      - name: Mutants
+        # See mutants.yml for notes on the exclusions
+        run: cargo mutants --in-diff git.diff --package all-is-cubes --exclude-re '::fmt ->' --exclude tests.rs -- --all-features
+
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: mutants-incremental.out
+          path: mutants.out
+
   miri:
     runs-on: ubuntu-latest
 
