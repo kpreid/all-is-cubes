@@ -579,17 +579,7 @@ mod inv {
             S: Serializer,
         {
             schema::InventorySer::InventoryV1 {
-                slots: self
-                    .slots
-                    .iter()
-                    .map(|slot| match *slot {
-                        crate::inv::Slot::Empty => None,
-                        crate::inv::Slot::Stack(count, ref item) => Some(schema::InvStackSer {
-                            count,
-                            item: item.clone(),
-                        }),
-                    })
-                    .collect(),
+                slots: self.slots.iter().map(|slot| slot.into()).collect(),
             }
             .serialize(serializer)
         }
