@@ -98,6 +98,9 @@ enum XtaskCommand {
     Update {
         #[arg(default_value = "latest")]
         to: UpdateTo,
+
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Set the version number of all packages and their dependencies on each other.
@@ -262,25 +265,35 @@ fn main() -> Result<(), ActionError> {
                 .args(server_args)
                 .run()?;
         }
-        XtaskCommand::Update { to } => match to {
-            UpdateTo::Locked => {
-                eprintln!("Doing nothing because update type is {to:?}.");
+        XtaskCommand::Update { to, dry_run } => {
+            let mut options: Vec<&str> = Vec::new();
+            if dry_run {
+                options.push("--dry-run");
             }
-            UpdateTo::Latest => {
-                config.do_for_all_workspaces(|| {
-                    // Note: The `fuzz` workspace lock file is ignored in version control.
-                    // But we do want to occasionally update it anyway.
-                    cargo().arg("update").run()?;
-                    Ok(())
-                })?;
+
+            match to {
+                UpdateTo::Locked => {
+                    eprintln!("Doing nothing because update type is {to:?}.");
+                }
+                UpdateTo::Latest => {
+                    config.do_for_all_workspaces(|| {
+                        // Note: The `fuzz` workspace lock file is ignored in version control.
+                        // But we do want to occasionally update it anyway.
+                        cargo().arg("update").args(&options).run()?;
+                        Ok(())
+                    })?;
+                }
+                UpdateTo::Minimal => {
+                    config.do_for_all_workspaces(|| {
+                        cargo()
+                            .args(["+nightly", "update", "-Zdirect-minimal-versions"])
+                            .args(&options)
+                            .run()?;
+                        Ok(())
+                    })?;
+                }
             }
-            UpdateTo::Minimal => {
-                config.do_for_all_workspaces(|| {
-                    cmd!("cargo +nightly update -Z direct-minimal-versions").run()?;
-                    Ok(())
-                })?;
-            }
-        },
+        }
         XtaskCommand::SetVersion { version } => {
             assert_eq!(config.scope, Scope::All);
 
