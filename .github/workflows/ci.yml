@@ -317,8 +317,8 @@ jobs:
           git diff origin/${{ github.base_ref }}.. | tee git.diff
       
       - name: Mutants
-        # See mutants.yml for notes on the exclusions
-        run: cargo mutants --in-diff git.diff --package all-is-cubes --exclude-re '::fmt ->' --exclude tests.rs -- --all-features
+        # See mutants.yml for notes on the package selection
+        run: cargo mutants --in-diff git.diff --package all-is-cubes -- --all-features
 
       - uses: actions/upload-artifact@v3
         if: always()

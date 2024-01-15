@@ -26,9 +26,7 @@ jobs:
 
       - name: Run mutation testing for all-is-cubes
         timeout-minutes: 60
-        # TODO: maybe un-exclude fmt()
-        # TODO: maybe un-exclude content once we are out of more important things (it's hard to test thoroughly)
-        run: cargo mutants --package all-is-cubes --exclude-re '::content::' --exclude-re '<impl Arbitrary for ' --exclude-re '::fmt ->' --exclude tests.rs -- --all-features
+        run: cargo mutants --package all-is-cubes -- --all-features
         # TODO: Other crates' reasons for non-inclusion:
         #   all-is-cubes-content: insufficient test coverage
         #   all-is-cubes-desktop: insufficient test coverage, unclear if even feasible

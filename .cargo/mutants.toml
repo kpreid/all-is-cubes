@@ -1,0 +1,10 @@
+# Cannot specify a package list here
+
+exclude_globs = [
+    "tests.rs",
+    "all-is-cubes/src/content/**",# TODO: maybe un-exclude content once we are out of more important things (it's hard to test thoroughly)
+]
+exclude_re = [
+    "::fmt ->", # easy to break, hard to test
+    "<impl Arbitrary for ", # near-impossible to test
+]
