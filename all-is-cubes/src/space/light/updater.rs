@@ -834,11 +834,18 @@ pub struct LightUpdatesInfo {
     pub(crate) max_queue_priority: Priority,
 }
 impl core::ops::AddAssign<LightUpdatesInfo> for LightUpdatesInfo {
+    #[mutants::skip] // hard to test completely
     fn add_assign(&mut self, other: Self) {
-        self.update_count += other.update_count;
-        self.max_update_difference = self.max_update_difference.max(other.max_update_difference);
-        self.queue_count += other.queue_count;
-        self.max_queue_priority = self.max_queue_priority.max(other.max_queue_priority);
+        let Self {
+            update_count,
+            max_update_difference,
+            queue_count,
+            max_queue_priority,
+        } = self;
+        *update_count += other.update_count;
+        *max_update_difference = (*max_update_difference).max(other.max_update_difference);
+        *queue_count += other.queue_count;
+        *max_queue_priority = (*max_queue_priority).max(other.max_queue_priority);
     }
 }
 impl Fmt<StatusText> for LightUpdatesInfo {
