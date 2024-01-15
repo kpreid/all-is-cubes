@@ -457,7 +457,8 @@ fn character() {
 
 #[test]
 fn spawn() {
-    let spawn = Spawn::default_for_new_space(GridAab::ORIGIN_CUBE);
+    let mut spawn = Spawn::default_for_new_space(GridAab::ORIGIN_CUBE);
+    spawn.set_inventory(vec![Tool::Activate.into()]);
 
     assert_round_trip_value(
         &spawn,
@@ -468,7 +469,12 @@ fn spawn() {
                 "upper": [1, 1, 41],
             },
             "eye_position": null,
-            "inventory": [],
+            "inventory": [
+                {
+                    "count": 1,
+                    "item": {"type": "ActivateV1"},
+                }
+            ],
             "look_direction": [0.0, 0.0, -1.0],
         }),
     );
