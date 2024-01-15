@@ -119,6 +119,7 @@ impl<I: Instant> core::ops::Sub<Duration> for Deadline<I> {
 
 // Allow comparing `Deadline` and `Instant` without wrapping.
 impl<I: Instant> PartialEq<I> for Deadline<I> {
+    #[mutants::skip] // trivial
     fn eq(&self, other: &I) -> bool {
         self.partial_cmp(other) == Some(Ordering::Equal)
     }

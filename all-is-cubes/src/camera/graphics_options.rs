@@ -376,6 +376,7 @@ pub enum AntialiasingOption {
 impl AntialiasingOption {
     /// True if GPU renderers should enable multisampling
     #[doc(hidden)]
+    #[mutants::skip] // a test would only reiterate the code
     pub fn is_msaa(&self) -> bool {
         match self {
             Self::None => false,
