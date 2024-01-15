@@ -661,13 +661,14 @@ impl Space {
             progress_callback(info);
 
             let LightUpdatesInfo {
-                queue_count,
                 update_count,
                 max_queue_priority,
                 ..
             } = info;
             total += update_count;
-            if queue_count == 0 || max_queue_priority <= epsilon {
+            if max_queue_priority <= epsilon {
+                // Stop when we have nothing worth updating as decided by epsilon
+                // (or if the queue is empty).
                 break;
             }
         }
