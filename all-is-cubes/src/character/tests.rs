@@ -254,4 +254,22 @@ fn click_wrong_space_or_correct_space() {
     assert!(matches!(error, ToolError::NoTool));
 }
 
+#[test]
+fn selected_slot_notification() {
+    let mut universe = Universe::new();
+    let space_ref = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+    let mut character = Character::spawn_default(space_ref);
+    let sink = Sink::new();
+    character.listen(sink.listener());
+
+    character.set_selected_slot(0, 2);
+
+    assert_eq!(sink.drain(), vec![CharacterChange::Selections]);
+
+    // no change
+    character.set_selected_slot(0, 2);
+
+    assert_eq!(sink.drain(), vec![]);
+}
+
 // TODO: more tests
