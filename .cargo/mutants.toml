@@ -5,6 +5,7 @@ exclude_globs = [
     "all-is-cubes/src/content/**",# TODO: maybe un-exclude content once we are out of more important things (it's hard to test thoroughly)
 ]
 exclude_re = [
-    "::fmt ->", # easy to break, hard to test
+    "::fmt ->", # easy to break, hard to test completely
+    "<impl Error for ", # easy to break, hard to test completely
     "<impl Arbitrary for ", # near-impossible to test
 ]
