@@ -8,4 +8,5 @@ exclude_re = [
     "::fmt ->", # easy to break, hard to test completely
     "<impl Error for ", # easy to break, hard to test completely
     "<impl Arbitrary for ", # near-impossible to test
+    "<impl Listener for .*>::alive", # mutating this to true can only cause leaks
 ]
