@@ -9,6 +9,7 @@ exclude_re = [
     "::fmt\\b", # easy to break, hard to test completely
     "::wireframe_points", # debug visualization, largely not tested
     "::consistency_check\\b", # is a form of test-assertion itself
+    "::log_to_rerun\\b", # debugging feature only; no tests, and feature-gated anyway
     "<impl Error for ", # easy to break, hard to test completely
     "<impl Arbitrary for ", # near-impossible to test
     "<impl Listener for .*>::alive", # mutating this to true can only cause leaks

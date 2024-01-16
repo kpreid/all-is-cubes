@@ -72,6 +72,7 @@ impl<D: RtBlockData> Surface<'_, D> {
 
 /// Simple directional lighting used to give corners extra definition.
 /// Note that this algorithm is also implemented in the fragment shader for GPU rendering.
+#[mutants::skip] // tests are in the test-renderers package
 fn fixed_directional_lighting(face: Face7) -> f32 {
     const LIGHT_1_DIRECTION: Vector3D<f32, ()> = Vector3D::new(0.4, -0.1, 0.0);
     const LIGHT_2_DIRECTION: Vector3D<f32, ()> = Vector3D::new(-0.4, 0.35, 0.25);
