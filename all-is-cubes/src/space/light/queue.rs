@@ -245,6 +245,7 @@ impl LightUpdateQueue {
 
     /// Returns the number of elements that will be produced by [`Self::pop()`].
     #[inline]
+    #[mutants::skip] // can cause infinite loops
     pub fn len(&self) -> usize {
         let sweep_items = match &self.sweep {
             Some(sweep) => {
@@ -315,6 +316,7 @@ mod tests {
         queue.insert(r([0, 0, 2], 200));
         queue.insert(r([0, 0, 1], 100));
 
+        assert_eq!(queue.len(), 8);
         assert_eq!(
             drain(&mut queue),
             vec![
@@ -329,6 +331,7 @@ mod tests {
                 r([3, 0, 0], 1),
             ]
         );
+        assert_eq!(queue.len(), 0);
     }
 
     #[test]
