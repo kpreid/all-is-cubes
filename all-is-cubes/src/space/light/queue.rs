@@ -312,11 +312,11 @@ mod tests {
         queue.insert(r([1, 0, 0], 1));
         queue.insert(r([3, 0, 0], 1));
         queue.insert(r([4, 0, 0], 1));
-        queue.insert(r([3, 0, 0], 1));
+        queue.insert(r([3, 0, 0], 1)); // duplicate
         queue.insert(r([0, 0, 2], 200));
         queue.insert(r([0, 0, 1], 100));
 
-        assert_eq!(queue.len(), 8);
+        assert_eq!(queue.len(), 7);
         assert_eq!(
             drain(&mut queue),
             vec![
