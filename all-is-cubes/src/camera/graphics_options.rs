@@ -388,6 +388,8 @@ impl AntialiasingOption {
 
 #[cfg(test)]
 mod tests {
+    use crate::math::OpacityCategory;
+
     use super::*;
     use pretty_assertions::assert_eq;
 
@@ -423,5 +425,22 @@ mod tests {
                 ..GraphicsOptions::default()
             }
         )
+    }
+
+    #[test]
+    fn will_output_alpha() {
+        for transparency in &[
+            TransparencyOption::Surface,
+            TransparencyOption::Volumetric,
+            TransparencyOption::Threshold(notnan!(0.5)),
+        ] {
+            assert_eq!(
+                transparency.will_output_alpha(),
+                transparency
+                    .limit_alpha(rgba_const!(1.0, 1.0, 1.0, 0.25))
+                    .opacity_category()
+                    == OpacityCategory::Partial
+            );
+        }
     }
 }
