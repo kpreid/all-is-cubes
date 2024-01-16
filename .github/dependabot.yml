@@ -26,3 +26,6 @@ updates:
       # Skip deps we only use for tooling and not on external data
       - dependency-name: "cargo_metadata"
       - dependency-name: "toml_edit"
+      # Skip glam because we only use it explicitly syncing with Rerun version
+      # (we can't use their reexport because it wouldn't enable the mint feature)
+      - dependency-name: "glam"
