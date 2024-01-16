@@ -81,7 +81,7 @@ jobs:
       # libasound2-dev: needed for audio via `kira`
 
     # Load cache before doing any Rust builds
-    - uses: Swatinem/rust-cache@v2.7.1
+    - uses: Swatinem/rust-cache@v2.7.3
       with:
         # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
         prefix-key: "v1-rust-unstablefeatures-${{ matrix.os }}-${{ matrix.depversions }}"
@@ -135,7 +135,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: Swatinem/rust-cache@v2.7.1
+    - uses: Swatinem/rust-cache@v2.7.3
       with:
         # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
         prefix-key: "v1-rust-unstablefeatures-ubuntu-locked"
