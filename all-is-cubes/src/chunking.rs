@@ -227,6 +227,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
 
     /// Convert to a `Space` so it can be directly viewed; for tests.
     #[doc(hidden)]
+    #[mutants::skip]
     pub fn visualization(&self) -> crate::space::Space {
         use crate::block::Block;
         use crate::math::Rgba;
