@@ -495,6 +495,7 @@ impl<'a> VoxelColor<'a> for &'a VoxelBrush<'a> {
 impl<'a> From<&'a VoxelBrush<'a>> for SpaceTransaction {
     /// Converts the brush into an equivalent transaction, as by
     /// [`VoxelBrush::paint_transaction`] at the origin.
+    #[mutants::skip]
     fn from(brush: &'a VoxelBrush<'a>) -> Self {
         brush.paint_transaction(Cube::ORIGIN)
     }
@@ -502,6 +503,7 @@ impl<'a> From<&'a VoxelBrush<'a>> for SpaceTransaction {
 impl<'a> From<VoxelBrush<'a>> for SpaceTransaction {
     /// Converts the brush into an equivalent transaction, as by
     /// [`VoxelBrush::paint_transaction`] at the origin.
+    #[mutants::skip]
     fn from(brush: VoxelBrush<'a>) -> Self {
         SpaceTransaction::from(&brush)
     }

@@ -2,10 +2,13 @@
 
 exclude_globs = [
     "tests.rs",
-    "all-is-cubes/src/content/**",# TODO: maybe un-exclude content once we are out of more important things (it's hard to test thoroughly)
+    "all-is-cubes/src/content/**", # TODO: maybe un-exclude content once we are out of more important things (it's hard to test thoroughly)
+    "all-is-cubes/src/raytracer/renderer.rs", # test coverage for this is in the separate test-renderers package
 ]
 exclude_re = [
-    "::fmt ->", # easy to break, hard to test completely
+    "::fmt\\b", # easy to break, hard to test completely
+    "::wireframe_points", # debug visualization, largely not tested
+    "::consistency_check\\b", # is a form of test-assertion itself
     "<impl Error for ", # easy to break, hard to test completely
     "<impl Arbitrary for ", # near-impossible to test
     "<impl Listener for .*>::alive", # mutating this to true can only cause leaks
