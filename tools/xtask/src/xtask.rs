@@ -285,8 +285,9 @@ fn main() -> Result<(), ActionError> {
                 }
                 UpdateTo::Minimal => {
                     config.do_for_all_workspaces(|| {
-                        cargo()
-                            .args(["+nightly", "update", "-Zdirect-minimal-versions"])
+                        // can't use cargo() to invoke rustup
+                        cmd!("cargo +nightly")
+                            .args(["update", "-Zdirect-minimal-versions"])
                             .args(&options)
                             .run()?;
                         Ok(())
