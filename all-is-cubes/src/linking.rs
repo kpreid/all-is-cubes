@@ -473,7 +473,7 @@ impl From<ExecuteError> for InGenError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Quote, Resolution::*};
+    use crate::block::{Quote, Resolution::*, AIR};
     use crate::content::make_some_blocks;
     use crate::math::GridAab;
     use crate::transaction::{self, Transaction as _};
@@ -540,6 +540,17 @@ mod tests {
         assert_eq!(
             p1[Key::A].clone().with_modifier(Quote::default()),
             p2[Key::A],
+        );
+    }
+
+    #[test]
+    fn provider_eq() {
+        let (_, p1) = test_provider();
+        let (_, p2) = test_provider();
+        assert_eq!(p1, p2);
+        assert_ne!(
+            p1,
+            p2.map(|key, block| if *key == Key::B { AIR } else { block.clone() })
         );
     }
 
