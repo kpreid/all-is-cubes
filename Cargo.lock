@@ -1829,7 +1829,7 @@ checksum = "8fce2eeef77fd4a293a54b62aa00ac9daebfbcda4bf8998c5a815635b004aa1c"
 dependencies = [
  "const_panic",
  "encase_derive",
- "glam",
+ "glam 0.24.2",
  "thiserror",
 ]
 
@@ -2349,6 +2349,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5418c17512bdf42730f9032c74e1ae39afc408745ebb2acf72fbc4691c17945"
 dependencies = [
  "bytemuck",
+ "mint",
+]
+
+[[package]]
+name = "glam"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "151665d9be52f9bb40fc7966565d39666f2d1e69233571b71b87791c7e0528b3"
+dependencies = [
  "mint",
 ]
 
@@ -3070,7 +3079,7 @@ checksum = "d15d6971aeabe05687ca909c6cf71b857e338b204c1ba9fe664e84020c633249"
 dependencies = [
  "atomic-arena",
  "cpal",
- "glam",
+ "glam 0.24.2",
  "mint",
  "ringbuf",
 ]
@@ -4869,7 +4878,7 @@ dependencies = [
  "bytemuck",
  "encase",
  "flume",
- "glam",
+ "glam 0.24.2",
  "handlebars",
  "indexmap 2.1.0",
  "list-any",
@@ -4900,7 +4909,7 @@ dependencies = [
  "base64 0.21.5",
  "bytemuck",
  "float-ord",
- "glam",
+ "glam 0.24.2",
  "gltf",
  "image",
  "log",
@@ -4922,7 +4931,7 @@ dependencies = [
  "codespan-reporting",
  "encase",
  "flume",
- "glam",
+ "glam 0.24.2",
  "log",
  "naga",
  "ordered-float",
@@ -4945,7 +4954,7 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "encase",
- "glam",
+ "glam 0.24.2",
  "list-any",
  "once_cell",
  "thiserror",
@@ -5768,7 +5777,7 @@ dependencies = [
  "exhaust",
  "futures-core",
  "futures-util",
- "glam",
+ "glam 0.25.0",
  "image",
  "itertools 0.12.0",
  "mint",
