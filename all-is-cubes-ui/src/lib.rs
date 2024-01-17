@@ -23,6 +23,7 @@
 extern crate alloc;
 
 pub mod apps;
+mod editor;
 pub mod logo;
 mod ui_content;
 pub mod vui;

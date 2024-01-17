@@ -245,6 +245,16 @@ impl<I: time::Instant> Session<I> {
                             ui.back();
                         }
                     }
+                    ControlMessage::EnterDebug => {
+                        if let Some(ui) = &mut self.ui {
+                            if let Some(cursor) = &self.cursor_result {
+                                ui.enter_debug(cursor);
+                            } else {
+                                // TODO: not actually a click
+                                ui.show_click_result(usize::MAX, Err(ToolError::NothingSelected));
+                            }
+                        }
+                    }
                     ControlMessage::Save => {
                         // TODO: Make this asynchronous. We will need to suspend normal
                         // stepping during that period.
@@ -687,6 +697,8 @@ pub(crate) enum ControlMessage {
     /// Save the game universe back to its [`WhenceUniverse`].
     Save,
 
+    EnterDebug,
+
     TogglePause,
 
     ToggleMouselook,
@@ -701,6 +713,7 @@ impl fmt::Debug for ControlMessage {
         match self {
             Self::Back => write!(f, "Back"),
             Self::Save => write!(f, "Save"),
+            Self::EnterDebug => write!(f, "EnterDebug"),
             Self::TogglePause => write!(f, "TogglePause"),
             Self::ToggleMouselook => write!(f, "ToggleMouselook"),
             Self::ModifyGraphicsOptions(_f) => f

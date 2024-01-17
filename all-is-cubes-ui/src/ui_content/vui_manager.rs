@@ -342,6 +342,17 @@ impl Vui {
         });
     }
 
+    /// Enter some kind of debug view. Not yet defined for the long run exactly what that is.
+    pub(crate) fn enter_debug(&mut self, cursor: &Cursor) {
+        self.set_state(VuiPageState::Dump {
+            previous: self.state.get(),
+            content: EphemeralOpaque::new(Arc::new(crate::editor::inspect_block_at_cursor(
+                &self.hud_inputs,
+                cursor,
+            ))),
+        });
+    }
+
     /// Present the UI visual response to a click (that has already been handled),
     /// either a small indication that a button was pressed or an error message.
     pub fn show_click_result(&self, button: usize, result: Result<(), ToolError>) {
