@@ -222,7 +222,7 @@ impl SwitchingWriter {
                 // format for data URLs; standard base64 is correct. The URL safety
                 // in question is for e.g. base64 components within ordinary URLs or
                 // file names.
-                base64::engine::general_purpose::STANDARD_NO_PAD.encode_string(&buffer, &mut url);
+                base64::engine::general_purpose::STANDARD.encode_string(&buffer, &mut url);
                 Ok((Some(url), buffer.len()))
             }
             SwitchingWriter::File {
