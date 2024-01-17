@@ -2,7 +2,8 @@
 
 exclude_globs = [
     "tests.rs",
-    "all-is-cubes/src/content/**", # TODO: maybe un-exclude content once we are out of more important things (it's hard to test thoroughly)
+    "all-is-cubes/src/content.rs", # TODO: maybe un-exclude content once we are out of more important things (it's hard to test thoroughly)
+    "all-is-cubes/src/content/*",
     "all-is-cubes/src/raytracer/renderer.rs", # test coverage for this is in the separate test-renderers package
 ]
 exclude_re = [
@@ -13,4 +14,5 @@ exclude_re = [
     "<impl Error for ", # easy to break, hard to test completely
     "<impl Arbitrary for ", # near-impossible to test
     "<impl Listener for .*>::alive", # mutating this to true can only cause leaks
+    "<impl BlockModule for .*>::namespace" # can validly be whatever
 ]
