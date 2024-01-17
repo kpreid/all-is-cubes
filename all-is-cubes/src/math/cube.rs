@@ -283,6 +283,14 @@ mod tests {
     use euclid::point3;
 
     #[test]
+    fn containing_simple() {
+        assert_eq!(
+            Cube::containing(point3(1.5, -2.0, -3.5)),
+            Some(Cube::new(1, -2, -4))
+        );
+    }
+
+    #[test]
     fn containing_inf() {
         assert_eq!(
             Cube::containing(point3(FreeCoordinate::INFINITY, 0., 0.)),
@@ -303,15 +311,33 @@ mod tests {
     fn containing_in_and_out_of_range() {
         let fmax = FreeCoordinate::from(GridCoordinate::MAX);
         let fmin = FreeCoordinate::from(GridCoordinate::MIN);
+
+        // min Z
         assert_eq!(Cube::containing(point3(0., 0., fmin - 0.001)), None);
         assert_eq!(
             Cube::containing(point3(0., 0., fmin + 0.001,)),
             Some(Cube::new(0, 0, GridCoordinate::MIN))
         );
+
+        // max Z
         assert_eq!(
             Cube::containing(point3(0., 0., fmax + 0.999,)),
             Some(Cube::new(0, 0, GridCoordinate::MAX))
         );
         assert_eq!(Cube::containing(point3(0., 0., fmax + 1.001)), None);
+
+        // max Y (exercise more axes)
+        assert_eq!(
+            Cube::containing(point3(0., fmax + 0.999, 0.)),
+            Some(Cube::new(0, GridCoordinate::MAX, 0))
+        );
+        assert_eq!(Cube::containing(point3(0., fmax + 1.001, 0.)), None);
+
+        // max X
+        assert_eq!(
+            Cube::containing(point3(fmax + 0.999, 0., 0.)),
+            Some(Cube::new(GridCoordinate::MAX, 0, 0))
+        );
+        assert_eq!(Cube::containing(point3(fmax + 1.001, 0., 0.)), None);
     }
 }
