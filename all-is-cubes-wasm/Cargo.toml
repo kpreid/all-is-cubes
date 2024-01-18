@@ -40,20 +40,20 @@ futures-channel = "0.3.28"
 getrandom = { version = "0.2.7", features = ["js"] }
 # Feature enabling for indirect dependency all-is-cubes-content → noise → rand → getrandom
 getrandom_old = { package = "getrandom", version = "0.1.16", features = ["wasm-bindgen"] }
-js-sys = "0.3.64"
+js-sys = "0.3.67"
 log = { version = "0.4.17", default-features = false }
-once_cell = "1.18.0"
+once_cell = "1.19.0"
 rand = { version = "0.8.3", default-features = false, features = ["std", "std_rng"] }
 send_wrapper = "0.6.0"
-wasm-bindgen = "0.2.89"
-wasm-bindgen-futures = "0.4.34"
+wasm-bindgen = "0.2.90"
+wasm-bindgen-futures = "0.4.40"
 web-time = { version = "0.2.3" }
 wgpu = { version = "0.19.1", default-features = false, features = ["webgl"] }
 # Feature enabling
 yield-progress = { version = "0.1.5", features = ["log_hiccups"] }
 
 [dependencies.web-sys]
-version = "0.3.64"
+version = "0.3.67"
 features = [
   "console",
   "AddEventListenerOptions",
