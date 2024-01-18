@@ -190,7 +190,10 @@ fn main() -> Result<(), ActionError> {
             // libraries with docs elsewhere.
             if config.scope.includes_main_workspace() {
                 let _t = CaptureTime::new(&mut time_log, "doc");
-                cargo().arg("doc").run()?;
+                // TODO: Temporarily using --no-deps due to a bug in Rust 1.75
+                // <https://github.com/rust-lang/rust/issues/114891>.
+                // Revert the commit that introduced this when Rust 1.76 is released.
+                cargo().arg("doc").arg("--no-deps").run()?;
             }
         }
         XtaskCommand::Fmt => {
