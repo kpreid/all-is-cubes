@@ -99,7 +99,6 @@ dependencies = [
  "rand_xoshiro",
  "resource",
  "thiserror",
- "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
