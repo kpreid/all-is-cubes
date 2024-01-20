@@ -5,7 +5,6 @@ use core::mem;
 
 use all_is_cubes::euclid::Vector3D;
 use exhaust::Exhaust;
-use maze_generator::prelude::{FieldType, Generator};
 use rand::prelude::SliceRandom;
 use rand::{Rng, SeedableRng};
 
@@ -28,15 +27,14 @@ use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{include_image, rgb_const};
 
 use crate::alg::four_walls;
-use crate::dungeon::{build_dungeon, f2d, maze_to_array, DungeonGrid, Theme};
+use crate::dungeon::{build_dungeon, generate_maze, DungeonGrid, MazeRoomKind, Theme};
 use crate::{tree, DemoBlocks, LandscapeBlocks, TemplateParameters};
 
 const WINDOW_PATTERN: [GridCoordinate; 3] = [-2, 0, 2];
 
 #[derive(Clone, Debug)]
 struct DemoRoom {
-    // TODO: remove dependency on maze gen entirely
-    maze_field_type: FieldType,
+    maze_kind: MazeRoomKind,
 
     /// In a *relative* room coordinate system (1 unit = 1 room box),
     /// how big is this room? Occupying multiple rooms' space if this
@@ -60,6 +58,7 @@ impl DemoRoom {
     }
 }
 
+/// What kind of holes a wall has.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum WallFeature {
     /// Blank wall.
@@ -243,10 +242,11 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
         let goal_wall = Block::from(rgb_const!(0.0, 0.8, 0.0));
 
         let interior = self.actual_room_box(room_position, room_data);
-        let wall_type = match room_data.maze_field_type {
-            FieldType::Start => Some(&start_wall),
-            FieldType::Goal => Some(&goal_wall),
-            FieldType::Normal => None,
+        let wall_type = match room_data.maze_kind {
+            MazeRoomKind::Start => Some(&start_wall),
+            MazeRoomKind::Goal => Some(&goal_wall),
+            MazeRoomKind::Path => None,
+            MazeRoomKind::Unoccupied => unreachable!(),
         };
         let floor_layer = self
             .dungeon_grid
@@ -366,7 +366,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 
                 // Set spawn.
                 // TODO: Don't unconditionally override spawn; instead communicate this out.
-                if matches!(room_data.maze_field_type, FieldType::Start) {
+                if matches!(room_data.maze_kind, MazeRoomKind::Start) {
                     let mut spawn = Spawn::default_for_new_space(space.bounds());
                     spawn.set_bounds(interior);
                     spawn.set_inventory(vec![
@@ -419,12 +419,16 @@ pub(crate) async fn demo_dungeon(
     };
     let perimeter_margin = 30;
 
-    let requested_rooms = (requested_size.unwrap_or(Vector3D::new(135, 40, 135))
+    let mut requested_rooms = (requested_size.unwrap_or(Vector3D::new(135, 40, 135))
         - Vector3D::new(perimeter_margin, 0, perimeter_margin))
     .component_div(dungeon_grid.room_spacing());
     if requested_rooms.x == 0 || requested_rooms.z == 0 {
         return Err(InGenError::Other("Size too small".into()));
     }
+
+    // TODO: Add 3D support (avoid collisions with tall rooms + generate stairs).
+    // For now, ignore vertical size suggestions entirely
+    requested_rooms.y = 1;
 
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
@@ -442,19 +446,17 @@ pub(crate) async fn demo_dungeon(
     // Construct dungeon map
     let maze_progress = progress.start_and_cut(0.1, "generating layout").await;
     let dungeon_map = {
-        let mut maze_seed = [0; 32];
-        maze_seed[0..8].copy_from_slice(&seed.to_le_bytes());
-        let maze = maze_generator::ellers_algorithm::EllersGenerator::new(Some(maze_seed))
-            .generate(requested_rooms.x, requested_rooms.z)
-            .map_err(|e| InGenError::Other(e.into()))?;
-
-        let maze = maze_to_array(&maze);
+        let maze = generate_maze(seed, requested_rooms);
 
         // Expand bounds to allow for extra-tall rooms.
         let expanded_bounds = maze.bounds().expand(FaceMap::symmetric([0, 1, 0]));
 
         let dungeon_map = GridArray::from_fn(expanded_bounds, |room_position| {
-            let maze_field = maze.get(room_position)?;
+            let maze_room = maze.get(room_position)?;
+
+            if maze_room.kind == MazeRoomKind::Unoccupied {
+                return None;
+            }
 
             let corridor_only = rng.gen_bool(0.5);
 
@@ -465,7 +467,7 @@ pub(crate) async fn demo_dungeon(
             };
             // Floor pit
             let floor = if !corridor_only
-                && matches!(maze_field.field_type, FieldType::Normal)
+                && matches!(maze_room.kind, MazeRoomKind::Path)
                 && rng.gen_bool(0.25)
             {
                 extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::NY, 1));
@@ -481,16 +483,12 @@ pub(crate) async fn demo_dungeon(
                     let neighbor = room_position + face.normal_vector();
                     let neighbor_in_bounds = maze.bounds().contains_cube(neighbor);
 
-                    if let Some(direction) = f2d(face) {
-                        // Bounds check is to work around the maze generator sometimes producing
-                        // out-of-bounds passages.
-                        if maze_field.has_passage(&direction) && neighbor_in_bounds {
-                            return WallFeature::Passage {
-                                // TODO: generate gates that are actual puzzles with keys
-                                // or that cut off dead end rooms
-                                gate: rng.gen_bool(0.25),
-                            };
-                        }
+                    if maze_room.has_passage(face) {
+                        return WallFeature::Passage {
+                            // TODO: generate gates that are actual puzzles with keys
+                            // or that cut off dead end rooms
+                            gate: rng.gen_bool(0.25),
+                        };
                     }
 
                     // Create windows only if they look into space outside the maze
@@ -512,7 +510,7 @@ pub(crate) async fn demo_dungeon(
             };
 
             Some(DemoRoom {
-                maze_field_type: maze_field.field_type,
+                maze_kind: maze_room.kind,
                 extended_bounds,
                 wall_features,
                 floor,

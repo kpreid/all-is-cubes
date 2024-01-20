@@ -1,27 +1,127 @@
-use maze_generator::prelude::{Direction, Field, Maze};
+use alloc::collections::VecDeque;
+use rand::seq::{IteratorRandom as _, SliceRandom as _};
+use rand::SeedableRng;
 
-use all_is_cubes::math::{Cube, Face6, GridAab, GridArray};
+use all_is_cubes::math::{Cube, Face6, FaceMap, GridAab, GridArray, GridVector};
 
-pub fn maze_to_array(maze: &Maze) -> GridArray<Field> {
-    GridArray::from_fn(
-        GridAab::from_lower_size([0, 0, 0], [maze.size.0, 1, maze.size.1]),
-        |p| maze.get_field(&c2m(p)).unwrap(),
-    )
+pub type Maze = GridArray<MazeRoom>;
+
+/// What role the room plays in the maze layout.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MazeRoomKind {
+    /// Room to start in.
+    Start,
+    /// Room which is to be sought by the player.
+    Goal,
+    /// A room that can be passed through.
+    Path,
+    /// A room that is not connected to the maze; empty space.
+    Unoccupied,
 }
 
-pub fn c2m(cube: Cube) -> maze_generator::prelude::Coordinates {
-    maze_generator::prelude::Coordinates {
-        x: cube.x,
-        y: cube.z,
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MazeRoom {
+    pub kind: MazeRoomKind,
+    passages: FaceMap<bool>,
+}
+
+impl MazeRoom {
+    pub fn has_passage(&self, direction: Face6) -> bool {
+        self.passages[direction]
     }
 }
 
-pub fn f2d(face: Face6) -> Option<Direction> {
-    Some(match face {
-        Face6::NZ => Direction::North,
-        Face6::PX => Direction::East,
-        Face6::PZ => Direction::South,
-        Face6::NX => Direction::West,
-        Face6::NY | Face6::PY => return None,
-    })
+fn open_passage(maze: &mut Maze, from: Cube, dir: Face6) {
+    maze[from].passages[dir] = true;
+    maze[from + dir.normal_vector()].passages[dir.opposite()] = true;
+}
+
+pub fn generate_maze(seed: u64, requested_rooms: GridVector) -> Maze {
+    let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
+
+    let mut maze = GridArray::repeat(
+        GridAab::from_lower_size([0, 0, 0], requested_rooms),
+        MazeRoom {
+            kind: MazeRoomKind::Unoccupied,
+            passages: FaceMap::repeat(false),
+        },
+    );
+
+    let start = Cube::new(0, 0, 0);
+    maze[start].kind = MazeRoomKind::Start;
+
+    generate_path(&mut maze, &mut rng, Cube::new(0, 0, 0), MazeRoomKind::Goal);
+    generate_dead_ends(&mut maze, &mut rng);
+
+    maze
+}
+
+fn generate_path(
+    maze: &mut Maze,
+    rng: &mut rand_xoshiro::Xoshiro256Plus,
+    starting_cube: Cube,
+    end_kind: MazeRoomKind,
+) {
+    let mut path_cube = starting_cube;
+    loop {
+        let Some(next_direction) = Face6::ALL
+            .into_iter()
+            .filter(|dir| {
+                let neighbor = path_cube + dir.normal_vector();
+                maze.bounds().contains_cube(neighbor)
+                    && maze[neighbor].kind == MazeRoomKind::Unoccupied
+            })
+            .choose(rng)
+        else {
+            // Painted ourselves into a corner...so call that the end
+            if path_cube != starting_cube {
+                maze[path_cube].kind = end_kind;
+            } else {
+                // TODO: signal error
+            }
+            break;
+        };
+        let neighbor = path_cube + next_direction.normal_vector();
+
+        open_passage(maze, path_cube, next_direction);
+        maze[neighbor].kind = MazeRoomKind::Path;
+
+        path_cube = neighbor;
+    }
+}
+
+fn generate_dead_ends(maze: &mut Maze, rng: &mut rand_xoshiro::Xoshiro256Plus) {
+    let mut needs_filling: VecDeque<Cube> = maze
+        .iter()
+        .filter(|(_, cell)| cell.kind == MazeRoomKind::Unoccupied)
+        .map(|(cube, _)| cube)
+        .collect();
+    needs_filling.make_contiguous().shuffle(rng);
+
+    let mut checked_without_progress = 0;
+
+    while let Some(cube_to_fill) = needs_filling.pop_front() {
+        match Face6::ALL
+            .into_iter()
+            .filter(|dir| {
+                let neighbor = cube_to_fill + dir.normal_vector();
+                maze.bounds().contains_cube(neighbor)
+                    && maze[neighbor].kind != MazeRoomKind::Unoccupied
+            })
+            .choose(rng)
+        {
+            None => {
+                needs_filling.push_back(cube_to_fill);
+                checked_without_progress += 1;
+                if checked_without_progress > needs_filling.len() {
+                    panic!("unable to make progress on dead ends");
+                }
+            }
+            Some(dir) => {
+                checked_without_progress = 0;
+                maze[cube_to_fill].kind = MazeRoomKind::Path;
+                open_passage(maze, cube_to_fill, dir);
+            }
+        }
+    }
 }

@@ -35,7 +35,6 @@ hashbrown = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 macro_rules_attribute = { workspace = true }
-maze_generator = "2.0.0"
 noise = { version = "0.8.2", default-features = false }
 paste = "1.0.12"
 petgraph = { version = "0.6.2", default-features = false, features = ["graphmap"] }
