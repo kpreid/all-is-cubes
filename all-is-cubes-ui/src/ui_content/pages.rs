@@ -13,7 +13,8 @@ use crate::ui_content::options::{graphics_options_widgets, pause_toggle_button, 
 use crate::ui_content::{VuiMessage, VuiPageState};
 use crate::vui::widgets::ButtonLabel;
 use crate::vui::{
-    page_modal_backdrop, parts, widgets, InstallVuiError, LayoutTree, UiBlocks, Widget, WidgetTree,
+    self, page_modal_backdrop, parts, widgets, InstallVuiError, LayoutTree, UiBlocks, Widget,
+    WidgetTree,
 };
 
 // TODO: Disentangle general UI from the concept of "HUD" — i.e. the input accepted should be
@@ -26,9 +27,9 @@ pub(super) fn new_paused_widget_tree(
 
     let mut children = vec![
         // TODO: establish standard resolutions for logo etc
-        LayoutTree::leaf(shrink(u, R16, LayoutTree::leaf(logo_text()))?),
+        vui::leaf_widget(shrink(u, R16, vui::leaf_widget(logo_text()))?),
         heading("Paused"),
-        LayoutTree::leaf(open_page_button(
+        vui::leaf_widget(open_page_button(
             hud_inputs,
             VuiPageState::AboutText,
             ButtonLabel {
@@ -36,7 +37,7 @@ pub(super) fn new_paused_widget_tree(
                 text: Some(literal!("About").into()),
             },
         )),
-        LayoutTree::leaf(open_page_button(
+        vui::leaf_widget(open_page_button(
             hud_inputs,
             VuiPageState::Options,
             ButtonLabel {
@@ -44,10 +45,10 @@ pub(super) fn new_paused_widget_tree(
                 text: Some(literal!("Options").into()),
             },
         )),
-        LayoutTree::leaf(pause_toggle_button(hud_inputs, OptionsStyle::LabeledColumn)),
+        vui::leaf_widget(pause_toggle_button(hud_inputs, OptionsStyle::LabeledColumn)),
     ];
     if let Some(quit_fn) = hud_inputs.quit.as_ref().cloned() {
-        children.push(LayoutTree::leaf(widgets::ActionButton::new(
+        children.push(vui::leaf_widget(widgets::ActionButton::new(
             literal!("Quit"),
             &hud_inputs.hud_blocks.widget_theme,
             // TODO: quit_fn should be an async function, but we don't have a way to
@@ -83,7 +84,7 @@ pub(super) fn new_options_widget_tree(
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
-            LayoutTree::leaf(shrink(u, R32, LayoutTree::leaf(logo_text()))?),
+            vui::leaf_widget(shrink(u, R32, vui::leaf_widget(logo_text()))?),
             heading("Options"),
             back_button(hud_inputs),
             Arc::new(LayoutTree::Stack {
@@ -134,7 +135,7 @@ pub(super) fn new_about_widget_tree(
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
-            LayoutTree::leaf(shrink(u, R8, LayoutTree::leaf(logo_text()))?),
+            vui::leaf_widget(shrink(u, R8, vui::leaf_widget(logo_text()))?),
             back_button(hud_inputs),
             heading("Controls"),
             paragraph(controls_text),
@@ -204,7 +205,7 @@ pub(crate) fn open_page_button(
 pub(crate) fn back_button(hud_inputs: &HudInputs) -> WidgetTree {
     // TODO: define a narrower set of inputs than HudInputs
     // TODO: this function should maybe live in a 'UI mid-level components' module?
-    LayoutTree::leaf(widgets::ActionButton::new(
+    vui::leaf_widget(widgets::ActionButton::new(
         hud_inputs.hud_blocks.ui_blocks[UiBlocks::BackButtonLabel].clone(),
         &hud_inputs.hud_blocks.widget_theme,
         {

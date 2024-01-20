@@ -13,7 +13,7 @@ use all_is_cubes::transaction;
 use all_is_cubes::universe::{URef, Universe};
 
 use crate::vui::{
-    install_widgets, widgets, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest,
+    self, install_widgets, widgets, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest,
     LayoutTree, Layoutable, Widget, WidgetTree,
 };
 
@@ -180,7 +180,7 @@ pub(crate) fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
                 // where all edges of the space spill off the window.
                 minimum: GridVector::new(0, 0, UiSize::DEPTH_BEHIND_VIEW_PLANE + 2),
             })),
-            LayoutTree::leaf(widgets::Frame::with_block(Block::from(Rgba::new(
+            vui::leaf_widget(widgets::Frame::with_block(Block::from(Rgba::new(
                 0., 0., 0., 0.7,
             )))),
             foreground,
@@ -213,13 +213,13 @@ pub(crate) mod parts {
     }
 
     pub fn heading(text: impl Into<ArcStr>) -> WidgetTree {
-        LayoutTree::leaf(Arc::new(widgets::Label::new(text.into())))
+        vui::leaf_widget(widgets::Label::new(text.into()))
     }
 
     pub fn paragraph(text: impl Into<ArcStr>) -> WidgetTree {
         // TODO: the layout of this is suboptimal, with an extra blank block row at the top
         // in the about-box usage; the cause is not yet diagnosed.
-        LayoutTree::leaf(Arc::new(widgets::Label::with_font(
+        vui::leaf_widget(widgets::Label::with_font(
             text.into(),
             text::Font::SmallerBodyText,
             text::Positioning {
@@ -227,7 +227,7 @@ pub(crate) mod parts {
                 line_y: text::PositioningY::BodyTop,
                 z: text::PositioningZ::Back,
             },
-        )))
+        ))
     }
 }
 

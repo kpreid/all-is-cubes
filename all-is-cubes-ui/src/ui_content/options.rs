@@ -22,7 +22,7 @@ pub(crate) fn graphics_options_widgets(
 ) -> Vec<WidgetTree> {
     let mut w: Vec<WidgetTree> = Vec::with_capacity(5);
     if let Some(setter) = hud_inputs.set_fullscreen.clone() {
-        w.push(LayoutTree::leaf(widgets::ToggleButton::new(
+        w.push(vui::leaf_widget(widgets::ToggleButton::new(
             hud_inputs.fullscreen_mode.clone(),
             |opt_value| opt_value.unwrap_or(false),
             hud_inputs.hud_blocks.ui_blocks[UiBlocks::FullscreenButtonLabel].clone(),
@@ -156,7 +156,7 @@ fn graphics_toggle_button(
         icon: Some(icon),
         text,
     };
-    let button: Arc<dyn Widget> = widgets::ToggleButton::new(
+    let button = widgets::ToggleButton::new(
         hud_inputs.graphics_options.clone(),
         getter.clone(),
         label,
@@ -176,7 +176,7 @@ fn graphics_toggle_button(
             }
         },
     );
-    LayoutTree::leaf(button)
+    vui::leaf_widget(button)
 }
 
 /// Generate a group of buttons that selects one of an enum of options.
@@ -197,7 +197,7 @@ fn graphics_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'stati
                 .into_iter()
                 .map(|value| {
                     let value2 = value.clone();
-                    let button: Arc<dyn Widget> = widgets::ToggleButton::new(
+                    let button = widgets::ToggleButton::new(
                         hud_inputs.graphics_options.clone(),
                         move |options| *getter(options) == value,
                         arcstr::format!("{:?}", value2), // TODO: quick kludge; need real labels
@@ -217,7 +217,7 @@ fn graphics_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'stati
                             }
                         },
                     );
-                    LayoutTree::leaf(button)
+                    vui::leaf_widget(button)
                 })
                 .collect(),
         }),

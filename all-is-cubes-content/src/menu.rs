@@ -111,7 +111,7 @@ impl vui::WidgetController for TemplateButtonController {
 pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError> {
     let template_iter = UniverseTemplate::iter().filter(UniverseTemplate::include_in_lists);
 
-    let logo_text_space = LayoutTree::leaf(logo_text()).to_space(
+    let logo_text_space = vui::leaf_widget(logo_text()).to_space(
         SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
         Vector3D::new(Align::Center, Align::Center, Align::Low),
     )?;
@@ -123,19 +123,17 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
     );
 
     let mut vertical_widgets: Vec<vui::WidgetTree> = Vec::with_capacity(10);
-    vertical_widgets.push(LayoutTree::leaf(Arc::new(logo_widget)));
+    vertical_widgets.push(vui::leaf_widget(logo_widget));
     for template in template_iter {
         vertical_widgets.push(LayoutTree::spacer(vui::LayoutRequest {
             minimum: GridVector::new(1, 1, 1),
         }));
-        vertical_widgets.push(LayoutTree::leaf(Arc::new(TemplateButton::new(
-            universe, template,
-        )?)));
+        vertical_widgets.push(vui::leaf_widget(TemplateButton::new(universe, template)?));
     }
     let tree: vui::WidgetTree = Arc::new(LayoutTree::Stack {
         direction: Face6::PZ,
         children: vec![
-            LayoutTree::leaf({
+            vui::leaf_widget({
                 // TODO: this should be the 'dialog box' background but we don't have access to that from this crate
                 let background = Block::from(palette::MENU_BACK);
                 let frame = Block::from(palette::MENU_FRAME);

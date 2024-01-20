@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn label_layout() {
-        let tree: vui::WidgetTree = vui::LayoutTree::leaf(Arc::new(Label::new(literal!("hi"))));
+        let tree: vui::WidgetTree = vui::leaf_widget(Label::new(literal!("hi")));
 
         // to_space() serves as a widget building sanity check. TODO: make a proper widget tester
         tree.to_space(
@@ -269,7 +269,7 @@ mod tests {
         // In the current system font and scale, this is exactly 1.5 blocks wide.
         let string = literal!("abcdef");
 
-        let tree: vui::WidgetTree = vui::LayoutTree::leaf(Arc::new(Label::new(string)));
+        let tree = vui::leaf_widget(Label::new(string));
 
         // A previous bug would cause this to be 3 wide.
         assert_eq!(

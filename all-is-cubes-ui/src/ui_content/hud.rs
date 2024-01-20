@@ -19,7 +19,7 @@ use crate::ui_content::options::{graphics_options_widgets, pause_toggle_button, 
 use crate::ui_content::pages::open_page_button;
 use crate::ui_content::{CueNotifier, VuiMessage, VuiPageState};
 use crate::vui::widgets::{self, TooltipState, WidgetBlocks};
-use crate::vui::{LayoutTree, UiBlocks, Widget, WidgetTree};
+use crate::vui::{self, LayoutTree, UiBlocks, Widget, WidgetTree};
 
 pub(crate) use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1::FONT_8X13_BOLD as HudFont;
 
@@ -58,26 +58,26 @@ pub(super) fn new_hud_widget_tree(
     universe: &mut Universe,
     tooltip_state: Arc<Mutex<TooltipState>>,
 ) -> WidgetTree {
-    let toolbar: Arc<dyn Widget> = widgets::Toolbar::new(
+    let toolbar = widgets::Toolbar::new(
         character_source,
         Arc::clone(&hud_inputs.hud_blocks),
         TOOLBAR_POSITIONS,
         universe,
         hud_inputs.cue_channel.clone(),
     );
-    let tooltip: Arc<dyn Widget> = widgets::Tooltip::new(
+    let tooltip = widgets::Tooltip::new(
         Arc::clone(&tooltip_state),
         hud_inputs.hud_blocks.clone(),
         universe,
     );
     let hud_widget_tree: WidgetTree = Arc::new(LayoutTree::Hud {
-        crosshair: LayoutTree::leaf(widgets::Crosshair::new(
+        crosshair: vui::leaf_widget(widgets::Crosshair::new(
             hud_inputs.hud_blocks.widget_theme.widget_blocks[WidgetBlocks::Crosshair].clone(),
             hud_inputs.mouselook_mode.clone(),
         )),
         toolbar: Arc::new(LayoutTree::Stack {
             direction: Face6::PY,
-            children: vec![LayoutTree::leaf(toolbar), LayoutTree::leaf(tooltip)],
+            children: vec![vui::leaf_widget(toolbar), vui::leaf_widget(tooltip)],
         }),
         control_bar: control_bar(hud_inputs),
     });
@@ -94,14 +94,14 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
                 direction: Face6::NX,
                 children: graphics_options_widgets(hud_inputs, OptionsStyle::CompactRow),
             }),
-            LayoutTree::leaf(open_page_button(
+            vui::leaf_widget(open_page_button(
                 hud_inputs,
                 VuiPageState::AboutText,
                 hud_inputs.hud_blocks.ui_blocks[UiBlocks::AboutButtonLabel].clone(),
             )),
-            LayoutTree::leaf(pause_toggle_button(hud_inputs, OptionsStyle::CompactRow)),
-            LayoutTree::leaf(save_button(hud_inputs)),
-            LayoutTree::leaf(widgets::ToggleButton::new(
+            vui::leaf_widget(pause_toggle_button(hud_inputs, OptionsStyle::CompactRow)),
+            vui::leaf_widget(save_button(hud_inputs)),
+            vui::leaf_widget(widgets::ToggleButton::new(
                 hud_inputs.mouselook_mode.clone(),
                 |&value| value,
                 hud_inputs.hud_blocks.ui_blocks[UiBlocks::MouselookButtonLabel].clone(),
@@ -120,7 +120,7 @@ pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
         Arc::new(LayoutTree::Stack {
             direction: Face6::PZ,
             children: vec![
-                LayoutTree::leaf(hud_inputs.hud_blocks.widget_theme.dialog_background()),
+                vui::leaf_widget(hud_inputs.hud_blocks.widget_theme.dialog_background()),
                 control_bar_widgets,
             ],
         })

@@ -546,7 +546,7 @@ async fn icons(mut context: RenderTestContext) {
     }
 
     let action_widgets = [UiBlocks::BackButtonLabel].map(|label_key| {
-        block_from_widget(vui::LayoutTree::leaf(widgets::ActionButton::new(
+        block_from_widget(vui::leaf_widget(widgets::ActionButton::new(
             ui_blocks_p[label_key].clone(),
             &widget_theme,
             || { /* do nothing */ },
@@ -560,7 +560,7 @@ async fn icons(mut context: RenderTestContext) {
         (UiBlocks::DebugLightRaysButtonLabel, true),
     ]
     .map(|(label_key, state)| {
-        block_from_widget(vui::LayoutTree::leaf(widgets::ToggleButton::new(
+        block_from_widget(vui::leaf_widget(widgets::ToggleButton::new(
             ListenableSource::constant(state),
             |state| *state,
             ui_blocks_p[label_key].clone(),

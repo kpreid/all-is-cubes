@@ -28,6 +28,8 @@
 
 - `all-is-cubes-ui` library:
     - New type `vui::widgets::ButtonLabel` allows giving `ActionButton` and `ToggleButton` text labels in addition to or instead of icons.
+    - New function `vui::leaf_widget()` allows easier, less type-error-prone construction of `WidgetTree`s.
+      It should generally be used in place of `LayoutTree::leaf()`.
 
 ### Changed
 

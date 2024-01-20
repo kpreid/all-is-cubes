@@ -518,6 +518,42 @@ impl<W: Layoutable> Layoutable for LayoutTree<W> {
     }
 }
 
+/// Narrower version of [`LayoutTree::leaf`] which is maximally ergonomic for wrapping individual
+/// [`Widget`] implementors without any type issues.
+pub fn leaf_widget(widget: impl IntoWidgetTree) -> WidgetTree {
+    widget.into_widget_tree()
+}
+/// Conversion into [`WidgetTree`]s.
+///
+/// You may use this trait via the function [`leaf_widget()`] instead of importing it.
+/// It exists so that, given a concrete widget type, we can reach `Arc<dyn Widget>` without
+/// encountering any type ambiguities in the conversion steps or requiring the caller to do
+/// any explicit `Arc` wrapping or type annotation.
+pub trait IntoWidgetTree {
+    /// Wrap `self` as necessary to make it into a [`WidgetTree`] [leaf](LayoutTree::Leaf).
+    fn into_widget_tree(self) -> WidgetTree;
+}
+impl<W: Widget + Sized + 'static> IntoWidgetTree for W {
+    #[inline]
+    fn into_widget_tree(self) -> WidgetTree {
+        let dyn_widget: Arc<dyn Widget> = Arc::new(self);
+        LayoutTree::leaf(dyn_widget)
+    }
+}
+impl<W: Widget + Sized + 'static> IntoWidgetTree for Arc<W> {
+    #[inline]
+    fn into_widget_tree(self) -> WidgetTree {
+        let dyn_widget: Arc<dyn Widget> = self;
+        LayoutTree::leaf(dyn_widget)
+    }
+}
+impl IntoWidgetTree for Arc<dyn Widget> {
+    #[inline]
+    fn into_widget_tree(self) -> WidgetTree {
+        LayoutTree::leaf(self)
+    }
+}
+
 pub(super) fn validate_widget_transaction(
     widget: &Arc<dyn Widget>,
     transaction: &SpaceTransaction,

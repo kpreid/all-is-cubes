@@ -267,7 +267,7 @@ pub(crate) async fn demo_city<I: Instant>(
         .unwrap();
     vui::install_widgets(
         vui::LayoutGrant::new(logo_location),
-        &vui::LayoutTree::leaf(logo_text()),
+        &vui::leaf_widget(logo_text()),
     )?
     .execute(&mut space, &mut transaction::no_outputs)?;
     planner.occupied_plots.push(logo_location);
@@ -436,10 +436,8 @@ async fn place_exhibits_in_city<I: Instant>(
             let info_voxels_widget: vui::WidgetTree = Arc::new(vui::LayoutTree::Stack {
                 direction: Face6::PZ,
                 children: vec![
-                    vui::LayoutTree::leaf(widgets::Frame::with_block(
-                        demo_blocks[Signboard].clone(),
-                    )),
-                    vui::LayoutTree::leaf(Arc::new(widgets::Voxels::new(
+                    vui::leaf_widget(widgets::Frame::with_block(demo_blocks[Signboard].clone())),
+                    vui::leaf_widget(Arc::new(widgets::Voxels::new(
                         bounds_for_info_voxels,
                         universe.insert_anonymous(exhibit_info_space),
                         info_resolution,
@@ -636,7 +634,7 @@ fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
     let info_widgets: vui::WidgetTree = Arc::new(vui::LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
-            vui::LayoutTree::leaf(Arc::new(widgets::LargeText {
+            vui::leaf_widget(widgets::LargeText {
                 text: exhibit.name.into(),
                 font: || &font::FONT_9X18_BOLD,
                 brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
@@ -644,8 +642,8 @@ fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
                     .alignment(Alignment::Center)
                     .baseline(Baseline::Middle)
                     .build(),
-            })),
-            vui::LayoutTree::leaf(Arc::new(widgets::LargeText {
+            }),
+            vui::leaf_widget(widgets::LargeText {
                 text: {
                     let t = exhibit.subtitle;
                     // TODO: rectangle_to_aab() fails when the empty string is drawn;
@@ -663,7 +661,7 @@ fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
                     .alignment(Alignment::Center)
                     .baseline(Baseline::Middle)
                     .build(),
-            })),
+            }),
         ],
     });
 
