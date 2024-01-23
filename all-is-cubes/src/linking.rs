@@ -94,7 +94,8 @@ where
     /// Constructs a `Provider` with values computed by the given function.
     ///
     /// This is an async function for the sake of cancellation and optional cooperative
-    /// multitasking. It may be blocked on from a synchronous context.
+    /// multitasking. It may be blocked on from a synchronous context (but if that is the
+    /// only use, consider calling [`Provider::new_sync()`] instead).
     pub async fn new<F>(progress: YieldProgress, mut definer: F) -> Result<Self, GenError>
     where
         F: FnMut(E) -> Result<V, InGenError>,
