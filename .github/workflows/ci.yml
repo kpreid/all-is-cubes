@@ -394,7 +394,7 @@ jobs:
       run: cargo install cargo-fuzz
 
     - name: Cache fuzzer corpus
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         key: fuzz-corpus
         path: |
