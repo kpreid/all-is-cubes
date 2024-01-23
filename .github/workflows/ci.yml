@@ -394,8 +394,10 @@ jobs:
       run: cargo install cargo-fuzz
 
     - name: Cache fuzzer corpus
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
+        # Failed runs are useful to cache since they expand the corpus
+        save-always: true
         key: fuzz-corpus
         path: |
           fuzz/corpus
