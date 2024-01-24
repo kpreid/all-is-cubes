@@ -117,22 +117,22 @@ async fn start_game_with_dom(
     let cameras = session.create_cameras(viewport_cell.as_source());
     let renderer = match renderer_option {
         RendererOption::Wgpu => {
-            let wgpu_instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
-            let surface = wgpu_instance
-                .create_surface(wgpu::SurfaceTarget::Canvas(
-                    gui_helpers.canvas_helper().canvas(),
-                ))
-                .map_err(|e| format!("Requesting WebGL context failed: {e:?}"))?;
-            // TODO: we lost the 'request no MSAA' feature
-            let adapter = wgpu_instance
-                .request_adapter(&wgpu::RequestAdapterOptions {
-                    power_preference: wgpu::PowerPreference::HighPerformance,
-                    compatible_surface: Some(&surface),
-                    force_fallback_adapter: false,
-                })
-                .await
-                .ok_or("Could not request suitable graphics adapter")?;
-            log::debug!("Adapter: {:?}", adapter.get_info());
+            let canvas = gui_helpers.canvas_helper().canvas();
+            let (surface, adapter) = match init_wgpu(&canvas, wgpu::Backends::all()).await {
+                Ok(sa) => Ok(sa),
+                Err(e) => {
+                    // Explicitly retrying with WebGL works around a Firefox quirk where
+                    // WebGPU appears to exist but getContext() returns null.
+                    // In principle, wgpu should handle this for us, but it's nontrivial.
+                    // <https://github.com/gfx-rs/wgpu/issues/5332>
+                    log::debug!(
+                        "failed to create surface with Backends::all(); trying WebGL only.\n\
+                        error: {e}"
+                    );
+                    init_wgpu(&canvas, wgpu::Backends::GL).await
+                }
+            }?;
+            log::debug!("adapter: {:?}", adapter.get_info());
             let renderer = in_wgpu::SurfaceRenderer::new(
                 cameras,
                 surface,
@@ -184,4 +184,26 @@ async fn start_game_with_dom(
     console::log_1(&JsValue::from_str("start_game() completed."));
     static_dom.loading_log.set_data("");
     Ok(())
+}
+
+async fn init_wgpu(
+    canvas: &web_sys::HtmlCanvasElement,
+    backends: wgpu::Backends,
+) -> Result<(wgpu::Surface<'static>, wgpu::Adapter), Box<dyn std::error::Error>> {
+    let wgpu_instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends,
+        ..Default::default()
+    });
+    let surface = wgpu_instance
+        .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
+        .map_err(|e| format!("Requesting {backends:?} context failed: {e:?}"))?;
+    let adapter = wgpu_instance
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            compatible_surface: Some(&surface),
+            force_fallback_adapter: false,
+        })
+        .await
+        .ok_or("Could not request suitable graphics adapter")?;
+    Ok((surface, adapter))
 }
