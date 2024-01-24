@@ -14,6 +14,7 @@ use all_is_cubes::notnan;
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::time;
+use wgpu::TextureViewDescriptor;
 
 use crate::in_wgpu::raytrace_to_texture::RaytraceToTexture;
 #[cfg(feature = "rerun")]
@@ -196,7 +197,10 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         // next frame.
         self.everything.add_info_text_and_postprocess(
             &self.queue,
-            &output.texture,
+            &output.texture.create_view(&TextureViewDescriptor {
+                format: Some(surface_view_format(self.everything.config.format)),
+                ..Default::default()
+            }),
             &info_text_fn(&info),
         );
         output.present();
@@ -316,7 +320,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
-            view_formats: vec![],
+            view_formats: vec![surface_view_format(surface_format)],
             // wgpu operations will fail if the size is zero; set a minimum of 1 so we can
             // successfully initialize and get a working renderer later.
             width: viewport.framebuffer_size.x.max(1),
@@ -792,7 +796,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
     pub fn add_info_text_and_postprocess(
         &mut self,
         queue: &wgpu::Queue,
-        output: &wgpu::Texture,
+        output: &wgpu::TextureView,
         mut text: &str,
     ) {
         // Apply info text option
@@ -880,4 +884,11 @@ fn choose_surface_format(capabilities: &wgpu::SurfaceCapabilities) -> wgpu::Text
         formats = capabilities.formats,
     );
     best
+}
+
+/// Bottleneck where we transform the surface texture format,
+/// so we can be reminded of all the places it needs to match.
+#[inline]
+fn surface_view_format(surface_format: wgpu::TextureFormat) -> wgpu::TextureFormat {
+    surface_format.add_srgb_suffix()
 }

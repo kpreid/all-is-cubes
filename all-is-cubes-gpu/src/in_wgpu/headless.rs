@@ -208,8 +208,13 @@ impl RendererImpl {
         }
 
         let _draw_info = self.everything.draw_frame_linear(&self.queue).unwrap();
-        self.everything
-            .add_info_text_and_postprocess(&self.queue, &self.color_texture, info_text);
+        self.everything.add_info_text_and_postprocess(
+            &self.queue,
+            &self
+                .color_texture
+                .create_view(&wgpu::TextureViewDescriptor::default()),
+            info_text,
+        );
         let image = init::get_image_from_gpu(
             self.device.clone(),
             &self.queue,

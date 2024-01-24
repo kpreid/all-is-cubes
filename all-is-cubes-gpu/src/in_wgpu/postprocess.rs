@@ -107,7 +107,7 @@ pub(crate) fn create_postprocess_pipeline(
             module: &postprocess_shader,
             entry_point: "postprocess_fragment",
             targets: &[Some(wgpu::ColorTargetState {
-                format: surface_format,
+                format: super::surface_view_format(surface_format),
                 blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
                 write_mask: wgpu::ColorWrites::ALL,
             })],
@@ -169,7 +169,7 @@ pub(crate) fn postprocess<I: time::Instant>(
     // TODO: instead of accepting `EverythingRenderer`, pass smaller (but not too numerous) things
     ev: &mut super::EverythingRenderer<I>,
     queue: &wgpu::Queue,
-    output: &wgpu::Texture,
+    output: &wgpu::TextureView,
 ) {
     let mut encoder = ev
         .device
@@ -179,11 +179,10 @@ pub(crate) fn postprocess<I: time::Instant>(
 
     // Render pass
     {
-        let output_view = output.create_view(&wgpu::TextureViewDescriptor::default());
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("add_info_text_and_postprocess() pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &output_view,
+                view: output,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
