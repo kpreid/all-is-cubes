@@ -181,7 +181,7 @@ impl<E: BlockModule> Provider<E, Block> {
 /// These methods do not require `E` to be a [`BlockModule`].
 impl<E: Exhaust + fmt::Debug + Clone + Eq + Hash, V> Provider<E, V> {
     /// Alternative to [`Self::new()`] which is neither async nor fallible.
-    fn new_sync<F>(mut definer: F) -> Self
+    pub fn new_sync<F>(mut definer: F) -> Self
     where
         F: FnMut(E) -> V,
     {
