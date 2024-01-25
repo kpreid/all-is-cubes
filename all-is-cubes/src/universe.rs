@@ -300,10 +300,7 @@ impl Universe {
 
         let tick = self.clock.advance(paused);
 
-        #[cfg(feature = "rerun")]
-        self.rerun_destination
-            .stream
-            .set_time_sequence("session_step_time", self.session_step_time as i64);
+        self.log_rerun_time();
 
         if self.wants_gc {
             self.gc();
@@ -695,6 +692,16 @@ impl Universe {
                 ),
             )
             .unwrap();
+
+        // Write current timepoint
+        self.log_rerun_time();
+    }
+
+    fn log_rerun_time(&self) {
+        #[cfg(feature = "rerun")]
+        self.rerun_destination
+            .stream
+            .set_time_sequence("session_step_time", self.session_step_time as i64);
     }
 }
 
