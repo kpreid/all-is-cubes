@@ -416,8 +416,6 @@ pub(crate) async fn demo_dungeon(
         install_txn.execute(universe, &mut transaction::no_outputs)?;
     }
 
-    let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
-
     let dungeon_grid = DungeonGrid {
         room_box: GridAab::from_lower_size([0, 0, 0], [9, 5, 9]),
         room_wall_thickness: FaceMap::repeat(1),
@@ -448,112 +446,24 @@ pub(crate) async fn demo_dungeon(
         window_glass_block: demo_blocks[DemoBlocks::GlassBlock].clone(),
         item_pedestal: demo_blocks[DemoBlocks::Pedestal].clone(),
     };
+    // Random assortment of blocks to provide
+    // TODO: make this things like keys for doors
+    let grantable_items = [
+        demo_blocks[DemoBlocks::Lamp].clone(),
+        demo_blocks[DemoBlocks::Signboard].clone(),
+        // TODO: can't do this until we have an "item" form: &demo_blocks[DemoBlocks::Explosion(0)],
+        landscape_blocks[LandscapeBlocks::Leaves(tree::TreeGrowth::Block)].clone(),
+        landscape_blocks[LandscapeBlocks::Grass].clone(),
+        landscape_blocks[LandscapeBlocks::Dirt].clone(),
+        landscape_blocks[LandscapeBlocks::Stone].clone(),
+    ];
 
     // Construct dungeon map
     let maze_progress = progress.start_and_cut(0.1, "generating layout").await;
-    let dungeon_map = {
-        let maze = generate_maze(seed, requested_rooms);
+    let dungeon_map = generate_dungeon_map(seed, requested_rooms, &grantable_items);
+    maze_progress.finish().await;
 
-        // Expand bounds to allow for extra-tall rooms.
-        let expanded_bounds = maze.bounds().expand(FaceMap::symmetric([0, 1, 0]));
-
-        let dungeon_map = GridArray::from_fn(expanded_bounds, |room_position| {
-            let maze_room = maze.get(room_position)?;
-
-            // Allow rooms that are not start or end to have more interesting properties.
-            let is_not_end = match maze_room.kind {
-                MazeRoomKind::Unoccupied => return None,
-                MazeRoomKind::Start | MazeRoomKind::Goal => false,
-                MazeRoomKind::Path | MazeRoomKind::OffPath => true,
-            };
-
-            let corridor_only = is_not_end && rng.gen_bool(0.5);
-
-            let mut extended_bounds = GridAab::ORIGIN_CUBE;
-            // Optional high ceiling
-            if !corridor_only && rng.gen_bool(0.25) {
-                extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::PY, 1));
-            };
-            // Floor pit
-            let floor = if !corridor_only && is_not_end && rng.gen_bool(0.25) {
-                extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::NY, 1));
-                *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
-                    .choose(&mut rng)
-                    .unwrap()
-            } else {
-                FloorKind::Solid
-            };
-
-            let wall_features = {
-                FaceMap::from_fn(|face| -> WallFeature {
-                    let neighbor = room_position + face.normal_vector();
-                    let neighbor_in_bounds = maze.bounds().contains_cube(neighbor);
-
-                    if maze_room.has_passage(face) {
-                        let gate = rng.gen_bool(0.25);
-                        return WallFeature::Passage {
-                            gate,
-                            // TODO: generate gates that are actual puzzles with keys, rather than
-                            // only permanently open or shut
-                            blocked: gate
-                                && (maze_room.kind == MazeRoomKind::OffPath
-                                    || maze[neighbor].kind == MazeRoomKind::OffPath)
-                                && rng.gen_bool(0.5),
-                        };
-                    }
-
-                    // Create windows only if they look into space outside the maze
-                    let have_window = if neighbor_in_bounds || corridor_only || face == Face6::NY {
-                        false
-                    } else if face == Face6::PY {
-                        // ceilings are more common overall and we want more internally-lit ones
-                        rng.gen_bool(0.25)
-                    } else {
-                        rng.gen_bool(0.75)
-                    };
-
-                    if have_window {
-                        WallFeature::Window
-                    } else {
-                        WallFeature::Blank
-                    }
-                })
-            };
-
-            Some(DemoRoom {
-                maze_kind: maze_room.kind,
-                extended_bounds,
-                wall_features,
-                floor,
-                corridor_only,
-                lit: wall_features[Face6::PY] == WallFeature::Blank && rng.gen_bool(0.75),
-                grants_item: (matches!(floor, FloorKind::Solid)
-                    && !corridor_only
-                    && is_not_end
-                    && rng.gen_bool(0.5))
-                .then(|| {
-                    // Random assortment of blocks to provide
-                    // TODO: make this things like keys for doors
-                    Block::clone(
-                        [
-                            &demo_blocks[DemoBlocks::Lamp],
-                            &demo_blocks[DemoBlocks::Signboard],
-                            // TODO: can't do this until we have an "item" form: &demo_blocks[DemoBlocks::Explosion(0)],
-                            &landscape_blocks[LandscapeBlocks::Leaves(tree::TreeGrowth::Block)],
-                            &landscape_blocks[LandscapeBlocks::Grass],
-                            &landscape_blocks[LandscapeBlocks::Dirt],
-                            &landscape_blocks[LandscapeBlocks::Stone],
-                        ]
-                        .choose(&mut rng)
-                        .unwrap(),
-                    )
-                }),
-            })
-        });
-        maze_progress.finish().await;
-        dungeon_map
-    };
-
+    // Construct space with initial bulk-filled contents
     let mut space = {
         let space_construction_progress = progress.start_and_cut(0.1, "filling the earth").await;
         let space_bounds = dungeon_grid
@@ -603,6 +513,98 @@ pub(crate) async fn demo_dungeon(
     light_progress.finish().await;
 
     Ok(space)
+}
+
+/// Non-async map generation subsection of [`demo_dungeon()`].
+fn generate_dungeon_map(
+    seed: u64,
+    requested_rooms: GridVector,
+    grantable_items: &[Block],
+) -> all_is_cubes::math::Vol<alloc::boxed::Box<[Option<DemoRoom>]>> {
+    let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
+
+    let maze = generate_maze(seed, requested_rooms);
+
+    // Expand bounds to allow for extra-tall rooms.
+    let expanded_bounds = maze.bounds().expand(FaceMap::symmetric([0, 1, 0]));
+
+    GridArray::from_fn(expanded_bounds, |room_position| {
+        let maze_room = maze.get(room_position)?;
+
+        // Allow rooms that are not start or end to have more interesting properties.
+        let is_not_end = match maze_room.kind {
+            MazeRoomKind::Unoccupied => return None,
+            MazeRoomKind::Start | MazeRoomKind::Goal => false,
+            MazeRoomKind::Path | MazeRoomKind::OffPath => true,
+        };
+
+        let corridor_only = is_not_end && rng.gen_bool(0.5);
+
+        let mut extended_bounds = GridAab::ORIGIN_CUBE;
+        // Optional high ceiling
+        if !corridor_only && rng.gen_bool(0.25) {
+            extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::PY, 1));
+        };
+        // Floor pit
+        let floor = if !corridor_only && is_not_end && rng.gen_bool(0.25) {
+            extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::NY, 1));
+            *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
+                .choose(&mut rng)
+                .unwrap()
+        } else {
+            FloorKind::Solid
+        };
+
+        let wall_features = {
+            FaceMap::from_fn(|face| -> WallFeature {
+                let neighbor = room_position + face.normal_vector();
+                let neighbor_in_bounds = maze.bounds().contains_cube(neighbor);
+
+                if maze_room.has_passage(face) {
+                    let gate = rng.gen_bool(0.25);
+                    return WallFeature::Passage {
+                        gate,
+                        // TODO: generate gates that are actual puzzles with keys, rather than
+                        // only permanently open or shut
+                        blocked: gate
+                            && (maze_room.kind == MazeRoomKind::OffPath
+                                || maze[neighbor].kind == MazeRoomKind::OffPath)
+                            && rng.gen_bool(0.5),
+                    };
+                }
+
+                // Create windows only if they look into space outside the maze
+                let have_window = if neighbor_in_bounds || corridor_only || face == Face6::NY {
+                    false
+                } else if face == Face6::PY {
+                    // ceilings are more common overall and we want more internally-lit ones
+                    rng.gen_bool(0.25)
+                } else {
+                    rng.gen_bool(0.75)
+                };
+
+                if have_window {
+                    WallFeature::Window
+                } else {
+                    WallFeature::Blank
+                }
+            })
+        };
+
+        Some(DemoRoom {
+            maze_kind: maze_room.kind,
+            extended_bounds,
+            wall_features,
+            floor,
+            corridor_only,
+            lit: wall_features[Face6::PY] == WallFeature::Blank && rng.gen_bool(0.75),
+            grants_item: (matches!(floor, FloorKind::Solid)
+                && !corridor_only
+                && is_not_end
+                && rng.gen_bool(0.5))
+            .then(|| Block::clone(grantable_items.choose(&mut rng).unwrap())),
+        })
+    })
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
