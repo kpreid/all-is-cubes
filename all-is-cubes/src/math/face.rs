@@ -6,6 +6,10 @@ use core::ops::{Index, IndexMut};
 
 use euclid::Vector3D;
 
+#[cfg(not(feature = "std"))]
+/// Acts as polyfill for float methods
+use num_traits::float::FloatCore as _;
+
 use crate::math::{
     Axis, ConciseDebug, Cube, FreeCoordinate, FreeVector, Geometry, GridCoordinate, GridPoint,
     GridRotation, GridVector, Gridgid, LineVertex, VectorOps, Zero,
@@ -105,27 +109,29 @@ impl Face6 {
     #[allow(unused)] // TODO: I expect to use this in block placement
     fn from_snapped_vector(vector: FreeVector) -> Option<Self> {
         let Vector3D { x, y, z, _unit } = vector;
-        if x.abs() > y.abs() && x.abs() > z.abs() {
-            match x.signum() as i8 {
-                -1 => Some(Face6::NX),
-                1 => Some(Face6::PX),
-                _ => unreachable!(), // condition rejects NaN
-            }
-        } else if y.abs() > z.abs() {
-            match y.signum() as i8 {
-                -1 => Some(Face6::NY),
-                1 => Some(Face6::PY),
-                _ => unreachable!(), // condition rejects NaN
-            }
-        } else if x.is_nan() || y.is_nan() || z.is_nan() {
-            None
-        } else {
-            match z.signum() as i8 {
-                -1 => Some(Face6::NZ),
-                1 => Some(Face6::PZ),
-                _ => unreachable!(), // already checked for NaN
-            }
+
+        // This isn't the likely case, but if we check it first, the generated code for signum()
+        // can avoid redundant NaN checks.
+        if x.is_nan() || y.is_nan() || z.is_nan() {
+            return None;
         }
+
+        // Note that the Rust signum() reads the sign of zeroes rather than returning zero for zero
+        // (as would be mathematically conventional --
+        // <https://en.wikipedia.org/w/index.php?title=Sign_function&oldid=1177447019>).
+        // Duplicating the calls in each branch helps avoid redundant NaN checks.
+        let (neg_face, sign) = if x.abs() > y.abs() && x.abs() > z.abs() {
+            (Face6::NX, x.signum())
+        } else if y.abs() > z.abs() {
+            (Face6::NY, y.signum())
+        } else {
+            (Face6::NZ, z.signum())
+        };
+        Some(if sign < 0. {
+            neg_face
+        } else {
+            neg_face.opposite()
+        })
     }
 
     /// Returns which axis this face's normal vector is parallel to.
