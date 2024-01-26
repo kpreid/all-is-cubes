@@ -7,8 +7,8 @@ use core::ops::{Index, IndexMut};
 use euclid::Vector3D;
 
 use crate::math::{
-    Axis, ConciseDebug, Cube, FreeCoordinate, Geometry, GridCoordinate, GridPoint, GridRotation,
-    GridVector, Gridgid, LineVertex, VectorOps, Zero,
+    Axis, ConciseDebug, Cube, FreeCoordinate, FreeVector, Geometry, GridCoordinate, GridPoint,
+    GridRotation, GridVector, Gridgid, LineVertex, VectorOps, Zero,
 };
 use crate::util::Refmt as _;
 
@@ -91,6 +91,40 @@ impl Face6 {
             5 => Some(Self::PY),
             6 => Some(Self::PZ),
             _ => None,
+        }
+    }
+
+    /// Returns the [`Face6`] whose normal vector is closest in direction to the given
+    /// vector.
+    ///
+    /// Edge cases:
+    /// *   Ties are broken by preferring Z faces over Y faces, and Y faces over X faces.
+    /// *   If all magnitudes are zero, the Z axis's sign is used. (Remember that floating-point
+    ///     numbers include distinct positive and negative zeroes).
+    /// *   If any coordinate is NaN, returns [`None`].
+    #[allow(unused)] // TODO: I expect to use this in block placement
+    fn from_snapped_vector(vector: FreeVector) -> Option<Self> {
+        let Vector3D { x, y, z, _unit } = vector;
+        if x.abs() > y.abs() && x.abs() > z.abs() {
+            match x.signum() as i8 {
+                -1 => Some(Face6::NX),
+                1 => Some(Face6::PX),
+                _ => unreachable!(), // condition rejects NaN
+            }
+        } else if y.abs() > z.abs() {
+            match y.signum() as i8 {
+                -1 => Some(Face6::NY),
+                1 => Some(Face6::PY),
+                _ => unreachable!(), // condition rejects NaN
+            }
+        } else if x.is_nan() || y.is_nan() || z.is_nan() {
+            None
+        } else {
+            match z.signum() as i8 {
+                -1 => Some(Face6::NZ),
+                1 => Some(Face6::PZ),
+                _ => unreachable!(), // already checked for NaN
+            }
         }
     }
 
@@ -830,6 +864,38 @@ impl Geometry for CubeFace {
 mod tests {
     use super::*;
     use alloc::vec::Vec;
+
+    #[test]
+    fn from_snapped_vector_roundtrip() {
+        for face in Face6::ALL {
+            let normal = face.normal_vector();
+            let snapped = Face6::from_snapped_vector(normal);
+            assert_eq!(Some(face), snapped, "from {normal:?}");
+        }
+    }
+
+    #[test]
+        #[rustfmt::skip]
+        fn from_snapped_vector_cases() {
+            for (face, vector, comment) in [
+                (Some(Face6::PZ), [0., 0., 0.], "zero tie, positive Z, positive other"),
+                (Some(Face6::PZ), [-0., -0., 0.], "zero tie, positive Z, negative other"),
+                (Some(Face6::NZ), [0., 0., -0.], "zero tie, negative Z, positive other"),
+                (Some(Face6::NZ), [-0., -0., -0.], "zero tie, negative Z, negative other"),
+
+                (Some(Face6::NZ), [-2., -3., -3.], "2-axis tie YZ, negative"),
+                (Some(Face6::NY), [-3., -3., -2.], "2-axis tie XY, negative"),
+                (Some(Face6::PZ), [2., 3., 3.], "2-axis tie YZ, positive"),
+                (Some(Face6::PY), [3., 3., 2.], "2-axis tie XY, positive"),
+    
+                (None, [f64::NAN, 1.0, 1.0], "NaN X"),
+                (None, [1.0, f64::NAN, 1.0], "NaN Y"),
+                (None, [1.0, 1.0, f64::NAN], "NaN Z"),
+            ] {
+                let vector = FreeVector::from(vector);
+                assert_eq!(face, Face6::from_snapped_vector(vector), "{comment}, {vector:?}");
+            }
+        }
 
     #[test]
     fn cross_6() {
