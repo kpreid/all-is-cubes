@@ -64,7 +64,7 @@ enum WallFeature {
     /// Blank wall.
     Blank,
     /// Opening to a corridor.
-    Passage { gate: bool },
+    Passage { gate: bool, blocked: bool },
     /// Window to the outside world.
     Window,
 }
@@ -119,6 +119,7 @@ impl DemoTheme {
         room_position: Cube,
         face: Face6,
         has_gate: bool,
+        blocked: bool,
     ) -> Result<(), InGenError> {
         let passage_axis = face.axis();
 
@@ -181,7 +182,9 @@ impl DemoTheme {
                 .unwrap()
                 .translate(face.opposite().normal_vector() * doorway_box.size()[face.axis()] / 2);
             let gate_side_1 = gate_box.abut(wall_parallel.opposite(), -1).unwrap();
-            let gate_side_2 = gate_box.abut(wall_parallel, -1).unwrap();
+            let gate_side_2 = gate_box
+                .abut(wall_parallel, if blocked { -2 } else { -1 })
+                .unwrap();
             space.fill_uniform(
                 gate_side_2,
                 &self.blocks[Gate].clone().rotate(rotate_nz_to_face),
@@ -191,6 +194,9 @@ impl DemoTheme {
                 &self.blocks[GatePocket].clone().rotate(rotate_nz_to_face),
             )?;
             // TODO: add opening/closing mechanism and make some of these outright blocked
+        } else if blocked {
+            // TODO: either implement this or change the schema so it can't happen
+            panic!("can't block gateless passage");
         }
 
         Ok(())
@@ -245,7 +251,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
         let wall_type = match room_data.maze_kind {
             MazeRoomKind::Start => Some(&start_wall),
             MazeRoomKind::Goal => Some(&goal_wall),
-            MazeRoomKind::Path => None,
+            MazeRoomKind::Path | MazeRoomKind::OffPath => None,
             MazeRoomKind::Unoccupied => unreachable!(),
         };
         let floor_layer = self
@@ -348,8 +354,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
             }
             1 => {
                 for face in [Face6::PX, Face6::PZ] {
-                    if let WallFeature::Passage { gate } = room_data.wall_features[face] {
-                        self.inside_doorway(space, map, room_position, face, gate)?;
+                    if let WallFeature::Passage { gate, blocked } = room_data.wall_features[face] {
+                        self.inside_doorway(space, map, room_position, face, gate, blocked)?;
                     }
                 }
 
@@ -467,7 +473,7 @@ pub(crate) async fn demo_dungeon(
             };
             // Floor pit
             let floor = if !corridor_only
-                && matches!(maze_room.kind, MazeRoomKind::Path)
+                && allow_obstacles_in_room(maze_room.kind)
                 && rng.gen_bool(0.25)
             {
                 extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::NY, 1));
@@ -484,10 +490,15 @@ pub(crate) async fn demo_dungeon(
                     let neighbor_in_bounds = maze.bounds().contains_cube(neighbor);
 
                     if maze_room.has_passage(face) {
+                        let gate = rng.gen_bool(0.25);
                         return WallFeature::Passage {
-                            // TODO: generate gates that are actual puzzles with keys
-                            // or that cut off dead end rooms
-                            gate: rng.gen_bool(0.25),
+                            gate,
+                            // TODO: generate gates that are actual puzzles with keys, rather than
+                            // only permanently open or shut
+                            blocked: gate
+                                && (maze_room.kind == MazeRoomKind::OffPath
+                                    || maze[neighbor].kind == MazeRoomKind::OffPath)
+                                && rng.gen_bool(0.5),
                         };
                     }
 
@@ -591,6 +602,14 @@ pub(crate) async fn demo_dungeon(
     light_progress.finish().await;
 
     Ok(space)
+}
+
+fn allow_obstacles_in_room(kind: MazeRoomKind) -> bool {
+    match kind {
+        MazeRoomKind::Start | MazeRoomKind::Goal => false,
+        MazeRoomKind::Path | MazeRoomKind::OffPath => true,
+        MazeRoomKind::Unoccupied => true,
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]

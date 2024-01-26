@@ -13,8 +13,10 @@ pub enum MazeRoomKind {
     Start,
     /// Room which is to be sought by the player.
     Goal,
-    /// A room that can be passed through.
+    /// A room that is on the path to the goal.
     Path,
+    /// A room that is not on the path to the goal.
+    OffPath,
     /// A room that is not connected to the maze; empty space.
     Unoccupied,
 }
@@ -119,7 +121,7 @@ fn generate_dead_ends(maze: &mut Maze, rng: &mut rand_xoshiro::Xoshiro256Plus) {
             }
             Some(dir) => {
                 checked_without_progress = 0;
-                maze[cube_to_fill].kind = MazeRoomKind::Path;
+                maze[cube_to_fill].kind = MazeRoomKind::OffPath;
                 open_passage(maze, cube_to_fill, dir);
             }
         }
