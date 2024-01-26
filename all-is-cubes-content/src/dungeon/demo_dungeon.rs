@@ -460,11 +460,14 @@ pub(crate) async fn demo_dungeon(
         let dungeon_map = GridArray::from_fn(expanded_bounds, |room_position| {
             let maze_room = maze.get(room_position)?;
 
-            if maze_room.kind == MazeRoomKind::Unoccupied {
-                return None;
-            }
+            // Allow rooms that are not start or end to have more interesting properties.
+            let is_not_end = match maze_room.kind {
+                MazeRoomKind::Unoccupied => return None,
+                MazeRoomKind::Start | MazeRoomKind::Goal => false,
+                MazeRoomKind::Path | MazeRoomKind::OffPath => true,
+            };
 
-            let corridor_only = rng.gen_bool(0.5);
+            let corridor_only = is_not_end && rng.gen_bool(0.5);
 
             let mut extended_bounds = GridAab::ORIGIN_CUBE;
             // Optional high ceiling
@@ -472,10 +475,7 @@ pub(crate) async fn demo_dungeon(
                 extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::PY, 1));
             };
             // Floor pit
-            let floor = if !corridor_only
-                && allow_obstacles_in_room(maze_room.kind)
-                && rng.gen_bool(0.25)
-            {
+            let floor = if !corridor_only && is_not_end && rng.gen_bool(0.25) {
                 extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::NY, 1));
                 *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
                     .choose(&mut rng)
@@ -529,6 +529,7 @@ pub(crate) async fn demo_dungeon(
                 lit: wall_features[Face6::PY] == WallFeature::Blank && rng.gen_bool(0.75),
                 grants_item: (matches!(floor, FloorKind::Solid)
                     && !corridor_only
+                    && is_not_end
                     && rng.gen_bool(0.5))
                 .then(|| {
                     // Random assortment of blocks to provide
@@ -602,14 +603,6 @@ pub(crate) async fn demo_dungeon(
     light_progress.finish().await;
 
     Ok(space)
-}
-
-fn allow_obstacles_in_room(kind: MazeRoomKind) -> bool {
-    match kind {
-        MazeRoomKind::Start | MazeRoomKind::Goal => false,
-        MazeRoomKind::Path | MazeRoomKind::OffPath => true,
-        MazeRoomKind::Unoccupied => true,
-    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
