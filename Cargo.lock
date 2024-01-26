@@ -3417,25 +3417,6 @@ checksum = "bc0287524726960e07b119cebd01678f852f147742ae0d925e6a520dca956126"
 
 [[package]]
 name = "naga"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae585df4b6514cf8842ac0f1ab4992edc975892704835b549cf818dc0191249e"
-dependencies = [
- "bit-set",
- "bitflags 2.4.1",
- "codespan-reporting",
- "hexf-parse",
- "indexmap",
- "log",
- "num-traits",
- "rustc-hash",
- "termcolor",
- "thiserror",
- "unicode-xid",
-]
-
-[[package]]
-name = "naga"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8878eb410fc90853da3908aebfe61d73d26d4437ef850b70050461f939509899"
@@ -4857,7 +4838,7 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 [[package]]
 name = "rend3"
 version = "0.3.0"
-source = "git+https://github.com/kpreid/rend3/?branch=wgpu19#2f3f06de2778dff02326bf9bdd59440a85c7bde5"
+source = "git+https://github.com/kpreid/rend3/?branch=wgpu19#407c9dd30f58d20ec00d4354b8f47e41e7d111a7"
 dependencies = [
  "arrayvec",
  "bimap",
@@ -4891,7 +4872,7 @@ dependencies = [
 [[package]]
 name = "rend3-gltf"
 version = "0.3.0"
-source = "git+https://github.com/kpreid/rend3/?branch=wgpu19#2f3f06de2778dff02326bf9bdd59440a85c7bde5"
+source = "git+https://github.com/kpreid/rend3/?branch=wgpu19#407c9dd30f58d20ec00d4354b8f47e41e7d111a7"
 dependencies = [
  "arrayvec",
  "base64 0.21.5",
@@ -4911,7 +4892,7 @@ dependencies = [
 [[package]]
 name = "rend3-routine"
 version = "0.3.0"
-source = "git+https://github.com/kpreid/rend3/?branch=wgpu19#2f3f06de2778dff02326bf9bdd59440a85c7bde5"
+source = "git+https://github.com/kpreid/rend3/?branch=wgpu19#407c9dd30f58d20ec00d4354b8f47e41e7d111a7"
 dependencies = [
  "arrayvec",
  "bitflags 2.4.1",
@@ -4921,7 +4902,7 @@ dependencies = [
  "flume",
  "glam",
  "log",
- "naga 0.14.2",
+ "naga",
  "ordered-float",
  "parking_lot",
  "profiling",
@@ -4936,7 +4917,7 @@ dependencies = [
 [[package]]
 name = "rend3-types"
 version = "0.3.0"
-source = "git+https://github.com/kpreid/rend3/?branch=wgpu19#2f3f06de2778dff02326bf9bdd59440a85c7bde5"
+source = "git+https://github.com/kpreid/rend3/?branch=wgpu19#407c9dd30f58d20ec00d4354b8f47e41e7d111a7"
 dependencies = [
  "bitflags 2.4.1",
  "bytemuck",
@@ -6360,7 +6341,7 @@ dependencies = [
  "cfg_aliases",
  "js-sys",
  "log",
- "naga 0.19.0",
+ "naga",
  "parking_lot",
  "profiling",
  "raw-window-handle 0.6.0",
@@ -6387,7 +6368,7 @@ dependencies = [
  "codespan-reporting",
  "indexmap",
  "log",
- "naga 0.19.0",
+ "naga",
  "once_cell",
  "parking_lot",
  "profiling",
@@ -6427,7 +6408,7 @@ dependencies = [
  "libloading 0.8.1",
  "log",
  "metal",
- "naga 0.19.0",
+ "naga",
  "objc",
  "once_cell",
  "parking_lot",
