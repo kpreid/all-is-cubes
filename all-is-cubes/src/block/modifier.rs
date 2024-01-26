@@ -100,7 +100,14 @@ impl Modifier {
                     value
                 } else {
                     block::Budget::decrement_voxels(&filter.budget, value.voxels.count())?;
-                    // TODO: Add a shuffle-in-place rotation operation to Vol and try implementing this using that, which should have less arithmetic involved than these matrix ops
+
+                    // It'd be nice if this rotation operation were in-place, but I've read that
+                    // it's actually quite difficult to implement a 3D array rotation in-place.
+                    // (But another possible improvement would be to have a spare buffer to reuse
+                    // across multiple evaluations/steps.)
+                    // TODO: But check if we can make the arithmetic simpler by using incrementing
+                    // instead of running a general transform on every Cube.
+
                     let resolution = value.resolution();
                     let inner_to_outer = rotation.to_positive_octant_transform(resolution.into());
                     let outer_to_inner = rotation
