@@ -5,11 +5,14 @@ All is Cubes is a “voxel game” where each block is made out of smaller block
 
 This particular package provides routines for data import and export between All is Cubes’ types and other data formats. It depends on [the core library crate `all-is-cubes`][all-is-cubes]. Currently supported formats:
 
-* MagicaVoxel `.vox` voxel scene files (import only)
+* All is Cubes native JSON data files
+* MagicaVoxel `.vox` voxel scene files
 * [glTF 2.0] (export only)
+* [STL] (export only)
 
 [glTF 2.0]: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
 [all-is-cubes]: https://crates.io/crates/all-is-cubes
+[STL]: <https://en.wikipedia.org/wiki/STL_(file_format)>
 
 License
 -------

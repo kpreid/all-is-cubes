@@ -5,7 +5,11 @@ A “voxel game” where each block is made out of smaller blocks (one level of 
 
 This is a work in progress; it's my very first project written in Rust, and I am aiming to duplicate and expand on my previous work [Cubes](https://github.com/kpreid/cubes/). For more information about the currently implemented functionality, see the [core library crate `all-is-cubes`.][all-is-cubes]
 
-This crate is the “desktop edition” that you can build and run to “play the game” on your own computer, as much as there is one right now (you can only admire the scenery, and place and remove blocks). You can also consider running the [web version][all-is-cubes-server].
+This package is the “desktop edition” that you can build and run to “play the game” on your own computer, as much as there is one right now (you can only admire the scenery, and place and remove blocks). You can also consider running the [web version][all-is-cubes-server].
+
+This package includes a library crate, but it is not yet a good general-purpose library.
+it currently only exists as a library so that additional development tools can reuse the same UI code.
+Use at your own risk. Documentation is lacking.
 
 [all-is-cubes]: https://crates.io/crates/all-is-cubes
 [all-is-cubes-server]: https://crates.io/crates/all-is-cubes-server
