@@ -8,6 +8,10 @@
 //! * The algorithms always generate triangles with counterclockwise winding order.
 //! * The generated meshes are designed for rendering and not for purposes which require
 //!   “watertight” meshes such as 3D printing systems.
+//! * The generated meshes are in the “blocky” style (have the appearance of being made of
+//!   axis-aligned cubes) rather than attempting to present a smooth surface (as would be
+//!   produced by, for example, the marching cubes algorithm); this is consistent with the
+//!   approach used by [`all_is_cubes`] as a whole.
 //!
 //! # Getting started
 //!
