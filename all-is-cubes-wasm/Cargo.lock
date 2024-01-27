@@ -101,7 +101,7 @@ dependencies = [
  "thiserror",
  "wasm-bindgen-futures",
  "web-sys",
- "web-time",
+ "web-time 1.0.0",
  "wgpu",
 ]
 
@@ -181,7 +181,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "web-sys",
- "web-time",
+ "web-time 1.0.0",
  "wgpu",
  "yield-progress",
 ]
@@ -1910,6 +1910,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "web-time"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ee269d72cc29bf77a2c4bc689cc750fb39f5cbd493d2205bbb3f5c7779cf7b0"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "wgpu"
 version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2154,7 +2164,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47617d3de0d5d22d008ea6abb7561db939c3a352a4bd6a5d831d5f6721e689f2"
 dependencies = [
  "log",
- "web-time",
+ "web-time 0.2.4",
 ]
 
 [[package]]

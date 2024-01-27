@@ -178,7 +178,7 @@ dependencies = [
  "tokio",
  "wasm-bindgen-futures",
  "web-sys",
- "web-time",
+ "web-time 1.0.0",
  "wgpu",
 ]
 
@@ -4532,7 +4532,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "web-time",
+ "web-time 0.2.3",
 ]
 
 [[package]]
@@ -4570,7 +4570,7 @@ dependencies = [
  "time",
  "typenum",
  "uuid",
- "web-time",
+ "web-time 0.2.3",
 ]
 
 [[package]]
@@ -4593,7 +4593,7 @@ dependencies = [
  "smallvec",
  "sysinfo",
  "wasm-bindgen",
- "web-time",
+ "web-time 0.2.3",
 ]
 
 [[package]]
@@ -4646,7 +4646,7 @@ dependencies = [
  "crossbeam",
  "parking_lot",
  "re_tracing",
- "web-time",
+ "web-time 0.2.3",
 ]
 
 [[package]]
@@ -4684,7 +4684,7 @@ dependencies = [
  "getrandom 0.2.11",
  "once_cell",
  "serde",
- "web-time",
+ "web-time 0.2.3",
 ]
 
 [[package]]
@@ -6325,6 +6325,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "web-time"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ee269d72cc29bf77a2c4bc689cc750fb39f5cbd493d2205bbb3f5c7779cf7b0"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "webpki-roots"
 version = "0.25.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6752,7 +6762,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "web-time",
+ "web-time 0.2.3",
  "windows-sys 0.48.0",
  "x11-dl",
  "x11rb",
@@ -6915,7 +6925,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47617d3de0d5d22d008ea6abb7561db939c3a352a4bd6a5d831d5f6721e689f2"
 dependencies = [
  "log",
- "web-time",
+ "web-time 0.2.3",
 ]
 
 [[package]]

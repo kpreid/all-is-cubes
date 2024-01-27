@@ -47,7 +47,7 @@ rand = { version = "0.8.3", default-features = false, features = ["std", "std_rn
 send_wrapper = "0.6.0"
 wasm-bindgen = "0.2.90"
 wasm-bindgen-futures = "0.4.40"
-web-time = { version = "0.2.3" }
+web-time = { version = "1.0.0" }
 wgpu = { version = "0.19.1", default-features = false, features = ["webgl"] }
 # Feature enabling
 yield-progress = { version = "0.1.5", features = ["log_hiccups"] }
