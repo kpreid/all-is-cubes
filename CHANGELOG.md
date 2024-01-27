@@ -1,7 +1,5 @@
 # Changelog
 
-## Unreleased
-
 ## 0.7.1 (2024-01-27)
 
 - `all-is-cubes` library:
