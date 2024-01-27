@@ -1,6 +1,6 @@
 [package]
 name = "all-is-cubes-content"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2021"
 rust-version = "1.65"
@@ -26,8 +26,8 @@ harness = false
 arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary"]
 
 [dependencies]
-all-is-cubes = { path = "../all-is-cubes", version = "0.6.0" }
-all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.6.0" }
+all-is-cubes = { path = "../all-is-cubes", version = "0.7.0" }
+all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.7.0" }
 arbitrary = { workspace = true, optional = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }

@@ -14,9 +14,9 @@ please consult [the crate documentation].
 
 This library is intended to be somewhat reusable for working with block/voxel data, but it does not currently have a particularly stable interface as I am still changing it as requirements are discovered.
 
-[the crate documentation]: https://docs.rs/all-is-cubes/0.6.0/all_is_cubes/
-[Blocks]: https://docs.rs/all-is-cubes/0.6.0/all_is_cubes/block/enum.Block.html
-[Spaces]: https://docs.rs/all-is-cubes/0.6.0/all_is_cubes/space/struct.Space.html
+[the crate documentation]: https://docs.rs/all-is-cubes/0.7.0/all_is_cubes/
+[Blocks]: https://docs.rs/all-is-cubes/0.7.0/all_is_cubes/block/enum.Block.html
+[Spaces]: https://docs.rs/all-is-cubes/0.7.0/all_is_cubes/space/struct.Space.html
 [embedded-graphics]: https://crates.io/crates/embedded-graphics
 
 Related crates

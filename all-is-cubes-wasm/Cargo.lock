@@ -23,7 +23,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "arcstr",
  "base64",
@@ -59,7 +59,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-content"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-ui",
@@ -79,7 +79,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-gpu"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-mesh",
@@ -107,7 +107,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-mesh"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "all-is-cubes",
  "bitflags 2.4.2",
@@ -124,7 +124,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-port"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-mesh",
@@ -145,7 +145,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-ui"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "all-is-cubes",
  "displaydoc",
@@ -159,7 +159,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-wasm"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-content",

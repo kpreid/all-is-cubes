@@ -1,6 +1,6 @@
 [package]
 name = "all-is-cubes"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2021"
 rust-version = "1.73"
