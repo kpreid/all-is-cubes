@@ -2,7 +2,12 @@
 
 ## Unreleased
 
-## 0.7.0 (2024-01-26)
+## 0.7.1 (2024-01-27)
+
+- `all-is-cubes` library:
+    - Fixed compilation error in the case where the `save` feature is enabled (and no other crate is enabling `serde/alloc`).
+
+## 0.7.0 (2024-01-27)
 
 ### Added
 
