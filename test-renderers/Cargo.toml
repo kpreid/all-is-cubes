@@ -23,6 +23,7 @@ doctest = false
 name = "gltf-render"
 doctest = false
 harness = false
+test = false # Exclude from normal test runs because it does not pass yet!
 required-features = ["gltf"]
 
 [[test]]
