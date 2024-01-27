@@ -4,30 +4,58 @@
 
 ### Added
 
+- Functionality:
+    - Sound effects for character/world collisions.
+
+- Graphics:
+    - Improved initial startup behavior of mesh generation; chunks will be filled in sooner but lacking detail.
+    - Windowed raytracing mode now uses background threads for increased throughput.
+
 - `all-is-cubes` library:
-    - `block::Primitive::Text` allows displaying text as part of a block, without having to separately draw the text as blocks first.
+    - Now `no_std` compatible (with caveats), if the `std` feature is disabled.
 
-    - `block::BlockAttributes::tick_action` can now specify a time period rather than always occurring on the next tick.
+    - New variant `block::Primitive::Text` allows displaying text as part of a block, without having to separately draw the text as blocks first.
 
-    - `linking::Provider` is `BlockProvider` but generalized to non-block types.
+    - Expanded `block::BlockAttributes::tick_action` can now specify a time period rather than always occurring on the next tick.
 
-    - `math::Axis` is an enum of coordinate axes.
+    - New `block::CompositeOperator` variants `Atop` and `Out`, as per the standard Porter-Duff compositing operators.
 
-    - `math::Cube` represents a unit cube on the grid; it replaces many previous uses of `GridPoint` to identify cubes.
+    - New field `block::EvaluatedBlock::face_colors` provides colors which may be distinct for each face of the block. These colors may be used for low-detail rendering.
 
-    - `math::Gridgid` represents rigid transformations, a useful subset of what `GridMatrix` already could do.
+    - New method `Camera::near_plane_distance()` returns the (currently hard-coded) near plane distance used in the calculated projection matrix.
+
+    - New type `linking::Provider` is `BlockProvider` but generalized to non-block types.
+
+    - New type `math::Axis` is an enum of coordinate axes.
+
+    - New type `math::Cube` represents a unit cube on the grid; it replaces many previous uses of `GridPoint` to identify cubes.
+
+    - New constructor function `math::GridAab::from_ranges()` can make it more convenient to construct `GridAab`s where different axes are handled differently.
+    - New method `math::GridAab::volume_f64()` returns the volume as a float, for calculations where volume is a scaling factor.
+
+    - New type `math::Gridgid` represents rigid transformations (including reflection), a useful subset of what `GridMatrix` already could do.
 
         The following new functions return `Gridgid`:
         
         - `math::Face6::face_transform()`
         - `math::GridRotation::to_positive_octant_transform()`
     
-    - `math::Vol` is a more general replacement for `math::GridArray` which allows choice of the data container type (including `&[T]` for borrowing without additional indirection), and also a replacement for uses of `math::GridAab` which care about volume and linearization.
+    - New type `math::Vol` is a more general replacement for `math::GridArray` which allows choice of the data container type (including `&[T]` for borrowing without additional indirection), and also a replacement for uses of `math::GridAab` which care about volume and linearization.
 
-    - `universe::UniverseTransaction::insert_anonymous()` has the same function as the same-named method on `Universe`, but does not require having an `&mut Universe` on hand.
+    - New type `op::Operation` describes local transformations of a `Space` and an interacting agent with an inventory.
+      It is now the type for specifying `BlockAttributes::tick_action` effects, and in the future will be used by `Tool`s as well.
+
+    - `universe::UniverseTransaction::insert_anonymous()` and `universe::UniverseTransaction::insert_mut()` allow conveniently building transactions that insert multiple members without needing `merge()`s. Such transactions allow building universe content without passing around a `&mut Universe`.
+
+- Demo content and `all-is-cubes-content` library:
+    - The `atrium` scene now includes more elements.
+
+- The `all-is-cubes-desktop` package now contains a library, which in principle can be used to create applications with different behavior than the included binary (such as creating and displaying a universe from some data source other than files and the provided templates). However, it does not yet have a well-designed API.
 
 - `all-is-cubes-ui` library:
+    - The UI optionally presents a “Quit” button, if configured via the `SessionBuilder`.
     - New type `vui::widgets::ButtonLabel` allows giving `ActionButton` and `ToggleButton` text labels in addition to or instead of icons.
+    - New function `Session::set_character()` allows changing the player character without also changing the universe.
     - New function `vui::leaf_widget()` allows easier, less type-error-prone construction of `WidgetTree`s.
       It should generally be used in place of `LayoutTree::leaf()`.
 
@@ -38,6 +66,7 @@
         - Light emission is now a property of `Atom` blocks instead of `BlockAttributes`.
         - `EvaluatedBlock`’s `color` field is computed more accurately, ignoring voxels hidden by other voxels.
         - `BlockAttributes::tick_action` is now a dedicated `TickAction` type instead of `VoxelBrush`.
+        - `BlockDef` now caches evaluation of its contained block. The cache is updated during `Universe::step()`.
 
     - All vector and matrix types from the library `cgmath` have been replaced with the library `euclid`.
 
@@ -49,6 +78,8 @@
     - `space::SpaceChange` now includes block indices, not just positions, in cube changes;
       and all variants have been renamed for clarity.
 
+    - `space::SpaceTransaction` now exposes its components as individual `CubeTransaction`s, which can be mutated using `SpaceTransaction::at()`.
+
     - In block names and universe member names, `Cow<'static, str>` and `Arc<str>` have been replaced with `arcstr::ArcStr`.
       This type allows both refcounting and static literal strings.
 
@@ -58,9 +89,15 @@
         - `space::Space::draw_target()`
         - `space::SpaceTransaction::draw_target()`
 
+    - The trait method `Behavior::step()` now must return a value of type `behavior::Then`, which specifies when the behavior should next be stepped.
+
     - `block::BlockBuilder::voxels_fn()` no longer takes a `&mut Universe` parameter.
       Instead, either the universe or a transaction must be supplied through a call to `.build_into()` or `.build_txn()`.
 
+    - `block::EvalBlockError::StackOverflow` has been replaced with `block::EvalBlockError::BudgetExceeded`,
+      which reflects a new, better-fitting block evaluation limit system.
+
+    - `math::GridAab::volume()` now returns `Option<usize>`, in preparation for a future change where `GridAab` will not have a limit on volume.
     - `math::GridArray` is now `math::Vol` and allows choice of the data container type.
 
     - `camera::HeadlessRenderer` now returns a custom image container type `Rendering` instead of using `image::RgbaImage`.
@@ -76,21 +113,39 @@
       reexported at `all_is_cubes::util::manyfmt`.
       The `CustomFormat` trait is now split into two traits, `Fmt` (for implementing) and `Refmt` (extension).
 
+- `all-is-cubes-gpu` library:
+    - Block textures are now fully dynamically allocated; it is no longer possible to run out of texture space.
+
 - `all-is-cubes-mesh` library:
     - The new trait `MeshTypes` is now used to combine declaration of vertex and texture types.
       `BlockMesh`, `SpaceMesh`, `ChunkedSpaceMesh`, and `GetBlockMesh` all have a single `M: MeshTypes` parameter in place of multiple generics.
-    - Texture writes are now given data using `Vol<&[Evoxel]>` rather than pre-converted sRGB data;
-      it is up to the texture implementation to convert and shuffle data as needed.
-    - Renamed `TextureAllocator` to `texture::Allocator`.
-    - Renamed `TextureTile` to `texture::Tile`.
-    - Renamed `NoTexture` to `texture::NoTexture`.
-    - Renamed `NoTextures` to `texture::NoTextures`.
+
+    - Major changes to texturing:
+        - It is now possible for texture allocator implementations to use purely 2D texturing; `Tile`s are now subdivided into `Plane`s before usage, and each plane may provide its own texture coordinates independent of other planes in the volume.
+        - Texture allocators may opt out of supporting multiple writes, and have only immutable allocations.
+
+        - Texture allocators are expected to be able to store emissive color in addition to reflectance.
+          The new type `texture::Channels` communicates which properties each allocation must actually store,
+          so that allocators can conserve memory when it is not necessary.
+
+        - Texture writes are now given data using `Vol<&[Evoxel]>` rather than pre-converted sRGB data;
+        it is up to the texture implementation to convert and shuffle data as needed.
+
+        - Trait method `GetBlockMesh::get_block_mesh()` takes additional arguments which support instanced rendering of blocks. (They are not yet used.)
+
+        - Renamed `TextureAllocator` to `texture::Allocator`.
+        - Renamed `TextureTile` to `texture::Tile`.
+        - Renamed `NoTexture` to `texture::NoTexture`.
+        - Renamed `NoTextures` to `texture::NoTextures`.
 
 ### Removed
 
 - `all-is-cubes` library:
+    - No longer depends on the `instant` library; WebAssembly builds do not need to depend on it to set its features.
     - `block::BlockBuilder::into_named_definition()` no longer exists.
       Instead, create the `BlockDef` separately after using the builder.
+    - `block::BlockDef` no longer implements `Deref<Target = Block>`.
+      Instead, call `BlockDef::block()` when needed.
     - `math::Aab::from_cube()` no longer exists. Use `Cube::aab()` instead.
     - `math::Face7::matrix()` no longer exists. Use `Face6::face_transform()` instead.
     - `math::GridAab::contains_cube()` no longer accepts `impl Into<GridPoint>`.
@@ -99,11 +154,21 @@
     - `math::GridRotation::to_positive_octant_matrix()` no longer exists. Use `to_positive_octant_transform()` instead.
     - `math::cube_to_midpoint()` no longer exists. Use `Cube::midpoint()` instead.
     - `math::point_to_enclosing_cube()` no longer exists. Use `Cube::containing()` instead.
+    - `space::SpaceTransaction::set_overwrite()` no longer exists. Use `transaction.at(cube).overwrite(block)` instead.
 
 - `all-is-cubes-mesh` library:
+    - No longer depends on the `instant` library; WebAssembly builds do not need to depend on it to set its features.
     - `TextureCoordinate` type alias no longer exists.
       Its only use was when implementing `TextureTile`; simply use `f32` instead.
     - `Texel` type alias no longer exists; callers are free to choose their own texel data type.
+
+### Performance improvements
+
+- Block voxel data is kept to smaller bounds where possible:
+    - `BlockBuilder::voxels_fn()` trims empty space surrounding the produced voxels.
+    - `all_is_cubes::block::Modifier::Composite` produces voxel data bounds that are the union or intersection of the inputs, as appropriate, rather than a full block.
+- Various tweaks to reduce the size of compiled code.
+
 
 ## 0.6.0 (2023-07-29)
 
