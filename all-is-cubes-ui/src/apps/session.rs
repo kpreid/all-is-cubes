@@ -9,7 +9,7 @@ use futures_core::future::BoxFuture;
 use futures_task::noop_waker_ref;
 
 use all_is_cubes::arcstr::{self, ArcStr};
-use all_is_cubes::camera::{GraphicsOptions, StandardCameras, UiViewState, Viewport};
+use all_is_cubes::camera::{GraphicsOptions, Layers, StandardCameras, UiViewState, Viewport};
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::inv::ToolError;
@@ -354,12 +354,18 @@ impl<I: time::Instant> Session<I> {
                 // TODO(time-budget): better timing policy that explicitly trades off with time spent
                 // on rendering, event handling, etc.
                 // (That policy should probably live in `frame_clock`.)
-                let deadline = time::Deadline::At(I::now() + game_tick.delta_t() / 4);
+                // TODO(time-budget): give UI a time that reflects how much time it needs, rather
+                // than arbitrarily partitioning the delta_t
+                let step_start_time = I::now();
+                let dt = game_tick.delta_t();
+                let deadlines = Layers {
+                    world: time::Deadline::At(step_start_time + dt / 2),
+                    ui: time::Deadline::At(step_start_time + dt / 2 + dt / 4),
+                };
 
-                // TODO(time-budget): give UI a minimum fraction of budget
-                let mut info = self.game_universe.step(paused, deadline);
+                let mut info = self.game_universe.step(paused, deadlines.world);
                 if let Some(ui) = &mut self.ui {
-                    info += ui.step(ui_tick, deadline);
+                    info += ui.step(ui_tick, deadlines.ui);
                 }
 
                 if LOG_FIRST_FRAMES && self.tick_counter_for_logging <= 10 {
