@@ -23,6 +23,9 @@ impl mesh::MeshTypes for Mt {
 }
 impl mesh::dynamic::DynamicMeshTypes for Mt {
     type RenderData = Option<DroppingMesh>;
+
+    // Instances are not supported by Rerun, so we should not generate them.
+    const MINIMUM_INSTANCE_INDEX_COUNT: usize = usize::MAX;
 }
 
 const CHUNK_SIZE: GridCoordinate = 32;

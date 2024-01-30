@@ -234,10 +234,12 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
     {
         let mut instance_data: (crate::MeshMeta<M>, M::RenderData) = Default::default();
 
-        // TODO(instancing): Once we support actually updating and rendering instances, set this
-        // to either true or should_use_instances(&mesh).
-        if false {
-            // TODO: wasteful data copy to make the SpaceMesh
+        // TODO(instancing): Eventually, we'll want to use instances for all blocks under some
+        // circumstances (e.g. a placed block in an existing chunk mesh). For now, though, we make
+        // instance mesh generation conditional on whether it will ever be used.
+        if should_use_instances(&mesh) {
+            // TODO: wasteful data copy to make the SpaceMesh. Consider arranging so that it is
+            // merely a sort of borrowing to present a `BlockMesh` as a `RenderDataUpdate`'s mesh.`
             let space_mesh = SpaceMesh::from(&mesh);
 
             render_data_updater(super::RenderDataUpdate {
@@ -272,9 +274,9 @@ pub(crate) enum BlockMeshVersion {
 }
 
 pub(crate) fn should_use_instances<M: DynamicMeshTypes>(block_mesh: &BlockMesh<M>) -> bool {
-    // TODO(instancing): Enable this and then tune this value, once instance rendering works.
-    // block_mesh.count_indices() > 400
-    let _ = block_mesh;
-
-    false
+    // TODO(instancing): Remove the restriction to only nontransparent meshes when (if) rendering transparent instances is supported.
+    block_mesh.count_indices() >= M::MINIMUM_INSTANCE_INDEX_COUNT
+        && block_mesh
+            .all_face_meshes()
+            .all(|(_, fm)| fm.indices_transparent.len() == 0)
 }

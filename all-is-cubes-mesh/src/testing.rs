@@ -25,6 +25,9 @@ impl MeshTypes for NoTextureMt {
 
 impl DynamicMeshTypes for NoTextureMt {
     type RenderData = ();
+
+    // TODO(instancing): add tests that involve instances, at which point we'll need to change this
+    const MINIMUM_INSTANCE_INDEX_COUNT: usize = usize::MAX;
 }
 
 #[derive(Debug)]
@@ -39,6 +42,9 @@ impl MeshTypes for TextureMt {
 
 impl DynamicMeshTypes for TextureMt {
     type RenderData = ();
+
+    // TODO(instancing): add tests that involve instances, at which point we'll need to change this
+    const MINIMUM_INSTANCE_INDEX_COUNT: usize = usize::MAX;
 }
 
 /// Test helper to call [`block_meshes_for_space`] followed directly by [`SpaceMesh::new`].

@@ -43,6 +43,11 @@ pub trait DynamicMeshTypes: MeshTypes {
     // /// Cube side-length at which to group blocks into chunks (single meshes).
     // const CHUNK_SIZE: GridCoordinate;
     // but it is useless because trait associated constants cannot yet be used in const generics.
+
+    /// Controls whether instanced block meshes are used, by specifying the minimum number of
+    /// indices in the block mesh at which instances will be used instead of combining the block
+    /// meshes into chunk meshes.
+    const MINIMUM_INSTANCE_INDEX_COUNT: usize;
 }
 
 // TODO: this probably wants to be a custom, opaque data structure

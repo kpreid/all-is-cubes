@@ -27,6 +27,9 @@ impl MeshTypes for RecordGltfMt {
 }
 impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for RecordGltfMt {
     type RenderData = MeshIndexCell;
+
+    // TODO(instancing): Implement instance rendering and set this appropriately.
+    const MINIMUM_INSTANCE_INDEX_COUNT: usize = usize::MAX;
 }
 
 #[derive(Debug)]

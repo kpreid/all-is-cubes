@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `all-is-cubes-mesh` library:
+    - Blocks in a `dynamic::ChunkedSpaceMesh` may now be rendered via instancing. `dynamic::DynamicMeshTypes::MINIMUM_INSTANCE_INDEX_COUNT` controls whether this is done.
+
 ## 0.7.1 (2024-01-27)
 
 - `all-is-cubes` library:
