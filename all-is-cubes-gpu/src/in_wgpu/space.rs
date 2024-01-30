@@ -377,8 +377,10 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
             return Ok(SpaceDrawInfo {
                 draw_init_time: Duration::ZERO,
-                draw_opaque_time: Duration::ZERO,
+                draw_opaque_chunks_time: Duration::ZERO,
+                draw_opaque_blocks_time: Duration::ZERO,
                 draw_transparent_time: Duration::ZERO,
+                finalize_time: Duration::ZERO,
                 squares_drawn: 0,
                 chunks_drawn: 0,
                 blocks_drawn: 0,
@@ -441,7 +443,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         }
 
         // Opaque geometry first, in front-to-back order
-        let start_opaque_draw_time = I::now();
+        let start_opaque_chunk_draw_time = I::now();
         let mut chunks_drawn = 0;
         let mut blocks_drawn = 0;
         let mut squares_drawn = 0;
@@ -468,6 +470,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         //
         // TODO(instancing): This is inefficient since we don't reuse instance buffer data across frames.
         // TODO(instancing): Render transparent pass too. (For now we avoid making transparent instances.)
+        let start_opaque_instance_draw_time = I::now();
         for (&block_index, cubes) in csm.block_instances() {
             // Set buffers for the mesh
             let Some((mesh_meta, Some(buffers))) = csm.get_render_data_for_block(block_index)
@@ -513,6 +516,11 @@ impl<I: time::Instant> SpaceRenderer<I> {
             }
         }
 
+        let start_drop_pass_time = I::now();
+
+        // measure its time now
+        drop(render_pass);
+
         if let Some(buffer) = self.instance_buffer.get() {
             queue.write_buffer(
                 buffer,
@@ -527,10 +535,14 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let end_time = I::now();
 
         Ok(SpaceDrawInfo {
-            draw_init_time: start_opaque_draw_time.saturating_duration_since(start_time),
-            draw_opaque_time: start_draw_transparent_time
-                .saturating_duration_since(start_opaque_draw_time),
-            draw_transparent_time: end_time.saturating_duration_since(start_draw_transparent_time),
+            draw_init_time: start_opaque_chunk_draw_time.saturating_duration_since(start_time),
+            draw_opaque_chunks_time: start_opaque_instance_draw_time
+                .saturating_duration_since(start_opaque_chunk_draw_time),
+            draw_opaque_blocks_time: start_draw_transparent_time
+                .saturating_duration_since(start_opaque_instance_draw_time),
+            draw_transparent_time: start_drop_pass_time
+                .saturating_duration_since(start_draw_transparent_time),
+            finalize_time: end_time.saturating_duration_since(start_drop_pass_time),
             squares_drawn,
             chunks_drawn,
             blocks_drawn,

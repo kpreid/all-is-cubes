@@ -238,10 +238,15 @@ pub struct SpaceDrawInfo {
     pub(crate) draw_init_time: Duration,
     /// Time taken to draw chunks' opaque geometry
     /// (and determine if they are visible to be drawn).
-    pub(crate) draw_opaque_time: Duration,
+    pub(crate) draw_opaque_chunks_time: Duration,
+    /// Time taken to draw instanced blocks' opaque geometry.
+    pub(crate) draw_opaque_blocks_time: Duration,
     /// Time taken to draw chunks' transparent geometry
     /// (and determine if they are visible to be drawn).
     pub(crate) draw_transparent_time: Duration,
+    /// Time taken to finish rendering (currently this means dropping the render pass and writing
+    /// the instance buffer).
+    pub(crate) finalize_time: Duration,
 
     /// Number of chunk meshes drawn.
     pub(crate) chunks_drawn: usize,
@@ -258,8 +263,10 @@ impl Fmt<StatusText> for SpaceDrawInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
         let &SpaceDrawInfo {
             draw_init_time,
-            draw_opaque_time,
+            draw_opaque_chunks_time,
+            draw_opaque_blocks_time,
             draw_transparent_time,
+            finalize_time,
             chunks_drawn,
             blocks_drawn,
             squares_drawn,
@@ -267,12 +274,18 @@ impl Fmt<StatusText> for SpaceDrawInfo {
         } = self;
 
         let draw_init_time = draw_init_time.refmt(fopt);
-        let draw_opaque_time = draw_opaque_time.refmt(fopt);
+        let draw_opaque_chunks_time = draw_opaque_chunks_time.refmt(fopt);
+        let draw_opaque_blocks_time = draw_opaque_blocks_time.refmt(fopt);
         let draw_transparent_time = draw_transparent_time.refmt(fopt);
+        let finalize_time = finalize_time.refmt(fopt);
 
         writeln!(
             fmt,
-            "Draw init: {draw_init_time}  opaque: {draw_opaque_time}  transparent: {draw_transparent_time}",
+            "Draw init: {draw_init_time}  \
+            opaque chunks: {draw_opaque_chunks_time}  \
+            opaque blocks: {draw_opaque_blocks_time}  \
+            transparent chunks: {draw_transparent_time}  \
+            finalize: {finalize_time}",
         )?;
         writeln!(
             fmt,
