@@ -1,11 +1,11 @@
 use core::fmt;
 
 use all_is_cubes::chunking::ChunkPos;
-use all_is_cubes::math::{Aab, Geometry, GridCoordinate, LineVertex};
+use all_is_cubes::math::{Aab, Cube, Geometry, GridCoordinate, LineVertex};
 use all_is_cubes::space::{BlockIndex, Space};
 
 use crate::dynamic::{self, DynamicMeshTypes};
-use crate::{MeshOptions, SpaceMesh, VPos};
+use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh, VPos};
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
@@ -16,6 +16,9 @@ pub struct ChunkMesh<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> {
     pub(super) position: ChunkPos<CHUNK_SIZE>,
     mesh: SpaceMesh<M>,
     block_dependencies: Vec<(BlockIndex, dynamic::BlockMeshVersion)>,
+
+    /// Blocks to be rendered as instances rather than part of the main mesh.
+    pub(super) block_instances: dynamic::InstanceMap,
 
     /// Per-chunk data the owner of the [`ChunkedSpaceMesh`]
     /// may use for whatever purpose suits it, such as handles to GPU buffers.
@@ -37,12 +40,14 @@ where
             position,
             mesh,
             block_dependencies,
+            block_instances,
             render_data,
             update_debug,
         } = self;
         *position == other.position
             && *mesh == other.mesh
             && *block_dependencies == other.block_dependencies
+            && *block_instances == other.block_instances
             && *render_data == other.render_data
             && *update_debug == other.update_debug
     }
@@ -56,6 +61,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> fmt::Debug
             position,
             mesh,
             block_dependencies,
+            block_instances,
             render_data,
             update_debug,
         } = self;
@@ -63,6 +69,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> fmt::Debug
             .field("position", &position)
             .field("mesh", &mesh)
             .field("block_dependencies", &block_dependencies)
+            .field("block_instances", &block_instances)
             .field("render_data", &render_data)
             .field("update_debug", &update_debug)
             .finish()
@@ -76,6 +83,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
             mesh: SpaceMesh::default(),
             render_data: Default::default(),
             block_dependencies: Vec::new(),
+            block_instances: Default::default(),
             update_debug: false,
         }
     }
@@ -113,7 +121,17 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     ) {
         // let compute_start: Option<I> = dynamic::LOG_CHUNK_UPDATES.then(Instant::now);
         let bounds = self.position.bounds();
-        self.mesh.compute(space, bounds, options, block_meshes);
+
+        self.block_instances.clear();
+        self.mesh.compute(
+            space,
+            bounds,
+            options,
+            InstanceTrackingBlockMeshSource {
+                block_meshes,
+                instances: &mut self.block_instances,
+            },
+        );
 
         // Logging
         // TODO: This logging code has been disabled to avoid`std::time::Instant
@@ -189,6 +207,26 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
             // Additional border that wiggles when updates happen.
             aab.expand(if self.update_debug { -0.05 } else { -0.02 })
                 .wireframe_points(output)
+        }
+    }
+}
+
+struct InstanceTrackingBlockMeshSource<'a, M: DynamicMeshTypes> {
+    block_meshes: &'a dynamic::VersionedBlockMeshes<M>,
+    instances: &'a mut dynamic::InstanceMap,
+}
+
+impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for InstanceTrackingBlockMeshSource<'a, M> {
+    fn get_block_mesh(&mut self, index: BlockIndex, cube: Cube, primary: bool) -> &'a BlockMesh<M> {
+        let mesh = self.block_meshes.get_block_mesh(index, cube, false);
+
+        if dynamic::blocks::should_use_instances(mesh) {
+            if primary {
+                self.instances.entry(index).or_default().insert(cube);
+            }
+            BlockMesh::<M>::EMPTY_REF
+        } else {
+            mesh
         }
     }
 }

@@ -198,20 +198,12 @@ impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for &'a VersionedBlockMeshes<M
         &mut self,
         index: BlockIndex,
         _cube: Cube,
-        primary: bool,
+        _primary: bool,
     ) -> &'a BlockMesh<M> {
-        let Some(mesh) = self.meshes.get(usize::from(index)).map(|vbm| &vbm.mesh) else {
-            return BlockMesh::<M>::EMPTY_REF;
-        };
-
-        if should_use_instances(mesh) {
-            if primary {
-                todo!("TODO(instancing): creating mesh instances not yet supported")
-            }
-            BlockMesh::<M>::EMPTY_REF
-        } else {
-            mesh
-        }
+        self.meshes
+            .get(usize::from(index))
+            .map(|vbm| &vbm.mesh)
+            .unwrap_or(BlockMesh::<M>::EMPTY_REF)
     }
 }
 

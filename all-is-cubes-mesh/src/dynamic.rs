@@ -4,6 +4,11 @@ use core::fmt;
 
 use crate::MeshTypes;
 
+use all_is_cubes::math::Cube;
+use all_is_cubes::space::BlockIndex;
+
+// --- Modules ---
+
 mod blocks;
 use blocks::{BlockMeshVersion, VersionedBlockMeshes};
 
@@ -17,6 +22,8 @@ pub use chunked_mesh::{ChunkedSpaceMesh, CsmUpdateInfo};
 mod render_data;
 use render_data::MeshIdImpl;
 pub use render_data::{MeshId, RenderDataUpdate};
+
+// --- Types and traits ---
 
 /// Bundle of types chosen to support dynamically-updating meshes within a specific graphics API.
 ///
@@ -37,3 +44,6 @@ pub trait DynamicMeshTypes: MeshTypes {
     // const CHUNK_SIZE: GridCoordinate;
     // but it is useless because trait associated constants cannot yet be used in const generics.
 }
+
+// TODO: this probably wants to be a custom, opaque data structure
+type InstanceMap = fnv::FnvHashMap<BlockIndex, fnv::FnvHashSet<Cube>>;

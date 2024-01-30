@@ -467,7 +467,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         // Render opaque parts of instances.
         //
         // TODO(instancing): This is inefficient since we don't reuse instance buffer data across frames.
-        // TODO(instancing): Render transparent pass too. (Sorting will be a problem...)
+        // TODO(instancing): Render transparent pass too. (For now we avoid making transparent instances.)
         for (&block_index, cubes) in csm.block_instances() {
             // Set buffers for the mesh
             let Some((mesh_meta, Some(buffers))) = csm.get_render_data_for_block(block_index)

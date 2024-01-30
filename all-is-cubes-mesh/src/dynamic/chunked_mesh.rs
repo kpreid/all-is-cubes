@@ -47,7 +47,7 @@ where
     /// into chunk meshes.
     //---
     // TODO: controllable layout
-    block_instances: FnvHashMap<BlockIndex, FnvHashSet<Cube>>,
+    block_instances: dynamic::InstanceMap,
 
     /// Invariant: the set of present chunks (keys here) is the same as the set of keys
     /// in `todo.read().unwrap().chunks`.
@@ -418,6 +418,24 @@ where
             self.startup_chunks_only = false;
         }
         let chunk_scan_end_time = I::now();
+
+        // Scan again to generate instance list.
+        // TODO(instancing): Improve this algorithm to not redo everything every frame.
+        self.block_instances.clear();
+        for chunk_pos in self
+            .chunk_chart
+            .chunks(view_chunk, camera.view_direction_mask())
+        {
+            // Merge chunk instance table into global instance table
+            if let Some(chunk) = self.chunks.get(&chunk_pos) {
+                for (&block_index, cubes) in chunk.block_instances.iter() {
+                    self.block_instances
+                        .entry(block_index)
+                        .or_default()
+                        .extend(cubes.iter().copied());
+                }
+            }
+        }
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
         let depth_sort_end_time = if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
