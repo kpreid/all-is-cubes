@@ -381,6 +381,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 draw_transparent_time: Duration::ZERO,
                 squares_drawn: 0,
                 chunks_drawn: 0,
+                blocks_drawn: 0,
                 flaws,
             });
         };
@@ -442,6 +443,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         // Opaque geometry first, in front-to-back order
         let start_opaque_draw_time = I::now();
         let mut chunks_drawn = 0;
+        let mut blocks_drawn = 0;
         let mut squares_drawn = 0;
         render_pass.set_pipeline(&pipelines.opaque_render_pipeline);
         for chunk in csm.iter_in_view(camera) {
@@ -465,7 +467,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         // Render opaque parts of instances.
         //
         // TODO(instancing): This is inefficient since we don't reuse instance buffer data across frames.
-        // TODO(instancing): Render transparent pass too.
+        // TODO(instancing): Render transparent pass too. (Sorting will be a problem...)
         for (&block_index, cubes) in csm.block_instances() {
             // Set buffers for the mesh
             let Some((mesh_meta, Some(buffers))) = csm.get_render_data_for_block(block_index)
@@ -484,6 +486,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 0,
                 first_instance_index..(first_instance_index + cubes.len() as u32),
             );
+            blocks_drawn += cubes.len();
             squares_drawn += mesh_meta.opaque_range().len() / 6;
         }
 
@@ -530,6 +533,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             draw_transparent_time: end_time.saturating_duration_since(start_draw_transparent_time),
             squares_drawn,
             chunks_drawn,
+            blocks_drawn,
             flaws,
         })
     }
