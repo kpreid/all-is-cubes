@@ -199,13 +199,12 @@ impl<const MBM: usize> CsmTester<MBM> {
     fn instances(&self) -> Vec<(BlockIndex, Vec<[GridCoordinate; 3]>)> {
         let mut by_block: Vec<_> = self
             .csm
-            .block_instances()
+            .iter_chunks()
+            .flat_map(|chunk| chunk.block_instances())
+            .collect::<dynamic::InstanceCollector>()
             .iter()
-            .map(|(&block_index, cubes)| {
-                let mut cubes: Vec<_> = cubes
-                    .iter()
-                    .map(|&cube| <[GridCoordinate; 3]>::from(cube))
-                    .collect();
+            .map(|(block_index, cubes)| {
+                let mut cubes: Vec<_> = cubes.map(<[GridCoordinate; 3]>::from).collect();
                 cubes.sort();
                 (block_index, cubes)
             })
@@ -365,6 +364,9 @@ fn did_not_finish_detection() {
 }
 
 /// Instances are grouped by block index, even if they are in different chunks.
+///
+/// TODO(instancing): This test used to be meaningful but then we refactored so it is trivial,
+/// just testing `CsmTester::instances()` and `InstanceCollector`...
 #[test]
 fn instances_grouped_by_block() {
     let [block1, block2] = make_some_blocks();

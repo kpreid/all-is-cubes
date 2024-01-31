@@ -2,8 +2,16 @@
 
 ## Unreleased
 
+### Added
+
 - `all-is-cubes-mesh` library:
-    - Blocks in a `dynamic::ChunkedSpaceMesh` may now be rendered via instancing. `dynamic::DynamicMeshTypes::MAXIMUM_MERGED_BLOCK_MESH_SIZE` controls whether this is done.
+    - Blocks in a `dynamic::ChunkedSpaceMesh` may now be rendered via instancing.
+      `dynamic::DynamicMeshTypes::MAXIMUM_MERGED_BLOCK_MESH_SIZE` controls whether this is done.
+      `dynamic::ChunkMesh::block_instances()` returns the instance data.
+
+### Changed
+
+### Removed
 
 ## 0.7.1 (2024-01-27)
 

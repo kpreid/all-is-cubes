@@ -19,6 +19,9 @@ use chunk::ChunkTodo;
 mod chunked_mesh;
 pub use chunked_mesh::{ChunkedSpaceMesh, CsmUpdateInfo};
 
+mod instance;
+pub use instance::InstanceCollector;
+
 mod render_data;
 use render_data::MeshIdImpl;
 pub use render_data::{MeshId, RenderDataUpdate};

@@ -30,15 +30,14 @@ mod tests;
 /// initialized using [`Default`]. This value may be a reference to a corresponding
 /// GPU buffer, for example. It will usually need to be an [`Option`] of something.
 ///
-/// Additionally, to handle complex blocks, a set of *block mesh instances* is maintained,
-/// which indicate that a certain block mesh should be rendered at a certain location,
-/// without it first having been aggregated into a chunk mesh. To support this,
-/// `M::RenderData` values are also prepared for each block mesh that might be instanced.
+/// Additionally, to allow instanced rendering of complex blocks that would be overly large
+/// if repeatedly copied into chunk meshes, render data is maintained for each individual block
+/// that chunks may decide to omit from their meshes; it is accessed through
+/// [`get_render_data_for_block()`](Self::get_render_data_for_block).
 ///
 /// [`ChunkedSpaceMesh`] manages all this data but does not demand a particular sequence of
-/// rendering operations; it is your responsibility to render the chunks and instances which
-/// you can obtain by calling [`iter_chunks()`](Self::iter_chunks) and
-/// [`block_instances()`](Self::block_instances).
+/// rendering operations; it is your responsibility to render the chunk meshes and instances which
+/// you can obtain by calling one of the iteration methods.
 ///
 /// [`SpaceMesh`]: crate::SpaceMesh
 #[derive(Debug)] // TODO: loosen trait bounds with manual impl
@@ -52,12 +51,6 @@ where
     todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>>,
 
     block_meshes: dynamic::VersionedBlockMeshes<M>,
-
-    /// Table of all blocks in the space rendered individually (instanced) rather than being merged
-    /// into chunk meshes.
-    //---
-    // TODO: controllable layout
-    block_instances: dynamic::InstanceMap,
 
     /// Invariant: the set of present chunks (keys here) is the same as the set of keys
     /// in `todo.read().unwrap().chunks`.
@@ -116,7 +109,6 @@ where
             space,
             todo: todo_rc,
             block_meshes: dynamic::VersionedBlockMeshes::new(),
-            block_instances: FnvHashMap::default(),
             chunks: FnvHashMap::default(),
             chunk_chart: ChunkChart::new(0.0),
             view_chunk: ChunkPos(Cube::new(0, 0, 0)),
@@ -141,11 +133,7 @@ where
         &self.chunk_chart
     }
 
-    /// Iterates over the [`ChunkMesh`]es of all chunks that currently exist, in arbitrary
-    /// order.
-    ///
-    /// Empty chunks are included; in particular, this will iterate over every `M::RenderData` value
-    /// owned by this [`ChunkedSpaceMesh`].
+    /// Iterates over all [`ChunkMesh`]es owned by this [`ChunkedSpaceMesh`], in arbitrary order.
     pub fn iter_chunks(&self) -> impl Iterator<Item = &ChunkMesh<M, CHUNK_SIZE>> {
         self.chunks.values()
     }
@@ -196,13 +184,20 @@ where
             })
     }
 
-    /// Returns the list of placements of blocks which should be rendered individually
-    /// rather than as chunk meshes.
-    ///
-    /// TODO(instancing): This exposes too many implementation choices, and should instead
-    /// be customizable to produce an instance buffer memory layout.
-    pub fn block_instances(&self) -> &FnvHashMap<BlockIndex, FnvHashSet<Cube>> {
-        &self.block_instances
+    /// Calculates how many [`ChunkMesh::block_instances()`] are present in chunks visible from the
+    /// camera.
+    //---
+    // TODO(instancing): wgpu needs this, but do we really want to offer this canned?
+    // Can we have a better API?
+    pub fn count_block_instances(&self, camera: &Camera) -> usize {
+        let view_chunk = point_to_chunk(camera.view_position());
+
+        self.chunk_chart
+            .chunks(view_chunk, camera.view_direction_mask())
+            .flat_map(|pos| self.chunks.get(&pos))
+            .flat_map(|chunk| chunk.block_instances.iter())
+            .map(|(_, instance_cubes)| instance_cubes.len())
+            .sum()
     }
 
     /// Recompute meshes of all blocks that need it, and the nearest chunks that need it.
@@ -427,25 +422,8 @@ where
         if !did_not_finish {
             self.startup_chunks_only = false;
         }
-        let chunk_scan_end_time = I::now();
 
-        // Scan again to generate instance list.
-        // TODO(instancing): Improve this algorithm to not redo everything every frame.
-        self.block_instances.clear();
-        for chunk_pos in self
-            .chunk_chart
-            .chunks(view_chunk, camera.view_direction_mask())
-        {
-            // Merge chunk instance table into global instance table
-            if let Some(chunk) = self.chunks.get(&chunk_pos) {
-                for (&block_index, cubes) in chunk.block_instances.iter() {
-                    self.block_instances
-                        .entry(block_index)
-                        .or_default()
-                        .extend(cubes.iter().copied());
-                }
-            }
-        }
+        let chunk_scan_end_time = I::now();
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
         let depth_sort_end_time = if let Some(chunk) = self.chunks.get_mut(&view_chunk) {

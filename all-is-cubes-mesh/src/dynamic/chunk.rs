@@ -11,7 +11,9 @@ use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh, VPos};
 use crate::dynamic::ChunkedSpaceMesh;
 
 /// Stores a [`SpaceMesh`] covering one [chunk](all_is_cubes::chunking) of a [`Space`],
-/// caller-provided rendering data, and incidentals.
+/// a list of blocks to render instanced instead, caller-provided rendering data, and incidentals.
+//---
+// TODO(instancing): Give this a new, broader-scoped name, like 'DynamicMeshChunk' or something.
 pub struct ChunkMesh<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> {
     pub(super) position: ChunkPos<CHUNK_SIZE>,
     mesh: SpaceMesh<M>,
@@ -168,6 +170,22 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         );
 
         chunk_todo.recompute_mesh = false;
+    }
+
+    /// Returns the blocks _not_ included in this chunk's mesh that are within the bounds of the
+    /// chunk.
+    ///
+    /// Use this together with [`ChunkedSpaceMesh::get_render_data_for_block()`] to obtain mesh data
+    /// from the block indexes, and render those blocks at these positions using instancing.
+    /// Consider using [`InstanceCollector`](super::InstanceCollector) to group instances across
+    /// chunks. (We don't do that for you so that the iteration over chunks remains in your
+    /// control.)
+    pub fn block_instances(
+        &self,
+    ) -> impl Iterator<Item = (BlockIndex, impl ExactSizeIterator<Item = Cube> + '_)> + '_ {
+        self.block_instances
+            .iter()
+            .map(|(&block_index, instance_cubes)| (block_index, instance_cubes.iter().copied()))
     }
 
     /// Sort the existing indices of `self.transparent_range(DepthOrdering::Within)` for

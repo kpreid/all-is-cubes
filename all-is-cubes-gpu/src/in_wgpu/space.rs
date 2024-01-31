@@ -19,7 +19,7 @@ use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{Space, SpaceChange};
 use all_is_cubes::time;
 use all_is_cubes::universe::{RefError, URef};
-use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, RenderDataUpdate};
+use all_is_cubes_mesh::dynamic::{self, ChunkedSpaceMesh, RenderDataUpdate};
 use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
 
 use crate::in_wgpu::block_texture::BlockTextureViews;
@@ -286,12 +286,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
         // Ensure instance buffer is big enough.
         // This is an overallocation because it doesn't account for culling or empty chunks,
         // but it shouldn't be too much.
-        let total_instance_count = csm.chunk_chart().count_all()
-            + csm
-                .block_instances()
-                .values()
-                .map(|set| set.len())
-                .sum::<usize>();
+        let total_instance_count =
+            csm.chunk_chart().count_all() + csm.count_block_instances(camera);
         self.instance_buffer.resize_at_least(
             bwp.device,
             &wgpu::BufferDescriptor {
@@ -447,11 +443,13 @@ impl<I: time::Instant> SpaceRenderer<I> {
             }
         }
 
-        // Opaque geometry first, in front-to-back order
+        // Opaque geometry first, in front-to-back order.
+        // Also collect instances.
         let start_opaque_chunk_draw_time = I::now();
         let mut chunks_drawn = 0;
         let mut blocks_drawn = 0;
         let mut squares_drawn = 0;
+        let mut block_instances = dynamic::InstanceCollector::new(); // TODO: reuse across frames
         render_pass.set_pipeline(&pipelines.opaque_render_pipeline);
         for chunk in csm.iter_in_view(camera) {
             chunks_drawn += 1;
@@ -468,15 +466,14 @@ impl<I: time::Instant> SpaceRenderer<I> {
             } else {
                 // TODO: If the chunk is missing, draw a blocking shape, possibly?
             }
+            block_instances.extend(chunk.block_instances());
             flaws |= chunk.mesh().flaws();
         }
 
-        // Render opaque parts of instances.
-        //
-        // TODO(instancing): This is inefficient since we don't reuse instance buffer data across frames.
-        // TODO(instancing): Render transparent pass too. (For now we avoid making transparent instances.)
+        // Render opaque block instances, which we just gathered from the chunks.
+        // (Currently, we don't ever try to instance transparent meshes, to avoid sorting issues.)
         let start_opaque_instance_draw_time = I::now();
-        for (&block_index, cubes) in csm.block_instances() {
+        for (block_index, cubes) in block_instances.iter() {
             // Set buffers for the mesh
             let Some((mesh_meta, Some(buffers))) = csm.get_render_data_for_block(block_index)
             else {
@@ -485,6 +482,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             set_buffers(&mut render_pass, buffers);
 
             let first_instance_index = u32::try_from(instance_data.len()).unwrap();
+            let cubes_len = cubes.len();
             for cube in cubes {
                 instance_data.push(WgpuInstanceData::new(cube.lower_bounds().to_vector()));
             }
@@ -492,9 +490,9 @@ impl<I: time::Instant> SpaceRenderer<I> {
             render_pass.draw_indexed(
                 to_wgpu_index_range(mesh_meta.opaque_range()),
                 0,
-                first_instance_index..(first_instance_index + cubes.len() as u32),
+                first_instance_index..(first_instance_index + cubes_len as u32),
             );
-            blocks_drawn += cubes.len();
+            blocks_drawn += cubes_len;
             squares_drawn += mesh_meta.opaque_range().len() / 6;
         }
 
