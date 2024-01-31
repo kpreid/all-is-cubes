@@ -1,6 +1,7 @@
 //! Manages meshes for rendering a [`Space`].
 
 use std::collections::HashSet;
+use std::mem;
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
@@ -283,15 +284,20 @@ impl<I: time::Instant> SpaceRenderer<I> {
         );
 
         // Ensure instance buffer is big enough.
-        // TODO(instancing): This doesn't account for non-chunk instances.
+        // This is an overallocation because it doesn't account for culling or empty chunks,
+        // but it shouldn't be too much.
+        let total_instance_count = csm.chunk_chart().count_all()
+            + csm
+                .block_instances()
+                .values()
+                .map(|set| set.len())
+                .sum::<usize>();
         self.instance_buffer.resize_at_least(
             bwp.device,
             &wgpu::BufferDescriptor {
                 label: Some(&self.instance_buffer_label),
-                size: u64::try_from(
-                    csm.chunk_chart().count_all() * std::mem::size_of::<WgpuInstanceData>(),
-                )
-                .expect("instance buffer size overflow"),
+                size: u64::try_from(total_instance_count * std::mem::size_of::<WgpuInstanceData>())
+                    .expect("instance buffer size overflow"),
                 usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX,
                 mapped_at_creation: false,
             },
@@ -390,9 +396,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         let view_chunk = csm.view_chunk();
 
-        // Accumulates instance data for meshes, which we will then write as part of this
-        // submission. (Draw commands always happen after buffer writes even if they
-        // enter the command encoder first.)
+        // Accumulates instance data for meshes, which we will then write to self.instance_buffer
+        // *before* submitting the rendering command buffer.
         let mut instance_data: Vec<WgpuInstanceData> = Vec::with_capacity(
             self.instance_buffer
                 .get()
@@ -521,15 +526,34 @@ impl<I: time::Instant> SpaceRenderer<I> {
         // measure its time now
         drop(render_pass);
 
-        if let Some(buffer) = self.instance_buffer.get() {
-            queue.write_buffer(
-                buffer,
-                0,
-                bytemuck::cast_slice::<WgpuInstanceData, u8>(instance_data.as_slice()),
-            );
-        } else {
-            // TODO: remember needed size for the next frame (perhaps as instance_data's len)
-            flaws |= Flaws::UNFINISHED;
+        // Copy instance_data to self.instance_buffer now that we've accumulated everything that
+        // goes in it. Note that this copy is submitted immediately to the queue, which means it
+        // will be executed *before* the command buffer containing render commands that read from
+        // instance_buffer.
+        {
+            let mut instance_data = instance_data.as_slice();
+            let buffer_capacity = self.instance_buffer.get().map_or(0, |b| b.size() as usize)
+                / mem::size_of::<WgpuInstanceData>();
+            let len = instance_data.len();
+            if len > buffer_capacity {
+                // Doing anything about this is probably futile, because wgpu will emit a validation
+                // error from the drawing commands, but we can at least report what the problem is.
+                flaws |= Flaws::UNFINISHED;
+                log::warn!(
+                    "instance buffer too small ({buffer_capacity} instances) for drawing \
+                        {len} instances"
+                );
+                instance_data = &instance_data[..buffer_capacity];
+            }
+
+            // if this fails then we are proceeding as if the length is 0 anyway.
+            if let Some(buffer) = self.instance_buffer.get() {
+                queue.write_buffer(
+                    buffer,
+                    0,
+                    bytemuck::cast_slice::<WgpuInstanceData, u8>(instance_data),
+                );
+            }
         }
 
         let end_time = I::now();
