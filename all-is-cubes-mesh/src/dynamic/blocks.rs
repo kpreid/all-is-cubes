@@ -275,7 +275,7 @@ pub(crate) enum BlockMeshVersion {
 
 pub(crate) fn should_use_instances<M: DynamicMeshTypes>(block_mesh: &BlockMesh<M>) -> bool {
     // TODO(instancing): Remove the restriction to only nontransparent meshes when (if) rendering transparent instances is supported.
-    block_mesh.count_indices() >= M::MINIMUM_INSTANCE_INDEX_COUNT
+    block_mesh.count_indices() > M::MAXIMUM_MERGED_BLOCK_MESH_SIZE
         && block_mesh
             .all_face_meshes()
             .all(|(_, fm)| fm.indices_transparent.len() == 0)

@@ -68,7 +68,7 @@ impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for WgpuMt {
     type RenderData = Option<space::ChunkBuffers>;
 
     // TODO(instancing): tune this value
-    const MINIMUM_INSTANCE_INDEX_COUNT: usize = 400;
+    const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = 400;
 }
 
 /// Entry point for [`wgpu`] rendering. Construct this and hand it the [`wgpu::Surface`]

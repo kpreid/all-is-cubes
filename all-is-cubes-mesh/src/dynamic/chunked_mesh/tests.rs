@@ -18,12 +18,12 @@ use crate::{dynamic, testing};
 
 use super::{ChunkTodo, ChunkedSpaceMesh, CsmTodo, CsmUpdateInfo, TodoListener};
 
-type Mt<const IM: usize> = testing::Mt<NoTextures, IM>;
+type Mt<const MBM: usize> = testing::Mt<NoTextures, MBM>;
 
 const CHUNK_SIZE: GridCoordinate = 16;
 const LARGE_VIEW_DISTANCE: f64 = 200.0;
 const NO_INSTANCES: usize = usize::MAX;
-const ALL_INSTANCES: usize = 1;
+const ALL_INSTANCES: usize = 0;
 
 fn read_todo_chunks(todo: &Mutex<CsmTodo<CHUNK_SIZE>>) -> Vec<(ChunkPos<CHUNK_SIZE>, ChunkTodo)> {
     let mut v = todo
@@ -145,15 +145,15 @@ fn todo_ignores_absent_chunks() {
 }
 
 #[derive(Debug)]
-struct CsmTester<const IM: usize> {
+struct CsmTester<const MBM: usize> {
     #[allow(dead_code)] // Universe must be kept alive but is not read after construction
     universe: Universe,
     space: URef<Space>,
     camera: Camera,
-    csm: ChunkedSpaceMesh<Mt<IM>, std::time::Instant, CHUNK_SIZE>,
+    csm: ChunkedSpaceMesh<Mt<MBM>, std::time::Instant, CHUNK_SIZE>,
 }
 
-impl<const IM: usize> CsmTester<IM> {
+impl<const MBM: usize> CsmTester<MBM> {
     fn new(space: Space, view_distance: f64) -> Self {
         let mut universe = Universe::new();
         let space_ref = universe.insert_anonymous(space);
@@ -177,7 +177,7 @@ impl<const IM: usize> CsmTester<IM> {
     /// Call `csm.update_blocks_and_some_chunks()` with the tester's placeholders
     fn update<F>(&mut self, render_data_updater: F) -> CsmUpdateInfo
     where
-        F: FnMut(dynamic::RenderDataUpdate<'_, Mt<IM>>),
+        F: FnMut(dynamic::RenderDataUpdate<'_, Mt<MBM>>),
     {
         self.csm.update_blocks_and_some_chunks(
             &self.camera,

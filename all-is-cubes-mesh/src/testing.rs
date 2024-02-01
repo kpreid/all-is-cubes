@@ -17,10 +17,10 @@ use crate::{block_meshes_for_space, texture, BlockMeshes, BlockVertex, MeshTypes
 
 /// Generic [`MeshTypes`] implementor for tests to use.
 #[derive(Debug)]
-pub struct Mt<Alloc, const IC: usize> {
+pub struct Mt<Alloc, const MBM: usize> {
     _phantom: PhantomData<fn() -> Alloc>,
 }
-impl<Alloc: texture::Allocator + 'static, const IC: usize> MeshTypes for Mt<Alloc, IC>
+impl<Alloc: texture::Allocator + 'static, const MBM: usize> MeshTypes for Mt<Alloc, MBM>
 where
     Alloc::Point: Fmt<ConciseDebug>, // TODO: clunky bound
 {
@@ -28,12 +28,12 @@ where
     type Alloc = Alloc;
     type Tile = Alloc::Tile;
 }
-impl<Alloc: texture::Allocator + 'static, const IC: usize> DynamicMeshTypes for Mt<Alloc, IC>
+impl<Alloc: texture::Allocator + 'static, const MBM: usize> DynamicMeshTypes for Mt<Alloc, MBM>
 where
     Alloc::Point: Fmt<ConciseDebug>, // TODO: clunky bound
 {
     type RenderData = ();
-    const MINIMUM_INSTANCE_INDEX_COUNT: usize = IC;
+    const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = MBM;
 }
 
 // TODO(instancing): add tests that involve instances, at which point we'll need to change the

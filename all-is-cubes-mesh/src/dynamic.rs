@@ -44,10 +44,11 @@ pub trait DynamicMeshTypes: MeshTypes {
     // const CHUNK_SIZE: GridCoordinate;
     // but it is useless because trait associated constants cannot yet be used in const generics.
 
-    /// Controls whether instanced block meshes are used, by specifying the minimum number of
-    /// indices in the block mesh at which instances will be used instead of combining the block
-    /// meshes into chunk meshes.
-    const MINIMUM_INSTANCE_INDEX_COUNT: usize;
+    /// Maximum number of indices a block mesh can have before it will no longer be put into
+    /// combined chunk meshes and will always be instanced instead.
+    ///
+    /// To disable instancing, set this to [`usize::MAX`]. To always use instancing, set this to 0.
+    const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize;
 }
 
 // TODO: this probably wants to be a custom, opaque data structure
