@@ -1,23 +1,29 @@
+#![allow(clippy::identity_op)]
+
 use std::sync::{Arc, Mutex};
 
 use all_is_cubes::block::Block;
 use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, TransparencyOption, Viewport};
 use all_is_cubes::chunking::ChunkPos;
+use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::listen::Listener as _;
 use all_is_cubes::math::{Cube, FreePoint, GridAab, GridCoordinate};
 use all_is_cubes::math::{GridPoint, NotNan};
-use all_is_cubes::space::{Space, SpaceChange, SpaceTransaction};
+use all_is_cubes::space::{BlockIndex, Space, SpaceChange, SpaceTransaction};
 use all_is_cubes::universe::{URef, Universe};
 use all_is_cubes::{notnan, rgba_const, time, transaction};
 
-use crate::dynamic;
-use crate::testing::NoTextureMt as Mt;
 use crate::texture::NoTextures;
+use crate::{dynamic, testing};
 
 use super::{ChunkTodo, ChunkedSpaceMesh, CsmTodo, CsmUpdateInfo, TodoListener};
 
+type Mt<const IM: usize> = testing::Mt<NoTextures, IM>;
+
 const CHUNK_SIZE: GridCoordinate = 16;
 const LARGE_VIEW_DISTANCE: f64 = 200.0;
+const NO_INSTANCES: usize = usize::MAX;
+const ALL_INSTANCES: usize = 1;
 
 fn read_todo_chunks(todo: &Mutex<CsmTodo<CHUNK_SIZE>>) -> Vec<(ChunkPos<CHUNK_SIZE>, ChunkTodo)> {
     let mut v = todo
@@ -139,15 +145,15 @@ fn todo_ignores_absent_chunks() {
 }
 
 #[derive(Debug)]
-struct CsmTester {
+struct CsmTester<const IM: usize> {
     #[allow(dead_code)] // Universe must be kept alive but is not read after construction
     universe: Universe,
     space: URef<Space>,
     camera: Camera,
-    csm: ChunkedSpaceMesh<Mt, std::time::Instant, CHUNK_SIZE>,
+    csm: ChunkedSpaceMesh<Mt<IM>, std::time::Instant, CHUNK_SIZE>,
 }
 
-impl CsmTester {
+impl<const IM: usize> CsmTester<IM> {
     fn new(space: Space, view_distance: f64) -> Self {
         let mut universe = Universe::new();
         let space_ref = universe.insert_anonymous(space);
@@ -171,7 +177,7 @@ impl CsmTester {
     /// Call `csm.update_blocks_and_some_chunks()` with the tester's placeholders
     fn update<F>(&mut self, render_data_updater: F) -> CsmUpdateInfo
     where
-        F: FnMut(dynamic::RenderDataUpdate<'_, Mt>),
+        F: FnMut(dynamic::RenderDataUpdate<'_, Mt<IM>>),
     {
         self.csm.update_blocks_and_some_chunks(
             &self.camera,
@@ -188,11 +194,31 @@ impl CsmTester {
         view_transform.translation = position.into().to_vector() * f64::from(CHUNK_SIZE);
         self.camera.set_view_transform(view_transform);
     }
+
+    /// Fetch instances and convert them into simpler data types
+    fn instances(&self) -> Vec<(BlockIndex, Vec<[GridCoordinate; 3]>)> {
+        let mut by_block: Vec<_> = self
+            .csm
+            .block_instances()
+            .iter()
+            .map(|(&block_index, cubes)| {
+                let mut cubes: Vec<_> = cubes
+                    .iter()
+                    .map(|&cube| <[GridCoordinate; 3]>::from(cube))
+                    .collect();
+                cubes.sort();
+                (block_index, cubes)
+            })
+            .collect();
+        by_block.sort();
+        by_block
+    }
 }
 
 #[test]
 fn basic_chunk_presence() {
-    let mut tester = CsmTester::new(Space::empty_positive(1, 1, 1), LARGE_VIEW_DISTANCE);
+    let mut tester: CsmTester<NO_INSTANCES> =
+        CsmTester::new(Space::empty_positive(1, 1, 1), LARGE_VIEW_DISTANCE);
     tester.update(|_| {});
     assert_ne!(None, tester.csm.chunk(ChunkPos::new(0, 0, 0)));
     // There should not be a chunk where there's no Space
@@ -202,7 +228,8 @@ fn basic_chunk_presence() {
 
 #[test]
 fn sort_view_every_frame_only_if_transparent() {
-    let mut tester = CsmTester::new(Space::empty_positive(1, 1, 1), LARGE_VIEW_DISTANCE);
+    let mut tester: CsmTester<NO_INSTANCES> =
+        CsmTester::new(Space::empty_positive(1, 1, 1), LARGE_VIEW_DISTANCE);
     tester.update(|u| {
         assert!(!u.indices_only);
     });
@@ -246,7 +273,7 @@ fn graphics_options_change() {
         .set([0, 0, 0], Block::from(rgba_const!(1., 1., 1., 0.25)))
         .unwrap();
 
-    let mut tester = CsmTester::new(space, 200.0);
+    let mut tester: CsmTester<NO_INSTANCES> = CsmTester::new(space, 200.0);
     tester.camera.set_options(options.clone());
 
     let mut vertices = None;
@@ -266,7 +293,7 @@ fn graphics_options_change() {
 #[test]
 fn drop_chunks_when_moving() {
     // use small view distance in a large space (especially large in x)
-    let mut tester = CsmTester::new(
+    let mut tester: CsmTester<NO_INSTANCES> = CsmTester::new(
         Space::builder(GridAab::from_lower_upper(
             [-1000, -100, -100],
             [1000, 100, 100],
@@ -301,7 +328,8 @@ fn drop_chunks_when_moving() {
 /// update itself.
 #[test]
 fn did_not_finish_detection() {
-    let mut tester = CsmTester::new(Space::empty_positive(1000, 1, 1), LARGE_VIEW_DISTANCE);
+    let mut tester: CsmTester<NO_INSTANCES> =
+        CsmTester::new(Space::empty_positive(1000, 1, 1), LARGE_VIEW_DISTANCE);
 
     eprintln!("--- timing out update");
     let info = tester.csm.update_blocks_and_some_chunks(
@@ -333,5 +361,29 @@ fn did_not_finish_detection() {
             tester.csm.complete_time.is_some(),
         ),
         (Flaws::empty(), false, true)
+    );
+}
+
+/// Instances are grouped by block index, even if they are in different chunks.
+#[test]
+fn instances_grouped_by_block() {
+    let [block1, block2] = make_some_blocks();
+    let mut space = Space::empty_positive(CHUNK_SIZE * 2, 1, 1);
+    space.set([0, 0, 0], &block1).unwrap();
+    space.set([1, 0, 0], &block2).unwrap();
+    space.set([CHUNK_SIZE + 0, 0, 0], &block1).unwrap();
+    space.set([CHUNK_SIZE + 1, 0, 0], &block2).unwrap();
+
+    let mut tester: CsmTester<ALL_INSTANCES> = CsmTester::new(space, LARGE_VIEW_DISTANCE);
+
+    tester.update(|_| {});
+
+    assert_eq!(
+        tester.instances(),
+        vec![
+            // index 0 is air
+            (1, vec![[0, 0, 0], [CHUNK_SIZE + 0, 0, 0]]),
+            (2, vec![[1, 0, 0], [CHUNK_SIZE + 1, 0, 0]]),
+        ]
     );
 }
