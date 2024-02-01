@@ -22,13 +22,23 @@ use crate::{texture, GfxVertex, MeshOptions};
 #[cfg(test)]
 mod tests;
 
-/// The large-scale analogue of [`SpaceMesh`]: subdivides a [`Space`] into
+/// The large-scale and updatable form of [`SpaceMesh`]: subdivides a [`Space`] into
 /// [chunks](all_is_cubes::chunking) which are individually recomputed as the space changes or
 /// its contained blocks do.
 ///
 /// Each chunk, a [`ChunkMesh`], owns a data value of type `M::RenderData`, which is
 /// initialized using [`Default`]. This value may be a reference to a corresponding
 /// GPU buffer, for example. It will usually need to be an [`Option`] of something.
+///
+/// Additionally, to handle complex blocks, a set of *block mesh instances* is maintained,
+/// which indicate that a certain block mesh should be rendered at a certain location,
+/// without it first having been aggregated into a chunk mesh. To support this,
+/// `M::RenderData` values are also prepared for each block mesh that might be instanced.
+///
+/// [`ChunkedSpaceMesh`] manages all this data but does not demand a particular sequence of
+/// rendering operations; it is your responsibility to render the chunks and instances which
+/// you can obtain by calling [`iter_chunks()`](Self::iter_chunks) and
+/// [`block_instances()`](Self::block_instances).
 ///
 /// [`SpaceMesh`]: crate::SpaceMesh
 #[derive(Debug)] // TODO: loosen trait bounds with manual impl
@@ -134,7 +144,7 @@ where
     /// Iterates over the [`ChunkMesh`]es of all chunks that currently exist, in arbitrary
     /// order.
     ///
-    /// Empty chunks are included; in particular, this will iterate over every `D` value
+    /// Empty chunks are included; in particular, this will iterate over every `M::RenderData` value
     /// owned by this [`ChunkedSpaceMesh`].
     pub fn iter_chunks(&self) -> impl Iterator<Item = &ChunkMesh<M, CHUNK_SIZE>> {
         self.chunks.values()
