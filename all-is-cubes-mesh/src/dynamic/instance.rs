@@ -1,3 +1,5 @@
+use core::fmt;
+
 use all_is_cubes::math::Cube;
 use all_is_cubes::space::BlockIndex;
 
@@ -60,6 +62,78 @@ where
         this
     }
 }
+
+/// Bidirectional map data structure for block mesh instances.
+///
+/// Unlike [`InstanceCollector`], this is used only internally, and does prohibit duplicates.
+#[derive(Default)]
+pub(crate) struct InstanceMap {
+    by_block: fnv::FnvHashMap<BlockIndex, fnv::FnvHashSet<Cube>>,
+    by_cube: fnv::FnvHashMap<Cube, BlockIndex>,
+}
+
+impl InstanceMap {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn iter(
+        &self,
+    ) -> impl Iterator<Item = (BlockIndex, impl ExactSizeIterator<Item = Cube> + '_)> + '_ {
+        self.by_block
+            .iter()
+            .map(|(&block_index, instance_cubes)| (block_index, instance_cubes.iter().copied()))
+    }
+
+    pub(crate) fn clear(&mut self) {
+        let Self { by_block, by_cube } = self;
+        by_block.clear();
+        by_cube.clear();
+    }
+
+    pub(crate) fn insert(&mut self, index: BlockIndex, cube: Cube) {
+        let old_index = self.by_cube.get(&cube).copied();
+        match old_index {
+            Some(old_index) if old_index == index => {
+                // No change
+            }
+            Some(old_index) => {
+                // There is an existing, different entry.
+                // Insert new by_block entry.
+                self.by_block.entry(index).or_default().insert(cube);
+                // Remove old by_block entry.
+                self.by_block.get_mut(&old_index).unwrap().remove(&cube);
+                // Update by_cube entry.
+                self.by_cube.insert(cube, index);
+            }
+            None => {
+                // No entry at all.
+                // (The try_reserve is because, just for fun, I'm trying to design this data
+                // structure to be robust against continuing to be used after an OOM panic;
+                // no changes are made until all allocations have succeeded.)
+                self.by_cube.reserve(1);
+                self.by_block.entry(index).or_default().insert(cube);
+                self.by_cube.insert(cube, index);
+            }
+        }
+    }
+}
+
+impl fmt::Debug for InstanceMap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InstanceMap")
+            .field("by_block", &self.by_block)
+            .finish_non_exhaustive()
+    }
+}
+
+impl PartialEq for InstanceMap {
+    fn eq(&self, other: &Self) -> bool {
+        // The two internal maps are in sync, so no need to compare both.
+        self.by_cube == other.by_cube
+    }
+}
+impl Eq for InstanceMap {}
 
 #[cfg(test)]
 mod tests {

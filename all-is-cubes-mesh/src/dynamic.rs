@@ -4,9 +4,6 @@ use core::fmt;
 
 use crate::MeshTypes;
 
-use all_is_cubes::math::Cube;
-use all_is_cubes::space::BlockIndex;
-
 // --- Modules ---
 
 mod blocks;
@@ -21,6 +18,7 @@ pub use chunked_mesh::{ChunkedSpaceMesh, CsmUpdateInfo};
 
 mod instance;
 pub use instance::InstanceCollector;
+pub(crate) use instance::InstanceMap;
 
 mod render_data;
 use render_data::MeshIdImpl;
@@ -53,6 +51,3 @@ pub trait DynamicMeshTypes: MeshTypes {
     /// To disable instancing, set this to [`usize::MAX`]. To always use instancing, set this to 0.
     const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize;
 }
-
-// TODO: this probably wants to be a custom, opaque data structure
-type InstanceMap = fnv::FnvHashMap<BlockIndex, fnv::FnvHashSet<Cube>>;

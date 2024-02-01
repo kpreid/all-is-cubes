@@ -85,7 +85,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
             mesh: SpaceMesh::default(),
             render_data: Default::default(),
             block_dependencies: Vec::new(),
-            block_instances: Default::default(),
+            block_instances: dynamic::InstanceMap::new(),
             update_debug: false,
         }
     }
@@ -183,9 +183,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     pub fn block_instances(
         &self,
     ) -> impl Iterator<Item = (BlockIndex, impl ExactSizeIterator<Item = Cube> + '_)> + '_ {
-        self.block_instances
-            .iter()
-            .map(|(&block_index, instance_cubes)| (block_index, instance_cubes.iter().copied()))
+        self.block_instances.iter()
     }
 
     /// Sort the existing indices of `self.transparent_range(DepthOrdering::Within)` for
@@ -240,7 +238,7 @@ impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for InstanceTrackingBlockMeshS
 
         if dynamic::blocks::should_use_instances(mesh) {
             if primary {
-                self.instances.entry(index).or_default().insert(cube);
+                self.instances.insert(index, cube);
             }
             BlockMesh::<M>::EMPTY_REF
         } else {
