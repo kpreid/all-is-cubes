@@ -7,7 +7,7 @@ use crate::DebugLineVertex;
 /// Texture coordinates in the 3D atlas textures.
 ///
 /// This type is public out of necessity; you should not need to refer to it.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TexPoint {
     // Which texture atlas to use; corresponds to [`all_is_cubes_mesh::texture::Channels`].
     pub(crate) atlas_id: u8,

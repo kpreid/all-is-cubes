@@ -2,6 +2,7 @@
 //!
 //! This module is public but doc(hidden).
 
+use core::marker::PhantomData;
 use core::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 
 use all_is_cubes::block::Evoxel;
@@ -9,43 +10,36 @@ use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{GridAab, Vol};
 use all_is_cubes::space::Space;
+use all_is_cubes::util::{ConciseDebug, Fmt};
 
 use crate::dynamic::DynamicMeshTypes;
 use crate::{block_meshes_for_space, texture, BlockMeshes, BlockVertex, MeshTypes, SpaceMesh};
 
+/// Generic [`MeshTypes`] implementor for tests to use.
 #[derive(Debug)]
-#[allow(clippy::exhaustive_enums)]
-pub enum NoTextureMt {}
-
-impl MeshTypes for NoTextureMt {
-    type Vertex = BlockVertex<texture::NoTexture>;
-    type Alloc = texture::NoTextures;
-    type Tile = texture::NoTexture;
+pub struct Mt<Alloc, const IC: usize> {
+    _phantom: PhantomData<fn() -> Alloc>,
 }
-
-impl DynamicMeshTypes for NoTextureMt {
+impl<Alloc: texture::Allocator + 'static, const IC: usize> MeshTypes for Mt<Alloc, IC>
+where
+    Alloc::Point: Fmt<ConciseDebug>, // TODO: clunky bound
+{
+    type Vertex = BlockVertex<Alloc::Point>;
+    type Alloc = Alloc;
+    type Tile = Alloc::Tile;
+}
+impl<Alloc: texture::Allocator + 'static, const IC: usize> DynamicMeshTypes for Mt<Alloc, IC>
+where
+    Alloc::Point: Fmt<ConciseDebug>, // TODO: clunky bound
+{
     type RenderData = ();
-
-    // TODO(instancing): add tests that involve instances, at which point we'll need to change this
-    const MINIMUM_INSTANCE_INDEX_COUNT: usize = usize::MAX;
+    const MINIMUM_INSTANCE_INDEX_COUNT: usize = IC;
 }
 
-#[derive(Debug)]
-#[allow(clippy::exhaustive_enums)]
-pub enum TextureMt {}
-
-impl MeshTypes for TextureMt {
-    type Vertex = BlockVertex<TexPoint>;
-    type Alloc = Allocator;
-    type Tile = Tile;
-}
-
-impl DynamicMeshTypes for TextureMt {
-    type RenderData = ();
-
-    // TODO(instancing): add tests that involve instances, at which point we'll need to change this
-    const MINIMUM_INSTANCE_INDEX_COUNT: usize = usize::MAX;
-}
+// TODO(instancing): add tests that involve instances, at which point we'll need to change the
+// MAX or introduce more variants
+pub type NoTextureMt = Mt<texture::NoTextures, { usize::MAX }>;
+pub type TextureMt = Mt<Allocator, { usize::MAX }>;
 
 /// Test helper to call [`block_meshes_for_space`] followed directly by [`SpaceMesh::new`].
 #[allow(clippy::type_complexity)]

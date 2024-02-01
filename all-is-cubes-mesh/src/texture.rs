@@ -35,11 +35,17 @@ pub type TilePoint = Point3D<TextureCoordinate, TexelUnit>;
 /// Allocations may be deallocated for reuse by dropping the returned [`Tile`]s.
 pub trait Allocator {
     /// Allocation handles produced by this allocator.
-    type Tile: Tile<Point = Self::Point>;
+    //---
+    // Design note: The bounds beyond `Tile` are not required for allocators to function, but
+    // for how this type is used in the rest of the mesh library.
+    type Tile: Tile<Point = Self::Point> + fmt::Debug + 'static;
 
     /// Type of points within the texture, that vertices store (or at least, that are
     /// used to construct vertices).
-    type Point;
+    //---
+    // Design note: The bounds are not required for allocators to function, but
+    // for how this type is used in the rest of the mesh library.
+    type Point: Copy + PartialEq + fmt::Debug + 'static;
 
     /// Allocate a tile, whose range of texels will be reserved for use as long as the
     /// [`Tile`] value, and its clones, are not dropped.
