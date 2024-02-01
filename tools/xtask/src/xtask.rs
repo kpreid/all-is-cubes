@@ -464,11 +464,15 @@ fn update_server_static(config: &Config, time_log: &mut Vec<Timing>) -> Result<(
 
     // Run the compilation if needed, which ensures that the wasm binary is fresh.
     // Note: This must use the same profile as thfe wasm-pack command is! (Both are dev for now)
-    cargo()
-        .arg("build")
-        .arg("--manifest-path=all-is-cubes-wasm/Cargo.toml")
-        .arg(TARGET_WASM)
-        .run()?;
+    {
+        let _t = CaptureTime::new(time_log, "wasm cargo build");
+        cargo()
+            .arg("build")
+            .arg("--manifest-path=all-is-cubes-wasm/Cargo.toml")
+            .arg(TARGET_WASM)
+            .args(config.cargo_build_args())
+            .run()?;
+    }
 
     // Run wasm-pack if and only if we need to.
     // This is because it unconditionally runs `wasm-opt` which is slow and also means
@@ -477,6 +481,7 @@ fn update_server_static(config: &Config, time_log: &mut Vec<Timing>) -> Result<(
         ["all-is-cubes-wasm/target/wasm32-unknown-unknown/debug/all_is_cubes_wasm.wasm"],
         ["all-is-cubes-wasm/pkg/all_is_cubes_wasm.js"],
     ) {
+        let _t = CaptureTime::new(time_log, "wasm-pack build");
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
         cmd!("wasm-pack build --dev --target web").run()?;
     }
