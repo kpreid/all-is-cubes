@@ -7,6 +7,7 @@ use crate::MeshTypes;
 // --- Modules ---
 
 mod blocks;
+pub use blocks::InstanceMesh;
 use blocks::{BlockMeshVersion, VersionedBlockMeshes};
 
 mod chunk;

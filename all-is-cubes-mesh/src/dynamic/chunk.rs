@@ -175,7 +175,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     /// Returns the blocks _not_ included in this chunk's mesh that are within the bounds of the
     /// chunk.
     ///
-    /// Use this together with [`ChunkedSpaceMesh::get_render_data_for_block()`] to obtain mesh data
+    /// Use this together with [`ChunkedSpaceMesh::block_instance_mesh()`] to obtain mesh data
     /// from the block indexes, and render those blocks at these positions using instancing.
     /// Consider using [`InstanceCollector`](super::InstanceCollector) to group instances across
     /// chunks. (We don't do that for you so that the iteration over chunks remains in your

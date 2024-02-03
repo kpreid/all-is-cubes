@@ -475,8 +475,13 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let start_opaque_instance_draw_time = I::now();
         for (block_index, cubes) in block_instances.iter() {
             // Set buffers for the mesh
-            let Some((mesh_meta, Some(buffers))) = csm.get_render_data_for_block(block_index)
+            let Some(dynamic::InstanceMesh {
+                meta,
+                render_data: Some(buffers),
+                ..
+            }) = csm.block_instance_mesh(block_index)
             else {
+                // TODO: this is an error that should be reported
                 continue;
             };
             set_buffers(&mut render_pass, buffers);
@@ -488,12 +493,12 @@ impl<I: time::Instant> SpaceRenderer<I> {
             }
             // Record draw command for all instances using this mesh
             render_pass.draw_indexed(
-                to_wgpu_index_range(mesh_meta.opaque_range()),
+                to_wgpu_index_range(meta.opaque_range()),
                 0,
                 first_instance_index..(first_instance_index + cubes_len as u32),
             );
             blocks_drawn += cubes_len;
-            squares_drawn += mesh_meta.opaque_range().len() / 6;
+            squares_drawn += meta.opaque_range().len() / 6;
         }
 
         // Transparent geometry after opaque geometry, in back-to-front order

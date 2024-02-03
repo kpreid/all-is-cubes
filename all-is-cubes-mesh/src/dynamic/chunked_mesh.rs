@@ -16,6 +16,7 @@ use all_is_cubes::time::{self, Duration};
 use all_is_cubes::universe::URef;
 use all_is_cubes::util::{Fmt, Refmt, StatusText, TimeStats};
 
+use crate::dynamic::blocks::InstanceMesh;
 use crate::dynamic::{self, ChunkMesh, ChunkTodo, DynamicMeshTypes};
 use crate::{texture, GfxVertex, MeshOptions};
 
@@ -33,7 +34,7 @@ mod tests;
 /// Additionally, to allow instanced rendering of complex blocks that would be overly large
 /// if repeatedly copied into chunk meshes, render data is maintained for each individual block
 /// that chunks may decide to omit from their meshes; it is accessed through
-/// [`get_render_data_for_block()`](Self::get_render_data_for_block).
+/// [`block_instance_mesh()`](Self::block_instance_mesh).
 ///
 /// [`ChunkedSpaceMesh`] manages all this data but does not demand a particular sequence of
 /// rendering operations; it is your responsibility to render the chunk meshes and instances which
@@ -166,22 +167,13 @@ where
         self.chunks.get(&position)
     }
 
-    /// Retrieves the render data for the given block index.
-    /// This should be used for instanced rendering of blocks.
-    ///
-    /// TODO(instancing): This may or may not be useful in the final form of instanced
-    /// rendering. It is currently useful for prototyping.
-    pub fn get_render_data_for_block(
-        &self,
-        block_index: BlockIndex,
-    ) -> Option<(&crate::MeshMeta<M>, &M::RenderData)> {
+    /// Retrieves the mesh for a block which should be rendered according to
+    /// [`ChunkMesh::block_instances()`].
+    pub fn block_instance_mesh(&self, block_index: BlockIndex) -> Option<&InstanceMesh<M>> {
         self.block_meshes
             .meshes
             .get(usize::from(block_index))
-            .map(|vbm| {
-                let (m, d) = &vbm.instance_data;
-                (m, d)
-            })
+            .and_then(|vbm| vbm.instance_data.as_ref())
     }
 
     /// Calculates how many [`ChunkMesh::block_instances()`] are present in chunks visible from the

@@ -9,7 +9,7 @@ use all_is_cubes::time;
 use all_is_cubes::util::{Refmt as _, StatusText, TimeStats};
 
 use crate::dynamic::DynamicMeshTypes;
-use crate::{texture, GfxVertex};
+use crate::{texture, GfxVertex, MeshMeta};
 use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh};
 
 #[derive(Debug)]
@@ -218,8 +218,22 @@ pub(crate) struct VersionedBlockMesh<M: DynamicMeshTypes> {
 
     /// Arbitrary data used for rendering the block in standalone/instanced form
     /// (not part of a larger mesh).
-    /// TODO(instancing): do we benefit anywhere from this being a tuple?
-    pub(crate) instance_data: (crate::MeshMeta<M>, M::RenderData),
+    ///
+    /// If [`None`], then the block is not a candidate for instanced rendering.
+    ///
+    /// TODO(instancing): Eventually all blocks should be candidates, but not always used, depending
+    /// on what happens to the chunk.
+    pub(crate) instance_data: Option<InstanceMesh<M>>,
+}
+
+/// Data for instanced rendering of a block. Contains a `M::RenderData` for the block mesh.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct InstanceMesh<M: DynamicMeshTypes> {
+    /// The [`MeshMeta`] for the mesh data that is in `render_data`.
+    pub meta: MeshMeta<M>,
+    /// Render data for the instanced mesh.
+    pub render_data: M::RenderData,
 }
 
 impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
@@ -232,25 +246,30 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
     where
         F: FnMut(super::RenderDataUpdate<'_, M>),
     {
-        let mut instance_data: (crate::MeshMeta<M>, M::RenderData) = Default::default();
-
         // TODO(instancing): Eventually, we'll want to use instances for all blocks under some
         // circumstances (e.g. a placed block in an existing chunk mesh). For now, though, we make
-        // instance mesh generation conditional on whether it will ever be used.
-        if should_use_instances(&mesh) {
+        // instance mesh generation conditional on whether it will ever be used, to make life nicer
+        // for exporters.
+        let instance_data = if should_use_instances(&mesh) {
             // TODO: wasteful data copy to make the SpaceMesh. Consider arranging so that it is
             // merely a sort of borrowing to present a `BlockMesh` as a `RenderDataUpdate`'s mesh.`
             let space_mesh = SpaceMesh::from(&mesh);
 
+            let mut render_data = M::RenderData::default();
             render_data_updater(super::RenderDataUpdate {
                 mesh: &space_mesh,
-                render_data: &mut instance_data.1,
+                render_data: &mut render_data,
                 indices_only: false,
                 mesh_id: super::MeshId(super::MeshIdImpl::Block(block_index)),
             });
 
-            instance_data.0 = space_mesh.into_meta();
-        }
+            Some(InstanceMesh {
+                meta: space_mesh.into_meta(),
+                render_data,
+            })
+        } else {
+            None
+        };
 
         Self {
             mesh,
