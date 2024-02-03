@@ -193,8 +193,12 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 Some(index) => index,
                 None => return, // continue in for_each() loop
             };
+            let Some(block_mesh) = block_meshes.get_block_mesh(index, cube, true) else {
+                // Skip this cube exactly as if it wasn't in bounds
+                return;
+            };
+
             let already_seen_index = bitset_set_and_get(&mut self.block_indices_used, index.into());
-            let block_mesh = block_meshes.get_block_mesh(index, cube, true);
 
             if !already_seen_index {
                 // Capture texture handles to ensure that our texture coordinates stay valid.
@@ -217,8 +221,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                     if let Some(adj_block_index) = space.get_block_index(adjacent_cube) {
                         if block_meshes
                             .get_block_mesh(adj_block_index, adjacent_cube, false)
-                            .face_vertices[face.opposite()]
-                        .fully_opaque
+                            .map_or(false, |bm| bm.face_vertices[face.opposite()].fully_opaque)
                         {
                             // Don't draw obscured faces, but do record that we depended on them.
                             bitset_set_and_get(
@@ -637,7 +640,7 @@ pub trait GetBlockMesh<'a, M: MeshTypes> {
     /// produce identical meshes. If this is not the case, then the resulting [`SpaceMesh`]
     /// may have inconsistent properties such as gaps where block faces were presumed to be hidden.
     ///
-    /// # `primary`
+    /// # `primary` and optional return
     ///
     /// The `primary` parameter will be `true` exactly once per cube in the meshed region,
     /// per call to [`SpaceMesh::compute()`], and the block mesh returned at that time will be the
@@ -646,6 +649,10 @@ pub trait GetBlockMesh<'a, M: MeshTypes> {
     ///
     /// Thus, for example, the implementation may choose to record the presence of a particular
     /// block to perform additional or substitute rendering separate from the computed mesh.
+    /// In the case of substitute rendering, it should return `None`, which is equivalent to
+    /// returning [`BlockMesh::EMPTY_REF`] except that the mesh will not be included in
+    /// [`SpaceMesh::blocks_used_iter()`] — essentially, the cube will be treated as if it is
+    /// excluded from the region covered by the mesh.
     ///
     /// # Errors and panics
     ///
@@ -656,7 +663,12 @@ pub trait GetBlockMesh<'a, M: MeshTypes> {
     ///
     /// Note that the returned [`BlockMesh`] may have [`Flaws`] which will be incorporated
     /// into the [`SpaceMesh`]'s flaws.
-    fn get_block_mesh(&mut self, index: BlockIndex, cube: Cube, primary: bool) -> &'a BlockMesh<M>;
+    fn get_block_mesh(
+        &mut self,
+        index: BlockIndex,
+        cube: Cube,
+        primary: bool,
+    ) -> Option<&'a BlockMesh<M>>;
 }
 
 /// Basic implementation of [`GetBlockMesh`] for any slice of meshes.
@@ -666,11 +678,11 @@ impl<'a, M: MeshTypes> GetBlockMesh<'a, M> for &'a [BlockMesh<M>] {
         index: BlockIndex,
         #[allow(unused)] cube: Cube,
         #[allow(unused)] primary: bool,
-    ) -> &'a BlockMesh<M> {
+    ) -> Option<&'a BlockMesh<M>> {
         // TODO: Consider changing this out-of-bounds behavior to either panic or return a mesh with
         // some `Flaws` set.
 
-        <[_]>::get(self, usize::from(index)).unwrap_or(BlockMesh::<M>::EMPTY_REF)
+        Some(<[_]>::get(self, usize::from(index)).unwrap_or(BlockMesh::<M>::EMPTY_REF))
     }
 }
 
@@ -964,7 +976,7 @@ mod tests {
         let mut source: &[BlockMesh<TextureMt>] = &[];
         assert_eq!(
             source.get_block_mesh(10, Cube::ORIGIN, true),
-            BlockMesh::EMPTY_REF
+            Some(BlockMesh::EMPTY_REF)
         );
     }
 }

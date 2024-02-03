@@ -234,18 +234,23 @@ struct InstanceTrackingBlockMeshSource<'a, M: DynamicMeshTypes> {
 }
 
 impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for InstanceTrackingBlockMeshSource<'a, M> {
-    fn get_block_mesh(&mut self, index: BlockIndex, cube: Cube, primary: bool) -> &'a BlockMesh<M> {
+    fn get_block_mesh(
+        &mut self,
+        index: BlockIndex,
+        cube: Cube,
+        primary: bool,
+    ) -> Option<&'a BlockMesh<M>> {
         let Some(vbm) = self.block_meshes.get_vbm(index) else {
-            return BlockMesh::<M>::EMPTY_REF;
+            return Some(BlockMesh::<M>::EMPTY_REF);
         };
 
         if vbm.instance_data.is_some() {
             if primary {
                 self.instances.insert(index, cube);
             }
-            BlockMesh::<M>::EMPTY_REF
+            None
         } else {
-            &vbm.mesh
+            Some(&vbm.mesh)
         }
     }
 }

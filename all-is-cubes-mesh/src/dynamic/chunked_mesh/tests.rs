@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use all_is_cubes::block::{AnimationHint, Block};
+use all_is_cubes::block::{AnimationHint, Block, BlockDef, BlockDefTransaction, AIR};
 use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, TransparencyOption, Viewport};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::make_some_blocks;
@@ -410,4 +410,46 @@ fn instances_for_animated() {
     tester.update(|_| {});
 
     assert_eq!(tester.instances(), vec![(index_of_anim, vec![[1, 0, 0]])]);
+}
+
+/// When block meshes are merged into chunk meshes, the chunk meshes need to be updated when the
+/// block meshes change -- but when not merged and rendered as instances, the chunk meshes should
+/// *not* be updated.
+///
+/// Note that this doesn't cover changes to the Space, only changes to the block definition.
+#[test]
+fn instances_dont_dirty_mesh_when_block_changes() {
+    let mut universe = Universe::new();
+    let [not_anim, will_be_anim] = make_some_blocks();
+    let anim_def = universe.insert_anonymous(BlockDef::new(
+        Block::builder()
+            .display_name("animated")
+            .color(will_be_anim.color())
+            .animation_hint(AnimationHint::TEMPORARY)
+            .build(),
+    ));
+    let mut space = Space::empty_positive(2, 1, 1);
+    space.set([0, 0, 0], &not_anim).unwrap();
+    space.set([1, 0, 0], Block::from(anim_def.clone())).unwrap();
+
+    let mut tester: CsmTester<1000> = CsmTester::new(space, LARGE_VIEW_DISTANCE);
+    tester.update(|_| {});
+
+    // Make a change to the block defunition...
+    anim_def
+        .execute(
+            &BlockDefTransaction::overwrite(
+                Block::builder()
+                    .display_name("replaced")
+                    .color(will_be_anim.color())
+                    .build(),
+            ),
+            &mut transaction::no_outputs,
+        )
+        .unwrap();
+
+    // ...and an update should not include updating any meshes.
+    tester.update(|rdu| {
+        panic!("unwanted render data update: {rdu:#?}");
+    });
 }
