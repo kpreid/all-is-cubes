@@ -227,6 +227,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     }
 }
 
+/// [`GetBlockMesh`] implementation which substitutes instances when appropriate.
 struct InstanceTrackingBlockMeshSource<'a, M: DynamicMeshTypes> {
     block_meshes: &'a dynamic::VersionedBlockMeshes<M>,
     instances: &'a mut dynamic::InstanceMap,
@@ -234,15 +235,17 @@ struct InstanceTrackingBlockMeshSource<'a, M: DynamicMeshTypes> {
 
 impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for InstanceTrackingBlockMeshSource<'a, M> {
     fn get_block_mesh(&mut self, index: BlockIndex, cube: Cube, primary: bool) -> &'a BlockMesh<M> {
-        let mesh = self.block_meshes.get_block_mesh(index, cube, false);
+        let Some(vbm) = self.block_meshes.get_vbm(index) else {
+            return BlockMesh::<M>::EMPTY_REF;
+        };
 
-        if dynamic::blocks::should_use_instances(mesh) {
+        if vbm.instance_data.is_some() {
             if primary {
                 self.instances.insert(index, cube);
             }
             BlockMesh::<M>::EMPTY_REF
         } else {
-            mesh
+            &vbm.mesh
         }
     }
 }

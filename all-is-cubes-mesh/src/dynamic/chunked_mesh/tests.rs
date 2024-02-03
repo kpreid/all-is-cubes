@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use all_is_cubes::block::Block;
+use all_is_cubes::block::{AnimationHint, Block};
 use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, TransparencyOption, Viewport};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::make_some_blocks;
@@ -377,7 +377,6 @@ fn instances_grouped_by_block() {
     space.set([CHUNK_SIZE + 1, 0, 0], &block2).unwrap();
 
     let mut tester: CsmTester<ALL_INSTANCES> = CsmTester::new(space, LARGE_VIEW_DISTANCE);
-
     tester.update(|_| {});
 
     assert_eq!(
@@ -388,4 +387,27 @@ fn instances_grouped_by_block() {
             (2, vec![[1, 0, 0], [CHUNK_SIZE + 1, 0, 0]]),
         ]
     );
+}
+
+/// Instances are used for blocks with relevant animation hints.
+#[test]
+fn instances_for_animated() {
+    let [not_anim, will_be_anim] = make_some_blocks();
+    let anim = Block::builder()
+        .display_name("animated")
+        .color(will_be_anim.color())
+        .animation_hint(AnimationHint::TEMPORARY)
+        .build();
+    let mut space = Space::empty_positive(2, 1, 1);
+    space.set([0, 0, 0], &not_anim).unwrap();
+    space.set([1, 0, 0], &anim).unwrap();
+    let index_of_anim = space.get_block_index([1, 0, 0]).unwrap();
+
+    // TODO(instancing): Kludge: the question "should we use instances *at all*" has not yet been
+    // separated from the question of "should we use instances always". We care about the former
+    // and not the latter here.
+    let mut tester: CsmTester<1000> = CsmTester::new(space, LARGE_VIEW_DISTANCE);
+    tester.update(|_| {});
+
+    assert_eq!(tester.instances(), vec![(index_of_anim, vec![[1, 0, 0]])]);
 }

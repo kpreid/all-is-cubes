@@ -2,7 +2,7 @@ use std::num::NonZeroU32;
 
 use fnv::FnvHashSet;
 
-use all_is_cubes::block::{EvaluatedBlock, Resolution};
+use all_is_cubes::block::{self, EvaluatedBlock, Resolution};
 use all_is_cubes::math::Cube;
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::time;
@@ -98,6 +98,7 @@ where
                             // marked as not-ready so it will be replaced eventually.
                             VersionedBlockMesh::new(
                                 index,
+                                evaluated,
                                 BlockMesh::new(evaluated, block_texture_allocator, &fast_options),
                                 BlockMeshVersion::NotReady,
                                 &mut render_data_updater,
@@ -107,6 +108,7 @@ where
                             // final mesh as quick as the placeholder.
                             VersionedBlockMesh::new(
                                 index,
+                                evaluated,
                                 BlockMesh::new(evaluated, block_texture_allocator, mesh_options),
                                 current_version_number,
                                 &mut render_data_updater,
@@ -162,6 +164,7 @@ where
                     // TODO: reuse old render data and allocations
                     *current_mesh_entry = VersionedBlockMesh::new(
                         index,
+                        new_evaluated_block,
                         new_block_mesh,
                         current_version_number,
                         &mut render_data_updater,
@@ -185,6 +188,10 @@ where
 
         stats
     }
+
+    pub(crate) fn get_vbm(&self, index: BlockIndex) -> Option<&VersionedBlockMesh<M>> {
+        self.meshes.get(usize::from(index))
+    }
 }
 
 impl<M: DynamicMeshTypes> Default for VersionedBlockMeshes<M> {
@@ -193,6 +200,7 @@ impl<M: DynamicMeshTypes> Default for VersionedBlockMeshes<M> {
     }
 }
 
+// TODO(instancing): This impl is no longer used internally by ChunkedSpaceMesh. Should we remove it?
 impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for &'a VersionedBlockMeshes<M> {
     fn get_block_mesh(
         &mut self,
@@ -200,8 +208,7 @@ impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for &'a VersionedBlockMeshes<M
         _cube: Cube,
         _primary: bool,
     ) -> &'a BlockMesh<M> {
-        self.meshes
-            .get(usize::from(index))
+        self.get_vbm(index)
             .map(|vbm| &vbm.mesh)
             .unwrap_or(BlockMesh::<M>::EMPTY_REF)
     }
@@ -239,6 +246,7 @@ pub struct InstanceMesh<M: DynamicMeshTypes> {
 impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
     pub(crate) fn new<F>(
         block_index: BlockIndex,
+        ev: &EvaluatedBlock,
         mesh: BlockMesh<M>,
         version: BlockMeshVersion,
         render_data_updater: &mut F,
@@ -250,7 +258,7 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
         // circumstances (e.g. a placed block in an existing chunk mesh). For now, though, we make
         // instance mesh generation conditional on whether it will ever be used, to make life nicer
         // for exporters.
-        let instance_data = if should_use_instances(&mesh) {
+        let instance_data = if should_use_instances(ev, &mesh) {
             // TODO: wasteful data copy to make the SpaceMesh. Consider arranging so that it is
             // merely a sort of borrowing to present a `BlockMesh` as a `RenderDataUpdate`'s mesh.`
             let space_mesh = SpaceMesh::from(&mesh);
@@ -292,10 +300,25 @@ pub(crate) enum BlockMeshVersion {
     Numbered(NonZeroU32),
 }
 
-pub(crate) fn should_use_instances<M: DynamicMeshTypes>(block_mesh: &BlockMesh<M>) -> bool {
+fn should_use_instances<M: DynamicMeshTypes>(
+    ev: &EvaluatedBlock,
+    block_mesh: &BlockMesh<M>,
+) -> bool {
+    // TODO(instancing): we either need an explicit “allow instances” configuration, or to demand
+    // that all clients support instances (probably the latter?)
+    if M::MAXIMUM_MERGED_BLOCK_MESH_SIZE == usize::MAX {
+        return false;
+    }
+
     // TODO(instancing): Remove the restriction to only nontransparent meshes when (if) rendering transparent instances is supported.
-    block_mesh.count_indices() > M::MAXIMUM_MERGED_BLOCK_MESH_SIZE
-        && block_mesh
-            .all_face_meshes()
-            .all(|(_, fm)| fm.indices_transparent.len() == 0)
+    if !block_mesh
+        .all_face_meshes()
+        .all(|(_, fm)| fm.indices_transparent.len() == 0)
+    {
+        return false;
+    }
+
+    // TODO(instancing): if the animation hint is colors-in-definition-only then we don't want instancing
+    ev.attributes.animation_hint != block::AnimationHint::UNCHANGING
+        || block_mesh.count_indices() > M::MAXIMUM_MERGED_BLOCK_MESH_SIZE
 }
