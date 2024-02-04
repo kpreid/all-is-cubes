@@ -1,0 +1,60 @@
+# Configuration file for <https://crates.io/crates/cargo-deny>.
+# Use this as `cargo deny --config tools/deny.toml`.
+
+# This list of features excludes the "rerun" and "gltf" features
+# as they are only intended for testing (i.e. no binaries will be distributed
+# with them enabled).
+features = ["std", "arbitrary", "save", "threads", "wgpu"]
+
+[licenses]
+unlicensed = "deny"
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "CC0-1.0",
+]
+copyleft = "deny"
+allow-osi-fsf-free = "osi"
+default = "warn"
+private = { ignore = true }
+
+[bans]
+multiple-versions = "warn"
+# TODO: enable wildcard check when https://github.com/EmbarkStudios/cargo-deny/issues/488 is fixed
+wildcards = "allow"
+allow-wildcard-paths = true
+# We might want to be stricter about default-features...
+# workspace-default-features = "warn"
+# external-default-features = "warn"
+
+skip = [
+    { name = "itertools" },
+    { name = "wasi" }, # not actually used on our targets
+    { name = "web-time", version = "=0.2.4" },
+    { name = "raw-window-handle", version = "=0.5.2" },
+    { name = "toml_edit", version = "=0.19.15" },
+    { name = "syn", version = "1" },
+    { name = "redox_syscall", version = "=0.3.5" },
+    { name = "libredox", version = "=0.0.1" },
+    { name = "jni", version = "<0.21" },
+    { name = "miniz_oxide", version = "0.4.4" }, # old used by png-decoder
+]
+
+skip-tree = [
+    # Known issue: `noise` has stale deps including `rand` family
+    { name = "noise", version = "=0.8.2", depth = 2 },
+
+    # misc transitive deps
+    { name = "bitflags", version = "=1.3.2", depth = 1 },
+    { name = "num_enum", version = "=0.5.11", depth = 2 },
+    { name = "ndk", version = "=0.7.0", depth = 2 },
+    { name = "windows", depth = 3 },
+    { name = "windows-sys", depth = 2 },
+    { name = "windows-targets", depth = 2 },
+    { name = "proc-macro-crate" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-git = []
