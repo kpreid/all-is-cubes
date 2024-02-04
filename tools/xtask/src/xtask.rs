@@ -302,21 +302,33 @@ fn main() -> Result<(), ActionError> {
             assert_eq!(config.scope, Scope::All);
 
             let version_value = toml_edit::value(version.as_str());
-            for package in ALL_NONTEST_PACKAGES {
-                let manifest_path = format!("{package}/Cargo.toml");
+            for manifest_dir in ALL_NONTEST_PACKAGES.into_iter().chain(["."]) {
+                let manifest_path = format!("{manifest_dir}/Cargo.toml");
                 eprint!("Editing {manifest_path}...");
                 let _ = std::io::stderr().flush();
+
                 let mut manifest: toml_edit::Document =
                     fs::read_to_string(&manifest_path)?.parse()?;
-                assert_eq!(manifest["package"]["name"].as_str(), Some(package));
 
-                // Update version of the package itself
-                manifest["package"]["version"] = version_value.clone();
+                // For packages only
+                let package_version_text = if manifest_dir != "." {
+                    assert_eq!(manifest["package"]["name"].as_str(), Some(manifest_dir));
 
-                // Update versions of dependencies
+                    // Update version of the package itself
+                    manifest["package"]["version"] = version_value.clone();
+                    "package version and "
+                } else {
+                    ""
+                };
+
+                // Update versions of dependencies in workspace or packages
+                let deps_table = if manifest_dir == "." {
+                    manifest["workspace"]["dependencies"].as_table_mut()
+                } else {
+                    manifest["dependencies"].as_table_mut()
+                };
                 let mut count_deps = 0;
-                for (_dep_key, dep_item) in manifest["dependencies"]
-                    .as_table_mut()
+                for (_dep_key, dep_item) in deps_table
                     .expect("dependencies not a table")
                     .iter_mut()
                     .filter(|(dep_key, _)| ALL_NONTEST_PACKAGES.contains(&dep_key.get()))
@@ -326,7 +338,7 @@ fn main() -> Result<(), ActionError> {
                 }
 
                 fs::write(&manifest_path, manifest.to_string())?;
-                eprintln!("wrote version and {count_deps} deps.");
+                eprintln!("wrote {package_version_text}{count_deps} deps.");
             }
             eprint!(
                 "Versions updated. Manual updates are still needed for:\n\

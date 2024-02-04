@@ -5824,6 +5824,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml_edit"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8dc77def39ce6079c2d0c866cc20848f591b1898f153c9fe7c4f29e1154510b"
+dependencies = [
+ "indexmap",
+ "toml_datetime",
+ "winnow",
+]
+
+[[package]]
 name = "tower"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6794,7 +6805,7 @@ dependencies = [
  "cargo_metadata 0.8.2",
  "clap",
  "once_cell",
- "toml_edit 0.21.1",
+ "toml_edit 0.22.0",
  "walkdir",
  "xshell 0.1.17",
 ]
