@@ -282,7 +282,18 @@ jobs:
         name: cargo-timings features
         path: |
           target/cargo-timings/cargo-timing-*.html
-    
+
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: EmbarkStudios/cargo-deny-action@v1.5.12
+      with:
+        # disables default --all-features
+        arguments:
+        command-arguments: --config=tools/deny.toml 
+
   # Run mutation testing against the changed code
   # Based on example from https://mutants.rs/pr-diff.html
   incremental-mutants:
