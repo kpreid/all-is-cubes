@@ -348,6 +348,7 @@ where
         // Update some chunk geometry.
         let chunk_bounds = space.bounds().divide(CHUNK_SIZE);
         let mut chunk_mesh_generation_times = TimeStats::default();
+        let mut chunk_instance_generation_times = TimeStats::default();
         let mut chunk_mesh_callback_times = TimeStats::default();
         let mut did_not_finish = false;
         for p in self.chunk_chart.chunks(view_chunk, OctantMask::ALL) {
@@ -398,8 +399,13 @@ where
                 let compute_time =
                     compute_end_update_start.saturating_duration_since(this_chunk_start_time);
                 let update_time = update_end.saturating_duration_since(compute_end_update_start);
-                chunk_mesh_generation_times += TimeStats::one(compute_time);
-                chunk_mesh_callback_times += TimeStats::one(update_time);
+                if actually_changed_mesh {
+                    chunk_mesh_generation_times += TimeStats::one(compute_time);
+                    chunk_mesh_callback_times += TimeStats::one(update_time);
+                } else {
+                    chunk_instance_generation_times += TimeStats::one(compute_time);
+                    // update_time should be nothing
+                }
 
                 #[cfg(feature = "rerun")]
                 if self.rerun_destination.is_enabled() {
@@ -474,6 +480,7 @@ where
                         chunk_mesh_generation_times.sum + chunk_mesh_callback_times.sum,
                     ),
                 chunk_mesh_generation_times,
+                chunk_instance_generation_times,
                 chunk_mesh_callback_times,
                 depth_sort_time: depth_sort_end_time
                     .map(|t| t.saturating_duration_since(chunk_scan_end_time)),
@@ -528,8 +535,10 @@ pub struct CsmUpdateInfo {
     /// Time spent on traversing chunks in view this frame,
     /// excluding the actual chunk mesh generation operations.
     pub chunk_scan_time: Duration,
-    /// Time spent on building chunk meshes this frame.
+    /// Time spent on building chunk meshes & block instances this frame.
     pub chunk_mesh_generation_times: TimeStats,
+    /// Time spent on only block instances within chunks this frame.
+    pub chunk_instance_generation_times: TimeStats,
     /// Time spent on `chunk_mesh_updater` callbacks this frame.
     pub chunk_mesh_callback_times: TimeStats,
     depth_sort_time: Option<Duration>,
@@ -550,6 +559,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
             prep_time,
             chunk_scan_time,
             chunk_mesh_generation_times,
+            chunk_instance_generation_times,
             chunk_mesh_callback_times,
             depth_sort_time,
             block_updates,
@@ -563,6 +573,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
                 Block mesh gen {block_updates}
                 Chunk scan     {chunk_scan_time}
                       mesh gen {chunk_mesh_generation_times}
+                      inst gen {chunk_instance_generation_times}
                       upload   {chunk_mesh_callback_times}
                       depthsort {depth_sort_time}
                 Mem: {chunk_mib} MiB for {chunk_count} chunks\
@@ -572,6 +583,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
             block_updates = block_updates,
             chunk_scan_time = chunk_scan_time.refmt(&StatusText),
             chunk_mesh_generation_times = chunk_mesh_generation_times,
+            chunk_instance_generation_times = chunk_instance_generation_times,
             chunk_mesh_callback_times = chunk_mesh_callback_times,
             depth_sort_time = depth_sort_time.unwrap_or(Duration::ZERO).refmt(&StatusText),
             chunk_mib = chunk_total_cpu_byte_size / (1024 * 1024),
@@ -592,6 +604,7 @@ impl CsmUpdateInfo {
             prep_time,
             chunk_scan_time,
             chunk_mesh_generation_times,
+            chunk_instance_generation_times,
             chunk_mesh_callback_times,
             depth_sort_time,
             block_updates,
@@ -603,6 +616,7 @@ impl CsmUpdateInfo {
         *prep_time += other.prep_time;
         *chunk_scan_time += other.chunk_scan_time;
         *chunk_mesh_generation_times += other.chunk_mesh_generation_times;
+        *chunk_instance_generation_times += other.chunk_instance_generation_times;
         *chunk_mesh_callback_times += other.chunk_mesh_callback_times;
         *depth_sort_time = [*depth_sort_time, other.depth_sort_time]
             .into_iter()
