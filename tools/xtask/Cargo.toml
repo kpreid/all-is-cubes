@@ -20,7 +20,7 @@ clap = { workspace = true }
 once_cell = { workspace = true }
 # This version of toml_edit is old, but it is also the same version used by
 # trycmd, so using it (as long as it still works) saves on build time and space.
-toml_edit = { version = "0.19.4" }
+toml_edit = { version = "0.21.1" }
 walkdir = "2.3.2"
 xshell = "0.1.17"
 
