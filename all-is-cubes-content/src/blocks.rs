@@ -10,8 +10,8 @@ use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
 use all_is_cubes::block::{
-    AnimationHint, Atom, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution::*,
-    RotationPlacementRule, TickAction, AIR,
+    self, AnimationHint, Atom, Block, BlockCollision, BlockDefTransaction, Primitive,
+    Resolution::*, RotationPlacementRule, TickAction, AIR,
 };
 use all_is_cubes::drawing::embedded_graphics::{
     prelude::Point,
@@ -429,12 +429,26 @@ pub async fn install_demo_blocks(
             BecomeBlinker(state) => Block::builder()
                 .color(if state { Rgba::WHITE } else { Rgba::BLACK })
                 .display_name(format!("Blinker {state:?}"))
+                .animation_hint({
+                    let mut h = AnimationHint::default();
+                    h.replacement = block::AnimationChange::ColorSameCategory;
+                    h
+                })
                 .build(),
 
             Explosion(timer) => {
                 let decay = (f32::from(timer) * -0.1).exp();
                 Block::builder()
                     .display_name(format!("Explosion {timer}"))
+                    .animation_hint({
+                        let mut h = AnimationHint::default();
+                        h.replacement = if timer == 255 {
+                            block::AnimationChange::Shape
+                        } else {
+                            block::AnimationChange::ColorSameCategory
+                        };
+                        h
+                    })
                     .color(Rgb::ONE.with_alpha(NotNan::new(decay).unwrap()))
                     .collision(BlockCollision::None)
                     .light_emission(rgb_const!(1.0, 0.77, 0.40) * 10.0 * decay)
