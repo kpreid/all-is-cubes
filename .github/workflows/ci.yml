@@ -75,7 +75,13 @@ jobs:
             depversions: minimal
             primary: false
 
-    runs-on: ${{ matrix.os }}-latest
+    # Override macOS version to not-yet-"latest" runners using M1 hardware.
+    # <https://github.blog/changelog/2024-01-30-github-actions-introducing-the-new-m1-macos-runner-available-to-open-source/>
+    # Motivation:
+    # * I currently use macOS x86 for development, so that's well tested, but Apple Silicon isn't.
+    # * macos is consistently the slowest job, so maybe this will be faster.
+    runs-on: ${{ matrix.os == 'macos' && 'macos-14' || format('{0}-latest', matrix.os) }}
+
     continue-on-error: ${{ !matrix.primary }}
 
     steps:
