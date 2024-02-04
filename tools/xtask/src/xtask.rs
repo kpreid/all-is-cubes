@@ -607,14 +607,12 @@ fn do_for_all_packages(
 
         match op {
             TestOrCheck::Test => {
-                // Run host-size tests (which exist because they're cheaper and because I made them
+                // Run host-side tests (which exist because they're cheaper and because I made them
                 // first).
                 cmd!("cargo test --manifest-path=all-is-cubes-wasm/Cargo.toml").run()?;
 
-                let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
-
                 // TODO: control over choice of browser
-                cmd!("wasm-pack test --headless --firefox").run()?;
+                cmd!("wasm-pack test --headless --firefox all-is-cubes-wasm/").run()?;
             }
             TestOrCheck::BuildTests | TestOrCheck::Lint => {
                 let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
