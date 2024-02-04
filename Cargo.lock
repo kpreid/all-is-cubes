@@ -4745,7 +4745,7 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 [[package]]
 name = "rend3"
 version = "0.3.0"
-source = "git+https://github.com/kpreid/rend3/?branch=wgpu19#407c9dd30f58d20ec00d4354b8f47e41e7d111a7"
+source = "git+https://github.com/BVE-Reborn/rend3/?rev=86bc4d2d2f4048a0adaa9af5ef542dc652308966#86bc4d2d2f4048a0adaa9af5ef542dc652308966"
 dependencies = [
  "arrayvec",
  "bimap",
@@ -4779,7 +4779,7 @@ dependencies = [
 [[package]]
 name = "rend3-gltf"
 version = "0.3.0"
-source = "git+https://github.com/kpreid/rend3/?branch=wgpu19#407c9dd30f58d20ec00d4354b8f47e41e7d111a7"
+source = "git+https://github.com/BVE-Reborn/rend3/?rev=86bc4d2d2f4048a0adaa9af5ef542dc652308966#86bc4d2d2f4048a0adaa9af5ef542dc652308966"
 dependencies = [
  "arrayvec",
  "base64 0.21.7",
@@ -4799,7 +4799,7 @@ dependencies = [
 [[package]]
 name = "rend3-routine"
 version = "0.3.0"
-source = "git+https://github.com/kpreid/rend3/?branch=wgpu19#407c9dd30f58d20ec00d4354b8f47e41e7d111a7"
+source = "git+https://github.com/BVE-Reborn/rend3/?rev=86bc4d2d2f4048a0adaa9af5ef542dc652308966#86bc4d2d2f4048a0adaa9af5ef542dc652308966"
 dependencies = [
  "arrayvec",
  "bitflags 2.4.2",
@@ -4824,7 +4824,7 @@ dependencies = [
 [[package]]
 name = "rend3-types"
 version = "0.3.0"
-source = "git+https://github.com/kpreid/rend3/?branch=wgpu19#407c9dd30f58d20ec00d4354b8f47e41e7d111a7"
+source = "git+https://github.com/BVE-Reborn/rend3/?rev=86bc4d2d2f4048a0adaa9af5ef542dc652308966#86bc4d2d2f4048a0adaa9af5ef542dc652308966"
 dependencies = [
  "bitflags 2.4.2",
  "bytemuck",
