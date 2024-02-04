@@ -17,6 +17,7 @@ use all_is_cubes::universe::URef;
 use all_is_cubes::util::{Fmt, Refmt, StatusText, TimeStats};
 
 use crate::dynamic::blocks::InstanceMesh;
+use crate::dynamic::chunk::ChunkTodoState;
 use crate::dynamic::{self, ChunkMesh, ChunkTodo, DynamicMeshTypes};
 use crate::{texture, GfxVertex, MeshOptions};
 
@@ -361,34 +362,37 @@ where
                 break;
             }
 
+            let chunk_todo = todo.chunks.entry(p).or_insert_with(|| ChunkTodo {
+                state: ChunkTodoState::DirtyMeshAndInstances,
+                always_instanced_or_empty: Some(
+                    self.block_meshes.always_instanced_or_empty.clone(),
+                ),
+            });
             let chunk_entry = self.chunks.entry(p);
-            // If the chunk needs updating or never existed, update it.
-            if (todo
-                .chunks
-                .get(&p)
-                .map(|ct| ct.recompute_mesh)
-                .unwrap_or(false)
-                && !self.did_not_finish_chunks)
-                || matches!(chunk_entry, Vacant(_))
-                || matches!(
-                    chunk_entry,
-                    Occupied(ref oe) if oe.get().stale_blocks(&self.block_meshes))
+
+            // If the chunk has stale blocks in its mesh, mark it dirty.
+            if matches!(
+                chunk_entry,
+                Occupied(ref oe) if oe.get().stale_blocks(&self.block_meshes))
             {
-                //let compute_start = I::now();
-                let chunk = chunk_entry.or_insert_with(|| {
-                    // Remember that we want to track dirty flags for this chunk.
-                    todo.chunks.insert(p, ChunkTodo::CLEAN);
-                    // Generate new chunk.
-                    ChunkMesh::new(p)
-                });
-                chunk.recompute_mesh(
+                chunk_todo.state = ChunkTodoState::DirtyMeshAndInstances;
+            }
+
+            // If the chunk needs updating or never existed, update it.
+            if (chunk_todo.is_not_clean() && !self.did_not_finish_chunks)
+                || matches!(chunk_entry, Vacant(_))
+            {
+                let chunk = chunk_entry.or_insert_with(|| ChunkMesh::new(p));
+                let actually_changed_mesh = chunk.recompute(
                     todo.chunks.get_mut(&p).unwrap(), // TODO: can we eliminate the double lookup with a todo entry?
                     space,
                     mesh_options,
                     &self.block_meshes,
                 );
                 let compute_end_update_start = I::now();
-                render_data_updater(chunk.borrow_for_update(false));
+                if actually_changed_mesh {
+                    render_data_updater(chunk.borrow_for_update(false));
+                }
                 let update_end = I::now();
 
                 let compute_time =
@@ -663,14 +667,22 @@ impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CH
             }
             SpaceChange::CubeBlock {
                 cube,
-                old_block_index: _,
-                new_block_index: _,
+                old_block_index,
+                new_block_index,
                 ..
             } => {
-                // TODO: use block index information to decide whether the new block
-                // should be rendered as an instanced block rather than chunk mesh
                 todo.modify_block_and_adjacent(cube, |chunk_todo| {
-                    chunk_todo.recompute_mesh = true;
+                    // TODO(instancing): Once we have "temporarily instance anything",
+                    // the right thing to do here is only check the old index, not the new one,
+                    // because what we're actually checking is whether the old block *in our mesh*
+                    // is instanced or not, which this merely an adequate approximation of.
+                    if chunk_todo.has_always_instanced(old_block_index)
+                        && chunk_todo.has_always_instanced(new_block_index)
+                    {
+                        chunk_todo.state |= ChunkTodoState::DirtyInstances;
+                    } else {
+                        chunk_todo.state |= ChunkTodoState::DirtyMeshAndInstances;
+                    }
                 });
             }
             SpaceChange::CubeLight { .. } => {

@@ -1,4 +1,5 @@
-use std::num::NonZeroU32;
+use alloc::sync::Arc;
+use core::num::NonZeroU32;
 
 use fnv::FnvHashSet;
 
@@ -17,6 +18,12 @@ pub(crate) struct VersionedBlockMeshes<M: DynamicMeshTypes> {
     /// Indices of this vector are block IDs in the Space.
     pub(crate) meshes: Vec<VersionedBlockMesh<M>>,
 
+    /// Sorted list of all indices of meshes that should always be rendered instanced rather than
+    /// as chunk meshes, or which are empty and thus don't draw or occlude anything.
+    ///
+    /// This is used to help determine when a chunk mesh doesn't need to be rebuilt.
+    pub(crate) always_instanced_or_empty: Arc<[BlockIndex]>,
+
     last_version_counter: NonZeroU32,
 }
 
@@ -24,6 +31,7 @@ impl<M: DynamicMeshTypes> VersionedBlockMeshes<M> {
     pub fn new() -> Self {
         Self {
             meshes: Vec::new(),
+            always_instanced_or_empty: Arc::from(Vec::new()),
             last_version_counter: NonZeroU32::new(u32::MAX).unwrap(),
         }
     }
@@ -33,6 +41,7 @@ impl<M: DynamicMeshTypes> VersionedBlockMeshes<M> {
     /// extra data.
     pub fn clear(&mut self) {
         self.meshes.clear();
+        self.always_instanced_or_empty = Arc::from(Vec::new());
     }
 }
 
@@ -185,6 +194,16 @@ where
                 );
             }
         }
+
+        // TODO(instancing): when we have "_sometimes_ instanced" blocks, this will need to change
+        // because it only looks at whether we prepared for instancing
+        self.always_instanced_or_empty = self
+            .meshes
+            .iter()
+            .enumerate()
+            .filter(|(_, vbm)| vbm.instance_data.is_some() || vbm.mesh.is_empty())
+            .map(|(i, _)| i as BlockIndex)
+            .collect();
 
         stats
     }

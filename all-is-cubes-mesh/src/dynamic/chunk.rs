@@ -1,4 +1,7 @@
+use alloc::sync::Arc;
 use core::fmt;
+use core::mem;
+use core::ops;
 
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::math::{Aab, Cube, Geometry, GridCoordinate, LineVertex};
@@ -10,6 +13,9 @@ use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh, VPos};
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
 
+/// TODO: use chunk-relative coordinates to save a bit of memory
+type MeshCubeSet = fnv::FnvHashSet<Cube>;
+
 /// Stores a [`SpaceMesh`] covering one [chunk](all_is_cubes::chunking) of a [`Space`],
 /// a list of blocks to render instanced instead, caller-provided rendering data, and incidentals.
 //---
@@ -18,6 +24,12 @@ pub struct ChunkMesh<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> {
     pub(super) position: ChunkPos<CHUNK_SIZE>,
     mesh: SpaceMesh<M>,
     block_dependencies: Vec<(BlockIndex, dynamic::BlockMeshVersion)>,
+
+    /// Cubes which were incorporated into the chunk mesh.
+    /// All cubes not in this set are candidates for having an instance placed there
+    /// during updates.
+    /// TODO: use sorted vector instead of set?
+    pub(crate) mesh_cubes: MeshCubeSet,
 
     /// Blocks to be rendered as instances rather than part of the main mesh.
     pub(super) block_instances: dynamic::InstanceMap,
@@ -41,6 +53,7 @@ where
         let Self {
             position,
             mesh,
+            mesh_cubes: _, // derived from mesh
             block_dependencies,
             block_instances,
             render_data,
@@ -62,6 +75,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> fmt::Debug
         let Self {
             position,
             mesh,
+            mesh_cubes,
             block_dependencies,
             block_instances,
             render_data,
@@ -70,6 +84,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> fmt::Debug
         f.debug_struct("ChunkMesh")
             .field("position", &position)
             .field("mesh", &mesh)
+            .field("mesh_cubes", &mesh_cubes)
             .field("block_dependencies", &block_dependencies)
             .field("block_instances", &block_instances)
             .field("render_data", &render_data)
@@ -83,6 +98,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         Self {
             position,
             mesh: SpaceMesh::default(),
+            mesh_cubes: Default::default(),
             render_data: Default::default(),
             block_dependencies: Vec::new(),
             block_instances: dynamic::InstanceMap::new(),
@@ -114,26 +130,65 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         }
     }
 
-    pub(crate) fn recompute_mesh(
+    pub(crate) fn recompute(
         &mut self,
         chunk_todo: &mut ChunkTodo,
         space: &Space,
         options: &MeshOptions,
         block_meshes: &dynamic::VersionedBlockMeshes<M>,
-    ) {
+    ) -> bool {
         // let compute_start: Option<I> = dynamic::LOG_CHUNK_UPDATES.then(Instant::now);
         let bounds = self.position.bounds();
 
         self.block_instances.clear();
-        self.mesh.compute(
-            space,
-            bounds,
-            options,
-            InstanceTrackingBlockMeshSource {
-                block_meshes,
-                instances: &mut self.block_instances,
-            },
-        );
+        let old_mesh_cubes = mem::take(&mut self.mesh_cubes);
+        let mut tracking_block_meshes = InstanceTrackingBlockMeshSource {
+            block_meshes,
+            instances: &mut self.block_instances,
+            mesh_cubes: &mut self.mesh_cubes,
+        };
+
+        let actually_changed_mesh = match chunk_todo.state {
+            ChunkTodoState::Clean => unreachable!("state should not be clean"),
+            ChunkTodoState::DirtyInstances => {
+                // We know the mesh is fine, so sweep for instances only.
+                let mut missing_instance_mesh = false;
+                for cube in bounds.interior_iter() {
+                    if old_mesh_cubes.contains(&cube) {
+                        // If the cube is in the mesh, then `chunk_todo` won't have sent us
+                        // merely `DirtyInstances` unless we don't need to care about updating it.
+                        continue;
+                    }
+
+                    if let Some(block_index) = space.get_block_index(cube) {
+                        // make use of InstanceTrackingBlockMeshSource's instance recording
+                        let non_instance_mesh =
+                            tracking_block_meshes.get_block_mesh(block_index, cube, true);
+
+                        if non_instance_mesh.is_some_and(|bm| !bm.is_empty()) {
+                            // Oops — the newly inserted block is not prepared for instancing.
+                            // Fall back to doing the chunk mesh instead.
+                            // TODO(instancing): this is a kludge and what we should really be doing
+                            // is allowing instancing anything temporarily.
+                            missing_instance_mesh = true;
+                            break;
+                        }
+                    }
+                }
+
+                if missing_instance_mesh {
+                    tracking_block_meshes.instances.clear();
+                    self.mesh
+                        .compute(space, bounds, options, tracking_block_meshes);
+                }
+                missing_instance_mesh
+            }
+            ChunkTodoState::DirtyMeshAndInstances => {
+                self.mesh
+                    .compute(space, bounds, options, tracking_block_meshes);
+                true
+            }
+        };
 
         // Logging
         // TODO: This logging code has been disabled to avoid`std::time::Instant
@@ -159,6 +214,8 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         //         );
         //     }
         // }
+
+        // TODO: figure out a way to distinguish mesh updates from instances updates in the debug visualization, and then give it enough info to do that
         self.update_debug = !self.update_debug;
 
         // Record the block meshes we incorporated into the chunk mesh.
@@ -169,7 +226,12 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
                 .map(|index| (index, block_meshes.meshes[usize::from(index)].version)),
         );
 
-        chunk_todo.recompute_mesh = false;
+        *chunk_todo = ChunkTodo {
+            state: ChunkTodoState::Clean,
+            always_instanced_or_empty: Some(block_meshes.always_instanced_or_empty.clone()),
+        };
+
+        actually_changed_mesh
     }
 
     /// Returns the blocks _not_ included in this chunk's mesh that are within the bounds of the
@@ -231,6 +293,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
 struct InstanceTrackingBlockMeshSource<'a, M: DynamicMeshTypes> {
     block_meshes: &'a dynamic::VersionedBlockMeshes<M>,
     instances: &'a mut dynamic::InstanceMap,
+    mesh_cubes: &'a mut MeshCubeSet,
 }
 
 impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for InstanceTrackingBlockMeshSource<'a, M> {
@@ -250,19 +313,66 @@ impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for InstanceTrackingBlockMeshS
             }
             None
         } else {
+            if primary && !vbm.mesh.is_empty() {
+                self.mesh_cubes.insert(cube);
+            }
             Some(&vbm.mesh)
         }
     }
 }
 
 /// What might be dirty about a single chunk.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct ChunkTodo {
-    pub(crate) recompute_mesh: bool,
+    pub(crate) state: ChunkTodoState,
+
+    /// Copy of [`dynamic::VersionedBlockMeshes::always_instanced_or_empty`] as of when this chunk
+    /// was last re-meshed. Optional just to allow constant `CLEAN`.
+    pub(crate) always_instanced_or_empty: Option<Arc<[BlockIndex]>>,
+}
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum ChunkTodoState {
+    Clean,
+    DirtyInstances,
+    DirtyMeshAndInstances,
 }
 
 impl ChunkTodo {
+    #[cfg(test)]
     pub const CLEAN: Self = Self {
-        recompute_mesh: false,
+        state: ChunkTodoState::Clean,
+        always_instanced_or_empty: None,
     };
+
+    pub(crate) fn is_not_clean(&self) -> bool {
+        self.state != ChunkTodoState::Clean
+    }
+
+    /// Returns whether the block index is in the `always_instanced_or_empty` list.
+    pub(crate) fn has_always_instanced(&self, block_index: BlockIndex) -> bool {
+        if let Some(ai) = &self.always_instanced_or_empty {
+            ai.binary_search(&block_index).is_ok()
+        } else {
+            false
+        }
+    }
+}
+
+impl ops::BitOr for ChunkTodoState {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::DirtyMeshAndInstances, _) => Self::DirtyMeshAndInstances,
+            (_, Self::DirtyMeshAndInstances) => Self::DirtyMeshAndInstances,
+            (Self::DirtyInstances, _) => Self::DirtyInstances,
+            (_, Self::DirtyInstances) => Self::DirtyInstances,
+            (Self::Clean, Self::Clean) => Self::Clean,
+        }
+    }
+}
+impl ops::BitOrAssign for ChunkTodoState {
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = *self | rhs
+    }
 }

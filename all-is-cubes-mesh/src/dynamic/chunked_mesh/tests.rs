@@ -31,7 +31,7 @@ fn read_todo_chunks(todo: &Mutex<CsmTodo<CHUNK_SIZE>>) -> Vec<(ChunkPos<CHUNK_SI
         .unwrap()
         .chunks
         .iter()
-        .map(|(&p, &ct)| (p, ct))
+        .map(|(&p, ct)| (p, ct.clone()))
         .collect::<Vec<_>>();
     v.sort_by_key(|(p, _): &(ChunkPos<CHUNK_SIZE>, _)| <_ as Into<[GridCoordinate; 3]>>::into(p.0));
     v
@@ -58,14 +58,14 @@ fn update_adjacent_chunk_positive() {
             (
                 ChunkPos::new(0, 0, 0),
                 ChunkTodo {
-                    recompute_mesh: true,
+                    state: dynamic::chunk::ChunkTodoState::DirtyMeshAndInstances,
                     ..ChunkTodo::CLEAN
                 }
             ),
             (
                 ChunkPos::new(1, 0, 0),
                 ChunkTodo {
-                    recompute_mesh: true,
+                    state: dynamic::chunk::ChunkTodoState::DirtyMeshAndInstances,
                     ..ChunkTodo::CLEAN
                 }
             ),
@@ -93,14 +93,14 @@ fn update_adjacent_chunk_negative() {
             (
                 ChunkPos::new(-1, 0, 0),
                 ChunkTodo {
-                    recompute_mesh: true,
+                    state: dynamic::chunk::ChunkTodoState::DirtyMeshAndInstances,
                     ..ChunkTodo::CLEAN
                 }
             ),
             (
                 ChunkPos::new(0, 0, 0),
                 ChunkTodo {
-                    recompute_mesh: true,
+                    state: dynamic::chunk::ChunkTodoState::DirtyMeshAndInstances,
                     ..ChunkTodo::CLEAN
                 }
             ),
@@ -137,7 +137,7 @@ fn todo_ignores_absent_chunks() {
         vec![(
             ChunkPos::new(0, 0, 0),
             ChunkTodo {
-                recompute_mesh: true,
+                state: dynamic::chunk::ChunkTodoState::DirtyMeshAndInstances,
                 ..ChunkTodo::CLEAN
             }
         ),],
@@ -416,7 +416,8 @@ fn instances_for_animated() {
 /// block meshes change -- but when not merged and rendered as instances, the chunk meshes should
 /// *not* be updated.
 ///
-/// Note that this doesn't cover changes to the Space, only changes to the block definition.
+/// Note that this doesn't cover changes to the `Space`, only changes to the block definition.
+/// There's a separate test for that.
 #[test]
 fn instances_dont_dirty_mesh_when_block_changes() {
     let mut universe = Universe::new();
@@ -425,7 +426,7 @@ fn instances_dont_dirty_mesh_when_block_changes() {
         Block::builder()
             .display_name("animated")
             .color(will_be_anim.color())
-            .animation_hint(AnimationHint::TEMPORARY)
+            .animation_hint(AnimationHint::CONTINUOUS)
             .build(),
     ));
     let mut space = Space::empty_positive(2, 1, 1);
@@ -452,4 +453,50 @@ fn instances_dont_dirty_mesh_when_block_changes() {
     tester.update(|rdu| {
         panic!("unwanted render data update: {rdu:#?}");
     });
+}
+
+/// Modifying a cube of the `Space`, when the old and new blocks are both instanced, should not
+/// cause a mesh rebuild.
+///
+/// Note that this doesn't cover changes to the block definition, only the `Space`.
+/// There's a separate test for that.
+#[test]
+fn instances_dont_dirty_mesh_when_space_changes() {
+    let [not_anim, will_be_anim] = make_some_blocks();
+    let anim = Block::builder()
+        .display_name("animated")
+        .color(will_be_anim.color())
+        .animation_hint(AnimationHint::TEMPORARY)
+        .build();
+    let mut space = Space::empty_positive(3, 1, 1);
+    space.set([0, 0, 0], &not_anim).unwrap();
+    space.set([1, 0, 0], &anim).unwrap();
+    space.set([2, 0, 0], &anim).unwrap(); // unchanged copy of the block to confirm the right change is made
+    let index_of_anim = space.get_block_index([1, 0, 0]).unwrap();
+
+    // Initialize
+    let mut tester: CsmTester<1000> = CsmTester::new(space, LARGE_VIEW_DISTANCE);
+    tester.update(|_| {});
+
+    // Check initial state
+    assert_eq!(
+        tester.instances(),
+        vec![(index_of_anim, vec![[1, 0, 0], [2, 0, 0]])]
+    );
+
+    // Make a change to the space...
+    tester
+        .space
+        .execute(
+            &SpaceTransaction::set_cube([1, 0, 0], Some(anim.clone()), Some(AIR)),
+            &mut transaction::no_outputs,
+        )
+        .unwrap();
+
+    // ...and an update should not include updating any meshes.
+    tester.update(|rdu| {
+        panic!("unwanted render data update: {rdu:#?}");
+    });
+
+    assert_eq!(tester.instances(), vec![(index_of_anim, vec![[2, 0, 0]]),]);
 }
