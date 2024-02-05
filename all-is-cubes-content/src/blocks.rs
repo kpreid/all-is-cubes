@@ -20,8 +20,8 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector, Gridgid,
-    NotNan, Rgb, Rgba, VectorOps,
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector, Gridgid, Rgb,
+    Rgba, VectorOps,
 };
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -53,7 +53,7 @@ pub enum DemoBlocks {
     LabelTextVoxel,
     Clock,
     BecomeBlinker(bool),
-    Explosion(u8),
+    Explosion(i8),
 }
 impl BlockModule for DemoBlocks {
     fn namespace() -> &'static str {
@@ -437,22 +437,47 @@ pub async fn install_demo_blocks(
                 .build(),
 
             Explosion(timer) => {
-                let decay = (f32::from(timer) * -0.1).exp();
+                let decay = if timer < 0 {
+                    1.0
+                } else {
+                    (f64::from(timer) * -0.1).exp()
+                };
+
+                let atom = Block::builder()
+                    .display_name(format!("Explosion {timer} particle"))
+                    .color(rgba_const!(0.014, 0.01, 0.01, 1.0))
+                    .collision(BlockCollision::None)
+                    .light_emission(if timer < 0 {
+                        if timer.rem_euclid(4) < 2 {
+                            Rgb::ZERO
+                        } else {
+                            rgb_const!(0.8, 0.0, 0.0)
+                        }
+                    } else {
+                        rgb_const!(1.0, 0.77, 0.40) * 10.0 * decay.powf(3.) as f32
+                    })
+                    .build();
+
+                let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
                 Block::builder()
                     .display_name(format!("Explosion {timer}"))
                     .animation_hint({
                         let mut h = AnimationHint::default();
-                        h.replacement = if timer == 255 {
+                        h.replacement = if timer == i8::MAX {
                             block::AnimationChange::Shape
                         } else {
                             block::AnimationChange::ColorSameCategory
                         };
                         h
                     })
-                    .color(Rgb::ONE.with_alpha(NotNan::new(decay).unwrap()))
-                    .collision(BlockCollision::None)
-                    .light_emission(rgb_const!(1.0, 0.77, 0.40) * 10.0 * decay)
-                    .build()
+                    .voxels_fn(if timer <= 0 { R1 } else { R8 }, |_| {
+                        if rng.gen_bool(decay.powf(3.)) {
+                            &atom
+                        } else {
+                            &AIR
+                        }
+                    })?
+                    .build_txn(txn)
             }
         })
     })
@@ -473,20 +498,20 @@ pub async fn install_demo_blocks(
     }
 
     // Join up explosion blocks
-    for i in u8::exhaust() {
+    for i in i8::exhaust() {
         modify_def(&provider_for_patch[Explosion(i)], |block| {
-            let Primitive::Atom(Atom { attributes, .. }) = block.primitive_mut() else {
+            let Primitive::Recur { attributes, .. } = block.primitive_mut() else {
                 panic!("explosion not atom");
             };
-            let brush = if i > 30 {
-                // Expire
+            let brush = if i > 22 {
+                // Expire because we're invisible by now
                 VoxelBrush::single(AIR)
             } else {
                 let next = &provider_for_patch[Explosion(i + 1)];
-                if i < 15 {
+                if i > 0 && i < 10 {
                     // Expand at first out to ~5 blocks
-                    if i % 3 == 0 {
-                        if i % 6 == 0 {
+                    if i.rem_euclid(2) == 0 {
+                        if i.rem_euclid(4) == 0 {
                             VoxelBrush::new([
                                 ([0, 0, 0], next.clone()),
                                 ([1, 0, 0], next.clone()),
@@ -517,13 +542,13 @@ pub async fn install_demo_blocks(
                         VoxelBrush::new([([0, 0, 0], next.clone())])
                     }
                 } else {
-                    // Just fade
+                    // Just tick or fade
                     VoxelBrush::new([([0, 0, 0], next.clone())])
                 }
             };
             attributes.tick_action = Some(TickAction {
                 operation: Operation::Paint(brush),
-                period: NonZeroU16::new(3).unwrap(),
+                period: NonZeroU16::new(2).unwrap(),
             });
         });
     }

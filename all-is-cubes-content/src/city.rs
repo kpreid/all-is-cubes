@@ -114,7 +114,7 @@ pub(crate) async fn demo_city<I: Instant>(
             }
             inventory.push(Slot::stack(
                 1,
-                Tool::InfiniteBlocks(demo_blocks[Explosion(0)].clone()),
+                Tool::InfiniteBlocks(demo_blocks[Explosion(-10)].clone()),
             ));
             spawn.set_inventory(inventory);
             spawn
