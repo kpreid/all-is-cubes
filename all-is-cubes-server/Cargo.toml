@@ -31,7 +31,7 @@ embed = []
 
 [dependencies]
 # TODO: server doesn't actually have any game-server functionality so this is unnecessary
-# all-is-cubes = { path = "../all-is-cubes", version = "0.6.0", features = ["threads"] }
+# all-is-cubes = { workspace = true, features = ["threads"] }
 anyhow = { workspace = true }
 axum = { version = "0.7.2", features = ["tower-log"] }
 clap = { workspace = true }

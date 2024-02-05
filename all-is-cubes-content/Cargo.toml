@@ -26,8 +26,8 @@ harness = false
 arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary"]
 
 [dependencies]
-all-is-cubes = { path = "../all-is-cubes", version = "0.7.0" }
-all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.7.0" }
+all-is-cubes = { workspace = true }
+all-is-cubes-ui = { workspace = true }
 arbitrary = { workspace = true, optional = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }

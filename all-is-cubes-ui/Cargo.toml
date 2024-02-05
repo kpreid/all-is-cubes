@@ -16,7 +16,7 @@ bench = false
 
 [dependencies]
 # TODO: Disable default features. Requires more `maybe_sync` work.
-all-is-cubes = { path = "../all-is-cubes", version = "0.7.0", default-features = true }
+all-is-cubes = { workspace = true, default-features = true }
 displaydoc = { workspace = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }

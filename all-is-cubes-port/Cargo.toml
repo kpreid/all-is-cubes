@@ -21,8 +21,8 @@ bench = false
 # TODO: Add features to make each format optional so that single-purpose importers or exporters are possible.
 
 [dependencies]
-all-is-cubes = { path = "../all-is-cubes", version = "0.7.0", features = ["save"] }
-all-is-cubes-mesh = { path = "../all-is-cubes-mesh", version = "0.7.0" }
+all-is-cubes = { workspace = true, features = ["save"] }
+all-is-cubes-mesh = { workspace = true }
 dot_vox = { version = "5.1.1" }
 futures-core = { workspace = true }
 # Used to write glTF textures
