@@ -40,7 +40,7 @@ wgpu = ["dep:wgpu"]
 threads = ["dep:rayon"]
 
 [dependencies]
-all-is-cubes = { workspace = true }
+all-is-cubes = { workspace = true, features = ["std"] }
 all-is-cubes-mesh = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 cfg-if = { workspace = true }

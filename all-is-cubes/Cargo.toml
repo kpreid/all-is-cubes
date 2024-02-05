@@ -60,6 +60,7 @@ std = [
 arbitrary = ["dep:arbitrary", "ordered-float/arbitrary"]
 # Adds serde implementations.
 save = [
+    "std", # TODO: Eliminate dependency on std (requires replacing flate2)
     "dep:base64", # encoded compressed data
     "dep:flate2", # compression
     "dep:serde",
