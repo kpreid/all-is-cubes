@@ -180,6 +180,10 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
                     tracking_block_meshes.instances.clear();
                     self.mesh
                         .compute(space, bounds, options, tracking_block_meshes);
+                } else {
+                    // We successfully updated instances, so the mesh is unchanged, so put back
+                    // the info about the mesh.
+                    self.mesh_cubes = old_mesh_cubes;
                 }
                 missing_instance_mesh
             }
