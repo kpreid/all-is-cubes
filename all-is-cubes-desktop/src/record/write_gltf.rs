@@ -67,7 +67,7 @@ impl MeshRecorder {
     pub fn capture_frame(&mut self, this_frame_number: super::FrameNumber) {
         // TODO: this glue logic belongs in our gltf module and crate,
         // not here
-        self.csm.update_blocks_and_some_chunks(
+        self.csm.update(
             &self.cameras.cameras().world,
             &self.tex,
             time::DeadlineStd::Whenever,

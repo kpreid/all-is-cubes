@@ -58,7 +58,7 @@ where
     /// in `todo.read().unwrap().chunks`.
     chunks: FnvHashMap<ChunkPos<CHUNK_SIZE>, ChunkMesh<M, CHUNK_SIZE>>,
 
-    /// Resized as needed upon each [`Self::update_blocks_and_some_chunks()`].
+    /// Resized as needed upon each [`Self::update()`].
     chunk_chart: ChunkChart<CHUNK_SIZE>,
 
     /// The chunk in which the last [`Camera`] provided is located.
@@ -129,8 +129,7 @@ where
         &self.space
     }
 
-    /// Returns a [`ChunkChart`] for the view distance used by the most recent
-    /// [`Self::update_blocks_and_some_chunks`].
+    /// Returns a [`ChunkChart`] for the view distance used by the most recent [`Self::update()`].
     pub fn chunk_chart(&self) -> &ChunkChart<CHUNK_SIZE> {
         &self.chunk_chart
     }
@@ -162,8 +161,7 @@ where
 
     /// Retrieves a [`ChunkMesh`] for the specified chunk position, if one exists.
     ///
-    /// Call this while drawing, after [`Self::update_blocks_and_some_chunks`]
-    /// has updated/created chunks.
+    /// Call this while drawing, after [`Self::update()`] has updated/created chunks.
     pub fn chunk(&self, position: ChunkPos<CHUNK_SIZE>) -> Option<&ChunkMesh<M, CHUNK_SIZE>> {
         self.chunks.get(&position)
     }
@@ -193,7 +191,7 @@ where
             .sum()
     }
 
-    /// Recompute meshes of all blocks that need it, and the nearest chunks that need it.
+    /// Recompute meshes of blocks that need it and the nearest chunks that need it.
     ///
     /// * `camera`'s view position is used to choose what to update and for depth
     ///    ordering; its graphics options are used for triangulation and view distance.
@@ -201,7 +199,7 @@ where
     /// * `render_data_updater` is called for every re-meshed or depth-sorted chunk.
     ///
     /// Returns performance information and the chunk the camera is located in.
-    pub fn update_blocks_and_some_chunks<F>(
+    pub fn update<F>(
         &mut self,
         camera: &Camera,
         block_texture_allocator: &M::Alloc,
@@ -244,7 +242,7 @@ where
         }
     }
 
-    /// Internal part of [`Self::update_blocks_and_some_chunks()`].
+    /// Internal part of [`Self::update()`].
     ///
     /// Boolean return indicates whether it exited early due to timeout rather than
     /// finishing its work.
@@ -498,8 +496,7 @@ where
         )
     }
 
-    /// Returns the chunk in which the camera from the most recent
-    /// [`Self::update_blocks_and_some_chunks`] was located.
+    /// Returns the chunk in which the camera from the most recent [`Self::update()`] was located.
     /// This may be used as the origin point to iterate over chunks in view.
     pub fn view_chunk(&self) -> ChunkPos<CHUNK_SIZE> {
         self.view_chunk

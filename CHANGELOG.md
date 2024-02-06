@@ -14,6 +14,7 @@
 - `all-is-cubes-mesh` library:
     - The return type of `GetBlockMesh::get_block_mesh()` has changed to `Option<&BlockMesh>`.
       `None` is to be returned when the implementor intends to request that the block be _omitted_ from a produced `SpaceMesh` (such as when it is being rendered separately) rather than the mesh merely being empty (invisible).
+    - Renamed `dynamic::ChunkedSpaceMesh::update_blocks_and_some_chunks()` to `update()`, which is shorter and also more accurate nowadays since it isn't guaranteed to update all blocks.
 
 ### Removed
 

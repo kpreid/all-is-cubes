@@ -165,12 +165,7 @@ fn dynamic_benches(c: &mut Criterion) {
                 (tex, csm)
             },
             |(tex, csm)| {
-                let info = csm.update_blocks_and_some_chunks(
-                    &camera,
-                    tex,
-                    time::DeadlineStd::Whenever,
-                    |_| {},
-                );
+                let info = csm.update(&camera, tex, time::DeadlineStd::Whenever, |_| {});
                 assert_eq!(info.flaws, Flaws::empty()); // should not be unfinished
             },
             BatchSize::LargeInput,

@@ -256,7 +256,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let end_light_update = I::now();
 
         // Update chunks
-        let csm_info = csm.update_blocks_and_some_chunks(
+        let csm_info = csm.update(
             camera,
             &self.block_texture,
             deadline, // TODO: decrease deadline by some guess at texture writing time
@@ -300,7 +300,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         );
 
         // Flush all texture updates to GPU.
-        // This must happen after `csm.update_blocks_and_some_chunks` so that the newly
+        // This must happen after `csm.update()` so that the newly
         // generated meshes have the texels they expect.
         let (block_texture_views, texture_info) = self.block_texture.flush::<I>(device, queue);
 

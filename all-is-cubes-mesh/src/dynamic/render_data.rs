@@ -9,8 +9,7 @@ use crate::dynamic::DynamicMeshTypes;
 
 /// Provides mutable access to the data of type `M::RenderData` in a dynamic mesh.
 ///
-/// This struct is provided to the callback of
-/// [`ChunkedSpaceMesh::update_blocks_and_some_chunks()`],
+/// This struct is provided to the callback of [`ChunkedSpaceMesh::update()`],
 /// and that callback should copy data from `mesh` to `render_data` in whatever form
 /// suits the application.
 #[derive(Debug)]

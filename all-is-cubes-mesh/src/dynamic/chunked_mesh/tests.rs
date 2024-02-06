@@ -174,12 +174,12 @@ impl<const MBM: usize> CsmTester<MBM> {
         }
     }
 
-    /// Call `csm.update_blocks_and_some_chunks()` with the tester's placeholders
+    /// Call [`ChunkedSpaceMesh::update()`] with the tester's placeholders
     fn update<F>(&mut self, render_data_updater: F) -> CsmUpdateInfo
     where
         F: FnMut(dynamic::RenderDataUpdate<'_, Mt<MBM>>),
     {
-        self.csm.update_blocks_and_some_chunks(
+        self.csm.update(
             &self.camera,
             &NoTextures,
             time::DeadlineNt::Whenever,
@@ -331,12 +331,9 @@ fn did_not_finish_detection() {
         CsmTester::new(Space::empty_positive(1000, 1, 1), LARGE_VIEW_DISTANCE);
 
     eprintln!("--- timing out update");
-    let info = tester.csm.update_blocks_and_some_chunks(
-        &tester.camera,
-        &NoTextures,
-        time::DeadlineNt::Asap,
-        |_| {},
-    );
+    let info = tester
+        .csm
+        .update(&tester.camera, &NoTextures, time::DeadlineNt::Asap, |_| {});
 
     // This is the state that should(n't) be affected.
     // (If we stop having `complete_time` then it's okay to just delete that part of

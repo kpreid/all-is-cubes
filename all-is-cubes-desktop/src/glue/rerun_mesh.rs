@@ -104,7 +104,7 @@ impl RerunMesher {
     }
 
     pub(crate) fn update(&mut self, camera: &Camera) {
-        let _info = self.csm.update_blocks_and_some_chunks(
+        let _info = self.csm.update(
             camera,
             &mesh::texture::NoTextures,
             all_is_cubes::time::Deadline::Whenever,
