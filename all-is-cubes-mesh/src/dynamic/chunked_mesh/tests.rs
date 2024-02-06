@@ -150,7 +150,7 @@ struct CsmTester<const MBM: usize> {
     universe: Universe,
     space: URef<Space>,
     camera: Camera,
-    csm: ChunkedSpaceMesh<Mt<MBM>, std::time::Instant, CHUNK_SIZE>,
+    csm: ChunkedSpaceMesh<Mt<MBM>, time::NoTime, CHUNK_SIZE>,
 }
 
 impl<const MBM: usize> CsmTester<MBM> {
@@ -182,7 +182,7 @@ impl<const MBM: usize> CsmTester<MBM> {
         self.csm.update_blocks_and_some_chunks(
             &self.camera,
             &NoTextures,
-            time::DeadlineStd::Whenever,
+            time::DeadlineNt::Whenever,
             render_data_updater,
         )
     }
@@ -334,7 +334,7 @@ fn did_not_finish_detection() {
     let info = tester.csm.update_blocks_and_some_chunks(
         &tester.camera,
         &NoTextures,
-        time::DeadlineStd::Asap,
+        time::DeadlineNt::Asap,
         |_| {},
     );
 
