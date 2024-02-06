@@ -526,7 +526,6 @@ pub(crate) fn make_button_label_block(
     }
     let space = txn.insert_anonymous(space);
     Ok(Block::builder()
-        // .animation_hint(Replace)
         .display_name(name.to_owned())
         .voxels_ref(theme::RESOLUTION, space))
 }
@@ -559,6 +558,11 @@ mod theme {
         Block::builder()
             .display_name(name.to_string())
             .voxels_ref(MULTI_RESOLUTION, space)
+            .animation_hint({
+                let mut h = block::AnimationHint::default();
+                h.replacement = block::AnimationChange::Shape;
+                h
+            })
             .build()
     }
 }
