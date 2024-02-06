@@ -70,7 +70,10 @@ enum XtaskCommand {
     },
 
     /// Run tests exercising more combinations of features.
-    TestMore,
+    TestMore {
+        #[arg(long)]
+        no_run: bool,
+    },
 
     /// Compile and report warnings without testing.
     Lint,
@@ -179,8 +182,16 @@ fn main() -> Result<(), ActionError> {
                 &mut time_log,
             )?;
         }
-        XtaskCommand::TestMore => {
-            exhaustive_test(&config, &mut time_log)?;
+        XtaskCommand::TestMore { no_run } => {
+            exhaustive_test(
+                &config,
+                if no_run {
+                    TestOrCheck::BuildTests
+                } else {
+                    TestOrCheck::Test
+                },
+                &mut time_log,
+            )?;
         }
         XtaskCommand::Lint => {
             do_for_all_packages(&config, TestOrCheck::Lint, Features::Default, &mut time_log)?;
@@ -350,7 +361,7 @@ fn main() -> Result<(), ActionError> {
         XtaskCommand::PublishAll { for_real } => {
             assert_eq!(config.scope, Scope::All);
 
-            exhaustive_test(&config, &mut time_log)?;
+            exhaustive_test(&config, TestOrCheck::Test, &mut time_log)?;
 
             let maybe_dry = if for_real { vec![] } else { vec!["--dry-run"] };
             for package in ALL_NONTEST_PACKAGES {
@@ -457,12 +468,16 @@ const TARGET_WASM: &str = "--target=wasm32-unknown-unknown";
 
 // Test all combinations of situations (that we've bothered to program test
 // setup for).
-fn exhaustive_test(config: &Config, time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
+fn exhaustive_test(
+    config: &Config,
+    op: TestOrCheck,
+    time_log: &mut Vec<Timing>,
+) -> Result<(), ActionError> {
     assert!(config.scope.includes_main_workspace());
 
     update_server_static(config, time_log)?;
 
-    do_for_all_packages(config, TestOrCheck::Test, Features::AllAndNothing, time_log)?;
+    do_for_all_packages(config, op, Features::AllAndNothing, time_log)?;
     Ok(())
 }
 
