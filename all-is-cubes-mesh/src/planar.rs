@@ -40,14 +40,7 @@ impl GreedyMesher {
     }
 
     /// Actually run the algorithm.
-    pub(crate) fn run(
-        mut self,
-        mut quad_callback: impl FnMut(
-            &Self,
-            Point2D<GridCoordinate, TexelUnit>,
-            Point2D<GridCoordinate, TexelUnit>,
-        ),
-    ) {
+    pub(crate) fn run(mut self, mut quad_callback: impl FnMut(GmRect)) {
         for tl in self.image_t_range.clone() {
             for sl in self.image_s_range.clone() {
                 if !self.add_seed(sl, tl) {
@@ -87,7 +80,12 @@ impl GreedyMesher {
                         self.erase(s, t);
                     }
                 }
-                quad_callback(&self, Point2D::new(sl, tl), Point2D::new(sh, th));
+                quad_callback(GmRect {
+                    low_corner: Point2D::new(sl, tl),
+                    high_corner: Point2D::new(sh, th),
+                    single_color: self.single_color,
+                    has_alpha: self.rect_has_alpha,
+                });
             }
         }
     }
@@ -141,6 +139,16 @@ impl GreedyMesher {
         let index = self.index(s, t);
         self.visible_image[index] = Rgba::TRANSPARENT;
     }
+}
+
+#[derive(Debug)]
+pub(super) struct GmRect {
+    pub low_corner: Point2D<GridCoordinate, TexelUnit>,
+    pub high_corner: Point2D<GridCoordinate, TexelUnit>,
+    /// Contains a color all voxels in this quad are that color.
+    pub single_color: Option<Rgba>,
+    /// Whether any of this rectangle has color that is not fully opaque.
+    pub has_alpha: bool,
 }
 
 /// Helper for [`push_quad`] which offers the alternatives of solid color or texturing.

@@ -497,10 +497,16 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                         rotated_voxel_range.x_range(),
                         rotated_voxel_range.y_range(),
                     )
-                    .run(|mesher, low_corner, high_corner| {
+                    .run(|rect| {
+                        let crate::GmRect {
+                            single_color,
+                            has_alpha: rect_has_alpha,
+                            low_corner,
+                            high_corner,
+                        } = rect;
                         // Generate quad.
                         let coloring = if let Some(single_color) =
-                            mesher.single_color.filter(|_| !prefer_textures)
+                            single_color.filter(|_| !prefer_textures)
                         {
                             // The quad we're going to draw has identical texels, so we might as
                             // well use a solid color and skip needing a texture.
@@ -551,7 +557,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
                         push_quad(
                             vertices,
-                            if mesher.rect_has_alpha {
+                            if rect_has_alpha {
                                 indices_transparent
                             } else {
                                 indices_opaque
