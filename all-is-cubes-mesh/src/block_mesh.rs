@@ -16,7 +16,7 @@ use all_is_cubes::space::Space;
 
 use crate::texture::{self, Tile as _};
 use crate::{
-    push_quad, GfxVertex, GreedyMesher, IndexVec, MeshOptions, MeshTypes, QuadColoring,
+    greedy_mesh, push_quad, GfxVertex, IndexVec, MeshOptions, MeshTypes, QuadColoring,
     QuadTransform,
 };
 
@@ -492,12 +492,12 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
                     // Traverse `visible_image` using the "greedy meshing" algorithm for
                     // breaking an irregular shape into quads.
-                    GreedyMesher::new(
+                    greedy_mesh(
                         visible_image,
                         rotated_voxel_range.x_range(),
                         rotated_voxel_range.y_range(),
                     )
-                    .run(|rect| {
+                    .for_each(|rect| {
                         let crate::GmRect {
                             single_color,
                             has_alpha: rect_has_alpha,

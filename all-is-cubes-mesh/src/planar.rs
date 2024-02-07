@@ -12,82 +12,85 @@ use all_is_cubes::math::{
 use crate::texture::{self, TexelUnit, TextureCoordinate, TilePoint};
 use crate::{BlockVertex, Coloring, IndexVec};
 
+pub(crate) fn greedy_mesh(
+    visible_image: Vec<Rgba>,
+    image_s_range: Range<GridCoordinate>,
+    image_t_range: Range<GridCoordinate>,
+) -> impl Iterator<Item = GmRect> {
+    GreedyMesher {
+        visible_image,
+        image_s_range,
+        image_t_range,
+        single_color: None,
+        rect_has_alpha: false,
+    }
+    .run()
+}
+
 /// Data structure for the state and components of the "greedy meshing" algorithm.
 /// <https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/>
-pub(crate) struct GreedyMesher {
+struct GreedyMesher {
     visible_image: Vec<Rgba>,
     // Logical bounding rectangle of the data in `visible_image`.
     image_s_range: Range<GridCoordinate>,
     image_t_range: Range<GridCoordinate>,
     /// Contains a color if all voxels examined so far have that color.
-    pub(crate) single_color: Option<Rgba>,
-    pub(crate) rect_has_alpha: bool,
+    single_color: Option<Rgba>,
+    rect_has_alpha: bool,
 }
 impl GreedyMesher {
-    /// Create the initial state.
-    pub(crate) fn new(
-        visible_image: Vec<Rgba>,
-        image_s_range: Range<GridCoordinate>,
-        image_t_range: Range<GridCoordinate>,
-    ) -> Self {
-        Self {
-            visible_image,
-            image_s_range,
-            image_t_range,
-            single_color: None,
-            rect_has_alpha: false,
-        }
-    }
-
     /// Actually run the algorithm.
-    pub(crate) fn run(mut self, mut quad_callback: impl FnMut(GmRect)) {
-        for tl in self.image_t_range.clone() {
-            for sl in self.image_s_range.clone() {
-                if !self.add_seed(sl, tl) {
-                    continue;
-                }
-                // Find the largest width that works.
-                let mut sh = sl;
-                loop {
-                    sh += 1;
-                    if sh >= self.image_s_range.end {
-                        break; // Found the far edge
-                    }
-                    if !self.add_candidate(sh, tl) {
-                        break;
-                    }
-                }
-                // Find the largest height that works
-                let mut th = tl;
-                'expand_t: loop {
-                    th += 1;
-                    if th >= self.image_t_range.end {
-                        break; // Found the far edge
-                    }
-                    // Check if all the voxels are wanted
-                    for s in sl..sh {
-                        if !self.add_candidate(s, th) {
-                            break 'expand_t;
-                        }
-                    }
-                }
-
-                // Erase all the voxels that we just built a rectangle on, to remember not
-                // to do it again. (We don't need to do this last, because the actual data
-                // is either in the texture or in `single_color`.
-                for t in tl..th {
-                    for s in sl..sh {
-                        self.erase(s, t);
-                    }
-                }
-                quad_callback(GmRect {
-                    low_corner: Point2D::new(sl, tl),
-                    high_corner: Point2D::new(sh, th),
-                    single_color: self.single_color,
-                    has_alpha: self.rect_has_alpha,
-                });
+    fn run(mut self) -> impl Iterator<Item = GmRect> {
+        let image_s_range = self.image_s_range.clone();
+        let t_and_s = self
+            .image_t_range
+            .clone()
+            .flat_map(move |t| image_s_range.clone().map(move |s| (s, t)));
+        t_and_s.filter_map(move |(sl, tl)| {
+            if !self.add_seed(sl, tl) {
+                return None;
             }
-        }
+            // Find the largest width that works.
+            let mut sh = sl;
+            loop {
+                sh += 1;
+                if sh >= self.image_s_range.end {
+                    break; // Found the far edge
+                }
+                if !self.add_candidate(sh, tl) {
+                    break;
+                }
+            }
+            // Find the largest height that works
+            let mut th = tl;
+            'expand_t: loop {
+                th += 1;
+                if th >= self.image_t_range.end {
+                    break; // Found the far edge
+                }
+                // Check if all the voxels are wanted
+                for s in sl..sh {
+                    if !self.add_candidate(s, th) {
+                        break 'expand_t;
+                    }
+                }
+            }
+
+            // Erase all the voxels that we just built a rectangle on, to remember not
+            // to do it again. (We don't need to do this last, because the actual data
+            // is either in the texture or in `single_color`.
+            for t in tl..th {
+                for s in sl..sh {
+                    self.erase(s, t);
+                }
+            }
+            Some(GmRect {
+                low_corner: Point2D::new(sl, tl),
+                high_corner: Point2D::new(sh, th),
+                single_color: self.single_color,
+                has_alpha: self.rect_has_alpha,
+            })
+        })
     }
 
     #[inline]
