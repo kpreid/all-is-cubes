@@ -566,7 +566,6 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                 }
             }
 
-            // TODO: avoid allocation
             self.texture_used = texture_if_needed;
             self.voxel_opacity_mask = if used_any_vertex_colors {
                 None
