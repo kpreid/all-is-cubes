@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use winit::event::{DeviceEvent, ElementState, Event, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget};
+use winit::event_loop::{ControlFlow, EventLoopWindowTarget};
 use winit::window::{CursorGrabMode, Window};
 
 use all_is_cubes::camera::{self, StandardCameras, Viewport};
@@ -147,34 +147,69 @@ impl crate::glue::Window for WinAndState {
 /// Run `winit` event loop, using [`RendererToWinit`] to perform rendering.
 ///
 /// Might not return but exit the process instead.
-pub fn winit_main_loop<Ren: RendererToWinit + 'static>(
-    event_loop: EventLoop<()>,
-    mut dsession: DesktopSession<Ren, WinAndState>,
+pub fn winit_main_loop_and_init<Ren: RendererToWinit + 'static>(
+    dsession_fn: impl FnOnce(
+        &crate::InnerMainParams,
+        &EventLoopWindowTarget<()>,
+    ) -> Result<DesktopSession<Ren, WinAndState>, anyhow::Error>,
+    inner_params: crate::InnerMainParams,
 ) -> Result<(), anyhow::Error> {
+    let event_loop = winit::event_loop::EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
 
     let loop_start_time = Instant::now();
+    let mut startup_params = Some((inner_params, dsession_fn));
     let mut first_frame = true;
+    let mut dsession: Option<DesktopSession<Ren, WinAndState>> = None;
     Ok(event_loop.run(move |event, elwt| {
-        if first_frame {
-            first_frame = false;
-            log::debug!(
-                "First frame completed in {:.3} s",
-                Instant::now().duration_since(loop_start_time).as_secs_f32()
-            );
+        if let winit::event::Event::Resumed = event {
+            if let Some((inner_params, dsession_fn)) = startup_params.take() {
+                // “It’s recommended that applications should only initialize their graphics context
+                // and create a window after they have received their first Resumed event.
+                // Some systems (specifically Android) won’t allow applications to create a render
+                // surface until they are resumed.”
+                // — <https://docs.rs/winit/0.29.10/winit/event/enum.Event.html#variant.Resumed>
+
+                // TODO: Ideally, any of the errors occurring here would be handled by putting up
+                // a dialog box before exiting.
+                let ds = dsession_fn(&inner_params, elwt).unwrap();
+                crate::inner_main(
+                    inner_params,
+                    |ds| {
+                        dsession = Some(ds);
+                        Ok(())
+                    },
+                    ds,
+                )
+                .unwrap();
+            }
         }
 
-        // Sync UI state back to window
-        dsession
-            .window
-            .sync_cursor_grab(&mut dsession.session.input_processor);
+        // If we have a session, run it
+        if let Some(dsession) = dsession.as_mut() {
+            if first_frame {
+                first_frame = false;
+                log::debug!(
+                    "First frame completed in {:.3} s",
+                    Instant::now().duration_since(loop_start_time).as_secs_f32()
+                );
+            }
 
-        // Compute when we want to resume.
-        if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
-            elwt.set_control_flow(ControlFlow::WaitUntil(t));
+            // Sync UI state back to window
+            dsession
+                .window
+                .sync_cursor_grab(&mut dsession.session.input_processor);
+
+            // Compute when we want to resume.
+            if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
+                elwt.set_control_flow(ControlFlow::WaitUntil(t));
+            }
+
+            handle_winit_event(event, dsession)
+        } else {
+            // Events can't mean anything interesting until we have a session.
+            // TODO: But we should express that cleaner than ignoring everything
         }
-
-        handle_winit_event(event, &mut dsession)
     })?)
 }
 

@@ -18,7 +18,7 @@ use all_is_cubes_desktop::terminal::{
     create_terminal_session, terminal_main_loop, terminal_print_once, TerminalOptions,
 };
 use all_is_cubes_desktop::winit::{
-    self as aic_winit, create_winit_wgpu_desktop_session, winit_main_loop,
+    self as aic_winit, create_winit_wgpu_desktop_session, winit_main_loop_and_init,
 };
 use all_is_cubes_desktop::{
     inner_main, load_config, logging, record, DesktopSession, InnerMainParams, Session,
@@ -141,32 +141,35 @@ fn main() -> Result<(), anyhow::Error> {
     // ever return “successfully”, so no code should follow it.
     match graphics_type {
         GraphicsType::Window | GraphicsType::WindowRt => {
-            let event_loop = winit::event_loop::EventLoop::new()?;
-            let dsession = inner_params
-                .runtime
-                .block_on(create_winit_wgpu_desktop_session(
-                    session,
-                    // TODO: turn this inside out and stop having `WinAndState` exposed
-                    aic_winit::WinAndState::new(
-                        &event_loop,
-                        &title_and_version(), // this will be overwritten with more detail later
-                        display_size,
-                        fullscreen,
-                    )
-                    .context("failed to create window")?,
-                    viewport_cell,
-                ))
-                .context("failed to create session")?;
-            if graphics_type == GraphicsType::WindowRt {
-                // TODO: improve on this kludge by just having a general cmdline graphics config
-                dsession.session.graphics_options_mut().update_mut(|o| {
-                    o.render_method = all_is_cubes::camera::RenderMethod::Reference;
-                });
-            }
-            inner_main(
+            winit_main_loop_and_init(
+                move |inner_params, elwt| {
+                    // TODO: this logic should not be inside main(), really, it should be part
+                    // of the winit module — it just has a mess of deps
+                    // TODO: don't block_on, be async?
+                    let dsession = inner_params
+                        .runtime
+                        .block_on(create_winit_wgpu_desktop_session(
+                            session,
+                            // TODO: turn this inside out and stop having `WinAndState` exposed
+                            aic_winit::WinAndState::new(
+                                elwt,
+                                &title_and_version(), // this will be overwritten with more detail later
+                                display_size,
+                                fullscreen,
+                            )
+                            .context("failed to create window")?,
+                            viewport_cell,
+                        ))
+                        .context("failed to create session")?;
+                    if graphics_type == GraphicsType::WindowRt {
+                        // TODO: improve on this kludge by just having a general cmdline graphics config
+                        dsession.session.graphics_options_mut().update_mut(|o| {
+                            o.render_method = all_is_cubes::camera::RenderMethod::Reference;
+                        });
+                    }
+                    Ok(dsession)
+                },
                 inner_params,
-                move |dsession| winit_main_loop(event_loop, dsession),
-                dsession,
             )
         }
         GraphicsType::Terminal => {

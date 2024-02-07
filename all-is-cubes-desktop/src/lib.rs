@@ -42,6 +42,9 @@ pub type Session = all_is_cubes_ui::apps::Session<Instant>;
 /// of main operations.
 ///
 /// This function may or may not ever return, depending on the type of event loop.
+/// If it does, it will return exactly what `looper` does, and there will be no other effects.
+/// (In particular, it is acceptable for `looper` to return *before* the event loop starts, if
+/// that suits the caller.)
 pub fn inner_main<Ren: glue::Renderer, Win: glue::Window>(
     params: InnerMainParams,
     looper: impl FnOnce(DesktopSession<Ren, Win>) -> Result<(), anyhow::Error>,
