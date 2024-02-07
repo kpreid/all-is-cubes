@@ -93,11 +93,13 @@ impl GreedyMesher {
         })
     }
 
-    #[inline]
+    #[inline(always)]
     fn index(&self, s: GridCoordinate, t: GridCoordinate) -> usize {
-        // Can't fail because a usize ≈ u16 platform is too small anyway.
-        let s = usize::try_from(s - self.image_s_range.start).unwrap();
-        let t = usize::try_from(t - self.image_t_range.start).unwrap();
+        // These casts can't overflow unless the inputs are out of range,
+        // because we already know the total size fits in usize,
+        // because `self.visible_image` exists.
+        let s = (s - self.image_s_range.start) as usize;
+        let t = (t - self.image_t_range.start) as usize;
         t * self.image_s_range.len() + s
     }
 
@@ -105,9 +107,6 @@ impl GreedyMesher {
     /// returns false if not, and updates `single_color`.
     #[inline]
     fn add_seed(&mut self, s: GridCoordinate, t: GridCoordinate) -> bool {
-        if !self.image_s_range.contains(&s) || !self.image_t_range.contains(&t) {
-            panic!("seed loop ran out of bounds");
-        }
         let color = self.visible_image[self.index(s, t)];
         if color.fully_transparent() {
             return false;
@@ -121,6 +120,7 @@ impl GreedyMesher {
     /// returns false if not, and updates `single_color`.
     #[inline]
     fn add_candidate(&mut self, s: GridCoordinate, t: GridCoordinate) -> bool {
+        // TODO: I think this can never fail and should be an assertion…
         if !self.image_s_range.contains(&s) || !self.image_t_range.contains(&t) {
             return false;
         }
