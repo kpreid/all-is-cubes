@@ -20,8 +20,7 @@ private = { ignore = true }
 
 [bans]
 multiple-versions = "warn"
-# TODO: enable wildcard check when https://github.com/EmbarkStudios/cargo-deny/issues/488 is fixed
-wildcards = "allow"
+wildcards = "deny"
 allow-wildcard-paths = true
 # We might want to be stricter about default-features...
 # workspace-default-features = "warn"
