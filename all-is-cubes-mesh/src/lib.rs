@@ -44,6 +44,7 @@ use core::fmt;
 
 use all_is_cubes::camera::{GraphicsOptions, TransparencyOption};
 
+mod analyze;
 mod block_vertex;
 pub use block_vertex::*;
 mod block_mesh;

@@ -288,6 +288,8 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
             &block.voxels
         };
 
+        // Short-circuit case: if we have a single voxel a.k.a. resolution 1, then we generate a
+        // mesh without going through all the conversion steps.
         if let Some(Evoxel {
             color: block_color, ..
         }) = voxels.single_voxel()
@@ -336,8 +338,6 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         } else {
             let voxels_array = voxels.as_vol_ref();
 
-            let mut used_any_vertex_colors = false;
-
             // Exit when the voxel data is not at all in the right volume.
             // This dodges some integer overflow cases on bad input.
             // TODO: Add a test for this case
@@ -348,6 +348,10 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
             {
                 return;
             }
+
+            let analysis = crate::analyze::analyze(resolution, voxels_array);
+
+            let mut used_any_vertex_colors = false;
 
             let block_resolution = GridCoordinate::from(resolution);
 
@@ -362,7 +366,11 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
             }
             let output_interior = &mut self.interior_vertices;
 
-            let mut texture_if_needed: Option<M::Tile> = None;
+            let texture_if_needed: Option<M::Tile> = if analysis.needs_texture {
+                texture::copy_voxels_to_new_texture(texture_allocator, voxels)
+            } else {
+                None
+            };
 
             // Walk through the planes (layers) of the block, figuring out what geometry to
             // generate for each layer and whether it needs a texture.
@@ -378,8 +386,10 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                     .transform(voxel_transform.inverse())
                     .unwrap();
 
-                // Check the case where the block's voxels don't meet its front face, or don't fill that face.
-                if !rotated_voxel_range.z_range().contains(&0)
+                // Check the case where the block's voxels don't meet its front face, or don't fill
+                // that face. If they do, then we'll take care of it later, but if we don't even
+                // iterate over the full surface (as layer 0), we need this extra check.
+                if !analysis.surface_is_occupied(face)
                     || rotated_voxel_range.x_range() != (0..block_resolution)
                     || rotated_voxel_range.y_range() != (0..block_resolution)
                 {
@@ -388,10 +398,12 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
                 // Layer 0 is the outside surface of the cube and successive layers are
                 // deeper below that surface.
-                for layer in rotated_voxel_range.z_range() {
-                    // TODO: Have EvaluatedBlock tell us when a block is fully cubical and opaque,
-                    // and then only scan the first and last layers. EvaluatedBlock.opaque
-                    // is not quite that because it is defined to allow concavities.
+                for layer in analysis.occupied_planes(face) {
+                    if !rotated_voxel_range.z_range().contains(&layer) {
+                        // TODO: This is a workaround for a bug in the analyzer; it should not be
+                        // marking out-of-bounds planes as occupied.
+                        continue;
+                    }
 
                     // Becomes true if there is any voxel that is both non-fully-transparent and
                     // not obscured by another voxel on top.
@@ -405,8 +417,23 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                         rotated_voxel_range.x_range().len() * rotated_voxel_range.y_range().len(),
                     );
 
-                    let mut texture_plane_if_needed: Option<<M::Tile as texture::Tile>::Plane> =
-                        None;
+                    let texture_plane_if_needed: Option<<M::Tile as texture::Tile>::Plane> =
+                        if let Some(ref texture) = texture_if_needed {
+                            // Compute the exact texture slice we will be accessing.
+                            // TODO: It would be better if this were shrunk to the visible voxels
+                            // in this specific layer, not just all voxels.
+                            let slice_range = GridAab::from_ranges([
+                                rotated_voxel_range.x_range(),
+                                rotated_voxel_range.y_range(),
+                                layer..layer + 1,
+                            ])
+                            .transform(face.face_transform(block_resolution))
+                            .unwrap();
+
+                            Some(texture.slice(slice_range))
+                        } else {
+                            None
+                        };
 
                     for t in rotated_voxel_range.y_range() {
                         for s in rotated_voxel_range.x_range() {
@@ -513,29 +540,6 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                             // well use a solid color and skip needing a texture.
                             QuadColoring::<<M::Tile as texture::Tile>::Plane>::Solid(single_color)
                         } else {
-                            if texture_plane_if_needed.is_none() {
-                                if texture_if_needed.is_none() {
-                                    // Try to compute texture (might fail)
-                                    texture_if_needed = texture::copy_voxels_to_new_texture(
-                                        texture_allocator,
-                                        voxels,
-                                    );
-                                }
-                                if let Some(ref texture) = texture_if_needed {
-                                    // Compute the exact texture slice we will be accessing.
-                                    // TODO: It would be better if this were shrunk to the visible voxels
-                                    // in this specific layer, not just all voxels.
-                                    let slice_range = GridAab::from_ranges([
-                                        rotated_voxel_range.x_range(),
-                                        rotated_voxel_range.y_range(),
-                                        layer..layer + 1,
-                                    ])
-                                    .transform(face.face_transform(block_resolution))
-                                    .unwrap();
-
-                                    texture_plane_if_needed = Some(texture.slice(slice_range));
-                                }
-                            }
                             if let Some(ref plane) = texture_plane_if_needed {
                                 QuadColoring::<<M::Tile as texture::Tile>::Plane>::Texture(plane)
                             } else {

@@ -121,6 +121,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "indoc",
+ "itertools 0.12.1",
  "log",
  "mutants",
  "num-traits",
