@@ -301,7 +301,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::vtable_address_comparisons)]
+    #[allow(ambiguous_wide_pointer_comparisons)]
     fn erased_listener() {
         let sink = Sink::new();
         let listener: DynListener<&str> = sink.listener().erased();

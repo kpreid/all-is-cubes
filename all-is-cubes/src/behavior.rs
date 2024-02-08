@@ -396,7 +396,7 @@ impl<H: BehaviorHost> fmt::Debug for BehaviorSetEntry<H> {
 }
 
 impl<H: BehaviorHost> PartialEq for BehaviorSetEntry<H> {
-    #[allow(clippy::vtable_address_comparisons)] // The hazards should be okay for this use case
+    #[allow(ambiguous_wide_pointer_comparisons)] // The hazards should be okay for this use case
     fn eq(&self, other: &Self) -> bool {
         self.attachment == other.attachment && Arc::ptr_eq(&self.behavior, &other.behavior)
     }
@@ -566,7 +566,7 @@ impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> 
     type CommitCheck = CommitCheck;
     type Output = transaction::NoOutput;
 
-    #[allow(clippy::vtable_address_comparisons)] // The hazards should be okay for this use case
+    #[allow(ambiguous_wide_pointer_comparisons)] // The hazards should be okay for this use case
     fn check(
         &self,
         target: &BehaviorSet<H>,
@@ -724,7 +724,7 @@ impl<H: BehaviorHost> PartialEq for BehaviorSetTransaction<H> {
 }
 impl<H: BehaviorHost> PartialEq for Replace<H> {
     // Manual implementation to avoid bounds on `H` and to implement the partiality (comparing pointers instead of values).
-    #[allow(clippy::vtable_address_comparisons)] // The hazards should be okay for this use case
+    #[allow(ambiguous_wide_pointer_comparisons)] // The hazards should be okay for this use case
     fn eq(&self, other: &Self) -> bool {
         let Self {
             old: old1,
