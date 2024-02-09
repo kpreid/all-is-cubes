@@ -8,8 +8,9 @@ use itertools::Itertools as _;
 use num_traits::One;
 use ordered_float::NotNan;
 
-#[cfg(not(feature = "std"))]
 /// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 use num_traits::float::Float as _;
 
 use crate::chunking::OctantMask;
@@ -672,5 +673,3 @@ fn projected_range(
         .into_option()
         .unwrap()
 }
-
-

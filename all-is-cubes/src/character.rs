@@ -8,8 +8,9 @@ use hashbrown::HashSet as HbHashSet;
 use manyfmt::Fmt;
 use ordered_float::NotNan;
 
-#[cfg(not(feature = "std"))]
 /// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 use num_traits::float::Float as _;
 
 use crate::behavior::{self, Behavior, BehaviorSet, BehaviorSetTransaction};
@@ -17,6 +18,7 @@ use crate::camera::ViewTransform;
 use crate::inv::{self, Inventory, InventoryTransaction, Slot, Tool};
 use crate::listen::{Listen, Listener, Notifier};
 #[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 use crate::math::Euclid as _;
 use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, Rgb, VectorOps};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};

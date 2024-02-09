@@ -4,8 +4,9 @@ use euclid::Vector3D;
 use num_traits::identities::Zero;
 pub use ordered_float::{FloatIsNan, NotNan};
 
-#[cfg(not(feature = "std"))]
 /// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
 use crate::util::ConciseDebug;

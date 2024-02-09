@@ -12,11 +12,13 @@ use std::sync::Mutex;
 
 use euclid::{vec3, Point3D, Vector3D};
 
-#[cfg(not(feature = "std"))]
 /// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
 #[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 use crate::math::Euclid as _;
 use crate::math::{
     Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint, VectorOps,
