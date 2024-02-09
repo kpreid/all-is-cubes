@@ -43,6 +43,9 @@ use core::fmt;
 use crate::math::GridCoordinate;
 
 impl Resolution {
+    /// The maximum available resolution.
+    pub const MAX: Resolution = Resolution::R128;
+
     /// Returns the [`Resolution`] that’s twice this one, or [`None`] at the limit.
     #[inline]
     pub const fn double(self) -> Option<Self> {
@@ -221,9 +224,25 @@ impl<N: fmt::Display> fmt::Display for IntoResolutionError<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
+    use exhaust::Exhaust as _;
     use Resolution::*;
 
     const RS: [Resolution; 8] = [R1, R2, R4, R8, R16, R32, R64, R128];
+
+    #[test]
+    fn test_list_is_complete() {
+        assert_eq!(
+            Vec::from(RS),
+            Resolution::exhaust().collect::<Vec<Resolution>>()
+        );
+    }
+
+    #[test]
+    fn max_is_max() {
+        assert_eq!(Resolution::MAX, *RS.last().unwrap());
+        assert_eq!(None, Resolution::MAX.double());
+    }
 
     #[test]
     fn resolution_steps() {

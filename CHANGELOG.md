@@ -4,6 +4,9 @@
 
 ### Added
 
+- `all-is-cubes` library:
+    - New constant `block::Resolution::MAX`.
+
 - `all-is-cubes-mesh` library:
     - Blocks in a `dynamic::ChunkedSpaceMesh` may now be rendered via instancing.
       `dynamic::DynamicMeshTypes::MAXIMUM_MERGED_BLOCK_MESH_SIZE` controls whether this is done.

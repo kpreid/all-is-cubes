@@ -576,6 +576,11 @@ fn SMALLEST(_: &Exhibit, universe: &Universe) {
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
     let resolution = R128;
+    assert_eq!(
+        resolution,
+        Resolution::MAX,
+        "need to update the exhibit info"
+    );
     let rg = GridCoordinate::from(resolution);
 
     let block_space = Space::builder(GridAab::from_lower_size([rg / 2, 0, rg / 2], [1, 1, 1]))
