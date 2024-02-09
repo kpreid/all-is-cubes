@@ -1,7 +1,7 @@
 //! [`EvaluatedBlock`] and [`Evoxel`].
 
 use alloc::sync::Arc;
-use core::{fmt, ops};
+use core::{fmt, ops, ptr};
 
 use euclid::Vector3D;
 use ordered_float::NotNan;
@@ -26,6 +26,11 @@ use super::{Block, Handle, Primitive, AIR};
 
 /// A snapshotted form of [`Block`] which contains all information needed for rendering
 /// and physics, and does not require dereferencing [`Handle`]s or unbounded computation.
+//---
+// TODO: The derived `PartialEq` impl will process redundant components such as
+// `voxel_opacity_mask`. We should make the whole structure read-only, so that we can
+// guarantee that they are consistent and don't need to be compared. Relatedly, it might
+// be good if those derived components were computed lazily.
 #[derive(Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))] // TODO: Should have a custom Arbitrary producing only “possible” results
 #[non_exhaustive]
@@ -761,6 +766,93 @@ impl MinEval {
     #[cfg(debug_assertions)]
     pub(crate) fn consistency_check(&self) {
         self.voxels.consistency_check();
+    }
+}
+
+/// Value derived from an [`EvaluatedBlock`] which can be cheaply hashed and compared.
+///
+/// It is guaranteed that asking the same [`EvaluatedBlock`] for its key twice will produce the same
+/// results, but multiple identical evaluations may not have the same key.
+///
+/// This is intended to support caching of complex data derived from blocks, such as meshes.
+#[doc(hidden)] // experimental
+#[derive(Clone, Debug)]
+pub struct EvKey {
+    // Non-coincidentally, this is the same data as `MinEval`.
+    attributes: BlockAttributes,
+    voxels: Evoxels,
+}
+
+impl EvKey {
+    pub fn new(ev: &EvaluatedBlock) -> Self {
+        Self {
+            // These clone `Arc`s.
+            attributes: ev.attributes.clone(),
+            voxels: ev.voxels.clone(),
+        }
+    }
+}
+
+impl PartialEq for EvKey {
+    fn eq(&self, other: &Self) -> bool {
+        let &Self {
+            attributes:
+                BlockAttributes {
+                    ref display_name,
+                    selectable,
+                    rotation_rule,
+                    ref tick_action,
+                    ref activation_action,
+                    animation_hint,
+                },
+            ref voxels,
+        } = self;
+
+        // TODO: define a pointer comparison for Operation and use it for the *_action
+        ptr::eq(
+            display_name.as_ptr(),
+            other.attributes.display_name.as_ptr(),
+        ) && selectable == other.attributes.selectable
+            && rotation_rule == other.attributes.rotation_rule
+            && *tick_action == other.attributes.tick_action
+            && *activation_action == other.attributes.activation_action
+            && animation_hint == other.attributes.animation_hint
+            && match (voxels, &other.voxels) {
+                (&Evoxels::One(a), &Evoxels::One(b)) => a == b,
+                (
+                    &Evoxels::Many(resolution_a, ref voxels_a),
+                    &Evoxels::Many(resolution_b, ref voxels_b),
+                ) => {
+                    resolution_a == resolution_b
+                        && ptr::eq(voxels_a.as_linear(), voxels_b.as_linear())
+                }
+                _ => false,
+            }
+    }
+}
+impl Eq for EvKey {}
+impl core::hash::Hash for EvKey {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        let &Self {
+            attributes:
+                BlockAttributes {
+                    ref display_name,
+                    selectable,
+                    rotation_rule,
+                    ref tick_action,
+                    ref activation_action,
+                    animation_hint,
+                },
+            ref voxels,
+        } = self;
+
+        display_name.as_ptr().hash(state);
+        selectable.hash(state);
+        rotation_rule.hash(state);
+        tick_action.hash(state);
+        activation_action.hash(state);
+        animation_hint.hash(state);
+        voxels.as_vol_ref().as_linear().as_ptr().hash(state);
     }
 }
 
