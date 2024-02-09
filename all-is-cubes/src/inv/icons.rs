@@ -6,8 +6,9 @@ use embedded_graphics::primitives::{Circle, Line, PrimitiveStyleBuilder};
 use euclid::vec3;
 use exhaust::Exhaust;
 
-#[cfg(not(feature = "std"))]
 /// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
 use crate::block::{Block, Resolution::*, AIR, AIR_EVALUATED};

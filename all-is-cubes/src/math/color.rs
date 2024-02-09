@@ -7,8 +7,9 @@ use core::ops::{Add, AddAssign, Mul, Sub};
 use euclid::{vec3, Vector3D};
 use ordered_float::{FloatIsNan, NotNan};
 
-#[cfg(not(feature = "std"))]
 /// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 use num_traits::float::Float as _;
 
 use crate::math::VectorOps as _;

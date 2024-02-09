@@ -15,8 +15,9 @@ use core::fmt;
 
 use euclid::{vec3, Vector2D, Vector3D};
 use manyfmt::Fmt;
-#[cfg(not(feature = "std"))]
 /// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 use num_traits::float::Float as _;
 use ordered_float::NotNan;
 
@@ -27,6 +28,7 @@ use crate::block::{Evoxels, Resolution, AIR};
 use crate::camera::NdcPoint2;
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 #[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 use crate::math::Euclid as _;
 use crate::math::{
     smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, GridMatrix,

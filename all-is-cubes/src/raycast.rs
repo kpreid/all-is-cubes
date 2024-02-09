@@ -9,11 +9,13 @@ use core::f64::consts::TAU;
 
 use euclid::Vector3D;
 
-#[cfg(not(feature = "std"))]
 /// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 use num_traits::float::Float as _;
 
 #[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 use crate::math::Euclid as _;
 use crate::math::{
     Axis, Cube, CubeFace, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab,

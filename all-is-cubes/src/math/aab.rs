@@ -4,8 +4,9 @@ use core::iter::FusedIterator;
 
 use euclid::{Point3D, Vector3D};
 
-#[cfg(not(feature = "std"))]
 /// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
 use crate::math::{

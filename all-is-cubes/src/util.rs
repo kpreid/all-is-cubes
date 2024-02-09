@@ -227,13 +227,15 @@ pub fn assert_conditional_send_sync<T>() {}
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused)]
     use super::*;
-    use std::error::Error;
-    use std::fmt;
 
     #[test]
     #[cfg(feature = "std")]
     fn error_chain() {
+        use std::error::Error;
+        use std::fmt;
+
         #[derive(Debug)]
         struct TestError1;
         impl Error for TestError1 {}

@@ -479,8 +479,6 @@ mod tests {
     use crate::math::GridAab;
     use crate::transaction::{self, Transaction as _};
     use crate::util::assert_send_sync;
-    use alloc::string::ToString;
-    use std::error::Error;
 
     #[derive(Exhaust, Clone, Debug, Eq, Hash, PartialEq)]
     enum Key {
@@ -564,6 +562,9 @@ mod tests {
     #[test]
     #[cfg(feature = "std")] // Error::source only exists on std
     fn gen_error_message() {
+        use alloc::string::ToString;
+        use std::error::Error;
+
         let set_cube_error = SetCubeError::OutOfBounds {
             modification: GridAab::for_block(R1),
             space_bounds: GridAab::for_block(R4),
