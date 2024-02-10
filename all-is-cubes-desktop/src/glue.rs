@@ -3,6 +3,10 @@
 //! This module includes only straightforward mappings and excludes application behavior
 //! choices.
 
+use std::num::NonZeroUsize;
+
+use futures_core::future::BoxFuture;
+
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 #[cfg(feature = "rerun")]
@@ -45,4 +49,39 @@ impl Renderer for all_is_cubes_gpu::in_wgpu::SurfaceRenderer<std::time::Instant>
 
 pub(crate) fn tokio_yield_progress() -> yield_progress::Builder {
     yield_progress::Builder::new().yield_using(|_| tokio::task::yield_now())
+}
+
+/// Implementation of [`all_is_cubes::util::Executor`] for use with the [`tokio`] runtime used by
+/// `all-is-cubes-desktop`.
+#[derive(Clone, Debug)]
+pub struct Executor {
+    handle: tokio::runtime::Handle,
+    per_task_parallelism: usize,
+}
+
+impl Executor {
+    #[allow(missing_docs)]
+    pub fn new(handle: tokio::runtime::Handle) -> Self {
+        Self {
+            handle,
+            // TODO: configurable, linked to runtime config
+            per_task_parallelism: std::thread::available_parallelism()
+                .unwrap_or(NonZeroUsize::MIN)
+                .get(),
+        }
+    }
+}
+
+impl all_is_cubes::util::Executor for Executor {
+    fn spawn_background(&self, task_factory: &mut dyn FnMut() -> BoxFuture<'static, ()>) {
+        // TODO: eventually we should be using `switchyard` or some other executor focused on
+        // compute support, and add a notion of job priority to `Executor`.
+        for _ in 0..self.per_task_parallelism {
+            self.handle.spawn(task_factory());
+        }
+    }
+
+    fn yield_now(&self) -> BoxFuture<'static, ()> {
+        Box::pin(tokio::task::yield_now())
+    }
 }

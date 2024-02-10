@@ -37,6 +37,7 @@ fn title_and_version() -> String {
 
 fn main() -> Result<(), anyhow::Error> {
     let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
+    let executor = all_is_cubes_desktop::Executor::new(runtime.handle().clone());
 
     // Parse and transform command-line arguments.
     let options = AicDesktopArgs::parse();

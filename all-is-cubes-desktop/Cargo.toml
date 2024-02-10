@@ -38,6 +38,7 @@ clap = { workspace = true }
 # Note: keep crossterm in sync with ratatui's crossterm dependency.
 crossterm = "0.27.0"
 directories-next = "2.0.0"
+futures-core = { workspace = true }
 indicatif = { version = "0.17.0", default-features = false }
 itertools = { workspace = true }
 kira = { version = "0.8.3", default-features = false, features = ["cpal"] }

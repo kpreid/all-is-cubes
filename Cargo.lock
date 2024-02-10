@@ -126,6 +126,7 @@ dependencies = [
  "clap",
  "crossterm",
  "directories-next",
+ "futures-core",
  "gltf",
  "indicatif",
  "itertools 0.12.0",

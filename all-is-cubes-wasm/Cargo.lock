@@ -173,6 +173,7 @@ dependencies = [
  "console_log",
  "form_urlencoded",
  "futures-channel",
+ "futures-core",
  "getrandom 0.1.16",
  "getrandom 0.2.12",
  "js-sys",

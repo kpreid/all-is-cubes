@@ -2,6 +2,7 @@
 
 use std::sync::Mutex;
 
+use futures_core::future::BoxFuture;
 use js_sys::{Error, Function};
 use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::Closure;
@@ -53,6 +54,19 @@ pub fn add_event_listener<E, F>(
         )
         .expect("addEventListener failure");
     closure.forget(); // TODO: Instead return the closure or some other kind of handle
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Executor;
+
+impl all_is_cubes::util::Executor for Executor {
+    fn spawn_background(&self, task_factory: &mut dyn FnMut() -> BoxFuture<'static, ()>) {
+        wasm_bindgen_futures::spawn_local(task_factory())
+    }
+
+    fn yield_now(&self) -> BoxFuture<'static, ()> {
+        Box::pin(yield_to_event_loop())
+    }
 }
 
 /// Yield to the browser's event loop (if significant time has passed since the last call).

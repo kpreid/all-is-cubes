@@ -23,6 +23,7 @@ use all_is_cubes::universe::Universe;
 mod audio;
 mod config_files;
 mod glue;
+pub use glue::Executor;
 pub mod logging;
 pub mod record;
 mod session;

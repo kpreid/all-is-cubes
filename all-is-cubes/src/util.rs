@@ -5,6 +5,9 @@ use core::marker::PhantomData;
 use core::ops::AddAssign;
 use core::time::Duration;
 
+// Note that this is not the `maybe_sync::BoxFuture`!
+use futures_core::future::BoxFuture as SyncBoxFuture;
+
 mod custom_format;
 pub use custom_format::*;
 
@@ -22,6 +25,61 @@ pub fn yield_progress_for_testing() -> YieldProgress {
     // Theoretically we should use Tokio's yield function, but it shouldn't matter for
     // tests and I don't want the dependency here.
     yield_progress::Builder::new().build()
+}
+
+/// Interface to start concurrent tasks.
+///
+/// In the typical case, applications making use of All is Cubes libraries provide an implementation
+/// of this trait to functions which can make use of it.
+///
+/// Executors should generally implement `Clone`.
+pub trait Executor: fmt::Debug + Send + Sync {
+    /// Create a set of tasks which runds the provided `future`, if possible.
+    ///
+    /// The given `task_factory` is called some number of times appropriate to the available
+    /// parallelism. If only single-threaded asynchronous execution is supported, it will be called
+    /// once. It may be called zero times; callers must be able to complete their work without the
+    /// assistance of these tasks.
+    ///
+    /// The future **must periodically yield** by calling [`Executor::yield_now()`].
+    /// Otherwise, it may prevent other tasks, even “foreground” ones, from progressing.
+    /// This requirement is for the benefit of single-threaded [`Executor`]s.
+    fn spawn_background(&self, task_factory: &mut dyn FnMut() -> SyncBoxFuture<'static, ()>);
+
+    /// Grants an opportunity for other tasks to execute instead of the current one.
+    ///
+    /// This should only be performed from inside of a [`Executor::spawn_background()`] task.
+    /// If it is called (or polled) under other circumstances, it may panic or have negative
+    /// effects on task scheduling.
+    //---
+    // If Rust ever gets object-safe async fn in trait without boxing, use it here.
+    fn yield_now(&self) -> SyncBoxFuture<'static, ()>;
+}
+impl<T: ?Sized + Executor> Executor for &T {
+    fn spawn_background(&self, task_factory: &mut dyn FnMut() -> SyncBoxFuture<'static, ()>) {
+        (**self).spawn_background(task_factory)
+    }
+    fn yield_now(&self) -> futures_util::future::BoxFuture<'static, ()> {
+        (**self).yield_now()
+    }
+}
+impl<T: ?Sized + Executor> Executor for alloc::sync::Arc<T> {
+    fn spawn_background(&self, task_factory: &mut dyn FnMut() -> SyncBoxFuture<'static, ()>) {
+        (**self).spawn_background(task_factory)
+    }
+    fn yield_now(&self) -> futures_util::future::BoxFuture<'static, ()> {
+        (**self).yield_now()
+    }
+}
+/// No-op executor for applications which cannot provide one.
+impl Executor for () {
+    fn spawn_background(&self, _: &mut dyn FnMut() -> SyncBoxFuture<'static, ()>) {}
+    fn yield_now(&self) -> futures_util::future::BoxFuture<'static, ()> {
+        unreachable!(
+            "yield_now() should only be called from a task, \
+            and this executor does not support tasks"
+        )
+    }
 }
 
 #[cfg(feature = "std")]
@@ -227,8 +285,9 @@ pub fn assert_conditional_send_sync<T>() {}
 
 #[cfg(test)]
 mod tests {
-    #[allow(unused)]
     use super::*;
+
+    fn _assert_executor_trait_is_object_safe(_: &dyn Executor) {}
 
     #[test]
     #[cfg(feature = "std")]
