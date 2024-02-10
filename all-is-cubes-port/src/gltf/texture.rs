@@ -2,9 +2,9 @@
 
 use std::io;
 
-use all_is_cubes::block::Evoxel;
 use gltf_json::validation::Checked::Valid;
 
+use all_is_cubes::block::Evoxel;
 use all_is_cubes::euclid::Point2D;
 use all_is_cubes::math::{Axis, GridAab, GridRotation, VectorOps, Vol};
 use all_is_cubes_mesh::texture::{self, TilePoint};

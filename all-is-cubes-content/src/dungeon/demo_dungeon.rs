@@ -3,7 +3,6 @@
 use core::f64::consts::TAU;
 use core::mem;
 
-use all_is_cubes::euclid::Vector3D;
 use exhaust::Exhaust;
 use rand::prelude::SliceRandom;
 use rand::{Rng, SeedableRng};
@@ -13,6 +12,7 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::content::load_image::space_from_image;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
+use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{

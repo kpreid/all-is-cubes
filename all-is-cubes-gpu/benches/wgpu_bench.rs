@@ -2,15 +2,15 @@
 
 use std::sync::{Arc, Mutex};
 
-use all_is_cubes::block;
-use all_is_cubes::content::make_some_blocks;
-use all_is_cubes::transaction::Transaction;
 use criterion::Criterion;
 
+use all_is_cubes::block;
 use all_is_cubes::camera::{Flaws, GraphicsOptions, HeadlessRenderer, StandardCameras, Viewport};
 use all_is_cubes::character::Character;
+use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::math::GridVector;
 use all_is_cubes::space::{Space, SpaceTransaction};
+use all_is_cubes::transaction::Transaction;
 use all_is_cubes::universe::{self, Universe};
 
 use all_is_cubes_gpu::in_wgpu::{headless, init};

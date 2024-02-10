@@ -1,23 +1,20 @@
 use core::array;
 use core::fmt;
 
-use all_is_cubes::universe::UniverseTransaction;
 use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
+use all_is_cubes::block::{
+    Block, BlockCollision, Primitive,
+    Resolution::{self, R16},
+    AIR,
+};
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
-use all_is_cubes::math::{FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb};
+use all_is_cubes::math::{Cube, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb};
 use all_is_cubes::notnan;
 use all_is_cubes::space::{SetCubeError, Space};
+use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::{
-    block::{
-        Block, BlockCollision, Primitive,
-        Resolution::{self, R16},
-        AIR,
-    },
-    math::Cube,
-};
 
 use crate::alg::{array_of_noise, scale_color, voronoi_pattern, NoiseFnExt};
 use crate::{palette, tree};

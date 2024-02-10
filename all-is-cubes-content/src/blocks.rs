@@ -4,8 +4,6 @@
 use core::fmt;
 use core::num::NonZeroU16;
 
-use all_is_cubes::euclid::Vector3D;
-use all_is_cubes::op::Operation;
 use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
@@ -18,11 +16,13 @@ use all_is_cubes::drawing::embedded_graphics::{
     primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable},
 };
 use all_is_cubes::drawing::VoxelBrush;
+use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
     Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector, Gridgid, Rgb,
     Rgba, VectorOps,
 };
+use all_is_cubes::op::Operation;
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::UniverseTransaction;

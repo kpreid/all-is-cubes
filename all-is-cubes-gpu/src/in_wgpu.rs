@@ -3,6 +3,8 @@
 use std::mem;
 use std::sync::Arc;
 
+use wgpu::TextureViewDescriptor;
+
 use all_is_cubes::camera::{info_text_drawable, Layers, RenderMethod, StandardCameras};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
@@ -14,7 +16,6 @@ use all_is_cubes::notnan;
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::time;
-use wgpu::TextureViewDescriptor;
 
 use crate::in_wgpu::raytrace_to_texture::RaytraceToTexture;
 #[cfg(feature = "rerun")]

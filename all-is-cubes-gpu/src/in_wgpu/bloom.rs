@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use all_is_cubes::listen::{DirtyFlagListener, Listen};
 use once_cell::sync::Lazy;
+
+use all_is_cubes::listen::{DirtyFlagListener, Listen};
 
 use crate::in_wgpu::glue::create_wgsl_module_from_reloadable;
 use crate::reloadable::{reloadable_str, Reloadable};

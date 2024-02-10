@@ -1,10 +1,10 @@
 use std::mem;
 
-use all_is_cubes::camera::{GraphicsOptions, TransparencyOption};
-use all_is_cubes::listen::{Listen, ListenableSource};
 use once_cell::sync::Lazy;
 
+use all_is_cubes::camera::{GraphicsOptions, TransparencyOption};
 use all_is_cubes::listen::DirtyFlag;
+use all_is_cubes::listen::{Listen, ListenableSource};
 
 use crate::in_wgpu::frame_texture::FramebufferTextures;
 use crate::in_wgpu::glue::create_wgsl_module_from_reloadable;

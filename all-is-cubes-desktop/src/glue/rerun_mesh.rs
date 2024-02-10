@@ -2,7 +2,6 @@
 
 use std::time::Instant;
 
-use all_is_cubes::time::DeadlineStd;
 use itertools::Itertools as _;
 
 use all_is_cubes::camera::Camera;
@@ -10,6 +9,7 @@ use all_is_cubes::euclid::{Point3D, Vector3D};
 use all_is_cubes::math::{Cube, GridCoordinate};
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::Space;
+use all_is_cubes::time::DeadlineStd;
 use all_is_cubes::universe::URef;
 use all_is_cubes_mesh as mesh;
 

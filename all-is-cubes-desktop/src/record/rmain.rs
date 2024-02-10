@@ -1,15 +1,15 @@
 use std::fmt;
 use std::time::Duration;
 
-use all_is_cubes::character::{self, Character};
-use all_is_cubes::physics::BodyTransaction;
-use all_is_cubes::{behavior, listen, universe};
 use anyhow::Context;
 use indicatif::{ProgressBar, ProgressStyle};
 
 use all_is_cubes::camera::Flaws;
+use all_is_cubes::character::{self, Character};
 use all_is_cubes::listen::Listen as _;
 use all_is_cubes::math::NotNan;
+use all_is_cubes::physics::BodyTransaction;
+use all_is_cubes::{behavior, listen, universe};
 
 use crate::record::{RecordOptions, Status};
 use crate::session::{ClockSource, DesktopSession};

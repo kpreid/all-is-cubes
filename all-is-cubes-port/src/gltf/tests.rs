@@ -1,12 +1,12 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use all_is_cubes::character::Character;
 use gltf_json::validation::Validate;
 use gltf_json::Index;
 
 use all_is_cubes::block::{Block, BlockDef, Resolution, AIR};
 use all_is_cubes::camera::GraphicsOptions;
+use all_is_cubes::character::Character;
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::Space;

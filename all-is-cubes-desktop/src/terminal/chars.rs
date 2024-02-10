@@ -5,11 +5,11 @@ use std::io;
 
 use crossterm::style::{Color, Colors, SetColors};
 use crossterm::QueueableCommand as _;
+use ratatui::backend::Backend;
 
 use all_is_cubes::camera::ImagePixel;
 use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::math::{Rgb, Rgba};
-use ratatui::backend::Backend;
 
 use super::options::{CharacterMode, ColorMode};
 use super::{TextAndColor, TextRayImage};
