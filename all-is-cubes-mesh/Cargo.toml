@@ -38,6 +38,9 @@ bitflags = { workspace = true }
 bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
 bytemuck = { workspace = true }
 either = { workspace = true }
+flume = { workspace = true }
+futures-channel = { workspace = true }
+futures-util = { workspace = true }
 fnv = "1.0.7"
 indoc = { workspace = true }
 log = { workspace = true }

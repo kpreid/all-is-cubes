@@ -8,9 +8,12 @@
     - New constant `block::Resolution::MAX`.
 
 - `all-is-cubes-mesh` library:
-    - Blocks in a `dynamic::ChunkedSpaceMesh` may now be rendered via instancing.
-      `dynamic::DynamicMeshTypes::MAXIMUM_MERGED_BLOCK_MESH_SIZE` controls whether this is done.
-      `dynamic::ChunkMesh::block_instances()` returns the instance data.
+    - New features in `dynamic::ChunkedSpaceMesh`:
+        - Blocks may now be rendered via instancing.
+          `dynamic::DynamicMeshTypes::MAXIMUM_MERGED_BLOCK_MESH_SIZE` controls whether this is done; set it to `usize::MAX` if you don't want instances.
+          `dynamic::ChunkMesh::block_instances()` returns the instance data.
+        - Mesh updates (currently only block meshes, not chunk meshes) may be executed in the background rather than strictly during `update()`.
+          This must be externally driven; if you wish to do so, clone the `ChunkedSpaceMesh::job_queue()`, and create one or more tasks/threads which take work from it.
 
 ### Changed
 

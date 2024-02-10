@@ -26,9 +26,11 @@
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 
-// This crate is *almost* `no_std` compatible; the sticking point is the `Mutex` that
-// `chunked_mesh::CsmTodo` uses. We could address that by exporting
-// `all_is_cubes::util::maybe_sync::Mutex`, but I don't want to do that (and switch hash maps to
+// This crate is *almost* `no_std` compatible; the tricky parts are synchronization stuff:
+// * the `Mutex` that `chunked_mesh::CsmTodo` uses.
+// * the `flume` channels used for background mesh calculation.
+// We could address that by exporting `all_is_cubes::util::maybe_sync::Mutex` and using some
+// non-Sync channel implementation, but I don't want to do that (and switch hash maps to
 // `hashbrown`) until I have some imaginable use case for mesh building on a `no_std` target.
 // So for now, the code is just in a state of “reveal how close it is”, hence using `core` and
 // `alloc` imports.

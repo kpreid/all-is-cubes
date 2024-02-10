@@ -306,7 +306,6 @@ where
             },
             &mut render_data_updater,
         );
-        let all_done_with_blocks = todo.blocks.is_empty();
 
         // We are now done with todo preparation, and block mesh updates,
         // and can start updating chunk meshes.
@@ -427,7 +426,7 @@ where
         // Instant at which we finished all processing
         let end_all_time = depth_sort_end_time.unwrap_or(chunk_scan_end_time);
 
-        let complete = all_done_with_blocks && !did_not_finish;
+        let complete = block_updates.all_done() && !did_not_finish;
         if complete && self.complete_time.is_none() {
             log::debug!(
                 "SpaceRenderer({space}): all meshes done in {time}",
@@ -482,6 +481,12 @@ where
         )
     }
 
+    /// Returns a handle to the job queue which may be executed by background tasks to make progress
+    /// in generating meshes separately from the [`Self::update()`] operation.
+    pub fn job_queue(&self) -> &dynamic::MeshJobQueue<M> {
+        self.block_meshes.job_queue()
+    }
+
     /// Returns the chunk in which the camera from the most recent [`Self::update()`] was located.
     /// This may be used as the origin point to iterate over chunks in view.
     pub fn view_chunk(&self) -> ChunkPos<CHUNK_SIZE> {
@@ -526,7 +531,7 @@ pub struct CsmUpdateInfo {
     pub chunk_mesh_callback_times: TimeStats,
     depth_sort_time: Option<Duration>,
     /// Time spent on building block meshes this frame.
-    pub block_updates: TimeStats,
+    block_updates: dynamic::blocks::VbmUpdateInfo,
 
     /// Number of chunks that currently exist.
     pub chunk_count: usize,
@@ -553,7 +558,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
             fmt,
             indoc! {"
                 Space prep     {prep_time}       Mesh flaws: {flaws}
-                Block mesh gen {block_updates}
+                {block_updates}
                 Chunk scan     {chunk_scan_time}
                       mesh gen {chunk_mesh_generation_times}
                       inst gen {chunk_instance_generation_times}
@@ -563,7 +568,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
             "},
             flaws = flaws,
             prep_time = prep_time.refmt(&StatusText),
-            block_updates = block_updates,
+            block_updates = block_updates.refmt(&StatusText),
             chunk_scan_time = chunk_scan_time.refmt(&StatusText),
             chunk_mesh_generation_times = chunk_mesh_generation_times,
             chunk_instance_generation_times = chunk_instance_generation_times,

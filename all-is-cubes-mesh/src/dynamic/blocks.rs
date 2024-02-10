@@ -1,7 +1,12 @@
 use alloc::sync::Arc;
+use core::future::Future;
 use core::num::NonZeroU32;
+use core::time::Duration;
+use core::{fmt, ops};
 
 use fnv::FnvHashSet;
+use futures_channel::oneshot::{self, Canceled};
+use futures_util::FutureExt as _;
 
 use all_is_cubes::block::{self, EvaluatedBlock, Resolution};
 use all_is_cubes::math::Cube;
@@ -15,8 +20,6 @@ use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh};
 
 #[derive(Debug)]
 pub(crate) struct VersionedBlockMeshes<M: DynamicMeshTypes> {
-    texture_allocator: M::Alloc,
-
     /// Indices of this vector are block IDs in the Space.
     pub(crate) meshes: Vec<VersionedBlockMesh<M>>,
 
@@ -26,16 +29,34 @@ pub(crate) struct VersionedBlockMeshes<M: DynamicMeshTypes> {
     /// This is used to help determine when a chunk mesh doesn't need to be rebuilt.
     pub(crate) always_instanced_or_empty: Arc<[BlockIndex]>,
 
+    /// The last version number assigned to some meshes in `self.meshes`;
+    /// incremented whenever new meshes are put in.
     last_version_counter: NonZeroU32,
+
+    /// Sends meshing jobs to be taken by executor tasks (or our own calling thread).
+    job_queue_sender: flume::Sender<MeshJob<M>>,
+
+    /// Job executors may take jobs from this handle, which is clonable and `Send` if `M` permits.
+    job_queue_handle: MeshJobQueue<M>,
+
+    /// The `strong_count` of this `Arc`, minus one, is the number of active, or completed but
+    /// not yet consumed, jobs.
+    job_counter: Arc<()>,
 }
 
 impl<M: DynamicMeshTypes> VersionedBlockMeshes<M> {
     pub fn new(texture_allocator: M::Alloc) -> Self {
+        let (job_queue_sender, job_queue_receiver) = flume::unbounded();
         Self {
-            texture_allocator,
             meshes: Vec::new(),
             always_instanced_or_empty: Arc::from(Vec::new()),
             last_version_counter: NonZeroU32::new(u32::MAX).unwrap(),
+            job_queue_sender,
+            job_queue_handle: MeshJobQueue {
+                queue: job_queue_receiver,
+                texture_allocator,
+            },
+            job_counter: Arc::new(()),
         }
     }
 
@@ -67,14 +88,23 @@ where
         mesh_options: &MeshOptions,
         deadline: time::Deadline<M::Instant>,
         mut render_data_updater: F,
-    ) -> TimeStats
+    ) -> VbmUpdateInfo
     where
         F: FnMut(super::RenderDataUpdate<'_, M>),
     {
-        if todo.is_empty() {
-            // Don't increment the version counter if we don't need to.
-            return TimeStats::default();
+        if todo.is_empty() && Arc::strong_count(&self.job_counter) == 1 {
+            // Don't increment the version counter, or do any of the scans, if we don't need to.
+            return VbmUpdateInfo {
+                total_time: Duration::ZERO,
+                block_calculations: TimeStats::default(),
+                block_callbacks: TimeStats::default(),
+                waiting: Duration::ZERO,
+                // job_counter tells us there are definitely zero jobs right now
+                queued: 0,
+                unfinished: 0,
+            };
         }
+        let start_time = M::Instant::now();
 
         // Bump version number.
         self.last_version_counter = match self.last_version_counter.get().checked_add(1) {
@@ -102,50 +132,49 @@ where
                 self.meshes.reserve(new_len);
                 for (index, bd) in ((old_len as BlockIndex)..).zip(&block_data[old_len..new_len]) {
                     let evaluated = bd.evaluated();
-                    self.meshes
-                        .push(if evaluated.resolution() > Resolution::R1 {
-                            // If the block has voxels, generate a placeholder mesh,
-                            // marked as not-ready so it will be replaced eventually.
-                            VersionedBlockMesh::new(
-                                index,
-                                evaluated,
-                                BlockMesh::new(evaluated, &self.texture_allocator, &fast_options),
-                                BlockMeshVersion::NotReady,
-                                &mut render_data_updater,
-                            )
+
+                    // If the block has nontrivial voxels, generate a placeholder mesh,
+                    // marked as not-ready so it will be replaced eventually.
+                    // Otherwise, the final mesh and the placeholder mesh are the same.
+                    let defer = evaluated.resolution() > Resolution::R1;
+                    let mut vbm = VersionedBlockMesh::new(
+                        index,
+                        evaluated,
+                        BlockMesh::new(
+                            evaluated,
+                            &self.job_queue_handle.texture_allocator,
+                            if defer { &fast_options } else { mesh_options },
+                        ),
+                        if defer {
+                            BlockMeshVersion::NotReady
                         } else {
-                            // If the block does not have voxels, then we can just generate the
-                            // final mesh as quick as the placeholder.
-                            VersionedBlockMesh::new(
-                                index,
-                                evaluated,
-                                BlockMesh::new(evaluated, &self.texture_allocator, mesh_options),
-                                current_version_number,
-                                &mut render_data_updater,
-                            )
-                        });
+                            current_version_number
+                        },
+                        &mut render_data_updater,
+                    );
+
+                    if defer {
+                        vbm.spawn_update_job(
+                            evaluated.clone(),
+                            mesh_options.clone(),
+                            &self.job_queue_sender,
+                            self.job_counter.clone(),
+                        );
+                    }
+
+                    self.meshes.push(vbm);
                 }
             }
         }
 
-        // Update individual meshes.
-        let mut last_start_time = M::Instant::now();
-        let mut stats = TimeStats::default();
-        while deadline > last_start_time && !todo.is_empty() {
-            let index: BlockIndex = todo.iter().next().copied().unwrap();
-            todo.remove(&index);
-            let uindex: usize = index.into();
-
-            let bd = &block_data[uindex];
-            let new_evaluated_block: &EvaluatedBlock = bd.evaluated();
+        // For each block that the Space has told us is changed, either update the mesh texture
+        // immediately, or put it in the job queue for re-meshing.
+        // TODO: This can lead to unbounded queue growth; figure out a way to cap the update rate
+        // for specific blocks when we can't keep up, without forgetting to update them eventually.
+        for block_index in todo.drain() {
+            let uindex = usize::from(block_index);
+            let new_evaluated_block: &EvaluatedBlock = block_data[uindex].evaluated();
             let current_mesh_entry: &mut VersionedBlockMesh<_> = &mut self.meshes[uindex];
-
-            // TODO: Consider re-introducing approximate cost measurement
-            // to hit the deadline better.
-            // cost += match &new_evaluated_block.voxels {
-            //     Some(voxels) => voxels.bounds().volume(),
-            //     None => 1,
-            // };
 
             if current_mesh_entry
                 .mesh
@@ -153,47 +182,86 @@ where
             {
                 // Updated the texture in-place. No need for mesh updates.
             } else {
-                // Compute a new mesh.
-                // TODO: Try using BlockMesh::compute() to reuse allocations.
-                // The catch is that then we will no longer be able to compare the new mesh
-                // to the existing mesh below, so this won't be a pure win.
-                let new_block_mesh =
-                    BlockMesh::new(new_evaluated_block, &self.texture_allocator, mesh_options);
-
-                // Only invalidate the chunks if we actually have different data.
-                // Note: This comparison depends on such things as the definition of PartialEq
-                // for Tex::Tile.
-                // TODO: We don't currently make use of this optimally because textures are never
-                // reused, except in the case of texture-only updates handled above.
-                // (If they were, we'd need to consider what we want to do about stale chunks with
-                // updated texture tiles, which might have geometry gaps or otherwise be obviously
-                // inconsistent.)
-                if new_block_mesh != current_mesh_entry.mesh
-                    || current_mesh_entry.version == BlockMeshVersion::NotReady
-                {
-                    // TODO: reuse old render data and allocations
-                    *current_mesh_entry = VersionedBlockMesh::new(
-                        index,
-                        new_evaluated_block,
-                        new_block_mesh,
-                        current_version_number,
-                        &mut render_data_updater,
-                    );
-                } else {
-                    // The new mesh is identical to the old one (which might happen because
-                    // interior voxels or non-rendered attributes were changed), so don't invalidate
-                    // the chunks.
-                }
-            }
-            let duration =
-                stats.record_consecutive_interval(&mut last_start_time, M::Instant::now());
-            if duration > time::Duration::from_millis(4) {
-                log::trace!(
-                    "Block mesh took {}: {:?} {:?}",
-                    duration.refmt(&StatusText),
-                    new_evaluated_block.attributes.display_name,
-                    bd.block(),
+                current_mesh_entry.spawn_update_job(
+                    new_evaluated_block.clone(),
+                    mesh_options.clone(),
+                    &self.job_queue_sender,
+                    self.job_counter.clone(),
                 );
+            }
+        }
+
+        // Run the job queue for a while to ensure that updates are happening
+        // (whether or not background tasks are also doing this).
+        let start_waiting_time = M::Instant::now();
+        let mut last_wait_check_time = start_waiting_time;
+        while deadline > last_wait_check_time {
+            let Some(job) = self.job_queue_handle.try_next() else {
+                // TODO: In the presence of background threads, “no jobs in queue” is not the same
+                // as “nothing to wait for”. Optimally, we'd sleep until either some jobs have
+                // completed or the deadline is hit, but only if we're actually using threads.
+                break;
+            };
+            job.now_or_never().expect("job should not suspend");
+            last_wait_check_time = M::Instant::now();
+        }
+        let end_waiting_time = last_wait_check_time;
+        let queued = self.job_queue_sender.len();
+
+        // Accept results of completed jobs.
+        let mut completed_job_stats = TimeStats::default();
+        let mut callback_stats = TimeStats::default();
+        for (block_index, current_mesh_entry) in self.meshes.iter_mut().enumerate() {
+            match current_mesh_entry.try_recv_update() {
+                Some(Ok(CompletedMeshJob {
+                    mesh: new_block_mesh,
+                    compute_time,
+                    job_counter_ticket: _,
+                })) => {
+                    completed_job_stats += TimeStats::one(compute_time);
+
+                    let new_evaluated_block: &EvaluatedBlock = block_data[block_index].evaluated();
+
+                    // Only invalidate the chunks if we actually have different data.
+                    // Note: This comparison depends on such things as the definition of PartialEq
+                    // for Tex::Tile.
+                    // TODO: We don't currently make use of this optimally because textures are never
+                    // reused, except in the case of texture-only updates handled above.
+                    // (If they were, we'd need to consider what we want to do about stale chunks with
+                    // updated texture tiles, which might have geometry gaps or otherwise be obviously
+                    // inconsistent.)
+                    if new_block_mesh != current_mesh_entry.mesh
+                        || current_mesh_entry.version == BlockMeshVersion::NotReady
+                    {
+                        // TODO: reuse old render data
+                        let start_callback_time = M::Instant::now();
+                        *current_mesh_entry = VersionedBlockMesh::new(
+                            block_index as BlockIndex,
+                            new_evaluated_block,
+                            new_block_mesh,
+                            current_version_number,
+                            &mut render_data_updater,
+                        );
+                        callback_stats += TimeStats::one(
+                            M::Instant::now().saturating_duration_since(start_callback_time),
+                        );
+                    } else {
+                        // The new mesh is identical to the old one (which might happen because
+                        // interior voxels or non-rendered attributes were changed), so don't invalidate
+                        // the chunks.
+                    }
+                }
+
+                // Not yet ready
+                None => {}
+
+                // If the job was cancelled, reschedule it.
+                Some(Err(Canceled)) => current_mesh_entry.spawn_update_job(
+                    block_data[block_index].evaluated().clone(),
+                    mesh_options.clone(),
+                    &self.job_queue_sender,
+                    self.job_counter.clone(),
+                ),
             }
         }
 
@@ -207,11 +275,24 @@ where
             .map(|(i, _)| i as BlockIndex)
             .collect();
 
-        stats
+        let end_time = M::Instant::now();
+
+        VbmUpdateInfo {
+            total_time: end_time.saturating_duration_since(start_time),
+            block_calculations: completed_job_stats,
+            block_callbacks: callback_stats,
+            waiting: end_waiting_time.saturating_duration_since(start_waiting_time),
+            queued,
+            unfinished: Arc::strong_count(&self.job_counter) - 1,
+        }
     }
 
     pub(crate) fn get_vbm(&self, index: BlockIndex) -> Option<&VersionedBlockMesh<M>> {
         self.meshes.get(usize::from(index))
+    }
+
+    pub(crate) fn job_queue(&self) -> &MeshJobQueue<M> {
+        &self.job_queue_handle
     }
 }
 
@@ -248,6 +329,15 @@ pub(crate) struct VersionedBlockMesh<M: DynamicMeshTypes> {
     /// TODO(instancing): Eventually all blocks should be candidates, but not always used, depending
     /// on what happens to the chunk.
     pub(crate) instance_data: Option<InstanceMesh<M>>,
+
+    /// Receives an asynchronously-computed improved version of this mesh.
+    /// This will be result of the very latest update job spawned for this mesh.
+    pending_latest: Option<oneshot::Receiver<CompletedMeshJob<M>>>,
+
+    /// Receives an asynchronously-computed improved version of this mesh.
+    /// This will be the result of a job that was superseded by `self.pending_latest`; it is kept
+    /// around to ensure that continuous block updates can't starve us of having any meshes at all.
+    pending_oldest: Option<oneshot::Receiver<CompletedMeshJob<M>>>,
 }
 
 /// Data for instanced rendering of a block. Contains a `M::RenderData` for the block mesh.
@@ -300,7 +390,76 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
             mesh,
             version,
             instance_data,
+            pending_latest: None,
+            pending_oldest: None,
         }
+    }
+
+    fn spawn_update_job(
+        &mut self,
+        block: EvaluatedBlock,
+        mesh_options: MeshOptions,
+        job_queue_sender: &flume::Sender<MeshJob<M>>,
+        job_counter_ticket: Arc<()>,
+    ) {
+        let (response_sender, response_receiver) = oneshot::channel();
+        job_queue_sender
+            .send(MeshJob {
+                block,
+                mesh_options,
+                response: response_sender,
+                job_counter_ticket,
+            })
+            .expect("job queue should never be defunct or full");
+
+        let old_job = self.pending_latest.replace(response_receiver);
+
+        // Keep around old_job as the “oldest job”, if we don't already have one, that we presume
+        // will complete soonest and therefore give us a relatively less stale mesh. If there is
+        // already an oldest job, old_job is discarded.
+        if self.pending_oldest.is_none() {
+            self.pending_oldest = old_job;
+        }
+    }
+
+    fn try_recv_update(&mut self) -> Option<Result<CompletedMeshJob<M>, Canceled>> {
+        if let Some(receiver) = &mut self.pending_latest {
+            match receiver.try_recv() {
+                Ok(Some(output)) => {
+                    self.pending_latest = None;
+                    self.pending_oldest = None; // never use anything older either
+                    return Some(Ok(output));
+                }
+
+                // If the job was cancelled, reschedule it.
+                Err(Canceled) => return Some(Err(Canceled)),
+
+                // Not yet ready
+                Ok(None) => {}
+            }
+        }
+
+        // If the latest job is not ready, try the oldest job, which is more likely to have
+        // completed.
+        if let Some(receiver) = &mut self.pending_oldest {
+            match receiver.try_recv() {
+                Ok(Some(output)) => {
+                    self.pending_oldest = None;
+                    return Some(Ok(output));
+                }
+
+                // Not yet ready
+                Ok(None) => {}
+
+                // If the job was cancelled, forget it since we have a newer one,
+                // by definition of how `pending_oldest` is updated.
+                Err(Canceled) => {
+                    self.pending_oldest = None;
+                }
+            }
+        }
+
+        None
     }
 }
 
@@ -338,4 +497,180 @@ fn should_use_instances<M: DynamicMeshTypes>(
     // TODO(instancing): if the animation hint is colors-in-definition-only then we don't want instancing
     ev.attributes.animation_hint != block::AnimationHint::UNCHANGING
         || block_mesh.count_indices() > M::MAXIMUM_MERGED_BLOCK_MESH_SIZE
+}
+
+/// Access to a job queue which may be used to speed up mesh generation by driving it from
+/// background tasks.
+///
+/// This queue handle implements [`Clone`] and [`Send`] if the underlying types permit.
+#[derive(Debug)]
+pub struct MeshJobQueue<M: DynamicMeshTypes> {
+    queue: flume::Receiver<MeshJob<M>>,
+    texture_allocator: M::Alloc,
+}
+
+impl<M: DynamicMeshTypes> Clone for MeshJobQueue<M>
+where
+    M::Alloc: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            queue: self.queue.clone(),
+            texture_allocator: self.texture_allocator.clone(),
+        }
+    }
+}
+
+impl<M: DynamicMeshTypes> MeshJobQueue<M> {
+    /// Waits until there is a job in the queue or the queue is defunct, and returns the job to run,
+    /// or [`None`] if the queue is defunct and will never have more jobs.
+    ///
+    /// Note that this is an async function *returning a [`Future`]*, so there are two layers of
+    /// [`Future`]. `let job = next().await` resolves when there is a job, and `job.await`
+    /// resolves when the job is complete. (This allows tasks to stop listening for jobs without
+    /// stopping execution of any specific job.)
+    ///
+    /// The job future may be compute-intensive (e.g. running for multiple milliseconds without
+    /// suspending) and should be run on a executor or thread suitable for this.
+    ///
+    /// Both this function's future and the job future are cancellation-safe; dropping the future
+    /// will not interfere with the functioning of the queue. However, dropping jobs rather than
+    /// completing them is less efficient than not doing that.
+    ///
+    /// Generally, this function should be called in a loop in a suitably scheduled task.
+    /// TODO: example code
+    pub async fn next(&self) -> Option<impl Future<Output = ()> + '_> {
+        match self.queue.recv_async().await {
+            Err(flume::RecvError::Disconnected) => None,
+            Ok(job) => Some(self.run_job(job)),
+        }
+    }
+
+    fn try_next(&self) -> Option<impl Future<Output = ()> + '_> {
+        match self.queue.try_recv() {
+            Err(flume::TryRecvError::Disconnected) => None,
+            Err(flume::TryRecvError::Empty) => None,
+            Ok(job) => Some(self.run_job(job)),
+        }
+    }
+
+    #[allow(clippy::unused_async)] // preserving the option of being able to suspend
+    async fn run_job(&self, job: MeshJob<M>) {
+        // Check that the job is not stale before kicking off the computation.
+        if !job.response.is_canceled() {
+            let t0 = M::Instant::now();
+            let mesh = BlockMesh::new(&job.block, &self.texture_allocator, &job.mesh_options);
+            let compute_time = M::Instant::now().saturating_duration_since(t0);
+            _ = job.response.send(CompletedMeshJob {
+                mesh,
+                compute_time,
+                job_counter_ticket: job.job_counter_ticket,
+            });
+
+            if compute_time > time::Duration::from_millis(4) {
+                log::trace!(
+                    "Block mesh took {}: {:?}",
+                    compute_time.refmt(&StatusText),
+                    job.block.attributes.display_name,
+                );
+            }
+        }
+    }
+}
+
+/// Inputs for a block mesh calculation.
+///
+/// (In the future we might also cover chunk meshes here with an enum.)
+struct MeshJob<M: DynamicMeshTypes> {
+    block: EvaluatedBlock,
+    mesh_options: MeshOptions,
+
+    /// Own this to signal that a job exists.
+    ///
+    /// TODO: The thing we actually want to signal is when a *completed* job exists;
+    /// this is a close enough over-approximation.
+    job_counter_ticket: Arc<()>,
+
+    response: oneshot::Sender<CompletedMeshJob<M>>,
+}
+
+struct CompletedMeshJob<M: DynamicMeshTypes> {
+    mesh: BlockMesh<M>,
+    compute_time: Duration,
+
+    /// Own this to signal that a completed job exists to be retrieved.
+    #[allow(dead_code)]
+    job_counter_ticket: Arc<()>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct VbmUpdateInfo {
+    /// Total time taken by the `update()` operation.
+    total_time: Duration,
+    /// Time taken by computing each block's meshes.
+    /// These may have been performed by background job executors and therefore not be included in
+    /// the `total_time` sum.
+    block_calculations: TimeStats,
+    /// Time taken to call the `render_data_updater`.
+    block_callbacks: TimeStats,
+    /// Time used running block mesh jobs to completion immediately.
+    waiting: Duration,
+    /// Number of block mesh jobs currently queued and not claimed by any executor, as of right
+    /// after the waiting period.
+    queued: usize,
+    /// Number of block mesh jobs which were started but whose results are not yet claimed.
+    unfinished: usize,
+}
+impl VbmUpdateInfo {
+    /// Returns whether no work remains to be done, i.e. all meshes are currently up to date.
+    pub(crate) fn all_done(&self) -> bool {
+        self.unfinished == 0
+    }
+}
+
+impl all_is_cubes::util::Fmt<StatusText> for VbmUpdateInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
+        let VbmUpdateInfo {
+            total_time,
+            block_calculations,
+            block_callbacks,
+            waiting,
+            queued,
+            unfinished,
+        } = self;
+        write!(
+            fmt,
+            // this format is designed to slot into `CsmUpdateInfo` cleanly
+            indoc::indoc! {"
+                Block total {total_time}, job wait {waiting}, queue {queued:3}, unfinished {unfinished:3}
+                      mesh gen {block_calculations}
+                      upload   {block_callbacks}\
+            "},
+            total_time = total_time.refmt(&StatusText),
+            waiting = waiting.refmt(&StatusText),
+            block_calculations = block_calculations,
+            block_callbacks = block_callbacks,
+            queued = queued,
+            unfinished = unfinished,
+        )
+    }
+}
+
+impl ops::AddAssign for VbmUpdateInfo {
+    fn add_assign(&mut self, rhs: Self) {
+        let VbmUpdateInfo {
+            total_time,
+            block_calculations,
+            block_callbacks,
+            waiting,
+            queued,
+            unfinished,
+        } = self;
+        *total_time += rhs.total_time;
+        *block_calculations += rhs.block_calculations;
+        *block_callbacks += rhs.block_callbacks;
+        *waiting += rhs.waiting;
+        *queued += rhs.queued;
+        *unfinished += rhs.unfinished;
+    }
 }
