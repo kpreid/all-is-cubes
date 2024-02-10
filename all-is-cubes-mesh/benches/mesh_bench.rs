@@ -160,12 +160,11 @@ fn dynamic_benches(c: &mut Criterion) {
         b.iter_batched_ref(
             || {
                 let csm: dynamic::ChunkedSpaceMesh<Mt, std::time::Instant, 16> =
-                    dynamic::ChunkedSpaceMesh::new(space_ref.clone(), true);
-                let tex = Allocator::new();
-                (tex, csm)
+                    dynamic::ChunkedSpaceMesh::new(space_ref.clone(), Allocator::new(), true);
+                csm
             },
-            |(tex, csm)| {
-                let info = csm.update(&camera, tex, time::DeadlineStd::Whenever, |_| {});
+            |csm| {
+                let info = csm.update(&camera, time::DeadlineStd::Whenever, |_| {});
                 assert_eq!(info.flaws, Flaws::empty()); // should not be unfinished
             },
             BatchSize::LargeInput,

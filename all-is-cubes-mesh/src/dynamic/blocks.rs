@@ -15,6 +15,8 @@ use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh};
 
 #[derive(Debug)]
 pub(crate) struct VersionedBlockMeshes<M: DynamicMeshTypes> {
+    texture_allocator: M::Alloc,
+
     /// Indices of this vector are block IDs in the Space.
     pub(crate) meshes: Vec<VersionedBlockMesh<M>>,
 
@@ -28,8 +30,9 @@ pub(crate) struct VersionedBlockMeshes<M: DynamicMeshTypes> {
 }
 
 impl<M: DynamicMeshTypes> VersionedBlockMeshes<M> {
-    pub fn new() -> Self {
+    pub fn new(texture_allocator: M::Alloc) -> Self {
         Self {
+            texture_allocator,
             meshes: Vec::new(),
             always_instanced_or_empty: Arc::from(Vec::new()),
             last_version_counter: NonZeroU32::new(u32::MAX).unwrap(),
@@ -61,7 +64,6 @@ where
         &mut self,
         todo: &mut FnvHashSet<BlockIndex>,
         space: &Space,
-        block_texture_allocator: &M::Alloc,
         mesh_options: &MeshOptions,
         deadline: time::Deadline<I>,
         mut render_data_updater: F,
@@ -108,7 +110,7 @@ where
                             VersionedBlockMesh::new(
                                 index,
                                 evaluated,
-                                BlockMesh::new(evaluated, block_texture_allocator, &fast_options),
+                                BlockMesh::new(evaluated, &self.texture_allocator, &fast_options),
                                 BlockMeshVersion::NotReady,
                                 &mut render_data_updater,
                             )
@@ -118,7 +120,7 @@ where
                             VersionedBlockMesh::new(
                                 index,
                                 evaluated,
-                                BlockMesh::new(evaluated, block_texture_allocator, mesh_options),
+                                BlockMesh::new(evaluated, &self.texture_allocator, mesh_options),
                                 current_version_number,
                                 &mut render_data_updater,
                             )
@@ -157,7 +159,7 @@ where
                 // The catch is that then we will no longer be able to compare the new mesh
                 // to the existing mesh below, so this won't be a pure win.
                 let new_block_mesh =
-                    BlockMesh::new(new_evaluated_block, block_texture_allocator, mesh_options);
+                    BlockMesh::new(new_evaluated_block, &self.texture_allocator, mesh_options);
 
                 // Only invalidate the chunks if we actually have different data.
                 // Note: This comparison depends on such things as the definition of PartialEq
@@ -210,12 +212,6 @@ where
 
     pub(crate) fn get_vbm(&self, index: BlockIndex) -> Option<&VersionedBlockMesh<M>> {
         self.meshes.get(usize::from(index))
-    }
-}
-
-impl<M: DynamicMeshTypes> Default for VersionedBlockMeshes<M> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

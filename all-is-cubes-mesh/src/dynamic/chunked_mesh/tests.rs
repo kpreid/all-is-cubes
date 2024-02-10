@@ -157,7 +157,7 @@ impl<const MBM: usize> CsmTester<MBM> {
     fn new(space: Space, view_distance: f64) -> Self {
         let mut universe = Universe::new();
         let space_ref = universe.insert_anonymous(space);
-        let csm = ChunkedSpaceMesh::new(space_ref.clone(), true);
+        let csm = ChunkedSpaceMesh::new(space_ref.clone(), NoTextures, true);
         let camera = Camera::new(
             {
                 let mut o = GraphicsOptions::default();
@@ -181,7 +181,6 @@ impl<const MBM: usize> CsmTester<MBM> {
     {
         self.csm.update(
             &self.camera,
-            &NoTextures,
             time::DeadlineNt::Whenever,
             render_data_updater,
         )
@@ -333,7 +332,7 @@ fn did_not_finish_detection() {
     eprintln!("--- timing out update");
     let info = tester
         .csm
-        .update(&tester.camera, &NoTextures, time::DeadlineNt::Asap, |_| {});
+        .update(&tester.camera, time::DeadlineNt::Asap, |_| {});
 
     // This is the state that should(n't) be affected.
     // (If we stop having `complete_time` then it's okay to just delete that part of

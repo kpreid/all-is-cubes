@@ -101,7 +101,7 @@ where
     ///
     /// If `interactive` is true, will prioritize getting a rough view of the world over
     /// a fully detailed one, by using placeholder block meshes on the first pass.
-    pub fn new(space: URef<Space>, interactive: bool) -> Self {
+    pub fn new(space: URef<Space>, texture_allocator: M::Alloc, interactive: bool) -> Self {
         let space_borrowed = space.read().unwrap();
         let todo = CsmTodo::initially_dirty();
         let todo_rc = Arc::new(Mutex::new(todo));
@@ -110,7 +110,7 @@ where
         Self {
             space,
             todo: todo_rc,
-            block_meshes: dynamic::VersionedBlockMeshes::new(),
+            block_meshes: dynamic::VersionedBlockMeshes::new(texture_allocator),
             chunks: FnvHashMap::default(),
             chunk_chart: ChunkChart::new(0.0),
             view_chunk: ChunkPos(Cube::new(0, 0, 0)),
@@ -202,7 +202,6 @@ where
     pub fn update<F>(
         &mut self,
         camera: &Camera,
-        block_texture_allocator: &M::Alloc,
         deadline: time::Deadline<I>,
         mut render_data_updater: F,
     ) -> CsmUpdateInfo
@@ -219,21 +218,11 @@ where
         // }
 
         let was_startup_chunks_only = self.startup_chunks_only;
-        let (mut info1, timed_out) = self.update_once(
-            camera,
-            block_texture_allocator,
-            deadline,
-            &mut render_data_updater,
-        );
+        let (mut info1, timed_out) = self.update_once(camera, deadline, &mut render_data_updater);
 
         // If the first pass did not finish and was startup_chunks_only, try again.
         if was_startup_chunks_only && !timed_out && info1.flaws.contains(Flaws::UNFINISHED) {
-            let (info2, _) = self.update_once(
-                camera,
-                block_texture_allocator,
-                deadline,
-                &mut render_data_updater,
-            );
+            let (info2, _) = self.update_once(camera, deadline, &mut render_data_updater);
             info1.add_second_pass(info2);
 
             info1
@@ -249,7 +238,6 @@ where
     fn update_once<F>(
         &mut self,
         camera: &Camera,
-        block_texture_allocator: &M::Alloc,
         deadline: time::Deadline<I>,
         mut render_data_updater: F,
     ) -> (CsmUpdateInfo, bool)
@@ -310,7 +298,6 @@ where
         let block_updates = self.block_meshes.update(
             &mut todo.blocks,
             space,
-            block_texture_allocator,
             mesh_options,
             if self.startup_chunks_only {
                 time::Deadline::Asap

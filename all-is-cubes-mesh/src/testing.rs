@@ -2,6 +2,7 @@
 //!
 //! This module is public but doc(hidden).
 
+use core::fmt;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 
@@ -20,7 +21,8 @@ use crate::{block_meshes_for_space, texture, BlockMeshes, BlockVertex, MeshTypes
 pub struct Mt<Alloc, const MBM: usize> {
     _phantom: PhantomData<fn() -> Alloc>,
 }
-impl<Alloc: texture::Allocator + 'static, const MBM: usize> MeshTypes for Mt<Alloc, MBM>
+impl<Alloc: texture::Allocator + fmt::Debug + 'static, const MBM: usize> MeshTypes
+    for Mt<Alloc, MBM>
 where
     Alloc::Point: Fmt<ConciseDebug>, // TODO: clunky bound
 {
@@ -28,7 +30,8 @@ where
     type Alloc = Alloc;
     type Tile = Alloc::Tile;
 }
-impl<Alloc: texture::Allocator + 'static, const MBM: usize> DynamicMeshTypes for Mt<Alloc, MBM>
+impl<Alloc: texture::Allocator + fmt::Debug + 'static, const MBM: usize> DynamicMeshTypes
+    for Mt<Alloc, MBM>
 where
     Alloc::Point: Fmt<ConciseDebug>, // TODO: clunky bound
 {

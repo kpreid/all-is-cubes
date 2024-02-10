@@ -2,6 +2,7 @@
 
 use std::time::Instant;
 
+use all_is_cubes::time::DeadlineStd;
 use itertools::Itertools as _;
 
 use all_is_cubes::camera::Camera;
@@ -99,44 +100,37 @@ impl RerunMesher {
     pub(crate) fn new(destination: rg::Destination, space: URef<Space>) -> Self {
         Self {
             destination,
-            csm: ChunkedSpaceMesh::new(space, false),
+            csm: ChunkedSpaceMesh::new(space, mesh::texture::NoTextures, false),
         }
     }
 
     pub(crate) fn update(&mut self, camera: &Camera) {
-        let _info = self.csm.update(
-            camera,
-            &mesh::texture::NoTextures,
-            all_is_cubes::time::Deadline::Whenever,
-            |u| {
-                assert!(!u.indices_only);
+        let _info = self.csm.update(camera, DeadlineStd::Whenever, |u| {
+            assert!(!u.indices_only);
 
-                let Some(translation) = u.mesh_id.singleton_translation(CHUNK_SIZE) else {
-                    return; // can't handle instances yet
+            let Some(translation) = u.mesh_id.singleton_translation(CHUNK_SIZE) else {
+                return; // can't handle instances yet
+            };
+
+            let dm = u.render_data.get_or_insert_with(|| {
+                let dm = DroppingMesh {
+                    destination: self.destination.child(&rg::entity_path![u.mesh_id]),
+                    mesh: rg::archetypes::Mesh3D::new([[0., 0., 0.]; 0]),
                 };
 
-                let dm = u.render_data.get_or_insert_with(|| {
-                    let dm = DroppingMesh {
-                        destination: self.destination.child(&rg::entity_path![u.mesh_id]),
-                        mesh: rg::archetypes::Mesh3D::new([[0., 0., 0.]; 0]),
-                    };
+                dm.destination.log(
+                    &rg::entity_path![],
+                    &rg::archetypes::Transform3D::from_translation(rg::convert_vec(translation)),
+                );
 
-                    dm.destination.log(
-                        &rg::entity_path![],
-                        &rg::archetypes::Transform3D::from_translation(rg::convert_vec(
-                            translation,
-                        )),
-                    );
+                dm
+            });
 
-                    dm
-                });
+            convert_to_rerun_mesh(u.mesh, &mut dm.mesh);
 
-                convert_to_rerun_mesh(u.mesh, &mut dm.mesh);
-
-                // TODO: this will need different handling for instances
-                dm.destination.log(&rg::entity_path![], &dm.mesh);
-            },
-        );
+            // TODO: this will need different handling for instances
+            dm.destination.log(&rg::entity_path![], &dm.mesh);
+        });
     }
 }
 

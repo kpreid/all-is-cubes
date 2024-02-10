@@ -111,7 +111,7 @@ pub trait MeshTypes: 'static {
     /// Texture, or texture atlas, allocator.
     ///
     /// If texture support is not desired or possible, use [`texture::NoTextures`] here.
-    type Alloc: texture::Allocator<Tile = Self::Tile> + 'static;
+    type Alloc: texture::Allocator<Tile = Self::Tile> + fmt::Debug + 'static;
 
     /// Texture handle type.
     //--

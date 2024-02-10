@@ -174,7 +174,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
         };
 
         #[allow(unused_mut)]
-        let mut new_csm = ChunkedSpaceMesh::new(space.clone(), *interactive);
+        let mut new_csm =
+            ChunkedSpaceMesh::new(space.clone(), self.block_texture.clone(), *interactive);
         // TODO: rescue ChunkChart and maybe block meshes from the old `csm`.
         #[cfg(feature = "rerun")]
         {
@@ -258,7 +259,6 @@ impl<I: time::Instant> SpaceRenderer<I> {
         // Update chunks
         let csm_info = csm.update(
             camera,
-            &self.block_texture,
             deadline, // TODO: decrease deadline by some guess at texture writing time
             |u| {
                 if u.indices_only {

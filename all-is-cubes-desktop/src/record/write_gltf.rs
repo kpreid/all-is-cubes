@@ -36,7 +36,6 @@ impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for RecordGltfMt {
 pub(super) struct MeshRecorder {
     cameras: camera::StandardCameras,
     csm: ChunkedSpaceMesh<RecordGltfMt, std::time::Instant, 32>,
-    tex: GltfTextureAllocator,
     scene_sender: mpsc::SyncSender<MeshRecordMsg>,
 }
 
@@ -56,9 +55,9 @@ impl MeshRecorder {
                         Space::builder(GridAab::ORIGIN_EMPTY).build(),
                     )
                 }),
+                tex,
                 false,
             ),
-            tex,
             scene_sender,
             cameras,
         }
@@ -69,7 +68,6 @@ impl MeshRecorder {
         // not here
         self.csm.update(
             &self.cameras.cameras().world,
-            &self.tex,
             time::DeadlineStd::Whenever,
             |u| {
                 if u.indices_only {
