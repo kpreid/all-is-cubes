@@ -3,7 +3,7 @@
 
 #![allow(clippy::arc_with_non_send_sync)] // wgpu on wasm
 
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
 use all_is_cubes::block::Evoxel;
 use all_is_cubes::content::palette;
@@ -293,11 +293,12 @@ impl AllocatorBacking {
     }
 
     fn flush(
-        backing: &Mutex<Self>,
+        backing_mutex: &Mutex<Self>,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) -> (Group<Arc<wgpu::TextureView>>, BlockTextureInfo) {
-        let backing = &mut *backing.lock().unwrap();
+        let mut backing_lock_guard = backing_mutex.lock().unwrap();
+        let backing = &mut *backing_lock_guard;
 
         let needed_texture_size = size_vector_to_extent(backing.alloctree.bounds().size());
 
@@ -373,41 +374,50 @@ impl AllocatorBacking {
 
         // Process tiles needing updates or deallocation.
         let mut count_written = 0;
+        let mut deferred_tile_drops: Vec<Arc<Mutex<TileBacking>>> = Vec::new();
         if backing.dirty {
             backing.in_use.retain(|weak_tile| {
                 // Process the non-dropped weak references
                 match weak_tile.backing.upgrade() {
                     Some(strong_ref) => {
-                        let backing: &mut TileBacking = &mut strong_ref.lock().unwrap();
-                        if backing.dirty || copy_everything_anyway {
-                            let region: GridAab = backing
-                                .handle
-                                .as_ref()
-                                .expect("can't happen: dead TileBacking")
-                                .allocation;
+                        {
+                            let backing: &mut TileBacking = &mut strong_ref.lock().unwrap();
+                            if backing.dirty || copy_everything_anyway {
+                                let region: GridAab = backing
+                                    .handle
+                                    .as_ref()
+                                    .expect("can't happen: dead TileBacking")
+                                    .allocation;
 
-                            if let Some(data) = backing.reflectance.as_ref() {
-                                write_texture_by_aab(
-                                    queue,
-                                    &textures.reflectance.texture,
-                                    region,
-                                    data,
-                                );
-                                // If we don't have reflectance then the tile was never written
-                                // so we have nothing to flush
-                                count_written += 1;
-                            }
-                            if let (Some(data), Some(gtexture)) =
-                                (backing.emission.as_ref(), &textures.emission)
-                            {
-                                write_texture_by_aab(queue, &gtexture.texture, region, data);
-                                // If we don't have reflectance then the tile was never written
-                                // so we have nothing to flush
-                                count_written += 1;
-                            }
+                                if let Some(data) = backing.reflectance.as_ref() {
+                                    write_texture_by_aab(
+                                        queue,
+                                        &textures.reflectance.texture,
+                                        region,
+                                        data,
+                                    );
+                                    // If we don't have reflectance then the tile was never written
+                                    // so we have nothing to flush
+                                    count_written += 1;
+                                }
+                                if let (Some(data), Some(gtexture)) =
+                                    (backing.emission.as_ref(), &textures.emission)
+                                {
+                                    write_texture_by_aab(queue, &gtexture.texture, region, data);
+                                    // If we don't have reflectance then the tile was never written
+                                    // so we have nothing to flush
+                                    count_written += 1;
+                                }
 
-                            backing.dirty = false;
+                                backing.dirty = false;
+                            }
                         }
+
+                        // The other tile references might have been dropped by another thread
+                        // in the time since we upgraded. Therefore, defer the drop of the tile
+                        // until we've released the allocator backing lock, to avoid deadlock.
+                        deferred_tile_drops.push(strong_ref);
+
                         true // retain in self.in_use
                     }
                     None => {
@@ -436,7 +446,8 @@ impl AllocatorBacking {
         }
 
         backing.dirty = false;
-        (
+
+        let output = (
             Group {
                 reflectance: textures.reflectance.texture_view.clone(),
                 emission: textures.emission.as_ref().map(|t| t.texture_view.clone()),
@@ -448,7 +459,14 @@ impl AllocatorBacking {
                 in_use_texels: backing.alloctree.occupied_volume(),
                 capacity_texels: backing.alloctree.bounds().volume().unwrap(),
             },
-        )
+        );
+
+        drop::<MutexGuard<'_, _>>(backing_lock_guard);
+        // Now that we no longer hold the allocator backing lock, drop the tiles which might
+        // want to acquire that lock on drop.
+        drop(deferred_tile_drops);
+
+        output
     }
 }
 
