@@ -25,6 +25,8 @@ impl mesh::MeshTypes for Mt {
 impl mesh::dynamic::DynamicMeshTypes for Mt {
     type RenderData = Option<DroppingMesh>;
 
+    type Instant = Instant;
+
     // Instances are not supported by Rerun, so we should not generate them.
     const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = usize::MAX;
 }
@@ -92,7 +94,7 @@ impl Drop for DroppingMesh {
 
 /// Generates and logs Rerun `Mesh3D`s from a `ChunkedSpaceMesh`.
 pub(crate) struct RerunMesher {
-    csm: ChunkedSpaceMesh<Mt, Instant, CHUNK_SIZE>,
+    csm: ChunkedSpaceMesh<Mt, CHUNK_SIZE>,
     destination: rg::Destination,
 }
 

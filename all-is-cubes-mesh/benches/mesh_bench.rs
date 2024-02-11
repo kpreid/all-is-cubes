@@ -159,12 +159,12 @@ fn dynamic_benches(c: &mut Criterion) {
         let space_ref = URef::new_pending(Name::Pending, half_space(Block::from(Rgba::WHITE)));
         b.iter_batched_ref(
             || {
-                let csm: dynamic::ChunkedSpaceMesh<Mt, std::time::Instant, 16> =
+                let csm: dynamic::ChunkedSpaceMesh<Mt, 16> =
                     dynamic::ChunkedSpaceMesh::new(space_ref.clone(), Allocator::new(), true);
                 csm
             },
             |csm| {
-                let info = csm.update(&camera, time::DeadlineStd::Whenever, |_| {});
+                let info = csm.update(&camera, time::DeadlineNt::Whenever, |_| {});
                 assert_eq!(info.flaws, Flaws::empty()); // should not be unfinished
             },
             BatchSize::LargeInput,

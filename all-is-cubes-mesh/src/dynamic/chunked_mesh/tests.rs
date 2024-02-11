@@ -150,7 +150,7 @@ struct CsmTester<const MBM: usize> {
     universe: Universe,
     space: URef<Space>,
     camera: Camera,
-    csm: ChunkedSpaceMesh<Mt<MBM>, time::NoTime, CHUNK_SIZE>,
+    csm: ChunkedSpaceMesh<Mt<MBM>, CHUNK_SIZE>,
 }
 
 impl<const MBM: usize> CsmTester<MBM> {

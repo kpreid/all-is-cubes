@@ -6,7 +6,7 @@ use fnv::FnvHashSet;
 use all_is_cubes::block::{self, EvaluatedBlock, Resolution};
 use all_is_cubes::math::Cube;
 use all_is_cubes::space::{BlockIndex, Space};
-use all_is_cubes::time;
+use all_is_cubes::time::{self, Instant};
 use all_is_cubes::util::{Refmt as _, StatusText, TimeStats};
 
 use crate::dynamic::DynamicMeshTypes;
@@ -60,17 +60,16 @@ where
     /// it will be the correct length.
     ///
     /// Relies on the caller to check if `mesh_options` has changed and fill `todo`.
-    pub(crate) fn update<F, I>(
+    pub(crate) fn update<F>(
         &mut self,
         todo: &mut FnvHashSet<BlockIndex>,
         space: &Space,
         mesh_options: &MeshOptions,
-        deadline: time::Deadline<I>,
+        deadline: time::Deadline<M::Instant>,
         mut render_data_updater: F,
     ) -> TimeStats
     where
         F: FnMut(super::RenderDataUpdate<'_, M>),
-        I: time::Instant,
     {
         if todo.is_empty() {
             // Don't increment the version counter if we don't need to.
@@ -130,7 +129,7 @@ where
         }
 
         // Update individual meshes.
-        let mut last_start_time = I::now();
+        let mut last_start_time = M::Instant::now();
         let mut stats = TimeStats::default();
         while deadline > last_start_time && !todo.is_empty() {
             let index: BlockIndex = todo.iter().next().copied().unwrap();
@@ -186,7 +185,8 @@ where
                     // the chunks.
                 }
             }
-            let duration = stats.record_consecutive_interval(&mut last_start_time, I::now());
+            let duration =
+                stats.record_consecutive_interval(&mut last_start_time, M::Instant::now());
             if duration > time::Duration::from_millis(4) {
                 log::trace!(
                     "Block mesh took {}: {:?} {:?}",

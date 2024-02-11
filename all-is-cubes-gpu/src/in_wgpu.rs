@@ -1,5 +1,7 @@
 //! Rendering via the [`wgpu`] WebGPU-in-Rust graphics library.
 
+use std::fmt;
+use std::marker::PhantomData;
 use std::mem;
 use std::sync::Arc;
 
@@ -57,16 +59,21 @@ mod vertex;
 
 /// [`DynamicMeshTypes`] implementation for this wgpu glue library.
 #[derive(Debug)]
-enum WgpuMt {}
+struct WgpuMt<I> {
+    _phantom: PhantomData<I>,
+    _not_instantiable: std::convert::Infallible,
+}
 
-impl all_is_cubes_mesh::MeshTypes for WgpuMt {
+impl<I: 'static> all_is_cubes_mesh::MeshTypes for WgpuMt<I> {
     type Vertex = vertex::WgpuBlockVertex;
     type Alloc = AtlasAllocator;
     type Tile = block_texture::AtlasTile;
 }
 
-impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for WgpuMt {
+impl<I: time::Instant> all_is_cubes_mesh::dynamic::DynamicMeshTypes for WgpuMt<I> {
     type RenderData = Option<space::ChunkBuffers>;
+
+    type Instant = I;
 
     // TODO(instancing): tune this value
     const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = 400;
@@ -75,7 +82,7 @@ impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for WgpuMt {
 /// Entry point for [`wgpu`] rendering. Construct this and hand it the [`wgpu::Surface`]
 /// to draw on.
 #[derive(Debug)]
-pub struct SurfaceRenderer<I> {
+pub struct SurfaceRenderer<I: time::Instant> {
     surface: wgpu::Surface<'static>,
     device: Arc<wgpu::Device>,
     queue: wgpu::Queue,
@@ -221,7 +228,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
 /// All the state, both CPU and GPU-side, that is needed for drawing a complete
 /// scene and UI, but not the surface it's drawn on. This may be used in tests or
 /// to support
-struct EverythingRenderer<I> {
+struct EverythingRenderer<I: time::Instant> {
     device: Arc<wgpu::Device>,
 
     staging_belt: wgpu::util::StagingBelt,
@@ -264,8 +271,8 @@ struct EverythingRenderer<I> {
     rerun_image: rerun_image::RerunImageExport,
 }
 
-impl<I: std::fmt::Debug> std::fmt::Debug for EverythingRenderer<I> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<I: time::Instant> fmt::Debug for EverythingRenderer<I> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // not at all clear how much is useful to print...
         let Self {
             device,

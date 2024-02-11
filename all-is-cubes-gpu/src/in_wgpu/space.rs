@@ -45,7 +45,7 @@ const CHUNK_SIZE: GridCoordinate = 16;
 ///
 /// Can be given a new [`Space`] or have none.
 #[derive(Debug)]
-pub(crate) struct SpaceRenderer<I> {
+pub(crate) struct SpaceRenderer<I: time::Instant> {
     space_label: String,
     /// A debugging label for the space's render pass.
     /// (Derived from constructor's space_label)
@@ -75,7 +75,7 @@ pub(crate) struct SpaceRenderer<I> {
     /// Mesh generator and updater.
     ///
     /// If [`None`], then we currently have no [`Space`].
-    csm: Option<ChunkedSpaceMesh<WgpuMt, I, CHUNK_SIZE>>,
+    csm: Option<ChunkedSpaceMesh<WgpuMt<I>, CHUNK_SIZE>>,
 
     interactive: bool,
 
@@ -720,9 +720,9 @@ fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuf
 }
 
 /// Copy [`SpaceMesh`] data to GPU buffers.
-fn update_chunk_buffers(
+fn update_chunk_buffers<I: time::Instant>(
     mut bwp: BeltWritingParts<'_, '_>,
-    update: RenderDataUpdate<'_, WgpuMt>,
+    update: RenderDataUpdate<'_, WgpuMt<I>>,
     space_label: &str,
 ) {
     if update.mesh.is_empty() {

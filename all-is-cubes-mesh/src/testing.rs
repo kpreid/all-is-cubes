@@ -36,6 +36,7 @@ where
     Alloc::Point: Fmt<ConciseDebug>, // TODO: clunky bound
 {
     type RenderData = ();
+    type Instant = all_is_cubes::time::NoTime;
     const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = MBM;
 }
 

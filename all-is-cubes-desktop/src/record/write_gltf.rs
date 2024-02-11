@@ -28,6 +28,8 @@ impl MeshTypes for RecordGltfMt {
 impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for RecordGltfMt {
     type RenderData = MeshIndexCell;
 
+    type Instant = std::time::Instant;
+
     // TODO(instancing): Implement instance rendering and set this appropriately.
     const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = usize::MAX;
 }
@@ -35,7 +37,7 @@ impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for RecordGltfMt {
 #[derive(Debug)]
 pub(super) struct MeshRecorder {
     cameras: camera::StandardCameras,
-    csm: ChunkedSpaceMesh<RecordGltfMt, std::time::Instant, 32>,
+    csm: ChunkedSpaceMesh<RecordGltfMt, 32>,
     scene_sender: mpsc::SyncSender<MeshRecordMsg>,
 }
 
