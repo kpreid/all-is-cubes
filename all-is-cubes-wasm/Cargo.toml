@@ -84,6 +84,7 @@ wasm-bindgen-test = "0.3"
 [lints]
 rust.rust_2018_idioms = "deny"
 rust.unsafe_op_in_unsafe_fn = "deny"
+
 rust.explicit_outlives_requirements = "warn"
 rust.missing_debug_implementations = "warn"
 rust.missing_docs = "warn"
@@ -97,81 +98,28 @@ rust.unused_qualifications = "warn"
 # rust.unused_crate_dependencies = "warn"
 
 clippy.collapsible_else_if = "allow"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.collapsible_if = "allow"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.needless_update = "allow"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.single_match = "allow"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
 
 clippy.should_panic_without_expect = "deny"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
 
 clippy.cast_lossless = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.doc_markdown = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.exhaustive_enums = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.exhaustive_structs = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.into_iter_without_iter = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.iter_without_into_iter = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.modulo_arithmetic = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.return_self_not_must_use = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.suboptimal_flops = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.undocumented_unsafe_blocks = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.uninlined_format_args = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.unnecessary_self_imports = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.unused_async = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
-
 clippy.wrong_self_convention = "warn"
-# This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
 
+# wasm-specific config
 clippy.arc_with_non_send_sync = "allow"
 
 [profile.dev]
@@ -187,11 +135,7 @@ split-debuginfo = "unpacked"
 
 # For packages whose code is not as performance-critical, spend less time optimizing
 package.all-is-cubes-content.opt-level = 1
-
-# For packages whose code is not as performance-critical, spend less time optimizing
 package.all-is-cubes-port.opt-level = 1
-
-# For packages whose code is not as performance-critical, spend less time optimizing
 package.all-is-cubes-ui.opt-level = 1
 
 [profile.release]
