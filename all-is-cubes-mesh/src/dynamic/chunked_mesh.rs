@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use core::fmt;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
@@ -333,10 +334,6 @@ where
         }
 
         // Define iterator over chunks to be updated.
-        // (TODO: This iterator being separate is from refactoring towards eventually doing
-        // background/parallel chunk updates. When we do that, we're going to need to remove/swap
-        // chunks to avoid HashMap borrow conflicts. If we don't end up doing it, this iterator
-        // declaration has less reason to exist separately.)
         let space_bounds_in_chunks = space.bounds().divide(CHUNK_SIZE);
         let mut did_not_finish = false;
         let chunk_update_iterator = self
@@ -353,71 +350,103 @@ where
                     did_not_finish = true;
                 }
                 still_have_time
-            });
+            })
+            .filter_map(
+                |chunk_pos| -> Option<(ChunkPos<CHUNK_SIZE>, ChunkTodo, ChunkMesh<M, CHUNK_SIZE>)> {
+                    // Only process chunks that are in the space bounds
+                    if !space_bounds_in_chunks.contains_cube(chunk_pos.0) {
+                        return None;
+                    }
+
+                    // In order to avoid borrow conflicts resulting from accessing the `self.chunks`
+                    // and `todo.chunks` maps more than once, we have to *remove* their contents
+                    // from the maps. This will not cause any trouble visible elsewhere because we
+                    // have an exclusive borrow of both maps while the entire process proceeds.
+
+                    let mut chunk_todo =
+                        todo.chunks.remove(&chunk_pos).unwrap_or_else(|| ChunkTodo {
+                            state: ChunkTodoState::DirtyMeshAndInstances,
+                            always_instanced_or_empty: Some(
+                                self.block_meshes.always_instanced_or_empty.clone(),
+                            ),
+                        });
+                    let chunk_mesh_entry = self.chunks.entry(chunk_pos);
+
+                    // If the chunk has stale blocks in its mesh, mark it dirty.
+                    if matches!(
+                        chunk_mesh_entry,
+                        Entry::Occupied(ref oe) if oe.get().stale_blocks(&self.block_meshes)
+                    ) {
+                        chunk_todo.state = ChunkTodoState::DirtyMeshAndInstances;
+                    }
+
+                    // Decide whether to update the chunk
+                    let should_update_chunk = (chunk_todo.is_not_clean()
+                        && !self.did_not_finish_chunks)
+                        || matches!(chunk_mesh_entry, Entry::Vacant(_));
+
+                    if should_update_chunk {
+                        let chunk_mesh = match chunk_mesh_entry {
+                            Entry::Occupied(oe) => oe.remove(),
+                            Entry::Vacant(_) => ChunkMesh::new(chunk_pos),
+                        };
+
+                        Some((chunk_pos, chunk_todo, chunk_mesh))
+                    } else {
+                        todo.chunks.insert(chunk_pos, chunk_todo);
+                        None
+                    }
+                },
+            );
 
         // Update some chunk geometry.
         let mut chunk_mesh_generation_times = TimeStats::default();
         let mut chunk_instance_generation_times = TimeStats::default();
         let mut chunk_mesh_callback_times = TimeStats::default();
-        for chunk_pos in chunk_update_iterator {
-            let chunk_todo = todo.chunks.entry(chunk_pos).or_insert_with(|| ChunkTodo {
-                state: ChunkTodoState::DirtyMeshAndInstances,
-                always_instanced_or_empty: Some(
-                    self.block_meshes.always_instanced_or_empty.clone(),
-                ),
-            });
-            let chunk_mesh_entry = self.chunks.entry(chunk_pos);
+        let to_put_back = chunk_update_iterator
+            .map(|(chunk_pos, mut chunk_todo, mut chunk_mesh)| {
+                let compute_start = M::Instant::now();
+                let actually_changed_mesh =
+                    chunk_mesh.recompute(&mut chunk_todo, space, mesh_options, &self.block_meshes);
+                let compute_end_update_start = M::Instant::now();
+                if actually_changed_mesh {
+                    render_data_updater(chunk_mesh.borrow_for_update(false));
+                }
+                let update_end = M::Instant::now();
 
-            // If the chunk has stale blocks in its mesh, mark it dirty.
-            if matches!(
-                chunk_mesh_entry,
-                Entry::Occupied(ref oe) if oe.get().stale_blocks(&self.block_meshes)
-            ) {
-                chunk_todo.state = ChunkTodoState::DirtyMeshAndInstances;
-            }
+                let compute_time =
+                    compute_end_update_start.saturating_duration_since(compute_start);
+                let update_time = update_end.saturating_duration_since(compute_end_update_start);
+                if actually_changed_mesh {
+                    chunk_mesh_generation_times += TimeStats::one(compute_time);
+                    chunk_mesh_callback_times += TimeStats::one(update_time);
+                } else {
+                    chunk_instance_generation_times += TimeStats::one(compute_time);
+                    // update_time should be nothing
+                }
 
-            // Decide whether to update the chunk.
-            // (We can't do these checks in the iterator without having borrow conflicts.)
-            let should_update_chunk = (chunk_todo.is_not_clean() && !self.did_not_finish_chunks)
-                || matches!(chunk_mesh_entry, Entry::Vacant(_));
-            if !should_update_chunk {
-                continue;
-            }
-            let chunk_mesh = chunk_mesh_entry.or_insert_with(|| ChunkMesh::new(chunk_pos));
+                #[cfg(feature = "rerun")]
+                if self.rerun_destination.is_enabled() {
+                    self.rerun_destination.log(
+                        &"one_chunk_compute_ms".into(),
+                        &rg::milliseconds(compute_time),
+                    );
+                    self.rerun_destination.log(
+                        &"one_chunk_update_ms".into(),
+                        &rg::milliseconds(update_time),
+                    );
+                }
 
-            // Done with checks; time to actually update the chunk.
+                (chunk_pos, chunk_todo, chunk_mesh)
+            })
+            .collect::<Vec<_>>();
 
-            let compute_start = M::Instant::now();
-            let actually_changed_mesh =
-                chunk_mesh.recompute(chunk_todo, space, mesh_options, &self.block_meshes);
-            let compute_end_update_start = M::Instant::now();
-            if actually_changed_mesh {
-                render_data_updater(chunk_mesh.borrow_for_update(false));
-            }
-            let update_end = M::Instant::now();
-
-            let compute_time = compute_end_update_start.saturating_duration_since(compute_start);
-            let update_time = update_end.saturating_duration_since(compute_end_update_start);
-            if actually_changed_mesh {
-                chunk_mesh_generation_times += TimeStats::one(compute_time);
-                chunk_mesh_callback_times += TimeStats::one(update_time);
-            } else {
-                chunk_instance_generation_times += TimeStats::one(compute_time);
-                // update_time should be nothing
-            }
-
-            #[cfg(feature = "rerun")]
-            if self.rerun_destination.is_enabled() {
-                self.rerun_destination.log(
-                    &"one_chunk_compute_ms".into(),
-                    &rg::milliseconds(compute_time),
-                );
-                self.rerun_destination.log(
-                    &"one_chunk_update_ms".into(),
-                    &rg::milliseconds(update_time),
-                );
-            }
+        // Put updated chunks back in the maps
+        for (chunk_pos, chunk_todo, chunk_mesh) in to_put_back {
+            self.chunks.insert(chunk_pos, chunk_mesh);
+            todo.chunks.insert(chunk_pos, chunk_todo);
         }
+        // Record outcome of processing
         self.did_not_finish_chunks = did_not_finish;
         if !did_not_finish {
             self.startup_chunks_only = false;
