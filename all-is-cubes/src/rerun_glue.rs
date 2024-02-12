@@ -67,6 +67,10 @@ impl Destination {
         self.catch(|| self.stream.log(self.path.join(path_suffix), data))
     }
 
+    pub fn log_timeless(&self, path_suffix: &EntityPath, data: &impl re_sdk::AsComponents) {
+        self.catch(|| self.stream.log_timeless(self.path.join(path_suffix), data))
+    }
+
     pub fn clear_recursive(&self, path_suffix: &EntityPath) {
         // TODO: this is no longer necessary
         self.log(path_suffix, &archetypes::Clear::new(true));
@@ -212,15 +216,8 @@ pub fn convert_camera_to_pinhole(
     )
 }
 
-pub fn milliseconds(d: core::time::Duration) -> archetypes::TimeSeriesScalar {
-    archetypes::TimeSeriesScalar::new(d.as_secs_f64() * 1000.0)
-}
-
-/// Create a dummy datapoint which acts to mark an event.
-pub fn time_series_marker(label: impl Into<components::Text>) -> archetypes::TimeSeriesScalar {
-    archetypes::TimeSeriesScalar::new(-10.0)
-        .with_scattered(true)
-        .with_label(label)
+pub fn milliseconds(d: core::time::Duration) -> archetypes::Scalar {
+    archetypes::Scalar::new(d.as_secs_f64() * 1000.0)
 }
 
 impl From<math::Face6> for view_coordinates::SignedAxis3 {

@@ -390,11 +390,11 @@ where
                 if self.rerun_destination.is_enabled() {
                     self.rerun_destination.log(
                         &"one_chunk_compute_ms".into(),
-                        &rg::milliseconds(compute_time).with_scattered(true),
+                        &rg::milliseconds(compute_time),
                     );
                     self.rerun_destination.log(
                         &"one_chunk_update_ms".into(),
-                        &rg::milliseconds(update_time).with_scattered(true),
+                        &rg::milliseconds(update_time),
                     );
                 }
             }
@@ -435,7 +435,7 @@ where
             if self.rerun_destination.is_enabled() {
                 self.rerun_destination.log(
                     &"all_meshes_done".into(),
-                    &rg::time_series_marker("all meshes done"),
+                    &rg::archetypes::Scalar::new(-10.0),
                 );
             }
             self.complete_time = Some(end_all_time);
@@ -501,6 +501,20 @@ where
     #[cfg(feature = "rerun")]
     pub fn log_to_rerun(&mut self, destination: rg::Destination) {
         self.rerun_destination = destination;
+
+        // Set up time series styling
+        self.rerun_destination.log_timeless(
+            &"one_chunk_compute_ms".into(),
+            &rg::archetypes::SeriesPoint::new(),
+        );
+        self.rerun_destination.log_timeless(
+            &"one_chunk_update_ms".into(),
+            &rg::archetypes::SeriesPoint::new(),
+        );
+        self.rerun_destination.log_timeless(
+            &"all_meshes_done".into(),
+            &rg::archetypes::SeriesPoint::new().with_name("all meshes done"),
+        );
     }
 }
 
