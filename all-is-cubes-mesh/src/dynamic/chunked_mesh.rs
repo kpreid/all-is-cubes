@@ -1,5 +1,6 @@
 use core::fmt;
-use std::collections::{hash_map::Entry::*, HashMap, HashSet};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, Weak};
 
 use fnv::{FnvHashMap, FnvHashSet};
@@ -328,75 +329,90 @@ where
             });
         }
 
+        // Define iterator over chunks to be updated.
+        // (TODO: This iterator being separate is from refactoring towards eventually doing
+        // background/parallel chunk updates. When we do that, we're going to need to remove/swap
+        // chunks to avoid HashMap borrow conflicts. If we don't end up doing it, this iterator
+        // declaration has less reason to exist separately.)
+        let space_bounds_in_chunks = space.bounds().divide(CHUNK_SIZE);
+        let mut did_not_finish = false;
+        let chunk_update_iterator = self
+            .chunk_chart
+            .chunks(view_chunk, OctantMask::ALL)
+            // Create/update in-bounds chunks only.
+            .filter(move |chunk_pos| space_bounds_in_chunks.contains_cube(chunk_pos.0))
+            .take_while(|_| {
+                // Stop processing chunks as soon as we hit the deadline.
+                // (This means we'll still overrun the deadline by one chunk's time, but that's
+                // the best we can do.)
+                let still_have_time = deadline > M::Instant::now();
+                if !still_have_time {
+                    did_not_finish = true;
+                }
+                still_have_time
+            });
+
         // Update some chunk geometry.
-        let chunk_bounds = space.bounds().divide(CHUNK_SIZE);
         let mut chunk_mesh_generation_times = TimeStats::default();
         let mut chunk_instance_generation_times = TimeStats::default();
         let mut chunk_mesh_callback_times = TimeStats::default();
-        let mut did_not_finish = false;
-        for p in self.chunk_chart.chunks(view_chunk, OctantMask::ALL) {
-            if !chunk_bounds.contains_cube(p.0) {
-                // Chunk not in the Space
-                continue;
-            }
-
-            let this_chunk_start_time = M::Instant::now();
-            if deadline < this_chunk_start_time {
-                did_not_finish = true;
-                break;
-            }
-
-            let chunk_todo = todo.chunks.entry(p).or_insert_with(|| ChunkTodo {
+        for chunk_pos in chunk_update_iterator {
+            let chunk_todo = todo.chunks.entry(chunk_pos).or_insert_with(|| ChunkTodo {
                 state: ChunkTodoState::DirtyMeshAndInstances,
                 always_instanced_or_empty: Some(
                     self.block_meshes.always_instanced_or_empty.clone(),
                 ),
             });
-            let chunk_entry = self.chunks.entry(p);
+            let chunk_mesh_entry = self.chunks.entry(chunk_pos);
 
             // If the chunk has stale blocks in its mesh, mark it dirty.
             if matches!(
-                chunk_entry,
-                Occupied(ref oe) if oe.get().stale_blocks(&self.block_meshes))
-            {
+                chunk_mesh_entry,
+                Entry::Occupied(ref oe) if oe.get().stale_blocks(&self.block_meshes)
+            ) {
                 chunk_todo.state = ChunkTodoState::DirtyMeshAndInstances;
             }
 
-            // If the chunk needs updating or never existed, update it.
-            if (chunk_todo.is_not_clean() && !self.did_not_finish_chunks)
-                || matches!(chunk_entry, Vacant(_))
-            {
-                let chunk = chunk_entry.or_insert_with(|| ChunkMesh::new(p));
-                let actually_changed_mesh =
-                    chunk.recompute(chunk_todo, space, mesh_options, &self.block_meshes);
-                let compute_end_update_start = M::Instant::now();
-                if actually_changed_mesh {
-                    render_data_updater(chunk.borrow_for_update(false));
-                }
-                let update_end = M::Instant::now();
+            // Decide whether to update the chunk.
+            // (We can't do these checks in the iterator without having borrow conflicts.)
+            let should_update_chunk = (chunk_todo.is_not_clean() && !self.did_not_finish_chunks)
+                || matches!(chunk_mesh_entry, Entry::Vacant(_));
+            if !should_update_chunk {
+                continue;
+            }
+            let chunk_mesh = chunk_mesh_entry.or_insert_with(|| ChunkMesh::new(chunk_pos));
 
-                let compute_time =
-                    compute_end_update_start.saturating_duration_since(this_chunk_start_time);
-                let update_time = update_end.saturating_duration_since(compute_end_update_start);
-                if actually_changed_mesh {
-                    chunk_mesh_generation_times += TimeStats::one(compute_time);
-                    chunk_mesh_callback_times += TimeStats::one(update_time);
-                } else {
-                    chunk_instance_generation_times += TimeStats::one(compute_time);
-                    // update_time should be nothing
-                }
+            // Done with checks; time to actually update the chunk.
 
-                #[cfg(feature = "rerun")]
-                if self.rerun_destination.is_enabled() {
-                    self.rerun_destination.log(
-                        &"one_chunk_compute_ms".into(),
-                        &rg::milliseconds(compute_time),
-                    );
-                    self.rerun_destination.log(
-                        &"one_chunk_update_ms".into(),
-                        &rg::milliseconds(update_time),
-                    );
-                }
+            let compute_start = M::Instant::now();
+            let actually_changed_mesh =
+                chunk_mesh.recompute(chunk_todo, space, mesh_options, &self.block_meshes);
+            let compute_end_update_start = M::Instant::now();
+            if actually_changed_mesh {
+                render_data_updater(chunk_mesh.borrow_for_update(false));
+            }
+            let update_end = M::Instant::now();
+
+            let compute_time = compute_end_update_start.saturating_duration_since(compute_start);
+            let update_time = update_end.saturating_duration_since(compute_end_update_start);
+            if actually_changed_mesh {
+                chunk_mesh_generation_times += TimeStats::one(compute_time);
+                chunk_mesh_callback_times += TimeStats::one(update_time);
+            } else {
+                chunk_instance_generation_times += TimeStats::one(compute_time);
+                // update_time should be nothing
+            }
+
+            #[cfg(feature = "rerun")]
+            if self.rerun_destination.is_enabled() {
+                self.rerun_destination.log(
+                    &"one_chunk_compute_ms".into(),
+                    &rg::milliseconds(compute_time),
+                );
+                self.rerun_destination.log(
+                    &"one_chunk_update_ms".into(),
+                    &rg::milliseconds(update_time),
+                );
             }
         }
         self.did_not_finish_chunks = did_not_finish;
