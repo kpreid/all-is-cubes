@@ -14,6 +14,8 @@ use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::time::{self, Instant};
 use all_is_cubes::util::{Refmt as _, StatusText, TimeStats};
 
+#[cfg(doc)]
+use crate::dynamic::ChunkedSpaceMesh;
 use crate::dynamic::DynamicMeshTypes;
 use crate::{texture, GfxVertex, MeshMeta};
 use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh};
@@ -502,7 +504,10 @@ fn should_use_instances<M: DynamicMeshTypes>(
 /// Access to a job queue which may be used to speed up mesh generation by driving it from
 /// background tasks.
 ///
-/// This queue handle implements [`Clone`] and [`Send`] if the underlying types permit.
+/// Obtain this from [`ChunkedSpaceMesh::job_queue()`].
+///
+/// This queue handle implements [`Clone`] and [`Send`] if `M`'s [`DynamicMeshTypes`] associated
+/// types permit.
 #[derive(Debug)]
 pub struct MeshJobQueue<M: DynamicMeshTypes> {
     queue: flume::Receiver<MeshJob<M>>,

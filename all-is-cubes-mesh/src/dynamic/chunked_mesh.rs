@@ -481,8 +481,8 @@ where
         )
     }
 
-    /// Returns a handle to the job queue which may be executed by background tasks to make progress
-    /// in generating meshes separately from the [`Self::update()`] operation.
+    /// Returns a handle to the job queue, which may be used by background tasks (which you supply)
+    /// to make progress in generating meshes separately from the [`Self::update()`] operation.
     pub fn job_queue(&self) -> &dynamic::MeshJobQueue<M> {
         self.block_meshes.job_queue()
     }
