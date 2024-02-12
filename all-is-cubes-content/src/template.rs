@@ -163,7 +163,7 @@ impl UniverseTemplate {
             let mut p = Some(p);
             use UniverseTemplate::*;
             let maybe_space: Option<Result<Space, InGenError>> = match self {
-                Menu => Some(template_menu(&mut universe)),
+                Menu => Some(template_menu(&mut universe, p.take().unwrap()).await),
                 Blank => None,
                 Fail => Some(Err(InGenError::Other(
                     "the Fail template always fails to generate".into(),

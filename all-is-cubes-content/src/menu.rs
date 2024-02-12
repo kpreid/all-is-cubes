@@ -1,114 +1,34 @@
-use all_is_cubes::arcstr;
-use all_is_cubes::block::{text, Primitive};
-use all_is_cubes::space::CubeTransaction;
-use alloc::string::ToString as _;
 use alloc::sync::Arc;
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 
 use strum::IntoEnumIterator;
 
-use all_is_cubes::{
-    block::{
-        Block, BlockAttributes,
-        Resolution::{self},
-    },
-    character::Spawn,
-    content::palette,
-    euclid::Vector3D,
-    inv::Tool,
-    linking::InGenError,
-    math::{Face6, GridAab, GridVector},
-    space::{Space, SpaceBuilder, SpacePhysics, SpaceTransaction},
-    transaction::{self, Merge, Transaction as _},
-    universe::Universe,
-};
+use all_is_cubes::arcstr;
+use all_is_cubes::block::{BlockAttributes, Resolution};
+use all_is_cubes::character::Spawn;
+use all_is_cubes::content::palette;
+use all_is_cubes::euclid::Vector3D;
+use all_is_cubes::inv::Tool;
+use all_is_cubes::linking::InGenError;
+use all_is_cubes::math::{Face6, GridAab};
+use all_is_cubes::space::{Space, SpaceBuilder, SpacePhysics};
+use all_is_cubes::transaction::{self, Transaction as _};
+use all_is_cubes::universe::{Universe, UniverseTransaction};
+use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::logo::logo_text;
 use all_is_cubes_ui::vui::{self, install_widgets, widgets, Align, LayoutTree, Layoutable as _};
 
 use crate::UniverseTemplate;
 
-#[derive(Debug)]
-struct TemplateButton {
-    // template: UniverseTemplate,
-    background_block: Block,
-    text: text::Text,
-}
+pub(crate) async fn template_menu(
+    universe: &mut Universe,
+    mut p: YieldProgress,
+) -> Result<Space, InGenError> {
+    let mut install_txn = UniverseTransaction::default();
+    let widget_theme_progress = p.start_and_cut(0.05, "WidgetTheme").await;
+    let widget_theme = widgets::WidgetTheme::new(&mut install_txn, widget_theme_progress).await?;
+    install_txn.execute(universe, &mut transaction::no_outputs)?;
 
-impl TemplateButton {
-    fn new(_universe: &mut Universe, template: UniverseTemplate) -> Result<Self, InGenError> {
-        let background_block = Block::builder()
-            .display_name(template.to_string())
-            .color(palette::MENU_FRAME)
-            .build();
-
-        let text = text::Text::builder()
-            .string(arcstr::format!("{template}"))
-            .positioning(text::Positioning {
-                x: text::PositioningX::Left,
-                line_y: text::PositioningY::BodyMiddle,
-                z: text::PositioningZ::Back,
-            })
-            .build();
-
-        Ok(Self {
-            // template,
-            background_block,
-            text,
-        })
-    }
-}
-
-impl vui::Layoutable for TemplateButton {
-    fn requirements(&self) -> vui::LayoutRequest {
-        vui::LayoutRequest {
-            minimum: GridVector::new(10, 1, 2),
-        }
-    }
-}
-impl vui::Widget for TemplateButton {
-    fn controller(self: Arc<Self>, _: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
-        Box::new(TemplateButtonController { definition: self })
-    }
-}
-
-#[derive(Debug)]
-struct TemplateButtonController {
-    definition: Arc<TemplateButton>,
-}
-impl vui::WidgetController for TemplateButtonController {
-    fn initialize(
-        &mut self,
-        context: &vui::WidgetContext<'_>,
-    ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
-        let text = &self.definition.text;
-        // TODO: propagate error
-        let bounds = context.grant().bounds;
-        let background_bounds = bounds.abut(Face6::NZ, -1).unwrap();
-        let text_bounds = bounds.abut(Face6::PZ, -1).unwrap();
-
-        // Fill background
-        let background_block = &self.definition.background_block;
-        let mut txn = SpaceTransaction::filling(background_bounds, |_| {
-            CubeTransaction::replacing(None, Some(background_block.clone()))
-        });
-
-        // Fill text
-        txn.merge_from(SpaceTransaction::filling(text_bounds, |cube| {
-            CubeTransaction::replacing(
-                None,
-                Some(Block::from_primitive(Primitive::Text {
-                    text: text.clone(),
-                    offset: cube.lower_bounds() - text_bounds.lower_bounds(),
-                })),
-            )
-        }))
-        .unwrap();
-
-        Ok(txn)
-    }
-}
-
-pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError> {
     let template_iter = UniverseTemplate::iter().filter(UniverseTemplate::include_in_lists);
 
     let logo_text_space = vui::leaf_widget(logo_text()).to_space(
@@ -118,38 +38,28 @@ pub(crate) fn template_menu(universe: &mut Universe) -> Result<Space, InGenError
     let logo_widget = widgets::Voxels::new(
         logo_text_space.bounds(),
         universe.insert_anonymous(logo_text_space),
-        Resolution::R4,
+        Resolution::R8,
         BlockAttributes::default(),
     );
 
     let mut vertical_widgets: Vec<vui::WidgetTree> = Vec::with_capacity(10);
     vertical_widgets.push(vui::leaf_widget(logo_widget));
     for template in template_iter {
-        vertical_widgets.push(LayoutTree::spacer(vui::LayoutRequest {
-            minimum: GridVector::new(1, 1, 1),
-        }));
-        vertical_widgets.push(vui::leaf_widget(TemplateButton::new(universe, template)?));
+        vertical_widgets.push(vui::leaf_widget(widgets::ActionButton::new(
+            arcstr::format!("{template}"),
+            &widget_theme,
+            move || {
+                // todo!("actually load template")
+            },
+        )));
     }
-    let tree: vui::WidgetTree = Arc::new(LayoutTree::Stack {
-        direction: Face6::PZ,
-        children: vec![
-            vui::leaf_widget({
-                // TODO: this should be the 'dialog box' background but we don't have access to that from this crate
-                let background = Block::from(palette::MENU_BACK);
-                let frame = Block::from(palette::MENU_FRAME);
-                widgets::Frame::new(widgets::BoxStyle::from_geometric_categories(
-                    None,
-                    Some(background),
-                    Some(frame.clone()),
-                    Some(frame),
-                ))
-            }),
-            Arc::new(LayoutTree::Stack {
+    let tree: vui::WidgetTree =
+        widget_theme
+            .dialog_background()
+            .as_background_of(Arc::new(LayoutTree::Stack {
                 direction: Face6::NY,
                 children: vertical_widgets,
-            }),
-        ],
-    });
+            }));
 
     let size = tree.requirements().minimum;
     let bounds = GridAab::from_lower_size([0, 0, 0], size);
