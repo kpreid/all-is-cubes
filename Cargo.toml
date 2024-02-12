@@ -111,7 +111,7 @@ yield-progress = { version = "0.1.5", default-features = false }
 
 # Note: Lints are also necessarily redefined in the workspaces other than this one.
 [workspace.lints]
-rust.rust_2018_idioms = "deny"
+rust.rust_2018_idioms = { level = "deny", priority = -1 }
 rust.unsafe_op_in_unsafe_fn = "deny"
 
 rust.explicit_outlives_requirements = "warn"
