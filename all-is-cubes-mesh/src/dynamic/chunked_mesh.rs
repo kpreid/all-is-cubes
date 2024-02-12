@@ -367,12 +367,8 @@ where
                 || matches!(chunk_entry, Vacant(_))
             {
                 let chunk = chunk_entry.or_insert_with(|| ChunkMesh::new(p));
-                let actually_changed_mesh = chunk.recompute(
-                    todo.chunks.get_mut(&p).unwrap(), // TODO: can we eliminate the double lookup with a todo entry?
-                    space,
-                    mesh_options,
-                    &self.block_meshes,
-                );
+                let actually_changed_mesh =
+                    chunk.recompute(chunk_todo, space, mesh_options, &self.block_meshes);
                 let compute_end_update_start = M::Instant::now();
                 if actually_changed_mesh {
                     render_data_updater(chunk.borrow_for_update(false));
