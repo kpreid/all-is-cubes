@@ -63,7 +63,7 @@ impl Default for EvalFilter {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct Budget {
     /// Number of [`Primitive`]s and [`Modifier`]s.
-    components: u32,
+    pub(super) components: u32,
 
     /// Number of individual voxels produced (e.g. by a [`Primitive::Recur`]) or altered
     /// (e.g. by a [`Modifier::Composite`]).

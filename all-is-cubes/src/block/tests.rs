@@ -653,20 +653,22 @@ fn listen_recur() {
     assert_eq!(sink.drain(), vec![]);
 }
 
-#[ignore = "TODO: we have no protection against stacked modifiers yet, and the depth model no longer catches anything, so nothing can make this test get the error it wants"]
 #[test]
 fn overflow_evaluate() {
+    // The primitive counts as a component.
+    let too_many_modifiers: u32 = block::Budget::default().components;
+
     let mut block = AIR;
     block
         .modifiers_mut()
-        .extend((0..100).map(|_| Modifier::Rotate(GridRotation::CLOCKWISE)));
+        .extend((0..too_many_modifiers).map(|_| Modifier::Rotate(GridRotation::CLOCKWISE)));
     assert_eq!(
         block.evaluate(),
         Err(EvalBlockError::BudgetExceeded {
             budget: block::Budget::default().to_cost(),
             used: block::Cost {
-                components: 2,
-                voxels: 8,
+                components: too_many_modifiers,
+                voxels: 0,
                 recursion: 0
             }
         })
