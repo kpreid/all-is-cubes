@@ -37,8 +37,13 @@ rerun = ["all-is-cubes/rerun", "all-is-cubes-mesh/rerun"]
 # (The library is useless without this, but we used to have multiple GPU API support
 # and I don't want to go entirely deleting it quite yet.)
 wgpu = ["dep:wgpu"]
-# Enable use of threads.
-threads = ["dep:rayon"]
+# Adds automatic parallelism to some algorithms.
+# If disabled, `std::thread` is never used.
+# If enabled, threads may be created and the active `rayon` thread pool may be used.
+threads = [
+    "dep:rayon",
+    "all-is-cubes-mesh/threads", # not mandatory, but almost certainly wanted
+]
 
 [dependencies]
 all-is-cubes = { workspace = true, features = ["std"] }

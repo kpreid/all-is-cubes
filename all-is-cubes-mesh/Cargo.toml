@@ -30,6 +30,11 @@ default = []
 rerun = ["all-is-cubes/rerun"]
 # Adds `impl arbitrary::Arbitrary for ...`
 arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary", "ordered-float/arbitrary"]
+# Adds automatic parallelism to some algorithms (but not all possible uses of concurrency).
+# If disabled, `std::thread` is never used.
+# If enabled, threads may be created and the active `rayon` thread pool may be used.
+threads = ["dep:rayon"]
+
 
 [dependencies]
 all-is-cubes = { workspace = true }
@@ -47,6 +52,7 @@ log = { workspace = true }
 mutants = { workspace = true }
 num-traits = { workspace = true }
 ordered-float = { workspace = true }
+rayon = { workspace = true, optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

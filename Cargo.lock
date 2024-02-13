@@ -206,6 +206,7 @@ dependencies = [
  "num-traits",
  "ordered-float",
  "pretty_assertions",
+ "rayon",
 ]
 
 [[package]]

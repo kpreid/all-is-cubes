@@ -79,6 +79,7 @@ rerun = [
 ]
 # Adds automatic parallelism to some algorithms.
 # If disabled, `std::thread` is never used.
+# If enabled, threads may be created and the active `rayon` thread pool may be used.
 threads = ["std", "dep:rayon"]
 
 [dependencies]
