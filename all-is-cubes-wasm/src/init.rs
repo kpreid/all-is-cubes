@@ -1,5 +1,7 @@
 //! Startup; going from a JS function call to a running session.
 
+use std::sync::Arc;
+
 use js_sys::Error;
 use rand::{thread_rng, Rng as _};
 use send_wrapper::SendWrapper;
@@ -130,7 +132,13 @@ async fn start_game_with_dom(
                 })
                 .await
                 .ok_or("Could not request suitable graphics adapter")?;
-            let renderer = in_wgpu::SurfaceRenderer::new(cameras, surface, &adapter).await?;
+            let renderer = in_wgpu::SurfaceRenderer::new(
+                cameras,
+                surface,
+                &adapter,
+                Arc::new(crate::web_glue::Executor),
+            )
+            .await?;
             WebRenderer::Wgpu(renderer)
         }
     };

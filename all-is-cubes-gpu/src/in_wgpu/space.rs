@@ -19,6 +19,7 @@ use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{Space, SpaceChange};
 use all_is_cubes::time;
 use all_is_cubes::universe::{RefError, URef};
+use all_is_cubes::util::Executor;
 use all_is_cubes_mesh::dynamic::{self, ChunkedSpaceMesh, RenderDataUpdate};
 use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
 
@@ -133,6 +134,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
     /// `set_space(..., None)` was called.
     pub(crate) fn set_space(
         &mut self,
+        executor: Arc<dyn Executor>,
         device: &wgpu::Device,
         _pipelines: &Pipelines,
         space: Option<&URef<Space>>,
@@ -181,6 +183,27 @@ impl<I: time::Instant> SpaceRenderer<I> {
         {
             new_csm.log_to_rerun(self.rerun_destination.clone());
         }
+
+        // Spawn background mesh jobs
+        executor.spawn_background(&mut || {
+            let task = {
+                let job_queue = new_csm.job_queue().clone();
+                let executor = executor.clone();
+                async move {
+                    while let Some(job) = job_queue.next().await {
+                        job.await;
+                        executor.yield_now().await;
+                    }
+                }
+            };
+
+            // On wasm, wgpu is not Send, but for the same reason, we never use any other threads,
+            // so a SendWrapper will make things work out.
+            #[cfg(target_family = "wasm")]
+            let task = send_wrapper::SendWrapper::new(task);
+
+            Box::pin(task)
+        });
 
         *csm = Some(new_csm);
 

@@ -5,6 +5,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::sync::Arc;
 
+use all_is_cubes::util::Executor;
 use wgpu::TextureViewDescriptor;
 
 use all_is_cubes::camera::{info_text_drawable, Layers, RenderMethod, StandardCameras};
@@ -102,6 +103,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         cameras: StandardCameras,
         surface: wgpu::Surface<'static>,
         adapter: &wgpu::Adapter,
+        executor: Arc<dyn Executor>,
     ) -> Result<Self, GraphicsResourceError> {
         let (device, queue) = adapter
             .request_device(
@@ -120,6 +122,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
 
         let viewport_source = cameras.viewport_source();
         let everything = EverythingRenderer::new(
+            executor,
             device.clone(),
             cameras,
             choose_surface_format(&surface.get_capabilities(adapter)),
@@ -229,6 +232,8 @@ impl<I: time::Instant> SurfaceRenderer<I> {
 /// scene and UI, but not the surface it's drawn on. This may be used in tests or
 /// to support
 struct EverythingRenderer<I: time::Instant> {
+    executor: Arc<dyn Executor>,
+
     device: Arc<wgpu::Device>,
 
     staging_belt: wgpu::util::StagingBelt,
@@ -275,6 +280,7 @@ impl<I: time::Instant> fmt::Debug for EverythingRenderer<I> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // not at all clear how much is useful to print...
         let Self {
+            executor,
             device,
             staging_belt,
             cameras,
@@ -296,6 +302,7 @@ impl<I: time::Instant> fmt::Debug for EverythingRenderer<I> {
                 rerun_image: _,
         } = self;
         f.debug_struct("EverythingRenderer")
+            .field("executor", &executor)
             .field("device", &device)
             .field("staging_belt", &staging_belt)
             .field("cameras", &cameras)
@@ -321,6 +328,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
     }
 
     pub fn new(
+        executor: Arc<dyn Executor>,
         device: Arc<wgpu::Device>,
         cameras: StandardCameras,
         surface_format: wgpu::TextureFormat,
@@ -424,6 +432,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             #[cfg(feature = "rerun")]
             rerun_image: rerun_image::RerunImageExport::new(device.clone()),
 
+            executor,
             device,
             config,
             cameras,
@@ -517,11 +526,21 @@ impl<I: time::Instant> EverythingRenderer<I> {
         // TODO: we should be able to express this as something like "Layers::zip()"
         self.space_renderers
             .world
-            .set_space(&self.device, &self.pipelines, spaces_to_render.world)
+            .set_space(
+                self.executor.clone(),
+                &self.device,
+                &self.pipelines,
+                spaces_to_render.world,
+            )
             .map_err(GraphicsResourceError::read_err)?;
         self.space_renderers
             .ui
-            .set_space(&self.device, &self.pipelines, spaces_to_render.ui)
+            .set_space(
+                self.executor.clone(),
+                &self.device,
+                &self.pipelines,
+                spaces_to_render.ui,
+            )
             .map_err(GraphicsResourceError::read_err)?;
 
         let mut encoder = self

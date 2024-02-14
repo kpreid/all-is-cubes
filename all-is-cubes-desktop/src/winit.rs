@@ -215,6 +215,7 @@ pub fn winit_main_loop_and_init<Ren: RendererToWinit + 'static>(
 
 /// Creates a [`DesktopSession`] that can be run in an [`winit`] event loop.
 pub async fn create_winit_wgpu_desktop_session(
+    executor: Arc<crate::glue::Executor>,
     session: Session,
     window: WinAndState,
     viewport_cell: ListenableCell<Viewport>,
@@ -258,6 +259,7 @@ pub async fn create_winit_wgpu_desktop_session(
         session.create_cameras(viewport_cell.as_source()),
         surface,
         &adapter,
+        executor,
     )
     .await?;
 

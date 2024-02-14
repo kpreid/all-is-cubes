@@ -150,6 +150,7 @@ fn main() -> Result<(), anyhow::Error> {
                     let dsession = inner_params
                         .runtime
                         .block_on(create_winit_wgpu_desktop_session(
+                            Arc::new(executor.clone()),
                             session,
                             // TODO: turn this inside out and stop having `WinAndState` exposed
                             aic_winit::WinAndState::new(

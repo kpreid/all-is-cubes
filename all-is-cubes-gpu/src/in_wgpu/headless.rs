@@ -8,6 +8,7 @@ use futures_core::future::BoxFuture;
 use all_is_cubes::camera::{self, Flaws, HeadlessRenderer, StandardCameras, Viewport};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
+use all_is_cubes::util::Executor;
 
 use crate::common::{AdaptedInstant, FrameBudget, GraphicsResourceError};
 use crate::in_wgpu::{self, init};
@@ -15,9 +16,10 @@ use crate::in_wgpu::{self, init};
 /// Builder for the headless [`Renderer`].
 #[derive(Clone, Debug)]
 pub struct Builder {
+    executor: Arc<dyn Executor>,
+    adapter: Arc<wgpu::Adapter>,
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
-    adapter: Arc<wgpu::Adapter>,
 }
 
 impl Builder {
@@ -36,13 +38,22 @@ impl Builder {
             device: Arc::new(device),
             queue: Arc::new(queue),
             adapter,
+            executor: Arc::new(()),
         })
+    }
+
+    /// Set the executor for parallel calculations.
+    #[must_use]
+    pub fn executor(mut self, executor: Arc<dyn Executor>) -> Self {
+        self.executor = executor;
+        self
     }
 
     /// Create a [`Renderer`] from the GPU connection in this builder and the given cameras.
     pub fn build(&self, cameras: StandardCameras) -> Renderer {
         let viewport_source = cameras.viewport_source();
         let everything = in_wgpu::EverythingRenderer::new(
+            self.executor.clone(),
             self.device.clone(),
             cameras,
             wgpu::TextureFormat::Rgba8UnormSrgb,
