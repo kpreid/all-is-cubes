@@ -11,6 +11,7 @@
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 
+use std::mem;
 use std::time::Instant;
 
 use anyhow::Context as _;
@@ -94,6 +95,10 @@ pub fn inner_main<Ren: glue::Renderer, Win: glue::Window>(
     dsession.session.set_universe(universe);
 
     log::trace!("Entering event loop.");
+
+    // The runtime should not be dropped even if looper returns.
+    // TODO: Find a better way to handle this, if we care about hypothetically calling inner_main more than once.
+    mem::forget(runtime);
 
     looper(dsession)
 }
