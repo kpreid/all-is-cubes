@@ -245,13 +245,19 @@ impl InputProcessor {
         }
     }
 
-    /// Returns the character movement velocity that input is currently requesting.
+    /// Returns the character movement direction that input is currently requesting.
+    ///
+    /// This is always a vector of length at most 1.
     pub fn movement(&self) -> FreeVector {
-        FreeVector::new(
+        let mut vector = FreeVector::new(
             self.net_movement(Key::Character('a'), Key::Character('d')),
             self.net_movement(Key::Character('c'), Key::Character('e')),
             self.net_movement(Key::Character('w'), Key::Character('s')),
-        )
+        );
+        if vector != FreeVector::zero() {
+            vector = vector.normalize();
+        }
+        vector
     }
 
     /// Advance time insofar as input interpretation is affected by time.
