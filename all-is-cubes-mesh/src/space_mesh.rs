@@ -8,7 +8,7 @@ use ordered_float::OrderedFloat;
 use all_is_cubes::camera::Flaws;
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{
-    Cube, Face6, GridAab, GridCoordinate, GridRotation, GridVector, VectorOps as _,
+    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, VectorOps as _, Vol,
 };
 use all_is_cubes::space::{BlockIndex, Space};
 
@@ -171,6 +171,45 @@ impl<M: MeshTypes> SpaceMesh<M> {
         &mut self,
         space: &Space,
         bounds: GridAab,
+        options: &MeshOptions,
+        block_meshes: P,
+    ) where
+        P: GetBlockMesh<'p, M>,
+    {
+        self.compute_inner(
+            |cube| space.get_block_index(cube),
+            bounds,
+            options,
+            block_meshes,
+        )
+    }
+
+    /// Compute from `Space` data already captured.
+    ///
+    /// `snapshot` must be 1 cube bigger than the desired mesh size, to allow neighbor checks.
+    //---
+    // TODO: To be used for background meshing <https://github.com/kpreid/all-is-cubes/issues/472>
+    #[allow(dead_code)]
+    pub(crate) fn compute_from_snapshot<'p, P>(
+        &mut self,
+        snapshot: &Snapshot,
+        options: &MeshOptions,
+        block_meshes: P,
+    ) where
+        P: GetBlockMesh<'p, M>,
+    {
+        self.compute_inner(
+            |cube| snapshot.get(cube),
+            snapshot.bounds,
+            options,
+            block_meshes,
+        )
+    }
+
+    fn compute_inner<'p, P>(
+        &mut self,
+        space_data_source: impl Fn(Cube) -> Option<BlockIndex>,
+        bounds: GridAab,
         _options: &MeshOptions,
         mut block_meshes: P,
     ) where
@@ -189,7 +228,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
         bounds.interior_iter().for_each(|cube| {
             // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
             // Do we want to make it the caller's responsibility to specify in-bounds?
-            let index: BlockIndex = match space.get_block_index(cube) {
+            let index: BlockIndex = match space_data_source(cube) {
                 Some(index) => index,
                 None => return, // continue in for_each() loop
             };
@@ -218,7 +257,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 &mut transparent_indices,
                 |face| {
                     let adjacent_cube = cube + face.normal_vector();
-                    if let Some(adj_block_index) = space.get_block_index(adjacent_cube) {
+                    if let Some(adj_block_index) = space_data_source(adjacent_cube) {
                         if block_meshes
                             .get_block_mesh(adj_block_index, adjacent_cube, false)
                             .map_or(false, |bm| bm.face_vertices[face.opposite()].fully_opaque)
@@ -625,6 +664,31 @@ where
     storage.extend(items);
     let end = storage.len();
     start..end
+}
+
+pub(crate) struct Snapshot {
+    data: Vol<Box<[BlockIndex]>>,
+    /// Bounds of the original request, whereas the bounds of `data` may be smaller due to
+    /// intersection with the space bounds.
+    bounds: GridAab,
+}
+impl Snapshot {
+    // TODO: To be used for background meshing <https://github.com/kpreid/all-is-cubes/issues/472>
+    #[allow(dead_code)]
+    pub(crate) fn new(space: &Space, bounds: GridAab) -> Snapshot {
+        let expanded_bounds = bounds
+            .expand(FaceMap::repeat(1))
+            .intersection(space.bounds())
+            .unwrap_or(GridAab::ORIGIN_EMPTY);
+        Snapshot {
+            data: space.extract(expanded_bounds, |e| e.block_index()),
+            bounds,
+        }
+    }
+
+    pub(crate) fn get(&self, cube: Cube) -> Option<BlockIndex> {
+        self.data.get(cube).copied()
+    }
 }
 
 /// Source of [`BlockMesh`] values to be assembled into a [`SpaceMesh`].
