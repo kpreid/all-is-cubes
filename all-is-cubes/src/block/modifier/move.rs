@@ -134,7 +134,15 @@ impl Move {
             None
         };
 
+        let animation_hint = if animation_action.is_some() {
+            input.attributes.animation_hint
+                | block::AnimationHint::replacement(block::AnimationChange::Shape)
+        } else {
+            input.attributes.animation_hint
+        };
+
         let attributes = BlockAttributes {
+            animation_hint,
             tick_action: animation_action,
             ..input.attributes
         };
