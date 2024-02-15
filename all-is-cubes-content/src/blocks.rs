@@ -421,7 +421,9 @@ pub async fn install_demo_blocks(
                 Block::builder()
                     .display_name("Clock")
                     .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
-                    .animation_hint(AnimationHint::CONTINUOUS)
+                    .animation_hint(block::AnimationHint::redefinition(
+                        block::AnimationChange::ColorSameCategory,
+                    ))
                     .voxels_ref(resolution, txn.insert_anonymous(space))
                     .build()
             }
@@ -429,11 +431,9 @@ pub async fn install_demo_blocks(
             BecomeBlinker(state) => Block::builder()
                 .color(if state { Rgba::WHITE } else { Rgba::BLACK })
                 .display_name(format!("Blinker {state:?}"))
-                .animation_hint({
-                    let mut h = AnimationHint::default();
-                    h.replacement = block::AnimationChange::ColorSameCategory;
-                    h
-                })
+                .animation_hint(AnimationHint::replacement(
+                    block::AnimationChange::ColorSameCategory,
+                ))
                 .build(),
 
             Explosion(timer) => {
@@ -461,15 +461,11 @@ pub async fn install_demo_blocks(
                 let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
                 Block::builder()
                     .display_name(format!("Explosion {timer}"))
-                    .animation_hint({
-                        let mut h = AnimationHint::default();
-                        h.replacement = if timer == i8::MAX {
-                            block::AnimationChange::Shape
-                        } else {
-                            block::AnimationChange::ColorSameCategory
-                        };
-                        h
-                    })
+                    .animation_hint(AnimationHint::replacement(if timer == i8::MAX {
+                        block::AnimationChange::Shape
+                    } else {
+                        block::AnimationChange::ColorSameCategory
+                    }))
                     .voxels_fn(if timer <= 0 { R1 } else { R8 }, |_| {
                         if rng.gen_bool(decay.powf(3.)) {
                             &atom

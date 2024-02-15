@@ -3,7 +3,7 @@ use std::error::Error;
 use std::sync::Mutex;
 
 use all_is_cubes::arcstr::{literal, ArcStr};
-use all_is_cubes::block::{space_to_blocks, AnimationHint, BlockAttributes, Resolution, AIR};
+use all_is_cubes::block::{self, space_to_blocks, BlockAttributes, Resolution, AIR};
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::drawing::embedded_graphics::{
     mono_font::MonoTextStyle,
@@ -251,7 +251,7 @@ impl WidgetController for TooltipController {
                 // ...wait, maybe tooltip vanishing should be based on removing the blocks entirely,
                 // instead of _just_ changing the text space. That would cooperate with light
                 // more straightforwardly.
-                animation_hint: AnimationHint::CONTINUOUS,
+                animation_hint: block::AnimationHint::redefinition(block::AnimationChange::Shape),
                 ..BlockAttributes::default()
             },
             self.definition.text_space.clone(),

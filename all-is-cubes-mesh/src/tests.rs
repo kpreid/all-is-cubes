@@ -180,7 +180,9 @@ fn animated_atom_uses_texture() {
     let atom_block = Block::builder()
         .color(Rgba::new(0.0, 1.0, 0.0, 1.0))
         .light_emission(Rgb::ONE)
-        .animation_hint(block::AnimationHint::CONTINUOUS)
+        .animation_hint(block::AnimationHint::redefinition(
+            block::AnimationChange::ColorSameCategory,
+        ))
         .build();
 
     let (allocator, _, mesh) = mesh_blocks_and_space(

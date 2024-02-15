@@ -3,7 +3,7 @@
 use pretty_assertions::assert_eq;
 
 use super::{data::LightStatus, LightUpdatesInfo, PackedLight, Priority};
-use crate::block::{AnimationHint, Block, AIR};
+use crate::block::{self, Block, AIR};
 use crate::listen::{Listen as _, Listener, Sink};
 use crate::math::{Cube, FaceMap, GridPoint, Rgb, Rgba};
 use crate::space::{GridAab, LightPhysics, Space, SpaceChange, SpacePhysics};
@@ -215,7 +215,9 @@ fn animation_treated_as_visible() {
     let invisible_but_animated = eval_mid_block(
         Block::builder()
             .color(Rgba::TRANSPARENT)
-            .animation_hint(AnimationHint::CONTINUOUS)
+            .animation_hint(block::AnimationHint::redefinition(
+                block::AnimationChange::Shape,
+            ))
             .build(),
     );
     assert_eq!(

@@ -558,11 +558,9 @@ mod theme {
         Block::builder()
             .display_name(name.to_string())
             .voxels_ref(MULTI_RESOLUTION, space)
-            .animation_hint({
-                let mut h = block::AnimationHint::default();
-                h.replacement = block::AnimationChange::Shape;
-                h
-            })
+            .animation_hint(block::AnimationHint::replacement(
+                block::AnimationChange::Shape,
+            ))
             .build()
     }
 }

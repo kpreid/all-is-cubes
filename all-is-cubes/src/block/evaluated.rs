@@ -7,7 +7,7 @@ use euclid::Vector3D;
 use ordered_float::NotNan;
 
 /// Acts as polyfill for float methods
-#[cfg(not(feature = "std"))] 
+#[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
@@ -766,7 +766,7 @@ impl MinEval {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{AnimationHint, Block, Resolution, Resolution::R2, AIR};
+    use crate::block::{Block, Resolution, Resolution::R2, AIR};
     use crate::raytracer::EvalTrace;
     use crate::universe::Universe;
     use euclid::vec3;
@@ -873,7 +873,9 @@ mod tests {
         assert!(va(Block::builder().color(Rgba::WHITE).build()));
         assert!(va(Block::builder()
             .color(Rgba::TRANSPARENT)
-            .animation_hint(AnimationHint::TEMPORARY)
+            .animation_hint(block::AnimationHint::replacement(
+                block::AnimationChange::Shape,
+            ))
             .build()));
     }
 

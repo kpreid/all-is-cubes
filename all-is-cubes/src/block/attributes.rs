@@ -295,26 +295,23 @@ impl AnimationHint {
         replacement: AnimationChange::None,
     };
 
-    /// The block is not going to exist in its current form for long.
-    ///
-    /// This suggests using a rendering technique which is comparatively expensive
-    /// per-block but allows it (and any successors that are also `TEMPORARY`) to be added
-    /// and removed cheaply.
-    pub const TEMPORARY: Self = Self {
-        redefinition: AnimationChange::None,
-        replacement: AnimationChange::Shape,
-    };
+    /// Creates a hint that the block definition might be redefined,
+    /// in the ways specified by `change`.
+    pub const fn redefinition(change: AnimationChange) -> Self {
+        Self {
+            redefinition: change,
+            replacement: AnimationChange::None,
+        }
+    }
 
-    /// The block's appearance is expected to change very frequently, but not by replacing
-    /// the block in its [`Space`].
-    ///
-    /// This suggests using a rendering technique which optimizes for not needing to e.g.
-    /// rebuild chunk meshes.
-    pub const CONTINUOUS: Self = Self {
-        redefinition: AnimationChange::Shape,
-        replacement: AnimationChange::None,
-        ..Self::UNCHANGING
-    };
+    /// Creates a hint that the block will be replaced with another block, which differs in the
+    /// ways specified by `change`.
+    pub const fn replacement(change: AnimationChange) -> Self {
+        Self {
+            redefinition: AnimationChange::None,
+            replacement: change,
+        }
+    }
 
     /// Returns whether this block's value for [`EvaluatedBlock::visible`] is likely to
     /// change from `false` to `true` for animation reasons.
@@ -486,7 +483,7 @@ mod tests {
         );
         assert_eq!(
             &*debug(BlockAttributes {
-                animation_hint: AnimationHint::TEMPORARY,
+                animation_hint: AnimationHint::replacement(AnimationChange::Shape,),
                 ..default()
             }),
             "BlockAttributes { animation_hint: \

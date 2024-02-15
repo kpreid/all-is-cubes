@@ -405,7 +405,7 @@ impl BuildPrimitive for BlockBuilderVoxels {
 mod tests {
     use alloc::boxed::Box;
 
-    use crate::block::{Resolution::*, TickAction, AIR};
+    use crate::block::{self, Resolution::*, TickAction, AIR};
     use crate::content::palette;
     use crate::math::{Face6, GridAab, Vol};
     use crate::op::Operation;
@@ -450,7 +450,9 @@ mod tests {
                 .selectable(false)
                 .light_emission(emission)
                 .tick_action(tick_action.clone())
-                .animation_hint(AnimationHint::TEMPORARY)
+                .animation_hint(block::AnimationHint::replacement(
+                    block::AnimationChange::Shape,
+                ))
                 .build(),
             Block::from(Atom {
                 attributes: BlockAttributes {
@@ -458,7 +460,9 @@ mod tests {
                     rotation_rule,
                     selectable: false,
                     tick_action,
-                    animation_hint: AnimationHint::TEMPORARY,
+                    animation_hint: block::AnimationHint::replacement(
+                        block::AnimationChange::Shape,
+                    ),
                 },
                 color,
                 emission,

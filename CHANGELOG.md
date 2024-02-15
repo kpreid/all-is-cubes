@@ -5,7 +5,9 @@
 ### Added
 
 - `all-is-cubes` library:
-    - New constant `block::Resolution::MAX`.
+    - `block::Resolution::MAX` provides the maximum available resolution.
+      This value is not planned to change, 
+    - `block::AnimationHint` now offers constructor functions `redefinition()` and `replacement()` for the common case of setting one of its fields to a specific `AnimationChange`.
 
 - `all-is-cubes-mesh` library:
     - New features in `dynamic::ChunkedSpaceMesh`:
@@ -24,6 +26,10 @@
     - `dynamic::ChunkedSpaceMesh` requires a texture allocator passed to `new()` instead of `update()`.
 
 ### Removed
+
+- `all-is-cubes` library:
+    - `block::AnimationHint::{TEMPORARY, CONTINUOUS}` constants have been removed.
+      Use the new constructor functions and `AnimationChange` instead.
 
 ## 0.7.1 (2024-01-27)
 

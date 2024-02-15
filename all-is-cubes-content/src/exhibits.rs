@@ -1,7 +1,6 @@
 //! Miscellanous demonstrations of capability and manual test-cases.
 //! The exhibits defined in this file are combined into [`crate::demo_city`].
 
-use all_is_cubes::block::text;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::convert::{identity, TryFrom as _};
@@ -11,6 +10,12 @@ use exhaust::Exhaust as _;
 use rand::SeedableRng as _;
 
 use all_is_cubes::arcstr::{self, literal};
+use all_is_cubes::block::{
+    self, space_to_blocks, text, Block, BlockAttributes, BlockCollision, Composite,
+    CompositeOperator, Move,
+    Resolution::{self, *},
+    RotationPlacementRule, Zoom, AIR,
+};
 use all_is_cubes::content::load_image::{default_srgb, space_from_image};
 use all_is_cubes::drawing::embedded_graphics::{
     geometry::Point,
@@ -20,6 +25,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{vec3, Point3D, Rotation2D, Vector2D, Vector3D};
 use all_is_cubes::linking::{BlockProvider, InGenError};
+use all_is_cubes::math::Gridgid;
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
     GridVector, NotNan, Rgb, Rgba, VectorOps,
@@ -27,15 +33,6 @@ use all_is_cubes::math::{
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::Universe;
-use all_is_cubes::{
-    block::{
-        space_to_blocks, AnimationHint, Block, BlockAttributes, BlockCollision, Composite,
-        CompositeOperator, Move,
-        Resolution::{self, *},
-        RotationPlacementRule, Zoom, AIR,
-    },
-    math::Gridgid,
-};
 use all_is_cubes::{include_image, rgb_const, rgba_const};
 
 use crate::alg::{four_walls, voronoi_pattern};
@@ -427,7 +424,9 @@ fn ANIMATION(_: &Exhibit, universe: &Universe) {
         )
         .execute(&mut block_space, &mut transaction::no_outputs)?;
         Block::builder()
-            .animation_hint(AnimationHint::CONTINUOUS)
+            .animation_hint(block::AnimationHint::redefinition(
+                block::AnimationChange::Shape,
+            ))
             .voxels_ref(resolution, txn.insert_anonymous(block_space))
             .build()
     };
@@ -435,7 +434,9 @@ fn ANIMATION(_: &Exhibit, universe: &Universe) {
     let fire_block = {
         let fire_resolution = R8;
         Block::builder()
-            .animation_hint(AnimationHint::CONTINUOUS)
+            .animation_hint(block::AnimationHint::redefinition(
+                block::AnimationChange::Shape,
+            ))
             .voxels_ref(fire_resolution, {
                 let fire_bounds = GridAab::for_block(fire_resolution);
                 let mut space = Space::for_block(fire_resolution).build();

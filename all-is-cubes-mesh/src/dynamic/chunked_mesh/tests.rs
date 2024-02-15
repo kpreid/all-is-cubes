@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use all_is_cubes::block::{AnimationHint, Block, BlockDef, BlockDefTransaction, AIR};
+use all_is_cubes::block::{self, Block, BlockDef, BlockDefTransaction, AIR};
 use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, TransparencyOption, Viewport};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::make_some_blocks;
@@ -392,7 +392,9 @@ fn instances_for_animated() {
     let anim = Block::builder()
         .display_name("animated")
         .color(will_be_anim.color())
-        .animation_hint(AnimationHint::TEMPORARY)
+        .animation_hint(block::AnimationHint::replacement(
+            block::AnimationChange::Shape,
+        ))
         .build();
     let mut space = Space::empty_positive(2, 1, 1);
     space.set([0, 0, 0], &not_anim).unwrap();
@@ -422,7 +424,9 @@ fn instances_dont_dirty_mesh_when_block_changes() {
         Block::builder()
             .display_name("animated")
             .color(will_be_anim.color())
-            .animation_hint(AnimationHint::CONTINUOUS)
+            .animation_hint(block::AnimationHint::redefinition(
+                block::AnimationChange::Shape,
+            ))
             .build(),
     ));
     let mut space = Space::empty_positive(2, 1, 1);
@@ -462,7 +466,9 @@ fn instances_dont_dirty_mesh_when_space_changes() {
     let anim = Block::builder()
         .display_name("animated")
         .color(will_be_anim.color())
-        .animation_hint(AnimationHint::TEMPORARY)
+        .animation_hint(block::AnimationHint::replacement(
+            block::AnimationChange::Shape,
+        ))
         .build();
     let mut space = Space::empty_positive(3, 1, 1);
     space.set([0, 0, 0], &not_anim).unwrap();
