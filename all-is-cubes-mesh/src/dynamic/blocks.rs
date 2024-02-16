@@ -186,7 +186,6 @@ where
                 Some(Ok(job::CompletedMeshJob {
                     mesh: new_block_mesh,
                     compute_time,
-                    ..
                 })) => {
                     completed_job_stats += TimeStats::one(compute_time);
 
