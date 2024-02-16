@@ -7,8 +7,8 @@ use crate::MeshTypes;
 // --- Modules ---
 
 mod blocks;
+pub use blocks::InstanceMesh;
 use blocks::{BlockMeshVersion, VersionedBlockMeshes};
-pub use blocks::{InstanceMesh, MeshJobQueue};
 
 mod chunk;
 pub use chunk::ChunkMesh;
@@ -20,6 +20,9 @@ pub use chunked_mesh::{ChunkedSpaceMesh, CsmUpdateInfo};
 mod instance;
 pub use instance::InstanceCollector;
 pub(crate) use instance::InstanceMap;
+
+mod job;
+pub use job::MeshJobQueue;
 
 mod render_data;
 use render_data::MeshIdImpl;
