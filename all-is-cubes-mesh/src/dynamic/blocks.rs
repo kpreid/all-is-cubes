@@ -4,7 +4,7 @@ use core::time::Duration;
 use core::{fmt, ops};
 
 use fnv::FnvHashSet;
-use futures_channel::oneshot::{self, Canceled};
+use futures_channel::oneshot::Canceled;
 
 use all_is_cubes::block::{self, EvaluatedBlock, Resolution};
 use all_is_cubes::math::Cube;
@@ -301,12 +301,12 @@ pub(crate) struct VersionedBlockMesh<M: DynamicMeshTypes> {
 
     /// Receives an asynchronously-computed improved version of this mesh.
     /// This will be result of the very latest update job spawned for this mesh.
-    pending_latest: Option<oneshot::Receiver<job::CompletedMeshJob<M>>>,
+    pending_latest: Option<job::Receiver<job::CompletedMeshJob<M>>>,
 
     /// Receives an asynchronously-computed improved version of this mesh.
     /// This will be the result of a job that was superseded by `self.pending_latest`; it is kept
     /// around to ensure that continuous block updates can't starve us of having any meshes at all.
-    pending_oldest: Option<oneshot::Receiver<job::CompletedMeshJob<M>>>,
+    pending_oldest: Option<job::Receiver<job::CompletedMeshJob<M>>>,
 }
 
 /// Data for instanced rendering of a block. Contains a `M::RenderData` for the block mesh.

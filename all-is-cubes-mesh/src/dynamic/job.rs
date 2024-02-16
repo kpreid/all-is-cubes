@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use core::fmt;
 use core::future::Future;
 use core::time::Duration;
 
@@ -81,9 +82,8 @@ impl<M: DynamicMeshTypes> MeshJobQueue<M> {
             let t0 = M::Instant::now();
             let mesh = BlockMesh::new(&job.block, &self.texture_allocator, &job.mesh_options);
             let compute_time = M::Instant::now().saturating_duration_since(t0);
-            _ = job.response.send(CompletedMeshJob {
-                mesh,
-                compute_time,
+            _ = job.response.send(CompletedJobShell {
+                output: CompletedMeshJob { mesh, compute_time },
                 job_counter_ticket: job.job_counter_ticket,
             });
 
@@ -151,8 +151,8 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
         &self,
         block: EvaluatedBlock,
         mesh_options: MeshOptions,
-    ) -> oneshot::Receiver<CompletedMeshJob<M>> {
-        let (response_sender, response_receiver) = oneshot::channel();
+    ) -> Receiver<CompletedMeshJob<M>> {
+        let (response_sender, receiver) = oneshot::channel();
         self.job_queue_sender
             .send(MeshJob {
                 block,
@@ -161,7 +161,7 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
                 job_counter_ticket: self.job_counter.clone(),
             })
             .expect("job queue should never be defunct or full");
-        response_receiver
+        Receiver { receiver }
     }
 
     /// Run jobs in the queue, wait for jobs to complete, or both,
@@ -186,6 +186,37 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
     }
 }
 
+/// Receiver of a single job's output.
+pub(in crate::dynamic) struct Receiver<T> {
+    receiver: oneshot::Receiver<CompletedJobShell<T>>,
+}
+impl<T> fmt::Debug for Receiver<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("job::Receiver")
+            .field("receiver", &self.receiver)
+            .finish()
+    }
+}
+impl<T> Receiver<T> {
+    // TODO: tidy up return type
+    pub fn try_recv(&mut self) -> Result<Option<T>, oneshot::Canceled> {
+        self.receiver
+            .try_recv()
+            .map(|option| option.map(|shell| shell.output))
+    }
+}
+
+/// Wrapper for the value of a completed job, which we want to be dropped when the output is
+/// actually retrieved.
+struct CompletedJobShell<T> {
+    output: T,
+
+    /// Own this to signal that a completed job exists to be retrieved.
+    /// It is dropped when the completed job is retrieved.
+    #[allow(dead_code)]
+    job_counter_ticket: Arc<()>,
+}
+
 /// Inputs for a block mesh calculation stored in the [`MeshJobQueue`].
 ///
 /// (In the future we might also cover chunk meshes here with an enum.)
@@ -199,15 +230,11 @@ struct MeshJob<M: DynamicMeshTypes> {
     /// this is a close enough over-approximation.
     job_counter_ticket: Arc<()>,
 
-    response: oneshot::Sender<CompletedMeshJob<M>>,
+    response: oneshot::Sender<CompletedJobShell<CompletedMeshJob<M>>>,
 }
 
+#[derive(Debug)]
 pub(in crate::dynamic) struct CompletedMeshJob<M: DynamicMeshTypes> {
     pub(in crate::dynamic) mesh: BlockMesh<M>,
     pub(in crate::dynamic) compute_time: Duration,
-
-    /// Own this to signal that a completed job exists to be retrieved.
-    /// It is dropped when the completed job is retrieved.
-    #[allow(dead_code)]
-    job_counter_ticket: Arc<()>,
 }
