@@ -103,7 +103,7 @@ thiserror = "1.0.56"
 # The library crates do not require Tokio.
 tokio = { version = "1.28.0", default-features = false }
 trycmd = "0.14.1" # keep in sync with `snapbox`
-unicode-segmentation = { version = "1.10.1", default-features = false }
+unicode-segmentation = { version = "1.11.0", default-features = false }
 wasm-bindgen-futures = "0.4.40"
 web-time = "1.0.0"
 wgpu = { version = "0.19.1", default-features = false, features = ["wgsl"] }
