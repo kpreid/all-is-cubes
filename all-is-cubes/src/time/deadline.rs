@@ -85,9 +85,11 @@ impl<I: Instant> Deadline<I> {
     /// Returns the time between `start` and the deadline, or [`None`] if there is no
     /// deadline and the remaining time is unbounded.
     ///
+    /// If the deadline is already past, returns `Some(Duration::ZERO)`
+    ///
     /// (This does not return [`Duration::MAX`] since that would be likely to cause
     /// unintended arithmetic overflows.)
-    pub(crate) fn remaining_since(&self, start: I) -> Option<Duration> {
+    pub fn remaining_since(&self, start: I) -> Option<Duration> {
         match self {
             Deadline::Asap => Some(Duration::ZERO),
             Deadline::At(deadline) => Some(deadline.saturating_duration_since(start)),

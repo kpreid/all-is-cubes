@@ -86,6 +86,7 @@ where
                 total_time: Duration::ZERO,
                 block_calculations: TimeStats::default(),
                 block_callbacks: TimeStats::default(),
+                running: Duration::ZERO,
                 waiting: Duration::ZERO,
                 // job_counter tells us there are definitely zero jobs right now
                 queued: 0,
@@ -173,65 +174,72 @@ where
             }
         }
 
-        // Run the job queue for a while to ensure that updates are happening
-        // (whether or not background tasks are also doing this).
-        let waiting = self.jobs.run_until(deadline);
-        let queued = self.jobs.count_queued();
-
-        // Accept results of completed jobs.
+        // Prepare to accept results of completed jobs.
         let mut completed_job_stats = TimeStats::default();
         let mut callback_stats = TimeStats::default();
-        for (block_index, current_mesh_entry) in self.meshes.iter_mut().enumerate() {
-            match current_mesh_entry.try_recv_update() {
-                Some(Ok(job::CompletedMeshJob {
-                    mesh: new_block_mesh,
-                    compute_time,
-                })) => {
-                    completed_job_stats += TimeStats::one(compute_time);
+        let process_completed_jobs = || {
+            // TODO: Instead of scanning everything, have the job queue notify us which ones
+            // have completed jobs.
+            for (block_index, current_mesh_entry) in self.meshes.iter_mut().enumerate() {
+                match current_mesh_entry.try_recv_update() {
+                    Some(Ok(job::CompletedMeshJob {
+                        mesh: new_block_mesh,
+                        compute_time,
+                    })) => {
+                        completed_job_stats += TimeStats::one(compute_time);
 
-                    let new_evaluated_block: &EvaluatedBlock = block_data[block_index].evaluated();
+                        let new_evaluated_block: &EvaluatedBlock =
+                            block_data[block_index].evaluated();
 
-                    // Only invalidate the chunks if we actually have different data.
-                    // Note: This comparison depends on such things as the definition of PartialEq
-                    // for Tex::Tile.
-                    // TODO: We don't currently make use of this optimally because textures are never
-                    // reused, except in the case of texture-only updates handled above.
-                    // (If they were, we'd need to consider what we want to do about stale chunks with
-                    // updated texture tiles, which might have geometry gaps or otherwise be obviously
-                    // inconsistent.)
-                    if new_block_mesh != current_mesh_entry.mesh
-                        || current_mesh_entry.version == BlockMeshVersion::NotReady
-                    {
-                        // TODO: reuse old render data
-                        let start_callback_time = M::Instant::now();
-                        *current_mesh_entry = VersionedBlockMesh::new(
-                            block_index as BlockIndex,
-                            new_evaluated_block,
-                            new_block_mesh,
-                            current_version_number,
-                            &mut render_data_updater,
-                        );
-                        callback_stats += TimeStats::one(
-                            M::Instant::now().saturating_duration_since(start_callback_time),
-                        );
-                    } else {
-                        // The new mesh is identical to the old one (which might happen because
-                        // interior voxels or non-rendered attributes were changed), so don't invalidate
-                        // the chunks.
+                        // Only invalidate the chunks if we actually have different data.
+                        // Note: This comparison depends on such things as the definition of
+                        // `PartialEq for Tex::Tile`.
+                        // TODO: We don't currently make use of this optimally because textures
+                        // are never reused, except in the case of texture-only updates handled
+                        // above. (If they were, we'd need to consider what we want to do about
+                        // stale chunks with updated texture tiles, which might have geometry gaps
+                        // or otherwise be obviously inconsistent.)
+                        if new_block_mesh != current_mesh_entry.mesh
+                            || current_mesh_entry.version == BlockMeshVersion::NotReady
+                        {
+                            // TODO: reuse old render data
+                            let start_callback_time = M::Instant::now();
+                            *current_mesh_entry = VersionedBlockMesh::new(
+                                block_index as BlockIndex,
+                                new_evaluated_block,
+                                new_block_mesh,
+                                current_version_number,
+                                &mut render_data_updater,
+                            );
+                            callback_stats += TimeStats::one(
+                                M::Instant::now().saturating_duration_since(start_callback_time),
+                            );
+                        } else {
+                            // The new mesh is identical to the old one (which might happen because
+                            // interior voxels or non-rendered attributes were changed),
+                            // so don't invalidate the chunks.
+                        }
                     }
+
+                    // Not yet ready
+                    None => {}
+
+                    // If the job was cancelled, reschedule it.
+                    Some(Err(Canceled)) => current_mesh_entry.spawn_update_job(
+                        block_data[block_index].evaluated().clone(),
+                        mesh_options.clone(),
+                        &self.jobs,
+                    ),
                 }
-
-                // Not yet ready
-                None => {}
-
-                // If the job was cancelled, reschedule it.
-                Some(Err(Canceled)) => current_mesh_entry.spawn_update_job(
-                    block_data[block_index].evaluated().clone(),
-                    mesh_options.clone(),
-                    &self.jobs,
-                ),
             }
-        }
+        };
+
+        // Run the job queue for a while to ensure that updates are happening
+        // (whether or not background tasks are also doing this).
+        let (running, waiting) = self.jobs.run_until(deadline, process_completed_jobs);
+        let queued = self.jobs.count_queued();
+
+        // All job processing is now done; finalize and report info.
 
         // TODO(instancing): when we have "_sometimes_ instanced" blocks, this will need to change
         // because it only looks at whether we prepared for instancing
@@ -249,6 +257,7 @@ where
             total_time: end_time.saturating_duration_since(start_time),
             block_calculations: completed_job_stats,
             block_callbacks: callback_stats,
+            running,
             waiting,
             queued,
             unfinished: self.jobs.count_jobs(),
@@ -469,6 +478,8 @@ pub(crate) struct VbmUpdateInfo {
     /// Time taken to call the `render_data_updater`.
     block_callbacks: TimeStats,
     /// Time used running block mesh jobs to completion immediately.
+    running: Duration,
+    /// Time used waiting for background block mesh jobs to complete.
     waiting: Duration,
     /// Number of block mesh jobs currently queued and not claimed by any executor, as of right
     /// after the waiting period.
@@ -489,6 +500,7 @@ impl all_is_cubes::util::Fmt<StatusText> for VbmUpdateInfo {
             total_time,
             block_calculations,
             block_callbacks,
+            running,
             waiting,
             queued,
             unfinished,
@@ -497,11 +509,13 @@ impl all_is_cubes::util::Fmt<StatusText> for VbmUpdateInfo {
             fmt,
             // this format is designed to slot into `CsmUpdateInfo` cleanly
             indoc::indoc! {"
-                Block total {total_time}, job wait {waiting}, queue {queued:3}, unfinished {unfinished:3}
+                Block total {total_time}, job run {running}, job wait {waiting}, \
+                        queue {queued:3}, unfinished {unfinished:3}
                       mesh gen {block_calculations}
                       upload   {block_callbacks}\
             "},
             total_time = total_time.refmt(&StatusText),
+            running = running.refmt(&StatusText),
             waiting = waiting.refmt(&StatusText),
             block_calculations = block_calculations,
             block_callbacks = block_callbacks,
@@ -517,6 +531,7 @@ impl ops::AddAssign for VbmUpdateInfo {
             total_time,
             block_calculations,
             block_callbacks,
+            running,
             waiting,
             queued,
             unfinished,
@@ -524,6 +539,7 @@ impl ops::AddAssign for VbmUpdateInfo {
         *total_time += rhs.total_time;
         *block_calculations += rhs.block_calculations;
         *block_callbacks += rhs.block_callbacks;
+        *running += rhs.running;
         *waiting += rhs.waiting;
         *queued += rhs.queued;
         *unfinished += rhs.unfinished;
