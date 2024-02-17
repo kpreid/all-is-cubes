@@ -342,10 +342,12 @@ mod state {
             let guard = self.counters.lock().unwrap();
             match timeout {
                 Some(timeout) => {
-                    let _ = self.endings.wait_timeout(guard, timeout);
+                    // We don't do anything with the guard we got back because we're just
+                    // receiving a wakeup, not making any transactional change.
+                    let _guard = self.endings.wait_timeout(guard, timeout);
                 }
                 None => {
-                    let _ = self.endings.wait(guard);
+                    let _guard = self.endings.wait(guard);
                 }
             }
         }
