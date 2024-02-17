@@ -516,9 +516,6 @@ pub(crate) trait CollisionSpace {
     /// If None, recursion is needed.
     fn collision(cell: &Self::Cell) -> Option<BlockCollision>;
 
-    /// TODO: document
-    fn get_voxels(cell: &Self::Cell) -> Option<&Evoxels>;
-
     /// Recursion helper for [`collide_along_ray()`].
     /// This breaks the infinite static recursion we would get otherwise,
     /// by only compiling into a call to [`collide_along_ray()`] if there is anything to do.
@@ -553,11 +550,6 @@ impl CollisionSpace for Space {
     #[inline]
     fn collision(cell: &Self::Cell) -> Option<BlockCollision> {
         cell.uniform_collision
-    }
-
-    #[inline]
-    fn get_voxels(evaluated: &EvaluatedBlock) -> Option<&Evoxels> {
-        Some(&evaluated.voxels)
     }
 
     #[inline]
@@ -636,13 +628,6 @@ impl CollisionSpace for Vol<Arc<[Evoxel]>> {
         Some(cell.collision)
     }
 
-    #[inline]
-    fn get_voxels(_cell: &Self::Cell) -> Option<&Evoxels> {
-        // TODO: can't just return Evoxels::One because it would have to be owned (unless we
-        // changed the return type to Cow or used a different enum), but that might be
-        // elegant (or not)...revisit.
-        None
-    }
     #[inline(always)]
     fn recurse(
         _cube: Cube,
