@@ -62,7 +62,7 @@ clap = { version = "4.2.4", default-features = false, features = ["cargo", "depr
 # when benching/testing specific packages
 criterion = { version = "0.5.1", features = ["async_tokio", "cargo_bench_support", "html_reports"] }
 displaydoc = { version = "0.2.4", default-features = false}
-either = { version = "1.8.0", default-features = false }
+either = { version = "1.10.0", default-features = false }
 exhaust = { version = "0.1.0", default-features = false }
 flume = { version = "0.11.0", default-features = false, features = ["async"] }
 futures-channel = { version = "0.3.28", default-features = false, features = ["alloc"] }
