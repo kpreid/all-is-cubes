@@ -58,7 +58,7 @@ tokio = { workspace = true, features = ["rt-multi-thread", "sync"] }
 ratatui = { version = "0.25.0", default-features = false, features = ["crossterm"] }
 unicode-width = { version = "0.1.9", default-features = false }
 # We have no true direct dependency on wgpu, but do need to select backends.
-# (As of wgpu 0.19, Vulkan is implicitly enabled on Linux
+# (As of wgpu 0.19, Vulkan is implicitly enabled on Linux.)
 wgpu = { workspace = true, features = ["dx12", "metal"] }
 # Note on feature selection: winit requires either "x11" or "wayland" to build at all on Linux, which is harmless elsewhere. I picked x11 because it should be the most compatible.
 winit = { version = "0.29.2", default-features = false, features = ["x11", "rwh_06"] }

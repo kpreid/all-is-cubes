@@ -80,7 +80,9 @@ tempfile = { workspace = true }
 tinytemplate = "1.2.1"
 # Using tokio for async test-running.
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync", "time"] }
-wgpu = { workspace = true }
+# In addition to depending on wgpu directly, we also need to select backends to be enabled in our binary.
+# (As of wgpu 0.19, Vulkan is implicitly enabled on Linux.)
+wgpu = { workspace = true, features = ["dx12", "metal"] }
 
 [lints]
 workspace = true
