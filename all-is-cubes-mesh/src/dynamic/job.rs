@@ -7,6 +7,7 @@ use futures_channel::oneshot;
 use futures_util::FutureExt as _;
 
 use all_is_cubes::block::EvaluatedBlock;
+use all_is_cubes::space::BlockIndex;
 use all_is_cubes::time::{self, Instant};
 use all_is_cubes::util::{Refmt as _, StatusText};
 
@@ -163,6 +164,7 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
 
     pub(in crate::dynamic) fn send(
         &self,
+        block_index: BlockIndex,
         block: EvaluatedBlock,
         mesh_options: MeshOptions,
     ) -> Receiver<CompletedMeshJob<M>> {
@@ -172,10 +174,19 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
                 block,
                 mesh_options,
                 response: response_sender,
-                counter_ticket: state::Ticket::new(self.counters.clone(), state::State::Queued),
+                counter_ticket: state::Ticket::new(
+                    self.counters.clone(),
+                    block_index,
+                    state::State::Queued,
+                ),
             })
             .expect("job queue should never be defunct or full");
         Receiver { receiver }
+    }
+
+    /// Returns all block indices which have had a job complete since the last time this was called.
+    pub(crate) fn take_completed(&self) -> Vec<BlockIndex> {
+        self.counters.take_completed()
     }
 
     /// Run jobs in the queue, wait for jobs to complete, or both,
@@ -289,9 +300,9 @@ pub(in crate::dynamic) struct CompletedMeshJob<M: DynamicMeshTypes> {
 }
 
 mod state {
+    use super::*;
+    use std::collections::HashSet;
     use std::sync::{Arc, Condvar, Mutex};
-    #[allow(unused_imports)] // conditionally used
-    use std::time::Duration;
 
     /// Shared structure recording how many jobs are in a given state.
     /// Fields correspond to variants of [`JobState`].
@@ -300,6 +311,8 @@ mod state {
         queued: usize,
         taken: usize,
         completed: usize,
+
+        completed_ids: HashSet<BlockIndex>,
     }
 
     impl InnerCounters {
@@ -326,6 +339,7 @@ mod state {
                     queued: 0,
                     taken: 0,
                     completed: 0,
+                    completed_ids: HashSet::new(),
                 }),
                 endings: Condvar::new(),
             }
@@ -351,6 +365,15 @@ mod state {
                 }
             }
         }
+
+        pub fn take_completed(&self) -> Vec<BlockIndex> {
+            self.counters
+                .lock()
+                .unwrap()
+                .completed_ids
+                .drain()
+                .collect()
+        }
     }
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -363,21 +386,24 @@ mod state {
     /// A handle on one count in [`JobStateCounters`], which makes sure to decrement
     /// on change or drop.
     pub(super) struct Ticket {
+        /// TODO: When we have background chunk meshing too, this will need to become a more general
+        /// "JobId" enum type
+        block_index: BlockIndex,
         current_state: State,
         shared: Arc<Counters>,
     }
     impl Ticket {
-        pub fn new(shared: Arc<Counters>, current_state: State) -> Self {
+        pub fn new(shared: Arc<Counters>, block_index: BlockIndex, current_state: State) -> Self {
+            // avoid complexity by not supporting this case
+            assert!(current_state != State::Completed);
+
             {
                 let counters = &mut *shared.counters.lock().unwrap();
                 *counters.field(current_state) += 1;
-
-                if current_state == State::Completed {
-                    shared.endings.notify_all();
-                }
             }
 
             Self {
+                block_index,
                 current_state,
                 shared,
             }
@@ -387,6 +413,8 @@ mod state {
             if new_state == self.current_state {
                 return;
             }
+            assert!(self.current_state != State::Completed);
+
             let old_state = self.current_state;
 
             let counters = &mut *self.shared.counters.lock().unwrap();
@@ -396,6 +424,7 @@ mod state {
             self.current_state = new_state;
 
             if new_state == State::Completed {
+                counters.completed_ids.insert(self.block_index);
                 self.shared.endings.notify_all();
             }
         }

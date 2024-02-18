@@ -143,7 +143,12 @@ where
                     );
 
                     if defer {
-                        vbm.spawn_update_job(evaluated.clone(), mesh_options.clone(), &self.jobs);
+                        vbm.spawn_update_job(
+                            index,
+                            evaluated.clone(),
+                            mesh_options.clone(),
+                            &self.jobs,
+                        );
                     }
 
                     self.meshes.push(vbm);
@@ -167,6 +172,7 @@ where
                 // Updated the texture in-place. No need for mesh updates.
             } else {
                 current_mesh_entry.spawn_update_job(
+                    block_index,
                     new_evaluated_block.clone(),
                     mesh_options.clone(),
                     &self.jobs,
@@ -178,9 +184,9 @@ where
         let mut completed_job_stats = TimeStats::default();
         let mut callback_stats = TimeStats::default();
         let process_completed_jobs = || {
-            // TODO: Instead of scanning everything, have the job queue notify us which ones
-            // have completed jobs.
-            for (block_index, current_mesh_entry) in self.meshes.iter_mut().enumerate() {
+            for block_index in self.jobs.take_completed() {
+                let uindex = usize::from(block_index);
+                let current_mesh_entry = &mut self.meshes[uindex];
                 match current_mesh_entry.try_recv_update() {
                     Some(Ok(job::CompletedMeshJob {
                         mesh: new_block_mesh,
@@ -188,8 +194,7 @@ where
                     })) => {
                         completed_job_stats += TimeStats::one(compute_time);
 
-                        let new_evaluated_block: &EvaluatedBlock =
-                            block_data[block_index].evaluated();
+                        let new_evaluated_block: &EvaluatedBlock = block_data[uindex].evaluated();
 
                         // Only invalidate the chunks if we actually have different data.
                         // Note: This comparison depends on such things as the definition of
@@ -205,7 +210,7 @@ where
                             // TODO: reuse old render data
                             let start_callback_time = M::Instant::now();
                             *current_mesh_entry = VersionedBlockMesh::new(
-                                block_index as BlockIndex,
+                                block_index,
                                 new_evaluated_block,
                                 new_block_mesh,
                                 current_version_number,
@@ -226,7 +231,8 @@ where
 
                     // If the job was cancelled, reschedule it.
                     Some(Err(Canceled)) => current_mesh_entry.spawn_update_job(
-                        block_data[block_index].evaluated().clone(),
+                        block_index,
+                        block_data[uindex].evaluated().clone(),
                         mesh_options.clone(),
                         &self.jobs,
                     ),
@@ -374,11 +380,12 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
 
     fn spawn_update_job(
         &mut self,
+        block_index: BlockIndex,
         block: EvaluatedBlock,
         mesh_options: MeshOptions,
         jobs: &job::QueueOwner<M>,
     ) {
-        let response_receiver = jobs.send(block, mesh_options);
+        let response_receiver = jobs.send(block_index, block, mesh_options);
 
         let old_job = self.pending_latest.replace(response_receiver);
 
