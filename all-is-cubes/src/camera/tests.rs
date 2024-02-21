@@ -1,4 +1,4 @@
-use euclid::{point3, vec3, Point3D, Rotation3D, Vector2D, vec2};
+use euclid::{point3, vec2, vec3, Point3D, Rotation3D, Vector2D};
 use pretty_assertions::assert_eq;
 use rand::SeedableRng;
 

@@ -161,7 +161,7 @@ mod tests {
         assert_eq!(u8::from(Axis::X), 0);
         assert_eq!(u8::from(Axis::Y), 1);
         assert_eq!(u8::from(Axis::Z), 2);
-        
+
         for axis in Axis::ALL {
             assert_eq!(usize::from(axis), usize::from(u8::from(axis)));
             assert_eq!(usize::from(axis), axis.index());
