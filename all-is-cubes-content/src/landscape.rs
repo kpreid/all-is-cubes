@@ -4,6 +4,7 @@ use core::fmt;
 use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
+use all_is_cubes::arcstr;
 use all_is_cubes::block::{
     Block, BlockCollision, Primitive,
     Resolution::{self, R16},
@@ -29,7 +30,7 @@ use crate::{palette, tree};
 pub enum LandscapeBlocks {
     Grass,
     GrassBlades {
-        variant: bool,
+        height: GrassHeight,
     },
     Dirt,
     Stone,
@@ -38,18 +39,43 @@ pub enum LandscapeBlocks {
     Leaves(tree::TreeGrowth),
 }
 
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust, strum::IntoStaticStr)]
+#[non_exhaustive]
+#[allow(missing_docs)]
+#[repr(u8)]
+pub enum GrassHeight {
+    H1 = 1,
+    H2 = 2,
+    H3 = 3,
+    H4 = 4,
+    H5 = 5,
+    H6 = 6,
+    H7 = 7,
+    H8 = 8,
+}
+impl GrassHeight {
+    fn from_int(i: u8) -> Option<GrassHeight> {
+        match i {
+            0 => None,
+            1 => Some(Self::H1),
+            2 => Some(Self::H2),
+            3 => Some(Self::H3),
+            4 => Some(Self::H4),
+            5 => Some(Self::H5),
+            6 => Some(Self::H6),
+            7 => Some(Self::H7),
+            _ => Some(Self::H8), // clamped high
+        }
+    }
+}
+
 impl fmt::Display for LandscapeBlocks {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LandscapeBlocks::Grass => write!(f, "grass"),
-            LandscapeBlocks::GrassBlades { variant } => write!(
-                f,
-                "grass-blades/{}",
-                match variant {
-                    false => 1,
-                    true => 2,
-                }
-            ),
+            &LandscapeBlocks::GrassBlades { height } => {
+                write!(f, "grass-blades/{}", height as u8)
+            }
             LandscapeBlocks::Dirt => write!(f, "dirt"),
             LandscapeBlocks::Stone => write!(f, "stone"),
             LandscapeBlocks::Log(growth) => write!(f, "log/{growth}"),
@@ -85,7 +111,7 @@ impl DefaultProvision<Block> for LandscapeBlocks {
         use LandscapeBlocks::*;
         match self {
             Grass => color_and_name(palette::GRASS, "Grass"),
-            GrassBlades { variant: _ } => blades(),
+            GrassBlades { height: _ } => blades(),
             Dirt => color_and_name(palette::DIRT, "Dirt"),
             Stone => color_and_name(palette::STONE, "Stone"),
             Log(g) => color_and_name(
@@ -111,7 +137,10 @@ pub async fn install_landscape_blocks(
     let colors = BlockProvider::<LandscapeBlocks>::default();
     let rng = &mut rand_xoshiro::Xoshiro256Plus::seed_from_u64(123890483921741);
 
-    let mut grass_blade_atom = colors[GrassBlades { variant: false }].clone();
+    let mut grass_blade_atom = colors[GrassBlades {
+        height: GrassHeight::H4,
+    }]
+    .clone();
     // TODO: easier way to do this?
     if let Primitive::Atom(ref mut atom) = grass_blade_atom.primitive_mut() {
         atom.color = atom.color.to_rgb().with_alpha_one();
@@ -126,9 +155,10 @@ pub async fn install_landscape_blocks(
         value * 2.5 + f64::from(resolution) * 0.75
     });
     let blade_noise = array_of_noise(
+        // TODO: not very well sized for the job — we just want a different chunk for each height
         resolution.double().unwrap(),
         &noise::ScalePoint::new(noise::OpenSimplex::new(0x7af8c181)).set_y_scale(0.1),
-        |value| value * (f64::from(resolution) * 1.7) + (f64::from(resolution) * -0.34),
+        |value| value * (f64::from(resolution) * 1.7) + (f64::from(resolution) * -0.4),
     );
 
     let stone_points: [_; 240] = array::from_fn(|_| {
@@ -155,7 +185,22 @@ pub async fn install_landscape_blocks(
     };
 
     BlockProvider::<LandscapeBlocks>::new(progress, |key| {
-        let grass_blades = |txn, index: GridCoordinate| -> Result<Block, InGenError> {
+        let grass_blades = |txn, height: GrassHeight| -> Result<Block, InGenError> {
+            let height_index = height as GridCoordinate - 1;
+            // give each grass variant a different height
+            let noise_section = GridVector::new(
+                height_index.rem_euclid(2),
+                height_index.div_euclid(2).rem_euclid(2),
+                height_index.div_euclid(4).rem_euclid(2),
+            ) * GridCoordinate::from(resolution);
+
+            // Increase the brightness of the blade color to compensate for the way the
+            // voxel blade shape is darkened by its own opacity.
+            // This is essentially “baked ambient occlusion” but backwards:
+            // faking the highlights that the algorithm does not comprehend.
+            // TODO: Ideally this would be handled by some kind of lighting hints instead.
+            let ao_fudge = 1.0 + f64::from(height as u8) * 0.15;
+
             Ok(Block::builder()
                 .attributes(
                     grass_blade_atom
@@ -163,16 +208,17 @@ pub async fn install_landscape_blocks(
                         .map_err(InGenError::other)?
                         .attributes,
                 )
+                .display_name(arcstr::format!("Grass Blades {}", height as u8))
                 .voxels_fn(resolution, |cube| {
-                    if f64::from(cube.y)
-                        < blade_noise[cube
-                            + GridVector::new(
-                                GridCoordinate::from(resolution),
-                                GridCoordinate::from(resolution) * 3 / 4,
-                                0,
-                            ) * index]
-                    {
-                        scale_color(grass_blade_atom.clone(), blade_color_noise(cube), 0.02)
+                    let mut cube_for_lookup = cube;
+                    cube_for_lookup.y = 0;
+                    cube_for_lookup += noise_section;
+                    if f64::from(cube.y - height_index) < blade_noise[cube_for_lookup] {
+                        scale_color(
+                            grass_blade_atom.clone(),
+                            blade_color_noise(cube) * ao_fudge,
+                            0.02,
+                        )
                     } else {
                         AIR
                     }
@@ -207,7 +253,7 @@ pub async fn install_landscape_blocks(
                 })?
                 .build_txn(txn),
 
-            GrassBlades { variant } => grass_blades(txn, variant.into())?,
+            GrassBlades { height } => grass_blades(txn, height)?,
 
             Dirt => Block::builder()
                 .attributes(
@@ -315,10 +361,8 @@ pub fn wavy_landscape(
     let slope_scaled = max_slope / 0.904087;
     let middle_y = (region.lower_bounds().y + region.upper_bounds().y) / 2;
 
-    let placement_noise = noise::ScaleBias::new(noise::OpenSimplex::new(0x21b5cc6b))
-        .set_bias(0.0)
-        .set_scale(4.0);
-    let grass_threshold = 1.0;
+    let grass_at = grass_placement_function(0x21b5cc6b);
+
     for x in region.x_range() {
         for z in region.z_range() {
             let fx = FreeCoordinate::from(x);
@@ -335,10 +379,8 @@ pub fn wavy_landscape(
                 let block: &Block = if altitude > 1 {
                     continue;
                 } else if altitude == 1 {
-                    if placement_noise.at_cube(cube) > grass_threshold * 2. {
-                        &blocks[GrassBlades { variant: true }]
-                    } else if placement_noise.at_cube(cube) > grass_threshold {
-                        &blocks[GrassBlades { variant: false }]
+                    if let Some(height) = grass_at(cube) {
+                        &blocks[GrassBlades { height }]
                     } else {
                         &AIR
                     }
@@ -355,4 +397,15 @@ pub fn wavy_landscape(
         }
     }
     Ok(())
+}
+
+pub(crate) fn grass_placement_function(seed: u32) -> impl Fn(Cube) -> Option<GrassHeight> {
+    let grass_noise = noise::ScalePoint::new(
+        noise::ScaleBias::new(noise::OpenSimplex::new(seed))
+            .set_bias(1.0) // grass rather than nongrass
+            .set_scale(15.0), // height variation
+    )
+    .set_scale(0.25);
+
+    move |cube| GrassHeight::from_int(grass_noise.at_cube(cube) as u8)
 }

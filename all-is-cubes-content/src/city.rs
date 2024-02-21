@@ -32,7 +32,7 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::{logo::logo_text, vui, vui::widgets};
 
-use crate::alg::{space_to_space_copy, walk, NoiseFnExt as _};
+use crate::alg::{space_to_space_copy, walk};
 use crate::{
     clouds::clouds, exhibits::DEMO_CITY_EXHIBITS, wavy_landscape, DemoBlocks, LandscapeBlocks,
 };
@@ -129,21 +129,12 @@ pub(crate) async fn demo_city<I: Instant>(
 
     // Stray grass
     {
-        let grass_noise = noise::ScaleBias::new(noise::OpenSimplex::new(0x21b5cc6b))
-            .set_bias(0.0)
-            .set_scale(8.0);
-        let grass_threshold = 1.2;
+        let grass_at = crate::landscape::grass_placement_function(0x21b5cc6b);
         space.fill(planner.y_range(1, 2), |cube| {
             if cube.x.abs() <= road_radius || cube.z.abs() <= road_radius {
                 return None;
             }
-            if grass_noise.at_cube(cube) > grass_threshold * 2. {
-                Some(&landscape_blocks[GrassBlades { variant: true }])
-            } else if grass_noise.at_cube(cube) > grass_threshold {
-                Some(&landscape_blocks[GrassBlades { variant: false }])
-            } else {
-                None
-            }
+            grass_at(cube).map(|height| &landscape_blocks[GrassBlades { height }])
         })?;
     }
     p.progress(0.3).await;
