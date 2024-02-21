@@ -16,7 +16,7 @@ use all_is_cubes::block::Resolution;
 use all_is_cubes::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
 use all_is_cubes::euclid::{point3, Rotation3D};
 use all_is_cubes::listen::ListenableSource;
-use all_is_cubes::math::{Face6, FreeVector, GridAab, GridVector, Rgb, Rgba};
+use all_is_cubes::math::{Face6, FreeVector, GridAab, GridVector, Rgba};
 use all_is_cubes::{notnan, time};
 use all_is_cubes_mesh::{BlockVertex, Coloring};
 
@@ -133,10 +133,11 @@ where
         &pipelines,
         &texture_view,
         &in_wgpu::space::SpaceLightTexture::new(
-            "shader_test_space",
+            "shader test space",
             &device,
             GridAab::for_block(Resolution::R1),
         ),
+        in_wgpu::skybox::Skybox::new(&device, "shader test space").texture_view(),
     );
 
     // This buffer contains one triangle, that will be full-screen once the camera looks
@@ -180,11 +181,7 @@ where
     queue.write_buffer(
         &camera_buffer.buffer,
         0,
-        bytemuck::bytes_of(&ShaderSpaceCamera::new(
-            &camera,
-            Rgb::ZERO,
-            GridVector::zero(),
-        )),
+        bytemuck::bytes_of(&ShaderSpaceCamera::new(&camera, GridVector::zero())),
     );
 
     let mut encoder =

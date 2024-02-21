@@ -28,7 +28,7 @@ use crate::{
     in_wgpu::{
         block_texture::AtlasAllocator,
         frame_texture::FbtFeatures,
-        glue::{to_wgpu_color, BeltWritingParts, ResizingBuffer},
+        glue::{BeltWritingParts, ResizingBuffer},
         pipelines::Pipelines,
         postprocess::PostprocessUniforms,
         vertex::WgpuLinesVertex,
@@ -54,6 +54,7 @@ mod raytrace_to_texture;
 mod rerun_image;
 #[doc(hidden)] // public for tests/shader_tests.rs
 pub mod shader_testing;
+mod skybox;
 mod space;
 use space::SpaceRenderer;
 mod vertex;
@@ -712,14 +713,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 &mut encoder,
                 &self.pipelines,
                 camera,
-                if mem::take(&mut output_needs_clearing) {
-                    // TODO: when we start drawing the sky we will need more than clear color
-                    wgpu::LoadOp::Clear(to_wgpu_color(
-                        (sr.sky.mean() * camera.exposure()).with_alpha_one(),
-                    ))
-                } else {
-                    wgpu::LoadOp::Load
-                },
+                mem::take(&mut output_needs_clearing),
                 // We need to store the depth buffer if and only if we are going to do
                 // the lines pass or read the scene afterward
                 match self.lines_vertex_count > 0 || self.fb.copy_out_enabled() {
@@ -764,11 +758,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             &mut encoder,
             &self.pipelines,
             &self.cameras.cameras().ui,
-            if mem::take(&mut output_needs_clearing) {
-                wgpu::LoadOp::Clear(to_wgpu_color(palette::NO_WORLD_TO_SHOW))
-            } else {
-                wgpu::LoadOp::Load
-            },
+            mem::take(&mut output_needs_clearing),
             wgpu::StoreOp::Discard, // nothing uses the ui depth buffer
             true,
         )?;

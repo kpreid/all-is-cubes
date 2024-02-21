@@ -25,9 +25,11 @@ use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
 use crate::in_wgpu::block_texture::BlockTextureViews;
 use crate::in_wgpu::frame_texture::FramebufferTextures;
 use crate::in_wgpu::glue::{
-    point_to_origin, size_vector_to_extent, to_wgpu_index_format, write_texture_by_aab,
+    point_to_origin, size_vector_to_extent, to_wgpu_color, to_wgpu_index_format,
+    write_texture_by_aab,
 };
 use crate::in_wgpu::pipelines::Pipelines;
+use crate::in_wgpu::skybox;
 use crate::in_wgpu::vertex::{WgpuInstanceData, WgpuLinesVertex};
 use crate::in_wgpu::WgpuMt;
 use crate::in_wgpu::{
@@ -39,6 +41,8 @@ use crate::in_wgpu::{
 use crate::{DebugLineVertex, GraphicsResourceError, Memo, SpaceDrawInfo, SpaceUpdateInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
+
+const NO_WORLD_SKY: Sky = Sky::Uniform(palette::NO_WORLD_TO_SHOW.to_rgb());
 
 /// Manages cached data and GPU resources for drawing a single [`Space`] and
 /// following its changes.
@@ -56,8 +60,8 @@ pub(crate) struct SpaceRenderer<I: time::Instant> {
     /// Note that `self.csm` has its own todo listener too.
     todo: Arc<Mutex<SpaceRendererTodo>>,
 
-    /// Cached copy of `space.physics.sky`.
-    pub(crate) sky: Sky,
+    /// Skybox texture.
+    skybox: skybox::Skybox,
 
     block_texture: AtlasAllocator,
     light_texture: SpaceLightTexture,
@@ -70,7 +74,8 @@ pub(crate) struct SpaceRenderer<I: time::Instant> {
     instance_buffer: ResizingBuffer,
 
     /// Bind group containing our block texture and light texture,
-    space_bind_group: Memo<[wgpu::Id<wgpu::TextureView>; 3], wgpu::BindGroup>,
+    #[allow(clippy::type_complexity)]
+    space_bind_group: Memo<[wgpu::Id<wgpu::TextureView>; 4], wgpu::BindGroup>,
 
     /// Mesh generator and updater.
     ///
@@ -103,14 +108,13 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         let camera_buffer = SpaceCameraBuffer::new(&space_label, device, pipelines);
 
-        let todo = Arc::new(Mutex::new(SpaceRendererTodo::default()));
+        let todo = Arc::new(Mutex::new(SpaceRendererTodo::EVERYTHING));
 
         Ok(SpaceRenderer {
             todo,
             render_pass_label: format!("{space_label} render_pass"),
             instance_buffer_label: format!("{space_label} instances"),
-            space_label,
-            sky: Sky::Uniform(palette::NO_WORLD_TO_SHOW.to_rgb()),
+            skybox: skybox::Skybox::new(device, &space_label),
             block_texture,
             light_texture,
             space_bind_group: Memo::new(),
@@ -118,6 +122,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             instance_buffer: ResizingBuffer::default(),
             csm: None,
             interactive,
+            space_label,
             #[cfg(feature = "rerun")]
             rerun_destination: Default::default(),
         })
@@ -156,7 +161,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             render_pass_label: _,
             instance_buffer_label: _,
             todo,
-            sky,
+            skybox: _, // will be updated due to todo.sky = true
             block_texture: _,
             light_texture,
             camera_buffer: _,
@@ -169,7 +174,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         } = self;
 
         *todo = {
-            let todo = Arc::new(Mutex::new(SpaceRendererTodo::default()));
+            let todo = Arc::new(Mutex::new(SpaceRendererTodo::EVERYTHING));
             space_borrowed.listen(TodoListener(Arc::downgrade(&todo)));
             todo
         };
@@ -206,7 +211,6 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         *csm = Some(new_csm);
 
-        *sky = space_borrowed.physics().sky.clone();
         // TODO: don't replace light texture if the size is the same
         *light_texture = SpaceLightTexture::new(space_label, device, space_borrowed.bounds());
 
@@ -220,7 +224,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             render_pass_label: _,
             instance_buffer_label: _,
             todo,
-            sky,
+            skybox: _,
             block_texture: _,
             light_texture: _,
             camera_buffer: _,
@@ -232,9 +236,9 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 rerun_destination: _,
         } = self;
 
-        *todo = Default::default(); // detach from space notifier
+        // detach from space notifier, and also request rebuilding the skybox
+        *todo = Arc::new(Mutex::new(SpaceRendererTodo::EVERYTHING));
         *csm = None;
-        *sky = Sky::Uniform(palette::NO_WORLD_TO_SHOW.to_rgb());
     }
 
     /// Update renderer internal state from the given [`Camera`] and referenced [`Space`],
@@ -254,6 +258,10 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let mut todo = self.todo.lock().unwrap();
 
         let Some(csm) = &mut self.csm else {
+            if mem::take(&mut todo.sky) {
+                self.skybox.compute(device, queue, &NO_WORLD_SKY);
+            }
+
             return Ok(SpaceUpdateInfo::default());
         };
         let space = &*csm
@@ -261,9 +269,9 @@ impl<I: time::Instant> SpaceRenderer<I> {
             .read()
             .map_err(GraphicsResourceError::read_err)?;
 
-        // Update sky color (cheap so we don't bother todo-tracking it)
-        // TODO: ... potentially not cheap any more
-        self.sky = space.physics().sky.clone();
+        if mem::take(&mut todo.sky) {
+            self.skybox.compute(device, queue, &space.physics().sky);
+        }
 
         // Update light texture
         let start_light_update = I::now();
@@ -334,6 +342,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 block_texture_views.g0_reflectance.global_id(),
                 block_texture_views.g1_reflectance.global_id(),
                 self.light_texture.texture_view.global_id(),
+                self.skybox.texture_view().global_id(),
             ],
             || {
                 create_space_bind_group(
@@ -342,6 +351,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                     pipelines,
                     &block_texture_views,
                     &self.light_texture,
+                    self.skybox.texture_view(),
                 )
             },
         );
@@ -375,16 +385,33 @@ impl<I: time::Instant> SpaceRenderer<I> {
         encoder: &mut wgpu::CommandEncoder,
         pipelines: &Pipelines,
         camera: &Camera,
-        color_load_op: wgpu::LoadOp<wgpu::Color>,
+        draw_sky: bool, // TODO: consider specifying this at update time to decide whether to calc
         store_depth: wgpu::StoreOp,
         is_ui: bool,
     ) -> Result<SpaceDrawInfo, GraphicsResourceError> {
         let start_time = I::now();
         let mut flaws = Flaws::empty();
 
+        let clear_op = if draw_sky {
+            if self.csm.is_none() {
+                // There will be no skybox, so use the NO_WORLD color.
+                // TODO: Refactor so that we can draw the skybox anyway, and have
+                // a fancy error-display one.
+                wgpu::LoadOp::Clear(to_wgpu_color(palette::NO_WORLD_TO_SHOW))
+            } else {
+                // The skybox will cover everything, so don't actually need to clear, but more
+                // importantly, we don't want to depend on the previous contents, and clearing
+                // to black is the best way to do that.
+                // This color should never be actually visible.
+                wgpu::LoadOp::Clear(wgpu::Color::BLACK)
+            }
+        } else {
+            wgpu::LoadOp::Load
+        };
+
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some(&self.render_pass_label),
-            color_attachments: &[Some(fb.color_attachment_for_scene(color_load_op))],
+            color_attachments: &[Some(fb.color_attachment_for_scene(clear_op))],
             depth_stencil_attachment: Some(fb.depth_attachment_for_scene(
                 wgpu::Operations {
                     load: wgpu::LoadOp::Clear(1.0),
@@ -397,8 +424,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         // Check if we actually have a space to render.
         let Some(csm) = &self.csm else {
-            // If we have no space to render, then only let the render pass perform its clear,
-            // and do nothing else.
+            // If we have no space to render, then we only render the clear + skybox.
 
             return Ok(SpaceDrawInfo {
                 draw_init_time: Duration::ZERO,
@@ -428,7 +454,6 @@ impl<I: time::Instant> SpaceRenderer<I> {
             0,
             bytemuck::bytes_of(&ShaderSpaceCamera::new(
                 camera,
-                self.sky.mean(), // TODO: create a sky texture
                 self.light_texture.light_lookup_offset(),
             )),
         );
@@ -466,7 +491,16 @@ impl<I: time::Instant> SpaceRenderer<I> {
             }
         }
 
-        // Opaque geometry first, in front-to-back order.
+        if draw_sky {
+            // Render skybox.
+            // TODO: Ideally, we would do this after drawing other opaque geometry, but that requires
+            // smarter depth test setup.
+            render_pass.set_pipeline(&pipelines.skybox_render_pipeline);
+            // No vertex buffer; shader generates a fullscreen triangle.
+            render_pass.draw(0..3, 0..1);
+        }
+
+        // Opaque geometry before other geometry, in front-to-back order.
         // Also collect instances.
         let start_opaque_chunk_draw_time = I::now();
         let mut chunks_drawn = 0;
@@ -698,6 +732,7 @@ pub(in crate::in_wgpu) fn create_space_bind_group(
     pipelines: &Pipelines,
     block_textures: &BlockTextureViews,
     light_texture: &SpaceLightTexture,
+    skybox_texture: &wgpu::TextureView,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         layout: &pipelines.space_texture_bind_group_layout,
@@ -717,6 +752,14 @@ pub(in crate::in_wgpu) fn create_space_bind_group(
             wgpu::BindGroupEntry {
                 binding: 3,
                 resource: wgpu::BindingResource::TextureView(&block_textures.g1_emission),
+            },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: wgpu::BindingResource::TextureView(skybox_texture),
+            },
+            wgpu::BindGroupEntry {
+                binding: 5,
+                resource: wgpu::BindingResource::Sampler(&pipelines.skybox_sampler),
             },
         ],
         label: Some(&format!("{space_label} space_bind_group")),
@@ -780,13 +823,24 @@ fn update_chunk_buffers<I: time::Instant>(
 }
 
 /// [`SpaceRenderer`]'s set of things that need recomputing.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct SpaceRendererTodo {
     /// Blocks whose light texels should be updated.
     /// None means do a full space reupload.
     ///
     /// TODO: experiment with different granularities of light invalidation (chunks, dirty rects, etc.)
     light: Option<HashSet<Cube>>,
+
+    sky: bool,
+}
+
+impl SpaceRendererTodo {
+    /// Initial value to use when we're initializing or re-initializing, which indicates to
+    /// reinitialize/reupload everything.
+    pub const EVERYTHING: Self = Self {
+        light: None,
+        sky: true,
+    };
 }
 
 /// [`Listener`] adapter for [`SpaceRendererTodo`].
@@ -810,7 +864,9 @@ impl Listener<SpaceChange> for TodoListener {
             SpaceChange::CubeBlock { .. } => {}
             SpaceChange::BlockIndex(..) => {}
             SpaceChange::BlockEvaluation(..) => {}
-            SpaceChange::Physics => {}
+            SpaceChange::Physics => {
+                todo.sky = true;
+            }
         }
     }
 
@@ -839,14 +895,14 @@ impl SpaceLightTexture {
     /// Construct a new `SpaceLightTexture` for the specified size of [`Space`],
     /// with no data.
     pub fn new(label_prefix: &str, device: &wgpu::Device, bounds: GridAab) -> Self {
-        // Boundary of 1 extra cube automatically captures sky light.
+        // Boundary of 1 extra cube all around automatically captures sky light.
         let texture_bounds = bounds.expand(FaceMap {
             px: 1,
             py: 1,
             pz: 1,
-            nx: 0,
-            ny: 0,
-            nz: 0,
+            nx: 1,
+            ny: 1,
+            nz: 1,
         });
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             size: size_vector_to_extent(texture_bounds.size()),

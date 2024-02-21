@@ -3,13 +3,20 @@
 // Mirrors `struct ShaderSpaceCamera` on the Rust side.
 struct ShaderSpaceCamera {
     projection: mat4x4<f32>,
+    inverse_projection: mat4x4<f32>,
     view_matrix: mat4x4<f32>,
+    // --- 16-byte aligned point ---
     view_position: vec3<f32>,
+    exposure: f32,
+    // --- 16-byte aligned point ---
     light_lookup_offset: vec3<i32>,
     light_option: i32,
-    fog_color: vec3<f32>,
+    // --- 16-byte aligned point ---
     fog_mode_blend: f32,
-    fog_distance_and_exposure: vec4<f32>, // last two components unused
+    fog_distance: f32,
+    // pad out to multiple of 16 bytes
+    padding1: f32,
+    padding2: f32,
 };
 
 // Mirrors `struct WgpuBlockVertex` on the Rust side.
@@ -39,6 +46,8 @@ struct WgpuLinesVertex {
 @group(1) @binding(1) var block_g0_reflectance: texture_3d<f32>;
 @group(1) @binding(2) var block_g1_reflectance: texture_3d<f32>;
 @group(1) @binding(3) var block_g1_emission: texture_3d<f32>;
+@group(1) @binding(4) var skybox_texture: texture_cube<f32>;
+@group(1) @binding(5) var skybox_sampler: sampler;
 
 // --- Fog computation --------------------------------------------------------
 
@@ -76,7 +85,7 @@ fn compute_fog(world_position: vec3<f32>) -> f32 {
     // for the distance_from_eye value, which we will want to pass out (in a struct)
 
     // Distance in range 0 (camera position) to 1 (opaque fog position/far clip position).
-    let normalized_distance: f32 = distance_from_eye / camera.fog_distance_and_exposure[0];
+    let normalized_distance: f32 = distance_from_eye / camera.fog_distance;
     let fog_mix = clamp(fog_combo(normalized_distance), 0.0, 1.0);
 
     return fog_mix;
@@ -440,12 +449,18 @@ fn get_material(in: BlockFragmentInput) -> Material {
 
 // Apply the effects of distance fog and camera exposure.
 // These effects are independent of alpha and therefore the input and output is RGB.
-fn apply_fog_and_exposure(lit_color: vec3<f32>, fog_mix: f32) -> vec3<f32> {
+fn apply_fog_and_exposure(
+    lit_color: vec3<f32>,
+    fog_mix: f32,
+    view_direction: vec3<f32>,
+) -> vec3<f32> {
+
     // Fog
-    let fogged_color = mix(lit_color, camera.fog_color, fog_mix);
+    let fog_color = textureSample(skybox_texture, skybox_sampler, view_direction).rgb;
+    let fogged_color = mix(lit_color, fog_color, fog_mix);
 
     // Exposure/eye adaptation
-    let exposed_color = fogged_color.rgb * camera.fog_distance_and_exposure[1];
+    let exposed_color = fogged_color.rgb * camera.exposure;
 
     return exposed_color;
 }
@@ -485,7 +500,10 @@ fn volumetric_transparency(in: BlockFragmentInput, starting_alpha: f32) -> f32 {
 fn block_fragment_opaque(in: BlockFragmentInput) -> @location(0) vec4<f32> {
     let material = get_material(in);
     let lit_color: vec3<f32> = material.reflectance.rgb * lighting(in) + material.emission;
-    return vec4<f32>(apply_fog_and_exposure(lit_color, in.fog_mix), 1.0);
+    return vec4<f32>(
+        apply_fog_and_exposure(lit_color, in.fog_mix, in.camera_ray_direction),
+        1.0,
+    );
 }
 
 // Entry point for transparency under TransparencyOption::Surface.
@@ -493,7 +511,10 @@ fn block_fragment_opaque(in: BlockFragmentInput) -> @location(0) vec4<f32> {
 fn block_fragment_transparent_surface(in: BlockFragmentInput) -> @location(0) vec4<f32> {
     let material = get_material(in);
     let lit_color = material.reflectance * vec4(lighting(in), 1.0) + vec4(material.emission, 0.0);
-    let exposed_color = vec4<f32>(apply_fog_and_exposure(lit_color.rgb, in.fog_mix), lit_color.a);
+    let exposed_color = vec4<f32>(
+        apply_fog_and_exposure(lit_color.rgb, in.fog_mix, in.camera_ray_direction),
+        lit_color.a,
+    );
     return vec4<f32>(exposed_color.rgb * exposed_color.a, exposed_color.a);
 }
 
@@ -506,7 +527,10 @@ fn block_fragment_transparent_volumetric(in: BlockFragmentInput) -> @location(0)
     material.reflectance.a = volumetric_transparency(in, material.reflectance.a);
 
     let lit_color = material.reflectance * vec4(lighting(in), 1.0) + vec4(material.emission, 0.0);
-    let exposed_color = vec4<f32>(apply_fog_and_exposure(lit_color.rgb, in.fog_mix), lit_color.a);
+    let exposed_color = vec4<f32>(
+        apply_fog_and_exposure(lit_color.rgb, in.fog_mix, in.camera_ray_direction),
+        lit_color.a,
+    );
     return vec4<f32>(exposed_color.rgb * exposed_color.a, exposed_color.a);
 }
 
@@ -535,10 +559,50 @@ fn lines_vertex(
 
 @fragment
 fn lines_fragment(input: LinesFragmentInput) -> @location(0) vec4<f32> {
-    let color = input.color;
-    
-    // Fog
-    let fogged_color = vec4<f32>(mix(color.rgb, camera.fog_color, input.fog_mix), color.a);
+    // TODO: refactor so that the skybox data is available when drawing lines,
+    // then implement fogging. (Or maybe the skybox should be moved entirely to the
+    // postprocessing pass?)
+    return input.color;
+}
 
-    return fogged_color;
+// --- Skybox shader -----------------------------------------------------------
+
+// Vertex-to-fragment data for skybox
+struct SkyboxFragmentInput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) camera_ray_direction: vec3<f32>,
+};
+
+fn fullscreen_vertex_position(vertex_index: u32) -> vec4<f32> {
+    return vec4<f32>(
+        mix(-1.0, 3.0, f32(vertex_index == 1u)),
+        mix(-1.0, 3.0, f32(vertex_index == 2u)),
+        1.0, // make this a cube corner point
+        1.0
+    );
+}
+
+@vertex
+fn skybox_vertex(
+    @builtin(vertex_index) vertex_index: u32,
+) -> SkyboxFragmentInput {
+    // Construct the transpose (inverse) view rotation
+    // to find the ray direction starting from our NDC-space triangle points.
+    let inverse_view = transpose(mat3x3<f32>(
+        camera.view_matrix[0].xyz,
+        camera.view_matrix[1].xyz,
+        camera.view_matrix[2].xyz));
+
+    let position = fullscreen_vertex_position(vertex_index);
+
+    return SkyboxFragmentInput(
+        position,
+        inverse_view * (camera.inverse_projection * position).xyz,
+    );
+}
+
+
+@fragment
+fn skybox_fragment(in: SkyboxFragmentInput) -> @location(0) vec4<f32> {
+    return vec4<f32>(apply_fog_and_exposure(vec3(0.0), 1.0, in.camera_ray_direction), 1.0);
 }

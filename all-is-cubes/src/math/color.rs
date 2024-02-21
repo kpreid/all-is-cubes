@@ -284,7 +284,7 @@ impl Rgba {
     /// Note that if alpha is 0 then the components could be any value and yet be “hidden”
     /// by the transparency.
     #[inline]
-    pub fn to_rgb(self) -> Rgb {
+    pub const fn to_rgb(self) -> Rgb {
         self.rgb
     }
 

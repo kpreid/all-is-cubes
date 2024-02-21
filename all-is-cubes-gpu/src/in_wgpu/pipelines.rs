@@ -50,6 +50,10 @@ pub(crate) struct Pipelines {
     /// Pipeline for drawing transparent (alpha ≠ 1) blocks.
     pub(crate) transparent_render_pipeline: wgpu::RenderPipeline,
 
+    /// Pipeline for drawing the skybox; similar to the block pipelines, but generates its own
+    /// geometry instead of using vertex buffers.
+    pub(crate) skybox_render_pipeline: wgpu::RenderPipeline,
+
     /// Bind group layout for the `frame-copy` shader's inputs.
     pub(crate) frame_copy_layout: wgpu::BindGroupLayout,
 
@@ -66,6 +70,9 @@ pub(crate) struct Pipelines {
 
     /// A sampler configured for linear, non-mipmapped sampling, for use in resampling frames.
     pub(crate) linear_sampler: wgpu::Sampler,
+
+    /// A sampler configured for rendering the `SpaceRenderer`'s skybox texture.
+    pub(crate) skybox_sampler: wgpu::Sampler,
 }
 
 /// Shader code for rendering `Space` content, and debug lines.
@@ -136,6 +143,24 @@ impl Pipelines {
                     block_texture_entry(1), // group 0 reflectivity
                     block_texture_entry(2), // group 1 reflectivity
                     block_texture_entry(3), // group 1 emission
+                    // Skybox texture
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::Cube,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    // Skybox sampler
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 5,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
                 ],
                 label: Some("Pipelines::space_texture_bind_group_layout"),
             });
@@ -249,6 +274,39 @@ impl Pipelines {
                     // opaque geometry obscures all transparent geometry behind it.
                     depth_write_enabled: false,
                     depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample,
+                multiview: None,
+            });
+
+        let skybox_render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Pipelines::skybox_render_pipeline"),
+                layout: Some(&block_render_pipeline_layout),
+                // The skybox entry points are in the blocks shader because the fog
+                // uses the skybox texture too.
+                vertex: wgpu::VertexState {
+                    module: &blocks_and_lines_shader,
+                    entry_point: "skybox_vertex",
+                    buffers: &[],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &blocks_and_lines_shader,
+                    entry_point: "skybox_fragment",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: fb.linear_scene_texture_format(),
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: block_primitive_state,
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: FramebufferTextures::DEPTH_FORMAT,
+                    // Skybox does not use depth
+                    depth_write_enabled: false,
+                    depth_compare: wgpu::CompareFunction::Always,
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
@@ -448,6 +506,13 @@ impl Pipelines {
             ..Default::default()
         });
 
+        let skybox_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Pipelines::skybox_sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+
         let dirty = DirtyFlag::new(false);
         BLOCKS_AND_LINES_SHADER.as_source().listen(dirty.listener());
         FRAME_COPY_SHADER.as_source().listen(dirty.listener());
@@ -463,6 +528,7 @@ impl Pipelines {
             block_render_pipeline_layout,
             opaque_render_pipeline,
             transparent_render_pipeline,
+            skybox_render_pipeline,
             lines_render_pipeline,
             frame_copy_layout,
             frame_copy_pipeline,
@@ -471,6 +537,7 @@ impl Pipelines {
             #[cfg(feature = "rerun")]
             rerun_copy_pipeline,
             linear_sampler,
+            skybox_sampler,
         }
     }
 
