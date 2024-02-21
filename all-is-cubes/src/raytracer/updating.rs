@@ -210,6 +210,7 @@ impl Listener<SpaceChange> for TodoListener {
             SpaceChange::BlockIndex(index) | SpaceChange::BlockEvaluation(index) => {
                 todo.blocks.insert(index);
             }
+            SpaceChange::Physics => {}
         }
     }
 

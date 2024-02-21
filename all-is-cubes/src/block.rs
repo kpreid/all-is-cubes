@@ -521,11 +521,12 @@ impl Block {
                             // in an unaffected area" without needing to store any data.
                             SpaceChange::BlockEvaluation(_) => Some(BlockChange::new()),
 
-                            // Light does not matter.
-                            SpaceChange::CubeLight { .. } => None,
-
                             // Index changes by themselves cannot affect the result.
                             SpaceChange::BlockIndex(_) => None,
+
+                            // Things that do not matter.
+                            SpaceChange::CubeLight { .. } => None,
+                            SpaceChange::Physics => None,
                         }
                     }));
                 }

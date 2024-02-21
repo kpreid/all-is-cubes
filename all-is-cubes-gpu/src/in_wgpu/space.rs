@@ -810,6 +810,7 @@ impl Listener<SpaceChange> for TodoListener {
             SpaceChange::CubeBlock { .. } => {}
             SpaceChange::BlockIndex(..) => {}
             SpaceChange::BlockEvaluation(..) => {}
+            SpaceChange::Physics => {}
         }
     }
 

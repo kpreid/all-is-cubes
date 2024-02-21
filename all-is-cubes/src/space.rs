@@ -683,8 +683,12 @@ impl Space {
 
     /// Sets the physics parameters, as per [`physics`](Self::physics).
     ///
-    /// This may cause recomputation of lighting.
+    /// This may cause immediate recomputation of lighting.
     pub fn set_physics(&mut self, physics: SpacePhysics) {
+        if physics == self.physics {
+            return;
+        }
+
         self.physics = physics;
         let physics = self.physics.clone(); // TODO: put physics in UpdateCtx?
         let (light, uc) = self.borrow_light_update_context();
@@ -692,9 +696,9 @@ impl Space {
             uc,
             &physics,
             uc.palette.all_block_opacities_as_category(),
-        )
+        );
 
-        // TODO: Also send out a SpaceChange notification, if anything is different.
+        self.change_notifier.notify(SpaceChange::Physics);
     }
 
     /// Returns the current default [`Spawn`], which determines where new [`Character`]s
@@ -1063,6 +1067,9 @@ pub enum SpaceChange {
     /// This should be understood as equivalent to [`SpaceChange::CubeBlock`] for every cube
     /// and [`SpaceChange::BlockIndex`] for every index.
     EveryBlock,
+
+    /// The associated [`SpacePhysics`] was changed.
+    Physics,
 }
 
 /// [`Fluff`] happening at a point in space.

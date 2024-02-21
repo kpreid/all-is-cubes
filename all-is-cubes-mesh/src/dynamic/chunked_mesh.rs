@@ -721,6 +721,7 @@ impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CH
                     todo.blocks.insert(index);
                 }
             }
+            SpaceChange::Physics => {}
         }
     }
 

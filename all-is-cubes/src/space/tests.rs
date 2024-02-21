@@ -7,6 +7,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::num::NonZeroU16;
 
+use euclid::Vector3D;
 use indoc::indoc;
 
 use crate::block::{
@@ -540,6 +541,22 @@ fn set_physics_light_rays() {
     assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(space.light.light_update_queue.len(), 1);
     // TODO: test what change notifications are sent
+}
+
+#[test]
+fn set_physics_notification() {
+    let mut space = Space::empty_positive(1, 1, 1);
+    let sink = Sink::new();
+    space.listen(sink.listener());
+
+    space.set_physics(space.physics.clone());
+    assert_eq!(sink.drain(), vec![]);
+
+    space.set_physics(SpacePhysics {
+        gravity: Vector3D::zero(),
+        ..SpacePhysics::default()
+    });
+    assert_eq!(sink.drain(), vec![SpaceChange::Physics]);
 }
 
 #[test]
