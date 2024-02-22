@@ -1,7 +1,7 @@
 use euclid::point3;
 
 use crate::content::palette;
-use crate::math::{Cube, Face6, FaceMap, FreeVector, GridAab, Rgb};
+use crate::math::{Cube, Face6, FaceMap, FreeVector, GridAab, Rgb, VectorOps};
 use crate::space::PackedLight;
 
 #[cfg(doc)]
@@ -106,15 +106,14 @@ impl BlockSky {
     /// Panics if `cube` is not on the surface of `bounds`.
     #[track_caller]
     pub fn light_outside(&self, bounds: GridAab, cube: Cube) -> PackedLight {
-        let lb = bounds.lower_bounds();
-        let ub = bounds.upper_bounds();
-        let nx = cube.x == lb.x - 1;
-        let ny = cube.y == lb.y - 1;
-        let nz = cube.z == lb.z - 1;
-        let px = cube.x == ub.x;
-        let py = cube.y == ub.y;
-        let pz = cube.z == ub.z;
-        match (nx, ny, nz, px, py, pz) {
+        // Note: cube.upper_bounds() is defined to be maybe panicking, so we can't use it.
+        let lower = bounds
+            .lower_bounds()
+            .zip(cube.lower_bounds(), |bl, cl| bl.checked_sub(cl) == Some(1));
+        let upper = bounds
+            .upper_bounds()
+            .zip(cube.lower_bounds(), |bu, cl| bu == cl);
+        match (lower.x, lower.y, lower.z, upper.x, upper.y, upper.z) {
             (true, false, false, false, false, false) => self.faces.nx,
             (false, true, false, false, false, false) => self.faces.ny,
             (false, false, true, false, false, false) => self.faces.nz,
