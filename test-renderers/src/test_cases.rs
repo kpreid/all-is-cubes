@@ -6,6 +6,7 @@ use std::future::Future;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use exhaust::Exhaust as _;
 use futures_core::future::BoxFuture;
 use futures_util::FutureExt;
 
@@ -19,10 +20,10 @@ use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::euclid::{point3, vec2, vec3, Point2D, Vector2D, Vector3D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector,
-    NotNan, Rgb, Rgba, VectorOps, Vol,
+    Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
+    GridVector, NotNan, Rgb, Rgba, VectorOps, Vol,
 };
-use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder};
+use all_is_cubes::space::{self, LightPhysics, Space, SpaceBuilder};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{RefError, URef, Universe, UniverseTransaction};
@@ -92,7 +93,8 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         ],
     );
     c.insert("no_update", None, no_update);
-    c.insert("sky_and_info_text", None, sky_and_info_text);
+    c.insert_variants("sky", None, sky, Face6::exhaust());
+    c.insert("info_text", None, info_text);
     c.insert_variants(
         "template",
         None,
@@ -466,6 +468,29 @@ async fn follow_options_change(mut context: RenderTestContext) {
         .await;
 }
 
+async fn info_text(mut context: RenderTestContext) {
+    let mut universe = Universe::new();
+    let space = Space::builder(GridAab::ORIGIN_CUBE)
+        // This used to also be a test of setting sky
+        .sky_color(rgb_const!(1.0, 0.5, 0.0))
+        .build();
+    finish_universe_from_space(&mut universe, space);
+    let overlays = Overlays {
+        cursor: None,
+        info_text: Some(
+            "\
+            +-------------+\n\
+            | Hello world |\n\
+            +-------------+\n\
+            ",
+        ),
+    };
+
+    context
+        .render_comparison_test(TEXT_MAX_DIFF, &universe, overlays)
+        .await;
+}
+
 /// Display some of the [`Icons`] and [`UiBlocks`].
 ///
 /// This is more of a content test than a renderer test, except that it also
@@ -744,26 +769,50 @@ async fn no_update(mut context: RenderTestContext) {
         .await;
 }
 
-/// Test (1) an explicitly set sky color, and (2) the info text rendering.
-async fn sky_and_info_text(mut context: RenderTestContext) {
+async fn sky(mut context: RenderTestContext, face: Face6) {
+    // The face passed is the face of the sky we are *looking at*.
+
     let mut universe = Universe::new();
-    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
-        .sky_color(rgb_const!(1.0, 0.5, 0.0))
+    let [block] = make_some_voxel_blocks(&mut universe);
+
+    let [r, g, b] = [
+        palette::UNIFORM_LUMINANCE_RED,
+        palette::UNIFORM_LUMINANCE_GREEN,
+        palette::UNIFORM_LUMINANCE_BLUE,
+    ];
+    // axis-colored sky (+x has red and -x has no red, and so on) to disambiguate
+    // all directions
+    let sky = space::Sky::Octants([Rgb::ZERO, b, g, g + b, r, r + b, r + g, r + g + b]);
+
+    let space = Space::builder(GridAab::ORIGIN_CUBE)
+        .sky(sky)
+        .filled_with(block)
+        .spawn({
+            let transform = face.opposite().face_transform(1).to_matrix().to_free();
+            let mut eye_position = transform.transform_point3d(point3(0.5, 0.5, -1.5)).unwrap();
+            // tilt the view a little
+            if face.axis() == Axis::Y {
+                eye_position.z -= 0.25;
+            } else {
+                eye_position.y += 0.25;
+            }
+
+            let mut spawn = Spawn::default_for_new_space(GridAab::ORIGIN_CUBE);
+            spawn.set_eye_position(eye_position);
+            // look back at the cube, wherever we put the eye
+            spawn.set_look_direction(point3(0.5, 0.5, 0.5) - eye_position);
+            spawn
+        })
         .build();
     finish_universe_from_space(&mut universe, space);
-    let overlays = Overlays {
-        cursor: None,
-        info_text: Some(
-            "\
-            +-------------+\n\
-            | Hello world |\n\
-            +-------------+\n\
-            ",
-        ),
-    };
+
+    // Enable lighting so that we can see the "reflected" sky light.
+    let mut options = GraphicsOptions::UNALTERED_COLORS;
+    options.lighting_display = LightingOption::Smooth;
+    let scene = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
 
     context
-        .render_comparison_test(TEXT_MAX_DIFF, &universe, overlays)
+        .render_comparison_test(4, scene, Overlays::NONE)
         .await;
 }
 
@@ -931,7 +980,7 @@ const TEXT_MAX_DIFF: u8 = 20;
 const COLOR_ROUNDING_MAX_DIFF: u8 = 2;
 
 fn one_cube_space() -> Space {
-    let bounds = GridAab::from_lower_size([0, 0, 0], [1, 1, 1]);
+    let bounds = GridAab::ORIGIN_CUBE;
 
     Space::builder(bounds)
         .sky_color(rgb_const!(0.5, 0.5, 0.5))
