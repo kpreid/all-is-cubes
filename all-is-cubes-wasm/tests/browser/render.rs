@@ -8,8 +8,9 @@ use std::sync::Arc;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use all_is_cubes::camera::{GraphicsOptions, HeadlessRenderer as _, StandardCameras, Viewport};
+use all_is_cubes::euclid::vec3;
 use all_is_cubes::util::yield_progress_for_testing;
-use all_is_cubes_content::{palette, TemplateParameters, UniverseTemplate};
+use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 use all_is_cubes_gpu::in_wgpu::init;
 
 #[wasm_bindgen_test]
@@ -32,17 +33,24 @@ async fn renderer_test() {
         Viewport::with_scale(1.0, [256, 256]),
         &universe,
     );
+    let world_space = cameras.world_space().snapshot().unwrap();
 
     let mut renderer =
         all_is_cubes_gpu::in_wgpu::headless::Builder::from_adapter(Arc::new(adapter))
             .await
             .unwrap()
-            .build(cameras);
+            .build(cameras.clone());
     renderer.update(None).await.unwrap();
     let image = renderer.draw("").await.unwrap();
 
-    assert_eq!(
-        image.data[0],
-        palette::DAY_SKY_COLOR.with_alpha_one().to_srgb8()
-    );
+    // TODO: hook up a full image comparison here
+    let expected_pixel = world_space
+        .read()
+        .unwrap()
+        .physics()
+        .sky
+        .sample(vec3(-1.0, 1.0, -1.0))
+        .with_alpha_one()
+        .to_srgb8();
+    assert_eq!(image.data[0], expected_pixel);
 }

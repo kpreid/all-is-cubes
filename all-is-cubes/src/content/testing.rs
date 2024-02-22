@@ -3,7 +3,7 @@ use rand_xoshiro::Xoshiro256Plus;
 
 use crate::block::{Block, AIR};
 use crate::character::Spawn;
-use crate::content::free_editing_starter_inventory;
+use crate::content::{free_editing_starter_inventory, palette};
 use crate::linking::InGenError;
 use crate::math::{Face6, FaceMap, GridAab, GridVector, Rgba};
 use crate::space::{LightPhysics, Space, SpacePhysics};
@@ -141,6 +141,17 @@ pub async fn lighting_bench_space(
     space.set_physics(SpacePhysics {
         light: LightPhysics::Rays {
             maximum_distance: space_bounds.size().x.max(space_bounds.size().z) as _,
+        },
+        sky: {
+            let sky_ground = palette::ALMOST_BLACK;
+            let sky_bright = palette::DAY_SKY_COLOR * 2.0;
+            let sky_dim = palette::DAY_SKY_COLOR * 0.5;
+            crate::space::Sky::Octants([
+                //       Y down ------------------ Y up
+                // Z forward - Z back
+                sky_ground, sky_ground, sky_bright, sky_bright, // X left
+                sky_ground, sky_ground, sky_dim, sky_dim, // X right
+            ])
         },
         ..SpacePhysics::default()
     });
