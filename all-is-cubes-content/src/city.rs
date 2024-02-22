@@ -21,7 +21,7 @@ use all_is_cubes::math::{
     Gridgid,
 };
 use all_is_cubes::raycast::Raycaster;
-use all_is_cubes::space::{self, LightPhysics, Space, SpaceBuilder, SpacePhysics};
+use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder, SpacePhysics};
 use all_is_cubes::time::Instant;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::Universe;
@@ -83,19 +83,9 @@ pub(crate) async fn demo_city<I: Instant>(
 
     let mut planner = CityPlanner::new(bounds);
 
-    let sky = {
-        // color of uniformly sky- lit grass
-        let ground = palette::GRASS * palette::DAY_SKY_COLOR;
-        let sky = palette::DAY_SKY_COLOR;
-        space::Sky::Octants([
-            ground, ground, sky, sky, //
-            ground, ground, sky, sky, //
-        ])
-    };
-
     // Construct space.
     let mut space = Space::builder(bounds)
-        .sky(sky)
+        .sky(crate::landscape::sky_with_grass(palette::DAY_SKY_COLOR))
         .light_physics(LightPhysics::None) // disable until we are done with bulk updates
         .spawn({
             // TODO: Add incremental spawn configuration to SpaceBuilder?

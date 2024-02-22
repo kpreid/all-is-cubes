@@ -13,6 +13,7 @@ use all_is_cubes::block::{
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{Cube, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb};
 use all_is_cubes::notnan;
+use all_is_cubes::space::Sky;
 use all_is_cubes::space::{SetCubeError, Space};
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
@@ -408,4 +409,13 @@ pub(crate) fn grass_placement_function(seed: u32) -> impl Fn(Cube) -> Option<Gra
     .set_scale(0.25);
 
     move |cube| GrassHeight::from_int(grass_noise.at_cube(cube) as u8)
+}
+
+/// Sky whose lower half pretends to be a grassy plane.
+pub(crate) fn sky_with_grass(sky_color: Rgb) -> Sky {
+    let ground = palette::GRASS * sky_color;
+    Sky::Octants([
+        ground, ground, sky_color, sky_color, //
+        ground, ground, sky_color, sky_color, //
+    ])
 }

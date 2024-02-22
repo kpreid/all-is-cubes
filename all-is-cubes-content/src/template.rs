@@ -9,7 +9,6 @@ use paste::paste;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::character::{Character, Spawn};
-use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
@@ -25,6 +24,7 @@ use all_is_cubes::{time, transaction};
 use crate::fractal::menger_sponge;
 use crate::menu::template_menu;
 use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_blocks};
+use crate::{free_editing_starter_inventory, palette};
 use crate::{wavy_landscape, LandscapeBlocks};
 
 /// Generate a `#[test]` function for each element of [`UniverseTemplate`].
@@ -320,6 +320,7 @@ async fn islands(
     let bounds = GridAab::from_lower_size([size.x / -2, size.y / -2, size.z], size);
 
     let mut space = Space::builder(bounds)
+        .sky_color(palette::DAY_SKY_COLOR)
         .spawn({
             let mut spawn = Spawn::default_for_new_space(bounds);
             spawn.set_inventory(free_editing_starter_inventory(true));

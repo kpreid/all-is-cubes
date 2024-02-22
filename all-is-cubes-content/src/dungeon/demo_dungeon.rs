@@ -470,7 +470,9 @@ pub(crate) async fn demo_dungeon(
             .minimum_space_for_rooms(dungeon_map.bounds())
             .expand(FaceMap::symmetric([perimeter_margin, 1, perimeter_margin]));
         let mut space = Space::builder(space_bounds)
-            .sky_color(palette::DAY_SKY_COLOR * 2.0)
+            .sky(crate::landscape::sky_with_grass(
+                palette::DAY_SKY_COLOR * 2.0,
+            ))
             .light_physics(LightPhysics::None) // temporary
             .build();
 
