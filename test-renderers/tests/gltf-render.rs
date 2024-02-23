@@ -11,8 +11,7 @@ use clap::Parser as _;
 use futures_core::future::BoxFuture;
 
 use all_is_cubes::camera::{Flaws, HeadlessRenderer, RenderError, StandardCameras};
-use all_is_cubes::math::Rgb;
-use all_is_cubes::space::Space;
+use all_is_cubes::space::{Sky, Space};
 use all_is_cubes::universe::URef;
 use all_is_cubes_content::palette;
 use all_is_cubes_port as port;
@@ -93,7 +92,7 @@ impl RendererFactory for GltfFactory {
             gltf_output: None,
             renderer,
             cameras,
-            sky_color: palette::NO_WORLD_TO_SHOW.to_rgb(),
+            sky: Sky::Uniform(palette::NO_WORLD_TO_SHOW.to_rgb()),
             base_rendergraph,
             pbr_routine,
             tonemapping_routine,
@@ -112,7 +111,7 @@ struct GltfRend3Renderer {
 
     cameras: StandardCameras,
     renderer: Arc<rend3::Renderer>,
-    sky_color: Rgb,
+    sky: Sky,
 
     base_rendergraph: rend3_routine::base::BaseRenderGraph,
     pbr_routine: rend3_routine::pbr::PbrRoutine,
@@ -164,7 +163,7 @@ impl GltfRend3Renderer {
         }
     }
 
-    fn render_to_rend3(&mut self, frame_texture: &wgpu::Texture, sky_color: Rgb) {
+    fn render_to_rend3(&mut self, frame_texture: &wgpu::Texture) {
         let renderer = &mut self.renderer;
         let size = glam::UVec2 {
             x: frame_texture.width(),
@@ -202,7 +201,8 @@ impl GltfRend3Renderer {
                 // just use white ambient lighting to obtain LightingOption::None-like behavior
                 // TODO: Put that in [`Flaws`].
                 ambient_color: glam::Vec4::splat(1.0),
-                clear_color: glam::Vec4::from(<[f32; 4]>::from(sky_color.with_alpha_one())),
+                // TODO: create skybox object
+                clear_color: glam::Vec4::from(<[f32; 4]>::from(self.sky.mean().with_alpha_one())),
             },
         );
 
@@ -222,10 +222,10 @@ impl HeadlessRenderer for GltfRend3Renderer {
             let world_space: Option<URef<Space>> = self.cameras.world_space().snapshot();
             let gltf_path = self.gltf_dir.path().join("scene.gltf");
 
-            self.sky_color = {
+            self.sky = {
                 match &world_space {
-                    Some(sp) => sp.read().map_err(RenderError::Read)?.physics().sky_color,
-                    None => palette::NO_WORLD_TO_SHOW.to_rgb(),
+                    Some(sp) => sp.read().map_err(RenderError::Read)?.physics().sky.clone(),
+                    None => Sky::Uniform(palette::NO_WORLD_TO_SHOW.to_rgb()),
                 }
             };
 
@@ -298,7 +298,7 @@ impl HeadlessRenderer for GltfRend3Renderer {
                     usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
                 });
 
-            self.render_to_rend3(&frame_texture, self.sky_color);
+            self.render_to_rend3(&frame_texture);
 
             let rendering = all_is_cubes_gpu::in_wgpu::init::get_image_from_gpu(
                 self.renderer.device.clone(),
