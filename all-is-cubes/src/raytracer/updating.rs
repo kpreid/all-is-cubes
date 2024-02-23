@@ -228,7 +228,7 @@ mod tests {
     use crate::content::make_some_voxel_blocks;
     use crate::raytracer::{CharacterBuf, CharacterRtData};
     use crate::universe::Universe;
-    use euclid::{vec2, vec3};
+    use euclid::{size2, vec3};
     use manyfmt::{formats::Unquote, Refmt};
     use pretty_assertions::assert_eq;
 
@@ -251,8 +251,8 @@ mod tests {
             let mut camera = Camera::new(
                 graphics_options.snapshot(),
                 Viewport {
-                    nominal_size: vec2(72., 72.),
-                    framebuffer_size: vec2(72, 36),
+                    nominal_size: size2(72., 72.),
+                    framebuffer_size: size2(72, 36),
                 },
             );
             camera.look_at_y_up(eye_for_look_at(bounds, vec3(0., 0., 1.)), bounds.center());

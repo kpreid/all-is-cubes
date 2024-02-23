@@ -10,7 +10,7 @@ use anyhow::Context;
 use clap::{CommandFactory as _, Parser as _};
 
 use all_is_cubes::camera::{GraphicsOptions, Viewport};
-use all_is_cubes::euclid::Vector2D;
+use all_is_cubes::euclid::Size2D;
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::math::VectorOps;
 
@@ -97,7 +97,7 @@ fn main() -> Result<(), anyhow::Error> {
     // this is mostly confined to initialization.
     let viewport_cell = ListenableCell::new(Viewport::with_scale(
         1.0,
-        display_size.unwrap_or_else(Vector2D::zero).cast_unit(),
+        display_size.unwrap_or_else(Size2D::zero).cast_unit(),
     ));
 
     let start_session_time = Instant::now();
@@ -205,7 +205,7 @@ fn main() -> Result<(), anyhow::Error> {
                         // TODO: Default display size should be based on terminal width
                         // (but not necessarily the full height)
                         display_size
-                            .unwrap_or_else(|| Vector2D::new(80, 24))
+                            .unwrap_or_else(|| Size2D::new(80, 24))
                             .map(|component| component.min(u16::MAX.into()) as u16)
                             .cast_unit(),
                     )

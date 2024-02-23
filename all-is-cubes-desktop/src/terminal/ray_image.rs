@@ -46,7 +46,7 @@ impl TextRayImage {
     ) -> [[&TextAndColor; W]; H] {
         let patch_size = self.patch_size().map(usize::from);
         let data: &[TextAndColor] = &self.image;
-        let image_row_length = usize::try_from(self.viewport.framebuffer_size.x).unwrap();
+        let image_row_length = usize::try_from(self.viewport.framebuffer_size.width).unwrap();
         let base_image_pos = character_position.component_mul(patch_size);
 
         assert!(

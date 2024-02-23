@@ -17,7 +17,7 @@ use all_is_cubes::camera::{
     ViewTransform, Viewport,
 };
 use all_is_cubes::character::{Character, Spawn};
-use all_is_cubes::euclid::{point3, vec2, vec3, Point2D, Vector2D, Vector3D};
+use all_is_cubes::euclid::{point3, size2, vec2, vec3, Point2D, Vector2D, Vector3D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
     Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
@@ -927,7 +927,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
         .draw(overlays.info_text.as_ref().unwrap())
         .await
         .unwrap();
-    assert_eq!(image.size, vec2(0, 0));
+    assert_eq!(image.size, size2(0, 0));
 
     // Now confirm the renderer can produce an okay image afterward
     viewport_cell.set(COMMON_VIEWPORT);
@@ -942,7 +942,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
         .draw(overlays.info_text.as_ref().unwrap())
         .await
         .unwrap();
-    assert_eq!(image.size, vec2(0, 0));
+    assert_eq!(image.size, size2(0, 0));
     viewport_cell.set(COMMON_VIEWPORT);
     context
         .render_comparison_test_with_renderer(TEXT_MAX_DIFF, &mut renderer, overlays)

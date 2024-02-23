@@ -2,7 +2,7 @@
 //! raycasting into the scene, etc.
 
 use euclid::{
-    point3, vec3, Angle, Point2D, Point3D, RigidTransform3D, Rotation3D, Transform3D, Vector2D,
+    point3, vec3, Angle, Point2D, Point3D, RigidTransform3D, Rotation3D, Size2D, Transform3D,
 };
 use itertools::Itertools as _;
 use num_traits::One;
@@ -439,11 +439,9 @@ pub type NdcPoint3 = Point3D<f64, Ndc>;
 /// image pixels.
 ///
 /// For sizes that are in nominal, or “logical” pixel units that have become separated from
-/// actual image or display resolution, use `Vector2D<T, NominalPixel>`; there is no type
+/// actual image or display resolution, use `Size2D<T, NominalPixel>`; there is no type
 /// alias for that.
-///
-/// TODO: euclid has a `Size2D` type. Try switching to that.
-pub type ImageSize = Vector2D<u32, ImagePixel>;
+pub type ImageSize = Size2D<u32, ImagePixel>;
 
 /// Viewport dimensions for rendering and UI layout with the correct resolution and
 /// aspect ratio.
@@ -452,7 +450,7 @@ pub type ImageSize = Vector2D<u32, ImagePixel>;
 pub struct Viewport {
     /// Viewport dimensions to use for determining aspect ratio and interpreting
     /// pointer events.
-    pub nominal_size: Vector2D<FreeCoordinate, NominalPixel>,
+    pub nominal_size: Size2D<FreeCoordinate, NominalPixel>,
     /// Viewport dimensions to use for framebuffer configuration.
     /// This aspect ratio may differ to represent non-square pixels.
     pub framebuffer_size: ImageSize,
@@ -467,7 +465,7 @@ impl Viewport {
     /// `scale_factor`.
     pub fn with_scale(
         scale_factor: f64,
-        framebuffer_size: impl Into<Vector2D<u32, ImagePixel>>,
+        framebuffer_size: impl Into<Size2D<u32, ImagePixel>>,
     ) -> Self {
         let framebuffer_size = framebuffer_size.into();
         Self {
@@ -480,8 +478,8 @@ impl Viewport {
     /// but do not care about its effects.
     #[doc(hidden)]
     pub const ARBITRARY: Viewport = Viewport {
-        nominal_size: Vector2D::new(2.0, 2.0),
-        framebuffer_size: Vector2D::new(2, 2),
+        nominal_size: Size2D::new(2.0, 2.0),
+        framebuffer_size: Size2D::new(2, 2),
     };
 
     /// Calculates the aspect ratio (width divided by height) of the `nominal_size` of this
@@ -492,7 +490,7 @@ impl Viewport {
     /// contain no pixels.
     #[inline]
     pub fn nominal_aspect_ratio(&self) -> FreeCoordinate {
-        let ratio = self.nominal_size.x / self.nominal_size.y;
+        let ratio = self.nominal_size.width / self.nominal_size.height;
         if ratio.is_finite() {
             ratio
         } else {
@@ -504,28 +502,29 @@ impl Viewport {
     /// to OpenGL normalized device coordinates, range -1 to 1 (at pixel centers).
     #[inline]
     pub fn normalize_fb_x(&self, x: usize) -> FreeCoordinate {
-        (x as FreeCoordinate + 0.5) / FreeCoordinate::from(self.framebuffer_size.x) * 2.0 - 1.0
+        (x as FreeCoordinate + 0.5) / FreeCoordinate::from(self.framebuffer_size.width) * 2.0 - 1.0
     }
 
     /// Convert a *y* coordinate from the range `0..self.framebuffer_size.y` (upper exclusive)
     /// to OpenGL normalized device coordinates, range -1 to 1 (at pixel centers) and flipped.
     #[inline]
     pub fn normalize_fb_y(&self, y: usize) -> FreeCoordinate {
-        -((y as FreeCoordinate + 0.5) / FreeCoordinate::from(self.framebuffer_size.y) * 2.0 - 1.0)
+        -((y as FreeCoordinate + 0.5) / FreeCoordinate::from(self.framebuffer_size.height) * 2.0
+            - 1.0)
     }
 
     /// Convert an *x* coordinate from the range `0..=self.framebuffer_size.x` (inclusive)
     /// to OpenGL normalized device coordinates, range -1 to 1 (at pixel *edges*).
     #[inline]
     pub fn normalize_fb_x_edge(&self, x: usize) -> FreeCoordinate {
-        (x as FreeCoordinate) / FreeCoordinate::from(self.framebuffer_size.x) * 2.0 - 1.0
+        (x as FreeCoordinate) / FreeCoordinate::from(self.framebuffer_size.width) * 2.0 - 1.0
     }
 
     /// Convert a *y* coordinate from the range `0..=self.framebuffer_size.y` (inclusive)
     /// to OpenGL normalized device coordinates, range -1 to 1 (at pixel *edges*) and flipped.
     #[inline]
     pub fn normalize_fb_y_edge(&self, y: usize) -> FreeCoordinate {
-        -((y as FreeCoordinate) / FreeCoordinate::from(self.framebuffer_size.y) * 2.0 - 1.0)
+        -((y as FreeCoordinate) / FreeCoordinate::from(self.framebuffer_size.height) * 2.0 - 1.0)
     }
 
     /// Convert a point in the [`Self::nominal_size`] coordinate system to
@@ -535,8 +534,8 @@ impl Viewport {
     #[inline]
     pub fn normalize_nominal_point(&self, nominal_point: Point2D<f64, NominalPixel>) -> NdcPoint2 {
         Point2D::new(
-            (nominal_point.x + 0.5) / self.nominal_size.x * 2.0 - 1.0,
-            -((nominal_point.y + 0.5) / self.nominal_size.y * 2.0 - 1.0),
+            (nominal_point.x + 0.5) / self.nominal_size.width * 2.0 - 1.0,
+            -((nominal_point.y + 0.5) / self.nominal_size.height * 2.0 - 1.0),
         )
     }
 
@@ -548,7 +547,7 @@ impl Viewport {
     ///
     /// Ignores `self.nominal_size`.
     pub fn is_empty(&self) -> bool {
-        self.framebuffer_size.x == 0 || self.framebuffer_size.y == 0
+        self.framebuffer_size.width == 0 || self.framebuffer_size.height == 0
     }
 
     /// Computes the number of pixels in the framebuffer.
@@ -556,8 +555,8 @@ impl Viewport {
     ///
     /// Whenever [`Viewport::is_empty()`] returns `true`, this returns `Some(0)`.
     pub fn pixel_count(&self) -> Option<usize> {
-        let w: usize = self.framebuffer_size.x.try_into().ok()?;
-        let h: usize = self.framebuffer_size.y.try_into().ok()?;
+        let w: usize = self.framebuffer_size.width.try_into().ok()?;
+        let h: usize = self.framebuffer_size.height.try_into().ok()?;
         w.checked_mul(h)
     }
 
@@ -570,8 +569,8 @@ impl Viewport {
 impl<'a> arbitrary::Arbitrary<'a> for Viewport {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Viewport {
-            nominal_size: Vector2D::new(u.arbitrary()?, u.arbitrary()?),
-            framebuffer_size: Vector2D::new(u.arbitrary()?, u.arbitrary()?),
+            nominal_size: Size2D::new(u.arbitrary()?, u.arbitrary()?),
+            framebuffer_size: Size2D::new(u.arbitrary()?, u.arbitrary()?),
         })
     }
 

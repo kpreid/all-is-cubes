@@ -286,7 +286,8 @@ mod tests {
     use super::*;
     use crate::terminal::{TerminalOptions, TextAndColor};
     use all_is_cubes::camera::{ImageSize, Viewport};
-    use all_is_cubes::euclid::vec2;
+    use all_is_cubes::euclid::size2;
+    use all_is_cubes::math::area_usize;
     use all_is_cubes::raytracer::RaytraceInfo;
 
     fn test_image(
@@ -300,7 +301,7 @@ mod tests {
             .map(|c| c.to_string())
             .zip(colors.into_iter().map(Some))
             .collect();
-        assert!(dimensions.x as usize * dimensions.y as usize == image.len());
+        assert_eq!(area_usize(dimensions), Some(image.len()));
         TextRayImage {
             viewport: Viewport::with_scale(1.0, dimensions), // scale is ignored
             options,
@@ -313,7 +314,7 @@ mod tests {
     /// ignoring colors.
     fn get_row(image: &TextRayImage, y: usize) -> String {
         //let reset = Colors::new(Color::Reset, Color::Reset);
-        (0..image.viewport.framebuffer_size.x as usize)
+        (0..image.viewport.framebuffer_size.width as usize)
             .map(|x| {
                 let (text, _color) = image_patch_to_character(image, Vector2D::new(x, y));
                 //assert_eq!(color, reset);
@@ -335,7 +336,7 @@ mod tests {
             .map(|v| Rgba::from_luminance(v / 5.0));
         let image = &test_image(
             mode_no_color(CharacterMode::Shades),
-            vec2(colors.len() as u32, 1),
+            size2(colors.len() as u32, 1),
             std::iter::repeat('*'),
             colors,
         );
@@ -349,7 +350,7 @@ mod tests {
             .map(|v| Rgba::from_luminance(v / 5.0));
         let image = &test_image(
             mode_no_color(CharacterMode::Split),
-            vec2(colors.len() as u32, 2),
+            size2(colors.len() as u32, 2),
             std::iter::repeat('*'),
             colors.into_iter().chain(colors), // 2 rows of same color
         );
@@ -363,7 +364,7 @@ mod tests {
             .map(|v| Rgba::from_luminance(v / 5.0));
         let image = &test_image(
             mode_no_color(CharacterMode::Shapes),
-            vec2(colors.len() as u32, 2),
+            size2(colors.len() as u32, 2),
             std::iter::repeat('*'),
             colors.into_iter().chain(colors), // 2 rows of same color
         );
@@ -377,7 +378,7 @@ mod tests {
             .map(|v| Rgba::from_luminance(v / 5.0));
         let image = &test_image(
             mode_no_color(CharacterMode::Shapes),
-            vec2(colors.len() as u32, 2),
+            size2(colors.len() as u32, 2),
             std::iter::repeat('*'),
             [Rgba::BLACK; 10].into_iter().chain(colors), // black above ramp
         );

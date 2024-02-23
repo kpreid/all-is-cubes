@@ -12,7 +12,7 @@ use all_is_cubes::camera::{info_text_drawable, Layers, RenderMethod, StandardCam
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Gray8, Drawable};
-use all_is_cubes::euclid::Vector2D;
+use all_is_cubes::euclid::Size2D;
 use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::math::VectorOps;
 use all_is_cubes::notnan;
@@ -343,8 +343,8 @@ impl<I: time::Instant> EverythingRenderer<I> {
             view_formats: vec![surface_view_format(surface_format)],
             // wgpu operations will fail if the size is zero; set a minimum of 1 so we can
             // successfully initialize and get a working renderer later.
-            width: viewport.framebuffer_size.x.max(1),
-            height: viewport.framebuffer_size.y.max(1),
+            width: viewport.framebuffer_size.width.max(1),
+            height: viewport.framebuffer_size.height.max(1),
             present_mode: wgpu::PresentMode::Fifo,
             desired_maximum_frame_latency: 2,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
@@ -469,11 +469,11 @@ impl<I: time::Instant> EverythingRenderer<I> {
         {
             let viewport = self.cameras.viewport();
             let size = viewport.framebuffer_size;
-            let previous_size = Vector2D::new(self.config.width, self.config.height);
+            let previous_size = Size2D::new(self.config.width, self.config.height);
             // wgpu insists on nonzero values, so if we get a zero, ignore it
-            if size != previous_size && size.x != 0 && size.y != 0 {
-                self.config.width = size.x;
-                self.config.height = size.y;
+            if size != previous_size && size.width != 0 && size.height != 0 {
+                self.config.width = size.width;
+                self.config.height = size.height;
 
                 self.info_text_texture.resize(
                     &self.device,

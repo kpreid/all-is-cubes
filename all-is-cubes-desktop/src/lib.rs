@@ -17,7 +17,7 @@ use std::time::Instant;
 use anyhow::Context as _;
 
 use all_is_cubes::camera;
-use all_is_cubes::euclid::{vec2, Vector2D};
+use all_is_cubes::euclid::{size2, Size2D};
 use all_is_cubes::universe::Universe;
 
 mod audio;
@@ -123,13 +123,13 @@ pub struct InnerMainParams {
 ///
 /// The given dimensions are of the maximum possible viewport size, if known.
 pub fn choose_graphical_window_size(
-    maximum_size: Option<Vector2D<u32, camera::NominalPixel>>,
-) -> Vector2D<u32, camera::NominalPixel> {
+    maximum_size: Option<Size2D<u32, camera::NominalPixel>>,
+) -> Size2D<u32, camera::NominalPixel> {
     match maximum_size {
         Some(maximum_size) => {
             // TODO: consider constraining the aspect ratio, setting a maximum size, and other caveats
             maximum_size * 7 / 10
         }
-        None => vec2(800, 600),
+        None => size2(800, 600),
     }
 }

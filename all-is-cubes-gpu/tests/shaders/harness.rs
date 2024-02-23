@@ -48,8 +48,8 @@ pub(crate) async fn run_shader_test(test_wgsl: &str) -> image::Rgba32FImage {
 
     // Convert f16 pixels to f32
     image::ImageBuffer::from_raw(
-        output_viewport.framebuffer_size.x,
-        output_viewport.framebuffer_size.y,
+        output_viewport.framebuffer_size.width,
+        output_viewport.framebuffer_size.height,
         f16_pixels.into_iter().map(f32::from).collect(),
     )
     .unwrap()

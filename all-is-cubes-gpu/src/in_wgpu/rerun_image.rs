@@ -71,8 +71,8 @@ impl RerunImageExport {
         // The render pass will take care of downsampling.
         let logged_size = logged_image_size_policy(normal_camera.viewport().framebuffer_size);
         let logged_size_extent = wgpu::Extent3d {
-            width: logged_size.x,
-            height: logged_size.y,
+            width: logged_size.width,
+            height: logged_size.height,
             depth_or_array_layers: 1,
         };
         let mut logged_camera = normal_camera.clone();
@@ -310,7 +310,7 @@ struct RerunCopyCamera {
 
 /// Policy about how to downsample the scene to produce a sane amount of Rerun data.
 fn logged_image_size_policy(size: ImageSize) -> ImageSize {
-    let pixel_area = f64::from(size.x) * f64::from(size.y);
+    let pixel_area = size.to_f64().area();
     let max_area = 640. * 480.;
     if pixel_area <= max_area {
         size

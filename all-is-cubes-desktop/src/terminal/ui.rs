@@ -293,6 +293,7 @@ impl TerminalState {
             .viewport
             .framebuffer_size
             .to_usize()
+            .to_vector()
             .component_div(image.options.characters.rays_per_character().to_usize());
 
         let mut rect = self.viewport_position;

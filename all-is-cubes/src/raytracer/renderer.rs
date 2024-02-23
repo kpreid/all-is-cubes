@@ -12,7 +12,7 @@ use crate::camera::{
 use crate::character::Cursor;
 use crate::content::palette;
 use crate::listen::ListenableSource;
-use crate::math::{Rgba, VectorOps};
+use crate::math::{area_usize, Rgba, VectorOps};
 use crate::raytracer::{
     Accumulate, ColorBuf, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer,
     UpdatingSpaceRaytracer,
@@ -234,7 +234,7 @@ impl RtRenderer<()> {
         let camera = self.cameras.cameras().world.clone();
         let size = self.modified_viewport().framebuffer_size;
 
-        let mut data = vec![[0; 4]; usize::try_from(size.x * size.y).unwrap()];
+        let mut data = vec![[0; 4]; area_usize(size).unwrap()];
         let info = self.draw::<ColorBuf, _, [u8; 4], _>(
             info_text_fn,
             |pixel_buf| camera.post_process_color(Rgba::from(pixel_buf)).to_srgb8(),
@@ -430,7 +430,7 @@ mod trace_image {
         // x.max(1) is zero-sized-viewport protection; the chunk size will be wrong, but there
         // will be zero chunks anyway.
         let total_info = output
-            .par_chunks_mut(viewport_size.x.max(1))
+            .par_chunks_mut(viewport_size.width.max(1))
             .enumerate()
             .map(move |(ych, raster_row)| {
                 let y0 = viewport.normalize_fb_y_edge(ych);
@@ -484,10 +484,10 @@ mod trace_image {
         let mut total_info = RaytraceInfo::default();
         let mut index = 0;
         let mut y0 = viewport.normalize_fb_y_edge(0);
-        for y_edge in 1..=viewport_size.y {
+        for y_edge in 1..=viewport_size.height {
             let y1 = viewport.normalize_fb_y_edge(y_edge);
             let mut x0 = viewport.normalize_fb_x_edge(0);
-            for x_edge in 1..=viewport_size.x {
+            for x_edge in 1..=viewport_size.width {
                 let x1 = viewport.normalize_fb_x_edge(x_edge);
                 let (pixel, info) = scene.trace_patch(NdcRect {
                     min: point2(x0, y0),
@@ -526,8 +526,8 @@ mod eg {
             data: output,
             paint,
             size: Size {
-                width: viewport.framebuffer_size.x,
-                height: viewport.framebuffer_size.y,
+                width: viewport.framebuffer_size.width,
+                height: viewport.framebuffer_size.height,
             },
         };
         let shadow = info_text_drawable(info_text, BinaryColor::Off);

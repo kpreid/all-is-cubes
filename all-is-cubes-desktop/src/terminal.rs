@@ -9,7 +9,7 @@ use ratatui::layout::Rect;
 
 use all_is_cubes::arcstr::literal_substr;
 use all_is_cubes::camera::{self, Camera, StandardCameras, Viewport};
-use all_is_cubes::euclid::{Point2D, Vector2D};
+use all_is_cubes::euclid::{Point2D, Size2D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::Rgba;
 use all_is_cubes::raytracer::{Accumulate, CharacterBuf, CharacterRtData, ColorBuf, RtRenderer};
@@ -32,9 +32,9 @@ use ui::{InventoryDisplay, OutMsg, TerminalWindow, UiFrame};
 /// built on the same components as [`terminal_main_loop`].
 pub fn terminal_print_once(
     mut dsession: DesktopSession<TerminalRenderer, TerminalWindow>,
-    display_size: Vector2D<u16, camera::ImagePixel>,
+    display_size: Size2D<u16, camera::ImagePixel>,
 ) -> Result<(), anyhow::Error> {
-    let rect = Rect::new(0, 0, display_size.x, display_size.y);
+    let rect = Rect::new(0, 0, display_size.width, display_size.height);
     dsession.window.send(OutMsg::OverrideViewport(rect));
     dsession.window.wait_for_sync();
     sync_viewport(&mut dsession);
@@ -368,6 +368,6 @@ impl Accumulate for ColorCharacterBuf {
     }
 }
 
-fn rect_size(rect: Rect) -> Vector2D<u16, camera::ImagePixel> {
-    Vector2D::new(rect.width, rect.height)
+fn rect_size(rect: Rect) -> Size2D<u16, camera::ImagePixel> {
+    Size2D::new(rect.width, rect.height)
 }

@@ -1,4 +1,4 @@
-use euclid::{point3, vec2, vec3, Point3D, Rotation3D, Vector2D};
+use euclid::{point3, vec2, vec3, Point3D, Rotation3D, Size2D};
 use pretty_assertions::assert_eq;
 use rand::SeedableRng;
 
@@ -13,8 +13,8 @@ fn camera_bad_viewport_doesnt_panic() {
     Camera::new(
         GraphicsOptions::default(),
         Viewport {
-            nominal_size: Vector2D::new(0.0, 0.0),
-            framebuffer_size: Vector2D::new(0, 0),
+            nominal_size: Size2D::new(0.0, 0.0),
+            framebuffer_size: Size2D::new(0, 0),
         },
     );
 }

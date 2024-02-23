@@ -8,15 +8,15 @@ use winit::event_loop::{ControlFlow, EventLoopWindowTarget};
 use winit::window::{CursorGrabMode, Window};
 
 use all_is_cubes::camera::{self, StandardCameras, Viewport};
-use all_is_cubes::euclid::{Point2D, Vector2D};
+use all_is_cubes::euclid::{Point2D, Size2D};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
 use all_is_cubes_gpu::wgpu;
 use all_is_cubes_ui::apps::InputProcessor;
 
 use crate::glue::winit::{
-    cursor_icon_to_winit, logical_size_from_vec, map_key, map_mouse_button,
-    monitor_size_for_window, physical_size_to_viewport,
+    cursor_icon_to_winit, map_key, map_mouse_button, monitor_size_for_window,
+    physical_size_to_viewport, to_logical_size,
 };
 use crate::session::DesktopSession;
 use crate::{choose_graphical_window_size, Session};
@@ -47,25 +47,23 @@ impl WinAndState {
     pub fn new(
         event_loop: &EventLoopWindowTarget<()>,
         window_title: &str,
-        requested_size: Option<Vector2D<u32, camera::NominalPixel>>,
+        requested_size: Option<Size2D<u32, camera::NominalPixel>>,
         fullscreen: bool,
     ) -> Result<WinAndState, winit::error::OsError> {
         // Pick a window size.
         let inner_size = if let Some(size) = requested_size {
-            logical_size_from_vec(size)
+            size
         } else {
             // TODO: Does this strategy actually best reflect what monitor the window is
             // going to appear on?
             let maybe_monitor = event_loop
                 .primary_monitor()
                 .or_else(|| event_loop.available_monitors().next());
-            logical_size_from_vec(choose_graphical_window_size(
-                maybe_monitor.map(monitor_size_for_window),
-            ))
+            choose_graphical_window_size(maybe_monitor.map(monitor_size_for_window))
         };
 
         let window = winit::window::WindowBuilder::new()
-            .with_inner_size(inner_size)
+            .with_inner_size(to_logical_size(inner_size))
             .with_title(window_title)
             .with_fullscreen(fullscreen.then_some(winit::window::Fullscreen::Borderless(None)))
             .build(event_loop)?;

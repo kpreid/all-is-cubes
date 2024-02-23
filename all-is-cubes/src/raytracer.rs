@@ -13,7 +13,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-use euclid::{vec3, Vector2D, Vector3D};
+use euclid::{vec3, Vector3D};
 use manyfmt::Fmt;
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
@@ -31,8 +31,8 @@ use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 #[allow(unused_imports)]
 use crate::math::Euclid as _;
 use crate::math::{
-    smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, GridMatrix,
-    Intensity, Rgb, Rgba, VectorOps, Vol,
+    area_usize, smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab,
+    GridMatrix, Intensity, Rgb, Rgba, VectorOps, Vol,
 };
 use crate::raycast::Ray;
 use crate::space::{BlockIndex, BlockSky, PackedLight, Sky, Space, SpaceBlockData};
@@ -303,11 +303,11 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     {
         let viewport = camera.viewport();
         let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
-        let output_iterator = (0..viewport_size.y)
+        let output_iterator = (0..viewport_size.height)
             .into_par_iter()
             .map(move |ych| {
                 let y = viewport.normalize_fb_y(ych);
-                (0..viewport_size.x)
+                (0..viewport_size.width)
                     .into_par_iter()
                     .map(move |xch| {
                         let x = viewport.normalize_fb_x(xch);
@@ -345,9 +345,9 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
         let viewport = camera.viewport();
         let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
-        for ych in 0..viewport_size.y {
+        for ych in 0..viewport_size.height {
             let y = viewport.normalize_fb_y(ych);
-            for xch in 0..viewport_size.x {
+            for xch in 0..viewport_size.width {
                 let x = viewport.normalize_fb_x(xch);
                 let (buf, info) =
                     self.trace_ray::<P>(camera.project_ndc_into_world(NdcPoint2::new(x, y)), true);
@@ -366,7 +366,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         P: Accumulate<BlockData = D> + Into<String>,
     {
         let mut out =
-            String::with_capacity(camera.viewport().framebuffer_size.dot(Vector2D::one()) as usize);
+            String::with_capacity(area_usize(camera.viewport().framebuffer_size).unwrap());
         self.trace_scene_to_text::<P, _, _>(camera, line_ending, |s| {
             out.push_str(s);
             Ok::<(), core::convert::Infallible>(())

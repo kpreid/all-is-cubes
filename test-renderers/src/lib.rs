@@ -143,8 +143,8 @@ pub fn compare_rendered_image(
     let diff_file_path = image_path(&test, Version::Diff);
 
     let actual_image = image::RgbaImage::from_raw(
-        actual_image.size.x,
-        actual_image.size.y,
+        actual_image.size.width,
+        actual_image.size.height,
         bytemuck::cast_vec::<[u8; 4], u8>(actual_image.data),
     )
     .unwrap();

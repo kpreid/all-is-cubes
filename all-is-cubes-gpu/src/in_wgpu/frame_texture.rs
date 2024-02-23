@@ -3,7 +3,7 @@ use std::{fmt, mem};
 
 use all_is_cubes::camera::{Flaws, GraphicsOptions, ImagePixel};
 use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
-use all_is_cubes::euclid::Vector2D;
+use all_is_cubes::euclid::Size2D;
 
 use super::bloom;
 use crate::EgFramebuffer;
@@ -42,11 +42,11 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
         &mut self,
         device: &wgpu::Device,
         label: Option<&str>,
-        size: Vector2D<u32, ImagePixel>,
+        size: Size2D<u32, ImagePixel>,
     ) {
         let new_extent = wgpu::Extent3d {
-            width: size.x,
-            height: size.y,
+            width: size.width,
+            height: size.height,
             depth_or_array_layers: 1,
         };
         if new_extent == self.size && self.texture.is_some() {

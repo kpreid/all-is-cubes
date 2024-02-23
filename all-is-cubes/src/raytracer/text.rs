@@ -5,7 +5,7 @@
 use alloc::string::String;
 
 use arcstr::{literal_substr, ArcStr, Substr};
-use euclid::vec2;
+use euclid::size2;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, Viewport};
@@ -113,11 +113,12 @@ fn print_space_impl(
     write: &mut dyn FnMut(&str),
 ) -> RaytraceInfo {
     // TODO: optimize height (and thus aspect ratio) for the shape of the space
+
     let mut camera = Camera::new(
         GraphicsOptions::default(),
         Viewport {
-            nominal_size: vec2(40., 40.),
-            framebuffer_size: vec2(80, 40),
+            nominal_size: size2(40., 40.),
+            framebuffer_size: size2(80, 40),
         },
     );
     camera.look_at_y_up(

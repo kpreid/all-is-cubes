@@ -9,6 +9,8 @@
       This value is not planned to change, 
     - `block::AnimationHint` now offers constructor functions `redefinition()` and `replacement()` for the common case of setting one of its fields to a specific `AnimationChange`.
 
+    - `math::GridSize` type alias for `euclid::Size3D<GridCoordinate, Cube>`.
+
 - `all-is-cubes-mesh` library:
     - New features in `dynamic::ChunkedSpaceMesh`:
         - Blocks may now be rendered via instancing.
@@ -18,6 +20,10 @@
           This must be externally driven; if you wish to do so, clone the `ChunkedSpaceMesh::job_queue()`, and create one or more tasks/threads which take work from it.
 
 ### Changed
+
+- `all-is-cubes` library:
+    - `camera::ImageSize` is now an `euclid::Size2D` instead of `euclid::Vector2D`.
+    - `camera::Viewport`'s fields are now `euclid::Size2D` instead of `euclid::Vector2D`.
 
 - `all-is-cubes-mesh` library:
     - The return type of `GetBlockMesh::get_block_mesh()` has changed to `Option<&BlockMesh>`.

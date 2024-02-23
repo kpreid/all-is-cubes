@@ -19,7 +19,7 @@ use all_is_cubes::drawing::embedded_graphics::pixelcolor::PixelColor;
 use all_is_cubes::drawing::embedded_graphics::{draw_target::DrawTarget, prelude::Point, Pixel};
 use all_is_cubes::euclid::{point2, vec2, Box2D};
 use all_is_cubes::listen::ListenableSource;
-use all_is_cubes::math::{Rgb, Rgba, VectorOps as _};
+use all_is_cubes::math::{area_usize, Rgb, Rgba, VectorOps as _};
 use all_is_cubes::raytracer::{ColorBuf, RtRenderer};
 
 use crate::in_wgpu::frame_texture::DrawableTexture;
@@ -203,9 +203,8 @@ impl Inner {
             }
             std::cmp::Ordering::Equal => {}
             std::cmp::Ordering::Less => {
-                let fbs = render_viewport.framebuffer_size;
-                self.rays_per_frame =
-                    (self.rays_per_frame + 5000).min(fbs.x as usize * fbs.y as usize);
+                self.rays_per_frame = (self.rays_per_frame + 5000)
+                    .min(area_usize(render_viewport.framebuffer_size).unwrap());
             }
         }
 
@@ -271,8 +270,8 @@ impl Iterator for PixelPicker {
             None => linear_index,
         };
         Some(Point::new(
-            index.rem_euclid(size.x) as i32,
-            index.div_euclid(size.x).rem_euclid(size.y) as i32,
+            index.rem_euclid(size.width) as i32,
+            index.div_euclid(size.width).rem_euclid(size.height) as i32,
         ))
     }
 }

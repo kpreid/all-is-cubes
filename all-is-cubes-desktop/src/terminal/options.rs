@@ -1,8 +1,10 @@
+use std::ops;
+
 use crossterm::style::Color;
 
 use all_is_cubes::camera::{ImagePixel, Viewport};
-use all_is_cubes::euclid::{Vector2D, Vector3D};
-use all_is_cubes::math::{FreeCoordinate, Rgba, VectorOps};
+use all_is_cubes::euclid::{size2, Size2D, Vector2D, Vector3D};
+use all_is_cubes::math::{Rgba, VectorOps};
 
 /// Options specific to the terminal UI.
 ///
@@ -20,20 +22,18 @@ pub struct TerminalOptions {
 impl TerminalOptions {
     /// Compute viewport to use for raytracing, given the size in characters of the
     /// drawing area.
-    pub(crate) fn viewport_from_terminal_size(&self, size: Vector2D<u16, ImagePixel>) -> Viewport {
+    pub(crate) fn viewport_from_terminal_size(&self, size: Size2D<u16, ImagePixel>) -> Viewport {
         // max(1) is to keep the projection math from blowing up.
         // TODO: Remove this and make it more robust instead.
-        let size = size.max(Vector2D::one());
+        let size = size.max(size2(1, 1));
         Viewport {
-            framebuffer_size: size
-                .map(u32::from)
-                .component_mul(self.characters.rays_per_character().map(u32::from)),
+            framebuffer_size: nonuniform_scale(
+                size,
+                self.characters.rays_per_character().map(u32::from),
+            ),
 
-            // Assume that characters are approximately twice as tall as they are wide.
-            nominal_size: size
-                .map(FreeCoordinate::from)
-                .component_mul(Vector2D::new(0.5, 1.0))
-                .cast_unit(),
+            // Assume that on the terminal, characters are twice as tall as they are wide.
+            nominal_size: nonuniform_scale(size, Vector2D::new(0.5, 1.0)),
         }
     }
 }
@@ -182,6 +182,16 @@ impl CharacterMode {
             Braille => Vector2D::new(2, 4),
         }
     }
+}
+
+fn nonuniform_scale<T: From<u16> + ops::Mul<Output = T>, U>(
+    size: Size2D<u16, ImagePixel>,
+    scale: Vector2D<T, U>,
+) -> Size2D<T, U> {
+    size2(
+        T::from(size.width) * scale.x,
+        T::from(size.height) * scale.y,
+    )
 }
 
 #[cfg(test)]

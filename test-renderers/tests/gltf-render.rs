@@ -286,8 +286,8 @@ impl HeadlessRenderer for GltfRend3Renderer {
                 .create_texture(&wgpu::TextureDescriptor {
                     label: None,
                     size: wgpu::Extent3d {
-                        width: viewport.framebuffer_size.x.max(1),
-                        height: viewport.framebuffer_size.y.max(1),
+                        width: viewport.framebuffer_size.width.max(1),
+                        height: viewport.framebuffer_size.height.max(1),
                         depth_or_array_layers: 1,
                     },
                     mip_level_count: 1,

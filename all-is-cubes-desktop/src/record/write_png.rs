@@ -43,7 +43,11 @@ fn new_png_writer<'a>(
     options: &RecordOptions,
 ) -> Result<png::Writer<&'a mut BufWriter<File>>, std::io::Error> {
     // Scope of file_writer being borrowed
-    let mut png_encoder = Encoder::new(file_writer, options.image_size.x, options.image_size.y);
+    let mut png_encoder = Encoder::new(
+        file_writer,
+        options.image_size.width,
+        options.image_size.height,
+    );
     png_encoder.set_color(png::ColorType::Rgba);
     png_encoder.set_depth(png::BitDepth::Eight);
     png_encoder.set_compression(png::Compression::Best);

@@ -1,6 +1,6 @@
 //! Numeric types used for coordinates and related quantities.
 
-use euclid::{Point3D, Vector3D};
+use euclid::{Point3D, Size2D, Vector3D};
 
 use crate::math::Cube;
 
@@ -66,4 +66,12 @@ mod impl_euclid {
     impl_vector_ops!(Point3D, (x y z));
     impl_vector_ops!(Size2D, (width height));
     impl_vector_ops!(Size3D, (width height depth));
+}
+
+/// Calculate area and convert to `usize`, which is a common operation for image data lengths.
+#[doc(hidden)]
+pub fn area_usize<T: TryInto<usize>, U>(size: Size2D<T, U>) -> Option<usize> {
+    let width = size.width.try_into().ok()?;
+    let height = size.height.try_into().ok()?;
+    width.checked_mul(height)
 }

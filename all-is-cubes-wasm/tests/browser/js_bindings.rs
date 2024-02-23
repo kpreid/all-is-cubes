@@ -5,7 +5,7 @@ use wasm_bindgen_test::wasm_bindgen_test;
 use web_sys::{Element, HtmlCanvasElement};
 
 use all_is_cubes::camera::Viewport;
-use all_is_cubes::euclid::Vector2D;
+use all_is_cubes::euclid::size2;
 use all_is_cubes_wasm::js_bindings::CanvasHelper;
 
 #[wasm_bindgen_test]
@@ -28,8 +28,8 @@ fn canvas_helper_viewport() {
     assert_eq!(
         canvas_helper.viewport(),
         Viewport {
-            nominal_size: Vector2D::new(123., 45.),
-            framebuffer_size: Vector2D::new(123, 45),
+            nominal_size: size2(123., 45.),
+            framebuffer_size: size2(123, 45),
         }
     );
 
