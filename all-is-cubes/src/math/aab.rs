@@ -2,7 +2,7 @@ use core::cmp::Ordering;
 use core::fmt;
 use core::iter::FusedIterator;
 
-use euclid::{Point3D, Vector3D};
+use euclid::{Point3D, Size3D, Vector3D};
 
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
@@ -10,7 +10,7 @@ use euclid::{Point3D, Vector3D};
 use num_traits::float::FloatCore as _;
 
 use crate::math::{
-    Axis, Face6, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab, GridCoordinate,
+    Axis, Cube, Face6, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab, GridCoordinate,
     LineVertex, VectorOps,
 };
 
@@ -28,7 +28,7 @@ pub struct Aab {
     lower_bounds: FreePoint,
     upper_bounds: FreePoint,
     // TODO: revisit which things we should be precalculating
-    sizes: FreeVector,
+    sizes: Size3D<FreeCoordinate, Cube>,
 }
 
 impl Aab {
@@ -36,7 +36,7 @@ impl Aab {
     pub const ZERO: Aab = Aab {
         lower_bounds: Point3D::new(0., 0., 0.),
         upper_bounds: Point3D::new(0., 0., 0.),
-        sizes: Vector3D::new(0., 0., 0.),
+        sizes: Size3D::new(0., 0., 0.),
     };
 
     /// Constructs an [`Aab`] from individual coordinates.
@@ -83,7 +83,7 @@ impl Aab {
             && lower_bounds.y <= upper_bounds.y
             && lower_bounds.z <= upper_bounds.z
         {
-            let sizes = upper_bounds - lower_bounds;
+            let sizes = Size3D::from(upper_bounds - lower_bounds);
             Some(Self {
                 lower_bounds,
                 upper_bounds,
@@ -132,7 +132,7 @@ impl Aab {
 
     /// Size of the box in each axis; equivalent to
     /// `self.upper_bounds() - self.lower_bounds()`.
-    pub fn size(&self) -> FreeVector {
+    pub fn size(&self) -> Size3D<FreeCoordinate, Cube> {
         self.sizes
     }
 

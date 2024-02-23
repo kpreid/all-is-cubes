@@ -144,6 +144,12 @@ where
     let array: [f32; 3] = v.cast::<f32>().into();
     datatypes::Vec3D::from(array)
 }
+fn convert_half_sizes<S, U>(size: euclid::Size3D<S, U>) -> components::HalfSizes3D
+where
+    S: num_traits::NumCast + Copy,
+{
+    components::HalfSizes3D(convert_vec(size.to_vector().cast::<f32>() / 2.0))
+}
 pub fn convert_quaternion<S, Src, Dst>(
     rot: euclid::Rotation3D<S, Src, Dst>,
 ) -> datatypes::Quaternion
@@ -179,7 +185,7 @@ pub fn convert_aabs(
         .into_iter()
         .map(|aab| {
             (
-                components::HalfSizes3D(convert_vec(aab.size() / 2.0)),
+                convert_half_sizes(aab.size()),
                 convert_point(aab.center() + offset),
             )
         })
