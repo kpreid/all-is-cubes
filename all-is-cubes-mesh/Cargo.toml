@@ -35,7 +35,7 @@ arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary", "ordered-float/arbitrary
 all-is-cubes = { workspace = true }
 arbitrary = { workspace = true, optional = true }
 bitflags = { workspace = true }
-bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
+bitvec = { workspace = true }
 bytemuck = { workspace = true }
 either = { workspace = true }
 flume = { workspace = true }
