@@ -5,7 +5,7 @@ use alloc::sync::Arc;
 use all_is_cubes::arcstr::{self, literal, ArcStr};
 use all_is_cubes::block::{self, Block};
 use all_is_cubes::character::Cursor;
-use all_is_cubes::euclid::vec3;
+use all_is_cubes::euclid::size3;
 use all_is_cubes::math::Face6;
 
 use crate::ui_content::hud::HudInputs;
@@ -133,6 +133,6 @@ fn inspect_evaluated(ev: &block::EvaluatedBlock) -> vui::WidgetTree {
 
 fn indent() -> vui::WidgetTree {
     Arc::new(vui::LayoutTree::Spacer(vui::LayoutRequest {
-        minimum: vec3(1, 1, 1),
+        minimum: size3(1, 1, 1),
     }))
 }

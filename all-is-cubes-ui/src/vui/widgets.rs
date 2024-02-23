@@ -3,7 +3,7 @@
 use alloc::sync::Arc;
 
 use all_is_cubes::block::Block;
-use all_is_cubes::math::GridVector;
+use all_is_cubes::euclid::size3;
 use all_is_cubes::space::SpaceTransaction;
 
 use crate::vui;
@@ -66,7 +66,7 @@ impl vui::Widget for Block {
 impl vui::Layoutable for Block {
     fn requirements(&self) -> vui::LayoutRequest {
         vui::LayoutRequest {
-            minimum: GridVector::new(1, 1, 1),
+            minimum: size3(1, 1, 1),
         }
     }
 }

@@ -17,7 +17,7 @@ use all_is_cubes::camera::{
     ViewTransform, Viewport,
 };
 use all_is_cubes::character::{Character, Spawn};
-use all_is_cubes::euclid::{point3, size2, vec2, vec3, Point2D, Vector2D, Vector3D};
+use all_is_cubes::euclid::{point3, size2, size3, vec2, vec3, Point2D, Size2D, Vector3D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
     Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
@@ -206,7 +206,7 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
         GraphicsOptions::UNALTERED_COLORS,
         Viewport::with_scale(
             1.0,
-            Vector2D::one() * (f64::from(bounds.size().x) * 4.) as u32,
+            Size2D::splat((f64::from(bounds.size().width) * 4.) as u32),
         ),
         &universe,
     );
@@ -566,7 +566,7 @@ async fn icons(mut context: RenderTestContext) {
                 Vector3D::new(Align::Low, Align::Low, Align::Low),
             )
             .unwrap();
-        assert_eq!(space.bounds().size(), GridVector::new(1, 1, 1));
+        assert_eq!(space.bounds().size(), size3(1, 1, 1));
         space[space.bounds().lower_bounds()].clone()
     }
 
@@ -611,9 +611,9 @@ async fn icons(mut context: RenderTestContext) {
     // Fill space with blocks
     let mut space = Space::builder(bounds)
         .spawn_position(point3(
-            FreeCoordinate::from(bounds.size().x) / 2.,
-            FreeCoordinate::from(bounds.size().y) / 2.,
-            FreeCoordinate::from(bounds.size().y) * 1.5,
+            FreeCoordinate::from(bounds.size().width) / 2.,
+            FreeCoordinate::from(bounds.size().height) / 2.,
+            FreeCoordinate::from(bounds.size().height) * 1.5,
         ))
         .build();
     for (index, block) in all_blocks.into_iter().enumerate() {
@@ -630,7 +630,8 @@ async fn icons(mut context: RenderTestContext) {
             .unwrap();
     }
 
-    let aspect_ratio = f64::from(space.bounds().size().y) / f64::from(space.bounds().size().x);
+    let aspect_ratio =
+        f64::from(space.bounds().size().height) / f64::from(space.bounds().size().width);
 
     space.evaluate_light::<time::NoTime>(1, |_| {});
     finish_universe_from_space(universe, space);
@@ -1107,7 +1108,7 @@ async fn fog_test_universe() -> Arc<Universe> {
         .light_emission(rgb_const!(40.0, 0.05, 0.05))
         .build();
     for z in bounds.z_range().step_by(2) {
-        let x = (z * 19i32).rem_euclid(bounds.size().x) + bounds.lower_bounds().x;
+        let x = (z * 19i32).rem_euclid(bounds.size().width) + bounds.lower_bounds().x;
 
         space
             .fill_uniform(

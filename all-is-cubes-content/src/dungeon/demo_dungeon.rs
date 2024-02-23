@@ -12,12 +12,12 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::content::load_image::space_from_image;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::euclid::Vector3D;
+use all_is_cubes::euclid::Size3D;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridRotation, GridVector, Rgb,
-    Rgba,
+    Axis, Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridRotation, GridSize,
+    GridVector, Rgb, Rgba,
 };
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::time;
@@ -419,20 +419,23 @@ pub(crate) async fn demo_dungeon(
     let dungeon_grid = DungeonGrid {
         room_box: GridAab::from_lower_size([0, 0, 0], [9, 5, 9]),
         room_wall_thickness: FaceMap::repeat(1),
-        gap_between_walls: Vector3D::new(1, 1, 1),
+        gap_between_walls: Size3D::new(1, 1, 1),
     };
     let perimeter_margin = 30;
 
-    let mut requested_rooms = (requested_size.unwrap_or(Vector3D::new(135, 40, 135))
-        - Vector3D::new(perimeter_margin, 0, perimeter_margin))
-    .component_div(dungeon_grid.room_spacing());
-    if requested_rooms.x == 0 || requested_rooms.z == 0 {
+    let mut requested_rooms = Size3D::from(
+        (requested_size.unwrap_or(Size3D::new(135, 40, 135))
+            - Size3D::new(perimeter_margin, 0, perimeter_margin))
+        .to_vector()
+        .component_div(dungeon_grid.room_spacing().to_vector()),
+    );
+    if requested_rooms.width == 0 || requested_rooms.depth == 0 {
         return Err(InGenError::Other("Size too small".into()));
     }
 
     // TODO: Add 3D support (avoid collisions with tall rooms + generate stairs).
     // For now, ignore vertical size suggestions entirely
-    requested_rooms.y = 1;
+    requested_rooms.height = 1;
 
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
@@ -503,7 +506,7 @@ pub(crate) async fn demo_dungeon(
     let mut physics = space.physics().clone();
     physics.light = LightPhysics::Rays {
         // account for large rooms
-        maximum_distance: (dungeon_grid.room_box.size().y * 4) as u16,
+        maximum_distance: (dungeon_grid.room_box.size().height * 4) as u16,
     };
     space.set_physics(physics);
     light_progress.progress(0.01).await;
@@ -520,7 +523,7 @@ pub(crate) async fn demo_dungeon(
 /// Non-async map generation subsection of [`demo_dungeon()`].
 fn generate_dungeon_map(
     seed: u64,
-    requested_rooms: GridVector,
+    requested_rooms: GridSize,
     grantable_items: &[Block],
 ) -> all_is_cubes::math::Vol<alloc::boxed::Box<[Option<DemoRoom>]>> {
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);

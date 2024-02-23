@@ -1,6 +1,6 @@
 //! Numeric types used for coordinates and related quantities.
 
-use euclid::{Point3D, Size2D, Vector3D};
+use euclid::{Point3D, Size2D, Size3D, Vector3D};
 
 use crate::math::Cube;
 
@@ -12,6 +12,9 @@ pub type GridPoint = Point3D<GridCoordinate, Cube>;
 
 /// Vectors that are locked to the cube grid.
 pub type GridVector = Vector3D<GridCoordinate, Cube>;
+
+/// Sizes of grid-aligned objects.
+pub type GridSize = Size3D<GridCoordinate, Cube>;
 
 /// Coordinates that are not locked to the cube grid.
 ///

@@ -12,7 +12,7 @@ use strum::IntoEnumIterator;
 
 use all_is_cubes::camera;
 use all_is_cubes::euclid::Size2D;
-use all_is_cubes::math::{GridCoordinate, GridVector};
+use all_is_cubes::math::{GridCoordinate, GridSize};
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 use all_is_cubes_desktop::logging::LoggingArgs;
 use all_is_cubes_port::ExportFormat;
@@ -282,7 +282,7 @@ impl FromStr for DisplaySizeArg {
 
 /// Template generation size.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct SpaceSizeArg(pub Option<GridVector>);
+pub(crate) struct SpaceSizeArg(pub Option<GridSize>);
 
 impl FromStr for SpaceSizeArg {
     type Err = String;
@@ -304,7 +304,7 @@ impl FromStr for SpaceSizeArg {
                 .collect::<Result<Vec<GridCoordinate>, String>>()?
                 .try_into()
                 .map_err(|_| String::from("must be three integers or \"default\""))?;
-            Ok(SpaceSizeArg(Some(GridVector::from(dims))))
+            Ok(SpaceSizeArg(Some(GridSize::from(dims))))
         }
     }
 }
@@ -348,10 +348,9 @@ pub(crate) fn parse_universe_source(
 
 #[cfg(test)]
 mod tests {
-    use all_is_cubes::euclid::Size2D;
-    use clap::error::{ContextValue, ErrorKind};
-
     use super::*;
+    use all_is_cubes::euclid::{size3, Size2D};
+    use clap::error::{ContextValue, ErrorKind};
 
     fn parse(args: &[&str]) -> clap::error::Result<AicDesktopArgs> {
         AicDesktopArgs::try_parse_from(std::iter::once("all-is-cubes").chain(args.iter().cloned()))
@@ -519,9 +518,9 @@ mod tests {
     fn space_size_parse() {
         let parse = |s: &str| s.parse::<SpaceSizeArg>().map(|SpaceSizeArg(size)| size);
         let err = |s: &str| Err(s.to_owned());
-        assert_eq!(parse("1,2,3"), Ok(Some(GridVector::new(1, 2, 3))));
-        assert_eq!(parse("10x20x30"), Ok(Some(GridVector::new(10, 20, 30))));
-        assert_eq!(parse("10×20×30"), Ok(Some(GridVector::new(10, 20, 30))));
+        assert_eq!(parse("1,2,3"), Ok(Some(size3(1, 2, 3))));
+        assert_eq!(parse("10x20x30"), Ok(Some(size3(10, 20, 30))));
+        assert_eq!(parse("10×20×30"), Ok(Some(size3(10, 20, 30))));
         assert_eq!(parse(""), err("\"\" not an integer or \"default\""));
         assert_eq!(parse("1"), err("must be three integers or \"default\""));
         assert_eq!(parse("a"), err("\"a\" not an integer or \"default\""));

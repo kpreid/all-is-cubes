@@ -11,6 +11,7 @@ use all_is_cubes::drawing::embedded_graphics::{
     text::{Alignment, Baseline, Text, TextStyleBuilder},
     Drawable as _,
 };
+use all_is_cubes::euclid::size3;
 use all_is_cubes::listen::{FnListener, Gate, Listen, Listener};
 use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridVector, Gridgid};
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
@@ -218,7 +219,7 @@ impl Tooltip {
 impl Layoutable for Tooltip {
     fn requirements(&self) -> LayoutRequest {
         LayoutRequest {
-            minimum: GridVector::new(self.width_in_hud, 1, 1),
+            minimum: size3(self.width_in_hud, 1, 1),
         }
     }
 }
@@ -263,7 +264,7 @@ impl WidgetController for TooltipController {
 
         // TODO: there should be a space_to_transaction_copy function or something
         // to implement this systematically
-        for i in 0..position.size().x {
+        for i in 0..position.size().width {
             let offset = GridVector::new(i, 0, 0);
             txn.at((origin + offset).into())
                 .overwrite(toolbar_text_blocks[offset.to_point()].clone());
@@ -294,7 +295,7 @@ impl WidgetController for TooltipController {
                 // the top edge.
                 let text_obj = Text::with_text_style(
                     &text,
-                    Point::new(bounds.size().x / 2, -1),
+                    Point::new(bounds.size().width / 2, -1),
                     MonoTextStyle::new(&HudFont, &self.definition.hud_blocks.text),
                     TextStyleBuilder::new()
                         .baseline(Baseline::Bottom)

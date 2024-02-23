@@ -1267,9 +1267,9 @@ fn UI_BLOCKS(_: &Exhibit, universe: &Universe) {
     // Fill space with blocks
     let mut space = Space::builder(bounds)
         .spawn_position(Point3D::new(
-            FreeCoordinate::from(bounds.size().x) / 2.,
-            FreeCoordinate::from(bounds.size().y) / 2.,
-            FreeCoordinate::from(bounds.size().y) * 1.5,
+            FreeCoordinate::from(bounds.size().width) / 2.,
+            FreeCoordinate::from(bounds.size().height) / 2.,
+            FreeCoordinate::from(bounds.size().height) * 1.5,
         ))
         .build();
     for (index, block) in all_blocks.into_iter().enumerate() {

@@ -12,7 +12,7 @@ use all_is_cubes::math::{GridAab, GridCoordinate, VectorOps, Vol};
 use all_is_cubes::time;
 use all_is_cubes_mesh::texture::{self, Channels};
 
-use crate::in_wgpu::glue::{size_vector_to_extent, write_texture_by_aab};
+use crate::in_wgpu::glue::{size3d_to_extent, write_texture_by_aab};
 use crate::in_wgpu::vertex::{AtlasTexel, FixTexCoord, TexPoint};
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};
 use crate::BlockTextureInfo;
@@ -300,7 +300,7 @@ impl AllocatorBacking {
         let mut backing_lock_guard = backing_mutex.lock().unwrap();
         let backing = &mut *backing_lock_guard;
 
-        let needed_texture_size = size_vector_to_extent(backing.alloctree.bounds().size());
+        let needed_texture_size = size3d_to_extent(backing.alloctree.bounds().size());
 
         // If we have textures already, check if they are the right size.
         let old_textures: Option<Group<_>> = if matches!(

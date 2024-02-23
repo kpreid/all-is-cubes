@@ -132,7 +132,7 @@ pub(crate) fn make_tree(
         // Edge cost.
         |edge_ref| {
             let relative_y = ((f64::from(edge_ref.target().y - bounds.lower_bounds().y) + 0.5)
-                / f64::from(bounds.size().y))
+                / f64::from(bounds.size().height))
             .clamp(0.0, 1.0);
             let is_currently_on_existing_branch =
                 graph.neighbor_edges(edge_ref.source()) != FaceMap::default();

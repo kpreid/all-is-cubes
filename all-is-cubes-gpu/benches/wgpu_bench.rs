@@ -8,7 +8,7 @@ use all_is_cubes::block;
 use all_is_cubes::camera::{Flaws, GraphicsOptions, HeadlessRenderer, StandardCameras, Viewport};
 use all_is_cubes::character::Character;
 use all_is_cubes::content::make_some_blocks;
-use all_is_cubes::math::GridVector;
+use all_is_cubes::euclid::size3;
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::transaction::Transaction;
 use all_is_cubes::universe::{self, Universe};
@@ -91,7 +91,7 @@ async fn create_updated_renderer(
     let space = all_is_cubes::content::testing::lighting_bench_space(
         &mut universe,
         all_is_cubes::util::yield_progress_for_testing(),
-        GridVector::new(50, 50, 50),
+        size3(50, 50, 50),
     )
     .await
     .unwrap();

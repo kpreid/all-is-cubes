@@ -199,7 +199,7 @@ impl<C, O> Vol<C, O> {
 
         let size = self.bounds.size();
         // This will not overflow, as an invariant of the `Vol` type.
-        size.x as usize * size.y as usize * size.z as usize
+        size.width as usize * size.height as usize * size.depth as usize
     }
 
     /// Returns the linear contents without copying.
@@ -308,9 +308,9 @@ impl<C> Vol<C, ZMaj> {
             GridPoint::from(cube).zip(self.bounds.lower_bounds(), GridCoordinate::wrapping_sub);
 
         // Bounds check, expressed as a single unsigned comparison.
-        if (deoffsetted.x as u32 >= sizes.x as u32)
-            | (deoffsetted.y as u32 >= sizes.y as u32)
-            | (deoffsetted.z as u32 >= sizes.z as u32)
+        if (deoffsetted.x as u32 >= sizes.width as u32)
+            | (deoffsetted.y as u32 >= sizes.height as u32)
+            | (deoffsetted.z as u32 >= sizes.depth as u32)
         {
             return None;
         }
@@ -330,8 +330,8 @@ impl<C> Vol<C, ZMaj> {
         // Always use wrapping (rather than maybe-checked) arithmetic, because we
         // checked the criteria for it to not overflow.
         Some(
-            (ixvec.x.wrapping_mul(usizes.y).wrapping_add(ixvec.y))
-                .wrapping_mul(usizes.z)
+            (ixvec.x.wrapping_mul(usizes.height).wrapping_add(ixvec.y))
+                .wrapping_mul(usizes.depth)
                 .wrapping_add(ixvec.z),
         )
     }

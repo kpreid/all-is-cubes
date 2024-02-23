@@ -9,7 +9,7 @@ use all_is_cubes_mesh::IndexSlice;
 use bytemuck::Pod;
 use wgpu::util::DeviceExt as _;
 
-use all_is_cubes::math::{GridAab, GridCoordinate, GridVector, Rgba};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridSize, Rgba};
 
 use crate::reloadable::Reloadable;
 use crate::GraphicsResourceError;
@@ -112,10 +112,10 @@ pub fn write_texture_by_aab<T: Pod>(
         bytemuck::cast_slice::<T, u8>(data),
         wgpu::ImageDataLayout {
             offset: 0,
-            bytes_per_row: Some(std::mem::size_of::<T>() as u32 * region.size().x as u32),
-            rows_per_image: Some(region.size().y as u32),
+            bytes_per_row: Some(std::mem::size_of::<T>() as u32 * region.size().width as u32),
+            rows_per_image: Some(region.size().height as u32),
         },
-        size_vector_to_extent(region.size()),
+        size3d_to_extent(region.size()),
     )
 }
 
@@ -129,11 +129,11 @@ pub fn point_to_origin<U>(origin: Point3D<GridCoordinate, U>) -> wgpu::Origin3d 
 }
 
 /// Convert vector of sizes to [`wgpu::Extent3d`]. Panics if the input is negative.
-pub fn size_vector_to_extent(size: GridVector) -> wgpu::Extent3d {
+pub fn size3d_to_extent(size: GridSize) -> wgpu::Extent3d {
     wgpu::Extent3d {
-        width: size.x.try_into().expect("negative size"),
-        height: size.y.try_into().expect("negative size"),
-        depth_or_array_layers: size.z.try_into().expect("negative size"),
+        width: size.width.try_into().expect("negative size"),
+        height: size.height.try_into().expect("negative size"),
+        depth_or_array_layers: size.depth.try_into().expect("negative size"),
     }
 }
 

@@ -44,13 +44,10 @@ pub fn logo_text() -> Arc<dyn vui::Widget> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::math::GridVector;
+    use all_is_cubes::euclid::size3;
 
     #[test]
     fn logo_extent_as_expected() {
-        assert_eq!(
-            logo_text().requirements().minimum,
-            GridVector::new(110, 17, 2)
-        );
+        assert_eq!(logo_text().requirements().minimum, size3(110, 17, 2));
     }
 }

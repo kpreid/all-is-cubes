@@ -106,23 +106,28 @@ where
     let low = bounding_box.lower_bounds();
     let high = bounding_box.upper_bounds() - GridVector::new(1, 1, 1);
     let size = bounding_box.size();
-    f(low, Face6::PZ, size.z, interior.abut(Face6::NX, 1).unwrap())?;
+    f(
+        low,
+        Face6::PZ,
+        size.depth,
+        interior.abut(Face6::NX, 1).unwrap(),
+    )?;
     f(
         GridPoint::new(low.x, low.y, high.z),
         Face6::PX,
-        size.x,
+        size.width,
         interior.abut(Face6::PZ, 1).unwrap(),
     )?;
     f(
         GridPoint::new(high.x, low.y, high.z),
         Face6::NZ,
-        size.z,
+        size.depth,
         interior.abut(Face6::PX, 1).unwrap(),
     )?;
     f(
         GridPoint::new(high.x, low.y, low.z),
         Face6::NX,
-        size.x,
+        size.width,
         interior.abut(Face6::NZ, 1).unwrap(),
     )?;
     Ok(())

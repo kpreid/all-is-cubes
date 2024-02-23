@@ -1,5 +1,5 @@
 use all_is_cubes::euclid::default::Translation3D;
-use all_is_cubes::math::{self, Cube, GridAab, GridCoordinate, GridPoint, GridVector, VectorOps};
+use all_is_cubes::math::{self, Cube, GridAab, GridCoordinate, GridPoint, VectorOps};
 
 /// An octree that knows how to allocate box regions of itself. It stores no other data.
 #[derive(Clone, Debug)]
@@ -306,11 +306,11 @@ fn fits(request: GridAab, size_exponent: u8) -> bool {
     max_edge_length(request.size()) <= expsize(size_exponent)
 }
 
-fn max_edge_length(size: GridVector) -> GridCoordinate {
-    size.x.max(size.y).max(size.z).max(0)
+fn max_edge_length(size: math::GridSize) -> GridCoordinate {
+    size.width.max(size.height).max(size.depth).max(0)
 }
 
-fn max_edge_length_exponent(size: GridVector) -> u8 {
+fn max_edge_length_exponent(size: math::GridSize) -> u8 {
     let max_edge_length = max_edge_length(size);
 
     if max_edge_length == 0 {

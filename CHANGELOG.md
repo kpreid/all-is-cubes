@@ -24,6 +24,8 @@
 - `all-is-cubes` library:
     - `camera::ImageSize` is now an `euclid::Size2D` instead of `euclid::Vector2D`.
     - `camera::Viewport`'s fields are now `euclid::Size2D` instead of `euclid::Vector2D`.
+    - `math::GridAab::from_lower_size()` now takes a `GridSize` instead of `GridVector`.
+    - `math::GridAab::size()` now return `GridSize` instead of `GridVector`.
 
 - `all-is-cubes-mesh` library:
     - The return type of `GetBlockMesh::get_block_mesh()` has changed to `Option<&BlockMesh>`.

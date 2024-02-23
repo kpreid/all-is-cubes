@@ -3,7 +3,7 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::content::testing::lighting_bench_space;
-use all_is_cubes::math::GridVector;
+use all_is_cubes::euclid::size3;
 use all_is_cubes::time;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::yield_progress_for_testing;
@@ -21,7 +21,7 @@ pub fn evaluate_light_bench(c: &mut Criterion) {
                     .block_on(lighting_bench_space(
                         &mut u,
                         yield_progress_for_testing(),
-                        GridVector::new(54, 16, 54),
+                        size3(54, 16, 54),
                     ))
                     .unwrap();
                 (u, space)

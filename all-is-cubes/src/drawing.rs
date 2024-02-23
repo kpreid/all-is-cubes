@@ -239,8 +239,8 @@ fn rectangle_from_bounds(transform: Gridgid, bounds: GridAab) -> Rectangle {
             y: bounds.lower_bounds().y,
         },
         size: Size {
-            width: size.x + 1,
-            height: size.y + 1,
+            width: size.width + 1,
+            height: size.height + 1,
         },
     }
 }

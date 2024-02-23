@@ -245,8 +245,9 @@ impl Vui {
         // (at least vertically, as we don't have aspect ratio support yet).
         ui_center.z = 0.0;
 
-        let view_distance =
-            FreeCoordinate::from(bounds.size().y) / (fov_y_degrees / 2.).to_radians().tan() / 2.;
+        let view_distance = FreeCoordinate::from(bounds.size().height)
+            / (fov_y_degrees / 2.).to_radians().tan()
+            / 2.;
         ViewTransform::from_translation(
             ui_center.to_vector() + FreeVector::new(0., 0., view_distance),
         )

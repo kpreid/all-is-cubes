@@ -8,7 +8,7 @@ use std::time::Duration;
 use all_is_cubes::camera::{Camera, Flaws};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
-use all_is_cubes::euclid::vec3;
+use all_is_cubes::euclid::size3;
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridVector, VectorOps,
@@ -25,8 +25,7 @@ use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
 use crate::in_wgpu::block_texture::BlockTextureViews;
 use crate::in_wgpu::frame_texture::FramebufferTextures;
 use crate::in_wgpu::glue::{
-    point_to_origin, size_vector_to_extent, to_wgpu_color, to_wgpu_index_format,
-    write_texture_by_aab,
+    point_to_origin, size3d_to_extent, to_wgpu_color, to_wgpu_index_format, write_texture_by_aab,
 };
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::skybox;
@@ -905,7 +904,7 @@ impl SpaceLightTexture {
             nz: 1,
         });
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: size_vector_to_extent(texture_bounds.size()),
+            size: size3d_to_extent(texture_bounds.size()),
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D3,
@@ -999,7 +998,7 @@ impl SpaceLightTexture {
                         origin: point_to_origin(cube.lower_bounds() + self.light_lookup_offset()),
                         aspect: wgpu::TextureAspect::All,
                     },
-                    size_vector_to_extent(vec3(1, 1, 1)),
+                    size3d_to_extent(size3(1, 1, 1)),
                 );
 
                 batch_count += 1;

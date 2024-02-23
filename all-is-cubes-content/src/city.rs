@@ -17,8 +17,8 @@ use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::{Slot, Tool};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector,
-    Gridgid,
+    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSize,
+    GridVector, Gridgid,
 };
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder, SpacePhysics};
@@ -75,10 +75,10 @@ pub(crate) async fn demo_city<I: Instant>(
     let lamp_spacing = 20;
     let sky_height = 30;
     let ground_depth = 30; // TODO: wavy_landscape is forcing us to have extra symmetry here
-    let space_size = params.size.unwrap_or(GridVector::new(160, 60, 160));
+    let space_size = params.size.unwrap_or(GridSize::new(160, 60, 160));
     let bounds = GridAab::from_lower_upper(
-        [-space_size.x / 2, -ground_depth, -space_size.z / 2],
-        [space_size.x / 2, sky_height, space_size.z / 2],
+        [-space_size.width / 2, -ground_depth, -space_size.depth / 2],
+        [space_size.width / 2, sky_height, space_size.depth / 2],
     );
 
     let mut planner = CityPlanner::new(bounds);
@@ -411,12 +411,12 @@ async fn place_exhibits_in_city<I: Instant>(
             // Enforce maximum width (TODO: this should be done inside draw_exhibit_info instead)
             let bounds_for_info_voxels = GridAab::from_lower_size(
                 exhibit_info_space.bounds().lower_bounds(),
-                GridVector {
-                    x: exhibit_info_space
+                GridSize {
+                    width: exhibit_info_space
                         .bounds()
                         .size()
-                        .x
-                        .min(enclosure_footprint.size().x * i32::from(info_resolution)),
+                        .width
+                        .min(enclosure_footprint.size().width * i32::from(info_resolution)),
                     ..exhibit_info_space.bounds().size()
                 },
             );

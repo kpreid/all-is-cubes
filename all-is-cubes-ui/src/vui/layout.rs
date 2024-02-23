@@ -2,10 +2,9 @@ use alloc::rc::Rc;
 use alloc::sync::Arc;
 use core::fmt;
 
-use all_is_cubes::euclid;
-use all_is_cubes::euclid::Vector3D;
+use all_is_cubes::euclid::{self, size3, Size3D, Vector3D};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector,
+    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridSize,
 };
 use all_is_cubes::space::{Space, SpaceBuilder, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _, Transaction as _};
@@ -51,13 +50,13 @@ pub fn install_widgets(
 pub struct LayoutRequest {
     /// The minimum dimensions required, without which correct functionality
     /// is not possible.
-    pub minimum: GridVector,
+    pub minimum: Size3D<GridCoordinate, Cube>,
 }
 
 impl LayoutRequest {
     /// A request for no space at all.
     pub const EMPTY: Self = Self {
-        minimum: GridVector::new(0, 0, 0),
+        minimum: size3(0, 0, 0),
     };
 }
 
@@ -101,9 +100,9 @@ impl LayoutGrant {
     /// be one greater on that axis, and `false` that the position should be rounded down
     /// (asymmetric placement).
     #[must_use]
-    pub fn shrink_to(self, mut sizes: GridVector, enlarge_for_symmetry: bool) -> Self {
+    pub fn shrink_to(self, mut sizes: GridSize, enlarge_for_symmetry: bool) -> Self {
         assert!(
-            sizes.x >= 0 && sizes.y >= 0 && sizes.z >= 0,
+            sizes.width >= 0 && sizes.height >= 0 && sizes.depth >= 0,
             "sizes to shrink to must be positive, not {sizes:?}"
         );
 
@@ -140,7 +139,7 @@ impl LayoutGrant {
     ///
     /// This is a common pattern but I'm not sure it should be, so this isn't public.
     pub(crate) fn shrink_to_cube(&self) -> Option<Cube> {
-        self.shrink_to(GridVector::new(1, 1, 1), false)
+        self.shrink_to(GridSize::new(1, 1, 1), false)
             .bounds
             .interior_iter()
             .next()
@@ -478,14 +477,14 @@ impl<W: Layoutable> Layoutable for LayoutTree<W> {
             LayoutTree::Spacer(ref requirements) => requirements.clone(),
             LayoutTree::Margin { margin, ref child } => {
                 let mut req = child.requirements();
-                req.minimum = req.minimum + margin.negatives() + margin.positives();
+                req.minimum += Size3D::from(margin.negatives() + margin.positives());
                 req
             }
             LayoutTree::Stack {
                 direction,
                 ref children,
             } => {
-                let mut accumulator = GridVector::zero();
+                let mut accumulator = GridSize::zero();
                 let stack_axis = direction.axis();
                 for child in children {
                     let child_req = child.requirements();
@@ -592,7 +591,7 @@ mod tests {
     }
 
     impl LT {
-        fn new(label: &'static str, minimum_size: impl Into<GridVector>) -> Self {
+        fn new(label: &'static str, minimum_size: impl Into<GridSize>) -> Self {
             Self {
                 label,
                 requirements: LayoutRequest {
@@ -658,7 +657,7 @@ mod tests {
             children: vec![
                 LayoutTree::leaf(LT::new("a", [1, 1, 1])),
                 LayoutTree::spacer(LayoutRequest {
-                    minimum: GridVector::new(3, 1, 1),
+                    minimum: size3(3, 1, 1),
                 }),
                 LayoutTree::leaf(LT::new("b", [1, 1, 1])),
             ],
@@ -697,7 +696,7 @@ mod tests {
         // (because LayoutGrant::new sets gravity to center)
         assert_eq!(
             LayoutGrant::new(GridAab::from_lower_size([0, 0, 0], [5, 10, 20]))
-                .shrink_to(GridVector::new(10, 10, 10), false),
+                .shrink_to(size3(10, 10, 10), false),
             LayoutGrant::new(GridAab::from_lower_size([0, 0, 5], [5, 10, 10]))
         );
     }
@@ -710,7 +709,7 @@ mod tests {
             gravity: Vector3D::new(Align::Center, Align::Center, Align::Center),
         };
         assert_eq!(
-            grant.shrink_to(GridVector::new(1, 2, 2), false),
+            grant.shrink_to(size3(1, 2, 2), false),
             LayoutGrant {
                 bounds: GridAab::from_lower_size([14, 14, 14], [1, 2, 2]), // TODO: oughta be rounding down
                 gravity: grant.gravity,
@@ -732,7 +731,7 @@ mod tests {
             gravity: Vector3D::new(Align::Center, Align::Center, Align::Center),
         };
         assert_eq!(
-            grant.shrink_to(GridVector::new(1, 2, 2), true),
+            grant.shrink_to(size3(1, 2, 2), true),
             LayoutGrant {
                 bounds: GridAab::from_lower_size([14, 14, 13], [2, 2, 3]),
                 gravity: grant.gravity,

@@ -1,11 +1,10 @@
-use all_is_cubes::euclid::Vector3D;
-use all_is_cubes::util::YieldProgress;
-
+use all_is_cubes::euclid::Size3D;
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridVector, VectorOps,
+    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridSize, GridVector, VectorOps,
 };
 use all_is_cubes::space::Space;
+use all_is_cubes::util::YieldProgress;
 
 /// Defines the dimensions that dungeon room construction must live within.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -20,21 +19,21 @@ pub struct DungeonGrid {
     /// should instead make this a `GridAab` and add a `GridAab::minkowski_sum` method.
     pub room_wall_thickness: FaceMap<u16>,
     /// Thickness of the space lying between each pair of rooms, belonging to neither.
-    pub gap_between_walls: Vector3D<u16, Cube>,
+    pub gap_between_walls: Size3D<u16, Cube>,
 }
 
 impl DungeonGrid {
     /// Returns the distance from the end of one room interior to the beginning of
     /// another, along each axis.
     #[rustfmt::skip]
-    pub fn gap_between_rooms(&self) -> GridVector {
-        self.gap_between_walls.map(GridCoordinate::from)
+    pub fn gap_between_rooms(&self) -> GridSize {
+        GridSize::from(self.gap_between_walls.map(GridCoordinate::from).to_vector()
             + self.room_wall_thickness.negatives().map(GridCoordinate::from)
-            + self.room_wall_thickness.positives().map(GridCoordinate::from)
+            + self.room_wall_thickness.positives().map(GridCoordinate::from))
     }
 
     /// Returns the distances from one room to the same point on the next room, along each axis.
-    pub fn room_spacing(&self) -> GridVector {
+    pub fn room_spacing(&self) -> GridSize {
         self.room_box.size() + self.gap_between_rooms()
     }
 
@@ -44,7 +43,7 @@ impl DungeonGrid {
         room_position
             .lower_bounds()
             .to_vector()
-            .component_mul(self.room_spacing())
+            .component_mul(self.room_spacing().to_vector())
     }
 
     pub fn room_box_including_walls(&self) -> GridAab {
@@ -84,12 +83,12 @@ impl DungeonGrid {
             rooms
                 .lower_bounds()
                 .to_vector()
-                .component_mul(spacing)
+                .component_mul(spacing.to_vector())
                 .to_point(),
             rooms
                 .upper_bounds()
                 .to_vector()
-                .component_mul(spacing)
+                .component_mul(spacing.to_vector())
                 .to_point()
                 // Correct "fencepost error": spacing * number of rooms has one extra
                 // "post" (gap_between_walls).

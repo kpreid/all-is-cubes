@@ -1,7 +1,8 @@
 use alloc::sync::Arc;
 
 use all_is_cubes::block::Block;
-use all_is_cubes::math::{Face6, FaceMap, GridVector};
+use all_is_cubes::euclid::size3;
+use all_is_cubes::math::{Face6, FaceMap};
 
 use crate::vui;
 
@@ -64,7 +65,7 @@ impl vui::Layoutable for Frame {
     fn requirements(&self) -> vui::LayoutRequest {
         // TODO: account for size of the chosen VoxelBrushes (currently not possible to change)
         vui::LayoutRequest {
-            minimum: GridVector::new(0, 0, 1),
+            minimum: size3(0, 0, 1),
         }
     }
 }

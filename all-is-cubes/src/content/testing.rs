@@ -5,7 +5,7 @@ use crate::block::{Block, AIR};
 use crate::character::Spawn;
 use crate::content::{free_editing_starter_inventory, palette};
 use crate::linking::InGenError;
-use crate::math::{Face6, FaceMap, GridAab, GridVector, Rgba};
+use crate::math::{Face6, FaceMap, GridAab, GridSize, Rgba};
 use crate::space::{LightPhysics, Space, SpacePhysics};
 use crate::universe::Universe;
 use crate::util::YieldProgress;
@@ -22,7 +22,7 @@ use crate::util::YieldProgress;
 pub async fn lighting_bench_space(
     _universe: &mut Universe,
     progress: YieldProgress,
-    requested_space_size: GridVector,
+    requested_space_size: GridSize,
 ) -> Result<Space, InGenError> {
     // Constant sizes
     let section_width = 6;
@@ -31,10 +31,10 @@ pub async fn lighting_bench_space(
 
     // Sizes chosen based on constants and space_size
     let array_side_lengths = euclid::default::Vector2D::new(
-        (requested_space_size.x - margin) / section_spacing,
-        (requested_space_size.z - margin) / section_spacing,
+        (requested_space_size.width - margin) / section_spacing,
+        (requested_space_size.depth - margin) / section_spacing,
     );
-    let between_bottom_and_top = requested_space_size.y - 2;
+    let between_bottom_and_top = requested_space_size.height - 2;
     if between_bottom_and_top < 2 {
         return Err(InGenError::Other("height too small".into()));
     }
@@ -140,7 +140,7 @@ pub async fn lighting_bench_space(
 
     space.set_physics(SpacePhysics {
         light: LightPhysics::Rays {
-            maximum_distance: space_bounds.size().x.max(space_bounds.size().z) as _,
+            maximum_distance: space_bounds.size().width.max(space_bounds.size().depth) as _,
         },
         sky: {
             let sky_ground = palette::ALMOST_BLACK;

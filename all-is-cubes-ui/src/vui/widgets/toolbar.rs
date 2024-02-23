@@ -1,14 +1,14 @@
-use all_is_cubes::arcstr;
 use alloc::sync::{Arc, Weak};
 use std::error::Error;
 use std::fmt;
 use std::sync::Mutex;
 
+use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, text, Block, Resolution};
 use all_is_cubes::character::Character;
 use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
 use all_is_cubes::listen::{DirtyFlag, Gate, Listen as _, ListenableSource, Listener};
-use all_is_cubes::math::{Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::math::{Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridSize, GridVector};
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::time::Duration;
 use all_is_cubes::transaction::Merge as _;
@@ -71,7 +71,7 @@ impl Toolbar {
 impl Layoutable for Toolbar {
     fn requirements(&self) -> LayoutRequest {
         LayoutRequest {
-            minimum: GridVector::new(
+            minimum: GridSize::new(
                 self.slot_count as GridCoordinate * Self::TOOLBAR_STEP + 1,
                 3,
                 3,

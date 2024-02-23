@@ -319,10 +319,14 @@ mod internal {
                     .unwrap(/* cannot overflow? */)
                     .unsigned_size();
                 assert_eq!(
-                    size.z, 1,
+                    size.depth, 1,
                     "failed to rotate slice {sliced_bounds:?} into the XY plane with {rotation:?}: {size:?}"
                 );
-                rects_to_place.push_rect(i, None, rp::RectToInsert::new(size.x, size.y, size.z));
+                rects_to_place.push_rect(
+                    i,
+                    None,
+                    rp::RectToInsert::new(size.width, size.height, size.depth),
+                );
             }
 
             let mut texture_size = 1;
@@ -364,8 +368,8 @@ mod internal {
 
                 // Copy slice from 3D `texels` into 2D atlas image.
                 // TODO: Something is wrong in this code causing skewed outputs; not yet diagnosed.
-                for y in 0..rotated_size.y {
-                    for x in 0..rotated_size.x {
+                for y in 0..rotated_size.height {
+                    for x in 0..rotated_size.width {
                         // Zero-offset position in the rotated-to-flat slice.
                         let pixel_position = Point3D::new(x, y, 0).cast::<i32>();
                         // Position in the rotated-to-flat slice's coordinates.
@@ -389,8 +393,8 @@ mod internal {
                             unrotated.lower_bounds() - entry.source_bounds.lower_bounds();
                         // Index into the `texels` array at that position.
                         let index_in_texels = (position_in_texels.x
-                            + texels_size.x * position_in_texels.y)
-                            + texels_size.y * position_in_texels.z;
+                            + texels_size.width * position_in_texels.y)
+                            + texels_size.height * position_in_texels.z;
 
                         let texel = texels[usize::try_from(index_in_texels).unwrap()];
                         atlas_image.put_pixel(

@@ -12,7 +12,8 @@ use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb, Rgba, VectorOps,
+    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridVector, Rgb, Rgba,
+    VectorOps,
 };
 use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{LightPhysics, Space};
@@ -178,7 +179,7 @@ impl UniverseTemplate {
                     all_is_cubes::content::testing::lighting_bench_space(
                         &mut universe,
                         p.take().unwrap(),
-                        params.size.unwrap_or(GridVector::new(54, 16, 54)),
+                        params.size.unwrap_or(GridSize::new(54, 16, 54)),
                     )
                     .await,
                 ),
@@ -255,7 +256,7 @@ pub struct TemplateParameters {
     ///
     /// If the space cannot be constructed in approximately this size, building the
     /// template should return an error.
-    pub size: Option<GridVector>,
+    pub size: Option<GridSize>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -314,10 +315,10 @@ async fn islands(
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
 
     let TemplateParameters { size, seed: _ } = params;
-    let size = size.unwrap_or(GridVector::new(1000, 400, 1000));
+    let size = size.unwrap_or(GridSize::new(1000, 400, 1000));
 
     // Set up dimensions
-    let bounds = GridAab::from_lower_size([size.x / -2, size.y / -2, size.z], size);
+    let bounds = GridAab::from_lower_size([size.width / -2, size.height / -2, size.depth], size);
 
     let mut space = Space::builder(bounds)
         .sky_color(palette::DAY_SKY_COLOR)
@@ -349,9 +350,9 @@ async fn islands(
         // TODO: randomize island location in cell?
         let margin = 10;
         // TODO: non-panicking expand() will be a better solution than this conditional here
-        if cell_bounds.size().x >= margin * 2
-            && cell_bounds.size().y >= margin + 25
-            && cell_bounds.size().z >= margin * 2
+        if cell_bounds.size().width >= margin * 2
+            && cell_bounds.size().height >= margin + 25
+            && cell_bounds.size().depth >= margin * 2
         {
             let occupied_bounds = cell_bounds.expand(FaceMap::repeat(-10).with(Face6::PY, -25));
             wavy_landscape(occupied_bounds, &mut space, &landscape_blocks, 0.5)?;
@@ -471,7 +472,6 @@ async fn arbitrary_space(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::euclid::Vector3D;
     use all_is_cubes::time;
     use all_is_cubes::util::yield_progress_for_testing;
     use futures_core::future::BoxFuture;
@@ -491,7 +491,7 @@ mod tests {
             // run a much smaller instance of it for the does-it-succeed test.
             TemplateParameters {
                 seed: Some(0x7f16dfe65954583e),
-                size: Some(Vector3D::new(100, 50, 100)),
+                size: Some(GridSize::new(100, 50, 100)),
             }
         } else {
             TemplateParameters {

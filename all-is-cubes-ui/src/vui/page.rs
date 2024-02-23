@@ -5,8 +5,8 @@ use all_is_cubes::block::{text, AIR};
 use all_is_cubes::block::{Block, BlockAttributes, Resolution};
 use all_is_cubes::camera;
 use all_is_cubes::content::palette;
-use all_is_cubes::euclid::{vec2, Vector2D};
-use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgba};
+use all_is_cubes::euclid::{size2, Size2D};
+use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridSize, Rgba};
 use all_is_cubes::space::{self, Space, SpaceBuilder, SpacePhysics};
 use all_is_cubes::time;
 use all_is_cubes::transaction;
@@ -24,7 +24,7 @@ use crate::vui::{
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct UiSize {
     /// Two-dimensional size; individual pages may have their own choices of depth.
-    size: Vector2D<GridCoordinate, Cube>,
+    size: Size2D<GridCoordinate, Cube>,
 }
 
 impl UiSize {
@@ -43,7 +43,7 @@ impl UiSize {
             .max(8);
         let height = height / 2 * 2 + 1; // ensure odd
         Self {
-            size: vec2(width, height),
+            size: size2(width, height),
         }
     }
 
@@ -51,7 +51,7 @@ impl UiSize {
     pub(crate) fn space_bounds(&self) -> GridAab {
         GridAab::from_lower_upper(
             [0, 0, -Self::DEPTH_BEHIND_VIEW_PLANE],
-            [self.size.x, self.size.y, 5],
+            [self.size.width, self.size.height, 5],
         )
     }
 
@@ -59,7 +59,11 @@ impl UiSize {
     // TODO: validate this doesn't crash on wonky sizes.
     pub(crate) fn create_space(self) -> Space {
         let bounds = self.space_bounds();
-        let Vector2D { x: w, y: h, .. } = self.size;
+        let Size2D {
+            width: w,
+            height: h,
+            ..
+        } = self.size;
         let mut space = Space::builder(bounds)
             .physics({
                 let mut physics = SpacePhysics::default();
@@ -121,7 +125,7 @@ impl PageInst {
         // TODO: We need overall better handling of this; for example, we should be able to
         // pan ("scroll") the camera over a tall dialog box.
         // Also, this doesn't handle Z size.
-        let fitting_size = size.size.max(self.tree.requirements().minimum.xy());
+        let fitting_size = size.size.max(drop_depth(self.tree.requirements().minimum));
         if fitting_size != size.size {
             log::debug!("VUI page had to enlarge proposed size {size:?} to {fitting_size:?}");
             size.size = fitting_size;
@@ -168,6 +172,11 @@ impl PageInst {
     }
 }
 
+// TODO: contribute this to euclid
+fn drop_depth(size: GridSize) -> Size2D<GridCoordinate, Cube> {
+    Size2D::new(size.width, size.height)
+}
+
 /// Wrap the given widget tree in a transparent screen-filling background.
 pub(crate) fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
     Arc::new(LayoutTree::Stack {
@@ -178,7 +187,7 @@ pub(crate) fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
                 // magic number 2 allows us to fill the edges of the viewport, ish
                 // TODO: VUI camera positioning should give us the option of "overscan",
                 // where all edges of the space spill off the window.
-                minimum: GridVector::new(0, 0, UiSize::DEPTH_BEHIND_VIEW_PLANE + 2),
+                minimum: GridSize::new(0, 0, UiSize::DEPTH_BEHIND_VIEW_PLANE + 2),
             })),
             vui::leaf_widget(widgets::Frame::with_block(Block::from(Rgba::new(
                 0., 0., 0., 0.7,

@@ -2,7 +2,7 @@ use alloc::collections::VecDeque;
 use rand::seq::{IteratorRandom as _, SliceRandom as _};
 use rand::SeedableRng;
 
-use all_is_cubes::math::{Cube, Face6, FaceMap, GridAab, GridArray, GridVector};
+use all_is_cubes::math::{Cube, Face6, FaceMap, GridAab, GridArray, GridSize};
 
 pub type Maze = GridArray<MazeRoom>;
 
@@ -38,7 +38,7 @@ fn open_passage(maze: &mut Maze, from: Cube, dir: Face6) {
     maze[from + dir.normal_vector()].passages[dir.opposite()] = true;
 }
 
-pub fn generate_maze(seed: u64, requested_rooms: GridVector) -> Maze {
+pub fn generate_maze(seed: u64, requested_rooms: GridSize) -> Maze {
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
 
     let mut maze = GridArray::repeat(

@@ -28,7 +28,9 @@ use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
 use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking::{self, InGenError};
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
-use all_is_cubes::math::{Cube, Face6, GridAab, GridCoordinate, GridVector, Gridgid, Rgba};
+use all_is_cubes::math::{
+    Cube, Face6, GridAab, GridCoordinate, GridSize, GridVector, Gridgid, Rgba,
+};
 use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{URef, UniverseTransaction};
@@ -114,18 +116,18 @@ impl vui::Layoutable for ButtonLabel {
         let Self { icon, text } = self;
         let text_size = text
             .as_ref()
-            .map_or(GridVector::zero(), |text| text.requirements().minimum);
+            .map_or(GridSize::zero(), |text| text.requirements().minimum);
         let icon_size = if icon.is_some() {
-            GridVector::one()
+            GridSize::new(1, 1, 1)
         } else {
-            GridVector::zero()
+            GridSize::zero()
         };
         vui::LayoutRequest {
-            minimum: GridVector::new(
+            minimum: GridSize::new(
                 // TODO: consider using LayoutTree to execute the layout
-                text_size.x + icon_size.x,
-                text_size.y.max(icon_size.y),
-                text_size.z.max(icon_size.z),
+                text_size.width + icon_size.width,
+                text_size.height.max(icon_size.height),
+                text_size.depth.max(icon_size.depth),
             ),
         }
     }
@@ -193,7 +195,7 @@ impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St>
 impl<St> vui::Layoutable for ButtonCommon<St> {
     fn requirements(&self) -> vui::LayoutRequest {
         let mut req = self.label.requirements();
-        req.minimum.z = req.minimum.z.max(1);
+        req.minimum.depth = req.minimum.depth.max(1);
         req
     }
 }

@@ -7,12 +7,12 @@ use core::fmt;
 use core::iter::FusedIterator;
 use core::ops::Range;
 
-use euclid::Vector3D;
+use euclid::{Size3D, Vector3D};
 
 use crate::block::Resolution;
 use crate::math::{
     sort_two, Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridCoordinate,
-    GridPoint, GridVector, Gridgid, VectorOps as _, Vol,
+    GridPoint, GridSize, GridVector, Gridgid, VectorOps as _, Vol,
 };
 
 /// An axis-aligned box with integer coordinates, whose volume is no larger than [`usize::MAX`].
@@ -32,7 +32,7 @@ pub struct GridAab {
     lower_bounds: GridPoint,
     /// Constructor checks ensure this is non-negative and that adding it
     /// to lower_bounds will not overflow.
-    sizes: GridVector,
+    sizes: GridSize,
 }
 
 impl GridAab {
@@ -61,7 +61,7 @@ impl GridAab {
     /// have *some* box.
     pub const ORIGIN_EMPTY: GridAab = GridAab {
         lower_bounds: GridPoint::new(0, 0, 0),
-        sizes: GridVector::new(0, 0, 0),
+        sizes: GridSize::new(0, 0, 0),
     };
 
     /// Constructs a [`GridAab`] from coordinate lower bounds and sizes.
@@ -74,10 +74,7 @@ impl GridAab {
     /// Panics if the sizes are negative or the resulting range would cause
     /// numeric overflow. Use [`GridAab::checked_from_lower_size`] to avoid panics.
     #[track_caller]
-    pub fn from_lower_size(
-        lower_bounds: impl Into<GridPoint>,
-        sizes: impl Into<GridVector>,
-    ) -> Self {
+    pub fn from_lower_size(lower_bounds: impl Into<GridPoint>, sizes: impl Into<GridSize>) -> Self {
         Self::checked_from_lower_size(lower_bounds.into(), sizes.into())
             .expect("GridAab::from_lower_size")
     }
@@ -93,9 +90,9 @@ impl GridAab {
     /// numeric overflow.
     pub fn checked_from_lower_size(
         lower_bounds: impl Into<GridPoint>,
-        sizes: impl Into<GridVector>,
+        sizes: impl Into<GridSize>,
     ) -> Result<Self, GridOverflowError> {
-        fn inner(lower_bounds: GridPoint, sizes: GridVector) -> Result<GridAab, GridOverflowError> {
+        fn inner(lower_bounds: GridPoint, sizes: GridSize) -> Result<GridAab, GridOverflowError> {
             // TODO: Test these error cases.
             // TODO: Replace string error construction with an error enum.
             for axis in Axis::ALL {
@@ -183,13 +180,13 @@ impl GridAab {
         let size = resolution.to_grid();
         GridAab {
             lower_bounds: GridPoint::new(0, 0, 0),
-            sizes: GridVector::new(size, size, size),
+            sizes: GridSize::new(size, size, size),
         }
     }
 
     /// Compute volume with checked arithmetic. In a function solely for the convenience
     /// of the `?` operator without which this is even worse.
-    fn checked_volume_helper(sizes: GridVector) -> Result<usize, ()> {
+    fn checked_volume_helper(sizes: GridSize) -> Result<usize, ()> {
         let mut volume: usize = 1;
         for i in Axis::ALL {
             volume = volume
@@ -222,8 +219,7 @@ impl GridAab {
     /// Computes the approximate volume of this box in cubes, i.e. the product of all sizes
     /// converted to [`f64`].
     pub fn volume_f64(&self) -> f64 {
-        let size = self.size().to_f64();
-        size.x * size.y * size.z
+        self.size().to_f64().volume()
     }
 
     /// Computes the surface area of this box; 1 unit of area = 1 cube-face.
@@ -232,13 +228,16 @@ impl GridAab {
     /// want float anyway.
     pub fn surface_area_f64(&self) -> f64 {
         let size = self.sizes.to_f64();
-        size.x * size.y * 2. + size.x * size.z * 2. + size.y * size.z * 2.
+        size.width * size.height * 2. + size.width * size.depth * 2. + size.height * size.depth * 2.
     }
 
     /// Returns whether the box contains no cubes (its volume is zero).
+    ///
+    /// This does not necessarily mean that its size is zero on all axes.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.sizes.x == 0 || self.sizes.y == 0 || self.sizes.z == 0
+        // euclid's Size3D::is_empty() is broken
+        self.sizes.width == 0 || self.sizes.height == 0 || self.sizes.depth == 0
     }
 
     /// Inclusive upper bounds on cube coordinates, or the most negative corner of the
@@ -254,14 +253,16 @@ impl GridAab {
     pub fn upper_bounds(&self) -> GridPoint {
         // Cannot overflow due to constructor-enforced invariants,
         // so always use un-checked arithmetic
-        self.lower_bounds
-            .zip(self.sizes.to_point(), GridCoordinate::wrapping_add)
+        self.lower_bounds.zip(
+            self.sizes.to_vector().to_point(),
+            GridCoordinate::wrapping_add,
+        )
     }
 
     /// Size of the box in each axis; equivalent to
     /// `self.upper_bounds() - self.lower_bounds()`.
     #[inline]
-    pub fn size(&self) -> GridVector {
+    pub fn size(&self) -> GridSize {
         self.sizes
     }
 
@@ -272,7 +273,7 @@ impl GridAab {
     /// Compared to [`GridAab::size()`], this is a convenience so that callers needing
     /// unsigned integers do not need to write a fallible-looking conversion.
     #[inline]
-    pub fn unsigned_size(&self) -> Vector3D<u32, Cube> {
+    pub fn unsigned_size(&self) -> Size3D<u32, Cube> {
         // Convert the i32 we know to be positive to u32.
         // Declaring the parameter type ensures that if we ever decide to change the numeric type
         // of `GridCoordinate`, this will fail to compile.

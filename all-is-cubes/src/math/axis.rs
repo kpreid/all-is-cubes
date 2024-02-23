@@ -125,31 +125,32 @@ mod impl_index_axis {
     }
 
     macro_rules! impl_xyz_e {
-        ($($type:tt)*) => {
+        ($x:ident $y:ident $z:ident, $($type:tt)*) => {
             impl<T, U> ops::Index<Axis> for $($type)*<T, U> {
                 type Output = T;
 
                 fn index(&self, index: Axis) -> &Self::Output {
                     match index {
-                        Axis::X => &self.x,
-                        Axis::Y => &self.y,
-                        Axis::Z => &self.z,
+                        Axis::X => &self.$x,
+                        Axis::Y => &self.$y,
+                        Axis::Z => &self.$z,
                     }
                 }
             }
             impl<T, U> ops::IndexMut<Axis> for $($type)*<T, U> {
                 fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
                     match index {
-                        Axis::X => &mut self.x,
-                        Axis::Y => &mut self.y,
-                        Axis::Z => &mut self.z,
+                        Axis::X => &mut self.$x,
+                        Axis::Y => &mut self.$y,
+                        Axis::Z => &mut self.$z,
                     }
                 }
             }
         };
     }
-    impl_xyz_e!(euclid::Vector3D);
-    impl_xyz_e!(euclid::Point3D);
+    impl_xyz_e!(x y z, euclid::Vector3D);
+    impl_xyz_e!(x y z, euclid::Point3D);
+    impl_xyz_e!(width height depth, euclid::Size3D);
 }
 
 #[cfg(test)]

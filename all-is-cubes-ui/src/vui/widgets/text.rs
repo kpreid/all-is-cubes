@@ -231,7 +231,7 @@ mod tests {
     use all_is_cubes::arcstr::literal;
     use all_is_cubes::block::Block;
     use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1::FONT_9X15_BOLD;
-    use all_is_cubes::euclid::vec3;
+    use all_is_cubes::euclid::size3;
     use all_is_cubes::math::Rgba;
     use all_is_cubes::space::{SpaceBuilder, SpacePhysics};
 
@@ -247,7 +247,7 @@ mod tests {
         assert_eq!(
             widget.requirements(),
             LayoutRequest {
-                minimum: vec3(9 * text.len() as i32, 15, 1)
+                minimum: size3(9 * text.len() as i32, 15, 1)
             }
         );
     }
@@ -275,7 +275,7 @@ mod tests {
         assert_eq!(
             tree.requirements(),
             LayoutRequest {
-                minimum: vec3(2, 1, 1)
+                minimum: size3(2, 1, 1)
             }
         );
     }

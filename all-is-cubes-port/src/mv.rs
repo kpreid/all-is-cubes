@@ -206,7 +206,7 @@ fn space_to_dot_vox_model(
 ) -> Result<dot_vox::Model, ExportError> {
     let space = space_ref.read()?;
     let bounds = space.bounds();
-    if bounds.size().x > 256 || bounds.size().y > 256 || bounds.size().z > 256 {
+    if bounds.size().width > 256 || bounds.size().height > 256 || bounds.size().depth > 256 {
         return Err(ExportError::NotRepresentable {
             name: Some(space_ref.name()),
             reason: format!(
@@ -254,7 +254,7 @@ fn space_to_dot_vox_model(
             // TODO: tidy this up by rotating the bounds?
             let Vector3D { x, y, z, _unit } = transform
                 .rotation
-                .transform_vector(space.bounds().size())
+                .transform_vector(space.bounds().size().to_vector())
                 .map(i32::abs) // vector rotation might make it negative
                 .to_u32(); // conversion from positive i32 to u32 cannot overflow
             dot_vox::Size { x, y, z }
@@ -307,9 +307,9 @@ fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
     let mv_size = dot_vox::Size {
         // Note axis swap! We can't just delegate this to the transform because the transform doesn't exist yet.
         // (TODO: But we could delegate it to the GridRotation)
-        x: aic_size.x,
-        y: aic_size.z,
-        z: aic_size.y,
+        x: aic_size.width,
+        y: aic_size.depth,
+        z: aic_size.height,
     };
     mv_to_aic_coordinate_transform(mv_size).inverse()
         * Gridgid::from_translation(-aic_bounds.lower_bounds().to_vector())

@@ -7,7 +7,7 @@ use core::hint::black_box;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::content::testing::lighting_bench_space;
-use all_is_cubes::math::GridVector;
+use all_is_cubes::euclid::size3;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::yield_progress_for_testing;
 
@@ -16,13 +16,9 @@ async fn save_space(c: &mut Criterion) {
     // TODO: add significant content beyond the `Space` (or maybe separate benches)
     let universe_to_save = {
         let mut u = Universe::new();
-        let space = lighting_bench_space(
-            &mut u,
-            yield_progress_for_testing(),
-            GridVector::new(100, 32, 100),
-        )
-        .await
-        .unwrap();
+        let space = lighting_bench_space(&mut u, yield_progress_for_testing(), size3(100, 32, 100))
+            .await
+            .unwrap();
         u.insert("space".into(), space).unwrap();
         u
     };

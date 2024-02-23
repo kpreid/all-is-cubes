@@ -8,8 +8,8 @@ use all_is_cubes::camera::{
 };
 use all_is_cubes::character::Character;
 use all_is_cubes::content::testing::lighting_bench_space;
+use all_is_cubes::euclid::size3;
 use all_is_cubes::listen::ListenableSource;
-use all_is_cubes::math::GridVector;
 use all_is_cubes::raytracer::RtRenderer;
 use all_is_cubes::universe::{URef, Universe};
 use all_is_cubes::util::yield_progress_for_testing;
@@ -27,7 +27,7 @@ impl TestData {
         let space = lighting_bench_space(
             &mut universe,
             yield_progress_for_testing(),
-            GridVector::new(54, 16, 54),
+            size3(54, 16, 54),
         )
         .await
         .unwrap();

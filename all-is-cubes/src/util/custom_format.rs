@@ -51,6 +51,20 @@ impl<T: fmt::Debug, U> Fmt<ConciseDebug> for euclid::Vector3D<T, U> {
         write!(fmt, "({:+.3?}, {:+.3?}, {:+.3?})", self.x, self.y, self.z)
     }
 }
+impl<T: fmt::Debug, U> Fmt<ConciseDebug> for euclid::Size2D<T, U> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &ConciseDebug) -> fmt::Result {
+        write!(fmt, "({:+.3?}, {:+.3?})", self.width, self.height)
+    }
+}
+impl<T: fmt::Debug, U> Fmt<ConciseDebug> for euclid::Size3D<T, U> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &ConciseDebug) -> fmt::Result {
+        write!(
+            fmt,
+            "({:+.3?}, {:+.3?}, {:+.3?})",
+            self.width, self.height, self.depth
+        )
+    }
+}
 
 /// Format type for [`manyfmt::Fmt`] which provides an highly condensed, ideally
 /// constant-size, user-facing format for live-updating textual status messages.
