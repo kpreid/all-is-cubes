@@ -28,6 +28,7 @@ required-features = ["wgpu"]
 [[bench]]
 name = "wgpu_bench"
 harness = false
+required-features = ["wgpu"]
 
 [features]
 # Adds support for render info logging to Rerun.

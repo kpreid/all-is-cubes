@@ -41,6 +41,7 @@ harness = false
 [[bench]]
 name = "save_bench"
 harness = false
+required-features = ["save"]
 
 [[bench]]
 name = "space_bench"
