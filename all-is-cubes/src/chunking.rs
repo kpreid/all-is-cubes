@@ -329,9 +329,9 @@ fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) 
     }
 }
 
-#[cfg(feature = "std")]
 #[doc(hidden)] // used for benchmarks
 pub fn reset_chunk_chart_cache() {
+    #[cfg(feature = "std")]
     match CHUNK_CHART_CACHE.lock() {
         Ok(mut cache) => cache.clear(),
         Err(_) => {
