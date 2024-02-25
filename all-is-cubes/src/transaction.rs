@@ -336,10 +336,15 @@ pub(crate) fn merge_option<T>(this: &mut Option<T>, other: Option<T>, if_both: f
 }
 
 /// For use with `merge_option()`.
-pub(crate) fn panic_if_not_equal<T: PartialEq>(a: T, b: T) -> T {
+#[track_caller]
+pub(crate) fn panic_if_not_equal<T: fmt::Debug + PartialEq>(a: T, b: T) -> T {
     if a == b {
         a
     } else {
-        panic!("transaction being merged contains conflicting elements");
+        panic!(
+            "transaction being merged contains conflicting elements:\n\
+            left:  {a:#?}\n
+            right: {b:#?}",
+        );
     }
 }
