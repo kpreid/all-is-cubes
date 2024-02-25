@@ -604,7 +604,9 @@ fn do_for_all_packages(
             Features::AllAndNothing => {
                 {
                     let _t = CaptureTime::new(time_log, format!("{op:?} --all-features"));
-                    op.cargo_cmd(config).arg("--all-features").run()?;
+                    op.cargo_cmd(config)
+                        .args(["--all-targets", "--all-features"])
+                        .run()?;
                 }
 
                 // To test with limited features, we need to run commands separately for each
@@ -618,7 +620,12 @@ fn do_for_all_packages(
 
                     let _t = CaptureTime::new(time_log, format!("{op:?} --package {package_name}"));
                     op.cargo_cmd(config)
-                        .args(["--package", package_name, "--no-default-features"])
+                        .args([
+                            "--package",
+                            package_name,
+                            "--all-targets",
+                            "--no-default-features",
+                        ])
                         .run()?;
                 }
             }
