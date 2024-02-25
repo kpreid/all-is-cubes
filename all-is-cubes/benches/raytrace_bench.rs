@@ -21,7 +21,7 @@ struct TestData {
     character: Handle<Character>,
 }
 impl TestData {
-    #[tokio::main]
+    #[tokio::main(flavor = "current_thread")]
     async fn new() -> Self {
         let mut universe = Universe::new();
         let space = lighting_bench_space(

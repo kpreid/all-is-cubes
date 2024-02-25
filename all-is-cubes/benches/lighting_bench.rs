@@ -9,6 +9,10 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::yield_progress_for_testing;
 
 pub fn evaluate_light_bench(c: &mut Criterion) {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+
     let mut group = c.benchmark_group("evaluate");
     group.sample_size(10);
 
@@ -16,8 +20,7 @@ pub fn evaluate_light_bench(c: &mut Criterion) {
         b.iter_batched(
             || {
                 let mut u = Universe::new();
-                let space = tokio::runtime::Runtime::new()
-                    .unwrap()
+                let space = rt
                     .block_on(lighting_bench_space(
                         &mut u,
                         yield_progress_for_testing(),
