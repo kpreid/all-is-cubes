@@ -510,9 +510,14 @@ impl Merge for CubeTransaction {
         let conflict = CubeConflict {
             // Incompatible preconditions will always fail.
             old: matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b),
-            // Replacing the same cube twice is not allowed -- even if they're
-            // equal, doing so could violate an intended conservation law.
-            new: self.new.is_some() && other.new.is_some() && self.conserved,
+            new: if self.conserved {
+                // Replacing the same cube twice is not allowed -- even if they're
+                // equal, doing so could violate an intended conservation law.
+                self.new.is_some() && other.new.is_some()
+            } else {
+                // If nonconservative, then we simply require equal outcomes.
+                matches!((&self.new, &other.new), (Some(a), Some(b)) if a != b)
+            },
         };
 
         if (conflict
@@ -695,10 +700,18 @@ mod tests {
     }
 
     #[test]
-    fn merge_rejects_different_new() {
+    fn merge_rejects_different_new_conserved() {
         let [b1, b2] = make_some_blocks();
         let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(b1.clone()));
         let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(b2.clone()));
+        t1.merge(t2).unwrap_err();
+    }
+
+    #[test]
+    fn merge_rejects_different_new_nonconserved() {
+        let [b1, b2] = make_some_blocks();
+        let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(b1.clone())).nonconserved();
+        let t2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(b2.clone())).nonconserved();
         t1.merge(t2).unwrap_err();
     }
 
