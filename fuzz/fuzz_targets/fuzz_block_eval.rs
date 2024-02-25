@@ -7,7 +7,7 @@ extern crate all_is_cubes;
 use all_is_cubes::block::Block;
 
 fuzz_target!(|block: Block| {
-    // TODO: The `Block` will have pending URefs (not inserted in a Universe).
+    // TODO: The `Block` will have pending `Handle`s (not inserted in a Universe).
     // Put them in a universe once that is possible.
 
     let sink = all_is_cubes::listen::Sink::new();
@@ -21,7 +21,7 @@ fuzz_target!(|block: Block| {
         }
     }
 
-    // Exercise visit_refs(), because it is a recursive operation on the block + modifiers.
+    // Exercise visit_handles(), because it is a recursive operation on the block + modifiers.
     // TODO: To do this we need a handy visitor, but I think it should be simplified...
-    // block.visit_refs(visitor);
+    // block.visit_handles(visitor);
 });

@@ -26,7 +26,7 @@ use all_is_cubes::math::{
 use all_is_cubes::space::{self, LightPhysics, Space, SpaceBuilder};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{RefError, URef, Universe, UniverseTransaction};
+use all_is_cubes::universe::{Handle, HandleError, Universe, UniverseTransaction};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes::{notnan, rgb_const, rgba_const};
 use all_is_cubes_content::{make_some_voxel_blocks, palette, UniverseTemplate};
@@ -315,8 +315,8 @@ async fn error_character_gone(context: RenderTestContext) {
     renderer.update(None).await.unwrap();
     let _image = renderer.draw("").await.unwrap();
 
-    let character_ref: URef<Character> = universe.get(&"character".into()).unwrap();
-    UniverseTransaction::delete(character_ref)
+    let character_handle: Handle<Character> = universe.get(&"character".into()).unwrap();
+    UniverseTransaction::delete(character_handle)
         .execute(&mut universe, &mut transaction::no_outputs)
         .unwrap();
     drop(universe); // shouldn't make a difference but hey
@@ -324,7 +324,7 @@ async fn error_character_gone(context: RenderTestContext) {
     // Updating may fail, or it may succeed because there were no change notifications.
     match renderer.update(None).await {
         Ok(()) => {}
-        Err(RenderError::Read(RefError::Gone(name)))
+        Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
         Err(e) => panic!("unexpected other error from update(): {e:?}"),
     }
@@ -332,7 +332,7 @@ async fn error_character_gone(context: RenderTestContext) {
     // TODO: We temporarily also allow failure. Stop that.
     match renderer.draw("").await {
         Ok(_image) => {}
-        Err(RenderError::Read(RefError::Gone(name)))
+        Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
         res => panic!("unexpected result from draw(): {res:?}"),
     }
@@ -352,7 +352,7 @@ async fn error_character_unavailable(context: RenderTestContext) {
     drop(universe);
 
     match renderer.update(None).await {
-        Err(RenderError::Read(RefError::Gone(name)))
+        Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
         res => panic!("unexpected result from update(): {res:?}"),
     }
@@ -360,7 +360,7 @@ async fn error_character_unavailable(context: RenderTestContext) {
     // TODO: We temporarily also allow failure. Stop that.
     match renderer.draw("").await {
         Ok(_image) => {}
-        Err(RenderError::Read(RefError::Gone(name)))
+        Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
         res => panic!("unexpected result from draw(): {res:?}"),
     }
@@ -381,7 +381,7 @@ async fn fog(mut context: RenderTestContext, fog: FogOption) {
 /// Does the renderer properly follow a change of character?
 async fn follow_character_change(context: RenderTestContext) {
     let mut universe = Universe::new();
-    let mut character_of_a_color = |color: Rgb| -> URef<Character> {
+    let mut character_of_a_color = |color: Rgb| -> Handle<Character> {
         let space = Space::builder(GridAab::ORIGIN_CUBE)
             .sky_color(color)
             .build();
@@ -1001,7 +1001,7 @@ fn looking_at_one_cube_spawn(bounds: GridAab) -> Spawn {
 }
 
 /// A simple space to draw something in the UI layer.
-fn ui_space(universe: &mut Universe) -> URef<Space> {
+fn ui_space(universe: &mut Universe) -> Handle<Space> {
     let ui_space = Space::builder(GridAab::from_lower_size([-3, -3, -4], [1, 1, 1]))
         .light_physics(all_is_cubes::space::LightPhysics::None)
         .sky_color(rgb_const!(1.0, 1.0, 0.5)) // blatantly wrong color that should not be seen

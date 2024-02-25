@@ -12,7 +12,7 @@ use all_is_cubes::math::{Cube, FaceMap, GridAab, GridCoordinate, GridPoint, Grid
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::time::Duration;
 use all_is_cubes::transaction::Merge as _;
-use all_is_cubes::universe::{URef, Universe};
+use all_is_cubes::universe::{Handle, Universe};
 
 use crate::inv_watch::InventoryWatcher;
 use crate::ui_content::{hud::HudBlocks, CueMessage, CueNotifier};
@@ -41,7 +41,7 @@ impl Toolbar {
     const TOOLBAR_STEP: GridCoordinate = 2;
 
     pub fn new(
-        character_source: ListenableSource<Option<URef<Character>>>,
+        character_source: ListenableSource<Option<Handle<Character>>>,
         // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
         hud_blocks: Arc<HudBlocks>,
         slot_count: usize,

@@ -888,9 +888,9 @@ mod universe {
     use crate::save::schema::MemberEntrySer;
     use crate::space::Space;
     use crate::time;
-    use crate::universe::{self, Name, PartialUniverse, UBorrow, URef, Universe};
+    use crate::universe::{self, Handle, Name, PartialUniverse, UBorrow, Universe};
     use core::cell::RefCell;
-    use schema::{MemberDe, NameSer, URefSer};
+    use schema::{HandleSer, MemberDe, NameSer};
 
     impl From<&BlockDef> for schema::MemberSer {
         fn from(block_def: &BlockDef) -> Self {
@@ -908,30 +908,30 @@ mod universe {
                 spaces,
             } = self;
 
-            let blocks = blocks.iter().map(|member_ref: &URef<BlockDef>| {
-                let name = member_ref.name();
-                let read_guard: UBorrow<BlockDef> = member_ref.read().map_err(|e| {
+            let blocks = blocks.iter().map(|member_handle: &Handle<BlockDef>| {
+                let name = member_handle.name();
+                let read_guard: UBorrow<BlockDef> = member_handle.read().map_err(|e| {
                     serde::ser::Error::custom(format!("Failed to read universe member {name}: {e}"))
                 })?;
                 let member_repr = schema::MemberSer::from(&*read_guard);
                 Ok(MemberEntrySer {
-                    name: member_ref.name(),
+                    name: member_handle.name(),
                     value: member_repr,
                 })
             });
-            let characters = characters.iter().map(|member_ref: &URef<Character>| {
+            let characters = characters.iter().map(|member_handle: &Handle<Character>| {
                 Ok(MemberEntrySer {
-                    name: member_ref.name(),
+                    name: member_handle.name(),
                     value: schema::MemberSer::Character {
-                        value: schema::SerializeRef(member_ref.clone()),
+                        value: schema::SerializeHandle(member_handle.clone()),
                     },
                 })
             });
-            let spaces = spaces.iter().map(|member_ref: &URef<Space>| {
+            let spaces = spaces.iter().map(|member_handle: &Handle<Space>| {
                 Ok(MemberEntrySer {
-                    name: member_ref.name(),
+                    name: member_handle.name(),
                     value: schema::MemberSer::Space {
-                        value: schema::SerializeRef(member_ref.clone()),
+                        value: schema::SerializeHandle(member_handle.clone()),
                     },
                 })
             });
@@ -983,7 +983,7 @@ mod universe {
             }
 
             universe
-                .fix_deserialized_refs()
+                .fix_deserialized_handles()
                 .map_err(serde::de::Error::custom)?;
 
             // Perform a paused step to let things do re-initialization,
@@ -995,20 +995,20 @@ mod universe {
         }
     }
 
-    impl<T: 'static> Serialize for URef<T> {
+    impl<T: 'static> Serialize for Handle<T> {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            URefSer::URefV1 { name: self.name() }.serialize(serializer)
+            HandleSer::HandleV1 { name: self.name() }.serialize(serializer)
         }
     }
 
-    impl<'de, T: 'static> Deserialize<'de> for URef<T>
+    impl<'de, T: 'static> Deserialize<'de> for Handle<T>
     where
         Universe: universe::UniverseTable<T, Table = universe::Storage<T>>,
     {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            match URefSer::deserialize(deserializer)? {
-                URefSer::URefV1 { name } => {
-                    UREF_DESERIALIZATION_CONTEXT.with(|context| -> Result<Self, D::Error> {
+            match HandleSer::deserialize(deserializer)? {
+                HandleSer::HandleV1 { name } => {
+                    HANDLE_DESERIALIZATION_CONTEXT.with(|context| -> Result<Self, D::Error> {
                         let mut context_refcell_guard = context.borrow_mut();
 
                         match context_refcell_guard.as_mut() {
@@ -1017,10 +1017,10 @@ mod universe {
                                 .get_or_insert_deserializing(name)
                                 .map_err(serde::de::Error::custom),
                             None => {
-                                // If there is no `Universe` context, use a “gone” reference.
+                                // If there is no `Universe` context, use a “gone” handle.
                                 // I am unsure whether this has any practical application, but it
                                 // is at least useful in deserialization tests.
-                                Ok(URef::new_gone(name))
+                                Ok(Handle::new_gone(name))
                             }
                         }
                     })
@@ -1035,7 +1035,9 @@ mod universe {
                 Name::Specific(s) => NameSer::Specific(s.clone()),
                 &Name::Anonym(number) => NameSer::Anonym(number),
                 Name::Pending => {
-                    return Err(serde::ser::Error::custom("cannot serialize a pending URef"))
+                    return Err(serde::ser::Error::custom(
+                        "cannot serialize a pending Handle",
+                    ))
                 }
             }
             .serialize(serializer)
@@ -1051,16 +1053,16 @@ mod universe {
         }
     }
 
-    impl<T: Serialize + 'static> Serialize for schema::SerializeRef<T> {
+    impl<T: Serialize + 'static> Serialize for schema::SerializeHandle<T> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
-            let uref: &URef<T> = &self.0;
-            let read_guard: UBorrow<T> = uref.read().map_err(|e| {
+            let handle: &Handle<T> = &self.0;
+            let read_guard: UBorrow<T> = handle.read().map_err(|e| {
                 serde::ser::Error::custom(format!(
                     "Failed to read universe member {name}: {e}",
-                    name = uref.name()
+                    name = handle.name()
                 ))
             })?;
             let value: &T = &read_guard;
@@ -1070,14 +1072,15 @@ mod universe {
 
     std::thread_local! {
         /// Thread-local state used to communicate from [`Universe`] deserialization to
-        /// [`URef`] deserialization so that the [`URef`] points to a member of that [`Universe`].
+        /// [`Handle`] deserialization so that the [`Handle`]`] points to a member of that
+        /// [`Universe`].
         ///
         /// If [`None`], no [`Universe`] deserialization is currently occurring.
         ///
         /// TODO: Find an alternative not dependent on external state. Perhaps
-        /// serde::DeserializeSeed will do, or if necessary we can modify URef to support
+        /// serde::DeserializeSeed will do, or if necessary we can modify Handle to support
         /// modification after construction.
-        static UREF_DESERIALIZATION_CONTEXT: RefCell<Option<DeContext>> = const {
+        static HANDLE_DESERIALIZATION_CONTEXT: RefCell<Option<DeContext>> = const {
             RefCell::new(None)
         };
     }
@@ -1090,7 +1093,7 @@ mod universe {
 
     impl ContextScope {
         fn install(new_context: DeContext) -> Self {
-            UREF_DESERIALIZATION_CONTEXT.with_borrow_mut(|tl| {
+            HANDLE_DESERIALIZATION_CONTEXT.with_borrow_mut(|tl| {
                 assert!(tl.is_none(), "cannot nest Universe deserialization");
                 *tl = Some(new_context);
             });
@@ -1099,9 +1102,9 @@ mod universe {
 
         /// Uninstall and retrieve the context. Panics if none present.
         fn take(self) -> DeContext {
-            let context = UREF_DESERIALIZATION_CONTEXT.with_borrow_mut(|tl| {
+            let context = HANDLE_DESERIALIZATION_CONTEXT.with_borrow_mut(|tl| {
                 tl.take()
-                    .expect("something went wrong with UREF_DESERIALIZATION_CONTEXT")
+                    .expect("something went wrong with HANDLE_DESERIALIZATION_CONTEXT")
             });
             core::mem::forget(self); // don't run Drop
             context
@@ -1110,13 +1113,13 @@ mod universe {
 
     impl Drop for ContextScope {
         fn drop(&mut self) {
-            UREF_DESERIALIZATION_CONTEXT.with(|uref_context| {
-                let mut uref_context = uref_context.borrow_mut();
+            HANDLE_DESERIALIZATION_CONTEXT.with(|handle_context| {
+                let mut handle_context = handle_context.borrow_mut();
                 assert!(
-                    uref_context.is_some(),
-                    "something went wrong with UREF_DESERIALIZATION_CONTEXT"
+                    handle_context.is_some(),
+                    "something went wrong with HANDLE_DESERIALIZATION_CONTEXT"
                 );
-                *uref_context = None;
+                *handle_context = None;
             });
         }
     }

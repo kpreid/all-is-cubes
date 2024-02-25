@@ -84,7 +84,7 @@ async fn create_updated_renderer(
     adapter: Arc<wgpu::Adapter>,
 ) -> (
     Universe,
-    universe::URef<Space>,
+    universe::Handle<Space>,
     Arc<Mutex<headless::Renderer>>,
 ) {
     let mut universe = Universe::new();

@@ -10,7 +10,7 @@ use all_is_cubes::math::{Cube, GridCoordinate};
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::Space;
 use all_is_cubes::time::DeadlineStd;
-use all_is_cubes::universe::URef;
+use all_is_cubes::universe::Handle;
 use all_is_cubes_mesh as mesh;
 
 use mesh::dynamic::ChunkedSpaceMesh;
@@ -99,7 +99,7 @@ pub(crate) struct RerunMesher {
 }
 
 impl RerunMesher {
-    pub(crate) fn new(destination: rg::Destination, space: URef<Space>) -> Self {
+    pub(crate) fn new(destination: rg::Destination, space: Handle<Space>) -> Self {
         Self {
             destination,
             csm: ChunkedSpaceMesh::new(space, mesh::texture::NoTextures, false),

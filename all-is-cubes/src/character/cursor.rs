@@ -14,18 +14,18 @@ use crate::math::{
 };
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
-use crate::universe::URef;
+use crate::universe::Handle;
 use crate::util::MapExtend;
 
 /// Find the first selectable block the ray strikes and express the result in a [`Cursor`]
 /// value, or [`None`] if nothing was struck within the distance limit.
 pub fn cursor_raycast(
     mut ray: Ray,
-    space_ref: &URef<Space>,
+    space_handle: &Handle<Space>,
     maximum_distance: FreeCoordinate,
 ) -> Option<Cursor> {
     ray.direction = ray.direction.normalize();
-    let space = space_ref.read().ok()?;
+    let space = space_handle.read().ok()?;
     for step in ray.cast().within(space.bounds()) {
         if step.t_distance() > maximum_distance {
             break;
@@ -73,7 +73,7 @@ pub fn cursor_raycast(
         };
 
         return Some(Cursor {
-            space: space_ref.clone(),
+            space: space_handle.clone(),
             face_entered: step.face(),
             face_selected: face_selected.expect("failed to determine face_selected"),
             point_entered: step.intersection_point(ray),
@@ -106,7 +106,7 @@ pub fn cursor_raycast(
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cursor {
     /// The space the selected cube is in.
-    space: URef<Space>,
+    space: Handle<Space>,
 
     /// The face that the cursor ray entered the cube via.
     ///
@@ -147,7 +147,7 @@ pub struct CubeSnapshot {
 impl Cursor {
     /// The space the selected cube is in.
     #[inline]
-    pub fn space(&self) -> &URef<Space> {
+    pub fn space(&self) -> &Handle<Space> {
         &self.space
     }
 
@@ -323,7 +323,7 @@ mod tests {
     use crate::universe::Universe;
     use euclid::{Point3D, Vector3D};
 
-    fn test_space<const N: usize>(universe: &mut Universe, blocks: [&Block; N]) -> URef<Space> {
+    fn test_space<const N: usize>(universe: &mut Universe, blocks: [&Block; N]) -> Handle<Space> {
         let mut space =
             Space::builder(GridAab::from_lower_size([0, 0, 0], [N as i32, 1, 1])).build();
         space
@@ -343,9 +343,9 @@ mod tests {
     fn simple_hit_after_air() {
         let universe = &mut Universe::new();
         let [block] = make_some_blocks();
-        let space_ref = test_space(universe, [&AIR, &block]);
+        let space_handle = test_space(universe, [&AIR, &block]);
 
-        let cursor = cursor_raycast(X_RAY, &space_ref, f64::INFINITY).unwrap();
+        let cursor = cursor_raycast(X_RAY, &space_handle, f64::INFINITY).unwrap();
         assert_eq!(cursor.hit().block, block);
         assert_eq!(cursor.cube(), Cube::new(1, 0, 0));
         assert_eq!(cursor.face_selected(), Face7::NX);
@@ -355,9 +355,9 @@ mod tests {
     fn maximum_distance_too_short() {
         let universe = &mut Universe::new();
         let [block] = make_some_blocks();
-        let space_ref = test_space(universe, [&AIR, &block]);
+        let space_handle = test_space(universe, [&AIR, &block]);
 
-        assert_eq!(cursor_raycast(X_RAY, &space_ref, 1.0), None);
+        assert_eq!(cursor_raycast(X_RAY, &space_handle, 1.0), None);
     }
 
     #[test]
@@ -368,9 +368,9 @@ mod tests {
             .color(Rgba::WHITE)
             .selectable(false)
             .build();
-        let space_ref = test_space(universe, [&not_selectable, &block]);
+        let space_handle = test_space(universe, [&not_selectable, &block]);
 
-        let cursor = cursor_raycast(X_RAY, &space_ref, f64::INFINITY).unwrap();
+        let cursor = cursor_raycast(X_RAY, &space_handle, f64::INFINITY).unwrap();
         // If the non-selectable block was hit, this would be [0, 0, 0]
         assert_eq!(cursor.cube(), Cube::new(1, 0, 0));
         assert_eq!(cursor.hit().block, block);
@@ -381,9 +381,9 @@ mod tests {
         let universe = &mut Universe::new();
         let [block] = make_some_blocks();
         let not_selectable = make_slab(universe, 1, R2); // Upper half is nonselectable air
-        let space_ref = test_space(universe, [&not_selectable, &block]);
+        let space_handle = test_space(universe, [&not_selectable, &block]);
 
-        let cursor = cursor_raycast(X_RAY, &space_ref, f64::INFINITY).unwrap();
+        let cursor = cursor_raycast(X_RAY, &space_handle, f64::INFINITY).unwrap();
         assert_eq!(cursor.cube(), Cube::new(1, 0, 0));
         assert_eq!(cursor.hit().block, block);
     }
@@ -393,9 +393,9 @@ mod tests {
         let universe = &mut Universe::new();
         let [other_block] = make_some_blocks();
         let selectable_voxels = make_slab(universe, 3, R4);
-        let space_ref = test_space(universe, [&AIR, &selectable_voxels, &other_block]);
+        let space_handle = test_space(universe, [&AIR, &selectable_voxels, &other_block]);
 
-        let cursor = cursor_raycast(X_RAY, &space_ref, f64::INFINITY).unwrap();
+        let cursor = cursor_raycast(X_RAY, &space_handle, f64::INFINITY).unwrap();
         assert_eq!(cursor.cube(), Cube::new(1, 0, 0));
         assert_eq!(cursor.hit().block, selectable_voxels);
     }
@@ -424,9 +424,9 @@ mod tests {
     fn slope_hits_face_of_full_block() {
         let universe = &mut Universe::new();
         let [block] = make_some_blocks();
-        let space_ref = test_space(universe, [&block]);
+        let space_handle = test_space(universe, [&block]);
 
-        let cursor = cursor_raycast(SLOPING_RAY, &space_ref, f64::INFINITY).unwrap();
+        let cursor = cursor_raycast(SLOPING_RAY, &space_handle, f64::INFINITY).unwrap();
         assert_eq!(cursor.face_entered, Face7::NX);
         assert_eq!(cursor.face_selected(), Face7::NX);
     }
@@ -437,9 +437,9 @@ mod tests {
     fn slope_hits_face_different_from_entered() {
         let universe = &mut Universe::new();
         let slab = make_slab(universe, 1, R2);
-        let space_ref = test_space(universe, [&slab]);
+        let space_handle = test_space(universe, [&slab]);
 
-        let cursor = cursor_raycast(SLOPING_RAY, &space_ref, f64::INFINITY).unwrap();
+        let cursor = cursor_raycast(SLOPING_RAY, &space_handle, f64::INFINITY).unwrap();
         dbg!(&cursor);
         assert_eq!(cursor.face_entered, Face7::NX);
         assert_eq!(cursor.face_selected(), Face7::PY);

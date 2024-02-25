@@ -18,7 +18,7 @@ use all_is_cubes::math::{
 use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::transaction::Transaction as _;
-use all_is_cubes::universe::{Name, URef, Universe, UniverseTransaction};
+use all_is_cubes::universe::{Handle, Name, Universe, UniverseTransaction};
 use all_is_cubes::util::{ErrorIfStd, YieldProgress};
 use all_is_cubes::{time, transaction};
 
@@ -199,12 +199,12 @@ impl UniverseTemplate {
 
         // Insert the space and generate the initial character.
         if let Some(space_result) = maybe_space {
-            let space_ref =
+            let space_handle =
                 insert_generated_space(&mut universe, default_space_name, space_result)?;
 
             // TODO: "character" is a special default name used for finding the character the
             // player actually uses, and we should replace that or handle it more formally.
-            universe.insert("character".into(), Character::spawn_default(space_ref))?;
+            universe.insert("character".into(), Character::spawn_default(space_handle))?;
         }
 
         universe.whence = Arc::new(TemplateAndParameters {
@@ -228,7 +228,7 @@ fn insert_generated_space(
     universe: &mut Universe,
     name: Name,
     result: Result<Space, InGenError>,
-) -> Result<URef<Space>, GenError> {
+) -> Result<Handle<Space>, GenError> {
     match result {
         Ok(space) => Ok(universe.insert(name, space)?),
         Err(e) => Err(GenError::failure(e, name)),

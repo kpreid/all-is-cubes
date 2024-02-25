@@ -10,7 +10,7 @@ use all_is_cubes::behavior::{self, Behavior};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _};
-use all_is_cubes::universe::{RefVisitor, UniverseTransaction, VisitRefs};
+use all_is_cubes::universe::{HandleVisitor, UniverseTransaction, VisitHandles};
 use all_is_cubes::util::maybe_sync::SendSyncIfStd;
 
 // reused for WidgetController
@@ -170,8 +170,8 @@ impl WidgetBehavior {
     }
 }
 
-impl VisitRefs for WidgetBehavior {
-    fn visit_refs(&self, _: &mut dyn RefVisitor) {
+impl VisitHandles for WidgetBehavior {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {
         // TODO: Do we need to visit the widget controllers?
     }
 }

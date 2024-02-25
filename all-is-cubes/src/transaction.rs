@@ -5,7 +5,7 @@ use alloc::sync::Arc;
 use core::any::type_name;
 use core::{fmt, mem};
 
-use crate::universe::{URef, UTransactional, UniverseTransaction};
+use crate::universe::{Handle, UTransactional, UniverseTransaction};
 use crate::util::ErrorIfStd;
 
 mod generic;
@@ -102,11 +102,11 @@ pub trait Transaction<T: ?Sized>: Merge {
             .map_err(ExecuteError::Commit)
     }
 
-    /// Specify the target of this transaction as a [`URef`], and erase its type,
+    /// Specify the target of this transaction as a [`Handle`], and erase its type,
     /// so that it can be combined with other transactions in the same universe.
     ///
     /// This is a convenience wrapper around [`UTransactional::bind`].
-    fn bind(self, target: URef<T>) -> UniverseTransaction
+    fn bind(self, target: Handle<T>) -> UniverseTransaction
     where
         Self: Sized,
         T: UTransactional<Transaction = Self>,

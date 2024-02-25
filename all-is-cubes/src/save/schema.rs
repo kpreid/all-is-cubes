@@ -26,12 +26,12 @@ use serde::{Deserialize, Serialize};
 use crate::block::Block;
 use crate::math::{Aab, Face6, GridAab, GridCoordinate, GridRotation};
 use crate::save::compress::{GzSerde, Leu16};
-use crate::universe::URef;
+use crate::universe::Handle;
 use crate::{behavior, block, character, inv, space, universe};
 
-/// Placeholder type for when we want to serialize the *contents* of a `URef`,
+/// Placeholder type for when we want to serialize the *contents* of a `Handle`,
 /// without cloning or referencing those contents immediately.
-pub(crate) struct SerializeRef<T>(pub(crate) URef<T>);
+pub(crate) struct SerializeHandle<T>(pub(crate) Handle<T>);
 
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `behavior` module
@@ -86,13 +86,13 @@ pub(crate) enum PrimitiveSer<'a> {
     RecurV1 {
         #[serde(flatten)]
         attributes: BlockAttributesV1Ser<'a>,
-        space: URef<space::Space>,
+        space: Handle<space::Space>,
         #[serde(default, skip_serializing_if = "is_default")]
         offset: [i32; 3],
         resolution: block::Resolution,
     },
     IndirectV1 {
-        definition: URef<block::BlockDef>,
+        definition: Handle<block::BlockDef>,
     },
     TextPrimitiveV1 {
         text: TextSer,
@@ -255,7 +255,7 @@ pub(crate) enum PositioningZSer {
 #[serde(tag = "type")]
 pub(crate) enum CharacterSer<'a> {
     CharacterV1 {
-        space: URef<space::Space>,
+        space: Handle<space::Space>,
         position: [f64; 3],
         velocity: [f64; 3],
         collision_box: Aab,
@@ -433,7 +433,7 @@ pub(crate) enum UniverseSchema<C, S> {
     },
 }
 pub(crate) type UniverseSer =
-    UniverseSchema<SerializeRef<character::Character>, SerializeRef<space::Space>>;
+    UniverseSchema<SerializeHandle<character::Character>, SerializeHandle<space::Space>>;
 pub(crate) type UniverseDe = UniverseSchema<character::Character, space::Space>;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -451,13 +451,13 @@ pub(crate) enum MemberSchema<C, S> {
     Space { value: S },
 }
 pub(crate) type MemberSer =
-    MemberSchema<SerializeRef<character::Character>, SerializeRef<space::Space>>;
+    MemberSchema<SerializeHandle<character::Character>, SerializeHandle<space::Space>>;
 pub(crate) type MemberDe = MemberSchema<character::Character, space::Space>;
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum URefSer {
-    URefV1 {
+pub(crate) enum HandleSer {
+    HandleV1 {
         #[serde(flatten)]
         name: universe::Name,
     },

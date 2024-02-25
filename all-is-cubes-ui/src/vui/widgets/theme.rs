@@ -117,7 +117,7 @@ impl WidgetBlocks {
             Ok(match key {
                 WidgetBlocks::Crosshair => Block::builder()
                     .display_name("Crosshair")
-                    .voxels_ref(
+                    .voxels_handle(
                         R64, // TODO: get resolution from image file
                         txn.insert_anonymous(space_from_image(
                             include_image!("theme/crosshair.png"),
@@ -130,7 +130,7 @@ impl WidgetBlocks {
                 WidgetBlocks::ToolbarSlotFrame => {
                     Block::builder()
                         .display_name("Toolbar Slot Frame")
-                        .voxels_ref(
+                        .voxels_handle(
                             R64,
                             txn.insert_anonymous(space_from_image(
                                 include_image!("theme/toolbar-slot.png"),
@@ -150,7 +150,7 @@ impl WidgetBlocks {
                 ]) => AIR,
                 WidgetBlocks::ToolbarPointer(buttons) => Block::builder()
                     .display_name("Selected")
-                    .voxels_ref(
+                    .voxels_handle(
                         R32, // TODO: get resolution from image file
                         txn.insert_anonymous(space_from_image(
                             include_image!("theme/toolbar-sel-cursor.png"),
@@ -169,7 +169,7 @@ impl WidgetBlocks {
                 WidgetBlocks::DialogBackground => {
                     Block::builder()
                         .display_name("Dialog Background")
-                        .voxels_ref(
+                        .voxels_handle(
                             R64, // 16 res × 4 tiles
                             txn.insert_anonymous(space_from_image(
                                 include_image!("theme/dialog-background.png"),
@@ -185,7 +185,7 @@ impl WidgetBlocks {
 
                 WidgetBlocks::LayoutDebugBoxCorner => Block::builder()
                     .display_name("LayoutDebugBoxCorner")
-                    .voxels_ref(
+                    .voxels_handle(
                         R32,
                         txn.insert_anonymous(space_from_image(
                             include_image!("theme/layout-debug-box-corner.png"),
@@ -196,7 +196,7 @@ impl WidgetBlocks {
                     .build(),
                 WidgetBlocks::LayoutDebugBoxEdge => Block::builder()
                     .display_name("LayoutDebugBoxEdge")
-                    .voxels_ref(
+                    .voxels_handle(
                         R32,
                         txn.insert_anonymous(space_from_image(
                             include_image!("theme/layout-debug-box-edge.png"),

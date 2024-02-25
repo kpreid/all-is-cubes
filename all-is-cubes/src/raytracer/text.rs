@@ -211,9 +211,9 @@ mod tests {
         block_space
             .fill_uniform(block_space.bounds(), &Block::from(Rgba::WHITE))
             .unwrap();
-        let space_ref = universe.insert_anonymous(block_space);
+        let space_handle = universe.insert_anonymous(block_space);
         let partial_block = Block::builder()
-            .voxels_ref(resolution, space_ref.clone())
+            .voxels_handle(resolution, space_handle.clone())
             .display_name("P")
             .build();
 

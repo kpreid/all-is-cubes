@@ -46,8 +46,8 @@ where
     // Add some motion to animation recordings.
     // TODO: replace this with a general camera scripting mechanism
     if let Some(anim) = &options.animation {
-        if let Some(character_ref) = dsession.session.character().snapshot() {
-            character_ref.try_modify(|c| {
+        if let Some(character_handle) = dsession.session.character().snapshot() {
+            character_handle.try_modify(|c| {
                 c.add_behavior(AutoRotate {
                     rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
                 })
@@ -161,9 +161,9 @@ impl behavior::Behavior<Character> for AutoRotate {
     }
 }
 
-impl universe::VisitRefs for AutoRotate {
-    // No references
-    fn visit_refs(&self, _visitor: &mut dyn universe::RefVisitor) {}
+impl universe::VisitHandles for AutoRotate {
+    // No handles
+    fn visit_handles(&self, _visitor: &mut dyn universe::HandleVisitor) {}
 }
 
 /// Adapt [`tokio::sync::mpsc::UnboundedSender`] to `Listener`.

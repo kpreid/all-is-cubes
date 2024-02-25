@@ -15,14 +15,14 @@ use crate::character::Character;
 use crate::space::Space;
 use crate::transaction;
 use crate::universe::{
-    universe_txn as ut, InsertError, Name, PartialUniverse, URef, URefErased, URootRef, Universe,
-    UniverseIter,
+    universe_txn as ut, ErasedHandle, Handle, InsertError, Name, PartialUniverse, RootHandle,
+    Universe, UniverseIter,
 };
 use crate::util::Refmt as _;
 
 /// A `BTreeMap` is used to ensure that the iteration order is deterministic across
 /// runs/versions.
-pub(crate) type Storage<T> = BTreeMap<Name, URootRef<T>>;
+pub(crate) type Storage<T> = BTreeMap<Name, RootHandle<T>>;
 
 /// Trait for every type which can be a named member of a universe.
 ///
@@ -32,8 +32,8 @@ pub(crate) type Storage<T> = BTreeMap<Name, URootRef<T>>;
 /// public-in-private.
 #[doc(hidden)]
 pub trait UniverseMember: Sized + 'static {
-    /// Generic constructor for [`AnyURef`].
-    fn into_any_ref(r: URef<Self>) -> AnyURef;
+    /// Generic constructor for [`AnyHandle`].
+    fn into_any_handle(r: Handle<Self>) -> AnyHandle;
 }
 
 /// For each type `T` that can be a member of a [`Universe`], this trait is implemented,
@@ -64,9 +64,9 @@ where
 {
     // Internal: Implementations of this are in the [`members`] module.
 
-    fn get(&self, name: &Name) -> Option<URef<T>>;
+    fn get(&self, name: &Name) -> Option<Handle<T>>;
 
-    fn insert(&mut self, name: Name, value: T) -> Result<URef<T>, InsertError>;
+    fn insert(&mut self, name: Name, value: T) -> Result<Handle<T>, InsertError>;
 
     fn iter_by_type(&self) -> UniverseIter<'_, T>;
 }
@@ -81,20 +81,20 @@ pub trait PartialUniverseOps<T>
 where
     T: UniverseMember,
 {
-    fn from_set(members: impl IntoIterator<Item = URef<T>>) -> Self
+    fn from_set(members: impl IntoIterator<Item = Handle<T>>) -> Self
     where
         Self: Sized;
 }
 
 // Helper functions to implement `UniverseOps` without putting everything
 // in the macro body.
-pub(super) fn ops_get<T>(this: &Universe, name: &Name) -> Option<URef<T>>
+pub(super) fn ops_get<T>(this: &Universe, name: &Name) -> Option<Handle<T>>
 where
     Universe: UniverseTable<T, Table = Storage<T>>,
 {
     <Universe as UniverseTable<T>>::table(this)
         .get(name)
-        .map(URootRef::downgrade)
+        .map(RootHandle::downgrade)
 }
 /// Implementation of inserting an item in a universe.
 /// Note that the same logic also exists in `UniverseTransaction`.
@@ -102,7 +102,7 @@ pub(super) fn ops_insert<T>(
     this: &mut Universe,
     mut name: Name,
     value: T,
-) -> Result<URef<T>, InsertError>
+) -> Result<Handle<T>, InsertError>
 where
     Universe: UniverseTable<T, Table = Storage<T>>,
 {
@@ -116,10 +116,10 @@ where
     match this.table_mut().entry(name.clone()) {
         Occupied(_) => unreachable!(/* should have already checked for existence */),
         Vacant(vacant) => {
-            let root_ref = URootRef::new(id, name, value);
-            let returned_ref = root_ref.downgrade();
-            vacant.insert(root_ref);
-            Ok(returned_ref)
+            let root_handle = RootHandle::new(id, name, value);
+            let returned_handle = root_handle.downgrade();
+            vacant.insert(root_handle);
+            Ok(returned_handle)
         }
     }
 }
@@ -128,8 +128,8 @@ where
 macro_rules! impl_universe_for_member {
     ($member_type:ident, $table:ident) => {
         impl UniverseMember for $member_type {
-            fn into_any_ref(r: URef<$member_type>) -> AnyURef {
-                AnyURef::$member_type(r)
+            fn into_any_handle(handle: Handle<$member_type>) -> AnyHandle {
+                AnyHandle::$member_type(handle)
             }
         }
 
@@ -145,7 +145,7 @@ macro_rules! impl_universe_for_member {
         }
 
         impl UniverseTable<$member_type> for PartialUniverse {
-            type Table = Vec<URef<$member_type>>;
+            type Table = Vec<Handle<$member_type>>;
 
             fn table(&self) -> &Self::Table {
                 &self.$table
@@ -156,14 +156,14 @@ macro_rules! impl_universe_for_member {
         }
 
         impl UniverseOps<$member_type> for Universe {
-            fn get(&self, name: &Name) -> Option<URef<$member_type>> {
+            fn get(&self, name: &Name) -> Option<Handle<$member_type>> {
                 ops_get(self, name)
             }
             fn insert(
                 &mut self,
                 name: Name,
                 value: $member_type,
-            ) -> Result<URef<$member_type>, InsertError> {
+            ) -> Result<Handle<$member_type>, InsertError> {
                 ops_insert(self, name, value)
             }
             fn iter_by_type(&self) -> UniverseIter<'_, $member_type> {
@@ -172,7 +172,7 @@ macro_rules! impl_universe_for_member {
         }
 
         impl PartialUniverseOps<$member_type> for PartialUniverse {
-            fn from_set(members: impl IntoIterator<Item = URef<$member_type>>) -> Self {
+            fn from_set(members: impl IntoIterator<Item = Handle<$member_type>>) -> Self {
                 // TODO: enforce exactly one universe id
                 let mut new_self = Self::default();
                 UniverseTable::<$member_type>::table_mut(&mut new_self).extend(members);
@@ -181,7 +181,10 @@ macro_rules! impl_universe_for_member {
         }
 
         impl ut::UTransactional for $member_type {
-            fn bind(target: URef<Self>, transaction: Self::Transaction) -> ut::UniverseTransaction {
+            fn bind(
+                target: Handle<Self>,
+                transaction: Self::Transaction,
+            ) -> ut::UniverseTransaction {
                 ut::UniverseTransaction::from(AnyTransaction::$member_type(
                     ut::TransactionInUniverse {
                         target,
@@ -208,39 +211,39 @@ macro_rules! member_enums_and_impls {
                 $( fmt_members_of_type::<$member_type>(&self.$table_name, ds); )*
             }
 
-            pub(crate) fn get_any(&self, name: &Name) -> Option<Box<dyn URefErased>> {
+            pub(crate) fn get_any(&self, name: &Name) -> Option<Box<dyn ErasedHandle>> {
                 $(
-                    if let Some(root_ref) = self.$table_name.get(name) {
-                        return Some(Box::new(root_ref.downgrade()));
+                    if let Some(root_handle) = self.$table_name.get(name) {
+                        return Some(Box::new(root_handle.downgrade()));
                     }
                 )*
                 None
             }
         }
 
-        /// Holds any one of the concrete [`URef<T>`](URef) types that can be in a [`Universe`].
+        /// Holds any one of the concrete [`Handle<T>`](Handle) types that can be in a [`Universe`].
         ///
-        /// See also [`URefErased`], which is implemented by `URef`s rather than owning one.
-        /// This type dereferences to `dyn URefErased` to provide all the operations that
+        /// See also [`ErasedHandle`], which is implemented by `Handle`s rather than owning one.
+        /// This type dereferences to `dyn ErasedHandle` to provide all the operations that
         /// trait does.
         #[derive(Clone, Debug, Eq, Hash, PartialEq)]
         #[non_exhaustive]
         #[allow(missing_docs)] // variant meanings are obvious from name
-        pub enum AnyURef {
-            $( $member_type(URef<$member_type>), )*
+        pub enum AnyHandle {
+            $( $member_type(Handle<$member_type>), )*
         }
 
-        impl AnyURef {
-            /// Returns whether this [`URef`] does not yet belong to a universe and can start
+        impl AnyHandle {
+            /// Returns whether this [`Handle`] does not yet belong to a universe and can start
             /// doing so. Used by [`MemberTxn::check`].
             ///
-            /// See [`URef::check_upgrade_pending`] for more information.
+            /// See [`Handle::check_upgrade_pending`] for more information.
             pub(crate) fn check_upgrade_pending(
                 &self,
                 universe_id: $crate::universe::UniverseId,
             ) -> Result<(), $crate::transaction::PreconditionFailed> {
                 match self {
-                    $( Self::$member_type(r) => r.check_upgrade_pending(universe_id), )*
+                    $( Self::$member_type(handle) => handle.check_upgrade_pending(universe_id), )*
                 }
             }
 
@@ -250,15 +253,15 @@ macro_rules! member_enums_and_impls {
                 universe: &mut Universe,
             ) -> Result<(), transaction::CommitError> {
                 match self {
-                    $( AnyURef::$member_type(pending_ref) => {
-                        ut::anyuref_insert_and_upgrade_pending(universe, pending_ref)
+                    $( AnyHandle::$member_type(pending_handle) => {
+                        ut::any_handle_insert_and_upgrade_pending(universe, pending_handle)
                     } )*
                 }
             }
         }
 
-        impl core::ops::Deref for AnyURef {
-            type Target = dyn URefErased;
+        impl core::ops::Deref for AnyHandle {
+            type Target = dyn ErasedHandle;
 
             fn deref(&self) -> &Self::Target {
                 match self {
@@ -280,7 +283,7 @@ macro_rules! member_enums_and_impls {
         }
 
         impl AnyTransaction {
-            pub(in crate::universe) fn target_erased(&self) -> Option<&dyn URefErased> {
+            pub(in crate::universe) fn target_erased(&self) -> Option<&dyn ErasedHandle> {
                 use AnyTransaction::*;
                 match self {
                     Noop => None,
@@ -402,29 +405,29 @@ macro_rules! member_enums_and_impls {
 //    transaction::universe_txn::*
 member_enums_and_impls!((BlockDef, blocks), (Character, characters), (Space, spaces),);
 
-impl AsRef<dyn URefErased> for AnyURef {
-    fn as_ref(&self) -> &dyn URefErased {
+impl AsRef<dyn ErasedHandle> for AnyHandle {
+    fn as_ref(&self) -> &dyn ErasedHandle {
         &**self
     }
 }
-impl core::borrow::Borrow<dyn URefErased> for AnyURef {
-    fn borrow(&self) -> &dyn URefErased {
+impl core::borrow::Borrow<dyn ErasedHandle> for AnyHandle {
+    fn borrow(&self) -> &dyn ErasedHandle {
         &**self
     }
 }
 
-impl URefErased for AnyURef {
+impl ErasedHandle for AnyHandle {
     fn name(&self) -> Name {
-        let r: &dyn URefErased = &**self;
+        let r: &dyn ErasedHandle = &**self;
         r.name()
     }
 
     fn universe_id(&self) -> Option<super::UniverseId> {
-        let r: &dyn URefErased = &**self;
+        let r: &dyn ErasedHandle = &**self;
         r.universe_id()
     }
 
-    fn to_any_uref(&self) -> AnyURef {
+    fn to_any_handle(&self) -> AnyHandle {
         self.clone()
     }
 
@@ -432,9 +435,9 @@ impl URefErased for AnyURef {
     fn fix_deserialized(
         &self,
         universe_id: super::UniverseId,
-        privacy_token: super::URefErasedInternalToken,
-    ) -> Result<(), super::RefError> {
-        let r: &dyn URefErased = &**self;
+        privacy_token: super::ErasedHandleInternalToken,
+    ) -> Result<(), super::HandleError> {
+        let r: &dyn ErasedHandle = &**self;
         r.fix_deserialized(universe_id, privacy_token)
     }
 }

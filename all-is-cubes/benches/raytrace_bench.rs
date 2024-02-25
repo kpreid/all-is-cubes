@@ -11,14 +11,14 @@ use all_is_cubes::content::testing::lighting_bench_space;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::raytracer::RtRenderer;
-use all_is_cubes::universe::{URef, Universe};
+use all_is_cubes::universe::{Handle, Universe};
 use all_is_cubes::util::yield_progress_for_testing;
 
 /// Non-mutated test data shared between benches
 struct TestData {
     #[allow(dead_code)] // must not be dropped
     universe: Universe,
-    character: URef<Character>,
+    character: Handle<Character>,
 }
 impl TestData {
     #[tokio::main]

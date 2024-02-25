@@ -307,7 +307,7 @@ pub async fn install_demo_blocks(
                 Block::builder()
                     .display_name("Arrow")
                     .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                    .voxels_ref(resolution, txn.insert_anonymous(space))
+                    .voxels_handle(resolution, txn.insert_anonymous(space))
                     .build()
             }
 
@@ -400,7 +400,7 @@ pub async fn install_demo_blocks(
                 Block::builder()
                     .display_name("Signboard")
                     .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                    .voxels_ref(resolution, txn.insert_anonymous(space))
+                    .voxels_handle(resolution, txn.insert_anonymous(space))
                     .build()
             }
 
@@ -424,7 +424,7 @@ pub async fn install_demo_blocks(
                     .animation_hint(block::AnimationHint::redefinition(
                         block::AnimationChange::ColorSameCategory,
                     ))
-                    .voxels_ref(resolution, txn.insert_anonymous(space))
+                    .voxels_handle(resolution, txn.insert_anonymous(space))
                     .build()
             }
 
@@ -556,16 +556,16 @@ pub async fn install_demo_blocks(
 /// [`BlockDef`]'s attributes.
 #[track_caller]
 fn modify_def(indirect: &Block, f: impl FnOnce(&mut Block)) {
-    let Primitive::Indirect(block_def_ref) = indirect.primitive() else {
+    let Primitive::Indirect(block_def_handle) = indirect.primitive() else {
         panic!("block not indirect, but {indirect:?}");
     };
-    let mut block: Block = block_def_ref
+    let mut block: Block = block_def_handle
         .read()
         .expect("could not read BlockDef")
         .block()
         .clone();
     f(&mut block);
-    block_def_ref
+    block_def_handle
         .execute(
             &BlockDefTransaction::overwrite(block),
             &mut transaction::no_outputs,

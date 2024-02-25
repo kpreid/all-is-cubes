@@ -22,9 +22,11 @@ use std::{fs, io};
 
 use futures_core::future::BoxFuture;
 
+#[cfg(doc)]
+use crate::universe::HandleError;
 use all_is_cubes::block::{self, BlockDef};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{self, PartialUniverse, URef, Universe};
+use all_is_cubes::universe::{self, Handle, PartialUniverse, Universe};
 use all_is_cubes::util::YieldProgress;
 
 pub mod file;
@@ -131,14 +133,14 @@ impl ExportSet {
     }
 
     /// Construct an [`ExportSet`] specifying exporting only the given [`BlockDef`]s.
-    pub fn from_block_defs(block_defs: Vec<URef<BlockDef>>) -> Self {
+    pub fn from_block_defs(block_defs: Vec<Handle<BlockDef>>) -> Self {
         Self {
             contents: PartialUniverse::from_set(block_defs),
         }
     }
 
     /// Construct an [`ExportSet`] specifying exporting only the given [`Space`]s.
-    pub fn from_spaces(spaces: Vec<URef<Space>>) -> Self {
+    pub fn from_spaces(spaces: Vec<Handle<Space>>) -> Self {
         Self {
             contents: PartialUniverse::from_set(spaces),
         }
@@ -148,12 +150,12 @@ impl ExportSet {
     /// (as opposed to all members into one file).
     ///
     /// This has a suffix added for uniqueness (after the name but preserving the existing
-    /// extension), based on the item's [`URef::name()`], if the [`ExportSet`] contains more
+    /// extension), based on the item's [`Handle::name()`], if the [`ExportSet`] contains more
     /// than one item. If it contains only one item, then `base_path` is returned unchanged.
     pub(crate) fn member_export_path(
         &self,
         base_path: &Path,
-        member: &dyn universe::URefErased,
+        member: &dyn universe::ErasedHandle,
     ) -> PathBuf {
         let mut path: PathBuf = base_path.to_owned();
         if self.contents.count() > 1 {
@@ -342,9 +344,9 @@ pub enum ExportError {
     #[error("could not write export data")]
     Write(#[from] std::io::Error),
 
-    /// `RefError` while reading the data to be exported.
+    /// [`HandleError`] while reading the data to be exported.
     #[error("could not read universe to be exported")]
-    Read(#[from] universe::RefError),
+    Read(#[from] universe::HandleError),
 
     /// `EvalBlockError` while exporting a block definition.
     #[error("could not evaluate block")]

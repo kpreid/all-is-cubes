@@ -14,7 +14,7 @@ use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
 use all_is_cubes::time::{self, Duration, Instant as _};
-use all_is_cubes::universe::URef;
+use all_is_cubes::universe::Handle;
 use all_is_cubes::util::{Fmt, Refmt, StatusText, TimeStats};
 
 use crate::dynamic::blocks::InstanceMesh;
@@ -48,7 +48,7 @@ pub struct ChunkedSpaceMesh<M, const CHUNK_SIZE: GridCoordinate>
 where
     M: DynamicMeshTypes,
 {
-    space: URef<Space>,
+    space: Handle<Space>,
 
     /// Dirty flags listening to `space`.
     todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>>,
@@ -101,7 +101,7 @@ where
     ///
     /// If `interactive` is true, will prioritize getting a rough view of the world over
     /// a fully detailed one, by using placeholder block meshes on the first pass.
-    pub fn new(space: URef<Space>, texture_allocator: M::Alloc, interactive: bool) -> Self {
+    pub fn new(space: Handle<Space>, texture_allocator: M::Alloc, interactive: bool) -> Self {
         let space_borrowed = space.read().unwrap();
         let todo = CsmTodo::initially_dirty();
         let todo_rc = Arc::new(Mutex::new(todo));
@@ -124,8 +124,8 @@ where
         }
     }
 
-    /// Returns a reference to the [`Space`] this watches.
-    pub fn space(&self) -> &URef<Space> {
+    /// Returns the handle to the [`Space`] this watches.
+    pub fn space(&self) -> &Handle<Space> {
         &self.space
     }
 

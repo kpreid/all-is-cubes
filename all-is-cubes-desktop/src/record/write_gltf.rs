@@ -52,7 +52,7 @@ impl MeshRecorder {
             // (or at least as much data as we care about).
             csm: ChunkedSpaceMesh::new(
                 cameras.world_space().snapshot().unwrap_or_else(|| {
-                    universe::URef::new_pending(
+                    universe::Handle::new_pending(
                         universe::Name::from("empty-space-placeholder"),
                         Space::builder(GridAab::ORIGIN_EMPTY).build(),
                     )

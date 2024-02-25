@@ -14,7 +14,7 @@ use downcast_rs::{impl_downcast, Downcast};
 
 use crate::time::Tick;
 use crate::transaction::{self, Merge as _, Transaction};
-use crate::universe::{RefVisitor, UniverseTransaction, VisitRefs};
+use crate::universe::{HandleVisitor, UniverseTransaction, VisitHandles};
 use crate::util::maybe_sync::{Mutex, SendSyncIfStd};
 
 #[cfg(doc)]
@@ -24,7 +24,7 @@ use crate::universe::Universe;
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
 /// is invoked.
 pub trait Behavior<H: BehaviorHost>:
-    fmt::Debug + SendSyncIfStd + Downcast + VisitRefs + 'static
+    fmt::Debug + SendSyncIfStd + Downcast + VisitHandles + 'static
 {
     /// Computes a transaction to apply the effects of this behavior for one timestep,
     /// and specifies when next to step the behavior again (if ever).
@@ -303,11 +303,11 @@ impl<H: BehaviorHost> fmt::Debug for BehaviorSet<H> {
     }
 }
 
-impl<H: BehaviorHost> VisitRefs for BehaviorSet<H> {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+impl<H: BehaviorHost> VisitHandles for BehaviorSet<H> {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         let Self { members, woken: _ } = self;
         for entry in members.values() {
-            entry.behavior.visit_refs(visitor);
+            entry.behavior.visit_handles(visitor);
         }
     }
 }
@@ -804,8 +804,8 @@ mod testing {
         }
     }
 
-    impl<D> VisitRefs for NoopBehavior<D> {
-        fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
+    impl<D> VisitHandles for NoopBehavior<D> {
+        fn visit_handles(&self, _visitor: &mut dyn HandleVisitor) {}
     }
 }
 
@@ -887,9 +887,9 @@ mod tests {
         }
     }
 
-    impl VisitRefs for SelfModifyingBehavior {
-        // No references
-        fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
+    impl VisitHandles for SelfModifyingBehavior {
+        // No handles
+        fn visit_handles(&self, _visitor: &mut dyn HandleVisitor) {}
     }
 
     #[test]
@@ -1002,8 +1002,8 @@ mod tests {
                 None
             }
         }
-        impl VisitRefs for SleepBehavior {
-            fn visit_refs(&self, _: &mut dyn RefVisitor) {}
+        impl VisitHandles for SleepBehavior {
+            fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
         }
 
         // Setup

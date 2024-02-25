@@ -17,7 +17,7 @@ use ratatui::Terminal;
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::inv::Slot;
-use all_is_cubes::universe::URef;
+use all_is_cubes::universe::Handle;
 use all_is_cubes::util::{Refmt as _, StatusText};
 
 use crate::terminal::chars::{image_patch_to_character, write_colored_and_measure};
@@ -526,10 +526,10 @@ pub(super) struct InventoryDisplay {
 impl InventoryDisplay {
     const SLOTS: usize = 10; // TODO: link with other UI and gameplay code
 
-    pub fn new(character_ref: Option<URef<Character>>) -> Self {
+    pub fn new(character_handle: Option<Handle<Character>>) -> Self {
         // TODO: reimplement character inventory viewing in a safely asynchronous way
-        if let Some(character_ref) = character_ref {
-            if let Ok(character) = character_ref.read() {
+        if let Some(character_handle) = character_handle {
+            if let Ok(character) = character_handle.read() {
                 let slots = &character.inventory().slots;
 
                 return Self {

@@ -8,7 +8,7 @@ use crate::math::{Cube, Face6, FreeCoordinate, FreePoint, FreeVector, GridAab, N
 #[cfg(feature = "save")]
 use crate::save::schema;
 
-use crate::universe::{RefVisitor, VisitRefs};
+use crate::universe::{HandleVisitor, VisitHandles};
 
 /// Defines the initial state of a [`Character`] that is being created or moved into a [`Space`].
 ///
@@ -107,15 +107,15 @@ fn notnan_or_zero(value: FreeCoordinate) -> NotNan<FreeCoordinate> {
     NotNan::new(value).unwrap_or_else(|_| NotNan::from(0))
 }
 
-impl VisitRefs for Spawn {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+impl VisitHandles for Spawn {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         let Self {
             inventory,
             bounds: _,
             eye_position: _,
             look_direction: _,
         } = self;
-        inventory.visit_refs(visitor);
+        inventory.visit_handles(visitor);
     }
 }
 

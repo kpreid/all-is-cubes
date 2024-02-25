@@ -5,7 +5,7 @@ use crate::drawing::VoxelBrush;
 use crate::inv::{Inventory, InventoryTransaction};
 use crate::math::{GridRotation, Gridgid};
 use crate::space::{CubeTransaction, Space, SpaceTransaction};
-use crate::universe::VisitRefs;
+use crate::universe::VisitHandles;
 
 /// A template for something that can happen to a location in [`Space`] and possibly an inventory.
 ///
@@ -99,11 +99,11 @@ impl Operation {
     }
 }
 
-impl VisitRefs for Operation {
-    fn visit_refs(&self, visitor: &mut dyn crate::universe::RefVisitor) {
+impl VisitHandles for Operation {
+    fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
         match self {
-            Operation::Become(block) => block.visit_refs(visitor),
-            Operation::Paint(brush) => brush.visit_refs(visitor),
+            Operation::Become(block) => block.visit_handles(visitor),
+            Operation::Paint(brush) => brush.visit_handles(visitor),
         }
     }
 }

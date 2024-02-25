@@ -129,7 +129,7 @@ mod tests {
     use all_is_cubes::content::make_some_voxel_blocks;
     use all_is_cubes::content::testing::lighting_bench_space;
     use all_is_cubes::euclid::size3;
-    use all_is_cubes::universe::{Name, URef, Universe};
+    use all_is_cubes::universe::{Handle, Name, Universe};
     use all_is_cubes::util::yield_progress_for_testing;
     use std::collections::BTreeSet;
     use std::path::PathBuf;
@@ -149,7 +149,7 @@ mod tests {
         // TODO: dedup this logic with gltf export
         let mut universe = Universe::new();
         let blocks: [Block; 2] = make_some_voxel_blocks(&mut universe);
-        let block_defs: Vec<URef<BlockDef>> = blocks
+        let block_defs: Vec<Handle<BlockDef>> = blocks
             .into_iter()
             .enumerate()
             .map(|(i, block)| {

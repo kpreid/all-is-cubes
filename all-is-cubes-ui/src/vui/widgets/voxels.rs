@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use all_is_cubes::block::{Block, BlockAttributes, Primitive, Resolution};
 use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, VectorOps};
 use all_is_cubes::space::{Space, SpaceTransaction};
-use all_is_cubes::universe::URef;
+use all_is_cubes::universe::Handle;
 
 use crate::vui::{self, Layoutable as _};
 
@@ -13,7 +13,7 @@ use crate::vui::{self, Layoutable as _};
 /// TODO: add a click response feature
 #[derive(Clone, Debug)]
 pub struct Voxels {
-    space: URef<Space>,
+    space: Handle<Space>,
     region: GridAab,
     scale: Resolution,
     block_attributes: BlockAttributes,
@@ -27,7 +27,7 @@ impl Voxels {
     /// `region` may be displayed in that case.
     pub const fn new(
         region: GridAab,
-        space: URef<Space>,
+        space: Handle<Space>,
         scale: Resolution,
         block_attributes: BlockAttributes,
     ) -> Self {

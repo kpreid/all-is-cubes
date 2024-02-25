@@ -13,7 +13,7 @@ use crate::block::{
 use crate::math::{Cube, GridAab, GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
 use crate::transaction::{self, Merge, Transaction};
-use crate::universe::{Name, URef, Universe, UniverseTransaction};
+use crate::universe::{Handle, Name, Universe, UniverseTransaction};
 
 /// Tool for constructing [`Block`] values conveniently.
 ///
@@ -139,10 +139,10 @@ impl<P, Txn> BlockBuilder<P, Txn> {
     /// Sets the space for building a [`Primitive::Recur`].
     ///
     /// This will replace any previous voxels **or color.**
-    pub fn voxels_ref(
+    pub fn voxels_handle(
         self,
         resolution: Resolution,
-        space: URef<Space>,
+        space: Handle<Space>,
     ) -> BlockBuilder<BlockBuilderVoxels, ()> {
         BlockBuilder {
             attributes: self.attributes,
@@ -164,7 +164,7 @@ impl<P, Txn> BlockBuilder<P, Txn> {
     /// shrunk to tightly enclose that region, to improve performance. However, this still requires
     /// the function to be called on all positions within the full block bounds, so for very high
     /// ratios of resolution to actual content, it may be wise to use
-    /// [`voxels_ref()`](Self::voxels_ref) instead.
+    /// [`voxels_handle()`](Self::voxels_handle) instead.
     ///
     /// Note that if the resulting builder is cloned, all clones will share the same
     /// space.
@@ -223,17 +223,17 @@ impl<P, Txn> BlockBuilder<P, Txn> {
                 space = shrunk;
             }
 
-            let space_ref = URef::new_pending(Name::Pending, space);
+            let space_handle = Handle::new_pending(Name::Pending, space);
 
             Ok(BlockBuilder {
                 attributes,
                 primitive_builder: BlockBuilderVoxels {
-                    space: space_ref.clone(),
+                    space: space_handle.clone(),
                     resolution,
                     offset: GridPoint::origin(),
                 },
                 modifiers,
-                transaction: UniverseTransaction::insert(space_ref),
+                transaction: UniverseTransaction::insert(space_handle),
             })
         }
 
@@ -386,7 +386,7 @@ impl BuildPrimitive for BlockBuilderAtom {
 /// ([`Primitive::Recur`]).
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct BlockBuilderVoxels {
-    space: URef<Space>,
+    space: Handle<Space>,
     resolution: Resolution,
     offset: GridPoint,
 }
@@ -474,12 +474,12 @@ mod tests {
     #[test]
     fn voxels_from_space() {
         let mut universe = Universe::new();
-        let space_ref = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let space_handle = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
 
         assert_eq!(
             Block::builder()
                 .display_name("hello world")
-                .voxels_ref(R2, space_ref.clone())
+                .voxels_handle(R2, space_handle.clone())
                 .build(),
             Block::from_primitive(Primitive::Recur {
                 attributes: BlockAttributes {
@@ -488,7 +488,7 @@ mod tests {
                 },
                 offset: GridPoint::origin(),
                 resolution: R2, // not same as space size
-                space: space_ref
+                space: space_handle
             }),
         );
     }
@@ -506,8 +506,8 @@ mod tests {
             .unwrap()
             .build_into(&mut universe);
 
-        // Extract the implicitly constructed space reference
-        let space_ref = if let Primitive::Recur { space, .. } = block.primitive() {
+        // Extract the implicitly constructed space handle
+        let space_handle = if let Primitive::Recur { space, .. } = block.primitive() {
             space.clone()
         } else {
             panic!("expected Recur, found {block:?}");
@@ -522,12 +522,12 @@ mod tests {
                 },
                 offset: GridPoint::origin(),
                 resolution,
-                space: space_ref.clone()
+                space: space_handle.clone()
             }),
         );
 
         // Check the space's characteristics
-        let space = space_ref.read().unwrap();
+        let space = space_handle.read().unwrap();
         assert_eq!(space.bounds(), expected_bounds);
         assert_eq!(space.physics(), &SpacePhysics::DEFAULT_FOR_BLOCK);
         assert_eq!(
@@ -556,8 +556,8 @@ mod tests {
             .unwrap()
             .build_into(&mut universe);
 
-        // Extract the implicitly constructed space reference
-        let space_ref = if let Primitive::Recur { space, .. } = block.primitive() {
+        // Extract the implicitly constructed space handle
+        let space_handle = if let Primitive::Recur { space, .. } = block.primitive() {
             space.clone()
         } else {
             panic!("expected Recur, found {block:?}");
@@ -565,7 +565,7 @@ mod tests {
 
         // Check the space's characteristics; not just that it has the smaller bounds, but that
         // it has the expected physics and contents.
-        let space = space_ref.read().unwrap();
+        let space = space_handle.read().unwrap();
         assert_eq!(space.bounds(), expected_bounds);
         assert_eq!(space.physics(), &SpacePhysics::DEFAULT_FOR_BLOCK);
         assert_eq!(

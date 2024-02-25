@@ -67,13 +67,13 @@ pub(crate) async fn dot_vox_data_to_universe(
         space.fast_evaluate_light();
 
         let name = Name::from(format!("model_{i}"));
-        let space_ref = universe
+        let space_handle = universe
             .insert(name, space)
             .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?;
 
         if i == 0 {
             universe
-                .insert("character".into(), Character::spawn_default(space_ref))
+                .insert("character".into(), Character::spawn_default(space_handle))
                 .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?;
         }
 
@@ -113,9 +113,9 @@ pub(crate) async fn export_to_dot_vox_data(
     let mut palette: Vec<dot_vox::Color> = Vec::new();
     let mut models: Vec<dot_vox::Model> = Vec::with_capacity(to_export.len());
 
-    for (mut p, space_ref) in p.split_evenly(to_export.len()).zip(to_export) {
-        p.set_label(format!("Exporting space {}", space_ref.name()));
-        models.push(space_to_dot_vox_model(&space_ref, &mut palette)?);
+    for (mut p, space_handle) in p.split_evenly(to_export.len()).zip(to_export) {
+        p.set_label(format!("Exporting space {}", space_handle.name()));
+        models.push(space_to_dot_vox_model(&space_handle, &mut palette)?);
         p.finish().await
     }
 
@@ -201,14 +201,14 @@ fn dot_vox_model_to_space(
     Ok(space)
 }
 fn space_to_dot_vox_model(
-    space_ref: &universe::URef<Space>,
+    space_handle: &universe::Handle<Space>,
     palette: &mut Vec<dot_vox::Color>,
 ) -> Result<dot_vox::Model, ExportError> {
-    let space = space_ref.read()?;
+    let space = space_handle.read()?;
     let bounds = space.bounds();
     if bounds.size().width > 256 || bounds.size().height > 256 || bounds.size().depth > 256 {
         return Err(ExportError::NotRepresentable {
-            name: Some(space_ref.name()),
+            name: Some(space_handle.name()),
             reason: format!(
                 "space of size {} is too large to export to .vox; must be 256 or less in each axis",
                 bounds.size().refmt(&ConciseDebug)
@@ -320,7 +320,7 @@ mod tests {
     use super::*;
     use all_is_cubes::block::BlockDef;
     use all_is_cubes::raytracer::print_space;
-    use all_is_cubes::universe::URef;
+    use all_is_cubes::universe::Handle;
     use all_is_cubes::util::yield_progress_for_testing;
     use either::Either;
 
@@ -410,7 +410,7 @@ mod tests {
         // Export and import.
         let import_universe = roundtrip(&export_universe).await.expect("roundtrip failed");
         // then find the one space in it.
-        let import_space: URef<Space> = import_universe.iter_by_type().next().unwrap().1;
+        let import_space: Handle<Space> = import_universe.iter_by_type().next().unwrap().1;
 
         print_space(&import_space.read().unwrap(), [1., 1., 1.]);
 

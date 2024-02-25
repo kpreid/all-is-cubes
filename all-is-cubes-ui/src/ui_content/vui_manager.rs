@@ -13,7 +13,7 @@ use all_is_cubes::math::{FreeVector, NotNan};
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
-use all_is_cubes::universe::{URef, Universe, UniverseStepInfo, UniverseTransaction};
+use all_is_cubes::universe::{Handle, Universe, UniverseStepInfo, UniverseTransaction};
 
 use crate::apps::{
     ControlMessage, FullscreenSetter, FullscreenState, InputProcessor, QuitCancelled, QuitFn,
@@ -58,7 +58,7 @@ pub(crate) struct Vui {
     /// Receiving internal messages from widgets for controlling the UI itself
     /// (changing `state`, etc).
     control_channel: mpsc::Receiver<VuiMessage>,
-    character_source: ListenableSource<Option<URef<Character>>>,
+    character_source: ListenableSource<Option<Handle<Character>>>,
     changed_character: DirtyFlag,
     tooltip_state: Arc<Mutex<TooltipState>>,
     /// Messages from session to UI that don't fit as [`ListenableSource`] changes.
@@ -77,7 +77,7 @@ impl Vui {
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn new(
         input_processor: &InputProcessor,
-        character_source: ListenableSource<Option<URef<Character>>>,
+        character_source: ListenableSource<Option<Handle<Character>>>,
         paused: ListenableSource<bool>,
         graphics_options: ListenableSource<GraphicsOptions>,
         app_control_channel: mpsc::SyncSender<ControlMessage>,
@@ -162,7 +162,7 @@ impl Vui {
     }
 
     /// The space that should be displayed to the user, drawn on top of the world.
-    // TODO: It'd be more encapsulating if we could provide a _read-only_ URef...
+    // TODO: It'd be more encapsulating if we could provide a _read-only_ Handle...
     pub fn view(&self) -> ListenableSource<UiViewState> {
         self.current_view.as_source()
     }
@@ -192,7 +192,7 @@ impl Vui {
         let size = self.last_ui_size;
         let universe = &mut self.universe;
 
-        let next_space: Option<URef<Space>> = match &*self.state.get() {
+        let next_space: Option<Handle<Space>> = match &*self.state.get() {
             VuiPageState::Hud => Some(self.hud_page.get_or_create_space(size, universe)),
             VuiPageState::Paused => Some(self.paused_page.get_or_create_space(size, universe)),
             VuiPageState::Options => Some(self.options_page.get_or_create_space(size, universe)),
@@ -215,7 +215,7 @@ impl Vui {
         }
     }
 
-    fn view_state_for(space: Option<URef<Space>>, inputs: &HudInputs) -> UiViewState {
+    fn view_state_for(space: Option<Handle<Space>>, inputs: &HudInputs) -> UiViewState {
         // TODO: compute the derived graphics options only once
         let graphics_options = Self::graphics_options(inputs.graphics_options.snapshot());
 
@@ -286,8 +286,8 @@ impl Vui {
     fn step_pre_sync(&mut self) {
         // TODO: This should possibly be the responsibility of the TooltipState itself?
         if self.changed_character.get_and_clear() {
-            if let Some(character_ref) = &*self.character_source.get() {
-                TooltipState::bind_to_character(&self.tooltip_state, character_ref.clone());
+            if let Some(character_handle) = &*self.character_source.get() {
+                TooltipState::bind_to_character(&self.tooltip_state, character_handle.clone());
             }
         }
 

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use all_is_cubes::block;
-use all_is_cubes::universe::{Name, URef};
+use all_is_cubes::universe::{Handle, Name};
 use all_is_cubes::util::yield_progress_for_testing;
 
 use crate::{export_to_path, load_universe_from_file, ExportSet};
@@ -26,8 +26,8 @@ async fn import_export_native_format() {
 
     // This is *not* a thorough test of `Universe` deserialization.
     // It is just enough to prove that we ran the deserialization code and not something else.
-    let uref: URef<block::BlockDef> = universe.get(&Name::from("foo")).unwrap();
-    assert_eq!(uref.read().unwrap().block(), &block::AIR);
+    let handle: Handle<block::BlockDef> = universe.get(&Name::from("foo")).unwrap();
+    assert_eq!(handle.read().unwrap().block(), &block::AIR);
 
     // Export again.
     let destination_dir = tempfile::tempdir().unwrap();

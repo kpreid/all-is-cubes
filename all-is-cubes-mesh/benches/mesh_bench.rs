@@ -9,7 +9,7 @@ use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::rgba_const;
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
-use all_is_cubes::universe::{Name, URef, Universe};
+use all_is_cubes::universe::{Handle, Name, Universe};
 
 use all_is_cubes_mesh::testing::Allocator;
 use all_is_cubes_mesh::testing::TextureMt as Mt;
@@ -156,11 +156,11 @@ fn dynamic_benches(c: &mut Criterion) {
     let camera = Camera::new(graphics_options, Viewport::with_scale(1.0, [100, 100]));
 
     g.bench_function("initial-update", |b| {
-        let space_ref = URef::new_pending(Name::Pending, half_space(Block::from(Rgba::WHITE)));
+        let space_handle = Handle::new_pending(Name::Pending, half_space(Block::from(Rgba::WHITE)));
         b.iter_batched_ref(
             || {
                 let csm: dynamic::ChunkedSpaceMesh<Mt, 16> =
-                    dynamic::ChunkedSpaceMesh::new(space_ref.clone(), Allocator::new(), true);
+                    dynamic::ChunkedSpaceMesh::new(space_handle.clone(), Allocator::new(), true);
                 csm
             },
             |csm| {
@@ -192,7 +192,7 @@ fn checkerboard_space_bench_setup(options: MeshOptions, transparent: bool) -> Sp
 
 fn checkerboard_block(universe: &mut Universe, voxels: [Block; 2]) -> Block {
     Block::builder()
-        .voxels_ref(R16, universe.insert_anonymous(checkerboard_space(voxels)))
+        .voxels_handle(R16, universe.insert_anonymous(checkerboard_space(voxels)))
         .build()
 }
 

@@ -10,7 +10,7 @@ use all_is_cubes::character::Character;
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{Name, URef, Universe};
+use all_is_cubes::universe::{Handle, Name, Universe};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_mesh::{block_meshes_for_space, MeshOptions, SpaceMesh};
 
@@ -97,7 +97,7 @@ async fn export_snapshot_test(test_name: &'static str, export_set: ExportSet) {
 async fn export_block_defs() {
     let mut universe = Universe::new();
     let blocks: [Block; 2] = make_some_voxel_blocks(&mut universe);
-    let block_defs: Vec<URef<BlockDef>> = blocks
+    let block_defs: Vec<Handle<BlockDef>> = blocks
         .into_iter()
         .enumerate()
         .map(|(i, block)| {

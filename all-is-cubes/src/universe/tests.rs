@@ -15,7 +15,7 @@ use crate::op::Operation;
 use crate::space::Space;
 use crate::transaction::{self, Transaction};
 use crate::universe::{
-    self, list_refs, InsertError, InsertErrorKind, Name, RefError, URef, Universe,
+    self, list_handles, Handle, HandleError, InsertError, InsertErrorKind, Name, Universe,
     UniverseTransaction,
 };
 use crate::util::{assert_conditional_send_sync, yield_progress_for_testing};
@@ -23,7 +23,7 @@ use crate::{behavior, time};
 
 #[test]
 fn thread_safety() {
-    assert_conditional_send_sync::<URef<Character>>();
+    assert_conditional_send_sync::<Handle<Character>>();
     assert_conditional_send_sync::<Universe>();
 }
 
@@ -125,15 +125,15 @@ fn get_any() {
 
     assert_eq!(
         u.get_any(&"test_block".into()).unwrap().type_id(),
-        TypeId::of::<URef<BlockDef>>()
+        TypeId::of::<Handle<BlockDef>>()
     );
     assert_eq!(
         u.get_any(&"test_space".into()).unwrap().type_id(),
-        TypeId::of::<URef<Space>>()
+        TypeId::of::<Handle<Space>>()
     );
     assert_eq!(
         u.get_any(&"test_char".into()).unwrap().type_id(),
-        TypeId::of::<URef<Character>>()
+        TypeId::of::<Handle<Character>>()
     );
 }
 
@@ -141,24 +141,24 @@ fn get_any() {
 fn insert_anonymous_makes_distinct_names() {
     let [block_0, block_1] = make_some_blocks();
     let mut u = Universe::new();
-    let ref_a = u.insert_anonymous(BlockDef::new(AIR));
-    let ref_b = u.insert_anonymous(BlockDef::new(AIR));
-    ref_a
+    let handle_a = u.insert_anonymous(BlockDef::new(AIR));
+    let handle_b = u.insert_anonymous(BlockDef::new(AIR));
+    handle_a
         .execute(
             &BlockDefTransaction::overwrite(block_0),
             &mut transaction::no_outputs,
         )
         .unwrap();
-    ref_b
+    handle_b
         .execute(
             &BlockDefTransaction::overwrite(block_1),
             &mut transaction::no_outputs,
         )
         .unwrap();
-    assert_ne!(ref_a, ref_b, "not equal");
+    assert_ne!(handle_a, handle_b, "not equal");
     assert_ne!(
-        ref_a.read().unwrap().block(),
-        ref_b.read().unwrap().block(),
+        handle_a.read().unwrap().block(),
+        handle_b.read().unwrap().block(),
         "different values"
     );
 }
@@ -193,7 +193,7 @@ fn insert_duplicate_name_different_type() {
 fn insert_duplicate_name_via_txn() {
     let mut u = Universe::new();
     u.insert("test_thing".into(), BlockDef::new(AIR)).unwrap();
-    let error = UniverseTransaction::insert(URef::new_pending(
+    let error = UniverseTransaction::insert(Handle::new_pending(
         "test_thing".into(),
         Space::empty_positive(1, 1, 1),
     ))
@@ -219,7 +219,7 @@ fn insert_anonym_prohibited_direct() {
 
 #[test]
 fn insert_anonym_prohibited_via_txn() {
-    let e = UniverseTransaction::insert(URef::new_pending(
+    let e = UniverseTransaction::insert(Handle::new_pending(
         Name::Anonym(0),
         Space::empty_positive(1, 1, 1),
     ))
@@ -245,7 +245,7 @@ fn insert_pending_becomes_anonym_direct() {
 #[test]
 fn insert_pending_becomes_anonym_via_txn() {
     let mut u = Universe::new();
-    UniverseTransaction::insert(URef::new_pending(Name::Pending, BlockDef::new(AIR)))
+    UniverseTransaction::insert(Handle::new_pending(Name::Pending, BlockDef::new(AIR)))
         .execute(&mut u, &mut drop)
         .unwrap();
     assert_eq!(
@@ -260,32 +260,32 @@ fn delete_success() {
     let name: Name = "test_thing".into();
     let blocks: [Block; 2] = make_some_blocks();
 
-    let ref_1 = u
+    let handle_1 = u
         .insert(name.clone(), BlockDef::new(blocks[0].clone()))
         .unwrap();
-    let _ = ref_1.read().unwrap();
+    let _ = handle_1.read().unwrap();
 
-    UniverseTransaction::delete(ref_1.clone())
+    UniverseTransaction::delete(handle_1.clone())
         .execute(&mut u, &mut drop)
         .unwrap();
     assert_eq!(
-        ref_1
+        handle_1
             .read()
             .expect_err("should be no longer reachable by ref"),
-        RefError::Gone(name.clone()),
+        HandleError::Gone(name.clone()),
     );
 
     // Now insert a new thing under the same name, and it should not be considered the same.
     // (Note: We might make this possible in the future, but it'll be required to be done with
     // the ref in hand, not by name.)
-    let ref_2 = u
+    let handle_2 = u
         .insert(name.clone(), BlockDef::new(blocks[1].clone()))
         .unwrap();
     assert_eq!(
-        ref_1.read().expect_err("should not be resurrected"),
-        RefError::Gone(name),
+        handle_1.read().expect_err("should not be resurrected"),
+        HandleError::Gone(name),
     );
-    let _ = ref_2.read().unwrap();
+    let _ = handle_2.read().unwrap();
 }
 
 /// Anonymous members are strictly garbage collected, and cannot be deleted.
@@ -303,9 +303,9 @@ fn delete_twice_fails() {
     let mut u = Universe::new();
     let name: Name = "test_thing".into();
     let [block] = make_some_blocks();
-    let uref = u.insert(name.clone(), BlockDef::new(block)).unwrap();
+    let handle = u.insert(name.clone(), BlockDef::new(block)).unwrap();
 
-    let txn = UniverseTransaction::delete(uref);
+    let txn = UniverseTransaction::delete(handle);
 
     // Deletion should succeed...
     txn.execute(&mut u, &mut drop).unwrap();
@@ -319,9 +319,9 @@ fn delete_wrong_universe_fails() {
     let mut u2 = Universe::new();
     let name: Name = "test_thing".into();
     let [block] = make_some_blocks();
-    let uref = u1.insert(name.clone(), BlockDef::new(block)).unwrap();
+    let handle = u1.insert(name.clone(), BlockDef::new(block)).unwrap();
 
-    let txn = UniverseTransaction::delete(uref);
+    let txn = UniverseTransaction::delete(handle);
 
     txn.execute(&mut u2, &mut drop).unwrap_err();
 }
@@ -346,7 +346,7 @@ fn universe_behavior() {
             _context: &behavior::BehaviorContext<'_, Universe>,
         ) -> (UniverseTransaction, behavior::Then) {
             (
-                UniverseTransaction::insert(URef::new_pending("foo".into(), BlockDef::new(AIR))),
+                UniverseTransaction::insert(Handle::new_pending("foo".into(), BlockDef::new(AIR))),
                 behavior::Then::Drop,
             )
         }
@@ -354,9 +354,9 @@ fn universe_behavior() {
             None
         }
     }
-    impl universe::VisitRefs for UTestBehavior {
-        // No references
-        fn visit_refs(&self, _visitor: &mut dyn universe::RefVisitor) {}
+    impl universe::VisitHandles for UTestBehavior {
+        // No handles.
+        fn visit_handles(&self, _visitor: &mut dyn universe::HandleVisitor) {}
     }
 
     // Setup
@@ -410,76 +410,79 @@ fn gc_preserves_named() {
 }
 
 #[test]
-fn visit_refs_block_def_no_ref() {
-    assert_eq!(list_refs(&BlockDef::new(AIR)), vec![]);
+fn visit_handles_block_def_no_handle() {
+    assert_eq!(list_handles(&BlockDef::new(AIR)), vec![]);
 }
 
 #[test]
-fn visit_refs_block_def_space() {
+fn visit_handles_block_def_space() {
     let mut u = Universe::new();
-    let space_ref = u
+    let space_handle = u
         .insert("s".into(), Space::empty_positive(1, 1, 1))
         .unwrap();
     let block_def = BlockDef::new(
         Block::builder()
-            .voxels_ref(Resolution::R1, space_ref)
+            .voxels_handle(Resolution::R1, space_handle)
             .build(),
     );
-    assert_eq!(list_refs(&block_def), vec!["s".into()]);
+    assert_eq!(list_handles(&block_def), vec!["s".into()]);
 }
 
 #[test]
-fn visit_refs_block_def_indirect() {
+fn visit_handles_block_def_indirect() {
     let mut u = Universe::new();
     let b1 = BlockDef::new(AIR);
-    let b1_ref = u.insert("destination".into(), b1).unwrap();
-    let b2 = BlockDef::new(Block::from(b1_ref));
-    assert_eq!(list_refs(&b2), vec!["destination".into()]);
+    let b1_handle = u.insert("destination".into(), b1).unwrap();
+    let b2 = BlockDef::new(Block::from(b1_handle));
+    assert_eq!(list_handles(&b2), vec!["destination".into()]);
 }
 
 #[test]
-fn visit_refs_block_tick_action() {
-    let b1 = URef::new_pending("foo".into(), BlockDef::new(AIR));
+fn visit_handles_block_tick_action() {
+    let b1 = Handle::new_pending("foo".into(), BlockDef::new(AIR));
     let b2 = Block::builder()
         .color(Rgba::WHITE)
         .tick_action(Some(TickAction::from(Operation::Paint(
             crate::drawing::VoxelBrush::single(Block::from(b1)),
         ))))
         .build();
-    assert_eq!(list_refs(&b2), vec!["foo".into()]);
+    assert_eq!(list_handles(&b2), vec!["foo".into()]);
 }
 
 #[test]
-fn visit_refs_character() {
+fn visit_handles_character() {
     let mut u = Universe::new();
 
     // Character's space
-    let space_ref = u
+    let space_handle = u
         .insert("space".into(), Space::empty_positive(1, 1, 1))
         .unwrap();
 
-    let mut character = Character::spawn_default(space_ref.clone());
+    let mut character = Character::spawn_default(space_handle.clone());
 
-    // A block reference in inventory.
-    let block_ref = u.insert("block".into(), BlockDef::new(AIR)).unwrap();
+    // A block handle in inventory.
+    let block_handle = u.insert("block".into(), BlockDef::new(AIR)).unwrap();
     CharacterTransaction::inventory(InventoryTransaction::insert([Tool::Block(Block::from(
-        block_ref,
+        block_handle,
     ))]))
     .execute(&mut character, &mut drop)
     .unwrap();
 
-    assert_eq!(list_refs(&character), vec!["space".into(), "block".into()]);
+    assert_eq!(
+        list_handles(&character),
+        vec!["space".into(), "block".into()]
+    );
 }
 
 #[test]
-fn visit_refs_space() {
+fn visit_handles_space() {
     let mut universe = Universe::new();
     let mut space = Space::empty_positive(1, 1, 1);
-    let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
+    let block_def_handle = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
     space
-        .set([0, 0, 0], Block::from(block_def_ref.clone()))
+        .set([0, 0, 0], Block::from(block_def_handle.clone()))
         .unwrap();
 
-    // TODO: Also add a behavior and a spawn inventory item containing refs and check those
-    assert_eq!(list_refs(&space), vec![block_def_ref.name().clone()]);
+    // TODO: Also add a behavior and a spawn inventory item containing handles and check those
+    assert_eq!(list_handles(&space), vec![block_def_handle.name().clone()]);
 }

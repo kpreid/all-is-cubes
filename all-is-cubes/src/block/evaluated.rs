@@ -22,10 +22,10 @@ use crate::raytracer;
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
-use super::{Block, Primitive, URef, AIR};
+use super::{Block, Handle, Primitive, AIR};
 
 /// A snapshotted form of [`Block`] which contains all information needed for rendering
-/// and physics, and does not require dereferencing [`URef`]s or unbounded computation.
+/// and physics, and does not require dereferencing [`Handle`]s or unbounded computation.
 #[derive(Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))] // TODO: Should have a custom Arbitrary producing only “possible” results
 #[non_exhaustive]

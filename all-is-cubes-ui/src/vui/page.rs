@@ -10,7 +10,7 @@ use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, G
 use all_is_cubes::space::{self, Space, SpaceBuilder, SpacePhysics};
 use all_is_cubes::time;
 use all_is_cubes::transaction;
-use all_is_cubes::universe::{URef, Universe};
+use all_is_cubes::universe::{Handle, Universe};
 
 use crate::vui::{
     self, install_widgets, widgets, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest,
@@ -100,7 +100,7 @@ impl UiSize {
 #[derive(Clone, Debug)]
 pub(crate) struct PageInst {
     tree: WidgetTree,
-    space: Option<URef<Space>>,
+    space: Option<Handle<Space>>,
 }
 
 impl PageInst {
@@ -112,7 +112,7 @@ impl PageInst {
         &mut self,
         mut size: UiSize,
         universe: &mut Universe,
-    ) -> URef<Space> {
+    ) -> Handle<Space> {
         if let Some(space) = self.space.as_ref() {
             // TODO: We will need to be comparing the entire size if it gains other fields
             if space.read().unwrap().bounds() == size.space_bounds() {
@@ -152,7 +152,7 @@ impl PageInst {
         &self,
         size: UiSize,
         universe: &mut Universe,
-    ) -> Result<URef<Space>, InstallVuiError> {
+    ) -> Result<Handle<Space>, InstallVuiError> {
         let space = universe.insert_anonymous(size.create_space());
         // TODO: error handling for layout
         let txn = install_widgets(LayoutGrant::new(size.space_bounds()), &self.tree)?;

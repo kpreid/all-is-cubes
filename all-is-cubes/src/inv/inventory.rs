@@ -11,7 +11,7 @@ use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::inv::{Icons, Tool, ToolError, ToolInput};
 use crate::linking::BlockProvider;
 use crate::transaction::{CommitError, Merge, PreconditionFailed, Transaction};
-use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
+use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 
 /// A collection of [`Tool`]s (items).
 ///
@@ -20,7 +20,7 @@ use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
 /// owner; its operations produce [`InventoryChange`]s (sometimes indirectly via
 /// [`InventoryTransaction`]'s output) which the owner is responsible for forwarding
 /// appropriately. This design choice allows an [`Inventory`] to be placed inside
-/// other objects directly rather than via [`URef`].
+/// other objects directly rather than via [`Handle`].
 ///
 #[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -52,7 +52,7 @@ impl Inventory {
     pub fn use_tool(
         &self,
         cursor: Option<&Cursor>,
-        character: URef<Character>,
+        character: Handle<Character>,
         slot_index: usize,
     ) -> Result<UniverseTransaction, ToolError> {
         let original_slot = self.slots.get(slot_index);
@@ -130,10 +130,10 @@ impl Inventory {
     }
 }
 
-impl VisitRefs for Inventory {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+impl VisitHandles for Inventory {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         let Self { slots } = self;
-        slots.visit_refs(visitor);
+        slots.visit_handles(visitor);
     }
 }
 
@@ -264,11 +264,11 @@ impl From<Option<Tool>> for Slot {
     }
 }
 
-impl VisitRefs for Slot {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+impl VisitHandles for Slot {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         match self {
             Slot::Empty => {}
-            Slot::Stack(_count, tool) => tool.visit_refs(visitor),
+            Slot::Stack(_count, tool) => tool.visit_handles(visitor),
         }
     }
 }

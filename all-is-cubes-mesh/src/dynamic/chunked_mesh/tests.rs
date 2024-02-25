@@ -10,7 +10,7 @@ use all_is_cubes::listen::Listener as _;
 use all_is_cubes::math::{Cube, FreePoint, GridAab, GridCoordinate};
 use all_is_cubes::math::{GridPoint, NotNan};
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange, SpaceTransaction};
-use all_is_cubes::universe::{URef, Universe};
+use all_is_cubes::universe::{Handle, Universe};
 use all_is_cubes::{notnan, rgba_const, time, transaction};
 
 use crate::texture::NoTextures;
@@ -148,7 +148,7 @@ fn todo_ignores_absent_chunks() {
 struct CsmTester<const MBM: usize> {
     #[allow(dead_code)] // Universe must be kept alive but is not read after construction
     universe: Universe,
-    space: URef<Space>,
+    space: Handle<Space>,
     camera: Camera,
     csm: ChunkedSpaceMesh<Mt<MBM>, CHUNK_SIZE>,
 }
@@ -156,8 +156,8 @@ struct CsmTester<const MBM: usize> {
 impl<const MBM: usize> CsmTester<MBM> {
     fn new(space: Space, view_distance: f64) -> Self {
         let mut universe = Universe::new();
-        let space_ref = universe.insert_anonymous(space);
-        let csm = ChunkedSpaceMesh::new(space_ref.clone(), NoTextures, true);
+        let space_handle = universe.insert_anonymous(space);
+        let csm = ChunkedSpaceMesh::new(space_handle.clone(), NoTextures, true);
         let camera = Camera::new(
             {
                 let mut o = GraphicsOptions::default();
@@ -168,7 +168,7 @@ impl<const MBM: usize> CsmTester<MBM> {
         );
         Self {
             universe,
-            space: space_ref,
+            space: space_handle,
             camera,
             csm,
         }

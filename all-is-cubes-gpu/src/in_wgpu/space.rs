@@ -17,7 +17,7 @@ use all_is_cubes::math::{
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{Sky, Space, SpaceChange};
 use all_is_cubes::time;
-use all_is_cubes::universe::{RefError, URef};
+use all_is_cubes::universe::{Handle, HandleError};
 use all_is_cubes::util::Executor;
 use all_is_cubes_mesh::dynamic::{self, ChunkedSpaceMesh, RenderDataUpdate};
 use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
@@ -140,8 +140,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
         executor: Arc<dyn Executor>,
         device: &wgpu::Device,
         _pipelines: &Pipelines,
-        space: Option<&URef<Space>>,
-    ) -> Result<(), RefError> {
+        space: Option<&Handle<Space>>,
+    ) -> Result<(), HandleError> {
         if self.csm.as_ref().map(|csm| csm.space()) == space {
             // No change.
             return Ok(());

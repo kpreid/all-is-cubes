@@ -11,13 +11,13 @@ use crate::listen::{Listen as _, ListenableSource, Listener};
 use crate::math::Cube;
 use crate::raytracer::{RtBlockData, RtOptionsRef, SpaceRaytracer, TracingBlock, TracingCubeData};
 use crate::space::{self, BlockIndex, Space, SpaceChange};
-use crate::universe::{RefError, URef};
+use crate::universe::{Handle, HandleError};
 use crate::util::maybe_sync::Mutex;
 
 /// Manages a [`SpaceRaytracer`] so that it can be cheaply updated when the [`Space`] is
 /// changed.
 pub struct UpdatingSpaceRaytracer<D: RtBlockData> {
-    space: URef<Space>,
+    space: Handle<Space>,
     graphics_options: ListenableSource<GraphicsOptions>,
     custom_options: ListenableSource<D::Options>,
     state: SpaceRaytracer<D>,
@@ -50,7 +50,7 @@ where
     /// [`update()`](Self::update). (This is done so that this constructor cannot fail and
     /// so the space is accessed on a consistent schedule.)
     pub fn new(
-        space: URef<Space>,
+        space: Handle<Space>,
         graphics_options: ListenableSource<GraphicsOptions>,
         custom_options: ListenableSource<D::Options>,
     ) -> Self {
@@ -80,7 +80,7 @@ where
     }
 
     /// Returns the [`Space`] this is synchronized with.
-    pub fn space(&self) -> &URef<Space> {
+    pub fn space(&self) -> &Handle<Space> {
         &self.space
     }
 
@@ -93,7 +93,7 @@ where
     /// Reads the previously provided [`Space`] and updates the local copy of its contents.
     ///
     /// Returns an error if reading fails.
-    pub fn update(&mut self) -> Result<(), RefError> {
+    pub fn update(&mut self) -> Result<(), HandleError> {
         // Deadlock safety note:
         // If the space is being updated, that will acquire the space's lock and then our
         // todo's lock for notifications. Therefore, to avoid deadlock we would need to
@@ -234,14 +234,14 @@ mod tests {
 
     struct EquivalenceTester {
         camera: Camera,
-        space: URef<Space>,
+        space: Handle<Space>,
         graphics_options: ListenableSource<GraphicsOptions>,
         custom_options: ListenableSource<()>,
         updating: UpdatingSpaceRaytracer<CharacterRtData>,
     }
 
     impl EquivalenceTester {
-        fn new(space: URef<Space>) -> Self {
+        fn new(space: Handle<Space>) -> Self {
             let bounds = space.read().unwrap().bounds();
 
             // TODO: add tests of changing the options
@@ -270,7 +270,7 @@ mod tests {
             }
         }
 
-        fn update_and_assert(&mut self) -> Result<(), RefError> {
+        fn update_and_assert(&mut self) -> Result<(), HandleError> {
             self.camera.set_options(self.graphics_options.snapshot());
             self.updating.update()?;
             let image_updating = self
@@ -343,7 +343,7 @@ mod tests {
 
             assert_eq!(
                 tester.updating.update().unwrap_err(),
-                RefError::InUse(space.name().clone()),
+                HandleError::InUse(space.name().clone()),
             );
         }
 

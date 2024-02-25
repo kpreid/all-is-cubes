@@ -188,8 +188,8 @@ impl From<Move> for Modifier {
     }
 }
 
-impl universe::VisitRefs for Move {
-    fn visit_refs(&self, _visitor: &mut dyn universe::RefVisitor) {
+impl universe::VisitHandles for Move {
+    fn visit_handles(&self, _visitor: &mut dyn universe::HandleVisitor) {
         let Move {
             direction: _,
             distance: _,

@@ -489,7 +489,7 @@ fn fully_opaque_voxels() {
 fn fully_opaque_partial_block() {
     let mut u = Universe::new();
     let block = Block::builder()
-        .voxels_ref(R8, {
+        .voxels_handle(R8, {
             // The dimensions don't meet the PX face, but the blocks are all opaque.
             u.insert_anonymous(
                 Space::builder(GridAab::from_lower_size([0, 0, 0], [4, 8, 8]))

@@ -675,7 +675,7 @@ pub async fn install_dungeon_blocks(
                     })?;
                 Block::builder()
                     .display_name("Floor Tile")
-                    .voxels_ref(resolution, txn.insert_anonymous(space))
+                    .voxels_handle(resolution, txn.insert_anonymous(space))
                     .build()
             }
 
@@ -702,7 +702,7 @@ pub async fn install_dungeon_blocks(
                     })?;
                 Block::builder()
                     .display_name("Gate")
-                    .voxels_ref(R16, txn.insert_anonymous(space))
+                    .voxels_handle(R16, txn.insert_anonymous(space))
                     .build()
             }
 
@@ -718,7 +718,7 @@ pub async fn install_dungeon_blocks(
                 )?;
                 Block::builder()
                     .display_name("Gate Pocket")
-                    .voxels_ref(R16, txn.insert_anonymous(space))
+                    .voxels_handle(R16, txn.insert_anonymous(space))
                     .build()
             }
         })

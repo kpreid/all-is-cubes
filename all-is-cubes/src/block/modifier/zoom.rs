@@ -28,7 +28,7 @@ pub struct Zoom {
     // /// [`Primitive`]. This may be used so that the before-zooming block can be a
     // /// custom preview rather than an exact miniature of the multi-block
     // /// structure.
-    // space: Option<URef<Space>>,
+    // space: Option<Handle<Space>>,
 }
 
 impl Zoom {
@@ -128,8 +128,8 @@ impl From<Zoom> for Modifier {
     }
 }
 
-impl universe::VisitRefs for Zoom {
-    fn visit_refs(&self, _visitor: &mut dyn universe::RefVisitor) {
+impl universe::VisitHandles for Zoom {
+    fn visit_handles(&self, _visitor: &mut dyn universe::HandleVisitor) {
         let Zoom {
             scale: _,
             offset: _,

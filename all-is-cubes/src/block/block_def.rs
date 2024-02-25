@@ -4,7 +4,7 @@ use core::{fmt, mem, ops};
 use crate::block::{self, Block, BlockChange, EvalBlockError, InEvalError, MinEval};
 use crate::listen::{self, Gate, Listen, Listener, Notifier};
 use crate::transaction::{self, Transaction};
-use crate::universe::{RefVisitor, VisitRefs};
+use crate::universe::{HandleVisitor, VisitHandles};
 
 #[cfg(doc)]
 use crate::block::{EvaluatedBlock, Primitive};
@@ -84,8 +84,8 @@ impl BlockDef {
 
     /// Returns the current cached evaluation of the current block value.
     ///
-    /// This returns the same success or error as `Block::from(ref_to_self).evaluate()` would, not
-    /// the same as `.block().evaluate()` would.
+    /// This returns the same success or error as `Block::from(handle_to_self).evaluate()` would,
+    /// not the same as `.block().evaluate()` would.
     pub fn evaluate(&self) -> Result<block::EvaluatedBlock, EvalBlockError> {
         let filter = block::EvalFilter::default();
         block::finish_evaluation(
@@ -241,8 +241,8 @@ impl AsRef<Block> for BlockDef {
     }
 }
 
-impl VisitRefs for BlockDef {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+impl VisitHandles for BlockDef {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         let Self {
             state:
                 BlockDefState {
@@ -256,7 +256,7 @@ impl VisitRefs for BlockDef {
                 },
             notifier: _,
         } = self;
-        block.visit_refs(visitor);
+        block.visit_handles(visitor);
     }
 }
 
@@ -420,7 +420,7 @@ pub(crate) struct BlockDefStepInfo {
     attempted: usize,
     /// A cache update succeeded.
     updated: usize,
-    /// A cache update failed because of a [`RefError::InUse`] conflict.
+    /// A cache update failed because of a [`HandleError::InUse`] conflict.
     was_in_use: usize,
 }
 
@@ -487,8 +487,8 @@ mod tests {
         let eval_bare = block.evaluate().unwrap();
         let block_def = BlockDef::new(block);
         let eval_def = block_def.evaluate().unwrap();
-        let block_def_ref = universe.insert_anonymous(block_def);
-        let eval_indirect = Block::from(block_def_ref).evaluate().unwrap();
+        let block_def_handle = universe.insert_anonymous(block_def);
+        let eval_indirect = Block::from(block_def_handle).evaluate().unwrap();
 
         assert_eq!(
             eval_def, eval_indirect,

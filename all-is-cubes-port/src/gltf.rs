@@ -390,16 +390,16 @@ pub(crate) async fn export_gltf(
     let mut writer = GltfWriter::new(GltfDataDestination::new(Some(destination.clone()), 2000));
     let mesh_options = MeshOptions::new(&GraphicsOptions::default());
 
-    for (mut p, block_def_ref) in block_def_progress
+    for (mut p, block_def_handle) in block_def_progress
         .split_evenly(block_defs.len())
         .zip(block_defs)
     {
-        let name = block_def_ref.name();
+        let name = block_def_handle.name();
         p.set_label(&name);
         p.progress(0.01).await;
         {
             // constrained scope so we don't hold UBorrow over an await
-            let block_def = block_def_ref.read()?;
+            let block_def = block_def_handle.read()?;
             let mesh = SpaceMesh::<GltfMt>::from(&BlockMesh::new(
                 &block_def
                     .evaluate()
@@ -432,13 +432,13 @@ pub(crate) async fn export_gltf(
         p.finish().await;
     }
 
-    for (mut p, space_ref) in space_progress.split_evenly(spaces.len()).zip(spaces) {
-        let name = space_ref.name();
+    for (mut p, space_handle) in space_progress.split_evenly(spaces.len()).zip(spaces) {
+        let name = space_handle.name();
         p.set_label(&name);
         p.progress(0.01).await;
         {
             // constrained scope so we don't hold UBorrow over an await
-            let space = space_ref.read()?;
+            let space = space_handle.read()?;
             let block_meshes = block_meshes_for_space::<GltfMt>(
                 &space,
                 &writer.texture_allocator(),

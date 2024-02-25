@@ -8,7 +8,7 @@ use embedded_graphics::Drawable;
 
 use crate::camera::{Flaws, ImageSize};
 use crate::character::Cursor;
-use crate::universe::RefError;
+use crate::universe::HandleError;
 use crate::util::maybe_sync::BoxFuture;
 
 /// Rendering a previously-specified scene to an in-memory image.
@@ -17,7 +17,7 @@ use crate::util::maybe_sync::BoxFuture;
 /// Therefore, all its `async` methods use boxed futures.
 pub trait HeadlessRenderer {
     /// Update the renderer's internal copy of the scene from the data sources
-    /// (`URef<Character>` etc.) it is tracking.
+    /// (`Handle<Character>` etc.) it is tracking.
     ///
     /// Returns [`RenderError::Read`] if said sources are in use or if some other
     /// prohibitive failure occurred. The resulting state of the renderer in such cases
@@ -53,7 +53,7 @@ pub enum RenderError {
     ///
     /// [`Universe`]: crate::universe::Universe
     #[displaydoc("scene to be rendered was not available for reading")]
-    Read(RefError),
+    Read(HandleError),
     // TODO: add errors for out of memory, lost GPU, etc.
 }
 

@@ -3,7 +3,7 @@ use crate::character::{cursor_raycast, Character, Cursor};
 use crate::listen::{DirtyFlag, ListenableCell, ListenableSource};
 use crate::math::FreeCoordinate;
 use crate::space::Space;
-use crate::universe::{URef, Universe};
+use crate::universe::{Handle, Universe};
 
 /// A collection of values associated with each of the layers of graphics that
 /// is normally drawn (HUD on top of world, currently) by [`HeadlessRenderer`] or
@@ -54,9 +54,9 @@ impl<T> Layers<T> {
 ///
 /// * [`GraphicsOptions`].
 /// * A [`Viewport`] specifying the dimensions of image to render.
-/// * A [`URef`] to the [`Character`] whose eyes we look through to render the “world”
+/// * A [`Handle`] to the [`Character`] whose eyes we look through to render the “world”
 ///   [`Space`].
-/// * A [`URef`] to the UI/HUD [`Space`] overlaid on the world, if any.
+/// * A [`Handle`] to the UI/HUD [`Space`] overlaid on the world, if any.
 ///
 /// When [`StandardCameras::update()`] is called, all of these data sources are read
 /// and used to update the [`Camera`] data. Those cameras, and copies of the input
@@ -75,17 +75,17 @@ pub struct StandardCameras {
     graphics_options: ListenableSource<GraphicsOptions>,
     graphics_options_dirty: DirtyFlag,
 
-    character_source: ListenableSource<Option<URef<Character>>>,
+    character_source: ListenableSource<Option<Handle<Character>>>,
     /// Tracks whether the character was replaced (not whether its view changed).
     character_dirty: DirtyFlag,
-    character: Option<URef<Character>>,
+    character: Option<Handle<Character>>,
     /// Cached and listenable version of character's space.
     /// TODO: This should be in a Layers along with ui_state...?
-    world_space: ListenableCell<Option<URef<Space>>>,
+    world_space: ListenableCell<Option<Handle<Space>>>,
 
     ui_source: ListenableSource<UiViewState>,
     ui_dirty: DirtyFlag,
-    ui_space: Option<URef<Space>>,
+    ui_space: Option<Handle<Space>>,
 
     viewport_source: ListenableSource<Viewport>,
     viewport_dirty: DirtyFlag,
@@ -100,7 +100,7 @@ impl StandardCameras {
     pub fn new(
         graphics_options: ListenableSource<GraphicsOptions>,
         viewport_source: ListenableSource<Viewport>,
-        character_source: ListenableSource<Option<URef<Character>>>,
+        character_source: ListenableSource<Option<Handle<Character>>>,
         ui_source: ListenableSource<UiViewState>,
     ) -> Self {
         // TODO: Add a unit test that each of these listeners works as intended.
@@ -204,8 +204,8 @@ impl StandardCameras {
             }
         }
 
-        if let Some(character_ref) = &self.character {
-            match character_ref.read() {
+        if let Some(character_handle) = &self.character {
+            match character_handle.read() {
                 Ok(character) => {
                     // TODO: Shouldn't we also grab the character's Space while we
                     // have the access? Renderers could use that.
@@ -249,7 +249,7 @@ impl StandardCameras {
 
     /// Returns the character's viewpoint to draw in the world layer.
     /// May be [`None`] if there is no current character.
-    pub fn character(&self) -> Option<&URef<Character>> {
+    pub fn character(&self) -> Option<&Handle<Character>> {
         self.character.as_ref()
     }
 
@@ -258,7 +258,7 @@ impl StandardCameras {
     /// This is a [`ListenableSource`] to make it simple to cache the Space rendering data and
     /// follow space transitions.
     /// It updates when [`Self::update()`] is called.
-    pub fn world_space(&self) -> ListenableSource<Option<URef<Space>>> {
+    pub fn world_space(&self) -> ListenableSource<Option<Handle<Space>>> {
         self.world_space.as_source()
     }
 
@@ -268,7 +268,7 @@ impl StandardCameras {
     /// false.
     ///
     /// TODO: Make this also a [`ListenableSource`]
-    pub fn ui_space(&self) -> Option<&URef<Space>> {
+    pub fn ui_space(&self) -> Option<&Handle<Space>> {
         self.ui_space.as_ref()
     }
 
@@ -290,17 +290,19 @@ impl StandardCameras {
     /// Make sure to call [`StandardCameras::update`] first so that the cameras are
     /// up to date with game state.
     pub fn project_cursor(&self, ndc_pos: NdcPoint2) -> Option<Cursor> {
-        if let Some(ui_space_ref) = self.ui_space.as_ref() {
+        if let Some(ui_space_handle) = self.ui_space.as_ref() {
             let ray = self.cameras.ui.project_ndc_into_world(ndc_pos);
-            if let Some(cursor) = cursor_raycast(ray, ui_space_ref, FreeCoordinate::INFINITY) {
+            if let Some(cursor) = cursor_raycast(ray, ui_space_handle, FreeCoordinate::INFINITY) {
                 return Some(cursor);
             }
         }
 
-        if let Some(character_ref) = self.character.as_ref() {
+        if let Some(character_handle) = self.character.as_ref() {
             let ray = self.cameras.world.project_ndc_into_world(ndc_pos);
-            // TODO: maximum distance should be determined by character/universe parameters instead of hardcoded
-            if let Some(cursor) = cursor_raycast(ray, &character_ref.read().unwrap().space, 6.0) {
+            // TODO: maximum distance should be determined by character/universe parameters
+            // instead of hardcoded
+            if let Some(cursor) = cursor_raycast(ray, &character_handle.read().unwrap().space, 6.0)
+            {
                 return Some(cursor);
             }
         }
@@ -336,7 +338,7 @@ impl Clone for StandardCameras {
 #[allow(clippy::exhaustive_structs)]
 pub struct UiViewState {
     /// The [`Space`] to render as the UI.
-    pub space: Option<URef<Space>>,
+    pub space: Option<Handle<Space>>,
     /// The viewpoint to render the `space` from.
     pub view_transform: ViewTransform,
     /// The graphics options to render the `space` with.
@@ -380,11 +382,11 @@ mod tests {
 
         // Create a universe with space and character
         let mut universe = Universe::new();
-        let space_ref = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let space_handle = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
         let character = universe
             .insert(
                 "character".into(),
-                Character::spawn_default(space_ref.clone()),
+                Character::spawn_default(space_handle.clone()),
             )
             .unwrap();
         character_cell.set(Some(character));
@@ -393,7 +395,7 @@ mod tests {
         assert!(!flag.get_and_clear());
         cameras.update();
         assert!(flag.get_and_clear());
-        assert_eq!(world_source.snapshot().as_ref(), Some(&space_ref));
+        assert_eq!(world_source.snapshot().as_ref(), Some(&space_handle));
 
         // No redundant notification when world is present
         cameras.update();

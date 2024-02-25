@@ -509,10 +509,10 @@ impl<'a> From<VoxelBrush<'a>> for SpaceTransaction {
     }
 }
 
-impl crate::universe::VisitRefs for VoxelBrush<'_> {
-    fn visit_refs(&self, visitor: &mut dyn crate::universe::RefVisitor) {
+impl crate::universe::VisitHandles for VoxelBrush<'_> {
+    fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
         for (_, block) in self.0.iter() {
-            block.visit_refs(visitor);
+            block.visit_handles(visitor);
         }
     }
 }
@@ -812,7 +812,7 @@ mod tests {
     fn draw_set_failure() {
         let name = Name::from("foo");
         let dead_block = Block::builder()
-            .voxels_ref(R1, URef::new_gone(name.clone()))
+            .voxels_handle(R1, Handle::new_gone(name.clone()))
             .build();
         let mut space = Space::empty_positive(100, 100, 100);
 
@@ -821,7 +821,7 @@ mod tests {
             Pixel(Point::new(0, 0), &dead_block)
                 .draw(&mut space.draw_target(Gridgid::IDENTITY))
                 .unwrap_err(),
-            SetCubeError::EvalBlock(EvalBlockError::DataRefIs(RefError::Gone(name)))
+            SetCubeError::EvalBlock(EvalBlockError::Handle(HandleError::Gone(name)))
         );
     }
 
@@ -855,18 +855,18 @@ mod tests {
             GridAab::from_lower_size([0, -1, 0], [1, 1, 1])
         );
         if let &block::Primitive::Recur {
-            space: ref block_space_ref,
+            space: ref block_space_handle,
             offset,
             ..
         } = space[[0, -1, 0]].primitive()
         {
-            print_space(&block_space_ref.read().unwrap(), [0., 1., -1.]);
+            print_space(&block_space_handle.read().unwrap(), [0., 1., -1.]);
             assert_eq!(
                 offset,
                 GridPoint::new(0, -GridCoordinate::from(resolution), 0)
             );
             assert_eq!(
-                block_space_ref.read().unwrap()[[0, -2, z]].color(),
+                block_space_handle.read().unwrap()[[0, -2, z]].color(),
                 a_primitive_color()
             );
         } else {
@@ -896,18 +896,18 @@ mod tests {
             GridAab::from_lower_size([-1, 0, 0], [1, 1, 1])
         );
         if let block::Primitive::Recur {
-            space: block_space_ref,
+            space: block_space_handle,
             offset,
             ..
         } = space[[-1, 0, 0]].primitive()
         {
-            print_space(&block_space_ref.read().unwrap(), [0., 1., -1.]);
+            print_space(&block_space_handle.read().unwrap(), [0., 1., -1.]);
             assert_eq!(
                 *offset,
                 GridPoint::new(-GridCoordinate::from(resolution), 0, 0)
             );
             assert_eq!(
-                block_space_ref.read().unwrap()[[-2, 1, z]].color(),
+                block_space_handle.read().unwrap()[[-2, 1, z]].color(),
                 a_primitive_color()
             );
         } else {

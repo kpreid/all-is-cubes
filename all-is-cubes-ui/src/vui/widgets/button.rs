@@ -33,7 +33,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::Merge;
-use all_is_cubes::universe::{URef, UniverseTransaction};
+use all_is_cubes::universe::{Handle, UniverseTransaction};
 
 use crate::vui::widgets::{BoxStyle, WidgetBlocks, WidgetTheme};
 use crate::vui::{self, Layoutable as _};
@@ -529,7 +529,7 @@ pub(crate) fn make_button_label_block(
     let space = txn.insert_anonymous(space);
     Ok(Block::builder()
         .display_name(name.to_owned())
-        .voxels_ref(theme::RESOLUTION, space))
+        .voxels_handle(theme::RESOLUTION, space))
 }
 
 /// Common constants for button shapes.
@@ -556,10 +556,10 @@ mod theme {
     }
 
     /// Build a [`Block`] for [`ButtonBase`].
-    pub fn common_block(space: URef<Space>, name: &str) -> Block {
+    pub fn common_block(space: Handle<Space>, name: &str) -> Block {
         Block::builder()
             .display_name(name.to_string())
-            .voxels_ref(MULTI_RESOLUTION, space)
+            .voxels_handle(MULTI_RESOLUTION, space)
             .animation_hint(block::AnimationHint::replacement(
                 block::AnimationChange::Shape,
             ))

@@ -225,8 +225,8 @@ impl Text {
         filter: &super::EvalFilter,
     ) -> Result<MinEval, block::InEvalError> {
         if filter.skip_eval {
-            // TODO: Once we have a `URef<FontDef>` or something, this will need to
-            // check  that before returning.
+            // TODO: Once we have a `Handle<FontDef>` or something, this will need to
+            // check that before returning.
             return Ok(block::AIR_EVALUATED_MIN); // placeholder value
         }
 
@@ -362,8 +362,8 @@ impl Text {
     }
 }
 
-impl universe::VisitRefs for Text {
-    fn visit_refs(&self, visitor: &mut dyn universe::RefVisitor) {
+impl universe::VisitHandles for Text {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
         let Self {
             string: _,
             font,
@@ -374,9 +374,9 @@ impl universe::VisitRefs for Text {
             positioning: _,
             debug: _,
         } = self;
-        font.visit_refs(visitor);
-        foreground.visit_refs(visitor);
-        outline.visit_refs(visitor);
+        font.visit_handles(visitor);
+        foreground.visit_handles(visitor);
+        outline.visit_handles(visitor);
     }
 }
 
@@ -595,8 +595,8 @@ impl Font {
     }
 }
 
-impl universe::VisitRefs for Font {
-    fn visit_refs(&self, _: &mut dyn universe::RefVisitor) {
+impl universe::VisitHandles for Font {
+    fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
         match self {
             Self::System16 | Self::SmallerBodyText => {}
         }

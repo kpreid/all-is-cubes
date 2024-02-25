@@ -13,7 +13,7 @@ use all_is_cubes::math::{Cube, GridAab, GridArray, GridPoint, GridVector, Rgba};
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge;
-use all_is_cubes::universe::{RefVisitor, UniverseTransaction, VisitRefs};
+use all_is_cubes::universe::{HandleVisitor, UniverseTransaction, VisitHandles};
 use all_is_cubes::{behavior, rgba_const};
 
 #[cfg(doc)]
@@ -90,9 +90,9 @@ impl<F> fmt::Debug for AnimatedVoxels<F> {
     }
 }
 
-impl<F> VisitRefs for AnimatedVoxels<F> {
-    // No references unless the function hides one
-    fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
+impl<F> VisitHandles for AnimatedVoxels<F> {
+    // No handles unless the function hides one
+    fn visit_handles(&self, _visitor: &mut dyn HandleVisitor) {}
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -201,9 +201,9 @@ impl behavior::Behavior<Space> for Fire {
     }
 }
 
-impl VisitRefs for Fire {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
-        self.blocks.visit_refs(visitor)
+impl VisitHandles for Fire {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        self.blocks.visit_handles(visitor)
     }
 }
 
@@ -301,6 +301,6 @@ impl behavior::Behavior<Space> for Clock {
     }
 }
 
-impl VisitRefs for Clock {
-    fn visit_refs(&self, _visitor: &mut dyn RefVisitor) {}
+impl VisitHandles for Clock {
+    fn visit_handles(&self, _visitor: &mut dyn HandleVisitor) {}
 }

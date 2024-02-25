@@ -18,7 +18,7 @@ use crate::math::{
 };
 use crate::raycast::Ray;
 use crate::space::{SetCubeError, Space, SpaceChange};
-use crate::universe::{RefVisitor, URef, VisitRefs};
+use crate::universe::{Handle, HandleVisitor, VisitHandles};
 
 mod attributes;
 pub use attributes::*;
@@ -95,11 +95,11 @@ pub enum Primitive {
     /// A block whose definition is stored elsewhere in a
     /// [`Universe`](crate::universe::Universe).
     ///
-    /// Note that this is a reference to a [`Block`], not a [`Primitive`]; the referenced
+    /// Note that this is a handle to a [`Block`], not a [`Primitive`]; the referenced
     /// [`BlockDef`] may have its own [`Modifier`]s, and thus the result of
     /// [evaluating](Block::evaluate) a primitive with no modifiers is not necessarily
     /// free of the effects of modifiers.
-    Indirect(URef<BlockDef>),
+    Indirect(Handle<BlockDef>),
 
     /// A block of totally uniform properties.
     Atom(Atom),
@@ -110,7 +110,7 @@ pub enum Primitive {
         attributes: BlockAttributes,
 
         /// The space from which voxels are taken.
-        space: URef<Space>,
+        space: Handle<Space>,
 
         /// Which portion of the space will be used, specified by the most negative
         /// corner.
@@ -418,7 +418,7 @@ impl Block {
     }
 
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
-    /// information needed for rendering and physics, and does not require [`URef`] access
+    /// information needed for rendering and physics, and does not require [`Handle`] access
     /// to other objects.
     pub fn evaluate(&self) -> Result<EvaluatedBlock, EvalBlockError> {
         self.evaluate2(&EvalFilter {
@@ -474,7 +474,7 @@ impl Block {
         Budget::decrement_components(&filter.budget)?;
 
         let mut value: MinEval = match *self.primitive() {
-            Primitive::Indirect(ref def_ref) => def_ref.read()?.evaluate_impl(filter)?,
+            Primitive::Indirect(ref def_handle) => def_handle.read()?.evaluate_impl(filter)?,
 
             Primitive::Atom(Atom {
                 ref attributes,
@@ -497,9 +497,9 @@ impl Block {
                 ref attributes,
                 offset,
                 resolution,
-                space: ref space_ref,
+                space: ref space_handle,
             } => {
-                let block_space = space_ref.read()?;
+                let block_space = space_handle.read()?;
 
                 // The region of `space` that the parameters say to look at.
                 let full_resolution_bounds =
@@ -625,11 +625,11 @@ impl core::hash::Hash for Block {
     }
 }
 
-impl VisitRefs for Block {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
-        self.primitive().visit_refs(visitor);
+impl VisitHandles for Block {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        self.primitive().visit_handles(visitor);
         for modifier in self.modifiers() {
-            modifier.visit_refs(visitor)
+            modifier.visit_handles(visitor)
         }
     }
 }
@@ -722,12 +722,12 @@ mod arbitrary_block {
                     emission: Rgb::arbitrary(u)?,
                     collision: BlockCollision::arbitrary(u)?,
                 }),
-                2 => Primitive::Indirect(URef::arbitrary(u)?),
+                2 => Primitive::Indirect(Handle::arbitrary(u)?),
                 3 => Primitive::Recur {
                     attributes: BlockAttributes::arbitrary(u)?,
                     offset: GridPoint::from(<[i32; 3]>::arbitrary(u)?),
                     resolution: Resolution::arbitrary(u)?,
-                    space: URef::arbitrary(u)?,
+                    space: Handle::arbitrary(u)?,
                 },
                 4 => Primitive::Text {
                     text: text::Text::arbitrary(u)?,
@@ -747,12 +747,12 @@ mod arbitrary_block {
                         Rgb::size_hint(depth),
                         BlockCollision::size_hint(depth),
                     ]),
-                    URef::<BlockDef>::size_hint(depth),
+                    Handle::<BlockDef>::size_hint(depth),
                     size_hint::and_all(&[
                         BlockAttributes::size_hint(depth),
                         <[i32; 3]>::size_hint(depth),
                         Resolution::size_hint(depth),
-                        URef::<Space>::size_hint(depth),
+                        Handle::<Space>::size_hint(depth),
                     ]),
                     size_hint::and_all(&[
                         text::Text::size_hint(depth),
@@ -835,11 +835,11 @@ impl fmt::Debug for Atom {
     }
 }
 
-impl VisitRefs for Primitive {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+impl VisitHandles for Primitive {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         match self {
-            Primitive::Indirect(block_ref) => visitor.visit(block_ref),
-            Primitive::Atom(atom) => atom.visit_refs(visitor),
+            Primitive::Indirect(block_handle) => visitor.visit(block_handle),
+            Primitive::Atom(atom) => atom.visit_handles(visitor),
             Primitive::Air => {}
             Primitive::Recur {
                 space,
@@ -848,22 +848,22 @@ impl VisitRefs for Primitive {
                 resolution: _,
             } => {
                 visitor.visit(space);
-                attributes.visit_refs(visitor);
+                attributes.visit_handles(visitor);
             }
-            Primitive::Text { text, offset: _ } => text.visit_refs(visitor),
+            Primitive::Text { text, offset: _ } => text.visit_handles(visitor),
         }
     }
 }
 
-impl VisitRefs for Atom {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+impl VisitHandles for Atom {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         let Self {
             attributes,
             color: _,
             emission: _,
             collision: _,
         } = self;
-        attributes.visit_refs(visitor);
+        attributes.visit_handles(visitor);
     }
 }
 
@@ -904,20 +904,20 @@ mod conversions_for_atom {
 mod conversions_for_indirect {
     use super::*;
 
-    impl From<URef<BlockDef>> for Primitive {
-        /// Convert a `URef<BlockDef>` into a [`Primitive::Indirect`] that refers to it.
-        fn from(block_def_ref: URef<BlockDef>) -> Self {
-            Primitive::Indirect(block_def_ref)
+    impl From<Handle<BlockDef>> for Primitive {
+        /// Convert a `Handle<BlockDef>` into a [`Primitive::Indirect`] that refers to it.
+        fn from(block_def_handle: Handle<BlockDef>) -> Self {
+            Primitive::Indirect(block_def_handle)
         }
     }
 
-    impl From<URef<BlockDef>> for Block {
-        /// Convert a `URef<BlockDef>` into a block with [`Primitive::Indirect`] that refers to it.
+    impl From<Handle<BlockDef>> for Block {
+        /// Convert a `Handle<BlockDef>` into a block with [`Primitive::Indirect`] that refers to it.
         ///
         /// The returned block will evaluate to the same [`EvaluatedBlock`] as the block contained
         /// within the given [`BlockDef`] (except in case of errors).
-        fn from(block_def_ref: URef<BlockDef>) -> Self {
-            Block::from_primitive(Primitive::Indirect(block_def_ref))
+        fn from(block_def_handle: Handle<BlockDef>) -> Self {
+            Block::from_primitive(Primitive::Indirect(block_def_handle))
         }
     }
 }
@@ -950,10 +950,10 @@ impl BlockChange {
 pub fn space_to_blocks(
     resolution: Resolution,
     attributes: BlockAttributes,
-    space_ref: URef<Space>,
+    space_handle: Handle<Space>,
 ) -> Result<Space, SetCubeError> {
     let resolution_g: GridCoordinate = resolution.into();
-    let source_bounds = space_ref
+    let source_bounds = space_handle
         .read()
         .expect("space_to_blocks() could not read() provided space")
         .bounds();
@@ -965,7 +965,7 @@ pub fn space_to_blocks(
             attributes: attributes.clone(),
             offset: (cube.lower_bounds().to_vector() * resolution_g).to_point(),
             resolution,
-            space: space_ref.clone(),
+            space: space_handle.clone(),
         }))
     })?;
     Ok(destination_space)

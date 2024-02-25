@@ -232,15 +232,15 @@ impl From<Composite> for Modifier {
     }
 }
 
-impl universe::VisitRefs for Composite {
-    fn visit_refs(&self, visitor: &mut dyn universe::RefVisitor) {
+impl universe::VisitHandles for Composite {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
         let Self {
             source,
             operator: _,
             reverse: _,
             disassemblable: _,
         } = self;
-        source.visit_refs(visitor);
+        source.visit_handles(visitor);
     }
 }
 
@@ -492,8 +492,8 @@ mod tests {
         let bounds2 = GridAab::from_lower_size([1, 0, 0], [2, 1, 1]);
         let space1 = universe.insert_anonymous(Space::builder(bounds1).build());
         let space2 = universe.insert_anonymous(Space::builder(bounds2).build());
-        let block1 = Block::builder().voxels_ref(R4, space1).build();
-        let block2 = Block::builder().voxels_ref(R4, space2).build();
+        let block1 = Block::builder().voxels_handle(R4, space1).build();
+        let block2 = Block::builder().voxels_handle(R4, space2).build();
 
         let union = GridAab::from_lower_size([0, 0, 0], [3, 1, 1]);
         let intersection = GridAab::from_lower_size([1, 0, 0], [1, 1, 1]);

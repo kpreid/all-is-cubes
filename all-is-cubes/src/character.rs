@@ -30,7 +30,7 @@ use crate::time::Tick;
 use crate::transaction::{
     self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
 };
-use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
+use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText};
 
 mod cursor;
@@ -49,7 +49,7 @@ const JUMP_SPEED: FreeCoordinate = 8.0;
 
 /// A `Character`:
 ///
-/// * knows what [`Space`] it is looking at, by reference,
+/// * knows what [`Space`] it is looking at, by [`Handle`],
 /// * knows where it is located and how it collides via a `Body` which it owns and
 ///   steps, and
 /// * handles the parts of input management that are associated with universe state
@@ -59,10 +59,10 @@ const JUMP_SPEED: FreeCoordinate = 8.0;
 pub struct Character {
     /// Position, collision, and look direction.
     pub body: Body,
-    // TODO: the space ref is here instead of on Body on a notion that it might be useful to have
-    // Body be a pure data structure with no refs. Dubious; revisit.
+    // TODO: the space handle is here instead of on Body on a notion that it might be useful to have
+    // Body be a pure data structure with no handles. Dubious; revisit.
     /// Refers to the [`Space`] to be viewed and collided with.
-    pub space: URef<Space>,
+    pub space: Handle<Space>,
 
     /// Velocity specified by user input, which the actual velocity is smoothly adjusted
     /// towards.
@@ -135,7 +135,7 @@ impl Fmt<StatusText> for Character {
 impl Character {
     /// Constructs a [`Character`] within/looking at the given `space`
     /// with the initial state specified by `spawn`.
-    pub fn spawn(spawn: &Spawn, space: URef<Space>) -> Self {
+    pub fn spawn(spawn: &Spawn, space: Handle<Space>) -> Self {
         // TODO: special inventory slots should be set up some other way.
         // * The knowledge "toolbar has 10 items" shouldn't be needed exactly here.
         // * And we shouldn't have special slots identified solely by number.
@@ -222,7 +222,7 @@ impl Character {
 
     /// Constructs a [`Character`] within/looking at the given `space`
     /// with the initial state specified by [`Space::spawn`].
-    pub fn spawn_default(space: URef<Space>) -> Self {
+    pub fn spawn_default(space: Handle<Space>) -> Self {
         Self::spawn(space.read().unwrap().spawn(), space)
     }
 
@@ -284,7 +284,7 @@ impl Character {
     /// Normally, this is called from [`Universe::step`](crate::universe::Universe::step).
     pub fn step(
         &mut self,
-        self_ref: Option<&URef<Character>>,
+        self_handle: Option<&Handle<Character>>,
         tick: Tick,
     ) -> (Option<BodyStepInfo>, UniverseTransaction) {
         let mut result_transaction = UniverseTransaction::default();
@@ -357,17 +357,20 @@ impl Character {
 
         // Automatic flying controls
         // TODO: lazy clone
-        if let Some(self_ref) = self_ref.cloned() {
+        if let Some(self_handle) = self_handle.cloned() {
             if self.velocity_input.y > 0. {
                 if let Some((slot_index, false)) = find_jetpacks(&self.inventory).next() {
-                    if let Ok(t) = self.inventory.use_tool(None, self_ref, slot_index) {
+                    if let Ok(t) = self.inventory.use_tool(None, self_handle, slot_index) {
                         result_transaction.merge_from(t).unwrap();
                     }
                 }
             } else if self.is_on_ground() {
                 for (slot_index, active) in find_jetpacks(&self.inventory) {
                     if active {
-                        if let Ok(t) = self.inventory.use_tool(None, self_ref.clone(), slot_index) {
+                        if let Ok(t) =
+                            self.inventory
+                                .use_tool(None, self_handle.clone(), slot_index)
+                        {
                             result_transaction.merge_from(t).unwrap();
                         }
                     }
@@ -378,10 +381,10 @@ impl Character {
         // TODO: Think about what order we want sequence of effects to be in. In particular,
         // combining behavior calls with step() means behaviors on different characters
         // see other characters as not having been stepped yet.
-        if let Some(self_ref) = self_ref {
+        if let Some(self_handle) = self_handle {
             let t = self.behaviors.step(
                 self,
-                &(|t: CharacterTransaction| t.bind(self_ref.clone())),
+                &(|t: CharacterTransaction| t.bind(self_handle.clone())),
                 CharacterTransaction::behaviors,
                 tick,
             );
@@ -507,7 +510,7 @@ impl Character {
     /// * The tool is not usable.
     /// * The cursor does not refer to the same space as this character occupies.
     pub fn click(
-        this: URef<Character>,
+        this: Handle<Character>,
         cursor: Option<&Cursor>,
         button: usize,
     ) -> Result<UniverseTransaction, inv::ToolError> {
@@ -559,9 +562,9 @@ impl Character {
     }
 }
 
-impl VisitRefs for Character {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
-        // Use pattern matching so that if we add a new field that might contain refs,
+impl VisitHandles for Character {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        // Use pattern matching so that if we add a new field that might contain handles,
         // we are reminded to traverse it here.
         let Self {
             body: _,
@@ -582,8 +585,8 @@ impl VisitRefs for Character {
                 rerun_destination: _,
         } = self;
         visitor.visit(space);
-        inventory.visit_refs(visitor);
-        behaviors.visit_refs(visitor);
+        inventory.visit_handles(visitor);
+        behaviors.visit_handles(visitor);
     }
 }
 
@@ -716,7 +719,7 @@ impl<'de> serde::Deserialize<'de> for Character {
 #[derive(Clone, Debug, Default, PartialEq)]
 #[must_use]
 pub struct CharacterTransaction {
-    set_space: Option<URef<Space>>,
+    set_space: Option<Handle<Space>>,
     body: BodyTransaction,
     inventory: InventoryTransaction,
     behaviors: BehaviorSetTransaction<Character>,
@@ -727,7 +730,7 @@ impl CharacterTransaction {
     ///
     /// Note that this leaves the position within the spaces unchanged; use a
     /// [`body()`](Self::body) transaction to also change that. TODO: Better API?
-    pub fn move_to_space(space: URef<Space>) -> Self {
+    pub fn move_to_space(space: Handle<Space>) -> Self {
         CharacterTransaction {
             set_space: Some(space),
             ..Default::default()

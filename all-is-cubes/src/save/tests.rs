@@ -23,7 +23,7 @@ use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::time::{self, Tick};
 use crate::transaction::Transaction as _;
-use crate::universe::{Name, PartialUniverse, URef, Universe};
+use crate::universe::{Handle, Name, PartialUniverse, Universe};
 use crate::{behavior, op};
 
 #[track_caller]
@@ -61,7 +61,7 @@ where
 /// equal. Returns the deserialized value.
 ///
 /// This is useful in lieu of [`assert_round_trip_value`] for when the values are
-/// necessarily unequal (anything involving [`URef`]s).
+/// necessarily unequal (anything involving [`Handle`]s).
 #[track_caller]
 fn assert_serdeser<T>(value: &T, expected_json: serde_json::Value) -> T
 where
@@ -407,7 +407,7 @@ fn character() {
     let mut universe = Universe::new();
     let space = Space::builder(GridAab::from_lower_upper([1, 2, 3], [4, 5, 6])).build();
     let mut spawn = space.spawn().clone();
-    let space: URef<Space> = universe.insert("a_space".into(), space).unwrap();
+    let space: Handle<Space> = universe.insert("a_space".into(), space).unwrap();
     spawn.set_inventory(vec![Tool::Activate.into()]);
     let character = Character::spawn(&spawn, space);
 
@@ -417,7 +417,7 @@ fn character() {
         &character,
         json!({
             "type": "CharacterV1",
-            "space": {"type": "URefV1", "Specific": "a_space"},
+            "space": {"type": "HandleV1", "Specific": "a_space"},
             "position": [2.5, 3.75, 26.0],
             "velocity": [0.0, 0.0, 0.0],
             "collision_box": {
@@ -748,17 +748,17 @@ fn universe_with_one_of_each() -> Universe {
     // Keep things simple but slightly distinguishable, because this is NOT a test
     // of the individual types' serializations.
     let [block] = make_some_blocks();
-    let block_ref = universe
+    let block_handle = universe
         .insert("a_block".into(), BlockDef::new(block))
         .unwrap();
 
     // Note: space has no light (which simplifies our work here)
     // TODO: Specify spawn explicitly, so these tests do not rely on the default spawn value
     let mut space = Space::for_block(Resolution::R2).build();
-    space.set([0, 0, 0], Block::from(block_ref)).unwrap();
-    let space_ref = universe.insert("a_space".into(), space).unwrap();
+    space.set([0, 0, 0], Block::from(block_handle)).unwrap();
+    let space_handle = universe.insert("a_space".into(), space).unwrap();
 
-    let character = Character::spawn_default(space_ref);
+    let character = Character::spawn_default(space_handle);
     universe.insert("a_character".into(), character).unwrap();
 
     universe
@@ -786,7 +786,7 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                 "member_type": "Character",
                 "value": {
                     "type": "CharacterV1",
-                    "space": {"type": "URefV1", "Specific": "a_space"},
+                    "space": {"type": "HandleV1", "Specific": "a_space"},
                     "position": [1.0, 1.75, 22.0],
                     "velocity": [0.0, 0.0, 0.0],
                     "collision_box": {
@@ -857,7 +857,7 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                             "type": "BlockV1",
                             "primitive": {
                                 "type": "IndirectV1",
-                                "definition": {"type": "URefV1", "Specific": "a_block"},
+                                "definition": {"type": "HandleV1", "Specific": "a_block"},
                             }
                         }
                     ],
@@ -879,7 +879,7 @@ fn universe_success() {
         universe_with_one_of_each_json(),
     );
 
-    // Test that the members and refs are in fact hooked up.
+    // Test that the members and handles are in fact hooked up.
     let a_block = deserialized_universe
         .get::<BlockDef>(&"a_block".into())
         .unwrap()
@@ -934,13 +934,13 @@ fn universe_de_missing_member() {
                         "type": "BlockV1",
                         "primitive": {
                             "type": "IndirectV1",
-                            "definition": {"type": "URefV1", "Specific": "missing_block"},
+                            "definition": {"type": "HandleV1", "Specific": "missing_block"},
                         }
                     }
                 },
             ],
         }),
-        "data contains a reference to 'missing_block' that was not defined",
+        "data contains a handle to 'missing_block' that was not defined",
     );
 }
 
@@ -966,9 +966,9 @@ fn universe_de_error_in_member() {
 }
 
 #[test]
-fn uref_de_named() {
-    let r: URef<BlockDef> = from_value(json!({
-        "type": "URefV1",
+fn handle_de_named() {
+    let r: Handle<BlockDef> = from_value(json!({
+        "type": "HandleV1",
         "Specific": "foo",
     }))
     .unwrap();
@@ -976,9 +976,9 @@ fn uref_de_named() {
 }
 
 #[test]
-fn uref_de_anon() {
-    let r: URef<BlockDef> = from_value(json!({
-        "type": "URefV1",
+fn handle_de_anon() {
+    let r: Handle<BlockDef> = from_value(json!({
+        "type": "HandleV1",
         "Anonym": 5,
     }))
     .unwrap();
@@ -986,22 +986,22 @@ fn uref_de_anon() {
 }
 
 #[test]
-fn uref_ser_named() {
+fn handle_ser_named() {
     assert_eq!(
-        to_value(URef::<BlockDef>::new_gone(Name::Specific("foo".into()))).unwrap(),
+        to_value(Handle::<BlockDef>::new_gone(Name::Specific("foo".into()))).unwrap(),
         json!({
-            "type": "URefV1",
+            "type": "HandleV1",
             "Specific": "foo",
         })
     );
 }
 
 #[test]
-fn uref_ser_anon() {
+fn handle_ser_anon() {
     assert_eq!(
-        to_value(URef::<BlockDef>::new_gone(Name::Anonym(5))).unwrap(),
+        to_value(Handle::<BlockDef>::new_gone(Name::Anonym(5))).unwrap(),
         json!({
-            "type": "URefV1",
+            "type": "HandleV1",
             "Anonym": 5,
         })
     );

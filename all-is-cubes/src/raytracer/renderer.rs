@@ -18,7 +18,7 @@ use crate::raytracer::{
     UpdatingSpaceRaytracer,
 };
 use crate::space::Space;
-use crate::universe::URef;
+use crate::universe::Handle;
 use crate::util::maybe_sync::BoxFuture;
 
 /// Builds upon [`UpdatingSpaceRaytracer`] to make a complete [`HeadlessRenderer`],
@@ -66,7 +66,7 @@ where
     }
 
     /// Update the renderer's internal copy of the scene from the data sources
-    /// (`URef<Character>` etc.) it is tracking.
+    /// (`Handle<Character>` etc.) it is tracking.
     ///
     /// Returns [`RenderError::Read`] if said sources are in use.
     /// In that case, the renderer is still functional but will have stale data.
@@ -81,7 +81,7 @@ where
 
         fn sync_space<D: RtBlockData>(
             cached_rt: &mut Option<UpdatingSpaceRaytracer<D>>,
-            optional_space: Option<&URef<Space>>,
+            optional_space: Option<&Handle<Space>>,
             graphics_options_source: &ListenableSource<GraphicsOptions>,
             custom_options_source: &ListenableSource<D::Options>,
         ) -> Result<(), RenderError>

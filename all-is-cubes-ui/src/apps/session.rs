@@ -19,7 +19,7 @@ use all_is_cubes::listen::{
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::time::{self, Duration};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{self, URef, Universe, UniverseStepInfo};
+use all_is_cubes::universe::{self, Handle, Universe, UniverseStepInfo};
 use all_is_cubes::util::{Fmt, Refmt as _, StatusText, YieldProgressBuilder};
 
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
@@ -47,7 +47,7 @@ pub struct Session<I> {
     graphics_options: ListenableCell<GraphicsOptions>,
 
     game_universe: Universe,
-    game_character: ListenableCellWithLocal<Option<URef<Character>>>,
+    game_character: ListenableCellWithLocal<Option<Handle<Character>>>,
     space_watch_state: SpaceWatchState,
 
     /// If present, a future that should be polled to produce a new [`Universe`]
@@ -135,7 +135,7 @@ impl<I: time::Instant> Session<I> {
     }
 
     /// Returns a source for the [`Character`] that should be shown to the user.
-    pub fn character(&self) -> ListenableSource<Option<URef<Character>>> {
+    pub fn character(&self) -> ListenableSource<Option<Handle<Character>>> {
         self.game_character.as_source()
     }
 
@@ -154,7 +154,7 @@ impl<I: time::Instant> Session<I> {
 
     /// Set the character which this session is “looking through the eyes of”.
     /// It must be from the universe previously set with `set_universe()`.
-    pub fn set_character(&mut self, character: Option<URef<Character>>) {
+    pub fn set_character(&mut self, character: Option<Handle<Character>>) {
         if let Some(character) = &character {
             assert!(character.universe_id() == Some(self.game_universe.universe_id()));
         }
@@ -336,11 +336,11 @@ impl<I: time::Instant> Session<I> {
 
                 self.frame_clock.did_step(u_clock.schedule());
 
-                if let Some(character_ref) = self.game_character.borrow() {
+                if let Some(character_handle) = self.game_character.borrow() {
                     self.input_processor.apply_input(
                         InputTargets {
                             universe: Some(&mut self.game_universe),
-                            character: Some(character_ref),
+                            character: Some(character_handle),
                             paused: Some(&self.paused),
                             graphics_options: Some(&self.graphics_options),
                             control_channel: Some(&self.control_channel_sender),
@@ -481,18 +481,21 @@ impl<I: time::Instant> Session<I> {
         } else {
             // Otherwise, it's a click inside the game world (even if the cursor hit nothing at all).
             // Character::click will validate against being a click in the wrong space.
-            if let Some(character_ref) = self.game_character.borrow() {
-                let transaction =
-                    Character::click(character_ref.clone(), self.cursor_result.as_ref(), button)?;
+            if let Some(character_handle) = self.game_character.borrow() {
+                let transaction = Character::click(
+                    character_handle.clone(),
+                    self.cursor_result.as_ref(),
+                    button,
+                )?;
                 transaction
                     .execute(self.universe_mut(), &mut transaction::no_outputs)
                     .map_err(|e| ToolError::Internal(e.to_string()))?;
 
                 // Spend a little time doing light updates, to ensure that changes right in front of
                 // the player are clean (and not flashes of blackness).
-                if let Some(space_ref) = self.cursor_result.as_ref().map(Cursor::space) {
+                if let Some(space_handle) = self.cursor_result.as_ref().map(Cursor::space) {
                     // TODO: make this a kind of SpaceTransaction, eliminating this try_modify.
-                    let _ = space_ref.try_modify(|space| {
+                    let _ = space_handle.try_modify(|space| {
                         space.evaluate_light_for_time::<I>(Duration::from_millis(1));
                     });
                 }
@@ -532,7 +535,7 @@ impl<I: time::Instant> Session<I> {
             .borrow()
             .as_ref()
             .map(|cref| cref.read().expect("TODO: decide how to handle error"));
-        let space: Option<&URef<Space>> = character_read.as_ref().map(|ch| &ch.space);
+        let space: Option<&Handle<Space>> = character_read.as_ref().map(|ch| &ch.space);
 
         if space != self.space_watch_state.space.as_ref() {
             self.space_watch_state = SpaceWatchState::new(space.cloned(), &self.fluff_notifier)
@@ -734,7 +737,7 @@ impl fmt::Debug for ControlMessage {
 #[derive(Debug)]
 struct SpaceWatchState {
     /// Which space this relates to watching.
-    space: Option<URef<Space>>,
+    space: Option<Handle<Space>>,
 
     /// Gates the message forwarding from the `space` to `Session::fluff_notifier`.
     #[allow(dead_code)] // acts upon being dropped
@@ -745,9 +748,9 @@ struct SpaceWatchState {
 
 impl SpaceWatchState {
     fn new(
-        space: Option<URef<Space>>,
+        space: Option<Handle<Space>>,
         fluff_notifier: &Arc<listen::Notifier<Fluff>>,
-    ) -> Result<Self, universe::RefError> {
+    ) -> Result<Self, universe::HandleError> {
         if let Some(space) = space {
             let space_read = space.read()?;
             let (fluff_gate, fluff_forwarder) =
@@ -784,8 +787,8 @@ pub struct InfoText<'a, I, T> {
 
 impl<I: time::Instant, T: Fmt<StatusText>> fmt::Display for InfoText<'_, I, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(character_ref) = self.session.game_character.borrow() {
-            write!(f, "{}", character_ref.read().unwrap().refmt(&StatusText)).unwrap();
+        if let Some(character_handle) = self.session.game_character.borrow() {
+            write!(f, "{}", character_handle.read().unwrap().refmt(&StatusText)).unwrap();
         }
         write!(
             f,

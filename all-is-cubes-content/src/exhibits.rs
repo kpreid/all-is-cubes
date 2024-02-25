@@ -427,7 +427,7 @@ fn ANIMATION(_: &Exhibit, universe: &Universe) {
             .animation_hint(block::AnimationHint::redefinition(
                 block::AnimationChange::Shape,
             ))
-            .voxels_ref(resolution, txn.insert_anonymous(block_space))
+            .voxels_handle(resolution, txn.insert_anonymous(block_space))
             .build()
     };
 
@@ -437,7 +437,7 @@ fn ANIMATION(_: &Exhibit, universe: &Universe) {
             .animation_hint(block::AnimationHint::redefinition(
                 block::AnimationChange::Shape,
             ))
-            .voxels_ref(fire_resolution, {
+            .voxels_handle(fire_resolution, {
                 let fire_bounds = GridAab::for_block(fire_resolution);
                 let mut space = Space::for_block(fire_resolution).build();
                 space.set([0, 0, 0], Rgb::ONE)?; // placeholder for not fully transparent so first pass lighting is better
@@ -596,7 +596,7 @@ fn SMALLEST(_: &Exhibit, universe: &Universe) {
             pedestal,
             &Block::builder()
                 .display_name("World's Smallest Voxel")
-                .voxels_ref(resolution, txn.insert_anonymous(block_space))
+                .voxels_handle(resolution, txn.insert_anonymous(block_space))
                 .build(),
         ],
     )?;
@@ -961,7 +961,7 @@ fn COLOR_LIGHTS(_: &Exhibit, _universe: &Universe) {
 
         Block::builder()
             .display_name("Color room wall")
-            .voxels_ref(wall_resolution, txn.insert_anonymous(wall_block_space))
+            .voxels_handle(wall_resolution, txn.insert_anonymous(wall_block_space))
             .build()
     };
 
@@ -1205,7 +1205,7 @@ fn IMAGES(_: &Exhibit, universe: &Universe) {
             txn.insert_anonymous(space_from_image(image, rotation, &terrain_map_function).unwrap());
         let block = Block::builder()
             .display_name(format!("{rotation:?}"))
-            .voxels_ref(R16, image_space)
+            .voxels_handle(R16, image_space)
             .build();
 
         stack(&mut outer_space, position, [pedestal, &block])?;

@@ -14,7 +14,9 @@ use crate::math::{Cube, Face6, GridRotation, Gridgid};
 use crate::op::{self, Operation};
 use crate::space::{CubeTransaction, Space, SpaceTransaction};
 use crate::transaction::{Merge, Transaction};
-use crate::universe::{RefError, RefVisitor, UBorrow, URef, UniverseTransaction, VisitRefs};
+use crate::universe::{
+    Handle, HandleError, HandleVisitor, UBorrow, UniverseTransaction, VisitHandles,
+};
 
 /// A `Tool` is an object which a character can use to have some effect in the game,
 /// such as placing or removing a block. In particular, a tool use usually corresponds
@@ -173,21 +175,21 @@ impl Tool {
             }
             Self::EditBlock => {
                 // TODO: this should probably be a utility on Block itself
-                fn find_space(block: &Block) -> Result<Option<URef<Space>>, RefError> {
+                fn find_space(block: &Block) -> Result<Option<Handle<Space>>, HandleError> {
                     match block.primitive() {
-                        Primitive::Indirect(r) => find_space(r.read()?.block()),
+                        Primitive::Indirect(handle) => find_space(handle.read()?.block()),
                         Primitive::Atom(_) | Primitive::Air | Primitive::Text { .. } => Ok(None),
                         Primitive::Recur { space, .. } => Ok(Some(space.clone())),
                     }
                 }
                 match find_space(&input.cursor()?.hit().block) {
                     // TODO: Actually implement the tool.
-                    Ok(Some(_space_ref)) => {
+                    Ok(Some(_space_handle)) => {
                         Err(ToolError::Internal("EditBlock not implemented".to_string()))
                     }
                     Ok(None) => Err(ToolError::NotUsable),
                     // TODO: slightly wrong meaning of error variant
-                    Err(ref_err) => Err(ToolError::SpaceRef(ref_err)),
+                    Err(handle_err) => Err(ToolError::SpaceHandle(handle_err)),
                 }
             }
             Self::PushPull => {
@@ -330,23 +332,23 @@ impl Tool {
     }
 }
 
-impl VisitRefs for Tool {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+impl VisitHandles for Tool {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         match self {
             Tool::Activate => {}
             Tool::RemoveBlock { .. } => {}
-            Tool::Block(block) => block.visit_refs(visitor),
-            Tool::InfiniteBlocks(block) => block.visit_refs(visitor),
+            Tool::Block(block) => block.visit_handles(visitor),
+            Tool::InfiniteBlocks(block) => block.visit_handles(visitor),
             Tool::CopyFromSpace => {}
             Tool::EditBlock => {}
             Tool::PushPull => {}
             Tool::Jetpack { active: _ } => {}
             Tool::Custom { op, icon } => {
-                op.visit_refs(visitor);
-                icon.visit_refs(visitor);
+                op.visit_handles(visitor);
+                icon.visit_handles(visitor);
             }
             Tool::ExternalAction { function: _, icon } => {
-                icon.visit_refs(visitor);
+                icon.visit_handles(visitor);
             }
         }
     }
@@ -365,7 +367,7 @@ pub struct ToolInput {
     /// Character that is using the tool.
     ///
     /// TODO: We want to be able to express “inventory host”, not just specifically Character (but there aren't any other examples).
-    pub character: Option<URef<Character>>,
+    pub character: Option<Handle<Character>>,
 }
 
 impl ToolInput {
@@ -380,15 +382,15 @@ impl ToolInput {
         old_block: Block,
         new_block: Block,
     ) -> Result<UniverseTransaction, ToolError> {
-        let space_ref = self.cursor()?.space();
-        let space = space_ref.read().map_err(ToolError::SpaceRef)?;
+        let space_handle = self.cursor()?.space();
+        let space = space_handle.read().map_err(ToolError::SpaceHandle)?;
         if space[cube] != old_block {
             return Err(ToolError::Obstacle);
         }
 
         Ok(
             SpaceTransaction::set_cube(cube, Some(old_block), Some(new_block))
-                .bind(space_ref.clone()),
+                .bind(space_handle.clone()),
         )
     }
 
@@ -483,7 +485,7 @@ pub enum ToolError {
     NothingSelected,
     /// The space to be operated on could not be accessed.
     #[displaydoc("error accessing space: {0}")]
-    SpaceRef(RefError),
+    SpaceHandle(HandleError),
     /// An error occurred while executing the effects of the tool.
     /// TODO: Improve this along with [`Transaction`] error types.
     #[displaydoc("unexpected error: {0}")]
@@ -498,7 +500,7 @@ impl std::error::Error for ToolError {
             ToolError::NotUsable => None,
             ToolError::Obstacle => None,
             ToolError::NothingSelected => None,
-            ToolError::SpaceRef(e) => Some(e),
+            ToolError::SpaceHandle(e) => Some(e),
             ToolError::Internal(_) => None,
         }
     }
@@ -520,9 +522,9 @@ impl From<op::OperationError> for ToolError {
     }
 }
 
-impl From<RefError> for ToolError {
-    fn from(value: RefError) -> Self {
-        ToolError::SpaceRef(value)
+impl From<HandleError> for ToolError {
+    fn from(value: HandleError) -> Self {
+        ToolError::SpaceHandle(value)
     }
 }
 
@@ -611,15 +613,15 @@ mod tests {
     use crate::raytracer::print_space;
     use crate::space::Space;
     use crate::transaction;
-    use crate::universe::{UBorrow, URef, Universe};
+    use crate::universe::{Handle, UBorrow, Universe};
     use crate::util::yield_progress_for_testing;
     use pretty_assertions::assert_eq;
 
     #[derive(Debug)]
     struct ToolTester {
         universe: Universe,
-        character_ref: URef<Character>,
-        space_ref: URef<Space>,
+        character_handle: Handle<Character>,
+        space_handle: Handle<Space>,
     }
     impl ToolTester {
         /// The provided function should modify the space to contain the blocks to operate on,
@@ -628,16 +630,16 @@ mod tests {
             let mut universe = Universe::new();
             let mut space = Space::empty_positive(6, 4, 4);
             f(&mut space);
-            let space_ref = universe.insert("ToolTester/space".into(), space).unwrap();
+            let space_handle = universe.insert("ToolTester/space".into(), space).unwrap();
 
             Self {
-                character_ref: universe
+                character_handle: universe
                     .insert(
                         "ToolTester/character".into(),
-                        Character::spawn_default(space_ref.clone()),
+                        Character::spawn_default(space_handle.clone()),
                     )
                     .unwrap(),
-                space_ref,
+                space_handle,
                 universe,
             }
         }
@@ -647,10 +649,10 @@ mod tests {
                 // TODO: define ToolInput::new
                 cursor: cursor_raycast(
                     Ray::new([0., 0.5, 0.5], [1., 0., 0.]),
-                    &self.space_ref,
+                    &self.space_handle,
                     FreeCoordinate::INFINITY,
                 ),
-                character: Some(self.character_ref.clone()),
+                character: Some(self.character_handle.clone()),
             }
         }
 
@@ -665,7 +667,7 @@ mod tests {
                 self.character().inventory().slots[index].clone(),
                 stack.into(),
             ));
-            self.character_ref
+            self.character_handle
                 .execute(&insert_txn, &mut transaction::no_outputs)
                 .unwrap();
 
@@ -674,7 +676,7 @@ mod tests {
             let input = self.input();
             self.character().inventory().use_tool(
                 input.cursor().ok(),
-                self.character_ref.clone(),
+                self.character_handle.clone(),
                 index,
             )
         }
@@ -689,13 +691,13 @@ mod tests {
         }
 
         fn space(&self) -> UBorrow<Space> {
-            self.space_ref.read().unwrap()
+            self.space_handle.read().unwrap()
         }
-        fn space_ref(&self) -> &URef<Space> {
-            &self.space_ref
+        fn space_handle(&self) -> &Handle<Space> {
+            &self.space_handle
         }
         fn character(&self) -> UBorrow<Character> {
-            self.character_ref.read().unwrap()
+            self.character_handle.read().unwrap()
         }
     }
 
@@ -733,7 +735,7 @@ mod tests {
             tester.equip_and_use_tool(Tool::Activate),
             Ok(CubeTransaction::ACTIVATE
                 .at(Cube::new(1, 0, 0))
-                .bind(tester.space_ref.clone()))
+                .bind(tester.space_handle.clone()))
         );
 
         // Tool::Activate currently has no cases where it fails
@@ -762,14 +764,14 @@ mod tests {
 
             let mut expected_delete =
                 SpaceTransaction::set_cube([1, 0, 0], Some(existing.clone()), Some(AIR))
-                    .bind(tester.space_ref.clone());
+                    .bind(tester.space_handle.clone());
             if keep {
                 expected_delete
                     .merge_from(
                         CharacterTransaction::inventory(InventoryTransaction::insert([
                             Tool::Block(existing),
                         ]))
-                        .bind(tester.character_ref.clone()),
+                        .bind(tester.character_handle.clone()),
                     )
                     .unwrap();
             }
@@ -822,7 +824,7 @@ mod tests {
                 .at(Cube::ORIGIN)
                 .add_fluff(Fluff::PlaceBlockGeneric);
             let mut expected_cube_transaction =
-                expected_cube_transaction.bind(tester.space_ref.clone());
+                expected_cube_transaction.bind(tester.space_handle.clone());
             if expect_consume {
                 expected_cube_transaction
                     .merge_from(
@@ -831,7 +833,7 @@ mod tests {
                             Slot::from(tool.clone()),
                             Slot::Empty,
                         ))
-                        .bind(tester.character_ref.clone()),
+                        .bind(tester.character_handle.clone()),
                     )
                     .unwrap();
             }
@@ -880,7 +882,7 @@ mod tests {
                 t.at(Cube::ORIGIN).add_fluff(Fluff::PlaceBlockGeneric);
                 t
             }
-            .bind(tester.space_ref.clone())
+            .bind(tester.space_handle.clone())
         );
     }
 
@@ -914,7 +916,7 @@ mod tests {
             });
             // Place the obstacle after the raycast
             tester
-                .space_ref()
+                .space_handle()
                 .execute(
                     &SpaceTransaction::set_cube([0, 0, 0], None, Some(obstacle.clone())),
                     &mut transaction::no_outputs,
@@ -954,7 +956,7 @@ mod tests {
             CharacterTransaction::inventory(InventoryTransaction::insert([Tool::InfiniteBlocks(
                 existing.clone()
             )]))
-            .bind(tester.character_ref.clone())
+            .bind(tester.character_handle.clone())
         );
         transaction
             .execute(&mut tester.universe, &mut drop)
@@ -985,7 +987,7 @@ mod tests {
                 Some(existing.clone()),
                 Some(placed.clone().rotate(GridRotation::CLOCKWISE)),
             )
-            .bind(tester.space_ref.clone())
+            .bind(tester.space_handle.clone())
         );
     }
 

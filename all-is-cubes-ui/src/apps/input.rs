@@ -12,7 +12,7 @@ use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{FreeCoordinate, FreeVector, VectorOps};
 use all_is_cubes::notnan;
 use all_is_cubes::time::Tick;
-use all_is_cubes::universe::{URef, Universe};
+use all_is_cubes::universe::{Handle, Universe};
 
 use crate::apps::ControlMessage;
 
@@ -299,8 +299,8 @@ impl InputProcessor {
         let key_turning_step = 80.0 * dt;
 
         // Direct character controls
-        if let Some(character_ref) = character_opt {
-            character_ref
+        if let Some(character_handle) = character_opt {
+            character_handle
                 .try_modify(|character| {
                     let movement = self.movement();
                     character.set_velocity_input(movement);
@@ -405,8 +405,8 @@ impl InputProcessor {
                 Key::Character(numeral) if numeral.is_ascii_digit() => {
                     let digit = numeral.to_digit(10).unwrap() as usize;
                     let slot = (digit + 9).rem_euclid(10); // wrap 0 to 9
-                    if let Some(character_ref) = character_opt {
-                        character_ref
+                    if let Some(character_handle) = character_opt {
+                        character_handle
                             .try_modify(|c| c.set_selected_slot(1, slot))
                             .expect("character was borrowed during apply_input()");
                     }
@@ -468,7 +468,7 @@ impl InputProcessor {
 #[non_exhaustive]
 pub(crate) struct InputTargets<'a> {
     pub universe: Option<&'a mut Universe>,
-    pub character: Option<&'a URef<Character>>,
+    pub character: Option<&'a Handle<Character>>,
     pub paused: Option<&'a ListenableCell<bool>>,
     pub graphics_options: Option<&'a ListenableCell<GraphicsOptions>>,
     // TODO: replace cells with control channel?
@@ -499,12 +499,12 @@ mod tests {
     use super::*;
     use all_is_cubes::euclid::vec3;
     use all_is_cubes::space::Space;
-    use all_is_cubes::universe::{URef, Universe};
+    use all_is_cubes::universe::{Handle, Universe};
 
     fn apply_input_helper(
         input: &mut InputProcessor,
         universe: &mut Universe,
-        character: &URef<Character>,
+        character: &Handle<Character>,
     ) {
         input.apply_input(
             InputTargets {

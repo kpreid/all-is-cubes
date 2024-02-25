@@ -23,7 +23,7 @@ use crate::math::{
 use crate::space::{Space, SpaceTransaction};
 use crate::time::DeadlineNt;
 use crate::transaction;
-use crate::universe::{Name, RefError, Universe};
+use crate::universe::{HandleError, Name, Universe};
 
 /// Just install a listener and discard the [`EvaluatedBlock`].
 ///
@@ -387,9 +387,9 @@ mod eval {
         space
             .fill_uniform(space.bounds(), &Block::from(Rgba::WHITE))
             .unwrap();
-        let space_ref = universe.insert_anonymous(space);
+        let space_handle = universe.insert_anonymous(space);
         let block = Block::builder()
-            .voxels_ref(resolution, space_ref.clone())
+            .voxels_handle(resolution, space_handle.clone())
             .build();
 
         let e = block.evaluate().unwrap();
@@ -414,12 +414,12 @@ mod eval {
                 Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
             })
             .unwrap();
-        let space_ref = universe.insert_anonymous(space);
+        let space_handle = universe.insert_anonymous(space);
         let block_at_offset = Block::from_primitive(Primitive::Recur {
             attributes: BlockAttributes::default(),
             offset: offset.to_point(),
             resolution,
-            space: space_ref.clone(),
+            space: space_handle.clone(),
         });
 
         let e = block_at_offset.evaluate().unwrap();
@@ -501,14 +501,14 @@ mod eval {
                 Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
             })
             .unwrap();
-        let space_ref = universe.insert_anonymous(space);
+        let space_handle = universe.insert_anonymous(space);
         let block = Block::builder()
-            .voxels_ref(resolution, space_ref.clone())
+            .voxels_handle(resolution, space_handle.clone())
             .build();
 
         let eval_bare = block.evaluate().unwrap();
-        let block_def_ref = universe.insert_anonymous(BlockDef::new(block));
-        let eval_def = Block::from(block_def_ref).evaluate().unwrap();
+        let block_def_handle = universe.insert_anonymous(BlockDef::new(block));
+        let eval_def = Block::from(block_def_handle).evaluate().unwrap();
 
         assert_eq!(
             eval_bare,
@@ -556,14 +556,14 @@ fn listen_atom() {
 #[test]
 fn listen_indirect_atom() {
     let mut universe = Universe::new();
-    let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
-    let indirect = Block::from(block_def_ref.clone());
+    let block_def_handle = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
+    let indirect = Block::from(block_def_handle.clone());
     let sink = Sink::new();
     listen(indirect, sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
 
     // Now mutate it and we should see a notification.
-    block_def_ref
+    block_def_handle
         .execute(
             &BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)),
             &mut transaction::no_outputs,
@@ -574,15 +574,15 @@ fn listen_indirect_atom() {
 
 /// Testing double indirection not because it's a case we expect to use routinely,
 /// but because it exercises the generality of the notification and cache mechanisms.
-/// Specifically, `block_def_ref1` is updated by transaction, but `block_def_ref2`
+/// Specifically, `block_def_handle1` is updated by transaction, but `block_def_handle2`
 /// is updated by universe stepping since it was not directly mutated.
 #[test]
 fn listen_indirect_double() {
     let mut universe = Universe::new();
-    let block_def_ref1 = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
-    let indirect1 = Block::from(block_def_ref1.clone());
-    let block_def_ref2 = universe.insert_anonymous(BlockDef::new(indirect1.clone()));
-    let indirect2 = Block::from(block_def_ref2.clone());
+    let block_def_handle1 = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
+    let indirect1 = Block::from(block_def_handle1.clone());
+    let block_def_handle2 = universe.insert_anonymous(BlockDef::new(indirect1.clone()));
+    let indirect2 = Block::from(block_def_handle2.clone());
     let sink1 = Sink::new();
     let sink2 = Sink::new();
     listen(indirect1, sink1.listener()).unwrap();
@@ -591,7 +591,7 @@ fn listen_indirect_double() {
     assert_eq!(sink2.drain(), vec![]);
 
     // Mutate the first BlockDef and we should see a notification for it alone.
-    block_def_ref1
+    block_def_handle1
         .execute(
             &BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)),
             &mut transaction::no_outputs,
@@ -603,16 +603,16 @@ fn listen_indirect_double() {
     universe.step(false, DeadlineNt::Whenever);
     assert_eq!([sink1.drain().len(), sink2.drain().len()], [0, 1]);
 
-    // Remove block_def_ref1 from the contents of block_def_ref2...
-    block_def_ref2
+    // Remove block_def_handle1 from the contents of block_def_handle2...
+    block_def_handle2
         .execute(
             &BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)),
             &mut transaction::no_outputs,
         )
         .unwrap();
     assert_eq!(sink2.drain().len(), 1);
-    // ...and then block_def_ref1's changes should NOT be forwarded.
-    block_def_ref1
+    // ...and then block_def_handle1's changes should NOT be forwarded.
+    block_def_handle1
         .execute(
             &BlockDefTransaction::overwrite(Block::from(Rgba::WHITE)),
             &mut transaction::no_outputs,
@@ -626,14 +626,16 @@ fn listen_indirect_double() {
 fn listen_recur() {
     let mut universe = Universe::new();
     let [block_0, block_1] = make_some_blocks();
-    let space_ref = universe.insert_anonymous(Space::empty_positive(2, 1, 1));
-    let block = Block::builder().voxels_ref(R1, space_ref.clone()).build();
+    let space_handle = universe.insert_anonymous(Space::empty_positive(2, 1, 1));
+    let block = Block::builder()
+        .voxels_handle(R1, space_handle.clone())
+        .build();
     let sink = Sink::new();
     listen(block, sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
 
     // Now mutate the space and we should see a notification.
-    space_ref
+    space_handle
         .execute(
             &SpaceTransaction::set_cube([0, 0, 0], None, Some(block_0)),
             &mut transaction::no_outputs,
@@ -644,7 +646,7 @@ fn listen_recur() {
     // TODO: Also test that we don't propagate lighting changes
 
     // A mutation out of bounds should not trigger a notification
-    space_ref
+    space_handle
         .execute(
             &SpaceTransaction::set_cube([1, 0, 0], None, Some(block_1)),
             &mut transaction::no_outputs,
@@ -681,7 +683,7 @@ fn self_referential_evaluate() {
     let block = self_referential_block(&mut universe);
     assert_eq!(
         block.evaluate(),
-        Err(EvalBlockError::DataRefIs(RefError::InUse(Name::Anonym(0))))
+        Err(EvalBlockError::Handle(HandleError::InUse(Name::Anonym(0))))
     );
 }
 
@@ -719,14 +721,14 @@ mod txn {
         // realistic scenario
         let [b1, b2] = make_some_blocks();
         let mut universe = Universe::new();
-        let block_def_ref = universe.insert_anonymous(BlockDef::new(b1));
-        let indirect = Block::from(block_def_ref.clone());
+        let block_def_handle = universe.insert_anonymous(BlockDef::new(b1));
+        let indirect = Block::from(block_def_handle.clone());
         let sink = Sink::new();
         listen(indirect, sink.listener()).unwrap();
         assert_eq!(sink.drain(), vec![]);
 
         // Now mutate it and we should see a notification.
-        block_def_ref
+        block_def_handle
             .execute(
                 &BlockDefTransaction::overwrite(b2),
                 &mut transaction::no_outputs,

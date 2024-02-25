@@ -46,7 +46,6 @@ pub(crate) const VELOCITY_MAGNITUDE_LIMIT_SQUARED: FreeCoordinate =
 #[derive(Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Body {
-    // TODO: pub space: Option<URef<Space>>   --- or maybe backwards?
     /// Position.
     pub position: FreePoint,
     /// Velocity, in position units per second.

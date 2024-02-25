@@ -34,14 +34,14 @@ pub type TestId = String;
 /// Given a [`Space`], create the [`Character`] looking at it, with the default name.
 pub fn finish_universe_from_space(universe: &mut Universe, space: Space) {
     // TODO: "character".into() shouldn't be sprinkled around various universe construction.
-    let space_ref = universe.insert("space".into(), space).unwrap();
+    let space_handle = universe.insert("space".into(), space).unwrap();
 
     // If the universe is dumped, include tools and jetpack
-    let mut spawn = space_ref.read().unwrap().spawn().clone();
+    let mut spawn = space_handle.read().unwrap().spawn().clone();
     spawn.set_inventory(free_editing_starter_inventory(true));
 
-    let _character_ref = universe
-        .insert("character".into(), Character::spawn(&spawn, space_ref))
+    let _character_handle = universe
+        .insert("character".into(), Character::spawn(&spawn, space_handle))
         .unwrap();
 }
 

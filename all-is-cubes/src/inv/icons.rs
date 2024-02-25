@@ -89,7 +89,7 @@ impl Icons {
 
                 Icons::Activate => Block::builder()
                     .display_name("Activate")
-                    .voxels_ref(
+                    .voxels_handle(
                         R16, // TODO: get resolution from image file
                         txn.insert_anonymous(space_from_image(
                             include_image!("icons/hand.png"),
@@ -147,7 +147,7 @@ impl Icons {
 
                     Block::builder()
                         .display_name("Delete Block")
-                        .voxels_ref(resolution, txn.insert_anonymous(space))
+                        .voxels_handle(resolution, txn.insert_anonymous(space))
                         .build()
                 }
 
@@ -168,7 +168,7 @@ impl Icons {
                     let dots = move |y: GridCoordinate| dots[y.rem_euclid(2) as usize].clone();
                     Block::builder()
                         .display_name("Push/Pull")
-                        .voxels_ref(
+                        .voxels_handle(
                             R32, // TODO: get resolution from image file,
                             txn.insert_anonymous(space_from_image(
                                 include_image!("icons/push.png"),

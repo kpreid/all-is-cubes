@@ -182,8 +182,8 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
     }
 }
 
-impl crate::universe::VisitRefs for BlockAttributes {
-    fn visit_refs(&self, visitor: &mut dyn crate::universe::RefVisitor) {
+impl crate::universe::VisitHandles for BlockAttributes {
+    fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
         let Self {
             display_name: _,
             selectable: _,
@@ -191,7 +191,7 @@ impl crate::universe::VisitRefs for BlockAttributes {
             tick_action,
             animation_hint: _,
         } = self;
-        tick_action.visit_refs(visitor);
+        tick_action.visit_handles(visitor);
     }
 }
 
@@ -435,13 +435,13 @@ impl From<Operation> for TickAction {
     }
 }
 
-impl crate::universe::VisitRefs for TickAction {
-    fn visit_refs(&self, visitor: &mut dyn crate::universe::RefVisitor) {
+impl crate::universe::VisitHandles for TickAction {
+    fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
         let Self {
             operation,
             period: _,
         } = self;
-        operation.visit_refs(visitor);
+        operation.visit_handles(visitor);
     }
 }
 

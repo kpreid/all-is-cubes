@@ -12,7 +12,7 @@ use futures_core::future::BoxFuture;
 
 use all_is_cubes::camera::{Flaws, HeadlessRenderer, RenderError, StandardCameras};
 use all_is_cubes::space::{Sky, Space};
-use all_is_cubes::universe::URef;
+use all_is_cubes::universe::Handle;
 use all_is_cubes_content::palette;
 use all_is_cubes_port as port;
 use test_renderers::{RendererFactory, RendererId};
@@ -219,7 +219,7 @@ impl HeadlessRenderer for GltfRend3Renderer {
             // Sync changes to what we should be drawing (exporting)
             self.cameras.update();
 
-            let world_space: Option<URef<Space>> = self.cameras.world_space().snapshot();
+            let world_space: Option<Handle<Space>> = self.cameras.world_space().snapshot();
             let gltf_path = self.gltf_dir.path().join("scene.gltf");
 
             self.sky = {
@@ -238,7 +238,7 @@ impl HeadlessRenderer for GltfRend3Renderer {
                 port::ExportSet::from_spaces(
                     world_space
                         .into_iter()
-                        .map(|r| URef::clone(&r))
+                        .map(|r| Handle::clone(&r))
                         .collect::<Vec<_>>(),
                 ),
                 gltf_path.clone(),

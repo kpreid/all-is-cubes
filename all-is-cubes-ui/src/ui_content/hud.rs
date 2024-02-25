@@ -11,7 +11,7 @@ use all_is_cubes::inv::Icons;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::Face6;
-use all_is_cubes::universe::{URef, Universe, UniverseTransaction};
+use all_is_cubes::universe::{Handle, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
 use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
@@ -52,7 +52,7 @@ impl fmt::Debug for HudInputs {
 #[allow(clippy::redundant_clone)]
 pub(super) fn new_hud_widget_tree(
     // TODO: mess of tightly coupled parameters
-    character_source: ListenableSource<Option<URef<Character>>>,
+    character_source: ListenableSource<Option<Handle<Character>>>,
     hud_inputs: &HudInputs,
     // TODO: stop mutating the universe in widget construction
     universe: &mut Universe,

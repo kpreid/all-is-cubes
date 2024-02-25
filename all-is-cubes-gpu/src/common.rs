@@ -5,7 +5,7 @@ use std::ops;
 use std::time::Duration;
 
 use all_is_cubes::camera::{Layers, RenderError};
-use all_is_cubes::universe::RefError;
+use all_is_cubes::universe::HandleError;
 
 mod debug_lines;
 pub(crate) use debug_lines::*;
@@ -45,7 +45,7 @@ impl GraphicsResourceError {
         }
     }
 
-    pub(crate) fn read_err(source: RefError) -> Self {
+    pub(crate) fn read_err(source: HandleError) -> Self {
         GraphicsResourceError {
             context: Some(String::from("Unable to read scene data")),
             source: Box::new(source),
@@ -54,7 +54,7 @@ impl GraphicsResourceError {
 
     /// TODO: make this not panic by expanding the functionality of [`RenderError`]
     pub fn into_render_error_or_panic(self) -> RenderError {
-        if let Some(re) = self.source.downcast_ref::<RefError>() {
+        if let Some(re) = self.source.downcast_ref::<HandleError>() {
             RenderError::Read(re.clone())
         } else {
             // TODO: don't panic

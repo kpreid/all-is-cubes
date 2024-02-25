@@ -2,7 +2,7 @@
 //!
 //! ## Thread-safety
 //!
-//! [`Universe`], [`URef`], and their contents implement [`Send`] and [`Sync`],
+//! [`Universe`], [`Handle`], and their contents implement [`Send`] and [`Sync`],
 //! such that it is possible to access a universe from multiple threads.
 //! However, they do not (currently) provide any ability to wait to obtain a lock,
 //! because there is not yet a policy about how one would avoid the possibility of
@@ -37,14 +37,14 @@ use crate::rerun_glue as rg;
 // Note: Most things in `members` are either an impl, private, or intentionally public-in-private.
 // Therefore, no glob reexport.
 mod members;
-pub use members::AnyURef;
+pub use members::AnyHandle;
 pub(crate) use members::*;
 
 mod universe_txn;
 pub use universe_txn::*;
 
-mod uref;
-pub use uref::*;
+mod handle;
+pub use handle::*;
 
 mod owning_guard;
 
@@ -143,7 +143,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Name {
 
 /// Copiable unique (within this process) identifier for a [`Universe`].
 ///
-/// Used to check whether [`URef`]s belong to particular [`Universe`]s.
+/// Used to check whether [`Handle`]s belong to particular [`Universe`]s.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub struct UniverseId(u64);
 
@@ -174,14 +174,14 @@ impl UniverseId {
     }
 }
 
-/// A collection of named objects which can refer to each other via [`URef`],
+/// A collection of named objects which can refer to each other via [`Handle`],
 /// and which are simulated at the same time steps.
 ///
 /// **Thread-safety caveat:** See the documentation on [avoiding deadlock].
 ///
 /// A `Universe` consists of:
 ///
-/// * _members_ of various types, which may be identified using [`Name`]s or [`URef`]s.
+/// * _members_ of various types, which may be identified using [`Name`]s or [`Handle`]s.
 /// * [`Behavior`](behavior::Behavior)s that modify the [`Universe`] itself.
 /// * A [`time::Clock`] defining how time is considered to pass in it.
 /// * A [`WhenceUniverse`] defining where its data is persisted, if anywhere.
@@ -257,16 +257,16 @@ impl Universe {
         }
     }
 
-    /// Returns a [`URef`] for the object in this universe with the given name,
+    /// Returns a [`Handle`] for the object in this universe with the given name,
     /// regardless of its type, or [`None`] if there is none.
     ///
     /// This is a dynamically-typed version of [`Universe::get()`].
     //
     // TODO: Find a useful way to implement this which does not require
-    // boxing. Perhaps `URootRef` should implement `URefErased`? That would
-    // change what `URef: Any` means, though. Perhaps `URootRef` should own
-    // a prepared `URef` that it can return a reference to.
-    pub fn get_any(&self, name: &Name) -> Option<Box<dyn URefErased>> {
+    // boxing. Perhaps `RootHandle` should implement `ErasedHandle`? That would
+    // change what `Handle: Any` means, though. Perhaps `RootHandle` should own
+    // a prepared `Handle` that it can return a reference to.
+    pub fn get_any(&self, name: &Name) -> Option<Box<dyn ErasedHandle>> {
         self.tables.get_any(name)
     }
 
@@ -276,13 +276,13 @@ impl Universe {
     /// TODO: this is a temporary shortcut to be replaced with something with more nuance
     /// (e.g. we might have temporary characters for editing purposes, which are 'current'
     /// but not 'primary').
-    pub fn get_default_character(&self) -> Option<URef<Character>> {
+    pub fn get_default_character(&self) -> Option<Handle<Character>> {
         self.get(&"character".into())
     }
 
     /// Returns a unique identifier for this particular [`Universe`] (within this memory space).
     ///
-    /// It may be used to determine whether a given [`URef`] belongs to this universe or not.
+    /// It may be used to determine whether a given [`Handle`] belongs to this universe or not.
     pub fn universe_id(&self) -> UniverseId {
         self.id
     }
@@ -408,7 +408,7 @@ impl Universe {
                         Ok(info) => info,
                         // An in-use error might be due to our own parallel borrows!
                         // Therefore, treat it as if it were an evaluation in-use instead.
-                        Err(RefError::InUse(_)) => BlockDefStepInfo::IN_USE,
+                        Err(HandleError::InUse(_)) => BlockDefStepInfo::IN_USE,
                         Err(e) => panic!(
                             "BlockDef ref broken during universe.step():\n{}",
                             crate::util::ErrorChain(&e)
@@ -439,7 +439,7 @@ impl Universe {
 
     /// Inserts a new object without giving it a specific name, and returns
     /// a reference to it.
-    pub fn insert_anonymous<T>(&mut self, value: T) -> URef<T>
+    pub fn insert_anonymous<T>(&mut self, value: T) -> Handle<T>
     where
         Self: UniverseOps<T>,
         T: UniverseMember,
@@ -448,11 +448,11 @@ impl Universe {
             .expect("shouldn't happen: insert_anonymous failed")
     }
 
-    /// Translates a name for an object of type `T` into a [`URef`] for it, which
+    /// Translates a name for an object of type `T` into a [`Handle`] for it, which
     /// allows borrowing the actual object.
     ///
     /// Returns [`None`] if no object exists for the name.
-    pub fn get<T>(&self, name: &Name) -> Option<URef<T>>
+    pub fn get<T>(&self, name: &Name) -> Option<Handle<T>>
     where
         Self: UniverseOps<T>,
         T: UniverseMember,
@@ -463,7 +463,7 @@ impl Universe {
     /// Inserts a new object with a specific name.
     ///
     /// Returns an error if the name is already in use.
-    pub fn insert<T>(&mut self, name: Name, value: T) -> Result<URef<T>, InsertError>
+    pub fn insert<T>(&mut self, name: Name, value: T) -> Result<Handle<T>, InsertError>
     where
         Self: UniverseOps<T>,
         T: UniverseMember,
@@ -471,12 +471,12 @@ impl Universe {
         UniverseOps::insert(self, name, value)
     }
 
-    /// Returns a `URef` to a member whose referent may or may not be deserialized yet.
+    /// Returns a `Handle` to a member whose referent may or may not be deserialized yet.
     #[cfg(feature = "save")]
     pub(crate) fn get_or_insert_deserializing<T>(
         &mut self,
         name: Name,
-    ) -> Result<URef<T>, InsertError>
+    ) -> Result<Handle<T>, InsertError>
     where
         Self: UniverseTable<T, Table = Storage<T>>,
     {
@@ -493,10 +493,10 @@ impl Universe {
         match <Universe as UniverseTable<T>>::table_mut(self).entry(name.clone()) {
             alloc::collections::btree_map::Entry::Occupied(oe) => Ok(oe.get().downgrade()),
             alloc::collections::btree_map::Entry::Vacant(ve) => {
-                let root_ref = URootRef::new_deserializing(id, name);
-                let returned_ref = root_ref.downgrade();
-                ve.insert(root_ref);
-                Ok(returned_ref)
+                let root_handle = RootHandle::new_deserializing(id, name);
+                let returned_handle = root_handle.downgrade();
+                ve.insert(root_handle);
+                Ok(returned_handle)
             }
         }
     }
@@ -521,7 +521,7 @@ impl Universe {
     /// ```
     /// use all_is_cubes::block::{Block, BlockDef};
     /// use all_is_cubes::content::make_some_blocks;
-    /// use all_is_cubes::universe::{Name, Universe, URef};
+    /// use all_is_cubes::universe::{Name, Universe, Handle};
     ///
     /// let mut universe = Universe::new();
     /// let [block_1, block_2] = make_some_blocks();
@@ -529,7 +529,7 @@ impl Universe {
     /// universe.insert(Name::from("b2"), BlockDef::new(block_2.clone()));
     ///
     /// let mut found_blocks = universe.iter_by_type()
-    ///     .map(|(name, value): (Name, URef<BlockDef>)| {
+    ///     .map(|(name, value): (Name, Handle<BlockDef>)| {
     ///         (name, value.read().unwrap().block().clone())
     ///     })
     ///     .collect::<Vec<_>>();
@@ -607,7 +607,7 @@ impl Universe {
             || spaces.remove(name).is_some()
     }
 
-    /// Delete all anonymous members which have no references to them.
+    /// Delete all anonymous members which have no handles to them.
     ///
     /// This may happen at any time during operations of the universe; calling this method
     /// merely ensures that it happens now and not earlier.
@@ -620,10 +620,10 @@ impl Universe {
 
         // TODO: We need a real GC algorithm. For now, let's perform non-cyclic collection by
         // checking reference counts. If an entry has no weak references to its `Arc`, then
-        // we know that it has no `URef`s.
+        // we know that it has no `Handle`s.
         //
         // Besides not collecting cycles, this algorithm also has the flaw that it keeps
-        // members around if there are `URef`s to them outside of the Universe, whereas the
+        // members around if there are `Handle`s to them outside of the Universe, whereas the
         // preferred behavior, for consistency of the game logic, would be that they
         // go away at a time that is deterministic with respect to the simulation.
         gc_members(blocks);
@@ -631,12 +631,12 @@ impl Universe {
         gc_members(spaces);
     }
 
-    /// Traverse all members and find [`URef`]s that were deserialized in disconnected form.
+    /// Traverse all members and find [`Handle`]s that were deserialized in disconnected form.
     /// Each one needs to have its state adjusted and checked that it actually exists.
     #[cfg(feature = "save")]
-    pub(crate) fn fix_deserialized_refs(&mut self) -> Result<(), DeserializeRefsError> {
-        let visitor = &mut |maybe_broken_ref: &dyn URefErased| {
-            let _result = maybe_broken_ref.fix_deserialized(self.id, URefErasedInternalToken);
+    pub(crate) fn fix_deserialized_handles(&mut self) -> Result<(), DeserializeHandlesError> {
+        let visitor = &mut |maybe_broken_handle: &dyn ErasedHandle| {
+            let _result = maybe_broken_handle.fix_deserialized(self.id, ErasedHandleInternalToken);
             // TODO: propagate errors usefully
         };
 
@@ -646,26 +646,26 @@ impl Universe {
             spaces,
         } = &self.tables;
 
-        fix_refs_in_members(visitor, blocks)?;
-        fix_refs_in_members(visitor, characters)?;
-        fix_refs_in_members(visitor, spaces)?;
+        fix_handles_in_members(visitor, blocks)?;
+        fix_handles_in_members(visitor, characters)?;
+        fix_handles_in_members(visitor, spaces)?;
 
-        fn fix_refs_in_members<T: VisitRefs + 'static>(
-            visitor: &mut dyn RefVisitor,
+        fn fix_handles_in_members<T: VisitHandles + 'static>(
+            visitor: &mut dyn HandleVisitor,
             storage: &Storage<T>,
-        ) -> Result<(), DeserializeRefsError> {
+        ) -> Result<(), DeserializeHandlesError> {
             for root in storage.values() {
-                // Besides allowing us to visit the refs, this read() has the side effect
+                // Besides allowing us to visit the handles, this read() has the side effect
                 // of discovering any missing referents, because they will have been
                 // inserted but not given a value.
                 //
                 // TODO: Gather information from other members to learn which member
-                // contained the bad reference.
+                // contained the bad handle.
                 let member_value = root.downgrade().read().map_err(|e| match e {
-                    RefError::NotReady(name) => DeserializeRefsError { to: name },
+                    HandleError::NotReady(name) => DeserializeHandlesError { to: name },
                     _ => unreachable!(),
                 })?;
-                member_value.visit_refs(visitor);
+                member_value.visit_handles(visitor);
             }
             Ok(())
         }
@@ -740,9 +740,9 @@ impl behavior::BehaviorHost for Universe {
 
 /// Iterator type for [`Universe::iter_by_type`].
 #[derive(Clone, Debug)]
-pub struct UniverseIter<'u, T>(alloc::collections::btree_map::Iter<'u, Name, URootRef<T>>);
+pub struct UniverseIter<'u, T>(alloc::collections::btree_map::Iter<'u, Name, RootHandle<T>>);
 impl<'u, T> Iterator for UniverseIter<'u, T> {
-    type Item = (Name, URef<T>);
+    type Item = (Name, Handle<T>);
     fn next(&mut self) -> Option<Self::Item> {
         self.0
             .next()
@@ -775,9 +775,9 @@ pub enum InsertErrorKind {
     AlreadyExists,
     /// The proposed name may not be used.
     InvalidName,
-    /// The provided [`URef`] does not have a value.
+    /// The provided [`Handle`] does not have a value.
     Gone,
-    /// The provided [`URef`] was already inserted into some universe.
+    /// The provided [`Handle`] was already inserted into some universe.
     AlreadyInserted,
 }
 
@@ -794,16 +794,16 @@ impl fmt::Display for InsertError {
             InsertErrorKind::InvalidName => {
                 write!(f, "the name {name} may not be used in an insert operation")
             }
-            InsertErrorKind::Gone => write!(f, "the URef {name} was already dead"),
+            InsertErrorKind::Gone => write!(f, "the Handle {name} was already dead"),
             InsertErrorKind::AlreadyInserted => write!(f, "the object {name} is already inserted"),
         }
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
-#[displaydoc("data contains a reference to {to} that was not defined")]
-pub(crate) struct DeserializeRefsError {
-    /// Name in the bad reference.
+#[displaydoc("data contains a handle to {to} that was not defined")]
+pub(crate) struct DeserializeHandlesError {
+    /// Name in the bad handle.
     to: Name,
 }
 
@@ -864,7 +864,7 @@ fn gc_members<T>(table: &mut Storage<T>) {
     }
 }
 
-/// A subset of the [`URef`]s in one universe.
+/// A subset of the [`Handle`]s in one universe.
 ///
 /// May be serialized as if it was a [`Universe`].
 ///
@@ -876,9 +876,9 @@ fn gc_members<T>(table: &mut Storage<T>) {
 pub struct PartialUniverse {
     // TODO: design API that doesn't rely on making these public, but still allows
     // exports to be statically exhaustive.
-    pub blocks: Vec<URef<block::BlockDef>>,
-    pub characters: Vec<URef<Character>>,
-    pub spaces: Vec<URef<Space>>,
+    pub blocks: Vec<Handle<block::BlockDef>>,
+    pub characters: Vec<Handle<Character>>,
+    pub spaces: Vec<Handle<Space>>,
 }
 
 impl PartialUniverse {
@@ -891,7 +891,7 @@ impl PartialUniverse {
     }
 
     /// Select only the given members.
-    pub fn from_set<T>(members: impl IntoIterator<Item = URef<T>>) -> Self
+    pub fn from_set<T>(members: impl IntoIterator<Item = Handle<T>>) -> Self
     where
         T: UniverseMember,
         Self: PartialUniverseOps<T>,

@@ -25,7 +25,7 @@ use crate::space::{
 };
 use crate::time::{self, Tick};
 use crate::transaction::{self, Transaction as _};
-use crate::universe::{Name, RefError, URef, Universe, UniverseTransaction};
+use crate::universe::{Handle, HandleError, Name, Universe, UniverseTransaction};
 
 // TODO: test consistency between the index and get_* methods
 // TODO: test fill() equivalence and error handling
@@ -65,11 +65,11 @@ fn set_success() {
 /// Test `set()` with a block that fails evaluation.
 /// This should succeed but leave a placeholder.
 ///
-/// This test case should also cover `RefError::InUse` and other evaluation errors.
+/// This test case should also cover [`HandleError::InUse`] and other evaluation errors.
 #[test]
 fn set_success_despite_eval_error_gone() {
     let block = Block::builder()
-        .voxels_ref(R1, URef::<Space>::new_gone("bs".into()))
+        .voxels_handle(R1, Handle::<Space>::new_gone("bs".into()))
         .build();
     let mut space = Space::empty_positive(1, 1, 1);
 
@@ -78,11 +78,11 @@ fn set_success_despite_eval_error_gone() {
     // Check for the expected placeholder.
     assert_eq!(
         space.get_evaluated([0, 0, 0]),
-        &EvalBlockError::DataRefIs(RefError::Gone("bs".into())).to_placeholder()
+        &EvalBlockError::Handle(HandleError::Gone("bs".into())).to_placeholder()
     );
 
     // TODO: Test that evaluation works the next time around. (It will be tricky to
-    // set up a URef that cooperates with that.)
+    // set up a Handle that cooperates with that.)
     // TODO: The placeholder should be subject to special stepping rules that prevent it
     // from being interacted with, but that's not implemented yet.
 
@@ -394,8 +394,8 @@ fn replace_last_block_regression() {
 fn listens_to_block_changes() {
     // Set up indirect block
     let mut universe = Universe::new();
-    let block_def_ref = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
-    let indirect = Block::from(block_def_ref.clone());
+    let block_def_handle = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
+    let indirect = Block::from(block_def_handle.clone());
 
     // Set up space and listener
     let mut space = Space::builder(GridAab::ORIGIN_CUBE)
@@ -408,7 +408,7 @@ fn listens_to_block_changes() {
     // Now mutate the block def .
     let new_block = Block::from(Rgba::BLACK);
     let new_evaluated = new_block.evaluate().unwrap();
-    block_def_ref
+    block_def_handle
         .execute(
             &BlockDefTransaction::overwrite(new_block),
             &mut transaction::no_outputs,
@@ -429,7 +429,7 @@ fn indirect_becomes_evaluation_error() {
     let block_name = Name::from("block");
 
     // Set up 2 levels of indirect block
-    // (because right now, a URef going away is silent...)
+    // (because right now, a Handle going away is silent...)
     let mut universe = Universe::new();
     let block_def_ref = universe
         .insert(block_name.clone(), BlockDef::new(Block::from(Rgba::WHITE)))

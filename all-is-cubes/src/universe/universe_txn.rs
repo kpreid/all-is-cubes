@@ -9,9 +9,11 @@ use hashbrown::HashMap as HbHashMap;
 use crate::transaction::{
     self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
 };
+#[cfg(doc)]
+use crate::universe::HandleError;
 use crate::universe::{
-    AnyURef, InsertError, Name, UBorrowMut, URef, URefErased, Universe, UniverseId, UniverseMember,
-    UniverseTable,
+    AnyHandle, ErasedHandle, Handle, InsertError, Name, UBorrowMut, Universe, UniverseId,
+    UniverseMember, UniverseTable,
 };
 use crate::{behavior, universe};
 
@@ -28,21 +30,21 @@ pub trait UTransactional: Transactional + 'static
 where
     Self: Sized,
 {
-    /// Specify the target of the transaction as a [`URef`], and erase its type,
+    /// Specify the target of the transaction as a [`Handle`], and erase its type,
     /// so that it can be combined with other transactions in the same universe.
     ///
     /// This is also available as [`Transaction::bind`].
-    fn bind(target: URef<Self>, transaction: Self::Transaction) -> UniverseTransaction;
+    fn bind(target: Handle<Self>, transaction: Self::Transaction) -> UniverseTransaction;
 }
 
-/// Pair of a transaction and a [`URef`] to its target.
+/// Pair of a transaction and a [`Handle`] to its target.
 ///
 /// [`AnyTransaction`] is a singly-typed wrapper around this.
 ///
 /// TODO: Better name.
 #[derive(Debug, Eq)]
 pub(in crate::universe) struct TransactionInUniverse<O: Transactional + 'static> {
-    pub(crate) target: URef<O>,
+    pub(crate) target: Handle<O>,
     pub(crate) transaction: O::Transaction,
 }
 
@@ -131,11 +133,11 @@ pub(in crate::universe) type AnyTransactionCheck = Box<dyn Any>;
 
 impl AnyTransaction {
     fn target_name(&self) -> Option<Name> {
-        self.target_erased().map(URefErased::name)
+        self.target_erased().map(ErasedHandle::name)
     }
 
     fn universe_id(&self) -> Option<UniverseId> {
-        self.target_erased().and_then(URefErased::universe_id)
+        self.target_erased().and_then(ErasedHandle::universe_id)
     }
 }
 
@@ -281,20 +283,20 @@ impl UniverseTransaction {
     }
 
     /// Transaction which inserts the given object into the universe under
-    /// the reference's name.
+    /// the handle's name.
     ///
     /// Note that this transaction can only ever succeed once.
-    pub fn insert<T: UniverseMember>(reference: URef<T>) -> Self {
+    pub fn insert<T: UniverseMember>(handle: Handle<T>) -> Self {
         // TODO: fail right away if the ref is already in a universe or if it is Anonym?
-        match reference.name() {
+        match handle.name() {
             Name::Specific(_) | Name::Anonym(_) => Self::from_member_txn(
-                reference.name(),
-                MemberTxn::Insert(UniverseMember::into_any_ref(reference)),
+                handle.name(),
+                MemberTxn::Insert(UniverseMember::into_any_handle(handle)),
             ),
             Name::Pending => Self {
                 members: HbHashMap::new(),
-                anonymous_insertions: vec![MemberTxn::Insert(UniverseMember::into_any_ref(
-                    reference,
+                anonymous_insertions: vec![MemberTxn::Insert(UniverseMember::into_any_handle(
+                    handle,
                 ))],
                 universe_id: None,
                 behaviors: Default::default(),
@@ -312,11 +314,11 @@ impl UniverseTransaction {
     ///
     /// TODO: Give this a better name by renaming `insert()`.
     /// TODO: Is `InsertError` actually desirable, or legacy from before transactions?
-    pub fn insert_mut<T: UniverseMember>(&mut self, reference: URef<T>) -> Result<(), InsertError> {
-        let insertion = MemberTxn::Insert(UniverseMember::into_any_ref(reference.clone()));
+    pub fn insert_mut<T: UniverseMember>(&mut self, handle: Handle<T>) -> Result<(), InsertError> {
+        let insertion = MemberTxn::Insert(UniverseMember::into_any_handle(handle.clone()));
 
         // TODO: fail right away if the ref is already in a universe or if it is Anonym?
-        match reference.name() {
+        match handle.name() {
             name @ (Name::Specific(_) | Name::Anonym(_)) => {
                 match self.members.entry(name.clone()) {
                     hashbrown::hash_map::Entry::Occupied(_) => {
@@ -340,32 +342,30 @@ impl UniverseTransaction {
     }
 
     /// Adds an insertion of an anonymous universe member to the transaction, and returns the
-    /// pending reference to that member.
+    /// pending handle to that member.
     ///
     /// These steps are combined together because anonymous insertion is special, in that it cannot
     /// fail to merge with the current state of the transaction, and it is a commonly needed
     /// operation.
-    pub fn insert_anonymous<T: UniverseMember>(&mut self, value: T) -> URef<T> {
-        let reference = URef::new_pending(Name::Pending, value);
+    pub fn insert_anonymous<T: UniverseMember>(&mut self, value: T) -> Handle<T> {
+        let handle = Handle::new_pending(Name::Pending, value);
         self.anonymous_insertions
-            .push(MemberTxn::Insert(UniverseMember::into_any_ref(
-                reference.clone(),
+            .push(MemberTxn::Insert(UniverseMember::into_any_handle(
+                handle.clone(),
             )));
-        reference
+        handle
     }
 
     /// Delete this member from the universe.
     ///
-    /// All existing references will become [`RefError::Gone`], even if a new member by
+    /// All existing handles will become [`HandleError::Gone`], even if a new member by
     /// the same name is later added.
     ///
     /// This transaction will fail if the member is already gone, is anonymous
     /// (only named entries can be deleted), or belongs to another universe.
     /// In the future, there may be a policy such that in-use items cannot be deleted.
-    ///
-    /// [`RefError::Gone`]: crate::universe::RefError::Gone
-    pub fn delete<R: URefErased>(member_ref: R) -> Self {
-        Self::from_member_txn(member_ref.name(), MemberTxn::Delete)
+    pub fn delete<R: ErasedHandle>(member_handle: R) -> Self {
+        Self::from_member_txn(member_handle.name(), MemberTxn::Delete)
     }
 
     /// Modify the [`Behavior`](behavior::Behavior)s of the universe.
@@ -420,7 +420,7 @@ impl Transaction<Universe> for UniverseTransaction {
                     // but that will be quite a lot of fallibility...
                     return Err(PreconditionFailed {
                         location: "UniverseTransaction",
-                        problem: "universe transactions may not involve pending URefs",
+                        problem: "universe transactions may not involve pending Handles",
                     });
                 }
             }
@@ -556,11 +556,11 @@ enum MemberTxn {
     Noop,
     /// Apply given transaction to the existing value.
     Modify(AnyTransaction),
-    /// Insert the provided [pending](URef::new_pending) [`URef`] in the universe.
+    /// Insert the provided [pending](Handle::new_pending) [`Handle`] in the universe.
     ///
     /// Note: This transaction can only succeed once, since after the first time it will
     /// no longer be pending.
-    Insert(AnyURef),
+    Insert(AnyHandle),
     /// Delete this member from the universe.
     ///
     /// See [`UniverseTransaction::delete()`] for full documentation.
@@ -580,15 +580,15 @@ impl MemberTxn {
     ) -> Result<MemberCommitCheck, PreconditionFailed> {
         match self {
             MemberTxn::Noop => Ok(MemberCommitCheck(None)),
-            // Kludge: The individual `AnyTransaction`s embed the `URef<T>` they operate on --
+            // Kludge: The individual `AnyTransaction`s embed the `Handle<T>` they operate on --
             // so we don't actually pass anything here.
             MemberTxn::Modify(txn) => Ok(MemberCommitCheck(Some(txn.check(&())?))),
-            MemberTxn::Insert(pending_ref) => {
-                if pending_ref.name() != *name {
+            MemberTxn::Insert(pending_handle) => {
+                if pending_handle.name() != *name {
                     return Err(PreconditionFailed {
                         location: "UniverseTransaction",
                         // TODO: better error reporting
-                        problem: "insert(): the URef is already in a universe (or name data is erroneous)",
+                        problem: "insert(): the Handle is already in a universe (or name data is erroneous)",
                     });
                 }
 
@@ -611,7 +611,7 @@ impl MemberTxn {
                 }
                 // TODO: This has a TOCTTOU problem because it doesn't ensure another thread
                 // couldn't insert the ref in the mean time.
-                pending_ref.check_upgrade_pending(universe.id)?;
+                pending_handle.check_upgrade_pending(universe.id)?;
                 Ok(MemberCommitCheck(None))
             }
             MemberTxn::Delete => {
@@ -649,8 +649,8 @@ impl MemberTxn {
             MemberTxn::Modify(txn) => {
                 txn.commit(&mut (), check.expect("missing check value"), outputs)
             }
-            MemberTxn::Insert(pending_ref) => {
-                pending_ref
+            MemberTxn::Insert(pending_handle) => {
+                pending_handle
                     .insert_and_upgrade_pending(universe)
                     .map_err(CommitError::catch::<Self, _>)?;
                 Ok(())
@@ -683,20 +683,20 @@ impl MemberTxn {
 }
 
 /// Generic helper function called by macro-generated
-/// [`AnyURef::insert_and_upgrade_pending()`]
-pub(in crate::universe) fn anyuref_insert_and_upgrade_pending<T>(
+/// [`AnyHandle::insert_and_upgrade_pending()`]
+pub(in crate::universe) fn any_handle_insert_and_upgrade_pending<T>(
     universe: &mut Universe,
-    pending_ref: &URef<T>,
+    pending_handle: &Handle<T>,
 ) -> Result<(), CommitError>
 where
     T: 'static,
     Universe: UniverseTable<T, Table = super::Storage<T>>,
 {
-    let new_root_ref = pending_ref.upgrade_pending(universe).map_err(|e| {
+    let new_root_handle = pending_handle.upgrade_pending(universe).map_err(|e| {
         CommitError::message::<UniverseTransaction>(format!("insert() unable to upgrade: {e}"))
     })?;
 
-    UniverseTable::<T>::table_mut(universe).insert(pending_ref.name(), new_root_ref);
+    UniverseTable::<T>::table_mut(universe).insert(pending_handle.name(), new_root_handle);
     universe.wants_gc = true;
 
     Ok(())
@@ -780,7 +780,7 @@ impl std::error::Error for MemberConflict {
 }
 
 /// Transaction conflict error type for modifying a [`Universe`] member (something a
-/// [`URef`] refers to).
+/// [`Handle`] refers to).
 //
 // Public wrapper hiding the details of [`AnyTransactionConflict`] which is an enum.
 // TODO: Probably this should just _be_ that enum, but let's hold off till a use case
@@ -931,7 +931,7 @@ mod tests {
     #[test]
     fn insert_affects_clones() {
         let mut u = Universe::new();
-        let pending_1 = URef::new_pending("foo".into(), Space::empty_positive(1, 1, 1));
+        let pending_1 = Handle::new_pending("foo".into(), Space::empty_positive(1, 1, 1));
         let pending_2 = pending_1.clone();
 
         UniverseTransaction::insert(pending_2)
@@ -942,15 +942,15 @@ mod tests {
         // TODO: Also verify that pending_1 is not still in the pending state
     }
 
-    /// Anonymous refs require special handling because, before being inserted, they do
+    /// Anonymous handles require special handling because, before being inserted, they do
     /// not have unique names.
     #[test]
     fn insert_anonymous() {
         let mut u = Universe::new();
 
         // TODO: Cleaner public API for new anonymous?
-        let foo = URef::new_pending(Name::Pending, Space::empty_positive(1, 1, 1));
-        let bar = URef::new_pending(Name::Pending, Space::empty_positive(2, 2, 2));
+        let foo = Handle::new_pending(Name::Pending, Space::empty_positive(1, 1, 1));
+        let bar = Handle::new_pending(Name::Pending, Space::empty_positive(2, 2, 2));
 
         UniverseTransaction::insert(foo.clone())
             .merge(UniverseTransaction::insert(bar.clone()))
@@ -967,10 +967,10 @@ mod tests {
     #[test]
     fn insert_anonymous_equivalence() {
         let mut txn = UniverseTransaction::default();
-        let r = txn.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let handle = txn.insert_anonymous(Space::empty_positive(1, 1, 1));
 
-        assert_eq!(r.name(), Name::Pending);
-        assert_eq!(txn, UniverseTransaction::insert(r));
+        assert_eq!(handle.name(), Name::Pending);
+        assert_eq!(txn, UniverseTransaction::insert(handle));
     }
 
     #[test]
@@ -981,7 +981,7 @@ mod tests {
             .transaction(UniverseTransaction::default(), |_, _| Ok(()))
             // TODO: this is going to fail because insert transactions aren't reusable
             .transaction(
-                UniverseTransaction::insert(URef::new_pending(
+                UniverseTransaction::insert(Handle::new_pending(
                     "foo".into(),
                     Space::empty_positive(1, 1, 1),
                 )),
@@ -1022,16 +1022,16 @@ mod tests {
     fn insert_named_already_in_different_universe() {
         let mut u1 = Universe::new();
         let mut u2 = Universe::new();
-        let r = u1
+        let handle = u1
             .insert("foo".into(), Space::empty_positive(1, 1, 1))
             .unwrap();
-        let txn = UniverseTransaction::insert(r);
+        let txn = UniverseTransaction::insert(handle);
 
         let e = txn.execute(&mut u2, &mut drop).unwrap_err();
         assert!(matches!(
             dbg!(e),
             ExecuteError::Check(PreconditionFailed {
-                problem: "insert(): the URef is already in a universe",
+                problem: "insert(): the Handle is already in a universe",
                 ..
             })
         ));
@@ -1039,10 +1039,10 @@ mod tests {
 
     #[test]
     fn insert_anonymous_already_in_different_universe() {
-        let r = URef::new_pending(Name::Pending, Space::empty_positive(1, 1, 1));
+        let handle = Handle::new_pending(Name::Pending, Space::empty_positive(1, 1, 1));
         let mut u1 = Universe::new();
         let mut u2 = Universe::new();
-        let txn = UniverseTransaction::insert(r);
+        let txn = UniverseTransaction::insert(handle);
 
         txn.execute(&mut u1, &mut drop).unwrap();
         let e = txn.execute(&mut u2, &mut drop).unwrap_err();
@@ -1050,7 +1050,8 @@ mod tests {
         assert!(matches!(
             dbg!(e),
             ExecuteError::Check(PreconditionFailed {
-                problem: "insert(): the URef is already in a universe (or name data is erroneous)",
+                problem:
+                    "insert(): the Handle is already in a universe (or name data is erroneous)",
                 ..
             })
         ));

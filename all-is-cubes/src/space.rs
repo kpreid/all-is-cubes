@@ -27,7 +27,7 @@ use crate::math::{
 use crate::physics::Acceleration;
 use crate::time;
 use crate::transaction::{Merge, Transaction as _};
-use crate::universe::{RefVisitor, URef, UniverseTransaction, VisitRefs};
+use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
 
 mod builder;
@@ -545,7 +545,7 @@ impl Space {
     /// * `deadline` is when to stop computing flexible things such as light transport.
     pub fn step<I: time::Instant>(
         &mut self,
-        self_ref: Option<&URef<Space>>,
+        self_handle: Option<&Handle<Space>>,
         tick: time::Tick,
         deadline: time::Deadline<I>,
     ) -> (SpaceStepInfo, UniverseTransaction) {
@@ -596,11 +596,11 @@ impl Space {
         let cube_ticks_to_space_behaviors = I::now();
 
         let mut transaction = UniverseTransaction::default();
-        if let Some(self_ref) = self_ref {
+        if let Some(self_handle) = self_handle {
             if !tick.paused() {
                 transaction = self.behaviors.step(
                     &*self,
-                    &(|t: SpaceTransaction| t.bind(self_ref.clone())),
+                    &(|t: SpaceTransaction| t.bind(self_handle.clone())),
                     SpaceTransaction::behaviors,
                     tick,
                 );
@@ -803,8 +803,8 @@ impl<T: Into<Cube>> core::ops::Index<T> for Space {
     }
 }
 
-impl VisitRefs for Space {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+impl VisitHandles for Space {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         let Space {
             palette,
             contents: _,
@@ -816,9 +816,9 @@ impl VisitRefs for Space {
             change_notifier: _,
             fluff_notifier: _,
         } = self;
-        palette.visit_refs(visitor);
-        behaviors.visit_refs(visitor);
-        spawn.visit_refs(visitor);
+        palette.visit_handles(visitor);
+        behaviors.visit_handles(visitor);
+        spawn.visit_handles(visitor);
     }
 }
 
@@ -1193,8 +1193,8 @@ impl behavior::Behavior<Space> for ActivatableRegion {
     }
 }
 
-impl VisitRefs for ActivatableRegion {
-    fn visit_refs(&self, _: &mut dyn RefVisitor) {
+impl VisitHandles for ActivatableRegion {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {
         // Our only interesting member is an EphemeralOpaque — which is opaque.
     }
 }

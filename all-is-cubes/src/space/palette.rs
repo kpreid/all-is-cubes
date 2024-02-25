@@ -364,10 +364,10 @@ impl fmt::Debug for Palette {
     }
 }
 
-impl crate::universe::VisitRefs for Palette {
-    fn visit_refs(&self, visitor: &mut dyn crate::universe::RefVisitor) {
+impl crate::universe::VisitHandles for Palette {
+    fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
         for SpaceBlockData { block, .. } in self.entries.iter() {
-            block.visit_refs(visitor);
+            block.visit_handles(visitor);
         }
     }
 }

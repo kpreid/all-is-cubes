@@ -16,7 +16,7 @@ use all_is_cubes::listen::{FnListener, Gate, Listen, Listener};
 use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridVector, Gridgid};
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time::{Duration, Tick};
-use all_is_cubes::universe::{URef, Universe};
+use all_is_cubes::universe::{Handle, Universe};
 
 use crate::ui_content::hud::{HudBlocks, HudFont};
 use crate::vui::{self, LayoutRequest, Layoutable, Widget, WidgetController};
@@ -24,7 +24,7 @@ use crate::vui::{self, LayoutRequest, Layoutable, Widget, WidgetController};
 #[derive(Debug)]
 pub(crate) struct TooltipState {
     /// Character we're reading inventory state from
-    character: Option<URef<Character>>,
+    character: Option<Handle<Character>>,
     /// Listener gate to stop the listener if we change characters
     character_gate: Gate,
 
@@ -41,7 +41,7 @@ pub(crate) struct TooltipState {
 }
 
 impl TooltipState {
-    pub(crate) fn bind_to_character(this_ref: &Arc<Mutex<Self>>, character: URef<Character>) {
+    pub(crate) fn bind_to_character(this_ref: &Arc<Mutex<Self>>, character: Handle<Character>) {
         let (gate, listener) =
             FnListener::new(this_ref, move |this: &Mutex<Self>, change| match change {
                 // TODO: Don't dirty if an unrelated inventory slot changed
@@ -87,8 +87,8 @@ impl TooltipState {
         if self.dirty_inventory {
             self.dirty_inventory = false;
 
-            if let Some(character_ref) = &self.character {
-                let character = character_ref.read().unwrap();
+            if let Some(character_handle) = &self.character {
+                let character = character_handle.read().unwrap();
                 let selected_slot = character
                     .selected_slots()
                     .get(1)
@@ -184,7 +184,7 @@ pub(crate) struct Tooltip {
     /// Tracks what we should be displaying and serves as dirty flag.
     state: Arc<Mutex<TooltipState>>,
     /// Space we write the text into.
-    text_space: URef<Space>,
+    text_space: Handle<Space>,
 }
 
 impl Tooltip {

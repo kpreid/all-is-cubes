@@ -47,8 +47,8 @@ impl From<Quote> for block::Modifier {
     }
 }
 
-impl universe::VisitRefs for Quote {
-    fn visit_refs(&self, _visitor: &mut dyn universe::RefVisitor) {
+impl universe::VisitHandles for Quote {
+    fn visit_handles(&self, _visitor: &mut dyn universe::HandleVisitor) {
         let Quote {
             suppress_ambient: _,
         } = self;

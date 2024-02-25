@@ -81,14 +81,14 @@ fn spawn_look_direction() {
 fn inventory_transaction() {
     let mut universe = Universe::new();
     let space = Space::empty_positive(1, 1, 1);
-    let space_ref = universe.insert_anonymous(space);
-    let character = Character::spawn_default(space_ref.clone());
+    let space_handle = universe.insert_anonymous(space);
+    let character = Character::spawn_default(space_handle.clone());
     let sink = Sink::new();
     character.listen(sink.listener());
-    let character_ref = universe.insert_anonymous(character);
+    let character_handle = universe.insert_anonymous(character);
 
     let item = Tool::InfiniteBlocks(AIR);
-    character_ref
+    character_handle
         .execute(
             &CharacterTransaction::inventory(InventoryTransaction::insert([item.clone()])),
             &mut transaction::no_outputs,
@@ -110,7 +110,7 @@ fn inventory_transaction() {
 fn transaction_systematic() {
     let mut universe = Universe::new();
     let space = Space::empty_positive(1, 1, 1);
-    let space_ref = universe.insert_anonymous(space);
+    let space_handle = universe.insert_anonymous(space);
 
     let old_item = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(1.0, 0.0, 0.0))));
     let new_item_1 = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 1.0, 0.0))));
@@ -132,8 +132,8 @@ fn transaction_systematic() {
     TransactionTester::new()
         // Set space
         .transaction(
-            CharacterTransaction::move_to_space(space_ref.clone()),
-            |_, after| rassert(after.space == space_ref, "expected space_ref"),
+            CharacterTransaction::move_to_space(space_handle.clone()),
+            |_, after| rassert(after.space == space_handle, "expected space_handle"),
         )
         .transaction(
             CharacterTransaction::move_to_space(new_space_1.clone()),
@@ -182,9 +182,9 @@ fn transaction_systematic() {
                 )
             },
         )
-        .target(|| Character::spawn_default(space_ref.clone()))
+        .target(|| Character::spawn_default(space_handle.clone()))
         .target(|| {
-            let mut character = Character::spawn_default(space_ref.clone());
+            let mut character = Character::spawn_default(space_handle.clone());
             CharacterTransaction::inventory(InventoryTransaction::insert([old_item.clone()]))
                 .execute(&mut character, &mut transaction::no_outputs)
                 .unwrap();
@@ -257,8 +257,8 @@ fn click_wrong_space_or_correct_space() {
 #[test]
 fn selected_slot_notification() {
     let mut universe = Universe::new();
-    let space_ref = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
-    let mut character = Character::spawn_default(space_ref);
+    let space_handle = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+    let mut character = Character::spawn_default(space_handle);
     let sink = Sink::new();
     character.listen(sink.listener());
 

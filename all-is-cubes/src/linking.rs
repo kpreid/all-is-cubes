@@ -20,7 +20,7 @@ use hashbrown::HashMap as HbHashMap;
 use crate::block::{Block, BlockDef};
 use crate::space::SetCubeError;
 use crate::transaction::ExecuteError;
-use crate::universe::{InsertError, Name, URef, Universe, UniverseTransaction};
+use crate::universe::{Handle, InsertError, Name, Universe, UniverseTransaction};
 use crate::util::{ErrorIfStd, YieldProgress};
 
 #[cfg(doc)]
@@ -128,9 +128,9 @@ impl<E: BlockModule> Provider<E, Block> {
             name: Name,
             block: &Block,
         ) -> Result<Block, InsertError> {
-            let block_def_ref = URef::new_pending(name, BlockDef::new(block.clone()));
-            txn.insert_mut(block_def_ref.clone())?;
-            let indirect_block = Block::from(block_def_ref);
+            let block_def_handle = Handle::new_pending(name, BlockDef::new(block.clone()));
+            txn.insert_mut(block_def_handle.clone())?;
+            let indirect_block = Block::from(block_def_handle);
             Ok(indirect_block)
         }
 
@@ -152,12 +152,12 @@ impl<E: BlockModule> Provider<E, Block> {
     where
         E: Eq + Hash + fmt::Display,
     {
-        let mut found: HbHashMap<E, URef<BlockDef>> = HbHashMap::new();
+        let mut found: HbHashMap<E, Handle<BlockDef>> = HbHashMap::new();
         let mut missing = Vec::new();
         for key in E::exhaust() {
             let name = name_in_module(&key);
-            if let Some(uref) = universe.get(&name) {
-                found.insert(key, uref);
+            if let Some(handle) = universe.get(&name) {
+                found.insert(key, handle);
             } else {
                 missing.push(name);
             }

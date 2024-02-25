@@ -11,7 +11,7 @@ use crate::block::{
 use crate::content::palette;
 use crate::listen;
 use crate::math::{GridAab, Rgba, Vol};
-use crate::universe::RefError;
+use crate::universe::HandleError;
 
 /// Parameters to [`Block::evaluate2()`] to choose which information to compute.
 #[allow(clippy::exhaustive_structs)]
@@ -235,11 +235,11 @@ pub enum EvalBlockError {
         used: Cost,
     },
 
-    /// Data referenced by the block definition was not available to read.
+    /// The block definition contained a [`Handle`] which was not currently available to read.
     ///
-    /// This may be temporary or permanent; consult the [`RefError`] to determine that.
+    /// This may be temporary or permanent; consult the [`HandleError`] to determine that.
     #[displaydoc("block data inaccessible: {0}")]
-    DataRefIs(RefError),
+    Handle(HandleError),
 }
 
 /// Intra-evaluation error type; corresponds to [`EvalBlockError`]
@@ -248,7 +248,7 @@ pub enum EvalBlockError {
 pub(in crate::block) enum InEvalError {
     BudgetExceeded,
     PriorBudgetExceeded { budget: Cost, used: Cost },
-    DataRefIs(RefError),
+    Handle(HandleError),
 }
 
 #[cfg(feature = "std")]
@@ -257,14 +257,14 @@ impl std::error::Error for EvalBlockError {
         match self {
             EvalBlockError::BudgetExceeded { .. } => None,
             EvalBlockError::PriorBudgetExceeded { .. } => None,
-            EvalBlockError::DataRefIs(e) => Some(e),
+            EvalBlockError::Handle(e) => Some(e),
         }
     }
 }
 
-impl From<RefError> for InEvalError {
-    fn from(value: RefError) -> Self {
-        InEvalError::DataRefIs(value)
+impl From<HandleError> for InEvalError {
+    fn from(value: HandleError) -> Self {
+        InEvalError::Handle(value)
     }
 }
 
@@ -275,7 +275,7 @@ impl InEvalError {
             InEvalError::PriorBudgetExceeded { budget, used } => {
                 EvalBlockError::PriorBudgetExceeded { budget, used }
             }
-            InEvalError::DataRefIs(e) => EvalBlockError::DataRefIs(e),
+            InEvalError::Handle(e) => EvalBlockError::Handle(e),
         }
     }
 }
@@ -287,7 +287,7 @@ impl EvalBlockError {
                 InEvalError::PriorBudgetExceeded { budget, used }
             }
             EvalBlockError::BudgetExceeded { .. } => InEvalError::BudgetExceeded,
-            EvalBlockError::DataRefIs(e) => InEvalError::DataRefIs(e),
+            EvalBlockError::Handle(e) => InEvalError::Handle(e),
         }
     }
 
@@ -295,10 +295,10 @@ impl EvalBlockError {
     /// of the underlying data.
     ///
     /// This is a simple match, but we declare it as a method to ensure that any future introduced
-    /// variants of [`EvalBlockError`] or [`RefError`], that are similar but not equal,
+    /// variants of [`EvalBlockError`] or [`HandleError`], that are similar but not equal,
     /// don't break the logic depending on this property.
     pub(crate) fn is_in_use(&self) -> bool {
-        matches!(self, EvalBlockError::DataRefIs(RefError::InUse(_)))
+        matches!(self, EvalBlockError::Handle(HandleError::InUse(_)))
     }
 
     /// Convert this error into an [`EvaluatedBlock`] which represents that an error has
@@ -326,7 +326,7 @@ impl EvalBlockError {
             match *self {
                 EvalBlockError::BudgetExceeded { used, .. } => used,
                 EvalBlockError::PriorBudgetExceeded { .. } => Cost::ZERO,
-                EvalBlockError::DataRefIs(_) => Cost::ZERO,
+                EvalBlockError::Handle(_) => Cost::ZERO,
             },
         )
     }

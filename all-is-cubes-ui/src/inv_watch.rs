@@ -9,13 +9,13 @@ use std::sync::Arc;
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::inv::{Inventory, TOOL_SELECTIONS};
 use all_is_cubes::listen::{self, Listen as _, Listener as _};
-use all_is_cubes::universe::{RefError, URef, Universe};
+use all_is_cubes::universe::{Handle, HandleError, Universe};
 
 /// Some game entity that has an inventory we are watching, or none (treated as empty inventory).
 ///
 /// Currently, no other game object has an inventory, but eventually this will have
 /// to become an enum of possibilities.
-type Owner = Option<URef<Character>>;
+type Owner = Option<Handle<Character>>;
 
 /// Track the contents of an [`Inventory`] stored elsewhere, and make UI elements for it.
 #[derive(Debug)]
@@ -51,7 +51,7 @@ impl InventoryWatcher {
     ///
     /// `ui_universe` will be used to create anonymous resources used to depict the inventory.
     pub fn new(
-        inventory_source: listen::ListenableSource<Option<URef<Character>>>,
+        inventory_source: listen::ListenableSource<Option<Handle<Character>>>,
         _ui_universe: &mut Universe,
     ) -> Self {
         let dirty = listen::DirtyFlag::new(true);
@@ -102,8 +102,8 @@ impl InventoryWatcher {
         let empty_inventory = (&Inventory::new(0), [usize::MAX; TOOL_SELECTIONS]);
         let character_guard;
         let (new_inventory, new_selections) = match &self.inventory_owner {
-            Some(character_ref) => {
-                match character_ref.read() {
+            Some(character_handle) => {
+                match character_handle.read() {
                     Ok(cg) => {
                         character_guard = cg;
                         if let Some(l) = listener_to_install {
@@ -120,24 +120,24 @@ impl InventoryWatcher {
                             character_guard.selected_slots(),
                         )
                     }
-                    Err(RefError::InUse(_) | RefError::NotReady(_)) => {
+                    Err(HandleError::InUse(_) | HandleError::NotReady(_)) => {
                         if listener_to_install.is_some() {
                             // spin until we can successfully write the listener
                             // TODO: send some kind of deduplicated warning on this case...
-                            // or even better, give URefs a way to notify when they become ready
+                            // or even better, give Handles a way to notify when they become ready
                             // to read.
                             self.dirty.set();
                             self.notifier.notify(WatcherChange::NeedsUpdate);
                         }
                         empty_inventory
                     }
-                    Err(RefError::Gone(_)) => {
+                    Err(HandleError::Gone(_)) => {
                         // No inventory exists any more, so nothing to do.
                         empty_inventory
                     }
                     Err(e) => {
                         // TODO: … perhaps the enum should be exhaustive.
-                        unreachable!("unhandled RefError: {e:?}");
+                        unreachable!("unknown HandleError: {e:?}");
                     }
                 }
             }
@@ -160,7 +160,7 @@ impl InventoryWatcher {
     /// Returns the current [`Character`] whose inventory is being tracked, as of the last
     /// [`Self::update()`].
     #[cfg(test)] // TODO: only used in tests at the moment
-    fn character(&self) -> Option<&URef<Character>> {
+    fn character(&self) -> Option<&Handle<Character>> {
         self.inventory_owner.as_ref()
     }
 
@@ -211,9 +211,9 @@ mod tests {
 
     struct Tester {
         universe: Universe,
-        space: URef<Space>,
-        character: URef<Character>,
-        character_cell: listen::ListenableCell<Option<URef<Character>>>,
+        space: Handle<Space>,
+        character: Handle<Character>,
+        character_cell: listen::ListenableCell<Option<Handle<Character>>>,
         watcher: InventoryWatcher,
         sink: listen::Sink<WatcherChange>,
     }

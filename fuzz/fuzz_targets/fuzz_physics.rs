@@ -30,8 +30,8 @@ fuzz_target!(|input: ([FreeCoordinate; 3], [FreeCoordinate; 3], Space)| {
     );
 
     let mut universe = Universe::new();
-    let space_ref = universe.insert_anonymous(space);
-    let mut character = Character::spawn_default(space_ref);
+    let space_handle = universe.insert_anonymous(space);
+    let mut character = Character::spawn_default(space_handle);
     character.body.position = position;
     character.body.velocity = velocity;
     for i in 0..5000 {

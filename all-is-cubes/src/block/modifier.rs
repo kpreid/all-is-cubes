@@ -1,6 +1,6 @@
 use crate::block::{self, Block, Evoxels, MinEval};
 use crate::math::{GridRotation, Vol};
-use crate::universe::{RefVisitor, VisitRefs};
+use crate::universe::{HandleVisitor, VisitHandles};
 
 mod composite;
 use alloc::vec::Vec;
@@ -163,14 +163,14 @@ impl Modifier {
     }
 }
 
-impl VisitRefs for Modifier {
-    fn visit_refs(&self, visitor: &mut dyn RefVisitor) {
+impl VisitHandles for Modifier {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         match self {
-            Modifier::Quote(m) => m.visit_refs(visitor),
+            Modifier::Quote(m) => m.visit_handles(visitor),
             Modifier::Rotate(_) => {}
-            Modifier::Composite(m) => m.visit_refs(visitor),
-            Modifier::Zoom(m) => m.visit_refs(visitor),
-            Modifier::Move(m) => m.visit_refs(visitor),
+            Modifier::Composite(m) => m.visit_handles(visitor),
+            Modifier::Zoom(m) => m.visit_handles(visitor),
+            Modifier::Move(m) => m.visit_handles(visitor),
         }
     }
 }

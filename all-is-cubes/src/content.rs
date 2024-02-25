@@ -117,7 +117,7 @@ fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usiz
     }
     Block::builder()
         .display_name(i.to_string())
-        .voxels_ref(resolution, transaction.insert_anonymous(block_space))
+        .voxels_handle(resolution, transaction.insert_anonymous(block_space))
         .build()
 }
 
@@ -175,7 +175,7 @@ pub fn make_slab_txn(
     Block::builder()
         .display_name(format!("Slab {numerator}/{denominator}"))
         .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-        .voxels_ref(denominator, txn.insert_anonymous(space))
+        .voxels_handle(denominator, txn.insert_anonymous(space))
         .build()
 }
 

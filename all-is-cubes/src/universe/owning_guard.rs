@@ -24,11 +24,11 @@
 use alloc::sync::Arc;
 use core::{mem, ptr};
 
-use super::uref::UEntry;
+use super::handle::UEntry;
 use crate::util::maybe_sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError};
 
 #[cfg(doc)]
-use super::URef;
+use super::Handle;
 
 type Lock<T> = RwLock<UEntry<T>>;
 type Strong<T> = Arc<Lock<T>>;
@@ -36,7 +36,7 @@ type Strong<T> = Arc<Lock<T>>;
 // There are two near-identical implementations for read-only and exclusive access.
 // For readability, they are presented in parallel; both structs then both impls, etc.
 
-/// Owning wrapper around [`RwLockReadGuard`] for [`URef`].
+/// Owning wrapper around [`RwLockReadGuard`] for [`Handle`].
 pub(super) struct UBorrowImpl<T: 'static> {
     // SAFETY: `guard` must be dropped before `strong`,
     // which is accomplished by declaring it first.
@@ -49,7 +49,7 @@ pub(super) struct UBorrowImpl<T: 'static> {
     strong: Strong<T>,
 }
 
-/// Owning wrapper around [`RwLockWriteGuard`] for [`URef`].
+/// Owning wrapper around [`RwLockWriteGuard`] for [`Handle`].
 pub(super) struct UBorrowMutImpl<T: 'static> {
     // SAFETY: `guard` must be dropped before `strong`,
     // which is accomplished by declaring it first.

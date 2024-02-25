@@ -682,7 +682,7 @@ async fn install_atrium_blocks(
                 .build_txn(txn),
             AtriumBlocks::Firepot => Block::builder()
                 .display_name("Firepot")
-                .voxels_ref(resolution, {
+                .voxels_handle(resolution, {
                     let mut space = Space::for_block(resolution).build();
                     // Use a darker color to dampen the effect of interior light
                     let body_block = Block::from(palette::STEEL * 0.2);
@@ -793,7 +793,7 @@ fn generate_arch<'b>(
     };
     Ok(Block::builder()
         .display_name("Atrium Upper Floor Arch")
-        .voxels_ref((resolution * MULTIBLOCK_SCALE).unwrap(), space)
+        .voxels_handle((resolution * MULTIBLOCK_SCALE).unwrap(), space)
         .build())
 }
 
