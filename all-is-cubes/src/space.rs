@@ -554,6 +554,48 @@ impl Space {
 
         // Process cubes_wanting_ticks.
         let start_cube_ticks = I::now();
+        let cube_ticks = self.execute_tick_actions(tick);
+        let cube_ticks_to_space_behaviors = I::now();
+
+        let mut transaction = UniverseTransaction::default();
+        if let Some(self_handle) = self_handle {
+            if !tick.paused() {
+                transaction = self.behaviors.step(
+                    &*self,
+                    &(|t: SpaceTransaction| t.bind(self_handle.clone())),
+                    SpaceTransaction::behaviors,
+                    tick,
+                );
+            }
+        }
+
+        let space_behaviors_to_lighting = I::now();
+
+        let light = {
+            let (light_storage, uc) = self.borrow_light_update_context();
+            light_storage.update_lighting_from_queue::<I>(
+                uc,
+                deadline.remaining_since(space_behaviors_to_lighting),
+            )
+        };
+
+        (
+            SpaceStepInfo {
+                spaces: 1,
+                evaluations,
+                cube_ticks,
+                cube_time: cube_ticks_to_space_behaviors
+                    .saturating_duration_since(start_cube_ticks),
+                behaviors_time: space_behaviors_to_lighting
+                    .saturating_duration_since(cube_ticks_to_space_behaviors),
+                light,
+            },
+            transaction,
+        )
+    }
+
+    /// Process the block `tick_action` part of a [`Self::step()`].
+    fn execute_tick_actions(&mut self, tick: time::Tick) -> usize {
         let mut tick_txn = SpaceTransaction::default();
         // TODO: don't empty the queue until the transaction succeeds
         let cubes_to_tick = mem::take(&mut self.cubes_wanting_ticks);
@@ -593,43 +635,7 @@ impl Space {
         //   determinism since the order is fixed
         let _ignored_failure = tick_txn.execute(self, &mut drop);
 
-        let cube_ticks_to_space_behaviors = I::now();
-
-        let mut transaction = UniverseTransaction::default();
-        if let Some(self_handle) = self_handle {
-            if !tick.paused() {
-                transaction = self.behaviors.step(
-                    &*self,
-                    &(|t: SpaceTransaction| t.bind(self_handle.clone())),
-                    SpaceTransaction::behaviors,
-                    tick,
-                );
-            }
-        }
-
-        let space_behaviors_to_lighting = I::now();
-
-        let light = {
-            let (light_storage, uc) = self.borrow_light_update_context();
-            light_storage.update_lighting_from_queue::<I>(
-                uc,
-                deadline.remaining_since(space_behaviors_to_lighting),
-            )
-        };
-
-        (
-            SpaceStepInfo {
-                spaces: 1,
-                evaluations,
-                cube_ticks: count_cubes_ticked,
-                cube_time: cube_ticks_to_space_behaviors
-                    .saturating_duration_since(start_cube_ticks),
-                behaviors_time: space_behaviors_to_lighting
-                    .saturating_duration_since(cube_ticks_to_space_behaviors),
-                light,
-            },
-            transaction,
-        )
+        count_cubes_ticked
     }
 
     /// Returns the source of [fluff](Fluff) occurring in this space.
