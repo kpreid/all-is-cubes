@@ -393,7 +393,6 @@ fn point_within_patch(patch: NdcRect, uv: euclid::default::Vector2D<f64>) -> Ndc
 /// when `trace_scene_to_image()` was a public interface. Revisit them.
 mod trace_image {
     use super::*;
-    use crate::raytracer::{Accumulate, RaytraceInfo};
 
     /// Compute a full image, writing it into `output`.
     ///

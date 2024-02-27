@@ -1,6 +1,5 @@
 //! Options controlling recording.
 
-use std::convert::TryFrom;
 use std::ops::RangeInclusive;
 use std::path::PathBuf;
 use std::time::Duration;

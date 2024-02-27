@@ -1,7 +1,5 @@
 //! [`Accumulate`] and output formats of the raytracer.
 
-use core::convert::TryFrom as _;
-
 use euclid::Vector3D;
 use ordered_float::NotNan;
 

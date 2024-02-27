@@ -223,7 +223,6 @@ impl Listener<SpaceChange> for TodoListener {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::AIR;
     use crate::camera::{eye_for_look_at, Camera, Viewport};
     use crate::content::make_some_voxel_blocks;
     use crate::raytracer::{CharacterBuf, CharacterRtData};

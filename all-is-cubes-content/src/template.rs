@@ -472,7 +472,6 @@ async fn arbitrary_space(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::time;
     use all_is_cubes::util::yield_progress_for_testing;
     use futures_core::future::BoxFuture;
 

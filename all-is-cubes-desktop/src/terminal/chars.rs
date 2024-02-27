@@ -284,7 +284,7 @@ fn fallback_measure_str(text: &str) -> u16 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::terminal::{TerminalOptions, TextAndColor};
+    use crate::terminal::TerminalOptions;
     use all_is_cubes::camera::{ImageSize, Viewport};
     use all_is_cubes::euclid::size2;
     use all_is_cubes::math::area_usize;

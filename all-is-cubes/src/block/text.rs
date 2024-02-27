@@ -820,8 +820,7 @@ impl Brush {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Block, Primitive};
-    use crate::math::GridVector;
+    use crate::block::Primitive;
     use crate::raytracer::print_space;
     use crate::space::Space;
     use alloc::string::String;

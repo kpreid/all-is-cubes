@@ -59,7 +59,7 @@ impl universe::VisitHandles for Quote {
 mod tests {
     use super::*;
     use crate::block::{Block, Modifier};
-    use crate::math::{Rgb, Rgba};
+    use crate::math::Rgba;
     use pretty_assertions::assert_eq;
 
     #[test]

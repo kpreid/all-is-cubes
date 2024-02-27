@@ -880,7 +880,7 @@ impl fmt::Debug for RangeWithLength {
 mod tests {
     use super::*;
     use crate::block::Resolution::*;
-    use crate::math::{GridRotation, Gridgid};
+    use crate::math::GridRotation;
     use alloc::vec::Vec;
     use indoc::indoc;
 

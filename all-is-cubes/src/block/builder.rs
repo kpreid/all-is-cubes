@@ -405,9 +405,9 @@ impl BuildPrimitive for BlockBuilderVoxels {
 mod tests {
     use alloc::boxed::Box;
 
-    use crate::block::{self, Resolution::*, TickAction, AIR};
+    use crate::block::{self, Resolution::*, TickAction};
     use crate::content::palette;
-    use crate::math::{Face6, GridAab, Vol};
+    use crate::math::{Face6, Vol};
     use crate::op::Operation;
     use crate::space::SpacePhysics;
 

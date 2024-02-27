@@ -201,10 +201,9 @@ impl universe::VisitHandles for Move {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Block, Composite, EvaluatedBlock, Evoxel, Resolution::*};
+    use crate::block::{Composite, EvaluatedBlock, Resolution::*};
     use crate::content::make_some_blocks;
     use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgb, Rgba};
-    use crate::notnan;
     use crate::space::Space;
     use crate::time;
     use crate::universe::Universe;

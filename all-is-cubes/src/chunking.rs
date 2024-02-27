@@ -568,7 +568,6 @@ impl FusedIterator for AxisMirrorIter {}
 mod tests {
     use super::*;
     use crate::raytracer::print_space;
-    use euclid::{vec3, Vector3D};
     use pretty_assertions::assert_eq;
     use rand::{Rng, SeedableRng};
     use std::collections::HashSet;

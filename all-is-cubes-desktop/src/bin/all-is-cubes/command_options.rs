@@ -349,7 +349,7 @@ pub(crate) fn parse_universe_source(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::euclid::{size3, Size2D};
+    use all_is_cubes::euclid::size3;
     use clap::error::{ContextValue, ErrorKind};
 
     fn parse(args: &[&str]) -> clap::error::Result<AicDesktopArgs> {

@@ -766,7 +766,7 @@ impl MinEval {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Block, Resolution, Resolution::R2, AIR};
+    use crate::block::{Block, Resolution::R2, AIR};
     use crate::raytracer::EvalTrace;
     use crate::universe::Universe;
     use euclid::vec3;

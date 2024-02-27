@@ -754,7 +754,6 @@ mod tests {
     use crate::block::{Block, BlockDef};
     use crate::math::Rgba;
     use crate::space::Space;
-    use crate::universe::Universe;
     use alloc::string::ToString;
     use pretty_assertions::assert_eq;
 

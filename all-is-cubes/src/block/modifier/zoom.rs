@@ -166,7 +166,7 @@ mod tests {
     use super::*;
     use crate::block::{EvaluatedBlock, Resolution::R2};
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
-    use crate::math::{GridAab, GridVector, Rgba};
+    use crate::math::{GridVector, Rgba};
     use crate::universe::Universe;
     use euclid::point3;
     use pretty_assertions::assert_eq;

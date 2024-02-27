@@ -360,7 +360,6 @@ impl Geometry for Aab {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::{Cube, VectorOps};
     use alloc::vec::Vec;
     use euclid::point3;
 

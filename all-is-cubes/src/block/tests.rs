@@ -711,7 +711,6 @@ fn self_referential_block(universe: &mut Universe) -> Block {
 
 mod txn {
     use super::*;
-    use crate::block::BlockDefTransaction;
     use crate::transaction::{Merge, TransactionTester};
     use pretty_assertions::assert_eq;
 

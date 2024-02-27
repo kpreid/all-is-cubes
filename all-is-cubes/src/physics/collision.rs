@@ -727,7 +727,6 @@ mod tests {
     use crate::content::{make_slab, make_some_blocks};
     use crate::raytracer::print_space;
     use crate::universe::Universe;
-    use alloc::vec::Vec;
     use rand::{Rng, SeedableRng as _};
     use std::eprintln;
 

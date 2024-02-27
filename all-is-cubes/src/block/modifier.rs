@@ -193,7 +193,7 @@ mod tests {
     use crate::block::{BlockAttributes, TickAction};
     use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Primitive, Resolution::R2};
     use crate::content::make_some_voxel_blocks;
-    use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgb, Rgba, Vol};
+    use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
     use crate::op::Operation;
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;

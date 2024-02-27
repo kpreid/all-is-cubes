@@ -369,7 +369,6 @@ fn make_unique_name(proposed: &str, used: &mut HashSet<String>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gltf_json::validation::USize64;
 
     #[test]
     fn discard() {

@@ -852,9 +852,8 @@ mod tests {
     use super::*;
     use all_is_cubes::character::CharacterTransaction;
     use all_is_cubes::math::Cube;
-    use all_is_cubes::space::Space;
     use all_is_cubes::transaction::no_outputs;
-    use all_is_cubes::universe::{Name, Universe};
+    use all_is_cubes::universe::Name;
     use futures_channel::oneshot;
 
     #[tokio::test]

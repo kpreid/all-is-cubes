@@ -227,7 +227,6 @@ fn draw_text_txn(text: &BlockText, grant: &LayoutGrant) -> SpaceTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vui;
     use all_is_cubes::arcstr::literal;
     use all_is_cubes::block::Block;
     use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1::FONT_9X15_BOLD;

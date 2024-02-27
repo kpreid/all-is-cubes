@@ -580,7 +580,6 @@ pub(super) fn validate_widget_transaction(
 mod tests {
     use super::*;
     use all_is_cubes::euclid::vec3;
-    use all_is_cubes::math::Face6;
     use pretty_assertions::assert_eq;
 
     /// Trivial implementation of [`Layoutable`].

@@ -422,7 +422,7 @@ mod tests {
     use crate::block::Resolution::*;
     use crate::content::make_slab;
     use crate::content::make_some_blocks;
-    use crate::math::{Rgb, Rgba};
+    use crate::math::Rgba;
     use crate::space::Space;
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;

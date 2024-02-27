@@ -11,7 +11,7 @@ use all_is_cubes::camera::{self, StandardCameras, Viewport};
 use all_is_cubes::euclid::{Point2D, Size2D};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
-use all_is_cubes_gpu::wgpu;
+
 use all_is_cubes_ui::apps::InputProcessor;
 
 use crate::glue::winit::{

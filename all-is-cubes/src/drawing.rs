@@ -609,11 +609,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{self, Resolution::R16, AIR};
+    use crate::block::{Resolution::R16, AIR};
     use crate::content::make_some_blocks;
-    use crate::math::{GridRotation, Rgba};
     use crate::raytracer::print_space;
-    use crate::universe::Universe;
     use embedded_graphics::primitives::{Primitive, PrimitiveStyle};
 
     /// With identity transform, `rectangle_to_aab`'s output matches exactly as one might

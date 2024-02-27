@@ -302,7 +302,7 @@ pub(in crate::dynamic) struct CompletedMeshJob<M: DynamicMeshTypes> {
 mod state {
     use super::*;
     use std::collections::HashSet;
-    use std::sync::{Arc, Condvar, Mutex};
+    use std::sync::{Condvar, Mutex};
 
     /// Shared structure recording how many jobs are in a given state.
     /// Fields correspond to variants of [`JobState`].

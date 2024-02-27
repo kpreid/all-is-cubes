@@ -601,19 +601,14 @@ impl fmt::Display for CubeConflict {
 
 #[cfg(test)]
 mod tests {
-    use alloc::sync::Arc;
-    use core::sync::atomic::{AtomicU32, Ordering};
-
-    use pretty_assertions::assert_eq;
-
+    use super::*;
     use crate::behavior::NoopBehavior;
     use crate::block::AIR;
     use crate::content::make_some_blocks;
     use crate::inv::EphemeralOpaque;
-    use crate::math::GridAab;
-    use crate::transaction::{no_outputs, TransactionTester};
-
-    use super::*;
+    use crate::transaction::TransactionTester;
+    use core::sync::atomic::{AtomicU32, Ordering};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn set_out_of_bounds_conserved_fails() {

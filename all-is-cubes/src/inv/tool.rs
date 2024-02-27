@@ -604,16 +604,14 @@ impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for EphemeralOpaq
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::Primitive;
     use crate::character::cursor_raycast;
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::inv::Slot;
-    use crate::math::{FreeCoordinate, GridRotation};
+    use crate::math::FreeCoordinate;
     use crate::raycast::Ray;
     use crate::raytracer::print_space;
-    use crate::space::Space;
     use crate::transaction;
-    use crate::universe::{Handle, UBorrow, Universe};
+    use crate::universe::Universe;
     use crate::util::yield_progress_for_testing;
     use pretty_assertions::assert_eq;
 
