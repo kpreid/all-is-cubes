@@ -15,6 +15,7 @@ use crate::block::{
     TickAction, AIR,
 };
 use crate::content::make_some_blocks;
+use crate::drawing::VoxelBrush;
 use crate::fluff::Fluff;
 use crate::listen::{Listen as _, Sink};
 use crate::math::{Cube, Face6, GridAab, GridCoordinate, GridPoint, Rgba, Vol};
@@ -565,7 +566,7 @@ fn set_physics_notification() {
 }
 
 #[test]
-fn block_tick_action() {
+fn block_tick_action_timing() {
     let [mut block1, mut block2, block3] = make_some_blocks();
 
     // Hook them up to turn into each other
@@ -605,11 +606,67 @@ fn block_tick_action() {
         });
 
         let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineStd::Whenever);
-        // TODO: the block effect isn't a returned transaction yet but it should be.
+        // TODO: the block effect isn't a returned transaction yet but it perhaps should be.
         // This test will need reworking at that point.
         assert_eq!(step_txn, UniverseTransaction::default());
     }
 
     // Check sequence of changes
     assert_eq!(blocks_found, [1, 2, 2, 3, 3, 3]);
+}
+
+#[test]
+#[ignore = "TODO: block tick action conflict handling not implemented"]
+fn block_tick_action_conflict() {
+    use pretty_assertions::assert_eq;
+
+    // Create an active block.
+    let [mut modifies_px_neighbor, output1, mut modifies_nx_neighbor, output2] = make_some_blocks();
+    fn connect(from: &mut Block, to: &Block, face: Face6) {
+        if let Primitive::Atom(Atom { attributes, .. }) = from.primitive_mut() {
+            attributes.tick_action = Some({
+                TickAction {
+                    // TODO: replace this with a better-behaved neighbor-modifying operation,
+                    // once we have one
+                    operation: Operation::Paint(VoxelBrush::new([(
+                        face.normal_vector(),
+                        to.clone(),
+                    )])),
+                    period: NonZeroU16::new(1).unwrap(),
+                }
+            });
+        } else {
+            panic!();
+        }
+    }
+    connect(&mut modifies_px_neighbor, &output1, Face6::PX);
+    connect(&mut modifies_nx_neighbor, &output2, Face6::NX);
+
+    // Create test setup.
+    let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
+    let mut space = Space::empty_positive(3, 1, 1);
+    // These two blocks will both try to mutate [1, 0, 0], with different results.
+    space.set([0, 0, 0], &modifies_px_neighbor).unwrap();
+    space.set([2, 0, 0], &modifies_nx_neighbor).unwrap();
+
+    let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineStd::Whenever);
+    assert_eq!(step_txn, UniverseTransaction::default());
+
+    assert_eq!(
+        [&space[[0, 0, 0]], &space[[1, 0, 0]], &space[[2, 0, 0]]],
+        [&modifies_px_neighbor, &AIR, &modifies_nx_neighbor],
+        "expecting no change"
+    );
+
+    // Now if we delete one of the conflicting blocks, the tick action of the remaining one
+    // should take effect.
+    space.set([2, 0, 0], &AIR).unwrap();
+
+    let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineStd::Whenever);
+    assert_eq!(step_txn, UniverseTransaction::default());
+    assert_eq!(
+        [&space[[0, 0, 0]], &space[[1, 0, 0]], &space[[2, 0, 0]]],
+        [&modifies_px_neighbor, &output1, &AIR],
+        "expecting change"
+    );
 }
