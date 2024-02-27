@@ -16,7 +16,11 @@ env:
   # artifacts, so they won't be useful for anything (other than maybe the exhaustive
   # builds with different features).
   CARGO_INCREMENTAL: 0
+  # Collect backtrace on panic.
   RUST_BACKTRACE: 1
+  # Tell `anyhow` *not* to collect backtraces for errors.
+  # <https://users.rust-lang.org/t/anyhow-backtraces/107437>
+  RUST_LIB_BACKTRACE: 0
 
 jobs:
   build:
