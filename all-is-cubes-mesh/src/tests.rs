@@ -1,4 +1,6 @@
-//! Tests for [`crate::mesh`].
+//! Tests for the mesh system as a whole.
+
+use alloc::vec::Vec;
 
 use pretty_assertions::assert_eq;
 

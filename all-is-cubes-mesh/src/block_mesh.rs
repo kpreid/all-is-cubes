@@ -2,6 +2,8 @@
 //!
 //! This module is internal and reexported by its parent.
 
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::fmt;
 use std::sync::Arc;
 

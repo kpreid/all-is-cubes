@@ -23,9 +23,6 @@
 //! [`GfxVertex`] and [`texture::Allocator`] traits, then implement [`MeshTypes`] to bundle them
 //! together.
 
-// Crate-specific lint settings. (General settings can be found in the workspace manifest.)
-#![forbid(unsafe_code)]
-
 // This crate is *almost* `no_std` compatible; the tricky parts are synchronization stuff:
 // * the `Mutex` that `chunked_mesh::CsmTodo` uses.
 // * the `flume` channels used for background mesh calculation.
@@ -34,7 +31,13 @@
 // `hashbrown`) until I have some imaginable use case for mesh building on a `no_std` target.
 // So for now, the code is just in a state of “reveal how close it is”, hence using `core` and
 // `alloc` imports.
+#![no_std]
+// Crate-specific lint settings. (General settings can be found in the workspace manifest.)
+#![forbid(unsafe_code)]
+
 extern crate alloc;
+#[macro_use]
+extern crate std;
 
 use core::fmt;
 

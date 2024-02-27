@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::num::NonZeroU32;
 use core::time::Duration;
 use core::{fmt, ops};

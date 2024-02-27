@@ -106,6 +106,7 @@ impl fmt::Debug for MeshId {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::ToString as _;
 
     #[test]
     fn mesh_id_strings() {

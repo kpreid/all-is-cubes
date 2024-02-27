@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use core::fmt;
 
 use all_is_cubes::math::Cube;

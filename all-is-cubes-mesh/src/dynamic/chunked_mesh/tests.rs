@@ -1,5 +1,6 @@
 #![allow(clippy::identity_op)]
 
+use alloc::vec::Vec;
 use std::sync::{Arc, Mutex};
 
 use all_is_cubes::block::{self, Block, BlockDef, BlockDefTransaction, AIR};
