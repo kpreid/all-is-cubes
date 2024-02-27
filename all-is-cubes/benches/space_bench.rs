@@ -4,10 +4,14 @@ use criterion::{
     black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
 };
 
+use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::content::make_some_blocks;
+use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::GridAab;
+use all_is_cubes::raytracer::UpdatingSpaceRaytracer;
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
+use all_is_cubes::universe::{Handle, Name};
 
 fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("space-bulk-mutation");
@@ -42,6 +46,33 @@ fn space_bulk_mutation(c: &mut Criterion) {
                     || Space::empty(bigger_bounds),
                     |mut space| {
                         space.fill(bounds, |_| Some(&block)).unwrap();
+                    },
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+
+        group.bench_function(
+            BenchmarkId::new("fill() part with notification", &size_description),
+            |b| {
+                let [block] = make_some_blocks();
+                b.iter_batched(
+                    || -> (Handle<Space>, [UpdatingSpaceRaytracer<()>; 2]) {
+                        let space = Handle::new_pending(Name::Pending, Space::empty(bigger_bounds));
+                        // Two nontrivial things that will receive notifications
+                        let rts = std::array::from_fn(|_| {
+                            UpdatingSpaceRaytracer::new(
+                                space.clone(),
+                                ListenableSource::constant(GraphicsOptions::default()),
+                                ListenableSource::constant(()),
+                            )
+                        });
+                        (space, rts)
+                    },
+                    |(space, _listening_rt)| {
+                        space
+                            .try_modify(|space| space.fill(bounds, |_| Some(&block)).unwrap())
+                            .unwrap();
                     },
                     BatchSize::SmallInput,
                 )
