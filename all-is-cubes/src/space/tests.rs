@@ -16,8 +16,8 @@ use crate::block::{
 };
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
-use crate::fluff::Fluff;
-use crate::listen::{Listen as _, Sink};
+use crate::fluff::{self, Fluff};
+use crate::listen::{self, Listen as _, Sink};
 use crate::math::{Cube, Face6, GridAab, GridCoordinate, GridPoint, Rgba, Vol};
 use crate::op::Operation;
 use crate::space::{
@@ -615,8 +615,9 @@ fn block_tick_action_timing() {
     assert_eq!(blocks_found, [1, 2, 2, 3, 3, 3]);
 }
 
+/// TODO: Need more tests along with implementation; the conflict processing *only* handles this
+/// simple case. In particular, test other actions proceeding while a conflict exists.
 #[test]
-#[ignore = "TODO: block tick action conflict handling not implemented"]
 fn block_tick_action_conflict() {
     use pretty_assertions::assert_eq;
 
@@ -643,29 +644,48 @@ fn block_tick_action_conflict() {
     connect(&mut modifies_nx_neighbor, &output2, Face6::NX);
 
     // Create test setup.
+    let fluff_sink = listen::Sink::new();
     let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
     let mut space = Space::empty_positive(3, 1, 1);
+    space.fluff().listen(fluff_sink.listener());
     // These two blocks will both try to mutate [1, 0, 0], with different results.
-    space.set([0, 0, 0], &modifies_px_neighbor).unwrap();
-    space.set([2, 0, 0], &modifies_nx_neighbor).unwrap();
+    let left = Cube::new(0, 0, 0);
+    let middle = Cube::new(1, 0, 0);
+    let right = Cube::new(2, 0, 0);
+    space.set(left, &modifies_px_neighbor).unwrap();
+    space.set(right, &modifies_nx_neighbor).unwrap();
 
     let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineStd::Whenever);
     assert_eq!(step_txn, UniverseTransaction::default());
 
     assert_eq!(
-        [&space[[0, 0, 0]], &space[[1, 0, 0]], &space[[2, 0, 0]]],
+        [&space[left], &space[middle], &space[right]],
         [&modifies_px_neighbor, &AIR, &modifies_nx_neighbor],
         "expecting no change"
+    );
+    assert_eq!(
+        fluff_sink.drain(),
+        vec![
+            SpaceFluff {
+                position: left,
+                fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(middle.grid_aab())),
+            },
+            SpaceFluff {
+                position: right,
+                fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(middle.grid_aab())),
+            }
+        ]
     );
 
     // Now if we delete one of the conflicting blocks, the tick action of the remaining one
     // should take effect.
-    space.set([2, 0, 0], &AIR).unwrap();
+    space.set(right, &AIR).unwrap();
 
     let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineStd::Whenever);
     assert_eq!(step_txn, UniverseTransaction::default());
+    assert_eq!(fluff_sink.drain(), vec![]);
     assert_eq!(
-        [&space[[0, 0, 0]], &space[[1, 0, 0]], &space[[2, 0, 0]]],
+        [&space[left], &space[middle], &space[right]],
         [&modifies_px_neighbor, &output1, &AIR],
         "expecting change"
     );

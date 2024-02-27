@@ -9,7 +9,7 @@ use core::ops;
 use core::time::Duration;
 
 use euclid::{vec3, Vector3D};
-use hashbrown::HashSet as HbHashSet;
+use hashbrown::{HashMap as HbHashMap, HashSet as HbHashSet};
 use manyfmt::Fmt;
 
 use crate::behavior::{self, BehaviorSet};
@@ -18,7 +18,7 @@ use crate::block::{Block, EvaluatedBlock, Resolution, TickAction, AIR, AIR_EVALU
 use crate::character::Character;
 use crate::character::Spawn;
 use crate::drawing::DrawingPlane;
-use crate::fluff::Fluff;
+use crate::fluff::{self, Fluff};
 use crate::inv::{EphemeralOpaque, InventoryTransaction};
 use crate::listen::{Listen, Listener, Notifier};
 use crate::math::{
@@ -26,7 +26,7 @@ use crate::math::{
 };
 use crate::physics::Acceleration;
 use crate::time;
-use crate::transaction::{Merge, Transaction as _};
+use crate::transaction::{self, Merge, Transaction as _};
 use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
 
@@ -596,46 +596,153 @@ impl Space {
 
     /// Process the block `tick_action` part of a [`Self::step()`].
     fn execute_tick_actions(&mut self, tick: time::Tick) -> usize {
-        let mut tick_txn = SpaceTransaction::default();
-        // TODO: don't empty the queue until the transaction succeeds
-        let cubes_to_tick = mem::take(&mut self.cubes_wanting_ticks);
-        let count_cubes_ticked = cubes_to_tick.len();
-        for position in cubes_to_tick {
-            if let Some(TickAction { operation, period }) =
-                self.get_evaluated(position).attributes.tick_action.as_ref()
-            {
-                if tick.prev_phase().rem_euclid(period.get()) != 0 {
-                    // Don't tick yet.
-                    // TODO: Use a more efficient queue structure
-                    self.cubes_wanting_ticks.insert(position);
-                    continue;
+        // Take contents of self.cubes_wanting_ticks, and filter out actions that shouldn't
+        // happen this tick.
+        // TODO: Use a queue structure for cubes_wanting_ticks that knows this so we can
+        // evaluate fewer cubes.
+        let mut cubes_to_tick: Vec<Cube> = mem::take(&mut self.cubes_wanting_ticks)
+            .into_iter()
+            .filter(|&cube| {
+                if let Some(TickAction {
+                    operation: _,
+                    period,
+                }) = self.get_evaluated(cube).attributes.tick_action
+                {
+                    if tick.prev_phase().rem_euclid(period.get()) != 0 {
+                        // Don't tick yet.
+                        // TODO: Use a more efficient queue structure
+                        self.cubes_wanting_ticks.insert(cube);
+                        false
+                    } else {
+                        true
+                    }
+                } else {
+                    // Doesn't actually have an action.
+                    false
                 }
+            })
+            .collect();
+        // Sort the list so our results are deterministic (in particular, in the order of the
+        // emitted `Fluff`).
+        // TODO: Maybe it would be more efficient to use a `BTreeMap` for storage? Benchmark.
+        cubes_to_tick.sort_unstable_by_key(|&cube| <[GridCoordinate; 3]>::from(cube));
 
-                match operation.apply(
-                    self,
-                    None,
-                    Gridgid::from_translation(position.lower_bounds().to_vector()),
-                ) {
-                    Ok((space_txn, inventory_txn)) => {
-                        assert_eq!(inventory_txn, InventoryTransaction::default());
-                        tick_txn
-                            .merge_from(space_txn)
-                            .expect("TODO: don't panic on tick conflict");
+        let mut first_pass_txn = SpaceTransaction::default();
+        let mut first_pass_cubes = HbHashSet::new();
+        let mut first_pass_conflicts: HbHashMap<Cube, SpaceTransaction> = HbHashMap::new();
+        for cube in cubes_to_tick.iter().copied() {
+            let Some(TickAction {
+                operation,
+                period: _,
+            }) = self.get_evaluated(cube).attributes.tick_action.as_ref()
+            else {
+                continue;
+            };
+
+            // Obtain the transaction.
+            let txn: SpaceTransaction = match operation.apply(
+                self,
+                None,
+                Gridgid::from_translation(cube.lower_bounds().to_vector()),
+            ) {
+                Ok((space_txn, inventory_txn)) => {
+                    assert_eq!(inventory_txn, InventoryTransaction::default());
+
+                    match space_txn.check(self) {
+                        Err(_e) => {
+                            // The operation produced a transaction which, itself, cannot execute
+                            // against the state of the Space. Omit it from the set.
+                            self.fluff_notifier.notify(SpaceFluff {
+                                position: cube,
+                                fluff: Fluff::BlockFault(fluff::BlockFault::TickPrecondition(
+                                    space_txn.bounds().unwrap_or_else(|| cube.grid_aab()),
+                                )),
+                            });
+                            SpaceTransaction::default()
+                        }
+                        Ok(_) => space_txn,
                     }
-                    Err(_) => {
-                        // TODO: emit fluff and other error logging if applicable
-                    }
+                }
+                Err(_) => {
+                    // The operation failed to apply. This is normal if it just isn't the right
+                    // conditions yet.
+                    self.fluff_notifier.notify(SpaceFluff {
+                        position: cube,
+                        fluff: Fluff::BlockFault(fluff::BlockFault::TickPrecondition(
+                            cube.grid_aab(),
+                        )),
+                    });
+                    SpaceTransaction::default()
+                }
+            };
+
+            // TODO: if we have already hit a conflict, we shouldn't be executing first_pass_txn,
+            // so we should just do a merge check and not a full merge.
+            match first_pass_txn.check_merge(&txn) {
+                Ok(check) => {
+                    // This cube's transaction successfully merged with the first_pass_txn.
+                    // Therefore, either it will be successful, *or* it will turn out that the
+                    // first pass set includes a conflict.
+                    first_pass_txn.commit_merge(txn, check);
+                    first_pass_cubes.insert(cube);
+                }
+                Err(_conflict) => {
+                    // This cube's transaction conflicts with something in the first pass set.
+                    // We now know that:
+                    // * we're not going to commit this cube's transaction
+                    // * we're not going to commit some or all of the first_pass_txn,
+                    // but we still need to continue to refine the conflict detection.
+                    first_pass_conflicts.insert(cube, txn);
                 }
             }
         }
-        // TODO: We need a strategy for, if this transaction fails, trying again while finding
-        // the non-conflicting pieces in a deterministic fashion.
-        // TODO: Should this potentially conflict with space behaviors?
-        //   Argument for: consistency; argument against: we don't need it for update-order
-        //   determinism since the order is fixed
-        let _ignored_failure = tick_txn.execute(self, &mut drop);
 
-        count_cubes_ticked
+        // TODO: What we should be doing now is identifying which transactions do not conflict with
+        // *any* other transaction. That will require a spatial data structure to compute
+        // efficiently. Instead, we'll just stop *all* tick actions, which is correct-in-a-sense
+        // even if it's very suboptimal game mechanics.
+        if first_pass_conflicts.is_empty() {
+            if let Err(e) = first_pass_txn.execute(self, &mut transaction::no_outputs) {
+                // This really shouldn't happen, because we already check()ed every part of
+                // first_pass_txn, but we don't want it to be fatal.
+                // TODO: this logging should use util::ErrorChain, but that's only available
+                // with the std feature.
+                log::error!("cube tick transaction could not be executed: {e:#?}");
+
+                // Re-register to not forget these are active cubes.
+                self.cubes_wanting_ticks.extend(cubes_to_tick);
+            }
+            first_pass_cubes.len()
+        } else {
+            // Don't run the transaction. Instead, report conflicts.
+            for cube in first_pass_cubes {
+                self.fluff_notifier.notify(SpaceFluff {
+                    position: cube,
+                    fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(
+                        // pick an arbitrary conflicting txn — best we can do for now till we
+                        // hqve the proper fine-grained conflict detector.
+                        {
+                            let (other_cube, other_txn) =
+                                first_pass_conflicts.iter().next().unwrap();
+                            other_txn.bounds().unwrap_or_else(|| other_cube.grid_aab())
+                        },
+                    )),
+                });
+            }
+            for cube in first_pass_conflicts.keys().copied() {
+                self.fluff_notifier.notify(SpaceFluff {
+                    position: cube,
+                    fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(
+                        first_pass_txn.bounds().unwrap_or_else(|| cube.grid_aab()),
+                    )),
+                });
+            }
+
+            // Re-register to not forget these are active cubes.
+            self.cubes_wanting_ticks.extend(cubes_to_tick);
+
+            0
+        }
     }
 
     /// Returns the source of [fluff](Fluff) occurring in this space.

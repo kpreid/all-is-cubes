@@ -112,6 +112,7 @@ fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: Aud
                     sound.settings.volume = kira::Volume::Amplitude(volume).into();
                     play_fluff(&mut manager, sound)
                 }
+                Fluff::BlockFault(_) => {}
                 f => log::debug!("No known sound for Fluff value: {f:?}"),
             },
         }
