@@ -11,6 +11,8 @@ use crate::block::{
 use crate::content::palette;
 use crate::listen;
 use crate::math::{GridAab, Rgba, Vol};
+#[cfg(doc)]
+use crate::universe::Handle;
 use crate::universe::HandleError;
 
 /// Parameters to [`Block::evaluate2()`] to choose which information to compute.
