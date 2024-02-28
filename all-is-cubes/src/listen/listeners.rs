@@ -25,7 +25,6 @@ impl<M> Listener<M> for NullListener {
 /// Tuples of listeners may be used to distribute messages.
 impl<M, L1, L2> Listener<M> for (L1, L2)
 where
-    M: Clone,
     L1: Listener<M>,
     L2: Listener<M>,
 {
@@ -186,10 +185,7 @@ impl<M> Clone for SinkListener<M> {
     }
 }
 
-impl<M> Default for Sink<M>
-where
-    M: Send + Sync,
-{
+impl<M> Default for Sink<M> {
     // This implementation cannot be derived because we do not want M: Default
 
     fn default() -> Self {

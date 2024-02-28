@@ -115,7 +115,7 @@ impl<M> fmt::Debug for NotifierForwarder<M> {
     }
 }
 
-impl<M: Clone + Send> Listener<M> for NotifierForwarder<M> {
+impl<M> Listener<M> for NotifierForwarder<M> {
     fn receive(&self, messages: &[M]) -> bool {
         if let Some(notifier) = self.0.upgrade() {
             notifier.notify_many(messages);

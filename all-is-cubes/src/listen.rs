@@ -30,7 +30,9 @@ pub use util::*;
 /// as long as it wishes to.
 pub trait Listen {
     /// The type of message which may be obtained from this source.
-    type Msg: Clone + Send;
+    ///
+    /// Most message types will satisfy `Copy + Send + Sync + 'static`, but this is not required.
+    type Msg;
 
     /// Subscribe the given [`Listener`] to this source of messages.
     ///
@@ -74,7 +76,7 @@ struct NotifierEntry<M> {
     was_alive: AtomicBool,
 }
 
-impl<M: Clone + Send> Notifier<M> {
+impl<M> Notifier<M> {
     /// Constructs a new empty [`Notifier`].
     pub fn new() -> Self {
         Self {
@@ -160,7 +162,7 @@ impl<M: Clone + Send> Notifier<M> {
     }
 }
 
-impl<M: Clone + Send> Listen for Notifier<M> {
+impl<M> Listen for Notifier<M> {
     type Msg = M;
 
     fn listen<L: Listener<M> + 'static>(&self, listener: L) {
@@ -178,7 +180,7 @@ impl<M: Clone + Send> Listen for Notifier<M> {
     }
 }
 
-impl<M: Clone + Send> Default for Notifier<M> {
+impl<M> Default for Notifier<M> {
     fn default() -> Self {
         Self::new()
     }
