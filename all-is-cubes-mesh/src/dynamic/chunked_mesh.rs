@@ -684,48 +684,51 @@ impl<const CHUNK_SIZE: GridCoordinate> CsmTodo<CHUNK_SIZE> {
 struct TodoListener<const CHUNK_SIZE: GridCoordinate>(Weak<Mutex<CsmTodo<CHUNK_SIZE>>>);
 
 impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CHUNK_SIZE> {
-    fn receive(&self, message: SpaceChange) {
-        let Some(cell) = self.0.upgrade() else { return }; // noop if dead listener
-        let Ok(mut todo) = cell.lock() else { return }; // noop if poisoned
-        match message {
-            SpaceChange::EveryBlock => {
-                todo.all_blocks_and_chunks = true;
-                todo.blocks.clear();
-                todo.chunks.clear();
-            }
-            SpaceChange::CubeBlock {
-                cube,
-                old_block_index,
-                new_block_index,
-                ..
-            } => {
-                todo.modify_block_and_adjacent(cube, |chunk_todo| {
-                    // TODO(instancing): Once we have "temporarily instance anything",
-                    // the right thing to do here is only check the old index, not the new one,
-                    // because what we're actually checking is whether the old block *in our mesh*
-                    // is instanced or not, which this merely an adequate approximation of.
-                    if chunk_todo.has_always_instanced(old_block_index)
-                        && chunk_todo.has_always_instanced(new_block_index)
-                    {
-                        chunk_todo.state |= ChunkTodoState::DirtyInstances;
-                    } else {
-                        chunk_todo.state |= ChunkTodoState::DirtyMeshAndInstances;
-                    }
-                });
-            }
-            SpaceChange::CubeLight { .. } => {
-                // Meshes are not affected by light
-            }
-            SpaceChange::BlockIndex(index) | SpaceChange::BlockEvaluation(index) => {
-                if !todo.all_blocks_and_chunks {
-                    todo.blocks.insert(index);
+    fn receive(&self, messages: &[SpaceChange]) -> bool {
+        let Some(cell) = self.0.upgrade() else {
+            return false;
+        }; // noop if dead listener
+        let Ok(mut todo) = cell.lock() else {
+            return false;
+        }; // noop if poisoned
+        for message in messages {
+            match *message {
+                SpaceChange::EveryBlock => {
+                    todo.all_blocks_and_chunks = true;
+                    todo.blocks.clear();
+                    todo.chunks.clear();
                 }
+                SpaceChange::CubeBlock {
+                    cube,
+                    old_block_index,
+                    new_block_index,
+                    ..
+                } => {
+                    todo.modify_block_and_adjacent(cube, |chunk_todo| {
+                        // TODO(instancing): Once we have "temporarily instance anything",
+                        // the right thing to do here is only check the old index, not the new one,
+                        // because what we're actually checking is whether the old block *in our
+                        // mesh* is instanced or not, which this is merely an approximation of.
+                        if chunk_todo.has_always_instanced(old_block_index)
+                            && chunk_todo.has_always_instanced(new_block_index)
+                        {
+                            chunk_todo.state |= ChunkTodoState::DirtyInstances;
+                        } else {
+                            chunk_todo.state |= ChunkTodoState::DirtyMeshAndInstances;
+                        }
+                    });
+                }
+                SpaceChange::CubeLight { .. } => {
+                    // Meshes are not affected by light
+                }
+                SpaceChange::BlockIndex(index) | SpaceChange::BlockEvaluation(index) => {
+                    if !todo.all_blocks_and_chunks {
+                        todo.blocks.insert(index);
+                    }
+                }
+                SpaceChange::Physics => {}
             }
-            SpaceChange::Physics => {}
         }
-    }
-
-    fn alive(&self) -> bool {
-        self.0.strong_count() > 0
+        true
     }
 }

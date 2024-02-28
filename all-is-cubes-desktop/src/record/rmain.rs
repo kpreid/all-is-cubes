@@ -173,7 +173,7 @@ impl universe::VisitHandles for AutoRotate {
 struct ChannelListener<M> {
     sender: tokio::sync::mpsc::UnboundedSender<M>,
 }
-impl<M: Send> ChannelListener<M> {
+impl<M: Send + Clone> ChannelListener<M> {
     fn new(sender: tokio::sync::mpsc::UnboundedSender<M>) -> Self {
         Self { sender }
     }
@@ -181,16 +181,25 @@ impl<M: Send> ChannelListener<M> {
 
 impl<M> fmt::Debug for ChannelListener<M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ChannelListener").finish_non_exhaustive()
+        f.debug_struct("ChannelListener")
+            .field("is_closed", &self.sender.is_closed())
+            .finish_non_exhaustive()
     }
 }
 
-impl<M: Send> listen::Listener<M> for ChannelListener<M> {
-    fn receive(&self, message: M) {
-        _ = self.sender.send(message);
-    }
-
-    fn alive(&self) -> bool {
-        !self.sender.is_closed()
+impl<M: Send + Clone> listen::Listener<M> for ChannelListener<M> {
+    fn receive(&self, messages: &[M]) -> bool {
+        if messages.is_empty() {
+            return !self.sender.is_closed();
+        }
+        for message in messages {
+            match self.sender.send(message.clone()) {
+                Ok(()) => {}
+                Err(tokio::sync::mpsc::error::SendError(_)) => {
+                    return false;
+                }
+            }
+        }
+        true
     }
 }

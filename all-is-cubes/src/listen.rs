@@ -13,6 +13,7 @@
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::fmt;
+use core::sync::atomic::{AtomicBool, Ordering::Relaxed};
 
 use crate::util::maybe_sync::{RwLock, SendSyncIfStd};
 
@@ -33,9 +34,9 @@ pub trait Listen {
 
     /// Subscribe the given [`Listener`] to this source of messages.
     ///
-    /// Note that listeners are removed only via their returning false from
-    /// [`Listener::alive()`]; there is no `unlisten()` operation, and identical listeners
-    /// are not deduplicated.
+    /// Note that listeners are removed only via their returning [`false`] from
+    /// [`Listener::receive()`]; there is no operation to remove a listener,
+    /// nor are subscriptions deduplicated.
     fn listen<L: Listener<Self::Msg> + 'static>(&self, listener: L);
 }
 
@@ -64,7 +65,13 @@ impl<T: Listen> Listen for Arc<T> {
 /// references *some* of the time — making `M` be a reference type can't have a
 /// satisfactory lifetime.
 pub struct Notifier<M> {
-    listeners: RwLock<Vec<DynListener<M>>>,
+    listeners: RwLock<Vec<NotifierEntry<M>>>,
+}
+
+struct NotifierEntry<M> {
+    listener: DynListener<M>,
+    /// True iff every call to `listener.receive()` has returned true.
+    was_alive: AtomicBool,
 }
 
 impl<M: Clone + Send> Notifier<M> {
@@ -108,13 +115,26 @@ impl<M: Clone + Send> Notifier<M> {
 
     /// Deliver a message to all [`Listener`]s.
     pub fn notify(&self, message: M) {
-        for listener in self.listeners.read().unwrap().iter() {
-            listener.receive(message.clone());
+        self.notify_many(&[message])
+    }
+
+    /// Deliver multiple messages to all [`Listener`]s.
+    pub fn notify_many(&self, messages: &[M]) {
+        for NotifierEntry {
+            listener,
+            was_alive,
+        } in self.listeners.read().unwrap().iter()
+        {
+            // Don't load was_alive before sending, because we assume the common case is that
+            // a listener implements receive() cheaply when it is dead.
+            let alive = listener.receive(messages);
+
+            was_alive.fetch_and(alive, Relaxed);
         }
     }
 
     /// Computes the exact count of listeners, including asking all current listeners
-    /// if they are [`alive()`](Listener::alive).
+    /// if they are alive.
     ///
     /// This operation is intended for testing and diagnostic purposes.
     pub fn count(&self) -> usize {
@@ -124,10 +144,14 @@ impl<M: Clone + Send> Notifier<M> {
     }
 
     /// Discard all dead weak pointers in `listeners`.
-    fn cleanup(listeners: &mut Vec<DynListener<M>>) {
+    fn cleanup(listeners: &mut Vec<NotifierEntry<M>>) {
         let mut i = 0;
         while i < listeners.len() {
-            if listeners[i].alive() {
+            let entry = &listeners[i];
+            // We must ask the listener, not just consult was_alive, in order to avoid
+            // leaking memory if listen() is called repeatedly without any notify().
+            // TODO: But we can skip it if the last operation was notify().
+            if entry.was_alive.load(Relaxed) && entry.listener.receive(&[]) {
                 i += 1;
             } else {
                 listeners.swap_remove(i);
@@ -140,12 +164,17 @@ impl<M: Clone + Send> Listen for Notifier<M> {
     type Msg = M;
 
     fn listen<L: Listener<M> + 'static>(&self, listener: L) {
-        if !listener.alive() {
+        if !listener.receive(&[]) {
+            // skip adding it if it's already dead
             return;
         }
         let mut listeners = self.listeners.write().unwrap();
+        // TODO: consider amortization by not doing cleanup every time
         Self::cleanup(&mut listeners);
-        listeners.push(listener.erased());
+        listeners.push(NotifierEntry {
+            listener: listener.erased(),
+            was_alive: AtomicBool::new(true),
+        });
     }
 }
 
@@ -170,16 +199,38 @@ impl<M> fmt::Debug for Notifier<M> {
 /// indicate when it is no longer interested in them (typically because the associated
 /// recipient has been dropped).
 ///
+/// Listeners are typically used in trait object form, which may be created by calling
+/// [`erased()`](Self::erased); this is done implicitly by [`Notifier`], but calling it
+/// earlier may in some cases be useful to minimize the number of separately allocated
+/// clones of the listener.
+///
 /// Please note the requirements set out in [`Listener::receive()`].
 ///
-/// Implementors should also implement [`Clone`] whenever possible; this allows
-/// for a "listen" operation to be implemented in terms of delegating to several others.
-/// This is not required, so that the `Listener` trait remains object-safe.
-///
 /// Implementors must also implement [`Send`] and [`Sync`] if the `std` feature of
-/// `all-is-cubes` is enabled.
+/// `all-is-cubes` is enabled. (This non-additive-feature behavior is unfortunately the
+/// least bad option available.)
 pub trait Listener<M>: fmt::Debug + SendSyncIfStd {
-    /// Process and store a message.
+    /// Process and store the given series of messages.
+    ///
+    /// Returns `true` if the listener is still interested in further messages (“alive”),
+    /// and `false` if it should be dropped because these and all future messages would have
+    /// no observable effect.
+    /// A call of the form `.receive(&[])` may be performed to query aliveness without
+    /// delivering any messages.
+    ///
+    /// # Requirements on implementors
+    ///
+    /// Messages are provided in a batch for efficiency of dispatch.
+    /// Each message in the provided slice should be processed exactly the same as if
+    /// it were the only message provided.
+    /// If the slice is empty, there should be no observable effect.
+    ///
+    /// This method should not panic under any circumstances, in order to ensure the sender's
+    /// other work is not interfered with.
+    /// For example, if the listener accesses a poisoned mutex, it should do nothing or clear
+    /// the poison, rather than panicking.
+    ///
+    /// # Advice for implementors
     ///
     /// Note that, since this method takes `&Self`, a `Listener` must use interior
     /// mutability of some variety to store the message. As a `Listener` may be called
@@ -194,20 +245,10 @@ pub trait Listener<M>: fmt::Debug + SendSyncIfStd {
     /// then be read and cleared by a later task; see [`FnListener`] for assistance in
     /// implementing this pattern.
     ///
-    /// This method should not panic under any circumstances, or inconsistencies may
-    /// result due to further work not being done and messages not being sent.
-    fn receive(&self, message: M);
-
-    /// Whether the [`Listener`]'s destination is still interested in receiving messages.
-    ///
-    /// This method should start returning [`false`] as soon as its destination is no
-    /// longer interested in them or they would not have any effects on the rest of the
-    /// system; this informs [`Notifier`]s that they should drop this listener and avoid
-    /// memory leaks in the form of defunct listeners.
-    ///
-    /// This method should not panic under any circumstances, or inconsistencies may
-    /// result due to further work not being done and messages not being sent.
-    fn alive(&self) -> bool;
+    /// Note that a [`Notifier`] might call `.receive(&[])` at any time, particularly when
+    /// listeners are added. Be careful not to cause a deadlock in this case; it may be
+    /// necessary to avoid locking in the case where there are no messages to be delivered.
+    fn receive(&self, messages: &[M]) -> bool;
 
     /// Convert this listener into trait object form, allowing it to be stored in
     /// collections or passed non-generically.
@@ -228,7 +269,7 @@ pub trait Listener<M>: fmt::Debug + SendSyncIfStd {
     fn filter<MI, F>(self, function: F) -> Filter<F, Self>
     where
         Self: Sized,
-        F: Fn(MI) -> Option<M> + Sync,
+        F: for<'a> Fn(&'a MI) -> Option<M> + Sync,
     {
         Filter {
             function,
@@ -246,10 +287,10 @@ pub trait Listener<M>: fmt::Debug + SendSyncIfStd {
     ///
     /// let sink = Sink::new();
     /// let (gate, gated) = sink.listener().gate();
-    /// gated.receive("kept");
+    /// gated.receive(&["kept"]);
     /// assert!(sink.take_equal("kept"));
     /// drop(gate);
-    /// gated.receive("discarded");
+    /// gated.receive(&["discarded"]);
     /// assert!(!sink.take_equal("discarded"));
     /// ```
     fn gate(self) -> (Gate, GateListener<Self>)
@@ -264,12 +305,8 @@ pub trait Listener<M>: fmt::Debug + SendSyncIfStd {
 pub type DynListener<M> = Arc<dyn Listener<M>>;
 
 impl<M> Listener<M> for DynListener<M> {
-    fn receive(&self, message: M) {
-        (**self).receive(message)
-    }
-
-    fn alive(&self) -> bool {
-        (**self).alive()
+    fn receive(&self, messages: &[M]) -> bool {
+        (**self).receive(messages)
     }
 
     fn erased(self) -> DynListener<M> {
@@ -312,15 +349,16 @@ mod tests {
         );
 
         // Should report alive (and not infinitely recurse).
-        assert!(listener.alive());
+        assert!(listener.receive(&[]));
 
         // Should deliver messages.
-        listener.receive("a");
+        assert!(listener.receive(&["a"]));
         assert_eq!(sink.drain(), vec!["a"]);
 
         // Should report dead
         drop(sink);
-        assert!(!listener.alive());
+        assert!(!listener.receive(&[]));
+        assert!(!listener.receive(&["b"]));
     }
 
     /// Demonstrate that [`DynListener`] implements [`fmt::Debug`].

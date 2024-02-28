@@ -24,8 +24,12 @@
 - `all-is-cubes` library:
     - `camera::ImageSize` is now an `euclid::Size2D` instead of `euclid::Vector2D`.
     - `camera::Viewport`'s fields are now `euclid::Size2D` instead of `euclid::Vector2D`.
+
+    - `listen::Listener::receive()` now accepts batches of messages instead of single messages, and the `alive()` method has been replaced with a return value from `receive()`. Implementors should review the new requirements documentation.
+
     - `math::GridAab::from_lower_size()` now takes a `GridSize` instead of `GridVector`.
     - `math::GridAab::size()` and `math::Aab::size()` now return `GridSize` instead of `GridVector`.
+    
     - Renamed `universe::URef` to `universe::Handle`. Related items have also been renamed:
         - `URefErased` to `ErasedHandle`
         - `AnyURef` to `AnyHandle`

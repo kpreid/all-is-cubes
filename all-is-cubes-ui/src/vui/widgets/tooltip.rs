@@ -42,16 +42,18 @@ pub(crate) struct TooltipState {
 
 impl TooltipState {
     pub(crate) fn bind_to_character(this_ref: &Arc<Mutex<Self>>, character: Handle<Character>) {
-        let (gate, listener) =
-            FnListener::new(this_ref, move |this: &Mutex<Self>, change| match change {
+        let (gate, listener) = FnListener::new(
+            this_ref,
+            move |this: &Mutex<Self>, change: &CharacterChange| match change {
                 // TODO: Don't dirty if an unrelated inventory slot changed
                 CharacterChange::Inventory(_) | CharacterChange::Selections => {
                     if let Ok(mut this) = this.lock() {
                         this.dirty_inventory = true;
                     }
                 }
-            })
-            .gate();
+            },
+        )
+        .gate();
 
         // TODO: Think about what state results if either of the locks/borrows fails
         character.read().unwrap().listen(listener);

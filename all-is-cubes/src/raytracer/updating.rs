@@ -62,8 +62,9 @@ where
         }));
 
         // TODO: Placeholder for more detailed graphics options updating
-        graphics_options
-            .listen(TodoListener(Arc::downgrade(&todo)).filter(|()| Some(SpaceChange::EveryBlock)));
+        graphics_options.listen(
+            TodoListener(Arc::downgrade(&todo)).filter(|&()| Some(SpaceChange::EveryBlock)),
+        );
 
         Self {
             state: SpaceRaytracer::new_empty(
@@ -190,33 +191,36 @@ impl SrtTodo {
 struct TodoListener(Weak<Mutex<SrtTodo>>);
 
 impl Listener<SpaceChange> for TodoListener {
-    fn receive(&self, message: SpaceChange) {
+    fn receive(&self, messages: &[SpaceChange]) -> bool {
         let Some(mutex) = self.0.upgrade() else {
             // noop if dead listener
-            return;
+            return false;
         };
+        if messages.is_empty() {
+            // don't acquire lock if not delivering messages
+            return true;
+        }
         let Ok(mut todo) = mutex.lock() else {
             // noop if poisoned
-            return;
+            return false;
         };
-        match message {
-            SpaceChange::EveryBlock => {
-                todo.everything = true;
-                todo.blocks.clear();
-                todo.cubes.clear()
+        for message in messages {
+            match *message {
+                SpaceChange::EveryBlock => {
+                    todo.everything = true;
+                    todo.blocks.clear();
+                    todo.cubes.clear()
+                }
+                SpaceChange::CubeLight { cube, .. } | SpaceChange::CubeBlock { cube, .. } => {
+                    todo.cubes.insert(cube);
+                }
+                SpaceChange::BlockIndex(index) | SpaceChange::BlockEvaluation(index) => {
+                    todo.blocks.insert(index);
+                }
+                SpaceChange::Physics => {}
             }
-            SpaceChange::CubeLight { cube, .. } | SpaceChange::CubeBlock { cube, .. } => {
-                todo.cubes.insert(cube);
-            }
-            SpaceChange::BlockIndex(index) | SpaceChange::BlockEvaluation(index) => {
-                todo.blocks.insert(index);
-            }
-            SpaceChange::Physics => {}
         }
-    }
-
-    fn alive(&self) -> bool {
-        self.0.strong_count() > 0
+        true
     }
 }
 

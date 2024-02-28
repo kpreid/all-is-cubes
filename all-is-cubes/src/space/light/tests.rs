@@ -131,12 +131,11 @@ fn evaluate_light() {
 #[test]
 fn set_cube_opaque_notification() {
     let mut space = Space::empty_positive(1, 1, 1);
-    let sink = Sink::new();
-    space.listen(
-        sink.listener().filter(|change| {
-            matches!(change, SpaceChange::CubeLight { cube: _ }).then_some(change)
-        }),
-    );
+    let sink: Sink<SpaceChange> = Sink::new();
+    space.listen(sink.listener().filter(|change| match change {
+        SpaceChange::CubeLight { cube: _ } => Some(change.clone()),
+        _ => None,
+    }));
     // Self-test that the initial condition is not trivially the answer we're looking for
     assert_ne!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
 

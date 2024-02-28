@@ -17,8 +17,7 @@ use crate::util::maybe_sync::{RwLock, SendSyncIfStd};
 pub struct NullListener;
 
 impl<M> Listener<M> for NullListener {
-    fn receive(&self, _message: M) {}
-    fn alive(&self) -> bool {
+    fn receive(&self, _messages: &[M]) -> bool {
         false
     }
 }
@@ -30,13 +29,9 @@ where
     L1: Listener<M>,
     L2: Listener<M>,
 {
-    fn receive(&self, message: M) {
-        self.0.receive(message.clone());
-        self.1.receive(message);
-    }
-
-    fn alive(&self) -> bool {
-        self.0.alive() || self.1.alive()
+    fn receive(&self, messages: &[M]) -> bool {
+        // note non-short-circuiting or
+        self.0.receive(messages) | self.1.receive(messages)
     }
 }
 
@@ -71,17 +66,19 @@ impl<F, T> fmt::Debug for FnListener<F, T> {
 
 impl<M, F, T> Listener<M> for FnListener<F, T>
 where
-    F: Fn(&T, M) + SendSyncIfStd,
+    F: Fn(&T, &M) + SendSyncIfStd,
     T: SendSyncIfStd,
 {
-    fn receive(&self, message: M) {
+    fn receive(&self, messages: &[M]) -> bool {
         if let Some(strong_target) = self.weak_target.upgrade() {
-            (self.function)(&*strong_target, message);
+            // TODO: Review whether changing FnListener to pass on the slice will be useful
+            for message in messages {
+                (self.function)(&*strong_target, message);
+            }
+            true
+        } else {
+            false
         }
-    }
-
-    fn alive(&self) -> bool {
-        self.weak_target.strong_count() > 0
     }
 }
 
@@ -119,7 +116,7 @@ impl<M> Sink<M> {
     /// use all_is_cubes::listen::{Listener, Sink};
     ///
     /// let sink = Sink::new();
-    /// sink.listener().receive(2);
+    /// sink.listener().receive(&[2]);
     /// assert!(!sink.take_equal(1));  // No match
     /// assert!(sink.take_equal(2));   // Match
     /// assert!(!sink.take_equal(2));  // Now removed
@@ -150,10 +147,10 @@ impl<M> Sink<M> {
     /// use all_is_cubes::listen::{Listener, Sink};
     ///
     /// let sink = Sink::new();
-    /// sink.listener().receive(1);
-    /// sink.listener().receive(2);
+    /// sink.listener().receive(&[1]);
+    /// sink.listener().receive(&[2]);
     /// assert_eq!(sink.drain(), vec![1, 2]);
-    /// sink.listener().receive(3);
+    /// sink.listener().receive(&[3]);
     /// assert_eq!(sink.drain(), vec![3]);
     /// ```
     pub fn drain(&self) -> Vec<M> {
@@ -170,14 +167,14 @@ impl<M> fmt::Debug for SinkListener<M> {
     }
 }
 
-impl<M: Send + Sync> Listener<M> for SinkListener<M> {
-    fn receive(&self, message: M) {
+impl<M: Clone + Send + Sync> Listener<M> for SinkListener<M> {
+    fn receive(&self, messages: &[M]) -> bool {
         if let Some(cell) = self.weak_messages.upgrade() {
-            cell.write().unwrap().push_back(message);
+            cell.write().unwrap().extend(messages.iter().cloned());
+            true
+        } else {
+            false
         }
-    }
-    fn alive(&self) -> bool {
-        self.weak_messages.strong_count() > 0
     }
 }
 
@@ -259,13 +256,15 @@ impl DirtyFlag {
     }
 }
 impl<M> Listener<M> for DirtyFlagListener {
-    fn receive(&self, _message: M) {
+    fn receive(&self, messages: &[M]) -> bool {
         if let Some(cell) = self.weak_flag.upgrade() {
-            cell.store(true, Ordering::Release);
+            if !messages.is_empty() {
+                cell.store(true, Ordering::Release);
+            }
+            true
+        } else {
+            false
         }
-    }
-    fn alive(&self) -> bool {
-        self.weak_flag.strong_count() > 0
     }
 }
 
@@ -316,11 +315,24 @@ mod tests {
     }
 
     #[test]
+    fn dirty_flag_set() {
+        let flag = DirtyFlag::new(false);
+
+        // not set by zero messages
+        flag.listener().receive(&[(); 0]);
+        assert!(!flag.get_and_clear());
+
+        // but set by receiving at least one message
+        flag.listener().receive(&[()]);
+        assert!(flag.get_and_clear());
+    }
+
+    #[test]
     fn dirty_flag_debug() {
         assert_eq!(format!("{:?}", DirtyFlag::new(false)), "DirtyFlag(false)");
         assert_eq!(format!("{:?}", DirtyFlag::new(true)), "DirtyFlag(true)");
         let dirtied = DirtyFlag::new(false);
-        dirtied.listener().receive(());
+        dirtied.listener().receive(&[()]);
         assert_eq!(format!("{dirtied:?}"), "DirtyFlag(true)");
     }
 }

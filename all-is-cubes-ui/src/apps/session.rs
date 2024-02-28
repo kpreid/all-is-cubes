@@ -755,9 +755,9 @@ impl SpaceWatchState {
             let space_read = space.read()?;
             let (fluff_gate, fluff_forwarder) =
                 listen::Notifier::forwarder(Arc::downgrade(fluff_notifier))
-                    .filter(|sf: space::SpaceFluff| {
+                    .filter(|sf: &space::SpaceFluff| {
                         // TODO: do not discard spatial information; and add source information
-                        Some(sf.fluff)
+                        Some(sf.fluff.clone())
                     })
                     .gate();
             space_read.fluff().listen(fluff_forwarder);

@@ -506,29 +506,31 @@ impl Block {
                     GridAab::for_block(resolution).translate(offset.to_vector());
 
                 if let Some(listener) = &filter.listener {
-                    block_space.listen(listener.clone().filter(move |msg| {
-                        match msg {
-                            SpaceChange::CubeBlock { cube, .. }
-                                if full_resolution_bounds.contains_cube(cube) =>
-                            {
-                                Some(BlockChange::new())
+                    block_space.listen(listener.clone().filter(
+                        move |msg: &SpaceChange| -> Option<BlockChange> {
+                            match *msg {
+                                SpaceChange::CubeBlock { cube, .. }
+                                    if full_resolution_bounds.contains_cube(cube) =>
+                                {
+                                    Some(BlockChange::new())
+                                }
+                                SpaceChange::CubeBlock { .. } => None,
+                                SpaceChange::EveryBlock => Some(BlockChange::new()),
+
+                                // TODO: It would be nice if the space gave more precise updates
+                                // such that we could conclude e.g. "this is a new/removed block
+                                // in an unaffected area" without needing to store any data.
+                                SpaceChange::BlockEvaluation(_) => Some(BlockChange::new()),
+
+                                // Index changes by themselves cannot affect the result.
+                                SpaceChange::BlockIndex(_) => None,
+
+                                // Things that do not matter.
+                                SpaceChange::CubeLight { .. } => None,
+                                SpaceChange::Physics => None,
                             }
-                            SpaceChange::CubeBlock { .. } => None,
-                            SpaceChange::EveryBlock => Some(BlockChange::new()),
-
-                            // TODO: It would be nice if the space gave more precise updates
-                            // such that we could conclude e.g. "this is a new/removed block
-                            // in an unaffected area" without needing to store any data.
-                            SpaceChange::BlockEvaluation(_) => Some(BlockChange::new()),
-
-                            // Index changes by themselves cannot affect the result.
-                            SpaceChange::BlockIndex(_) => None,
-
-                            // Things that do not matter.
-                            SpaceChange::CubeLight { .. } => None,
-                            SpaceChange::Physics => None,
-                        }
-                    }));
+                        },
+                    ));
                 }
 
                 // Intersect that region with the actual bounds of `space`.

@@ -154,7 +154,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
             })?;
 
             // TODO: this should be a notification we get from the `Session` instead
-            altered.receive(());
+            altered.receive(&[()]);
 
             Ok(universe)
         })

@@ -155,17 +155,20 @@ impl fmt::Debug for FluffListener {
 }
 
 impl Listener<Fluff> for FluffListener {
-    fn receive(&self, fluff: Fluff) {
-        match self.sender.try_send(AudioCommand::Fluff(fluff)) {
-            Ok(()) => {}
-            Err(mpsc::TrySendError::Full(_)) => {}
-            Err(mpsc::TrySendError::Disconnected(_)) => {
-                self.alive.store(false, atomic::Ordering::Relaxed);
+    fn receive(&self, fluffs: &[Fluff]) -> bool {
+        if !self.alive.load(atomic::Ordering::Relaxed) {
+            return false;
+        }
+        for fluff in fluffs {
+            match self.sender.try_send(AudioCommand::Fluff(fluff.clone())) {
+                Ok(()) => {}
+                Err(mpsc::TrySendError::Full(_)) => {}
+                Err(mpsc::TrySendError::Disconnected(_)) => {
+                    self.alive.store(false, atomic::Ordering::Relaxed);
+                    return false;
+                }
             }
         }
-    }
-
-    fn alive(&self) -> bool {
-        self.alive.load(atomic::Ordering::Relaxed)
+        true
     }
 }

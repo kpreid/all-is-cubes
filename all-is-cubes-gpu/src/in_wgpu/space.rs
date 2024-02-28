@@ -875,13 +875,16 @@ struct ParticleSet {
     age: u64,
 }
 impl ParticleSet {
-    fn from_fluff(fluff: SpaceFluff) -> Option<ParticleSet> {
+    fn from_fluff(fluff: &SpaceFluff) -> Option<ParticleSet> {
         use all_is_cubes::fluff::Fluff;
         // Filter whether we want particles for this at all.
         // TODO: The initial age should be determined by time in the Space, so that we don't get
         // lingeringly visible hiccups any time a frame is skipped.
         match fluff.fluff {
-            Fluff::BlockFault(_) => Some(Self { fluff, age: 0 }),
+            Fluff::BlockFault(_) => Some(Self {
+                fluff: fluff.clone(),
+                age: 0,
+            }),
             Fluff::Beep
             | Fluff::Happened
             | Fluff::PlaceBlockGeneric
@@ -931,36 +934,45 @@ impl SpaceRendererTodo {
 struct TodoListener(Weak<Mutex<SpaceRendererTodo>>);
 
 impl Listener<SpaceChange> for TodoListener {
-    fn receive(&self, message: SpaceChange) {
-        let Some(cell) = self.0.upgrade() else { return }; // noop if dead listener
-        let Ok(mut todo) = cell.lock() else { return }; // noop if poisoned
-        match message {
-            SpaceChange::EveryBlock => {
-                todo.light = None;
-            }
-            SpaceChange::CubeLight { cube } => {
-                // None means we're already at "update everything"
-                if let Some(set) = &mut todo.light {
-                    set.insert(cube);
+    fn receive(&self, messages: &[SpaceChange]) -> bool {
+        let Some(cell) = self.0.upgrade() else {
+            return false; // noop if dead listener
+        };
+        let Ok(mut todo) = cell.lock() else {
+            return false; // noop if poisoned
+        };
+
+        for message in messages {
+            match *message {
+                SpaceChange::EveryBlock => {
+                    todo.light = None;
+                }
+                SpaceChange::CubeLight { cube } => {
+                    // None means we're already at "update everything"
+                    if let Some(set) = &mut todo.light {
+                        set.insert(cube);
+                    }
+                }
+                SpaceChange::CubeBlock { .. } => {}
+                SpaceChange::BlockIndex(..) => {}
+                SpaceChange::BlockEvaluation(..) => {}
+                SpaceChange::Physics => {
+                    todo.sky = true;
                 }
             }
-            SpaceChange::CubeBlock { .. } => {}
-            SpaceChange::BlockIndex(..) => {}
-            SpaceChange::BlockEvaluation(..) => {}
-            SpaceChange::Physics => {
-                todo.sky = true;
-            }
         }
-    }
 
-    fn alive(&self) -> bool {
-        self.0.strong_count() > 0
+        true
     }
 }
 
 #[derive(Debug)]
 struct FluffListener {
     particle_sender: mpsc::SyncSender<ParticleSet>,
+    // We need this to be able to return false even when given an empty slice
+    // of messages. TODO: Consider weakening receive()'s requirements to avoid that,
+    // or switch to a different channel implementation which lets us query liveness
+    // without sending anything.
     alive: atomic::AtomicBool,
 }
 
@@ -974,24 +986,27 @@ impl FluffListener {
 }
 
 impl Listener<SpaceFluff> for FluffListener {
-    fn receive(&self, fluff: SpaceFluff) {
-        let Some(message) = ParticleSet::from_fluff(fluff) else {
-            return;
-        };
+    fn receive(&self, fluffs: &[SpaceFluff]) -> bool {
+        if !self.alive.load(atomic::Ordering::Relaxed) {
+            return false;
+        }
+        for fluff in fluffs {
+            let Some(message) = ParticleSet::from_fluff(fluff) else {
+                continue;
+            };
 
-        match self.particle_sender.try_send(message) {
-            Ok(()) => {}
-            Err(mpsc::TrySendError::Disconnected(_)) => {
-                self.alive.store(false, atomic::Ordering::Relaxed);
-            }
-            Err(mpsc::TrySendError::Full(_)) => {
-                // ignore
+            match self.particle_sender.try_send(message) {
+                Ok(()) => {}
+                Err(mpsc::TrySendError::Disconnected(_)) => {
+                    self.alive.store(false, atomic::Ordering::Relaxed);
+                    return false;
+                }
+                Err(mpsc::TrySendError::Full(_)) => {
+                    // discard if we're not keeping upo
+                }
             }
         }
-    }
-
-    fn alive(&self) -> bool {
-        self.alive.load(atomic::Ordering::Relaxed)
+        true
     }
 }
 

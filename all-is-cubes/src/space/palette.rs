@@ -470,7 +470,7 @@ impl SpaceBlockData {
             Ok(ev) => ev,
             Err(err) => {
                 // Trigger retrying evaluation at next step.
-                block_listener.receive(BlockChange::new());
+                block_listener.receive(&[BlockChange::new()]);
                 // Use a placeholder value.
                 err.to_placeholder()
             }
@@ -520,17 +520,20 @@ struct BlockListener {
 }
 
 impl listen::Listener<BlockChange> for BlockListener {
-    fn receive(&self, _: BlockChange) {
+    fn receive(&self, messages: &[BlockChange]) -> bool {
         if let Some(todo_mutex) = self.todo.upgrade() {
-            if let Ok(mut todo) = todo_mutex.lock() {
-                todo.blocks.insert(self.index);
+            if !messages.is_empty() {
+                if let Ok(mut todo) = todo_mutex.lock() {
+                    todo.blocks.insert(self.index);
+                } else {
+                    // If the mutex is poisoned, don't panic but do die
+                    return false;
+                }
             }
-            // If the mutex is poisoned, do nothing so we don't propagate failure to the notifier.
+            true
+        } else {
+            false
         }
-    }
-
-    fn alive(&self) -> bool {
-        self.todo.strong_count() > 0
     }
 }
 

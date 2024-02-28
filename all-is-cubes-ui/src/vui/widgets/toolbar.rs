@@ -317,20 +317,23 @@ struct ToolbarTodo {
 struct CueListener(Weak<Mutex<ToolbarTodo>>);
 
 impl Listener<CueMessage> for CueListener {
-    fn receive(&self, message: CueMessage) {
-        match message {
-            CueMessage::Clicked(button) => {
-                let Some(cell) = self.0.upgrade() else { return }; // noop if dead listener
-                let Ok(mut todo) = cell.lock() else { return }; // noop if poisoned
-                if let Some(t) = todo.button_pressed_decay.get_mut(button) {
-                    *t = Duration::from_millis(200);
+    fn receive(&self, messages: &[CueMessage]) -> bool {
+        let Some(cell) = self.0.upgrade() else {
+            return false;
+        }; // noop if dead listener
+        for message in messages {
+            match *message {
+                CueMessage::Clicked(button) => {
+                    let Ok(mut todo) = cell.lock() else {
+                        return false;
+                    }; // noop if poisoned
+                    if let Some(t) = todo.button_pressed_decay.get_mut(button) {
+                        *t = Duration::from_millis(200);
+                    }
                 }
             }
         }
-    }
-
-    fn alive(&self) -> bool {
-        self.0.strong_count() > 0
+        true
     }
 }
 

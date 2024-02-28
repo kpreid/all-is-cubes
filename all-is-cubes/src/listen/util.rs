@@ -31,16 +31,25 @@ impl<F, T: fmt::Debug> fmt::Debug for Filter<F, T> {
 
 impl<MI, MO, F, T> Listener<MI> for Filter<F, T>
 where
-    F: Fn(MI) -> Option<MO> + Send + Sync,
+    F: Fn(&MI) -> Option<MO> + Send + Sync,
     T: Listener<MO>,
 {
-    fn receive(&self, message: MI) {
-        if let Some(filtered_message) = (self.function)(message) {
-            self.target.receive(filtered_message);
+    fn receive(&self, messages: &[MI]) -> bool {
+        if messages.is_empty() {
+            return self.target.receive(&[]);
         }
-    }
-    fn alive(&self) -> bool {
-        self.target.alive()
+
+        for message in messages {
+            if let Some(filtered_message) = (self.function)(message) {
+                // TODO: figure out some kind of stack array batching so we don't do a separate
+                // receive() for each message.
+                let alive = self.target.receive(&[filtered_message]);
+                if !alive {
+                    return false;
+                }
+            }
+        }
+        true
     }
 }
 
@@ -85,13 +94,12 @@ impl<M, T> Listener<M> for GateListener<T>
 where
     T: Listener<M>,
 {
-    fn receive(&self, message: M) {
-        if self.alive() {
-            self.target.receive(message);
+    fn receive(&self, messages: &[M]) -> bool {
+        if self.weak.strong_count() > 0 {
+            self.target.receive(messages)
+        } else {
+            false
         }
-    }
-    fn alive(&self) -> bool {
-        self.weak.strong_count() > 0 && self.target.alive()
     }
 }
 
@@ -108,13 +116,13 @@ impl<M> fmt::Debug for NotifierForwarder<M> {
 }
 
 impl<M: Clone + Send> Listener<M> for NotifierForwarder<M> {
-    fn receive(&self, message: M) {
+    fn receive(&self, messages: &[M]) -> bool {
         if let Some(notifier) = self.0.upgrade() {
-            notifier.notify(message);
+            notifier.notify_many(messages);
+            true
+        } else {
+            false
         }
-    }
-    fn alive(&self) -> bool {
-        self.0.strong_count() > 0
     }
 }
 
@@ -134,7 +142,7 @@ mod tests {
     fn filter() {
         let notifier: Notifier<Option<i32>> = Notifier::new();
         let sink = Sink::new();
-        notifier.listen(sink.listener().filter(|x| x));
+        notifier.listen(sink.listener().filter(|&x| x));
         assert_eq!(notifier.count(), 1);
 
         // Try delivering messages
