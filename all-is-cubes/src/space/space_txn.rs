@@ -225,6 +225,16 @@ impl Transaction<Space> for SpaceTransaction {
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
         let mut to_activate = Vec::new();
+
+        // Create a mutation context, which lets us batch change notifications from this commit.
+        let mut ctx = crate::space::MutationCtx {
+            palette: &mut space.palette,
+            contents: space.contents.as_mut(),
+            light: &mut space.light,
+            change_buffer: &mut space.change_notifier.buffer(),
+            cubes_wanting_ticks: &mut space.cubes_wanting_ticks,
+        };
+
         for (
             &cube,
             CubeTransaction {
@@ -239,7 +249,7 @@ impl Transaction<Space> for SpaceTransaction {
             let cube = Cube::from(cube);
 
             if let Some(new) = new {
-                match space.set(cube, new) {
+                match Space::set_impl(&mut ctx, cube, new) {
                     Ok(_) => Ok(()),
                     Err(SetCubeError::OutOfBounds { .. }) if !conserved => {
                         // ignore

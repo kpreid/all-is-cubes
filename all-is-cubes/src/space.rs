@@ -318,13 +318,30 @@ impl Space {
     ) -> Result<bool, SetCubeError> {
         // Delegate to a monomorphic function.
         // This may reduce compile time and code size.
-        self.set_impl(position.into(), &block.into())
+        Self::set_impl(
+            &mut MutationCtx {
+                palette: &mut self.palette,
+                contents: self.contents.as_mut(),
+                light: &mut self.light,
+                change_buffer: &mut self.change_notifier.buffer(),
+                cubes_wanting_ticks: &mut self.cubes_wanting_ticks,
+            },
+            position.into(),
+            &block.into(),
+        )
     }
 
-    fn set_impl(&mut self, position: Cube, block: &Block) -> Result<bool, SetCubeError> {
-        if let Some(contents_index) = self.contents.index(position) {
-            let old_block_index = self.contents.as_linear()[contents_index];
-            let old_block = self.palette.entry(old_block_index).block();
+    /// Implementation of replacing the block in a single cube, as in [`Self::set()`].
+    /// Monomorphic to keep codegen costs low.
+    /// Takes individual borrowed fields to enable use of `ChangeBuffer`.
+    fn set_impl(
+        ctx: &mut MutationCtx<'_, '_>,
+        position: Cube,
+        block: &Block,
+    ) -> Result<bool, SetCubeError> {
+        if let Some(contents_index) = ctx.contents.index(position) {
+            let old_block_index = ctx.contents.as_linear()[contents_index];
+            let old_block = ctx.palette.entry(old_block_index).block();
             if *old_block == *block {
                 // No change.
                 return Ok(false);
@@ -338,11 +355,12 @@ impl Space {
             //
             // It also means that the externally observable block index behavior is easier
             // to characterize and won't create unnecessary holes.
-            if self
+            if ctx
                 .palette
-                .try_replace_unique(old_block_index, block, &self.change_notifier)
+                .try_replace_unique(old_block_index, block, ctx.change_buffer)
             {
-                self.side_effects_of_set(
+                Self::side_effects_of_set(
+                    ctx,
                     old_block_index,
                     old_block_index,
                     position,
@@ -352,23 +370,27 @@ impl Space {
             }
 
             // Find or allocate index for new block. This must be done before other mutations since it can fail.
-            let new_block_index = self
-                .palette
-                .ensure_index(block, &self.change_notifier, true)?;
+            let new_block_index = ctx.palette.ensure_index(block, ctx.change_buffer, true)?;
 
             // Update counts
-            self.palette.decrement_maybe_free(old_block_index);
-            self.palette.increment(new_block_index);
+            ctx.palette.decrement_maybe_free(old_block_index);
+            ctx.palette.increment(new_block_index);
 
             // Write actual space change.
-            self.contents.as_linear_mut()[contents_index] = new_block_index;
+            ctx.contents.as_linear_mut()[contents_index] = new_block_index;
 
-            self.side_effects_of_set(old_block_index, new_block_index, position, contents_index);
+            Self::side_effects_of_set(
+                ctx,
+                old_block_index,
+                new_block_index,
+                position,
+                contents_index,
+            );
             Ok(true)
         } else {
             Err(SetCubeError::OutOfBounds {
                 modification: GridAab::single_cube(position),
-                space_bounds: self.bounds(),
+                space_bounds: ctx.contents.bounds(),
             })
         }
     }
@@ -378,33 +400,30 @@ impl Space {
     /// `contents_index` is redundant with `position` but saves computation.
     #[inline]
     fn side_effects_of_set(
-        &mut self,
+        ctx: &mut MutationCtx<'_, '_>,
         old_block_index: BlockIndex,
         new_block_index: BlockIndex,
         cube: Cube,
         contents_index: usize,
     ) {
-        let evaluated = &self.palette.entry(new_block_index).evaluated;
+        let evaluated = &ctx.palette.entry(new_block_index).evaluated;
 
         if evaluated.attributes.tick_action.is_some() {
-            self.cubes_wanting_ticks.insert(cube);
+            ctx.cubes_wanting_ticks.insert(cube);
         }
 
-        {
-            // inlined borrow_light_update_context() to not conflict with `evaluated` borrow
-            let (light, uc) = (
-                &mut self.light,
-                light::UpdateCtx {
-                    contents: self.contents.as_ref(),
-                    palette: &self.palette,
-                    change_notifier: &self.change_notifier,
-                },
-            );
+        ctx.light.modified_cube_needs_update(
+            light::UpdateCtx {
+                contents: ctx.contents.as_ref(),
+                palette: ctx.palette,
+            },
+            ctx.change_buffer,
+            cube,
+            evaluated,
+            contents_index,
+        );
 
-            light.modified_cube_needs_update(uc, cube, evaluated, contents_index);
-        }
-
-        self.change_notifier.notify(SpaceChange::CubeBlock {
+        ctx.change_buffer.push(SpaceChange::CubeBlock {
             cube,
             old_block_index,
             new_block_index,
@@ -450,11 +469,20 @@ impl Space {
                 space_bounds: self.bounds(),
             });
         }
+
+        let mutation_ctx = &mut MutationCtx {
+            palette: &mut self.palette,
+            contents: self.contents.as_mut(),
+            light: &mut self.light,
+            change_buffer: &mut self.change_notifier.buffer(),
+            cubes_wanting_ticks: &mut self.cubes_wanting_ticks,
+        };
+
         for cube in region.interior_iter() {
             if let Some(block) = function(cube) {
                 // TODO: Optimize side effect processing by batching lighting updates for
                 // when we know what's now opaque or not.
-                self.set(cube, block.borrow())?;
+                Self::set_impl(mutation_ctx, cube, block.borrow())?;
             }
         }
         Ok(())
@@ -550,7 +578,7 @@ impl Space {
         deadline: time::Deadline<I>,
     ) -> (SpaceStepInfo, UniverseTransaction) {
         // Process changed block definitions.
-        let evaluations = self.palette.step::<I>(&self.change_notifier);
+        let evaluations = self.palette.step::<I>(&mut self.change_notifier.buffer());
 
         // Process cubes_wanting_ticks.
         let start_cube_ticks = I::now();
@@ -572,9 +600,10 @@ impl Space {
         let space_behaviors_to_lighting = I::now();
 
         let light = {
-            let (light_storage, uc) = self.borrow_light_update_context();
+            let (light_storage, uc, mut change_buffer) = self.borrow_light_update_context();
             light_storage.update_lighting_from_queue::<I>(
                 uc,
+                &mut change_buffer,
                 deadline.remaining_since(space_behaviors_to_lighting),
             )
         };
@@ -764,13 +793,16 @@ impl Space {
         epsilon: u8,
         mut progress_callback: impl FnMut(LightUpdatesInfo),
     ) -> usize {
-        let (light, uc) = self.borrow_light_update_context();
+        let (light, uc, mut change_buffer) = self.borrow_light_update_context();
         let epsilon = light::Priority::from_difference(epsilon);
 
         let mut total = 0;
         loop {
-            let info =
-                light.update_lighting_from_queue::<I>(uc, Some(Duration::from_secs_f32(0.25)));
+            let info = light.update_lighting_from_queue::<I>(
+                uc,
+                &mut change_buffer,
+                Some(Duration::from_secs_f32(0.25)),
+            );
 
             progress_callback(info);
 
@@ -805,14 +837,16 @@ impl Space {
 
         self.physics = physics;
         let physics = self.physics.clone(); // TODO: put physics in UpdateCtx?
-        let (light, uc) = self.borrow_light_update_context();
+        let (light, uc, mut change_buffer) = self.borrow_light_update_context();
         light.maybe_reinitialize_for_physics_change(
             uc,
             &physics,
             uc.palette.all_block_opacities_as_category(),
         );
 
-        self.change_notifier.notify(SpaceChange::Physics);
+        // TODO: We should notify specifically whether the light changed,
+        // but there isn't a message for that.
+        change_buffer.push(SpaceChange::Physics);
     }
 
     /// Returns the current default [`Spawn`], which determines where new [`Character`]s
@@ -837,8 +871,10 @@ impl Space {
     ///
     /// TODO: Revisit whether this is a good public API.
     pub fn fast_evaluate_light(&mut self) {
-        let (light, uc) = self.borrow_light_update_context();
+        let (light, uc, _change_buffer) = self.borrow_light_update_context();
         light.fast_evaluate_light(uc);
+
+        // TODO: change_buffer.push(SpaceChange::EveryBlock), or something
     }
 
     #[doc(hidden)] // kludge used by session for tool usage
@@ -846,8 +882,8 @@ impl Space {
         &mut self,
         budget: Duration,
     ) -> LightUpdatesInfo {
-        let (light, uc) = self.borrow_light_update_context();
-        light.update_lighting_from_queue::<I>(uc, Some(budget))
+        let (light, uc, mut change_buffer) = self.borrow_light_update_context();
+        light.update_lighting_from_queue::<I>(uc, &mut change_buffer, Some(budget))
     }
 
     /// Compute the new lighting value for a cube.
@@ -859,13 +895,13 @@ impl Space {
     where
         D: light::LightComputeOutput,
     {
+        // Unlike borrow_light_update_context(), this returns only &s
         let (light, uc) = {
             (
                 &self.light,
                 light::UpdateCtx {
                     contents: self.contents.as_ref(),
                     palette: &self.palette,
-                    change_notifier: &self.change_notifier,
                 },
             )
         };
@@ -878,14 +914,16 @@ impl Space {
     }
 
     /// Produce split borrows of `self` to run light updating functions.
-    fn borrow_light_update_context(&mut self) -> (&mut LightStorage, light::UpdateCtx<'_>) {
+    fn borrow_light_update_context(
+        &mut self,
+    ) -> (&mut LightStorage, light::UpdateCtx<'_>, ChangeBuffer<'_>) {
         (
             &mut self.light,
             light::UpdateCtx {
                 contents: self.contents.as_ref(),
                 palette: &self.palette,
-                change_notifier: &self.change_notifier,
             },
+            self.change_notifier.buffer(),
         )
     }
 
@@ -1354,4 +1392,16 @@ impl<'s> Extract<'s> {
             LightPhysics::Rays { .. } => self.space.light.contents.as_linear()[self.cube_index],
         }
     }
+}
+
+// TODO: Tune this buffer size parameter, and validate it isn't overly large on the stack.
+type ChangeBuffer<'notifier> = crate::listen::Buffer<'notifier, SpaceChange, 16>;
+
+/// Argument passed to [`Space`] mutation methods that are used in bulk mutations.
+struct MutationCtx<'a, 'n> {
+    contents: Vol<&'a mut [BlockIndex]>,
+    light: &'a mut LightStorage,
+    palette: &'a mut Palette,
+    cubes_wanting_ticks: &'a mut HbHashSet<Cube>,
+    change_buffer: &'a mut ChangeBuffer<'n>,
 }

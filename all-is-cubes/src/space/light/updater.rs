@@ -14,7 +14,6 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use super::debug::LightComputeOutput;
 use crate::block::{self, EvaluatedBlock};
-use crate::listen;
 use crate::math::{
     Cube, Face6, FaceMap, FreeCoordinate, Geometry, NotNan, OpacityCategory, Rgb, VectorOps, Vol,
 };
@@ -22,8 +21,8 @@ use crate::raycast::{Ray, RaycastStep};
 use crate::space::light::{LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority};
 use crate::space::palette::Palette;
 use crate::space::{
-    BlockIndex, BlockSky, GridAab, LightPhysics, LightStatus, PackedLight, PackedLightScalar, Sky,
-    SpaceChange, SpacePhysics,
+    BlockIndex, BlockSky, ChangeBuffer, GridAab, LightPhysics, LightStatus, PackedLight,
+    PackedLightScalar, Sky, SpaceChange, SpacePhysics,
 };
 use crate::time::{Duration, Instant};
 use crate::util::StatusText;
@@ -147,6 +146,7 @@ impl LightStorage {
     pub(in crate::space) fn modified_cube_needs_update(
         &mut self,
         uc: UpdateCtx<'_>,
+        change_buffer: &mut ChangeBuffer<'_>,
         cube: Cube,
         evaluated: &EvaluatedBlock,
         contents_index: usize,
@@ -169,7 +169,7 @@ impl LightStorage {
             // But it'll at least save a little bit of memory.)
             self.light_update_queue.remove(cube);
 
-            uc.change_notifier.notify(SpaceChange::CubeLight { cube });
+            change_buffer.push(SpaceChange::CubeLight { cube });
         } else {
             self.light_needs_update(cube, Priority::NEWLY_VISIBLE);
         }
@@ -193,6 +193,7 @@ impl LightStorage {
     pub(in crate::space) fn update_lighting_from_queue<I: Instant>(
         &mut self,
         uc: UpdateCtx<'_>,
+        change_buffer: &mut ChangeBuffer<'_>,
         budget: Option<Duration>,
     ) -> LightUpdatesInfo {
         let mut light_update_count: usize = 0;
@@ -237,7 +238,8 @@ impl LightStorage {
                         self.last_light_updates.push(output.cube);
                     }
                     light_update_count += 1;
-                    let (difference, cube_cost) = self.apply_lighting_update(uc, output);
+                    let (difference, cube_cost) =
+                        self.apply_lighting_update(uc, change_buffer, output);
                     max_difference = max_difference.max(difference);
                     cost += cube_cost;
                 }
@@ -257,7 +259,8 @@ impl LightStorage {
 
                 let computation = self.compute_lighting(uc, cube);
 
-                let (difference, cube_cost) = self.apply_lighting_update(uc, computation);
+                let (difference, cube_cost) =
+                    self.apply_lighting_update(uc, change_buffer, computation);
                 max_difference = max_difference.max(difference);
                 cost += cube_cost;
                 if cost >= max_cost {
@@ -287,6 +290,7 @@ impl LightStorage {
     fn apply_lighting_update(
         &mut self,
         uc: UpdateCtx<'_>,
+        change_buffer: &mut ChangeBuffer<'_>,
         computation: ComputedLight<()>,
     ) -> (PackedLightScalar, usize) {
         let ComputedLight {
@@ -305,7 +309,7 @@ impl LightStorage {
             cost += 200;
             // TODO: compute volume index of the cube only once
             self.contents[cube] = new_light_value;
-            uc.change_notifier.notify(SpaceChange::CubeLight { cube });
+            change_buffer.push(SpaceChange::CubeLight { cube });
 
             // If neighbors have missing (not just stale) light values, fill them in too.
             for dir in Face6::ALL {
@@ -324,7 +328,7 @@ impl LightStorage {
                             continue;
                         }
                         *neighbor_light = PackedLight::guess(new_light_value.value());
-                        uc.change_notifier.notify(SpaceChange::CubeLight {
+                        change_buffer.push(SpaceChange::CubeLight {
                             cube: neighbor_cube,
                         });
                         // We don't put the neighbor on the update queue because it should
@@ -353,10 +357,7 @@ impl LightStorage {
         (difference_priority, cost)
     }
 
-    /// Compute the new lighting value for a cube.
-    ///
-    /// The returned vector of points lists those cubes which the computed value depends on
-    /// (imprecisely; empty cubes passed through are not listed).
+    /// Compute the new lighting value for a cube, returning it rather than storing it.
     #[inline]
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu for debugging
     pub(in crate::space) fn compute_lighting<D>(
@@ -438,6 +439,8 @@ impl LightStorage {
     /// Clear and recompute light data and update queue, in a way which gets fast approximate
     /// results suitable for flat landscapes mostly lit from above (the +Y axis).
     ///
+    /// Does not send any change notifications.
+    ///
     /// TODO: Revisit whether this is a good public API.
     pub(in crate::space) fn fast_evaluate_light(&mut self, uc: UpdateCtx<'_>) {
         self.light_update_queue.clear(); // Going to refill it
@@ -512,12 +515,12 @@ impl LightStorage {
     }
 }
 
-/// Argument passed to [`LightStorage`] methods to provide access to the rest of the space.
-#[derive(Copy, Clone, Debug)]
+/// Argument passed to [`LightStorage`] methods to provide immutable and shareable access to the
+/// rest of the space. (Don't try to add any `&mut` references to this!)
+#[derive(Clone, Copy, Debug)]
 pub(in crate::space) struct UpdateCtx<'a> {
     pub(in crate::space) contents: Vol<&'a [BlockIndex]>,
     pub(in crate::space) palette: &'a Palette,
-    pub(in crate::space) change_notifier: &'a listen::Notifier<SpaceChange>,
 }
 
 impl<'a> UpdateCtx<'a> {

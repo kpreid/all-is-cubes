@@ -8,7 +8,7 @@ use itertools::Itertools as _;
 use crate::block::{self, Block, BlockChange, EvaluatedBlock, AIR, AIR_EVALUATED};
 use crate::listen::{self, Listener as _};
 use crate::math::{self, OpacityCategory};
-use crate::space::{BlockIndex, SetCubeError, SpaceChange};
+use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
 use crate::time::Instant;
 use crate::util::maybe_sync::Mutex;
 use crate::util::TimeStats;
@@ -78,6 +78,7 @@ impl Palette {
         blocks: &mut dyn ExactSizeIterator<Item = Block>,
     ) -> Result<(Self, hashbrown::HashMap<BlockIndex, BlockIndex>), PaletteError> {
         let dummy_notifier = listen::Notifier::new();
+        let dummy_buffer = &mut dummy_notifier.buffer();
 
         let len = blocks.len();
         if len.saturating_sub(1) > (BlockIndex::MAX as usize) {
@@ -93,7 +94,7 @@ impl Palette {
         let mut remapping = hashbrown::HashMap::new();
         for (original_index, block) in (0..).zip(blocks) {
             let new_index = new_self
-                .ensure_index(&block, &dummy_notifier, false)
+                .ensure_index(&block, dummy_buffer, false)
                 .expect("palette iterator lied about its length");
             if new_index != original_index {
                 remapping.insert(original_index, new_index);
@@ -135,7 +136,7 @@ impl Palette {
     pub(super) fn ensure_index(
         &mut self,
         block: &Block,
-        notifier: &listen::Notifier<SpaceChange>,
+        change_buffer: &mut ChangeBuffer<'_>,
         use_zeroed_entries: bool,
     ) -> Result<BlockIndex, TooManyBlocks> {
         if let Some(&old_index) = self.block_to_index.get(block) {
@@ -153,7 +154,7 @@ impl Palette {
                         );
                         self.block_to_index
                             .insert(block.clone(), new_index as BlockIndex);
-                        notifier.notify(SpaceChange::BlockIndex(new_index as BlockIndex));
+                        change_buffer.push(SpaceChange::BlockIndex(new_index as BlockIndex));
                         return Ok(new_index as BlockIndex);
                     }
                 }
@@ -167,7 +168,7 @@ impl Palette {
             // Grow the vector.
             self.entries.push(new_data);
             self.block_to_index.insert(block.clone(), new_index);
-            notifier.notify(SpaceChange::BlockIndex(new_index));
+            change_buffer.push(SpaceChange::BlockIndex(new_index));
             Ok(new_index)
         }
     }
@@ -178,7 +179,7 @@ impl Palette {
         &mut self,
         old_block_index: BlockIndex,
         new_block: &Block,
-        notifier: &listen::Notifier<SpaceChange>,
+        change_buffer: &mut ChangeBuffer<'_>,
     ) -> bool {
         if self.entries[old_block_index as usize].count == 1
             && !self.block_to_index.contains_key(new_block)
@@ -199,7 +200,7 @@ impl Palette {
             self.block_to_index
                 .insert(new_block.clone(), old_block_index);
 
-            notifier.notify(SpaceChange::BlockIndex(old_block_index));
+            change_buffer.push(SpaceChange::BlockIndex(old_block_index));
 
             true
         } else {
@@ -238,17 +239,14 @@ impl Palette {
     }
 
     /// Reevaluate changed blocks.
-    pub(crate) fn step<I: Instant>(
-        &mut self,
-        notifier: &listen::Notifier<SpaceChange>,
-    ) -> TimeStats {
+    pub(crate) fn step<I: Instant>(&mut self, change_buffer: &mut ChangeBuffer<'_>) -> TimeStats {
         let mut last_start_time = I::now();
         let mut evaluations = TimeStats::default();
         {
             let mut try_eval_again = hashbrown::HashSet::new();
             let mut todo = self.todo.lock().unwrap();
             for block_index in todo.blocks.drain() {
-                notifier.notify(SpaceChange::BlockEvaluation(block_index));
+                change_buffer.push(SpaceChange::BlockEvaluation(block_index));
                 let data: &mut SpaceBlockData = &mut self.entries[usize::from(block_index)];
 
                 // TODO: We may want to have a higher-level error handling by pausing the Space
