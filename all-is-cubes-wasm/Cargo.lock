@@ -26,6 +26,7 @@ name = "all-is-cubes"
 version = "0.7.1"
 dependencies = [
  "arcstr",
+ "arrayvec",
  "base64",
  "bitflags 2.4.2",
  "bytemuck",

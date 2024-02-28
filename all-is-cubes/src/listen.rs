@@ -135,6 +135,16 @@ impl<M> Notifier<M> {
         }
     }
 
+    /// Creates a [`Buffer`] which batches messages sent through it.
+    /// This may be used as a more convenient interface to [`Notifier::notify_many()`],
+    /// at the cost of delaying messages until the buffer is dropped.
+    ///
+    /// The buffer does not use any heap allocations and will collect up to `CAPACITY` messages
+    /// per batch.
+    pub fn buffer<const CAPACITY: usize>(&self) -> Buffer<'_, M, CAPACITY> {
+        Buffer::new(self)
+    }
+
     /// Computes the exact count of listeners, including asking all current listeners
     /// if they are alive.
     ///
@@ -193,6 +203,53 @@ impl<M> fmt::Debug for Notifier<M> {
             write!(fmt, "Notifier({})", listeners.len())
         } else {
             write!(fmt, "Notifier(?)")
+        }
+    }
+}
+
+/// A batch of messages of type `M` to be sent through a [`Notifier`].
+///
+/// Messages may be added to the buffer, and when the buffer is full or when it is dropped,
+/// they are sent through the notifier. Creating such a batch is intended to increase performance
+/// by not executing dynamic dispatch to every notifier for every message.
+#[derive(Debug)]
+pub struct Buffer<'notifier, M, const CAPACITY: usize> {
+    buffer: arrayvec::ArrayVec<M, CAPACITY>,
+    notifier: &'notifier Notifier<M>,
+}
+
+impl<'notifier, M, const CAPACITY: usize> Buffer<'notifier, M, CAPACITY> {
+    fn new(notifier: &'notifier Notifier<M>) -> Self {
+        Self {
+            buffer: arrayvec::ArrayVec::new(),
+            notifier,
+        }
+    }
+
+    /// Store a message in this buffer, to be delivered later as if by [`Notifier::notify()`].
+    pub fn push(&mut self, message: M) {
+        // We don't need to check for fullness before pushing, because we always flush immediately
+        // if full.
+        self.buffer.push(message);
+        if self.buffer.is_full() {
+            self.flush();
+        }
+    }
+
+    #[cold]
+    fn flush(&mut self) {
+        self.notifier.notify_many(&self.buffer);
+        self.buffer.clear();
+    }
+}
+
+impl<'notifier, M, const CAPACITY: usize> Drop for Buffer<'notifier, M, CAPACITY> {
+    fn drop(&mut self) {
+        // TODO: Should we discard messages if panicking?
+        // Currently leaning no, because we've specified that listeners should not panic even under
+        // error conditions such as poisoned mutexes.
+        if !self.buffer.is_empty() {
+            self.flush();
         }
     }
 }

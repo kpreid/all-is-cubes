@@ -9,6 +9,8 @@
       This value is not planned to change, 
     - `block::AnimationHint` now offers constructor functions `redefinition()` and `replacement()` for the common case of setting one of its fields to a specific `AnimationChange`.
 
+    - `listen::Notifier::buffer()` and `listen::Buffer` allows creating and sending batches of messages, to improve efficiency over dispatching each message individually to all listeners.
+
     - `math::GridSize` type alias for `euclid::Size3D<GridCoordinate, Cube>`.
 
 - `all-is-cubes-mesh` library:
