@@ -34,7 +34,18 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion) {
     let (_, adapter) = runtime.block_on(init::create_instance_and_adapter_for_test(|msg| {
         eprintln!("{msg}")
     }));
-    let adapter = Arc::new(adapter.expect("render_bench requires GPU"));
+    let adapter = match adapter {
+        Some(adapter) => Arc::new(adapter),
+        None => {
+            // TODO: kludge; would be better if we could get the mode out of Criterion
+            if std::env::args().any(|s| s == "--test") {
+                eprintln!("GPU not available; skipping actually testing bench functions");
+                return;
+            } else {
+                panic!("wgpu_bench requires a GPU, but no adapter was found");
+            }
+        }
+    };
 
     // Benchmark for running update() only. Insofar as this touches the GPU it will
     // naturally fill up the pipeline as Criterion iterates it.
