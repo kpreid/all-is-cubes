@@ -55,7 +55,7 @@ simplelog = { workspace = true }
 strum = { workspace = true, features = ["derive", "std"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "sync"] }
-ratatui = { version = "0.25.0", default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.26.1", default-features = false, features = ["crossterm"] }
 unicode-width = { version = "0.1.9", default-features = false }
 # We have no true direct dependency on wgpu, but do need to select backends.
 # (As of wgpu 0.19, Vulkan is implicitly enabled on Linux.)
