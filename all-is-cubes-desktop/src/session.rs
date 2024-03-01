@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use all_is_cubes::arcstr;
 use all_is_cubes::camera::Viewport;
-use all_is_cubes::listen::{DirtyFlag, ListenableCell, Listener};
+use all_is_cubes::listen::{DirtyFlag, ListenableCell};
 #[cfg(doc)]
 use all_is_cubes::universe::Universe;
 use all_is_cubes::universe::UniverseStepInfo;
@@ -50,10 +50,9 @@ pub struct DesktopSession<Ren, Win> {
     /// universe.
     fixed_title: String,
 
-    /// Flag for when the `Session` might have changed its `Universe`, or similar changes.
-    ///
-    /// TODO: This ought to be built in to the `Session` itself.
-    session_altered: DirtyFlag,
+    /// Flag for `Session` might have changed its `Universe`, or otherwise done something that
+    /// requires the window title to change.
+    session_info_altered: DirtyFlag,
 }
 
 impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
@@ -66,6 +65,8 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         viewport_cell: ListenableCell<Viewport>,
     ) -> Self {
         let new_self = Self {
+            session_info_altered: DirtyFlag::listening(false, session.universe_info()),
+
             session,
             executor,
             renderer,
@@ -75,7 +76,6 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
             recorder: None,
             audio: None,
             fixed_title: String::new(),
-            session_altered: DirtyFlag::new(false),
         };
 
         new_self.sync_title();
@@ -104,7 +104,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
             recorder.capture_frame();
         }
 
-        if self.session_altered.get_and_clear() {
+        if self.session_info_altered.get_and_clear() {
             self.sync_title();
         }
 
@@ -144,8 +144,6 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
     /// command-line behavior as much as is reasonable, and also maybe supports
     /// e.g. importing resources *into* an existing universe.
     pub fn replace_universe_with_file(&mut self, path: PathBuf) {
-        let altered = self.session_altered.listener();
-
         // TODO: ideally this would be a cancelled-on-drop task
         let loader_task = self
             .executor
@@ -164,9 +162,6 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
             match loader_task.await.unwrap() {
                 Ok(universe) => {
                     ctx.set_universe(universe);
-
-                    // TODO: this should be a notification we get from the `Session` instead
-                    altered.receive(&[()]);
                 }
                 Err(e) => {
                     ctx.show_modal_message(arcstr::format!(
@@ -190,13 +185,16 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         self.sync_title();
     }
 
+    /// Update window title.
+    ///
+    /// This depends on `self.fixed_title` and `self.session.universe_info()` and should be called
+    /// when either of them changes.
     fn sync_title(&self) {
         let fixed_title = &self.fixed_title;
+        let info = self.session.universe_info().get();
+
         self.window.set_title(
-            match (
-                fixed_title.is_empty(),
-                self.session.universe().whence.document_name(),
-            ) {
+            match (fixed_title.is_empty(), info.whence.document_name()) {
                 (false, Some(dn)) => format!("{fixed_title} — {dn}"),
                 (true, Some(dn)) => dn,
                 (false, None) => fixed_title.clone(),
