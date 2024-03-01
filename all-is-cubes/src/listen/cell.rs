@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
 use crate::listen::{Listen, Listener, Notifier};
-use crate::util::maybe_sync::Mutex;
+use crate::util::maybe_sync::{Mutex, MutexGuard};
 
 /// A interior-mutable container for a value which can notify that the value changed,
 /// and which has reference-counted read-only handles to read it.
@@ -55,6 +55,34 @@ impl<T> ListenableCell<T> {
     /// notification, this cannot be enforced.
     pub fn set(&self, value: impl Into<Arc<T>>) {
         *self.storage.cell.lock().unwrap() = value.into();
+        self.storage
+            .notifier
+            .as_ref()
+            .expect("can't happen: set() on a constant cell")
+            .notify(());
+    }
+
+    /// Sets the contained value to the given value iff they are unequal.
+    ///
+    /// Caution: This executes `PartialEq::eq()` with the lock held; this may delay readers of
+    /// the value, or cause permanent failure in the event of a panic.
+    #[doc(hidden)] // TODO: good public API?
+    pub fn set_if_unequal(&self, value: T)
+    where
+        T: PartialEq,
+    {
+        let mut guard: MutexGuard<'_, Arc<T>> = self.storage.cell.lock().unwrap();
+        if value == **guard {
+            return;
+        }
+
+        *guard = Arc::new(value);
+
+        // Don't hold the lock while notifying.
+        // Listeners shouldn't be trying to read immediately, but it's simpler if we don't create
+        // this deadlock opportunity.
+        drop(guard);
+
         self.storage
             .notifier
             .as_ref()

@@ -1,3 +1,4 @@
+use all_is_cubes::save::WhenceUniverse;
 use alloc::sync::Arc;
 use core::fmt;
 use core::future::Future;
@@ -20,7 +21,7 @@ use all_is_cubes::listen::{
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::time::{self, Duration};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{self, Handle, Universe, UniverseStepInfo};
+use all_is_cubes::universe::{self, Handle, Universe, UniverseId, UniverseStepInfo};
 use all_is_cubes::util::{Fmt, Refmt as _, StatusText, YieldProgressBuilder};
 
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
@@ -48,7 +49,15 @@ pub struct Session<I> {
     graphics_options: ListenableCell<GraphicsOptions>,
 
     game_universe: Universe,
+
+    /// Subset of information from `game_universe` that is largely immutable and can be
+    /// meaningfully listened to.
+    game_universe_info: ListenableCell<SessionUniverseInfo>,
+
+    /// Character we're designating as “the player character”.
+    /// Always a member of `game_universe`.
     game_character: ListenableCellWithLocal<Option<Handle<Character>>>,
+
     space_watch_state: SpaceWatchState,
 
     /// If present, a future that is polled at the beginning of stepping,
@@ -92,6 +101,7 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
             input_processor,
             graphics_options,
             game_universe,
+            game_universe_info,
             game_character,
             space_watch_state,
             main_task,
@@ -112,6 +122,7 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
             .field("input_processor", input_processor)
             .field("graphics_options", graphics_options)
             .field("game_universe", game_universe)
+            .field("game_universe_info", game_universe_info)
             .field("game_character", game_character)
             .field("space_watch_state", space_watch_state)
             .field("main_task", &main_task.as_ref().map(|_| "..."))
@@ -148,7 +159,7 @@ impl<I: time::Instant> Session<I> {
         self.game_character
             .set(self.game_universe.get_default_character());
 
-        self.sync_character_space();
+        self.sync_universe_and_character_derived();
     }
 
     /// Set the character which this session is “looking through the eyes of”.
@@ -159,7 +170,7 @@ impl<I: time::Instant> Session<I> {
         }
 
         self.game_character.set(character);
-        self.sync_character_space();
+        self.sync_universe_and_character_derived();
     }
 
     /// Install a main task in the session, replacing any existing one.
@@ -190,9 +201,15 @@ impl<I: time::Instant> Session<I> {
     /// Returns a mutable reference to the [`Universe`].
     ///
     /// Note: Replacing the universe will not update the UI and character state.
-    /// Use [`Self::set_universe`] instead.
+    /// Use [`Self::set_universe()`] instead.
     pub fn universe_mut(&mut self) -> &mut Universe {
         &mut self.game_universe
+    }
+
+    /// Allows observing replacement of the current universe in this session, or updates to its
+    /// [`WhenceUniverse`].
+    pub fn universe_info(&self) -> ListenableSource<SessionUniverseInfo> {
+        self.game_universe_info.as_source()
     }
 
     /// What the renderer should be displaying on screen for the UI.
@@ -404,7 +421,7 @@ impl<I: time::Instant> Session<I> {
             }
         }
 
-        self.sync_character_space();
+        self.sync_universe_and_character_derived();
     }
 
     /// Call this once per frame to update the cursor raycast.
@@ -551,19 +568,31 @@ impl<I: time::Instant> Session<I> {
         fut
     }
 
-    /// Check if the current game character's current space differs from the current
-    /// `SpaceWatchState`, and update the latter if so.
-    fn sync_character_space(&mut self) {
-        let character_read: Option<universe::UBorrow<Character>> = self
-            .game_character
-            .borrow()
-            .as_ref()
-            .map(|cref| cref.read().expect("TODO: decide how to handle error"));
-        let space: Option<&Handle<Space>> = character_read.as_ref().map(|ch| &ch.space);
+    /// Update derived information that might have changed.
+    ///
+    /// * Check if the current game character's current space differs from the current
+    ///   `SpaceWatchState`, and update the latter if so.
+    /// * Check if the universe or the universe's `WhenceUniverse` have changed.
+    fn sync_universe_and_character_derived(&mut self) {
+        // Sync game_universe_info. The WhenceUniverse might in principle be overwritten any time.
+        self.game_universe_info.set_if_unequal(SessionUniverseInfo {
+            id: self.game_universe.universe_id(),
+            whence: Arc::clone(&self.game_universe.whence),
+        });
 
-        if space != self.space_watch_state.space.as_ref() {
-            self.space_watch_state = SpaceWatchState::new(space.cloned(), &self.fluff_notifier)
-                .expect("TODO: decide how to handle error");
+        // Sync space_watch_state in case the character changed its universe.
+        {
+            let character_read: Option<universe::UBorrow<Character>> = self
+                .game_character
+                .borrow()
+                .as_ref()
+                .map(|cref| cref.read().expect("TODO: decide how to handle error"));
+            let space: Option<&Handle<Space>> = character_read.as_ref().map(|ch| &ch.space);
+
+            if space != self.space_watch_state.space.as_ref() {
+                self.space_watch_state = SpaceWatchState::new(space.cloned(), &self.fluff_notifier)
+                    .expect("TODO: decide how to handle error");
+            }
         }
     }
 
@@ -662,6 +691,10 @@ impl<I: time::Instant> SessionBuilder<I> {
             input_processor,
             graphics_options,
             game_character,
+            game_universe_info: ListenableCell::new(SessionUniverseInfo {
+                id: game_universe.universe_id(),
+                whence: game_universe.whence.clone(),
+            }),
             game_universe,
             space_watch_state,
             main_task: None,
@@ -806,6 +839,24 @@ impl SpaceWatchState {
             space: None,
             fluff_gate: listen::Gate::default(),
         }
+    }
+}
+
+/// Information about the [`Universe`] currently owned by a [`Session`].
+///
+/// TODO: This suspiciously resembles a struct that should be part of the universe itself...
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct SessionUniverseInfo {
+    /// The [`Universe::universe_id()`] of the universe.
+    pub id: UniverseId,
+    /// The [`Universe::whence`] of the universe.
+    pub whence: Arc<dyn WhenceUniverse>,
+}
+
+impl PartialEq for SessionUniverseInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && Arc::ptr_eq(&self.whence, &other.whence)
     }
 }
 
