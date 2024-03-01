@@ -24,6 +24,8 @@ pub struct DesktopSession<Ren, Win> {
     #[allow(missing_docs)]
     pub session: Session,
 
+    executor: Arc<crate::Executor>,
+
     // TODO: Instead of being generic over the renderer, be generic over
     // the window-system-type such that we can accept any
     // "dyn DesktopRenderer<Window = Win>" which supports the current type
@@ -57,6 +59,7 @@ pub struct DesktopSession<Ren, Win> {
 impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
     #[allow(missing_docs)]
     pub fn new(
+        executor: Arc<crate::Executor>,
         renderer: Ren,
         window: Win,
         session: Session,
@@ -64,6 +67,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
     ) -> Self {
         let new_self = Self {
             session,
+            executor,
             renderer,
             window,
             viewport_cell,
@@ -116,14 +120,13 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
     /// Errors: Returns errors directly from `Recorder::new()`.
     pub(crate) fn start_recording(
         &mut self,
-        runtime_handle: &tokio::runtime::Handle,
         options: &record::RecordOptions,
     ) -> Result<(), anyhow::Error> {
         let recorder = record::Recorder::new(
             options.clone(),
             self.session.create_cameras(self.viewport_cell.as_source()),
             self.session.universe(),
-            runtime_handle,
+            self.executor.clone(),
         )?;
 
         self.recorder = Some(recorder);
@@ -235,6 +238,7 @@ mod tests {
 
         let (sender, receiver) = std::sync::mpsc::channel();
         drop(DesktopSession::new(
+            crate::Executor::new(tokio::runtime::Handle::current()),
             DropLogger {
                 sender: sender.clone(),
                 message: "renderer",

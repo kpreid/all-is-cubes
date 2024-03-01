@@ -1,6 +1,7 @@
 //! Rendering as styled terminal text.
 
 use std::sync::mpsc::{self, TrySendError};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
@@ -82,6 +83,7 @@ struct FrameInput {
 
 /// Creates a [`DesktopSession`] which can be used with [`terminal_main_loop`].
 pub fn create_terminal_session(
+    executor: Arc<crate::Executor>,
     session: Session,
     options: TerminalOptions,
     viewport_cell: ListenableCell<Viewport>,
@@ -139,6 +141,7 @@ pub fn create_terminal_session(
         .context("failed to create terminal raytracer thread")?;
 
     Ok(DesktopSession::new(
+        executor,
         TerminalRenderer {
             cameras,
             options,

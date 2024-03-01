@@ -19,7 +19,6 @@ use crate::session::{ClockSource, DesktopSession};
 pub(crate) fn configure_session_for_recording<Ren, Win>(
     dsession: &mut DesktopSession<Ren, Win>,
     options: &RecordOptions,
-    runtime_handle: &tokio::runtime::Handle,
 ) -> Result<(), anyhow::Error>
 where
     Win: crate::glue::Window,
@@ -55,7 +54,7 @@ where
         }
     }
 
-    dsession.start_recording(runtime_handle, options)?;
+    dsession.start_recording(options)?;
 
     Ok(())
 }
@@ -64,14 +63,13 @@ where
 pub fn record_main(
     mut dsession: DesktopSession<(), ()>,
     options: RecordOptions,
-    runtime_handle: &tokio::runtime::Handle,
 ) -> Result<(), anyhow::Error> {
     let progress_style = ProgressStyle::default_bar()
         .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
         .unwrap();
 
     // TODO: We should start recording independent of the main loop type being used
-    configure_session_for_recording(&mut dsession, &options, runtime_handle)
+    configure_session_for_recording(&mut dsession, &options)
         .context("failed to configure session for recording")?;
 
     let (status_tx, mut status_receiver) = tokio::sync::mpsc::unbounded_channel::<Status>();

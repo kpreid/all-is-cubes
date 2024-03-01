@@ -4,6 +4,7 @@
 //! choices.
 
 use std::num::NonZeroUsize;
+use std::sync::Arc;
 
 use futures_core::future::BoxFuture;
 
@@ -60,15 +61,21 @@ pub struct Executor {
 }
 
 impl Executor {
+    /// Note: At this layer, we don't actually need the [`Arc`] but it's useful for type erasure
+    /// to `Arc<dyn Executor>`.
     #[allow(missing_docs)]
-    pub fn new(handle: tokio::runtime::Handle) -> Self {
-        Self {
+    pub fn new(handle: tokio::runtime::Handle) -> Arc<Self> {
+        Arc::new(Self {
             handle,
             // TODO: configurable, linked to runtime config
             per_task_parallelism: std::thread::available_parallelism()
                 .unwrap_or(NonZeroUsize::MIN)
                 .get(),
-        }
+        })
+    }
+
+    pub(crate) fn tokio(&self) -> &tokio::runtime::Handle {
+        &self.handle
     }
 }
 

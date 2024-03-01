@@ -42,7 +42,7 @@ enum RecorderInner {
     Raytrace(RtRecorder),
     Mesh(write_gltf::MeshRecorder),
     Export {
-        runtime_handle: tokio::runtime::Handle,
+        executor: Arc<crate::Executor>,
         export_format: ExportFormat,
         /// Becomes `None` when export has been performed
         export_set: Option<ExportSet>,
@@ -69,7 +69,7 @@ impl Recorder {
         options: RecordOptions,
         cameras: StandardCameras,
         universe: &Universe,
-        runtime_handle: &tokio::runtime::Handle,
+        executor: Arc<crate::Executor>,
     ) -> Result<Self, anyhow::Error> {
         let status_notifier = Arc::new(listen::Notifier::new());
 
@@ -158,7 +158,7 @@ impl Recorder {
                 };
 
                 RecorderInner::Export {
-                    runtime_handle: runtime_handle.clone(),
+                    executor: executor.clone(),
                     status_notifier: status_notifier.clone(),
                     export_format,
                     export_set: Some(export_set),
@@ -197,7 +197,7 @@ impl Recorder {
             RecorderInner::Mesh(rec) => rec.capture_frame(this_frame_number),
 
             &mut RecorderInner::Export {
-                ref runtime_handle,
+                ref executor,
                 ref status_notifier,
                 export_format,
                 ref mut export_set,
@@ -209,7 +209,8 @@ impl Recorder {
                     // TODO: Stop using block_on(), and instead be able to ask the main loop to
                     // suspend stepping until we're done with this operation that is both async
                     // and reading the universe.
-                    runtime_handle
+                    executor
+                        .tokio()
                         .block_on(all_is_cubes_port::export_to_path(
                             // TODO: hook up a progress bar
                             crate::glue::tokio_yield_progress().build(),

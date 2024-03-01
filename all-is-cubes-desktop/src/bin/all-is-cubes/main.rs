@@ -150,7 +150,7 @@ fn main() -> Result<(), anyhow::Error> {
                     let dsession = inner_params
                         .runtime
                         .block_on(create_winit_wgpu_desktop_session(
-                            Arc::new(executor.clone()),
+                            executor.clone(),
                             session,
                             // TODO: turn this inside out and stop having `WinAndState` exposed
                             aic_winit::WinAndState::new(
@@ -175,28 +175,35 @@ fn main() -> Result<(), anyhow::Error> {
             )
         }
         GraphicsType::Terminal => {
-            let dsession =
-                create_terminal_session(session, TerminalOptions::default(), viewport_cell)
-                    .context("failed to create session")?;
+            let dsession = create_terminal_session(
+                executor,
+                session,
+                TerminalOptions::default(),
+                viewport_cell,
+            )
+            .context("failed to create session")?;
             inner_main(inner_params, terminal_main_loop, dsession)
         }
         GraphicsType::Record => {
             let record_options =
                 record_options.expect("arg validation did not require output with -g record");
 
-            let dsession = DesktopSession::new((), (), session, viewport_cell);
-            let handle = inner_params.runtime.handle().clone();
+            let dsession = DesktopSession::new(executor, (), (), session, viewport_cell);
 
             inner_main(
                 inner_params,
-                move |dsession| record::record_main(dsession, record_options, &handle),
+                move |dsession| record::record_main(dsession, record_options),
                 dsession,
             )
         }
         GraphicsType::Print => {
-            let dsession =
-                create_terminal_session(session, TerminalOptions::default(), viewport_cell)
-                    .context("failed to create session")?;
+            let dsession = create_terminal_session(
+                executor,
+                session,
+                TerminalOptions::default(),
+                viewport_cell,
+            )
+            .context("failed to create session")?;
             inner_main(
                 inner_params,
                 |dsession| {
@@ -216,7 +223,7 @@ fn main() -> Result<(), anyhow::Error> {
         GraphicsType::Headless => inner_main(
             inner_params,
             |dsession| headless_main_loop(dsession, duration),
-            DesktopSession::new((), (), session, viewport_cell),
+            DesktopSession::new(executor, (), (), session, viewport_cell),
         ),
     }
 }
