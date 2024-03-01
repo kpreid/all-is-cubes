@@ -146,19 +146,22 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
     pub fn replace_universe_with_file(&mut self, path: PathBuf) {
         let altered = self.session_altered.listener();
 
+        // TODO: ideally this would be a cancelled-on-drop task
+        let loader_task = self
+            .executor
+            .tokio()
+            .spawn(all_is_cubes_port::load_universe_from_file(
+                crate::glue::tokio_yield_progress().build(),
+                Arc::new(path.clone()),
+            ));
+
         // TODO: Also make a way to do this that isn't replacing the main task,
         // or that defines a way for the existing main task to coordinate.
         self.session.set_main_task(move |ctx| async move {
             // TODO: Offer confirmation before replacing the current universe.
             // TODO: Then open a progress-bar UI page while we load.
 
-            // TODO: spawn the actual work instead of doing it in this task
-            match all_is_cubes_port::load_universe_from_file(
-                crate::glue::tokio_yield_progress().build(),
-                Arc::new(path.clone()),
-            )
-            .await
-            {
+            match loader_task.await.unwrap() {
                 Ok(universe) => {
                     ctx.set_universe(universe);
 
