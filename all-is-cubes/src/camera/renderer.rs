@@ -49,8 +49,6 @@ pub enum RenderError {
     /// A component of the [`Universe`] that is to be rendered was not available
     /// for reading.
     ///
-    /// TODO: The renderers currently implemented don't return this error but panic.
-    ///
     /// [`Universe`]: crate::universe::Universe
     #[displaydoc("scene to be rendered was not available for reading")]
     Read(HandleError),
