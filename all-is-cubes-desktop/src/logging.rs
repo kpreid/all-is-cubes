@@ -226,18 +226,33 @@ pub struct LateLogging {
 }
 
 impl LateLogging {
-    pub(crate) fn finish<Ren: crate::glue::Renderer, Win>(
-        self: LateLogging,
-        universe: &mut all_is_cubes::universe::Universe,
-        dsession: &mut crate::DesktopSession<Ren, Win>,
-    ) {
+    /// Hook up to the renderer.
+    pub fn attach_to_renderer<Ren: crate::glue::Renderer>(&self, renderer: &mut Ren) {
         cfg_if::cfg_if! {
             if #[cfg(feature = "rerun")] {
                 // split out into a function so rustfmt isn't interfered with by the macro
-                actually_log_to_rerun(&self, universe, dsession);
+                log_renderer_to_rerun(self, renderer);
             } else {
                 // suppress warning
-                let _ = (universe, dsession);
+                let _ = renderer;
+
+                if !self.kinds.is_empty() {
+                    // TODO: cleaner error handling from this point
+                    panic!("not compiled with rerun logging support");
+                }
+            }
+        }
+    }
+
+    /// Hook up to the universe.
+    pub(crate) fn finish(self: LateLogging, universe: &mut all_is_cubes::universe::Universe) {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "rerun")] {
+                // split out into a function so rustfmt isn't interfered with by the macro
+                log_universe_to_rerun(&self, universe);
+            } else {
+                // suppress warning
+                let _ = universe;
 
                 if !self.kinds.is_empty() {
                     // TODO: cleaner error handling from this point
@@ -249,13 +264,31 @@ impl LateLogging {
 }
 
 #[cfg(feature = "rerun")]
-fn actually_log_to_rerun<Ren: crate::glue::Renderer, Win>(
-    this: &LateLogging,
-    universe: &mut all_is_cubes::universe::Universe,
-    dsession: &mut crate::DesktopSession<Ren, Win>,
-) {
-    use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport};
+fn log_renderer_to_rerun<Ren: crate::glue::Renderer>(this: &LateLogging, renderer: &mut Ren) {
     use all_is_cubes_gpu::RerunFilter;
+
+    let LateLogging {
+        kinds,
+        #[cfg(feature = "rerun")]
+            rerun_destination: destination,
+    } = this;
+
+    let mut render_filter = RerunFilter::default();
+    if kinds.contains(&RerunDataKind::RenderPerf) {
+        render_filter.performance = true;
+    }
+    if kinds.contains(&RerunDataKind::RenderImage) {
+        render_filter.image = true;
+    }
+
+    if render_filter != RerunFilter::default() {
+        renderer.log_to_rerun(destination.clone(), render_filter);
+    }
+}
+
+#[cfg(feature = "rerun")]
+fn log_universe_to_rerun(this: &LateLogging, universe: &mut all_is_cubes::universe::Universe) {
+    use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport};
 
     let LateLogging {
         kinds,
@@ -296,19 +329,5 @@ fn actually_log_to_rerun<Ren: crate::glue::Renderer, Win>(
         } else {
             panic!("no character to render mesh from");
         }
-    }
-
-    // Attach to renderer
-    let mut render_filter = RerunFilter::default();
-    if kinds.contains(&RerunDataKind::RenderPerf) {
-        render_filter.performance = true;
-    }
-    if kinds.contains(&RerunDataKind::RenderImage) {
-        render_filter.image = true;
-    }
-    if render_filter != RerunFilter::default() {
-        dsession
-            .renderer
-            .log_to_rerun(destination.clone(), render_filter);
     }
 }

@@ -121,6 +121,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Bundle of inputs to `inner_main()`, which — unlike this function — is generic over
     // the kind of window system we're using.
+    let (universe_ready_tx, mut universe_ready_rx) = tokio::sync::oneshot::channel();
     let inner_params = InnerMainParams {
         application_title: title_and_version(),
         runtime,
@@ -128,6 +129,8 @@ fn main() -> Result<(), anyhow::Error> {
         universe_future,
         headless: options.is_headless(),
         logging: late_logging,
+        recording: record_options,
+        universe_ready_signal: universe_ready_tx,
     };
 
     // The graphics type selects not only the kind of 'window' we create, but also the
@@ -182,17 +185,9 @@ fn main() -> Result<(), anyhow::Error> {
                 viewport_cell,
             )
             .context("failed to create session")?;
-            inner_main(inner_params, terminal_main_loop, dsession)
-        }
-        GraphicsType::Record => {
-            let record_options =
-                record_options.expect("arg validation did not require output with -g record");
-
-            let dsession = DesktopSession::new(executor, (), (), session, viewport_cell);
-
             inner_main(
                 inner_params,
-                move |dsession| record::record_main(dsession, &record_options),
+                |dsession| terminal_main_loop(dsession, universe_ready_rx),
                 dsession,
             )
         }
@@ -206,7 +201,15 @@ fn main() -> Result<(), anyhow::Error> {
             .context("failed to create session")?;
             inner_main(
                 inner_params,
-                |dsession| {
+                |mut dsession| {
+                    // Wait for the universe to be finished before capturing.
+                    // TODO: How about we make this a special case of recording instead?
+                    while let Err(tokio::sync::oneshot::error::TryRecvError::Empty) =
+                        universe_ready_rx.try_recv()
+                    {
+                        dsession.advance_time_and_maybe_step();
+                    }
+
                     terminal_print_once(
                         dsession,
                         // TODO: Default display size should be based on terminal width
@@ -220,37 +223,15 @@ fn main() -> Result<(), anyhow::Error> {
                 dsession,
             )
         }
-        GraphicsType::Headless => inner_main(
+        GraphicsType::Record | GraphicsType::Headless => inner_main(
             inner_params,
-            |dsession| headless_main_loop(dsession, duration),
+            |dsession| {
+                all_is_cubes_desktop::headless_main_loop(
+                    dsession,
+                    duration.map(Duration::from_secs_f64),
+                )
+            },
             DesktopSession::new(executor, (), (), session, viewport_cell),
         ),
     }
-}
-
-/// Main loop that does nothing but run the simulation.
-/// This may be used in case the simulation has interesting side-effects.
-#[allow(clippy::unnecessary_wraps)]
-fn headless_main_loop(
-    mut dsession: DesktopSession<(), ()>,
-    duration: Option<f64>,
-) -> Result<(), anyhow::Error> {
-    // TODO: Right now this is useless. Eventually, we may have other paths for side
-    // effects from the universe, or interesting logging.
-    log::info!("Simulating a universe nobody's looking at...");
-
-    let duration = duration.map(Duration::from_secs_f64);
-
-    let t0 = Instant::now();
-    loop {
-        dsession.advance_time_and_maybe_step();
-
-        if duration.is_some_and(|d| Instant::now().duration_since(t0) > d) {
-            break;
-        } else if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
-            std::thread::sleep(t - Instant::now());
-        }
-    }
-
-    Ok(())
 }

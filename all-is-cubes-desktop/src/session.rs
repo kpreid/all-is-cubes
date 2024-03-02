@@ -8,9 +8,9 @@ use all_is_cubes::listen::{DirtyFlag, ListenableCell};
 #[cfg(doc)]
 use all_is_cubes::universe::Universe;
 use all_is_cubes::universe::UniverseStepInfo;
+use all_is_cubes::util::ErrorChain;
 use all_is_cubes_ui::apps::ExitMainTask;
 
-use crate::record;
 use crate::Session;
 
 /// Wraps a basic [`Session`] to add functionality that is common within
@@ -38,9 +38,6 @@ pub struct DesktopSession<Ren, Win> {
     /// The current viewport size linked to the renderer.
     pub(crate) viewport_cell: ListenableCell<Viewport>,
     pub(crate) clock_source: ClockSource,
-
-    /// If present, writes frames to disk.
-    pub(crate) recorder: Option<record::Recorder>,
 
     /// If present, connection to system audio output.
     /// If absent, sound is not produced
@@ -73,7 +70,6 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
             window,
             viewport_cell,
             clock_source: ClockSource::Instant,
-            recorder: None,
             audio: None,
             fixed_title: String::new(),
         };
@@ -96,42 +92,11 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         }
         let step_info = self.session.maybe_step_universe();
 
-        // If we are recording, then do it now.
-        // (TODO: We want to record 1 frame *before the first step* too)
-        // (TODO: This code is awkward because of partial refactoring towards recording being a
-        // option to combine with anything rather than a special main loop mode)
-        if let Some(recorder) = self.recorder.as_mut() {
-            recorder.capture_frame();
-        }
-
         if self.session_info_altered.get_and_clear() {
             self.sync_title();
         }
 
         step_info
-    }
-
-    /// Add recording to this session.
-    ///
-    /// This overwrites its previous recorder, if any.
-    ///
-    /// If the universe is changed then the recorder will not follow it.
-    ///
-    /// Errors: Returns errors directly from `Recorder::new()`.
-    pub(crate) fn start_recording(
-        &mut self,
-        options: &record::RecordOptions,
-    ) -> Result<(), anyhow::Error> {
-        let recorder = record::Recorder::new(
-            options.clone(),
-            self.session.create_cameras(self.viewport_cell.as_source()),
-            self.session.universe(),
-            self.executor.clone(),
-        )?;
-
-        self.recorder = Some(recorder);
-
-        Ok(())
     }
 
     /// Replace the session's universe with one whose contents are the given file,
@@ -165,9 +130,9 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
                 }
                 Err(e) => {
                     ctx.show_modal_message(arcstr::format!(
-                        "Failed to load file '{}':\n{}",
-                        path.display(),
-                        e
+                        "Failed to load file '{path}':\n{e}",
+                        path = path.display(),
+                        e = ErrorChain(&e),
                     ));
                 }
             }

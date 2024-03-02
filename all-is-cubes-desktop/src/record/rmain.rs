@@ -1,21 +1,19 @@
 use std::fmt;
 use std::time::Duration;
 
-use anyhow::Context;
-use indicatif::{ProgressBar, ProgressStyle};
-
-use all_is_cubes::camera::Flaws;
 use all_is_cubes::character::{self, Character};
-use all_is_cubes::listen::Listen as _;
 use all_is_cubes::math::NotNan;
 use all_is_cubes::physics::BodyTransaction;
+use all_is_cubes::universe::Handle;
 use all_is_cubes::{behavior, listen, universe};
 
-use crate::record::{RecordOptions, Status};
+use crate::record::RecordOptions;
 use crate::session::{ClockSource, DesktopSession};
 
-/// Opinionated version of [`DesktopSession::start_recording`] that applies [`RecordOptions`]
-/// to the session.
+/// Use [`RecordOptions`] to configure `dsession`'s clock and graphics options.
+///
+/// TODO: Change things around so that this can be done by the main task as needed.
+#[allow(clippy::unnecessary_wraps)]
 pub(crate) fn configure_session_for_recording<Ren, Win>(
     dsession: &mut DesktopSession<Ren, Win>,
     options: &RecordOptions,
@@ -42,95 +40,28 @@ where
             graphics_options.debug_info_text = false;
         });
 
-    // Add some motion to animation recordings.
-    // TODO: replace this with a general camera scripting mechanism
-    if let Some(anim) = &options.animation {
-        if let Some(character_handle) = dsession.session.character().snapshot() {
-            character_handle.try_modify(|c| {
-                c.add_behavior(AutoRotate {
-                    rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
-                })
-            })?;
-        }
-    }
-
-    dsession.start_recording(options)?;
-
     Ok(())
 }
 
-/// Main loop which drives a headless session and then returns when the recording is complete.
-pub fn record_main(
-    mut dsession: DesktopSession<(), ()>,
+pub(crate) fn configure_universe_for_recording(
+    character_handle: Option<&Handle<Character>>,
     options: &RecordOptions,
-) -> Result<(), anyhow::Error> {
-    let progress_style = ProgressStyle::default_bar()
-        .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
-        .unwrap();
-
-    // TODO: We should start recording independent of the main loop type being used
-    configure_session_for_recording(&mut dsession, options)
-        .context("failed to configure session for recording")?;
-
-    let (status_tx, mut status_receiver) = tokio::sync::mpsc::unbounded_channel::<Status>();
-    dsession
-        .recorder
-        .as_ref()
-        .expect("record_main() requires a recorder present")
-        .listen(ChannelListener::new(status_tx));
-
-    // Use main thread for universe stepping, raytracer snapshotting, and progress updating.
-    // (We could move the universe stepping to another thread to get more precise progress updates,
-    // but that doesn't seem necessary.)
-    let mut flaws_total = Flaws::empty();
-    {
-        let drawing_progress_bar = ProgressBar::new(options.frame_range().size_hint().0 as u64)
-            .with_style(progress_style)
-            .with_prefix("Drawing");
-        drawing_progress_bar.enable_steady_tick(Duration::from_secs(1));
-
-        for _ in options.frame_range() {
-            // Advance time for next frame.
-            dsession.advance_time_and_maybe_step();
-
-            // Update progress bar.
-            if let Ok(Status {
-                frame_number,
-                flaws,
-            }) = status_receiver.try_recv()
-            {
-                drawing_progress_bar.set_position((frame_number + 1) as u64);
-                flaws_total |= flaws;
-            }
+) {
+    // Add some motion to animation recordings.
+    // TODO: replace this with a general camera scripting mechanism
+    if let Some(character_handle) = character_handle {
+        if let Some(anim) = &options.animation {
+            character_handle
+                .try_modify(|c| {
+                    c.add_behavior(AutoRotate {
+                        rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
+                    })
+                })
+                .unwrap();
         }
-        dsession.recorder.as_mut().unwrap().no_more_frames();
-
-        // We've completed sending frames; now block on their completion.
-        // TODO: deduplicate receiving logic
-        while let Some(Status {
-            frame_number,
-            flaws,
-        }) = status_receiver.blocking_recv()
-        {
-            drawing_progress_bar.set_position((frame_number + 1) as u64);
-            flaws_total |= flaws;
-        }
-        assert_eq!(
-            drawing_progress_bar.position() as usize,
-            options.frame_range().end() - options.frame_range().start() + 1,
-            "Didn't draw the correct number of frames"
-        );
-        drawing_progress_bar.finish();
+    } else {
+        log::warn!("Recording universe contains no character.");
     }
-
-    // Report completion
-    eprintln!("\nWrote {}", options.output_path.to_string_lossy());
-    if flaws_total != Flaws::empty() {
-        // TODO: write user-facing formatting for Flaws
-        eprintln!("Flaws in recording: {flaws_total}");
-    }
-
-    Ok(())
 }
 
 /// A simple behavior which causes a `Character`'s viewpoint to rotate without user input,
@@ -168,11 +99,11 @@ impl universe::VisitHandles for AutoRotate {
 ///
 /// Caution: If you care about when the channel is closed, check how long this listener
 /// is going to live.
-struct ChannelListener<M> {
+pub(super) struct ChannelListener<M> {
     sender: tokio::sync::mpsc::UnboundedSender<M>,
 }
 impl<M: Send + Clone> ChannelListener<M> {
-    fn new(sender: tokio::sync::mpsc::UnboundedSender<M>) -> Self {
+    pub fn new(sender: tokio::sync::mpsc::UnboundedSender<M>) -> Self {
         Self { sender }
     }
 }

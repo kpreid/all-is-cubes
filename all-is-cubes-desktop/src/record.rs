@@ -3,20 +3,22 @@
 use std::fs::File;
 use std::sync::mpsc;
 use std::sync::{Arc, Weak};
+use std::time::Duration;
 
 use anyhow::Context;
 
 use all_is_cubes::camera::{Flaws, StandardCameras};
-use all_is_cubes::listen::{self, ListenableSource};
+use all_is_cubes::listen::{self, Listen as _, ListenableSource};
 use all_is_cubes::raytracer::RtRenderer;
 use all_is_cubes::universe::Universe;
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
 use all_is_cubes_port::{ExportFormat, ExportSet};
+use all_is_cubes_ui::apps::MainTaskContext;
 
 mod options;
 pub use options::*;
 mod rmain;
-pub use rmain::record_main;
+pub(crate) use rmain::{configure_session_for_recording, configure_universe_for_recording};
 mod write_gltf;
 mod write_png;
 
@@ -27,6 +29,8 @@ type FrameNumber = usize;
 pub(crate) struct Recorder {
     /// The number of times [`Self::send_frame`] has been called.
     sending_frame_number: FrameNumber,
+
+    options: RecordOptions,
 
     inner: RecorderInner,
 
@@ -109,6 +113,7 @@ impl Recorder {
                     .spawn({
                         let file = File::create(&options.output_path)?;
                         let status_notifier = status_notifier.clone();
+                        let options = options.clone();
                         move || {
                             write_png::threaded_write_frames(
                                 file,
@@ -173,7 +178,7 @@ impl Recorder {
                     status_notifier: status_notifier.clone(),
                     export_format,
                     export_set: Some(export_set),
-                    options,
+                    options: options.clone(),
                 }
             }
         };
@@ -182,10 +187,11 @@ impl Recorder {
             inner,
             sending_frame_number: 0,
             status_notifier: Arc::downgrade(&status_notifier),
+            options,
         })
     }
 
-    pub fn capture_frame(&mut self) {
+    fn capture_frame(&mut self) {
         let this_frame_number = self.sending_frame_number;
         self.sending_frame_number += 1;
 
@@ -243,8 +249,73 @@ impl Recorder {
         }
     }
 
-    pub fn no_more_frames(&mut self) {
+    fn no_more_frames(&mut self) {
         self.inner = RecorderInner::Shutdown;
+    }
+
+    /// Capture frames of recording, then wait for the recording to have been finished.
+    pub(crate) async fn record_task(mut self, ctx: &MainTaskContext) {
+        let frame_range = self.options.frame_range();
+
+        let progress_style = indicatif::ProgressStyle::default_bar()
+            .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
+            .unwrap();
+
+        // TODO: instead of a full channel, just have some kind of cell for last seen value
+        let (status_tx, mut status_receiver) = tokio::sync::mpsc::unbounded_channel();
+        self.listen(rmain::ChannelListener::new(status_tx));
+
+        let drawing_progress_bar = indicatif::ProgressBar::new(frame_range.clone().count() as u64)
+            .with_style(progress_style)
+            .with_prefix("Drawing");
+        drawing_progress_bar.enable_steady_tick(Duration::from_secs(1));
+
+        let mut flaws_total = Flaws::empty();
+
+        // Capture first (no step) frame
+        self.capture_frame();
+        // Capture remaining frames
+        while self.sending_frame_number < frame_range.clone().count() {
+            ctx.yield_to_step().await;
+            self.capture_frame();
+
+            // Drain channel and update progress bar.
+            if let Ok(Status {
+                frame_number,
+                flaws,
+            }) = status_receiver.try_recv()
+            {
+                drawing_progress_bar.set_position((frame_number + 1) as u64);
+                flaws_total |= flaws;
+            }
+        }
+        self.no_more_frames();
+
+        // We've completed sending frames; now await the inner workings actually finishing
+        // processing.
+        // TODO: deduplicate receiving logic
+        while let Some(Status {
+            frame_number,
+            flaws,
+        }) = status_receiver.recv().await
+        {
+            drawing_progress_bar.set_position((frame_number + 1) as u64);
+            flaws_total |= flaws;
+        }
+        assert_eq!(
+            drawing_progress_bar.position() as usize,
+            frame_range.count(),
+            "Didn't draw the correct number of frames"
+        );
+        drawing_progress_bar.finish();
+
+        // Report completion
+        // TODO: do this in UI too, in case we have one and are not exiting
+        eprintln!("\nWrote {}", self.options.output_path.to_string_lossy());
+        if flaws_total != Flaws::empty() {
+            // TODO: write user-facing formatting for Flaws
+            eprintln!("Flaws in recording: {flaws_total}");
+        }
     }
 }
 

@@ -6,7 +6,9 @@ use std::time::Duration;
 
 use all_is_cubes::camera::{self, Viewport};
 
-/// Options for recording and output in [`record_main`](super::record_main).
+/// Specifies a destination and format to write a recording.
+///
+/// Part of [`InnerMainParams`](crate::InnerMainParams).
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)] // TODO: make fields private again
 #[allow(missing_docs)]
