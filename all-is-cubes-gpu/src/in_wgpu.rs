@@ -5,10 +5,11 @@ use std::marker::PhantomData;
 use std::mem;
 use std::sync::Arc;
 
-use all_is_cubes::util::Executor;
 use wgpu::TextureViewDescriptor;
 
-use all_is_cubes::camera::{info_text_drawable, Layers, RenderMethod, StandardCameras};
+use all_is_cubes::camera::{
+    info_text_drawable, Flaws, Layers, RenderError, RenderMethod, StandardCameras,
+};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Gray8, Drawable};
@@ -19,6 +20,7 @@ use all_is_cubes::notnan;
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::time;
+use all_is_cubes::util::Executor;
 
 use crate::in_wgpu::raytrace_to_texture::RaytraceToTexture;
 #[cfg(feature = "rerun")]
@@ -33,8 +35,8 @@ use crate::{
         postprocess::PostprocessUniforms,
         vertex::WgpuLinesVertex,
     },
-    wireframe_vertices, DrawInfo, FrameBudget, GraphicsResourceError, Memo, RenderInfo,
-    SpaceDrawInfo, SpaceUpdateInfo, UpdateInfo,
+    wireframe_vertices, DrawInfo, FrameBudget, Memo, RenderInfo, SpaceDrawInfo, SpaceUpdateInfo,
+    UpdateInfo,
 };
 
 mod block_texture;
@@ -105,19 +107,13 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         surface: wgpu::Surface<'static>,
         adapter: &wgpu::Adapter,
         executor: Arc<dyn Executor>,
-    ) -> Result<Self, GraphicsResourceError> {
+    ) -> Result<Self, wgpu::RequestDeviceError> {
         let (device, queue) = adapter
             .request_device(
                 &EverythingRenderer::<I>::device_descriptor(adapter.limits()),
                 None,
             )
-            .await
-            .map_err(|e| {
-                GraphicsResourceError::new(
-                    String::from("requesting Device from wgpu to create a SurfaceRenderer"),
-                    e,
-                )
-            })?;
+            .await?;
         #[cfg_attr(target_family = "wasm", allow(clippy::arc_with_non_send_sync))]
         let device = Arc::new(device);
 
@@ -165,7 +161,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         &mut self,
         cursor_result: Option<&Cursor>,
         info_text_fn: impl FnOnce(&RenderInfo) -> String,
-    ) -> Result<RenderInfo, GraphicsResourceError> {
+    ) -> Result<RenderInfo, RenderError> {
         let update_info = self.everything.update(
             &self.queue,
             cursor_result,
@@ -184,7 +180,25 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         // If the GPU is busy, `get_current_texture()` blocks until a previous texture
         // is no longer in use (except on wasm, in which case submit() seems to take the time).
         let before_get = I::now();
-        let output = self.surface.get_current_texture()?;
+        let output = match self.surface.get_current_texture() {
+            Ok(t) => t,
+            Err(e @ wgpu::SurfaceError::Timeout) => {
+                // Nothing to do but try again next frame.
+                log::error!(
+                    "Error from wgpu::Surface::get_current_texture(): {e:?}. Skipping this frame."
+                );
+                return Ok(RenderInfo {
+                    flaws: Flaws::UNFINISHED,
+                    ..RenderInfo::default()
+                });
+            }
+            Err(e) => {
+                panic!(
+                    "error from wgpu::Surface::get_current_texture(): {e:?}; \
+                    error recovery not implemented"
+                );
+            }
+        };
         let after_get = I::now();
 
         let draw_info = self.everything.draw_frame_linear(&self.queue)?;
@@ -388,10 +402,8 @@ impl<I: time::Instant> EverythingRenderer<I> {
                     &pipelines,
                     block_texture.clone(),
                     true,
-                )
-                .unwrap(), // TODO: can't actually fail I think
-                ui: SpaceRenderer::new("ui".into(), &device, &pipelines, block_texture, true)
-                    .unwrap(),
+                ),
+                ui: SpaceRenderer::new("ui".into(), &device, &pipelines, block_texture, true),
             },
             rt: RaytraceToTexture::new(cameras.clone()),
 
@@ -458,7 +470,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         queue: &wgpu::Queue,
         cursor_result: Option<&Cursor>,
         frame_budget: &FrameBudget,
-    ) -> Result<UpdateInfo, GraphicsResourceError> {
+    ) -> Result<UpdateInfo, RenderError> {
         let start_frame_time = I::now();
 
         // This updates camera matrices and graphics options which we are going to consult
@@ -533,7 +545,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 &self.pipelines,
                 spaces_to_render.world,
             )
-            .map_err(GraphicsResourceError::read_err)?;
+            .map_err(RenderError::Read)?;
         self.space_renderers
             .ui
             .set_space(
@@ -542,7 +554,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 &self.pipelines,
                 spaces_to_render.ui,
             )
-            .map_err(GraphicsResourceError::read_err)?;
+            .map_err(RenderError::Read)?;
 
         let mut encoder = self
             .device
@@ -645,7 +657,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 queue,
                 &self.pipelines,
                 &self.cameras.cameras().world,
-            )?;
+            );
         }
 
         // TODO: measure time of these
@@ -668,7 +680,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
     pub(crate) fn draw_frame_linear(
         &mut self,
         queue: &wgpu::Queue,
-    ) -> Result<DrawInfo, GraphicsResourceError> {
+    ) -> Result<DrawInfo, RenderError> {
         let start_draw_time = I::now();
 
         let mut encoder = self
@@ -723,7 +735,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                     false => wgpu::StoreOp::Discard,
                 },
                 false,
-            )?
+            )
         };
         let world_to_lines_time = I::now();
 
@@ -763,7 +775,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             mem::take(&mut output_needs_clearing),
             wgpu::StoreOp::Discard, // nothing uses the ui depth buffer
             true,
-        )?;
+        );
         let ui_to_postprocess_time = I::now();
 
         // Write the postprocess camera data.

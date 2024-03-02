@@ -42,7 +42,7 @@ pub trait HeadlessRenderer {
     fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<Rendering, RenderError>>;
 }
 
-/// An error indicating that a [`HeadlessRenderer`] failed to operate.
+/// An error indicating that a [`HeadlessRenderer`] or other renderer failed to operate.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 pub enum RenderError {

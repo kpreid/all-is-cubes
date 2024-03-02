@@ -10,7 +10,7 @@ use all_is_cubes::character::Cursor;
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use all_is_cubes::util::Executor;
 
-use crate::common::{AdaptedInstant, FrameBudget, GraphicsResourceError};
+use crate::common::{AdaptedInstant, FrameBudget};
 use crate::in_wgpu::{self, init};
 
 /// Builder for the headless [`Renderer`].
@@ -192,10 +192,9 @@ impl RendererImpl {
     }
 
     fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), camera::RenderError> {
-        let info = self
-            .everything
-            .update(&self.queue, cursor, &FrameBudget::PRACTICALLY_INFINITE)
-            .map_err(GraphicsResourceError::into_render_error_or_panic)?;
+        let info =
+            self.everything
+                .update(&self.queue, cursor, &FrameBudget::PRACTICALLY_INFINITE)?;
         self.flaws = info.flaws();
         Ok(())
     }

@@ -24,7 +24,7 @@ use all_is_cubes::raytracer::{ColorBuf, RtRenderer};
 
 use crate::in_wgpu::frame_texture::DrawableTexture;
 use crate::in_wgpu::pipelines::Pipelines;
-use crate::{GraphicsResourceError, Memo, ToTexel};
+use crate::{Memo, ToTexel};
 
 #[derive(Debug)]
 pub(crate) struct RaytraceToTexture {
@@ -96,7 +96,7 @@ impl RaytraceToTexture {
         queue: &wgpu::Queue,
         pipelines: &Pipelines,
         camera: &Camera,
-    ) -> Result<(), GraphicsResourceError> {
+    ) {
         let inner = &mut *self.inner.lock().unwrap(); // not handling poisoning, just fail
 
         inner.set_viewport(device, raytracer_size_policy(camera.viewport()));
@@ -123,8 +123,6 @@ impl RaytraceToTexture {
 
         inner.do_some_tracing();
         inner.render_target.upload(queue);
-
-        Ok(())
     }
 
     pub fn frame_copy_bind_group(&self) -> Option<&wgpu::BindGroup> {

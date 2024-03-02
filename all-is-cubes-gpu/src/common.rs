@@ -1,11 +1,9 @@
 //! Items not specific to a particular GPU API.
 
-use std::error::Error;
 use std::ops;
 use std::time::Duration;
 
-use all_is_cubes::camera::{Layers, RenderError};
-use all_is_cubes::universe::HandleError;
+use all_is_cubes::camera::Layers;
 
 mod debug_lines;
 pub(crate) use debug_lines::*;
@@ -18,50 +16,6 @@ pub use info::*;
 pub mod octree_alloc;
 
 pub(crate) mod reloadable;
-
-/// Error arising when GPU/platform resources could not be obtained, or there is a bug
-/// or incompatibility, and the requested graphics initialization or drawing could not be
-/// completed.
-///
-/// Unless otherwise specified, these errors should be assumed to be recoverable
-/// — invoking the renderer again in the same way next frame might or might not succeed,
-/// but it should do no harm and should recover if possible (i.e. external reinitialization
-/// should not be necessary).
-///
-/// TODO: Merge this with [`RenderError`], probably.
-#[derive(Debug, thiserror::Error)]
-#[error("graphics error (in {0})", context.as_ref().map(|s| s.as_ref()).unwrap_or("?"))]
-pub struct GraphicsResourceError {
-    context: Option<String>,
-    #[source]
-    source: Box<dyn Error + Send + Sync>,
-}
-
-impl GraphicsResourceError {
-    pub(crate) fn new<E: Error + Send + Sync + 'static>(context: String, source: E) -> Self {
-        GraphicsResourceError {
-            context: Some(context),
-            source: Box::new(source),
-        }
-    }
-
-    pub(crate) fn read_err(source: HandleError) -> Self {
-        GraphicsResourceError {
-            context: Some(String::from("Unable to read scene data")),
-            source: Box::new(source),
-        }
-    }
-
-    /// TODO: make this not panic by expanding the functionality of [`RenderError`]
-    pub fn into_render_error_or_panic(self) -> RenderError {
-        if let Some(re) = self.source.downcast_ref::<HandleError>() {
-            RenderError::Read(re.clone())
-        } else {
-            // TODO: don't panic
-            panic!("error updating renderer: {}", &self.source);
-        }
-    }
-}
 
 /// A plan for the maximum amount of time to use for each step of each frame of rendering.
 ///
@@ -182,17 +136,5 @@ impl<K: Eq, V> Memo<K, V> {
 impl<K, V> Default for Memo<K, V> {
     fn default() -> Self {
         Self { data: None }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn assert_send_sync<T: Send + Sync>() {}
-
-    #[test]
-    fn graphics_resource_error_is_sync() {
-        assert_send_sync::<GraphicsResourceError>()
     }
 }

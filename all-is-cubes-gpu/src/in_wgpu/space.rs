@@ -5,7 +5,7 @@ use std::mem;
 use std::sync::{atomic, mpsc, Arc, Mutex, Weak};
 use std::time::Duration;
 
-use all_is_cubes::camera::{Camera, Flaws};
+use all_is_cubes::camera::{Camera, Flaws, RenderError};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::num::Zero as _;
@@ -39,7 +39,7 @@ use crate::in_wgpu::{
     glue::{to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
     vertex::WgpuBlockVertex,
 };
-use crate::{DebugLineVertex, GraphicsResourceError, Memo, SpaceDrawInfo, SpaceUpdateInfo};
+use crate::{DebugLineVertex, Memo, SpaceDrawInfo, SpaceUpdateInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -114,14 +114,14 @@ impl<I: time::Instant> SpaceRenderer<I> {
         pipelines: &Pipelines,
         block_texture: AtlasAllocator,
         interactive: bool,
-    ) -> Result<Self, GraphicsResourceError> {
+    ) -> Self {
         let light_texture = SpaceLightTexture::new(&space_label, device, GridAab::ORIGIN_CUBE); // dummy
 
         let camera_buffer = SpaceCameraBuffer::new(&space_label, device, pipelines);
 
         let todo = Arc::new(Mutex::new(SpaceRendererTodo::EVERYTHING));
 
-        Ok(SpaceRenderer {
+        SpaceRenderer {
             todo,
             render_pass_label: format!("{space_label} render_pass"),
             instance_buffer_label: format!("{space_label} instances"),
@@ -141,7 +141,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             },
             #[cfg(feature = "rerun")]
             rerun_destination: Default::default(),
-        })
+        }
     }
 
     /// Replace the space being rendered, while preserving some of the resources used to render it.
@@ -283,7 +283,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         pipelines: &Pipelines,
         camera: &Camera,
         mut bwp: BeltWritingParts<'_, '_>,
-    ) -> Result<SpaceUpdateInfo, GraphicsResourceError> {
+    ) -> Result<SpaceUpdateInfo, RenderError> {
         let start_time = I::now();
 
         let mut todo = self.todo.lock().unwrap();
@@ -295,10 +295,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
             return Ok(SpaceUpdateInfo::default());
         };
-        let space = &*csm
-            .space()
-            .read()
-            .map_err(GraphicsResourceError::read_err)?;
+        let space = &*csm.space().read().map_err(RenderError::Read)?;
 
         if mem::take(&mut todo.sky) {
             self.skybox.compute(device, queue, &space.physics().sky);
@@ -430,7 +427,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         draw_sky: bool, // TODO: consider specifying this at update time to decide whether to calc
         store_depth: wgpu::StoreOp,
         is_ui: bool,
-    ) -> Result<SpaceDrawInfo, GraphicsResourceError> {
+    ) -> SpaceDrawInfo {
         let start_time = I::now();
         let mut flaws = Flaws::empty();
 
@@ -468,7 +465,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let Some(csm) = &self.csm else {
             // If we have no space to render, then we only render the clear + skybox.
 
-            return Ok(SpaceDrawInfo {
+            return SpaceDrawInfo {
                 draw_init_time: Duration::ZERO,
                 draw_opaque_chunks_time: Duration::ZERO,
                 draw_opaque_blocks_time: Duration::ZERO,
@@ -478,7 +475,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 chunks_drawn: 0,
                 blocks_drawn: 0,
                 flaws,
-            });
+            };
         };
 
         let view_chunk = csm.view_chunk();
@@ -660,7 +657,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         let end_time = I::now();
 
-        Ok(SpaceDrawInfo {
+        SpaceDrawInfo {
             draw_init_time: start_opaque_chunk_draw_time.saturating_duration_since(start_time),
             draw_opaque_chunks_time: start_opaque_instance_draw_time
                 .saturating_duration_since(start_opaque_chunk_draw_time),
@@ -673,7 +670,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             chunks_drawn,
             blocks_drawn,
             flaws,
-        })
+        }
     }
 
     pub fn particle_lines(&self) -> impl Iterator<Item = WgpuLinesVertex> + '_ {

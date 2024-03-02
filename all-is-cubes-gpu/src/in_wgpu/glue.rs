@@ -12,18 +12,6 @@ use wgpu::util::DeviceExt as _;
 use all_is_cubes::math::{GridAab, GridCoordinate, GridSize, Rgba};
 
 use crate::reloadable::Reloadable;
-use crate::GraphicsResourceError;
-
-/// TODO: Revisit whether this generic conversion is appropriate;
-/// we should be *handling* some or all of [`wgpu::SurfaceError`] with a retry.
-impl From<wgpu::SurfaceError> for GraphicsResourceError {
-    fn from(source: wgpu::SurfaceError) -> Self {
-        GraphicsResourceError::new(
-            String::from("obtaining surface texture for rendering the next frame"),
-            source,
-        )
-    }
-}
 
 /// A vector of 3 f32s padded to resemble a vector of 4, to satisfy
 /// GPU alignment expectations.
