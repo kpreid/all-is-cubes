@@ -122,7 +122,7 @@ async fn start_game_with_dom(
                 .create_surface(wgpu::SurfaceTarget::Canvas(
                     gui_helpers.canvas_helper().canvas(),
                 ))
-                .map_err(|_| "Requesting WebGL context failed")?;
+                .map_err(|e| format!("Requesting WebGL context failed: {e:?}"))?;
             // TODO: we lost the 'request no MSAA' feature
             let adapter = wgpu_instance
                 .request_adapter(&wgpu::RequestAdapterOptions {
@@ -132,6 +132,7 @@ async fn start_game_with_dom(
                 })
                 .await
                 .ok_or("Could not request suitable graphics adapter")?;
+            log::debug!("Adapter: {:?}", adapter.get_info());
             let renderer = in_wgpu::SurfaceRenderer::new(
                 cameras,
                 surface,
