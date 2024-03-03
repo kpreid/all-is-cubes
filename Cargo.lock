@@ -106,7 +106,7 @@ dependencies = [
  "pretty_assertions",
  "rand 0.8.5",
  "rand_xoshiro",
- "strum 0.25.0",
+ "strum 0.26.1",
  "tokio",
  "yield-progress",
 ]
@@ -141,7 +141,7 @@ dependencies = [
  "serde",
  "serde_json",
  "simplelog",
- "strum 0.25.0",
+ "strum 0.26.1",
  "tempfile",
  "thiserror",
  "tokio",
@@ -5466,9 +5466,6 @@ name = "strum"
 version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "290d54ea6f91c969195bdbcd7442c8c2a2ba87da8bf60a7ee86a235d4bc1e125"
-dependencies = [
- "strum_macros 0.25.3",
-]
 
 [[package]]
 name = "strum"
