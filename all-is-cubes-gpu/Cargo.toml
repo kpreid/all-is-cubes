@@ -56,7 +56,7 @@ futures-util = { workspace = true, features = [
     "sink"
 ] }
 # f16 support for working with floating point textures.
-half = { version = "2.3.1", features = ["bytemuck"] }
+half = { version = "2.4.0", features = ["bytemuck"] }
 itertools = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }
