@@ -33,7 +33,7 @@ use crate::alg::{space_to_space_copy, walk};
 use crate::{clouds::clouds, wavy_landscape, DemoBlocks, LandscapeBlocks};
 
 mod exhibit;
-use exhibit::{Exhibit, Placement};
+use exhibit::{Context, Exhibit, Placement};
 mod exhibits;
 use exhibits::DEMO_CITY_EXHIBITS;
 
@@ -332,7 +332,8 @@ async fn place_exhibits_in_city<I: Instant>(
 
         // Execute the exhibit factory function.
         // TODO: stop handing out mutable Universe access, so we can parallelize this loop
-        let (exhibit_space, exhibit_transaction) = match (exhibit.factory)(exhibit, universe) {
+        let ctx = Context { exhibit, universe };
+        let (exhibit_space, exhibit_transaction) = match (exhibit.factory)(ctx) {
             Ok(s) => s,
             Err(error) => {
                 // TODO: put the error on a sign in place of the exhibit

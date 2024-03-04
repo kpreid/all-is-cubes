@@ -32,11 +32,10 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::Universe;
 use all_is_cubes::{include_image, rgb_const, rgba_const};
 
 use crate::alg::{four_walls, voronoi_pattern};
-use crate::city::exhibit::{exhibit, Exhibit, ExhibitTransaction, Placement};
+use crate::city::exhibit::{exhibit, Context, Exhibit, ExhibitTransaction, Placement};
 use crate::{
     make_slab_txn, make_some_blocks, make_some_voxel_blocks_txn, palette, tree, AnimatedVoxels,
     DemoBlocks, Fire, LandscapeBlocks,
@@ -79,7 +78,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
         Lighting of volumes still needs work.",
     placement: Placement::Surface,
 )]
-fn TRANSPARENCY_LARGE(_: &Exhibit, _universe: &Universe) {
+fn TRANSPARENCY_LARGE(_: Context<'_>) {
     let mut space = Space::empty(GridAab::from_lower_size([-3, 0, -3], [7, 5, 7]));
 
     let colors = [
@@ -115,7 +114,7 @@ fn TRANSPARENCY_LARGE(_: &Exhibit, _universe: &Universe) {
         We also need something for surface properties.",
     placement: Placement::Surface,
 )]
-fn TRANSPARENCY_SMALL(_: &Exhibit, _universe: &Universe) {
+fn TRANSPARENCY_SMALL(_: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
     let footprint = GridAab::from_lower_size([0, 0, 0], [7, 4, 7]);
@@ -200,7 +199,7 @@ fn TRANSPARENCY_SMALL(_: &Exhibit, _universe: &Universe) {
     subtitle: "Complex voxel shape",
     placement: Placement::Surface,
 )]
-fn KNOT(this: &Exhibit, _universe: &Universe) {
+fn KNOT(ctx: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
     let footprint = GridAab::from_lower_size([-2, -2, -1], [5, 5, 3]);
     let resolution = R32;
@@ -262,7 +261,7 @@ fn KNOT(this: &Exhibit, _universe: &Universe) {
     let space = space_to_blocks(
         resolution,
         BlockAttributes {
-            display_name: this.name.into(),
+            display_name: ctx.exhibit.name.into(),
             ..BlockAttributes::default()
         },
         txn.insert_anonymous(drawing_space),
@@ -276,7 +275,7 @@ fn KNOT(this: &Exhibit, _universe: &Universe) {
     subtitle: "",
     placement: Placement::Surface,
 )]
-fn TEXT(_: &Exhibit, _universe: &Universe) {
+fn TEXT(_: Context<'_>) {
     use all_is_cubes::block::text;
 
     let foreground_block = Block::from(palette::HUD_TEXT_FILL);
@@ -369,8 +368,8 @@ fn TEXT(_: &Exhibit, _universe: &Universe) {
     subtitle: "Blocks whose definition is animated",
     placement: Placement::Surface,
 )]
-fn ANIMATION(_: &Exhibit, universe: &Universe) {
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+fn ANIMATION(ctx: Context<'_>) {
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
 
     let footprint = GridAab::from_lower_size([0, 0, -1], [3, 2, 3]);
     let mut space = Space::empty(footprint);
@@ -446,7 +445,7 @@ fn ANIMATION(_: &Exhibit, universe: &Universe) {
     subtitle: "Test cases for character/world collision",
     placement: Placement::Surface,
 )]
-fn COLLISION(_: &Exhibit, _universe: &Universe) {
+fn COLLISION(_: Context<'_>) {
     let footprint = GridAab::from_lower_size([0, 0, 0], [5, 2, 4]);
     let mut txn = ExhibitTransaction::default();
     let mut space = Space::empty(footprint);
@@ -497,13 +496,13 @@ fn COLLISION(_: &Exhibit, _universe: &Universe) {
         powers of 2 from 2 to 256.",
     placement: Placement::Surface,
 )]
-fn RESOLUTIONS(_: &Exhibit, universe: &Universe) {
+fn RESOLUTIONS(ctx: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
     let footprint = GridAab::from_lower_size([0, 0, 0], [5, 3, 3]);
     let mut space = Space::empty(footprint);
 
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
     for (i, &resolution) in (0i32..).zip([R1, R2, R4, R8, R16, R32].iter()) {
@@ -555,9 +554,9 @@ fn RESOLUTIONS(_: &Exhibit, universe: &Universe) {
     subtitle: "1/128th the length of a standard block",
     placement: Placement::Surface,
 )]
-fn SMALLEST(_: &Exhibit, universe: &Universe) {
+fn SMALLEST(ctx: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
     let resolution = R128;
@@ -594,9 +593,9 @@ fn SMALLEST(_: &Exhibit, universe: &Universe) {
     subtitle: "Rotated blocks and GridRotation::from_to()",
     placement: Placement::Surface,
 )]
-fn ROTATIONS(_: &Exhibit, universe: &Universe) {
+fn ROTATIONS(ctx: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
     let mut space = Space::empty(GridAab::from_lower_size([-2, 0, -2], [5, 5, 5]));
 
     let [_, central_block] = make_some_voxel_blocks_txn(&mut txn);
@@ -640,8 +639,8 @@ fn ROTATIONS(_: &Exhibit, universe: &Universe) {
     subtitle: "",
     placement: Placement::Surface,
 )]
-fn ZOOM(_: &Exhibit, universe: &Universe) {
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+fn ZOOM(ctx: Context<'_>) {
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
 
     let specimen = &demo_blocks[DemoBlocks::LamppostBase];
 
@@ -677,8 +676,8 @@ fn ZOOM(_: &Exhibit, universe: &Universe) {
     subtitle: "",
     placement: Placement::Surface,
 )]
-fn COMPOSITE(_: &Exhibit, universe: &Universe) {
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+fn COMPOSITE(ctx: Context<'_>) {
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
 
     let sources = [
         &demo_blocks[DemoBlocks::Lamp],
@@ -754,7 +753,7 @@ fn COMPOSITE(_: &Exhibit, universe: &Universe) {
     subtitle: "Stationary but not animated cases.",
     placement: Placement::Surface,
 )]
-fn MOVED_BLOCKS(_: &Exhibit, _universe: &Universe) {
+fn MOVED_BLOCKS(_: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
     let mut space = Space::empty(GridAab::from_lower_upper([0, 0, -3], [16, 2, 3]));
 
@@ -790,8 +789,8 @@ fn MOVED_BLOCKS(_: &Exhibit, _universe: &Universe) {
     subtitle: "",
     placement: Placement::Surface,
 )]
-fn BECOME(_: &Exhibit, universe: &Universe) {
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+fn BECOME(ctx: Context<'_>) {
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
     let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 3])).build();
@@ -811,8 +810,8 @@ fn BECOME(_: &Exhibit, universe: &Universe) {
     subtitle: "RGB cube of 5 linear color steps",
     placement: Placement::Surface,
 )]
-fn COLORS(_: &Exhibit, universe: &Universe) {
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+fn COLORS(ctx: Context<'_>) {
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
 
     let gradient_resolution = 5;
     let mut space = Space::empty(GridAab::from_lower_size(
@@ -878,7 +877,7 @@ fn COLORS(_: &Exhibit, universe: &Universe) {
     subtitle: "RGBCMY lights in an enclosed room",
     placement: Placement::Surface,
 )]
-fn COLOR_LIGHTS(_: &Exhibit, _universe: &Universe) {
+fn COLOR_LIGHTS(_: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
     let room_width = 11;
@@ -1042,7 +1041,7 @@ fn COLOR_LIGHTS(_: &Exhibit, _universe: &Universe) {
     subtitle: "Volume of world chunks in view at a distance of 4.99",
     placement: Placement::Surface,
 )]
-fn CHUNK_CHART(_: &Exhibit, _: &Universe) {
+fn CHUNK_CHART(_: Context<'_>) {
     use all_is_cubes::chunking::ChunkChart;
 
     // TODO: Show more than one size.
@@ -1057,7 +1056,7 @@ fn CHUNK_CHART(_: &Exhibit, _: &Universe) {
     subtitle: "",
     placement: Placement::Surface,
 )]
-fn MAKE_SOME_BLOCKS(_: &Exhibit, _universe: &Universe) {
+fn MAKE_SOME_BLOCKS(_: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
     const ROWS: GridCoordinate = 5;
@@ -1090,7 +1089,7 @@ fn MAKE_SOME_BLOCKS(_: &Exhibit, _universe: &Universe) {
     subtitle: "",
     placement: Placement::Surface,
 )]
-fn DASHED_BOXES(_: &Exhibit, _universe: &Universe) {
+fn DASHED_BOXES(_: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
     let color = Rgb::new(1.0, 0.5, 0.5);
@@ -1142,7 +1141,7 @@ fn DASHED_BOXES(_: &Exhibit, _universe: &Universe) {
     subtitle: "Transparent blocks that can be passed through",
     placement: Placement::Surface,
 )]
-fn SWIMMING_POOL(_: &Exhibit, _: &Universe) {
+fn SWIMMING_POOL(_: Context<'_>) {
     let width = 6;
     let depth = 6;
     let water_area = GridAab::from_lower_size([0, -depth, 0], [width, depth, width]);
@@ -1164,11 +1163,11 @@ fn SWIMMING_POOL(_: &Exhibit, _: &Universe) {
     subtitle: "Using rotations XYZ, XyZ, XZY, xYZ",
     placement: Placement::Surface,
 )]
-fn IMAGES(_: &Exhibit, universe: &Universe) {
+fn IMAGES(ctx: Context<'_>) {
     // TODO: it would be nice if this exhibit visualized the generated bounding box somehow
 
     let mut txn = ExhibitTransaction::default();
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
     let mut outer_space = Space::empty(GridAab::from_lower_size([0, 0, 0], [4, 2, 1]));
@@ -1210,17 +1209,17 @@ fn IMAGES(_: &Exhibit, universe: &Universe) {
         "Blocks from the UI system (inactive)",
     placement: Placement::Surface,
 )]
-fn UI_BLOCKS(_: &Exhibit, universe: &Universe) {
+fn UI_BLOCKS(ctx: Context<'_>) {
     // TODO: This was designed for a render test and is still shaped for that rather than
     // any-viewpoint examination.
 
     use all_is_cubes_ui::vui::blocks::UiBlocks;
     use all_is_cubes_ui::vui::widgets::{ToolbarButtonState, WidgetBlocks};
 
-    let icons = BlockProvider::<all_is_cubes::inv::Icons>::using(universe)?;
+    let icons = BlockProvider::<all_is_cubes::inv::Icons>::using(ctx.universe)?;
     let icons = icons.iter().map(|(_, block)| block.clone());
 
-    let widget_blocks = BlockProvider::<WidgetBlocks>::using(universe)?;
+    let widget_blocks = BlockProvider::<WidgetBlocks>::using(ctx.universe)?;
     let widget_blocks = widget_blocks
             .iter()
             .filter(|&(key, _)| match key {
@@ -1235,7 +1234,7 @@ fn UI_BLOCKS(_: &Exhibit, universe: &Universe) {
             })
             .map(|(_, block)| block.clone());
 
-    let ui_blocks = BlockProvider::<UiBlocks>::using(universe)?;
+    let ui_blocks = BlockProvider::<UiBlocks>::using(ctx.universe)?;
     let ui_blocks = ui_blocks.iter().map(|(_, block)| block.clone());
 
     let all_blocks: Vec<Block> = icons.chain(widget_blocks).chain(ui_blocks).collect();
@@ -1279,8 +1278,8 @@ fn UI_BLOCKS(_: &Exhibit, universe: &Universe) {
     subtitle: "",
     placement: Placement::Surface,
 )]
-fn TREES(_: &Exhibit, universe: &Universe) {
-    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
+fn TREES(ctx: Context<'_>) {
+    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(ctx.universe)?;
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(128947981240);
 
     let n_x = 4;
@@ -1336,7 +1335,7 @@ fn TREES(_: &Exhibit, universe: &Universe) {
     subtitle: "Animation prototype",
     placement: Placement::Surface,
 )]
-fn DESTRUCTION(_: &Exhibit, universe: &Universe) {
+fn DESTRUCTION(ctx: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
     let width = 7;
@@ -1344,8 +1343,8 @@ fn DESTRUCTION(_: &Exhibit, universe: &Universe) {
     let footprint = GridAab::from_lower_size([0, 0, 0], [width, 3, 1]);
     let mut space = Space::empty(footprint);
 
-    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(ctx.universe)?;
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
     let block_to_destroy = &landscape_blocks[LandscapeBlocks::Grass];
 

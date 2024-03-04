@@ -12,8 +12,12 @@ pub(crate) struct Exhibit {
     pub name: &'static str,
     pub subtitle: &'static str,
     pub placement: Placement,
-    pub factory:
-        for<'a> fn(&'a Exhibit, &'a Universe) -> Result<(Space, ExhibitTransaction), InGenError>,
+    pub factory: for<'a> fn(Context<'a>) -> Result<(Space, ExhibitTransaction), InGenError>,
+}
+
+pub(crate) struct Context<'a> {
+    pub(super) exhibit: &'a Exhibit,
+    pub(super) universe: &'a Universe,
 }
 
 /// How an exhibit should be placed in the city surroundings.
