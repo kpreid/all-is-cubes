@@ -4,6 +4,7 @@ use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::GridCoordinate;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
+use all_is_cubes_ui::vui::widgets;
 
 use crate::city::CityPlanner;
 
@@ -18,6 +19,7 @@ pub(crate) struct Exhibit {
 pub(crate) struct Context<'a> {
     pub(super) exhibit: &'a Exhibit,
     pub(super) universe: &'a Universe,
+    pub(super) widget_theme: &'a widgets::WidgetTheme,
 }
 
 /// How an exhibit should be placed in the city surroundings.

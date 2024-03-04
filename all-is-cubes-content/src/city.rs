@@ -54,9 +54,10 @@ pub(crate) async fn demo_city<I: Instant>(
     // TODO: We want a "module loading" system that allows expressing dependencies.
     let mut install_txn = UniverseTransaction::default();
     let widget_theme_progress = p.start_and_cut(0.05, "WidgetTheme").await;
-    all_is_cubes_ui::vui::widgets::WidgetTheme::new(&mut install_txn, widget_theme_progress)
-        .await
-        .unwrap();
+    let widget_theme =
+        all_is_cubes_ui::vui::widgets::WidgetTheme::new(&mut install_txn, widget_theme_progress)
+            .await
+            .unwrap();
     let ui_blocks_progress = p.start_and_cut(0.05, "UiBlocks").await;
     all_is_cubes_ui::vui::blocks::UiBlocks::new(&mut install_txn, ui_blocks_progress)
         .await
@@ -264,7 +265,14 @@ pub(crate) async fn demo_city<I: Instant>(
     planner.occupied_plots.push(logo_location);
 
     // Exhibits
-    place_exhibits_in_city::<I>(exhibits_progress, universe, &mut planner, &mut space).await?;
+    place_exhibits_in_city::<I>(
+        exhibits_progress,
+        universe,
+        &widget_theme,
+        &mut planner,
+        &mut space,
+    )
+    .await?;
 
     // Lampposts
     'directions: for direction in road_directions {
@@ -316,6 +324,7 @@ pub(crate) async fn demo_city<I: Instant>(
 async fn place_exhibits_in_city<I: Instant>(
     exhibits_progress: YieldProgress,
     universe: &mut Universe,
+    widget_theme: &widgets::WidgetTheme,
     planner: &mut CityPlanner,
     space: &mut Space,
 ) -> Result<(), InGenError> {
@@ -332,7 +341,11 @@ async fn place_exhibits_in_city<I: Instant>(
 
         // Execute the exhibit factory function.
         // TODO: stop handing out mutable Universe access, so we can parallelize this loop
-        let ctx = Context { exhibit, universe };
+        let ctx = Context {
+            exhibit,
+            universe,
+            widget_theme,
+        };
         let (exhibit_space, exhibit_transaction) = match (exhibit.factory)(ctx) {
             Ok(s) => s,
             Err(error) => {
