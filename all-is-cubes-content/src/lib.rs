@@ -35,7 +35,6 @@ mod clouds;
 mod template;
 pub use template::*;
 mod dungeon;
-mod exhibits;
 mod fractal;
 mod landscape;
 pub use landscape::*;

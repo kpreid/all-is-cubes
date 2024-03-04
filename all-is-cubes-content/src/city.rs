@@ -30,9 +30,12 @@ use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::{logo::logo_text, vui, vui::widgets};
 
 use crate::alg::{space_to_space_copy, walk};
-use crate::{
-    clouds::clouds, exhibits::DEMO_CITY_EXHIBITS, wavy_landscape, DemoBlocks, LandscapeBlocks,
-};
+use crate::{clouds::clouds, wavy_landscape, DemoBlocks, LandscapeBlocks};
+
+mod exhibit;
+use exhibit::{Exhibit, Placement};
+mod exhibits;
+use exhibits::DEMO_CITY_EXHIBITS;
 
 pub(crate) async fn demo_city<I: Instant>(
     universe: &mut Universe,
@@ -588,31 +591,6 @@ fn place_lamppost(
     space.set(globe_position, &demo_blocks[Lamp])?;
 
     Ok(())
-}
-
-#[allow(clippy::type_complexity)]
-pub(crate) struct Exhibit {
-    pub name: &'static str,
-    pub subtitle: &'static str,
-    pub placement: Placement,
-    pub factory:
-        for<'a> fn(&'a Exhibit, &'a Universe) -> Result<(Space, UniverseTransaction), InGenError>,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum Placement {
-    Surface,
-    #[allow(unused)] // TODO: polish this and then use it
-    Underground,
-}
-
-impl Placement {
-    fn floor(self) -> GridCoordinate {
-        match self {
-            Placement::Surface => CityPlanner::SURFACE_Y,
-            Placement::Underground => CityPlanner::UNDERGROUND_FLOOR_Y,
-        }
-    }
 }
 
 /// Generate a Space containing text voxels to put on the signboard for an exhibit.

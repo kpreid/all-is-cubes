@@ -36,13 +36,11 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::{include_image, rgb_const, rgba_const};
 
 use crate::alg::{four_walls, voronoi_pattern};
-use crate::city::{Exhibit, Placement};
+use crate::city::exhibit::{exhibit, Exhibit, ExhibitTransaction, Placement};
 use crate::{
     make_slab_txn, make_some_blocks, make_some_voxel_blocks_txn, palette, tree, AnimatedVoxels,
     DemoBlocks, Fire, LandscapeBlocks,
 };
-
-type ExhibitTransaction = all_is_cubes::universe::UniverseTransaction;
 
 /// All exhibits which will show up in [`crate::UniverseTemplate::DemoCity`].
 ///
@@ -72,20 +70,6 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     ZOOM,
     BECOME,
 ];
-
-macro_rules! exhibit {
-    (
-        #[exhibit($( $fields:tt )*)]
-        fn $name:ident($( $args:tt )*) {
-            $( $body:tt )*
-        }
-    ) => {
-        const $name: Exhibit = Exhibit {
-            factory: |$( $args )*| { $( $body )* },
-            $( $fields )*
-        };
-    }
-}
 
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
@@ -1406,6 +1390,8 @@ fn DESTRUCTION(_: &Exhibit, universe: &Universe) {
 
     Ok((space, txn))
 }
+
+// --- Helper functions ----------------------------------------------------------------------------
 
 /// Place a series of blocks on top of each other, starting at the specified point.
 ///
