@@ -88,7 +88,7 @@ polonius-the-crab = { version = "0.4.1" }
 pretty_assertions = "1.2.0"
 rand = { version = "0.8.3", default-features = false }
 rand_xoshiro = "0.6.0"
-rayon = { version = "1.8.0" }
+rayon = { version = "1.9.0" }
 re_log_types = { version = "0.13.0", default-features = false }
 re_sdk = { version = "0.13.0", default-features = false }
 re_types = { version = "0.13.0", default-features = false }
