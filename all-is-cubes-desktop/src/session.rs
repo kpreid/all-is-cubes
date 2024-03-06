@@ -35,6 +35,12 @@ pub struct DesktopSession<Ren, Win> {
     /// Whatever handle or other state is needed to maintain the window or interact with the event loop.
     pub(crate) window: Win,
 
+    /// Gamepad input manager.
+    ///
+    /// TODO: For multi-session/multi-window, this should be shared and communicate to the
+    /// foreground window, rather than one per session.
+    gilrs: Option<gilrs::Gilrs>,
+
     /// The current viewport size linked to the renderer.
     pub(crate) viewport_cell: ListenableCell<Viewport>,
     pub(crate) clock_source: ClockSource,
@@ -60,7 +66,21 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         window: Win,
         session: Session,
         viewport_cell: ListenableCell<Viewport>,
+        enable_gamepad_input: bool,
     ) -> Self {
+        // TODO: There should be one of this for the whole event loop, not per session
+        let gilrs = if enable_gamepad_input {
+            match gilrs::Gilrs::new() {
+                Ok(gilrs) => Some(gilrs),
+                Err(e) => {
+                    log::error!("Failed to access gamepads: {:?}", ErrorChain(&e));
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         let new_self = Self {
             session_info_altered: DirtyFlag::listening(false, session.universe_info()),
 
@@ -68,6 +88,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
             executor,
             renderer,
             window,
+            gilrs,
             viewport_cell,
             clock_source: ClockSource::Instant,
             audio: None,
@@ -81,6 +102,10 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
 
     /// Steps the [`Universe`] if the [`ClockSource`] says to.
     pub fn advance_time_and_maybe_step(&mut self) -> Option<UniverseStepInfo> {
+        if let Some(gilrs) = &mut self.gilrs {
+            crate::glue::gilrs::apply_gilrs_events(gilrs, &mut self.session.input_processor);
+        }
+
         match self.clock_source {
             ClockSource::Instant => {
                 self.session.frame_clock.advance_to(Instant::now());
@@ -176,6 +201,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
                 executor: self.executor,
                 renderer: (),
                 window: (),
+                gilrs: self.gilrs,
                 viewport_cell: self.viewport_cell,
                 clock_source: self.clock_source,
                 audio: self.audio,
@@ -233,6 +259,7 @@ mod tests {
             },
             Session::builder().build().await,
             ListenableCell::new(Viewport::ARBITRARY),
+            false,
         ));
 
         assert_eq!(

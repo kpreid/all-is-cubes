@@ -245,7 +245,7 @@ fn main() -> Result<(), anyhow::Error> {
                     duration.map(Duration::from_secs_f64),
                 )
             },
-            DesktopSession::new(executor, (), (), session, viewport_cell),
+            DesktopSession::new(executor, (), (), session, viewport_cell, false),
         ),
     }
 }

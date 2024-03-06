@@ -262,7 +262,7 @@ pub async fn create_winit_wgpu_desktop_session(
     )
     .await?;
 
-    let dsession = DesktopSession::new(executor, renderer, window, session, viewport_cell);
+    let dsession = DesktopSession::new(executor, renderer, window, session, viewport_cell, true);
 
     let ready_time = Instant::now();
     log::debug!(

@@ -153,6 +153,7 @@ pub fn create_terminal_session(
         TerminalWindow::new().context("failed to create TerminalWindow")?,
         session,
         viewport_cell,
+        false, // tty might be remote, so no gamepad input
     ))
 }
 

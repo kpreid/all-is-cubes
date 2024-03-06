@@ -17,6 +17,7 @@ pub(crate) mod crossterm;
 #[cfg(feature = "rerun")]
 pub(crate) mod rerun_mesh;
 pub(crate) mod winit;
+pub(crate) mod gilrs;
 
 /// Abstraction over different window types.
 // TODO: seal this trait
