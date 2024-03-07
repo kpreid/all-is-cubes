@@ -20,6 +20,7 @@ use all_is_cubes::math::{Face6, FreeVector, GridAab, GridVector, Rgba};
 use all_is_cubes::{notnan, time};
 use all_is_cubes_mesh::{BlockVertex, Coloring};
 
+use crate::in_wgpu::shaders::Shaders;
 use crate::in_wgpu::{
     self,
     camera::ShaderSpaceCamera,
@@ -49,14 +50,13 @@ where
     #[cfg_attr(target_family = "wasm", allow(clippy::arc_with_non_send_sync))]
     let device = Arc::new(device);
 
-    let test_shader_source: String = in_wgpu::pipelines::BLOCKS_AND_LINES_SHADER
-        .as_source()
-        .snapshot()
-        .to_string()
-        + test_wgsl;
+    let shaders = Shaders::new(&device);
+    let test_shader_source: String =
+        shaders.blocks_and_lines.get_source_text().to_string() + test_wgsl;
 
     let fbt = FramebufferTextures::new(
         &device,
+        &shaders,
         FbtConfig::new(
             // TODO: We don't actually need a SurfaceConfiguration here, only its size.
             &wgpu::SurfaceConfiguration {
@@ -77,6 +77,7 @@ where
 
     let pipelines = in_wgpu::pipelines::Pipelines::new(
         &device,
+        &shaders,
         &fbt,
         ListenableSource::constant(GraphicsOptions::default()),
     );

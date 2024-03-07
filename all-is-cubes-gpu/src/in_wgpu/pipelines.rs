@@ -1,17 +1,14 @@
 use std::mem;
 
-use once_cell::sync::Lazy;
-
 use all_is_cubes::camera::{GraphicsOptions, TransparencyOption};
 use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::listen::{Listen, ListenableSource};
 
 use crate::in_wgpu::frame_texture::FramebufferTextures;
-use crate::in_wgpu::glue::create_wgsl_module_from_reloadable;
+use crate::in_wgpu::shaders::Shaders;
 use crate::in_wgpu::vertex::WgpuBlockVertex;
 use crate::in_wgpu::vertex::WgpuInstanceData;
 use crate::in_wgpu::vertex::WgpuLinesVertex;
-use crate::reloadable::{reloadable_str, Reloadable};
 
 /// Resources needed for rendering that aren't actually specific to any content and so
 /// don't need to be modified under normal circumstances.
@@ -75,25 +72,15 @@ pub(crate) struct Pipelines {
     pub(crate) skybox_sampler: wgpu::Sampler,
 }
 
-/// Shader code for rendering `Space` content, and debug lines.
-///
-/// Public for use in `shader_tests`.
-pub(crate) static BLOCKS_AND_LINES_SHADER: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/blocks-and-lines.wgsl"));
-
-static FRAME_COPY_SHADER: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/frame-copy.wgsl"));
-#[cfg(feature = "rerun")]
-static RERUN_COPY_SHADER: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/rerun-copy.wgsl"));
-
 impl Pipelines {
     /// * `device` is used to create pipelines.
+    /// * `shaders` supplies shaders and may be needed in the future as well.
     /// * `fb` is used to determine what texture formats these pipelines must be compatible
     ///   with.
     /// * `graphics_options` is used to determine transparency behavior.
     pub fn new(
         device: &wgpu::Device,
+        shaders: &Shaders,
         fb: &FramebufferTextures,
         graphics_options: ListenableSource<GraphicsOptions>,
     ) -> Self {
@@ -102,18 +89,6 @@ impl Pipelines {
         // the graphics options used to make that decision should be fetched in exactly one
         // place to ensure that no skew occurs.
         let current_graphics_options = graphics_options.get();
-
-        let blocks_and_lines_shader = create_wgsl_module_from_reloadable(
-            device,
-            "blocks-and-lines",
-            &BLOCKS_AND_LINES_SHADER,
-        );
-
-        let frame_copy_shader =
-            create_wgsl_module_from_reloadable(device, "frame-copy", &FRAME_COPY_SHADER);
-        #[cfg(feature = "rerun")]
-        let rerun_copy_shader =
-            create_wgsl_module_from_reloadable(device, "rerun-copy", &RERUN_COPY_SHADER);
 
         let block_texture_entry = |binding| wgpu::BindGroupLayoutEntry {
             binding,
@@ -206,12 +181,12 @@ impl Pipelines {
                 label: Some("Pipelines::opaque_render_pipeline"),
                 layout: Some(&block_render_pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: &blocks_and_lines_shader,
+                    module: shaders.blocks_and_lines.get(),
                     entry_point: "block_vertex_main",
                     buffers: vertex_buffers,
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: &blocks_and_lines_shader,
+                    module: shaders.blocks_and_lines.get(),
                     entry_point: "block_fragment_opaque",
                     targets: &[Some(wgpu::ColorTargetState {
                         format: fb.linear_scene_texture_format(),
@@ -236,12 +211,12 @@ impl Pipelines {
                 label: Some("Pipelines::transparent_render_pipeline"),
                 layout: Some(&block_render_pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: &blocks_and_lines_shader,
+                    module: shaders.blocks_and_lines.get(),
                     entry_point: "block_vertex_main",
                     buffers: vertex_buffers,
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: &blocks_and_lines_shader,
+                    module: shaders.blocks_and_lines.get(),
                     entry_point: match current_graphics_options.transparency {
                         TransparencyOption::Volumetric => "block_fragment_transparent_volumetric",
                         TransparencyOption::Surface | TransparencyOption::Threshold(_) => {
@@ -288,12 +263,12 @@ impl Pipelines {
                 // The skybox entry points are in the blocks shader because the fog
                 // uses the skybox texture too.
                 vertex: wgpu::VertexState {
-                    module: &blocks_and_lines_shader,
+                    module: shaders.blocks_and_lines.get(),
                     entry_point: "skybox_vertex",
                     buffers: &[],
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: &blocks_and_lines_shader,
+                    module: shaders.blocks_and_lines.get(),
                     entry_point: "skybox_fragment",
                     targets: &[Some(wgpu::ColorTargetState {
                         format: fb.linear_scene_texture_format(),
@@ -326,12 +301,12 @@ impl Pipelines {
                 label: Some("Pipelines::lines_render_pipeline"),
                 layout: Some(&lines_render_pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: &blocks_and_lines_shader,
+                    module: shaders.blocks_and_lines.get(),
                     entry_point: "lines_vertex",
                     buffers: &[WgpuLinesVertex::desc()],
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: &blocks_and_lines_shader,
+                    module: shaders.blocks_and_lines.get(),
                     entry_point: "lines_fragment",
                     targets: &[Some(wgpu::ColorTargetState {
                         format: fb.linear_scene_texture_format(),
@@ -386,12 +361,12 @@ impl Pipelines {
                 }),
             ),
             vertex: wgpu::VertexState {
-                module: &frame_copy_shader,
+                module: shaders.frame_copy.get(),
                 entry_point: "frame_copy_vertex",
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &frame_copy_shader,
+                module: shaders.frame_copy.get(),
                 entry_point: "frame_copy_fragment",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: wgpu::TextureFormat::Rgba16Float,
@@ -464,12 +439,12 @@ impl Pipelines {
                 }),
             ),
             vertex: wgpu::VertexState {
-                module: &rerun_copy_shader,
+                module: shaders.rerun_copy.get(),
                 entry_point: "rerun_frame_copy_vertex",
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &rerun_copy_shader,
+                module: shaders.rerun_copy.get(),
                 entry_point: "rerun_frame_copy_fragment",
                 targets: &[
                     Some(wgpu::ColorTargetState {
@@ -514,10 +489,7 @@ impl Pipelines {
         });
 
         let dirty = DirtyFlag::new(false);
-        BLOCKS_AND_LINES_SHADER.as_source().listen(dirty.listener());
-        FRAME_COPY_SHADER.as_source().listen(dirty.listener());
-        #[cfg(feature = "rerun")]
-        RERUN_COPY_SHADER.as_source().listen(dirty.listener());
+        shaders.listen(dirty.listener());
         graphics_options.listen(dirty.listener());
 
         Self {
@@ -541,12 +513,18 @@ impl Pipelines {
         }
     }
 
-    pub(crate) fn rebuild_if_changed(&mut self, device: &wgpu::Device, fb: &FramebufferTextures) {
+    pub(crate) fn rebuild_if_changed(
+        &mut self,
+        device: &wgpu::Device,
+        shaders: &Shaders,
+        fb: &FramebufferTextures,
+    ) {
         if self.dirty.get_and_clear() {
             // TODO: Maybe we should split shader compilation and other changes, and keep the
             // non-dependent parts.
             *self = Self::new(
                 device,
+                shaders,
                 fb,
                 mem::replace(
                     &mut self.graphics_options,

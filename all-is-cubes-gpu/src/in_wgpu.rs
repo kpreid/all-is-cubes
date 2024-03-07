@@ -23,6 +23,7 @@ use all_is_cubes::time;
 use all_is_cubes::util::Executor;
 
 use crate::in_wgpu::raytrace_to_texture::RaytraceToTexture;
+use crate::in_wgpu::shaders::Shaders;
 #[cfg(feature = "rerun")]
 use crate::RerunFilter;
 use crate::{
@@ -56,6 +57,7 @@ mod raytrace_to_texture;
 mod rerun_image;
 #[doc(hidden)] // public for tests/shader_tests.rs
 pub mod shader_testing;
+mod shaders;
 mod skybox;
 mod space;
 use space::SpaceRenderer;
@@ -214,7 +216,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
                 flaws: ui_flaws, ..
             },
         } = draw_info.space_info;
-        let info = RenderInfo {
+        let mut info = RenderInfo {
             waiting_for_gpu: after_get.saturating_duration_since(before_get),
             flaws: update_info.flaws | world_flaws | ui_flaws,
             update: update_info,
@@ -224,7 +226,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         // Render info and postprocessing step.
         // TODO: We should record the amount of time this takes, then display that
         // next frame.
-        self.everything.add_info_text_and_postprocess(
+        info.flaws |= self.everything.add_info_text_and_postprocess(
             &self.queue,
             &output.texture.create_view(&TextureViewDescriptor {
                 format: Some(surface_view_format(self.everything.config.format)),
@@ -260,6 +262,9 @@ struct EverythingRenderer<I: time::Instant> {
 
     fb: FramebufferTextures,
 
+    /// Shaders compiled for this Device
+    shaders: Shaders,
+
     /// Pipelines and layouts for rendering Space content
     pipelines: Pipelines,
 
@@ -274,12 +279,11 @@ struct EverythingRenderer<I: time::Instant> {
     lines_vertex_count: u32,
 
     /// Pipeline for the color postprocessing + info text layer drawing.
-    postprocess_render_pipeline: wgpu::RenderPipeline,
+    postprocess_render_pipeline: Memo<wgpu::Id<wgpu::ShaderModule>, wgpu::RenderPipeline>,
     #[allow(clippy::type_complexity)]
     postprocess_bind_group:
         Memo<(wgpu::Id<wgpu::TextureView>, frame_texture::FbtId), wgpu::BindGroup>,
     postprocess_bind_group_layout: wgpu::BindGroupLayout,
-    postprocess_shader_dirty: DirtyFlag,
     postprocess_camera_buffer: wgpu::Buffer,
 
     /// Debug overlay text is uploaded via this texture
@@ -301,6 +305,7 @@ impl<I: time::Instant> fmt::Debug for EverythingRenderer<I> {
             cameras,
             config,
             fb: _,
+            shaders: _,
             pipelines: _,
             space_renderers,
             rt: _,
@@ -309,7 +314,6 @@ impl<I: time::Instant> fmt::Debug for EverythingRenderer<I> {
             postprocess_render_pipeline: _,
             postprocess_bind_group: _,
             postprocess_bind_group_layout: _,
-            postprocess_shader_dirty,
             postprocess_camera_buffer: _,
             info_text_texture: _,
             info_text_sampler: _,
@@ -324,7 +328,6 @@ impl<I: time::Instant> fmt::Debug for EverythingRenderer<I> {
             .field("config", &config)
             .field("space_renderers", &space_renderers)
             .field("lines_vertex_count", &lines_vertex_count)
-            .field("postprocess_shader_dirty", &postprocess_shader_dirty)
             .finish_non_exhaustive()
     }
 }
@@ -351,6 +354,8 @@ impl<I: time::Instant> EverythingRenderer<I> {
     ) -> Self {
         let viewport = cameras.viewport();
 
+        let shaders = Shaders::new(&device);
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -366,6 +371,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
         let fb = FramebufferTextures::new(
             &device,
+            &shaders,
             frame_texture::FbtConfig::new(
                 &config,
                 FbtFeatures::new(adapter),
@@ -377,7 +383,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         let postprocess_bind_group_layout =
             postprocess::create_postprocess_bind_group_layout(&device);
 
-        let pipelines = Pipelines::new(&device, &fb, cameras.graphics_options_source());
+        let pipelines = Pipelines::new(&device, &shaders, &fb, cameras.graphics_options_source());
         let block_texture = AtlasAllocator::new("EverythingRenderer");
 
         let mut new_self = EverythingRenderer {
@@ -410,15 +416,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             lines_buffer: ResizingBuffer::default(),
             lines_vertex_count: 0,
 
-            postprocess_shader_dirty: DirtyFlag::listening(
-                false,
-                postprocess::POSTPROCESS_SHADER.as_source(),
-            ),
-            postprocess_render_pipeline: postprocess::create_postprocess_pipeline(
-                &device,
-                &postprocess_bind_group_layout,
-                config.format,
-            ),
+            postprocess_render_pipeline: Memo::new(),
             postprocess_bind_group_layout,
             postprocess_bind_group: Memo::new(),
             postprocess_camera_buffer: device.create_buffer(&wgpu::BufferDescriptor {
@@ -449,8 +447,11 @@ impl<I: time::Instant> EverythingRenderer<I> {
             device,
             config,
             cameras,
+            shaders,
             pipelines,
         };
+        // Ensure that we *always* have a postprocess pipeline ready.
+        new_self.update_postprocess_pipeline();
         // create initial texture
         new_self.info_text_texture.resize(
             &new_self.device,
@@ -476,6 +477,11 @@ impl<I: time::Instant> EverythingRenderer<I> {
         // This updates camera matrices and graphics options which we are going to consult
         // or copy to the GPU.
         self.cameras.update();
+
+        // Recompile shaders if needed.
+        // Note this must happen before the viewport update
+        // because the viewport update currently includes bloom pipeline building.
+        self.shaders.update(&self.device);
 
         // Update viewport-sized resources from viewport.
         {
@@ -508,6 +514,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             // Note: this must happen before `self.pipelines` is updated!
             self.fb.rebuild_if_changed(
                 &self.device,
+                &self.shaders,
                 frame_texture::FbtConfig::new(
                     &self.config,
                     self.fb.config().features,
@@ -517,16 +524,10 @@ impl<I: time::Instant> EverythingRenderer<I> {
             );
         }
 
-        // Recompile shaders and pipeline if needed.
-        if self.postprocess_shader_dirty.get_and_clear() {
-            self.postprocess_render_pipeline = postprocess::create_postprocess_pipeline(
-                &self.device,
-                &self.postprocess_bind_group_layout,
-                self.config.format,
-            );
-        }
-        // Note: this must happen after `self.fb` is updated!
-        self.pipelines.rebuild_if_changed(&self.device, &self.fb);
+        // Recompile pipelines if needed.
+        self.update_postprocess_pipeline();
+        self.pipelines
+            .rebuild_if_changed(&self.device, &self.shaders, &self.fb);
 
         // Identify spaces to be rendered
         let ws = self.cameras.world_space().snapshot(); // TODO: ugly
@@ -673,6 +674,20 @@ impl<I: time::Instant> EverythingRenderer<I> {
             submit_time: Some(finish_update_time.saturating_duration_since(lines_to_submit_time)),
             spaces: space_infos,
         })
+    }
+
+    fn update_postprocess_pipeline(&mut self) {
+        self.postprocess_render_pipeline.get_or_insert(
+            self.shaders.postprocess.get().global_id(),
+            || {
+                postprocess::create_postprocess_pipeline(
+                    &self.device,
+                    &self.shaders,
+                    &self.postprocess_bind_group_layout,
+                    self.config.format,
+                )
+            },
+        );
     }
 
     /// Render the current scene content to the linear scene texture,
@@ -828,12 +843,13 @@ impl<I: time::Instant> EverythingRenderer<I> {
         })
     }
 
-    pub fn add_info_text_and_postprocess(
+    #[must_use]
+    pub(crate) fn add_info_text_and_postprocess(
         &mut self,
         queue: &wgpu::Queue,
         output: &wgpu::TextureView,
         mut text: &str,
-    ) {
+    ) -> Flaws {
         // Apply info text option
         if !self.cameras.cameras().world.options().debug_info_text {
             text = "";
@@ -849,10 +865,12 @@ impl<I: time::Instant> EverythingRenderer<I> {
             info_text_texture.upload(queue);
         }
 
-        postprocess::postprocess(self, queue, output);
+        let flaws = postprocess::postprocess(self, queue, output);
 
         #[cfg(feature = "rerun")]
         self.rerun_image.finish_frame();
+
+        flaws
     }
 
     /// Activate logging performance information to a Rerun stream.

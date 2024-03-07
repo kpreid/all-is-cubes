@@ -1,17 +1,13 @@
 //! Miscellaneous conversion functions and trait impls for [`wgpu`].
 
-use std::borrow::Cow;
 use std::ops::Range;
-use std::sync::Arc;
 
-use all_is_cubes::euclid::{Point3D, Vector3D};
-use all_is_cubes_mesh::IndexSlice;
 use bytemuck::Pod;
 use wgpu::util::DeviceExt as _;
 
+use all_is_cubes::euclid::{Point3D, Vector3D};
 use all_is_cubes::math::{GridAab, GridCoordinate, GridSize, Rgba};
-
-use crate::reloadable::Reloadable;
+use all_is_cubes_mesh::IndexSlice;
 
 /// A vector of 3 f32s padded to resemble a vector of 4, to satisfy
 /// GPU alignment expectations.
@@ -58,18 +54,6 @@ pub fn to_wgpu_index_format(slice: IndexSlice<'_>) -> wgpu::IndexFormat {
 
 pub fn to_wgpu_index_range(range: Range<usize>) -> Range<u32> {
     range.start.try_into().unwrap()..range.end.try_into().unwrap()
-}
-
-pub(crate) fn create_wgsl_module_from_reloadable(
-    device: &wgpu::Device,
-    label: &str,
-    r: &Reloadable,
-) -> wgpu::ShaderModule {
-    let current_source: Arc<str> = r.as_source().snapshot();
-    device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some(label),
-        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*current_source)),
-    })
 }
 
 /// Write to a texture, with the region written specified by a [`GridAab`].

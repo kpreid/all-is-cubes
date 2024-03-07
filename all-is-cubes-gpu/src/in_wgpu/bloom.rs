@@ -1,14 +1,6 @@
 use std::sync::Arc;
 
-use once_cell::sync::Lazy;
-
-use all_is_cubes::listen::{DirtyFlagListener, Listen};
-
-use crate::in_wgpu::glue::create_wgsl_module_from_reloadable;
-use crate::reloadable::{reloadable_str, Reloadable};
-
-static BLOOM_SHADER: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/bloom.wgsl"));
+use crate::in_wgpu::shaders::Shaders;
 
 #[derive(Debug)]
 pub(crate) struct BloomPipelines {
@@ -16,19 +8,15 @@ pub(crate) struct BloomPipelines {
     linear_sampler: wgpu::Sampler,
     downsample_pipeline: wgpu::RenderPipeline,
     upsample_pipeline: wgpu::RenderPipeline,
+    bloom_shader_id: wgpu::Id<wgpu::ShaderModule>,
 }
 
 impl BloomPipelines {
     pub fn new(
         device: &wgpu::Device,
+        shaders: &Shaders,
         linear_scene_texture_format: wgpu::TextureFormat,
     ) -> Arc<Self> {
-        let shader = create_wgsl_module_from_reloadable(
-            device,
-            "BloomPipelines::bloom_shader",
-            &BLOOM_SHADER,
-        );
-
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
                 // Binding for input texture
@@ -73,12 +61,12 @@ impl BloomPipelines {
             label: Some("BloomPipelines::downsample_pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader,
+                module: shaders.bloom.get(),
                 entry_point: "bloom_vertex",
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shader,
+                module: shaders.bloom.get(),
                 entry_point: "bloom_downsample_fragment",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: linear_scene_texture_format,
@@ -96,12 +84,12 @@ impl BloomPipelines {
             label: Some("BloomPipelines::upsample_pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader,
+                module: shaders.bloom.get(),
                 entry_point: "bloom_vertex",
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shader,
+                module: shaders.bloom.get(),
                 entry_point: "bloom_upsample_fragment",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: linear_scene_texture_format,
@@ -131,6 +119,7 @@ impl BloomPipelines {
                 mipmap_filter: wgpu::FilterMode::Nearest,
                 ..Default::default()
             }),
+            bloom_shader_id: shaders.bloom.get().global_id(),
 
             downsample_pipeline,
             upsample_pipeline,
@@ -158,11 +147,6 @@ impl BloomPipelines {
             label: Some("BloomPipelines::bind_group"),
         })
     }
-
-    #[allow(unused)] // TODO: unused because reloading not hooked up
-    pub(crate) fn listen_for_reload(&self, listener: DirtyFlagListener) {
-        BLOOM_SHADER.as_source().listen(listener);
-    }
 }
 
 /// Resources for executing bloom on a specific image size.
@@ -176,6 +160,8 @@ pub(crate) struct BloomResources {
     render_bundles: Vec<(String, wgpu::RenderBundle, wgpu::TextureView)>,
 
     pub bloom_output_texture_view: wgpu::TextureView,
+
+    bloom_shader_id: wgpu::Id<wgpu::ShaderModule>,
 }
 
 impl BloomResources {
@@ -265,6 +251,7 @@ impl BloomResources {
             render_bundles,
 
             bloom_output_texture_view: bloom_mip_view(0, &bloom_texture),
+            bloom_shader_id: pipelines.bloom_shader_id,
         }
     }
 
@@ -285,6 +272,11 @@ impl BloomResources {
             });
             render_pass.execute_bundles([bundle]);
         }
+    }
+
+    /// For determinig whether this is outdated
+    pub(crate) fn bloom_shader_id(&self) -> wgpu::Id<wgpu::ShaderModule> {
+        self.bloom_shader_id
     }
 }
 

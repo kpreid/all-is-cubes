@@ -63,6 +63,11 @@ pub(crate) struct DrawInfo {
     /// `None` if the graphics API does not expose this as a step.
     pub(crate) submit_time: Option<Duration>,
 }
+impl DrawInfo {
+    pub(crate) fn flaws(&self) -> Flaws {
+        self.space_info.world.flaws | self.space_info.ui.flaws
+    }
+}
 
 impl Fmt<StatusText> for RenderInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {

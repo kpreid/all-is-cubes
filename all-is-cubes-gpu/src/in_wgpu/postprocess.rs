@@ -5,16 +5,10 @@
 
 use std::sync::Arc;
 
-use once_cell::sync::Lazy;
-
-use all_is_cubes::camera::{GraphicsOptions, ToneMappingOperator};
+use all_is_cubes::camera::{Flaws, GraphicsOptions, ToneMappingOperator};
 use all_is_cubes::time;
 
-use crate::in_wgpu::glue::create_wgsl_module_from_reloadable;
-use crate::reloadable::{reloadable_str, Reloadable};
-
-pub(crate) static POSTPROCESS_SHADER: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/postprocess.wgsl"));
+use crate::in_wgpu::shaders::Shaders;
 
 pub(crate) fn create_postprocess_bind_group_layout(
     device: &Arc<wgpu::Device>,
@@ -80,15 +74,10 @@ pub(crate) fn create_postprocess_bind_group_layout(
 /// Read postprocessing shader and create the postprocessing render pipeline.
 pub(crate) fn create_postprocess_pipeline(
     device: &wgpu::Device,
+    shaders: &Shaders,
     postprocess_bind_group_layout: &wgpu::BindGroupLayout,
     surface_format: wgpu::TextureFormat,
 ) -> wgpu::RenderPipeline {
-    let postprocess_shader = create_wgsl_module_from_reloadable(
-        device,
-        "EverythingRenderer::postprocess_shader",
-        &POSTPROCESS_SHADER,
-    );
-
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("EverythingRenderer::postprocess_pipeline_layout"),
         bind_group_layouts: &[postprocess_bind_group_layout],
@@ -99,12 +88,12 @@ pub(crate) fn create_postprocess_pipeline(
         label: Some("EverythingRenderer::postprocess_render_pipeline"),
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
-            module: &postprocess_shader,
+            module: shaders.postprocess.get(),
             entry_point: "postprocess_vertex",
             buffers: &[],
         },
         fragment: Some(wgpu::FragmentState {
-            module: &postprocess_shader,
+            module: shaders.postprocess.get(),
             entry_point: "postprocess_fragment",
             targets: &[Some(wgpu::ColorTargetState {
                 format: super::surface_view_format(surface_format),
@@ -165,17 +154,23 @@ impl PostprocessUniforms {
     }
 }
 
+#[must_use]
 pub(crate) fn postprocess<I: time::Instant>(
     // TODO: instead of accepting `EverythingRenderer`, pass smaller (but not too numerous) things
     ev: &mut super::EverythingRenderer<I>,
     queue: &wgpu::Queue,
     output: &wgpu::TextureView,
-) {
+) -> Flaws {
     let mut encoder = ev
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("add_info_text_and_postprocess() encoder"),
         });
+
+    let Some(postprocess_render_pipeline) = ev.postprocess_render_pipeline.get() else {
+        // This shouldn't happen, but if it does, don't panic.
+        return Flaws::UNFINISHED;
+    };
 
     // Render pass
     {
@@ -192,7 +187,7 @@ pub(crate) fn postprocess<I: time::Instant>(
             ..Default::default()
         });
 
-        render_pass.set_pipeline(&ev.postprocess_render_pipeline);
+        render_pass.set_pipeline(postprocess_render_pipeline);
         render_pass.set_bind_group(
             0,
             ev.postprocess_bind_group.get_or_insert(
@@ -241,4 +236,6 @@ pub(crate) fn postprocess<I: time::Instant>(
     }
 
     queue.submit(std::iter::once(encoder.finish()));
+
+    Flaws::empty()
 }

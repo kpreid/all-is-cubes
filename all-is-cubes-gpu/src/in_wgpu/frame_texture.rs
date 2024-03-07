@@ -6,6 +6,7 @@ use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
 use all_is_cubes::euclid::Size2D;
 
 use super::bloom;
+use crate::in_wgpu::shaders::Shaders;
 use crate::EgFramebuffer;
 
 /// A RGBA [`wgpu::Texture`] with a CPU-side buffer that can be drawn on.
@@ -196,7 +197,7 @@ impl FramebufferTextures {
     pub const LINEAR_SCENE_TEXTURE_USAGES: wgpu::TextureUsages =
         wgpu::TextureUsages::RENDER_ATTACHMENT.union(wgpu::TextureUsages::TEXTURE_BINDING);
 
-    pub fn new(device: &wgpu::Device, config: FbtConfig) -> Self {
+    pub fn new(device: &wgpu::Device, shaders: &Shaders, config: FbtConfig) -> Self {
         let mut linear_scene_texture_usages_with_copy = Self::LINEAR_SCENE_TEXTURE_USAGES;
         if config.enable_copy_out {
             linear_scene_texture_usages_with_copy |= wgpu::TextureUsages::COPY_SRC;
@@ -273,7 +274,7 @@ impl FramebufferTextures {
                 device,
                 // TODO: Don't reconstruct on every resize, but reuse it. Has a circularity
                 // problem with needing FbtConfig, but it really only needs FbtFeatures.
-                bloom::BloomPipelines::new(device, config.linear_scene_texture_format),
+                bloom::BloomPipelines::new(device, shaders, config.linear_scene_texture_format),
                 &config,
                 bloom_input_view,
             )),
@@ -372,10 +373,16 @@ impl FramebufferTextures {
     pub(crate) fn rebuild_if_changed(
         &mut self,
         device: &wgpu::Device,
+        shaders: &Shaders,
         new_config: FbtConfig,
     ) -> bool {
-        if new_config != self.config {
-            *self = Self::new(device, new_config);
+        if new_config != self.config
+            || self
+                .bloom
+                .as_ref()
+                .is_some_and(|b| b.bloom_shader_id() != shaders.bloom.get().global_id())
+        {
+            *self = Self::new(device, shaders, new_config);
             true
         } else {
             false

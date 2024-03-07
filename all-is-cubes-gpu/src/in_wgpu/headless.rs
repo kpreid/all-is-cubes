@@ -217,8 +217,8 @@ impl RendererImpl {
             self.color_texture = create_color_texture(&self.device, viewport);
         }
 
-        let _draw_info = self.everything.draw_frame_linear(&self.queue).unwrap();
-        self.everything.add_info_text_and_postprocess(
+        let draw_info = self.everything.draw_frame_linear(&self.queue).unwrap();
+        let post_flaws = self.everything.add_info_text_and_postprocess(
             &self.queue,
             &self
                 .color_texture
@@ -229,7 +229,7 @@ impl RendererImpl {
             self.device.clone(),
             &self.queue,
             &self.color_texture,
-            self.flaws,
+            self.flaws | draw_info.flaws() | post_flaws,
         )
         .await;
         debug_assert_eq!(viewport.framebuffer_size, image.size);
