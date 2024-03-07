@@ -566,18 +566,37 @@ fn set_physics_notification() {
 }
 
 #[test]
+fn block_tick_action_does_not_run_paused() {
+    let vanisher = Block::builder()
+        .color(Rgba::WHITE)
+        .tick_action(TickAction {
+            operation: Operation::Become(AIR),
+            period: NonZeroU16::MIN,
+        })
+        .build();
+    let mut space = Space::empty_positive(1, 1, 1);
+    space.set([0, 0, 0], &vanisher).unwrap();
+    let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
+
+    // No effect when paused
+    _ = space.step(None, clock.advance(true), time::DeadlineStd::Whenever);
+    assert_eq!(space[[0, 0, 0]], vanisher);
+
+    // Operation applied when unpaused
+    _ = space.step(None, clock.advance(false), time::DeadlineStd::Whenever);
+    assert_eq!(space[[0, 0, 0]], AIR);
+}
+
+#[test]
 fn block_tick_action_timing() {
     let [mut block1, mut block2, block3] = make_some_blocks();
 
     // Hook them up to turn into each other
     fn connect(from: &mut Block, to: &Block) {
         if let Primitive::Atom(Atom { attributes, .. }) = from.primitive_mut() {
-            attributes.tick_action = Some({
-                let operation = Operation::Become(to.clone());
-                TickAction {
-                    operation,
-                    period: NonZeroU16::new(2).unwrap(),
-                }
+            attributes.tick_action = Some(TickAction {
+                operation: Operation::Become(to.clone()),
+                period: NonZeroU16::new(2).unwrap(),
             });
         } else {
             panic!();

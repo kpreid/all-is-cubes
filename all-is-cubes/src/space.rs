@@ -582,7 +582,11 @@ impl Space {
 
         // Process cubes_wanting_ticks.
         let start_cube_ticks = I::now();
-        let cube_ticks = self.execute_tick_actions(tick);
+        let cube_ticks = if !tick.paused() {
+            self.execute_tick_actions(tick)
+        } else {
+            0
+        };
         let cube_ticks_to_space_behaviors = I::now();
 
         let mut transaction = UniverseTransaction::default();
