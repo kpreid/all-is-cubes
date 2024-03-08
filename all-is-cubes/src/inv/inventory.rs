@@ -24,6 +24,7 @@ use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 ///
 #[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub struct Inventory {
     /// TODO: This probably shouldn't be public forever.
@@ -139,6 +140,7 @@ impl VisitHandles for Inventory {
 
 /// The direct child of [`Inventory`]; a container for any number of identical [`Tool`]s.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Slot {
     /// Slot contains nothing.
@@ -281,6 +283,7 @@ impl VisitHandles for Slot {
 /// stack size and specific deviations from it.
 #[non_exhaustive]
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub(crate) enum StackLimit {
     One,
     Standard,

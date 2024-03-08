@@ -27,6 +27,7 @@ use crate::universe::{
 ///
 #[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Tool {
     /// “Click”, or “push button”, or generally “activate the function of this”
