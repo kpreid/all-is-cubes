@@ -66,7 +66,7 @@ pub(crate) enum BlockSer<'a> {
     BlockV1 {
         primitive: PrimitiveSer<'a>,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        modifiers: Vec<ModifierSer>,
+        modifiers: Vec<ModifierSer<'a>>,
     },
 }
 
@@ -172,7 +172,7 @@ pub(crate) enum AnimationChangeV1Ser {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum ModifierSer {
+pub(crate) enum ModifierSer<'a> {
     QuoteV1 {
         suppress_ambient: bool,
     },
@@ -193,6 +193,12 @@ pub(crate) enum ModifierSer {
         direction: Face6,
         distance: u16,
         velocity: i16,
+    },
+    /// This is called "BlockInventory" rather than "Inventory" so that the
+    /// variant tags are unique across the entire schema, which might be useful
+    /// for future compatibility or other applications accessing the data.
+    BlockInventoryV1 {
+        inventory: Cow<'a, crate::inv::Inventory>,
     },
 }
 

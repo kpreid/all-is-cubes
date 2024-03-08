@@ -1,4 +1,5 @@
 use crate::block::{self, Block, Evoxels, MinEval};
+use crate::inv;
 use crate::math::{GridRotation, Vol};
 use crate::universe::{HandleVisitor, VisitHandles};
 
@@ -70,6 +71,12 @@ pub enum Modifier {
 
     /// Displace the block out of the grid, cropping it.
     Move(Move),
+
+    /// The block has an inventory (e.g. a chest, a dropped item, a machine).
+    ///
+    /// TODO(inventory): Define means for a block definition to specify the properties the inventory
+    /// should have (its size, at least), and how it is rendered into the block.
+    Inventory(inv::Inventory),
 }
 
 impl Modifier {
@@ -137,6 +144,9 @@ impl Modifier {
             Modifier::Zoom(ref z) => z.evaluate(value, filter)?,
 
             Modifier::Move(ref m) => m.evaluate(block, this_modifier_index, value, filter)?,
+
+            // Inventories are rendered by compositing their icon blocks in.
+            Modifier::Inventory(ref i) => render_inventory(value, i, filter)?,
         })
     }
 
@@ -159,6 +169,17 @@ impl Modifier {
             // TODO: Implement deletion of moving blocks.
             // This is essentially a 2-block multiblock situation.
             Modifier::Move(_) => ModifierUnspecialize::Keep,
+
+            Modifier::Inventory(i) => {
+                // TODO(inventory): Should be possible for the contents of the inventory to be
+                // split off, depending on the block definition's desires and possibly on exactly
+                // what role this unspecialize operation is playingh.
+                if i.is_empty() {
+                    ModifierUnspecialize::Pop
+                } else {
+                    ModifierUnspecialize::Keep
+                }
+            }
         }
     }
 }
@@ -171,6 +192,7 @@ impl VisitHandles for Modifier {
             Modifier::Composite(m) => m.visit_handles(visitor),
             Modifier::Zoom(m) => m.visit_handles(visitor),
             Modifier::Move(m) => m.visit_handles(visitor),
+            Modifier::Inventory(i) => i.visit_handles(visitor),
         }
     }
 }

@@ -283,6 +283,22 @@ impl Tool {
         }
     }
 
+    /// Kludge restricted version of `icon()` to get inventory-in-a-block rendering working at all.
+    /// TODO(inventory): <https://github.com/kpreid/all-is-cubes/issues/480>
+    pub(crate) fn icon_only_if_intrinsic(&self) -> Option<&Block> {
+        match self {
+            Tool::Activate => None,
+            Tool::RemoveBlock { .. } => None,
+            Tool::Block(block) => Some(block),
+            Tool::InfiniteBlocks(block) => Some(block),
+            Tool::CopyFromSpace => None,
+            Tool::EditBlock => None,
+            Tool::PushPull => None,
+            Tool::Jetpack { .. } => None,
+            Tool::Custom { op: _, icon } => Some(icon),
+        }
+    }
+
     /// Specifies a limit on the number of this item that should be combined in a single
     /// [`Slot`].
     pub(crate) fn stack_limit(&self) -> StackLimit {

@@ -8,6 +8,8 @@
     - `block::Resolution::MAX` provides the maximum available resolution.
       This value is not planned to change, 
     - `block::AnimationHint` now offers constructor functions `redefinition()` and `replacement()` for the common case of setting one of its fields to a specific `AnimationChange`.
+    - `block::Modifier::Inventory` is a new modifier allowing blocks to carry inventory.
+      It does not do anything yet.
 
     - `listen::Notifier::buffer()` and `listen::Buffer` allows creating and sending batches of messages, to improve efficiency over dispatching each message individually to all listeners.
 

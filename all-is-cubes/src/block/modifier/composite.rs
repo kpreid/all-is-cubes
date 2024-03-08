@@ -415,6 +415,42 @@ fn union_ignoring_empty(a: GridAab, b: GridAab) -> GridAab {
     }
 }
 
+// Inventories are rendered by compositing their icon blocks in.
+pub(in crate::block) fn render_inventory(
+    input: MinEval,
+    inventory: &crate::inv::Inventory,
+    filter: &block::EvalFilter,
+) -> Result<MinEval, block::InEvalError> {
+    // TODO(inventory): Define rules under which the inventory is rendered at all, and if so, where
+    // each icon should be placed. This should be controlled by the evaluation result *preceding*
+    // this modifier.
+    // For now, we never render anything.
+    if true {
+        return Ok(input);
+    }
+
+    // TODO: scale the icon down and place it in a location determined by previously established
+    // block attributes.
+    // TODO: icon_only_if_intrinsic is a kludge
+
+    let Some(source) = inventory
+        .slots
+        .iter()
+        .find_map(|slot| slot.icon_only_if_intrinsic())
+        .cloned()
+    else {
+        // no nonempty slot to show
+        return Ok(input);
+    };
+    Composite {
+        source,
+        operator: CompositeOperator::Over,
+        reverse: false,
+        disassemblable: true,
+    }
+    .evaluate(input, filter)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

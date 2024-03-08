@@ -17,7 +17,7 @@ use crate::block::{
 use crate::character::{Character, Spawn};
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
-use crate::inv::{EphemeralOpaque, Tool};
+use crate::inv::{EphemeralOpaque, Inventory, Tool};
 use crate::math::{Cube, Face6, GridAab, GridRotation, Rgb, Rgba};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
@@ -348,6 +348,9 @@ fn block_with_modifiers() {
             .color(Rgba::WHITE)
             .modifier(Modifier::Quote(block::Quote::default()))
             .modifier(Modifier::Rotate(GridRotation::RXyZ))
+            .modifier(Modifier::Inventory(Inventory::from_slots(vec![
+                Tool::Activate.into(),
+            ])))
             .build(),
         json!({
             "type": "BlockV1",
@@ -358,6 +361,18 @@ fn block_with_modifiers() {
             "modifiers": [
                 { "type": "QuoteV1", "suppress_ambient": false },
                 { "type": "RotateV1", "rotation": "RXyZ" },
+                {
+                    "type": "BlockInventoryV1",
+                    "inventory": {
+                        "type": "InventoryV1",
+                        "slots": [
+                            {
+                                "count": 1,
+                                "item": { "type": "ActivateV1" },
+                            },
+                        ]
+                    }
+                }
             ]
         }),
     );

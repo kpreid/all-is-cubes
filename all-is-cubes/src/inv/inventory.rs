@@ -47,6 +47,11 @@ impl Inventory {
         Inventory { slots: items }
     }
 
+    /// Returns whether all slots in this inventory are empty.
+    pub fn is_empty(&self) -> bool {
+        self.slots.iter().all(|slot| matches!(slot, Slot::Empty))
+    }
+
     /// Use a tool stored in this inventory.
     ///
     /// `character` must be the character containing the inventory. TODO: Bad API
@@ -175,6 +180,15 @@ impl Slot {
         match self {
             Slot::Empty => Cow::Borrowed(&predefined[Icons::EmptySlot]),
             Slot::Stack(_, tool) => tool.icon(predefined),
+        }
+    }
+
+    /// Kludge restricted version of `icon()` to get inventory-in-a-block rendering working at all.
+    /// TODO(inventory): <https://github.com/kpreid/all-is-cubes/issues/480>
+    pub(crate) fn icon_only_if_intrinsic(&self) -> Option<&Block> {
+        match self {
+            Slot::Empty => None,
+            Slot::Stack(_, tool) => tool.icon_only_if_intrinsic(),
         }
     }
 

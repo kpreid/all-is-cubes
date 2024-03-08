@@ -323,8 +323,8 @@ mod block {
         }
     }
 
-    impl From<&Modifier> for ModifierSer {
-        fn from(value: &Modifier) -> Self {
+    impl<'a> From<&'a Modifier> for ModifierSer<'a> {
+        fn from(value: &'a Modifier) -> Self {
             match *value {
                 Modifier::Quote(Quote { suppress_ambient }) => {
                     ModifierSer::QuoteV1 { suppress_ambient }
@@ -351,12 +351,15 @@ mod block {
                     distance,
                     velocity,
                 },
+                Modifier::Inventory(ref inventory) => ModifierSer::BlockInventoryV1 {
+                    inventory: Cow::Borrowed(inventory),
+                },
             }
         }
     }
 
-    impl From<ModifierSer> for Modifier {
-        fn from(value: ModifierSer) -> Self {
+    impl From<ModifierSer<'_>> for Modifier {
+        fn from(value: ModifierSer<'_>) -> Self {
             match value {
                 ModifierSer::QuoteV1 { suppress_ambient } => {
                     Modifier::Quote(Quote { suppress_ambient })
@@ -381,6 +384,9 @@ mod block {
                     distance,
                     velocity,
                 } => Modifier::Move(Move::new(direction, distance, velocity)),
+                ModifierSer::BlockInventoryV1 { inventory } => {
+                    Modifier::Inventory(inventory.into_owned())
+                }
             }
         }
     }
