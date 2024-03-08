@@ -321,9 +321,6 @@ pub(crate) enum ToolSer {
         op: crate::op::Operation,
         icon: Block,
     },
-    ExternalActionV1 {
-        icon: Block,
-    },
 }
 
 //------------------------------------------------------------------------------------------------//

@@ -79,31 +79,9 @@ pub enum Tool {
         /// Icon for the tool.
         icon: Block,
     },
-
-    /// A tool which calls an arbitrary function.
-    /// TODO: This is not used and should perhaps be folded into `Custom`
-    ExternalAction {
-        // TODO: Rework this so that the external component gets to update the icon.
-        // (Perhaps that's "a block defined by an external source"?)
-        /// Function that will be called when the tool is activated.
-        function: EphemeralOpaque<dyn Fn(&ToolInput) + Send + Sync>,
-        /// Icon for the tool.
-        icon: Block,
-    },
 }
 
 impl Tool {
-    #[allow(dead_code)] // TODO: This is going to be used for UI interactions but got delayed, so hide the warning
-    pub(crate) fn external_action<F: Fn(&ToolInput) + Send + Sync + 'static>(
-        icon: Block,
-        function: F,
-    ) -> Self {
-        Tool::ExternalAction {
-            icon,
-            function: EphemeralOpaque::new(Arc::new(function)),
-        }
-    }
-
     /// Computes the effect of using the tool.
     ///
     /// The effect consists of both mutations to `self` and a [`UniverseTransaction`].
@@ -259,14 +237,6 @@ impl Tool {
                 }
                 Ok((Some(self), txn))
             }
-            Self::ExternalAction { ref function, .. } => {
-                if let Some(f) = function.try_ref() {
-                    f(input);
-                    Ok((Some(self), UniverseTransaction::default()))
-                } else {
-                    Err(ToolError::NotUsable) // TODO: communicate permanent error
-                }
-            }
         }
     }
 
@@ -309,7 +279,6 @@ impl Tool {
                 Cow::Borrowed(&predefined[Icons::Jetpack { active: *active }])
             }
             Self::Custom { icon, op: _ } => Cow::Borrowed(icon),
-            Self::ExternalAction { icon, .. } => Cow::Borrowed(icon),
         }
     }
 
@@ -327,7 +296,6 @@ impl Tool {
             Tool::PushPull => One,
             Tool::Jetpack { .. } => One,
             Tool::Custom { .. } => One, // TODO: let tool specify
-            Tool::ExternalAction { .. } => One,
         }
     }
 }
@@ -345,9 +313,6 @@ impl VisitHandles for Tool {
             Tool::Jetpack { active: _ } => {}
             Tool::Custom { op, icon } => {
                 op.visit_handles(visitor);
-                icon.visit_handles(visitor);
-            }
-            Tool::ExternalAction { function: _, icon } => {
                 icon.visit_handles(visitor);
             }
         }
@@ -987,25 +952,5 @@ mod tests {
             )
             .bind(tester.space_handle.clone())
         );
-    }
-
-    #[test]
-    fn use_external_action() {
-        use core::sync::atomic::{AtomicU32, Ordering};
-
-        let called = Arc::new(AtomicU32::new(0));
-        let tool = Tool::external_action(AIR, {
-            let called = called.clone();
-            move |_: &ToolInput| {
-                called.fetch_add(1, Ordering::Relaxed);
-            }
-        });
-
-        let tester = ToolTester::new(|_space| {});
-        assert_eq!(
-            tester.equip_and_use_tool(tool),
-            Ok(UniverseTransaction::default())
-        );
-        assert_eq!(called.load(Ordering::Relaxed), 1);
     }
 }

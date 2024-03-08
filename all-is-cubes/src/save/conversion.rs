@@ -571,7 +571,7 @@ mod math {
 
 mod inv {
     use super::*;
-    use crate::inv::{EphemeralOpaque, Inventory, Slot, Tool};
+    use crate::inv::{Inventory, Slot, Tool};
 
     impl Serialize for Inventory {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -641,10 +641,6 @@ mod inv {
                     op: op.clone(),
                     icon: icon.clone(),
                 },
-                Tool::ExternalAction {
-                    function: _,
-                    ref icon,
-                } => schema::ToolSer::ExternalActionV1 { icon: icon.clone() },
             }
             .serialize(serializer)
         }
@@ -665,10 +661,6 @@ mod inv {
                 schema::ToolSer::PushPullV1 {} => Tool::PushPull,
                 schema::ToolSer::JetpackV1 { active } => Tool::Jetpack { active },
                 schema::ToolSer::CustomV1 { op, icon } => Tool::Custom { op, icon },
-                schema::ToolSer::ExternalActionV1 { icon } => Tool::ExternalAction {
-                    function: EphemeralOpaque(None),
-                    icon,
-                },
             })
         }
     }
