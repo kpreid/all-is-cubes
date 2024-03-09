@@ -507,7 +507,20 @@ fn update_server_static(config: &Config, time_log: &mut Vec<Timing>) -> Result<(
     ) {
         let _t = CaptureTime::new(time_log, "wasm-pack build");
         let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
-        cmd!("wasm-pack build --dev --target web").run()?;
+
+        // Run the compilation if needed, which ensures that the wasm binary is fresh.
+        // Note: This must use the same profile as the wasm-pack command is! (Both are dev for now)
+        cargo().arg("build").arg(TARGET_WASM).run()?;
+
+        // Run wasm-pack if and only if we need to.
+        // This is because it unconditionally runs `wasm-opt` which is slow and also means
+        // the files will be touched unnecessarily.
+        if newer_than(
+            ["target/wasm32-unknown-unknown/debug/all_is_cubes_wasm.wasm"],
+            ["pkg/all_is_cubes_wasm.js"],
+        ) {
+            cmd!("wasm-pack build --dev --target web").run()?;
+        }
     }
 
     // Combine the static files and build results in the same way that webpack used to
