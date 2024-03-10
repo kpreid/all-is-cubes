@@ -10,8 +10,6 @@ use core::ops;
 use core::time::Duration;
 
 #[cfg(target_family = "wasm")]
-mod gameapp;
-#[cfg(target_family = "wasm")]
 mod init;
 #[cfg(target_family = "wasm")]
 #[doc(hidden)] // public for testing
@@ -20,6 +18,8 @@ pub mod js_bindings;
 mod url_params;
 #[cfg_attr(not(target_family = "wasm"), allow(unused))]
 mod web_glue;
+#[cfg(target_family = "wasm")]
+mod web_session;
 
 /// Wrapper to implement [`all_is_cubes::time::Instant`] for [`web_time::Instant`].
 ///

@@ -11,10 +11,10 @@ use web_sys::{console, Document};
 
 use all_is_cubes_gpu::in_wgpu;
 
-use crate::gameapp::{create_session, StaticDom, WebRenderer, WebSession};
 use crate::js_bindings::{make_all_static_gui_helpers, GuiHelpers};
 use crate::url_params::{options_from_query_string, OptionsInUrl, RendererOption};
 use crate::web_glue::yield_to_event_loop;
+use crate::web_session::{create_session, StaticDom, WebRenderer, WebSession};
 
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
