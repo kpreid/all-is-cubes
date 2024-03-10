@@ -123,8 +123,8 @@ impl fmt::Debug for Character {
 
 impl Fmt<StatusText> for Character {
     #[mutants::skip] // technically user visible but really debugging
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
-        writeln!(fmt, "{}", self.body.refmt(&StatusText))?;
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
+        writeln!(fmt, "{}", self.body.refmt(fopt))?;
         if let Some(info) = &self.last_step_info {
             writeln!(fmt, "Last step: {:#?}", info.refmt(&ConciseDebug))?;
         }

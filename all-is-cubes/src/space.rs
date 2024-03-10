@@ -1290,8 +1290,8 @@ impl Fmt<StatusText> for SpaceStepInfo {
         } = self;
         if self.spaces > 0 {
             let light = light.refmt(fopt);
-            let cube_time = cube_time.refmt(fopt);
-            let behaviors_time = behaviors_time.refmt(fopt);
+            let cube_time = cube_time.refmt(&ConciseDebug);
+            let behaviors_time = behaviors_time.refmt(&ConciseDebug);
             write!(
                 fmt,
                 "\

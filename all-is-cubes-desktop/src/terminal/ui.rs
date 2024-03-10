@@ -479,7 +479,7 @@ impl TerminalState {
                 );
 
                 f.render_widget(
-                    Paragraph::new(format!("{}", info.refmt(&StatusText))),
+                    Paragraph::new(format!("{}", info.refmt(&StatusText::ALL))),
                     render_info_rect,
                 );
             }

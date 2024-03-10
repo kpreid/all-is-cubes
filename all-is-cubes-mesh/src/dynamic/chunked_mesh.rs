@@ -15,7 +15,7 @@ use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
 use all_is_cubes::time::{self, Duration, Instant as _};
 use all_is_cubes::universe::Handle;
-use all_is_cubes::util::{Fmt, Refmt, StatusText, TimeStats};
+use all_is_cubes::util::{ConciseDebug, Fmt, Refmt, StatusText, TimeStats};
 
 use crate::dynamic::blocks::InstanceMesh;
 use crate::dynamic::chunk::ChunkTodoState;
@@ -445,7 +445,7 @@ where
                 space = self.space().name(),
                 time = end_all_time
                     .saturating_duration_since(self.zero_time)
-                    .refmt(&StatusText)
+                    .refmt(&ConciseDebug)
             );
             #[cfg(feature = "rerun")]
             if self.rerun_destination.is_enabled() {
@@ -566,7 +566,7 @@ pub struct CsmUpdateInfo {
 }
 
 impl Fmt<StatusText> for CsmUpdateInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
         let CsmUpdateInfo {
             flaws,
             total_time: _,
@@ -593,13 +593,13 @@ impl Fmt<StatusText> for CsmUpdateInfo {
                 Mem: {chunk_mib} MiB for {chunk_count} chunks\
             "},
             flaws = flaws,
-            prep_time = prep_time.refmt(&StatusText),
-            block_updates = block_updates.refmt(&StatusText),
-            chunk_scan_time = chunk_scan_time.refmt(&StatusText),
+            prep_time = prep_time.refmt(fopt),
+            block_updates = block_updates.refmt(fopt),
+            chunk_scan_time = chunk_scan_time.refmt(fopt),
             chunk_mesh_generation_times = chunk_mesh_generation_times,
             chunk_instance_generation_times = chunk_instance_generation_times,
             chunk_mesh_callback_times = chunk_mesh_callback_times,
-            depth_sort_time = depth_sort_time.unwrap_or(Duration::ZERO).refmt(&StatusText),
+            depth_sort_time = depth_sort_time.unwrap_or(Duration::ZERO).refmt(fopt),
             chunk_mib = chunk_total_cpu_byte_size / (1024 * 1024),
             chunk_count = chunk_count,
         )

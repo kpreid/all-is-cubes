@@ -1,8 +1,8 @@
-use all_is_cubes::save::WhenceUniverse;
 use alloc::sync::Arc;
 use core::fmt;
 use core::future::Future;
 use core::marker::PhantomData;
+use core::mem;
 use core::task::{Context, Poll};
 use std::sync::mpsc::{self, TryRecvError};
 use std::sync::Mutex;
@@ -18,11 +18,14 @@ use all_is_cubes::inv::ToolError;
 use all_is_cubes::listen::{
     self, Listen as _, ListenableCell, ListenableCellWithLocal, ListenableSource, Listener,
 };
+use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::time::{self, Duration};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{self, Handle, Universe, UniverseId, UniverseStepInfo};
-use all_is_cubes::util::{Fmt, Refmt as _, StatusText, YieldProgressBuilder};
+use all_is_cubes::util::{
+    ConciseDebug, Fmt, Refmt as _, ShowStatus, StatusText, YieldProgressBuilder,
+};
 
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
 use crate::ui_content::Vui;
@@ -334,7 +337,7 @@ impl<I: time::Instant> Session<I> {
                     log::debug!(
                         "tick={} step {}",
                         self.tick_counter_for_logging,
-                        info.computation_time.refmt(&StatusText)
+                        info.computation_time.refmt(&ConciseDebug)
                     );
                 }
                 self.last_step_info = info.clone();
@@ -599,17 +602,22 @@ impl<I: time::Instant> Session<I> {
     /// Returns textual information intended to be overlaid as a HUD on top of the rendered scene
     /// containing diagnostic information about rendering and stepping.
     pub fn info_text<T: Fmt<StatusText>>(&self, render: T) -> InfoText<'_, I, T> {
+        let fopt = StatusText {
+            show: self.graphics_options.get().debug_info_text_contents,
+        };
+
         if LOG_FIRST_FRAMES && self.tick_counter_for_logging <= 10 {
             log::debug!(
                 "tick={} draw {}",
                 self.tick_counter_for_logging,
-                render.refmt(&StatusText)
+                render.refmt(&fopt)
             )
         }
 
         InfoText {
             session: self,
             render,
+            fopt,
         }
     }
 
@@ -865,27 +873,43 @@ impl PartialEq for SessionUniverseInfo {
 pub struct InfoText<'a, I, T> {
     session: &'a Session<I>,
     render: T,
+    fopt: StatusText,
 }
 
 impl<I: time::Instant, T: Fmt<StatusText>> fmt::Display for InfoText<'_, I, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(character_handle) = self.session.game_character.borrow() {
-            write!(f, "{}", character_handle.read().unwrap().refmt(&StatusText)).unwrap();
+        let fopt = self.fopt;
+        let mut empty = true;
+        if fopt.show.contains(ShowStatus::CHARACTER) {
+            if let Some(character_handle) = self.session.game_character.borrow() {
+                empty = false;
+                write!(f, "{}", character_handle.read().unwrap().refmt(&fopt)).unwrap();
+            }
         }
-        write!(
-            f,
-            "\n\n{:#?}\n\nFPS: {:2.1}\n{:#?}\n\n",
-            self.session.last_step_info.refmt(&StatusText),
-            self.session
-                .frame_clock
-                .draw_fps_counter()
-                .frames_per_second(),
-            self.render.refmt(&StatusText),
-        )?;
-        match self.session.cursor_result() {
-            Some(cursor) => write!(f, "{cursor}"),
-            None => write!(f, "No block"),
-        }?;
+        if fopt.show.contains(ShowStatus::STEP) {
+            if !mem::take(&mut empty) {
+                write!(f, "\n\n")?;
+            }
+            write!(
+                f,
+                "{:#?}\n\nFPS: {:2.1}\n{:#?}",
+                self.session.last_step_info.refmt(&fopt),
+                self.session
+                    .frame_clock
+                    .draw_fps_counter()
+                    .frames_per_second(),
+                self.render.refmt(&fopt),
+            )?;
+        }
+        if fopt.show.contains(ShowStatus::CURSOR) {
+            if !mem::take(&mut empty) {
+                write!(f, "\n\n")?;
+            }
+            match self.session.cursor_result() {
+                Some(cursor) => write!(f, "{cursor}"),
+                None => write!(f, "No block"),
+            }?;
+        }
         Ok(())
     }
 }

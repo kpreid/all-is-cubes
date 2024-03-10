@@ -28,7 +28,7 @@ use crate::character::Character;
 use crate::save::WhenceUniverse;
 use crate::space::{Space, SpaceStepInfo};
 use crate::transaction::{self, Transaction as _};
-use crate::util::{Refmt as _, StatusText};
+use crate::util::{ConciseDebug, Refmt as _, ShowStatus, StatusText};
 use crate::{behavior, time};
 
 #[cfg(feature = "rerun")]
@@ -843,10 +843,14 @@ impl Fmt<StatusText> for UniverseStepInfo {
         writeln!(
             fmt,
             "Step computation: {t} for {active_members} of {total_members}",
-            t = computation_time.refmt(fopt),
+            t = computation_time.refmt(&ConciseDebug),
         )?;
-        writeln!(fmt, "Block defs: {}", block_def_step.refmt(fopt))?;
-        write!(fmt, "{}", space_step.refmt(fopt))?;
+        if fopt.show.contains(ShowStatus::BLOCK) {
+            writeln!(fmt, "Block defs: {}", block_def_step.refmt(fopt))?;
+        }
+        if fopt.show.contains(ShowStatus::SPACE) {
+            write!(fmt, "{}", space_step.refmt(fopt))?;
+        }
         Ok(())
     }
 }

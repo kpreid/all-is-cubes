@@ -66,6 +66,7 @@ save = [
     "dep:flate2", # compression
     "dep:serde",
     "dep:serde_repr",
+    "bitflags/serde", # serialize for util::ShowStatus
     "bytemuck/extern_crate_std", # impl Error for CheckedCastError
     "ordered-float/serde",
 ]

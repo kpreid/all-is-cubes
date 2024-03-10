@@ -11,7 +11,7 @@ use all_is_cubes::block::{self, EvaluatedBlock, Resolution};
 use all_is_cubes::math::Cube;
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::time::{self, Instant};
-use all_is_cubes::util::{Refmt as _, StatusText, TimeStats};
+use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
@@ -522,9 +522,9 @@ impl all_is_cubes::util::Fmt<StatusText> for VbmUpdateInfo {
                       mesh gen {block_calculations}
                       upload   {block_callbacks}\
             "},
-            total_time = total_time.refmt(&StatusText),
-            running = running.refmt(&StatusText),
-            waiting = waiting.refmt(&StatusText),
+            total_time = total_time.refmt(&ConciseDebug),
+            running = running.refmt(&ConciseDebug),
+            waiting = waiting.refmt(&ConciseDebug),
             block_calculations = block_calculations,
             block_callbacks = block_callbacks,
             queued = queued,

@@ -253,17 +253,17 @@ impl fmt::Display for TimeStats {
             None => write!(
                 f,
                 "(-------- .. {}) for {:3}, total {}",
-                self.max.refmt(&StatusText),
+                self.max.refmt(&ConciseDebug),
                 self.count,
-                self.sum.refmt(&StatusText),
+                self.sum.refmt(&ConciseDebug),
             ),
             Some(min) => write!(
                 f,
                 "({} .. {}) for {:3}, total {}",
-                min.refmt(&StatusText),
-                self.max.refmt(&StatusText),
+                min.refmt(&ConciseDebug),
+                self.max.refmt(&ConciseDebug),
                 self.count,
-                self.sum.refmt(&StatusText),
+                self.sum.refmt(&ConciseDebug),
             ),
         }
     }

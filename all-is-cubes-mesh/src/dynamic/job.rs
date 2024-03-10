@@ -10,7 +10,7 @@ use futures_util::FutureExt as _;
 use all_is_cubes::block::EvaluatedBlock;
 use all_is_cubes::space::BlockIndex;
 use all_is_cubes::time::{self, Instant};
-use all_is_cubes::util::{Refmt as _, StatusText};
+use all_is_cubes::util::{ConciseDebug, Refmt as _};
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
@@ -104,7 +104,7 @@ impl<M: DynamicMeshTypes> MeshJobQueue<M> {
         if compute_time > time::Duration::from_millis(4) {
             log::trace!(
                 "Block mesh took {}: {:?}",
-                compute_time.refmt(&StatusText),
+                compute_time.refmt(&ConciseDebug),
                 job.block.attributes.display_name,
             );
         }

@@ -4,7 +4,7 @@ use std::{fmt, ops};
 use all_is_cubes::camera::{Flaws, Layers};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
-use all_is_cubes::util::{Fmt, Refmt, StatusText};
+use all_is_cubes::util::{Fmt, Refmt, ShowStatus, StatusText};
 use all_is_cubes_mesh::dynamic::CsmUpdateInfo;
 
 /// Performance info about drawing an entire scene.
@@ -70,7 +70,7 @@ impl DrawInfo {
 }
 
 impl Fmt<StatusText> for RenderInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
         let &Self {
             waiting_for_gpu,
             update:
@@ -101,14 +101,14 @@ impl Fmt<StatusText> for RenderInfo {
             fmt,
             // TODO: adjust this format to account for more pieces
             "Frame time: {} (GPU wait {}, update {}, draw world {}, ui {}",
-            total_time.refmt(&StatusText),
-            waiting_for_gpu.refmt(&StatusText),
-            update_time.refmt(&StatusText),
-            draw_time.world.refmt(&StatusText),
-            draw_time.ui.refmt(&StatusText),
+            total_time.refmt(fopt),
+            waiting_for_gpu.refmt(fopt),
+            update_time.refmt(fopt),
+            draw_time.world.refmt(fopt),
+            draw_time.ui.refmt(fopt),
         )?;
         if let Some(t) = submit_time {
-            write!(fmt, ", submit {}", t.refmt(&StatusText))?;
+            write!(fmt, ", submit {}", t.refmt(fopt))?;
         }
         writeln!(fmt, ")")?;
 
@@ -116,28 +116,32 @@ impl Fmt<StatusText> for RenderInfo {
         write!(
             fmt,
             "Update breakdown: prep {}, world mesh {}, ui mesh {}, lines {}",
-            update_prep_time.refmt(&StatusText),
-            update_spaces.world.total_time.refmt(&StatusText),
-            update_spaces.ui.total_time.refmt(&StatusText),
-            lines_time.refmt(&StatusText),
+            update_prep_time.refmt(fopt),
+            update_spaces.world.total_time.refmt(fopt),
+            update_spaces.ui.total_time.refmt(fopt),
+            lines_time.refmt(fopt),
         )?;
         if let Some(t) = update_submit_time {
-            write!(fmt, ", submit {}", t.refmt(&StatusText))?;
+            write!(fmt, ", submit {}", t.refmt(fopt))?;
         }
 
         // Spaces
-        write!(
-            fmt,
-            "\n\nWORLD:\n{}\n{}\n\n",
-            update_spaces.world.refmt(&StatusText),
-            draw_spaces.world.refmt(&StatusText)
-        )?;
-        write!(
-            fmt,
-            "UI:\n{}\n{}",
-            update_spaces.ui.refmt(&StatusText),
-            draw_spaces.ui.refmt(&StatusText)
-        )?;
+        if fopt.show.contains(ShowStatus::WORLD) {
+            write!(
+                fmt,
+                "\n\nWORLD:\n{}\n{}",
+                update_spaces.world.refmt(fopt),
+                draw_spaces.world.refmt(fopt)
+            )?;
+        }
+        if fopt.show.contains(ShowStatus::UI) {
+            write!(
+                fmt,
+                "\n\nUI:\n{}\n{}",
+                update_spaces.ui.refmt(fopt),
+                draw_spaces.ui.refmt(fopt)
+            )?;
+        }
 
         write!(fmt, "\nRender flaws: {flaws}")?;
         Ok(())
@@ -175,7 +179,7 @@ impl SpaceUpdateInfo {
     pub(crate) fn write_to_rerun(&self, destination: &rg::Destination) {
         destination.log(
             &"info".into(),
-            &rg::archetypes::TextDocument::new(self.refmt(&StatusText).to_string())
+            &rg::archetypes::TextDocument::new(self.refmt(&StatusText::ALL).to_string())
                 .with_media_type(rg::components::MediaType::TEXT),
         );
 

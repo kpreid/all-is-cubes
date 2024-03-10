@@ -2,6 +2,7 @@ use num_traits::One;
 use ordered_float::NotNan;
 
 use crate::math::{FreeCoordinate, Rgb, Rgba};
+use crate::util::ShowStatus;
 
 #[cfg(doc)]
 use crate::{block::Block, space::Space};
@@ -81,6 +82,12 @@ pub struct GraphicsOptions {
     /// Draw text overlay showing debug information.
     pub debug_info_text: bool,
 
+    /// What information should be displayed in [`debug_info_text`](Self::debug_info_text).
+    //---
+    // TODO: It's inelegant that this is counted as part of the graphics options, but perhaps
+    // not less so than the other debug options...
+    pub debug_info_text_contents: ShowStatus,
+
     /// Draw boxes around [`Behavior`]s attached to parts of [`Space`]s.
     /// This may also eventually include further in-world diagnostic information.
     ///
@@ -127,6 +134,7 @@ impl GraphicsOptions {
         antialiasing: AntialiasingOption::None,
         use_frustum_culling: true,
         debug_info_text: true,
+        debug_info_text_contents: ShowStatus::DEFAULT,
         debug_behaviors: false,
         debug_chunk_boxes: false,
         debug_collision_boxes: false,
@@ -166,6 +174,7 @@ impl Default for GraphicsOptions {
             antialiasing: AntialiasingOption::default(),
             use_frustum_culling: true,
             debug_info_text: true,
+            debug_info_text_contents: ShowStatus::DEFAULT,
             debug_behaviors: false,
             debug_chunk_boxes: false,
             debug_collision_boxes: false,
