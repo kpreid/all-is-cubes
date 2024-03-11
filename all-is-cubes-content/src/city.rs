@@ -319,7 +319,7 @@ pub(crate) async fn demo_city<I: Instant>(
 }
 
 async fn place_exhibits_in_city<I: Instant>(
-    exhibits_progress: YieldProgress,
+    progress: YieldProgress,
     universe: &mut Universe,
     widget_theme: &widgets::WidgetTheme,
     planner: &mut CityPlanner,
@@ -328,23 +328,56 @@ async fn place_exhibits_in_city<I: Instant>(
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
     use DemoBlocks::*;
 
-    'exhibit: for (exhibit, mut exhibit_progress) in DEMO_CITY_EXHIBITS
+    // TODO: We would like to compute these exhibits in parallel; making that happen requires
+    // concurrency support from `YieldProgress` and getting an `Executor` plumbed in here.
+    // We currently separate generation and placement into two phases as a preliminary step
+    // in that direction; placement always has to be sequential since it mutates the planner and
+    // universe.
+
+    let [mut generation_progress, mut placement_progress] = progress.split(0.75);
+    generation_progress.set_label("Generating exhibits");
+    placement_progress.set_label("Placing exhibits");
+
+    let mut generated_exhibits: Vec<(&'static Exhibit, Result<_, InGenError>)> = Vec::new();
+    for (exhibit, mut exhibit_progress) in DEMO_CITY_EXHIBITS
         .iter()
-        .zip(exhibits_progress.split_evenly(DEMO_CITY_EXHIBITS.len()))
+        .zip(generation_progress.split_evenly(DEMO_CITY_EXHIBITS.len()))
     {
         exhibit_progress.set_label(format!("Exhibit “{name}”", name = exhibit.name));
         exhibit_progress.progress(0.0).await;
-        let start_exhibit_time = I::now();
 
-        // Execute the exhibit factory function.
-        // TODO: stop handing out mutable Universe access, so we can parallelize this loop
         let ctx = Context {
             exhibit,
             universe,
             widget_theme,
         };
-        let (exhibit_space, exhibit_transaction) = match (exhibit.factory)(ctx) {
-            Ok(s) => s,
+
+        // Execute the exhibit factory function.
+        let start_exhibit_time = I::now();
+        let result = (exhibit.factory)(ctx);
+        let gen_duration = I::now().saturating_duration_since(start_exhibit_time);
+
+        exhibit_progress.finish().await;
+        generated_exhibits.push((
+            exhibit,
+            match result {
+                Ok((exhibit_space, exhibit_transaction)) => {
+                    Ok((exhibit_space, exhibit_transaction, gen_duration))
+                }
+                Err(error) => Err(error),
+            },
+        ));
+    }
+
+    'exhibit: for ((exhibit, result), mut placement_progress) in generated_exhibits
+        .into_iter()
+        .zip(placement_progress.split_evenly(DEMO_CITY_EXHIBITS.len()))
+    {
+        placement_progress.set_label(format!("Placing “{name}”", name = exhibit.name));
+        placement_progress.progress(0.0).await;
+
+        let (exhibit_space, exhibit_transaction, factory_time) = match result {
+            Ok(parts) => parts,
             Err(error) => {
                 // TODO: put the error on a sign in place of the exhibit
                 log::error!(
@@ -355,7 +388,8 @@ async fn place_exhibits_in_city<I: Instant>(
                 continue 'exhibit;
             }
         };
-        exhibit_progress.progress(0.33).await;
+
+        let start_placement_time = I::now();
 
         // Amount by which the exhibit's own size is expanded to form walls and empty space
         // for displaying it and allowing players to move around it.
@@ -391,7 +425,7 @@ async fn place_exhibits_in_city<I: Instant>(
         );
         space.fill_uniform(enclosure_at_plot, &AIR)?;
         space.fill_uniform(enclosure_lower, &demo_blocks[ExhibitBackground])?;
-        exhibit_progress.progress(0.4).await;
+        placement_progress.progress(0.4).await;
 
         // Cut an "entranceway" into the curb and grass, or corridor wall underground
         let entranceway_height = 2; // TODO: let exhibit customize
@@ -515,7 +549,7 @@ async fn place_exhibits_in_city<I: Instant>(
                 .occupied_plots
                 .push(info_sign_space.bounds().transform(sign_transform).unwrap());
         }
-        exhibit_progress.progress(0.66).await;
+        placement_progress.progress(0.66).await;
 
         // As the last step before we actually copy the exhibit into the city,
         // execute its transaction.
@@ -536,14 +570,14 @@ async fn place_exhibits_in_city<I: Instant>(
         space_to_space_copy(&exhibit_space, exhibit_footprint, space, plot_transform)?; // TODO: on failure, place an error marker and continue
 
         // Log build time
-        let exhibit_time = I::now().saturating_duration_since(start_exhibit_time);
+        let placement_time = I::now().saturating_duration_since(start_placement_time);
         log::trace!(
             "{:?} took {:.3} s",
             exhibit.name,
-            exhibit_time.as_secs_f32()
+            (factory_time + placement_time).as_secs_f32()
         );
 
-        exhibit_progress.finish().await;
+        placement_progress.finish().await;
     }
 
     Ok(())
