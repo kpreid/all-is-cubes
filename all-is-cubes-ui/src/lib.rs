@@ -1,3 +1,4 @@
+#![feature(min_exhaustive_patterns)]
 #![feature(never_type)]
 #![feature(noop_waker)]
 
