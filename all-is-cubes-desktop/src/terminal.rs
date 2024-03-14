@@ -67,7 +67,7 @@ pub struct TerminalRenderer {
 
     /// Options pertaining to how to draw.
     ///
-    /// TODO: Unclear whether this belongs in Renderer or Window
+    /// TODO: Unclear whether this belongs in `Renderer` or `Window`
     options: TerminalOptions,
 
     buffer_reuse_out: mpsc::Receiver<RtRenderer<CharacterRtData>>,

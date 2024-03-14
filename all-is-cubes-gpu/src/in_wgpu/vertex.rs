@@ -38,11 +38,11 @@ pub(crate) struct WgpuBlockVertex {
 
     /// Vertex position within the cube, fixed point; and vertex normal in [`Face7`] format.
     ///
-    /// * The first u32 is a bitwise combination of two u16s:
+    /// * The first `u32` is a bitwise combination of two u16s:
     ///   `(position.x * 256) | (position.y * 256) << 16`.
     ///   The scale factor 256 is chosen as being greater than the smallest [`Resolution`]
     ///   available. (Equal would also work.)
-    /// * The second u32 is
+    /// * The second `u32` is
     ///   `position.z * 256 | (face << 16)`
     ///   where `face` is a `Face6` converted to integer.
     ///
@@ -65,7 +65,7 @@ pub(crate) struct WgpuBlockVertex {
     /// Interpolated texture coordinates are clamped to be within these ranges,
     /// to avoid bleeding.
     ///
-    /// Each u32 is two packed [`FixTexCoord`], min | (max << 16).
+    /// Each `u32` is two packed [`FixTexCoord`], `min | (max << 16)`.
     ///
     /// Design note: It would be more straightforward to use `f16` here, but that's a
     /// WebGPU optional extension; and there are no `[f16; 3]` vectors so it would still
