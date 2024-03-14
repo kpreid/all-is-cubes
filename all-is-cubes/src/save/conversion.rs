@@ -89,7 +89,7 @@ mod block {
                 modifiers: self
                     .modifiers()
                     .iter()
-                    .map(schema::ModifierSer::from)
+                    .map(ModifierSer::from)
                     .collect(),
             }
             .serialize(serializer)
@@ -610,8 +610,8 @@ mod inv {
     impl From<&Slot> for Option<schema::InvStackSer> {
         fn from(slot: &Slot) -> Self {
             match *slot {
-                crate::inv::Slot::Empty => None,
-                crate::inv::Slot::Stack(count, ref item) => Some(schema::InvStackSer {
+                Slot::Empty => None,
+                Slot::Stack(count, ref item) => Some(schema::InvStackSer {
                     count,
                     item: item.clone(),
                 }),
@@ -726,7 +726,7 @@ mod space {
                     self.extract(self.bounds(), |e| Leu16::from(e.block_index()))
                         .into_elements(),
                 )),
-                light: if matches!(self.physics().light, space::LightPhysics::None) {
+                light: if matches!(self.physics().light, LightPhysics::None) {
                     None
                 } else {
                     Some(GzSerde(Cow::Owned(

@@ -54,7 +54,7 @@ impl Lef32 {
 }
 
 impl fmt::Debug for Lef32 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f32::from(*self).fmt(f)
     }
 }

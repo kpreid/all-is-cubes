@@ -17,7 +17,7 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::fluff::{self, Fluff};
-use crate::listen::{self, Listen as _, Sink};
+use crate::listen::{Listen as _, Sink};
 use crate::math::{Cube, Face6, GridAab, GridCoordinate, GridPoint, Rgba, Vol};
 use crate::op::Operation;
 use crate::space::{
@@ -663,7 +663,7 @@ fn block_tick_action_conflict() {
     connect(&mut modifies_nx_neighbor, &output2, Face6::NX);
 
     // Create test setup.
-    let fluff_sink = listen::Sink::new();
+    let fluff_sink = Sink::new();
     let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
     let mut space = Space::empty_positive(3, 1, 1);
     space.fluff().listen(fluff_sink.listener());

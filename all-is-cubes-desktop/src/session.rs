@@ -40,7 +40,7 @@ pub struct DesktopSession<Ren, Win> {
     pub(crate) clock_source: ClockSource,
 
     /// If present, writes frames to disk.
-    pub(crate) recorder: Option<crate::record::Recorder>,
+    pub(crate) recorder: Option<record::Recorder>,
 
     /// If present, connection to system audio output.
     /// If absent, sound is not produced
@@ -237,7 +237,7 @@ mod tests {
             fn set_title(&self, _: String) {}
         }
 
-        let (sender, receiver) = std::sync::mpsc::channel();
+        let (sender, receiver) = mpsc::channel();
         drop(DesktopSession::new(
             crate::Executor::new(tokio::runtime::Handle::current()),
             DropLogger {

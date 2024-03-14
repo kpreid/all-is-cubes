@@ -85,7 +85,7 @@ impl Layoutable for Toolbar {
 }
 
 impl Widget for Toolbar {
-    fn controller(self: Arc<Self>, grant: &crate::vui::LayoutGrant) -> Box<dyn WidgetController> {
+    fn controller(self: Arc<Self>, grant: &vui::LayoutGrant) -> Box<dyn WidgetController> {
         let bounds = grant.bounds;
 
         let todo_more = Arc::new(Mutex::new(ToolbarTodo {
@@ -228,7 +228,7 @@ impl WidgetController for ToolbarController {
         fn zoom(block: &Block, pos: GridPoint) -> Block {
             block
                 .clone()
-                .with_modifier(block::Zoom::new(block::Resolution::R4, pos))
+                .with_modifier(block::Zoom::new(Resolution::R4, pos))
         }
         let frame_multiblock =
             &self.definition.hud_blocks.widget_theme.widget_blocks[WidgetBlocks::ToolbarSlotFrame];
@@ -293,7 +293,7 @@ impl WidgetController for ToolbarController {
         let slots_txn = if should_update_inventory {
             self.write_items(&watcher.inventory().slots)?
         } else {
-            vui::WidgetTransaction::default()
+            WidgetTransaction::default()
         };
 
         // should_update_inventory is currently true when the selected_slots value changes.
@@ -301,7 +301,7 @@ impl WidgetController for ToolbarController {
         let pointers_txn = if should_update_inventory || should_update_pointers {
             self.write_pointers(&watcher.selected_slots(), pressed_buttons)?
         } else {
-            vui::WidgetTransaction::default()
+            WidgetTransaction::default()
         };
 
         // TODO: Use Then::Sleep and a waker

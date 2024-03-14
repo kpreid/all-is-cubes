@@ -57,7 +57,7 @@ impl BoxStyle {
                 from_fn(|y| {
                     from_fn(|_z| {
                         Some(multiblock.clone().with_modifier(block::Zoom::new(
-                            block::Resolution::R4,
+                            Resolution::R4,
                             GridPoint::new(twiddle(x) as i32, twiddle(y) as i32, 0),
                         )))
                     })

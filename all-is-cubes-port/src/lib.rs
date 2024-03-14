@@ -314,7 +314,7 @@ pub enum ImportErrorKind {
         path: Option<String>,
 
         /// The IO error that occurred while reading.
-        error: std::io::Error,
+        error: io::Error,
     },
 
     /// The data did not match the expected format, or was invalid as defined by that format.
@@ -342,7 +342,7 @@ pub enum ExportError {
     ///
     /// TODO: also represent file path if available
     #[error("could not write export data")]
-    Write(#[from] std::io::Error),
+    Write(#[from] io::Error),
 
     /// [`HandleError`] while reading the data to be exported.
     #[error("could not read universe to be exported")]

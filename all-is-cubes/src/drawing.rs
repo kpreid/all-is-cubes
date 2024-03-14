@@ -28,7 +28,7 @@ use embedded_graphics::primitives::Rectangle;
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
 
-use crate::block::{self, space_to_blocks, text, Block, BlockAttributes, Evoxel, Resolution};
+use crate::block::{space_to_blocks, text, Block, BlockAttributes, Evoxel, Resolution};
 use crate::math::{
     Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid,
     Rgb, Rgba, Vol,
@@ -307,7 +307,7 @@ impl<'a> VoxelColor<'a> for Rgba {
     }
 }
 
-impl PixelColor for block::text::Brush {
+impl PixelColor for text::Brush {
     type Raw = ();
 }
 
@@ -609,7 +609,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Resolution::R16, AIR};
+    use crate::block::{self, Resolution::R16, AIR};
     use crate::content::make_some_blocks;
     use crate::raytracer::print_space;
     use embedded_graphics::primitives::{Primitive, PrimitiveStyle};

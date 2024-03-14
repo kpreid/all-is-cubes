@@ -450,7 +450,7 @@ mod tests {
                 .selectable(false)
                 .light_emission(emission)
                 .tick_action(tick_action.clone())
-                .animation_hint(block::AnimationHint::replacement(
+                .animation_hint(AnimationHint::replacement(
                     block::AnimationChange::Shape,
                 ))
                 .build(),
@@ -460,7 +460,7 @@ mod tests {
                     rotation_rule,
                     selectable: false,
                     tick_action,
-                    animation_hint: block::AnimationHint::replacement(
+                    animation_hint: AnimationHint::replacement(
                         block::AnimationChange::Shape,
                     ),
                 },

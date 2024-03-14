@@ -30,7 +30,7 @@ impl AicClientSource {
             }
         };
 
-        axum::Router::new()
+        Router::new()
             .route("/", static_service.clone())
             .route("/*path", static_service)
     }

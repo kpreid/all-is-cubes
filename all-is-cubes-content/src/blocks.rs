@@ -421,7 +421,7 @@ pub async fn install_demo_blocks(
                 Block::builder()
                     .display_name("Clock")
                     .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
-                    .animation_hint(block::AnimationHint::redefinition(
+                    .animation_hint(AnimationHint::redefinition(
                         block::AnimationChange::ColorSameCategory,
                     ))
                     .voxels_handle(resolution, txn.insert_anonymous(space))

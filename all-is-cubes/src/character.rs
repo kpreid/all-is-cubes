@@ -602,7 +602,7 @@ impl Transactional for Character {
     type Transaction = CharacterTransaction;
 }
 
-impl crate::behavior::BehaviorHost for Character {
+impl behavior::BehaviorHost for Character {
     type Attachment = ();
 }
 

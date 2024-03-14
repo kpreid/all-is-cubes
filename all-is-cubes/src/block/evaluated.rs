@@ -627,7 +627,7 @@ impl Evoxels {
     }
 }
 
-impl core::ops::Index<Cube> for Evoxels {
+impl ops::Index<Cube> for Evoxels {
     type Output = Evoxel;
 
     #[inline]

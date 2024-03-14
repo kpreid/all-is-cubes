@@ -123,7 +123,7 @@ impl BlockDef {
             self.state
                 .cache
                 .clone()
-                .map_err(block::EvalBlockError::into_internal_error_for_block_def)
+                .map_err(EvalBlockError::into_internal_error_for_block_def)
         }
     }
 

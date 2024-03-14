@@ -112,7 +112,7 @@ impl SpaceTransaction {
     where
         B: behavior::Behavior<Space> + 'static,
     {
-        Self::behaviors(behavior::BehaviorSetTransaction::insert(
+        Self::behaviors(BehaviorSetTransaction::insert(
             super::SpaceBehaviorAttachment::new(bounds),
             Arc::new(behavior),
         ))

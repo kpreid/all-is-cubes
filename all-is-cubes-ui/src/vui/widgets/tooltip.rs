@@ -227,7 +227,7 @@ impl Layoutable for Tooltip {
 }
 
 impl Widget for Tooltip {
-    fn controller(self: Arc<Self>, _: &crate::vui::LayoutGrant) -> Box<dyn WidgetController> {
+    fn controller(self: Arc<Self>, _: &vui::LayoutGrant) -> Box<dyn WidgetController> {
         Box::new(TooltipController { definition: self })
     }
 }
@@ -241,7 +241,7 @@ impl WidgetController for TooltipController {
     fn initialize(
         &mut self,
         context: &vui::WidgetContext<'_>,
-    ) -> Result<vui::WidgetTransaction, crate::vui::InstallVuiError> {
+    ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         let position = context.grant().bounds;
         let toolbar_text_blocks = space_to_blocks(
             Tooltip::RESOLUTION,

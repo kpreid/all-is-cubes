@@ -1028,7 +1028,7 @@ mod tests {
 
         assert_eq!(mesh.count_indices(), 6 /* faces */ * 6 /* vertices */);
 
-        let expected_data_size = std::mem::size_of_val::<[BlockVertex<TexPoint>]>(mesh.vertices())
+        let expected_data_size = mem::size_of_val::<[BlockVertex<TexPoint>]>(mesh.vertices())
             + mesh.indices().as_bytes().len();
 
         let actual_size = dbg!(mesh.total_byte_size());

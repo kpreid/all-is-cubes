@@ -101,7 +101,7 @@ impl TerminalWindow {
         let state = TerminalState {
             tui,
             in_sender,
-            has_terminal_stdin: std::io::IsTerminal::is_terminal(&io::stdin()),
+            has_terminal_stdin: io::IsTerminal::is_terminal(&io::stdin()),
             viewport_position: Rect::default(),
             terminal_state_dirty: true,
             widths: HashMap::new(),

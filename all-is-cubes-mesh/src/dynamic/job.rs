@@ -101,7 +101,7 @@ impl<M: DynamicMeshTypes> MeshJobQueue<M> {
             counter_ticket,
         });
 
-        if compute_time > time::Duration::from_millis(4) {
+        if compute_time > Duration::from_millis(4) {
             log::trace!(
                 "Block mesh took {}: {:?}",
                 compute_time.refmt(&ConciseDebug),

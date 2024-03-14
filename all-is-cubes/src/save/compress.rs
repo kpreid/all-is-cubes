@@ -132,7 +132,7 @@ mod tests {
     #[track_caller]
     fn assert_round_trip<T>(value: &[T], expected_base64: &str)
     where
-        T: bytemuck::Pod + Eq + core::fmt::Debug,
+        T: bytemuck::Pod + Eq + fmt::Debug,
     {
         let json_value =
             serde_json::to_value(GzSerde(Cow::Borrowed(value))).expect("failed to serialize");

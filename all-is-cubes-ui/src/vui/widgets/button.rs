@@ -278,8 +278,8 @@ impl vui::WidgetController for ActionButtonController {
 
         // TODO: we never draw the pressed state
         let draw = self.txns[ButtonVisualState { pressed: false }].clone();
-        let activatable = space::SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
-            space::SpaceBehaviorAttachment::new(grant.bounds),
+        let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
+            SpaceBehaviorAttachment::new(grant.bounds),
             Arc::new(space::ActivatableRegion {
                 effect: self.definition.action.clone(),
             }),

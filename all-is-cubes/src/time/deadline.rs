@@ -98,7 +98,7 @@ impl<I: Instant> Deadline<I> {
     }
 }
 
-impl<I: Instant> core::ops::Add<Duration> for Deadline<I> {
+impl<I: Instant> ops::Add<Duration> for Deadline<I> {
     type Output = Self;
     fn add(self, rhs: Duration) -> Self::Output {
         match self {
@@ -108,7 +108,7 @@ impl<I: Instant> core::ops::Add<Duration> for Deadline<I> {
         }
     }
 }
-impl<I: Instant> core::ops::Sub<Duration> for Deadline<I> {
+impl<I: Instant> ops::Sub<Duration> for Deadline<I> {
     type Output = Self;
     fn sub(self, rhs: Duration) -> Self::Output {
         match self {

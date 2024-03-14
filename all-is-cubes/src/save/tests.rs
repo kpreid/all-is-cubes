@@ -151,7 +151,7 @@ fn block_air() {
 #[test]
 fn block_atom_default() {
     assert_round_trip_value(
-        &block::Block::from(Rgba::new(1.0, 0.5, 0.0, 0.5)),
+        &Block::from(Rgba::new(1.0, 0.5, 0.0, 0.5)),
         json!({
             "type": "BlockV1",
             "primitive": {

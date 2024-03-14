@@ -142,7 +142,7 @@ pub fn compare_rendered_image(
     let actual_file_path = image_path(&test, Version::Actual);
     let diff_file_path = image_path(&test, Version::Diff);
 
-    let actual_image = image::RgbaImage::from_raw(
+    let actual_image = RgbaImage::from_raw(
         actual_image.size.width,
         actual_image.size.height,
         bytemuck::cast_vec::<[u8; 4], u8>(actual_image.data),
@@ -234,7 +234,7 @@ pub fn initialize_logging() {
                 .add_filter_ignore_str("naga") // noisy
                 .add_filter_ignore_str("winit") // noisy at Trace level only
                 .build(),
-            std::io::stderr(),
+            io::stderr(),
         )
         .unwrap();
     }

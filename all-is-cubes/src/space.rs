@@ -939,7 +939,7 @@ impl Space {
     }
 }
 
-impl<T: Into<Cube>> core::ops::Index<T> for Space {
+impl<T: Into<Cube>> ops::Index<T> for Space {
     type Output = Block;
 
     /// Gets a reference to the block in this space at the given position.
@@ -985,7 +985,7 @@ impl Listen for Space {
     }
 }
 
-impl crate::behavior::BehaviorHost for Space {
+impl behavior::BehaviorHost for Space {
     type Attachment = SpaceBehaviorAttachment;
 }
 
@@ -1264,7 +1264,7 @@ pub struct SpaceStepInfo {
     /// Performance data about light updates within the space.
     pub light: LightUpdatesInfo,
 }
-impl core::ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
+impl ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
     fn add_assign(&mut self, other: Self) {
         if other == Self::default() {
             // Specifically don't count those that did nothing.

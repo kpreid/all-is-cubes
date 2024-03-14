@@ -741,7 +741,7 @@ mod arbitrary_block {
         }
 
         fn size_hint(depth: usize) -> (usize, Option<usize>) {
-            arbitrary::size_hint::recursion_guard(depth, |depth| {
+            size_hint::recursion_guard(depth, |depth| {
                 size_hint::or_all(&[
                     size_hint::and_all(&[
                         BlockAttributes::size_hint(depth),

@@ -19,7 +19,7 @@ use tokio::runtime::Runtime;
 fn main() {
     let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
 
-    let mut criterion: Criterion<_> = criterion::Criterion::default().configure_from_args();
+    let mut criterion: Criterion<_> = Criterion::default().configure_from_args();
     render_benches(&runtime, &mut criterion);
 
     criterion.final_summary();

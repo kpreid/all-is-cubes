@@ -1009,7 +1009,7 @@ impl MainTaskContext {
     /// TODO: Explain exactly what phase/state this resumes in.
     pub async fn yield_to_step(&self) {
         // TODO: roundabout implementation
-        all_is_cubes::util::YieldProgressBuilder::new()
+        YieldProgressBuilder::new()
             .build()
             .yield_without_progress()
             .await
@@ -1077,7 +1077,7 @@ mod tests {
     async fn main_task() {
         let old_marker = Name::from("old");
         let new_marker = Name::from("new");
-        let mut session = Session::<all_is_cubes::time::NoTime>::builder()
+        let mut session = Session::<time::NoTime>::builder()
             .build()
             .await;
         session

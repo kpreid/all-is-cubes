@@ -72,7 +72,7 @@ impl WinAndState {
             window: Arc::new(window),
             occluded: false,
             mouse_position: None,
-            cursor_grab_mode: winit::window::CursorGrabMode::None,
+            cursor_grab_mode: CursorGrabMode::None,
             ignore_next_mouse_move: false,
         })
     }
@@ -160,7 +160,7 @@ pub fn winit_main_loop_and_init<Ren: RendererToWinit + 'static>(
     let mut first_frame = true;
     let mut dsession: Option<DesktopSession<Ren, WinAndState>> = None;
     Ok(event_loop.run(move |event, elwt| {
-        if let winit::event::Event::Resumed = event {
+        if let Event::Resumed = event {
             if let Some((inner_params, dsession_fn)) = startup_params.take() {
                 // “It’s recommended that applications should only initialize their graphics context
                 // and create a window after they have received their first Resumed event.

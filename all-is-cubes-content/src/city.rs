@@ -55,11 +55,11 @@ pub(crate) async fn demo_city<I: Instant>(
     let mut install_txn = UniverseTransaction::default();
     let widget_theme_progress = p.start_and_cut(0.05, "WidgetTheme").await;
     let widget_theme =
-        all_is_cubes_ui::vui::widgets::WidgetTheme::new(&mut install_txn, widget_theme_progress)
+        widgets::WidgetTheme::new(&mut install_txn, widget_theme_progress)
             .await
             .unwrap();
     let ui_blocks_progress = p.start_and_cut(0.05, "UiBlocks").await;
-    all_is_cubes_ui::vui::blocks::UiBlocks::new(&mut install_txn, ui_blocks_progress)
+    vui::blocks::UiBlocks::new(&mut install_txn, ui_blocks_progress)
         .await
         .install(&mut install_txn)
         .unwrap();

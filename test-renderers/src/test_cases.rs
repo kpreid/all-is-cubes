@@ -1003,7 +1003,7 @@ fn looking_at_one_cube_spawn(bounds: GridAab) -> Spawn {
 /// A simple space to draw something in the UI layer.
 fn ui_space(universe: &mut Universe) -> Handle<Space> {
     let ui_space = Space::builder(GridAab::from_lower_size([-3, -3, -4], [1, 1, 1]))
-        .light_physics(all_is_cubes::space::LightPhysics::None)
+        .light_physics(LightPhysics::None)
         .sky_color(rgb_const!(1.0, 1.0, 0.5)) // blatantly wrong color that should not be seen
         .filled_with(Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0)))
         .build();

@@ -6,7 +6,7 @@ use core::fmt;
 
 use exhaust::Exhaust;
 
-use all_is_cubes::block::{self, Block, Composite, Resolution, RotationPlacementRule, Zoom, AIR};
+use all_is_cubes::block::{self, Block, Resolution, RotationPlacementRule, Zoom, AIR};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::euclid::Point3D;
@@ -305,7 +305,7 @@ fn map_text_block(
         b'B' => {
             // Banner with bottom edge accent
             if let Some(banner_color) = banner_color {
-                Composite::new(
+                block::Composite::new(
                     blocks[AtriumBlocks::BannerBottomAccent].clone(),
                     block::CompositeOperator::Atop,
                 )
