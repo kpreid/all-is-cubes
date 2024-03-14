@@ -60,13 +60,13 @@ pub fn terminal_print_once(
 /// Fills the renderer slot of [`DesktopSession`] for terminal sessions.
 #[derive(Debug)]
 pub struct TerminalRenderer {
-    /// Redundant with the RtRenderer's cameras, but is a copy that
+    /// Redundant with the [`RtRenderer`]'s cameras, but is a copy that
     /// isn't hopping around threads.
     cameras: StandardCameras,
 
     /// Options pertaining to how to draw.
     ///
-    /// TODO: Unclear whether this belongs in Renderer or Window
+    /// TODO: Unclear whether this belongs in `Renderer` or `Window`
     options: TerminalOptions,
 
     buffer_reuse_out: mpsc::Receiver<RtRenderer<CharacterRtData>>,

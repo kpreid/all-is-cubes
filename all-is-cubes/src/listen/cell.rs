@@ -26,7 +26,7 @@ struct ListenableCellStorage<T> {
     /// `None` if this is a constant cell.
     ///
     /// TODO: Add ability to diff the value and distribute that.
-    /// TODO: If the ListenableCell is dropped, drop this.
+    /// TODO: If the `ListenableCell` is dropped, drop this.
     notifier: Option<Notifier<()>>,
 }
 

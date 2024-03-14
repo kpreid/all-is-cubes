@@ -79,8 +79,8 @@ pub struct StandardCameras {
     /// Tracks whether the character was replaced (not whether its view changed).
     character_dirty: DirtyFlag,
     character: Option<Handle<Character>>,
-    /// Cached and listenable version of character's space.
-    /// TODO: This should be in a Layers along with ui_state...?
+    /// Cached and listenable version of `character`'s space.
+    /// TODO: This should be in a Layers along with `ui_state`...?
     world_space: ListenableCell<Option<Handle<Space>>>,
 
     ui_source: ListenableSource<UiViewState>,

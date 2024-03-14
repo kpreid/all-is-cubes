@@ -30,19 +30,19 @@ pub(crate) enum CubeFix256 {}
 #[repr(C)]
 pub(crate) struct WgpuBlockVertex {
     /// Chunk-relative position of the cube containing the triangle this vertex belongs to,
-    /// packed into a u32 as x | (y << 8) | (z << 16).
+    /// packed into a `u32` as `x | (y << 8) | (z << 16)`.
     ///
-    /// Note that this is not the same as floor() of the final coordinates, since a
+    /// Note that this is not the same as `floor()` of the final coordinates, since a
     /// block's mesh coordinates range from 0 to 1 inclusive.
     cube_packed: u32,
 
     /// Vertex position within the cube, fixed point; and vertex normal in [`Face7`] format.
     ///
-    /// * The first u32 is a bitwise combination of two u16s:
+    /// * The first `u32` is a bitwise combination of two u16s:
     ///   `(position.x * 256) | (position.y * 256) << 16`.
     ///   The scale factor 256 is chosen as being greater than the smallest [`Resolution`]
     ///   available. (Equal would also work.)
-    /// * The second u32 is
+    /// * The second `u32` is
     ///   `position.z * 256 | (face << 16)`
     ///   where `face` is a `Face6` converted to integer.
     ///
@@ -57,7 +57,7 @@ pub(crate) struct WgpuBlockVertex {
     /// * If `[3]` is in the range 0.0 to 1.0, then the attribute is a linear RGBA color.
     /// * If `[3]` is negative, then the first three components are 3D texture coordinates,
     ///   stored in texel units rather than normalized 0-1 units, and the fourth component
-    ///   is the (-1 - atlas_id) where atlas_id identifies which texture atlas to use.
+    ///   is the `(-1 - atlas_id)` where `atlas_id` identifies which texture atlas to use.
     ///
     /// TODO: we don't need `f32` precision here.
     color_or_texture: [f32; 4],
@@ -65,7 +65,7 @@ pub(crate) struct WgpuBlockVertex {
     /// Interpolated texture coordinates are clamped to be within these ranges,
     /// to avoid bleeding.
     ///
-    /// Each u32 is two packed [`FixTexCoord`], min | (max << 16).
+    /// Each `u32` is two packed [`FixTexCoord`], `min | (max << 16)`.
     ///
     /// Design note: It would be more straightforward to use `f16` here, but that's a
     /// WebGPU optional extension; and there are no `[f16; 3]` vectors so it would still

@@ -1,4 +1,4 @@
-doc-valid-idents = ["glTF", "sRGB", "MagicaVoxel", "NaN", "OpenGL", "WebGL"]
+doc-valid-idents = ["glTF", "sRGB", "MagicaVoxel", "NaN", "OpenGL", "WebGL", "WebGPU"]
 enforced-import-renames = [
     { path = "all_is_cubes::rerun_glue", rename = "rg" },
 ]

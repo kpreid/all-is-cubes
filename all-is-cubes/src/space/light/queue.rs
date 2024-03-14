@@ -112,7 +112,7 @@ impl fmt::Debug for Priority {
 /// at most once, even when added with different priorities.
 pub(crate) struct LightUpdateQueue {
     /// Sorted storage of queue elements.
-    /// This is a BTreeSet rather than a BinaryHeap so that items can be removed.
+    /// This is a `BTreeSet` rather than a `BinaryHeap` so that items can be removed.
     queue: BTreeSet<LightUpdateRequest>,
 
     /// Maps [`Cube`] to priority value. This allows deduplicating entries, including

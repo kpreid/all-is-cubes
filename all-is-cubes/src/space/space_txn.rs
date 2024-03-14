@@ -7,6 +7,8 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::{fmt, mem};
 
+#[cfg(doc)]
+use crate::behavior::BehaviorSet;
 use crate::behavior::{self, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::drawing::DrawingPlane;

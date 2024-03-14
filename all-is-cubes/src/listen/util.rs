@@ -59,7 +59,7 @@ where
 /// effect is required, [`Gate::default`].
 #[derive(Clone, Default)]
 pub struct Gate {
-    /// By owning this we keep its [`Weak`] peers alive, and thus the GateListener active.
+    /// By owning this we keep its [`Weak`] peers alive, and thus the [`GateListener`] active.
     _strong: Arc<()>,
 }
 

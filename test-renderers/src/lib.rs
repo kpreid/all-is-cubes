@@ -67,7 +67,7 @@ pub enum ComparisonOutcome {
     /// The images were different, but the renderer signaled a known flaw.
     /// The string is a list of flaws, of unspecified syntax.
     Flawed(String),
-    /// The flaws included Flaws::UNFINISHED, which shouldn't happen.
+    /// The flaws included `Flaws::UNFINISHED`, which shouldn't happen.
     Unfinished,
 }
 impl ComparisonOutcome {
