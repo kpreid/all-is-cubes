@@ -54,7 +54,6 @@ pub(super) fn new_paused_widget_tree(
             // TODO: quit_fn should be an async function, but we don't have a way to
             // kick off a “Quitting...” task yet.
             move || match quit_fn() {
-                Ok(s) => match s {},
                 Err(_cancelled) => {
 
                     // TODO: display message indicating failure
