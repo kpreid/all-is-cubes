@@ -359,9 +359,13 @@ async fn place_exhibits_in_city<I: Instant>(
         };
         exhibit_progress.progress(0.33).await;
 
+        // Amount by which the exhibit's own size is expanded to form walls and empty space
+        // for displaying it and allowing players to move around it.
+        let enclosure_thickness = FaceMap::repeat(1);
+
         // Now that we know the size of the exhibit, find a place for it that fits its bounds.
         let exhibit_footprint = exhibit_space.bounds();
-        let enclosure_footprint = exhibit_footprint.expand(FaceMap::repeat(1));
+        let enclosure_footprint = exhibit_footprint.expand(enclosure_thickness);
 
         let Some(plot_transform) = planner.find_plot(enclosure_footprint, exhibit.placement) else {
             log::error!("Out of city space!");
@@ -372,7 +376,7 @@ async fn place_exhibits_in_city<I: Instant>(
 
         // Create enclosure, with a block replacing all ground blocks 1 block around,
         // and everything else cleared
-        let enclosure = GridAab::from_lower_upper(
+        let enclosure_lower = GridAab::from_lower_upper(
             enclosure_at_plot.lower_bounds(),
             [
                 enclosure_at_plot.upper_bounds().x,
@@ -383,7 +387,7 @@ async fn place_exhibits_in_city<I: Instant>(
             ],
         );
         space.fill_uniform(enclosure_at_plot, &AIR)?;
-        space.fill_uniform(enclosure, &demo_blocks[ExhibitBackground])?;
+        space.fill_uniform(enclosure_lower, &demo_blocks[ExhibitBackground])?;
         exhibit_progress.progress(0.4).await;
 
         // Cut an "entranceway" into the curb and grass, or corridor wall underground
@@ -391,19 +395,19 @@ async fn place_exhibits_in_city<I: Instant>(
         {
             let front_face = plot_transform.rotation.transform(Face6::PZ);
             // Compute the surface that needs to be clear for walking
-            let entrance_plane = enclosure
-                .expand(FaceMap {
-                    // subtract enclosure bounds
-                    nx: -1,
-                    ny: 0,
-                    nz: -1,
-                    px: -1,
-                    py: 0,
-                    pz: -1,
-                })
+            let entrance_plane = enclosure_lower
+                .expand(
+                    FaceMap {
+                        // don't alter y
+                        ny: 0,
+                        py: 0,
+                        ..enclosure_thickness
+                    }
+                    .map(|_, thick| -thick),
+                )
                 .abut(Face6::PY, 0)
                 .unwrap()
-                .abut(front_face, 1) // re-add enclosure bounds
+                .abut(front_face, enclosure_thickness.pz) // re-add enclosure bounds
                 .unwrap()
                 .abut(
                     front_face,
