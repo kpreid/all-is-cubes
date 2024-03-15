@@ -54,10 +54,9 @@ pub(crate) async fn demo_city<I: Instant>(
     // TODO: We want a "module loading" system that allows expressing dependencies.
     let mut install_txn = UniverseTransaction::default();
     let widget_theme_progress = p.start_and_cut(0.05, "WidgetTheme").await;
-    let widget_theme =
-        widgets::WidgetTheme::new(&mut install_txn, widget_theme_progress)
-            .await
-            .unwrap();
+    let widget_theme = widgets::WidgetTheme::new(&mut install_txn, widget_theme_progress)
+        .await
+        .unwrap();
     let ui_blocks_progress = p.start_and_cut(0.05, "UiBlocks").await;
     vui::blocks::UiBlocks::new(&mut install_txn, ui_blocks_progress)
         .await
@@ -387,7 +386,8 @@ async fn place_exhibits_in_city<I: Instant>(
         space.fill_uniform(enclosure, &demo_blocks[ExhibitBackground])?;
         exhibit_progress.progress(0.4).await;
 
-        // Cut an "entranceway" into the curb and grass
+        // Cut an "entranceway" into the curb and grass, or corridor wall underground
+        let entranceway_height = 2; // TODO: let exhibit customize
         {
             let front_face = plot_transform.rotation.transform(Face6::PZ);
             // Compute the surface that needs to be clear for walking
@@ -411,10 +411,12 @@ async fn place_exhibits_in_city<I: Instant>(
                 )
                 .unwrap();
 
-            let walkway = entrance_plane.abut(Face6::NY, 1).unwrap();
-            space.fill_uniform(walkway, &demo_blocks[Road])?;
+            if let Placement::Surface = exhibit.placement {
+                let walkway = entrance_plane.abut(Face6::NY, 1).unwrap();
+                space.fill_uniform(walkway, &demo_blocks[Road])?;
+            }
 
-            let walking_volume = entrance_plane.abut(Face6::PY, 2).unwrap();
+            let walking_volume = entrance_plane.abut(Face6::PY, entranceway_height).unwrap();
             space.fill_uniform(walking_volume, &AIR)?;
 
             planner.occupied_plots.push(walking_volume);
@@ -441,7 +443,12 @@ async fn place_exhibits_in_city<I: Instant>(
             let info_voxels_widget: vui::WidgetTree = Arc::new(vui::LayoutTree::Stack {
                 direction: Face6::PZ,
                 children: vec![
-                    vui::leaf_widget(widgets::Frame::with_block(demo_blocks[Signboard].clone())),
+                    match exhibit.placement {
+                        Placement::Surface => vui::leaf_widget(widgets::Frame::with_block(
+                            demo_blocks[Signboard].clone(),
+                        )),
+                        Placement::Underground => vui::LayoutTree::empty(),
+                    },
                     vui::leaf_widget(Arc::new(widgets::Voxels::new(
                         bounds_for_info_voxels,
                         universe.insert_anonymous(exhibit_info_space),
@@ -462,14 +469,27 @@ async fn place_exhibits_in_city<I: Instant>(
                 )
                 .unwrap();
 
-            let sign_position_in_plot_coordinates = GridVector::new(
-                // extending right from left edge
-                enclosure_footprint.lower_bounds().x,
-                // at ground level
-                0,
-                // minus 1 to put the Signboard blockss on the enclosure blocks
-                enclosure_footprint.upper_bounds().z - 1,
-            );
+            let sign_position_in_plot_coordinates = match exhibit.placement {
+                Placement::Surface => GridVector::new(
+                    // extending right from left edge
+                    enclosure_footprint.lower_bounds().x,
+                    // at ground level
+                    0,
+                    // minus 1 to put the Signboard blocks sitting on the enclosure blocks
+                    enclosure_footprint.upper_bounds().z - 1,
+                ),
+                Placement::Underground => GridVector::new(
+                    // centered horizontally
+                    enclosure_footprint.lower_bounds().x
+                        + (enclosure_footprint.size().width
+                            - info_sign_space.bounds().size().width)
+                            / 2,
+                    // at above-the-entrance level
+                    entranceway_height,
+                    // on the surface of the corridor wall -- TODO: We don't actually know fundamentally that the corridor
+                    enclosure_footprint.upper_bounds().z + 1,
+                ),
+            };
             let sign_transform =
                 plot_transform * Gridgid::from_translation(sign_position_in_plot_coordinates);
 
