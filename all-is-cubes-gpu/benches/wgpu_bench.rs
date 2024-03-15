@@ -38,7 +38,7 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion) {
         Some(adapter) => Arc::new(adapter),
         None => {
             // TODO: kludge; would be better if we could get the mode out of Criterion
-            if std::env::args().any(|s| s == "--test") {
+            if cfg!(test) || std::env::args().any(|s| s == "--test") {
                 eprintln!("GPU not available; skipping actually testing bench functions");
                 return;
             } else {
