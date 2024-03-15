@@ -52,7 +52,7 @@ async fn get_factory() -> WgpuFactory {
     // Create a new adapter every time, rather than sharing one.
     // TODO: Either remove this or keep it and remove WGPU_ADAPTER.
     let (_instance, adapter) = init::create_instance_and_adapter_for_test(|_| {}).await;
-    let adapter = Arc::new(adapter.unwrap());
+    let adapter = Arc::new(adapter.expect("failed to obtain wgpu::Adapter"));
 
     let builder = headless::Builder::from_adapter(adapter)
         .await
