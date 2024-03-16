@@ -50,6 +50,7 @@
 - `all-is-cubes-ui` library:
     - `apps::Session::set_universe_async()` has been replaced with the more flexible `set_main_task()`.
       It can do several things via the `MainTaskContext` type.
+    - `vui::widgets::LargeText` now uses `all_is_cubes::block::text::Font` as the font type.
 
 ### Removed
 

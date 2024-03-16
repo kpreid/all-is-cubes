@@ -582,14 +582,20 @@ pub enum Font {
 
     #[doc(hidden)]
     // experimental while we figure things out. Probably to be replaced with fonts stored in Universe
+    Logo,
+
+    #[doc(hidden)]
+    // experimental while we figure things out. Probably to be replaced with fonts stored in Universe
     SmallerBodyText,
 }
 impl Font {
-    fn eg_font(&self) -> &eg::mono_font::MonoFont<'static> {
+    /// Do not use. This will be removed if and when we change font renderers.
+    #[doc(hidden)]
+    pub fn eg_font(&self) -> &eg::mono_font::MonoFont<'static> {
         use eg::mono_font::iso_8859_1 as f;
         match self {
-            //Self::System16 => &f::FONT_9X15,
             Self::System16 => &f::FONT_8X13_BOLD,
+            Self::Logo => &f::FONT_9X15_BOLD,
             Self::SmallerBodyText => &f::FONT_6X10,
         }
     }
@@ -598,7 +604,7 @@ impl Font {
 impl universe::VisitHandles for Font {
     fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
         match self {
-            Self::System16 | Self::SmallerBodyText => {}
+            Self::System16 | Self::SmallerBodyText | Self::Logo => {}
         }
     }
 }

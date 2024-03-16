@@ -4,7 +4,7 @@ use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::text::{self, Text as BlockText};
 use all_is_cubes::block::{self, Resolution::*};
 use all_is_cubes::drawing::embedded_graphics::{
-    mono_font::{MonoFont, MonoTextStyle},
+    mono_font::MonoTextStyle,
     prelude::{Dimensions, Point},
     text::{Text as EgText, TextStyle},
     Drawable,
@@ -26,8 +26,7 @@ pub struct LargeText {
     /// Text to be displayed.
     pub text: ArcStr,
     /// Font with which to draw the text.
-    /// Needs to be a function to be Send+Sync.
-    pub font: fn() -> &'static MonoFont<'static>,
+    pub font: all_is_cubes::block::text::Font,
     /// Brush with which to draw the text.
     pub brush: VoxelBrush<'static>,
     /// Text positioning within the bounds of the widget.
@@ -39,7 +38,7 @@ impl LargeText {
         EgText::with_text_style(
             &self.text,
             Point::new(0, 0),
-            MonoTextStyle::new((self.font)(), &self.brush),
+            MonoTextStyle::new(self.font.eg_font(), &self.brush),
             self.text_style,
         )
     }
@@ -228,8 +227,8 @@ fn draw_text_txn(text: &BlockText, grant: &LayoutGrant) -> SpaceTransaction {
 mod tests {
     use super::*;
     use all_is_cubes::arcstr::literal;
+    use all_is_cubes::block::text::Font;
     use all_is_cubes::block::Block;
-    use all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1::FONT_9X15_BOLD;
     use all_is_cubes::euclid::size3;
     use all_is_cubes::math::Rgba;
     use all_is_cubes::space::{SpaceBuilder, SpacePhysics};
@@ -239,7 +238,7 @@ mod tests {
         let text = "abc";
         let widget = LargeText {
             text: text.into(),
-            font: || &FONT_9X15_BOLD,
+            font: Font::Logo,
             brush: VoxelBrush::single(Block::from(Rgba::WHITE)),
             text_style: TextStyle::default(),
         };

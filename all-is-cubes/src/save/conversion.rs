@@ -86,11 +86,7 @@ mod block {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             BlockSer::BlockV1 {
                 primitive: schema::PrimitiveSer::from(self.primitive()),
-                modifiers: self
-                    .modifiers()
-                    .iter()
-                    .map(ModifierSer::from)
-                    .collect(),
+                modifiers: self.modifiers().iter().map(ModifierSer::from).collect(),
             }
             .serialize(serializer)
         }
@@ -395,6 +391,7 @@ mod block {
         fn from(value: &text::Font) -> Self {
             match value {
                 text::Font::System16 => schema::FontSer::System16V1,
+                text::Font::Logo => schema::FontSer::LogoV1,
                 text::Font::SmallerBodyText => schema::FontSer::UnstableSmallerBodyTextV1,
             }
         }
@@ -404,6 +401,7 @@ mod block {
         fn from(value: schema::FontSer) -> Self {
             match value {
                 schema::FontSer::System16V1 => text::Font::System16,
+                schema::FontSer::LogoV1 => text::Font::Logo,
                 schema::FontSer::UnstableSmallerBodyTextV1 => text::Font::SmallerBodyText,
             }
         }

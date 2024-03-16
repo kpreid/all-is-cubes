@@ -4,13 +4,10 @@ use alloc::sync::Arc;
 
 use all_is_cubes::{
     arcstr::literal,
-    block::Block,
+    block::{text::Font, Block},
     content::palette,
     drawing::{
-        embedded_graphics::{
-            mono_font::iso_8859_1::FONT_9X15_BOLD,
-            text::{Alignment, Baseline, TextStyleBuilder},
-        },
+        embedded_graphics::text::{Alignment, Baseline, TextStyleBuilder},
         VoxelBrush,
     },
 };
@@ -24,7 +21,7 @@ pub fn logo_text() -> Arc<dyn vui::Widget> {
 
     Arc::new(vui::widgets::LargeText {
         text: literal!("All is Cubes"),
-        font: || &FONT_9X15_BOLD,
+        font: Font::Logo,
         brush: {
             VoxelBrush::new([
                 ([0, 0, 1], foreground_text_block),
