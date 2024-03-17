@@ -27,13 +27,6 @@ use crate::space::{
 use crate::time::{Duration, Instant};
 use crate::util::StatusText;
 
-/// This parameter determines to what degree absorption of light due to a block surface's
-/// color is taken into account. At zero, it is not (all surfaces are perfectly
-/// reflective); at one, light values are simply multiplied by the surface color (e.g.
-/// a red surface will reflect no green or blue light), which is the idealized physical
-/// model.
-const SURFACE_ABSORPTION: f32 = 0.75;
-
 #[derive(Debug)]
 struct LightRayData {
     ray: Ray,
@@ -703,9 +696,7 @@ impl LightBuffer {
             }
             let stored_light = current_light.get(light_cube);
 
-            let surface_color = ev_hit.face7_color(hit.face()).clamp().to_rgb()
-                * SURFACE_ABSORPTION
-                + Rgb::ONE * (1. - SURFACE_ABSORPTION);
+            let surface_color = ev_hit.face7_color(hit.face()).clamp().to_rgb();
             let light_from_struck_face =
                 ev_hit.light_emission + stored_light.value() * surface_color;
             self.incoming_light +=
