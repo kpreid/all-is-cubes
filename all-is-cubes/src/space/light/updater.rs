@@ -15,8 +15,8 @@ use rayon::iter::{IntoParallelRefMutIterator as _, ParallelIterator as _};
 use super::debug::LightComputeOutput;
 use crate::block::{self, EvaluatedBlock};
 use crate::math::{
-    Cube, CubeFace, Face6, FaceMap, FreeCoordinate, Geometry, NotNan, OpacityCategory, Rgb,
-    VectorOps, Vol,
+    Cube, CubeFace, Face6, Face7, FaceMap, FreeCoordinate, Geometry, NotNan, OpacityCategory, Rgb,
+    Rgba, VectorOps, Vol,
 };
 use crate::raycast::Ray;
 use crate::space::light::{LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority};
@@ -755,60 +755,90 @@ impl LightBuffer {
         D: LightComputeOutput,
     {
         if !ev_hit.visible_or_animated() {
-            // Completely transparent block is passed through.
+            // Completely transparent block is passed through, disregarding its stored light
+            // (which it typically will not have).
             return;
         }
 
-        // Compute whether we hit an opaque face which should stop propagation.
-        // TODO: Also count the opacity of the face we *exited* of the previous block,
-        let hit_opaque_face = {
-            let hit_opaque = ev_hit.opaque;
-            match Face6::try_from(hit.face) {
-                Ok(face) => hit_opaque[face],
-                Err(_) => hit_opaque == FaceMap::repeat(true),
-            }
+        // Compute whether we hit an opaque face which should totally stop propagation.
+        //
+        // TODO: Also count the opacity of the face we *exited* of the previous block
+        // (but should we do that here?).
+        //
+        // Note that hit_opaque_face is not necessarily true when hit_alpha is 1.0, because
+        // the former is strict “watertightness” and the latter is merely an averaged image of
+        // the block. (TODO: But maybe we should always use hit_alpha anyway?)
+        let hit_opaque_face: bool = match Face6::try_from(hit.face) {
+            Ok(face) => ev_hit.opaque[face],
+            Err(_) => ev_hit.opaque == FaceMap::repeat(true),
         };
 
-        if hit_opaque_face {
-            // On striking a fully opaque block face, we use the light value from its
-            // adjacent cube as the light falling on that face.
-            let light_cube = hit.adjacent();
-            if light_cube == hit.cube {
-                // Don't read the value we're trying to recalculate.
-                // (And we hit an opaque block, so this ray is stopping.)
+        if hit_opaque_face && hit.face == Face7::Within {
+            // We are inside the block the ray started in. Don't use its existing light value!
+            // Just consider it a total absence of light.
+            // (TODO: In principle, a block could have light emission inside itself while being
+            // fully opaque, and we should be able to support that, but we're not trying for now.)
+            //
+            // (Note that not reading *transparent* block light is handled separately below.)
 
-                // Setting the weight to 0 cancels its future effect,
-                // and there were no past effects.
-                ray_state.ray_weight_by_faces = 0.0;
-                ray_state.alpha = 0.0;
-                return;
-            }
+            // Setting the weight to 0 cancels its future effect,
+            // and there were no past effects.
+            ray_state.ray_weight_by_faces = 0.0;
+            ray_state.alpha = 0.0;
+            return;
+        }
+
+        let hit_surface_color: Rgba = ev_hit.face7_color(hit.face).clamp();
+        // The alpha of the hit block face is also what fraction of the light ray we assume to hit
+        // the block, as opposed to passing through it.
+        let hit_alpha: f32 = hit_surface_color.alpha().into_inner();
+
+        // On striking a (semi-)opaque block face, we use the light value from its
+        // adjacent cube as the light falling on, thus being reflected by, that face.
+        // The ray still might continue through.
+        if hit_alpha > 0.0 && hit.face != Face7::Within {
+            let light_cube = hit.adjacent();
             let stored_light = light_behind_cache.unwrap_or_else(|| current_light.get(light_cube));
 
-            let surface_color = ev_hit.face7_color(hit.face).clamp().to_rgb();
-            let light_from_struck_face =
-                ev_hit.light_emission + stored_light.value() * surface_color;
+            let reflectance = hit_surface_color.to_rgb() * hit_alpha;
+            let light_from_struck_face = ev_hit.light_emission + stored_light.value() * reflectance;
             self.incoming_light +=
                 light_from_struck_face * ray_state.alpha * ray_state.ray_weight_by_faces;
-            self.dependencies.push(light_cube);
-            self.cost += 10;
-            // This terminates the raycast; we don't bounce rays
-            // (diffuse reflections, not specular/mirror).
-            ray_state.alpha = 0.0;
 
-            // Diagnostics. TODO: Track transparency too.
-            D::push_ray(info, || LightUpdateRayInfo {
-                ray: relative_ray_to_here
-                    .translate(ray_state.origin_cube.lower_bounds().to_vector().to_f64()),
-                trigger_cube: hit.cube,
-                value_cube: light_cube,
-                value: stored_light,
-            });
-        } else {
-            // Block is partly transparent and light should pass through.
+            self.cost += 10;
+            if self.dependencies.last() != Some(&light_cube) {
+                // add dep only if not already present from previous step's ahead
+                self.dependencies.push(light_cube);
+            }
+
+            // If we hit a truly light-proof face, it's the end of the ray.
+            if hit_opaque_face {
+                // This terminates the raycast; we don't bounce rays
+                // (diffuse reflections, not specular/mirror).
+                ray_state.alpha = 0.0;
+
+                // Diagnostics:
+                // Iff this is the hit that terminates the ray, record it.
+                // TODO: Record transparency too.
+                D::push_ray(info, || LightUpdateRayInfo {
+                    ray: relative_ray_to_here
+                        .translate(ray_state.origin_cube.lower_bounds().to_vector().to_f64()),
+                    trigger_cube: hit.cube,
+                    value_cube: light_cube,
+                    value: stored_light,
+                });
+            } else {
+                // Account for surface alpha in the future of this ray's state
+                ray_state.alpha *= 1.0 - hit_alpha;
+            }
+        }
+
+        // Block is partly transparent and light should be picked up from the block's cube itself,
+        // but the ray is also not stopped.
+        if hit_alpha < 1.0 {
             let light_cube = hit.cube;
 
-            let stored_light = if light_cube == ray_state.origin_cube {
+            let stored_light = if hit.face == Face7::Within {
                 // Don't read the value we're trying to recalculate.
                 Rgb::ZERO
             } else {
@@ -816,29 +846,17 @@ impl LightBuffer {
                     .get_or_insert_with(|| current_light.get(light_cube))
                     .value()
             };
-            // 'coverage' is what fraction of the light ray we assume to hit this block,
-            // as opposed to passing through it.
-            // The block evaluation algorithm incidentally computes a suitable
-            // approximation as an alpha value.
-            let coverage = ev_hit
-                .face7_color(hit.face)
-                .alpha()
-                .into_inner()
-                .clamp(0.0, 1.0);
-            // Note that light emission is *not* multiplied by the coverage, because coverage is about
+            // Note that light emission is *not* multiplied by the alpha, because alpha is about
             // reflection/transmission. It's perfectly okay to have a totally transparent (alpha
             // equals zero), yet emissive, block.
-            self.incoming_light += (ev_hit.light_emission + stored_light * coverage)
-                * ray_state.alpha
-                * ray_state.ray_weight_by_faces;
-            self.cost += 10;
-            ray_state.alpha *= 1.0 - coverage;
+            let light_from_traversed_block = ev_hit.light_emission + stored_light * hit_alpha;
+            self.incoming_light +=
+                light_from_traversed_block * ray_state.alpha * ray_state.ray_weight_by_faces;
 
-            self.dependencies.push(hit.cube);
-            // We did not read hit.adjacent(), but we want to trigger its updates
-            // anyway, because otherwise, transparent blocks' neighbors will *never*
-            // get their light updated except when the block is initially placed.
-            self.dependencies.push(hit.adjacent());
+            self.cost += 10;
+            self.dependencies.push(light_cube);
+
+            ray_state.alpha *= 1.0 - hit_alpha;
         }
     }
 
