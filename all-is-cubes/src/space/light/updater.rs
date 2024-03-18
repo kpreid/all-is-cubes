@@ -401,6 +401,10 @@ impl LightStorage {
                     .cast()
                     .within(self.contents.bounds());
 
+                // Stores the light value that might have been fetched, if it was, from the previous
+                // step's cube_ahead, which is the current step's cube_behind.
+                let mut light_behind_cache: Option<PackedLight> = None;
+
                 'raycast: for hit in raycaster {
                     cube_buffer.cost += 1;
                     if hit.t_distance() > maximum_distance {
@@ -409,10 +413,22 @@ impl LightStorage {
                         // indoor spaces.
                         break 'raycast;
                     }
-                    cube_buffer.traverse::<D>(&mut ray_state, &mut info_rays, self, uc, hit);
+
+                    let mut light_ahead_cache = None;
+                    cube_buffer.traverse::<D>(
+                        &mut ray_state,
+                        &mut info_rays,
+                        self,
+                        hit,
+                        uc.get_evaluated(hit.cube_ahead()),
+                        &mut light_ahead_cache,
+                        light_behind_cache,
+                    );
                     if ray_state.alpha.partial_cmp(&0.0) != Some(Ordering::Greater) {
                         break;
                     }
+
+                    light_behind_cache = light_ahead_cache;
                 }
                 cube_buffer.end_of_ray(&ray_state, &self.sky);
             }
@@ -652,6 +668,9 @@ impl LightBuffer {
     /// Process a ray intersecting a single cube.
     ///
     /// The caller should check `ray_state.alpha` to decide when to stop calling this.
+    ///
+    /// Note: to avoid redundant lookups as a ray proceeds, `current_light` is used only to fill
+    /// `light_ahead_cache` or `light_behind_cache`.
     #[inline]
     #[allow(clippy::too_many_arguments)]
     fn traverse<D>(
@@ -659,12 +678,13 @@ impl LightBuffer {
         ray_state: &mut LightRayState,
         info: &mut D::RayInfoBuffer,
         current_light: &LightStorage,
-        uc: UpdateCtx<'_>,
         hit: RaycastStep,
+        ev_hit: &EvaluatedBlock,
+        light_ahead_cache: &mut Option<PackedLight>,
+        light_behind_cache: Option<PackedLight>,
     ) where
         D: LightComputeOutput,
     {
-        let ev_hit = uc.get_evaluated(hit.cube_ahead());
         if !ev_hit.visible_or_animated() {
             // Completely transparent block is passed through.
             return;
@@ -694,7 +714,7 @@ impl LightBuffer {
                 ray_state.alpha = 0.0;
                 return;
             }
-            let stored_light = current_light.get(light_cube);
+            let stored_light = light_behind_cache.unwrap_or_else(|| current_light.get(light_cube));
 
             let surface_color = ev_hit.face7_color(hit.face()).clamp().to_rgb();
             let light_from_struck_face =
@@ -729,7 +749,9 @@ impl LightBuffer {
                 // Don't read the value we're trying to recalculate.
                 Rgb::ZERO
             } else {
-                current_light.get(light_cube).value()
+                light_ahead_cache
+                    .get_or_insert_with(|| current_light.get(light_cube))
+                    .value()
             };
             // 'coverage' is what fraction of the light ray we assume to hit this block,
             // as opposed to passing through it.
