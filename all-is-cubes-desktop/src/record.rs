@@ -67,7 +67,7 @@ impl Recorder {
     /// refactor.
     pub fn new(
         options: RecordOptions,
-        cameras: StandardCameras,
+        mut cameras: StandardCameras,
         universe: &Universe,
         executor: Arc<crate::Executor>,
     ) -> Result<Self, anyhow::Error> {
@@ -148,13 +148,24 @@ impl Recorder {
                 RecorderInner::Mesh(write_gltf::MeshRecorder::new(cameras, tex, scene_sender))
             }
             RecordFormat::Export(export_format) => {
+                cameras.update();
+
                 // TODO: better rule than this special case. AicJson doesn't strictly require
                 // all of the universe, but it does require the transitive closure, and this is the
                 // easiest way to proceed for now.
                 let export_set = if options.save_all || export_format == ExportFormat::AicJson {
                     ExportSet::all_of_universe(universe)
                 } else {
-                    ExportSet::from_spaces(vec![cameras.world_space().snapshot().unwrap()])
+                    ExportSet::from_spaces(vec![cameras.world_space().snapshot().ok_or_else(
+                        || match universe.whence.document_name() {
+                            None => {
+                                anyhow::anyhow!("universe contains no default space to export")
+                            }
+                            Some(name) => anyhow::anyhow!(
+                                "universe {name:?} contains no default space to export",
+                            ),
+                        },
+                    )?])
                 };
 
                 RecorderInner::Export {

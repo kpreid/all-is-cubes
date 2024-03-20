@@ -1,0 +1,5 @@
+...
+Error: failed to configure session for recording
+
+Caused by:
+    universe "blank" contains no default space to export

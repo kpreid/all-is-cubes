@@ -1,0 +1,4 @@
+# It is not an error if there is nothing to record. (But perhaps it should be?)
+bin.name = "all-is-cubes"
+args = "--no-config-files --template=blank --graphics=record --output=test-record-empty.png"
+status.code = 0

@@ -1,0 +1,5 @@
+# It is *not* an error if there is nothing to export in native format.
+# (But the "empty" template has a bunch of demo stuff, so we aren't comparing it.)
+bin.name = "all-is-cubes"
+args = "--no-config-files --template=blank --graphics=record --output=test-export-empty.alliscubesjson"
+status.code = 0

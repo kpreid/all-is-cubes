@@ -1,0 +1,5 @@
+# It is an error if there is nothing to export (at least for now).
+# We specifically want to test the export-via-record path, which .vox is an example of.
+bin.name = "all-is-cubes"
+args = "--no-config-files --template=blank --graphics=record --output=test-export-empty.vox"
+status.code = 1
