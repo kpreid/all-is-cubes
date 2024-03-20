@@ -201,17 +201,11 @@ impl<I: time::Instant> Session<I> {
         self.shuttle().game_character.as_source()
     }
 
-    /// Replace the game universe, such as on initial startup or because the player
+    /// Replaces the game universe, such as for initial setup or because the player
     /// chose to load a new one.
-    pub fn set_universe(&mut self, u: Universe) {
-        let shuttle = self.shuttle_mut();
-        shuttle.game_universe = u;
-        shuttle
-            .game_character
-            .set(shuttle.game_universe.get_default_character());
-
-        shuttle.sync_universe_and_character_derived();
-        // TODO: Need to sync FrameClock's schedule with the universe
+    /// This also resets the character to be the new universe's default character.
+    pub fn set_universe(&mut self, universe: Universe) {
+        self.shuttle_mut().set_universe(universe);
     }
 
     /// Set the character which this session is “looking through the eyes of”.
@@ -484,9 +478,6 @@ impl<I: time::Instant> Session<I> {
                     ControlMessage::ToggleMouselook => {
                         self.input_processor.toggle_mouselook_mode();
                     }
-                    ControlMessage::SetUniverse(universe) => {
-                        self.set_universe(universe);
-                    }
                     ControlMessage::ModifyGraphicsOptions(f) => {
                         let shuttle = self.shuttle();
                         shuttle
@@ -683,6 +674,15 @@ impl<I: time::Instant> Session<I> {
 }
 
 impl Shuttle {
+    fn set_universe(&mut self, universe: Universe) {
+        self.game_universe = universe;
+        self.game_character
+            .set(self.game_universe.get_default_character());
+
+        self.sync_universe_and_character_derived();
+        // TODO: Need to sync FrameClock's schedule with the universe in case it is different
+    }
+
     /// Update derived information that might have changed.
     ///
     /// * Check if the current game character's current space differs from the current
@@ -870,8 +870,6 @@ pub(crate) enum ControlMessage {
 
     ToggleMouselook,
 
-    SetUniverse(Universe),
-
     /// TODO: this should be "modify user preferences", from which graphics options are derived.
     ModifyGraphicsOptions(Box<dyn FnOnce(Arc<GraphicsOptions>) -> Arc<GraphicsOptions> + Send>),
 }
@@ -886,7 +884,6 @@ impl fmt::Debug for ControlMessage {
             Self::EnterDebug => write!(f, "EnterDebug"),
             Self::TogglePause => write!(f, "TogglePause"),
             Self::ToggleMouselook => write!(f, "ToggleMouselook"),
-            Self::SetUniverse(_u) => f.debug_struct("SetUniverse").finish_non_exhaustive(),
             Self::ModifyGraphicsOptions(_func) => f
                 .debug_struct("ModifyGraphicsOptions")
                 .finish_non_exhaustive(),
@@ -1076,17 +1073,14 @@ impl fmt::Debug for MainTaskContext {
 }
 
 impl MainTaskContext {
-    /// Replaces the session's universe.
+    /// Replaces the game universe, such as for initial setup or because the player
+    /// chose to load a new one.
+    /// This also resets the character to be the new universe's default character.
     ///
     /// Panics if called while the main task is suspended.
     pub fn set_universe(&self, universe: Universe) {
         self.with(|shuttle| {
-            // TODO: Instead of using the control channel, this should have an immediate
-            // side-effect. That'll be trickier to implement, so not bothering for now.
-            shuttle
-                .control_channel_sender
-                .send(ControlMessage::SetUniverse(universe))
-                .unwrap();
+            shuttle.set_universe(universe);
         })
     }
 
@@ -1256,8 +1250,9 @@ mod tests {
             .insert(old_marker.clone(), Space::empty_positive(1, 1, 1))
             .unwrap();
 
-        // Set up task that won't do anything yet
+        // Set up task (that won't do anything until it's polled as part of stepping)
         let (send, recv) = oneshot::channel();
+        let mut cameras = session.create_cameras(ListenableSource::constant(Viewport::ARBITRARY));
         session.set_main_task({
             let noticed_step = noticed_step.clone();
             move |ctx| async move {
@@ -1265,6 +1260,9 @@ mod tests {
                 let new_universe = recv.await.unwrap();
                 ctx.set_universe(new_universe);
                 eprintln!("main task: have set new universe");
+
+                cameras.update();
+                assert!(cameras.character().is_some(), "has character");
 
                 // Now try noticing steps
                 for _ in 0..2 {
@@ -1284,8 +1282,11 @@ mod tests {
 
         // Deliver new universe.
         let mut new_universe = Universe::new();
-        new_universe
+        let new_space = new_universe
             .insert(new_marker.clone(), Space::empty_positive(1, 1, 1))
+            .unwrap();
+        new_universe
+            .insert(Name::from("character"), Character::spawn_default(new_space))
             .unwrap();
         send.send(new_universe).unwrap();
 
