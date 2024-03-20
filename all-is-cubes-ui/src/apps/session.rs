@@ -50,33 +50,18 @@ pub struct Session<I> {
     /// [`Session`] will handle applying it to the game state.
     pub input_processor: InputProcessor,
 
-    graphics_options: ListenableCell<GraphicsOptions>,
-
-    game_universe: Universe,
-
-    /// Subset of information from `game_universe` that is largely immutable and can be
-    /// meaningfully listened to.
-    game_universe_info: ListenableCell<SessionUniverseInfo>,
-
-    /// Character we're designating as “the player character”.
-    /// Always a member of `game_universe`.
-    game_character: ListenableCellWithLocal<Option<Handle<Character>>>,
-
-    space_watch_state: SpaceWatchState,
+    /// The game universe and other parts of the session that can be mutated by the
+    /// main task. See [`Shuttle`]'s documentation.
+    ///
+    /// Boxed to make the move a cheap pointer move, since `Shuttle` is a large struct.
+    shuttle: Option<Box<Shuttle>>,
 
     /// If present, a future that is polled at the beginning of stepping,
     /// which may read or write parts of the session state via the context it was given.
     main_task: Option<BoxFuture<'static, ExitMainTask>>,
 
-    task_context_inner: Arc<Mutex<Option<TaskContextInner>>>,
-
-    /// Notifies when the session transitions to particular states.
-    session_event_notifier: Arc<listen::Notifier<Event>>,
-
-    /// Outputs [`Fluff`] from the game character's viewpoint and also the session UI.
-    //---
-    // TODO: should include spatial information and source information
-    fluff_notifier: Arc<listen::Notifier<Fluff>>,
+    /// Jointly owned by the main task.
+    task_context_inner: Arc<Mutex<Option<Box<Shuttle>>>>,
 
     paused: ListenableCell<bool>,
 
@@ -101,20 +86,44 @@ pub struct Session<I> {
     tick_counter_for_logging: u8,
 }
 
+/// Data abstractly belonging to [`Session`] whose ownership is temporarily moved as needed.
+///
+/// Currently, this is between the `Session` and its [`MainTaskContext`], but in the future it
+/// might also be moved to a background task to allow the session stepping to occur independent
+/// of the event loop or other owner of the `Session`.
+struct Shuttle {
+    graphics_options: ListenableCell<GraphicsOptions>,
+
+    game_universe: Universe,
+
+    /// Subset of information from `game_universe` that is largely immutable and can be
+    /// meaningfully listened to.
+    game_universe_info: ListenableCell<SessionUniverseInfo>,
+
+    /// Character we're designating as “the player character”.
+    /// Always a member of `game_universe`.
+    game_character: ListenableCellWithLocal<Option<Handle<Character>>>,
+
+    space_watch_state: SpaceWatchState,
+
+    control_channel_sender: mpsc::SyncSender<ControlMessage>,
+
+    /// Outputs [`Fluff`] from the game character's viewpoint and also the session UI.
+    //---
+    // TODO: should include spatial information and source information
+    fluff_notifier: Arc<listen::Notifier<Fluff>>,
+
+    /// Notifies when the session transitions to particular states.
+    session_event_notifier: Arc<listen::Notifier<Event>>,
+}
+
 impl<I: fmt::Debug> fmt::Debug for Session<I> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             frame_clock,
             input_processor,
-            graphics_options,
-            game_universe,
-            game_universe_info,
-            game_character,
-            space_watch_state,
             main_task,
-            task_context_inner,
-            fluff_notifier,
-            session_event_notifier,
+            task_context_inner: _,
             paused,
             ui,
             control_channel: _,
@@ -123,7 +132,24 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
             cursor_result,
             last_step_info,
             tick_counter_for_logging,
+
+            shuttle,
         } = self;
+
+        let Some(shuttle) = shuttle else {
+            write!(f, "Session(is in the middle of an operation)")?;
+            return Ok(());
+        };
+        let Shuttle {
+            graphics_options,
+            game_universe,
+            game_universe_info,
+            game_character,
+            space_watch_state,
+            control_channel_sender: _,
+            fluff_notifier,
+            session_event_notifier,
+        } = &**shuttle;
 
         f.debug_struct("Session")
             .field("frame_clock", frame_clock)
@@ -134,7 +160,6 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
             .field("game_character", game_character)
             .field("space_watch_state", space_watch_state)
             .field("main_task", &main_task.as_ref().map(|_| "..."))
-            .field("task_context_inner", task_context_inner)
             .field("session_event_notifier", session_event_notifier)
             .field("fluff_notifier", fluff_notifier)
             .field("paused", &paused)
@@ -156,30 +181,49 @@ impl<I: time::Instant> Session<I> {
         SessionBuilder::default()
     }
 
+    #[track_caller]
+    fn shuttle(&self) -> &Shuttle {
+        self.shuttle.as_ref().expect(
+            "Shuttle not returned to Session; \
+            this indicates something went wrong with main task execution",
+        )
+    }
+    #[track_caller]
+    fn shuttle_mut(&mut self) -> &mut Shuttle {
+        self.shuttle.as_mut().expect(
+            "Shuttle not returned to Session; \
+            this indicates something went wrong with main task execution",
+        )
+    }
+
     /// Returns a source for the [`Character`] that should be shown to the user.
     pub fn character(&self) -> ListenableSource<Option<Handle<Character>>> {
-        self.game_character.as_source()
+        self.shuttle().game_character.as_source()
     }
 
     /// Replace the game universe, such as on initial startup or because the player
     /// chose to load a new one.
     pub fn set_universe(&mut self, u: Universe) {
-        self.game_universe = u;
-        self.game_character
-            .set(self.game_universe.get_default_character());
+        let shuttle = self.shuttle_mut();
+        shuttle.game_universe = u;
+        shuttle
+            .game_character
+            .set(shuttle.game_universe.get_default_character());
 
-        self.sync_universe_and_character_derived();
+        shuttle.sync_universe_and_character_derived();
+        // TODO: Need to sync FrameClock's schedule with the universe
     }
 
     /// Set the character which this session is “looking through the eyes of”.
     /// It must be from the universe previously set with `set_universe()`.
     pub fn set_character(&mut self, character: Option<Handle<Character>>) {
+        let shuttle = self.shuttle_mut();
         if let Some(character) = &character {
-            assert!(character.universe_id() == Some(self.game_universe.universe_id()));
+            assert!(character.universe_id() == Some(shuttle.game_universe.universe_id()));
         }
 
-        self.game_character.set(character);
-        self.sync_universe_and_character_derived();
+        shuttle.game_character.set(character);
+        shuttle.sync_universe_and_character_derived();
     }
 
     /// Install a main task in the session, replacing any existing one.
@@ -197,15 +241,15 @@ impl<I: time::Instant> Session<I> {
         F::OutputFuture: Send + 'static,
     {
         let context = MainTaskContext {
-            inner: self.task_context_inner.clone(),
-            session_event_notifier: Arc::downgrade(&self.session_event_notifier),
+            shuttle: self.task_context_inner.clone(),
+            session_event_notifier: Arc::downgrade(&self.shuttle().session_event_notifier),
         };
         self.main_task = Some(Box::pin(task_ctor(context)));
     }
 
     /// Returns the current game universe owned by this session.
     pub fn universe(&self) -> &Universe {
-        &self.game_universe
+        &self.shuttle().game_universe
     }
 
     /// Returns a mutable reference to the [`Universe`].
@@ -213,13 +257,13 @@ impl<I: time::Instant> Session<I> {
     /// Note: Replacing the universe will not update the UI and character state.
     /// Use [`Self::set_universe()`] instead.
     pub fn universe_mut(&mut self) -> &mut Universe {
-        &mut self.game_universe
+        &mut self.shuttle_mut().game_universe
     }
 
     /// Allows observing replacement of the current universe in this session, or updates to its
     /// [`WhenceUniverse`].
     pub fn universe_info(&self) -> ListenableSource<SessionUniverseInfo> {
-        self.game_universe_info.as_source()
+        self.shuttle().game_universe_info.as_source()
     }
 
     /// What the renderer should be displaying on screen for the UI.
@@ -232,12 +276,12 @@ impl<I: time::Instant> Session<I> {
 
     /// Allows reading, and observing changes to, the current graphics options.
     pub fn graphics_options(&self) -> ListenableSource<GraphicsOptions> {
-        self.graphics_options.as_source()
+        self.shuttle().graphics_options.as_source()
     }
 
     /// Allows setting the current graphics options.
     pub fn graphics_options_mut(&self) -> &ListenableCell<GraphicsOptions> {
-        &self.graphics_options
+        &self.shuttle().graphics_options
     }
 
     /// Create [`StandardCameras`] which may be used in rendering a view of this session.
@@ -253,7 +297,7 @@ impl<I: time::Instant> Session<I> {
     /// Listen for [`Fluff`] events from this session. Fluff constitutes short-duration
     /// sound or particle effects.
     pub fn listen_fluff(&self, listener: impl listen::Listener<Fluff> + Send + Sync + 'static) {
-        self.fluff_notifier.listen(listener)
+        self.shuttle().fluff_notifier.listen(listener)
     }
 
     /// Steps the universe if the [`FrameClock`] says it's time to do so.
@@ -273,20 +317,21 @@ impl<I: time::Instant> Session<I> {
         // TODO: Catch-up implementation should probably live in FrameClock.
         for _ in 0..FrameClock::<I>::CATCH_UP_STEPS {
             if self.frame_clock.should_step() {
-                let u_clock = self.game_universe.clock();
+                let shuttle = self.shuttle.as_mut().unwrap();
+                let u_clock = shuttle.game_universe.clock();
                 let paused = *self.paused.get();
                 let ui_tick = u_clock.next_tick(false);
                 let game_tick = u_clock.next_tick(paused);
 
                 self.frame_clock.did_step(u_clock.schedule());
 
-                if let Some(character_handle) = self.game_character.borrow() {
+                if let Some(character_handle) = shuttle.game_character.borrow() {
                     self.input_processor.apply_input(
                         InputTargets {
-                            universe: Some(&mut self.game_universe),
+                            universe: Some(&mut shuttle.game_universe),
                             character: Some(character_handle),
                             paused: Some(&self.paused),
-                            graphics_options: Some(&self.graphics_options),
+                            graphics_options: Some(&shuttle.graphics_options),
                             control_channel: Some(&self.control_channel_sender),
                         },
                         game_tick,
@@ -307,7 +352,7 @@ impl<I: time::Instant> Session<I> {
                     ui: time::Deadline::At(step_start_time + dt / 2 + dt / 4),
                 };
 
-                let mut info = self.game_universe.step(paused, deadlines.world);
+                let mut info = shuttle.game_universe.step(paused, deadlines.world);
                 if let Some(ui) = &mut self.ui {
                     info += ui.step(ui_tick, deadlines.ui);
                 }
@@ -325,7 +370,7 @@ impl<I: time::Instant> Session<I> {
 
                 // --- Post-step activities ---
 
-                self.session_event_notifier.notify(Event::Stepped);
+                shuttle.session_event_notifier.notify(Event::Stepped);
 
                 // Let main task do things triggered by the step.
                 // Note that we do this once per step even with catch-up.
@@ -343,21 +388,30 @@ impl<I: time::Instant> Session<I> {
         // TODO: for efficiency, use a waker
         if let Some(future) = self.main_task.as_mut() {
             {
-                let mut context_guard = match self.task_context_inner.lock() {
+                let mut shuttle_guard = match self.task_context_inner.lock() {
                     Ok(g) => g,
                     Err(poisoned) => poisoned.into_inner(),
                 };
-                *context_guard = Some(TaskContextInner {
-                    control_channel_sender: self.control_channel_sender.clone(),
-                });
+                *shuttle_guard = Some(
+                    self.shuttle
+                        .take()
+                        .expect("Session lost its shuttle before polling the main task"),
+                );
             }
             // Reset on drop even if the future panics
             let _reset_on_drop = scopeguard::guard((), |()| {
-                let mut context_guard = match self.task_context_inner.lock() {
+                let mut shuttle_guard = match self.task_context_inner.lock() {
                     Ok(g) => g,
                     Err(poisoned) => poisoned.into_inner(),
                 };
-                *context_guard = None;
+                if let Some(shuttle) = shuttle_guard.take() {
+                    self.shuttle = Some(shuttle);
+                } else {
+                    log::error!(
+                        "Session lost its shuttle while polling the main task and will be unusable"
+                    );
+                }
+                *shuttle_guard = None;
             });
 
             match future
@@ -398,7 +452,7 @@ impl<I: time::Instant> Session<I> {
                     ControlMessage::Save => {
                         // TODO: Make this asynchronous. We will need to suspend normal
                         // stepping during that period.
-                        let u = &self.game_universe;
+                        let u = &self.shuttle().game_universe;
                         let fut = u.whence.save(
                             u,
                             YieldProgressBuilder::new()
@@ -434,7 +488,10 @@ impl<I: time::Instant> Session<I> {
                         self.set_universe(universe);
                     }
                     ControlMessage::ModifyGraphicsOptions(f) => {
-                        self.graphics_options.set(f(self.graphics_options.get()));
+                        let shuttle = self.shuttle();
+                        shuttle
+                            .graphics_options
+                            .set(f(shuttle.graphics_options.get()));
                     }
                 },
                 Err(TryRecvError::Empty) => break,
@@ -445,7 +502,7 @@ impl<I: time::Instant> Session<I> {
             }
         }
 
-        self.sync_universe_and_character_derived();
+        self.shuttle_mut().sync_universe_and_character_derived();
     }
 
     /// Call this once per frame to update the cursor raycast.
@@ -520,8 +577,9 @@ impl<I: time::Instant> Session<I> {
         }
 
         if let Err(error) = &result {
+            let shuttle = self.shuttle();
             for fluff in error.fluff() {
-                self.fluff_notifier.notify(fluff);
+                shuttle.fluff_notifier.notify(fluff);
             }
         } else {
             // success effects should come from the tool's transaction
@@ -546,7 +604,7 @@ impl<I: time::Instant> Session<I> {
         } else {
             // Otherwise, it's a click inside the game world (even if the cursor hit nothing at all).
             // Character::click will validate against being a click in the wrong space.
-            if let Some(character_handle) = self.game_character.borrow() {
+            if let Some(character_handle) = self.shuttle().game_character.borrow() {
                 let transaction = Character::click(
                     character_handle.clone(),
                     self.cursor_result.as_ref(),
@@ -592,6 +650,39 @@ impl<I: time::Instant> Session<I> {
         fut
     }
 
+    /// Returns textual information intended to be overlaid as a HUD on top of the rendered scene
+    /// containing diagnostic information about rendering and stepping.
+    pub fn info_text<T: Fmt<StatusText>>(&self, render: T) -> InfoText<'_, I, T> {
+        let fopt = StatusText {
+            show: self
+                .shuttle()
+                .graphics_options
+                .get()
+                .debug_info_text_contents,
+        };
+
+        if LOG_FIRST_FRAMES && self.tick_counter_for_logging <= 10 {
+            log::debug!(
+                "tick={} draw {}",
+                self.tick_counter_for_logging,
+                render.refmt(&fopt)
+            )
+        }
+
+        InfoText {
+            session: self,
+            render,
+            fopt,
+        }
+    }
+
+    #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
+    pub fn draw_fps_counter(&self) -> &FpsCounter<I> {
+        self.frame_clock.draw_fps_counter()
+    }
+}
+
+impl Shuttle {
     /// Update derived information that might have changed.
     ///
     /// * Check if the current game character's current space differs from the current
@@ -618,33 +709,6 @@ impl<I: time::Instant> Session<I> {
                     .expect("TODO: decide how to handle error");
             }
         }
-    }
-
-    /// Returns textual information intended to be overlaid as a HUD on top of the rendered scene
-    /// containing diagnostic information about rendering and stepping.
-    pub fn info_text<T: Fmt<StatusText>>(&self, render: T) -> InfoText<'_, I, T> {
-        let fopt = StatusText {
-            show: self.graphics_options.get().debug_info_text_contents,
-        };
-
-        if LOG_FIRST_FRAMES && self.tick_counter_for_logging <= 10 {
-            log::debug!(
-                "tick={} draw {}",
-                self.tick_counter_for_logging,
-                render.refmt(&fopt)
-            )
-        }
-
-        InfoText {
-            session: self,
-            render,
-            fopt,
-        }
-    }
-
-    #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
-    pub fn draw_fps_counter(&self) -> &FpsCounter<I> {
-        self.frame_clock.draw_fps_counter()
     }
 }
 
@@ -699,6 +763,8 @@ impl<I: time::Instant> SessionBuilder<I> {
         let space_watch_state = SpaceWatchState::empty();
 
         Session {
+            frame_clock: FrameClock::new(game_universe.clock().schedule()),
+
             ui: match viewport_for_ui {
                 Some(viewport) => Some(
                     Vui::new(
@@ -716,20 +782,22 @@ impl<I: time::Instant> SessionBuilder<I> {
                 ),
                 None => None,
             },
-            frame_clock: FrameClock::new(game_universe.clock().schedule()),
+            shuttle: Some(Box::new(Shuttle {
+                graphics_options,
+                game_character,
+                game_universe_info: ListenableCell::new(SessionUniverseInfo {
+                    id: game_universe.universe_id(),
+                    whence: game_universe.whence.clone(),
+                }),
+                game_universe,
+                space_watch_state,
+                session_event_notifier: Arc::new(listen::Notifier::new()),
+                fluff_notifier: Arc::new(listen::Notifier::new()),
+                control_channel_sender: control_send.clone(),
+            })),
             input_processor,
-            graphics_options,
-            game_character,
-            game_universe_info: ListenableCell::new(SessionUniverseInfo {
-                id: game_universe.universe_id(),
-                whence: game_universe.whence.clone(),
-            }),
-            game_universe,
-            space_watch_state,
             main_task: None,
             task_context_inner: Arc::new(Mutex::new(None)),
-            session_event_notifier: Arc::new(listen::Notifier::new()),
-            fluff_notifier: Arc::new(listen::Notifier::new()),
             paused,
             control_channel: control_recv,
             control_channel_sender: control_send,
@@ -903,7 +971,12 @@ impl<I: time::Instant, T: Fmt<StatusText>> fmt::Display for InfoText<'_, I, T> {
         let fopt = self.fopt;
         let mut empty = true;
         if fopt.show.contains(ShowStatus::CHARACTER) {
-            if let Some(character_handle) = self.session.game_character.borrow() {
+            if let Some(character_handle) = self
+                .session
+                .shuttle
+                .as_ref()
+                .and_then(|shuttle| shuttle.game_character.borrow().as_ref())
+            {
                 empty = false;
                 write!(f, "{}", character_handle.read().unwrap().refmt(&fopt)).unwrap();
             }
@@ -991,11 +1064,15 @@ enum Event {
 }
 
 /// Given to the task of a [`Session::set_main_task()`] to allow manipulating the session.
-#[derive(Debug)]
-
 pub struct MainTaskContext {
-    inner: Arc<Mutex<Option<TaskContextInner>>>,
+    shuttle: Arc<Mutex<Option<Box<Shuttle>>>>,
     session_event_notifier: Weak<listen::Notifier<Event>>,
+}
+
+impl fmt::Debug for MainTaskContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MainTaskContext").finish_non_exhaustive()
+    }
 }
 
 impl MainTaskContext {
@@ -1003,10 +1080,11 @@ impl MainTaskContext {
     ///
     /// Panics if called while the main task is suspended.
     pub fn set_universe(&self, universe: Universe) {
-        self.with(|ctx| {
+        self.with(|shuttle| {
             // TODO: Instead of using the control channel, this should have an immediate
             // side-effect. That'll be trickier to implement, so not bothering for now.
-            ctx.control_channel_sender
+            shuttle
+                .control_channel_sender
                 .send(ControlMessage::SetUniverse(universe))
                 .unwrap();
         })
@@ -1026,8 +1104,9 @@ impl MainTaskContext {
     // the main task with VUI pages, so that the main task can pop messages at opportune
     // times.
     pub fn show_modal_message(&self, message: ArcStr) {
-        self.with(|ctx| {
-            ctx.control_channel_sender
+        self.with(|shuttle| {
+            shuttle
+                .control_channel_sender
                 .send(ControlMessage::ShowModal(message))
                 .unwrap();
         })
@@ -1042,7 +1121,7 @@ impl MainTaskContext {
     ///
     /// Panics if called while the main task is suspended.
     pub async fn yield_to_step(&self) {
-        self.with(|_ctx| {});
+        self.with(|_| {});
         let notifier = self
             .session_event_notifier
             .upgrade()
@@ -1055,16 +1134,11 @@ impl MainTaskContext {
     }
 
     #[track_caller]
-    fn with<R>(&self, f: impl FnOnce(&mut TaskContextInner) -> R) -> R {
-        f(self.inner.lock().unwrap().as_mut().expect(
+    fn with<R>(&self, f: impl FnOnce(&mut Shuttle) -> R) -> R {
+        f(self.shuttle.lock().unwrap().as_mut().expect(
             "MainTaskContext operations may not be called while the main task is not executing",
         ))
     }
-}
-
-#[derive(Debug)]
-struct TaskContextInner {
-    control_channel_sender: mpsc::SyncSender<ControlMessage>,
 }
 
 /// Produces a `Listener` and a `Future` that suspends until the `Listener` receives one message.
