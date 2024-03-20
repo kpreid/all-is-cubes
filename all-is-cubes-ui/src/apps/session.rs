@@ -33,6 +33,9 @@ use crate::ui_content::Vui;
 
 const LOG_FIRST_FRAMES: bool = false;
 
+const SHUTTLE_PANIC_MSG: &str = "Shuttle not returned to Session; \
+    this indicates something went wrong with main task execution";
+
 /// A game session; a bundle of a [`Universe`] and supporting elements such as
 /// a [`FrameClock`] and UI state.
 ///
@@ -65,21 +68,12 @@ pub struct Session<I> {
 
     paused: ListenableCell<bool>,
 
-    ui: Option<Vui>,
-
     /// Messages for controlling the state that aren't via [`InputProcessor`].
     ///
     /// TODO: This is originally a quick kludge to make onscreen UI buttons work.
     /// Not sure whether it is a good strategy overall.
     control_channel: mpsc::Receiver<ControlMessage>,
     control_channel_sender: mpsc::SyncSender<ControlMessage>,
-
-    quit_fn: Option<QuitFn>,
-
-    /// Last cursor raycast result.
-    /// TODO: This needs to handle clicking on the HUD and thus explicitly point into
-    /// one of two different spaces.
-    cursor_result: Option<Cursor>,
 
     last_step_info: UniverseStepInfo,
 
@@ -104,9 +98,14 @@ struct Shuttle {
     /// Always a member of `game_universe`.
     game_character: ListenableCellWithLocal<Option<Handle<Character>>>,
 
+    ui: Option<Vui>,
+
     space_watch_state: SpaceWatchState,
 
     control_channel_sender: mpsc::SyncSender<ControlMessage>,
+
+    /// Last cursor raycast result.
+    cursor_result: Option<Cursor>,
 
     /// Outputs [`Fluff`] from the game character's viewpoint and also the session UI.
     //---
@@ -115,6 +114,8 @@ struct Shuttle {
 
     /// Notifies when the session transitions to particular states.
     session_event_notifier: Arc<listen::Notifier<Event>>,
+
+    quit_fn: Option<QuitFn>,
 }
 
 impl<I: fmt::Debug> fmt::Debug for Session<I> {
@@ -125,11 +126,8 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
             main_task,
             task_context_inner: _,
             paused,
-            ui,
             control_channel: _,
             control_channel_sender: _,
-            quit_fn,
-            cursor_result,
             last_step_info,
             tick_counter_for_logging,
 
@@ -146,7 +144,10 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
             game_universe_info,
             game_character,
             space_watch_state,
+            ui,
             control_channel_sender: _,
+            cursor_result,
+            quit_fn,
             fluff_notifier,
             session_event_notifier,
         } = &**shuttle;
@@ -183,17 +184,11 @@ impl<I: time::Instant> Session<I> {
 
     #[track_caller]
     fn shuttle(&self) -> &Shuttle {
-        self.shuttle.as_ref().expect(
-            "Shuttle not returned to Session; \
-            this indicates something went wrong with main task execution",
-        )
+        self.shuttle.as_ref().expect(SHUTTLE_PANIC_MSG)
     }
     #[track_caller]
     fn shuttle_mut(&mut self) -> &mut Shuttle {
-        self.shuttle.as_mut().expect(
-            "Shuttle not returned to Session; \
-            this indicates something went wrong with main task execution",
-        )
+        self.shuttle.as_mut().expect(SHUTTLE_PANIC_MSG)
     }
 
     /// Returns a source for the [`Character`] that should be shown to the user.
@@ -262,10 +257,7 @@ impl<I: time::Instant> Session<I> {
 
     /// What the renderer should be displaying on screen for the UI.
     pub fn ui_view(&self) -> ListenableSource<UiViewState> {
-        match &self.ui {
-            Some(ui) => ui.view(),
-            None => ListenableSource::constant(UiViewState::default()), // TODO: cache this to allocate less
-        }
+        self.shuttle().ui_view()
     }
 
     /// Allows reading, and observing changes to, the current graphics options.
@@ -311,7 +303,7 @@ impl<I: time::Instant> Session<I> {
         // TODO: Catch-up implementation should probably live in FrameClock.
         for _ in 0..FrameClock::<I>::CATCH_UP_STEPS {
             if self.frame_clock.should_step() {
-                let shuttle = self.shuttle.as_mut().unwrap();
+                let shuttle = self.shuttle.as_mut().expect(SHUTTLE_PANIC_MSG);
                 let u_clock = shuttle.game_universe.clock();
                 let paused = *self.paused.get();
                 let ui_tick = u_clock.next_tick(false);
@@ -347,7 +339,7 @@ impl<I: time::Instant> Session<I> {
                 };
 
                 let mut info = shuttle.game_universe.step(paused, deadlines.world);
-                if let Some(ui) = &mut self.ui {
+                if let Some(ui) = &mut shuttle.ui {
                     info += ui.step(ui_tick, deadlines.ui);
                 }
 
@@ -426,7 +418,7 @@ impl<I: time::Instant> Session<I> {
                 Ok(msg) => match msg {
                     ControlMessage::Back => {
                         // TODO: error reporting … ? hm.
-                        if let Some(ui) = &mut self.ui {
+                        if let Some(ui) = &mut self.shuttle_mut().ui {
                             ui.back();
                         }
                     }
@@ -434,8 +426,9 @@ impl<I: time::Instant> Session<I> {
                         self.show_modal_message(message);
                     }
                     ControlMessage::EnterDebug => {
-                        if let Some(ui) = &mut self.ui {
-                            if let Some(cursor) = &self.cursor_result {
+                        let shuttle = self.shuttle_mut();
+                        if let Some(ui) = &mut shuttle.ui {
+                            if let Some(cursor) = &shuttle.cursor_result {
                                 ui.enter_debug(cursor);
                             } else {
                                 // TODO: not actually a click
@@ -502,7 +495,7 @@ impl<I: time::Instant> Session<I> {
     /// We'd like to not have too much dependencies on the rendering, but also
     /// not obligate each platform/renderer layer to have too much boilerplate.
     pub fn update_cursor(&mut self, cameras: &StandardCameras) {
-        self.cursor_result = self
+        self.shuttle_mut().cursor_result = self
             .input_processor
             .cursor_ndc_position()
             .and_then(|ndc_pos| cameras.project_cursor(ndc_pos));
@@ -510,7 +503,7 @@ impl<I: time::Instant> Session<I> {
 
     /// Returns the [`Cursor`] computed by the last call to [`Session::update_cursor()`].
     pub fn cursor_result(&self) -> Option<&Cursor> {
-        self.cursor_result.as_ref()
+        self.shuttle().cursor_result.as_ref()
     }
 
     /// Returns the suggested mouse-pointer/cursor appearance for the current [`Cursor`]
@@ -519,7 +512,7 @@ impl<I: time::Instant> Session<I> {
     /// Note that this does not report any information about whether the pointer should be
     /// *hidden*. (TODO: Should we change that?)
     pub fn cursor_icon(&self) -> &CursorIcon {
-        match self.cursor_result {
+        match self.shuttle().cursor_result {
             // TODO: add more distinctions.
             // * Non-clickable UI should get normal arrow cursor.
             // * Maybe a lack-of-world should be indicated with a disabled cursor.
@@ -538,7 +531,7 @@ impl<I: time::Instant> Session<I> {
     /// Caution: calling this repeatedly will currently result in stacking up arbitrary
     /// numbers of dialogs. Avoid using it for situations not in response to user action.
     pub fn show_modal_message(&mut self, message: ArcStr) {
-        if let Some(ui) = &mut self.ui {
+        if let Some(ui) = &mut self.shuttle_mut().ui {
             ui.show_modal_message(message);
         } else {
             log::info!("UI message not shown: {message}");
@@ -552,7 +545,7 @@ impl<I: time::Instant> Session<I> {
     pub fn click(&mut self, button: usize) {
         // TODO: This function has no tests.
 
-        let result = self.click_impl(button);
+        let result = self.shuttle_mut().click_impl::<I>(button);
 
         // Now, do all the _reporting_ of the tool's success or failure.
         // (The architectural reason this isn't inside of the use_tool() itself is so that
@@ -576,48 +569,8 @@ impl<I: time::Instant> Session<I> {
             // success effects should come from the tool's transaction
         }
 
-        if let Some(ui) = &self.ui {
+        if let Some(ui) = &self.shuttle_mut().ui {
             ui.show_click_result(button, result);
-        }
-    }
-
-    /// Implementation of click interpretation logic, called by [`Self::click`].
-    /// TODO: This function needs tests.
-    fn click_impl(&mut self, button: usize) -> Result<(), ToolError> {
-        let cursor_space = self.cursor_result.as_ref().map(|c| c.space());
-        // TODO: A better condition for this would be "is one of the spaces in the UI universe"
-        if cursor_space == Option::as_ref(&self.ui_view().get().space) {
-            // TODO: refactor away unwrap
-            self.ui
-                .as_mut()
-                .unwrap()
-                .click(button, self.cursor_result.clone())
-        } else {
-            // Otherwise, it's a click inside the game world (even if the cursor hit nothing at all).
-            // Character::click will validate against being a click in the wrong space.
-            if let Some(character_handle) = self.shuttle().game_character.borrow() {
-                let transaction = Character::click(
-                    character_handle.clone(),
-                    self.cursor_result.as_ref(),
-                    button,
-                )?;
-                transaction
-                    .execute(self.universe_mut(), &mut transaction::no_outputs)
-                    .map_err(|e| ToolError::Internal(e.to_string()))?;
-
-                // Spend a little time doing light updates, to ensure that changes right in front of
-                // the player are clean (and not flashes of blackness).
-                if let Some(space_handle) = self.cursor_result.as_ref().map(Cursor::space) {
-                    // TODO: make this a kind of SpaceTransaction, eliminating this try_modify.
-                    let _ = space_handle.try_modify(|space| {
-                        space.evaluate_light_for_time::<I>(Duration::from_millis(1));
-                    });
-                }
-
-                Ok(())
-            } else {
-                Err(ToolError::NoTool)
-            }
         }
     }
 
@@ -633,12 +586,7 @@ impl<I: time::Instant> Session<I> {
     /// any reason. If it is successful, the future never resolves. It is not necessary to poll
     /// the future if the result value is not wanted.
     pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static {
-        let fut: BoxFuture<'static, QuitResult> = match (&self.ui, &self.quit_fn) {
-            (Some(ui), _) => Box::pin(ui.quit()),
-            (None, Some(quit_fn)) => Box::pin(std::future::ready(quit_fn())),
-            (None, None) => Box::pin(std::future::ready(Err(QuitCancelled::Unsupported))),
-        };
-        fut
+        self.shuttle().quit()
     }
 
     /// Returns textual information intended to be overlaid as a HUD on top of the rendered scene
@@ -673,6 +621,8 @@ impl<I: time::Instant> Session<I> {
     }
 }
 
+/// Methods on `Shuttle` are those operations that can be called from both [`Session`] and
+/// [ `MainTaskContext`].
 impl Shuttle {
     fn set_universe(&mut self, universe: Universe) {
         self.game_universe = universe;
@@ -681,6 +631,63 @@ impl Shuttle {
 
         self.sync_universe_and_character_derived();
         // TODO: Need to sync FrameClock's schedule with the universe in case it is different
+    }
+
+    fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static {
+        let fut: BoxFuture<'static, QuitResult> = match (&self.ui, &self.quit_fn) {
+            (Some(ui), _) => Box::pin(ui.quit()),
+            (None, Some(quit_fn)) => Box::pin(std::future::ready(quit_fn())),
+            (None, None) => Box::pin(std::future::ready(Err(QuitCancelled::Unsupported))),
+        };
+        fut
+    }
+
+    /// What the renderer should be displaying on screen for the UI.
+    fn ui_view(&self) -> ListenableSource<UiViewState> {
+        match &self.ui {
+            Some(ui) => ui.view(),
+            None => ListenableSource::constant(UiViewState::default()), // TODO: cache this to allocate less
+        }
+    }
+
+    /// Implementation of click interpretation logic, called by [`Self::click`].
+    /// TODO: This function needs tests.
+    fn click_impl<I: time::Instant>(&mut self, button: usize) -> Result<(), ToolError> {
+        let cursor_space = self.cursor_result.as_ref().map(|c| c.space());
+        // TODO: A better condition for this would be "is one of the spaces in the UI universe"
+        if cursor_space == Option::as_ref(&self.ui_view().get().space) {
+            // TODO: refactor away unwrap
+            self.ui
+                .as_mut()
+                .unwrap()
+                .click(button, self.cursor_result.clone())
+        } else {
+            // Otherwise, it's a click inside the game world (even if the cursor hit nothing at all).
+            // Character::click will validate against being a click in the wrong space.
+            if let Some(character_handle) = self.game_character.borrow() {
+                let transaction = Character::click(
+                    character_handle.clone(),
+                    self.cursor_result.as_ref(),
+                    button,
+                )?;
+                transaction
+                    .execute(&mut self.game_universe, &mut transaction::no_outputs)
+                    .map_err(|e| ToolError::Internal(e.to_string()))?;
+
+                // Spend a little time doing light updates, to ensure that changes right in front of
+                // the player are clean (and not flashes of blackness).
+                if let Some(space_handle) = self.cursor_result.as_ref().map(Cursor::space) {
+                    // TODO: make this a kind of SpaceTransaction, eliminating this try_modify.
+                    let _ = space_handle.try_modify(|space| {
+                        space.evaluate_light_for_time::<I>(Duration::from_millis(1));
+                    });
+                }
+
+                Ok(())
+            } else {
+                Err(ToolError::NoTool)
+            }
+        }
     }
 
     /// Update derived information that might have changed.
@@ -765,24 +772,25 @@ impl<I: time::Instant> SessionBuilder<I> {
         Session {
             frame_clock: FrameClock::new(game_universe.clock().schedule()),
 
-            ui: match viewport_for_ui {
-                Some(viewport) => Some(
-                    Vui::new(
-                        &input_processor,
-                        game_character.as_source(),
-                        paused.as_source(),
-                        graphics_options.as_source(),
-                        control_send.clone(),
-                        viewport,
-                        fullscreen_state,
-                        set_fullscreen,
-                        quit_fn.clone(),
-                    )
-                    .await,
-                ),
-                None => None,
-            },
             shuttle: Some(Box::new(Shuttle {
+                ui: match viewport_for_ui {
+                    Some(viewport) => Some(
+                        Vui::new(
+                            &input_processor,
+                            game_character.as_source(),
+                            paused.as_source(),
+                            graphics_options.as_source(),
+                            control_send.clone(),
+                            viewport,
+                            fullscreen_state,
+                            set_fullscreen,
+                            quit_fn.clone(),
+                        )
+                        .await,
+                    ),
+                    None => None,
+                },
+
                 graphics_options,
                 game_character,
                 game_universe_info: ListenableCell::new(SessionUniverseInfo {
@@ -791,9 +799,11 @@ impl<I: time::Instant> SessionBuilder<I> {
                 }),
                 game_universe,
                 space_watch_state,
+                cursor_result: None,
                 session_event_notifier: Arc::new(listen::Notifier::new()),
                 fluff_notifier: Arc::new(listen::Notifier::new()),
                 control_channel_sender: control_send.clone(),
+                quit_fn,
             })),
             input_processor,
             main_task: None,
@@ -801,8 +811,6 @@ impl<I: time::Instant> SessionBuilder<I> {
             paused,
             control_channel: control_recv,
             control_channel_sender: control_send,
-            quit_fn,
-            cursor_result: None,
             last_step_info: UniverseStepInfo::default(),
             tick_counter_for_logging: 0,
         }
@@ -1082,6 +1090,21 @@ impl MainTaskContext {
         self.with(|shuttle| {
             shuttle.set_universe(universe);
         })
+    }
+
+    /// Invoke the [`SessionBuilder::quit()`] callback as if the user clicked a quit button inside
+    /// our UI.
+    ///
+    /// This may be used in response to a window's close button, for example.
+    ///
+    /// The session state *may* decline to actually call the callback, such as if there are
+    /// user-visible unsaved changes.
+    ///
+    /// The returned future will produce a [`QuitCancelled`] value if quitting was unsuccessful for
+    /// any reason. If it is successful, the future never resolves. It is not necessary to poll
+    /// the future if the result value is not wanted.
+    pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static {
+        self.with(|shuttle| shuttle.quit())
     }
 
     /// Display a dialog box with a message. The user can exit the dialog box to return
