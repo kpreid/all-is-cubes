@@ -353,7 +353,7 @@ mod tests {
     use clap::error::{ContextValue, ErrorKind};
 
     fn parse(args: &[&str]) -> clap::error::Result<AicDesktopArgs> {
-        AicDesktopArgs::try_parse_from(std::iter::once("all-is-cubes").chain(args.iter().cloned()))
+        AicDesktopArgs::try_parse_from(std::iter::once("all-is-cubes").chain(args.iter().copied()))
     }
 
     fn error_context(

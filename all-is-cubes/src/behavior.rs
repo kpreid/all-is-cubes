@@ -269,7 +269,7 @@ impl<H: BehaviorHost> BehaviorSet<H> {
 
 impl<H: BehaviorHost> Clone for BehaviorSet<H> {
     fn clone(&self) -> Self {
-        let woken = Arc::new(Mutex::new(self.members.keys().cloned().collect()));
+        let woken = Arc::new(Mutex::new(self.members.keys().copied().collect()));
 
         // Reassign keys and wakers to be unique
         // Note: This is similar to `BehaviorSetTransaction::commit()`.
