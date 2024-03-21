@@ -1,3 +1,5 @@
+use core::fmt;
+
 use alloc::sync::Arc;
 
 use crate::listen::{Listen, Listener, Notifier};
@@ -5,17 +7,14 @@ use crate::util::maybe_sync::{Mutex, MutexGuard};
 
 /// A interior-mutable container for a value which can notify that the value changed,
 /// and which has reference-counted read-only handles to read it.
-#[derive(Debug)]
 pub struct ListenableCell<T> {
     storage: Arc<ListenableCellStorage<T>>,
 }
 /// Access to a value that might change (provided by a [`ListenableCell`]) or be [a
 /// constant](ListenableSource::constant), and which can be listened to.
-#[derive(Clone, Debug)]
 pub struct ListenableSource<T> {
     storage: Arc<ListenableCellStorage<T>>,
 }
-#[derive(Debug)]
 struct ListenableCellStorage<T> {
     /// Mutex because it's mutable; Arc because we want to be able to clone out of it to
     /// avoid holding the cell borrowed.
@@ -114,7 +113,7 @@ impl<T> ListenableCell<T> {
     }
 }
 
-impl<T: Clone> ListenableSource<T> {
+impl<T> ListenableSource<T> {
     /// Creates a new [`ListenableSource`] containing the given value, which will
     /// never change.
     pub fn constant(value: T) -> Self {
@@ -133,13 +132,24 @@ impl<T: Clone> ListenableSource<T> {
     }
 
     /// Returns a clone of the current value of the cell.
-    pub fn snapshot(&self) -> T {
+    pub fn snapshot(&self) -> T
+    where
+        T: Clone,
+    {
         // TODO: This was originally written to avoid cloning the Rc if cloning the value is the final goal, but under threading we don't want to hold the lock unnecessarily or possibly cause it to be poisoned due to the clone operation panicking. What's the best option? Should this method just be deleted?
         T::clone(&*self.get())
     }
 }
 
-impl<T: Clone> Listen for ListenableSource<T> {
+impl<T> Clone for ListenableSource<T> {
+    fn clone(&self) -> Self {
+        Self {
+            storage: Arc::clone(&self.storage),
+        }
+    }
+}
+
+impl<T> Listen for ListenableSource<T> {
     type Msg = ();
 
     fn listen<L: Listener<Self::Msg> + 'static>(&self, listener: L) {
@@ -151,7 +161,6 @@ impl<T: Clone> Listen for ListenableSource<T> {
 
 /// Convenience wrapper around [`ListenableCell`] which allows borrowing the current
 /// value, at the cost of requiring `&mut` access to set it.
-#[derive(Debug)] // TODO: custom format ?
 #[doc(hidden)] // TODO: decide if good API -- currently used by all_is_cubes_gpu
 pub struct ListenableCellWithLocal<T> {
     cell: ListenableCell<T>,
@@ -185,13 +194,99 @@ impl<T> ListenableCellWithLocal<T> {
     }
 }
 
+impl<T: fmt::Debug> fmt::Debug for ListenableCell<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ds = f.debug_struct("ListenableCell");
+        ds.field("value", &self.get());
+        format_cell_metadata(&mut ds, &self.storage);
+        ds.finish()
+    }
+}
+impl<T: fmt::Debug> fmt::Debug for ListenableSource<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ds = f.debug_struct("ListenableSource");
+        ds.field("value", &self.get());
+        format_cell_metadata(&mut ds, &self.storage);
+        ds.finish()
+    }
+}
+impl<T: fmt::Debug> fmt::Debug for ListenableCellWithLocal<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ds = f.debug_struct("ListenableCellWithLocal");
+        ds.field("value", &self.value);
+        format_cell_metadata(&mut ds, &self.cell.storage);
+        ds.finish()
+    }
+}
+
+fn format_cell_metadata<T>(
+    ds: &mut fmt::DebugStruct<'_, '_>,
+    storage: &Arc<ListenableCellStorage<T>>,
+) {
+    ds.field("owners", &Arc::strong_count(storage));
+    if let Some(notifier) = &storage.notifier {
+        ds.field("listeners", &notifier.count());
+    } else {
+        ds.field("constant", &true);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::listen::Sink;
+    use alloc::vec::Vec;
+    use pretty_assertions::assert_eq;
 
     #[test]
-    fn listenable_cell() {
+    fn listenable_cell_and_source_debug() {
+        let cell = ListenableCell::<Vec<&str>>::new(Arc::new(vec!["hi"]));
+        let source = cell.as_source();
+        assert_eq!(
+            format!("{cell:#?}"),
+            indoc::indoc! {
+                r#"ListenableCell {
+                    value: [
+                        "hi",
+                    ],
+                    owners: 2,
+                    listeners: 0,
+                }"#
+            }
+        );
+        assert_eq!(
+            format!("{source:#?}"),
+            indoc::indoc! {
+               r#"ListenableSource {
+                    value: [
+                        "hi",
+                    ],
+                    owners: 2,
+                    listeners: 0,
+                }"#
+            }
+        );
+    }
+
+    #[test]
+    fn constant_source_debug() {
+        let source = ListenableSource::constant(vec!["hi"]);
+        assert_eq!(
+            format!("{source:#?}"),
+            indoc::indoc! {
+               r#"ListenableSource {
+                    value: [
+                        "hi",
+                    ],
+                    owners: 1,
+                    constant: true,
+                }"#
+            }
+        );
+    }
+
+    #[test]
+    fn listenable_cell_usage() {
         let cell = ListenableCell::new(0);
 
         let s = cell.as_source();
@@ -205,7 +300,7 @@ mod tests {
     }
 
     #[test]
-    fn listenable_source_constant() {
+    fn constant_source_usage() {
         let s = ListenableSource::constant(123);
         assert_eq!(*s.get(), 123);
         s.listen(Sink::new().listener()); // no panic
