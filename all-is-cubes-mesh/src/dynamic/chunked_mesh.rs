@@ -185,7 +185,7 @@ where
 
         self.chunk_chart
             .chunks(view_chunk, camera.view_direction_mask())
-            .flat_map(|pos| self.chunks.get(&pos))
+            .filter_map(|pos| self.chunks.get(&pos))
             .flat_map(|chunk| chunk.block_instances.iter())
             .map(|(_, instance_cubes)| instance_cubes.len())
             .sum()

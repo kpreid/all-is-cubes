@@ -490,7 +490,7 @@ impl Body {
                         })
                     })
                 })
-                .flat_map(|direction| self.attempt_push_out(space, direction))
+                .filter_map(|direction| self.attempt_push_out(space, direction))
                 .min_by_key(|(_, distance)| *distance);
 
             if let Some((new_position, _)) = shortest_push_out {

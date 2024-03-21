@@ -268,7 +268,7 @@ where
     // Find all unique universe_futures.
     let universe_future_set: HashSet<UniverseFuture> = filtered_test_table
         .values()
-        .flat_map(|test_case| test_case.universe_source.clone())
+        .filter_map(|test_case| test_case.universe_source.clone())
         .collect();
 
     // Kick off all the universe_futures immediately, without the concurrency limit

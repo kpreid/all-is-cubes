@@ -242,14 +242,13 @@ impl AlloctreeNode {
                 children
                     .iter_mut()
                     .zip(linearization().iter_cubes())
-                    .filter_map(|(child, child_position)| {
+                    .find_map(|(child, child_position)| {
                         child.allocate(
                             size_exponent - 1,
                             low_corner + child_position.lower_bounds().to_vector() * child_size,
                             request,
                         )
                     })
-                    .next()
             }
         }
     }

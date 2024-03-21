@@ -71,7 +71,7 @@ impl Accumulate for CharacterBuf {
     fn mean<const N: usize>(items: [Self; N]) -> Self {
         // TODO: we should at least find the mode (or maybe prefer None) instead of the first
         Self {
-            hit_text: items.into_iter().flat_map(|cb| cb.hit_text).next(),
+            hit_text: items.into_iter().find_map(|cb| cb.hit_text),
         }
     }
 }

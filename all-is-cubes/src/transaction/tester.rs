@@ -117,7 +117,7 @@ where
             core::iter::once(t1.clone()).chain(
                 self.transactions
                     .iter()
-                    .flat_map(move |t2| t1.clone().try_merge(t2.clone())),
+                    .filter_map(move |t2| t1.clone().try_merge(t2.clone())),
             )
         })
     }
