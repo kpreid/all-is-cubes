@@ -244,10 +244,7 @@ fn headless_main_loop(
     loop {
         dsession.advance_time_and_maybe_step();
 
-        if duration
-            .map(|d| Instant::now().duration_since(t0) > d)
-            .unwrap_or(false)
-        {
+        if duration.is_some_and(|d| Instant::now().duration_since(t0) > d) {
             break;
         } else if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
             std::thread::sleep(t - Instant::now());

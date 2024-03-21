@@ -215,8 +215,7 @@ pub fn compare_rendered_image(
                     .enumerate()
                     .rev() // find highest difference
                     .find(|&(_, v)| v > 0)
-                    .map(|(i, _)| i as u8)
-                    .unwrap_or(0),
+                    .map_or(0, |(i, _)| i as u8),
             }
         },
     )

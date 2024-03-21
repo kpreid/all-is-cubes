@@ -181,10 +181,10 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
     #[inline]
     fn get_packed_light(&self, cube: Cube) -> PackedLight {
-        self.cubes
-            .get(cube)
-            .map(|b| b.lighting)
-            .unwrap_or_else(|| self.block_sky.light_outside(self.cubes.bounds(), cube))
+        match self.cubes.get(cube) {
+            Some(b) => b.lighting,
+            None => self.block_sky.light_outside(self.cubes.bounds(), cube),
+        }
     }
 
     fn get_interpolated_light(&self, point: FreePoint, face: Face7) -> Rgb {

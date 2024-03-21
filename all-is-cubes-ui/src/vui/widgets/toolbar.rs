@@ -179,11 +179,7 @@ impl ToolbarController {
         for index in 0..self.definition.slot_count {
             let position = self.slot_position(index);
             let this_slot_selected_mask = core::array::from_fn(|sel| {
-                if selected_slots
-                    .get(sel)
-                    .map(|&i| i == index)
-                    .unwrap_or(false)
-                {
+                if selected_slots.get(sel).is_some_and(|&i| i == index) {
                     if pressed[sel] {
                         ToolbarButtonState::Pressed
                     } else {

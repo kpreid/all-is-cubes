@@ -431,13 +431,12 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                                     // Compute whether this voxel is not hidden behind another
                                     let obscuring_cat = voxels_array
                                         .get(cube + face.normal_vector())
-                                        .map(|ev| {
+                                        .map_or(Invisible, |ev| {
                                             options
                                                 .transparency
                                                 .limit_alpha(ev.color)
                                                 .opacity_category()
-                                        })
-                                        .unwrap_or(Invisible);
+                                        });
                                     match (this_cat, obscuring_cat) {
                                         // Nothing to draw no matter what
                                         (Invisible, _) => false,

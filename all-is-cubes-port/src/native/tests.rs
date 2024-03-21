@@ -36,7 +36,7 @@ async fn import_export_native_format() {
         yield_progress_for_testing(),
         crate::ExportFormat::AicJson,
         ExportSet::all_of_universe(&universe),
-        destination.to_path_buf(),
+        destination.clone(),
     )
     .await
     .unwrap();

@@ -288,11 +288,10 @@ impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for &'a VersionedBlockMeshes<M
         _cube: Cube,
         _primary: bool,
     ) -> Option<&'a BlockMesh<M>> {
-        Some(
-            self.get_vbm(index)
-                .map(|vbm| &vbm.mesh)
-                .unwrap_or(BlockMesh::<M>::EMPTY_REF),
-        )
+        Some(match self.get_vbm(index) {
+            Some(vbm) => &vbm.mesh,
+            None => BlockMesh::<M>::EMPTY_REF,
+        })
     }
 }
 
