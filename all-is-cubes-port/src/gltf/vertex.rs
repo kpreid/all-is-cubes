@@ -29,15 +29,6 @@ pub struct GltfVertex {
     pub(crate) base_color_tc: [Lef32; 2],
 }
 
-impl GltfVertex {
-    /// Placeholder constant value for [`bytemuck::offset_of`] calculations.
-    pub(crate) const DUMMY: GltfVertex = GltfVertex {
-        position: [Lef32::ZERO; 3],
-        base_color: [Lef32::ZERO; 4],
-        base_color_tc: [Lef32::ZERO; 2],
-    };
-}
-
 impl From<BlockVertex<GltfAtlasPoint>> for GltfVertex {
     #[inline]
     fn from(vertex: BlockVertex<GltfAtlasPoint>) -> Self {

@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
-use std::mem::size_of;
+use std::mem::{offset_of, size_of};
 
-use bytemuck::offset_of;
 use gltf_json::buffer::Stride;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::validation::USize64;
@@ -101,7 +100,7 @@ where
                 create_accessor(
                     format!("{name} position"),
                     vertex_buffer_view,
-                    offset_of!(GltfVertex::DUMMY, GltfVertex, position),
+                    offset_of!(GltfVertex, position),
                     mesh.vertices().iter().map(|v| v.position.map(f32::from)),
                 ),
             ),
@@ -113,7 +112,7 @@ where
                 create_accessor(
                     format!("{name} base color"),
                     vertex_buffer_view,
-                    offset_of!(GltfVertex::DUMMY, GltfVertex, base_color),
+                    offset_of!(GltfVertex, base_color),
                     mesh.vertices().iter().map(|v| v.base_color.map(f32::from)),
                 ),
             ),
@@ -125,7 +124,7 @@ where
                 create_accessor(
                     format!("{name} base color texcoords"),
                     vertex_buffer_view,
-                    offset_of!(GltfVertex::DUMMY, GltfVertex, base_color_tc),
+                    offset_of!(GltfVertex, base_color_tc),
                     mesh.vertices()
                         .iter()
                         .map(|v| v.base_color_tc.map(f32::from)),
