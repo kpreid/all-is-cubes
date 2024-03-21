@@ -540,12 +540,12 @@ impl<T> Deref for UBorrow<T> {
 }
 impl<T> AsRef<T> for UBorrow<T> {
     fn as_ref(&self) -> &T {
-        self.deref()
+        self
     }
 }
 impl<T> core::borrow::Borrow<T> for UBorrow<T> {
     fn borrow(&self) -> &T {
-        self.deref()
+        self
     }
 }
 
