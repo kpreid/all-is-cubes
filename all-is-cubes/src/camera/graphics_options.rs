@@ -1,3 +1,5 @@
+use core::fmt;
+
 use num_traits::One;
 use ordered_float::NotNan;
 
@@ -14,7 +16,7 @@ use crate::{block::Block, space::Space};
 /// report such failings via [`Flaws`](crate::camera::Flaws).
 ///
 #[doc = include_str!("../save/serde-warning.md")]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "save", serde(default))]
 #[non_exhaustive]
@@ -153,6 +155,52 @@ impl GraphicsOptions {
     }
 }
 
+impl fmt::Debug for GraphicsOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            render_method,
+            fog,
+            fov_y,
+            tone_mapping,
+            exposure,
+            bloom_intensity,
+            view_distance,
+            lighting_display,
+            transparency,
+            show_ui,
+            antialiasing,
+            use_frustum_culling,
+            debug_info_text,
+            debug_info_text_contents,
+            debug_behaviors,
+            debug_chunk_boxes,
+            debug_collision_boxes,
+            debug_light_rays_at_cursor,
+        } = self;
+        // This custom impl reduces unnecessary text by stripping off NotNan wrappers.
+        f.debug_struct("GraphicsOptions")
+            .field("render_method", render_method)
+            .field("fog", fog)
+            .field("fov_y", &fov_y.into_inner())
+            .field("tone_mapping", &tone_mapping)
+            .field("exposure", &exposure)
+            .field("bloom_intensity", &bloom_intensity.into_inner())
+            .field("view_distance", &view_distance.into_inner())
+            .field("lighting_display", &lighting_display)
+            .field("transparency", &transparency)
+            .field("show_ui", &show_ui)
+            .field("antialiasing", &antialiasing)
+            .field("use_frustum_culling", &use_frustum_culling)
+            .field("debug_info_text", &debug_info_text)
+            .field("debug_info_text_contents", &debug_info_text_contents)
+            .field("debug_behaviors", &debug_behaviors)
+            .field("debug_chunk_boxes", &debug_chunk_boxes)
+            .field("debug_collision_boxes", &debug_collision_boxes)
+            .field("debug_light_rays_at_cursor", &debug_light_rays_at_cursor)
+            .finish()
+    }
+}
+
 impl Default for GraphicsOptions {
     /// Default graphics options broadly have “everything reasonable” turned on
     /// (they may disable things that are not well-implemented yet).
@@ -269,7 +317,7 @@ impl ToneMappingOperator {
 /// [`ToneMappingOperator`].
 ///
 #[doc = include_str!("../save/serde-warning.md")]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum ExposureOption {
@@ -281,6 +329,15 @@ pub enum ExposureOption {
     /// Note: If [`GraphicsOptions::lighting_display`] is disabled,
     /// then this currently will act as `Fixed(1.0)`.
     Automatic,
+}
+
+impl fmt::Debug for ExposureOption {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Fixed(value) => write!(f, "Fixed({})", value.into_inner()),
+            Self::Automatic => write!(f, "Automatic"),
+        }
+    }
 }
 
 impl ExposureOption {
@@ -401,6 +458,38 @@ mod tests {
 
     use super::*;
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn debug() {
+        let options = GraphicsOptions::default();
+        assert_eq!(
+            format!("{options:#?}"),
+            indoc::indoc! {
+                r#"GraphicsOptions {
+                    render_method: Preferred,
+                    fog: Abrupt,
+                    fov_y: 90.0,
+                    tone_mapping: Clamp,
+                    exposure: Fixed(1),
+                    bloom_intensity: 0.125,
+                    view_distance: 200.0,
+                    lighting_display: Smooth,
+                    transparency: Volumetric,
+                    show_ui: true,
+                    antialiasing: None,
+                    use_frustum_culling: true,
+                    debug_info_text: true,
+                    debug_info_text_contents: ShowStatus(
+                        WORLD | STEP | RENDER | CURSOR,
+                    ),
+                    debug_behaviors: false,
+                    debug_chunk_boxes: false,
+                    debug_collision_boxes: false,
+                    debug_light_rays_at_cursor: false,
+                }"#
+            }
+        );
+    }
 
     #[test]
     fn default_is_clean() {
