@@ -533,8 +533,15 @@ impl Merge for UniverseTransaction {
 /// This formatting is chosen to be similar to [`Universe`]'s.
 impl fmt::Debug for UniverseTransaction {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            members,
+            // TODO: implement and test printing these
+            anonymous_insertions,
+            behaviors,
+            universe_id: _, // not printed because it is effectively nondeterministic
+        } = self;
         let mut ds = fmt.debug_struct("UniverseTransaction");
-        for (name, txn) in &self.members {
+        for (name, txn) in members {
             // transaction_as_debug() gives us the type-specific transaction without the redundant
             // TransactionInUniverse wrapper
             ds.field(&name.to_string(), txn.transaction_as_debug());

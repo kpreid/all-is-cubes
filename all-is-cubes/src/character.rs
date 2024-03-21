@@ -109,15 +109,34 @@ pub struct Character {
 impl fmt::Debug for Character {
     #[mutants::skip]
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            body,
+            space: _,
+            velocity_input,
+            eye_displacement_pos: _,
+            eye_displacement_vel: _,
+            colliding_cubes,
+            last_step_info: _,
+            // TODO: report light samples?
+            light_samples: _,
+            light_sample_index: _,
+            exposure_log,
+            inventory,
+            selected_slots,
+            notifier: _,
+            behaviors,
+            #[cfg(feature = "rerun")]
+                rerun_destination: _,
+        } = self;
         fmt.debug_struct("Character")
-            .field("body", &self.body)
-            .field("velocity_input", &self.velocity_input.refmt(&ConciseDebug))
-            .field("colliding_cubes", &self.colliding_cubes)
-            // TODO: report light samples
-            .field("exposure", &self.exposure_log.exp())
-            .field("inventory", &self.inventory)
-            .field("behaviors", &self.behaviors)
-            .finish()
+            .field("body", &body)
+            .field("velocity_input", &velocity_input.refmt(&ConciseDebug))
+            .field("colliding_cubes", &colliding_cubes)
+            .field("exposure", &exposure_log.exp())
+            .field("inventory", &inventory)
+            .field("selected_slots", selected_slots)
+            .field("behaviors", &behaviors)
+            .finish_non_exhaustive()
     }
 }
 

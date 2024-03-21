@@ -78,6 +78,7 @@ where
         // TODO: raytracer needs to implement drawing the cursor
         self.had_cursor = cursor.is_some();
         self.cameras.update();
+        // TODO: custom_options_cache needs updating but isn't getting it; write test
 
         fn sync_space<D: RtBlockData>(
             cached_rt: &mut Option<UpdatingSpaceRaytracer<D>>,
@@ -263,10 +264,20 @@ where
     D::Options: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            rts,
+            cameras,
+            size_policy: _, // can't print a function
+            custom_options,
+            custom_options_cache: _, // not printed because its value is not meaningful when not in use
+            had_cursor,
+        } = self;
         // TODO: missing fields
         f.debug_struct("RtRenderer")
-            .field("cameras", &self.cameras)
-            .field("rts", &self.rts)
+            .field("cameras", cameras)
+            .field("rts", rts)
+            .field("custom_options", custom_options)
+            .field("had_cursor", had_cursor)
             .finish()
     }
 }
