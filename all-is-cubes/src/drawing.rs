@@ -153,7 +153,7 @@ where
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
-        for Pixel(point, color) in pixels.into_iter() {
+        for Pixel(point, color) in pixels {
             // TODO: Add a cache so we're not reconstructing the block for every single pixel.
             // (This is possible because `PixelColor: PartialEq`.)
             // TODO: Need to rotate the brush to match our transform
@@ -177,7 +177,7 @@ where
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
-        for Pixel(point, color) in pixels.into_iter() {
+        for Pixel(point, color) in pixels {
             // TODO: Add a cache so we're not reconstructing the block for every single pixel.
             // (This is possible because `PixelColor: PartialEq`.)
             // TODO: Need to rotate the brush to match our transform
@@ -200,7 +200,7 @@ where
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
-        for Pixel(point, brush) in pixels.into_iter() {
+        for Pixel(point, brush) in pixels {
             let point3d = self.convert_point(point);
             for (offset, ev) in brush.iter() {
                 let offset = self.transform.rotation.transform_vector(offset);

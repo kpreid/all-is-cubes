@@ -50,7 +50,7 @@ impl<T: VisitHandles> VisitHandles for Option<T> {
 
 impl<T: VisitHandles> VisitHandles for [T] {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
-        for element in self.iter() {
+        for element in self {
             element.visit_handles(visitor);
         }
     }

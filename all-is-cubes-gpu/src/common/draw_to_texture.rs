@@ -76,7 +76,7 @@ impl<In: ToTexel<Out>, Out> DrawTarget for EgFramebuffer<In, Out> {
             top_left: Point::zero(),
             size: self.size,
         };
-        for Pixel(point, color) in pixels.into_iter() {
+        for Pixel(point, color) in pixels {
             if bounds.contains(point) {
                 self.data[point.y as usize * self.size.width as usize + point.x as usize] =
                     color.to_texel();

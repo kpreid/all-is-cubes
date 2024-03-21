@@ -1165,8 +1165,7 @@ impl SpaceLightTexture {
         let mut total_count = 0;
 
         // Break into batches of our buffer size.
-        for cube_batch in
-            itertools::Itertools::chunks(cubes.into_iter(), Self::COPY_BUFFER_TEXELS).into_iter()
+        for cube_batch in &itertools::Itertools::chunks(cubes.into_iter(), Self::COPY_BUFFER_TEXELS)
         {
             let mut data: [[u8; Self::COMPONENTS]; Self::COPY_BUFFER_TEXELS] =
                 [[0; Self::COMPONENTS]; Self::COPY_BUFFER_TEXELS];

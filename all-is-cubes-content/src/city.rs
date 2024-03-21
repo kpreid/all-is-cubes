@@ -156,7 +156,7 @@ pub(crate) async fn demo_city<I: Instant>(
 
             // Curbs
             if i >= road_radius {
-                for &(side, p) in [(1, -road_radius), (0, road_radius)].iter() {
+                for (side, p) in [(1, -road_radius), (0, road_radius)] {
                     let position = step.cube_ahead() + perpendicular * p + curb_y;
 
                     // Place curb and combine it with other curb blocks .

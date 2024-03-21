@@ -309,7 +309,7 @@ impl Merge for SpaceTransaction {
             // but unfortunately, does not have an analogue for BTreeMap.
             mem::swap(&mut cubes1, &mut cubes2);
         }
-        for (&cube, t1) in cubes1.iter() {
+        for (&cube, t1) in cubes1 {
             if let Some(t2) = cubes2.get(&cube) {
                 let CubeMergeCheck {} =
                     t1.check_merge(t2)
