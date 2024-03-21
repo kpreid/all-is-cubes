@@ -250,11 +250,11 @@ where
 
         // Compute the AAB of the potential intersection, excluding the exterior of the
         // space.
-        let potential_intersection_bounds =
-            match step_aab.round_up_to_grid().intersection(space.bounds()) {
-                Some(aab) => aab,
-                None => continue 'ray_step,
-            };
+        let Some(potential_intersection_bounds) =
+            step_aab.round_up_to_grid().intersection(space.bounds())
+        else {
+            continue 'ray_step;
+        };
 
         // Loop over all the cubes that our AAB is just now intersecting and check if
         // any of them are solid, and if so, how far into their volume is a hit.

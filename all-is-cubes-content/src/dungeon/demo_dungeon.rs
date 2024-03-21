@@ -238,9 +238,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
         room_position: Cube,
         room_data: &Option<DemoRoom>,
     ) -> Result<(), InGenError> {
-        let room_data = match room_data.as_ref() {
-            Some(room_data) => room_data,
-            None => return Ok(()),
+        let Some(room_data) = room_data.as_ref() else {
+            return Ok(());
         };
 
         // TODO: put in struct, or eliminate

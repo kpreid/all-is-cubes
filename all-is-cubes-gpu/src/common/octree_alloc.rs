@@ -357,9 +357,8 @@ mod tests {
     ) -> Vec<AlloctreeHandle> {
         let mut handles: Vec<AlloctreeHandle> = Vec::new();
         for request in requests {
-            let handle = match t.allocate(request) {
-                Some(val) => val,
-                None => panic!("check_no_overlaps: allocation failure for {request:?}"),
+            let Some(handle) = t.allocate(request) else {
+                panic!("check_no_overlaps: allocation failure for {request:?}")
             };
             assert_eq!(
                 request.size(),
