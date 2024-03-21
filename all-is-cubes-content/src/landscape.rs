@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use core::array;
 use core::fmt;
 
@@ -162,22 +163,23 @@ pub async fn install_landscape_blocks(
         |value| value * (f64::from(resolution) * 1.7) + (f64::from(resolution) * -0.4),
     );
 
-    let stone_points: [_; 240] = array::from_fn(|_| {
+    // boxed to avoid the async fn future being huge
+    let stone_points: Box<[_; 240]> = Box::new(array::from_fn(|_| {
         (
             Cube::ORIGIN.aab().random_point(rng),
             scale_color(colors[Stone].clone(), rng.gen_range(0.9..1.1), 0.02),
         )
-    });
-    let stone_pattern = voronoi_pattern(resolution, true, &stone_points);
+    }));
+    let stone_pattern = voronoi_pattern(resolution, true, &*stone_points);
 
     // TODO: give dirt a palette of varying hue and saturation
-    let dirt_points: [_; 1024] = array::from_fn(|_| {
+    let dirt_points: Box<[_; 1024]> = Box::new(array::from_fn(|_| {
         (
             Cube::ORIGIN.aab().random_point(rng),
             scale_color(colors[Dirt].clone(), rng.gen_range(0.9..1.1), 0.02),
         )
-    });
-    let dirt_pattern = voronoi_pattern(resolution, true, &dirt_points);
+    }));
+    let dirt_pattern = voronoi_pattern(resolution, true, &*dirt_points);
 
     // TODO: needs a tiling and abruptly-changing pattern -- perhaps a coordinate-streched voronoi noise instead
     let bark_noise = {
