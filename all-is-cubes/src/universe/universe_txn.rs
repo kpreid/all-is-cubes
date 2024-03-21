@@ -535,16 +535,22 @@ impl fmt::Debug for UniverseTransaction {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             members,
-            // TODO: implement and test printing these
             anonymous_insertions,
             behaviors,
             universe_id: _, // not printed because it is effectively nondeterministic
         } = self;
+
         let mut ds = fmt.debug_struct("UniverseTransaction");
         for (name, txn) in members {
             // transaction_as_debug() gives us the type-specific transaction without the redundant
             // TransactionInUniverse wrapper
             ds.field(&name.to_string(), txn.transaction_as_debug());
+        }
+        for txn in anonymous_insertions {
+            ds.field("[anonymous pending]", txn.transaction_as_debug());
+        }
+        if !behaviors.is_empty() {
+            ds.field("behaviors", behaviors);
         }
         ds.finish()
     }
@@ -820,6 +826,8 @@ mod tests {
     //! (where they are parallel with non-transaction behavior tests).
 
     use super::*;
+    use crate::block::BlockDef;
+    use crate::block::AIR;
     use crate::content::make_some_blocks;
     use crate::math::Cube;
     use crate::space::CubeConflict;
@@ -827,6 +835,7 @@ mod tests {
     use crate::space::SpaceTransaction;
     use crate::space::SpaceTransactionConflict;
     use crate::transaction::{ExecuteError, MapConflict, TransactionTester};
+    use alloc::sync::Arc;
     use indoc::indoc;
 
     #[test]
@@ -843,11 +852,48 @@ mod tests {
     }
 
     #[test]
-    fn debug() {
+    fn debug_empty() {
+        let transaction = UniverseTransaction::default();
+
+        pretty_assertions::assert_str_eq!(format!("{transaction:#?}"), "UniverseTransaction");
+    }
+
+    #[test]
+    fn debug_full() {
         let [block] = make_some_blocks();
         let mut u = Universe::new();
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let transaction = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(space);
+
+        // a UniverseBehavior to test inserting it
+        #[derive(Clone, Debug, PartialEq)]
+        struct UTestBehavior {}
+        impl behavior::Behavior<Universe> for UTestBehavior {
+            fn step(
+                &self,
+                _: &behavior::BehaviorContext<'_, Universe>,
+            ) -> (UniverseTransaction, behavior::Then) {
+                unimplemented!()
+            }
+            fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+                None
+            }
+        }
+        impl universe::VisitHandles for UTestBehavior {
+            // No handles.
+            fn visit_handles(&self, _visitor: &mut dyn universe::HandleVisitor) {}
+        }
+
+        // Transaction has all of:
+        // * a member-modifying part
+        let mut transaction = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(space);
+        // * an anonymous insertion part
+        transaction.insert_anonymous(BlockDef::new(AIR));
+        // * a behavior set part
+        transaction
+            .merge_from(UniverseTransaction::behaviors(
+                behavior::BehaviorSetTransaction::insert((), Arc::new(UTestBehavior {})),
+            ))
+            .unwrap();
 
         println!("{transaction:#?}");
         pretty_assertions::assert_str_eq!(
@@ -870,6 +916,25 @@ mod tests {
                         ),
                         conserved: true,
                     },
+                },
+                [anonymous pending]: Insert(
+                    BlockDef(
+                        Handle([pending anonymous] in no universe = BlockDef {
+                            block: Block {
+                                primitive: Air,
+                            },
+                            cache_dirty: DirtyFlag(false),
+                            listeners_ok: true,
+                            notifier: Notifier(0),
+                            ..
+                        }),
+                    ),
+                ),
+                behaviors: BehaviorSetTransaction {
+                    replace: {},
+                    insert: [
+                        UTestBehavior @ (),
+                    ],
                 },
             }
             "}
