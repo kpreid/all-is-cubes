@@ -109,37 +109,6 @@ impl<M> Sink<M> {
         }
     }
 
-    /// If the given message was received, remove the first occurrence of it and return true.
-    ///
-    /// ```
-    /// use all_is_cubes::listen::{Listener, Sink};
-    ///
-    /// let sink = Sink::new();
-    /// sink.listener().receive(&[2]);
-    /// assert!(!sink.take_equal(1));  // No match
-    /// assert!(sink.take_equal(2));   // Match
-    /// assert!(!sink.take_equal(2));  // Now removed
-    /// ```
-    ///
-    /// TODO: This is never used and therefore a candidate for removal.
-    pub fn take_equal(&self, message: M) -> bool
-    where
-        M: Eq,
-    {
-        let mut queue = self.messages.write().unwrap();
-        if let Some(index) = queue
-            .iter()
-            .enumerate()
-            .filter_map(|(i, m)| (*m == message).then_some(i))
-            .next()
-        {
-            queue.remove(index);
-            true
-        } else {
-            false
-        }
-    }
-
     /// Remove and return all messages returned so far.
     ///
     /// ```

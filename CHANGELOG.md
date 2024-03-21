@@ -59,6 +59,7 @@
 - `all-is-cubes` library:
     - `block::AnimationHint::{TEMPORARY, CONTINUOUS}` constants have been removed.
       Use the new constructor functions and `AnimationChange` instead.
+    - `listen::Sink::take_equal()`
 
 ## 0.7.1 (2024-01-27)
 

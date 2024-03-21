@@ -346,11 +346,12 @@ pub trait Listener<M>: fmt::Debug + SendSyncIfStd {
     ///
     /// let sink = Sink::new();
     /// let (gate, gated) = sink.listener().gate();
-    /// gated.receive(&["kept"]);
-    /// assert!(sink.take_equal("kept"));
+    /// gated.receive(&["kept1"]);
+    /// assert_eq!(sink.drain(), vec!["kept1"]);
+    /// gated.receive(&["kept2"]);
     /// drop(gate);
     /// gated.receive(&["discarded"]);
-    /// assert!(!sink.take_equal("discarded"));
+    /// assert_eq!(sink.drain(), vec!["kept2"]);
     /// ```
     fn gate(self) -> (Gate, GateListener<Self>)
     where
