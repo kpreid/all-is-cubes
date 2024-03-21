@@ -496,12 +496,12 @@ impl Pipelines {
             dirty,
             graphics_options,
             camera_bind_group_layout,
+            lines_render_pipeline,
             space_texture_bind_group_layout,
             block_render_pipeline_layout,
             opaque_render_pipeline,
             transparent_render_pipeline,
             skybox_render_pipeline,
-            lines_render_pipeline,
             frame_copy_layout,
             frame_copy_pipeline,
             #[cfg(feature = "rerun")]

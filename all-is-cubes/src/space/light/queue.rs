@@ -201,7 +201,7 @@ impl LightUpdateQueue {
     /// Sweeps do not count as present entries.
     pub fn remove(&mut self, cube: Cube) -> bool {
         if let Some(priority) = self.table.remove(&cube) {
-            let q_removed = self.queue.remove(&LightUpdateRequest { cube, priority });
+            let q_removed = self.queue.remove(&LightUpdateRequest { priority, cube });
             debug_assert!(q_removed);
             true
         } else {

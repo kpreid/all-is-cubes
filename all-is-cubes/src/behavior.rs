@@ -284,7 +284,7 @@ impl<H: BehaviorHost> Clone for BehaviorSet<H> {
             })
             .collect();
 
-        Self { woken, members }
+        Self { members, woken }
     }
 }
 

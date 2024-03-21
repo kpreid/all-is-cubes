@@ -705,8 +705,8 @@ mod tests {
             ] {
                 // The transform we're testing with.
                 let transform = Gridgid {
-                    translation,
                     rotation,
+                    translation,
                 };
 
                 // Fetch what DrawingPlane thinks the nominal bounding box is.

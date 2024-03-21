@@ -34,8 +34,8 @@ impl Voxels {
         // Design note: We could take `region` from `space` but that'd require locking it,
         // and the caller is very likely to already have that information.
         Self {
-            region,
             space,
+            region,
             scale,
             block_attributes,
         }
