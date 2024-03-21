@@ -47,7 +47,7 @@ pub(super) fn new_paused_widget_tree(
         )),
         vui::leaf_widget(pause_toggle_button(hud_inputs, OptionsStyle::LabeledColumn)),
     ];
-    if let Some(quit_fn) = hud_inputs.quit.as_ref().cloned() {
+    if let Some(quit_fn) = hud_inputs.quit.clone() {
         children.push(vui::leaf_widget(widgets::ActionButton::new(
             literal!("Quit"),
             &hud_inputs.hud_blocks.widget_theme,

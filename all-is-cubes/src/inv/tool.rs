@@ -227,7 +227,7 @@ impl Tool {
                 let mut txn = space_txn.bind(cursor.space().clone());
                 if inventory_txn != InventoryTransaction::default() {
                     txn.merge_from(CharacterTransaction::inventory(inventory_txn).bind(
-                        input.character.as_ref().cloned().ok_or_else(|| {
+                        input.character.clone().ok_or_else(|| {
                             ToolError::Internal(format!(
                                 "operation produced inventory transaction \
                                     without being given an inventory: {op:?}"
