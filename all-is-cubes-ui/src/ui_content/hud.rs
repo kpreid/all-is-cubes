@@ -65,11 +65,7 @@ pub(super) fn new_hud_widget_tree(
         universe,
         hud_inputs.cue_channel.clone(),
     );
-    let tooltip = widgets::Tooltip::new(
-        Arc::clone(&tooltip_state),
-        hud_inputs.hud_blocks.clone(),
-        universe,
-    );
+    let tooltip = widgets::Tooltip::new(tooltip_state, hud_inputs.hud_blocks.clone(), universe);
     let hud_widget_tree: WidgetTree = Arc::new(LayoutTree::Hud {
         crosshair: vui::leaf_widget(widgets::Crosshair::new(
             hud_inputs.hud_blocks.widget_theme.widget_blocks[WidgetBlocks::Crosshair].clone(),

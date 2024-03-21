@@ -97,7 +97,7 @@ fn shortened_adapter_info(info: &wgpu::AdapterInfo) -> String {
 /// Panics if the pixel type or viewport size are incorrect.
 #[doc(hidden)]
 pub fn get_image_from_gpu(
-    device: Arc<wgpu::Device>,
+    device: &Arc<wgpu::Device>,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     flaws: camera::Flaws,
@@ -124,7 +124,7 @@ pub fn get_image_from_gpu(
 /// Panics if the provided sizes are incorrect.
 #[doc(hidden)]
 pub fn get_texels_from_gpu<C>(
-    device: Arc<wgpu::Device>,
+    device: &Arc<wgpu::Device>,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     components: usize,
@@ -182,7 +182,7 @@ where
         .map_async(wgpu::MapMode::Read, |result| {
             let _ = sender.send(result);
         });
-    super::poll::ensure_polled(Arc::downgrade(&device));
+    super::poll::ensure_polled(Arc::downgrade(device));
 
     // Await the buffer being available and build the image.
     async move {

@@ -301,7 +301,7 @@ impl HeadlessRenderer for GltfRend3Renderer {
             self.render_to_rend3(&frame_texture);
 
             let rendering = all_is_cubes_gpu::in_wgpu::init::get_image_from_gpu(
-                self.renderer.device.clone(),
+                &self.renderer.device,
                 &self.renderer.queue,
                 &frame_texture,
                 flaws,

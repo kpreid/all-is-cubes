@@ -32,7 +32,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 
     g.bench_function("checker-new", |b| {
         let mut universe = Universe::new();
-        let block = checkerboard_block(&mut universe, [AIR, Block::from(Rgba::WHITE)]);
+        let block = checkerboard_block(&mut universe, &[AIR, Block::from(Rgba::WHITE)]);
         let ev = block.evaluate().unwrap();
 
         b.iter_batched_ref(
@@ -44,7 +44,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 
     g.bench_function("checker-reused", |b| {
         let mut universe = Universe::new();
-        let block = checkerboard_block(&mut universe, [AIR, Block::from(Rgba::WHITE)]);
+        let block = checkerboard_block(&mut universe, &[AIR, Block::from(Rgba::WHITE)]);
         let ev = block.evaluate().unwrap();
 
         let mut shared_mesh = BlockMesh::<Mt>::default();
@@ -60,7 +60,7 @@ fn block_mesh_benches(c: &mut Criterion) {
         let mut universe = Universe::new();
         let block = checkerboard_block(
             &mut universe,
-            [Block::from(Rgba::BLACK), Block::from(Rgba::WHITE)],
+            &[Block::from(Rgba::BLACK), Block::from(Rgba::WHITE)],
         );
         let ev = block.evaluate().unwrap();
 
@@ -121,7 +121,7 @@ fn space_mesh_benches(c: &mut Criterion) {
         );
     });
 
-    let half_ing = SpaceMeshIngredients::new(options, half_space(Block::from(Rgba::WHITE)));
+    let half_ing = SpaceMeshIngredients::new(options, half_space(&Block::from(Rgba::WHITE)));
     g.bench_function("half-new", |b| {
         b.iter_batched_ref(|| (), |()| half_ing.do_new(), BatchSize::SmallInput);
     });
@@ -156,7 +156,8 @@ fn dynamic_benches(c: &mut Criterion) {
     let camera = Camera::new(graphics_options, Viewport::with_scale(1.0, [100, 100]));
 
     g.bench_function("initial-update", |b| {
-        let space_handle = Handle::new_pending(Name::Pending, half_space(Block::from(Rgba::WHITE)));
+        let space_handle =
+            Handle::new_pending(Name::Pending, half_space(&Block::from(Rgba::WHITE)));
         b.iter_batched_ref(
             || {
                 let csm: dynamic::ChunkedSpaceMesh<Mt, 16> =
@@ -179,7 +180,7 @@ fn dynamic_benches(c: &mut Criterion) {
 fn checkerboard_space_bench_setup(options: MeshOptions, transparent: bool) -> SpaceMeshIngredients {
     SpaceMeshIngredients::new(
         options,
-        checkerboard_space([
+        checkerboard_space(&[
             AIR,
             Block::from(if transparent {
                 rgba_const!(0.5, 0.5, 0.5, 0.5)
@@ -190,13 +191,13 @@ fn checkerboard_space_bench_setup(options: MeshOptions, transparent: bool) -> Sp
     )
 }
 
-fn checkerboard_block(universe: &mut Universe, voxels: [Block; 2]) -> Block {
+fn checkerboard_block(universe: &mut Universe, voxels: &[Block; 2]) -> Block {
     Block::builder()
         .voxels_handle(R16, universe.insert_anonymous(checkerboard_space(voxels)))
         .build()
 }
 
-fn checkerboard_space(blocks: [Block; 2]) -> Space {
+fn checkerboard_space(blocks: &[Block; 2]) -> Space {
     let bounds = GridAab::from_lower_size([0, 0, 0], [16, 16, 16]);
     let mut space = Space::empty(bounds);
     space
@@ -208,11 +209,11 @@ fn checkerboard_space(blocks: [Block; 2]) -> Space {
 }
 
 /// Space whose lower half is filled with the block.
-fn half_space(block: Block) -> Space {
+fn half_space(block: &Block) -> Space {
     let bounds = GridAab::from_lower_size([0, 0, 0], [16, 16, 16]);
     let mut space = Space::empty(bounds);
     space
-        .fill_uniform(GridAab::from_lower_size([0, 0, 0], [16, 8, 16]), &block)
+        .fill_uniform(GridAab::from_lower_size([0, 0, 0], [16, 8, 16]), block)
         .unwrap();
     space
 }

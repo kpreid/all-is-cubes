@@ -28,11 +28,11 @@ pub enum RendererOption {
 pub fn options_from_query_string(query_string: &[u8]) -> OptionsInUrl {
     let params: BTreeMap<Cow<'_, str>, Cow<'_, str>> =
         form_urlencoded::parse(query_string).collect();
-    options_from_pairs(params)
+    options_from_pairs(&params)
 }
 
 /// Given key-value pairs from the URL query string, return game options.
-pub fn options_from_pairs<S>(params: BTreeMap<S, S>) -> OptionsInUrl
+pub fn options_from_pairs<S>(params: &BTreeMap<S, S>) -> OptionsInUrl
 where
     S: Ord + Borrow<str>,
 {

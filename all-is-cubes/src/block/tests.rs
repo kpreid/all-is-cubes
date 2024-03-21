@@ -30,7 +30,7 @@ use crate::universe::{HandleError, Name, Universe};
 /// TODO: Expand this to, or otherwise create, a helper which checks that the evaluation result
 /// changes only with notification.
 fn listen(
-    block: Block,
+    block: &Block,
     listener: impl listen::Listener<BlockChange> + 'static,
 ) -> Result<(), EvalBlockError> {
     block
@@ -548,7 +548,7 @@ mod eval {
 fn listen_atom() {
     let block = Block::from(Rgba::WHITE);
     let sink = Sink::new();
-    listen(block, sink.listener()).unwrap();
+    listen(&block, sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
     // No notifications are possible, so nothing more to test.
 }
@@ -559,7 +559,7 @@ fn listen_indirect_atom() {
     let block_def_handle = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
     let indirect = Block::from(block_def_handle.clone());
     let sink = Sink::new();
-    listen(indirect, sink.listener()).unwrap();
+    listen(&indirect, sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
 
     // Now mutate it and we should see a notification.
@@ -585,8 +585,8 @@ fn listen_indirect_double() {
     let indirect2 = Block::from(block_def_handle2.clone());
     let sink1 = Sink::new();
     let sink2 = Sink::new();
-    listen(indirect1, sink1.listener()).unwrap();
-    listen(indirect2, sink2.listener()).unwrap();
+    listen(&indirect1, sink1.listener()).unwrap();
+    listen(&indirect2, sink2.listener()).unwrap();
     assert_eq!(sink1.drain(), vec![]);
     assert_eq!(sink2.drain(), vec![]);
 
@@ -631,7 +631,7 @@ fn listen_recur() {
         .voxels_handle(R1, space_handle.clone())
         .build();
     let sink = Sink::new();
-    listen(block, sink.listener()).unwrap();
+    listen(&block, sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
 
     // Now mutate the space and we should see a notification.
@@ -693,7 +693,7 @@ fn self_referential_listen() {
     let block = self_referential_block(&mut universe);
     // This should *not* produce an error, because BlockDef manages its own notifier and we want
     // it to be possible to listen to a currently-erring BlockDef.
-    assert_eq!(listen(block, NullListener), Ok(()));
+    assert_eq!(listen(&block, NullListener), Ok(()));
 }
 
 /// Helper for overflow_ tests
@@ -723,7 +723,7 @@ mod txn {
         let block_def_handle = universe.insert_anonymous(BlockDef::new(b1));
         let indirect = Block::from(block_def_handle.clone());
         let sink = Sink::new();
-        listen(indirect, sink.listener()).unwrap();
+        listen(&indirect, sink.listener()).unwrap();
         assert_eq!(sink.drain(), vec![]);
 
         // Now mutate it and we should see a notification.

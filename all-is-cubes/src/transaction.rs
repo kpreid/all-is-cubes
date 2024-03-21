@@ -337,6 +337,7 @@ pub(crate) fn merge_option<T>(this: &mut Option<T>, other: Option<T>, if_both: f
 
 /// For use with `merge_option()`.
 #[track_caller]
+#[allow(clippy::needless_pass_by_value)]
 pub(crate) fn panic_if_not_equal<T: fmt::Debug + PartialEq>(a: T, b: T) -> T {
     if a == b {
         a

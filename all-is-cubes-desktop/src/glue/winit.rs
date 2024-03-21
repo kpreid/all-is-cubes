@@ -18,7 +18,7 @@ pub fn to_logical_size(size: Size2D<u32, camera::NominalPixel>) -> LogicalSize<u
     }
 }
 
-pub fn monitor_size_for_window(monitor: MonitorHandle) -> Size2D<u32, camera::NominalPixel> {
+pub fn monitor_size_for_window(monitor: &MonitorHandle) -> Size2D<u32, camera::NominalPixel> {
     // TODO: monitor.size() doesn't specify whether it's the usable-area or the outer size
     physical_size_to_viewport(monitor.scale_factor(), monitor.size())
         .nominal_size

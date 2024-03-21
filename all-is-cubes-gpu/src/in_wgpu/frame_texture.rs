@@ -274,7 +274,7 @@ impl FramebufferTextures {
                 device,
                 // TODO: Don't reconstruct on every resize, but reuse it. Has a circularity
                 // problem with needing FbtConfig, but it really only needs FbtFeatures.
-                bloom::BloomPipelines::new(device, shaders, config.linear_scene_texture_format),
+                &bloom::BloomPipelines::new(device, shaders, config.linear_scene_texture_format),
                 &config,
                 bloom_input_view,
             )),

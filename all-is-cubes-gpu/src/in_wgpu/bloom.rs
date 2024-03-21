@@ -167,7 +167,7 @@ pub(crate) struct BloomResources {
 impl BloomResources {
     pub fn new(
         device: &wgpu::Device,
-        pipelines: Arc<BloomPipelines>,
+        pipelines: &BloomPipelines,
         config: &super::frame_texture::FbtConfig,
         scene_texture: &wgpu::TextureView,
     ) -> Self {

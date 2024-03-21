@@ -50,6 +50,7 @@ pub(crate) fn init_sound(session: &Session) -> Result<AudioOut, anyhow::Error> {
 }
 
 /// Thread function for receiving commands and executing them on `&mut AudioManager`.
+#[allow(clippy::needless_pass_by_value)]
 fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: AudioManager) {
     // TODO: better sound and more sounds
     let beep = StaticSoundData {

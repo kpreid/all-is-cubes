@@ -490,7 +490,7 @@ impl<'a> TestCaseCollector<'a> {
     pub fn insert_variants<I, F>(
         &mut self,
         name: &str,
-        universe_source: Option<UniverseFuture>,
+        universe_source: &Option<UniverseFuture>,
         test_function: F,
         values: I,
     ) where

@@ -809,6 +809,7 @@ impl TestOrCheck {
 }
 
 /// Which features we want to test building with.
+#[derive(Clone, Copy, Debug)]
 enum Features {
     /// Test with default features only
     Default,

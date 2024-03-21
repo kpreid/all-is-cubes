@@ -421,9 +421,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             postprocess_bind_group: Memo::new(),
             postprocess_camera_buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("EverythingRenderer::postprocess_camera_buffer"),
-                size: mem::size_of::<PostprocessUniforms>()
-                    .try_into()
-                    .unwrap(),
+                size: mem::size_of::<PostprocessUniforms>().try_into().unwrap(),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }),
@@ -541,7 +539,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         self.space_renderers
             .world
             .set_space(
-                self.executor.clone(),
+                &self.executor,
                 &self.device,
                 &self.pipelines,
                 spaces_to_render.world,
@@ -550,7 +548,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         self.space_renderers
             .ui
             .set_space(
-                self.executor.clone(),
+                &self.executor,
                 &self.device,
                 &self.pipelines,
                 spaces_to_render.ui,
@@ -887,7 +885,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         }
         if filter.image {
             self.rerun_image
-                .log_to_rerun(destination.child(&rg::entity_path!["image"]));
+                .log_to_rerun(destination.into_child(&rg::entity_path!["image"]));
         }
     }
 }

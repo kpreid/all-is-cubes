@@ -10,6 +10,7 @@ use all_is_cubes::listen;
 use crate::record::{RecordOptions, Status};
 
 /// Occupy a thread with writing a sequence of frames as (A)PNG data.
+#[allow(clippy::needless_pass_by_value)] // let thread function own its state
 pub(crate) fn threaded_write_frames(
     file: File,
     options: RecordOptions,

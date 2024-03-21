@@ -157,7 +157,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
     /// `set_space(..., None)` was called.
     pub(crate) fn set_space(
         &mut self,
-        executor: Arc<dyn Executor>,
+        executor: &Arc<dyn Executor>,
         device: &wgpu::Device,
         _pipelines: &Pipelines,
         space: Option<&Handle<Space>>,
@@ -893,6 +893,7 @@ fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuf
 }
 
 /// Copy [`SpaceMesh`] data to GPU buffers.
+#[allow(clippy::needless_pass_by_value)] // https://github.com/rust-lang/rust-clippy/issues/12525
 fn update_chunk_buffers<I: time::Instant>(
     mut bwp: BeltWritingParts<'_, '_>,
     update: RenderDataUpdate<'_, WgpuMt<I>>,

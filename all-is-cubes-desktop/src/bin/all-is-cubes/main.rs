@@ -192,7 +192,7 @@ fn main() -> Result<(), anyhow::Error> {
 
             inner_main(
                 inner_params,
-                move |dsession| record::record_main(dsession, record_options),
+                move |dsession| record::record_main(dsession, &record_options),
                 dsession,
             )
         }

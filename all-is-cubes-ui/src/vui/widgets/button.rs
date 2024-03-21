@@ -148,17 +148,18 @@ struct ButtonCommon<St> {
 }
 
 impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St> {
-    fn new(shape: linking::Provider<St, Block>, label: ButtonLabel) -> Self {
+    fn new(shape: &linking::Provider<St, Block>, label: ButtonLabel) -> Self {
         let shape = shape.map(|_, base_multiblock| BoxStyle::from_nine_and_thin(base_multiblock));
         Self { shape, label }
     }
 
     /// For a specific layout grant, generate the transaction which draws the button in a specific
     /// state.
-    fn create_draw_txn(&self, grant: &vui::LayoutGrant, state: St) -> vui::WidgetTransaction {
+    fn create_draw_txn(&self, grant: &vui::LayoutGrant, state: &St) -> vui::WidgetTransaction {
         let grant = self.shrink_bounds(*grant);
 
         // Create transaction for the button shape of the required size *without label*.
+        // TODO: add Provider index impl to avoid this clone
         let mut shape_txn = self.shape[state.clone()].create_box(grant.bounds);
 
         // Composite label and shape
@@ -167,7 +168,7 @@ impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St>
             let cube = Cube::from(grant.bounds.lower_bounds() + vec3(x, 0, 0));
 
             if let Some(result_block) = shape_txn.at(cube).new_mut() {
-                let shifted_label = shift_label_block(&state, label_block);
+                let shifted_label = shift_label_block(state, label_block);
                 *result_block = result_block.clone().with_modifier(block::Composite::new(
                     shifted_label,
                     block::CompositeOperator::Over,
@@ -184,7 +185,7 @@ impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St>
     ) -> linking::Provider<St, vui::WidgetTransaction> {
         self.shape
             .clone()
-            .map(|state, _| self.create_draw_txn(grant, state.clone()))
+            .map(|state, _| self.create_draw_txn(grant, state))
     }
 
     fn shrink_bounds(&self, grant: vui::LayoutGrant) -> vui::LayoutGrant {
@@ -217,7 +218,7 @@ impl ActionButton {
     ) -> Arc<Self> {
         Arc::new(Self {
             common: ButtonCommon::new(
-                theme.widget_blocks.subset(WidgetBlocks::ActionButton),
+                &theme.widget_blocks.subset(WidgetBlocks::ActionButton),
                 label.into(),
             ),
             action: EphemeralOpaque::new(Arc::new(action)),
@@ -324,7 +325,7 @@ impl<D> ToggleButton<D> {
     ) -> Arc<Self> {
         Arc::new(Self {
             common: ButtonCommon::new(
-                theme.widget_blocks.subset(WidgetBlocks::ToggleButton),
+                &theme.widget_blocks.subset(WidgetBlocks::ToggleButton),
                 label.into(),
             ),
             data_source,
@@ -491,6 +492,7 @@ pub(crate) enum ButtonIcon<'a> {
 }
 
 /// TODO: document, refine, and make public
+#[allow(clippy::needless_pass_by_value)] // convenience
 pub(crate) fn make_button_label_block(
     txn: &mut UniverseTransaction,
     name: &str,

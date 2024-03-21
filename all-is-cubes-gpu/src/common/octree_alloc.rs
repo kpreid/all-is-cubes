@@ -106,6 +106,7 @@ impl Alloctree {
     ///
     /// If the handle does not exactly match a previous allocation from this allocator,
     /// may panic or deallocate something else.
+    #[allow(clippy::needless_pass_by_value)] // deliberately taking handle ownership
     pub fn free(&mut self, handle: AlloctreeHandle) {
         self.root
             .free(self.size_exponent, handle.allocation.lower_bounds());

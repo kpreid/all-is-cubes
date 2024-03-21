@@ -810,6 +810,7 @@ mod tests {
         );
     }
 
+    #[allow(clippy::needless_pass_by_value)] // convenience
     fn collide_along_ray_tester(
         initial_y: FreeCoordinate,
         block_gen: fn(&mut Universe) -> [Block; 2],
@@ -974,6 +975,8 @@ mod tests {
             }),
         );
     }
+
+    #[allow(clippy::needless_pass_by_value)] // convenience
     fn escape_along_ray_tester(
         ray: Ray,
         block_gen: fn(&mut Universe) -> [Block; 2],

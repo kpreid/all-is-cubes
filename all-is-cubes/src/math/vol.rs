@@ -164,6 +164,7 @@ where
     // TODO: Reimplement this in terms of adopting the elements as a linear array.
     // TODO: Test.
     #[doc(hidden)] // used by all-is-cubes-content
+    #[allow(clippy::needless_pass_by_value)]
     pub fn from_y_flipped_array<const DX: usize, const DY: usize, const DZ: usize>(
         array: [[[V; DX]; DY]; DZ],
     ) -> Self

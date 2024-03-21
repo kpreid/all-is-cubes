@@ -360,11 +360,11 @@ impl Vui {
         self.cue_channel.notify(CueMessage::Clicked(button));
         match result {
             Ok(()) => {}
-            Err(error) => self.show_tool_error(error),
+            Err(error) => self.show_tool_error(&error),
         }
     }
 
-    fn show_tool_error(&self, error: ToolError) {
+    fn show_tool_error(&self, error: &ToolError) {
         // TODO: review text formatting
         if let Ok(mut state) = self.tooltip_state.lock() {
             state.set_message(error.to_string().into());

@@ -315,10 +315,11 @@ impl UniverseTransaction {
     /// TODO: Give this a better name by renaming `insert()`.
     /// TODO: Is `InsertError` actually desirable, or legacy from before transactions?
     pub fn insert_mut<T: UniverseMember>(&mut self, handle: Handle<T>) -> Result<(), InsertError> {
-        let insertion = MemberTxn::Insert(UniverseMember::into_any_handle(handle.clone()));
+        let name = handle.name();
+        let insertion = MemberTxn::Insert(UniverseMember::into_any_handle(handle));
 
         // TODO: fail right away if the ref is already in a universe or if it is Anonym?
-        match handle.name() {
+        match name {
             name @ (Name::Specific(_) | Name::Anonym(_)) => {
                 match self.members.entry(name.clone()) {
                     hashbrown::hash_map::Entry::Occupied(_) => {
@@ -364,6 +365,7 @@ impl UniverseTransaction {
     /// This transaction will fail if the member is already gone, is anonymous
     /// (only named entries can be deleted), or belongs to another universe.
     /// In the future, there may be a policy such that in-use items cannot be deleted.
+    #[allow(clippy::needless_pass_by_value)] // TODO: by ref or not by ref?
     pub fn delete<R: ErasedHandle>(member_handle: R) -> Self {
         Self::from_member_txn(member_handle.name(), MemberTxn::Delete)
     }

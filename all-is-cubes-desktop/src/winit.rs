@@ -59,7 +59,7 @@ impl WinAndState {
             let maybe_monitor = event_loop
                 .primary_monitor()
                 .or_else(|| event_loop.available_monitors().next());
-            choose_graphical_window_size(maybe_monitor.map(monitor_size_for_window))
+            choose_graphical_window_size(maybe_monitor.as_ref().map(monitor_size_for_window))
         };
 
         let window = winit::window::WindowBuilder::new()

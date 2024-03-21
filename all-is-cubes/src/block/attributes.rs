@@ -463,6 +463,7 @@ mod tests {
     #[test]
     fn debug() {
         let default = BlockAttributes::default;
+        #[allow(clippy::needless_pass_by_value)]
         fn debug(a: BlockAttributes) -> String {
             format!("{a:?}")
         }

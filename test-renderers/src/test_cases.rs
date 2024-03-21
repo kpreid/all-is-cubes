@@ -38,7 +38,7 @@ use crate::{
 
 /// Function to be called by the custom test harness to find all tests.
 pub fn all_tests(c: &mut TestCaseCollector<'_>) {
-    let light_test_universe = u("light", light_test_universe());
+    let light_test_universe = &u("light", light_test_universe());
 
     if false {
         c.insert("dummy_failing_test", None, |_| async {
@@ -48,13 +48,13 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
 
     c.insert_variants(
         "antialias",
-        u("antialias", antialias_test_universe()),
+        &u("antialias", antialias_test_universe()),
         antialias,
         // Note: if we wanted full coverage of response to graphics options we would
         // also test the "if cheap" logic .
         [AntialiasingOption::None, AntialiasingOption::Always],
     );
-    c.insert_variants("bloom", light_test_universe.clone(), bloom, [0.0, 0.25]);
+    c.insert_variants("bloom", light_test_universe, bloom, [0.0, 0.25]);
     c.insert("color_srgb_ramp", None, color_srgb_ramp);
     c.insert("cursor_basic", None, cursor_basic);
     c.insert("emission", None, emission);
@@ -66,7 +66,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     );
     c.insert_variants(
         "fog",
-        u("fog", fog_test_universe()),
+        &u("fog", fog_test_universe()),
         fog,
         [
             FogOption::None,
@@ -84,7 +84,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert("layers_ui_only", None, layers_ui_only);
     c.insert_variants(
         "light",
-        light_test_universe.clone(),
+        light_test_universe,
         light,
         [
             LightingOption::None,
@@ -93,11 +93,11 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         ],
     );
     c.insert("no_update", None, no_update);
-    c.insert_variants("sky", None, sky, Face6::exhaust());
+    c.insert_variants("sky", &None, sky, Face6::exhaust());
     c.insert("info_text", None, info_text);
     c.insert_variants(
         "template",
-        None,
+        &None,
         template,
         // This list contains only templates which we expect to not change very much, so we don't
         // have to frequently update the render tests.
@@ -111,7 +111,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     );
     c.insert_variants(
         "tone_mapping",
-        u("tone_mapping", tone_mapping_test_universe()),
+        &u("tone_mapping", tone_mapping_test_universe()),
         tone_mapping,
         [
             (ToneMappingOperator::Clamp, 0.5),
@@ -120,7 +120,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
             (ToneMappingOperator::Reinhard, 2.0),
         ],
     );
-    c.insert_variants("transparent_one", None, transparent_one, ["surf", "vol"]);
+    c.insert_variants("transparent_one", &None, transparent_one, ["surf", "vol"]);
     c.insert("viewport_zero", None, viewport_zero);
     c.insert("viewport_prime", None, viewport_prime);
 }

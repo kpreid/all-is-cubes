@@ -163,7 +163,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                         }
                         EnterSurface(surface) => {
                             debug_assert!(!surface.diffuse_color.fully_transparent());
-                            state.trace_through_surface(surface, self);
+                            state.trace_through_surface(&surface, self);
                         }
                     }
                 }
@@ -542,7 +542,7 @@ impl<P: Accumulate> TracingState<P> {
     #[inline]
     fn trace_through_surface(
         &mut self,
-        surface: Surface<'_, P::BlockData>,
+        surface: &Surface<'_, P::BlockData>,
         rt: &SpaceRaytracer<P::BlockData>,
     ) {
         if let Some(color) = surface.to_lit_color(rt) {
@@ -572,7 +572,7 @@ impl<P: Accumulate> TracingState<P> {
             surface.emission = surface.emission * thickness;
         }
 
-        self.trace_through_surface(surface, rt);
+        self.trace_through_surface(&surface, rt);
     }
 }
 

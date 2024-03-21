@@ -206,7 +206,7 @@ impl RerunImageExport {
         }
 
         self.image_copy_future = Some(perform_image_copy(
-            self.device.clone(),
+            &self.device,
             queue,
             srgb_color_texture,
             linear_depth_texture,
@@ -241,14 +241,13 @@ type RerunImageCopyOutput = (
 );
 
 fn perform_image_copy(
-    device: Arc<wgpu::Device>,
+    device: &Arc<wgpu::Device>,
     queue: &wgpu::Queue,
     srgb_scene_texture: &wgpu::Texture,
     depth_texture: &wgpu::Texture,
     camera: &Camera,
 ) -> BoxFuture<'static, RerunImageCopyOutput> {
-    let color_future =
-        init::get_texels_from_gpu::<u8>(device.clone(), queue, srgb_scene_texture, 4);
+    let color_future = init::get_texels_from_gpu::<u8>(device, queue, srgb_scene_texture, 4);
     let depth_future = init::get_texels_from_gpu::<f32>(device, queue, depth_texture, 1);
     let size = srgb_scene_texture.size();
 

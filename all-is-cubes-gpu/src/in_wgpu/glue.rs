@@ -45,6 +45,7 @@ pub fn to_wgpu_color(color: Rgba) -> wgpu::Color {
     }
 }
 
+#[allow(clippy::needless_pass_by_value)] // the value is nearly a reference itself
 pub fn to_wgpu_index_format(slice: IndexSlice<'_>) -> wgpu::IndexFormat {
     match slice {
         IndexSlice::U16(_) => wgpu::IndexFormat::Uint16,

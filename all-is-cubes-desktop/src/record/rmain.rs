@@ -62,14 +62,14 @@ where
 /// Main loop which drives a headless session and then returns when the recording is complete.
 pub fn record_main(
     mut dsession: DesktopSession<(), ()>,
-    options: RecordOptions,
+    options: &RecordOptions,
 ) -> Result<(), anyhow::Error> {
     let progress_style = ProgressStyle::default_bar()
         .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")
         .unwrap();
 
     // TODO: We should start recording independent of the main loop type being used
-    configure_session_for_recording(&mut dsession, &options)
+    configure_session_for_recording(&mut dsession, options)
         .context("failed to configure session for recording")?;
 
     let (status_tx, mut status_receiver) = tokio::sync::mpsc::unbounded_channel::<Status>();

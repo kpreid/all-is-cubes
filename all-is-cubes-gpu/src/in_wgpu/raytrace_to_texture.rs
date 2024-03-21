@@ -212,6 +212,7 @@ impl Inner {
 
 #[cfg(feature = "threads")]
 /// Runs raytracing, periodically releasing the lock to allow updating input and retrieving output.
+#[allow(clippy::needless_pass_by_value)] // let thread function own its state
 fn background_tracing_task(weak_inner: Weak<Mutex<Inner>>) {
     // By using a weak reference, we arrange for this task to stop itself when it is no longer
     // relevant.

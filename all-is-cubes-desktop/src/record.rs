@@ -65,7 +65,7 @@ pub struct Status {
 impl Recorder {
     /// TODO: This is only implementing part of the [`RecordOptions`] (not the frame timing);
     /// refactor.
-    pub fn new(
+    pub(crate) fn new(
         options: RecordOptions,
         mut cameras: StandardCameras,
         universe: &Universe,
@@ -169,7 +169,7 @@ impl Recorder {
                 };
 
                 RecorderInner::Export {
-                    executor: executor.clone(),
+                    executor,
                     status_notifier: status_notifier.clone(),
                     export_format,
                     export_set: Some(export_set),

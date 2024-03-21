@@ -83,6 +83,13 @@ impl Destination {
             path: self.path.join(path_suffix),
         }
     }
+    #[must_use]
+    pub fn into_child(self, path_suffix: &EntityPath) -> Self {
+        Self {
+            stream: self.stream,
+            path: self.path.join(path_suffix),
+        }
+    }
 }
 
 // --- Timeless configuration ---

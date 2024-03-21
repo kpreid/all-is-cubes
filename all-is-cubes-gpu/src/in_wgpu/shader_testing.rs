@@ -217,5 +217,5 @@ where
     }
     queue.submit(std::iter::once(encoder.finish()));
 
-    get_texels_from_gpu(device.clone(), &queue, fbt.scene_for_test_copy(), 4).await
+    get_texels_from_gpu(&device, &queue, fbt.scene_for_test_copy(), 4).await
 }

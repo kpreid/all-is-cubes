@@ -226,7 +226,7 @@ impl RendererImpl {
             info_text,
         );
         let image = init::get_image_from_gpu(
-            self.device.clone(),
+            &self.device,
             &self.queue,
             &self.color_texture,
             self.flaws | draw_info.flaws() | post_flaws,

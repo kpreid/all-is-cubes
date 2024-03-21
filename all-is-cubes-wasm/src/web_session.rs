@@ -472,11 +472,11 @@ impl StaticDom {
         Ok(Self {
             app_root: get_mandatory_element(document, "app-root")?,
             progress_bar: get_mandatory_element(document, "loading-progress-bar")?,
-            loading_log: replace_children_with_one_text_node(get_mandatory_element(
+            loading_log: replace_children_with_one_text_node(&get_mandatory_element(
                 document,
                 "loading-log",
             )?),
-            scene_info_text_node: replace_children_with_one_text_node(get_mandatory_element(
+            scene_info_text_node: replace_children_with_one_text_node(&get_mandatory_element(
                 document,
                 "scene-info-text",
             )?),

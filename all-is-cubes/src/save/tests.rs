@@ -28,6 +28,7 @@ use crate::{behavior, op};
 
 #[track_caller]
 /// Serialize and deserialize and assert the value is equal.
+#[allow(clippy::needless_pass_by_value)] // convenience
 fn assert_round_trip_value<T>(value: &T, expected_json: serde_json::Value)
 where
     T: PartialEq + fmt::Debug + serde::Serialize + serde::de::DeserializeOwned,
@@ -44,9 +45,10 @@ where
     );
 }
 
-#[track_caller]
 /// Deserialize and serialize and assert the JSON is equal.
 /// Returns the deserialized value.
+#[track_caller]
+#[allow(clippy::needless_pass_by_value)] // convenience
 fn assert_round_trip_json<T>(json: serde_json::Value) -> T
 where
     T: fmt::Debug + serde::Serialize + serde::de::DeserializeOwned,
@@ -63,6 +65,7 @@ where
 /// This is useful in lieu of [`assert_round_trip_value`] for when the values are
 /// necessarily unequal (anything involving [`Handle`]s).
 #[track_caller]
+#[allow(clippy::needless_pass_by_value)] // convenience
 fn assert_serdeser<T>(value: &T, expected_json: serde_json::Value) -> T
 where
     T: fmt::Debug + serde::Serialize + serde::de::DeserializeOwned,
