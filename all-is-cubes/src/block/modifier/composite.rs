@@ -286,7 +286,7 @@ pub enum CompositeOperator {
 
 impl CompositeOperator {
     /// Entry point by which [`Composite::evaluate()`] uses [`Self`].
-    fn blend_evoxel(&self, src_ev: Evoxel, dst_ev: Evoxel) -> Evoxel {
+    fn blend_evoxel(self, src_ev: Evoxel, dst_ev: Evoxel) -> Evoxel {
         use BlockCollision as Coll;
         Evoxel {
             color: {
@@ -343,7 +343,7 @@ impl CompositeOperator {
     /// Note that this does not accept and return `Rgba` because the output is not necessarily
     /// in the 0-1 range; it might work but that's not an intended use of the type.
     fn alpha_blend(
-        &self,
+        self,
         source: Rgb,
         sa: NotNan<f32>,
         destination: Rgb,
@@ -381,7 +381,7 @@ impl CompositeOperator {
 
     /// Called by [`Self::blend_evoxel()`] to handle properties that can be described as
     /// “present or absent” binary flags.
-    fn blend_binary(&self, source: bool, destination: bool) -> bool {
+    fn blend_binary(self, source: bool, destination: bool) -> bool {
         match self {
             Self::Over => source | destination,
             Self::In => source & destination,
@@ -391,7 +391,7 @@ impl CompositeOperator {
     }
 
     /// Compute the bounds of the result given the bounds of the source and destination.
-    fn bounds(&self, source: GridAab, destination: GridAab) -> GridAab {
+    fn bounds(self, source: GridAab, destination: GridAab) -> GridAab {
         match self {
             Self::Over => union_ignoring_empty(source, destination),
             Self::In => source

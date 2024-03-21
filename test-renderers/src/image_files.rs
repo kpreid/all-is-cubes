@@ -29,7 +29,7 @@ pub enum RendererId {
     Wgpu,
 }
 impl RendererId {
-    fn as_str(&self) -> &'static str {
+    fn as_str(self) -> &'static str {
         match self {
             RendererId::All => "all",
             RendererId::Gltf => "gltf",

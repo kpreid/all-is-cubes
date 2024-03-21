@@ -245,7 +245,7 @@ pub enum RotationPlacementRule {
 }
 
 impl RotationPlacementRule {
-    pub(crate) fn rotationally_symmetric(&self) -> bool {
+    pub(crate) fn rotationally_symmetric(self) -> bool {
         match self {
             RotationPlacementRule::Never => true,
             RotationPlacementRule::Attach { by: _ } => false,
@@ -315,7 +315,7 @@ impl AnimationHint {
 
     /// Returns whether this block's value for [`EvaluatedBlock::visible`] is likely to
     /// change from `false` to `true` for animation reasons.
-    pub(crate) fn might_become_visible(&self) -> bool {
+    pub(crate) fn might_become_visible(self) -> bool {
         self.redefinition.might_become_visible() || self.replacement.might_become_visible()
     }
 }
@@ -368,7 +368,7 @@ pub enum AnimationChange {
 
 impl AnimationChange {
     /// Helper for [`AnimationHint::might_become_visible`].
-    fn might_become_visible(&self) -> bool {
+    fn might_become_visible(self) -> bool {
         match self {
             AnimationChange::None => false,
             // same category implies not becoming visible if invisible

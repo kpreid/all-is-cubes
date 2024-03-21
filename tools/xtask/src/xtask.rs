@@ -428,7 +428,7 @@ impl Config {
 }
 
 impl Scope {
-    fn includes_main_workspace(&self) -> bool {
+    fn includes_main_workspace(self) -> bool {
         match self {
             Scope::All => true,
             Scope::OnlyNormal => true,
@@ -436,7 +436,7 @@ impl Scope {
         }
     }
 
-    fn includes_fuzz_workspace(&self) -> bool {
+    fn includes_fuzz_workspace(self) -> bool {
         match self {
             Scope::All => true,
             Scope::OnlyNormal => false,
@@ -794,7 +794,7 @@ impl TestOrCheck {
 
     /// Return the cargo subcommand to use for the targets that we are *not* planning or able
     /// to run.
-    fn non_build_check_subcmd(&self) -> &'static str {
+    fn non_build_check_subcmd(self) -> &'static str {
         match self {
             // In place of testing, we use check instead of clippy.
             // This is so that in CI, when a rustc beta release has a broken clippy lint,

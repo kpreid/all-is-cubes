@@ -174,7 +174,7 @@ impl CharacterMode {
         }
     }
 
-    pub fn rays_per_character(&self) -> Vector2D<u8, ImagePixel> {
+    pub fn rays_per_character(self) -> Vector2D<u8, ImagePixel> {
         use CharacterMode::*;
         match self {
             Names | Shades => Vector2D::new(1, 1),

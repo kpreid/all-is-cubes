@@ -116,6 +116,7 @@ pub(crate) struct BlockAttributesV1Ser<'a> {
 fn return_true() -> bool {
     true
 }
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_true(value: &bool) -> bool {
     *value
 }
