@@ -708,7 +708,7 @@ impl Transaction<Body> for BodyTransaction {
     fn commit(
         &self,
         body: &mut Body,
-        _: Self::CommitCheck,
+        (): Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
         body.yaw += self.delta_yaw;

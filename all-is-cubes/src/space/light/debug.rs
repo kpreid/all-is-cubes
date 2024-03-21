@@ -22,9 +22,9 @@ pub trait LightComputeOutput {
 impl LightComputeOutput for () {
     type RayInfoBuffer = ();
     #[inline(always)]
-    fn new(_: Cube, _: PackedLight, _: Self::RayInfoBuffer) {}
+    fn new(_: Cube, _: PackedLight, (): Self::RayInfoBuffer) {}
     #[inline(always)]
-    fn push_ray(_: &mut Self::RayInfoBuffer, _: LightUpdateRayInfo) {}
+    fn push_ray((): &mut Self::RayInfoBuffer, _: LightUpdateRayInfo) {}
 }
 
 impl LightComputeOutput for LightUpdateCubeInfo {

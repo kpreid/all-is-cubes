@@ -963,14 +963,14 @@ mod universe {
                 schema::UniverseDe::UniverseV1 { members } => {
                     for MemberEntrySer { name, value } in members {
                         match value {
-                            MemberDe::Block { value: block } => universe
-                                .insert_deserialized(name, BlockDef::new(block))
-                                .map(|_| ()),
+                            MemberDe::Block { value: block } => {
+                                universe.insert_deserialized(name, BlockDef::new(block))
+                            }
                             MemberDe::Character { value: character } => {
-                                universe.insert_deserialized(name, character).map(|_| ())
+                                universe.insert_deserialized(name, character)
                             }
                             MemberDe::Space { value: space } => {
-                                universe.insert_deserialized(name, space).map(|_| ())
+                                universe.insert_deserialized(name, space)
                             }
                         }
                         .expect("insertion from deserialization failed");
