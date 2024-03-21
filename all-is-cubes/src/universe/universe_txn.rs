@@ -756,7 +756,7 @@ impl Merge for MemberTxn {
                 t1.commit_merge(t2, check.expect("missing check value"));
             }
             (Delete, Delete) => {}
-            (a @ Insert(_), b) | (a, b @ Insert(_)) | (a @ Delete, b) | (a, b @ Delete) => {
+            (a @ (Insert(_) | Delete), b) | (a, b @ (Insert(_) | Delete)) => {
                 panic!(
                     "Invalid merge check: tried to merge {a:?} with {b:?}, \
                     which are not mergeable"

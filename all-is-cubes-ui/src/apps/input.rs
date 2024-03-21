@@ -108,7 +108,7 @@ impl InputProcessor {
             Key::Character('p') => true,
             Key::Character('u') => true,
             Key::Character('y') => true,
-            Key::Character('`') | Key::Character('~') => true,
+            Key::Character('`' | '~') => true,
             _ => false,
         }
     }
@@ -125,7 +125,7 @@ impl InputProcessor {
             Key::Character('p') => true,
             Key::Character('u') => true,
             Key::Character('y') => true,
-            Key::Character('`') | Key::Character('~') => true,
+            Key::Character('`' | '~') => true,
             // TODO: move slot selection commands here
             _ => false,
         }
@@ -397,7 +397,7 @@ impl InputProcessor {
                         });
                     }
                 }
-                Key::Character('`') | Key::Character('~') => {
+                Key::Character('`' | '~') => {
                     if let Some(ch) = control_channel {
                         let _ = ch.try_send(ControlMessage::EnterDebug);
                     }
