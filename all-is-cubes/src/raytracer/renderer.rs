@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use core::fmt;
 
 use euclid::{point2, vec2};
@@ -33,8 +34,8 @@ pub struct RtRenderer<D: RtBlockData = ()> {
     size_policy: Box<dyn Fn(Viewport) -> Viewport + Send + Sync>,
 
     custom_options: ListenableSource<D::Options>,
-
-    custom_options_cache: D::Options,
+    /// Borrowable copy of the value in `custom_options`.
+    custom_options_cache: Arc<D::Options>,
 
     /// Whether there was a [`Cursor`] to be drawn.
     /// Raytracing doesn't yet support cursors but we need to report that.
@@ -59,7 +60,7 @@ where
             rts: Layers::<Option<_>>::default(),
             cameras,
             size_policy,
-            custom_options_cache: custom_options.snapshot(),
+            custom_options_cache: custom_options.get(),
             custom_options,
             had_cursor: false,
         }
@@ -78,7 +79,7 @@ where
         // TODO: raytracer needs to implement drawing the cursor
         self.had_cursor = cursor.is_some();
         self.cameras.update();
-        // TODO: custom_options_cache needs updating but isn't getting it; write test
+        self.custom_options_cache = self.custom_options.get();
 
         fn sync_space<D: RtBlockData>(
             cached_rt: &mut Option<UpdatingSpaceRaytracer<D>>,
@@ -194,7 +195,7 @@ where
 
         let options = RtOptionsRef {
             graphics_options: self.cameras.graphics_options(),
-            custom_options: &self.custom_options_cache,
+            custom_options: &*self.custom_options_cache,
         };
 
         RtScene {
@@ -601,12 +602,81 @@ mod eg {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::assert_conditional_send_sync;
-
     use super::*;
+    use crate::listen::ListenableCell;
+    use crate::universe::Universe;
+    use crate::util::assert_conditional_send_sync;
+    use core::convert::identity;
 
     #[test]
     fn renderer_is_send_sync() {
         assert_conditional_send_sync::<RtRenderer>()
+    }
+
+    #[test]
+    fn custom_options_are_updated() {
+        #[derive(Clone, Copy, Debug, Default, PartialEq)]
+        struct CatchCustomOptions {
+            custom_options: &'static str,
+        }
+        impl RtBlockData for CatchCustomOptions {
+            type Options = &'static str;
+            fn from_block(
+                options: RtOptionsRef<'_, Self::Options>,
+                _: &crate::space::SpaceBlockData,
+            ) -> Self {
+                CatchCustomOptions {
+                    custom_options: options.custom_options,
+                }
+            }
+            fn error(options: RtOptionsRef<'_, Self::Options>) -> Self {
+                CatchCustomOptions {
+                    custom_options: options.custom_options,
+                }
+            }
+            fn sky(options: RtOptionsRef<'_, Self::Options>) -> Self {
+                CatchCustomOptions {
+                    custom_options: options.custom_options,
+                }
+            }
+        }
+        impl Accumulate for CatchCustomOptions {
+            type BlockData = CatchCustomOptions;
+            fn opaque(&self) -> bool {
+                self.custom_options.is_empty()
+            }
+            fn add(&mut self, _: Rgba, block_data: &Self::BlockData) {
+                if self.custom_options.is_empty() {
+                    *self = *block_data;
+                }
+            }
+            fn mean<const N: usize>(_: [Self; N]) -> Self {
+                unimplemented!()
+            }
+        }
+
+        let universe = Universe::new();
+        let cameras = StandardCameras::from_constant_for_test(
+            GraphicsOptions::UNALTERED_COLORS,
+            Viewport::with_scale(1.0, [1, 1]),
+            &universe,
+        );
+
+        // Change the options after the renderer is created.
+        let custom_options = ListenableCell::new("before");
+        let mut renderer = RtRenderer::new(cameras, Box::new(identity), custom_options.as_source());
+        custom_options.set("after");
+
+        // See what options value is used.
+        let mut result = [CatchCustomOptions::default()];
+        renderer.update(None).unwrap();
+        renderer.draw(|_| String::new(), identity, &mut result);
+
+        assert_eq!(
+            result,
+            [CatchCustomOptions {
+                custom_options: "after"
+            }]
+        )
     }
 }
