@@ -360,7 +360,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                 // cube is ourself.
                 face_mesh.fully_opaque = true;
             }
-            let mut output_interior = &mut self.interior_vertices;
+            let output_interior = &mut self.interior_vertices;
 
             let mut texture_if_needed: Option<M::Tile> = None;
 
@@ -488,7 +488,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                     } = if layer == 0 {
                         &mut *face_mesh
                     } else {
-                        &mut output_interior
+                        &mut *output_interior
                     };
                     let depth = FreeCoordinate::from(layer);
 
