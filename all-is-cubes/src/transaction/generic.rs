@@ -83,12 +83,13 @@ where
 
 macro_rules! hashmap_merge {
     ($module:ident) => {
-        impl<K, V> Merge for $module::HashMap<K, V>
+        impl<K, V, S> Merge for $module::HashMap<K, V, S>
         where
             K: Clone + Eq + Hash + fmt::Debug + 'static,
             V: Default + Merge,
+            S: core::hash::BuildHasher + Clone + 'static,
         {
-            type MergeCheck = $module::HashMap<K, <V as Merge>::MergeCheck>;
+            type MergeCheck = $module::HashMap<K, <V as Merge>::MergeCheck, S>;
             type Conflict = MapConflict<K, <V as Merge>::Conflict>;
 
             fn check_merge<'a>(
