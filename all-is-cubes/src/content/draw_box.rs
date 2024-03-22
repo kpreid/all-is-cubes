@@ -1,3 +1,4 @@
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use crate::block::{self, Block, Resolution};
@@ -16,7 +17,10 @@ pub struct BoxStyle {
     /// * Bit 0 (1) = the block is on an lower edge.
     /// * Bit 1 (2) = the block is on an upper edge.
     /// So the sequence on each axis is [interior, lower, upper, lower & upper].
-    parts: [[[Option<Block>; 4]; 4]; 4],
+    ///
+    /// `Arc`ed to allow it to be passed around cheaply even though it contains 64 `Block`s
+    /// which would be 128 × pointer size.
+    parts: Arc<[[[Option<Block>; 4]; 4]; 4]>,
 }
 
 impl BoxStyle {
@@ -53,7 +57,7 @@ impl BoxStyle {
         }
 
         Self {
-            parts: from_fn(|x| {
+            parts: Arc::new(from_fn(|x| {
                 from_fn(|y| {
                     from_fn(|_z| {
                         Some(multiblock.clone().with_modifier(block::Zoom::new(
@@ -62,7 +66,7 @@ impl BoxStyle {
                         )))
                     })
                 })
-            }),
+            })),
         }
     }
 
@@ -98,13 +102,13 @@ impl BoxStyle {
             [inner, outer.clone(), outer.clone(), outer]
         }
         Self {
-            parts: level(
+            parts: Arc::new(level(
                 level(
                     level(interior, face.clone()),
                     level(face.clone(), edge.clone()),
                 ),
                 level(level(face, edge.clone()), level(edge, corner)),
-            ),
+            )),
         }
     }
 
@@ -137,7 +141,7 @@ impl BoxStyle {
         let unsupported = || None;
 
         Self {
-            parts: [
+            parts: Arc::new([
                 [
                     // X interior
                     [None, wall.clone(), wall.clone(), wall.clone()], // Y interior
@@ -220,7 +224,7 @@ impl BoxStyle {
                     [wall.clone(), unsupported(), unsupported(), unsupported()], // Y ceiling
                     [wall, unsupported(), unsupported(), unsupported()],         // Y floorceiling
                 ],
-            ],
+            ]),
         }
     }
 
@@ -263,7 +267,7 @@ impl BoxStyle {
 
         use core::array::from_fn;
         Self {
-            parts: from_fn(|x| {
+            parts: Arc::new(from_fn(|x| {
                 from_fn(|y| {
                     from_fn(|z| {
                         // Decode coordinate index encoding to a more legible form
@@ -360,20 +364,22 @@ impl BoxStyle {
                         }
                     })
                 })
-            }),
+            })),
         }
     }
 
     #[must_use]
     pub fn with_interior(mut self, interior: Option<Block>) -> Self {
-        self.parts[0][0][0] = interior;
+        let parts = Arc::make_mut(&mut self.parts);
+        parts[0][0][0] = interior;
         self
     }
 
     /// Applies the given function to every block present in this.
     #[must_use]
     pub fn map_blocks(mut self, mut block_fn: impl FnMut(Block) -> Block) -> Self {
-        for block in self.parts.iter_mut().flatten().flatten() {
+        let parts = Arc::make_mut(&mut self.parts);
+        for block in parts.iter_mut().flatten().flatten() {
             if let Some(old_block) = block.take() {
                 *block = Some(block_fn(old_block));
             }
