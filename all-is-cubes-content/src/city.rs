@@ -318,6 +318,8 @@ pub(crate) async fn demo_city<I: Instant>(
     Ok(space)
 }
 
+type ExhibitResult = Result<(Space, UniverseTransaction, core::time::Duration), InGenError>;
+
 async fn place_exhibits_in_city<I: Instant>(
     progress: YieldProgress,
     universe: &mut Universe,
@@ -326,7 +328,6 @@ async fn place_exhibits_in_city<I: Instant>(
     space: &mut Space,
 ) -> Result<(), InGenError> {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
-    use DemoBlocks::*;
 
     // TODO: We would like to compute these exhibits in parallel; making that happen requires
     // concurrency support from `YieldProgress` and getting an `Executor` plumbed in here.
@@ -338,7 +339,7 @@ async fn place_exhibits_in_city<I: Instant>(
     generation_progress.set_label("Generating exhibits");
     placement_progress.set_label("Placing exhibits");
 
-    let mut generated_exhibits: Vec<(&'static Exhibit, Result<_, InGenError>)> = Vec::new();
+    let mut generated_exhibits: Vec<(&Exhibit, ExhibitResult)> = Vec::new();
     for (exhibit, mut exhibit_progress) in DEMO_CITY_EXHIBITS
         .iter()
         .zip(generation_progress.split_evenly(DEMO_CITY_EXHIBITS.len()))
@@ -369,216 +370,236 @@ async fn place_exhibits_in_city<I: Instant>(
         ));
     }
 
-    'exhibit: for ((exhibit, result), mut placement_progress) in generated_exhibits
+    for ((exhibit, result), mut placement_progress) in generated_exhibits
         .into_iter()
         .zip(placement_progress.split_evenly(DEMO_CITY_EXHIBITS.len()))
     {
         placement_progress.set_label(format!("Placing “{name}”", name = exhibit.name));
         placement_progress.progress(0.0).await;
 
-        let (exhibit_space, exhibit_transaction, factory_time) = match result {
-            Ok(parts) => parts,
-            Err(error) => {
-                // TODO: put the error on a sign in place of the exhibit
-                log::error!(
-                    "Exhibit generation failure.\nExhibit: {name}\nError: {error}",
-                    name = exhibit.name,
-                    error = all_is_cubes::util::ErrorChain(&error),
-                );
-                continue 'exhibit;
-            }
-        };
-
-        let start_placement_time = I::now();
-
-        // Amount by which the exhibit's own size is expanded to form walls and empty space
-        // for displaying it and allowing players to move around it.
-        let enclosure_thickness = match exhibit.placement {
-            Placement::Surface => FaceMap::repeat(1),
-            // Underground exhibits get no enclosure; they are expected to play nicely with being
-            // buried in stone except for the entranceway.
-            Placement::Underground => FaceMap::repeat(0),
-        };
-
-        // Now that we know the size of the exhibit, find a place for it that fits its bounds.
-        let exhibit_footprint = exhibit_space.bounds();
-        let enclosure_footprint = exhibit_footprint.expand(enclosure_thickness);
-
-        let Some(plot_transform) = planner.find_plot(enclosure_footprint, exhibit.placement) else {
-            log::error!("Out of city space!");
-            break 'exhibit;
-        };
-        let plot = exhibit_footprint.transform(plot_transform).unwrap();
-        let enclosure_at_plot = enclosure_footprint.transform(plot_transform).unwrap();
-
-        // Create enclosure, with a block replacing all ground blocks 1 block around,
-        // and everything else cleared
-        let enclosure_lower = GridAab::from_lower_upper(
-            enclosure_at_plot.lower_bounds(),
-            [
-                enclosure_at_plot.upper_bounds().x,
-                // max()ing handles the case where the plot is floating but should still
-                // have enclosure floor
-                exhibit.placement.floor().max(plot.lower_bounds().y),
-                enclosure_at_plot.upper_bounds().z,
-            ],
-        );
-        space.fill_uniform(enclosure_at_plot, &AIR)?;
-        space.fill_uniform(enclosure_lower, &demo_blocks[ExhibitBackground])?;
-        placement_progress.progress(0.4).await;
-
-        // Cut an "entranceway" into the curb and grass, or corridor wall underground
-        let entranceway_height = 2; // TODO: let exhibit customize
-        {
-            let front_face = plot_transform.rotation.transform(Face6::PZ);
-            // Compute the surface that needs to be clear for walking
-            let entrance_plane = enclosure_lower
-                .expand(
-                    FaceMap {
-                        // don't alter y
-                        ny: 0,
-                        py: 0,
-                        ..enclosure_thickness
-                    }
-                    .map(|_, thick| -thick),
-                )
-                .abut(Face6::PY, 0)
-                .unwrap()
-                .abut(front_face, enclosure_thickness.pz) // re-add enclosure bounds
-                .unwrap()
-                .abut(
-                    front_face,
-                    CityPlanner::PLOT_FRONT_RADIUS - CityPlanner::ROAD_RADIUS + 1,
-                )
-                .unwrap();
-
-            if let Placement::Surface = exhibit.placement {
-                let walkway = entrance_plane.abut(Face6::NY, 1).unwrap();
-                space.fill_uniform(walkway, &demo_blocks[Road])?;
-            }
-
-            let walking_volume = entrance_plane.abut(Face6::PY, entranceway_height).unwrap();
-            space.fill_uniform(walking_volume, &AIR)?;
-
-            planner.occupied_plots.push(walking_volume);
-        }
-
-        // Draw exhibit info
-        {
-            let info_resolution = R64;
-            let exhibit_info_space = draw_exhibit_info(exhibit)?; // TODO: on failure, place an error marker and continue ... or at least produce a GenError for context
-
-            // Enforce maximum width (TODO: this should be done inside draw_exhibit_info instead)
-            let bounds_for_info_voxels = GridAab::from_lower_size(
-                exhibit_info_space.bounds().lower_bounds(),
-                GridSize {
-                    width: exhibit_info_space
-                        .bounds()
-                        .size()
-                        .width
-                        .min(enclosure_footprint.size().width * i32::from(info_resolution)),
-                    ..exhibit_info_space.bounds().size()
-                },
-            );
-
-            let info_voxels_widget: vui::WidgetTree = Arc::new(vui::LayoutTree::Stack {
-                direction: Face6::PZ,
-                children: vec![
-                    match exhibit.placement {
-                        Placement::Surface => vui::leaf_widget(widgets::Frame::with_block(
-                            demo_blocks[Signboard].clone(),
-                        )),
-                        Placement::Underground => vui::LayoutTree::empty(),
-                    },
-                    vui::leaf_widget(Arc::new(widgets::Voxels::new(
-                        bounds_for_info_voxels,
-                        universe.insert_anonymous(exhibit_info_space),
-                        info_resolution,
-                        BlockAttributes {
-                            display_name: "Exhibit Name".into(),
-                            ..Default::default()
-                        },
-                    ))),
-                ],
-            });
-
-            // Install the signboard-and-text widgets in a space.
-            let info_sign_space = info_voxels_widget
-                .to_space(
-                    SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
-                    vui::Gravity::new(vui::Align::Center, vui::Align::Center, vui::Align::Low),
-                )
-                .unwrap();
-
-            let sign_position_in_plot_coordinates = match exhibit.placement {
-                Placement::Surface => GridVector::new(
-                    // extending right from left edge
-                    enclosure_footprint.lower_bounds().x,
-                    // at ground level
-                    0,
-                    // minus 1 to put the Signboard blocks sitting on the enclosure blocks
-                    enclosure_footprint.upper_bounds().z - 1,
-                ),
-                Placement::Underground => GridVector::new(
-                    // centered horizontally
-                    enclosure_footprint.lower_bounds().x
-                        + (enclosure_footprint.size().width
-                            - info_sign_space.bounds().size().width)
-                            / 2,
-                    // at above-the-entrance level
-                    entranceway_height,
-                    // on the surface of the corridor wall -- TODO: We don't actually know fundamentally that the corridor
-                    enclosure_footprint.upper_bounds().z + 1,
-                ),
-            };
-            let sign_transform =
-                plot_transform * Gridgid::from_translation(sign_position_in_plot_coordinates);
-
-            // Copy the signboard into the main space.
-            // (TODO: We do this indirection because the widget system does not currently
-            // support arbitrary rotation of widget trees, but that is wanted.)
-            space_to_space_copy(
-                &info_sign_space,
-                info_sign_space.bounds(),
-                space,
-                sign_transform,
-            )?;
-
-            // Mark sign space as occupied
-            planner
-                .occupied_plots
-                .push(info_sign_space.bounds().transform(sign_transform).unwrap());
-        }
-        placement_progress.progress(0.66).await;
-
-        // As the last step before we actually copy the exhibit into the city,
-        // execute its transaction.
-        match exhibit_transaction.execute(universe, &mut transaction::no_outputs) {
-            Ok(()) => {}
-            Err(error) => {
-                // TODO: put the error on a sign in place of the exhibit
-                log::error!(
-                    "Exhibit transaction failure.\nExhibit: {name}\nError: {error}",
-                    name = exhibit.name,
-                    error = all_is_cubes::util::ErrorChain(&error),
-                );
-                continue 'exhibit;
-            }
-        }
-
-        // Place exhibit content
-        space_to_space_copy(&exhibit_space, exhibit_footprint, space, plot_transform)?; // TODO: on failure, place an error marker and continue
-
-        // Log build time
-        let placement_time = I::now().saturating_duration_since(start_placement_time);
-        log::trace!(
-            "{:?} took {:.3} s",
-            exhibit.name,
-            (factory_time + placement_time).as_secs_f32()
-        );
+        // This function is separate in order to reduce the complexity of the async part of
+        // the code, which makes the compiler's job easier and avoids generating large futures.
+        place_one_exhibit::<I>(universe, &demo_blocks, planner, space, exhibit, result)?;
 
         placement_progress.finish().await;
     }
+
+    Ok(())
+}
+
+fn place_one_exhibit<I: Instant>(
+    universe: &mut Universe,
+    demo_blocks: &BlockProvider<DemoBlocks>,
+    planner: &mut CityPlanner,
+    space: &mut Space,
+    exhibit: &Exhibit,
+    result: ExhibitResult,
+) -> Result<(), InGenError> {
+    // TODO: Turn all of these error logs into returning an error,
+    // then handle those errors by posting them as signs in the world.
+
+    use DemoBlocks::*;
+
+    let (exhibit_space, exhibit_transaction, factory_time) = match result {
+        Ok(parts) => parts,
+        Err(error) => {
+            // TODO: put the error on a sign in place of the exhibit
+            log::error!(
+                "Exhibit generation failure.\nExhibit: {name}\nError: {error}",
+                name = exhibit.name,
+                error = all_is_cubes::util::ErrorChain(&error),
+            );
+            return Ok(());
+        }
+    };
+
+    let start_placement_time = I::now();
+
+    // Amount by which the exhibit's own size is expanded to form walls and empty space
+    // for displaying it and allowing players to move around it.
+    let enclosure_thickness = match exhibit.placement {
+        Placement::Surface => FaceMap::repeat(1),
+        // Underground exhibits get no enclosure; they are expected to play nicely with being
+        // buried in stone except for the entranceway.
+        Placement::Underground => FaceMap::repeat(0),
+    };
+
+    // Now that we know the size of the exhibit, find a place for it that fits its bounds.
+    let exhibit_footprint = exhibit_space.bounds();
+    let enclosure_footprint = exhibit_footprint.expand(enclosure_thickness);
+
+    let Some(plot_transform) = planner.find_plot(enclosure_footprint, exhibit.placement) else {
+        log::error!(
+            "Out of city space! Could not place {name:?}",
+            name = exhibit.name
+        );
+        return Ok(());
+    };
+    let plot = exhibit_footprint.transform(plot_transform).unwrap();
+    let enclosure_at_plot = enclosure_footprint.transform(plot_transform).unwrap();
+
+    // Create enclosure, with a block replacing all ground blocks 1 block around,
+    // and everything else cleared
+    let enclosure_lower = GridAab::from_lower_upper(
+        enclosure_at_plot.lower_bounds(),
+        [
+            enclosure_at_plot.upper_bounds().x,
+            // max()ing handles the case where the plot is floating but should still
+            // have enclosure floor
+            exhibit.placement.floor().max(plot.lower_bounds().y),
+            enclosure_at_plot.upper_bounds().z,
+        ],
+    );
+    space.fill_uniform(enclosure_at_plot, &AIR)?;
+    space.fill_uniform(enclosure_lower, &demo_blocks[ExhibitBackground])?;
+
+    // Cut an "entranceway" into the curb and grass, or corridor wall underground
+    let entranceway_height = 2; // TODO: let exhibit customize
+    {
+        let front_face = plot_transform.rotation.transform(Face6::PZ);
+        // Compute the surface that needs to be clear for walking
+        let entrance_plane = enclosure_lower
+            .expand(
+                FaceMap {
+                    // don't alter y
+                    ny: 0,
+                    py: 0,
+                    ..enclosure_thickness
+                }
+                .map(|_, thick| -thick),
+            )
+            .abut(Face6::PY, 0)
+            .unwrap()
+            .abut(front_face, enclosure_thickness.pz) // re-add enclosure bounds
+            .unwrap()
+            .abut(
+                front_face,
+                CityPlanner::PLOT_FRONT_RADIUS - CityPlanner::ROAD_RADIUS + 1,
+            )
+            .unwrap();
+
+        if let Placement::Surface = exhibit.placement {
+            let walkway = entrance_plane.abut(Face6::NY, 1).unwrap();
+            space.fill_uniform(walkway, &demo_blocks[Road])?;
+        }
+
+        let walking_volume = entrance_plane.abut(Face6::PY, entranceway_height).unwrap();
+        space.fill_uniform(walking_volume, &AIR)?;
+
+        planner.occupied_plots.push(walking_volume);
+    }
+
+    // Draw exhibit info
+    {
+        let info_resolution = R64;
+        let exhibit_info_space = draw_exhibit_info(exhibit)?; // TODO: on failure, place an error marker and continue ... or at least produce a GenError for context
+
+        // Enforce maximum width (TODO: this should be done inside draw_exhibit_info instead)
+        let bounds_for_info_voxels = GridAab::from_lower_size(
+            exhibit_info_space.bounds().lower_bounds(),
+            GridSize {
+                width: exhibit_info_space
+                    .bounds()
+                    .size()
+                    .width
+                    .min(enclosure_footprint.size().width * i32::from(info_resolution)),
+                ..exhibit_info_space.bounds().size()
+            },
+        );
+
+        let info_voxels_widget: vui::WidgetTree = Arc::new(vui::LayoutTree::Stack {
+            direction: Face6::PZ,
+            children: vec![
+                match exhibit.placement {
+                    Placement::Surface => {
+                        vui::leaf_widget(widgets::Frame::with_block(demo_blocks[Signboard].clone()))
+                    }
+                    Placement::Underground => vui::LayoutTree::empty(),
+                },
+                vui::leaf_widget(Arc::new(widgets::Voxels::new(
+                    bounds_for_info_voxels,
+                    universe.insert_anonymous(exhibit_info_space),
+                    info_resolution,
+                    BlockAttributes {
+                        display_name: "Exhibit Name".into(),
+                        ..Default::default()
+                    },
+                ))),
+            ],
+        });
+
+        // Install the signboard-and-text widgets in a space.
+        let info_sign_space = info_voxels_widget
+            .to_space(
+                SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
+                vui::Gravity::new(vui::Align::Center, vui::Align::Center, vui::Align::Low),
+            )
+            .unwrap();
+
+        let sign_position_in_plot_coordinates = match exhibit.placement {
+            Placement::Surface => GridVector::new(
+                // extending right from left edge
+                enclosure_footprint.lower_bounds().x,
+                // at ground level
+                0,
+                // minus 1 to put the Signboard blocks sitting on the enclosure blocks
+                enclosure_footprint.upper_bounds().z - 1,
+            ),
+            Placement::Underground => GridVector::new(
+                // centered horizontally
+                enclosure_footprint.lower_bounds().x
+                    + (enclosure_footprint.size().width - info_sign_space.bounds().size().width)
+                        / 2,
+                // at above-the-entrance level
+                entranceway_height,
+                // on the surface of the corridor wall -- TODO: We don't actually know fundamentally that the corridor
+                enclosure_footprint.upper_bounds().z + 1,
+            ),
+        };
+        let sign_transform =
+            plot_transform * Gridgid::from_translation(sign_position_in_plot_coordinates);
+
+        // Copy the signboard into the main space.
+        // (TODO: We do this indirection because the widget system does not currently
+        // support arbitrary rotation of widget trees, but that is wanted.)
+        space_to_space_copy(
+            &info_sign_space,
+            info_sign_space.bounds(),
+            space,
+            sign_transform,
+        )?;
+
+        // Mark sign space as occupied
+        planner
+            .occupied_plots
+            .push(info_sign_space.bounds().transform(sign_transform).unwrap());
+    }
+
+    // As the last step before we actually copy the exhibit into the city,
+    // execute its transaction.
+    match exhibit_transaction.execute(universe, &mut transaction::no_outputs) {
+        Ok(()) => {}
+        Err(error) => {
+            // TODO: put the error on a sign in place of the exhibit
+            log::error!(
+                "Exhibit transaction failure.\nExhibit: {name}\nError: {error}",
+                name = exhibit.name,
+                error = all_is_cubes::util::ErrorChain(&error),
+            );
+            return Ok(());
+        }
+    }
+
+    // Place exhibit content
+    space_to_space_copy(&exhibit_space, exhibit_footprint, space, plot_transform)?; // TODO: on failure, place an error marker and continue
+
+    // Log build time
+    let placement_time = I::now().saturating_duration_since(start_placement_time);
+    log::trace!(
+        "{:?} took {:.3} s",
+        exhibit.name,
+        (factory_time + placement_time).as_secs_f32()
+    );
 
     Ok(())
 }
