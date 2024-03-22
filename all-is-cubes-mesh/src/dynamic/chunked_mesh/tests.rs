@@ -205,7 +205,7 @@ impl<const MBM: usize> CsmTester<MBM> {
             .iter()
             .map(|(block_index, cubes)| {
                 let mut cubes: Vec<_> = cubes.map(<[GridCoordinate; 3]>::from).collect();
-                cubes.sort();
+                cubes.sort_unstable();
                 (block_index, cubes)
             })
             .collect();
