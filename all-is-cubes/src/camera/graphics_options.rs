@@ -465,7 +465,7 @@ mod tests {
         assert_eq!(
             format!("{options:#?}"),
             indoc::indoc! {
-                r#"GraphicsOptions {
+                r"GraphicsOptions {
                     render_method: Preferred,
                     fog: Abrupt,
                     fov_y: 90.0,
@@ -486,7 +486,7 @@ mod tests {
                     debug_chunk_boxes: false,
                     debug_collision_boxes: false,
                     debug_light_rays_at_cursor: false,
-                }"#
+                }"
             }
         );
     }
