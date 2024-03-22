@@ -75,7 +75,7 @@ impl ops::Add<Duration> for AdaptedInstant {
 impl ops::Sub<Duration> for AdaptedInstant {
     type Output = Self;
     fn sub(self, rhs: Duration) -> Self::Output {
-        Self(self.0 - rhs)
+        Self(ops::Sub::sub(self.0, rhs))
     }
 }
 

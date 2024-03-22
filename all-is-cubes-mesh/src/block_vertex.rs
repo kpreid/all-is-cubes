@@ -41,7 +41,7 @@ impl<T: Clone> BlockVertex<T> {
                 clamp_max: pos.clone(),
                 pos,
             },
-            other => other,
+            other @ Coloring::Solid(_) => other,
         };
         self
     }

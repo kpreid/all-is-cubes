@@ -69,7 +69,7 @@ struct TerminalState {
     has_terminal_stdin: bool,
 
     /// True if we should clean up on drop.
-    terminal_state_dirty: bool,
+    reset_terminal_on_drop: bool,
 
     /// Region of the terminal the scene is drawn into;
     /// updated when `tui` layout runs.
@@ -103,7 +103,7 @@ impl TerminalWindow {
             in_sender,
             has_terminal_stdin: io::IsTerminal::is_terminal(&io::stdin()),
             viewport_position: Rect::default(),
-            terminal_state_dirty: true,
+            reset_terminal_on_drop: true,
             widths: HashMap::new(),
         };
 
@@ -236,7 +236,7 @@ impl TerminalState {
     fn begin_fullscreen(&mut self) -> anyhow::Result<()> {
         match &mut self.tui {
             MaybeTui::Tui(terminal) => {
-                self.terminal_state_dirty = true;
+                self.reset_terminal_on_drop = true;
                 if self.has_terminal_stdin {
                     crossterm::terminal::enable_raw_mode()?;
                 }
@@ -252,7 +252,7 @@ impl TerminalState {
 
     /// Reset terminal state, as before exiting.
     fn clean_up_terminal(&mut self) {
-        if self.terminal_state_dirty {
+        if self.reset_terminal_on_drop {
             fn log_if_fails<T, E: std::error::Error>(r: Result<T, E>) {
                 match r {
                     Ok(_) => {}
@@ -268,7 +268,7 @@ impl TerminalState {
             log_if_fails(out.queue(cursor::Show));
             log_if_fails(out.queue(crossterm::event::DisableMouseCapture));
             log_if_fails(crossterm::terminal::disable_raw_mode());
-            self.terminal_state_dirty = false;
+            self.reset_terminal_on_drop = false;
         }
     }
 

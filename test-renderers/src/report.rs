@@ -150,7 +150,7 @@ mod tmpl {
                 },
                 // Show histogram details but only if not flawed
                 diffcount: if input.outcome.is_flawed() {
-                    "".into()
+                    String::new()
                 } else {
                     // TODO: make this the `impl Display for Histogram`
                     input

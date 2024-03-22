@@ -269,7 +269,7 @@ impl Block {
                 })));
                 match self.0 {
                     BlockPtr::Owned(ref mut arc_repr) => Arc::make_mut(arc_repr),
-                    _ => unreachable!(),
+                    BlockPtr::Static(_) => unreachable!(),
                 }
             }
             BlockPtr::Owned(ref mut arc_repr) => Arc::make_mut(arc_repr),
