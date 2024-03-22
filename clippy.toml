@@ -2,3 +2,16 @@ doc-valid-idents = ["glTF", "sRGB", "MagicaVoxel", "NaN", "OpenGL", "WebGL", "We
 enforced-import-renames = [
     { path = "all_is_cubes::rerun_glue", rename = "rg" },
 ]
+
+# --- Configurations for "large values" kinds of lints ---
+# It'd be nice if these were per-package/per-crate, but clippy doesn't support that,
+# so we have to take the max.
+
+# Would like this to be much smaller, but I was getting a span-less and therefore uncontrollable warning.
+# TODO: find the cause and file a bug report.
+array-size-threshold = 8192
+# TODO: squeeze the UniverseTemplate futures a bit smaller — they're 4xxx bytes on 64-bit
+future-size-threshold = 6000
+pass-by-value-size-limit = 2048
+# stack-size-threshold is generous, because it is highly overestimating
+stack-size-threshold = 100_000

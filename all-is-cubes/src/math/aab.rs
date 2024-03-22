@@ -329,6 +329,7 @@ impl Geometry for Aab {
     where
         E: Extend<LineVertex>,
     {
+        #[allow(clippy::large_stack_arrays)]
         let mut vertices = [LineVertex::from(FreePoint::origin()); 24];
         let l = self.lower_bounds_p();
         let u = self.upper_bounds_p();

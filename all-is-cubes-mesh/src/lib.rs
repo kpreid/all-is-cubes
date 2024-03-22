@@ -34,6 +34,7 @@
 #![no_std]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
+#![cfg_attr(test, allow(clippy::large_stack_arrays))]
 
 extern crate alloc;
 #[macro_use]
