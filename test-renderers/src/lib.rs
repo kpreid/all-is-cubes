@@ -86,6 +86,7 @@ impl ComparisonOutcome {
 }
 
 impl ComparisonRecord {
+    #[allow(clippy::large_types_passed_by_value)]
     fn from_paths(
         expected_file_path: &Path,
         actual_file_path: &Path,

@@ -17,6 +17,7 @@ use crate::{block::Block, space::Space};
 ///
 #[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Eq, PartialEq)]
+#[allow(clippy::unsafe_derive_deserialize)] // false positive from notnan! macro
 #[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "save", serde(default))]
 #[non_exhaustive]

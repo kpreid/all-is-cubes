@@ -208,6 +208,8 @@ pub(crate) fn make_tree(
 
 use graph::Growph;
 mod graph {
+    #![allow(clippy::option_option)]
+
     use super::*;
     use all_is_cubes::euclid::default::Vector3D;
     use all_is_cubes::math::Axis;

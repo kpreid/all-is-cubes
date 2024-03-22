@@ -114,9 +114,11 @@ yield-progress = { version = "0.1.5", default-features = false }
 
 # Note: Lints are also necessarily redefined in the workspaces other than this one.
 [workspace.lints]
+# rustc lints that are set to deny
 rust.rust_2018_idioms = { level = "deny", priority = -1 }
 rust.unsafe_op_in_unsafe_fn = "deny"
 
+# rustc lints that are set to warn
 rust.explicit_outlives_requirements = "warn"
 rust.missing_debug_implementations = "warn"
 rust.missing_docs = "warn"
@@ -129,14 +131,51 @@ rust.unused_qualifications = "warn"
 # This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
 # rust.unused_crate_dependencies = "warn"
 
+# clippy default lints that are set to allow
 clippy.collapsible_else_if = "allow"
 clippy.collapsible_if = "allow"
 clippy.match_ref_pats = "allow"
 clippy.needless_update = "allow"
 clippy.single_match = "allow"
 
+# clippy::pedantic lints that are set to allow
+clippy.cast_possible_truncation = "allow" # consider enabling
+clippy.cast_possible_wrap = "allow" # consider enabling
+clippy.cast_precision_loss = "allow" # consider enabling
+clippy.cast_sign_loss = "allow" # consider enabling
+clippy.default_trait_access = "allow"
+clippy.enum_glob_use = "allow"
+clippy.explicit_iter_loop = "allow" # I prefer the opposite style
+clippy.float_cmp = "allow"
+clippy.from_iter_instead_of_collect = "allow" # <https://github.com/rust-lang/rust-clippy/issues/7213>
+clippy.if_not_else = "allow"
+clippy.inline_always = "allow"
+clippy.items_after_statements = "allow" # we use this sparingly
+clippy.manual_assert = "allow"
+clippy.many_single_char_names = "allow"
+clippy.match_bool = "allow"
+clippy.match_same_arms = "allow"
+clippy.missing_errors_doc = "allow" # consider enabling
+clippy.missing_panics_doc = "allow" # consider enabling
+clippy.module_name_repetitions = "allow" # would use except for <https://github.com/rust-lang/rust-clippy/issues/8524>
+clippy.must_use_candidate = "allow" # consider enabling
+clippy.no_effect_underscore_binding = "allow"
+clippy.range_plus_one = "allow" # https://github.com/rust-lang/rust-clippy/issues/3307
+clippy.redundant_closure_for_method_calls = "allow" # consider enabling
+clippy.redundant_else = "allow"
+clippy.semicolon_if_nothing_returned = "allow"
+clippy.similar_names = "allow"
+clippy.single_match_else = "allow"
+clippy.struct_excessive_bools = "allow"
+clippy.too_many_lines = "allow"
+clippy.unreadable_literal = "allow"
+clippy.wildcard_imports = "allow" # we use this sparingly
+
+# clippy lints that are set to deny
 clippy.should_panic_without_expect = "deny"
 
+# clippy lints that are set to warn
+clippy.pedantic = { level = "warn", priority = -1 }
 clippy.cast_lossless = "warn"
 clippy.doc_markdown = "warn"
 clippy.exhaustive_enums = "warn"

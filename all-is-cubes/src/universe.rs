@@ -697,6 +697,7 @@ impl Universe {
         self.log_rerun_time();
     }
 
+    #[allow(clippy::unused_self)]
     fn log_rerun_time(&self) {
         #[cfg(feature = "rerun")]
         self.rerun_destination

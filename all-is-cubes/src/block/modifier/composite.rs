@@ -381,6 +381,7 @@ impl CompositeOperator {
 
     /// Called by [`Self::blend_evoxel()`] to handle properties that can be described as
     /// “present or absent” binary flags.
+    #[allow(clippy::needless_bitwise_bool)] // ideally this would be branchless…
     fn blend_binary(self, source: bool, destination: bool) -> bool {
         match self {
             Self::Over => source | destination,

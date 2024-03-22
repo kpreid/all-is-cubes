@@ -56,6 +56,7 @@ impl Destination {
         self.stream.is_enabled()
     }
 
+    #[allow(clippy::unused_self)]
     fn catch(&self, f: impl FnOnce() -> RecordingStreamResult<()>) {
         match f() {
             Ok(()) => (),
