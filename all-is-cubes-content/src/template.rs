@@ -434,7 +434,7 @@ async fn arbitrary_space(
     use rand::{RngCore, SeedableRng};
 
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
-    let mut bytes = [0u8; 16384];
+    let mut bytes = vec![0u8; 16384];
     let mut attempt = 0;
     loop {
         attempt += 1;
