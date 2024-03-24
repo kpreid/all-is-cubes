@@ -227,7 +227,7 @@ fn terminal_thread_loop(output_channel: mpsc::Receiver<OutMsg>, mut state: Termi
             }
         }
     }
-    state.clean_up_terminal().unwrap();
+    state.clean_up_terminal();
     log::trace!("exiting terminal_thread_loop()");
 }
 
@@ -250,7 +250,7 @@ impl TerminalState {
     }
 
     /// Reset terminal state, as before exiting.
-    fn clean_up_terminal(&mut self) -> io::Result<()> {
+    fn clean_up_terminal(&mut self) {
         if self.terminal_state_dirty {
             fn log_if_fails<T, E: std::error::Error>(r: Result<T, E>) {
                 match r {
@@ -269,7 +269,6 @@ impl TerminalState {
             log_if_fails(crossterm::terminal::disable_raw_mode());
             self.terminal_state_dirty = false;
         }
-        Ok(())
     }
 
     /// Actually write image data to the terminal. Does not write UI.
