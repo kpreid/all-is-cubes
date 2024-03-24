@@ -155,23 +155,20 @@ pub(super) fn new_about_widget_tree(
 }
 
 /// A message in a "modal dialog box".
-pub(super) fn new_message_widget_tree(
-    message: ArcStr,
-    hud_inputs: &HudInputs,
-) -> Result<WidgetTree, InstallVuiError> {
+pub(super) fn new_message_widget_tree(message: ArcStr, hud_inputs: &HudInputs) -> WidgetTree {
     use parts::paragraph;
 
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![paragraph(message), back_button(hud_inputs)],
     });
-    Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
+    page_modal_backdrop(Arc::new(LayoutTree::Shrink(
         hud_inputs
             .hud_blocks
             .widget_theme
             .dialog_background()
             .as_background_of(contents),
-    ))))
+    )))
 }
 
 /// Make a button that sends [`VuiMessage::Open`].
