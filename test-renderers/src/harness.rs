@@ -127,7 +127,7 @@ impl RenderTestContext {
         };
         let flaws = image.flaws;
 
-        let mut outcome = crate::compare_rendered_image(combo, allowed_difference.into(), image);
+        let mut outcome = crate::compare_rendered_image(combo, &allowed_difference.into(), image);
 
         if flaws.contains(Flaws::UNFINISHED) {
             outcome.outcome = ComparisonOutcome::Unfinished;

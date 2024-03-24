@@ -136,7 +136,7 @@ impl ComparisonRecord {
 /// Finish a rendering test by storing/displaying/comparing the output image.
 pub fn compare_rendered_image(
     test: ImageId,
-    allowed_difference: Threshold,
+    allowed_difference: &Threshold,
     actual_image: Rendering,
 ) -> ComparisonRecord {
     let actual_file_path = image_path(&test, Version::Actual);
