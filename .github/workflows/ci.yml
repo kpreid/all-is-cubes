@@ -145,8 +145,9 @@ jobs:
     - name: Install tools
       # Note: Swatinem/rust-cache will cache these installed binaries, so we don't have to worry
       # about caching the builds of them.
+      # cargo-mutants is not used in this step but it will be cached for later use.
       run: |
-        cargo install wasm-pack@0.12.1 cargo-about@0.6.1 cargo-mutants@24.1.0
+        cargo install --locked wasm-pack@0.12.1 cargo-about@0.6.1 cargo-mutants@24.1.0
 
 
     - run: df -h .
@@ -267,7 +268,7 @@ jobs:
     - name: Install tools
       # These should already be installed but we might have a cache miss, so don't fail in that case.
       run: |
-        cargo install wasm-pack@0.12.1 cargo-about@0.6.1
+        cargo install --locked wasm-pack@0.12.1 cargo-about@0.6.1
 
     - run: df -h .
 
@@ -324,7 +325,7 @@ jobs:
 
       # Install cargo-mutants
       # This should usually be already installed, but is present in case of cache miss
-      - run: cargo install --version 24.1.0 cargo-mutants
+      - run: cargo install --locked cargo-mutants@24.1.0
 
       - name: Relative diff
         run: |
