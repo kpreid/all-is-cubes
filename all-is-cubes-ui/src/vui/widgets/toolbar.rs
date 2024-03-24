@@ -174,7 +174,7 @@ impl ToolbarController {
         &self,
         selected_slots: &[usize],
         pressed: [bool; TOOL_SELECTIONS],
-    ) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
+    ) -> WidgetTransaction {
         let mut txn = SpaceTransaction::default();
         for index in 0..self.definition.slot_count {
             let position = self.slot_position(index);
@@ -195,8 +195,7 @@ impl ToolbarController {
                 .clone(),
             );
         }
-
-        Ok(txn)
+        txn
     }
 }
 
@@ -295,7 +294,7 @@ impl WidgetController for ToolbarController {
         // should_update_inventory is currently true when the selected_slots value changes.
         // TODO: InventoryWatcher should provide us this
         let pointers_txn = if should_update_inventory || should_update_pointers {
-            self.write_pointers(&watcher.selected_slots(), pressed_buttons)?
+            self.write_pointers(&watcher.selected_slots(), pressed_buttons)
         } else {
             WidgetTransaction::default()
         };
