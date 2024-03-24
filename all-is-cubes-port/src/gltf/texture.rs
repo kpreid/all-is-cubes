@@ -59,8 +59,7 @@ impl GltfTextureAllocator {
                     .expect("failed to write image to in-memory buffer");
                 w.write_all(tmp.into_inner().as_slice())?;
                 Ok(())
-            })
-            .expect("TODO: propagate IO errors to later instead of panicking");
+            })?;
         Ok(buffer)
     }
 }
