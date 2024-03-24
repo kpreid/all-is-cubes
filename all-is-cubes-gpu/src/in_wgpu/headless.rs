@@ -217,7 +217,7 @@ impl RendererImpl {
             self.color_texture = create_color_texture(&self.device, viewport);
         }
 
-        let draw_info = self.everything.draw_frame_linear(&self.queue).unwrap();
+        let draw_info = self.everything.draw_frame_linear(&self.queue);
         let post_flaws = self.everything.add_info_text_and_postprocess(
             &self.queue,
             &self

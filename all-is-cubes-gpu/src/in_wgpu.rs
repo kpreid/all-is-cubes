@@ -203,7 +203,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         };
         let after_get = I::now();
 
-        let draw_info = self.everything.draw_frame_linear(&self.queue)?;
+        let draw_info = self.everything.draw_frame_linear(&self.queue);
 
         // Construct aggregated info.
         // TODO: the flaws combination logic is awkward. Should we combine them at printing
@@ -690,10 +690,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
     /// Render the current scene content to the linear scene texture,
     /// in linear color values without tone mapping.
-    pub(crate) fn draw_frame_linear(
-        &mut self,
-        queue: &wgpu::Queue,
-    ) -> Result<DrawInfo, RenderError> {
+    pub(crate) fn draw_frame_linear(&mut self, queue: &wgpu::Queue) -> DrawInfo {
         let start_draw_time = I::now();
 
         let mut encoder = self
@@ -827,7 +824,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         self.staging_belt.recall();
 
         let end_time = I::now();
-        Ok(DrawInfo {
+        DrawInfo {
             times: Layers {
                 world: world_to_lines_time.saturating_duration_since(start_draw_time),
                 ui: ui_to_postprocess_time.saturating_duration_since(lines_to_ui_time),
@@ -838,7 +835,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             },
             // TODO: count bloom (call it postprocess) time separately from submit
             submit_time: Some(end_time.saturating_duration_since(ui_to_postprocess_time)),
-        })
+        }
     }
 
     #[must_use]
