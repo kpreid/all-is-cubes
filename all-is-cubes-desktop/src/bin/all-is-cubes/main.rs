@@ -230,6 +230,7 @@ fn main() -> Result<(), anyhow::Error> {
 
 /// Main loop that does nothing but run the simulation.
 /// This may be used in case the simulation has interesting side-effects.
+#[allow(clippy::unnecessary_wraps)]
 fn headless_main_loop(
     mut dsession: DesktopSession<(), ()>,
     duration: Option<f64>,

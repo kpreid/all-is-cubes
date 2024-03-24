@@ -126,6 +126,7 @@ clippy.trivially_copy_pass_by_ref = "warn"
 clippy.undocumented_unsafe_blocks = "warn"
 clippy.uninlined_format_args = "warn"
 clippy.unnecessary_self_imports = "warn"
+clippy.unnecessary_wraps = "warn"
 clippy.unused_async = "warn"
 clippy.wrong_self_convention = "warn"
 

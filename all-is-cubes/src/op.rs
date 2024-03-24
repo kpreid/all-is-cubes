@@ -51,6 +51,7 @@ impl Operation {
     ///
     /// Note that lack of error does not guarantee that the returned transaction will
     /// succeed. TODO: Explain how the two kinds of errors should be reported.
+    #[allow(clippy::unnecessary_wraps)] // We have no fallible operations *yet*.
     pub(crate) fn apply(
         &self,
         space: &Space,

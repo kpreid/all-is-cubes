@@ -151,6 +151,7 @@ impl TerminalWindow {
     }
 
     /// Send the cleanup command and wait for the thread to exit.
+    #[allow(clippy::unnecessary_wraps)] // see TODO below
     pub fn stop(mut self) -> Result<(), anyhow::Error> {
         // Drop channel to signal thread to shut down
         self.out_sender = None;

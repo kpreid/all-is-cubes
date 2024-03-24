@@ -125,6 +125,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert("viewport_prime", None, viewport_prime);
 }
 
+#[allow(clippy::unnecessary_wraps)] // convenience where it is used
 fn u(
     label: &str,
     f: impl Future<Output = Arc<Universe>> + Send + Sync + 'static,

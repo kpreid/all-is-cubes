@@ -160,6 +160,7 @@ impl AicDesktopArgs {
     /// Returns `Ok(None)` if recording was not requested (`output_file` not set).
     ///
     /// Panics if `output_path` is not validated (this should have been checked at parse time).
+    #[allow(clippy::unnecessary_wraps)] // *currently* no error can happen
     pub fn record_options(&self) -> clap::error::Result<Option<RecordOptions>> {
         let Some(output_path) = self.output_file.clone() else {
             return Ok(None);
