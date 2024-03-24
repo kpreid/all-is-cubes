@@ -1447,7 +1447,7 @@ fn TREES(ctx: Context<'_>) {
                     py: ix + iz * 2,
                     pz: 2,
                 }),
-            )?
+            )
             .execute(&mut space, &mut transaction::no_outputs)?;
         }
     }

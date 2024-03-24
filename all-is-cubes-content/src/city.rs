@@ -628,7 +628,7 @@ async fn plant_trees(
             pz: height / 3,
         });
         if space.bounds().contains_box(tree_bounds) && !planner.is_occupied(tree_bounds) {
-            crate::tree::make_tree(&landscape_blocks, &mut rng, tree_origin, tree_bounds)?
+            crate::tree::make_tree(&landscape_blocks, &mut rng, tree_origin, tree_bounds)
                 .execute(space, &mut transaction::no_outputs)?;
         }
         progress.finish().await;

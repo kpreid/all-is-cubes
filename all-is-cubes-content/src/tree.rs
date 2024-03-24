@@ -4,7 +4,7 @@ use itertools::Itertools as _;
 use petgraph::visit::EdgeRef as _;
 
 use all_is_cubes::block::{self, Block, AIR};
-use all_is_cubes::linking::{BlockProvider, InGenError};
+use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridRotation, GridVector,
 };
@@ -96,12 +96,14 @@ pub(crate) fn make_log(
 
 /// Construct a tree whose lowest trunk piece is at `root` and which is contained within
 /// `bounds`.
+///
+/// Panics if `root` is not within `bounds`.
 pub(crate) fn make_tree(
     blocks: &BlockProvider<LandscapeBlocks>,
     rng: &mut impl rand::Rng,
     root: Cube,
     bounds: GridAab,
-) -> Result<SpaceTransaction, InGenError> {
+) -> SpaceTransaction {
     // Graph of which blocks are to be connected by logs.
     let mut graph = Growph::new(bounds.expand(FaceMap::default().with(Face6::NY, 1)));
 
@@ -201,7 +203,7 @@ pub(crate) fn make_tree(
             txn.at(cube).overwrite(log);
         }
     }
-    Ok(txn)
+    txn
 }
 
 use graph::Growph;
