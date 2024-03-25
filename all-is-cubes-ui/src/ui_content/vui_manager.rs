@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use core::future::Future;
-use std::sync::mpsc::TryRecvError;
-use std::sync::{mpsc, Mutex};
+use flume::TryRecvError;
+use std::sync::Mutex;
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::camera::{FogOption, GraphicsOptions, UiViewState, ViewTransform, Viewport};
@@ -57,7 +57,11 @@ pub(crate) struct Vui {
 
     /// Receiving internal messages from widgets for controlling the UI itself
     /// (changing `state`, etc).
-    control_channel: mpsc::Receiver<VuiMessage>,
+    ///
+    /// Design note: Using `flume` not because we want MPMC, but because its receiver is
+    /// `Send + Sync`, unlike the `std`` one.
+    /// Our choice of `flume` in particular is just because our other crates use it.
+    control_channel: flume::Receiver<VuiMessage>,
     character_source: ListenableSource<Option<Handle<Character>>>,
     changed_character: DirtyFlag,
     tooltip_state: Arc<Mutex<TooltipState>>,
@@ -80,7 +84,7 @@ impl Vui {
         character_source: ListenableSource<Option<Handle<Character>>>,
         paused: ListenableSource<bool>,
         graphics_options: ListenableSource<GraphicsOptions>,
-        app_control_channel: mpsc::SyncSender<ControlMessage>,
+        app_control_channel: flume::Sender<ControlMessage>,
         viewport_source: ListenableSource<Viewport>,
         fullscreen_source: ListenableSource<FullscreenState>,
         set_fullscreen: FullscreenSetter,
@@ -101,7 +105,7 @@ impl Vui {
             .execute(&mut universe, &mut transaction::no_outputs)
             .unwrap();
 
-        let (control_send, control_recv) = mpsc::sync_channel(100);
+        let (control_send, control_recv) = flume::bounded(100);
         let state = ListenableCell::new(VuiPageState::Hud);
 
         let tooltip_state = Arc::<Mutex<TooltipState>>::default();
@@ -502,8 +506,8 @@ pub(crate) enum CueMessage {
 mod tests {
     use super::*;
 
-    async fn new_vui_for_test(paused: bool) -> (Vui, mpsc::Receiver<ControlMessage>) {
-        let (cctx, ccrx) = mpsc::sync_channel(1);
+    async fn new_vui_for_test(paused: bool) -> (Vui, flume::Receiver<ControlMessage>) {
+        let (cctx, ccrx) = flume::bounded(1);
         let vui = Vui::new(
             &InputProcessor::new(),
             ListenableSource::constant(None),

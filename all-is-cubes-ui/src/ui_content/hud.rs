@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 use core::fmt;
-use std::sync::{mpsc, Mutex};
+use std::sync::Mutex;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::camera::GraphicsOptions;
@@ -32,8 +32,8 @@ pub(crate) const TOOLBAR_POSITIONS: usize = 10;
 pub(crate) struct HudInputs {
     pub hud_blocks: Arc<HudBlocks>,
     pub cue_channel: CueNotifier,
-    pub vui_control_channel: mpsc::SyncSender<VuiMessage>,
-    pub app_control_channel: mpsc::SyncSender<ControlMessage>,
+    pub vui_control_channel: flume::Sender<VuiMessage>,
+    pub app_control_channel: flume::Sender<ControlMessage>,
     pub graphics_options: ListenableSource<GraphicsOptions>,
     pub paused: ListenableSource<bool>,
     pub page_state: ListenableSource<VuiPageState>,

@@ -1,6 +1,5 @@
 use core::time::Duration;
 use std::collections::{HashMap, HashSet};
-use std::sync::mpsc;
 
 use all_is_cubes::camera::{
     FogOption, GraphicsOptions, LightingOption, NdcPoint2, NominalPixel, RenderMethod,
@@ -473,7 +472,7 @@ pub(crate) struct InputTargets<'a> {
     pub graphics_options: Option<&'a ListenableCell<GraphicsOptions>>,
     // TODO: replace cells with control channel?
     // TODO: make the control channel a type alias?
-    pub control_channel: Option<&'a mpsc::SyncSender<ControlMessage>>,
+    pub control_channel: Option<&'a flume::Sender<ControlMessage>>,
 }
 
 /// A platform-neutral representation of keyboard keys for [`InputProcessor`].

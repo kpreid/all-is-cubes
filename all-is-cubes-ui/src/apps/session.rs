@@ -3,13 +3,15 @@ use core::fmt;
 use core::future::Future;
 use core::marker::PhantomData;
 use core::mem;
+use core::pin::Pin;
 use core::sync::atomic::{AtomicBool, Ordering};
 use core::task::{Context, Poll};
-use std::sync::mpsc::{self, TryRecvError};
 use std::sync::Mutex;
 
+use flume::TryRecvError;
 use futures_core::future::BoxFuture;
 use futures_task::noop_waker_ref;
+use sync_wrapper::SyncWrapper;
 
 use all_is_cubes::arcstr::{self, ArcStr};
 use all_is_cubes::camera::{GraphicsOptions, Layers, StandardCameras, UiViewState, Viewport};
@@ -61,7 +63,11 @@ pub struct Session<I> {
 
     /// If present, a future that is polled at the beginning of stepping,
     /// which may read or write parts of the session state via the context it was given.
-    main_task: Option<BoxFuture<'static, ExitMainTask>>,
+    ///
+    /// The `SyncWrapper` ensures that `Session: Sync` even though this future need not be
+    /// (which is sound because the future is only polled with `&mut Session`).
+    ///
+    main_task: Option<SyncWrapper<BoxFuture<'static, ExitMainTask>>>,
 
     /// Jointly owned by the main task.
     task_context_inner: Arc<Mutex<Option<Box<Shuttle>>>>,
@@ -72,8 +78,12 @@ pub struct Session<I> {
     ///
     /// TODO: This is originally a quick kludge to make onscreen UI buttons work.
     /// Not sure whether it is a good strategy overall.
-    control_channel: mpsc::Receiver<ControlMessage>,
-    control_channel_sender: mpsc::SyncSender<ControlMessage>,
+    ///
+    /// Design note: Using `flume` not because we want MPMC, but because its receiver is
+    /// `Send + Sync`, unlike the `std`` one.
+    /// Our choice of `flume` in particular is just because our other crates use it.
+    control_channel: flume::Receiver<ControlMessage>,
+    control_channel_sender: flume::Sender<ControlMessage>,
 
     last_step_info: UniverseStepInfo,
 
@@ -102,7 +112,7 @@ struct Shuttle {
 
     space_watch_state: SpaceWatchState,
 
-    control_channel_sender: mpsc::SyncSender<ControlMessage>,
+    control_channel_sender: flume::Sender<ControlMessage>,
 
     /// Last cursor raycast result.
     cursor_result: Option<Cursor>,
@@ -233,7 +243,7 @@ impl<I: time::Instant> Session<I> {
             shuttle: self.task_context_inner.clone(),
             session_event_notifier: Arc::downgrade(&self.shuttle().session_event_notifier),
         };
-        self.main_task = Some(Box::pin(task_ctor(context)));
+        self.main_task = Some(SyncWrapper::new(Box::pin(task_ctor(context))));
     }
 
     /// Returns the current game universe owned by this session.
@@ -372,7 +382,7 @@ impl<I: time::Instant> Session<I> {
     /// Call this each time something happens the main task might care about.
     fn poll_main_task(&mut self) {
         // TODO: for efficiency, use a waker
-        if let Some(future) = self.main_task.as_mut() {
+        if let Some(sync_wrapped_future) = self.main_task.as_mut() {
             {
                 let mut shuttle_guard = match self.task_context_inner.lock() {
                     Ok(g) => g,
@@ -400,10 +410,9 @@ impl<I: time::Instant> Session<I> {
                 *shuttle_guard = None;
             });
 
-            match future
-                .as_mut()
-                .poll(&mut Context::from_waker(noop_waker_ref()))
-            {
+            let future: Pin<&mut dyn Future<Output = ExitMainTask>> =
+                sync_wrapped_future.get_mut().as_mut();
+            match future.poll(&mut Context::from_waker(noop_waker_ref())) {
                 Poll::Pending => {}
                 Poll::Ready(ExitMainTask) => {
                     self.main_task = None;
@@ -765,7 +774,7 @@ impl<I: time::Instant> SessionBuilder<I> {
         let input_processor = InputProcessor::new();
         let graphics_options = ListenableCell::new(GraphicsOptions::default());
         let paused = ListenableCell::new(false);
-        let (control_send, control_recv) = mpsc::sync_channel(100);
+        let (control_send, control_recv) = flume::bounded(100);
 
         let space_watch_state = SpaceWatchState::empty();
 
@@ -1223,8 +1232,14 @@ mod tests {
     use all_is_cubes::math::Cube;
     use all_is_cubes::transaction::no_outputs;
     use all_is_cubes::universe::Name;
+    use all_is_cubes::util::assert_send_sync;
     use futures_channel::oneshot;
     use std::sync::atomic::AtomicUsize;
+
+    #[test]
+    fn is_send_sync() {
+        assert_send_sync::<Session<std::time::Instant>>();
+    }
 
     #[tokio::test]
     async fn fluff_forwarding_following() {
