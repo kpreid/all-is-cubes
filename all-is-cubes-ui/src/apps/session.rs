@@ -280,7 +280,8 @@ impl<I: time::Instant> Session<I> {
         &self.shuttle().graphics_options
     }
 
-    /// Create [`StandardCameras`] which may be used in rendering a view of this session.
+    /// Returns a [`StandardCameras`] which may be used in rendering a view of this session,
+    /// including following changes to the current character or universe.
     pub fn create_cameras(&self, viewport_source: ListenableSource<Viewport>) -> StandardCameras {
         StandardCameras::new(
             self.graphics_options(),
@@ -1090,6 +1091,24 @@ impl fmt::Debug for MainTaskContext {
 }
 
 impl MainTaskContext {
+    /// Returns a [`StandardCameras`] which may be used in rendering a view of this session,
+    /// including following changes to the current character or universe.
+    pub fn create_cameras(&self, viewport_source: ListenableSource<Viewport>) -> StandardCameras {
+        self.with(|shuttle| {
+            StandardCameras::new(
+                shuttle.graphics_options.as_source(),
+                viewport_source,
+                shuttle.game_character.as_source(),
+                shuttle.ui_view(),
+            )
+        })
+    }
+
+    /// Provides a reference to the current game universe of this session.
+    pub fn with_universe<R>(&self, f: impl FnOnce(&Universe) -> R) -> R {
+        self.with(|shuttle| f(&shuttle.game_universe))
+    }
+
     /// Replaces the game universe, such as for initial setup or because the player
     /// chose to load a new one.
     /// This also resets the character to be the new universe's default character.
@@ -1161,7 +1180,7 @@ impl MainTaskContext {
 
     #[track_caller]
     fn with<R>(&self, f: impl FnOnce(&mut Shuttle) -> R) -> R {
-        f(self.shuttle.lock().unwrap().as_mut().expect(
+        f(self.shuttle.try_lock().unwrap().as_mut().expect(
             "MainTaskContext operations may not be called while the main task is not executing",
         ))
     }
