@@ -219,6 +219,36 @@ impl<T: fmt::Debug> fmt::Debug for ListenableCellWithLocal<T> {
     }
 }
 
+// Pointer printing implementations to enable determining whether a cell and a source share
+// state. Including the debug_struct to make it less ambiguous what role this pointer plays.
+impl<T> fmt::Pointer for ListenableCell<T> {
+    /// Prints the address of the cell's state storage, which is shared with
+    /// [`ListenableSource`]s created from this cell.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ds = f.debug_struct("ListenableCell");
+        ds.field("cell_address", &Arc::as_ptr(&self.storage));
+        ds.finish()
+    }
+}
+impl<T> fmt::Pointer for ListenableSource<T> {
+    /// Prints the address of the state storage, which is shared with the originating
+    /// [`ListenableCell`] and other [`ListenableSource`]s.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ds = f.debug_struct("ListenableSource");
+        ds.field("cell_address", &Arc::as_ptr(&self.storage));
+        ds.finish()
+    }
+}
+impl<T> fmt::Pointer for ListenableCellWithLocal<T> {
+    /// Prints the address of the cell's state storage, which is shared with
+    /// [`ListenableSource`]s created from this cell.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ds = f.debug_struct("ListenableCellWithLocal");
+        ds.field("cell_address", &Arc::as_ptr(&self.cell.storage));
+        ds.finish()
+    }
+}
+
 fn format_cell_metadata<T>(
     ds: &mut fmt::DebugStruct<'_, '_>,
     storage: &Arc<ListenableCellStorage<T>>,
