@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::camera::{Camera, GraphicsOptions, NdcPoint2, ViewTransform, Viewport};
 use crate::character::{cursor_raycast, Character, Cursor};
 use crate::listen::{DirtyFlag, ListenableCell, ListenableSource};
@@ -308,6 +310,27 @@ impl StandardCameras {
         }
 
         None
+    }
+}
+
+impl fmt::Pointer for StandardCameras {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Print all and only the fields which point to external mutable state
+        write!(
+            f,
+            indoc::indoc! {"\
+                StandardCameras {{
+                    graphics_options: {graphics_options:p},
+                    viewport_source: {viewport_source:p},
+                    character_source: {character_source:p},
+                    ui_source: {ui_source:p},
+                }}\
+            "},
+            graphics_options = self.graphics_options,
+            viewport_source = self.viewport_source,
+            character_source = self.character_source,
+            ui_source = self.ui_source,
+        )
     }
 }
 
