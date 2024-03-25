@@ -98,7 +98,7 @@ pub fn inner_main<Ren: glue::Renderer, Win: glue::Window>(
     }
     let viewport_source = dsession.viewport_cell.as_source();
 
-    dsession.session.set_main_task(|ctx| async move {
+    dsession.session.set_main_task(|mut ctx| async move {
         let universe_result: Result<Universe, anyhow::Error> = match universe_future.await {
             Ok(Ok(u)) => Ok(u),
             Ok(Err(e)) => {

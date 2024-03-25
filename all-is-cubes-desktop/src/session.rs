@@ -120,7 +120,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
 
         // TODO: Also make a way to do this that isn't replacing the main task,
         // or that defines a way for the existing main task to coordinate.
-        self.session.set_main_task(move |ctx| async move {
+        self.session.set_main_task(move |mut ctx| async move {
             // TODO: Offer confirmation before replacing the current universe.
             // TODO: Then open a progress-bar UI page while we load.
 

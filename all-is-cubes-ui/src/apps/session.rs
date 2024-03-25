@@ -1116,7 +1116,7 @@ impl MainTaskContext {
     /// This also resets the character to be the new universe's default character.
     ///
     /// Panics if called while the main task is suspended.
-    pub fn set_universe(&self, universe: Universe) {
+    pub fn set_universe(&mut self, universe: Universe) {
         self.with_mut(|shuttle| {
             shuttle.set_universe(universe);
         })
@@ -1185,18 +1185,21 @@ impl MainTaskContext {
         f(self
             .shuttle
             .try_read()
-            .expect("MainTaskContext read and write operations may not be mixed")
+            .expect("MainTaskContext lock misused somehow (could not read)")
             .as_ref()
             .expect(
                 "MainTaskContext operations may not be called while the main task is not executing",
             ))
     }
+
+    /// Note: By accepting `&mut self` even though it is unnecessary, we prevent run-time
+    /// read/write or write/write conflicts with the lock.
     #[track_caller]
-    fn with_mut<R>(&self, f: impl FnOnce(&mut Shuttle) -> R) -> R {
+    fn with_mut<R>(&mut self, f: impl FnOnce(&mut Shuttle) -> R) -> R {
         f(self
             .shuttle
             .try_write()
-            .expect("MainTaskContext read and write operations may not be mixed")
+            .expect("MainTaskContext lock misused somehow (could not write)")
             .as_mut()
             .expect(
                 "MainTaskContext operations may not be called while the main task is not executing",
@@ -1330,7 +1333,7 @@ mod tests {
         let mut cameras = session.create_cameras(ListenableSource::constant(Viewport::ARBITRARY));
         session.set_main_task({
             let noticed_step = noticed_step.clone();
-            move |ctx| async move {
+            move |mut ctx| async move {
                 eprintln!("main task: waiting for new universe");
                 let new_universe = recv.await.unwrap();
                 ctx.set_universe(new_universe);
