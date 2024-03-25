@@ -6,7 +6,7 @@ use core::mem;
 use core::pin::Pin;
 use core::sync::atomic::{AtomicBool, Ordering};
 use core::task::{Context, Poll};
-use std::sync::Mutex;
+use std::sync::RwLock;
 
 use flume::TryRecvError;
 use futures_core::future::BoxFuture;
@@ -70,7 +70,9 @@ pub struct Session<I> {
     main_task: Option<SyncWrapper<BoxFuture<'static, ExitMainTask>>>,
 
     /// Jointly owned by the main task.
-    task_context_inner: Arc<Mutex<Option<Box<Shuttle>>>>,
+    /// The `Option` is filled only when the main task is executing.
+    /// The `RwLock` is never blocked on.
+    task_context_inner: Arc<RwLock<Option<Box<Shuttle>>>>,
 
     paused: ListenableCell<bool>,
 
@@ -385,7 +387,7 @@ impl<I: time::Instant> Session<I> {
         // TODO: for efficiency, use a waker
         if let Some(sync_wrapped_future) = self.main_task.as_mut() {
             {
-                let mut shuttle_guard = match self.task_context_inner.lock() {
+                let mut shuttle_guard = match self.task_context_inner.write() {
                     Ok(g) => g,
                     Err(poisoned) => poisoned.into_inner(),
                 };
@@ -397,7 +399,7 @@ impl<I: time::Instant> Session<I> {
             }
             // Reset on drop even if the future panics
             let _reset_on_drop = scopeguard::guard((), |()| {
-                let mut shuttle_guard = match self.task_context_inner.lock() {
+                let mut shuttle_guard = match self.task_context_inner.write() {
                     Ok(g) => g,
                     Err(poisoned) => poisoned.into_inner(),
                 };
@@ -817,7 +819,7 @@ impl<I: time::Instant> SessionBuilder<I> {
             })),
             input_processor,
             main_task: None,
-            task_context_inner: Arc::new(Mutex::new(None)),
+            task_context_inner: Arc::new(RwLock::new(None)),
             paused,
             control_channel: control_recv,
             control_channel_sender: control_send,
@@ -1080,7 +1082,7 @@ enum Event {
 
 /// Given to the task of a [`Session::set_main_task()`] to allow manipulating the session.
 pub struct MainTaskContext {
-    shuttle: Arc<Mutex<Option<Box<Shuttle>>>>,
+    shuttle: Arc<RwLock<Option<Box<Shuttle>>>>,
     session_event_notifier: Weak<listen::Notifier<Event>>,
 }
 
@@ -1094,7 +1096,7 @@ impl MainTaskContext {
     /// Returns a [`StandardCameras`] which may be used in rendering a view of this session,
     /// including following changes to the current character or universe.
     pub fn create_cameras(&self, viewport_source: ListenableSource<Viewport>) -> StandardCameras {
-        self.with(|shuttle| {
+        self.with_ref(|shuttle| {
             StandardCameras::new(
                 shuttle.graphics_options.as_source(),
                 viewport_source,
@@ -1106,7 +1108,7 @@ impl MainTaskContext {
 
     /// Provides a reference to the current game universe of this session.
     pub fn with_universe<R>(&self, f: impl FnOnce(&Universe) -> R) -> R {
-        self.with(|shuttle| f(&shuttle.game_universe))
+        self.with_ref(|shuttle| f(&shuttle.game_universe))
     }
 
     /// Replaces the game universe, such as for initial setup or because the player
@@ -1115,7 +1117,7 @@ impl MainTaskContext {
     ///
     /// Panics if called while the main task is suspended.
     pub fn set_universe(&self, universe: Universe) {
-        self.with(|shuttle| {
+        self.with_mut(|shuttle| {
             shuttle.set_universe(universe);
         })
     }
@@ -1132,7 +1134,7 @@ impl MainTaskContext {
     /// any reason. If it is successful, the future never resolves. It is not necessary to poll
     /// the future if the result value is not wanted.
     pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static {
-        self.with(|shuttle| shuttle.quit())
+        self.with_ref(|shuttle| shuttle.quit())
     }
 
     /// Display a dialog box with a message. The user can exit the dialog box to return
@@ -1149,7 +1151,7 @@ impl MainTaskContext {
     // the main task with VUI pages, so that the main task can pop messages at opportune
     // times.
     pub fn show_modal_message(&self, message: ArcStr) {
-        self.with(|shuttle| {
+        self.with_ref(|shuttle| {
             shuttle
                 .control_channel_sender
                 .send(ControlMessage::ShowModal(message))
@@ -1166,7 +1168,7 @@ impl MainTaskContext {
     ///
     /// Panics if called while the main task is suspended.
     pub async fn yield_to_step(&self) {
-        self.with(|_| {});
+        self.with_ref(|_| {});
         let notifier = self
             .session_event_notifier
             .upgrade()
@@ -1179,10 +1181,26 @@ impl MainTaskContext {
     }
 
     #[track_caller]
-    fn with<R>(&self, f: impl FnOnce(&mut Shuttle) -> R) -> R {
-        f(self.shuttle.try_lock().unwrap().as_mut().expect(
-            "MainTaskContext operations may not be called while the main task is not executing",
-        ))
+    fn with_ref<R>(&self, f: impl FnOnce(&Shuttle) -> R) -> R {
+        f(self
+            .shuttle
+            .try_read()
+            .expect("MainTaskContext read and write operations may not be mixed")
+            .as_ref()
+            .expect(
+                "MainTaskContext operations may not be called while the main task is not executing",
+            ))
+    }
+    #[track_caller]
+    fn with_mut<R>(&self, f: impl FnOnce(&mut Shuttle) -> R) -> R {
+        f(self
+            .shuttle
+            .try_write()
+            .expect("MainTaskContext read and write operations may not be mixed")
+            .as_mut()
+            .expect(
+                "MainTaskContext operations may not be called while the main task is not executing",
+            ))
     }
 }
 
