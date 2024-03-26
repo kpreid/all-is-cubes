@@ -831,6 +831,7 @@ impl fmt::Debug for CubeFace {
 impl Geometry for CubeFace {
     type Coord = GridCoordinate;
 
+    #[inline]
     fn translate(mut self, offset: GridVector) -> Self {
         self.cube += offset;
         self

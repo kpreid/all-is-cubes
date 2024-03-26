@@ -105,6 +105,7 @@ impl Ray {
 impl Geometry for Ray {
     type Coord = FreeCoordinate;
 
+    #[inline]
     fn translate(self, offset: FreeVector) -> Self {
         Self {
             origin: self.origin + offset,
