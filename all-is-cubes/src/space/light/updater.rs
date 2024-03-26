@@ -728,19 +728,16 @@ impl LightBuffer {
             ray_state.alpha = 0.0;
 
             // Diagnostics. TODO: Track transparency too.
-            D::push_ray(
-                info,
-                LightUpdateRayInfo {
-                    ray: Ray {
-                        origin: ray_state.translated_ray.origin,
-                        direction: hit.intersection_point(ray_state.translated_ray)
-                            - ray_state.translated_ray.origin,
-                    },
-                    trigger_cube: hit.cube_ahead(),
-                    value_cube: light_cube,
-                    value: stored_light,
+            D::push_ray(info, || LightUpdateRayInfo {
+                ray: Ray {
+                    origin: ray_state.translated_ray.origin,
+                    direction: hit.intersection_point(ray_state.translated_ray)
+                        - ray_state.translated_ray.origin,
                 },
-            );
+                trigger_cube: hit.cube_ahead(),
+                value_cube: light_cube,
+                value: stored_light,
+            });
         } else {
             // Block is partly transparent and light should pass through.
             let light_cube = hit.cube_ahead();

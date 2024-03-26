@@ -16,7 +16,7 @@ use crate::util::MapExtend;
 pub trait LightComputeOutput {
     type RayInfoBuffer: Default;
     fn new(cube: Cube, result: PackedLight, rays: Self::RayInfoBuffer) -> Self;
-    fn push_ray(buffer: &mut Self::RayInfoBuffer, ray_info: LightUpdateRayInfo);
+    fn push_ray(buffer: &mut Self::RayInfoBuffer, ray_info: impl FnOnce() -> LightUpdateRayInfo);
 }
 
 impl LightComputeOutput for () {
@@ -24,7 +24,7 @@ impl LightComputeOutput for () {
     #[inline(always)]
     fn new(_: Cube, _: PackedLight, (): Self::RayInfoBuffer) {}
     #[inline(always)]
-    fn push_ray((): &mut Self::RayInfoBuffer, _: LightUpdateRayInfo) {}
+    fn push_ray((): &mut Self::RayInfoBuffer, _: impl FnOnce() -> LightUpdateRayInfo) {}
 }
 
 impl LightComputeOutput for LightUpdateCubeInfo {
@@ -32,8 +32,8 @@ impl LightComputeOutput for LightUpdateCubeInfo {
     fn new(cube: Cube, result: PackedLight, rays: Self::RayInfoBuffer) -> Self {
         Self { cube, result, rays }
     }
-    fn push_ray(buffer: &mut Self::RayInfoBuffer, ray_info: LightUpdateRayInfo) {
-        buffer.push(ray_info)
+    fn push_ray(buffer: &mut Self::RayInfoBuffer, ray_info: impl FnOnce() -> LightUpdateRayInfo) {
+        buffer.push(ray_info())
     }
 }
 
