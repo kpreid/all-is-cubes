@@ -15,9 +15,10 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use super::debug::LightComputeOutput;
 use crate::block::{self, EvaluatedBlock};
 use crate::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, Geometry, NotNan, OpacityCategory, Rgb, VectorOps, Vol,
+    Cube, CubeFace, Face6, FaceMap, FreeCoordinate, Geometry, NotNan, OpacityCategory, Rgb,
+    VectorOps, Vol,
 };
-use crate::raycast::{Ray, RaycastStep};
+use crate::raycast::Ray;
 use crate::space::light::{LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority};
 use crate::space::palette::Palette;
 use crate::space::{
@@ -31,6 +32,26 @@ use crate::util::StatusText;
 struct LightRayData {
     ray: Ray,
     face_cosines: FaceMap<f32>,
+}
+
+/// Derived from [`LightRayData`], but with a pre-calculated sequence of cubes instead of a ray
+///  for maximum performance in the lighting calculation.
+#[derive(Debug)]
+struct LightRayCubes {
+    /// For diagnostics only
+    ray: Ray,
+    relative_cube_sequence: Vec<LightRayStep>,
+    face_cosines: FaceMap<f32>,
+}
+
+/// A raycast step pre-adapted.
+#[derive(Debug)]
+struct LightRayStep {
+    /// Cube we just hit.
+    relative_cube_face: CubeFace,
+    /// Ray segment from the origin to the point where it struck the cube.
+    /// Used only for diagnostic purposes ("where did the rays go?").
+    relative_ray_to_here: Ray,
 }
 
 // Build script generates the declaration:
@@ -66,6 +87,9 @@ pub(crate) struct LightStorage {
 
     pub(in crate::space) sky: Sky,
     pub(in crate::space) block_sky: BlockSky,
+
+    /// Pre-computed table of what adjacent blocks need to be consulted to update light.
+    propagation_table: Vec<LightRayCubes>,
 }
 
 /// Methods on Space that specifically implement the lighting algorithm.
@@ -83,6 +107,7 @@ impl LightStorage {
             physics: physics.light.clone(),
             sky: physics.sky.clone(),
             block_sky: physics.sky.for_blocks(),
+            propagation_table: calculate_propagation_table(&physics.light),
         }
     }
 
@@ -102,6 +127,7 @@ impl LightStorage {
             self.contents = self
                 .physics
                 .initialize_lighting(uc.contents.without_elements(), opacity);
+            self.propagation_table = calculate_propagation_table(&self.physics);
 
             match self.physics {
                 LightPhysics::None => {
@@ -361,13 +387,6 @@ impl LightStorage {
     where
         D: LightComputeOutput,
     {
-        let maximum_distance = match self.physics {
-            LightPhysics::None => {
-                panic!("Light is disabled; should not reach here");
-            }
-            LightPhysics::Rays { maximum_distance } => FreeCoordinate::from(maximum_distance),
-        };
-
         let mut cube_buffer = LightBuffer::new();
         let mut info_rays = D::RayInfoBuffer::default();
 
@@ -383,8 +402,12 @@ impl LightStorage {
                 FaceMap::from_fn(|face| uc.get_evaluated(cube + face.normal_vector()));
             let direction_weights = directions_to_seek_light(ev_origin, ev_neighbors);
 
-            // TODO: Choose a ray pattern that suits the maximum_distance.
-            for &LightRayData { ray, face_cosines } in LIGHT_RAYS {
+            for &LightRayCubes {
+                ray,
+                ref relative_cube_sequence,
+                face_cosines,
+            } in self.propagation_table.iter()
+            {
                 // TODO: Theoretically we should weight light rays by the cosine but that has caused poor behavior in the past.
                 let ray_weight_by_faces = face_cosines
                     .zip(direction_weights, |_face, ray_cosine, reflects| {
@@ -396,21 +419,19 @@ impl LightStorage {
                     continue;
                 }
                 let mut ray_state = LightRayState::new(cube, ray, ray_weight_by_faces);
-                let raycaster = ray_state
-                    .translated_ray
-                    .cast()
-                    .within(self.contents.bounds());
 
                 // Stores the light value that might have been fetched, if it was, from the previous
                 // step's cube_ahead, which is the current step's cube_behind.
                 let mut light_behind_cache: Option<PackedLight> = None;
 
-                'raycast: for hit in raycaster {
+                'raycast: for step in relative_cube_sequence {
+                    let cube_face = step
+                        .relative_cube_face
+                        .translate(cube.lower_bounds().to_vector());
+
                     cube_buffer.cost += 1;
-                    if hit.t_distance() > maximum_distance {
-                        // Rays that didn't hit anything close enough will be treated
-                        // as sky. TODO: We should have a better policy in case of large
-                        // indoor spaces.
+                    if !self.contents.bounds().contains_cube(cube_face.cube) {
+                        // Stop (and display the sky) if we exit the space bounds.
                         break 'raycast;
                     }
 
@@ -419,8 +440,10 @@ impl LightStorage {
                         &mut ray_state,
                         &mut info_rays,
                         self,
-                        hit,
-                        uc.get_evaluated(hit.cube_ahead()),
+                        step.relative_cube_face
+                            .translate(cube.lower_bounds().to_vector()),
+                        step.relative_ray_to_here,
+                        uc.get_evaluated(cube_face.cube),
                         &mut light_ahead_cache,
                         light_behind_cache,
                     );
@@ -430,6 +453,9 @@ impl LightStorage {
 
                     light_behind_cache = light_ahead_cache;
                 }
+                // Rays that didn't hit anything close enough will be treated
+                // as sky. TODO: We should have a better policy in case of large
+                // indoor spaces.
                 cube_buffer.end_of_ray(&ray_state, &self.sky);
             }
         }
@@ -521,6 +547,34 @@ impl LightStorage {
         // TODO: validate light update queue
         // - consistency with space bounds
         // - contains all cubes with LightStatus::UNINIT
+    }
+}
+
+fn calculate_propagation_table(physics: &LightPhysics) -> Vec<LightRayCubes> {
+    match *physics {
+        LightPhysics::None => vec![],
+        // TODO: Instead of having a constant ray pattern, choose one that suits the maximum_distance.
+        LightPhysics::Rays { maximum_distance } => {
+            let maximum_distance = f64::from(maximum_distance);
+            LIGHT_RAYS
+                .iter()
+                .map(|&LightRayData { ray, face_cosines }| LightRayCubes {
+                    relative_cube_sequence: ray
+                        .cast()
+                        .take_while(|step| step.t_distance() <= maximum_distance)
+                        .map(|step| LightRayStep {
+                            relative_cube_face: step.cube_face(),
+                            relative_ray_to_here: Ray {
+                                origin: ray.origin,
+                                direction: step.intersection_point(ray) - ray.origin,
+                            },
+                        })
+                        .collect(),
+                    ray,
+                    face_cosines,
+                })
+                .collect()
+        }
     }
 }
 
@@ -678,7 +732,8 @@ impl LightBuffer {
         ray_state: &mut LightRayState,
         info: &mut D::RayInfoBuffer,
         current_light: &LightStorage,
-        hit: RaycastStep,
+        hit: CubeFace,
+        relative_ray_to_here: Ray,
         ev_hit: &EvaluatedBlock,
         light_ahead_cache: &mut Option<PackedLight>,
         light_behind_cache: Option<PackedLight>,
@@ -694,7 +749,7 @@ impl LightBuffer {
         // TODO: Also count the opacity of the face we *exited* of the previous block,
         let hit_opaque_face = {
             let hit_opaque = ev_hit.opaque;
-            match Face6::try_from(hit.face()) {
+            match Face6::try_from(hit.face) {
                 Ok(face) => hit_opaque[face],
                 Err(_) => hit_opaque == FaceMap::repeat(true),
             }
@@ -703,8 +758,8 @@ impl LightBuffer {
         if hit_opaque_face {
             // On striking a fully opaque block face, we use the light value from its
             // adjacent cube as the light falling on that face.
-            let light_cube = hit.cube_behind();
-            if light_cube == hit.cube_ahead() {
+            let light_cube = hit.adjacent();
+            if light_cube == hit.cube {
                 // Don't read the value we're trying to recalculate.
                 // (And we hit an opaque block, so this ray is stopping.)
 
@@ -716,7 +771,7 @@ impl LightBuffer {
             }
             let stored_light = light_behind_cache.unwrap_or_else(|| current_light.get(light_cube));
 
-            let surface_color = ev_hit.face7_color(hit.face()).clamp().to_rgb();
+            let surface_color = ev_hit.face7_color(hit.face).clamp().to_rgb();
             let light_from_struck_face =
                 ev_hit.light_emission + stored_light.value() * surface_color;
             self.incoming_light +=
@@ -729,18 +784,15 @@ impl LightBuffer {
 
             // Diagnostics. TODO: Track transparency too.
             D::push_ray(info, || LightUpdateRayInfo {
-                ray: Ray {
-                    origin: ray_state.translated_ray.origin,
-                    direction: hit.intersection_point(ray_state.translated_ray)
-                        - ray_state.translated_ray.origin,
-                },
-                trigger_cube: hit.cube_ahead(),
+                ray: relative_ray_to_here
+                    .translate(ray_state.origin_cube.lower_bounds().to_vector().to_f64()),
+                trigger_cube: hit.cube,
                 value_cube: light_cube,
                 value: stored_light,
             });
         } else {
             // Block is partly transparent and light should pass through.
-            let light_cube = hit.cube_ahead();
+            let light_cube = hit.cube;
 
             let stored_light = if light_cube == ray_state.origin_cube {
                 // Don't read the value we're trying to recalculate.
@@ -755,7 +807,7 @@ impl LightBuffer {
             // The block evaluation algorithm incidentally computes a suitable
             // approximation as an alpha value.
             let coverage = ev_hit
-                .face7_color(hit.face())
+                .face7_color(hit.face)
                 .alpha()
                 .into_inner()
                 .clamp(0.0, 1.0);
@@ -766,11 +818,11 @@ impl LightBuffer {
             self.cost += 10;
             ray_state.alpha *= 1.0 - coverage;
 
-            self.dependencies.push(hit.cube_ahead());
-            // We did not read hit.cube_behind(), but we want to trigger its updates
+            self.dependencies.push(hit.cube);
+            // We did not read hit.adjacent(), but we want to trigger its updates
             // anyway, because otherwise, transparent blocks' neighbors will *never*
             // get their light updated except when the block is initially placed.
-            self.dependencies.push(hit.cube_behind());
+            self.dependencies.push(hit.adjacent());
         }
     }
 
