@@ -179,6 +179,7 @@ impl PackedLight {
         difference
     }
 
+    #[inline(always)]
     fn scalar_in(value: NotNan<f32>) -> PackedLightScalar {
         // Note that `as` is a saturating cast.
         (value.log2() * Self::LOG_SCALE + Self::LOG_OFFSET) as PackedLightScalar
@@ -186,6 +187,7 @@ impl PackedLight {
 
     /// Convert a `PackedLightScalar` value to a linear color component value.
     /// This function is guaranteed (and tested) to only return finite floats.
+    #[inline(always)]
     fn scalar_out(value: PackedLightScalar) -> f32 {
         // Special representation to ensure we don't "round" zero up to a small nonzero value.
         if value == 0 {
@@ -195,6 +197,7 @@ impl PackedLight {
         }
     }
 
+    #[inline(always)]
     fn scalar_out_nn(value: PackedLightScalar) -> NotNan<f32> {
         // Safety: a test verifies that `scalar_out` can never return NaN.
         unsafe { NotNan::new_unchecked(Self::scalar_out(value)) }
