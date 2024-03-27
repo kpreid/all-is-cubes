@@ -164,14 +164,12 @@ fn light_source_self_illumination_transparent() {
     let light = Rgb::new(0.5, 1.0, 2.0);
     let alpha = 0.125;
     let block = Block::builder()
-        .color(Rgba::new(1.0, 0.0, 0.0, alpha)) // irrelevant except for alpha
+        .color(Rgba::new(1.0, 0.0, 0.0, alpha)) // irrelevant except maybe for alpha
         .light_emission(light)
         .build();
 
     let space = light_source_test_space(block);
-    // TODO: Arguably the coverage/alpha shouldn't affect light emission.
-    // Perhaps we should multiply the emission value by the coverage.
-    assert_eq!(space.get_lighting([1, 1, 1]).value(), light * alpha);
+    assert_eq!(space.get_lighting([1, 1, 1]), light.into());
 }
 
 #[test]

@@ -825,8 +825,10 @@ impl LightBuffer {
                 .alpha()
                 .into_inner()
                 .clamp(0.0, 1.0);
-            self.incoming_light += (ev_hit.light_emission + stored_light)
-                * coverage
+            // Note that light emission is *not* multiplied by the coverage, because coverage is about
+            // reflection/transmission. It's perfectly okay to have a totally transparent (alpha
+            // equals zero), yet emissive, block.
+            self.incoming_light += (ev_hit.light_emission + stored_light * coverage)
                 * ray_state.alpha
                 * ray_state.ray_weight_by_faces;
             self.cost += 10;
