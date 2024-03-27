@@ -9,6 +9,8 @@ pub use debug::{LightComputeOutput, LightUpdateCubeInfo, LightUpdateRayInfo};
 mod queue;
 pub(crate) use queue::{LightUpdateQueue, LightUpdateRequest, Priority};
 
+mod rays;
+
 mod updater;
 pub use updater::LightUpdatesInfo;
 pub(in crate::space) use updater::{ComputedLight, LightStorage, UpdateCtx};

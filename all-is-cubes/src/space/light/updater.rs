@@ -6,7 +6,6 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::{fmt, mem};
 
-use euclid::{Point3D, Vector3D};
 use manyfmt::Fmt;
 
 #[cfg(feature = "threads")]
@@ -19,7 +18,9 @@ use crate::math::{
     Rgba, VectorOps, Vol,
 };
 use crate::raycast::Ray;
-use crate::space::light::{LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority};
+use crate::space::light::{
+    rays, LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority,
+};
 use crate::space::palette::Palette;
 use crate::space::{
     BlockIndex, BlockSky, ChangeBuffer, GridAab, LightPhysics, LightStatus, PackedLight,
@@ -27,36 +28,6 @@ use crate::space::{
 };
 use crate::time::{Duration, Instant};
 use crate::util::StatusText;
-
-#[derive(Debug)]
-struct LightRayData {
-    ray: Ray,
-    face_cosines: FaceMap<f32>,
-}
-
-/// Derived from [`LightRayData`], but with a pre-calculated sequence of cubes instead of a ray
-///  for maximum performance in the lighting calculation.
-#[derive(Debug)]
-struct LightRayCubes {
-    /// For diagnostics only
-    ray: Ray,
-    relative_cube_sequence: Vec<LightRayStep>,
-    face_cosines: FaceMap<f32>,
-}
-
-/// A raycast step pre-adapted.
-#[derive(Debug)]
-struct LightRayStep {
-    /// Cube we just hit.
-    relative_cube_face: CubeFace,
-    /// Ray segment from the origin to the point where it struck the cube.
-    /// Used only for diagnostic purposes ("where did the rays go?").
-    relative_ray_to_here: Ray,
-}
-
-// Build script generates the declaration:
-// static LIGHT_RAYS: &[LightRayData] = &[...
-include!(concat!(env!("OUT_DIR"), "/light_ray_pattern.rs"));
 
 /// Storage and update queue for a [`Space`]'s light.
 ///
@@ -89,7 +60,7 @@ pub(crate) struct LightStorage {
     pub(in crate::space) block_sky: BlockSky,
 
     /// Pre-computed table of what adjacent blocks need to be consulted to update light.
-    propagation_table: Vec<LightRayCubes>,
+    propagation_table: Vec<rays::LightRayCubes>,
 }
 
 /// Methods on Space that specifically implement the lighting algorithm.
@@ -107,7 +78,7 @@ impl LightStorage {
             physics: physics.light.clone(),
             sky: physics.sky.clone(),
             block_sky: physics.sky.for_blocks(),
-            propagation_table: calculate_propagation_table(&physics.light),
+            propagation_table: rays::calculate_propagation_table(&physics.light),
         }
     }
 
@@ -127,7 +98,7 @@ impl LightStorage {
             self.contents = self
                 .physics
                 .initialize_lighting(uc.contents.without_elements(), opacity);
-            self.propagation_table = calculate_propagation_table(&self.physics);
+            self.propagation_table = rays::calculate_propagation_table(&self.physics);
 
             match self.physics {
                 LightPhysics::None => {
@@ -416,7 +387,7 @@ impl LightStorage {
                 FaceMap::from_fn(|face| uc.get_evaluated(cube + face.normal_vector()));
             let direction_weights = directions_to_seek_light(ev_origin, ev_neighbors);
 
-            for &LightRayCubes {
+            for &rays::LightRayCubes {
                 ray,
                 ref relative_cube_sequence,
                 face_cosines,
@@ -561,34 +532,6 @@ impl LightStorage {
         // TODO: validate light update queue
         // - consistency with space bounds
         // - contains all cubes with LightStatus::UNINIT
-    }
-}
-
-fn calculate_propagation_table(physics: &LightPhysics) -> Vec<LightRayCubes> {
-    match *physics {
-        LightPhysics::None => vec![],
-        // TODO: Instead of having a constant ray pattern, choose one that suits the maximum_distance.
-        LightPhysics::Rays { maximum_distance } => {
-            let maximum_distance = f64::from(maximum_distance);
-            LIGHT_RAYS
-                .iter()
-                .map(|&LightRayData { ray, face_cosines }| LightRayCubes {
-                    relative_cube_sequence: ray
-                        .cast()
-                        .take_while(|step| step.t_distance() <= maximum_distance)
-                        .map(|step| LightRayStep {
-                            relative_cube_face: step.cube_face(),
-                            relative_ray_to_here: Ray {
-                                origin: ray.origin,
-                                direction: step.intersection_point(ray) - ray.origin,
-                            },
-                        })
-                        .collect(),
-                    ray,
-                    face_cosines,
-                })
-                .collect()
-        }
     }
 }
 
