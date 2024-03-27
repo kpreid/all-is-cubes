@@ -10,7 +10,7 @@ use euclid::{Point3D, Vector3D};
 use manyfmt::Fmt;
 
 #[cfg(feature = "threads")]
-use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
+use rayon::iter::{IntoParallelRefMutIterator as _, ParallelIterator as _};
 
 use super::debug::LightComputeOutput;
 use crate::block::{self, EvaluatedBlock};
@@ -241,17 +241,31 @@ impl LightStorage {
             // so it can be consulted by the calculation.
             #[cfg(feature = "threads")]
             while self.light_update_queue.len() > 0 {
+                use core::array::from_fn;
+
+                enum Calc {
+                    None,
+                    In(LightUpdateRequest),
+                    Out(ComputedLight<()>),
+                }
+
                 // TODO: empirical tuning suggests that 128 is a good minimum batch size,
                 // but is too big for the amount of time we want to take
-                let some_updates: [Option<LightUpdateRequest>; 32] =
-                    [None::<LightUpdateRequest>; 32].map(|_| self.light_update_queue.pop());
-                let outputs = some_updates
-                    .as_slice()
-                    .into_par_iter()
-                    .flatten()
-                    .map(|&LightUpdateRequest { cube, .. }| self.compute_lighting(uc, cube))
-                    .collect::<Vec<ComputedLight<()>>>();
-                for output in outputs {
+                let mut data: [Calc; 32] =
+                    from_fn(|_| self.light_update_queue.pop().map_or(Calc::None, Calc::In));
+
+                data.par_iter_mut().for_each(|calc| {
+                    if let Calc::In(LightUpdateRequest { cube, .. }) = *calc {
+                        *calc = Calc::Out(self.compute_lighting(uc, cube));
+                    }
+                });
+                for calc in data {
+                    let output = match calc {
+                        Calc::None => continue,
+                        Calc::In(_) => unreachable!(),
+                        Calc::Out(output) => output,
+                    };
+
                     if false {
                         // Log cubes that were updated for debug visualization.
                         self.last_light_updates.push(output.cube);
