@@ -170,7 +170,7 @@ pub(crate) struct FramebufferTextures {
     linear_scene_view: wgpu::TextureView,
 
     /// If multisampling is enabled, provides the “resolve target” companion to
-    /// `linear_scene_texture`. This texture has a sample_count of 1, is
+    /// `linear_scene_texture`. This texture has a `sample_count` of 1, is
     /// automatically written to when we do multisampled rendering, and is the *input*
     /// to postprocessing. If multisampling is not enabled, we use the
     /// `linear_scene_texture` directly as input to postprocessing.

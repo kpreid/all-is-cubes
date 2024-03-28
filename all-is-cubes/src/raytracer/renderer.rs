@@ -309,7 +309,7 @@ impl HeadlessRenderer for RtRenderer<()> {
 /// Obtain this by calling [`RtRenderer::scene()`].
 pub struct RtScene<'a, P: Accumulate> {
     rts: Layers<Option<&'a SpaceRaytracer<P::BlockData>>>,
-    /// Cameras *with* size_policy applied.
+    /// Cameras *with* `size_policy` applied.
     cameras: Layers<Camera>,
     options: RtOptionsRef<'a, <P::BlockData as RtBlockData>::Options>,
 }

@@ -82,7 +82,7 @@ pub struct StandardCameras {
     character_dirty: DirtyFlag,
     character: Option<Handle<Character>>,
     /// Cached and listenable version of character's space.
-    /// TODO: This should be in a Layers along with ui_state...?
+    /// TODO: This should be in a `Layers` along with `ui_state`...?
     world_space: ListenableCell<Option<Handle<Space>>>,
 
     ui_source: ListenableSource<UiViewState>,

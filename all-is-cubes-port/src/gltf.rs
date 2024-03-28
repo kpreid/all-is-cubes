@@ -98,7 +98,7 @@ pub struct GltfWriter {
     frame_states: Vec<FrameState>,
 
     /// Every mesh appearing anywhere in `frame_states`.
-    /// Using BTreeSet for stable ordering.
+    /// Using [`BTreeSet`] for stable ordering.
     any_time_visible_mesh_instances: BTreeSet<MeshInstance>,
 
     /// All flaws encountered so far.

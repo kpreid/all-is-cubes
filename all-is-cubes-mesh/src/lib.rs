@@ -70,7 +70,7 @@ mod tests;
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct MeshOptions {
-    /// Input to TransparencyOption::limit_alpha.
+    /// Input to [`TransparencyOption::limit_alpha()`].
     transparency: TransparencyOption,
 
     /// Ignore blocks' [`voxels`] data and use only the overall color.

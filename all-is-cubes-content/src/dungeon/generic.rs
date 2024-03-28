@@ -15,7 +15,7 @@ pub struct DungeonGrid {
     /// Thickness of each wall of the room, located outside of `room_box` but still
     /// belonging to that room and not its neighbors.
     ///
-    /// TODO: FaceMap is a _possible_ representation but not the _most robust_ and we
+    /// TODO: `FaceMap` is a _possible_ representation but not the _most robust_ and we
     /// should instead make this a `GridAab` and add a `GridAab::minkowski_sum` method.
     pub room_wall_thickness: FaceMap<u16>,
     /// Thickness of the space lying between each pair of rooms, belonging to neither.
@@ -101,8 +101,6 @@ impl DungeonGrid {
 }
 
 pub trait Theme<R> {
-    fn grid(&self) -> &DungeonGrid;
-
     fn passes(&self) -> usize;
 
     // TODO: Replace `&mut Space` with transactions so we can use this post-startup?

@@ -16,7 +16,7 @@ pub struct ListenableSource<T> {
     storage: Arc<ListenableCellStorage<T>>,
 }
 struct ListenableCellStorage<T> {
-    /// Mutex because it's mutable; Arc because we want to be able to clone out of it to
+    /// `Mutex` because it's mutable; `Arc` because we want to be able to clone out of it to
     /// avoid holding the cell borrowed.
     /// TODO: Look into strategies to make this cheaper?
     cell: Mutex<Arc<T>>,
@@ -25,7 +25,7 @@ struct ListenableCellStorage<T> {
     /// `None` if this is a constant cell.
     ///
     /// TODO: Add ability to diff the value and distribute that.
-    /// TODO: If the ListenableCell is dropped, drop this.
+    /// TODO: If the `ListenableCell` is dropped, drop this.
     notifier: Option<Notifier<()>>,
 }
 

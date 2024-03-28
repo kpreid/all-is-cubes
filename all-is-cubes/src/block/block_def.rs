@@ -384,7 +384,7 @@ impl transaction::Merge for BlockDefTransaction {
 pub struct BlockDefConflict {
     /// The transactions have conflicting preconditions (`old` blocks).
     pub(crate) old: bool,
-    /// The transactions are attempting to replace the same BlockDef with different blocks.
+    /// The transactions are attempting to replace the existing block with different `new` blocks.
     pub(crate) new: bool,
 }
 

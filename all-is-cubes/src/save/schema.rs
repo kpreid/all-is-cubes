@@ -195,11 +195,11 @@ pub(crate) enum ModifierSer<'a> {
         distance: u16,
         velocity: i16,
     },
-    /// This is called "BlockInventory" rather than "Inventory" so that the
+    /// This is called "`BlockInventory`" rather than "`Inventory`" so that the
     /// variant tags are unique across the entire schema, which might be useful
     /// for future compatibility or other applications accessing the data.
     BlockInventoryV1 {
-        inventory: Cow<'a, crate::inv::Inventory>,
+        inventory: Cow<'a, inv::Inventory>,
     },
 }
 

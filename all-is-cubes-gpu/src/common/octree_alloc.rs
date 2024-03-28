@@ -161,7 +161,7 @@ enum AlloctreeNode {
     /// the remaining space.
     Full,
 
-    /// Subdivided into parts with size_exponent decremented by one.
+    /// Subdivided into parts with `size_exponent` decremented by one.
     Oct(Box<[AlloctreeNode; 8]>),
 }
 

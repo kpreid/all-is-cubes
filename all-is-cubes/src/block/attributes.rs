@@ -400,7 +400,7 @@ impl ops::BitOr for AnimationChange {
 pub struct TickAction {
     /// Operation to perform on the schedule.
     pub operation: Operation,
-    /// Period, relative to the universe's [`TickSchedule`]`'s tick length, with which
+    /// Period, relative to the universe's [`TickSchedule`]'s tick length, with which
     /// to perform this action.
     ///
     /// For example, if this is `1`, then it will be executed on every tick.

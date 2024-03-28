@@ -204,8 +204,8 @@ pub struct Raycaster {
     /// Which way to increment `cube` when stepping; signum of `direction`.
     step: Vector3D<GridCoordinate, Cube>,
 
-    /// t_max stores the t-value at which we would next cross a cube boundary,
-    /// for each axis in which we could move. Thus, the least element of t_max
+    /// `t_max` stores the t-value at which we would next cross a cube boundary,
+    /// for each axis in which we could move. Thus, the least element of `t_max`
     /// is the next intersection between the grid and the ray.
     t_max: Vector3D<FreeCoordinate, Tc>,
 
@@ -216,8 +216,8 @@ pub struct Raycaster {
     /// Last face we passed through.
     last_face: Face7,
 
-    /// The t_max value used in the previous step; thus, the position along the
-    /// ray where we passed through last_face.
+    /// The `t_max` value used in the previous step; thus, the position along the
+    /// ray where we passed through `last_face`.
     last_t_distance: FreeCoordinate,
 
     /// Bounds to filter our outputs to within. This makes the iteration finite.

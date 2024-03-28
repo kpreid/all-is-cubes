@@ -82,7 +82,7 @@ pub struct Space {
 
     spawn: Spawn,
 
-    /// Cubes that should be checked on the next call to step()
+    /// Cubes that should be checked for `tick_action`s on the next call to [`Self::step()`].
     cubes_wanting_ticks: HbHashSet<Cube>,
 
     /// Notifier of changes to Space data.

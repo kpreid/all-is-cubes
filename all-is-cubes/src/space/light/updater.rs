@@ -616,13 +616,13 @@ fn directions_to_seek_light(
 #[derive(Debug)]
 struct LightBuffer {
     /// Accumulator of incoming light encountered.
-    /// TODO: Make this a vector of f32 to save NaN checks?
+    /// TODO: Make this a vector of `f32` to save NaN checks?
     incoming_light: Rgb,
-    /// Number of rays contributing to incoming_light.
+    /// Number of rays contributing to `incoming_light`.
     total_rays: usize,
     /// Number of rays, weighted by the ray angle versus local cube faces.
     total_ray_weight: f32,
-    /// Cubes whose lighting value contributed to the incoming_light value.
+    /// Cubes whose lighting value contributed to the `incoming_light` value.
     dependencies: Vec<Cube>,
     /// Approximation of CPU cost of doing the calculation, with one unit defined as
     /// one raycast step.

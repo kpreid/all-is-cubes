@@ -222,10 +222,6 @@ impl DemoTheme {
 }
 
 impl Theme<Option<DemoRoom>> for DemoTheme {
-    fn grid(&self) -> &DungeonGrid {
-        &self.dungeon_grid
-    }
-
     fn passes(&self) -> usize {
         2
     }

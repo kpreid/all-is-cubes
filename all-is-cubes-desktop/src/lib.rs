@@ -66,7 +66,7 @@ pub fn inner_main<Ren: glue::Renderer, Win: glue::Window>(
         task_done_signal,
     } = params;
 
-    let executor = crate::Executor::new(runtime.handle().clone());
+    let executor = Executor::new(runtime.handle().clone());
 
     // At this point we have just finished whatever the GraphicsType did before calling
     // inner_main().

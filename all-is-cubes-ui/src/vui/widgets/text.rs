@@ -26,7 +26,7 @@ pub struct LargeText {
     /// Text to be displayed.
     pub text: ArcStr,
     /// Font with which to draw the text.
-    pub font: all_is_cubes::block::text::Font,
+    pub font: text::Font,
     /// Brush with which to draw the text.
     pub brush: VoxelBrush<'static>,
     /// Text positioning within the bounds of the widget.

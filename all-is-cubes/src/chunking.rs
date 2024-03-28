@@ -161,7 +161,7 @@ pub struct ChunkChart<const CHUNK_SIZE: GridCoordinate> {
     /// squared, in multiples of a whole chunk.
     view_distance_in_squared_chunks: GridCoordinate,
 
-    /// One octant of chunk positions (scaled down by CHUNK_SIZE) sorted by distance.
+    /// One octant of chunk positions (scaled down by `CHUNK_SIZE`) sorted by distance.
     /// (It could be further reduced to a 64th by mirroring across the diagonal,
     /// but then the indexing gets more complicated.)
     ///

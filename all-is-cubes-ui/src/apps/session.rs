@@ -82,7 +82,7 @@ pub struct Session<I> {
     /// Not sure whether it is a good strategy overall.
     ///
     /// Design note: Using `flume` not because we want MPMC, but because its receiver is
-    /// `Send + Sync`, unlike the `std`` one.
+    /// `Send + Sync`, unlike the `std` one.
     /// Our choice of `flume` in particular is just because our other crates use it.
     control_channel: flume::Receiver<ControlMessage>,
     control_channel_sender: flume::Sender<ControlMessage>,

@@ -56,7 +56,7 @@ const NO_WORLD_SKY: Sky = Sky::Uniform(palette::NO_WORLD_TO_SHOW.to_rgb());
 pub(crate) struct SpaceRenderer<I: time::Instant> {
     space_label: String,
     /// A debugging label for the space's render pass.
-    /// (Derived from constructor's space_label)
+    /// (Derived from constructor's `space_label`)
     render_pass_label: String,
     instance_buffer_label: String,
 
@@ -95,7 +95,7 @@ pub(crate) struct SpaceRenderer<I: time::Instant> {
     particle_sets: Vec<ParticleSet>,
 
     /// Receiver whose sender end is held by a space listener, which feeds new particles into
-    /// [Self::particle_sets].
+    /// [`Self::particle_sets`].
     particle_rx: mpsc::Receiver<ParticleSet>,
 
     #[cfg(feature = "rerun")]

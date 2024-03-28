@@ -31,7 +31,7 @@ use crate::math::{
 pub struct GridAab {
     lower_bounds: GridPoint,
     /// Constructor checks ensure this is non-negative and that adding it
-    /// to lower_bounds will not overflow.
+    /// to `lower_bounds` will not overflow.
     sizes: GridSize,
 }
 

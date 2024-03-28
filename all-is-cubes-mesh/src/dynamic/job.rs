@@ -388,7 +388,7 @@ mod state {
     /// on change or drop.
     pub(super) struct Ticket {
         /// TODO: When we have background chunk meshing too, this will need to become a more general
-        /// "JobId" enum type
+        /// "`JobId`" enum type
         block_index: BlockIndex,
         current_state: State,
         shared: Arc<Counters>,

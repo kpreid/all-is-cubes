@@ -59,7 +59,7 @@ pub(crate) struct Vui {
     /// (changing `state`, etc).
     ///
     /// Design note: Using `flume` not because we want MPMC, but because its receiver is
-    /// `Send + Sync`, unlike the `std`` one.
+    /// `Send + Sync`, unlike the `std` one.
     /// Our choice of `flume` in particular is just because our other crates use it.
     control_channel: flume::Receiver<VuiMessage>,
     character_source: ListenableSource<Option<Handle<Character>>>,

@@ -199,13 +199,13 @@ pub struct Universe {
     /// Next number to assign to a [`Name::Anonym`].
     next_anonym: usize,
 
-    /// Whether to run a garbage collection on the next step().
+    /// Whether to run a garbage collection on the next [`Self::step()`].
     /// This is set to true whenever a new member is inserted, which policy ensures
     /// that repeated insertion and dropping references cannot lead to unbounded growth
     /// as long as steps occur routinely.
     wants_gc: bool,
 
-    /// Where the contents of `self came from, and where they might be able to be written
+    /// Where the contents of `self` came from, and where they might be able to be written
     /// back to.
     ///
     /// For universes created by [`Universe::new()`], this is equal to `Arc::new(())`.
