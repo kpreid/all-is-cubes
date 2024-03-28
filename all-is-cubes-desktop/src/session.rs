@@ -168,6 +168,24 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
             },
         );
     }
+
+    pub(crate) fn into_renderer_and_window(self) -> (DesktopSession<(), ()>, Ren, Win) {
+        (
+            DesktopSession {
+                session: self.session,
+                executor: self.executor,
+                renderer: (),
+                window: (),
+                viewport_cell: self.viewport_cell,
+                clock_source: self.clock_source,
+                audio: self.audio,
+                fixed_title: self.fixed_title,
+                session_info_altered: self.session_info_altered,
+            },
+            self.renderer,
+            self.window,
+        )
+    }
 }
 
 /// Defines the clock for time passing in the simulation managed by a [`DesktopSession`].

@@ -34,8 +34,10 @@ pub struct RecordAnimationOptions {
 pub enum RecordFormat {
     /// PNG and Animated-PNG are the same except for having multiple frames or not.
     PngOrApng,
+
     /// glTF recordings contain a scene with an animated world.
     Gltf,
+
     /// Any [`all_is_cubes_port`] export format may be written via the recording feature.
     Export(all_is_cubes_port::ExportFormat),
 }

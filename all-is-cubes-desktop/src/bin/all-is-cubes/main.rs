@@ -122,6 +122,7 @@ fn main() -> Result<(), anyhow::Error> {
     // Bundle of inputs to `inner_main()`, which — unlike this function — is generic over
     // the kind of window system we're using.
     let (universe_ready_tx, mut universe_ready_rx) = tokio::sync::oneshot::channel();
+    let (task_done_tx, mut task_done_rx) = tokio::sync::oneshot::channel();
     let inner_params = InnerMainParams {
         application_title: title_and_version(),
         runtime,
@@ -131,6 +132,7 @@ fn main() -> Result<(), anyhow::Error> {
         logging: late_logging,
         recording: record_options,
         universe_ready_signal: universe_ready_tx,
+        task_done_signal: task_done_tx,
     };
 
     // The graphics type selects not only the kind of 'window' we create, but also the
@@ -192,6 +194,9 @@ fn main() -> Result<(), anyhow::Error> {
             )
         }
         GraphicsType::Print => {
+            // TODO: Replace having a special mode with this being a kind of record/export running
+            // under the headless main loop. We're not doing that yet because, currently, "renderer"
+            // and "recorder" are handled very differently.
             let dsession = create_terminal_session(
                 executor,
                 session,
@@ -210,7 +215,7 @@ fn main() -> Result<(), anyhow::Error> {
                         dsession.advance_time_and_maybe_step();
                     }
 
-                    terminal_print_once(
+                    let mut dsession = terminal_print_once(
                         dsession,
                         // TODO: Default display size should be based on terminal width
                         // (but not necessarily the full height)
@@ -218,7 +223,16 @@ fn main() -> Result<(), anyhow::Error> {
                             .unwrap_or_else(|| Size2D::new(80, 24))
                             .map(|component| component.min(u16::MAX.into()) as u16)
                             .cast_unit(),
-                    )
+                    )?;
+
+                    // Wait for any other activities to complete.
+                    while let Err(tokio::sync::oneshot::error::TryRecvError::Empty) =
+                        task_done_rx.try_recv()
+                    {
+                        dsession.advance_time_and_maybe_step();
+                    }
+
+                    Ok(())
                 },
                 dsession,
             )

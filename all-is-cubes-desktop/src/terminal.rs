@@ -34,7 +34,7 @@ use ui::{InventoryDisplay, OutMsg, TerminalWindow, UiFrame};
 pub fn terminal_print_once(
     mut dsession: DesktopSession<TerminalRenderer, TerminalWindow>,
     display_size: Size2D<u16, camera::ImagePixel>,
-) -> Result<(), anyhow::Error> {
+) -> Result<DesktopSession<(), ()>, anyhow::Error> {
     let rect = Rect::new(0, 0, display_size.width, display_size.height);
     dsession.window.send(OutMsg::OverrideViewport(rect));
     dsession.window.wait_for_sync();
@@ -50,11 +50,12 @@ pub fn terminal_print_once(
         .expect("Internal error in rendering");
     dsession.window.send(OutMsg::WriteFrameOnly(frame));
 
-    dsession
-        .window
+    let (dsession, _, window) = dsession.into_renderer_and_window();
+
+    window
         .stop()
         .context("failed to stop TerminalWindow after printing")?;
-    Ok(())
+    Ok(dsession)
 }
 
 /// Fills the renderer slot of [`DesktopSession`] for terminal sessions.

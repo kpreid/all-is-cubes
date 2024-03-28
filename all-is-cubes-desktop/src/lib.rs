@@ -18,6 +18,7 @@ use anyhow::Context as _;
 
 use all_is_cubes::camera;
 use all_is_cubes::euclid::{size2, Size2D};
+use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::universe::Universe;
 use all_is_cubes_ui::apps::{ExitMainTask, MainTaskContext};
 
@@ -62,6 +63,7 @@ pub fn inner_main<Ren: glue::Renderer, Win: glue::Window>(
         logging,
         recording,
         universe_ready_signal,
+        task_done_signal,
     } = params;
 
     let executor = crate::Executor::new(runtime.handle().clone());
@@ -96,7 +98,6 @@ pub fn inner_main<Ren: glue::Renderer, Win: glue::Window>(
         record::configure_session_for_recording(&mut dsession, options)
             .context("failed to configure session for recording")?;
     }
-    let viewport_source = dsession.viewport_cell.as_source();
 
     dsession.session.set_main_task(|mut ctx| async move {
         let universe_result: Result<Universe, anyhow::Error> = match universe_future.await {
@@ -119,7 +120,12 @@ pub fn inner_main<Ren: glue::Renderer, Win: glue::Window>(
         _ = universe_ready_signal.send(Ok(()));
 
         if let Some(record_options) = recording {
-            let recording_cameras = ctx.create_cameras(viewport_source.clone());
+            // Note that this does NOT use the session's viewport_cell, so that the recording can
+            // have a consistent, as-requested size, regardless of what other rendering might be
+            // doing. (Of course, the UI will fail to adapt, but there isn't much to do about that.)
+            let recording_cameras =
+                ctx.create_cameras(ListenableSource::constant(record_options.viewport()));
+
             let recorder = ctx.with_universe(|universe| {
                 record::configure_universe_for_recording(
                     universe.get_default_character().as_ref(),
@@ -140,6 +146,8 @@ pub fn inner_main<Ren: glue::Renderer, Win: glue::Window>(
         }
 
         log::trace!("Startup task has completed all activities.");
+
+        _ = task_done_signal.send(());
 
         ExitMainTask
     });
@@ -205,6 +213,8 @@ pub struct InnerMainParams {
     pub recording: Option<record::RecordOptions>,
     /// Will send a message when the `universe_future` completes and its result has been installed.
     pub universe_ready_signal: tokio::sync::oneshot::Sender<Result<(), anyhow::Error>>,
+    /// Will send a message when the main task completes.
+    pub task_done_signal: tokio::sync::oneshot::Sender<()>,
 }
 
 /// Choose a window size (in terms of viewport size) when the user did not request one.
