@@ -20,7 +20,7 @@ use crate::listen::{Listen, Listener, Notifier};
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use crate::math::Euclid as _;
-use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, Rgb, VectorOps};
+use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, VectorOps};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};
 use crate::raycast::Ray;
 #[cfg(feature = "save")]
@@ -84,9 +84,9 @@ pub struct Character {
 
     /// Incrementally updated samples of neighboring light levels, used for
     /// determining exposure / eye adaptation.
-    light_samples: [Rgb; 100],
+    luminance_samples: [f32; 100],
     /// Last written element of [`Self::light_samples`]
-    light_sample_index: usize,
+    luminance_sample_index: usize,
     /// Computed camera exposure value based on light samples; converted to natural logarithm.
     exposure_log: f32,
 
@@ -118,8 +118,8 @@ impl fmt::Debug for Character {
             colliding_cubes,
             last_step_info: _,
             // TODO: report light samples?
-            light_samples: _,
-            light_sample_index: _,
+            luminance_samples: _,
+            luminance_sample_index: _,
             exposure_log,
             inventory,
             selected_slots,
@@ -226,8 +226,8 @@ impl Character {
             eye_displacement_vel: Vector3D::zero(),
             colliding_cubes: HbHashSet::new(),
             last_step_info: None,
-            light_samples: [Rgb::ONE; 100],
-            light_sample_index: 0,
+            luminance_samples: [1.0; 100],
+            luminance_sample_index: 0,
             exposure_log: 0.0,
             inventory: Inventory::from_slots(inventory),
             selected_slots,
@@ -456,12 +456,13 @@ impl Character {
                 }
             };
             let vt = self.view().to_transform();
-            let sqrtedge = (self.light_samples.len() as FreeCoordinate).sqrt();
+            let sqrtedge = (self.luminance_samples.len() as FreeCoordinate).sqrt();
             let ray_origin = vt.transform_point3d(Point3D::origin()).unwrap();
             'rays: for _ray in 0..10 {
                 // TODO: better idea for what ray count should be
-                let index = (self.light_sample_index + 1).rem_euclid(self.light_samples.len());
-                self.light_sample_index = index;
+                let index =
+                    (self.luminance_sample_index + 1).rem_euclid(self.luminance_samples.len());
+                self.luminance_sample_index = index;
                 let indexf = index as FreeCoordinate;
                 let ray = Ray::new(
                     ray_origin,
@@ -479,20 +480,21 @@ impl Character {
                     // just take the first valid value, then we'll trivially pick the same cube
                     // every time if our eye is within a cube with valid light.
                     if !bounds.contains_cube(step.cube_ahead()) {
-                        self.light_samples[self.light_sample_index] =
-                            space.physics().sky.sample(ray.direction);
+                        self.luminance_samples[self.luminance_sample_index] =
+                            space.physics().sky.sample(ray.direction).luminance();
                         continue 'rays;
                     } else if space.get_evaluated(step.cube_ahead()).visible {
                         let l = space.get_lighting(step.cube_behind());
                         if l.valid() {
-                            self.light_samples[self.light_sample_index] = l.value();
+                            self.luminance_samples[self.luminance_sample_index] =
+                                l.value().luminance();
                             continue 'rays;
                         }
                     }
                 }
                 // If we got here, nothing was hit
-                self.light_samples[self.light_sample_index] =
-                    space.physics().sky.sample(ray.direction);
+                self.luminance_samples[self.luminance_sample_index] =
+                    space.physics().sky.sample(ray.direction).luminance();
             }
         }
 
@@ -506,9 +508,9 @@ impl Character {
         const EXPOSURE_CHANGE_RATE: f32 = 2.0;
 
         // Combine the light rays into an exposure value update.
-        let light_average: Rgb = self.light_samples.iter().copied().sum::<Rgb>()
-            * (self.light_samples.len() as f32).recip();
-        let derived_exposure = (TARGET_LUMINANCE / light_average.luminance()).clamp(0.1, 10.);
+        let luminance_average: f32 = self.luminance_samples.iter().copied().sum::<f32>()
+            * (self.luminance_samples.len() as f32).recip();
+        let derived_exposure = (TARGET_LUMINANCE / luminance_average).clamp(0.1, 10.);
         // Lerp between full adjustment and no adjustment according to ADJUSTMENT_STRENGTH
         let derived_exposure =
             derived_exposure * ADJUSTMENT_STRENGTH + 1. * (1. - ADJUSTMENT_STRENGTH);
@@ -593,8 +595,8 @@ impl VisitHandles for Character {
             eye_displacement_vel: _,
             colliding_cubes: _,
             last_step_info: _,
-            light_samples: _,
-            light_sample_index: _,
+            luminance_samples: _,
+            luminance_sample_index: _,
             exposure_log: _,
             inventory,
             selected_slots: _,
@@ -658,8 +660,8 @@ impl serde::Serialize for Character {
             eye_displacement_vel: _,
             colliding_cubes: _,
             last_step_info: _,
-            light_samples: _,
-            light_sample_index: _,
+            luminance_samples: _,
+            luminance_sample_index: _,
             exposure_log: _,
         } = self;
         schema::CharacterSer::CharacterV1 {
@@ -726,8 +728,8 @@ impl<'de> serde::Deserialize<'de> for Character {
                 eye_displacement_vel: Vector3D::zero(),
                 colliding_cubes: HbHashSet::new(),
                 last_step_info: None,
-                light_samples: [Rgb::ONE; 100],
-                light_sample_index: 0,
+                luminance_samples: [1.0; 100],
+                luminance_sample_index: 0,
                 exposure_log: 0.0,
             }),
         }
