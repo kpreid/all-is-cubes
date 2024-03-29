@@ -197,16 +197,19 @@ where
     ///    ordering; its graphics options are used for triangulation and view distance.
     /// * `deadline` is the approximate time at which this should stop.
     /// * `render_data_updater` is called for every re-meshed or depth-sorted chunk.
+    ///    It is required to be `Fn` rather than `FnMut` because future versions of this
+    ///    function are expected to support multithreaded chunk updates. TODO: If that
+    ///    never happens, then we should revert the callback's trait bound to `FnMut`.
     ///
     /// Returns performance information and the chunk the camera is located in.
     pub fn update<F>(
         &mut self,
         camera: &Camera,
         deadline: time::Deadline<M::Instant>,
-        mut render_data_updater: F,
+        render_data_updater: F,
     ) -> CsmUpdateInfo
     where
-        F: FnMut(dynamic::RenderDataUpdate<'_, M>),
+        F: Fn(dynamic::RenderDataUpdate<'_, M>),
     {
         // if deadline == time::Deadline::Whenever {
         //     // If we have time, don't bother with the startup pass.
@@ -218,11 +221,11 @@ where
         // }
 
         let was_startup_chunks_only = self.startup_chunks_only;
-        let (mut info1, timed_out) = self.update_once(camera, deadline, &mut render_data_updater);
+        let (mut info1, timed_out) = self.update_once(camera, deadline, &render_data_updater);
 
         // If the first pass did not finish and was startup_chunks_only, try again.
         if was_startup_chunks_only && !timed_out && info1.flaws.contains(Flaws::UNFINISHED) {
-            let (info2, _) = self.update_once(camera, deadline, &mut render_data_updater);
+            let (info2, _) = self.update_once(camera, deadline, &render_data_updater);
             info1.add_second_pass(info2);
 
             info1
@@ -239,10 +242,10 @@ where
         &mut self,
         camera: &Camera,
         deadline: time::Deadline<M::Instant>,
-        mut render_data_updater: F,
+        render_data_updater: &F,
     ) -> (CsmUpdateInfo, bool)
     where
-        F: FnMut(dynamic::RenderDataUpdate<'_, M>),
+        F: Fn(dynamic::RenderDataUpdate<'_, M>),
     {
         let update_start_time = M::Instant::now();
 
@@ -305,7 +308,7 @@ where
                 // TODO: don't hardcode this figure here, let the caller specify it
                 deadline - Duration::from_micros(500)
             },
-            &mut render_data_updater,
+            render_data_updater,
         );
 
         // We are now done with todo preparation, and block mesh updates,

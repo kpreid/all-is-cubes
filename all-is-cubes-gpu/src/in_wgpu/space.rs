@@ -1,5 +1,6 @@
 //! Manages meshes for rendering a [`Space`].
 
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::mem;
 use std::sync::{atomic, mpsc, Arc, Mutex, Weak};
@@ -318,7 +319,11 @@ impl<I: time::Instant> SpaceRenderer<I> {
         }
         let end_light_update = I::now();
 
-        // Update chunks
+        // Update chunks.
+        // `bwp` is put into a cell so that the callback can be `Fn` rather than `FnMut`. In the
+        // future, this will need to be a `Mutex` to enable threaded chunk updates. If that never
+        // happens, then we should revert the callback's trait bound to `FnMut`.
+        let bwp_cell = RefCell::new(bwp.reborrow());
         let csm_info = csm.update(
             camera,
             deadline, // TODO: decrease deadline by some guess at texture writing time
@@ -335,12 +340,14 @@ impl<I: time::Instant> SpaceRenderer<I> {
                             .ok()
                             .and_then(wgpu::BufferSize::new)
                         {
-                            bwp.write_buffer(index_buf, 0, len)
+                            bwp_cell
+                                .borrow_mut()
+                                .write_buffer(index_buf, 0, len)
                                 .copy_from_slice(index_buf_bytes);
                         }
                     }
                 } else {
-                    update_chunk_buffers(bwp.reborrow(), u, &self.space_label);
+                    update_chunk_buffers(bwp_cell.borrow_mut().reborrow(), u, &self.space_label);
                 }
             },
         );

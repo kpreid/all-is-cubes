@@ -175,16 +175,18 @@ impl<const MBM: usize> CsmTester<MBM> {
         }
     }
 
-    /// Call [`ChunkedSpaceMesh::update()`] with the tester's placeholders
+    /// Call [`ChunkedSpaceMesh::update()`] with the tester's placeholders.
+    ///
+    /// For convenience, the `render_data_updater` may be a [`FnMut`] instead of a [`Fn`].
     fn update<F>(&mut self, render_data_updater: F) -> CsmUpdateInfo
     where
         F: FnMut(dynamic::RenderDataUpdate<'_, Mt<MBM>>),
     {
-        self.csm.update(
-            &self.camera,
-            time::DeadlineNt::Whenever,
-            render_data_updater,
-        )
+        let updater_cell = core::cell::RefCell::new(render_data_updater);
+        self.csm
+            .update(&self.camera, time::DeadlineNt::Whenever, |u| {
+                updater_cell.borrow_mut()(u)
+            })
     }
 
     /// Move camera to a position measured in chunks.

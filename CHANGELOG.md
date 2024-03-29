@@ -47,6 +47,7 @@
     - The return type of `GetBlockMesh::get_block_mesh()` has changed to `Option<&BlockMesh>`.
       `None` is to be returned when the implementor intends to request that the block be _omitted_ from a produced `SpaceMesh` (such as when it is being rendered separately) rather than the mesh merely being empty (invisible).
     - Renamed `dynamic::ChunkedSpaceMesh::update_blocks_and_some_chunks()` to `update()`, which is shorter and also more accurate nowadays since it isn't guaranteed to update all blocks.
+    - `dynamic::ChunkedSpaceMesh::update()` requires the `render_data_updater` callback to be a `Fn`, not just a `FnMut`.
     - `dynamic::ChunkedSpaceMesh` requires a texture allocator passed to `new()` instead of `update()`.
 
 - `all-is-cubes-ui` library:

@@ -75,10 +75,10 @@ where
         space: &Space,
         mesh_options: &MeshOptions,
         deadline: time::Deadline<M::Instant>,
-        mut render_data_updater: F,
+        render_data_updater: &F,
     ) -> VbmUpdateInfo
     where
-        F: FnMut(super::RenderDataUpdate<'_, M>),
+        F: Fn(super::RenderDataUpdate<'_, M>),
     {
         // TODO: optimally we would check whether any jobs are complete here
         if todo.is_empty() && self.jobs.count_jobs() == 0 {
@@ -140,7 +140,7 @@ where
                         } else {
                             current_version_number
                         },
-                        &mut render_data_updater,
+                        render_data_updater,
                     );
 
                     if defer {
@@ -215,7 +215,7 @@ where
                                 new_evaluated_block,
                                 new_block_mesh,
                                 current_version_number,
-                                &mut render_data_updater,
+                                render_data_updater,
                             );
                             callback_stats += TimeStats::one(
                                 M::Instant::now().saturating_duration_since(start_callback_time),
@@ -339,10 +339,10 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
         ev: &EvaluatedBlock,
         mesh: BlockMesh<M>,
         version: BlockMeshVersion,
-        render_data_updater: &mut F,
+        render_data_updater: &F,
     ) -> Self
     where
-        F: FnMut(super::RenderDataUpdate<'_, M>),
+        F: Fn(super::RenderDataUpdate<'_, M>),
     {
         // TODO(instancing): Eventually, we'll want to use instances for all blocks under some
         // circumstances (e.g. a placed block in an existing chunk mesh). For now, though, we make
