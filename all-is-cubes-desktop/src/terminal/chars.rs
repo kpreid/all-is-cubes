@@ -172,7 +172,7 @@ pub(super) fn image_patch_to_character(
 
 /// This is all of the Braille Unicode characters, as individual `&str`s.
 #[rustfmt::skip]
-const BRAILLE_TABLE: [&str; 256] = [
+static BRAILLE_TABLE: [&str; 256] = [
     "⠀","⠁","⠂","⠃","⠄","⠅","⠆","⠇","⠈","⠉","⠊","⠋","⠌","⠍","⠎","⠏",
     "⠐","⠑","⠒","⠓","⠔","⠕","⠖","⠗","⠘","⠙","⠚","⠛","⠜","⠝","⠞","⠟",
     "⠠","⠡","⠢","⠣","⠤","⠥","⠦","⠧","⠨","⠩","⠪","⠫","⠬","⠭","⠮","⠯",
