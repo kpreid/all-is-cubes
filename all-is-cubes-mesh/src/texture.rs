@@ -45,7 +45,7 @@ pub trait Allocator {
     //---
     // Design note: The bounds are not required for allocators to function, but
     // for how this type is used in the rest of the mesh library.
-    type Point: Copy + PartialEq + fmt::Debug + 'static;
+    type Point: Copy + PartialEq + fmt::Debug + Send + Sync + 'static;
 
     /// Allocate a tile, whose range of texels will be reserved for use as long as the
     /// [`Tile`] value, and its clones, are not dropped.

@@ -112,6 +112,8 @@ pub trait MeshTypes: 'static {
     type Vertex: GfxVertex<TexPoint = <Self::Alloc as texture::Allocator>::Point>
         + fmt::Debug
         + PartialEq
+        + Send
+        + Sync
         + 'static;
 
     /// Texture, or texture atlas, allocator.
