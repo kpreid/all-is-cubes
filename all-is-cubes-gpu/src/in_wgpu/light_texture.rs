@@ -1,3 +1,10 @@
+use cfg_if::cfg_if;
+#[cfg(feature = "threads")]
+use rayon::{
+    iter::{IndexedParallelIterator as _, IntoParallelIterator as _, ParallelIterator as _},
+    slice::ParallelSliceMut as _,
+};
+
 use all_is_cubes::camera::Camera;
 use all_is_cubes::euclid::{size3, Vector3D};
 use all_is_cubes::math::{
@@ -237,7 +244,7 @@ impl LightTexture {
     /// of texels. Must fall within the range of a single modulo wrap of the space coordinates.
     /// This is only called by [`Self::copy_region()`] which ensures those properties.
     fn copy_contiguous_region(
-        &mut self,
+        &self,
         queue: &wgpu::Queue,
         space: &Space,
         region: GridAab,
@@ -246,13 +253,35 @@ impl LightTexture {
         let volume = region.volume().unwrap();
 
         buffer.clear();
-        buffer.reserve(volume);
-
-        // Note: I tried using iproduct!() or flat_map() instead of this loop, and it's slower.
-        for z in region.z_range() {
-            for y in region.y_range() {
-                for x in region.x_range() {
-                    buffer.push(space.get_lighting([x, y, z]).as_texel());
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "threads")] {
+                // TODO: choose axis to chunk based on which axis is biggest...
+                // ...or better yet, define a general-purpose ParallelGridIter
+                buffer.resize(volume, [0; Self::COMPONENTS]);
+                let chunk_size = volume / region.z_range().len();
+                region
+                    .z_range()
+                    .into_par_iter()
+                    .zip(buffer.par_chunks_mut(chunk_size))
+                    .for_each(|(z, chunk)| {
+                        let mut i = 0;
+                        for y in region.y_range() {
+                            for x in region.x_range() {
+                                chunk[i] = space.get_lighting([x, y, z]).as_texel();
+                                i += 1;
+                            }
+                        }
+                    });
+            } else {
+                // Note: I tried using iproduct!() or flat_map() instead of these nested loops,
+                // and that was slower.
+                buffer.reserve(volume);
+                for z in region.z_range() {
+                    for y in region.y_range() {
+                        for x in region.x_range() {
+                            buffer.push(space.get_lighting([x, y, z]).as_texel());
+                        }
+                    }
                 }
             }
         }
@@ -358,7 +387,9 @@ fn split_axis(
     space_range: Range,
     texture_size: i32,
     buffer: &mut Vec<Texel>,
-    mut function: impl FnMut(Range, &mut Vec<Texel>),
+    // This bounds change is valid because this is an internal function.
+    #[cfg(feature = "threads")] function: impl Fn(Range, &mut Vec<Texel>) + Sync,
+    #[cfg(not(feature = "threads"))] function: impl Fn(Range, &mut Vec<Texel>),
 ) {
     let range_size = space_range.end - space_range.start;
     assert!(
@@ -371,8 +402,20 @@ fn split_axis(
 
     if first_half_endpoint < space_range.end {
         // Range must be split into two parts to wrap around.
-        function(space_range.start..first_half_endpoint, buffer);
-        function(first_half_endpoint..space_range.end, buffer);
+        let part_1 = space_range.start..first_half_endpoint;
+        let part_2 = first_half_endpoint..space_range.end;
+        cfg_if! {
+            if #[cfg(feature = "threads")] {
+                rayon::join(
+                    || function(part_1, buffer),
+                    || function(part_2, &mut Vec::new()),
+                );
+            } else {
+                function(part_1, buffer);
+                function(part_2, buffer);
+            }
+
+        }
     } else {
         // Range fits within a single wrap-around.
         function(space_range, buffer);
