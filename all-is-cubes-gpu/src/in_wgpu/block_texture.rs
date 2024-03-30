@@ -15,7 +15,7 @@ use all_is_cubes_mesh::texture::{self, Channels};
 use crate::in_wgpu::glue::{size3d_to_extent, write_texture_by_aab};
 use crate::in_wgpu::vertex::{AtlasTexel, FixTexCoord, TexPoint};
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};
-use crate::BlockTextureInfo;
+use crate::{BlockTextureInfo, Msw};
 
 //------------------------------------------------------------------------------------------------//
 // Types
@@ -123,7 +123,7 @@ struct AllocatorBacking {
     channels: Channels,
 
     /// GPU texture objects and texture views. [`None`] if `flush()` has never been called.
-    textures: Option<Group<GpuTexture>>,
+    textures: Option<Msw<Group<GpuTexture>>>,
 }
 
 #[derive(Debug)]
@@ -303,8 +303,8 @@ impl AllocatorBacking {
         let needed_texture_size = size3d_to_extent(backing.alloctree.bounds().size());
 
         // If we have textures already, check if they are the right size.
-        let old_textures: Option<Group<_>> = if matches!(
-            backing.textures,
+        let old_textures: Option<Msw<Group<_>>> = if matches!(
+            backing.textures.as_deref(),
             Some(Group { reflectance: GpuTexture { ref texture, .. }, .. })
             if texture.size() != needed_texture_size
         ) {
@@ -319,7 +319,7 @@ impl AllocatorBacking {
         let copy_everything_anyway = cfg!(target_family = "wasm") && old_textures.is_some();
 
         // Allocate a texture if needed.
-        let textures: &mut Group<GpuTexture> = backing.textures.get_or_insert_with(|| {
+        let textures: &mut Msw<Group<GpuTexture>> = backing.textures.get_or_insert_with(|| {
             // TODO: Add an error scope so we can detect and recover from errors,
             // including out-of-memory.
             let new_textures = Group {
@@ -369,7 +369,7 @@ impl AllocatorBacking {
                 queue.submit([encoder.finish()]);
             }
 
-            new_textures
+            Msw::new(new_textures)
         });
 
         // Process tiles needing updates or deallocation.

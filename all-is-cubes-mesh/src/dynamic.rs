@@ -42,7 +42,7 @@ pub trait DynamicMeshTypes: MeshTypes {
     //-
     // TODO: This `Default` bound is used for initializing, but it might be better replaced
     // with `Option`?
-    type RenderData: Default + fmt::Debug;
+    type RenderData: Default + Send + Sync + fmt::Debug;
 
     /// Source of time measurement for scheduling and profiling.
     type Instant: all_is_cubes::time::Instant;

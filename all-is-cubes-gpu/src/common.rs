@@ -11,6 +11,8 @@ mod draw_to_texture;
 pub(crate) use draw_to_texture::*;
 mod info;
 pub use info::*;
+mod msw;
+pub(crate) use msw::Msw;
 
 #[doc(hidden)] // Exported only for use by fuzz_octree
 pub mod octree_alloc;

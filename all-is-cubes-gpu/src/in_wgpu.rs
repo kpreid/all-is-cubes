@@ -36,8 +36,8 @@ use crate::{
         postprocess::PostprocessUniforms,
         vertex::WgpuLinesVertex,
     },
-    wireframe_vertices, DrawInfo, FrameBudget, Memo, RenderInfo, SpaceDrawInfo, SpaceUpdateInfo,
-    UpdateInfo,
+    wireframe_vertices, DrawInfo, FrameBudget, Memo, Msw, RenderInfo, SpaceDrawInfo,
+    SpaceUpdateInfo, UpdateInfo,
 };
 
 mod block_texture;
@@ -77,7 +77,7 @@ impl<I: 'static> all_is_cubes_mesh::MeshTypes for WgpuMt<I> {
 }
 
 impl<I: time::Instant> all_is_cubes_mesh::dynamic::DynamicMeshTypes for WgpuMt<I> {
-    type RenderData = Option<space::ChunkBuffers>;
+    type RenderData = Option<Msw<space::ChunkBuffers>>;
 
     type Instant = I;
 

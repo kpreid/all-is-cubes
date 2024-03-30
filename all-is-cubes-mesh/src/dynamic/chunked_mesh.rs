@@ -94,7 +94,8 @@ where
     M: DynamicMeshTypes,
     // These bounds are redundant with `DynamicMeshTypes` but the compiler needs to see them
     M::Vertex: GfxVertex<TexPoint = <M::Tile as texture::Tile>::Point> + PartialEq,
-    M::Tile: texture::Tile + PartialEq,
+    M::Alloc: Send + Sync,
+    M::Tile: texture::Tile + PartialEq + Send + Sync,
 {
     /// Constructs a new [`ChunkedSpaceMesh`] that will maintain a mesh representation of
     /// the contents of the given space, within a requested viewing distance (specified
@@ -210,7 +211,7 @@ where
         render_data_updater: F,
     ) -> CsmUpdateInfo
     where
-        F: Fn(dynamic::RenderDataUpdate<'_, M>),
+        F: Fn(dynamic::RenderDataUpdate<'_, M>) + Send + Sync,
     {
         // if deadline == time::Deadline::Whenever {
         //     // If we have time, don't bother with the startup pass.
@@ -246,7 +247,7 @@ where
         render_data_updater: &F,
     ) -> (CsmUpdateInfo, bool)
     where
-        F: Fn(dynamic::RenderDataUpdate<'_, M>),
+        F: Fn(dynamic::RenderDataUpdate<'_, M>) + Send + Sync,
     {
         let update_start_time = M::Instant::now();
 

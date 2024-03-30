@@ -1,6 +1,5 @@
 //! Manages meshes for rendering a [`Space`].
 
-use std::cell::RefCell;
 use std::collections::HashSet;
 use std::mem;
 use std::sync::{atomic, mpsc, Arc, Mutex, Weak};
@@ -43,7 +42,7 @@ use crate::in_wgpu::{
     glue::{to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
     vertex::WgpuBlockVertex,
 };
-use crate::{DebugLineVertex, Memo, SpaceDrawInfo, SpaceUpdateInfo};
+use crate::{DebugLineVertex, Memo, Msw, SpaceDrawInfo, SpaceUpdateInfo};
 
 const CHUNK_SIZE: GridCoordinate = 16;
 
@@ -320,37 +319,36 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let end_light_update = I::now();
 
         // Update chunks.
-        // `bwp` is put into a cell so that the callback can be `Fn` rather than `FnMut`. In the
-        // future, this will need to be a `Mutex` to enable threaded chunk updates. If that never
-        // happens, then we should revert the callback's trait bound to `FnMut`.
-        let bwp_cell = RefCell::new(bwp.reborrow());
-        let csm_info = csm.update(
-            camera,
-            deadline, // TODO: decrease deadline by some guess at texture writing time
-            |u| {
-                if u.indices_only {
-                    if let Some(index_buf) = u.render_data.as_ref().and_then(|b| b.index_buf.get())
-                    {
-                        // It's OK to ignore which type the indices are because they will
-                        // always be the same type as they were previously.
-                        let index_buf_bytes = u.mesh.indices().as_bytes();
-                        if let Some(len) = index_buf_bytes
-                            .len()
-                            .try_into()
-                            .ok()
-                            .and_then(wgpu::BufferSize::new)
+        let csm_info = {
+            let bwp_mutex = Mutex::new(Msw::new(bwp.reborrow()));
+            csm.update(
+                camera,
+                deadline, // TODO: decrease deadline by some guess at texture writing time
+                |u| {
+                    let bwp = &mut *bwp_mutex.lock().unwrap();
+                    if u.indices_only {
+                        if let Some(index_buf) =
+                            u.render_data.as_ref().and_then(|b| b.index_buf.get())
                         {
-                            bwp_cell
-                                .borrow_mut()
-                                .write_buffer(index_buf, 0, len)
-                                .copy_from_slice(index_buf_bytes);
+                            // It's OK to ignore which type the indices are because they will
+                            // always be the same type as they were previously.
+                            let index_buf_bytes = u.mesh.indices().as_bytes();
+                            if let Some(len) = index_buf_bytes
+                                .len()
+                                .try_into()
+                                .ok()
+                                .and_then(wgpu::BufferSize::new)
+                            {
+                                bwp.write_buffer(index_buf, 0, len)
+                                    .copy_from_slice(index_buf_bytes);
+                            }
                         }
+                    } else {
+                        update_chunk_buffers(bwp.reborrow(), u, &self.space_label);
                     }
-                } else {
-                    update_chunk_buffers(bwp_cell.borrow_mut().reborrow(), u, &self.space_label);
-                }
-            },
-        );
+                },
+            )
+        };
 
         // Update particle state.
         self.particle_sets.retain_mut(|pset| {
@@ -917,7 +915,9 @@ fn update_chunk_buffers<I: time::Instant>(
     let new_indices: IndexSlice<'_> = update.mesh.indices();
 
     let mesh_id = &update.mesh_id;
-    let buffers = update.render_data.get_or_insert_with(ChunkBuffers::default);
+    let buffers = update
+        .render_data
+        .get_or_insert_with(|| Msw::new(ChunkBuffers::default()));
     buffers.vertex_buf.write_with_resizing(
         bwp.reborrow(),
         &wgpu::util::BufferInitDescriptor {
