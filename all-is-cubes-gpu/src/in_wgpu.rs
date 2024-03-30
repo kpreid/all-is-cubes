@@ -49,6 +49,8 @@ mod glue;
 pub mod headless;
 #[doc(hidden)]
 pub mod init;
+mod light_texture;
+pub(crate) use light_texture::LightTexture;
 mod pipelines;
 mod poll;
 mod postprocess;

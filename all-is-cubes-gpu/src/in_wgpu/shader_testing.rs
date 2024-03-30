@@ -133,7 +133,7 @@ where
         &device,
         &pipelines,
         &texture_view,
-        &in_wgpu::space::SpaceLightTexture::new(
+        &in_wgpu::LightTexture::new(
             "shader test space",
             &device,
             GridAab::for_block(Resolution::R1),
