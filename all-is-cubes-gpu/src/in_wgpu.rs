@@ -50,7 +50,8 @@ pub mod headless;
 #[doc(hidden)]
 pub mod init;
 mod light_texture;
-pub(crate) use light_texture::LightTexture;
+#[doc(hidden)] // public for benchmark
+pub use light_texture::LightTexture;
 mod pipelines;
 mod poll;
 mod postprocess;

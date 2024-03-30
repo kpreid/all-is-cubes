@@ -1,7 +1,9 @@
 #![allow(missing_docs)]
 
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
+use all_is_cubes::math::GridAab;
 use criterion::Criterion;
 
 use all_is_cubes::block;
@@ -20,16 +22,6 @@ fn main() {
     let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
 
     let mut criterion: Criterion<_> = Criterion::default().configure_from_args();
-    render_benches(&runtime, &mut criterion);
-
-    criterion.final_summary();
-}
-
-pub fn benches() {}
-
-#[allow(clippy::await_holding_lock)]
-fn render_benches(runtime: &Runtime, c: &mut Criterion) {
-    let mut g = c.benchmark_group("render");
 
     let (_, adapter) = runtime.block_on(init::create_instance_and_adapter_for_test(|msg| {
         eprintln!("{msg}")
@@ -46,6 +38,16 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion) {
             }
         }
     };
+
+    render_benches(&runtime, &mut criterion, &adapter);
+    module_benches(&runtime, &mut criterion, &adapter);
+
+    criterion.final_summary();
+}
+
+#[allow(clippy::await_holding_lock)]
+fn render_benches(runtime: &Runtime, c: &mut Criterion, adapter: &Arc<wgpu::Adapter>) {
+    let mut g = c.benchmark_group("render");
 
     // Benchmark for running update() only. Insofar as this touches the GPU it will
     // naturally fill up the pipeline as Criterion iterates it.
@@ -124,4 +126,34 @@ async fn create_updated_renderer(
 
     // Arc<Mutex< needed to satisfy borrow checking of the benchmark closure
     (universe, space, Arc::new(Mutex::new(renderer)))
+}
+
+/// Benchmarks for internal components
+fn module_benches(runtime: &Runtime, c: &mut Criterion, adapter: &Arc<wgpu::Adapter>) {
+    let mut g = c.benchmark_group("mod");
+    g.sample_size(400); // increase sample size from default 100 to reduce noise
+    g.measurement_time(Duration::from_secs(10));
+
+    let (device, queue) = runtime
+        .block_on(adapter.request_device(&wgpu::DeviceDescriptor::default(), None))
+        .unwrap();
+
+    g.bench_function("light-update", |b| {
+        let size = 64;
+        let bounds = GridAab::from_lower_size([0, 0, 0], [size, size, size]);
+        // We're reusing one texture across these tests because it has no observable state that
+        // influences the benchmark, and we're not primarily interested in effects like "the light
+        // data isn't in cache".
+        let mut texture = all_is_cubes_gpu::in_wgpu::LightTexture::new("lt", &device, bounds);
+        let space = Space::empty_positive(size, size, size);
+
+        b.iter_with_large_drop(|| {
+            texture.update_all(&queue, &space);
+
+            scopeguard::guard((), |()| {
+                // flush wgpu's buffering of copy commands (not sure if this is effective).
+                queue.submit([]);
+            })
+        });
+    });
 }

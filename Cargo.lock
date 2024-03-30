@@ -176,6 +176,7 @@ dependencies = [
  "rand_xoshiro",
  "rayon",
  "resource",
+ "scopeguard",
  "send_wrapper",
  "thiserror",
  "tokio",

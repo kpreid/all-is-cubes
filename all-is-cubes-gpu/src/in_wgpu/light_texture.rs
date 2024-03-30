@@ -8,7 +8,8 @@ use crate::in_wgpu::glue::{point_to_origin, size3d_to_extent, write_texture_by_a
 ///
 /// The texels are in [`PackedLight::as_texel()`] form.
 #[derive(Debug)]
-pub(crate) struct LightTexture {
+#[doc(hidden)] // public for benchmark
+pub struct LightTexture {
     texture: wgpu::Texture,
     texture_view: wgpu::TextureView,
     /// The region of cube coordinates for which there are valid texels.

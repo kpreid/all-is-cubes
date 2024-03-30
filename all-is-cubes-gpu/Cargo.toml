@@ -91,6 +91,8 @@ wgpu = { workspace = true, optional = true }
 criterion = { workspace = true, features = ["async_tokio"] }
 # Used in shader tests. TODO: Not really necessary
 image = { workspace = true }
+# Used in benchmark
+scopeguard = { workspace = true }
 # Using tokio for async test-running.
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
 
