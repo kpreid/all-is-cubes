@@ -20,8 +20,10 @@
         - Blocks may now be rendered via instancing.
           `dynamic::DynamicMeshTypes::MAXIMUM_MERGED_BLOCK_MESH_SIZE` controls whether this is done; set it to `usize::MAX` if you don't want instances.
           `dynamic::ChunkMesh::block_instances()` returns the instance data.
-        - Mesh updates (currently only block meshes, not chunk meshes) may be executed in the background rather than strictly during `update()`.
-          This must be externally driven; if you wish to do so, clone the `ChunkedSpaceMesh::job_queue()`, and create one or more tasks/threads which take work from it.
+        - Parallelism for block and chunk mesh calculations:
+            - Block mesh updates may be executed in the background rather than strictly during `update()`.
+            This must be externally driven; if you wish to do so, clone the `ChunkedSpaceMesh::job_queue()`, and create one or more tasks/threads which take work from it.
+            - Chunk mesh updates are performed in parallel using `rayon` if the `"threads"` feature is enabled. They are not performed in the background, because they currently still require read access to the `Space` being rendered.
 
 - `all-is-cubes-ui` library:
     - New widget `ProgressBar`.
@@ -47,6 +49,7 @@
     - The return type of `GetBlockMesh::get_block_mesh()` has changed to `Option<&BlockMesh>`.
       `None` is to be returned when the implementor intends to request that the block be _omitted_ from a produced `SpaceMesh` (such as when it is being rendered separately) rather than the mesh merely being empty (invisible).
     - Renamed `dynamic::ChunkedSpaceMesh::update_blocks_and_some_chunks()` to `update()`, which is shorter and also more accurate nowadays since it isn't guaranteed to update all blocks.
+    - The caller-supplied types in `MeshTypes` and `DynamicMeshTypes` must meet `Send + Sync` bounds.
     - `dynamic::ChunkedSpaceMesh::update()` requires the `render_data_updater` callback to be a `Fn`, not just a `FnMut`.
     - `dynamic::ChunkedSpaceMesh` requires a texture allocator passed to `new()` instead of `update()`.
 
