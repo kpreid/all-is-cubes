@@ -253,7 +253,7 @@ fn light_texture_fetch(fragment_position: vec3<f32>) -> vec4<f32> {
     
     // Implement wrapping (not automatic since we're not using a sampler).
     // Wrapping is used to handle negative cube coordinates, and also
-    // (someday) circular buffering of the local light in an unbounded world.
+    // circular buffering of the local light in an unbounded world.
     let size: vec3<i32> = vec3<i32>(textureDimensions(light_texture, 0));
     lookup_position = (lookup_position % size + size) % size;
 

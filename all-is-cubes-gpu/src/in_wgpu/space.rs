@@ -14,7 +14,7 @@ use all_is_cubes::euclid::num::Zero as _;
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{
     Cube, Face6, FreeCoordinate, FreePoint, Geometry as _, GridAab, GridCoordinate, GridPoint,
-    GridVector, NotNan, Rgb, VectorOps,
+    GridSize, GridVector, NotNan, Rgb, VectorOps,
 };
 use all_is_cubes::raycast::Ray;
 #[cfg(feature = "rerun")]
@@ -41,7 +41,8 @@ use crate::in_wgpu::{
 use crate::in_wgpu::{LightTexture, WgpuMt};
 use crate::{DebugLineVertex, Memo, Msw, SpaceDrawInfo, SpaceUpdateInfo};
 
-const CHUNK_SIZE: GridCoordinate = 16;
+// temporarily public for a lighting kludge
+pub(super) const CHUNK_SIZE: GridCoordinate = 16;
 
 const NO_WORLD_SKY: Sky = Sky::Uniform(palette::NO_WORLD_TO_SHOW.to_rgb());
 
@@ -115,7 +116,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         block_texture: AtlasAllocator,
         interactive: bool,
     ) -> Self {
-        let light_texture = LightTexture::new(&space_label, device, GridAab::ORIGIN_CUBE); // dummy
+        let light_texture = LightTexture::new(&space_label, device, GridSize::splat(1)); // dummy
 
         let camera_buffer = SpaceCameraBuffer::new(&space_label, device, pipelines);
 
@@ -155,7 +156,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
     pub(crate) fn set_space(
         &mut self,
         executor: &Arc<dyn Executor>,
-        device: &wgpu::Device,
+        _device: &wgpu::Device,
         _pipelines: &Pipelines,
         space: Option<&Handle<Space>>,
     ) -> Result<(), HandleError> {
@@ -173,7 +174,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         // Destructuring to explicitly skip or handle each field.
         let SpaceRenderer {
-            space_label,
+            space_label: _,
             render_pass_label: _,
             instance_buffer_label: _,
             todo,
@@ -238,8 +239,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         *csm = Some(new_csm);
 
-        // TODO: don't replace light texture if the size is the same
-        *light_texture = LightTexture::new(space_label, device, space_borrowed.bounds());
+        light_texture.forget_mapped();
 
         Ok(())
     }
@@ -301,17 +301,31 @@ impl<I: time::Instant> SpaceRenderer<I> {
             self.skybox.compute(device, queue, &space.physics().sky);
         }
 
-        // Update light texture
+        // Update light texture.
         let start_light_update = I::now();
         let mut light_update_count = 0;
-        if let Some(set) = &mut todo.light {
-            // TODO: work in larger, ahem, chunks
-            light_update_count +=
-                self.light_texture
-                    .update_scatter(device, queue, space, set.drain());
-        } else {
-            light_update_count += self.light_texture.update_all(queue, space);
-            todo.light = Some(HashSet::new());
+        {
+            // Check the size.
+            let needed_size =
+                LightTexture::choose_size(&device.limits(), space.bounds(), camera.view_distance());
+            self.light_texture
+                .ensure_as_big_as(&self.space_label, device, needed_size);
+
+            // Handle individual changed cubes, or the space changing.
+            if let Some(set) = &mut todo.light {
+                // Update individual cubes.
+                light_update_count +=
+                    self.light_texture
+                        .update_scatter(device, queue, space, set.drain());
+            } else {
+                self.light_texture.forget_mapped();
+                todo.light = Some(HashSet::new());
+            }
+
+            // Ensure the texture covers the right region for the camera.
+            light_update_count += self
+                .light_texture
+                .ensure_visible_is_mapped(queue, space, camera);
         }
         let end_light_update = I::now();
 

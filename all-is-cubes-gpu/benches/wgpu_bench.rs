@@ -3,7 +3,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use all_is_cubes::math::GridAab;
+use all_is_cubes::math::{GridAab, GridSize};
 use criterion::Criterion;
 
 use all_is_cubes::block;
@@ -144,11 +144,13 @@ fn module_benches(runtime: &Runtime, c: &mut Criterion, adapter: &Arc<wgpu::Adap
         // We're reusing one texture across these tests because it has no observable state that
         // influences the benchmark, and we're not primarily interested in effects like "the light
         // data isn't in cache".
-        let mut texture = all_is_cubes_gpu::in_wgpu::LightTexture::new("lt", &device, bounds);
+        let mut texture =
+            all_is_cubes_gpu::in_wgpu::LightTexture::new("lt", &device, GridSize::splat(size));
         let space = Space::empty_positive(size, size, size);
 
         b.iter_with_large_drop(|| {
-            texture.update_all(&queue, &space);
+            texture.forget_mapped();
+            texture.ensure_mapped(&queue, &space, bounds);
 
             scopeguard::guard((), |()| {
                 // flush wgpu's buffering of copy commands (not sure if this is effective).

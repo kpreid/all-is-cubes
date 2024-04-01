@@ -1,10 +1,7 @@
 use core::fmt;
 
 use crate::content::palette;
-use crate::math::Rgb;
-
-#[cfg(doc)]
-use crate::math::Face6;
+use crate::math::{Face6, Rgb};
 
 /// Enumeration of the axes of three-dimensional space.
 ///
@@ -41,6 +38,24 @@ impl Axis {
             Axis::X => palette::UNIFORM_LUMINANCE_RED,
             Axis::Y => palette::UNIFORM_LUMINANCE_GREEN,
             Axis::Z => palette::UNIFORM_LUMINANCE_BLUE,
+        }
+    }
+
+    /// Returns the [`Face6`] value which corresponds to the positive direction on this axis.
+    pub fn positive_face(&self) -> Face6 {
+        match self {
+            Axis::X => Face6::PX,
+            Axis::Y => Face6::PY,
+            Axis::Z => Face6::PZ,
+        }
+    }
+
+    /// Returns the [`Face6`] value which corresponds to the negative direction on this axis.
+    pub fn negative_face(&self) -> Face6 {
+        match self {
+            Axis::X => Face6::NX,
+            Axis::Y => Face6::NY,
+            Axis::Z => Face6::NZ,
         }
     }
 

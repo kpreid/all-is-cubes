@@ -1,5 +1,8 @@
-use all_is_cubes::euclid::size3;
-use all_is_cubes::math::{Cube, FaceMap, GridAab, GridCoordinate, GridSize, VectorOps};
+use all_is_cubes::camera::Camera;
+use all_is_cubes::euclid::{size3, Vector3D};
+use all_is_cubes::math::{
+    Aab, Axis, Cube, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, VectorOps,
+};
 use all_is_cubes::space::Space;
 
 use crate::in_wgpu::glue::{
@@ -8,6 +11,34 @@ use crate::in_wgpu::glue::{
 
 type Texel = [u8; LightTexture::COMPONENTS];
 type Range = std::ops::Range<GridCoordinate>;
+
+/// Kludge to account for chunks being more visible than expected when fog is disabled and
+/// visibility is controlled by the far clipping plane instead of the fog.
+///
+/// We only need 1 chunk worth because for more than 1 chunk, the chunk itself will be culled.
+///
+/// 1.75 overapproximates the square root of 3, aka the longest diagonal across a unit cube,
+/// which is the farthest possible distance (in chunk sizes) a part of a chunk could be seen from.
+///
+/// TODO: Find a better solution; perhaps decide that we want to clip geometry more proactively.
+const CAMERA_MARGIN_RADIUS: f64 = crate::in_wgpu::space::CHUNK_SIZE as f64 * 1.75;
+
+/// Compute the rendered region for which light data is needed.
+///
+/// This region is bounded by view distance and by `Space` bounds.
+fn visible_light_volume(space_bounds: GridAab, camera: &Camera) -> GridAab {
+    // TODO: handle NaN and overflow cases, and the texture not being big enough, for robustness.
+    let effective_view_radius = Vector3D::splat(camera.view_distance() + CAMERA_MARGIN_RADIUS);
+    let visible_bounds = Aab::from_lower_upper(
+        camera.view_position() - effective_view_radius,
+        camera.view_position() + effective_view_radius,
+    )
+    .round_up_to_grid();
+    // Extra volume of 1 extra cube around all sides automatically captures sky light.
+    visible_bounds
+        .intersection(space_bounds.expand(FaceMap::repeat(1)))
+        .unwrap_or(GridAab::ORIGIN_CUBE)
+}
 
 /// Keeps a 3D [`wgpu::Texture`] up to date with the light data from a [`Space`].
 ///
@@ -26,21 +57,50 @@ type Range = std::ops::Range<GridCoordinate>;
 pub struct LightTexture {
     texture: wgpu::Texture,
     texture_view: wgpu::TextureView,
+
     /// Temporary storage for updated light texels to be copied into the texture.
     copy_buffer: wgpu::Buffer,
+
+    /// The region of `Space` cube coordinates which are currently represented by the texture
+    /// (as opposed to being either not initialized or being a different section of the `Space`).
+    /// This AAB is always smaller than the `texture`'s size.
+    mapped_region: GridAab,
 }
 
 impl LightTexture {
     const COPY_BUFFER_TEXELS: usize = 1024;
     const COMPONENTS: usize = 4;
 
-    /// Construct a new texture for the specified size of [`Space`],
-    /// with no data.
-    pub fn new(label_prefix: &str, device: &wgpu::Device, bounds: GridAab) -> Self {
+    /// Compute the appropriate size of light texture for the given conditions.
+    pub fn choose_size(
+        limits: &wgpu::Limits,
+        space_bounds: GridAab,
+        view_distance: FreeCoordinate,
+    ) -> GridSize {
+        let max_texture_size = limits.max_texture_dimension_3d.min(i32::MAX as u32) as i32;
+
         // Extra volume of 1 extra cube around all sides automatically captures sky light.
-        let size = size3d_to_extent(bounds.size() + GridSize::splat(2));
+        let space_size = space_bounds.size() + GridSize::splat(2);
+
+        // times 2 for radius, plus one to account for the effect of rounding up points to
+        // containing cubes.
+        let camera_size = GridSize::splat(
+            view_distance
+                .mul_add(2., CAMERA_MARGIN_RADIUS.mul_add(2., 1.))
+                .ceil() as GridCoordinate,
+        );
+
+        // The texture need not be bigger than the Space or bigger than the viewable diameter.
+        // But it must also be within wgpu's limits.
+        space_size
+            .min(camera_size)
+            .clamp(GridSize::splat(1), GridSize::splat(max_texture_size))
+    }
+
+    /// Construct a new texture of the specified size with no data.
+    pub fn new(label_prefix: &str, device: &wgpu::Device, size: GridSize) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            size,
+            size: size3d_to_extent(size),
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D3,
@@ -58,18 +118,109 @@ impl LightTexture {
                 usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
                 mapped_at_creation: false,
             }),
+            mapped_region: GridAab::ORIGIN_EMPTY,
         }
     }
 
-    /// Copy the specified region of light data into the texture.
+    pub fn ensure_as_big_as(&mut self, label_prefix: &str, device: &wgpu::Device, size: GridSize) {
+        let current = extent_to_size3d(self.texture.size());
+        if current.lower_than(size).any() {
+            *self = Self::new(label_prefix, device, size);
+        }
+    }
+
+    /// Ensure that the texture contains data for the part of `space` which is seen by `camera`.
+    ///
+    /// The texture must have already been resized to be large enough for the view distance.
+    ///
+    /// Returns the volume (number of cubes) that needed to be copied to the texture.
+    pub fn ensure_visible_is_mapped(
+        &mut self,
+        queue: &wgpu::Queue,
+        space: &Space,
+        camera: &Camera,
+    ) -> usize {
+        self.ensure_mapped(queue, space, visible_light_volume(space.bounds(), camera))
+    }
+
+    /// Ensure that the texture contains data for all of the given `region` of the `space`.
+    ///
     /// The region must be no larger than the texture.
-    pub fn update(&mut self, queue: &wgpu::Queue, space: &Space, region: GridAab) -> usize {
+    ///
+    /// Returns the volume (number of cubes) that needed to be copied to the texture.
+    pub fn ensure_mapped(&mut self, queue: &wgpu::Queue, space: &Space, region: GridAab) -> usize {
+        let Some(region) = region.intersection(space.bounds().expand(FaceMap::repeat(1))) else {
+            return 0;
+        };
+
+        match self.mapped_region.intersection(region) {
+            Some(intersection) if !intersection.is_empty() => {
+                // The previous region has some overlap; reuse it.
+
+                // Forget the no-longer-wanted region that we might be about to overwrite.
+                // TODO: This is overly conservative; we actually only need to forget the region
+                // that we *definitely* will overwrite due to wrap-around.
+                self.mapped_region = intersection;
+
+                let mut updated_volume = 0;
+
+                // Grows the mapped_region along one axis.
+                // Note that once we start these mutations, we *do not* use `intersection` any more,
+                // because it is obsolete and we'd forget to update the corners.
+                let mut grow = |axis| {
+                    let old_range = self.mapped_region.axis_range(axis);
+                    let new_range = region.axis_range(axis);
+                    if new_range.start < old_range.start {
+                        // expand negativeward
+                        let ext = self
+                            .mapped_region
+                            .abut(axis.negative_face(), old_range.start - new_range.start)
+                            .unwrap();
+                        updated_volume += self.copy_region(queue, space, ext);
+                        self.mapped_region = self.mapped_region.union(ext).unwrap();
+                    }
+                    if new_range.end > old_range.end {
+                        // expand positiveward
+                        let ext = self
+                            .mapped_region
+                            .abut(axis.positive_face(), new_range.end - old_range.end)
+                            .unwrap();
+                        updated_volume += self.copy_region(queue, space, ext);
+                        self.mapped_region = self.mapped_region.union(ext).unwrap();
+                    }
+                };
+
+                grow(Axis::Z);
+                grow(Axis::Y);
+                grow(Axis::X);
+
+                updated_volume
+            }
+            _ => {
+                // No overlap, so just forget previous state.
+                self.mapped_region = region;
+                self.copy_region(queue, space, region)
+            }
+        }
+    }
+
+    /// Mark all previously copied data as obsolete, such as because the [`Space`] data was
+    /// all replaced.
+    pub fn forget_mapped(&mut self) {
+        self.mapped_region = GridAab::ORIGIN_EMPTY;
+    }
+
+    /// Copy the specified region of light data from the [`Space`] the texture.
+    /// The region must be no larger than the texture.
+    ///
+    /// This method does *not* update `mapped_region`; that's the caller's job.
+    fn copy_region(&mut self, queue: &wgpu::Queue, space: &Space, region: GridAab) -> usize {
         let size = extent_to_size3d(self.texture.size());
         let buffer = &mut Vec::new();
         split_axis(region.x_range(), size.width, buffer, |x_range, buffer| {
             split_axis(region.y_range(), size.height, buffer, |y_range, buffer| {
                 split_axis(region.z_range(), size.depth, buffer, |z_range, buffer| {
-                    self.update_contiguous(
+                    self.copy_contiguous_region(
                         queue,
                         space,
                         GridAab::from_ranges([x_range.clone(), y_range.clone(), z_range]),
@@ -84,8 +235,8 @@ impl LightTexture {
 
     /// Primitive operation to copy a contiguous volume of light data to a contiguous volume
     /// of texels. Must fall within the range of a single modulo wrap of the space coordinates.
-    /// This is only called by [`Self::update()`] which ensures those properties.
-    fn update_contiguous(
+    /// This is only called by [`Self::copy_region()`] which ensures those properties.
+    fn copy_contiguous_region(
         &mut self,
         queue: &wgpu::Queue,
         space: &Space,
@@ -124,13 +275,10 @@ impl LightTexture {
         volume
     }
 
-    pub fn update_all(&mut self, queue: &wgpu::Queue, space: &Space) -> usize {
-        let update_bounds = space.bounds().expand(FaceMap::repeat(1));
-        self.update(queue, space, update_bounds);
-        update_bounds.volume().unwrap()
-    }
-
     /// Copy many individual cubes of light data.
+    ///
+    /// Any cubes not within the current mapped region (determined by [`Self::ensure_mapped()`] or
+    /// [`Self::ensure_visible_is_mapped()`]) are ignored.
     pub fn update_scatter(
         &mut self,
         device: &wgpu::Device,
@@ -142,9 +290,13 @@ impl LightTexture {
 
         let texture_size = extent_to_size3d(self.texture.size());
 
+        // Filter out out-of-bounds cubes.
+        let cubes = cubes
+            .into_iter()
+            .filter(|&cube| self.mapped_region.contains_cube(cube));
+
         // Break into batches of our buffer size.
-        for cube_batch in &itertools::Itertools::chunks(cubes.into_iter(), Self::COPY_BUFFER_TEXELS)
-        {
+        for cube_batch in &itertools::Itertools::chunks(cubes, Self::COPY_BUFFER_TEXELS) {
             #[allow(clippy::large_stack_arrays)]
             let mut data: [Texel; Self::COPY_BUFFER_TEXELS] =
                 [[0; Self::COMPONENTS]; Self::COPY_BUFFER_TEXELS];
@@ -211,7 +363,7 @@ fn split_axis(
     let range_size = space_range.end - space_range.start;
     assert!(
         range_size <= texture_size,
-        "update range larger than texture"
+        "update range {range_size:?} larger than texture {texture_size:?}"
     );
 
     // *If* the range is to be split, then this is the Space coordinate at which it is split.
@@ -224,5 +376,49 @@ fn split_axis(
     } else {
         // Range fits within a single wrap-around.
         function(space_range, buffer);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use all_is_cubes::camera::{GraphicsOptions, ViewTransform, Viewport};
+    use all_is_cubes::euclid::vec3;
+    use all_is_cubes::math::NotNan;
+
+    use super::*;
+
+    #[test]
+    fn visible_volume_always_fits_in_size() {
+        let limits = wgpu::Limits::default();
+
+        // big enough not to matter — this is a test of the view_distance logic which is trickier
+        // since it involves rounding floats to ints
+        let irrelevant_space_bounds =
+            GridAab::from_lower_size([-5000, -5000, -5000], [10000, 10000, 10000]);
+
+        let mut camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
+
+        // In principle, this should be a fuzzing test, but I don't think it's worth doing that
+        // for this.
+        let step = 1. / 8.;
+        // note: view distance is clamped in graphics options to be a minimum of 1.0
+        for view_distance in (8..100).map(|i| f64::from(i) * step) {
+            let texture_size =
+                LightTexture::choose_size(&limits, irrelevant_space_bounds, view_distance);
+
+            let mut options = GraphicsOptions::default();
+            options.view_distance = NotNan::new(view_distance).unwrap();
+            camera.set_options(options);
+
+            for position in (0..100).map(|i| f64::from(i) * step) {
+                eprintln!("{view_distance} {position}");
+                camera.set_view_transform(ViewTransform::from_translation(vec3(position, 0., 0.)));
+                let visible_bounds = visible_light_volume(irrelevant_space_bounds, &camera);
+                assert!(
+                    visible_bounds.size().greater_than(texture_size).none(),
+                    "bounds {visible_bounds:?} should fit in texture size {texture_size:?}"
+                );
+            }
+        }
     }
 }
