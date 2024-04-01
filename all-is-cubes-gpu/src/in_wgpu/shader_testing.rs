@@ -182,7 +182,7 @@ where
     queue.write_buffer(
         &camera_buffer.buffer,
         0,
-        bytemuck::bytes_of(&ShaderSpaceCamera::new(&camera, GridVector::zero())),
+        bytemuck::bytes_of(&ShaderSpaceCamera::new(&camera)),
     );
 
     let mut encoder =

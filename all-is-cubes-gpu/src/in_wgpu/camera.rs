@@ -1,6 +1,6 @@
 use all_is_cubes::camera::{Camera, FogOption, LightingOption, Ndc};
 use all_is_cubes::euclid::Transform3D;
-use all_is_cubes::math::{GridVector, VectorOps};
+use all_is_cubes::math::VectorOps;
 
 /// Information corresponding to [`Camera`] but in a form suitable for passing in a
 /// uniform buffer to the `blocks-and-lines.wgsl` shader. Also includes some miscellaneous
@@ -22,27 +22,20 @@ pub(crate) struct ShaderSpaceCamera {
     exposure: f32,
 
     // --- 16-byte aligned point ---
-    /// Translation which converts mesh cube coordinates to `light_texture` texel
-    /// coordinates.
-    ///
-    /// This is not strictly part of the [`Camera`], but it is expected to change under
-    /// the same sort of conditions.
-    light_lookup_offset: [i32; 3], // next field functions as the required 4th component/padding
     /// Light rendering style to use; a copy of [`GraphicsOptions::lighting_display`].
     light_option: i32,
 
-    // --- 16-byte aligned point ---
     /// Fog equation blending: 0 is realistic fog and 1 is distant more abrupt fog.
     fog_mode_blend: f32,
     /// How far out should be fully fogged?
     fog_distance: f32,
 
     /// pad out to multiple of vec4<something32>
-    _padding: [i32; 2],
+    _padding: i32,
 }
 
 impl ShaderSpaceCamera {
-    pub fn new(camera: &Camera, light_lookup_offset: GridVector) -> Self {
+    pub fn new(camera: &Camera) -> Self {
         let options = camera.options();
         let view_distance = camera.view_distance() as f32;
         let (fog_mode_blend, fog_distance) = match options.fog {
@@ -68,7 +61,6 @@ impl ShaderSpaceCamera {
             view_matrix: convert_matrix(camera.view_matrix()),
             view_position: camera.view_position().map(|s| s as f32).to_vector().into(),
 
-            light_lookup_offset: light_lookup_offset.into(),
             light_option: match options.lighting_display {
                 LightingOption::None => 0,
                 LightingOption::Flat => 1,

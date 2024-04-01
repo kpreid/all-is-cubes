@@ -9,14 +9,11 @@ struct ShaderSpaceCamera {
     view_position: vec3<f32>,
     exposure: f32,
     // --- 16-byte aligned point ---
-    light_lookup_offset: vec3<i32>,
     light_option: i32,
-    // --- 16-byte aligned point ---
     fog_mode_blend: f32,
     fog_distance: f32,
     // pad out to multiple of 16 bytes
     padding1: f32,
-    padding2: f32,
 };
 
 // Mirrors `struct WgpuBlockVertex` on the Rust side.
@@ -252,11 +249,11 @@ fn partial_scale_to_integer_step(s_in: f32, ds_in: f32) -> f32 {
 // excluding opaque blocks, while the -1 value indicates values that should be
 // truly ignored.
 fn light_texture_fetch(fragment_position: vec3<f32>) -> vec4<f32> {
-    var lookup_position = vec3<i32>(floor(fragment_position)) + camera.light_lookup_offset;
+    var lookup_position = vec3<i32>(floor(fragment_position));
     
     // Implement wrapping (not automatic since we're not using a sampler).
-    // Wrapping is used to handle sky light and in the future will be used for
-    // circular buffering of the local light in an unbounded world.
+    // Wrapping is used to handle negative cube coordinates, and also
+    // (someday) circular buffering of the local light in an unbounded world.
     let size: vec3<i32> = vec3<i32>(textureDimensions(light_texture, 0));
     lookup_position = (lookup_position % size + size) % size;
 

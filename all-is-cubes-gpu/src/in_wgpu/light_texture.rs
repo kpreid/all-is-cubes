@@ -1,12 +1,24 @@
 use all_is_cubes::euclid::size3;
-use all_is_cubes::math::{Cube, FaceMap, GridAab, GridVector};
+use all_is_cubes::math::{Cube, FaceMap, GridAab, GridCoordinate, GridSize, VectorOps};
 use all_is_cubes::space::Space;
 
-use crate::in_wgpu::glue::{point_to_origin, size3d_to_extent, write_texture_by_aab};
+use crate::in_wgpu::glue::{
+    extent_to_size3d, point_to_origin, size3d_to_extent, write_texture_by_aab,
+};
 
 type Texel = [u8; LightTexture::COMPONENTS];
+type Range = std::ops::Range<GridCoordinate>;
 
-/// Keeps a 3D [`Texture`] up to date with the light data from a [`Space`].
+/// Keeps a 3D [`wgpu::Texture`] up to date with the light data from a [`Space`].
+///
+/// [`Space`] coordinates are mapped directly to texel coordinates, with modulo wrap-around.
+/// For example, if the [`Space`] has a range of -20..20 on some axis, and the texture size is 50,
+/// then the cube range 0..20 is stored in the texel range 0..20 and the cube range -20..0 is
+/// stored in the texel range 30..50.
+///
+/// If the texture is smaller than the [`Space`], then which cubes' data the texture stores is
+/// determined by the most recent update commands. This may be used to move about a larger space,
+/// updating only the edges as needed.
 ///
 /// The texels are in [`PackedLight::as_texel()`] form.
 #[derive(Debug)]
@@ -14,8 +26,6 @@ type Texel = [u8; LightTexture::COMPONENTS];
 pub struct LightTexture {
     texture: wgpu::Texture,
     texture_view: wgpu::TextureView,
-    /// The region of cube coordinates for which there are valid texels.
-    texture_bounds: GridAab,
     /// Temporary storage for updated light texels to be copied into the texture.
     copy_buffer: wgpu::Buffer,
 }
@@ -27,17 +37,10 @@ impl LightTexture {
     /// Construct a new texture for the specified size of [`Space`],
     /// with no data.
     pub fn new(label_prefix: &str, device: &wgpu::Device, bounds: GridAab) -> Self {
-        // Boundary of 1 extra cube all around automatically captures sky light.
-        let texture_bounds = bounds.expand(FaceMap {
-            px: 1,
-            py: 1,
-            pz: 1,
-            nx: 1,
-            ny: 1,
-            nz: 1,
-        });
+        // Extra volume of 1 extra cube around all sides automatically captures sky light.
+        let size = size3d_to_extent(bounds.size() + GridSize::splat(2));
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: size3d_to_extent(texture_bounds.size()),
+            size,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D3,
@@ -49,7 +52,6 @@ impl LightTexture {
         Self {
             texture_view: texture.create_view(&wgpu::TextureViewDescriptor::default()),
             texture,
-            texture_bounds,
             copy_buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(&format!("{label_prefix} space light copy buffer")),
                 size: u64::try_from(Self::COPY_BUFFER_TEXELS * Self::COMPONENTS).unwrap(),
@@ -59,35 +61,73 @@ impl LightTexture {
         }
     }
 
-    /// Copy the specified region of light data.
+    /// Copy the specified region of light data into the texture.
+    /// The region must be no larger than the texture.
     pub fn update(&mut self, queue: &wgpu::Queue, space: &Space, region: GridAab) -> usize {
-        let mut data: Vec<Texel> = Vec::with_capacity(region.volume().unwrap());
-        // TODO: Enable circular operation and eliminate the need for the offset of the
-        // coordinates (texture_bounds.lower_bounds() and light_offset in the shader)
-        // by doing a coordinate wrap-around -- the shader and the Space will agree
-        // on coordinates modulo the texture size, and this upload will need to be broken
-        // into up to 8 pieces.
+        let size = extent_to_size3d(self.texture.size());
+        let buffer = &mut Vec::new();
+        split_axis(region.x_range(), size.width, buffer, |x_range, buffer| {
+            split_axis(region.y_range(), size.height, buffer, |y_range, buffer| {
+                split_axis(region.z_range(), size.depth, buffer, |z_range, buffer| {
+                    self.update_contiguous(
+                        queue,
+                        space,
+                        GridAab::from_ranges([x_range.clone(), y_range.clone(), z_range]),
+                        buffer,
+                    );
+                });
+            });
+        });
+
+        region.volume().unwrap()
+    }
+
+    /// Primitive operation to copy a contiguous volume of light data to a contiguous volume
+    /// of texels. Must fall within the range of a single modulo wrap of the space coordinates.
+    /// This is only called by [`Self::update()`] which ensures those properties.
+    fn update_contiguous(
+        &mut self,
+        queue: &wgpu::Queue,
+        space: &Space,
+        region: GridAab,
+        buffer: &mut Vec<Texel>,
+    ) -> usize {
+        let volume = region.volume().unwrap();
+
+        buffer.clear();
+        buffer.reserve(volume);
+
+        // Note: I tried using iproduct!() or flat_map() instead of this loop, and it's slower.
         for z in region.z_range() {
             for y in region.y_range() {
                 for x in region.x_range() {
-                    data.push(space.get_lighting([x, y, z]).as_texel());
+                    buffer.push(space.get_lighting([x, y, z]).as_texel());
                 }
             }
         }
 
+        let ts = extent_to_size3d(self.texture.size());
         write_texture_by_aab(
             queue,
             &self.texture,
-            region.translate(self.light_lookup_offset()),
-            &data,
+            GridAab::from_lower_size(
+                region
+                    .lower_bounds()
+                    .zip(ts.to_vector().to_point(), |coord, size| {
+                        coord.rem_euclid(size)
+                    }),
+                region.size(),
+            ),
+            buffer,
         );
 
-        region.volume().unwrap_or(usize::MAX)
+        volume
     }
 
     pub fn update_all(&mut self, queue: &wgpu::Queue, space: &Space) -> usize {
-        self.update(queue, space, self.texture_bounds);
-        self.texture_bounds.volume().unwrap()
+        let update_bounds = space.bounds().expand(FaceMap::repeat(1));
+        self.update(queue, space, update_bounds);
+        update_bounds.volume().unwrap()
     }
 
     /// Copy many individual cubes of light data.
@@ -99,6 +139,8 @@ impl LightTexture {
         cubes: impl IntoIterator<Item = Cube>,
     ) -> usize {
         let mut total_count = 0;
+
+        let texture_size = extent_to_size3d(self.texture.size());
 
         // Break into batches of our buffer size.
         for cube_batch in &itertools::Itertools::chunks(cubes.into_iter(), Self::COPY_BUFFER_TEXELS)
@@ -128,7 +170,7 @@ impl LightTexture {
                     wgpu::ImageCopyTexture {
                         texture: &self.texture,
                         mip_level: 0,
-                        origin: point_to_origin(cube.lower_bounds() + self.light_lookup_offset()),
+                        origin: point_to_origin(cube.lower_bounds().rem_euclid(&texture_size)),
                         aspect: wgpu::TextureAspect::All,
                     },
                     size3d_to_extent(size3(1, 1, 1)),
@@ -154,12 +196,33 @@ impl LightTexture {
         total_count
     }
 
-    /// Translation from [`Space`] cube coordinates to texel coordinates.
-    pub fn light_lookup_offset(&self) -> GridVector {
-        -self.texture_bounds.lower_bounds().to_vector()
-    }
-
     pub fn texture_view(&self) -> &wgpu::TextureView {
         &self.texture_view
+    }
+}
+
+/// Split `space_range` into two parts if needed to provide wrap-around.
+fn split_axis(
+    space_range: Range,
+    texture_size: i32,
+    buffer: &mut Vec<Texel>,
+    mut function: impl FnMut(Range, &mut Vec<Texel>),
+) {
+    let range_size = space_range.end - space_range.start;
+    assert!(
+        range_size <= texture_size,
+        "update range larger than texture"
+    );
+
+    // *If* the range is to be split, then this is the Space coordinate at which it is split.
+    let first_half_endpoint = (space_range.start.div_euclid(texture_size) + 1) * texture_size;
+
+    if first_half_endpoint < space_range.end {
+        // Range must be split into two parts to wrap around.
+        function(space_range.start..first_half_endpoint, buffer);
+        function(first_half_endpoint..space_range.end, buffer);
+    } else {
+        // Range fits within a single wrap-around.
+        function(space_range, buffer);
     }
 }

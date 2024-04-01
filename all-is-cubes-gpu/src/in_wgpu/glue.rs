@@ -101,13 +101,24 @@ pub fn point_to_origin<U>(origin: Point3D<GridCoordinate, U>) -> wgpu::Origin3d 
     }
 }
 
-/// Convert vector of sizes to [`wgpu::Extent3d`]. Panics if the input is negative.
+/// Convert [`GridSize`] to [`wgpu::Extent3d`]. Panics if the input is negative.
 pub fn size3d_to_extent(size: GridSize) -> wgpu::Extent3d {
     wgpu::Extent3d {
         width: size.width.try_into().expect("negative size"),
         height: size.height.try_into().expect("negative size"),
         depth_or_array_layers: size.depth.try_into().expect("negative size"),
     }
+}
+
+/// Convert [`wgpu::Extent3d`] to [`GridSize`]. Panics if the input overflows.
+pub fn extent_to_size3d(size: wgpu::Extent3d) -> GridSize {
+    GridSize::new(
+        size.width.try_into().expect("overflowing size"),
+        size.height.try_into().expect("overflowing size"),
+        size.depth_or_array_layers
+            .try_into()
+            .expect("overflowing size"),
+    )
 }
 
 pub(crate) struct BeltWritingParts<'sh, 'mu> {

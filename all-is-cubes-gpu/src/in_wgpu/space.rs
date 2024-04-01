@@ -496,10 +496,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         queue.write_buffer(
             &self.camera_buffer.buffer,
             0,
-            bytemuck::bytes_of(&ShaderSpaceCamera::new(
-                camera,
-                self.light_texture.light_lookup_offset(),
-            )),
+            bytemuck::bytes_of(&ShaderSpaceCamera::new(camera)),
         );
 
         render_pass.set_bind_group(0, &self.camera_buffer.bind_group, &[]);
