@@ -4,6 +4,8 @@ use all_is_cubes::space::Space;
 
 use crate::in_wgpu::glue::{point_to_origin, size3d_to_extent, write_texture_by_aab};
 
+type Texel = [u8; LightTexture::COMPONENTS];
+
 /// Keeps a 3D [`Texture`] up to date with the light data from a [`Space`].
 ///
 /// The texels are in [`PackedLight::as_texel()`] form.
@@ -59,7 +61,7 @@ impl LightTexture {
 
     /// Copy the specified region of light data.
     pub fn update(&mut self, queue: &wgpu::Queue, space: &Space, region: GridAab) -> usize {
-        let mut data: Vec<[u8; Self::COMPONENTS]> = Vec::with_capacity(region.volume().unwrap());
+        let mut data: Vec<Texel> = Vec::with_capacity(region.volume().unwrap());
         // TODO: Enable circular operation and eliminate the need for the offset of the
         // coordinates (texture_bounds.lower_bounds() and light_offset in the shader)
         // by doing a coordinate wrap-around -- the shader and the Space will agree
@@ -102,7 +104,7 @@ impl LightTexture {
         for cube_batch in &itertools::Itertools::chunks(cubes.into_iter(), Self::COPY_BUFFER_TEXELS)
         {
             #[allow(clippy::large_stack_arrays)]
-            let mut data: [[u8; Self::COMPONENTS]; Self::COPY_BUFFER_TEXELS] =
+            let mut data: [Texel; Self::COPY_BUFFER_TEXELS] =
                 [[0; Self::COMPONENTS]; Self::COPY_BUFFER_TEXELS];
             let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("space light scatter-copy"),
@@ -143,7 +145,7 @@ impl LightTexture {
             queue.write_buffer(
                 &self.copy_buffer,
                 0,
-                bytemuck::cast_slice::<[u8; Self::COMPONENTS], u8>(&data[..batch_count]),
+                bytemuck::cast_slice::<Texel, u8>(&data[..batch_count]),
             );
 
             queue.submit([encoder.finish()]);
