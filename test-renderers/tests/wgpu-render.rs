@@ -24,8 +24,7 @@ async fn main() -> test_renderers::HarnessResult {
     };
 
     let parallelism = if option_env!("CI").is_some() && cfg!(target_os = "macos") {
-        // Attempted workaround for out-of-memory on macOS CI. If this doesn't help then
-        // the problem must be a leak, not concurrency.
+        // Workaround for limited available memory on macOS CI.
         Some(1)
     } else {
         None
