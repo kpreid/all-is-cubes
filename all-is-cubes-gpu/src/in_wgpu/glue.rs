@@ -1,6 +1,7 @@
 //! Miscellaneous conversion functions and trait impls for [`wgpu`].
 
-use std::ops::Range;
+use core::num::TryFromIntError;
+use core::ops::Range;
 
 use bytemuck::Pod;
 use wgpu::util::DeviceExt as _;
@@ -93,32 +94,40 @@ pub fn write_texture_by_aab<T: Pod>(
 }
 
 /// Convert point to [`wgpu::Origin3d`]. Panics if the input is negative.
+#[inline(never)]
 pub fn point_to_origin<U>(origin: Point3D<GridCoordinate, U>) -> wgpu::Origin3d {
-    wgpu::Origin3d {
-        x: origin.x.try_into().expect("negative origin"),
-        y: origin.y.try_into().expect("negative origin"),
-        z: origin.z.try_into().expect("negative origin"),
-    }
+    (|| -> Result<_, TryFromIntError> {
+        Ok(wgpu::Origin3d {
+            x: origin.x.try_into()?,
+            y: origin.y.try_into()?,
+            z: origin.z.try_into()?,
+        })
+    })()
+    .expect("negative origin")
 }
 
 /// Convert [`GridSize`] to [`wgpu::Extent3d`]. Panics if the input is negative.
 pub fn size3d_to_extent(size: GridSize) -> wgpu::Extent3d {
-    wgpu::Extent3d {
-        width: size.width.try_into().expect("negative size"),
-        height: size.height.try_into().expect("negative size"),
-        depth_or_array_layers: size.depth.try_into().expect("negative size"),
-    }
+    (|| -> Result<_, TryFromIntError> {
+        Ok(wgpu::Extent3d {
+            width: size.width.try_into()?,
+            height: size.height.try_into()?,
+            depth_or_array_layers: size.depth.try_into()?,
+        })
+    })()
+    .expect("negative size")
 }
 
 /// Convert [`wgpu::Extent3d`] to [`GridSize`]. Panics if the input overflows.
 pub fn extent_to_size3d(size: wgpu::Extent3d) -> GridSize {
-    GridSize::new(
-        size.width.try_into().expect("overflowing size"),
-        size.height.try_into().expect("overflowing size"),
-        size.depth_or_array_layers
-            .try_into()
-            .expect("overflowing size"),
-    )
+    (|| -> Result<_, TryFromIntError> {
+        Ok(GridSize::new(
+            size.width.try_into()?,
+            size.height.try_into()?,
+            size.depth_or_array_layers.try_into()?,
+        ))
+    })()
+    .expect("overflowing size")
 }
 
 pub(crate) struct BeltWritingParts<'sh, 'mu> {
