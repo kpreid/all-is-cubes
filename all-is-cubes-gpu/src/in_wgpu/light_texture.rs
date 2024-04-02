@@ -255,22 +255,27 @@ impl LightTexture {
         buffer.clear();
         cfg_if::cfg_if! {
             if #[cfg(feature = "threads")] {
-                // TODO: choose axis to chunk based on which axis is biggest...
-                // ...or better yet, define a general-purpose ParallelGridIter
                 buffer.resize(volume, [0; Self::COMPONENTS]);
-                let chunk_size = volume / region.z_range().len();
+
+                let x_chunk_size = region.x_range().len();
+                let xy_chunk_size = x_chunk_size * region.y_range().len();
                 region
                     .z_range()
                     .into_par_iter()
-                    .zip(buffer.par_chunks_mut(chunk_size))
-                    .for_each(|(z, chunk)| {
-                        let mut i = 0;
-                        for y in region.y_range() {
-                            for x in region.x_range() {
-                                chunk[i] = space.get_lighting([x, y, z]).as_texel();
-                                i += 1;
+                    .zip(buffer.par_chunks_mut(xy_chunk_size))
+                    .for_each(|(z, xy_chunk)| {
+                        region
+                        .y_range()
+                        .into_par_iter()
+                        .zip(xy_chunk.par_chunks_mut(x_chunk_size))
+                        .for_each(|(y, x_chunk)| {
+                            // Not parallelizing this deepest level because in the typical case,
+                            // we're updating either a volume or a plane, which will have at least
+                            // one of a long Y axis or a long Z axis.
+                            for (x, light_value) in region.x_range().zip(x_chunk.iter_mut()) {
+                                *light_value = space.get_lighting([x, y, z]).as_texel();
                             }
-                        }
+                        });
                     });
             } else {
                 // Note: I tried using iproduct!() or flat_map() instead of these nested loops,
