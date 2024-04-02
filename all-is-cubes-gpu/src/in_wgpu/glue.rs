@@ -69,10 +69,10 @@ pub fn write_texture_by_aab<T: Pod>(
     data: &[T],
 ) {
     let volume = region.volume().unwrap();
-    assert_eq!(
-        volume,
-        data.len(),
-        "texture region size does not match supplied data length"
+    let len = data.len();
+    assert!(
+        volume == len,
+        "volume {volume} of texture region {region:?} does not match supplied data length {len}",
     );
 
     queue.write_texture(
