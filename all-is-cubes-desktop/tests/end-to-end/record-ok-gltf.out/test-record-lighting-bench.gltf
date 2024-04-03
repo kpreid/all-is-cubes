@@ -3,68 +3,6 @@
     {
       "bufferView": 0,
       "byteOffset": 0,
-      "count": 1104,
-      "componentType": 5126,
-      "type": "VEC3",
-      "min": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "max": [
-        14.0,
-        2.0,
-        14.0
-      ],
-      "name": "chunk [0, 0, 0] position"
-    },
-    {
-      "bufferView": 0,
-      "byteOffset": 12,
-      "count": 1104,
-      "componentType": 5126,
-      "type": "VEC4",
-      "min": [
-        0.5,
-        0.19272807240486145,
-        0.5,
-        1.0
-      ],
-      "max": [
-        0.854192852973938,
-        0.5,
-        0.9754981994628906,
-        1.0
-      ],
-      "name": "chunk [0, 0, 0] base color"
-    },
-    {
-      "bufferView": 0,
-      "byteOffset": 28,
-      "count": 1104,
-      "componentType": 5126,
-      "type": "VEC2",
-      "min": [
-        0.0,
-        0.0
-      ],
-      "max": [
-        0.0,
-        0.0
-      ],
-      "name": "chunk [0, 0, 0] base color texcoords"
-    },
-    {
-      "bufferView": 1,
-      "byteOffset": 0,
-      "count": 1656,
-      "componentType": 5123,
-      "type": "SCALAR",
-      "name": "chunk [0, 0, 0] opaque index"
-    },
-    {
-      "bufferView": 2,
-      "byteOffset": 0,
       "count": 1680,
       "componentType": 5126,
       "type": "VEC3",
@@ -81,7 +19,7 @@
       "name": "chunk [0, -1, 0] position"
     },
     {
-      "bufferView": 2,
+      "bufferView": 0,
       "byteOffset": 12,
       "count": 1680,
       "componentType": 5126,
@@ -101,7 +39,7 @@
       "name": "chunk [0, -1, 0] base color"
     },
     {
-      "bufferView": 2,
+      "bufferView": 0,
       "byteOffset": 28,
       "count": 1680,
       "componentType": 5126,
@@ -117,12 +55,74 @@
       "name": "chunk [0, -1, 0] base color texcoords"
     },
     {
-      "bufferView": 3,
+      "bufferView": 1,
       "byteOffset": 0,
       "count": 2520,
       "componentType": 5123,
       "type": "SCALAR",
       "name": "chunk [0, -1, 0] opaque index"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 0,
+      "count": 1104,
+      "componentType": 5126,
+      "type": "VEC3",
+      "min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "max": [
+        14.0,
+        2.0,
+        14.0
+      ],
+      "name": "chunk [0, 0, 0] position"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 12,
+      "count": 1104,
+      "componentType": 5126,
+      "type": "VEC4",
+      "min": [
+        0.5,
+        0.19272807240486145,
+        0.5,
+        1.0
+      ],
+      "max": [
+        0.854192852973938,
+        0.5,
+        0.9754981994628906,
+        1.0
+      ],
+      "name": "chunk [0, 0, 0] base color"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 28,
+      "count": 1104,
+      "componentType": 5126,
+      "type": "VEC2",
+      "min": [
+        0.0,
+        0.0
+      ],
+      "max": [
+        0.0,
+        0.0
+      ],
+      "name": "chunk [0, 0, 0] base color texcoords"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 0,
+      "count": 1656,
+      "componentType": 5123,
+      "type": "SCALAR",
+      "name": "chunk [0, 0, 0] opaque index"
     }
   ],
   "asset": {
@@ -131,43 +131,43 @@
   },
   "buffers": [
     {
-      "byteLength": 43056,
-      "name": "chunk [0, 0, 0] data",
+      "byteLength": 65520,
+      "name": "chunk [0, -1, 0] data",
       "uri": "test-record-lighting-bench-mesh-0.glbin"
     },
     {
-      "byteLength": 65520,
-      "name": "chunk [0, -1, 0] data",
+      "byteLength": 43056,
+      "name": "chunk [0, 0, 0] data",
       "uri": "test-record-lighting-bench-mesh-1.glbin"
     }
   ],
   "bufferViews": [
     {
       "buffer": 0,
-      "byteLength": 39744,
-      "byteStride": 36,
-      "name": "chunk [0, 0, 0] vertex",
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 3312,
-      "byteOffset": 39744,
-      "name": "chunk [0, 0, 0] index",
-      "target": 34963
-    },
-    {
-      "buffer": 1,
       "byteLength": 60480,
       "byteStride": 36,
       "name": "chunk [0, -1, 0] vertex",
       "target": 34962
     },
     {
-      "buffer": 1,
+      "buffer": 0,
       "byteLength": 5040,
       "byteOffset": 60480,
       "name": "chunk [0, -1, 0] index",
+      "target": 34963
+    },
+    {
+      "buffer": 1,
+      "byteLength": 39744,
+      "byteStride": 36,
+      "name": "chunk [0, 0, 0] vertex",
+      "target": 34962
+    },
+    {
+      "buffer": 1,
+      "byteLength": 3312,
+      "byteOffset": 39744,
+      "name": "chunk [0, 0, 0] index",
       "target": 34963
     }
   ],
@@ -235,7 +235,7 @@
   ],
   "meshes": [
     {
-      "name": "chunk [0, 0, 0] mesh",
+      "name": "chunk [0, -1, 0] mesh",
       "primitives": [
         {
           "attributes": {
@@ -249,7 +249,7 @@
       ]
     },
     {
-      "name": "chunk [0, -1, 0] mesh",
+      "name": "chunk [0, 0, 0] mesh",
       "primitives": [
         {
           "attributes": {
@@ -282,7 +282,7 @@
       "mesh": 0,
       "translation": [
         0.0,
-        0.0,
+        -32.0,
         0.0
       ]
     },
@@ -290,7 +290,7 @@
       "mesh": 1,
       "translation": [
         0.0,
-        -32.0,
+        0.0,
         0.0
       ]
     }

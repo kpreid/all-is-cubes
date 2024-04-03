@@ -1,8 +1,9 @@
 //! TODO: Most of this glue logic should live in [`all_is_cubes_port`] instead --
 //! all the ingredients to create an animated scene should be there.
 
+use std::collections::BTreeMap;
 use std::fs;
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, Mutex};
 
 use anyhow::Context;
 
@@ -68,24 +69,36 @@ impl MeshRecorder {
     pub fn capture_frame(&mut self, this_frame_number: super::FrameNumber) {
         // TODO: this glue logic belongs in our gltf module and crate,
         // not here
+
+        // `csm.update()` will produce mesh data in a nondeterministic order.
+        // To restore determinism, we need to sort the meshes in this update batch.
+        // The `BTreeMap` will do that for us.
+        let meshes_to_record: Mutex<BTreeMap<MeshId, MeshRecordMsg>> = Mutex::new(BTreeMap::new());
+
         self.csm.update(
             &self.cameras.cameras().world,
             time::DeadlineStd::Whenever,
             |u| {
                 if u.indices_only {
+                    // We don't do depth sorting.
                     return;
                 }
                 // We could probably get away with reusing the cells but this is safer.
                 let new_cell = MeshIndexCell::default();
-                // Ignore error since finish_frame() will catch it anyway
-                let _ = self.scene_sender.send(MeshRecordMsg::AddMesh(
+                meshes_to_record.lock().unwrap().insert(
                     u.mesh_id,
-                    u.mesh.clone(),
-                    Arc::clone(&new_cell),
-                ));
+                    MeshRecordMsg::AddMesh(u.mesh_id, u.mesh.clone(), Arc::clone(&new_cell)),
+                );
                 *u.render_data = new_cell;
             },
         );
+
+        // Deliver meshes in sorted order.
+        for msg in meshes_to_record.into_inner().unwrap().into_values() {
+            // Ignore error since sending FinishFrame will catch it anyway
+            let _ = self.scene_sender.send(msg);
+        }
+
         self.scene_sender
             .send(MeshRecordMsg::FinishFrame(
                 this_frame_number,
