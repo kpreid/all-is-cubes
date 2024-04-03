@@ -784,7 +784,7 @@ mod tests {
             indoc! {"
                 EvaluatedBlock {
                     color: Rgba(1.0, 1.0, 1.0, 1.0),
-                    opaque: FaceMap { nx: true, ny: true, nz: true, px: true, py: true, pz: true },
+                    opaque: {all: true},
                     visible: true,
                     uniform_collision: Some(Hard),
                     resolution: 1,
@@ -835,7 +835,7 @@ mod tests {
                     },
                     color: Rgba(1.0, 1.0, 1.0, 1.0),
                     light_emission: Rgb(1.0, 2.0, 3.0),
-                    opaque: FaceMap { nx: true, ny: true, nz: true, px: false, py: false, pz: false },
+                    opaque: {−all: true, +all: false},
                     visible: true,
                     uniform_collision: None,
                     resolution: 2,

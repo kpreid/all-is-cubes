@@ -15,6 +15,8 @@
 
     - `listen::Notifier::buffer()` and `listen::Buffer` allows creating and sending batches of messages, to improve efficiency over dispatching each message individually to all listeners.
 
+    - `math::FaceMap` now implements `Exhaust`.
+
     - `math::GridSize` type alias for `euclid::Size3D<GridCoordinate, Cube>`.
 
 - `all-is-cubes-mesh` library:
@@ -38,6 +40,7 @@
 
     - `listen::Listener::receive()` now accepts batches of messages instead of single messages, and the `alive()` method has been replaced with a return value from `receive()`. Implementors should review the new requirements documentation.
 
+    - `math::FaceMap`’s `Debug` deduplicates identical elements.
     - `math::GridAab::from_lower_size()` now takes a `GridSize` instead of `GridVector`.
     - `math::GridAab::size()` and `math::Aab::size()` now return `GridSize` instead of `GridVector`.
     

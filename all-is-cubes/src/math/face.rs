@@ -6,6 +6,7 @@ use core::ops::{Index, IndexMut};
 
 use euclid::Vector3D;
 
+use manyfmt::formats::Unquote;
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
@@ -568,7 +569,7 @@ pub struct Faceless;
 
 /// Container for values keyed by [`Face6`]s. Always holds exactly six elements.
 #[allow(clippy::exhaustive_structs)]
-#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, Hash, PartialEq, Eq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct FaceMap<V> {
     /// The value whose key is [`Face6::NX`].
@@ -786,6 +787,47 @@ impl<V> IndexMut<Face6> for FaceMap<V> {
     }
 }
 
+impl<V> fmt::Debug for FaceMap<V>
+where
+    V: fmt::Debug + PartialEq,
+{
+    /// In addition to the usual formatting behaviors, [`FaceMap`] will detect whether
+    /// elements are equal and avoid redundant printing.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+
+        let FaceMap {
+            nx,
+            ny,
+            nz,
+            px,
+            py,
+            pz,
+        } = self;
+
+        let mut dm = f.debug_map();
+
+        if nx == ny && nx == nz && nx == px && nx == py && nx == pz {
+            dm.entry(&"all".refmt(&Unquote), nx);
+        } else if nx == ny && nx == nz && px == py && px == pz {
+            dm.entry(&"−all".refmt(&Unquote), nx);
+            dm.entry(&"+all".refmt(&Unquote), px);
+        } else if nx == px && ny == py && nz == pz {
+            dm.entry(&"x".refmt(&Unquote), nx);
+            dm.entry(&"y".refmt(&Unquote), ny);
+            dm.entry(&"z".refmt(&Unquote), nz);
+        } else {
+            dm.entry(&"−x".refmt(&Unquote), nx);
+            dm.entry(&"−y".refmt(&Unquote), ny);
+            dm.entry(&"−z".refmt(&Unquote), nz);
+            dm.entry(&"+x".refmt(&Unquote), px);
+            dm.entry(&"+y".refmt(&Unquote), py);
+            dm.entry(&"+z".refmt(&Unquote), pz);
+        };
+
+        dm.finish()
+    }
+}
+
 /// The combination of a [`Cube`] and [`Face7`] identifying one face of it or the interior.
 /// This pattern appears in cursor selection and collision detection.
 #[derive(Clone, Copy, Hash, Eq, PartialEq)]
@@ -871,7 +913,10 @@ impl Geometry for CubeFace {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::String;
     use alloc::vec::Vec;
+    use exhaust::Exhaust;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn from_snapped_vector_roundtrip() {
@@ -941,6 +986,82 @@ mod tests {
     }
 
     // TODO: More tests of face.face_transform()
+
+    #[test]
+    fn face_map_debug_cmp() {
+        let strings = FaceMap::<bool>::exhaust()
+            .map(|fm| format!("{fm:?}"))
+            .collect::<Vec<String>>();
+        assert_eq!(
+            strings.iter().map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "{all: false}",
+                "{−x: false, −y: false, −z: false, +x: false, +y: false, +z: true}",
+                "{−x: false, −y: false, −z: false, +x: false, +y: true, +z: false}",
+                "{−x: false, −y: false, −z: false, +x: false, +y: true, +z: true}",
+                "{−x: false, −y: false, −z: false, +x: true, +y: false, +z: false}",
+                "{−x: false, −y: false, −z: false, +x: true, +y: false, +z: true}",
+                "{−x: false, −y: false, −z: false, +x: true, +y: true, +z: false}",
+                "{−all: false, +all: true}",
+                "{−x: false, −y: false, −z: true, +x: false, +y: false, +z: false}",
+                "{x: false, y: false, z: true}",
+                "{−x: false, −y: false, −z: true, +x: false, +y: true, +z: false}",
+                "{−x: false, −y: false, −z: true, +x: false, +y: true, +z: true}",
+                "{−x: false, −y: false, −z: true, +x: true, +y: false, +z: false}",
+                "{−x: false, −y: false, −z: true, +x: true, +y: false, +z: true}",
+                "{−x: false, −y: false, −z: true, +x: true, +y: true, +z: false}",
+                "{−x: false, −y: false, −z: true, +x: true, +y: true, +z: true}",
+                "{−x: false, −y: true, −z: false, +x: false, +y: false, +z: false}",
+                "{−x: false, −y: true, −z: false, +x: false, +y: false, +z: true}",
+                "{x: false, y: true, z: false}",
+                "{−x: false, −y: true, −z: false, +x: false, +y: true, +z: true}",
+                "{−x: false, −y: true, −z: false, +x: true, +y: false, +z: false}",
+                "{−x: false, −y: true, −z: false, +x: true, +y: false, +z: true}",
+                "{−x: false, −y: true, −z: false, +x: true, +y: true, +z: false}",
+                "{−x: false, −y: true, −z: false, +x: true, +y: true, +z: true}",
+                "{−x: false, −y: true, −z: true, +x: false, +y: false, +z: false}",
+                "{−x: false, −y: true, −z: true, +x: false, +y: false, +z: true}",
+                "{−x: false, −y: true, −z: true, +x: false, +y: true, +z: false}",
+                "{x: false, y: true, z: true}",
+                "{−x: false, −y: true, −z: true, +x: true, +y: false, +z: false}",
+                "{−x: false, −y: true, −z: true, +x: true, +y: false, +z: true}",
+                "{−x: false, −y: true, −z: true, +x: true, +y: true, +z: false}",
+                "{−x: false, −y: true, −z: true, +x: true, +y: true, +z: true}",
+                "{−x: true, −y: false, −z: false, +x: false, +y: false, +z: false}",
+                "{−x: true, −y: false, −z: false, +x: false, +y: false, +z: true}",
+                "{−x: true, −y: false, −z: false, +x: false, +y: true, +z: false}",
+                "{−x: true, −y: false, −z: false, +x: false, +y: true, +z: true}",
+                "{x: true, y: false, z: false}",
+                "{−x: true, −y: false, −z: false, +x: true, +y: false, +z: true}",
+                "{−x: true, −y: false, −z: false, +x: true, +y: true, +z: false}",
+                "{−x: true, −y: false, −z: false, +x: true, +y: true, +z: true}",
+                "{−x: true, −y: false, −z: true, +x: false, +y: false, +z: false}",
+                "{−x: true, −y: false, −z: true, +x: false, +y: false, +z: true}",
+                "{−x: true, −y: false, −z: true, +x: false, +y: true, +z: false}",
+                "{−x: true, −y: false, −z: true, +x: false, +y: true, +z: true}",
+                "{−x: true, −y: false, −z: true, +x: true, +y: false, +z: false}",
+                "{x: true, y: false, z: true}",
+                "{−x: true, −y: false, −z: true, +x: true, +y: true, +z: false}",
+                "{−x: true, −y: false, −z: true, +x: true, +y: true, +z: true}",
+                "{−x: true, −y: true, −z: false, +x: false, +y: false, +z: false}",
+                "{−x: true, −y: true, −z: false, +x: false, +y: false, +z: true}",
+                "{−x: true, −y: true, −z: false, +x: false, +y: true, +z: false}",
+                "{−x: true, −y: true, −z: false, +x: false, +y: true, +z: true}",
+                "{−x: true, −y: true, −z: false, +x: true, +y: false, +z: false}",
+                "{−x: true, −y: true, −z: false, +x: true, +y: false, +z: true}",
+                "{x: true, y: true, z: false}",
+                "{−x: true, −y: true, −z: false, +x: true, +y: true, +z: true}",
+                "{−all: true, +all: false}",
+                "{−x: true, −y: true, −z: true, +x: false, +y: false, +z: true}",
+                "{−x: true, −y: true, −z: true, +x: false, +y: true, +z: false}",
+                "{−x: true, −y: true, −z: true, +x: false, +y: true, +z: true}",
+                "{−x: true, −y: true, −z: true, +x: true, +y: false, +z: false}",
+                "{−x: true, −y: true, −z: true, +x: true, +y: false, +z: true}",
+                "{−x: true, −y: true, −z: true, +x: true, +y: true, +z: false}",
+                "{all: true}",
+            ],
+        );
+    }
 
     /// Test the ordering of all [`FaceMap`] methods that explicitly produce an ordered result.
     #[test]
