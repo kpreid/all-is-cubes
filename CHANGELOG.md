@@ -5,6 +5,8 @@
 ### Added
 
 - `all-is-cubes` library:
+    - `color_block!` macro is a constant, non-allocating version of `Block::from(Rgba::new(...))`.
+
     - `block::Resolution::MAX` provides the maximum available resolution.
       This value is not planned to change, 
     - `block::AnimationHint` now offers constructor functions `redefinition()` and `replacement()` for the common case of setting one of its fields to a specific `AnimationChange`.

@@ -20,6 +20,55 @@ use crate::raycast::Ray;
 use crate::space::{SetCubeError, Space, SpaceChange};
 use crate::universe::{Handle, HandleVisitor, VisitHandles};
 
+/// Construct a [`Block`] with the given reflectance color, and default attributes.
+///
+/// This is equivalent to calling `Block::from()`, except that:
+///
+/// * the arguments must be constant expressions,
+/// * no allocations are performed, and
+/// * the value may be used in `const` evaluation.
+///
+/// The color may be specified as an expression which returns [`Rgb`] or [`Rgba`], or as three
+/// or four [`f32`] literal color components.
+///
+/// ```
+/// use all_is_cubes::{block::Block, color_block, math::Rgb, rgb_const};
+///
+/// assert_eq!(
+///     color_block!(rgb_const!(1.0, 0.5, 0.0)),
+///     Block::from(Rgb::new(1.0, 0.5, 0.0)),
+/// );
+///
+/// assert_eq!(
+///     color_block!(rgb_const!(1.0, 0.5, 0.0)),
+///     color_block!(1.0, 0.5, 0.0),
+/// );
+///
+/// assert_eq!(
+///     color_block!(1.0, 0.5, 0.0),
+///     color_block!(1.0, 0.5, 0.0, 1.0),
+/// );
+/// ```
+// ---
+// Must declare this macro before child modules, so they can use it.
+#[macro_export]
+macro_rules! color_block {
+    ($color:expr) => {{
+        const PRIMITIVE: &$crate::block::Primitive =
+            &$crate::block::Primitive::from_color($color.with_alpha_one_if_has_no_alpha());
+
+        $crate::block::Block::from_static_primitive(PRIMITIVE)
+    }};
+
+    ($r:literal, $g:literal, $b:literal $(,)?) => {
+        $crate::color_block!($crate::rgb_const!($r, $g, $b))
+    };
+
+    ($r:literal, $g:literal, $b:literal, $a:literal $(,)?) => {
+        $crate::color_block!($crate::rgba_const!($r, $g, $b, $a))
+    };
+}
+
 mod attributes;
 pub use attributes::*;
 
@@ -212,8 +261,11 @@ impl Block {
         }
     }
 
-    /// Construct a [`Block`] from a [`Primitive`] constant.
-    #[doc(hidden)] // used in mesh tests
+    /// Constructs a [`Block`] which references the given static [`Primitive`].
+    ///
+    /// This performs no allocation.
+    /// It is also available as a [`From`] implementation.
+    #[doc(hidden)] // used by `color_block!()`, but I'm not sure whether to make it really public
     pub const fn from_static_primitive(r: &'static Primitive) -> Self {
         Block(BlockPtr::Static(r))
     }
@@ -637,12 +689,18 @@ impl VisitHandles for Block {
 }
 
 impl From<&'static Primitive> for Block {
+    /// Constructs a [`Block`] which references the given static [`Primitive`].
+    ///
+    /// This performs no allocation.
     fn from(r: &'static Primitive) -> Self {
         Block(BlockPtr::Static(r))
     }
 }
 
 impl From<Primitive> for Block {
+    /// Constructs a [`Block`] that owns the given [`Primitive`].
+    ///
+    /// This operation creates a heap allocation for the [`Primitive`].
     fn from(primitive: Primitive) -> Self {
         Block::from_primitive(primitive)
     }
@@ -665,26 +723,38 @@ impl<'a> From<&'a Block> for Cow<'a, Block> {
 
 // Converting colors to blocks.
 impl From<Rgb> for Block {
-    /// Convert a color to a block with default attributes.
+    /// Constructs a [`Block`] with the given reflectance color, and default attributes.
+    ///
+    /// This operation allocates a new [`Primitive`] value on the heap.
+    /// If the color is a constant, you may use [`color_block!`] instead to avoid allocation.
     fn from(color: Rgb) -> Self {
         Block::from(color.with_alpha_one())
     }
 }
 impl From<Rgba> for Block {
-    /// Convert a color to a block with default attributes.
+    /// Construct a [`Block`] with the given reflectance color, and default attributes.
+    ///
+    /// This operation allocates a new [`Primitive`] value on the heap.
+    /// If the color is a constant, you may use [`color_block!`] instead to avoid allocation.
     fn from(color: Rgba) -> Self {
         Block::from_primitive(Primitive::Atom(Atom::from(color)))
     }
 }
 // TODO: Eliminate these Cow impls given the new Block-is-a-pointer world.
 impl From<Rgb> for Cow<'_, Block> {
-    /// Convert a color to a block with default attributes.
+    /// Construct a [`Block`] with the given reflectance color, and default attributes.
+    ///
+    /// This operation allocates a new [`Primitive`] value on the heap.
+    /// If the color is a constant, you may use [`color_block!`] instead to avoid allocation.
     fn from(color: Rgb) -> Self {
         Cow::Owned(Block::from(color))
     }
 }
 impl From<Rgba> for Cow<'_, Block> {
-    /// Convert a color to a block with default attributes.
+    /// Construct a [`Block`] with the given reflectance color, and default attributes.
+    ///
+    /// This operation allocates a new [`Primitive`] value on the heap.
+    /// If the color is a constant, you may use [`color_block!`] instead to avoid allocation.
     fn from(color: Rgba) -> Self {
         Cow::Owned(Block::from(color))
     }
@@ -789,6 +859,16 @@ pub(crate) fn recursive_ray(ray: Ray, cube: Cube, resolution: Resolution) -> Ray
     }
 }
 
+// TODO: uncomfortable with where this impl block is located
+impl Primitive {
+    /// Construct a [`Primitive`] from a reflectance color.
+    ///
+    /// This function is equivalent to `Block::from(color)` but it can be used in const contexts.
+    pub const fn from_color(color: Rgba) -> Primitive {
+        Primitive::Atom(Atom::from_color(color))
+    }
+}
+
 impl fmt::Debug for Primitive {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -872,21 +952,31 @@ impl VisitHandles for Atom {
 mod conversions_for_atom {
     use super::*;
 
-    impl From<Rgb> for Atom {
-        /// Convert a color to an [`Atom`] with default attributes.
-        fn from(color: Rgb) -> Self {
-            Atom::from(color.with_alpha_one())
-        }
-    }
-    impl From<Rgba> for Atom {
-        /// Convert a color to an [`Atom`] with default attributes.
-        fn from(color: Rgba) -> Self {
+    impl Atom {
+        /// Construct an [`Atom`] with the given reflectance color, and default attributes.
+        ///
+        /// This is identical to `From<Rgba>::from()` except that it is a `const fn`.
+        // TODO: public API?
+        pub(crate) const fn from_color(color: Rgba) -> Self {
             Atom {
                 attributes: BlockAttributes::default(),
                 color,
                 emission: Rgb::ZERO,
                 collision: BlockCollision::DEFAULT_FOR_FROM_COLOR,
             }
+        }
+    }
+
+    impl From<Rgb> for Atom {
+        /// Construct an [`Atom`] with the given reflectance color, and default attributes.
+        fn from(color: Rgb) -> Self {
+            Self::from_color(color.with_alpha_one())
+        }
+    }
+    impl From<Rgba> for Atom {
+        /// Construct an [`Atom`] with the given reflectance color, and default attributes.
+        fn from(color: Rgba) -> Self {
+            Self::from_color(color)
         }
     }
 

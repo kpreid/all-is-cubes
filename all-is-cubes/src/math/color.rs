@@ -129,6 +129,15 @@ impl Rgb {
         self.with_alpha(NN1)
     }
 
+    /// Adds an alpha component of `1.0` (fully opaque) to produce an [Rgba] color.
+    /// This is for compile-time duck-typed use by the [`color_block!`] macro.
+    #[doc(hidden)]
+    #[inline]
+    #[must_use]
+    pub const fn with_alpha_one_if_has_no_alpha(self) -> Rgba {
+        self.with_alpha(NN1)
+    }
+
     /// Returns the red color component. Values are linear (gamma = 1).
     #[inline]
     pub const fn red(self) -> NotNan<f32> {
@@ -226,6 +235,15 @@ impl Rgba {
     #[inline]
     pub fn from_luminance(luminance: f32) -> Self {
         Rgb::new(luminance, luminance, luminance).with_alpha_one()
+    }
+
+    /// Returns the color unchanged.
+    /// This is for compile-time duck-typed use by the [`color_block!`] macro.
+    #[doc(hidden)]
+    #[inline]
+    #[must_use]
+    pub const fn with_alpha_one_if_has_no_alpha(self) -> Rgba {
+        self
     }
 
     /// Returns the red color component. Values are linear (gamma = 1) and not premultiplied.
