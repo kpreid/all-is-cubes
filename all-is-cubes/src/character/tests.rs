@@ -2,8 +2,9 @@ use alloc::sync::Arc;
 
 use euclid::{point3, Vector3D};
 
-use crate::block::{Block, AIR};
+use crate::block::AIR;
 use crate::character::{cursor_raycast, Character, CharacterChange, CharacterTransaction, Spawn};
+use crate::color_block;
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::{Listen as _, Sink};
 use crate::math::{Aab, Face6, GridAab, Rgb};
@@ -42,9 +43,9 @@ fn spawn_inferred_position() {
 
 #[test]
 fn spawn_inventory() {
-    let inventory_data = vec![Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(
+    let inventory_data = vec![Slot::from(Tool::InfiniteBlocks(color_block!(
         0.1, 0.2, 0.3
-    ))))];
+    )))];
     let character = test_spawn(|space| {
         let mut spawn = Spawn::default_for_new_space(space.bounds());
         spawn.set_inventory(inventory_data.clone());
@@ -112,9 +113,9 @@ fn transaction_systematic() {
     let space = Space::empty_positive(1, 1, 1);
     let space_handle = universe.insert_anonymous(space);
 
-    let old_item = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(1.0, 0.0, 0.0))));
-    let new_item_1 = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 1.0, 0.0))));
-    let new_item_2 = Slot::from(Tool::InfiniteBlocks(Block::from(rgb_const!(0.0, 0.0, 1.0))));
+    let old_item = Slot::from(Tool::InfiniteBlocks(color_block!(1.0, 0.0, 0.0)));
+    let new_item_1 = Slot::from(Tool::InfiniteBlocks(color_block!(0.0, 1.0, 0.0)));
+    let new_item_2 = Slot::from(Tool::InfiniteBlocks(color_block!(0.0, 0.0, 1.0)));
 
     let new_space_1 = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
     let new_space_2 = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
@@ -198,7 +199,7 @@ fn no_superjumping() {
     let mut universe = Universe::new();
     let space = universe.insert_anonymous(
         Space::builder(GridAab::ORIGIN_CUBE)
-            .filled_with(Block::from(Rgb::ONE))
+            .filled_with(color_block!(Rgb::ONE))
             .build(),
     );
     let mut character = Character::spawn_default(space);
@@ -233,7 +234,7 @@ fn click_wrong_space_or_correct_space() {
         // something for the raycast to hit
         universe.insert_anonymous(
             Space::builder(GridAab::ORIGIN_CUBE)
-                .filled_with(Block::from(Rgb::ONE))
+                .filled_with(color_block!(Rgb::ONE))
                 .build(),
         )
     };

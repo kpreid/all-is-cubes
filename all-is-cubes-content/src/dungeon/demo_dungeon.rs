@@ -24,7 +24,7 @@ use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::{include_image, rgb_const};
+use all_is_cubes::{color_block, include_image};
 
 use crate::alg::four_walls;
 use crate::dungeon::{build_dungeon, generate_maze, DungeonGrid, MazeRoomKind, Theme};
@@ -239,8 +239,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
         };
 
         // TODO: put in struct, or eliminate
-        let start_wall = Block::from(rgb_const!(1.0, 0.0, 0.0));
-        let goal_wall = Block::from(rgb_const!(0.0, 0.8, 0.0));
+        let start_wall = color_block!(1.0, 0.0, 0.0);
+        let goal_wall = color_block!(0.0, 0.8, 0.0);
 
         let interior = self.actual_room_box(room_position, room_data);
         let wall_type = match room_data.maze_kind {
@@ -643,7 +643,7 @@ pub async fn install_dungeon_blocks(
         .color(Rgba::new(0.7, 0.7, 0.0, 1.0))
         .light_emission(Rgb::new(8.0, 7.0, 0.7) * 0.5)
         .build();
-    let spike_metal = Block::from(palette::STEEL);
+    let spike_metal = color_block!(palette::STEEL);
 
     BlockProvider::<DungeonBlocks>::new(progress, |key| {
         Ok(match key {

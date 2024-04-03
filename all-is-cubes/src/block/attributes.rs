@@ -484,7 +484,7 @@ mod tests {
         );
         assert_eq!(
             &*debug(BlockAttributes {
-                animation_hint: AnimationHint::replacement(AnimationChange::Shape,),
+                animation_hint: AnimationHint::replacement(AnimationChange::Shape),
                 ..default()
             }),
             "BlockAttributes { animation_hint: \

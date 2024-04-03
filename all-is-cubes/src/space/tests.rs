@@ -14,6 +14,7 @@ use crate::block::{
     Atom, Block, BlockDef, BlockDefTransaction, EvalBlockError, Primitive, Resolution::*,
     TickAction, AIR,
 };
+use crate::color_block;
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::fluff::{self, Fluff};
@@ -338,7 +339,7 @@ fn fill_out_of_bounds() {
 /// Test filling an entire space with one block using [`Space::fill`].
 #[test]
 fn fill_entire_space() {
-    let block = Block::from(Rgba::new(0., 0., 0., 0.5)); // transparent so light gets involved
+    let block = color_block!(0., 0., 0., 0.5); // transparent so light gets involved
     let bounds = GridAab::from_lower_size([0, 3, 0], [25 * 16, 16, 2]);
     let mut space = Space::empty(bounds);
 
@@ -395,7 +396,7 @@ fn replace_last_block_regression() {
 fn listens_to_block_changes() {
     // Set up indirect block
     let mut universe = Universe::new();
-    let block_def_handle = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
+    let block_def_handle = universe.insert_anonymous(BlockDef::new(color_block!(Rgba::WHITE)));
     let indirect = Block::from(block_def_handle.clone());
 
     // Set up space and listener
@@ -407,7 +408,7 @@ fn listens_to_block_changes() {
     assert_eq!(sink.drain(), vec![]);
 
     // Now mutate the block def .
-    let new_block = Block::from(Rgba::BLACK);
+    let new_block = color_block!(Rgba::BLACK);
     let new_evaluated = new_block.evaluate().unwrap();
     block_def_handle
         .execute(
@@ -433,7 +434,7 @@ fn indirect_becomes_evaluation_error() {
     // (because right now, a Handle going away is silent...)
     let mut universe = Universe::new();
     let block_def_ref = universe
-        .insert(block_name.clone(), BlockDef::new(Block::from(Rgba::WHITE)))
+        .insert(block_name.clone(), BlockDef::new(color_block!(Rgba::WHITE)))
         .unwrap();
     let block = Block::from(block_def_ref.clone());
 

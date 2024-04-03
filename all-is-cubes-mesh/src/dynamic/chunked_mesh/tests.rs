@@ -12,7 +12,8 @@ use all_is_cubes::math::{Cube, FreePoint, GridAab, GridCoordinate};
 use all_is_cubes::math::{GridPoint, NotNan};
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange, SpaceTransaction};
 use all_is_cubes::universe::{Handle, Universe};
-use all_is_cubes::{notnan, rgba_const, time, transaction};
+use all_is_cubes::{color_block, notnan};
+use all_is_cubes::{time, transaction};
 
 use crate::texture::NoTextures;
 use crate::{dynamic, testing};
@@ -237,11 +238,7 @@ fn sort_view_every_frame_only_if_transparent() {
     tester
         .space
         .execute(
-            &SpaceTransaction::set_cube(
-                [0, 0, 0],
-                None,
-                Some(Block::from(rgba_const!(1.0, 1.0, 1.0, 0.5))),
-            ),
+            &SpaceTransaction::set_cube([0, 0, 0], None, Some(color_block!(1.0, 1.0, 1.0, 0.5))),
             &mut transaction::no_outputs,
         )
         .unwrap();
@@ -271,7 +268,7 @@ fn graphics_options_change() {
 
     let mut space = Space::empty_positive(1, 1, 1);
     space
-        .set([0, 0, 0], Block::from(rgba_const!(1., 1., 1., 0.25)))
+        .set([0, 0, 0], color_block!(1., 1., 1., 0.25))
         .unwrap();
 
     let mut tester: CsmTester<NO_INSTANCES> = CsmTester::new(space, 200.0);

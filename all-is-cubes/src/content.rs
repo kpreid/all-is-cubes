@@ -16,6 +16,7 @@ use embedded_graphics::text::TextStyleBuilder;
 
 use crate::arcstr::{literal, ArcStr};
 use crate::block::{Block, Resolution, Resolution::R16, RotationPlacementRule};
+use crate::color_block;
 use crate::inv::{Slot, Tool};
 use crate::math::{Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, Rgb, Rgba};
 use crate::raycast::Raycaster;
@@ -156,7 +157,7 @@ pub fn make_slab_txn(
     denominator: Resolution,
 ) -> Block {
     let voxel_palette = [
-        Block::from(palette::PLANK),
+        color_block!(palette::PLANK),
         Block::from(palette::PLANK * 1.06),
     ];
     let bounds = GridAab::from_lower_size(

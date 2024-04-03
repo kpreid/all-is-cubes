@@ -4,6 +4,7 @@ use pretty_assertions::assert_eq;
 
 use super::{data::LightStatus, LightUpdatesInfo, PackedLight, Priority};
 use crate::block::{self, Block, AIR};
+use crate::color_block;
 use crate::listen::{Listen as _, Listener, Sink};
 use crate::math::{Cube, Face6, FaceMap, GridPoint, Rgb, Rgba};
 use crate::space::{GridAab, LightPhysics, Sky, Space, SpaceChange, SpacePhysics};
@@ -19,7 +20,7 @@ fn initial_value_in_empty_space() {
 #[test]
 fn initial_value_in_filled_space() {
     let space = Space::builder(GridAab::ORIGIN_CUBE)
-        .filled_with(Block::from(Rgba::WHITE))
+        .filled_with(color_block!(Rgba::WHITE))
         .build();
     assert_eq!(PackedLight::OPAQUE, space.get_lighting([0, 0, 0]));
 }
@@ -36,7 +37,7 @@ fn initial_value_initialized_after_creation() {
 
     // Put a block in it so this is not a trivial case, and activate lighting.
     space
-        .set([1, 1, 1], Block::from(Rgba::new(1.0, 0.0, 0.0, 1.0)))
+        .set([1, 1, 1], color_block!(1.0, 0.0, 0.0, 1.0))
         .unwrap();
     space.set_physics(SpacePhysics {
         light: LightPhysics::Rays {
@@ -139,7 +140,7 @@ fn set_cube_opaque_notification() {
     // Self-test that the initial condition is not trivially the answer we're looking for
     assert_ne!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
 
-    space.set([0, 0, 0], Block::from(Rgb::ONE)).unwrap();
+    space.set([0, 0, 0], color_block!(Rgb::ONE)).unwrap();
 
     assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(
@@ -218,7 +219,7 @@ fn animation_treated_as_visible() {
         ]
     }
     let no_block = eval_mid_block(AIR);
-    let visible_block = eval_mid_block(Block::from(rgba_const!(1.0, 1.0, 1.0, 0.5)));
+    let visible_block = eval_mid_block(color_block!(1.0, 1.0, 1.0, 0.5));
     let invisible_but_animated = eval_mid_block(
         Block::builder()
             .color(Rgba::TRANSPARENT)
@@ -239,7 +240,7 @@ fn animation_treated_as_visible() {
 
 #[test]
 fn reflectance_is_clamped() {
-    let over_unity_block = Block::from(rgba_const!(16.0, 1.0, 0.0, 1.0));
+    let over_unity_block = color_block!(16.0, 1.0, 0.0, 1.0);
     let sky_color = rgb_const!(0.5, 0.5, 0.5);
     let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [5, 3, 3]))
         .sky_color(sky_color)

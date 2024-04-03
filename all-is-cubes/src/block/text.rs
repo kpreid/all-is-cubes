@@ -554,7 +554,7 @@ impl Default for TextBuilder {
         Self {
             string: ArcStr::new(),
             font: Font::System16,
-            foreground: Block::from(palette::ALMOST_BLACK), // TODO: wish this wasn't a repeated allocation
+            foreground: color_block!(palette::ALMOST_BLACK),
             outline: None,
             resolution: Resolution::R16,
             layout_bounds: None,

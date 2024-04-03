@@ -24,7 +24,7 @@ use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::time::{self, Tick};
 use crate::transaction::Transaction as _;
 use crate::universe::{Handle, Name, PartialUniverse, Universe};
-use crate::{behavior, op};
+use crate::{behavior, color_block, op};
 
 #[track_caller]
 /// Serialize and deserialize and assert the value is equal.
@@ -154,7 +154,7 @@ fn block_air() {
 #[test]
 fn block_atom_default() {
     assert_round_trip_value(
-        &Block::from(Rgba::new(1.0, 0.5, 0.0, 0.5)),
+        &color_block!(1.0, 0.5, 0.0, 0.5),
         json!({
             "type": "BlockV1",
             "primitive": {
@@ -232,7 +232,7 @@ fn block_text_without_optional() {
                 text::Text::builder()
                     .string(literal!("hello"))
                     .font(text::Font::System16) // TODO: use a nondefault font once such are stable
-                    .foreground(Block::from(rgba_const!(1.0, 0.0, 0.0, 1.0)))
+                    .foreground(color_block!(1.0, 0.0, 0.0, 1.0))
                     .layout_bounds(
                         Resolution::R32,
                         GridAab::from_lower_upper([0, 1, 2], [3, 4, 5]),
@@ -288,8 +288,8 @@ fn block_text_with_optional() {
                 text::Text::builder()
                     .string(literal!("hello"))
                     .font(text::Font::System16) // TODO: use a nondefault font once such are stable
-                    .foreground(Block::from(rgba_const!(1.0, 0.0, 0.0, 1.0)))
-                    .outline(Some(Block::from(rgba_const!(0.0, 1.0, 0.0, 1.0))))
+                    .foreground(color_block!(1.0, 0.0, 0.0, 1.0))
+                    .outline(Some(color_block!(0.0, 1.0, 0.0, 1.0)))
                     .layout_bounds(
                         Resolution::R32,
                         GridAab::from_lower_upper([0, 1, 2], [3, 4, 5]),

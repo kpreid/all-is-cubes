@@ -433,16 +433,15 @@ fn on_faces(bounds: GridAab, cube: Cube) -> FaceMap<bool> {
 
 #[cfg(test)]
 mod tests {
-    use crate::math::Rgba;
-
     use super::*;
+    use crate::color_block;
 
     /// Test that funny box sizes (e.g. zero in some axis) don't cause panics.
     #[test]
     fn box_smoke_test() {
         let style = BoxStyle::from_composited_corner_and_edge(
-            Block::from(Rgba::new(1., 0., 0., 1.)),
-            Block::from(Rgba::new(0., 0., 1., 1.)),
+            color_block!(1., 0., 0., 1.),
+            color_block!(0., 0., 1., 1.),
         );
         for aab in [
             GridAab::ORIGIN_CUBE,

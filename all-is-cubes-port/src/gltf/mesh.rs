@@ -267,15 +267,15 @@ impl Materials {
 mod tests {
     use super::*;
     use crate::gltf::{tests::gltf_mesh, GltfDataDestination};
-    use all_is_cubes::block::Block;
-    use all_is_cubes::math::{GridAab, Rgba};
+    use all_is_cubes::color_block;
+    use all_is_cubes::math::GridAab;
     use all_is_cubes::space::Space;
     use std::time::Duration;
 
     #[test]
     fn no_extra_indices_when_transparent() {
         let space = Space::builder(GridAab::ORIGIN_CUBE)
-            .filled_with(Block::from(Rgba::new(0., 0., 0., 0.5)))
+            .filled_with(color_block!(0., 0., 0., 0.5))
             .build();
 
         let mut writer = GltfWriter::new(GltfDataDestination::null());

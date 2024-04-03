@@ -1,14 +1,14 @@
 //! A space with miscellaneous demonstrations/tests of functionality.
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
-use all_is_cubes::block::text::Font;
 use alloc::{sync::Arc, vec::Vec};
 
 use itertools::Itertools;
 use rand::{Rng, SeedableRng as _};
 
-use all_is_cubes::block::{self, Block, BlockAttributes, Resolution::*, AIR};
+use all_is_cubes::block::{self, text::Font, BlockAttributes, Resolution::*, AIR};
 use all_is_cubes::character::Spawn;
+use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::text::{Alignment, Baseline, TextStyleBuilder};
 use all_is_cubes::drawing::VoxelBrush;
@@ -699,7 +699,7 @@ fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
             vui::leaf_widget(widgets::LargeText {
                 text: exhibit.name.into(),
                 font: Font::System16,
-                brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
+                brush: VoxelBrush::single(color_block!(palette::ALMOST_BLACK)),
                 text_style: TextStyleBuilder::new()
                     .alignment(Alignment::Center)
                     .baseline(Baseline::Middle)
@@ -718,7 +718,7 @@ fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
                 }
                 .into(),
                 font: Font::SmallerBodyText,
-                brush: VoxelBrush::single(Block::from(palette::ALMOST_BLACK)),
+                brush: VoxelBrush::single(color_block!(palette::ALMOST_BLACK)),
                 text_style: TextStyleBuilder::new()
                     .alignment(Alignment::Center)
                     .baseline(Baseline::Middle)

@@ -141,6 +141,7 @@ mod tests {
 
     use super::*;
     use crate::block::{Block, Resolution::R4};
+    use crate::color_block;
     use crate::content::make_some_blocks;
     use crate::universe::Universe;
 
@@ -209,7 +210,7 @@ mod tests {
         let mut universe = Universe::new();
         let mut block_space = Space::empty_positive(4, 2, 4);
         block_space
-            .fill_uniform(block_space.bounds(), &Block::from(Rgba::WHITE))
+            .fill_uniform(block_space.bounds(), &color_block!(Rgba::WHITE))
             .unwrap();
         let space_handle = universe.insert_anonymous(block_space);
         let partial_block = Block::builder()

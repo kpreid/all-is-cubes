@@ -776,7 +776,7 @@ mod tests {
 
     #[test]
     fn evaluated_block_debug_simple() {
-        let ev = Block::from(Rgba::WHITE).evaluate().unwrap();
+        let ev = color_block!(Rgba::WHITE).evaluate().unwrap();
 
         // not testing the one-line version because it'll be not too surprising
         assert_eq!(

@@ -450,9 +450,7 @@ mod tests {
                 .selectable(false)
                 .light_emission(emission)
                 .tick_action(tick_action.clone())
-                .animation_hint(AnimationHint::replacement(
-                    block::AnimationChange::Shape,
-                ))
+                .animation_hint(AnimationHint::replacement(block::AnimationChange::Shape))
                 .build(),
             Block::from(Atom {
                 attributes: BlockAttributes {
@@ -460,9 +458,7 @@ mod tests {
                     rotation_rule,
                     selectable: false,
                     tick_action,
-                    animation_hint: AnimationHint::replacement(
-                        block::AnimationChange::Shape,
-                    ),
+                    animation_hint: AnimationHint::replacement(block::AnimationChange::Shape),
                 },
                 color,
                 emission,
@@ -499,7 +495,7 @@ mod tests {
 
         let resolution = R4;
         let expected_bounds = GridAab::for_block(resolution);
-        let atom = Block::from(palette::DIRT);
+        let atom = color_block!(palette::DIRT);
         let block = Block::builder()
             .display_name("hello world")
             .voxels_fn(resolution, |_cube| &atom)
@@ -543,7 +539,7 @@ mod tests {
 
         let resolution = R4;
         let expected_bounds = GridAab::from_lower_upper([0, 0, 0], [2, 4, 4]);
-        let atom = Block::from(palette::DIRT);
+        let atom = color_block!(palette::DIRT);
         let block = Block::builder()
             .display_name("hello world")
             .voxels_fn(resolution, |cube| {

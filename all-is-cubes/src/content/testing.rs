@@ -3,6 +3,7 @@ use rand_xoshiro::Xoshiro256Plus;
 
 use crate::block::{Block, AIR};
 use crate::character::Spawn;
+use crate::color_block;
 use crate::content::{free_editing_starter_inventory, palette};
 use crate::linking::InGenError;
 use crate::math::{Face6, FaceMap, GridAab, GridSize, Rgba};
@@ -64,7 +65,7 @@ pub async fn lighting_bench_space(
     space
         .fill_uniform(
             space_bounds.expand(FaceMap::default().with(Face6::PY, -yup)),
-            &Block::from(rgb_const!(0.5, 0.5, 0.5)),
+            &color_block!(0.5, 0.5, 0.5),
         )
         .unwrap();
 

@@ -1,5 +1,3 @@
-use all_is_cubes::arcstr::ArcStr;
-use all_is_cubes::euclid::vec3;
 use alloc::sync::Arc;
 use core::fmt;
 use core::hash::Hash;
@@ -8,12 +6,15 @@ use std::error::Error;
 
 use exhaust::Exhaust;
 
+use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::behavior::BehaviorSetTransaction;
-use all_is_cubes::block::builder::BlockBuilderVoxels;
 use all_is_cubes::block::{
-    self, Block, BlockBuilder,
+    self,
+    builder::BlockBuilderVoxels,
+    Block, BlockBuilder,
     Resolution::{self, *},
 };
+use all_is_cubes::color_block;
 use all_is_cubes::content::load_image::{default_srgb, DecodedPng, PngAdapter};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{
@@ -25,6 +26,7 @@ use all_is_cubes::drawing::embedded_graphics::{
     Drawable,
 };
 use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
+use all_is_cubes::euclid::vec3;
 use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking::{self, InGenError};
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
@@ -518,7 +520,7 @@ pub(crate) fn make_button_label_block(
                 Point::new(-1, -1),
                 MonoTextStyle::new(
                     font,
-                    &VoxelBrush::single(Block::from(palette::BUTTON_LABEL)),
+                    &VoxelBrush::single(color_block!(palette::BUTTON_LABEL)),
                 ),
                 TextStyleBuilder::new()
                     .baseline(Baseline::Middle)
@@ -601,7 +603,7 @@ impl ButtonBase for ButtonVisualState {
     fn button_block(&self, txn: &mut UniverseTransaction) -> Result<Block, InGenError> {
         let label_z = self.button_label_z();
         let back_block = palette::BUTTON_BACK; // TODO: different color theme for action than toggle?
-        let frame_brush = VoxelBrush::single(Block::from(palette::BUTTON_FRAME));
+        let frame_brush = VoxelBrush::single(color_block!(palette::BUTTON_FRAME));
         let back_brush = VoxelBrush::with_thickness(back_block, 0..label_z);
         let cap_rim_brush = VoxelBrush::new([(
             [0, 0, label_z - 1],
@@ -665,7 +667,7 @@ impl ButtonBase for ToggleButtonVisualState {
             }
             .build()
         };
-        let frame_brush = VoxelBrush::single(Block::from(palette::BUTTON_FRAME));
+        let frame_brush = VoxelBrush::single(color_block!(palette::BUTTON_FRAME));
         let back_brush = VoxelBrush::with_thickness(
             illuminate(Block::builder().color(palette::BUTTON_ACTIVATED_BACK)),
             0..label_z,

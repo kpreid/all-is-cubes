@@ -12,6 +12,7 @@ use exhaust::Exhaust;
 use num_traits::float::FloatCore as _;
 
 use crate::block::{Block, Resolution::*, AIR, AIR_EVALUATED};
+use crate::color_block;
 use crate::content::load_image::{default_srgb, include_image, space_from_image};
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
@@ -110,7 +111,7 @@ impl Icons {
                         ([0, 1, 0], &background_block_2),
                         ([0, -1, 0], &background_block_2),
                     ]);
-                    let line_brush = VoxelBrush::single(Block::from(Rgba::BLACK))
+                    let line_brush = VoxelBrush::single(color_block!(Rgba::BLACK))
                         .translate(GridVector::new(0, 0, 2));
                     let line_style = PrimitiveStyleBuilder::new()
                         .stroke_color(&line_brush)
@@ -164,7 +165,7 @@ impl Icons {
                     .build(),
 
                 Icons::PushPull => {
-                    let dots = [Block::from(Rgba::BLACK), AIR];
+                    let dots = [color_block!(Rgba::BLACK), AIR];
                     let dots = move |y: GridCoordinate| dots[y.rem_euclid(2) as usize].clone();
                     Block::builder()
                         .display_name("Push/Pull")
@@ -202,8 +203,8 @@ impl Icons {
                 }
 
                 Icons::Jetpack { active } => {
-                    let shell_block = Block::from(rgb_const!(0.5, 0.5, 0.5));
-                    let stripe_block = Block::from(rgb_const!(0.9, 0.1, 0.1));
+                    let shell_block = color_block!(0.5, 0.5, 0.5);
+                    let stripe_block = color_block!(0.9, 0.1, 0.1);
                     let exhaust = if active {
                         Block::builder()
                             .color(rgba_const!(1.0, 1.0, 1.0, 0.1))
@@ -213,9 +214,9 @@ impl Icons {
                         AIR
                     };
                     let active_color = if active {
-                        Block::from(Rgba::new(1.0, 1.0, 0.5, 1.))
+                        color_block!(1.0, 1.0, 0.5, 1.)
                     } else {
-                        Block::from(Rgba::new(0.4, 0.4, 0.4, 1.))
+                        color_block!(0.4, 0.4, 0.4, 1.)
                     };
                     let shape: [(FreeCoordinate, &Block); 16] = [
                         (4., &shell_block),

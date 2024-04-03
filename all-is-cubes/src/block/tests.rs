@@ -179,7 +179,7 @@ mod eval {
 
     #[test]
     fn invisible_atom() {
-        let block = Block::from(Rgba::TRANSPARENT);
+        let block = color_block!(Rgba::TRANSPARENT);
         let e = block.evaluate().unwrap();
         assert_eq!(e.color, Rgba::TRANSPARENT);
         assert_eq!(e.face_colors, FaceMap::repeat(Rgba::TRANSPARENT));
@@ -385,7 +385,7 @@ mod eval {
         let mut universe = Universe::new();
         let mut space = Space::empty_positive(2, 4, 4);
         space
-            .fill_uniform(space.bounds(), &Block::from(Rgba::WHITE))
+            .fill_uniform(space.bounds(), &color_block!(Rgba::WHITE))
             .unwrap();
         let space_handle = universe.insert_anonymous(space);
         let block = Block::builder()
@@ -546,7 +546,7 @@ mod eval {
 
 #[test]
 fn listen_atom() {
-    let block = Block::from(Rgba::WHITE);
+    let block = color_block!(Rgba::WHITE);
     let sink = Sink::new();
     listen(&block, sink.listener()).unwrap();
     assert_eq!(sink.drain(), vec![]);
@@ -556,7 +556,7 @@ fn listen_atom() {
 #[test]
 fn listen_indirect_atom() {
     let mut universe = Universe::new();
-    let block_def_handle = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
+    let block_def_handle = universe.insert_anonymous(BlockDef::new(color_block!(Rgba::WHITE)));
     let indirect = Block::from(block_def_handle.clone());
     let sink = Sink::new();
     listen(&indirect, sink.listener()).unwrap();
@@ -565,7 +565,7 @@ fn listen_indirect_atom() {
     // Now mutate it and we should see a notification.
     block_def_handle
         .execute(
-            &BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)),
+            &BlockDefTransaction::overwrite(color_block!(Rgba::BLACK)),
             &mut transaction::no_outputs,
         )
         .unwrap();
@@ -579,7 +579,7 @@ fn listen_indirect_atom() {
 #[test]
 fn listen_indirect_double() {
     let mut universe = Universe::new();
-    let block_def_handle1 = universe.insert_anonymous(BlockDef::new(Block::from(Rgba::WHITE)));
+    let block_def_handle1 = universe.insert_anonymous(BlockDef::new(color_block!(Rgba::WHITE)));
     let indirect1 = Block::from(block_def_handle1.clone());
     let block_def_handle2 = universe.insert_anonymous(BlockDef::new(indirect1.clone()));
     let indirect2 = Block::from(block_def_handle2.clone());
@@ -593,7 +593,7 @@ fn listen_indirect_double() {
     // Mutate the first BlockDef and we should see a notification for it alone.
     block_def_handle1
         .execute(
-            &BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)),
+            &BlockDefTransaction::overwrite(color_block!(Rgba::BLACK)),
             &mut transaction::no_outputs,
         )
         .unwrap();
@@ -606,7 +606,7 @@ fn listen_indirect_double() {
     // Remove block_def_handle1 from the contents of block_def_handle2...
     block_def_handle2
         .execute(
-            &BlockDefTransaction::overwrite(Block::from(Rgba::BLACK)),
+            &BlockDefTransaction::overwrite(color_block!(Rgba::BLACK)),
             &mut transaction::no_outputs,
         )
         .unwrap();
@@ -614,7 +614,7 @@ fn listen_indirect_double() {
     // ...and then block_def_handle1's changes should NOT be forwarded.
     block_def_handle1
         .execute(
-            &BlockDefTransaction::overwrite(Block::from(Rgba::WHITE)),
+            &BlockDefTransaction::overwrite(color_block!(Rgba::WHITE)),
             &mut transaction::no_outputs,
         )
         .unwrap();

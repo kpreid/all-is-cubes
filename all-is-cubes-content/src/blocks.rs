@@ -27,7 +27,7 @@ use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::{rgb_const, rgba_const};
+use all_is_cubes::{color_block, rgb_const, rgba_const};
 
 use crate::alg::{gradient_lookup, scale_color, square_radius, NoiseFnExt as _};
 use crate::landscape::install_landscape_blocks;
@@ -119,19 +119,19 @@ pub async fn install_demo_blocks(
         .build();
     let lamppost_edge = Block::from(palette::ALMOST_BLACK * 1.12);
 
-    let pedestal_voxel = Block::from(palette::STONE);
+    let pedestal_voxel = color_block!(palette::STONE);
 
     use DemoBlocks::*;
     let provider_for_patch = BlockProvider::<DemoBlocks>::new(p, |key| {
         Ok(match key {
             GlassBlock => {
                 let glass_densities = [
-                    //Block::from(rgba_const!(1.0, 0.0, 0.0, 1.0)),
-                    Block::from(rgba_const!(0.95, 1.0, 0.95, 0.9)),
-                    Block::from(rgba_const!(0.95, 0.95, 1.0, 0.65)),
-                    Block::from(rgba_const!(0.95, 1.0, 0.95, 0.3)),
-                    Block::from(rgba_const!(0.95, 0.95, 1.0, 0.07)),
-                    Block::from(rgba_const!(0.95, 1.0, 0.95, 0.05)),
+                    //color_block!(1.0, 0.0, 0.0, 1.0),
+                    color_block!(0.95, 1.0, 0.95, 0.9),
+                    color_block!(0.95, 0.95, 1.0, 0.65),
+                    color_block!(0.95, 1.0, 0.95, 0.3),
+                    color_block!(0.95, 0.95, 1.0, 0.07),
+                    color_block!(0.95, 1.0, 0.95, 0.05),
                 ];
 
                 Block::builder()
@@ -267,7 +267,7 @@ pub async fn install_demo_blocks(
                 let mut space = Space::for_block(resolution).build();
 
                 // Support legs, identifying the down / -Y direction.
-                let leg = Block::from(palette::STEEL);
+                let leg = color_block!(palette::STEEL);
                 space.fill_uniform(
                     GridAab::from_lower_size(
                         [resolution_g / 2 - 1, 0, resolution_g / 2 - 1],
@@ -320,8 +320,8 @@ pub async fn install_demo_blocks(
 
             ExhibitBackground => {
                 let colors = [
-                    Block::from(Rgba::new(0.825, 0.825, 0.825, 1.0)),
-                    Block::from(Rgba::new(0.75, 0.75, 0.75, 1.0)),
+                    color_block!(0.825, 0.825, 0.825, 1.0),
+                    color_block!(0.75, 0.75, 0.75, 1.0),
                 ];
                 Block::builder()
                     .display_name("Exhibit Background")
@@ -349,8 +349,8 @@ pub async fn install_demo_blocks(
                 .build_txn(txn),
 
             Signboard => {
-                let sign_board = Block::from(palette::PLANK);
-                let sign_post = Block::from(palette::STEEL);
+                let sign_board = color_block!(palette::PLANK);
+                let sign_post = color_block!(palette::STEEL);
 
                 // This shape has to coordinate with the name-drawing code in city::demo_city.
                 // Haven't thought of a good way to abstract/combine it yet.

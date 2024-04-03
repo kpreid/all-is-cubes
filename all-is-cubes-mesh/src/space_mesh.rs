@@ -1002,7 +1002,7 @@ mod tests {
     use super::*;
     use crate::testing::{mesh_blocks_and_space, TexPoint, TextureMt};
     use crate::BlockVertex;
-    use all_is_cubes::block::Block;
+    use all_is_cubes::color_block;
     use all_is_cubes::math::Rgba;
     use core::mem;
 
@@ -1022,7 +1022,7 @@ mod tests {
     #[test]
     fn nonempty_properties() {
         let space = Space::builder(GridAab::ORIGIN_CUBE)
-            .filled_with(Block::from(Rgba::WHITE))
+            .filled_with(color_block!(Rgba::WHITE))
             .build();
         let (_, _, mesh) = mesh_blocks_and_space(&space);
 

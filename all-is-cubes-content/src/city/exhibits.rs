@@ -33,7 +33,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{SetCubeError, Space, SpaceBuilder, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::{include_image, rgb_const, rgba_const};
+use all_is_cubes::{color_block, include_image, rgb_const, rgba_const};
 
 use crate::alg::{four_walls, voronoi_pattern};
 use crate::city::exhibit::{exhibit, Context, Exhibit, ExhibitTransaction, Placement};
@@ -162,9 +162,9 @@ fn TRANSPARENCY_SMALL(_: Context<'_>) {
     let window_block = {
         let window_pane_resolution = R32;
         let depth = 3;
-        let window_frame_block = Block::from(palette::ALMOST_BLACK);
-        let window_glass_surface_block = Block::from(rgba_const!(0.5, 0.72, 0.5, 0.6));
-        let window_glass_inner_block = Block::from(rgba_const!(0.7, 0.72, 0.7, 0.05));
+        let window_frame_block = color_block!(palette::ALMOST_BLACK);
+        let window_glass_surface_block = color_block!(0.5, 0.72, 0.5, 0.6);
+        let window_glass_inner_block = color_block!(0.7, 0.72, 0.7, 0.05);
         let upper = GridCoordinate::from(window_pane_resolution) - 1;
 
         Block::builder()
@@ -233,9 +233,9 @@ fn KNOT(ctx: Context<'_>) {
     let mut drawing_space = Space::builder(footprint.multiply(resolution.into()))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build();
-    let paint1 = Block::from(Rgba::new(0.7, 0.7, 0.7, 1.0));
-    let paint2 = Block::from(Rgba::new(0.1, 0.1, 0.9, 1.0));
-    let paint3 = Block::from(Rgba::new(0.9, 0.7, 0.1, 1.0));
+    let paint1 = color_block!(0.7, 0.7, 0.7, 1.0);
+    let paint2 = color_block!(0.1, 0.1, 0.9, 1.0);
+    let paint3 = color_block!(0.9, 0.7, 0.1, 1.0);
     drawing_space.fill(drawing_space.bounds(), |p| {
         // Measure from midpoint of odd dimension space
         let p = p - Vector3D::new(1, 1, 1) * (GridCoordinate::from(resolution) / 2);
@@ -299,8 +299,8 @@ fn KNOT(ctx: Context<'_>) {
 fn TEXT(_: Context<'_>) {
     use all_is_cubes::block::text;
 
-    let foreground_block = Block::from(palette::HUD_TEXT_FILL);
-    let outline_block = Block::from(palette::HUD_TEXT_STROKE);
+    let foreground_block = color_block!(palette::HUD_TEXT_FILL);
+    let outline_block = color_block!(palette::HUD_TEXT_STROKE);
 
     struct Texhibit {
         text: text::Text,
@@ -334,7 +334,7 @@ fn TEXT(_: Context<'_>) {
             offset: vec3(0, 1, 0),
         },
         {
-            let op = Composite::new(Block::from(palette::MENU_BACK), CompositeOperator::Out);
+            let op = Composite::new(color_block!(palette::MENU_BACK), CompositeOperator::Out);
             Texhibit {
                 text: text::Text::builder()
                     .string(literal!("engraved"))
@@ -406,11 +406,11 @@ fn ANIMATION(ctx: Context<'_>) {
             AIR,
             AIR,
             AIR,
-            Block::from(Rgb::new(0.0, 0.3, 0.0)),
-            Block::from(Rgb::new(0.0, 0.7, 0.0)),
-            Block::from(Rgb::new(0.0, 1.0, 0.0)),
-            Block::from(Rgb::new(0.0, 0.7, 0.7)),
-            Block::from(Rgb::new(0.0, 0.3, 1.0)),
+            color_block!(0.0, 0.3, 0.0),
+            color_block!(0.0, 0.7, 0.0),
+            color_block!(0.0, 1.0, 0.0),
+            color_block!(0.0, 0.7, 0.7),
+            color_block!(0.0, 0.3, 1.0),
         ];
         let repeats_per_fill = 6;
         SpaceTransaction::add_behavior(
@@ -589,7 +589,7 @@ fn SMALLEST(ctx: Context<'_>) {
     let rg = GridCoordinate::from(resolution);
 
     let block_space = Space::builder(GridAab::from_lower_size([rg / 2, 0, rg / 2], [1, 1, 1]))
-        .filled_with(Block::from(palette::ALMOST_BLACK))
+        .filled_with(color_block!(palette::ALMOST_BLACK))
         .build();
 
     let mut exhibit_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 1])).build();
@@ -935,7 +935,7 @@ fn COLOR_LIGHTS(_: Context<'_>) {
     ];
 
     // Room wall block with test card
-    let wall_color_block = Block::from(rgba_const!(0.5, 0.5, 0.5, 1.0));
+    let wall_color_block = color_block!(0.5, 0.5, 0.5, 1.0);
     let wall_resolution = R16;
     let wall_block = {
         let colors_as_blocks: Vec<Block> =
@@ -1090,7 +1090,7 @@ fn COLORED_BOUNCE(_: Context<'_>) {
         .light_emission(Rgb::ONE * brightness)
         .build();
 
-    let wall_block = Block::from(rgb_const!(0.25, 0.25, 0.25)); // fairly absorbing
+    let wall_block = color_block!(0.25, 0.25, 0.25); // fairly absorbing
 
     // --- Space ---
 
@@ -1487,7 +1487,7 @@ fn DESTRUCTION(ctx: Context<'_>) {
         resolution: Resolution,
         fraction: f64,
     ) -> Result<Block, InGenError> {
-        let solid = Block::from(Rgba::WHITE);
+        let solid = color_block!(Rgba::WHITE);
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3887829);
         let points: [_; 32] = core::array::from_fn(|_| {
             let free_point = Cube::ORIGIN.aab().random_point(&mut rng);

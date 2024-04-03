@@ -351,6 +351,7 @@ impl Block {
     ///
     /// ```
     /// use all_is_cubes::block::{AIR, Block, Modifier};
+    /// use all_is_cubes::color_block;
     /// use all_is_cubes::content::make_some_voxel_blocks;
     /// use all_is_cubes::math::{GridRotation, Rgba};
     /// use all_is_cubes::universe::Universe;
@@ -368,7 +369,7 @@ impl Block {
     /// assert_eq!(double.modifiers(), &[Modifier::Rotate(clockwise * clockwise)]);
     ///
     /// // Atoms and AIR are never rotated
-    /// let atom = Block::from(Rgba::WHITE);
+    /// let atom = color_block!(Rgba::WHITE);
     /// assert_eq!(atom.clone().rotate(clockwise), atom);
     /// assert_eq!(AIR.rotate(clockwise), AIR);
     /// ```

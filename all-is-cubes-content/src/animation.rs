@@ -7,6 +7,7 @@ use core::time::Duration;
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
+use all_is_cubes::behavior;
 use all_is_cubes::block::{Block, BlockCollision, AIR};
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{Cube, GridAab, GridArray, GridPoint, GridVector, Rgba};
@@ -14,7 +15,7 @@ use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{HandleVisitor, UniverseTransaction, VisitHandles};
-use all_is_cubes::{behavior, rgba_const};
+use all_is_cubes::{color_block, rgba_const};
 
 #[cfg(doc)]
 use all_is_cubes::time::TickSchedule;
@@ -229,13 +230,13 @@ impl Clock {
     fn paint(&self) -> SpaceTransaction {
         // TODO: While these don't actually need to allocate anything, we ought to make them
         // constants to keep the per-frame cost minial.
-        let rim = Block::from(rgba_const!(0.7, 0.7, 0.4, 1.0));
-        let marks = Block::from(palette::ALMOST_BLACK);
-        let trail = Block::from(rgba_const!(0.5, 0.5, 0.5, 1.0));
+        let rim = color_block!(0.7, 0.7, 0.4, 1.0);
+        let marks = color_block!(palette::ALMOST_BLACK);
+        let trail = color_block!(0.5, 0.5, 0.5, 1.0);
         let background = if self.ticks.rem_euclid(120) >= 60 {
-            Block::from(rgba_const!(0.6, 0.6, 0.6, 1.0))
+            color_block!(0.6, 0.6, 0.6, 1.0)
         } else {
-            Block::from(rgba_const!(1.0, 1.0, 1.0, 1.0))
+            color_block!(1.0, 1.0, 1.0, 1.0)
         };
 
         let time_angle = self.ticks.rem_euclid(60) as f64 / 60.0;

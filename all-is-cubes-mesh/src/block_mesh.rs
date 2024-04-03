@@ -688,6 +688,7 @@ mod tests {
     use crate::{BlockVertex, Coloring};
     use all_is_cubes::block::{Block, AIR};
     use all_is_cubes::camera::GraphicsOptions;
+    use all_is_cubes::color_block;
     use all_is_cubes::universe::Universe;
 
     type TestMesh = BlockMesh<crate::testing::NoTextureMt>;
@@ -705,7 +706,7 @@ mod tests {
 
     #[test]
     fn nonempty() {
-        let ev = Block::from(Rgba::WHITE).evaluate().unwrap();
+        let ev = color_block!(Rgba::WHITE).evaluate().unwrap();
         let mesh: TestMesh = BlockMesh::new(
             &ev,
             &NoTextures,
@@ -725,7 +726,7 @@ mod tests {
                 if cube == Cube::ORIGIN {
                     AIR
                 } else {
-                    Block::from(Rgba::WHITE)
+                    color_block!(Rgba::WHITE)
                 }
             })
             .unwrap()

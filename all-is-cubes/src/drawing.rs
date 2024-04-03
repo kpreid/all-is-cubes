@@ -610,6 +610,7 @@ where
 mod tests {
     use super::*;
     use crate::block::{self, Resolution::R16, AIR};
+    use crate::color_block;
     use crate::content::make_some_blocks;
     use crate::raytracer::print_space;
     use embedded_graphics::primitives::{Primitive, PrimitiveStyle};
@@ -685,7 +686,7 @@ mod tests {
 
         // Brush to nominally draw with.
         // TODO: also test bigger or offset brushes
-        let brush = VoxelBrush::single(Block::from(Rgba::WHITE));
+        let brush = VoxelBrush::single(color_block!(Rgba::WHITE));
         let style = PrimitiveStyle::with_fill(&brush);
         let brush_box = brush.bounds().unwrap();
 

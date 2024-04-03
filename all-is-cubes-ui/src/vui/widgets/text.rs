@@ -228,7 +228,7 @@ mod tests {
     use super::*;
     use all_is_cubes::arcstr::literal;
     use all_is_cubes::block::text::Font;
-    use all_is_cubes::block::Block;
+    use all_is_cubes::color_block;
     use all_is_cubes::euclid::size3;
     use all_is_cubes::math::Rgba;
     use all_is_cubes::space::{SpaceBuilder, SpacePhysics};
@@ -239,7 +239,7 @@ mod tests {
         let widget = LargeText {
             text: text.into(),
             font: Font::Logo,
-            brush: VoxelBrush::single(Block::from(Rgba::WHITE)),
+            brush: VoxelBrush::single(color_block!(Rgba::WHITE)),
             text_style: TextStyle::default(),
         };
         assert_eq!(

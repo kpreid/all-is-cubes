@@ -4,6 +4,7 @@ use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::{text, AIR};
 use all_is_cubes::block::{Block, BlockAttributes, Resolution};
 use all_is_cubes::camera;
+use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{size2, Size2D};
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridSize, Rgba};
@@ -189,9 +190,7 @@ pub(crate) fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
                 // where all edges of the space spill off the window.
                 minimum: GridSize::new(0, 0, UiSize::DEPTH_BEHIND_VIEW_PLANE + 2),
             })),
-            vui::leaf_widget(widgets::Frame::with_block(Block::from(Rgba::new(
-                0., 0., 0., 0.7,
-            )))),
+            vui::leaf_widget(widgets::Frame::with_block(color_block!(0., 0., 0., 0.7))),
             foreground,
         ],
     })
