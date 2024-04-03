@@ -1,5 +1,6 @@
 //! VUI components related to allowing the user to inspect universe contents.
 
+use all_is_cubes::universe::Handle;
 use alloc::sync::Arc;
 
 use all_is_cubes::arcstr::{self, literal, ArcStr};
@@ -19,15 +20,6 @@ pub fn inspect_block_at_cursor(
 ) -> vui::WidgetTree {
     let hit = cursor.hit();
 
-    let mut def_stack = vec![vui::leaf_widget(widgets::Label::new(literal!(
-        "Definition"
-    )))];
-
-    def_stack.push(inspect_primitive(hit.block.primitive()));
-    for i in 0..hit.block.modifiers().len() {
-        def_stack.push(inspect_modifier(&hit.block, i));
-    }
-
     let contents = Arc::new(vui::LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
@@ -38,7 +30,10 @@ pub fn inspect_block_at_cursor(
                 children: vec![
                     Arc::new(vui::LayoutTree::Stack {
                         direction: Face6::NY,
-                        children: def_stack,
+                        children: vec![
+                            vui::leaf_widget(widgets::Label::new(literal!("Definition"))),
+                            inspect_block_definition(&hit.block),
+                        ],
                     }),
                     inspect_evaluated(&hit.evaluated),
                 ],
@@ -55,13 +50,72 @@ pub fn inspect_block_at_cursor(
     )))
 }
 
+fn inspect_block_definition(block: &Block) -> vui::WidgetTree {
+    let mut stack = Vec::new();
+    stack.push(inspect_primitive(block.primitive()));
+    for i in 0..block.modifiers().len() {
+        stack.push(inspect_modifier(block, i));
+    }
+    Arc::new(vui::LayoutTree::Stack {
+        direction: Face6::NY,
+        children: stack,
+    })
+}
+
 fn inspect_primitive(primitive: &block::Primitive) -> vui::WidgetTree {
     let (name, details): (ArcStr, vui::WidgetTree) = match primitive {
-        block::Primitive::Indirect(_) => (literal!("Indirect"), vui::LayoutTree::empty()),
-        block::Primitive::Atom(_) => (literal!("Atom"), vui::LayoutTree::empty()),
-        block::Primitive::Recur { .. } => (literal!("Recur"), vui::LayoutTree::empty()),
+        block::Primitive::Indirect(block_def) => (literal!("Indirect"), inspect_handle(block_def)),
+        block::Primitive::Atom(block::Atom {
+            attributes,
+            color,
+            emission,
+            collision,
+        }) => (
+            literal!("Atom"),
+            Arc::new(vui::LayoutTree::Stack {
+                direction: Face6::NY,
+                children: vec![paragraph(arcstr::format!(
+                    "\
+                        Color: {color:?}\n\
+                        Emission: {emission:?}\n\
+                        Collision: {collision:?}\n\
+                        Attributes: {attributes:#?}\
+                        "
+                ))],
+            }),
+        ),
+        block::Primitive::Recur {
+            attributes,
+            space,
+            offset,
+            resolution,
+        } => (
+            literal!("Recur"),
+            Arc::new(vui::LayoutTree::Stack {
+                direction: Face6::NY,
+                children: vec![
+                    inspect_handle(space),
+                    paragraph(arcstr::format!(
+                        "\
+                        Resolution: {resolution}\n\
+                        Offset: {offset:?}\n\
+                        Attributes: {attributes:#?}\
+                        "
+                    )),
+                ],
+            }),
+        ),
         block::Primitive::Air => (literal!("Air"), vui::LayoutTree::empty()),
-        block::Primitive::Text { .. } => (literal!("Text"), vui::LayoutTree::empty()),
+        block::Primitive::Text { text, offset } => (
+            literal!("Text"),
+            // TODO: truncate text
+            paragraph(arcstr::format!(
+                "\
+                Text: {text:#?}\n\
+                Offset: {offset:?}\
+                "
+            )),
+        ),
         // TODO: do a debug print instead of nothing
         _ => (literal!("<unknown>"), vui::LayoutTree::empty()),
     };
@@ -93,15 +147,60 @@ fn inspect_modifier(block: &Block, modifier_index: usize) -> vui::WidgetTree {
         .modifiers_mut()
         .truncate(modifier_index + 1);
 
-    let name = match modifier {
-        block::Modifier::Quote(_) => literal!("Quote"),
-        block::Modifier::Rotate(_) => literal!("Rotate"),
-        block::Modifier::Composite(_) => literal!("Composite"),
-        block::Modifier::Zoom(_) => literal!("Zoom"),
-        block::Modifier::Move(_) => literal!("Move"),
-        _ => literal!("<unknown>"),
+    let (name, details) = match modifier {
+        block::Modifier::Quote(q) => (literal!("Quote"), paragraph(arcstr::format!("{q:?}"))),
+        block::Modifier::Rotate(rotation) => (
+            literal!("Rotate"),
+            paragraph(arcstr::format!("{rotation:?}")),
+        ),
+        block::Modifier::Composite(block::Composite {
+            source,
+            operator,
+            reverse,
+            disassemblable,
+            ..
+        }) => (
+            literal!("Composite"),
+            Arc::new(vui::LayoutTree::Stack {
+                direction: Face6::NY,
+                children: vec![
+                    inspect_block_definition(source),
+                    paragraph(arcstr::format!(
+                        "\
+                        Operator: {operator:?}\n\
+                        Reverse: {reverse:?}\n\
+                        Disassemblable: {disassemblable:?}\
+                        "
+                    )),
+                ],
+            }),
+        ),
+        block::Modifier::Zoom(zoom) => {
+            let scale = zoom.scale();
+            let offset = zoom.offset();
+            (
+                literal!("Zoom"),
+                paragraph(arcstr::format!(
+                    "\
+                Scale: {scale:?}\n\
+                Offset: {offset:?}\
+                "
+                )),
+            )
+        }
+        block::Modifier::Move(block::Move {
+            direction,
+            distance,
+            velocity,
+            ..
+        }) => (
+            literal!("Move"),
+            paragraph(arcstr::format!(
+                "{direction:?} distance {distance:?} velocity {velocity:?}"
+            )),
+        ),
+        _ => (literal!("<unknown>"), vui::LayoutTree::empty()),
     };
-    let details = vui::LayoutTree::empty();
 
     Arc::new(vui::LayoutTree::Stack {
         direction: Face6::NY,
@@ -131,8 +230,15 @@ fn inspect_evaluated(ev: &block::EvaluatedBlock) -> vui::WidgetTree {
     })
 }
 
+fn inspect_handle<T: 'static>(handle: &Handle<T>) -> vui::WidgetTree {
+    let name = handle.name();
+    // TODO: have an icon and a custom background style
+    paragraph(arcstr::format!("Handle:\n{name}"))
+}
+
 fn indent() -> vui::WidgetTree {
     Arc::new(vui::LayoutTree::Spacer(vui::LayoutRequest {
-        minimum: size3(1, 1, 1),
+        // Y/Z size is zero so that it can collapse if it has no content
+        minimum: size3(1, 0, 0),
     }))
 }

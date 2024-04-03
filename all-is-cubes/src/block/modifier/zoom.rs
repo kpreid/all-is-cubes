@@ -120,6 +120,18 @@ impl Zoom {
             }
         })
     }
+
+    /// Scale factor to zoom in by.
+    pub fn scale(&self) -> Resolution {
+        self.scale
+    }
+
+    /// Which portion of the block/space will be used, specified in terms of an offset
+    /// in the grid of zoomed blocks (that is, this will have coordinates between `0`
+    /// and `scale - 1`).
+    pub fn offset(&self) -> GridPoint {
+        self.offset.map(i32::from)
+    }
 }
 
 impl From<Zoom> for Modifier {
