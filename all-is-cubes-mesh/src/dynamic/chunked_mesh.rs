@@ -198,12 +198,10 @@ where
     /// Recompute meshes of blocks that need it and the nearest chunks that need it.
     ///
     /// * `camera`'s view position is used to choose what to update and for depth
-    ///    ordering; its graphics options are used for triangulation and view distance.
+    ///   ordering; its graphics options are used for triangulation and view distance.
     /// * `deadline` is the approximate time at which this should stop.
     /// * `render_data_updater` is called for every re-meshed or depth-sorted chunk.
-    ///    It is required to be `Fn` rather than `FnMut` because future versions of this
-    ///    function are expected to support multithreaded chunk updates. TODO: If that
-    ///    never happens, then we should revert the callback's trait bound to `FnMut`.
+    ///   It may be called concurrently from multiple threads.
     ///
     /// Returns performance information and the chunk the camera is located in.
     pub fn update<F>(

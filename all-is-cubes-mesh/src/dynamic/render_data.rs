@@ -40,6 +40,7 @@ pub struct RenderDataUpdate<'a, M: DynamicMeshTypes> {
 /// You may use this identifier for comparison and transmission via:
 ///
 /// * Its `PartialEq + Eq + Hash` implementations, to use it as a `HashMap` key or similar.
+/// * Its `PartialOrd + Ord` implementations, to sort it or use it as a `BTreeMap` key.
 /// * Its [`fmt::Display`] implementation, to produce a short string suitable for a map key
 ///   that must be a string; the produced string uses only alphanumeric characters and `'-'`.
 /// * Its [`fmt::Debug`] implementation, to produce a diagnostic label for e.g. a GPU buffer
@@ -47,13 +48,13 @@ pub struct RenderDataUpdate<'a, M: DynamicMeshTypes> {
 ///   and so may be more legible.
 ///
 /// [instanced rendering]: https://en.wikipedia.org/wiki/Geometry_instancing
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MeshId(pub(crate) MeshIdImpl);
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) enum MeshIdImpl {
-    Chunk([i32; 3]),
     Block(all_is_cubes::space::BlockIndex),
+    Chunk([i32; 3]),
 }
 
 impl MeshId {
@@ -107,6 +108,22 @@ impl fmt::Debug for MeshId {
 mod tests {
     use super::*;
     use alloc::string::ToString as _;
+
+    #[test]
+    fn mesh_id_sort() {
+        let ids = vec![
+            MeshId(MeshIdImpl::Block(1)),
+            MeshId(MeshIdImpl::Block(7)),
+            MeshId(MeshIdImpl::Chunk([0, -1, 0])),
+            MeshId(MeshIdImpl::Chunk([0, -1, 1])),
+            MeshId(MeshIdImpl::Chunk([0, 0, 0])),
+            MeshId(MeshIdImpl::Chunk([0, 0, 1])),
+            MeshId(MeshIdImpl::Chunk([100, 0, 0])),
+        ];
+        let mut sorted_ids = ids.clone();
+        sorted_ids.sort();
+        assert_eq!(ids, sorted_ids);
+    }
 
     #[test]
     fn mesh_id_strings() {
