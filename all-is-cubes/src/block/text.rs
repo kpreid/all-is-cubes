@@ -311,16 +311,20 @@ impl Text {
         } = self.positioning;
 
         let lb = self.layout_bounds;
+        // TODO: The subtractions of 1 here are dubious.
+        // I believe they are correct on the principle that embedded-graphics uses
+        // "a point labels a pixel" coordinates, so even leftward-extending text
+        // *includes* the identified pixel, but I'm not certain about that.
         let layout_offset = vec3(
             match positioning_x {
                 PositioningX::Left => lb.lower_bounds().x,
                 PositioningX::Center => lb.center().x as GridCoordinate,
-                PositioningX::Right => lb.upper_bounds().x,
+                PositioningX::Right => lb.upper_bounds().x - 1,
             },
             match line_y {
                 PositioningY::BodyBottom | PositioningY::Baseline => lb.lower_bounds().y,
                 PositioningY::BodyMiddle => lb.center().y as GridCoordinate,
-                PositioningY::BodyTop => lb.upper_bounds().y,
+                PositioningY::BodyTop => lb.upper_bounds().y - 1,
             },
             match positioning_z {
                 PositioningZ::Back => lb.lower_bounds().z,
@@ -946,6 +950,7 @@ mod tests {
         assert_eq!(
             plane_to_text(block.evaluate().unwrap().voxels.as_vol_ref()),
             vec![
+                "................................",
                 "........##...................##.",
                 "........##...................##.",
                 "........##...................##.",
@@ -973,6 +978,29 @@ mod tests {
                 "................................",
             ]
         )
+    }
+
+    /// Test that the high-coordinate positioning options correctly meet the
+    /// upper corner of the block.
+    #[test]
+    fn bounding_voxels_of_positioning_high() {
+        let text = Text::builder()
+            .resolution(Resolution::R32)
+            .string(literal!("abc"))
+            .font(Font::System16)
+            .positioning(Positioning {
+                x: PositioningX::Right,
+                line_y: PositioningY::BodyTop,
+                z: PositioningZ::Front,
+            })
+            .build();
+
+        // The part we care about precisely is that the upper corner.
+        // The lower corner might change when we change the system font metrics.
+        assert_eq!(
+            text.bounding_voxels(),
+            GridAab::from_lower_upper([8, 19, 31], [32, 32, 32])
+        );
     }
 
     #[test]

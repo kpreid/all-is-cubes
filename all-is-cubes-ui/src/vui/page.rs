@@ -225,8 +225,6 @@ pub(crate) mod parts {
     }
 
     pub fn paragraph(text: impl Into<ArcStr>) -> WidgetTree {
-        // TODO: the layout of this is suboptimal, with an extra blank block row at the top
-        // in the about-box usage; the cause is not yet diagnosed.
         vui::leaf_widget(widgets::Label::with_font(
             text.into(),
             text::Font::SmallerBodyText,
