@@ -28,14 +28,12 @@ allow-wildcard-paths = true
 
 skip = [
     { name = "itertools" },
+    { name = "sync_wrapper" },
     { name = "wasi" }, # not actually used on our targets
     { name = "web-time", version = "=0.2.4" },
-    { name = "raw-window-handle", version = "=0.5.2" },
-    { name = "toml_edit", version = "=0.19.15" },
     { name = "syn", version = "1" },
     { name = "redox_syscall", version = "=0.3.5" },
     { name = "libredox", version = "=0.0.1" },
-    { name = "jni", version = "<0.21" },
     { name = "miniz_oxide", version = "0.4.4" }, # old used by png-decoder
 ]
 
@@ -46,7 +44,6 @@ skip-tree = [
     # misc transitive deps
     { name = "bitflags", version = "=1.3.2", depth = 1 },
     { name = "num_enum", version = "=0.5.11", depth = 2 },
-    { name = "ndk", version = "=0.7.0", depth = 2 },
     { name = "windows", depth = 3 },
     { name = "windows-sys", depth = 2 },
     { name = "windows-targets", depth = 2 },
