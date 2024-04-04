@@ -45,7 +45,7 @@ tower-http = { version = "0.5.0", features = ["fs"] }
 async_fn_traits = { workspace = true }
 # Note that with default features disabled, reqwest has no TLS/SSL support.
 # This is usable because we are only using it to talk to the local server.
-reqwest = { version = "0.11.11", default-features = false }
+reqwest = { version = "0.12.2", default-features = false }
 # add "process" feature for tests to spawn the server
 tokio = { workspace = true, features = ["process"] }
 
