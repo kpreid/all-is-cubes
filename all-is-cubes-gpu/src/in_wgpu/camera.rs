@@ -10,7 +10,7 @@ use all_is_cubes::math::VectorOps;
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ShaderSpaceCamera {
     projection_matrix: [[f32; 4]; 4],
-    inverse_projection_matrix: [[f32; 4]; 4],
+    pub(super) inverse_projection_matrix: [[f32; 4]; 4],
     view_matrix: [[f32; 4]; 4],
 
     // --- 16-byte aligned point ---

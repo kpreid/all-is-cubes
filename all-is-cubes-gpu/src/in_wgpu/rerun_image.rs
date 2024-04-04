@@ -11,6 +11,7 @@ use all_is_cubes::rerun_glue as rg;
 
 use rg::datatypes::TensorDimension;
 
+use crate::in_wgpu::camera::ShaderSpaceCamera;
 use crate::in_wgpu::init;
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::Memo;
@@ -159,9 +160,9 @@ impl RerunImageExport {
             )
             .unwrap()
             .copy_from_slice(bytemuck::bytes_of(&RerunCopyCamera {
-                near: normal_camera.near_plane_distance() as f32,
-                far: normal_camera.view_distance() as f32,
-                _padding: [0.0; 2],
+                // a bit wasteful to construct entire `ShaderSpaceCamera`, but avoids inconsistency
+                inverse_projection_matrix: ShaderSpaceCamera::new(normal_camera)
+                    .inverse_projection_matrix,
             }));
 
         {
@@ -302,9 +303,7 @@ fn perform_image_copy(
 #[repr(C, align(16))] // align triggers bytemuck error if the size doesn't turn out to be a multiple
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct RerunCopyCamera {
-    near: f32,
-    far: f32,
-    _padding: [f32; 2],
+    inverse_projection_matrix: [[f32; 4]; 4],
 }
 
 /// Policy about how to downsample the scene to produce a sane amount of Rerun data.

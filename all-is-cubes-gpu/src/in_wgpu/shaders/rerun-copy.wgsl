@@ -4,11 +4,7 @@
 
 // Mirrors `struct RerunCopyCamera` on the Rust side.
 struct RerunCopyCamera {
-    near: f32,
-    far: f32,
-    // padding to 16 bytes for WebGL compatibility
-    padding1: f32,
-    padding2: f32,
+    inverse_projection: mat4x4<f32>,
 }
 
 // This group is named rerun_copy_layout in the code.
@@ -58,9 +54,18 @@ fn depth(texcoord: vec2<f32>) -> f32 {
         // didn't hit anything; set the distance to zero so the point doesn't appear anywhere in space
         return 0.0;
     } else {
-        let far = camera.far;
-        let near = camera.near;
-        return ((-far*near) / (far-near)) / (raw_value - far/(far-near));
+        // Unproject the projected depth value to get world-space depth.
+        //
+        // This is a matrix multiplication followed by a homogenous-to-Cartesian conversion,
+        // with the extra knowledge that the depth coordinate of the point is not affected by
+        // the XY coordinates, so we can ignore everything but the Z and W components. (If the
+        // image plane were not perpendicular to the view direction, that would not be true.)
+        //
+        // This particular technique for depth unprojection was recommended by
+        // @jasperrlz:matrix.org in the WebGPU Matrix chat room.
+        let ipz = camera.inverse_projection[2];
+        let ipw = camera.inverse_projection[3];
+        return -(raw_value * ipz.z + ipw.z) / (raw_value * ipz.w + ipw.w);
     }
 }
 
