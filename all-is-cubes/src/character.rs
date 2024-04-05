@@ -3,7 +3,7 @@
 use alloc::sync::Arc;
 use core::fmt;
 
-use euclid::{Angle, Point3D, Rotation3D, Vector3D};
+use euclid::{Angle, Rotation3D, Vector3D};
 use hashbrown::HashSet as HbHashSet;
 use manyfmt::Fmt;
 use ordered_float::NotNan;
@@ -17,15 +17,11 @@ use crate::behavior::{self, Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
 use crate::inv::{self, Inventory, InventoryTransaction, Slot, Tool};
 use crate::listen::{Listen, Listener, Notifier};
-#[cfg(not(feature = "std"))]
-#[allow(unused_imports)]
-use crate::math::Euclid as _;
 use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, VectorOps};
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};
-use crate::raycast::Ray;
 #[cfg(feature = "save")]
 use crate::save::schema;
-use crate::space::{CubeTransaction, LightPhysics, Space};
+use crate::space::{CubeTransaction, Space};
 use crate::time::Tick;
 use crate::transaction::{
     self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
@@ -35,6 +31,8 @@ use crate::util::{ConciseDebug, Refmt as _, StatusText};
 
 mod cursor;
 pub use cursor::*;
+
+mod exposure;
 
 mod spawn;
 pub use spawn::*;
@@ -82,13 +80,7 @@ pub struct Character {
     /// Last [`Character::step`] info result, for debugging.
     pub(crate) last_step_info: Option<BodyStepInfo>,
 
-    /// Incrementally updated samples of neighboring light levels, used for
-    /// determining exposure / eye adaptation.
-    luminance_samples: [f32; 100],
-    /// Last written element of [`Self::light_samples`]
-    luminance_sample_index: usize,
-    /// Computed camera exposure value based on light samples; converted to natural logarithm.
-    exposure_log: f32,
+    exposure: exposure::State,
 
     // TODO: Figure out what access is needed and add accessors
     inventory: Inventory,
@@ -117,10 +109,7 @@ impl fmt::Debug for Character {
             eye_displacement_vel: _,
             colliding_cubes,
             last_step_info: _,
-            // TODO: report light samples?
-            luminance_samples: _,
-            luminance_sample_index: _,
-            exposure_log,
+            exposure,
             inventory,
             selected_slots,
             notifier: _,
@@ -132,7 +121,7 @@ impl fmt::Debug for Character {
             .field("body", &body)
             .field("velocity_input", &velocity_input.refmt(&ConciseDebug))
             .field("colliding_cubes", &colliding_cubes)
-            .field("exposure", &exposure_log.exp())
+            .field("exposure", &exposure.exposure())
             .field("inventory", &inventory)
             .field("selected_slots", selected_slots)
             .field("behaviors", &behaviors)
@@ -226,9 +215,7 @@ impl Character {
             eye_displacement_vel: Vector3D::zero(),
             colliding_cubes: HbHashSet::new(),
             last_step_info: None,
-            luminance_samples: [1.0; 100],
-            luminance_sample_index: 0,
-            exposure_log: 0.0,
+            exposure: exposure::State::default(),
             inventory: Inventory::from_slots(inventory),
             selected_slots,
             notifier: Notifier::new(),
@@ -340,7 +327,7 @@ impl Character {
         let control_delta_v = (velocity_target - self.body.velocity).component_mul(stiffness) * dt;
 
         let body_step_info = if let Ok(space) = self.space.read() {
-            self.update_exposure(&space, dt);
+            self.exposure.step(&space, self.view(), dt);
 
             let colliding_cubes = &mut self.colliding_cubes;
             colliding_cubes.clear();
@@ -437,87 +424,7 @@ impl Character {
     /// Returns the character's current automatic-exposure calculation based on the light
     /// around it.
     pub fn exposure(&self) -> f32 {
-        self.exposure_log.exp()
-    }
-
-    fn update_exposure(&mut self, space: &Space, dt: f64) {
-        #![allow(clippy::cast_lossless)] // lossiness depends on size of usize
-
-        if dt == 0. {
-            return;
-        }
-
-        // Sample surrounding light.
-        {
-            let max_steps = match space.physics().light {
-                LightPhysics::None => 0,
-                LightPhysics::Rays { maximum_distance } => {
-                    usize::from(maximum_distance).saturating_mul(2)
-                }
-            };
-            let vt = self.view().to_transform();
-            let sqrtedge = (self.luminance_samples.len() as FreeCoordinate).sqrt();
-            let ray_origin = vt.transform_point3d(Point3D::origin()).unwrap();
-            'rays: for _ray in 0..10 {
-                // TODO: better idea for what ray count should be
-                let index =
-                    (self.luminance_sample_index + 1).rem_euclid(self.luminance_samples.len());
-                self.luminance_sample_index = index;
-                let indexf = index as FreeCoordinate;
-                let ray = Ray::new(
-                    ray_origin,
-                    // Fixed 90° FOV
-                    vt.transform_vector3d(Vector3D::new(
-                        (indexf).rem_euclid(sqrtedge) / sqrtedge * 2. - 1.,
-                        (indexf).div_euclid(sqrtedge) / sqrtedge * 2. - 1.,
-                        -1.0,
-                    )),
-                );
-                // TODO: this should be something more like the light-propagation raycast.
-                let bounds = space.bounds();
-                for step in ray.cast().within(bounds).take(max_steps) {
-                    // Require hitting a visible surface and checking behind it, because if we
-                    // just take the first valid value, then we'll trivially pick the same cube
-                    // every time if our eye is within a cube with valid light.
-                    if !bounds.contains_cube(step.cube_ahead()) {
-                        self.luminance_samples[self.luminance_sample_index] =
-                            space.physics().sky.sample(ray.direction).luminance();
-                        continue 'rays;
-                    } else if space.get_evaluated(step.cube_ahead()).visible {
-                        let l = space.get_lighting(step.cube_behind());
-                        if l.valid() {
-                            self.luminance_samples[self.luminance_sample_index] =
-                                l.value().luminance();
-                            continue 'rays;
-                        }
-                    }
-                }
-                // If we got here, nothing was hit
-                self.luminance_samples[self.luminance_sample_index] =
-                    space.physics().sky.sample(ray.direction).luminance();
-            }
-        }
-
-        /// What average luminance of the exposed scene to try to match
-        const TARGET_LUMINANCE: f32 = 0.9;
-        /// Proportion by which we apply the exposure adjustment rather than not
-        /// (0.0 = none, 1.0 = perfect adaptation). This is less than 1 so that
-        /// dark areas stay dark.
-        /// TODO: this should be an adjustable game rule + graphics option.
-        const ADJUSTMENT_STRENGTH: f32 = 0.5;
-        const EXPOSURE_CHANGE_RATE: f32 = 2.0;
-
-        // Combine the light rays into an exposure value update.
-        let luminance_average: f32 = self.luminance_samples.iter().copied().sum::<f32>()
-            * (self.luminance_samples.len() as f32).recip();
-        let derived_exposure = (TARGET_LUMINANCE / luminance_average).clamp(0.1, 10.);
-        // Lerp between full adjustment and no adjustment according to ADJUSTMENT_STRENGTH
-        let derived_exposure =
-            derived_exposure * ADJUSTMENT_STRENGTH + 1. * (1. - ADJUSTMENT_STRENGTH);
-        if derived_exposure.is_finite() {
-            let delta_log = derived_exposure.ln() - self.exposure_log;
-            self.exposure_log += delta_log * dt as f32 * EXPOSURE_CHANGE_RATE;
-        }
+        self.exposure.exposure()
     }
 
     /// Maximum range for normal keyboard input should be -1 to 1
@@ -595,9 +502,7 @@ impl VisitHandles for Character {
             eye_displacement_vel: _,
             colliding_cubes: _,
             last_step_info: _,
-            luminance_samples: _,
-            luminance_sample_index: _,
-            exposure_log: _,
+            exposure: _,
             inventory,
             selected_slots: _,
             notifier: _,
@@ -660,9 +565,7 @@ impl serde::Serialize for Character {
             eye_displacement_vel: _,
             colliding_cubes: _,
             last_step_info: _,
-            luminance_samples: _,
-            luminance_sample_index: _,
-            exposure_log: _,
+            exposure: _,
         } = self;
         schema::CharacterSer::CharacterV1 {
             space: space.clone(),
@@ -728,9 +631,7 @@ impl<'de> serde::Deserialize<'de> for Character {
                 eye_displacement_vel: Vector3D::zero(),
                 colliding_cubes: HbHashSet::new(),
                 last_step_info: None,
-                luminance_samples: [1.0; 100],
-                luminance_sample_index: 0,
-                exposure_log: 0.0,
+                exposure: exposure::State::default(),
             }),
         }
     }
