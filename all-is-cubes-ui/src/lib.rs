@@ -22,9 +22,14 @@
 
 extern crate alloc;
 
-pub mod apps;
 mod editor;
 mod inv_watch;
+
+pub mod apps;
+
 pub mod logo;
+
 mod ui_content;
+pub use ui_content::notification;
+
 pub mod vui;

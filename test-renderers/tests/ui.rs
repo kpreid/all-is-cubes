@@ -21,6 +21,7 @@ use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{raytracer, space, transaction};
 
 use all_is_cubes_ui::apps::{Key, Session};
+use all_is_cubes_ui::notification::NotificationContent;
 use all_is_cubes_ui::vui::{self, widgets};
 
 use test_renderers::test_cases::u;
@@ -53,6 +54,7 @@ fn ui_render_tests(c: &mut test_renderers::TestCaseCollector<'_>) {
         // TODO: doesn't give the expected result and I don't know why
         c.insert("session_page_pause", None, session_page_pause);
     }
+    c.insert("session_page_progress", None, session_page_progress);
     c.insert("widget_button_action", wu.clone(), widget_button_action);
     c.insert("widget_button_toggle", wu.clone(), widget_button_toggle);
     // TODO: test for LayoutDebugFrame widget
@@ -84,6 +86,25 @@ async fn session_page_pause(mut context: RenderTestContext) {
 
     // TODO: this should not be a key-binding test
     session.input_processor.key_momentary(Key::Character('p'));
+    advance_time(&mut session);
+
+    context.compare_image(0, render_session(&session));
+}
+
+/// Exercise the full-screen progress bar page.
+async fn session_page_progress(mut context: RenderTestContext) {
+    let mut session = create_session().await;
+
+    let n = session
+        .show_notification(NotificationContent::Progress(
+            widgets::ProgressBarState::new(0.25),
+        ))
+        .unwrap();
+    advance_time(&mut session);
+    // exercise updates not just initial state
+    n.set_content(NotificationContent::Progress(
+        widgets::ProgressBarState::new(0.75),
+    ));
     advance_time(&mut session);
 
     context.compare_image(0, render_session(&session));

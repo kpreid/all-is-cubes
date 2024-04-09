@@ -4,13 +4,14 @@ use alloc::sync::Arc;
 
 use all_is_cubes::arcstr::{literal, ArcStr};
 use all_is_cubes::block::Resolution::*;
+use all_is_cubes::euclid::size3;
 use all_is_cubes::math::Face6;
 use all_is_cubes::universe::Universe;
 
 use crate::logo::logo_text;
 use crate::ui_content::hud::HudInputs;
 use crate::ui_content::options::{graphics_options_widgets, pause_toggle_button, OptionsStyle};
-use crate::ui_content::{VuiMessage, VuiPageState};
+use crate::ui_content::{notification, VuiMessage, VuiPageState};
 use crate::vui::widgets::ButtonLabel;
 use crate::vui::{
     self, page_modal_backdrop, parts, widgets, InstallVuiError, LayoutTree, UiBlocks, Widget,
@@ -73,6 +74,32 @@ pub(super) fn new_paused_widget_tree(
             .dialog_background()
             .as_background_of(contents),
     ))))
+}
+
+pub(super) fn new_progress_widget_tree(
+    theme: &widgets::WidgetTheme,
+    hub: &notification::Hub,
+) -> WidgetTree {
+    let children = vec![
+        // impose desired width. TODO: better way to add a constraint
+        LayoutTree::spacer(vui::LayoutRequest {
+            minimum: size3(10, 0, 0),
+        }),
+        vui::leaf_widget(widgets::ProgressBar::new(
+            theme,
+            Face6::PX,
+            hub.primary_progress(),
+        )),
+    ];
+
+    // TODO: should have at least a title giving context
+    let contents = Arc::new(LayoutTree::Stack {
+        direction: Face6::NY,
+        children,
+    });
+    page_modal_backdrop(Arc::new(LayoutTree::Shrink(
+        theme.dialog_background().as_background_of(contents),
+    )))
 }
 
 pub(super) fn new_options_widget_tree(

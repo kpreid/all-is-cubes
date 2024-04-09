@@ -3,6 +3,7 @@
 //! module, which I am intending to convert into being just the widget-library part.
 
 pub(crate) mod hud;
+pub mod notification;
 pub(crate) mod options;
 pub(crate) mod pages;
 pub(crate) mod vui_manager;

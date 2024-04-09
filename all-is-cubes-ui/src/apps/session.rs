@@ -31,6 +31,7 @@ use all_is_cubes::util::{
 };
 
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
+use crate::ui_content::notification::{self, Notification};
 use crate::ui_content::Vui;
 
 const LOG_FIRST_FRAMES: bool = false;
@@ -547,6 +548,21 @@ impl<I: time::Instant> Session<I> {
             ui.show_modal_message(message);
         } else {
             log::info!("UI message not shown: {message}");
+        }
+    }
+
+    /// Display a notification to the user. Notifications persist until dismissed or the returned
+    /// [`Notification`] handle is dropped, and their content may be updated through that handle.
+    ///
+    /// Returns an error if there is no UI to display notifications or if there are too many.
+    pub fn show_notification(
+        &mut self,
+        content: impl Into<notification::NotificationContent>,
+    ) -> Result<Notification, notification::Error> {
+        // TODO: stop requiring mut by using a dedicated channel...?
+        match &mut self.shuttle_mut().ui {
+            Some(ui) => Ok(ui.show_notification(content)),
+            None => Err(notification::Error::NoUi),
         }
     }
 
@@ -1147,15 +1163,28 @@ impl MainTaskContext {
     /// Caution: calling this repeatedly will currently result in stacking up arbitrary
     /// numbers of dialogs. Avoid using it for situations not in response to user action.
     //---
-    // TODO: We should have some kind of UI state management framework that coordinates
-    // the main task with VUI pages, so that the main task can pop messages at opportune
-    // times.
+    // TODO: Replace this entirely with `show_notification`.
     pub fn show_modal_message(&self, message: ArcStr) {
         self.with_ref(|shuttle| {
             shuttle
                 .control_channel_sender
                 .send(ControlMessage::ShowModal(message))
                 .unwrap();
+        })
+    }
+
+    /// Display a notification to the user. Notifications persist until dismissed or the returned
+    /// [`Notification`] handle is dropped, and their content may be updated through that handle.
+    ///
+    /// Returns an error if there is no UI to display notifications or if there are too many.
+    pub fn show_notification(
+        &mut self,
+        content: impl Into<notification::NotificationContent>,
+    ) -> Result<Notification, notification::Error> {
+        // TODO: stop requiring mut by using a dedicated channel...?
+        self.with_mut(|shuttle| match &mut shuttle.ui {
+            Some(ui) => Ok(ui.show_notification(content)),
+            None => Err(notification::Error::NoUi),
         })
     }
 

@@ -20,7 +20,7 @@ use crate::apps::{
     QuitResult,
 };
 use crate::ui_content::hud::{HudBlocks, HudInputs};
-use crate::ui_content::pages;
+use crate::ui_content::{notification, pages};
 use crate::vui::widgets::TooltipState;
 use crate::vui::{LayoutTree, PageInst, UiSize, WidgetTree};
 
@@ -51,6 +51,7 @@ pub(crate) struct Vui {
     hud_page: PageInst,
     paused_page: PageInst,
     about_page: PageInst,
+    progress_page: PageInst,
     options_page: PageInst,
     /// Whatever [`VuiPageState::Dump`] contained.
     dump_page: PageInst,
@@ -67,6 +68,8 @@ pub(crate) struct Vui {
     tooltip_state: Arc<Mutex<TooltipState>>,
     /// Messages from session to UI that don't fit as [`ListenableSource`] changes.
     cue_channel: CueNotifier,
+
+    notif_hub: notification::Hub,
 }
 
 impl Vui {
@@ -110,6 +113,7 @@ impl Vui {
 
         let tooltip_state = Arc::<Mutex<TooltipState>>::default();
         let cue_channel: CueNotifier = Arc::new(Notifier::new());
+        let notif_hub = notification::Hub::new();
 
         // TODO: terrible mess of tightly coupled parameters
         let changed_viewport = DirtyFlag::listening(false, &viewport_source);
@@ -138,6 +142,8 @@ impl Vui {
         let options_widget_tree =
             pages::new_options_widget_tree(&mut universe, &hud_inputs).unwrap();
         let about_widget_tree = pages::new_about_widget_tree(&mut universe, &hud_inputs).unwrap();
+        let progress_widget_tree =
+            pages::new_progress_widget_tree(&hud_inputs.hud_blocks.widget_theme, &notif_hub);
 
         let mut new_self = Self {
             universe,
@@ -154,12 +160,14 @@ impl Vui {
             options_page: PageInst::new(options_widget_tree),
             about_page: PageInst::new(about_widget_tree),
             dump_page: PageInst::new(LayoutTree::empty()),
+            progress_page: PageInst::new(progress_widget_tree),
 
             control_channel: control_recv,
             changed_character: DirtyFlag::listening(false, &character_source),
             character_source,
             tooltip_state,
             cue_channel,
+            notif_hub,
         };
         new_self.set_space_from_state();
         new_self
@@ -201,6 +209,8 @@ impl Vui {
             VuiPageState::Paused => Some(self.paused_page.get_or_create_space(size, universe)),
             VuiPageState::Options => Some(self.options_page.get_or_create_space(size, universe)),
             VuiPageState::AboutText => Some(self.about_page.get_or_create_space(size, universe)),
+            VuiPageState::Progress => Some(self.progress_page.get_or_create_space(size, universe)),
+
             // Note: checking the `content` is handled in `set_state()`.
             VuiPageState::Dump {
                 previous: _,
@@ -324,16 +334,12 @@ impl Vui {
             }
         }
 
-        // Decide what state we should be in.
-        {
-            let current_state: &VuiPageState = &self.state.get();
-            let paused = *self.hud_inputs.paused.get();
-            if paused && matches!(current_state, VuiPageState::Hud) {
-                // TODO: also do this for lost focus
-                self.set_state(VuiPageState::Paused);
-            } else if !paused && matches!(current_state, VuiPageState::Paused) {
-                self.set_state(VuiPageState::Hud);
-            }
+        // Gather latest notification data.
+        self.notif_hub.update();
+
+        // Decide what state we should be in (based on all the stuff we just checked).
+        if let Some(new_state) = self.choose_new_page_state(&self.state.get()) {
+            self.set_state(new_state);
         }
     }
 
@@ -346,6 +352,13 @@ impl Vui {
             previous: self.state.get(),
             content,
         });
+    }
+
+    pub fn show_notification(
+        &mut self,
+        content: impl Into<notification::NotificationContent>,
+    ) -> notification::Notification {
+        self.notif_hub.insert(content.into())
     }
 
     /// Enter some kind of debug view. Not yet defined for the long run exactly what that is.
@@ -426,6 +439,9 @@ impl Vui {
                 // TODO: Instead check right now, but in a reusable fashion.
                 self.set_state(VuiPageState::Hud);
             }
+            VuiPageState::Progress => {
+                log::error!("TODO: need UI state for dismissing notifications");
+            }
             VuiPageState::Dump { ref previous, .. } => {
                 self.set_state(Arc::clone(previous));
             }
@@ -449,6 +465,37 @@ impl Vui {
             std::future::ready(Err(QuitCancelled::Unsupported))
         }
     }
+
+    /// Compute the wanted page state based on the previous state and external inputs.
+    ///
+    /// This is how, for example, the pause menu appears when the game is paused by whatever means.
+    ///
+    /// Returns [`None`] if no change in state should be made.
+    fn choose_new_page_state(&self, current_state: &VuiPageState) -> Option<VuiPageState> {
+        // Decide whether to display VuiPageState::Progress
+        if self.notif_hub.has_interrupt()
+            && current_state.freely_replaceable()
+            && !matches!(current_state, VuiPageState::Progress)
+        {
+            return Some(VuiPageState::Progress);
+        }
+
+        // Decide whether to stop displaying notifications
+        if !self.notif_hub.has_interrupt() && matches!(current_state, VuiPageState::Progress) {
+            // TODO: actually we should delegate to the paused-or-not logic...
+            return Some(VuiPageState::Hud);
+        }
+
+        let paused = *self.hud_inputs.paused.get();
+        if paused && matches!(current_state, VuiPageState::Hud) {
+            // TODO: also do this for lost focus
+            Some(VuiPageState::Paused)
+        } else if !paused && matches!(current_state, VuiPageState::Paused) {
+            Some(VuiPageState::Hud)
+        } else {
+            None
+        }
+    }
 }
 
 /// Identifies which “page” the UI should be showing — what should be in
@@ -457,12 +504,21 @@ impl Vui {
 pub(crate) enum VuiPageState {
     /// Normal gameplay, with UI elements around the perimeter.
     Hud,
+
     /// Report the paused (or lost-focus) state and offer a button to unpause
     /// and reactivate mouselook.
     Paused,
+
     /// Options/settings/preferences menu.
     Options,
+
+    /// “About All is Cubes” info.
     AboutText,
+
+    /// Displays a task progress bar taken from the [notification] list.
+    /// Reverts to [`VuiPageState::Hud`] when there is no notification.
+    Progress,
+
     /// Arbitrary widgets that have already been computed, and which don't demand
     /// any navigation behavior more complex than “cancellable”. This is to be used for
     /// viewing various reports/dialogs until we have a better idea.
@@ -470,6 +526,21 @@ pub(crate) enum VuiPageState {
         previous: Arc<VuiPageState>,
         content: EphemeralOpaque<WidgetTree>,
     },
+}
+
+impl VuiPageState {
+    /// Whether replacing this state _won't_ lose any important state.
+    pub fn freely_replaceable(&self) -> bool {
+        match self {
+            VuiPageState::Hud => true,
+            VuiPageState::Paused => true,
+            VuiPageState::AboutText => true,
+            VuiPageState::Progress => true,
+
+            VuiPageState::Options => false,
+            VuiPageState::Dump { .. } => false,
+        }
+    }
 }
 
 /// Message indicating a UI action that affects the UI itself
