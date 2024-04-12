@@ -42,8 +42,19 @@ mod tests;
 /// world position, rather than needing to be rotated by the view direction.
 pub type ViewTransform = RigidTransform3D<FreeCoordinate, Eye, Cube>;
 
-/// Defines a viewpoint in/of the world: a viewport (aspect ratio), projection matrix,
-/// and view matrix.
+/// Defines a view in/of the world.
+///
+/// A [`Camera`] has the following independently controllable properties.
+///
+/// * A [`ViewTransform`], which specifies the viewpoint (eye position) and
+///   direction.
+/// * A [`Viewport`], whose aspect ratio is used in the projection matrix.
+/// * A [`GraphicsOptions`], whose `fov_y` is used in the projection matrix.
+/// * A “measured exposure” (luminance scale factor) value which should be provided by examining
+///   the world, and which is carried through to [the output](Self::exposure).
+///
+/// From this information, it derives [view](Self::view_matrix) and
+/// [projection](Self::projection) matrices.
 ///
 /// See also [`StandardCameras`], which adds self-updating from a character’s viewport,
 /// among other features.
@@ -84,13 +95,14 @@ pub struct Camera {
     exposure_value: NotNan<f32>,
 }
 
+/// Basic creation and mutation.
 #[allow(clippy::cast_lossless)]
 impl Camera {
     /// Create a camera which has
     ///
-    /// * `options` and `viewport` as given,
-    /// * a `view_transform` of [`ViewTransform::identity()`], and
-    /// * an `exposure` determined based on the graphics options.
+    /// * options and viewport as given,
+    /// * a view transform of [`ViewTransform::identity()`], and
+    /// * an exposure determined based on the graphics options.
     pub fn new(options: GraphicsOptions, viewport: Viewport) -> Self {
         let options = options.repair();
         let mut new_self = Self {
@@ -112,16 +124,6 @@ impl Camera {
         new_self
     }
 
-    /// Returns the viewport value last provided.
-    pub fn viewport(&self) -> Viewport {
-        self.viewport
-    }
-
-    /// Returns the [`GraphicsOptions`] value last provided (possibly with adjusted values).
-    pub fn options(&self) -> &GraphicsOptions {
-        &self.options
-    }
-
     /// Replace the [`GraphicsOptions`] stored in this camera with
     /// [`options.repair()`](GraphicsOptions::repair).
     pub fn set_options(&mut self, options: GraphicsOptions) {
@@ -132,40 +134,36 @@ impl Camera {
         self.compute_matrices();
     }
 
+    /// Returns the [`GraphicsOptions`] value last provided to
+    /// [`Camera::new()`] or [`Camera::set_options()`] (possibly with
+    /// [adjusted](GraphicsOptions::repair) values).
+    pub fn options(&self) -> &GraphicsOptions {
+        &self.options
+    }
+
     /// Sets the contained viewport value, and recalculates matrices to be suitable for
     /// the new viewport's aspect ratio.
     pub fn set_viewport(&mut self, viewport: Viewport) {
         if viewport != self.viewport {
             self.viewport = viewport;
+            // TODO: What happens if the viewport is negative sized?
             self.compute_matrices();
         }
     }
 
-    /// Returns the field of view, expressed in degrees on the vertical axis (that is, the
-    /// horizontal field of view depends on the viewport's aspect ratio).
-    /// This differs from the value in [`GraphicsOptions`] by being clamped to valid values.
-    pub fn fov_y(&self) -> FreeCoordinate {
-        self.options.fov_y.into_inner()
+    /// Returns the viewport last provided to [`Camera::new()`] or [`Camera::set_viewport()`].
+    pub fn viewport(&self) -> Viewport {
+        self.viewport
     }
 
-    /// Returns the view distance; the far plane of the projection matrix, or the distance
-    /// at which rendering may be truncated.
-    pub fn view_distance(&self) -> FreeCoordinate {
-        self.options.view_distance.into_inner()
-    }
-
-    /// Returns the position of the near plane of the projection matrix.
-    /// This is not currently configurable.
-    pub fn near_plane_distance(&self) -> FreeCoordinate {
-        // half a voxel at resolution=16
-        (32.0f64).recip()
-    }
-
-    /// Sets the view transform.
+    /// Sets the view transform and recalculates matrices appropriately.
+    ///
+    /// Note that this is specified as the eye-to-world transform; that is, the given transform’s
+    /// translation should be equal to the view point in world coordinates.
     ///
     /// Besides controlling rendering, this is used to determine world coordinates for purposes
-    /// of [`view_position`](Self::view_position) and
-    /// [`project_ndc_into_world`](Self::project_ndc_into_world).
+    /// of [`view_position()`](Self::view_position) and
+    /// [`project_ndc_into_world()`](Self::project_ndc_into_world).
     #[allow(clippy::float_cmp)]
     pub fn set_view_transform(&mut self, eye_to_world_transform: ViewTransform) {
         if eye_to_world_transform.to_untyped() == self.eye_to_world_transform.to_untyped() {
@@ -176,22 +174,65 @@ impl Camera {
         self.compute_matrices();
     }
 
-    /// Sets the view transform like [`Self::set_view_transform()`], but in “look at” fashion.
+    /// Sets the view transform like [`Camera::set_view_transform()`], but in “look at” fashion.
     pub fn look_at_y_up(&mut self, eye: FreePoint, target: FreePoint) {
         self.set_view_transform(look_at_y_up(eye, target))
     }
 
-    /// Gets the last eye-to-world transform set by [`Self::set_view_transform()`].
+    /// Returns the last eye-to-world transform set by [`Camera::set_view_transform()`].
     pub fn get_view_transform(&self) -> ViewTransform {
         self.eye_to_world_transform
     }
 
-    /// Returns a projection matrix suitable for OpenGL use.
+    /// Sets the exposure value that should have been determined by average scene brightness.
+    /// This may or may not affect [`Self::exposure()`] depending on the current
+    /// graphics options.
+    pub fn set_measured_exposure(&mut self, value: f32) {
+        if let Ok(value) = NotNan::new(value) {
+            match (&self.options.exposure, &self.options.lighting_display) {
+                (ExposureOption::Fixed(_), _) => { /* nothing to do */ }
+                (ExposureOption::Automatic, LightingOption::None) => {
+                    self.exposure_value = NotNan::one();
+                }
+                (ExposureOption::Automatic, _) => {
+                    self.exposure_value = value;
+                }
+            }
+        }
+    }
+}
+
+/// Values derived from the basic parameters, and
+/// functions for applying this camera’s characteristics to points and colors.
+impl Camera {
+    /// Returns the field of view, expressed in degrees on the vertical axis (that is, the
+    /// horizontal field of view depends on the viewport's aspect ratio).
+    pub fn fov_y(&self) -> FreeCoordinate {
+        self.options.fov_y.into_inner()
+    }
+
+    /// Returns the view distance; the far plane of the view frustum, or the distance
+    /// at which rendering may be truncated.
+    pub fn view_distance(&self) -> FreeCoordinate {
+        self.options.view_distance.into_inner()
+    }
+
+    /// Returns the position of the near plane of the view frustum.
+    /// This is not currently configurable.
+    pub fn near_plane_distance(&self) -> FreeCoordinate {
+        // half a voxel at resolution=16
+        (32.0f64).recip()
+    }
+
+    /// Returns a projection matrix suitable for OpenGL use; that is, it maps coordinates in
+    /// “eye” space into the Normalized Device Cooordinate space whose range is from -1 to 1 in
+    /// all axes.
     pub fn projection(&self) -> Transform3D<FreeCoordinate, Eye, Ndc> {
         self.projection
     }
 
-    /// Returns a view matrix suitable for OpenGL use.
+    /// Returns a matrix which maps coordinates in world space to coordinates in eye space.
+    /// It is the inverse of the current [`Camera::get_view_transform()`].
     pub fn view_matrix(&self) -> Transform3D<FreeCoordinate, Cube, Eye> {
         self.world_to_eye_matrix
     }
@@ -201,7 +242,11 @@ impl Camera {
         self.view_position
     }
 
-    /// Returns an [`OctantMask`] including all directions this camera's field of view includes.
+    /// Returns an [`OctantMask`] which includes all directions (in world space) visible in
+    /// images rendered as specified by this camera.
+    ///
+    /// This information may be used as a fast initial culling step, avoiding iterating over
+    /// content behind the camera.
     pub fn view_direction_mask(&self) -> OctantMask {
         #[rustfmt::skip]
         let FrustumPoints { lbf, rbf, ltf, rtf, lbn, rbn, ltn, rtn, .. } = self.view_frustum;
@@ -233,7 +278,7 @@ impl Camera {
     }
 
     /// Converts a screen position in normalized device coordinates (as produced by
-    /// [`Viewport::normalize_nominal_point`]) into a ray in world space.
+    /// [`Viewport::normalize_nominal_point()`]) into a ray in world space.
     /// Uses the view transformation given by [`set_view_transform`](Self::set_view_transform).
     pub fn project_ndc_into_world(&self, ndc: NdcPoint2) -> Ray {
         let ndc_near = ndc.extend(-1.0);
@@ -322,39 +367,30 @@ impl Camera {
         intersection_max < intersection_min
     }
 
-    /// Apply postprocessing steps determined by this camera to convert a HDR “scene”
-    /// color into a LDR “image” color. Specifically:
-    ///
-    /// 1. Multiply the input by this camera's exposure value.
-    /// 2. Apply the tone mapping operator specified in [`Camera::options()`].
-    pub fn post_process_color(&self, color: Rgba) -> Rgba {
-        color.map_rgb(|rgb| self.options.tone_mapping.apply(rgb * self.exposure()))
-    }
-
     /// Returns the current exposure value for scaling luminance.
     ///
-    /// Renderers should use this value.
+    /// Renderers should use this value, not the fixed exposure value in the [`GraphicsOptions`].
+    /// It may or may not be equal to the last
+    /// [`set_measured_exposure()`](Self::set_measured_exposure),
+    /// depending on the graphics options.
     pub fn exposure(&self) -> NotNan<f32> {
         self.exposure_value
     }
 
-    /// Set the exposure value determined by average scene brightness.
-    /// This may or may not affect [`Self::exposure()`] depending on the current
-    /// graphics options.
-    pub fn set_measured_exposure(&mut self, value: f32) {
-        if let Ok(value) = NotNan::new(value) {
-            match (&self.options.exposure, &self.options.lighting_display) {
-                (ExposureOption::Fixed(_), _) => { /* nothing to do */ }
-                (ExposureOption::Automatic, LightingOption::None) => {
-                    self.exposure_value = NotNan::one();
-                }
-                (ExposureOption::Automatic, _) => {
-                    self.exposure_value = value;
-                }
-            }
-        }
+    /// Apply postprocessing steps determined by this camera to convert a [HDR] “scene”
+    /// color into a SDR “image” color. Specifically:
+    ///
+    /// 1. Multiply the input by this camera's [`exposure()`](Camera::exposure) value.
+    /// 2. Apply the tone mapping operator specified in [`Camera::options()`].
+    ///
+    /// [HDR]: https://en.wikipedia.org/wiki/High_dynamic_range
+    pub fn post_process_color(&self, color: Rgba) -> Rgba {
+        color.map_rgb(|rgb| self.options.tone_mapping.apply(rgb * self.exposure()))
     }
+}
 
+/// Internals
+impl Camera {
     fn compute_matrices(&mut self) {
         let fov_cot = (self.fov_y() / 2.).to_radians().tan().recip();
         let aspect = self.viewport.nominal_aspect_ratio();
@@ -362,7 +398,8 @@ impl Camera {
         let near = self.near_plane_distance();
         let far = self.view_distance();
 
-        // Rationale for this particular matrix formula: "that's what `cgmath` does".
+        // Rationale for this particular matrix formula: "that's what `cgmath` does",
+        // and we used to use `cgmath`.
         //
         // Note that this is an OpenGL—style projection matrix — that is, the depth range
         // is -1 to 1, not 0 to 1. TODO: Change that, and update the documentation.
