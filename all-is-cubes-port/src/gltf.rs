@@ -170,9 +170,8 @@ impl GltfWriter {
 
         self.frame_states.push(FrameState {
             visible_mesh_instances: visible_meshes.to_vec(),
-            camera_transform: our_camera.map_or_else(ViewTransform::identity, |camera| {
-                camera.get_view_transform()
-            }),
+            camera_transform: our_camera
+                .map_or_else(ViewTransform::identity, |camera| camera.view_transform()),
         });
         self.any_time_visible_mesh_instances
             .extend(visible_meshes.iter());

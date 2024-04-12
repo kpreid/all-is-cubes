@@ -193,7 +193,7 @@ impl<const MBM: usize> CsmTester<MBM> {
     /// Move camera to a position measured in chunks.
     fn move_camera_to(&mut self, position: impl Into<FreePoint>) {
         // TODO(euclid migration): wrong unit
-        let mut view_transform = self.camera.get_view_transform();
+        let mut view_transform = self.camera.view_transform();
         view_transform.translation = position.into().to_vector() * f64::from(CHUNK_SIZE);
         self.camera.set_view_transform(view_transform);
     }

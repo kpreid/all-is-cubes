@@ -54,7 +54,7 @@ pub type ViewTransform = RigidTransform3D<FreeCoordinate, Eye, Cube>;
 ///   the world, and which is carried through to [the output](Self::exposure).
 ///
 /// From this information, it derives [view](Self::view_matrix) and
-/// [projection](Self::projection) matrices.
+/// [projection](Self::projection_matrix) matrices.
 ///
 /// See also [`StandardCameras`], which adds self-updating from a character’s viewport,
 /// among other features.
@@ -180,7 +180,7 @@ impl Camera {
     }
 
     /// Returns the last eye-to-world transform set by [`Camera::set_view_transform()`].
-    pub fn get_view_transform(&self) -> ViewTransform {
+    pub fn view_transform(&self) -> ViewTransform {
         self.eye_to_world_transform
     }
 
@@ -227,12 +227,12 @@ impl Camera {
     /// Returns a projection matrix suitable for OpenGL use; that is, it maps coordinates in
     /// “eye” space into the Normalized Device Cooordinate space whose range is from -1 to 1 in
     /// all axes.
-    pub fn projection(&self) -> Transform3D<FreeCoordinate, Eye, Ndc> {
+    pub fn projection_matrix(&self) -> Transform3D<FreeCoordinate, Eye, Ndc> {
         self.projection
     }
 
     /// Returns a matrix which maps coordinates in world space to coordinates in eye space.
-    /// It is the inverse of the current [`Camera::get_view_transform()`].
+    /// It is the inverse of the current [`Camera::view_transform()`].
     pub fn view_matrix(&self) -> Transform3D<FreeCoordinate, Cube, Eye> {
         self.world_to_eye_matrix
     }

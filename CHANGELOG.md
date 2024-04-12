@@ -37,6 +37,10 @@
 - `all-is-cubes` library:
     - `camera::ImageSize` is now an `euclid::Size2D` instead of `euclid::Vector2D`.
     - `camera::Viewport`'s fields are now `euclid::Size2D` instead of `euclid::Vector2D`.
+    - Renamed `camera::Camera` methods:
+        - `projection()` to `projection_matrix()`
+        - `get_view_transform()` to `view_transform()`
+
 
     - `listen::Listener::receive()` now accepts batches of messages instead of single messages, and the `alive()` method has been replaced with a return value from `receive()`. Implementors should review the new requirements documentation.
 

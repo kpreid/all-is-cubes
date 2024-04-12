@@ -22,13 +22,13 @@ fn camera_bad_viewport_doesnt_panic() {
 #[test]
 fn set_options_updates_matrices() {
     let mut camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
-    let matrix = camera.projection();
+    let matrix = camera.projection_matrix();
     camera.set_options({
         let mut g = camera.options().clone();
         g.fov_y = NotNan::from(30);
         g
     });
-    assert_ne!(matrix, camera.projection());
+    assert_ne!(matrix, camera.projection_matrix());
 }
 
 #[test]

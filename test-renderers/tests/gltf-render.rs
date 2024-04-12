@@ -322,7 +322,7 @@ fn convert_camera(aic_camera: &all_is_cubes::camera::Camera) -> rend3::types::Ca
     let translation_matrix = glam::Mat4::from_translation(view_translation.into());
 
     // Convert rotation
-    let rot_quat = aic_camera.get_view_transform().rotation;
+    let rot_quat = aic_camera.view_transform().rotation;
     let rotation_matrix = glam::Mat4::from_quat(
         glam::Quat::from_xyzw(
             rot_quat.i as f32,

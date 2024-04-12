@@ -45,7 +45,7 @@ impl ShaderSpaceCamera {
             /* FogOption::None | */ _ => (0.0, f32::INFINITY),
         };
 
-        let projection_matrix = camera.projection().then(&OPENGL_TO_WGPU_PROJECTION);
+        let projection_matrix = camera.projection_matrix().then(&OPENGL_TO_WGPU_PROJECTION);
 
         // If the matrix isn't invertible, then what we're rendering must be degenerate (e.g.
         // zero FOV), so use a mostly harmless placeholder.

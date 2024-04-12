@@ -225,7 +225,7 @@ pub fn convert_camera_to_pinhole(
         },
         archetypes::Transform3D {
             // TODO: shouldn't from_parent be true?
-            transform: convert_transform(camera.get_view_transform(), false).into(),
+            transform: convert_transform(camera.view_transform(), false).into(),
         },
     )
 }
