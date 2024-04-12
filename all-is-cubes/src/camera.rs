@@ -242,6 +242,36 @@ impl Camera {
         self.view_position
     }
 
+    /// Converts a screen position in normalized device coordinates (as produced by
+    /// [`Viewport::normalize_nominal_point()`]) into a ray in world space.
+    /// Uses the view transformation given by [`set_view_transform`](Self::set_view_transform).
+    pub fn project_ndc_into_world(&self, ndc: NdcPoint2) -> Ray {
+        let ndc_near = ndc.extend(-1.0);
+        let ndc_far = ndc.extend(1.0);
+
+        // World-space endpoints of the ray.
+        // TODO(euclid migration): don't unwrap, do what instead?
+        let world_near = self
+            .inverse_projection_view
+            .transform_point3d(ndc_near)
+            .unwrap();
+        let world_far = self
+            .inverse_projection_view
+            .transform_point3d(ndc_far)
+            .unwrap();
+
+        let direction = world_far - world_near;
+        Ray {
+            origin: world_near,
+            direction,
+        }
+    }
+
+    fn project_point_into_world(&self, p: NdcPoint3) -> FreePoint {
+        // TODO(euclid migration): don't unwrap, do what instead?
+        self.inverse_projection_view.transform_point3d(p).unwrap()
+    }
+
     /// Returns an [`OctantMask`] which includes all directions (in world space) visible in
     /// images rendered as specified by this camera.
     ///
@@ -275,36 +305,6 @@ impl Camera {
         mask.set_octant_of(lmid + rmid);
 
         mask
-    }
-
-    /// Converts a screen position in normalized device coordinates (as produced by
-    /// [`Viewport::normalize_nominal_point()`]) into a ray in world space.
-    /// Uses the view transformation given by [`set_view_transform`](Self::set_view_transform).
-    pub fn project_ndc_into_world(&self, ndc: NdcPoint2) -> Ray {
-        let ndc_near = ndc.extend(-1.0);
-        let ndc_far = ndc.extend(1.0);
-
-        // World-space endpoints of the ray.
-        // TODO(euclid migration): don't unwrap, do what instead?
-        let world_near = self
-            .inverse_projection_view
-            .transform_point3d(ndc_near)
-            .unwrap();
-        let world_far = self
-            .inverse_projection_view
-            .transform_point3d(ndc_far)
-            .unwrap();
-
-        let direction = world_far - world_near;
-        Ray {
-            origin: world_near,
-            direction,
-        }
-    }
-
-    fn project_point_into_world(&self, p: NdcPoint3) -> FreePoint {
-        // TODO(euclid migration): don't unwrap, do what instead?
-        self.inverse_projection_view.transform_point3d(p).unwrap()
     }
 
     /// Determine whether the given `Aab` is visible in this projection+view.
