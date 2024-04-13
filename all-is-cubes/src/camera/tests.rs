@@ -43,6 +43,26 @@ fn camera_view_position() {
     assert_eq!(camera.view_position(), pos);
 }
 
+/// Test that the range of depth values produced by the projection matrix is as expected.
+#[test]
+fn projection_depth() {
+    let camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
+    let mat = camera.projection_matrix();
+    let world_depths = [camera.near_plane_distance(), camera.view_distance()];
+    let expected_ndc_depths = [-1., 1.];
+    let actual_ndc_depths = world_depths.map(|z| {
+        let eye = point3(0., 0., -z);
+        let clip = mat.transform_point3d_homogeneous(eye);
+        // doesn't reject z=0 like euclid's to_point3d() does
+        clip.z / clip.w
+    });
+
+    // In principle, this should have some allowed error, but we don't seem to need it for now,
+    // and all of the operations involved in computing these values are basic arithmetic, so
+    // they won't be platform-dependent.
+    assert_eq!(actual_ndc_depths, expected_ndc_depths);
+}
+
 #[test]
 fn view_frustum() {
     let camera = Camera::new(
