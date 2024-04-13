@@ -1,4 +1,4 @@
-use all_is_cubes::camera::{Camera, FogOption, LightingOption, Ndc};
+use all_is_cubes::camera::{Camera, FogOption, LightingOption};
 use all_is_cubes::euclid::Transform3D;
 use all_is_cubes::math::VectorOps;
 
@@ -45,7 +45,7 @@ impl ShaderSpaceCamera {
             /* FogOption::None | */ _ => (0.0, f32::INFINITY),
         };
 
-        let projection_matrix = camera.projection_matrix().then(&OPENGL_TO_WGPU_PROJECTION);
+        let projection_matrix = camera.projection_matrix();
 
         // If the matrix isn't invertible, then what we're rendering must be degenerate (e.g.
         // zero FOV), so use a mostly harmless placeholder.
@@ -83,11 +83,3 @@ impl ShaderSpaceCamera {
 fn convert_matrix<Src, Dst>(matrix: Transform3D<f64, Src, Dst>) -> [[f32; 4]; 4] {
     matrix.cast::<f32>().to_arrays()
 }
-
-// TODO: does it make sense to break this out really?
-const OPENGL_TO_WGPU_PROJECTION: Transform3D<f64, Ndc, Ndc> = Transform3D::new(
-    1.0, 0.0, 0.0, 0.0, //
-    0.0, 1.0, 0.0, 0.0, //
-    0.0, 0.0, 0.5, 0.0, //
-    0.0, 0.0, 0.5, 1.0, //
-);

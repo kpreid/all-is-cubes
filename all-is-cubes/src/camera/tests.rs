@@ -46,10 +46,13 @@ fn camera_view_position() {
 /// Test that the range of depth values produced by the projection matrix is as expected.
 #[test]
 fn projection_depth() {
-    let camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
-    let mat = camera.projection_matrix();
+    let camera = Camera::new(
+        GraphicsOptions::default(),
+        Viewport::with_scale(1.0, [4, 3]),
+    );
+    let mat = dbg!(camera.projection_matrix());
     let world_depths = [camera.near_plane_distance(), camera.view_distance()];
-    let expected_ndc_depths = [-1., 1.];
+    let expected_ndc_depths = [0., 1.];
     let actual_ndc_depths = world_depths.map(|z| {
         let eye = point3(0., 0., -z);
         let clip = mat.transform_point3d_homogeneous(eye);
@@ -57,10 +60,11 @@ fn projection_depth() {
         clip.z / clip.w
     });
 
-    // In principle, this should have some allowed error, but we don't seem to need it for now,
-    // and all of the operations involved in computing these values are basic arithmetic, so
-    // they won't be platform-dependent.
-    assert_eq!(actual_ndc_depths, expected_ndc_depths);
+    dbg!(expected_ndc_depths, actual_ndc_depths);
+    assert!(actual_ndc_depths
+        .into_iter()
+        .zip(expected_ndc_depths)
+        .all(|(a, e)| (a - e).abs() < 1e-8));
 }
 
 #[test]
@@ -77,9 +81,9 @@ fn view_frustum() {
     let x_near = 0.062499999999999986;
     let y_near = 0.031249999999999993;
     let z_near = -0.03125;
-    let x_far = 199.99999999996868;
-    let y_far = 99.99999999998434;
-    let z_far = -99.99999999998437;
+    let x_far = 200.00000000003973;
+    let y_far = 100.00000000001987;
+    let z_far = -100.0000000000199;
     assert_eq!(
         camera.view_frustum,
         FrustumPoints {

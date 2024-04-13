@@ -224,9 +224,11 @@ impl Camera {
         (32.0f64).recip()
     }
 
-    /// Returns a projection matrix suitable for OpenGL use; that is, it maps coordinates in
-    /// “eye” space into the Normalized Device Cooordinate space whose range is from -1 to 1 in
-    /// all axes.
+    /// Returns a perspective projection matrix based on the configured FOV and view distance,
+    ///
+    /// It maps coordinates in “eye” space into the Normalized Device Cooordinate space whose range
+    /// is from -1 to 1 in X and Y, and 0 to 1 in Z. (This is DirectX and WebGPU style NDC, rather
+    /// than OpenGL style which has a range of -1 to 1 in Z.)
     pub fn projection_matrix(&self) -> Transform3D<FreeCoordinate, Eye, Ndc> {
         self.projection
     }
@@ -401,14 +403,14 @@ impl Camera {
         // Rationale for this particular matrix formula: "that's what `cgmath` does",
         // and we used to use `cgmath`.
         //
-        // Note that this is an OpenGL—style projection matrix — that is, the depth range
-        // is -1 to 1, not 0 to 1. TODO: Change that, and update the documentation.
+        // Note that this is an DirectX—style projection matrix — that is, the depth range
+        // is 0 to 1, not -1 to 1.
         #[rustfmt::skip]
         let projection = Transform3D::new(
             fov_cot / aspect, 0.0, 0.0, 0.0,
             0.0, fov_cot, 0.0, 0.0,
-            0.0, 0.0, (far + near) / (near - far), -1.0,
-            0.0, 0.0, (2. * far * near) / (near - far), 0.0,
+            0.0, 0.0, far / (near - far), -1.0,
+            0.0, 0.0, (far * near) / (near - far), 0.0,
         );
         self.projection = projection;
 
@@ -425,10 +427,10 @@ impl Camera {
         // Compute the view frustum's corner points,
         // by unprojecting the corners of clip space.
         self.view_frustum = FrustumPoints {
-            lbn: self.project_point_into_world(point3(-1., -1., -1.)),
-            rbn: self.project_point_into_world(point3(1., -1., -1.)),
-            ltn: self.project_point_into_world(point3(-1., 1., -1.)),
-            rtn: self.project_point_into_world(point3(1., 1., -1.)),
+            lbn: self.project_point_into_world(point3(-1., -1., 0.)),
+            rbn: self.project_point_into_world(point3(1., -1., 0.)),
+            ltn: self.project_point_into_world(point3(-1., 1., 0.)),
+            rtn: self.project_point_into_world(point3(1., 1., 0.)),
             lbf: self.project_point_into_world(point3(-1., -1., 1.)),
             rbf: self.project_point_into_world(point3(1., -1., 1.)),
             ltf: self.project_point_into_world(point3(-1., 1., 1.)),
@@ -460,9 +462,11 @@ pub enum NominalPixel {}
 #[derive(Debug, Eq, PartialEq)]
 pub enum ImagePixel {}
 
-/// Unit-of-measure type for points/vectors in “normalized device coordinates”
-/// (where screen-space x and y have the range -1 to 1, zero is the center of the
-/// screen, and z is image depth rather than an equivalent third spatial axis).
+/// Unit-of-measure type for points/vectors in “normalized device coordinates”:
+/// screen-space *x* and *y* have the range -1 to 1;
+/// zero is the center of the screen;
+/// and *z* has the range 0 (nearest) to 1 (farthest) and is image depth rather than an equivalent
+/// third spatial axis.
 #[allow(clippy::exhaustive_enums)]
 #[derive(Debug, Eq, PartialEq)]
 pub enum Ndc {}
