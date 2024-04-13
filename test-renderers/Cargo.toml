@@ -36,6 +36,11 @@ name = "wgpu-render"
 doctest = false
 harness = false
 
+[[test]]
+name = "ui"
+doctest = false
+harness = false
+
 [features]
 default = []
 gltf = [
@@ -66,6 +71,7 @@ glam = { version = "0.24", optional = true, features = ["mint"] }
 image = { workspace = true, features = ["png"] }
 itertools = { workspace = true }
 mint = { version = "0.5.9", optional = true }
+rayon = { workspace = true }
 rend3 = { git = "https://github.com/BVE-Reborn/rend3/", rev = "86bc4d2d2f4048a0adaa9af5ef542dc652308966", optional = true }
 rend3-gltf = { git = "https://github.com/BVE-Reborn/rend3/", rev = "86bc4d2d2f4048a0adaa9af5ef542dc652308966",  optional = true, default-features = false }
 rend3-routine = { git = "https://github.com/BVE-Reborn/rend3/", rev = "86bc4d2d2f4048a0adaa9af5ef542dc652308966", optional = true }

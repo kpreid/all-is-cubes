@@ -5,17 +5,20 @@
 #![allow(missing_docs)] // library for internal use only
 #![forbid(unsafe_code)]
 
+use std::fmt;
 use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
+use clap::builder::PossibleValue;
 use image::RgbaImage;
 use rendiff::{Histogram, Threshold};
 
 use all_is_cubes::camera::Rendering;
 use all_is_cubes::character::Character;
 use all_is_cubes::space::Space;
+use all_is_cubes::universe::Handle;
 use all_is_cubes::universe::Universe;
 use all_is_cubes_content::free_editing_starter_inventory;
 
@@ -29,10 +32,55 @@ mod report;
 pub use report::*;
 pub mod test_cases;
 
-pub type TestId = String;
+/// A suite is a group of tests which get their own image directories, report files, and
+/// test targets.
+#[derive(
+    Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
+)]
+#[allow(clippy::exhaustive_enums)]
+pub enum SuiteId {
+    Renderers,
+    Ui,
+}
+impl SuiteId {
+    fn as_str(self) -> &'static str {
+        match self {
+            SuiteId::Renderers => "renderers",
+            SuiteId::Ui => "ui",
+        }
+    }
+}
+impl clap::ValueEnum for SuiteId {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[SuiteId::Renderers, SuiteId::Ui]
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        Some(PossibleValue::new(self.as_str()))
+    }
+}
+impl fmt::Display for SuiteId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+#[derive(
+    Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
+)]
+#[allow(clippy::exhaustive_structs)]
+pub struct TestId {
+    pub suite: SuiteId,
+
+    /// Name of the test function and parameters, used as part of the image file name.
+    pub test: String,
+}
 
 /// Given a [`Space`], create the [`Character`] looking at it, with the default name.
-pub fn finish_universe_from_space(universe: &mut Universe, space: Space) {
+pub fn finish_universe_from_space(
+    universe: &mut Universe,
+    space: Space,
+) -> (Handle<Space>, Handle<Character>) {
     // TODO: "character".into() shouldn't be sprinkled around various universe construction.
     let space_handle = universe.insert("space".into(), space).unwrap();
 
@@ -40,9 +88,14 @@ pub fn finish_universe_from_space(universe: &mut Universe, space: Space) {
     let mut spawn = space_handle.read().unwrap().spawn().clone();
     spawn.set_inventory(free_editing_starter_inventory(true));
 
-    let _character_handle = universe
-        .insert("character".into(), Character::spawn(&spawn, space_handle))
+    let character_handle = universe
+        .insert(
+            "character".into(),
+            Character::spawn(&spawn, space_handle.clone()),
+        )
         .unwrap();
+
+    (space_handle, character_handle)
 }
 
 /// Result of calling [`compare_rendered_image`]

@@ -33,6 +33,7 @@ async fn main() -> test_renderers::HarnessResult {
     test_renderers::harness_main(
         test_renderers::HarnessArgs::parse(),
         RendererId::Wgpu,
+        test_renderers::SuiteId::Renderers,
         test_renderers::test_cases::all_tests,
         get_factory,
         parallelism,

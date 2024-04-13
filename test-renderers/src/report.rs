@@ -6,7 +6,7 @@ use std::{fs, io};
 
 use tinytemplate::TinyTemplate;
 
-use crate::{test_data_dir_path, ComparisonRecord, RendererId, TestId, Version};
+use crate::{test_data_dir_path, ComparisonRecord, RendererId, SuiteId, TestId, Version};
 
 /// Record of what happened when a specific test case was run with a specific renderer.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -21,23 +21,23 @@ pub struct TestCaseOutput {
 /// and generate a HTML report.
 ///
 /// TODO: report staleness of the data, just in case.
-pub(crate) fn write_report_file() -> PathBuf {
+pub(crate) fn write_report_file(suite_id: SuiteId) -> PathBuf {
     // Fetch previous comparison records from disk since we are currently only running one of the renderer cases
-    let comparison_records: Vec<BTreeMap<TestId, TestCaseOutput>> = [
+    let comparison_records: Vec<BTreeMap<String, TestCaseOutput>> = [
         // These must be in the same order that the template displays columns
         RendererId::Raytracer,
         RendererId::Wgpu,
         RendererId::Gltf,
     ]
     .into_iter()
-    .map(|id| match fs::File::open(results_json_path(id)) {
+    .map(|id| match fs::File::open(results_json_path(suite_id, id)) {
         Ok(f) => serde_json::from_reader(f).expect("Parse error reading results json"),
         Err(e) if e.kind() == io::ErrorKind::NotFound => BTreeMap::new(),
         Err(e) => panic!("IO error reading results json: {e}"),
     })
     .collect();
 
-    let all_ids: BTreeSet<String> = comparison_records
+    let all_test_ids: BTreeSet<String> = comparison_records
         .iter()
         .flat_map(|map| map.keys().cloned())
         .collect();
@@ -47,7 +47,7 @@ pub(crate) fn write_report_file() -> PathBuf {
         .unwrap();
 
     let context = tmpl::Context {
-        statuses: all_ids
+        statuses: all_test_ids
             .iter()
             .map(|test_id| tmpl::StatusRow {
                 id: test_id.clone(),
@@ -84,12 +84,12 @@ pub(crate) fn write_report_file() -> PathBuf {
 
     let rendered = tt.render("report", &context).unwrap();
 
-    let report_path: PathBuf = test_data_dir_path(Version::Root).join("index.html");
+    let report_path: PathBuf = test_data_dir_path(suite_id, Version::Root).join("index.html");
     fs::write(&report_path, rendered).unwrap();
 
     // Copy report CSS so it is self-contained
     fs::write(
-        test_data_dir_path(Version::Root).join("report.css"),
+        test_data_dir_path(suite_id, Version::Root).join("report.css"),
         include_bytes!("report.css"),
     )
     .unwrap();
@@ -97,8 +97,8 @@ pub(crate) fn write_report_file() -> PathBuf {
     report_path
 }
 
-pub fn results_json_path(renderer_id: RendererId) -> PathBuf {
-    test_data_dir_path(Version::Root).join(format!("results-{renderer_id}.json"))
+pub fn results_json_path(suite_id: SuiteId, renderer_id: RendererId) -> PathBuf {
+    test_data_dir_path(suite_id, Version::Root).join(format!("results-{renderer_id}.json"))
 }
 
 /// Types for the HTML templating

@@ -19,7 +19,7 @@ use all_is_cubes::util::{ConciseDebug, Refmt as _};
 
 use crate::{
     results_json_path, write_report_file, ComparisonOutcome, ComparisonRecord, ImageId, Overlays,
-    RendererFactory, RendererId, Scene, TestCaseOutput, TestId, Threshold,
+    RendererFactory, RendererId, Scene, SuiteId, TestCaseOutput, TestId, Threshold,
 };
 
 type BoxedTestFn = Box<dyn Fn(RenderTestContext) -> BoxFuture<'static, ()> + Send + Sync>;
@@ -208,6 +208,7 @@ pub type HarnessResult = ExitCode;
 pub async fn harness_main<Factory, Ff>(
     args: HarnessArgs,
     renderer_id: RendererId,
+    suite_id: SuiteId,
     test_suite: fn(&mut TestCaseCollector<'_>),
     factory_factory: Ff, // TODO: better name
     max_parallelism: Option<usize>,
@@ -302,17 +303,21 @@ where
     // Start the tests, in parallel with a concurrency limit imposed by buffer_unordered().
     let suite_start_time = Instant::now();
     let mut handles = stream::iter(filtered_test_table)
-        .map(|(name, test_case)| {
-            let test_id = name.clone();
+        .map(|(test_name, test_case)| {
+            let test_id = TestId {
+                suite: suite_id,
+                test: test_name.clone(),
+            };
             let comparison_log: Arc<Mutex<Vec<ComparisonRecord>>> = Default::default();
             let factory_future = factory_factory();
             let universe_future = test_case.universe_source.clone();
             async {
-                // This handle serves to act as a catch_unwind for the test case itself.
+                let test_id_tc = test_id.clone();
                 let comparison_log_tc = comparison_log.clone();
+                // This handle serves to act as a catch_unwind for the test case itself.
                 let test_case_handle = tokio::spawn(async move {
                     let context = RenderTestContext {
-                        test_id,
+                        test_id: test_id_tc,
                         renderer_factory: Box::new(factory_future.await),
                         comparison_log: comparison_log_tc,
                         universe: match universe_future {
@@ -337,7 +342,7 @@ where
                 let outcome: Result<Duration, tokio::task::JoinError> = test_case_handle.await;
 
                 TestRunResult {
-                    name,
+                    test_id,
                     outcome,
                     comparison_log,
                 }
@@ -354,7 +359,10 @@ where
     // Collect results.
     while let Some(result) = handles.next().await {
         let TestRunResult {
-            name,
+            test_id: TestId {
+                suite: _,
+                test: name,
+            },
             outcome,
             comparison_log,
         } = result;
@@ -413,7 +421,10 @@ where
             name.clone(),
             TestCaseOutput {
                 outcome: outcome_for_report,
-                test_id: name,
+                test_id: TestId {
+                    suite: suite_id,
+                    test: name,
+                },
                 comparisons: Arc::try_unwrap(comparison_log)
                     .expect("somebody hung onto the log")
                     .into_inner()
@@ -433,14 +444,15 @@ where
     );
 
     // Write data from this run to a JSON file.
+    // (This doesn't create the directory, but that doesn't matter unless we ran zero tests.)
     fs::write(
-        results_json_path(renderer_id),
+        results_json_path(suite_id, renderer_id),
         serde_json::to_string(&per_test_output).unwrap().as_bytes(),
     )
-    .unwrap();
+    .expect("failed to write results json file");
 
     // Compile this run *and* others into a report file.
-    let report_path = write_report_file();
+    let report_path = write_report_file(suite_id);
     eprintln!("report written to {p}", p = report_path.display());
 
     if count_failed == 0 {
@@ -536,7 +548,7 @@ fn stringify_variant(variant: &serde_json::Value) -> String {
 
 /// Data conveyed from a test case.
 struct TestRunResult {
-    name: String,
+    test_id: TestId,
     outcome: Result<Duration, tokio::task::JoinError>,
     comparison_log: Arc<Mutex<Vec<ComparisonRecord>>>,
 }

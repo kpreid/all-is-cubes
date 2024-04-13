@@ -1,9 +1,9 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{fmt, io};
 
 use clap::builder::PossibleValue;
 
-use crate::TestId;
+use crate::{SuiteId, TestId};
 
 // TODO: better name
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -82,8 +82,14 @@ pub enum Version {
 /// ensuring the directory exists.
 ///
 /// Public so bless-render can sue it.
-pub fn image_path(test: &ImageId, version: Version) -> PathBuf {
-    let mut path = test_data_dir_path(version);
+pub fn image_path(image_id: &ImageId, version: Version) -> PathBuf {
+    let &ImageId {
+        test_id: TestId { suite, ref test },
+        renderer,
+        serial_number,
+    } = image_id;
+
+    let mut path = test_data_dir_path(suite, version);
 
     // Convenience kludge: ensure the directory exists
     match std::fs::create_dir_all(&path) {
@@ -91,38 +97,36 @@ pub fn image_path(test: &ImageId, version: Version) -> PathBuf {
         Err(e) => panic!("Failed to create output dir '{p}': {e}", p = path.display()),
     }
 
-    let &ImageId {
-        ref test_id,
-        renderer,
-        serial_number,
-    } = test;
     let serial_str = if serial_number == 1 {
         String::new()
     } else {
         format!("-{serial_number}")
     };
-    path.push(&format!("{test_id}{serial_str}-{renderer}.png"));
+    path.push(&format!("{test}{serial_str}-{renderer}.png"));
 
     path
 }
 
 /// Return the path to the directory in which the files of the sort specified by `version`
 /// should be read or written.
-pub(crate) fn test_data_dir_path(version: Version) -> PathBuf {
+pub(crate) fn test_data_dir_path(suite_id: SuiteId, version: Version) -> PathBuf {
     // CARGO_MANIFEST_DIR will be the directory of the test-renderers package
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push(match version {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let output_root = manifest_dir.join(format!("../target/test-renderers-output/{suite_id}/"));
+    let path = match version {
         // These paths must also match the report template's relative paths
-        Version::Actual => "../target/test-renderers-output/actual/",
-        Version::Diff => "../target/test-renderers-output/diff/",
-        Version::ExpectedSnapshot => "../target/test-renderers-output/expected/",
-        Version::ExpectedSrc => "expected/",
-        Version::Root => "../target/test-renderers-output/",
-    });
-    if let Ok(p) = path.canonicalize() {
-        path = p;
+        Version::Actual => output_root.join("actual/"),
+        Version::Diff => output_root.join("diff/"),
+        Version::ExpectedSnapshot => output_root.join("expected/"),
+        Version::ExpectedSrc => manifest_dir.join(format!("expected/{suite_id}/")),
+        Version::Root => output_root,
+    };
+
+    if let Ok(canon) = path.canonicalize() {
+        canon
+    } else {
+        path
     }
-    path
 }
 
 /// Load a specific expected image, and *also* copy it to the output expected-images dir,

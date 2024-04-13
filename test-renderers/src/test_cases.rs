@@ -496,6 +496,8 @@ async fn info_text(mut context: RenderTestContext) {
 ///
 /// This is more of a content test than a renderer test, except that it also
 /// exercises the renderers with various block shapes.
+/// (TODO: Move this to the UI test suite and replace it with something else with complex
+/// blocks.)
 ///
 /// It does not draw everything because that would mean the render test requires an
 /// update every time a new UI block is added, which is tedious and not a greatly useful

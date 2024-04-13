@@ -7,7 +7,7 @@ use std::process::Command;
 
 use clap::Parser as _;
 
-use test_renderers::{image_path, ImageId, RendererId};
+use test_renderers::{image_path, ImageId, RendererId, SuiteId, TestId};
 
 #[derive(Debug, clap::Parser)]
 #[command(author, about, version)]
@@ -17,23 +17,31 @@ struct BlessArgs {
     #[arg(long)]
     specific: bool,
 
+    /// Name of the test suite, e.g. "renderers".
+    suite_id: SuiteId,
+
     /// Which renderer's output to copy, e.g. "ray".
     src_id: RendererId,
 
     /// Names of the test cases, e.g. "fog-None".
-    test_id: Vec<String>,
+    test_names: Vec<String>,
 }
 
 fn main() {
     let BlessArgs {
         specific,
+        suite_id,
         src_id,
-        test_id: test_ids,
+        test_names,
     } = BlessArgs::parse();
 
     let dst_id = if specific { src_id } else { RendererId::All };
 
-    for test_id in test_ids {
+    for test_name in test_names {
+        let test_id = TestId {
+            suite: suite_id,
+            test: test_name,
+        };
         let src_path = image_path(
             &ImageId {
                 test_id: test_id.clone(),
