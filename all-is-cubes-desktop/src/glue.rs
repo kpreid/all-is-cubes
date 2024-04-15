@@ -14,10 +14,10 @@ use all_is_cubes::rerun_glue as rg;
 use all_is_cubes_gpu::RerunFilter as GpuRerunFilter;
 
 pub(crate) mod crossterm;
+pub(crate) mod gilrs;
 #[cfg(feature = "rerun")]
 pub(crate) mod rerun_mesh;
 pub(crate) mod winit;
-pub(crate) mod gilrs;
 
 /// Abstraction over different window types.
 // TODO: seal this trait

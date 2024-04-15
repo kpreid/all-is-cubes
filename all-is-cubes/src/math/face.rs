@@ -794,7 +794,6 @@ where
     /// In addition to the usual formatting behaviors, [`FaceMap`] will detect whether
     /// elements are equal and avoid redundant printing.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-
         let FaceMap {
             nx,
             ny,
