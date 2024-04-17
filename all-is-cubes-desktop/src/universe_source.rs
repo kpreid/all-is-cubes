@@ -1,14 +1,17 @@
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use anyhow::Context as _;
 use indicatif::ProgressBar;
 use rand::Rng as _;
+use tokio::sync::oneshot;
 
 use all_is_cubes::space::{LightUpdatesInfo, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
+use all_is_cubes_ui::notification::{self, Notification};
+use all_is_cubes_ui::vui::widgets::ProgressBarState;
 
 use crate::{glue, logging};
 
@@ -27,8 +30,15 @@ pub enum UniverseSource {
 
 impl UniverseSource {
     /// Perform and log the creation of the universe.
-    pub async fn create_universe(self, precompute_light: bool) -> Result<Universe, anyhow::Error> {
+    pub async fn create_universe(
+        self,
+        precompute_light: bool,
+        notif_rx: oneshot::Receiver<Notification>,
+    ) -> Result<Universe, anyhow::Error> {
         let start_time = Instant::now();
+
+        // TODO: figure out a cleaner way to wrangle this rx hookup
+        let notif_rx = Mutex::new(TryRecvKeep::Rx(notif_rx));
         let universe_progress_bar = logging::new_progress_bar(100)
             .with_style(
                 logging::common_progress_style()
@@ -43,9 +53,16 @@ impl UniverseSource {
                 .progress_using(move |info| {
                     universe_progress_bar.set_position((info.fraction() * 100.0) as u64);
                     universe_progress_bar.set_message(String::from(info.label_str()));
+
+                    if let Some(notification) = notif_rx.lock().unwrap().try_borrow() {
+                        notification.set_content(notification::NotificationContent::Progress(
+                            ProgressBarState::new(info.fraction().into()),
+                        ));
+                    }
                 })
                 .build()
         };
+
         let universe = match self.clone() {
             UniverseSource::Template(template, TemplateParameters { seed, size }) => {
                 let seed: u64 = seed.unwrap_or_else(|| {
@@ -110,5 +127,22 @@ fn lighting_progress_adapter(progress: &ProgressBar) -> impl FnMut(LightUpdatesI
         worst = worst.max(info.queue_count);
         progress.set_length(worst as u64);
         progress.set_position((worst - info.queue_count) as u64);
+    }
+}
+
+enum TryRecvKeep {
+    Rx(oneshot::Receiver<Notification>),
+    Have(Notification),
+}
+impl TryRecvKeep {
+    fn try_borrow(&mut self) -> Option<&Notification> {
+        if let Self::Rx(rx) = self {
+            *self = Self::Have(rx.try_recv().ok()?)
+        }
+        if let Self::Have(value) = self {
+            Some(value)
+        } else {
+            None
+        }
     }
 }

@@ -39,6 +39,7 @@ clap = { workspace = true }
 crossterm = "0.27.0"
 directories-next = "2.0.0"
 futures-core = { workspace = true }
+futures-util = { workspace = true }
 gilrs = { workspace = true }
 indicatif = { version = "0.17.0", default-features = false }
 itertools = { workspace = true }

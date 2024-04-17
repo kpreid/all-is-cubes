@@ -13,6 +13,8 @@ use all_is_cubes::camera::{GraphicsOptions, Viewport};
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::math::VectorOps;
+use all_is_cubes_ui::notification;
+use all_is_cubes_ui::vui::widgets::ProgressBarState;
 
 use all_is_cubes_desktop::terminal::{
     create_terminal_session, terminal_main_loop, terminal_print_once, TerminalOptions,
@@ -80,7 +82,8 @@ fn main() -> Result<(), anyhow::Error> {
     // Done with options; now start creating the session.
 
     // Kick off constructing the universe in the background.
-    let universe_future = {
+    let (universe_future, universe_notif_tx) = {
+        let (n_tx, n_rx) = tokio::sync::oneshot::channel();
         // TODO: refactor this to access fewer deep details
         let precompute_light = precompute_light
             || (graphics_type == GraphicsType::Record
@@ -88,7 +91,10 @@ fn main() -> Result<(), anyhow::Error> {
                     determine_record_format(file).map_or(false, |fmt| fmt.includes_light())
                 }));
 
-        runtime.spawn(input_source.create_universe(precompute_light))
+        (
+            runtime.spawn(input_source.create_universe(precompute_light, n_rx)),
+            n_tx,
+        )
     };
 
     // This cell will be moved into the session after (possibly) being reset to the actual
@@ -101,7 +107,7 @@ fn main() -> Result<(), anyhow::Error> {
     ));
 
     let start_session_time = Instant::now();
-    let session = runtime.block_on(
+    let mut session = runtime.block_on(
         Session::builder()
             .ui(viewport_cell.as_source())
             .quit(Arc::new(|| {
@@ -110,7 +116,14 @@ fn main() -> Result<(), anyhow::Error> {
             }))
             .build(),
     );
+    // TODO: this code should live in the lib
     session.graphics_options_mut().set(graphics_options);
+    if let Ok(n) = session.show_notification(notification::NotificationContent::Progress(
+        ProgressBarState::new(0.0),
+    )) {
+        // Ignore send error because the process might have finished and dropped the receiver.
+        _ = universe_notif_tx.send(n);
+    }
     let session_done_time = Instant::now();
     log::debug!(
         "Initialized session ({:.3} s)",
