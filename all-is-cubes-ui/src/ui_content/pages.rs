@@ -27,7 +27,7 @@ pub(super) fn new_paused_widget_tree(
 
     let mut children = vec![
         // TODO: establish standard resolutions for logo etc
-        vui::leaf_widget(shrink(u, R16, vui::leaf_widget(logo_text()))?),
+        vui::leaf_widget(shrink(u, R16, &vui::leaf_widget(logo_text()))?),
         heading("Paused"),
         vui::leaf_widget(open_page_button(
             hud_inputs,
@@ -84,7 +84,7 @@ pub(super) fn new_options_widget_tree(
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
-            vui::leaf_widget(shrink(u, R32, vui::leaf_widget(logo_text()))?),
+            vui::leaf_widget(shrink(u, R32, &vui::leaf_widget(logo_text()))?),
             heading("Options"),
             back_button(hud_inputs),
             Arc::new(LayoutTree::Stack {
@@ -135,7 +135,7 @@ pub(super) fn new_about_widget_tree(
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
-            vui::leaf_widget(shrink(u, R8, vui::leaf_widget(logo_text()))?),
+            vui::leaf_widget(shrink(u, R8, &vui::leaf_widget(logo_text()))?),
             back_button(hud_inputs),
             heading("Controls"),
             paragraph(controls_text),

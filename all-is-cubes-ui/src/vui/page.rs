@@ -206,7 +206,7 @@ pub(crate) mod parts {
     pub fn shrink(
         universe: &mut Universe,
         resolution: Resolution,
-        large: WidgetTree,
+        large: &WidgetTree,
     ) -> Result<Arc<dyn Widget>, InstallVuiError> {
         let space = large.to_space(
             SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),

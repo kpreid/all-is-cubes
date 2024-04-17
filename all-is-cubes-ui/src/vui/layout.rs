@@ -428,7 +428,7 @@ impl LayoutTree<Arc<dyn Widget>> {
     /// Note that the widgets will not actually appear as blocks until the first time the
     /// space is stepped.
     pub fn to_space<B: all_is_cubes::space::SpaceBuilderBounds>(
-        self: Arc<Self>,
+        self: &Arc<Self>,
         builder: SpaceBuilder<B>,
         gravity: Gravity,
     ) -> Result<Space, InstallVuiError> {
@@ -441,7 +441,7 @@ impl LayoutTree<Arc<dyn Widget>> {
                 bounds: space.bounds(),
                 gravity,
             },
-            &self,
+            self,
         )?
         .execute(&mut space, &mut transaction::no_outputs)
         .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;

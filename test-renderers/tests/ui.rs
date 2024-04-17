@@ -184,7 +184,6 @@ fn render_widget(widget: &vui::WidgetTree, gravity: vui::Gravity) -> Rendering {
     render_orthographic(&Handle::new_pending(
         Name::Pending,
         widget
-            .clone()
             .to_space(space::SpaceBuilder::default(), gravity)
             .unwrap(),
     ))
