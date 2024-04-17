@@ -1,22 +1,29 @@
 //! Tests of the visual appearance of [`all_is_cubes_ui`] widgets and pages,
 //! as well as some of the behavior of [`Session`].
 
+use std::sync::Arc;
+
 use clap::Parser as _;
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::camera::{self, GraphicsOptions, ImagePixel, Rendering, Viewport};
 use all_is_cubes::euclid::{point2, point3, vec2, vec3, Scale};
-use all_is_cubes::listen::ListenableSource;
-use all_is_cubes::math::{Cube, FreePoint, Rgba};
+use all_is_cubes::linking::BlockProvider;
+use all_is_cubes::listen::{ListenableCell, ListenableSource};
+use all_is_cubes::math::{Cube, Face6, FreePoint, Rgba};
 use all_is_cubes::raycast::Ray;
-use all_is_cubes::raytracer;
 use all_is_cubes::space::Space;
 use all_is_cubes::time::NoTime;
-use all_is_cubes::universe::Handle;
+use all_is_cubes::transaction::Transaction as _;
+use all_is_cubes::universe::{Handle, Name, Universe, UniverseTransaction};
+use all_is_cubes::util::YieldProgress;
+use all_is_cubes::{raytracer, space, transaction};
 
 use all_is_cubes_ui::apps::{Key, Session};
+use all_is_cubes_ui::vui::{self, widgets};
 
+use test_renderers::test_cases::u;
 use test_renderers::RenderTestContext;
 
 #[tokio::main]
@@ -38,12 +45,22 @@ async fn main() -> test_renderers::HarnessResult {
 // so they are not in a library but right here.
 
 fn ui_render_tests(c: &mut test_renderers::TestCaseCollector<'_>) {
+    let wu = u("widget_theme_universe", create_widget_theme_universe());
+
     c.insert("session_initial_state", None, session_initial_state);
     c.insert("session_modal", None, session_modal);
     if false {
         // TODO: doesn't give the expected result and I don't know why
         c.insert("session_page_pause", None, session_page_pause);
     }
+    c.insert("widget_button_action", wu.clone(), widget_button_action);
+    c.insert("widget_button_toggle", wu.clone(), widget_button_toggle);
+    // TODO: test for LayoutDebugFrame widget
+    // TODO: test for Frame widget
+    c.insert("widget_progress_bar", wu, widget_progress_bar);
+    // TODO: test for Toolbar widget
+    // TODO: test for Tooltip widget
+    // TODO: test for Voxels widget
 }
 
 // --- Test cases ---------------------------------------------------------------------------------
@@ -72,12 +89,83 @@ async fn session_page_pause(mut context: RenderTestContext) {
     context.compare_image(0, render_session(&session));
 }
 
+async fn widget_button_action(mut context: RenderTestContext) {
+    let theme = widget_theme(&context);
+    let widget = vui::leaf_widget(widgets::ActionButton::new(
+        widgets::ButtonLabel::from(literal!("Hi")),
+        &theme,
+        || {},
+    ));
+    context.compare_image(
+        0,
+        render_widget(&widget, vui::Gravity::splat(vui::Align::Low)),
+    );
+    context.compare_image(
+        0,
+        render_widget(&widget, vui::Gravity::splat(vui::Align::Center)),
+    );
+    context.compare_image(
+        0,
+        render_widget(&widget, vui::Gravity::splat(vui::Align::High)),
+    );
+}
+
+async fn widget_button_toggle(mut context: RenderTestContext) {
+    let theme = widget_theme(&context);
+    let cell = ListenableCell::new(false);
+    let widget = vui::leaf_widget(widgets::ToggleButton::new(
+        cell.as_source(),
+        |&v| v,
+        widgets::ButtonLabel::from(literal!("Hi")),
+        &theme,
+        || {},
+    ));
+    for value in [false, true] {
+        cell.set(value);
+        context.compare_image(
+            0,
+            render_widget(&widget, vui::Gravity::splat(vui::Align::Center)),
+        );
+    }
+}
+
+async fn widget_progress_bar(mut context: RenderTestContext) {
+    let theme = widget_theme(&context);
+    let cell = ListenableCell::new(widgets::ProgressBarState::new(0.0));
+    let widget = vui::leaf_widget(widgets::ProgressBar::new(
+        &theme,
+        Face6::PX,
+        cell.as_source(),
+    ));
+    for value in [0.0, 0.5, 1.0] {
+        cell.set(widgets::ProgressBarState::new(value));
+        context.compare_image(
+            0,
+            render_widget(&widget, vui::Gravity::splat(vui::Align::Center)),
+        );
+    }
+}
+
 // --- Test helpers -------------------------------------------------------------------------------
 
 async fn create_session() -> Session<NoTime> {
     let viewport = ListenableSource::constant(Viewport::with_scale(1.0, [256, 192]));
     let session: Session<NoTime> = Session::builder().ui(viewport).build().await;
     session
+}
+
+async fn create_widget_theme_universe() -> Arc<Universe> {
+    let mut u = Universe::new();
+    let mut txn = UniverseTransaction::default();
+    widgets::WidgetTheme::new(&mut txn, YieldProgress::noop())
+        .await
+        .unwrap();
+    txn.execute(&mut u, &mut transaction::no_outputs).unwrap();
+    Arc::new(u)
+}
+
+fn widget_theme(context: &RenderTestContext) -> widgets::WidgetTheme {
+    widgets::WidgetTheme::from_provider(BlockProvider::using(context.universe()).unwrap())
 }
 
 fn advance_time(session: &mut Session<NoTime>) {
@@ -90,6 +178,16 @@ fn advance_time(session: &mut Session<NoTime>) {
 
 fn render_session(session: &Session<NoTime>) -> Rendering {
     render_orthographic(session.ui_view().get().space.as_ref().unwrap())
+}
+
+fn render_widget(widget: &vui::WidgetTree, gravity: vui::Gravity) -> Rendering {
+    render_orthographic(&Handle::new_pending(
+        Name::Pending,
+        widget
+            .clone()
+            .to_space(space::SpaceBuilder::default(), gravity)
+            .unwrap(),
+    ))
 }
 
 /// Special-purpose renderer which uses a pixel-perfect orthographic projectiuon and adapts to the

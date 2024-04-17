@@ -40,7 +40,13 @@ impl WidgetTheme {
     ) -> Result<Self, GenError> {
         let widget_blocks = WidgetBlocks::new(txn, progress).await.install(txn)?;
 
-        Ok(Self {
+        Ok(Self::from_provider(widget_blocks))
+    }
+
+    // TODO: make this public and documented but figure out what our general "linking and loading" story is
+    #[doc(hidden)]
+    pub fn from_provider(widget_blocks: BlockProvider<WidgetBlocks>) -> Self {
+        Self {
             dialog_box_style: BoxStyle::from_nine_and_thin(
                 &widget_blocks[WidgetBlocks::DialogBackground],
             ),
@@ -56,7 +62,7 @@ impl WidgetTheme {
             ),
 
             widget_blocks,
-        })
+        }
     }
 
     /// Returns a [`widgets::Frame`] to be placed behind some other widgets as a dialog box.

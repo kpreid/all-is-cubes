@@ -126,9 +126,9 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
 }
 
 #[allow(clippy::unnecessary_wraps)] // convenience where it is used
-fn u(
+pub fn u(
     label: &str,
-    f: impl Future<Output = Arc<Universe>> + Send + Sync + 'static,
+    f: impl Future<Output = Arc<Universe>> + Send + 'static,
 ) -> Option<UniverseFuture> {
     let boxed: BoxFuture<'static, Arc<Universe>> = Box::pin(f);
     Some(UniverseFuture {
