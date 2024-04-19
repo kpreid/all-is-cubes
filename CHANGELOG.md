@@ -31,6 +31,7 @@
 
 - `all-is-cubes-ui` library:
     - New widget `ProgressBar`.
+    - New module `notification` and method `Session::show_notification()` for displaying notifications to the user (within the window, not platform notification integration).
 
 ### Changed
 
