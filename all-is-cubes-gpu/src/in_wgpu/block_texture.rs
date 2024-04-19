@@ -232,6 +232,7 @@ impl texture::Tile for AtlasTile {
         self.channels
     }
 
+    #[track_caller]
     fn slice(&self, requested_bounds: GridAab) -> Self::Plane {
         texture::validate_slice(self.requested_bounds, requested_bounds);
         AtlasPlane {

@@ -128,6 +128,7 @@ impl texture::Tile for GltfTile {
         self.channels
     }
 
+    #[track_caller]
     fn slice(&self, sliced_bounds: GridAab) -> Self::Plane {
         let axis = texture::validate_slice(self.bounds, sliced_bounds);
 

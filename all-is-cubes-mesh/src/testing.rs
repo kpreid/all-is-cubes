@@ -134,11 +134,13 @@ impl texture::Tile for Tile {
         self.channels
     }
 
+    #[track_caller]
     fn slice(&self, bounds: GridAab) -> Self::Plane {
         texture::validate_slice(self.bounds, bounds);
         self.clone()
     }
 
+    #[track_caller]
     fn write(&mut self, data: Vol<&[Evoxel]>) {
         // Validate data size.
         assert_eq!(
