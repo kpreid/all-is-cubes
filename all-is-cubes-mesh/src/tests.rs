@@ -439,7 +439,7 @@ fn atom_transparency_thresholded() {
     // TODO: also test voxels -- including self-occlusion (thresholded voxel in front of truly opaque voxel)
 }
 
-/// Test [`BlockMesh::fully_opaque`] results from basic voxels.
+/// Test mesh opacity flags from basic voxels.
 #[test]
 fn fully_opaque_voxels() {
     let resolution = R8;
@@ -469,7 +469,7 @@ fn fully_opaque_voxels() {
     );
 }
 
-/// Test [`BlockMesh::fully_opaque`] when the voxels are all individually opaque,
+/// Test mesh opacity flags when the voxels are all individually opaque,
 /// but don't fill the cube.
 #[test]
 fn fully_opaque_partial_block() {
@@ -496,6 +496,29 @@ fn fully_opaque_partial_block() {
             pz: false,
         }
     );
+}
+
+/// Test mesh opacity flags when the voxels fill the cube, but are transparent.
+#[test]
+fn invisible_voxel_block() {
+    let mut u = Universe::new();
+    let block = Block::builder()
+        .voxels_handle(R8, {
+            // Don't use voxels_fn() because it auto-shrinkwraps.
+            u.insert_anonymous(
+                Space::builder(GridAab::from_lower_size([0, 0, 0], [8, 8, 8]))
+                    .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+                    .build(),
+            )
+        })
+        .build();
+    assert_eq!(
+        block.evaluate().unwrap().voxels.bounds(),
+        GridAab::for_block(R8),
+        "sanity check test data"
+    );
+
+    assert_eq!(opacities(&test_block_mesh(block)), FaceMap::repeat(false));
 }
 
 #[test]
