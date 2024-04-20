@@ -28,7 +28,7 @@ pub(in crate::space) struct LightRayCubes {
 /// A raycast step pre-adapted.
 #[derive(Debug)]
 pub(in crate::space) struct LightRayStep {
-    /// Cube we just hit.
+    /// Cube we just hit, relative to the origin of rays.
     pub relative_cube_face: CubeFace,
     /// Ray segment from the origin to the point where it struck the cube.
     /// Used only for diagnostic purposes ("where did the rays go?").
@@ -40,7 +40,10 @@ pub(in crate::space) struct LightRayStep {
 include!(concat!(env!("OUT_DIR"), "/light_ray_pattern.rs"));
 
 /// Convert [`LIGHT_RAYS`] containing [`LightRayData`] into [`LightRayCubes`].
+#[inline(never)] // cold code shouldn't be duplicated
 pub(in crate::space) fn calculate_propagation_table(physics: &LightPhysics) -> Vec<LightRayCubes> {
+    // TODO: Save memory for the table by adding mirroring support, like ChunkChart does
+
     match *physics {
         LightPhysics::None => vec![],
         // TODO: Instead of having a constant ray pattern, choose one that suits the
