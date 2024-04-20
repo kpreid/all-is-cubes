@@ -7,6 +7,8 @@ use alloc::vec::Vec;
 use core::fmt;
 use std::sync::Arc;
 
+use itertools::Itertools as _;
+
 use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
 use all_is_cubes::camera::Flaws;
 use all_is_cubes::euclid::point2;
@@ -435,65 +437,66 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
                             None
                         };
 
-                    for t in rotated_voxel_range.y_range() {
-                        for s in rotated_voxel_range.x_range() {
-                            let cube: Cube = voxel_transform.transform_cube(Cube::new(s, t, layer));
+                    for (t, s) in rotated_voxel_range
+                        .y_range()
+                        .cartesian_product(rotated_voxel_range.x_range())
+                    {
+                        let cube: Cube = voxel_transform.transform_cube(Cube::new(s, t, layer));
 
-                            let color = options
-                                .transparency
-                                .limit_alpha(voxels_array.get(cube).unwrap_or(&Evoxel::AIR).color);
+                        let color = options
+                            .transparency
+                            .limit_alpha(voxels_array.get(cube).unwrap_or(&Evoxel::AIR).color);
 
-                            if layer == 0 && !color.fully_opaque() {
-                                // If the first layer is transparent in any cube at all, then the face is
-                                // not fully opaque
-                                face_mesh.fully_opaque = false;
-                            }
+                        if layer == 0 && !color.fully_opaque() {
+                            // If the first layer is transparent in any cube at all, then the face is
+                            // not fully opaque
+                            face_mesh.fully_opaque = false;
+                        }
 
-                            let voxel_is_visible = {
-                                use OpacityCategory::{Invisible, Opaque, Partial};
-                                let this_cat = color.opacity_category();
-                                if this_cat == Invisible {
-                                    false
-                                } else {
-                                    // Compute whether this voxel is not hidden behind another
-                                    let obscuring_cat = voxels_array
-                                        .get(cube + face.normal_vector())
-                                        .map_or(Invisible, |ev| {
-                                            options
-                                                .transparency
-                                                .limit_alpha(ev.color)
-                                                .opacity_category()
-                                        });
-                                    match (this_cat, obscuring_cat) {
-                                        // Nothing to draw no matter what
-                                        (Invisible, _) => false,
-                                        // Definitely obscured
-                                        (_, Opaque) => false,
-                                        // Completely visible.
-                                        (Partial | Opaque, Invisible) => true,
-                                        // Partially obscured, therefore visible.
-                                        (Opaque, Partial) => true,
-                                        // This is the weird one: we count transparency adjacent to
-                                        // transparency as if there was nothing to draw. This is
-                                        // because:
-                                        // (1) If we didn't, we would end up generating large
-                                        //     numbers (bad) of intersecting (also bad) quads
-                                        //     for any significant volume of transparency.
-                                        // (2) TODO: We intend to delegate responsibility for
-                                        //     complex transparency to the shader. Until then,
-                                        //     this is still better for the first reason.
-                                        (Partial, Partial) => false,
-                                    }
-                                }
-                            };
-                            if voxel_is_visible {
-                                layer_is_visible_somewhere = true;
-                                visible_image.push(color);
+                        let voxel_is_visible = {
+                            use OpacityCategory::{Invisible, Opaque, Partial};
+                            let this_cat = color.opacity_category();
+                            if this_cat == Invisible {
+                                false
                             } else {
-                                // All obscured voxels are treated as transparent ones, in that we don't
-                                // generate geometry for them.
-                                visible_image.push(Rgba::TRANSPARENT);
+                                // Compute whether this voxel is not hidden behind another
+                                let obscuring_cat = voxels_array
+                                    .get(cube + face.normal_vector())
+                                    .map_or(Invisible, |ev| {
+                                        options
+                                            .transparency
+                                            .limit_alpha(ev.color)
+                                            .opacity_category()
+                                    });
+                                match (this_cat, obscuring_cat) {
+                                    // Nothing to draw no matter what
+                                    (Invisible, _) => false,
+                                    // Definitely obscured
+                                    (_, Opaque) => false,
+                                    // Completely visible.
+                                    (Partial | Opaque, Invisible) => true,
+                                    // Partially obscured, therefore visible.
+                                    (Opaque, Partial) => true,
+                                    // This is the weird one: we count transparency adjacent to
+                                    // transparency as if there was nothing to draw. This is
+                                    // because:
+                                    // (1) If we didn't, we would end up generating large
+                                    //     numbers (bad) of intersecting (also bad) quads
+                                    //     for any significant volume of transparency.
+                                    // (2) TODO: We intend to delegate responsibility for
+                                    //     complex transparency to the shader. Until then,
+                                    //     this is still better for the first reason.
+                                    (Partial, Partial) => false,
+                                }
                             }
+                        };
+                        if voxel_is_visible {
+                            layer_is_visible_somewhere = true;
+                            visible_image.push(color);
+                        } else {
+                            // All obscured voxels are treated as transparent ones, in that we don't
+                            // generate geometry for them.
+                            visible_image.push(Rgba::TRANSPARENT);
                         }
                     }
 
