@@ -21,20 +21,36 @@ fn chunk_chart_bench(c: &mut Criterion) {
     group.finish();
 }
 
-/// Test the performance of strategies to choose chunks to draw.
-fn cull_bench(c: &mut Criterion) {
+// Shared configuration for the benches and the test.
+fn config() -> (ChunkChart<16>, Camera, GridAab) {
     let chart = ChunkChart::<16>::new(200.0);
-    let bounds = GridAab::from_lower_upper([-100, -30, -100], [100, 30, 100]);
-    let chunked_bounds = bounds.divide(16);
+
     let mut camera = Camera::new(
         GraphicsOptions::default(),
         // only aspect ratio should matter
         Viewport::with_scale(1.0, [800, 600]),
     );
-    // Set a small translation to avoid the edge case of being exactly on a chunk boundaries.
+    // Set a small translation to avoid the edge case of being exactly on a chunk boundary.
     camera.set_view_transform(ViewTransform::from_translation(-FreeVector::new(
         0.01, 0.01, 0.01,
     )));
+
+    let bounds = GridAab::from_lower_upper([-100, -30, -100], [100, 30, 100]);
+    let chunked_bounds = bounds.divide(16);
+
+    (chart, camera, chunked_bounds)
+}
+
+/// Test the performance of strategies to choose chunks to draw.
+fn cull_bench(c: &mut Criterion) {
+    let (chart, camera, chunked_bounds) = config();
+
+    // This would make more sense as an ignored #[test], but we can't do that
+    // while we use harness=false.
+    #[cfg(feature = "rerun")]
+    if false {
+        dump_frustum_culling();
+    }
 
     // Chunk counts for sanity checks that these are all equivalent as expected.
     let expected_chunks_in_space = chunked_bounds.volume().unwrap();
@@ -114,6 +130,53 @@ fn cull_bench(c: &mut Criterion) {
             matched
         })
     });
+}
+
+/// Connect to Rerun viewer and display the results of exactly the frustum culling this benchmark
+/// does.
+#[cfg(feature = "rerun")]
+fn dump_frustum_culling() {
+    use all_is_cubes::math::{Aab, Geometry as _};
+    use all_is_cubes::rerun_glue as rg;
+    use itertools::Itertools;
+
+    let (chart, camera, chunked_bounds) = config();
+
+    let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes/chunk_bench")
+        .default_enabled(true)
+        .connect()
+        .unwrap();
+
+    let frustum = camera.view_frustum_geometry();
+    let mut frustum_points = Vec::new();
+    frustum.wireframe_points(&mut frustum_points);
+    let frustum_lines = frustum_points
+        .into_iter()
+        .map(|vertex| rg::convert_vec(vertex.position.to_vector()))
+        .tuples()
+        .map(|(a, b)| rg::components::LineStrip3D(vec![a, b]));
+
+    stream
+        .log_timeless(
+            rg::entity_path!["frustum"],
+            &rg::archetypes::LineStrips3D::new(frustum_lines),
+        )
+        .unwrap();
+    stream
+        .log_timeless(
+            rg::entity_path!["aabs"],
+            &rg::convert_aabs(
+                chart
+                    .chunks(ChunkPos(Cube::ORIGIN), camera.view_direction_mask())
+                    .filter(|chunk| {
+                        camera.aab_in_view(chunk.bounds().into())
+                            && chunked_bounds.contains_cube(chunk.0)
+                    })
+                    .map(|chunk| Aab::from(chunk.bounds())),
+                FreeVector::zero(),
+            ),
+        )
+        .unwrap();
 }
 
 criterion_group!(benches, cull_bench, chunk_chart_bench);

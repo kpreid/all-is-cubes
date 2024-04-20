@@ -15,7 +15,8 @@ use num_traits::float::Float as _;
 
 use crate::chunking::OctantMask;
 use crate::math::{
-    Aab, Axis, Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, Rgba, VectorOps,
+    Aab, Axis, Cube, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab, LineVertex, Rgba,
+    VectorOps,
 };
 use crate::raycast::Ray;
 
@@ -369,6 +370,11 @@ impl Camera {
         intersection_max < intersection_min
     }
 
+    #[doc(hidden)] // for tests
+    pub fn view_frustum_geometry(&self) -> &(impl Geometry + '_) {
+        &self.view_frustum
+    }
+
     /// Returns the current exposure value for scaling luminance.
     ///
     /// Renderers should use this value, not the fixed exposure value in the [`GraphicsOptions`].
@@ -696,6 +702,43 @@ impl FrustumPoints {
         let (yl, yh) = projected_range(self.iter(), vec3(0., 1., 0.));
         let (zl, zh) = projected_range(self.iter(), vec3(0., 0., 1.));
         self.bounds = Aab::from_lower_upper([xl, yl, zl], [xh, yh, zh]);
+    }
+}
+
+/// Implemented only for debug visualization
+impl Geometry for FrustumPoints {
+    type Coord = FreeCoordinate;
+
+    fn translate(self, _offset: euclid::Vector3D<Self::Coord, Cube>) -> Self {
+        unimplemented!()
+    }
+
+    fn wireframe_points<E>(&self, output: &mut E)
+    where
+        E: Extend<LineVertex>,
+    {
+        output.extend(
+            [
+                // far plane box
+                [self.lbf, self.rbf],
+                [self.rbf, self.rtf],
+                [self.rtf, self.ltf],
+                [self.ltf, self.lbf],
+                // near plane box
+                [self.lbn, self.rbn],
+                [self.rbn, self.rtn],
+                [self.rtn, self.ltn],
+                [self.ltn, self.lbn],
+                // far-near joining lines
+                [self.lbf, self.lbn],
+                [self.rbf, self.rbn],
+                [self.rtf, self.rtn],
+                [self.ltf, self.ltn],
+            ]
+            .into_iter()
+            .flatten()
+            .map(LineVertex::from),
+        );
     }
 }
 
