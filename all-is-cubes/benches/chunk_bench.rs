@@ -36,6 +36,11 @@ fn cull_bench(c: &mut Criterion) {
         0.01, 0.01, 0.01,
     )));
 
+    // Chunk counts for sanity checks that these are all equivalent as expected.
+    let expected_chunks_in_space = chunked_bounds.volume().unwrap();
+    // Caution: this number is sensitive to the exact projection arithmetic used.
+    let expected_chunks_in_frustum = 284;
+
     c.bench_function("bounds", |b| {
         b.iter(|| {
             let mut matched = 0;
@@ -47,7 +52,7 @@ fn cull_bench(c: &mut Criterion) {
                     matched += 1;
                 }
             }
-            assert_eq!(matched, 784);
+            assert_eq!(matched, expected_chunks_in_space);
             matched
         })
     });
@@ -60,7 +65,7 @@ fn cull_bench(c: &mut Criterion) {
                     matched += 1;
                 }
             }
-            assert_eq!(matched, 280);
+            assert_eq!(matched, expected_chunks_in_frustum);
             matched
         })
     });
@@ -73,7 +78,7 @@ fn cull_bench(c: &mut Criterion) {
                     matched += 1;
                 }
             }
-            assert_eq!(matched, 280);
+            assert_eq!(matched, expected_chunks_in_frustum);
             matched
         })
     });
@@ -89,7 +94,7 @@ fn cull_bench(c: &mut Criterion) {
                     matched += 1;
                 }
             }
-            assert_eq!(matched, 280);
+            assert_eq!(matched, expected_chunks_in_frustum);
             matched
         })
     });
@@ -105,7 +110,7 @@ fn cull_bench(c: &mut Criterion) {
                     matched += 1;
                 }
             }
-            assert_eq!(matched, 280);
+            assert_eq!(matched, expected_chunks_in_frustum);
             matched
         })
     });
