@@ -176,7 +176,7 @@ fn dot_vox_model_to_space(
             spawn
         })
         .light_physics(LightPhysics::Rays {
-            maximum_distance: bounds.y_range().len() as u16,
+            maximum_distance: u8::try_from(bounds.y_range().len()).unwrap_or(u8::MAX),
         })
         .sky_color(Rgb::ONE)
         .build();

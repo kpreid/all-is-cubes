@@ -501,7 +501,7 @@ pub(crate) async fn demo_dungeon(
     let mut physics = space.physics().clone();
     physics.light = LightPhysics::Rays {
         // account for large rooms
-        maximum_distance: (dungeon_grid.room_box.size().height * 4) as u16,
+        maximum_distance: (dungeon_grid.room_box.size().height * 4) as u8,
     };
     space.set_physics(physics);
     light_progress.progress(0.01).await;

@@ -419,7 +419,7 @@ pub(crate) enum SkySer {
 #[serde(tag = "type")]
 pub(crate) enum LightPhysicsSerV1 {
     NoneV1,
-    RaysV1 { maximum_distance: u16 },
+    RaysV1 { maximum_distance: u8 },
 }
 
 //------------------------------------------------------------------------------------------------//

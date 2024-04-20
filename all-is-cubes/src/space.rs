@@ -1125,7 +1125,7 @@ pub enum LightPhysics {
     Rays {
         /// The maximum distance a simulated light ray will travel; blocks farther than
         /// that distance apart will never have direct influence on each other.
-        maximum_distance: u16,
+        maximum_distance: u8,
     },
 }
 

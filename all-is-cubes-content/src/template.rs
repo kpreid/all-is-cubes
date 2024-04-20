@@ -378,7 +378,7 @@ fn cornell_box() -> Result<Space, InGenError> {
         // There shall be no light but that which we make for ourselves!
         .sky_color(Rgb::ZERO)
         .light_physics(LightPhysics::Rays {
-            maximum_distance: (box_size * 2).try_into().unwrap_or(u16::MAX),
+            maximum_distance: (box_size * 2).try_into().unwrap_or(u8::MAX),
         })
         .spawn({
             let mut spawn = Spawn::default_for_new_space(bounds);

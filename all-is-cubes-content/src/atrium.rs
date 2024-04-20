@@ -88,7 +88,7 @@ pub(crate) async fn atrium(
         })
         .sky_color(rgb_const!(0.242, 0.617, 0.956) * 1.0)
         .light_physics(all_is_cubes::space::LightPhysics::Rays {
-            maximum_distance: space_bounds.size().to_vector().map(f64::from).length() as u16,
+            maximum_distance: space_bounds.size().to_vector().map(f64::from).length() as u8,
         })
         .build();
 
