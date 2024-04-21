@@ -144,11 +144,10 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
     /// Returns the number of vertex indices in this mesh (three times the number of
     /// triangles).
-    // TODO(instancing): this is going to be used for deciding whether to draw blocks
-    // as instances or within chunk meshes. That's not implemented yet. After it's used
-    // there, think about whether this should be public and whether it should count
-    // indices or whole triangles. Whatever is decided, also update `MeshMeta::count_indices()`.
-    #[allow(unused)]
+    // TODO(instancing): this is used for deciding whether to draw blocks as instances or within
+    // chunk meshes. That's implemented but not fully settled yet. Think about whether this should
+    // be public and whether it should count indices or whole triangles.
+    // Whatever is decided, also update `MeshMeta::count_indices()`.
     pub(crate) fn count_indices(&self) -> usize {
         self.all_face_meshes()
             .map(|(_, fm)| fm.indices_opaque.len() + fm.indices_transparent.len())
