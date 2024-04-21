@@ -17,6 +17,9 @@ use crate::{GfxVertex, IndexVec, MeshOptions, MeshTypes};
 
 mod analyze;
 mod compute;
+mod viz;
+#[doc(hidden)]
+pub use viz::Viz;
 
 #[cfg(test)]
 mod tests;
@@ -228,7 +231,19 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         texture_allocator: &M::Alloc,
         options: &MeshOptions,
     ) {
-        compute::compute_block_mesh(self, block, texture_allocator, options)
+        compute::compute_block_mesh(self, block, texture_allocator, options, Viz::disabled())
+    }
+
+    /// As [`Self::compute()`], but writes details of the algorithm execution to [`viz`].
+    #[doc(hidden)]
+    pub fn compute_with_viz(
+        &mut self,
+        block: &EvaluatedBlock,
+        texture_allocator: &M::Alloc,
+        options: &MeshOptions,
+        viz: Viz,
+    ) {
+        compute::compute_block_mesh(self, block, texture_allocator, options, viz);
     }
 }
 

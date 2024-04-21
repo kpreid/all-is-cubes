@@ -10,7 +10,7 @@ use all_is_cubes::math::{
 };
 
 use crate::texture::{self, TexelUnit, TextureCoordinate, TilePoint};
-use crate::{BlockVertex, Coloring, IndexVec};
+use crate::{BlockVertex, Coloring, IndexVec, Viz};
 
 pub(crate) fn greedy_mesh(
     visible_image: Vec<Rgba>,
@@ -181,6 +181,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
     low_corner: Point2D<FreeCoordinate, TexelUnit>,
     high_corner: Point2D<FreeCoordinate, TexelUnit>,
     coloring: QuadColoring<'_, Tex>,
+    viz: &mut Viz,
 ) {
     let index_origin: u32 = vertices.len().try_into().expect("vertex index overflow");
     let half_texel = 0.5;
@@ -193,6 +194,13 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
             low_corner.to_vector() + unit_square_point.component_mul(high_corner - low_corner);
         rectangle_point.extend(depth).to_point().cast_unit()
     });
+
+    viz.extend_vertices(
+        position_iter
+            .clone()
+            .map(|p| transform.transform_position(p) * f64::from(transform.resolution)),
+        transform.face,
+    );
 
     // Compute and push the four vertices.
     match coloring {
@@ -251,6 +259,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
 /// so they can be computed only six times per block.
 pub(super) struct QuadTransform {
     face: Face6,
+    resolution: Resolution,
     // TODO: specialize transforms since there are only 6 possible values plus scale,
     // so we don't need as many ops as a full matrix-vector multiplication?
     // Or would the branching needed make it pointless?
@@ -265,6 +274,7 @@ impl QuadTransform {
         let voxel_to_block_scale = FreeCoordinate::from(resolution).recip();
         Self {
             face,
+            resolution,
             position_transform: Transform3D::from_scale(Scale::new(voxel_to_block_scale))
                 .then(&face.face_transform(1).to_matrix().to_free()),
             texture_transform: Transform3D::from_untyped(

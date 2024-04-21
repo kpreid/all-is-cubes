@@ -24,6 +24,10 @@ doctest = false
 name = "mesh_bench"
 harness = false
 
+[[example]]
+name = "visualize-block-mesh"
+required-features = ["rerun"]
+
 [features]
 default = []
 # Adds support for mesh generation performance logging to Rerun.
@@ -42,6 +46,7 @@ arbitrary = { workspace = true, optional = true }
 bitflags = { workspace = true }
 bitvec = { workspace = true }
 bytemuck = { workspace = true }
+cfg-if = { workspace = true }
 either = { workspace = true }
 flume = { workspace = true }
 futures-channel = { workspace = true }
@@ -56,6 +61,9 @@ ordered-float = { workspace = true }
 rayon = { workspace = true, optional = true }
 
 [dev-dependencies]
+# used for visualize-block-mesh example
+all-is-cubes-content = { workspace = true }
+pollster = { workspace = true }
 criterion = { workspace = true }
 pretty_assertions = { workspace = true }
 

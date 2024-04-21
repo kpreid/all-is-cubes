@@ -418,7 +418,7 @@ where
 
     /// Iterates over all the cubes and values in this volume data, in the ordering specified
     /// by the `O` type parameter.
-    pub fn iter<'s>(&'s self) -> impl Iterator<Item = (Cube, &V)>
+    pub fn iter<'s>(&'s self) -> impl Iterator<Item = (Cube, &V)> + Clone
     where
         V: 's,
     {

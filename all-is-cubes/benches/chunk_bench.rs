@@ -136,7 +136,7 @@ fn cull_bench(c: &mut Criterion) {
 /// does.
 #[cfg(feature = "rerun")]
 fn dump_frustum_culling() {
-    use all_is_cubes::math::{Aab, Geometry as _};
+    use all_is_cubes::math::Geometry as _;
     use all_is_cubes::rerun_glue as rg;
     use itertools::Itertools;
 
@@ -165,15 +165,14 @@ fn dump_frustum_culling() {
     stream
         .log_timeless(
             rg::entity_path!["aabs"],
-            &rg::convert_aabs(
+            &rg::convert_grid_aabs(
                 chart
                     .chunks(ChunkPos(Cube::ORIGIN), camera.view_direction_mask())
                     .filter(|chunk| {
                         camera.aab_in_view(chunk.bounds().into())
                             && chunked_bounds.contains_cube(chunk.0)
                     })
-                    .map(|chunk| Aab::from(chunk.bounds())),
-                FreeVector::zero(),
+                    .map(|chunk| chunk.bounds()),
             ),
         )
         .unwrap();

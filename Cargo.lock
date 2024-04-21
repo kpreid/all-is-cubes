@@ -193,10 +193,12 @@ name = "all-is-cubes-mesh"
 version = "0.7.0"
 dependencies = [
  "all-is-cubes",
+ "all-is-cubes-content",
  "arbitrary",
  "bitflags 2.4.2",
  "bitvec",
  "bytemuck",
+ "cfg-if",
  "criterion",
  "either",
  "flume",
@@ -209,6 +211,7 @@ dependencies = [
  "mutants",
  "num-traits",
  "ordered-float",
+ "pollster",
  "pretty_assertions",
  "rayon",
 ]

@@ -1,12 +1,11 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use re_sdk::{RecordingStream, RecordingStreamResult};
-
-use crate::math;
+use crate::math::{self, Axis, Rgb};
 
 // To support concise conditional debugging, this module re-exports many items from rerun.
 pub use re_log_types::{entity_path, EntityPath};
+pub use re_sdk::{RecordingStream, RecordingStreamBuilder, RecordingStreamResult};
 pub use re_types::datatypes;
 pub use re_types::external::arrow2::types::f16;
 pub use re_types::{archetypes, components, view_coordinates};
@@ -106,7 +105,21 @@ pub enum ClassId {
     BodyCollisionBox,
     CollisionContactWithin,
     CollisionContactAgainst,
+
+    // These are used by `all_is_cubes_mesh`'s mesh generation debug visualization.
+    MeshVizBlockBounds,
+    MeshVizVoxelBounds,
+    MeshVizOccupiedPlane,
+    MeshVizWipWindow,
+    MeshVizWipPlane,
+    MeshVizEdgeNx,
+    MeshVizEdgeNy,
+    MeshVizEdgeNz,
+    MeshVizEdgePx,
+    MeshVizEdgePy,
+    MeshVizEdgePz,
 }
+
 impl From<ClassId> for datatypes::ClassId {
     fn from(value: ClassId) -> Self {
         Self(value as u16)
@@ -123,6 +136,18 @@ fn annotation_context() -> archetypes::AnnotationContext {
         (C::CollisionContactWithin, "within", p::DEBUG_COLLISION_CUBE_WITHIN),
         (C::CollisionContactAgainst, "against", p::DEBUG_COLLISION_CUBE_AGAINST),
         (C::SpaceBlock, "", rgba_const!(0.15, 0.15, 0.15, 1.0)),
+
+        (C::MeshVizBlockBounds, "", rgba_const!(0.15, 0.15, 0.15, 1.0)),
+        (C::MeshVizVoxelBounds, "", rgba_const!(0.15, 0.15, 0.15, 1.0)),
+        (C::MeshVizOccupiedPlane, "", rgba_const!(0.3, 0.3, 0.0, 1.0)),
+        (C::MeshVizWipWindow, "", rgba_const!(1.0, 0.0, 1.0, 1.0)),
+        (C::MeshVizWipPlane, "", rgba_const!(1.0, 0.0, 1.0, 1.0)),
+        (C::MeshVizEdgeNx, "", Axis::X.color().with_alpha_one()),
+        (C::MeshVizEdgeNy, "", Axis::Y.color().with_alpha_one()),
+        (C::MeshVizEdgeNz, "", Axis::Z.color().with_alpha_one()),
+        (C::MeshVizEdgePx, "", (Rgb::ONE * 0.2 - Axis::X.color()).with_alpha_one()),
+        (C::MeshVizEdgePy, "", (Rgb::ONE * 0.2 - Axis::Y.color()).with_alpha_one()),
+        (C::MeshVizEdgePz, "", (Rgb::ONE * 0.2 - Axis::Z.color()).with_alpha_one()),
     ];
 
     archetypes::AnnotationContext::new(descs.into_iter().map(|(id, label, color)| {
@@ -201,6 +226,12 @@ pub fn convert_aabs(
     archetypes::Boxes3D::from_half_sizes(half_sizes).with_centers(centers)
 }
 
+pub fn convert_grid_aabs(aabs: impl IntoIterator<Item = math::GridAab>) -> archetypes::Boxes3D {
+    convert_aabs(
+        aabs.into_iter().map(math::Aab::from),
+        math::FreeVector::zero(),
+    )
+}
 pub fn convert_camera_to_pinhole(
     camera: &crate::camera::Camera,
 ) -> (archetypes::Pinhole, archetypes::Transform3D) {
@@ -267,8 +298,8 @@ impl From<math::Face6> for view_coordinates::SignedAxis3 {
     }
 }
 
-impl From<math::Rgb> for components::Color {
-    fn from(value: math::Rgb) -> Self {
+impl From<Rgb> for components::Color {
+    fn from(value: Rgb) -> Self {
         value.with_alpha_one().into()
     }
 }

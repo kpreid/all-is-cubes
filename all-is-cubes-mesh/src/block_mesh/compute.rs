@@ -11,17 +11,22 @@ use all_is_cubes::math::{
     Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, OpacityCategory, Rgb, Rgba, VectorOps,
 };
 
+use crate::block_mesh::viz::Viz;
 use crate::block_mesh::{analyze::analyze, BlockFaceMesh};
 use crate::texture::{self, Tile as _};
 use crate::{
     greedy_mesh, push_quad, BlockMesh, MeshOptions, MeshTypes, QuadColoring, QuadTransform,
 };
 
+/// Generate the [`BlockMesh`] data for the given [`EvaluatedBlock`], writing it into `output`.
+///
+/// This private function is called by [`BlockMesh`]'s public functions.
 pub(super) fn compute_block_mesh<M: MeshTypes>(
     output: &mut BlockMesh<M>,
     block: &EvaluatedBlock,
     texture_allocator: &M::Alloc,
     options: &MeshOptions,
+    mut viz: Viz,
 ) {
     output.clear();
 
@@ -92,11 +97,13 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                     point2(0., 0.),
                     point2(1., 1.),
                     coloring,
+                    &mut viz,
                 );
             }
             face_mesh.fully_opaque = block_color.fully_opaque();
         }
     } else {
+        viz.voxels(voxels);
         let voxels_array = voxels.as_vol_ref();
 
         // Exit when the voxel data is not at all in the right volume.
@@ -110,7 +117,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             return;
         }
 
-        let analysis = analyze(resolution, voxels_array);
+        let analysis = analyze(resolution, voxels_array, &viz);
 
         let mut used_any_vertex_colors = false;
 
@@ -165,6 +172,8 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                     // marking out-of-bounds planes as occupied.
                     continue;
                 }
+
+                viz.set_layer_in_progress(face, layer);
 
                 // Becomes true if there is any voxel that is both non-fully-transparent and
                 // not obscured by another voxel on top.
@@ -333,10 +342,14 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                         low_corner.map(FreeCoordinate::from),
                         high_corner.map(FreeCoordinate::from),
                         coloring,
+                        &mut viz,
                     );
                 });
             }
         }
+
+        viz.clear_layer_in_progress();
+        viz.clear_analysis();
 
         output.texture_used = texture_if_needed;
         output.voxel_opacity_mask = if used_any_vertex_colors {

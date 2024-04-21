@@ -6,6 +6,8 @@ use all_is_cubes::block::{Evoxel, Resolution};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::math::{Face6, FaceMap, GridCoordinate, GridPoint, Rgba, Vol};
 
+use crate::block_mesh::viz::Viz;
+
 const NBITS: usize = Resolution::MAX.to_grid() as usize + 1;
 
 #[derive(Debug)]
@@ -38,17 +40,22 @@ impl Analysis {
 /// Analyze a block's voxel array and find characteristics its mesh will have.
 ///
 /// This is a preliminary step before creating the actual vertices and texture of a `BlockMesh`.
-pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>) -> Analysis {
+pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &Viz) -> Analysis {
     let resolution = usize::from(resolution);
 
-    let mut occupied_planes: FaceMap<bitvec::BitArr!(for NBITS)> = Default::default();
-    let mut needs_texture = false;
+    let mut analysis = Analysis {
+        occupied_planes: Default::default(),
+        needs_texture: false,
+    };
+    viz.analysis_in_progress(&analysis);
 
     // TODO: Have EvaluatedBlock tell us when a block is fully cubical and opaque,
     // and then avoid scanning the interior volume. EvaluatedBlock.opaque
     // is not quite that because it is defined to allow concavities.
 
     for (center, colors) in windows(voxels) {
+        viz.window(center);
+
         let opaque = bitmask(colors, Rgba::fully_opaque);
         let semitransparent = !(opaque | bitmask(colors, Rgba::fully_transparent));
         let renderable = opaque | semitransparent;
@@ -58,7 +65,7 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>) -> Analysi
         // First, quickly check if there are any visible surfaces at all here.
         if opaque != 0x00 && opaque != 0xFF || semitransparent != 0x00 && semitransparent != 0xFF {
             // TODO: false positives — look only at visible cubes on each axis, instead of all cubes
-            needs_texture = needs_texture
+            analysis.needs_texture = analysis.needs_texture
                 || !colors
                     .iter()
                     .filter(|color| !color.fully_transparent())
@@ -68,30 +75,30 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>) -> Analysi
             // and not covered by opaque blocks in the shallower side,
             // and mark that plane as occupied if so.
             if renderable & shift_px(0xFF) & !shift_px(opaque) != 0 {
-                occupied_planes.nx.set(planes.x, true);
+                analysis.occupied_planes.nx.set(planes.x, true);
             }
             if renderable & shift_py(0xFF) & !shift_py(opaque) != 0 {
-                occupied_planes.ny.set(planes.y, true);
+                analysis.occupied_planes.ny.set(planes.y, true);
             }
             if renderable & shift_pz(0xFF) & !shift_pz(opaque) != 0 {
-                occupied_planes.nz.set(planes.z, true);
+                analysis.occupied_planes.nz.set(planes.z, true);
             }
             if renderable & shift_nx(0xFF) & !shift_nx(opaque) != 0 {
-                occupied_planes.px.set(resolution - planes.x, true);
+                analysis.occupied_planes.px.set(resolution - planes.x, true);
             }
             if renderable & shift_ny(0xFF) & !shift_ny(opaque) != 0 {
-                occupied_planes.py.set(resolution - planes.y, true);
+                analysis.occupied_planes.py.set(resolution - planes.y, true);
             }
             if renderable & shift_nz(0xFF) & !shift_nz(opaque) != 0 {
-                occupied_planes.pz.set(resolution - planes.z, true);
+                analysis.occupied_planes.pz.set(resolution - planes.z, true);
             }
         }
-    }
 
-    Analysis {
-        occupied_planes,
-        needs_texture,
+        viz.analysis_in_progress(&analysis);
     }
+    viz.clear_window();
+
+    analysis
 }
 
 /// Iterates over all 2×2×2 windows that intersect at least one voxel, and returns their center
@@ -206,7 +213,7 @@ mod tests {
             eprintln!("thickness {thickness}:");
             let slab = all_is_cubes::content::make_slab(&mut u, thickness, Resolution::R4);
             let ev = slab.evaluate().unwrap();
-            let analysis = analyze(ev.resolution(), ev.voxels.as_vol_ref());
+            let analysis = analyze(ev.resolution(), ev.voxels.as_vol_ref(), &Viz::disabled());
 
             let occupied_planes = FaceMap::from_fn(|f| analysis.occupied_planes(f).collect_vec());
             if thickness == 0 {
