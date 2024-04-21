@@ -1,0 +1,348 @@
+//! The algorithm for generating block meshes, and nothing else.
+
+use alloc::vec::Vec;
+
+use itertools::Itertools as _;
+
+use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
+use all_is_cubes::camera::Flaws;
+use all_is_cubes::euclid::point2;
+use all_is_cubes::math::{
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, OpacityCategory, Rgb, Rgba, VectorOps,
+};
+
+use crate::block_mesh::{analyze::analyze, BlockFaceMesh};
+use crate::texture::{self, Tile as _};
+use crate::{
+    greedy_mesh, push_quad, BlockMesh, MeshOptions, MeshTypes, QuadColoring, QuadTransform,
+};
+
+pub(super) fn compute_block_mesh<M: MeshTypes>(
+    output: &mut BlockMesh<M>,
+    block: &EvaluatedBlock,
+    texture_allocator: &M::Alloc,
+    options: &MeshOptions,
+) {
+    output.clear();
+
+    // If this is true, avoid using vertex coloring even on solid rectangles.
+    // We do this because:
+    // * the block may be animated such that it is useful to reuse the mesh and change the
+    //   texture, or
+    // * the block has any light emission, which we do not support via vertex coloring.
+    //   (TODO: This isn't quite the right condition, because a block might e.g. have emissive
+    //   voxels only on its interior or something.)
+    let prefer_textures = block.attributes.animation_hint.redefinition != AnimationChange::None
+        || block.light_emission != Rgb::ZERO;
+
+    let flaws = &mut output.flaws;
+
+    let resolution = block.resolution();
+
+    // If `options.ignore_voxels` is set, substitute the block color for the
+    // actual voxels.
+    let tmp_block_color_voxel: Evoxels;
+    let voxels: &Evoxels = if options.ignore_voxels {
+        tmp_block_color_voxel = Evoxels::One(Evoxel::from_color(block.color));
+        &tmp_block_color_voxel
+    } else {
+        &block.voxels
+    };
+
+    // Short-circuit case: if we have a single voxel a.k.a. resolution 1, then we generate a
+    // mesh without going through all the conversion steps.
+    if let Some(Evoxel {
+        color: block_color, ..
+    }) = voxels.single_voxel()
+    {
+        let block_color = options.transparency.limit_alpha(block_color);
+
+        // TODO: Use `EvaluatedBlock::face_colors` to color each face separately.
+        // (We'll need to map the faces into a texture if prefer_textures)
+
+        // If we want to use a texture, try to allocate it.
+        output.texture_used = if prefer_textures {
+            texture::copy_voxels_to_new_texture(texture_allocator, voxels)
+        } else {
+            None
+        };
+        // If we successfully decided to use a texture, use that.
+        let texture_plane;
+        let coloring = if let Some(tile) = &output.texture_used {
+            texture_plane = tile.slice(GridAab::ORIGIN_CUBE);
+            QuadColoring::Texture(&texture_plane)
+        } else {
+            QuadColoring::Solid(block_color)
+        };
+
+        for (face, face_mesh) in output.face_vertices.iter_mut() {
+            if !block_color.fully_transparent() {
+                face_mesh.vertices.reserve_exact(4);
+                push_quad(
+                    &mut face_mesh.vertices,
+                    if block_color.fully_opaque() {
+                        face_mesh.indices_opaque.reserve_exact(6);
+                        &mut face_mesh.indices_opaque
+                    } else {
+                        face_mesh.indices_transparent.reserve_exact(6);
+                        &mut face_mesh.indices_transparent
+                    },
+                    &QuadTransform::new(face, Resolution::R1),
+                    /* depth= */ 0.,
+                    point2(0., 0.),
+                    point2(1., 1.),
+                    coloring,
+                );
+            }
+            face_mesh.fully_opaque = block_color.fully_opaque();
+        }
+    } else {
+        let voxels_array = voxels.as_vol_ref();
+
+        // Exit when the voxel data is not at all in the right volume.
+        // This dodges some integer overflow cases on bad input.
+        // TODO: Add a test for this case
+        if voxels_array
+            .bounds()
+            .intersection(GridAab::for_block(resolution))
+            .is_none()
+        {
+            return;
+        }
+
+        let analysis = analyze(resolution, voxels_array);
+
+        let mut used_any_vertex_colors = false;
+
+        let block_resolution = GridCoordinate::from(resolution);
+
+        // Construct empty output to mutate.
+        for (_, face_mesh) in output.face_vertices.iter_mut() {
+            // Start assuming opacity; if we find any transparent pixels we'll set
+            // this to false. `Within` is always "transparent" because the algorithm
+            // that consumes this structure will say "draw this face if its adjacent
+            // cube's opposing face is not opaque", and `Within` means the adjacent
+            // cube is ourself.
+            face_mesh.fully_opaque = true;
+        }
+        let output_interior = &mut output.interior_vertices;
+
+        let texture_if_needed: Option<M::Tile> = if analysis.needs_texture {
+            texture::copy_voxels_to_new_texture(texture_allocator, voxels)
+        } else {
+            None
+        };
+
+        // Walk through the planes (layers) of the block, figuring out what geometry to
+        // generate for each layer and whether it needs a texture.
+        for face in Face6::ALL {
+            let voxel_transform = face.face_transform(block_resolution);
+            let quad_transform = QuadTransform::new(face, resolution);
+            let face_mesh = &mut output.face_vertices[face];
+
+            // Rotate the voxel array's extent into our local coordinate system, so we can find
+            // out what range to iterate over.
+            let rotated_voxel_range = voxels_array
+                .bounds()
+                .transform(voxel_transform.inverse())
+                .unwrap();
+
+            // Check the case where the block's voxels don't meet its front face, or don't fill
+            // that face. If they do, then we'll take care of it later, but if we don't even
+            // iterate over the full surface (as layer 0), we need this extra check.
+            if !analysis.surface_is_occupied(face)
+                || rotated_voxel_range.x_range() != (0..block_resolution)
+                || rotated_voxel_range.y_range() != (0..block_resolution)
+            {
+                face_mesh.fully_opaque = false;
+            }
+
+            // Layer 0 is the outside surface of the cube and successive layers are
+            // deeper below that surface.
+            for layer in analysis.occupied_planes(face) {
+                if !rotated_voxel_range.z_range().contains(&layer) {
+                    // TODO: This is a workaround for a bug in the analyzer; it should not be
+                    // marking out-of-bounds planes as occupied.
+                    continue;
+                }
+
+                // Becomes true if there is any voxel that is both non-fully-transparent and
+                // not obscured by another voxel on top.
+                let mut layer_is_visible_somewhere = false;
+
+                // Contains a color with alpha > 0 for every voxel that _should be drawn_.
+                // That is, it excludes all obscured interior volume.
+                // First, we traverse the block and fill this with non-obscured voxels,
+                // then we erase it as we convert contiguous rectangles of it to quads.
+                let mut visible_image: Vec<Rgba> = Vec::with_capacity(
+                    rotated_voxel_range.x_range().len() * rotated_voxel_range.y_range().len(),
+                );
+
+                let texture_plane_if_needed: Option<<M::Tile as texture::Tile>::Plane> =
+                    if let Some(ref texture) = texture_if_needed {
+                        // Compute the exact texture slice we will be accessing.
+                        // TODO: It would be better if this were shrunk to the visible voxels
+                        // in this specific layer, not just all voxels.
+                        let slice_range = GridAab::from_ranges([
+                            rotated_voxel_range.x_range(),
+                            rotated_voxel_range.y_range(),
+                            layer..layer + 1,
+                        ])
+                        .transform(face.face_transform(block_resolution))
+                        .unwrap();
+
+                        Some(texture.slice(slice_range))
+                    } else {
+                        None
+                    };
+
+                for (t, s) in rotated_voxel_range
+                    .y_range()
+                    .cartesian_product(rotated_voxel_range.x_range())
+                {
+                    let cube: Cube = voxel_transform.transform_cube(Cube::new(s, t, layer));
+
+                    let color = options
+                        .transparency
+                        .limit_alpha(voxels_array.get(cube).unwrap_or(&Evoxel::AIR).color);
+
+                    if layer == 0 && !color.fully_opaque() {
+                        // If the first layer is transparent in any cube at all, then the face is
+                        // not fully opaque
+                        face_mesh.fully_opaque = false;
+                    }
+
+                    let voxel_is_visible = {
+                        use OpacityCategory::{Invisible, Opaque, Partial};
+                        let this_cat = color.opacity_category();
+                        if this_cat == Invisible {
+                            false
+                        } else {
+                            // Compute whether this voxel is not hidden behind another
+                            let obscuring_cat = voxels_array
+                                .get(cube + face.normal_vector())
+                                .map_or(Invisible, |ev| {
+                                    options
+                                        .transparency
+                                        .limit_alpha(ev.color)
+                                        .opacity_category()
+                                });
+                            match (this_cat, obscuring_cat) {
+                                // Nothing to draw no matter what
+                                (Invisible, _) => false,
+                                // Definitely obscured
+                                (_, Opaque) => false,
+                                // Completely visible.
+                                (Partial | Opaque, Invisible) => true,
+                                // Partially obscured, therefore visible.
+                                (Opaque, Partial) => true,
+                                // This is the weird one: we count transparency adjacent to
+                                // transparency as if there was nothing to draw. This is
+                                // because:
+                                // (1) If we didn't, we would end up generating large
+                                //     numbers (bad) of intersecting (also bad) quads
+                                //     for any significant volume of transparency.
+                                // (2) TODO: We intend to delegate responsibility for
+                                //     complex transparency to the shader. Until then,
+                                //     this is still better for the first reason.
+                                (Partial, Partial) => false,
+                            }
+                        }
+                    };
+                    if voxel_is_visible {
+                        layer_is_visible_somewhere = true;
+                        visible_image.push(color);
+                    } else {
+                        // All obscured voxels are treated as transparent ones, in that we don't
+                        // generate geometry for them.
+                        visible_image.push(Rgba::TRANSPARENT);
+                    }
+                }
+
+                if !layer_is_visible_somewhere {
+                    // No need to analyze further.
+                    continue;
+                }
+
+                // Pick where we're going to store the quads.
+                // Only the cube-surface faces go anywhere but `Within`.
+                // (We could generalize this to blocks with concavities that still form a
+                // light-tight seal against the cube face.)
+                let BlockFaceMesh {
+                    vertices,
+                    indices_opaque,
+                    indices_transparent,
+                    ..
+                } = if layer == 0 {
+                    &mut *face_mesh
+                } else {
+                    &mut *output_interior
+                };
+                let depth = FreeCoordinate::from(layer);
+
+                // Traverse `visible_image` using the "greedy meshing" algorithm for
+                // breaking an irregular shape into quads.
+                greedy_mesh(
+                    visible_image,
+                    rotated_voxel_range.x_range(),
+                    rotated_voxel_range.y_range(),
+                )
+                .for_each(|rect| {
+                    let crate::GmRect {
+                        single_color,
+                        has_alpha: rect_has_alpha,
+                        low_corner,
+                        high_corner,
+                    } = rect;
+                    // Generate quad.
+                    let coloring =
+                        if let Some(single_color) = single_color.filter(|_| !prefer_textures) {
+                            // The quad we're going to draw has identical texels, so we might as
+                            // well use a solid color and skip needing a texture.
+                            QuadColoring::<<M::Tile as texture::Tile>::Plane>::Solid(single_color)
+                        } else {
+                            if let Some(ref plane) = texture_plane_if_needed {
+                                QuadColoring::<<M::Tile as texture::Tile>::Plane>::Texture(plane)
+                            } else {
+                                // Texture allocation failure.
+                                // Report the flaw and use block color as a fallback.
+                                // Further improvement that could be had here:
+                                // * Compute and use per-face colors in EvaluatedBlock
+                                // * Offer the alternative of generating as much
+                                //   geometry as needed.
+                                *flaws |= Flaws::MISSING_TEXTURES;
+                                QuadColoring::<<M::Tile as texture::Tile>::Plane>::Solid(
+                                    options.transparency.limit_alpha(block.color),
+                                )
+                            }
+                        };
+
+                    if matches!(coloring, QuadColoring::Solid(_)) {
+                        used_any_vertex_colors = true;
+                    }
+
+                    push_quad(
+                        vertices,
+                        if rect_has_alpha {
+                            indices_transparent
+                        } else {
+                            indices_opaque
+                        },
+                        &quad_transform,
+                        depth,
+                        low_corner.map(FreeCoordinate::from),
+                        high_corner.map(FreeCoordinate::from),
+                        coloring,
+                    );
+                });
+            }
+        }
+
+        output.texture_used = texture_if_needed;
+        output.voxel_opacity_mask = if used_any_vertex_colors {
+            None
+        } else {
+            block.voxel_opacity_mask.clone()
+        };
+    }
+}
