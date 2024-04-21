@@ -395,8 +395,10 @@ impl CompositeOperator {
     fn bounds(self, source: GridAab, destination: GridAab) -> GridAab {
         match self {
             Self::Over => union_ignoring_empty(source, destination),
+            // We could equally well use intersection_cubes() here, but prefer the one that
+            // more often returns a box related to the input.
             Self::In => source
-                .intersection(destination)
+                .intersection_box(destination)
                 .unwrap_or(GridAab::ORIGIN_EMPTY),
             Self::Out => source,
             Self::Atop => destination,

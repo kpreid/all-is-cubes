@@ -95,7 +95,7 @@ impl Zoom {
                     .to_vector()
                     * GridCoordinate::from(zoom_resolution);
                 match GridAab::for_block(zoom_resolution)
-                    .intersection(voxels.bounds().translate(-voxel_offset))
+                    .intersection_cubes(voxels.bounds().translate(-voxel_offset))
                 {
                     // This case occurs when the voxels' actual bounds (which may be smaller
                     // than the block bounding box) don't intersect the zoom region.

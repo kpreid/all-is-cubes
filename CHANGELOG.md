@@ -17,6 +17,8 @@
 
     - `math::FaceMap` now implements `Exhaust`.
 
+    - `math::GridAab::intersection_box()` is a new definition of box intersection which returns a bigger box in some zero-volume/flat cases.
+
     - `math::GridSize` type alias for `euclid::Size3D<GridCoordinate, Cube>`.
 
 - `all-is-cubes-mesh` library:
@@ -48,6 +50,8 @@
     - `math::FaceMap`’s `Debug` deduplicates identical elements.
     - `math::GridAab::from_lower_size()` now takes a `GridSize` instead of `GridVector`.
     - `math::GridAab::size()` and `math::Aab::size()` now return `GridSize` instead of `GridVector`.
+    - `math::GridAab::intersection()` has been renamed to `intersection_cubes()`, and its precise behavior with zero-volume boxes clarified.
+      If the alternative behavior is desired, see `intersection_box()`.
     
     - Renamed `universe::URef` to `universe::Handle`. Related items have also been renamed:
         - `URefErased` to `ErasedHandle`

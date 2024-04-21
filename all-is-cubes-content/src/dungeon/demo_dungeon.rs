@@ -323,7 +323,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                 window_pos.y = window_y;
                                 if let Some(window_box) =
                                     GridAab::from_lower_size(window_pos, [1, 3, 1])
-                                        .intersection(wall_excluding_corners_box)
+                                        .intersection_cubes(wall_excluding_corners_box)
                                 {
                                     space.fill_uniform(window_box, &self.window_glass_block)?;
                                 }

@@ -104,7 +104,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
         // TODO: Add a test for this case
         if voxels_array
             .bounds()
-            .intersection(GridAab::for_block(resolution))
+            .intersection_cubes(GridAab::for_block(resolution))
             .is_none()
         {
             return;

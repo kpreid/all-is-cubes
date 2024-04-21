@@ -368,7 +368,9 @@ mod tests {
                 handle.allocation
             );
             for existing in &handles {
-                if let Some(intersection) = handle.allocation.intersection(existing.allocation) {
+                if let Some(intersection) =
+                    handle.allocation.intersection_cubes(existing.allocation)
+                {
                     assert!(
                         intersection.volume() == Some(0),
                         "intersection between\n{:?} and {:?}\n",

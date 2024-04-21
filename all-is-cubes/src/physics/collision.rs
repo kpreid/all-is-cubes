@@ -250,8 +250,9 @@ where
 
         // Compute the AAB of the potential intersection, excluding the exterior of the
         // space.
-        let Some(potential_intersection_bounds) =
-            step_aab.round_up_to_grid().intersection(space.bounds())
+        let Some(potential_intersection_bounds) = step_aab
+            .round_up_to_grid()
+            .intersection_cubes(space.bounds())
         else {
             continue 'ray_step;
         };
@@ -375,8 +376,9 @@ where
 
         // Compute the AAB of the potential intersection, excluding the exterior of the
         // space.
-        let potential_intersection_bounds =
-            step_aab.round_up_to_grid().intersection(space.bounds());
+        let potential_intersection_bounds = step_aab
+            .round_up_to_grid()
+            .intersection_cubes(space.bounds());
 
         let mut farthest_recursive_end: Option<CollisionRayEnd> = None;
         // Loop over all the cubes that our AAB is currently intersecting.

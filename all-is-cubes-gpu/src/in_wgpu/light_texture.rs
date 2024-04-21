@@ -43,7 +43,7 @@ fn visible_light_volume(space_bounds: GridAab, camera: &Camera) -> GridAab {
     .round_up_to_grid();
     // Extra volume of 1 extra cube around all sides automatically captures sky light.
     visible_bounds
-        .intersection(space_bounds.expand(FaceMap::repeat(1)))
+        .intersection_cubes(space_bounds.expand(FaceMap::repeat(1)))
         .unwrap_or(GridAab::ORIGIN_CUBE)
 }
 
@@ -156,11 +156,12 @@ impl LightTexture {
     ///
     /// Returns the volume (number of cubes) that needed to be copied to the texture.
     pub fn ensure_mapped(&mut self, queue: &wgpu::Queue, space: &Space, region: GridAab) -> usize {
-        let Some(region) = region.intersection(space.bounds().expand(FaceMap::repeat(1))) else {
+        let Some(region) = region.intersection_cubes(space.bounds().expand(FaceMap::repeat(1)))
+        else {
             return 0;
         };
 
-        match self.mapped_region.intersection(region) {
+        match self.mapped_region.intersection_cubes(region) {
             Some(intersection) if !intersection.is_empty() => {
                 // The previous region has some overlap; reuse it.
 

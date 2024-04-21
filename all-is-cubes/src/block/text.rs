@@ -251,7 +251,7 @@ impl Text {
             block_offset,
             |text_obj, text_aab, drawing_transform| {
                 let voxels: Evoxels =
-                    match text_aab.intersection(GridAab::for_block(self.resolution)) {
+                    match text_aab.intersection_cubes(GridAab::for_block(self.resolution)) {
                         Some(bounds_in_this_block) => {
                             let fill = if self.debug {
                                 DEBUG_TEXT_BOUNDS_VOXEL

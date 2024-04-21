@@ -385,30 +385,91 @@ impl GridAab {
         true
     }
 
-    /// Returns the intersection of two grids, or None if they have no cubes in common.
+    /// Returns the intersection of `self` and `other`, defined as the box which contains
+    /// every cube that both `self` and `other` do, and no others.
     ///
-    /// TODO: Precisely define the behavior on zero volume grids.
+    /// Returns [`None`] if there are no such cubes.
+    /// In other words, if a box is returned, then its volume will always be nonzero;
+    /// this definition of intersection is suitable when the intent is to take action on
+    /// the intersecting cubes. For applications which are more concerned with preserving
+    /// the box coordinates, call [`GridAab::intersection_box()`] instead.
     ///
     /// ```
     /// use all_is_cubes::math::GridAab;
     ///
-    /// let g1 = GridAab::from_lower_size([1, 2, 3], [4, 5, 6]);
-    /// assert_eq!(g1.intersection(g1), Some(g1));
+    /// // Simple example of an intersection.
     /// assert_eq!(
-    ///     GridAab::from_lower_size([0, 0, 0], [2, 2, 2]).intersection(
-    ///        GridAab::from_lower_size([2, 0, 0], [2, 1, 2])),
-    ///     None);
+    ///     GridAab::from_lower_size([0, 0, 0], [2, 2, 2])
+    ///         .intersection_cubes(GridAab::from_lower_size([1, 0, 0], [2, 1, 2])),
+    ///     Some(GridAab::from_lower_size([1, 0, 0], [1, 1, 2])),
+    /// );
+    ///
+    /// // A box's intersection with itself is equal to itself...
+    /// let b = GridAab::from_lower_size([1, 2, 3], [4, 5, 6]);
+    /// assert_eq!(b.intersection_cubes(b), Some(b));
+    /// // ...unless it has zero volume.
+    /// let bz = GridAab::from_lower_size([1, 2, 3], [4, 5, 0]);
+    /// assert_eq!(bz.intersection_cubes(bz), None);
+    ///
+    /// // Boxes which only touch on their faces are not considered to intersect.
     /// assert_eq!(
-    ///     GridAab::from_lower_size([0, 0, 0], [2, 2, 2]).intersection(
-    ///         GridAab::from_lower_size([1, 0, 0], [2, 1, 2])),
-    ///     Some(GridAab::from_lower_size([1, 0, 0], [1, 1, 2])));
+    ///     GridAab::from_lower_size([0, 0, 0], [2, 2, 2])
+    ///         .intersection_cubes(GridAab::from_lower_size([2, 0, 0], [2, 1, 2])),
+    ///     None,
+    /// );
     /// ```
     #[inline]
-    pub fn intersection(self, other: GridAab) -> Option<GridAab> {
+    pub fn intersection_cubes(self, other: GridAab) -> Option<GridAab> {
         let lower = self.lower_bounds().max(other.lower_bounds());
         let upper = self.upper_bounds().min(other.upper_bounds());
         for axis in Axis::ALL {
             if upper[axis] <= lower[axis] {
+                return None;
+            }
+        }
+        Some(GridAab::from_lower_upper(lower, upper))
+    }
+
+    /// Returns the intersection of `self` and `other`, defined as the box which is as large as
+    /// possible while not extending beyond the bounds of `self` or the bounds of `other`.
+    ///
+    /// Returns [`None`] if that is impossible, i.e. if the two boxes do not touch.
+    ///
+    /// This definition of intersection is suitable when the intent is to constrain the bounds
+    /// of a box to fit in another, while preserving their coordinates as much as possible.
+    /// For applications which are more concerned with processing the overlapping volume when there
+    /// is overlap, call [`GridAab::intersection_cubes()`] instead for a tighter bound.
+    ///
+    /// ```
+    /// use all_is_cubes::math::GridAab;
+    ///
+    /// // Simple example of an intersection.
+    /// assert_eq!(
+    ///     GridAab::from_lower_size([0, 0, 0], [2, 2, 2])
+    ///         .intersection_box(GridAab::from_lower_size([1, 0, 0], [2, 1, 2])),
+    ///     Some(GridAab::from_lower_size([1, 0, 0], [1, 1, 2])),
+    /// );
+    ///
+    /// // A box's intersection with itself is always equal to itself...
+    /// let b = GridAab::from_lower_size([1, 2, 3], [4, 5, 6]);
+    /// assert_eq!(b.intersection_box(b), Some(b));
+    /// // ...even when it has zero volume.
+    /// let bz = GridAab::from_lower_size([1, 2, 3], [4, 5, 0]);
+    /// assert_eq!(bz.intersection_box(bz), Some(bz));
+    ///
+    /// // Boxes which only touch on their faces yield their shared boundary surface.
+    /// assert_eq!(
+    ///     GridAab::from_lower_size([0, 0, 0], [2, 2, 2])
+    ///         .intersection_box(GridAab::from_lower_size([2, 0, 0], [2, 1, 2])),
+    ///     Some(GridAab::from_lower_size([2, 0, 0], [0, 1, 2])),
+    /// );
+    /// ```
+    #[inline]
+    pub fn intersection_box(self, other: GridAab) -> Option<GridAab> {
+        let lower = self.lower_bounds().max(other.lower_bounds());
+        let upper = self.upper_bounds().min(other.upper_bounds());
+        for axis in Axis::ALL {
+            if upper[axis] < lower[axis] {
                 return None;
             }
         }

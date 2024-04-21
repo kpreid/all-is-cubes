@@ -121,7 +121,7 @@ impl LightStorage {
     }
 
     pub(crate) fn light_needs_update_in_region(&mut self, region: GridAab, priority: Priority) {
-        let Some(region) = region.intersection(self.contents.bounds()) else {
+        let Some(region) = region.intersection_cubes(self.contents.bounds()) else {
             return;
         };
         if !region.volume().is_some_and(|v| v <= 400) {

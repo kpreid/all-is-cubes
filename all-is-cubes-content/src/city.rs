@@ -858,7 +858,7 @@ impl CityPlanner {
 
     fn is_occupied(&self, query: GridAab) -> bool {
         for occupied in self.occupied_plots.iter() {
-            if occupied.intersection(query).is_some() {
+            if occupied.intersection_cubes(query).is_some() {
                 return true;
             }
         }

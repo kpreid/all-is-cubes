@@ -589,7 +589,7 @@ impl Block {
                 // Intersect that region with the actual bounds of `space`.
                 let mut voxels_animation_hint = AnimationHint::UNCHANGING;
                 let voxels: Vol<Arc<[Evoxel]>> = match full_resolution_bounds
-                    .intersection(block_space.bounds())
+                    .intersection_cubes(block_space.bounds())
                     .filter(|_| !filter.skip_eval)
                 {
                     Some(occupied_bounds) => {

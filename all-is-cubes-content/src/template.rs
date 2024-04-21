@@ -345,7 +345,7 @@ async fn islands(
             (island_pos.lower_bounds().to_vector() * island_stride).to_point(),
             [island_stride, island_stride, island_stride],
         )
-        .intersection(bounds)
+        .intersection_cubes(bounds)
         .expect("island outside space bounds");
         // TODO: randomize island location in cell?
         let margin = 10;

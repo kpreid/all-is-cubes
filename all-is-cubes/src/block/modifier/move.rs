@@ -97,7 +97,7 @@ impl Move {
         // This will be None if the displacement puts the block entirely out of view.
         let displaced_bounds: Option<GridAab> = original_bounds
             .translate(translation_in_res)
-            .intersection(GridAab::for_block(effective_resolution));
+            .intersection_cubes(GridAab::for_block(effective_resolution));
 
         let animation_action: Option<TickAction> = if displaced_bounds.is_none() && velocity >= 0 {
             // Displaced to invisibility; turn into just plain air.

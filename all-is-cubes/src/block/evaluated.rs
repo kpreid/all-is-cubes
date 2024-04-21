@@ -279,7 +279,7 @@ impl EvaluatedBlock {
                 // so that we can also consider a face opaque if it has hollows/engravings.
                 // Merge this with the raytracer above.
                 let surface_volume = full_block_bounds.abut(face, -1).unwrap();
-                if surface_volume.intersection(voxels.bounds()) == Some(surface_volume) {
+                if surface_volume.intersection_cubes(voxels.bounds()) == Some(surface_volume) {
                     surface_volume.interior_iter().all(
                         #[inline(always)]
                         |p| voxels[p].color.fully_opaque(),

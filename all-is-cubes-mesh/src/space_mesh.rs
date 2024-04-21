@@ -679,7 +679,7 @@ impl Snapshot {
     pub(crate) fn new(space: &Space, bounds: GridAab) -> Snapshot {
         let expanded_bounds = bounds
             .expand(FaceMap::repeat(1))
-            .intersection(space.bounds())
+            .intersection_box(space.bounds())
             .unwrap_or(GridAab::ORIGIN_EMPTY);
         Snapshot {
             data: space.extract(expanded_bounds, |e| e.block_index()),
