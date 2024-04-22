@@ -26,6 +26,13 @@ type Rect = all_is_cubes::euclid::Box2D<GridCoordinate, Cube>;
 /// ordinary `GridAab` (after we get rid of the `GridAab` volume restriction).
 type PlaneBox = all_is_cubes::euclid::Box2D<GridCoordinate, Cube>;
 
+/// A maximally inside-out box, used as the `occupied_planes` value containing no voxels.
+/// When it meets any actual voxel it will get replaced implicitly by the min/max operations.
+const EMPTY_PLANE_BOX: PlaneBox = PlaneBox {
+    min: Point2D::new(GridCoordinate::MAX, GridCoordinate::MAX),
+    max: Point2D::new(GridCoordinate::MIN, GridCoordinate::MIN),
+};
+
 #[derive(Clone, Debug)] // could be Copy, but it's large so let's not
 pub(crate) struct Analysis {
     resolution: Resolution,
@@ -36,8 +43,10 @@ pub(crate) struct Analysis {
     /// Index 0 is depth 0 (the surface of the block volume), index 1 is one voxel
     /// deeper, and so on.
     ///
+    /// If a given plane contains no voxels, its value will be [`EMPTY_PLANE_BOX`].
+    ///
     /// The boxes' thickness happens to be equal to the layer position but this is coincidental.
-    occupied_planes: FaceMap<[Option<PlaneBox>; MAX_PLANES]>,
+    occupied_planes: FaceMap<[PlaneBox; MAX_PLANES]>,
 
     /// Whether there are any adjacent visible voxels that have different colors, and therefore
     /// probably need a texture rather than vertex colors.
@@ -60,7 +69,7 @@ fn unflatten(
 impl Analysis {
     pub fn empty() -> Self {
         Analysis {
-            occupied_planes: FaceMap::repeat([None; MAX_PLANES]),
+            occupied_planes: FaceMap::repeat([EMPTY_PLANE_BOX; MAX_PLANES]),
             needs_texture: false,
             resolution: Resolution::R1,
         }
@@ -75,12 +84,21 @@ impl Analysis {
     ) -> impl Iterator<Item = (GridCoordinate, Rect)> + '_ {
         (0..GridCoordinate::from(self.resolution))
             .zip(self.occupied_planes[face])
-            .filter_map(move |(i, pbox)| pbox.map(move |pbox| (i, self.pbox_to_rect(face, pbox))))
+            .filter_map(move |(i, pbox)| {
+                if pbox.is_empty() {
+                    None
+                } else {
+                    Some((i, self.pbox_to_rect(face, pbox)))
+                }
+            })
     }
 
     #[cfg(feature = "rerun")]
     pub fn occupied_plane_box(&self, face: Face6, layer: GridCoordinate) -> Option<GridAab> {
-        let pbox = self.occupied_planes[face][usize::try_from(layer).unwrap()]?;
+        let pbox = self.occupied_planes[face][usize::try_from(layer).unwrap()];
+        if pbox.is_empty() {
+            return None;
+        }
         let mc = if face.is_negative() {
             layer
         } else {
@@ -93,7 +111,7 @@ impl Analysis {
     }
 
     pub(crate) fn surface_is_occupied(&self, face: Face6) -> bool {
-        self.occupied_planes[face][0].is_some()
+        !self.occupied_planes[face][0].is_empty()
     }
 
     fn pbox_to_rect(&self, face: Face6, pbox: PlaneBox) -> Rect {
@@ -117,19 +135,15 @@ impl Analysis {
         // exactly compensated for by the fact that we'll always have a window spilling over
         // the edge, so the range of window-center-points is equal to the range we need to
         // consider meshing.
-        match &mut self.occupied_planes[face][layer as usize] {
-            Some(existing_box) => {
-                // Can't use union() because that special cases zero-sized boxes.
-                *existing_box =
-                    PlaneBox::new(existing_box.min.min(center), existing_box.max.max(center))
-            }
-            empty @ None => *empty = Some(PlaneBox::new(center, center)),
-        }
+        let existing_box = &mut self.occupied_planes[face][layer as usize];
+
+        // Can't use union() because that special cases zero-sized boxes in a way we don't want.
+        *existing_box = PlaneBox::new(existing_box.min.min(center), existing_box.max.max(center))
     }
 
     #[cfg(feature = "rerun")]
     pub(crate) fn delete_occupied_plane(&mut self, face: Face6, layer: GridCoordinate) {
-        self.occupied_planes[face][layer as usize] = None;
+        self.occupied_planes[face][layer as usize] = EMPTY_PLANE_BOX;
     }
 }
 
