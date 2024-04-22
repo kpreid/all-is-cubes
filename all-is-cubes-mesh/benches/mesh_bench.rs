@@ -56,6 +56,27 @@ fn block_mesh_benches(c: &mut Criterion) {
         );
     });
 
+    g.bench_function("half", |b| {
+        let mut universe = Universe::new();
+        // Elsewhere this kind of block is called a slab, but “half” is consistent with the
+        // terminology of the space mesh benches in this file.
+        // Note also that unlike `make_slab()`, `half_space()` is not shrinkwrapping the space
+        // — there are empty voxels.
+        let block = Block::builder()
+            .voxels_handle(
+                R16,
+                universe.insert_anonymous(half_space(&color_block!(Rgba::WHITE))),
+            )
+            .build();
+        let ev = block.evaluate().unwrap();
+
+        b.iter_batched_ref(
+            || (),
+            |()| BlockMesh::<Mt>::new(&ev, &Allocator::new(), options),
+            BatchSize::SmallInput,
+        );
+    });
+
     g.bench_function("opaque", |b| {
         let mut universe = Universe::new();
         let block = checkerboard_block(
