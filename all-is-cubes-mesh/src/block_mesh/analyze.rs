@@ -73,7 +73,7 @@ impl Analysis {
         &self,
         face: Face6,
     ) -> impl Iterator<Item = (GridCoordinate, Rect)> + '_ {
-        (0i32..)
+        (0..GridCoordinate::from(self.resolution))
             .zip(self.occupied_planes[face])
             .filter_map(move |(i, pbox)| pbox.map(move |pbox| (i, self.pbox_to_rect(face, pbox))))
     }
