@@ -3,8 +3,8 @@ use std::array::from_fn as arr;
 use itertools::Itertools;
 
 use all_is_cubes::block::{Evoxel, Resolution};
-use all_is_cubes::euclid::vec3;
-use all_is_cubes::math::{Cube, Face6, FaceMap, GridCoordinate, GridPoint, Rgba, Vol};
+use all_is_cubes::euclid::{point3, vec3, Point2D};
+use all_is_cubes::math::{Axis, Cube, Face6, FaceMap, GridCoordinate, GridPoint, Rgba, Vol};
 
 #[cfg(feature = "rerun")]
 use all_is_cubes::math::GridAab;
@@ -24,7 +24,7 @@ type Rect = all_is_cubes::euclid::Box2D<GridCoordinate, Cube>;
 ///
 /// TODO: Investigate representation improvements for this, and if none succeed, make this an
 /// ordinary `GridAab` (after we get rid of the `GridAab` volume restriction).
-type PlaneBox = all_is_cubes::euclid::Box3D<GridCoordinate, Cube>;
+type PlaneBox = all_is_cubes::euclid::Box2D<GridCoordinate, Cube>;
 
 #[derive(Clone, Debug)] // could be Copy, but it's large so let's not
 pub(crate) struct Analysis {
@@ -42,6 +42,19 @@ pub(crate) struct Analysis {
     /// Whether there are any adjacent visible voxels that have different colors, and therefore
     /// probably need a texture rather than vertex colors.
     pub needs_texture: bool,
+}
+
+/// Reverses the 2D-ification transformation done to `occupied_planes`.
+fn unflatten(
+    axis: Axis,
+    missing_coordinate: GridCoordinate,
+    point: Point2D<GridCoordinate, Cube>,
+) -> GridPoint {
+    match axis {
+        Axis::X => point3(missing_coordinate, point.x, point.y),
+        Axis::Y => point3(point.x, missing_coordinate, point.y),
+        Axis::Z => point3(point.x, point.y, missing_coordinate),
+    }
 }
 
 impl Analysis {
@@ -68,7 +81,15 @@ impl Analysis {
     #[cfg(feature = "rerun")]
     pub fn occupied_plane_box(&self, face: Face6, layer: GridCoordinate) -> Option<GridAab> {
         let pbox = self.occupied_planes[face][usize::try_from(layer).unwrap()]?;
-        Some(GridAab::from_lower_upper(pbox.min, pbox.max))
+        let mc = if face.is_negative() {
+            layer
+        } else {
+            GridCoordinate::from(self.resolution) - layer
+        };
+        Some(GridAab::from_lower_upper(
+            unflatten(face.axis(), mc, pbox.min),
+            unflatten(face.axis(), mc, pbox.max),
+        ))
     }
 
     pub(crate) fn surface_is_occupied(&self, face: Face6) -> bool {
@@ -78,13 +99,20 @@ impl Analysis {
     fn pbox_to_rect(&self, face: Face6, pbox: PlaneBox) -> Rect {
         let t = face.face_transform(self.resolution.into()).inverse();
         Rect::from_points([
-            t.transform_point(pbox.min).to_2d(),
-            t.transform_point(pbox.max).to_2d(),
+            t.transform_point(unflatten(face.axis(), 0, pbox.min))
+                .to_2d(),
+            t.transform_point(unflatten(face.axis(), 0, pbox.max))
+                .to_2d(),
         ])
     }
 
     #[inline(always)] // we want this specialized for each case
-    fn expand_rect(&mut self, face: Face6, layer: GridCoordinate, center: GridPoint) {
+    fn expand_rect(
+        &mut self,
+        face: Face6,
+        layer: GridCoordinate,
+        center: Point2D<GridCoordinate, Cube>,
+    ) {
         // We didn't check *exactly* which voxels in the window need pixels, but this is
         // exactly compensated for by the fact that we'll always have a window spilling over
         // the edge, so the range of window-center-points is equal to the range we need to
@@ -138,23 +166,25 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut 
             // For each direction, check if any of the voxels in the deeper side are visible
             // and not covered by opaque blocks in the shallower side,
             // and mark that plane as occupied if so.
+            //
+            // `unflatten()` undoes the axis dropping/swapping this code does.
             if renderable & shift_px(0xFF) & !shift_px(opaque) != 0 {
-                analysis.expand_rect(Face6::NX, center.x, center);
+                analysis.expand_rect(Face6::NX, center.x, center.yz());
             }
             if renderable & shift_py(0xFF) & !shift_py(opaque) != 0 {
-                analysis.expand_rect(Face6::NY, center.y, center);
+                analysis.expand_rect(Face6::NY, center.y, center.xz());
             }
             if renderable & shift_pz(0xFF) & !shift_pz(opaque) != 0 {
-                analysis.expand_rect(Face6::NZ, center.z, center);
+                analysis.expand_rect(Face6::NZ, center.z, center.xy());
             }
             if renderable & shift_nx(0xFF) & !shift_nx(opaque) != 0 {
-                analysis.expand_rect(Face6::PX, resolution_coord - center.x, center);
+                analysis.expand_rect(Face6::PX, resolution_coord - center.x, center.yz());
             }
             if renderable & shift_ny(0xFF) & !shift_ny(opaque) != 0 {
-                analysis.expand_rect(Face6::PY, resolution_coord - center.y, center);
+                analysis.expand_rect(Face6::PY, resolution_coord - center.y, center.xz());
             }
             if renderable & shift_nz(0xFF) & !shift_nz(opaque) != 0 {
-                analysis.expand_rect(Face6::PZ, resolution_coord - center.z, center);
+                analysis.expand_rect(Face6::PZ, resolution_coord - center.z, center.xy());
             }
         }
 
