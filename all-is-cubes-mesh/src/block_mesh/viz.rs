@@ -4,15 +4,15 @@
 
 #![allow(clippy::unused_self)]
 
-use all_is_cubes::block::Evoxels;
-use all_is_cubes::math::{Face6, FreePoint, GridCoordinate, GridPoint};
+use all_is_cubes::block::{Evoxel, Evoxels};
+use all_is_cubes::math::{Face6, FreePoint, GridCoordinate, GridPoint, Vol};
 
 use crate::block_mesh::analyze::Analysis;
 
 #[cfg(feature = "rerun")]
 use {
     all_is_cubes::block::Resolution,
-    all_is_cubes::math::{Aab, GridAab},
+    all_is_cubes::math::{Cube, GridAab, GridVector},
     all_is_cubes::rerun_glue as rg,
     alloc::vec::Vec,
 };
@@ -44,7 +44,7 @@ pub struct Inner {
     analysis: Analysis,
 
     destination: rg::Destination,
-    window_path: rg::EntityPath,
+    window_voxels_path: rg::EntityPath,
     occupied_path: rg::EntityPath,
     layer_path: rg::EntityPath,
     mesh_edges_path: rg::EntityPath,
@@ -71,7 +71,7 @@ impl Viz {
         } else {
             Self::Enabled(Inner {
                 destination,
-                window_path: rg::entity_path!["analysis", "window"],
+                window_voxels_path: rg::entity_path!["analysis", "window_voxels"],
                 occupied_path: rg::entity_path!["analysis", "occupied"],
                 layer_path: rg::entity_path!["compute", "layer"],
                 mesh_edges_path: rg::entity_path!["compute", "mesh_edges"],
@@ -110,43 +110,37 @@ impl Viz {
             let voxel_vol = voxels.as_vol_ref();
             let voxel_iter = voxel_vol
                 .iter()
+                .map(|(cube, &voxel)| (cube, voxel))
                 .filter(|&(_, voxel)| !voxel.color.fully_transparent());
 
-            state.destination.log(
-                &rg::entity_path!["voxels"],
-                &rg::archetypes::Points3D::new(
-                    voxel_iter
-                        .clone()
-                        .map(|(cube, _)| rg::convert_point(cube.midpoint())),
-                )
-                .with_colors(voxel_iter.map(|(_, voxel)| rg::components::Color(voxel.color.into())))
-                .with_radii([VOXEL_RADIUS]),
-            );
+            state.log_voxels(&rg::entity_path!("voxels"), voxel_iter, VOXEL_RADIUS);
         }
     }
 
-    pub(crate) fn window(&self, #[allow(unused)] center: GridPoint) {
+    pub(crate) fn window(
+        &self,
+        #[allow(unused)] center: GridPoint,
+        #[allow(unused)] voxels: Vol<&[Evoxel]>,
+    ) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
-            state.destination.log(
-                &state.window_path,
-                // box big enough to enclose the relevant voxel points, but not so big it looks distractingly chunky
-                &rg::convert_aabs(
-                    [Aab::from_lower_upper(
-                        FreePoint::splat(-0.75),
-                        FreePoint::splat(0.75),
-                    )],
-                    center.to_f64().to_vector(),
-                )
-                .with_class_ids([rg::ClassId::MeshVizWipWindow]),
+            let window_grid_aab = GridAab::from_lower_upper(
+                center - GridVector::splat(1),
+                center + GridVector::splat(1),
             );
+
+            // Log the voxels the window is looking at, with bigger radius to highlight them.
+            let voxel_iter = window_grid_aab
+                .interior_iter()
+                .map(|cube| (cube, voxels.get(cube).copied().unwrap_or(Evoxel::AIR)));
+            state.log_voxels(&state.window_voxels_path, voxel_iter, 0.5);
         }
     }
 
     pub(crate) fn clear_window(&self) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
-            state.destination.clear_recursive(&state.window_path);
+            state.destination.clear_recursive(&state.window_voxels_path);
         }
     }
 
@@ -243,6 +237,24 @@ impl Inner {
             &rg::convert_grid_aabs(iter)
                 .with_class_ids([rg::ClassId::MeshVizOccupiedPlane])
                 .with_radii([OCCUPIED_RADIUS]),
+        );
+    }
+
+    fn log_voxels(
+        &self,
+        path: &rg::EntityPath,
+        voxel_iter: impl Iterator<Item = (Cube, Evoxel)> + Clone,
+        radius: f32,
+    ) {
+        self.destination.log(
+            path,
+            &rg::archetypes::Points3D::new(
+                voxel_iter
+                    .clone()
+                    .map(|(cube, _)| rg::convert_point(cube.midpoint())),
+            )
+            .with_colors(voxel_iter.map(|(_, voxel)| rg::components::Color(voxel.color.into())))
+            .with_radii([radius]),
         );
     }
 }

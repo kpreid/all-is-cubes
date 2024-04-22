@@ -162,7 +162,7 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut 
     // is not quite that because it is defined to allow concavities.
 
     for (center, colors) in windows(voxels) {
-        viz.window(center);
+        viz.window(center, voxels);
 
         let opaque = bitmask(colors, Rgba::fully_opaque);
         let semitransparent = !(opaque | bitmask(colors, Rgba::fully_transparent));
