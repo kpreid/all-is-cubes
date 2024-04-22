@@ -53,8 +53,6 @@ mod index_vec;
 pub use index_vec::*;
 mod space_mesh;
 pub use space_mesh::*;
-mod planar;
-use planar::*;
 #[doc(hidden)]
 pub mod testing;
 pub mod texture;

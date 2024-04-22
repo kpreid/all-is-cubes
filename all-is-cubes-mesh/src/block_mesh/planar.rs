@@ -1,4 +1,4 @@
-//! Triangulator's 2D plane operations (sliced voxels to texels and meshes).
+//! 2D operations for block mesh generation (sliced voxels to texels and triangles).
 
 use alloc::vec::Vec;
 use core::ops::Range;
@@ -12,7 +12,7 @@ use all_is_cubes::math::{
 use crate::texture::{self, TexelUnit, TextureCoordinate, TilePoint};
 use crate::{BlockVertex, Coloring, IndexVec, Viz};
 
-pub(crate) fn greedy_mesh(
+pub(super) fn greedy_mesh(
     visible_image: Vec<Rgba>,
     image_s_range: Range<GridCoordinate>,
     image_t_range: Range<GridCoordinate>,

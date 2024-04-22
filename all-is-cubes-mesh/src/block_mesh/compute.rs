@@ -11,12 +11,10 @@ use all_is_cubes::math::{
     Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, OpacityCategory, Rgb, Rgba, VectorOps,
 };
 
-use crate::block_mesh::viz::Viz;
+use crate::block_mesh::planar::{greedy_mesh, push_quad, GmRect, QuadColoring, QuadTransform};
 use crate::block_mesh::{analyze::analyze, BlockFaceMesh};
 use crate::texture::{self, Tile as _};
-use crate::{
-    greedy_mesh, push_quad, BlockMesh, MeshOptions, MeshTypes, QuadColoring, QuadTransform,
-};
+use crate::{BlockMesh, MeshOptions, MeshTypes, Viz};
 
 /// Generate the [`BlockMesh`] data for the given [`EvaluatedBlock`], writing it into `output`.
 ///
@@ -297,7 +295,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                     rotated_voxel_range.y_range(),
                 )
                 .for_each(|rect| {
-                    let crate::GmRect {
+                    let GmRect {
                         single_color,
                         has_alpha: rect_has_alpha,
                         low_corner,

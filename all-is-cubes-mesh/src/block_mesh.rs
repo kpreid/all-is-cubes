@@ -17,6 +17,7 @@ use crate::{GfxVertex, IndexVec, MeshOptions, MeshTypes};
 
 mod analyze;
 mod compute;
+mod planar;
 mod viz;
 #[doc(hidden)]
 pub use viz::Viz;
