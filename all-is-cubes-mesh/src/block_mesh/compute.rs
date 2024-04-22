@@ -353,7 +353,6 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
         }
 
         viz.clear_layer_in_progress();
-        viz.clear_analysis();
 
         output.texture_used = texture_if_needed;
         output.voxel_opacity_mask = if used_any_vertex_colors {

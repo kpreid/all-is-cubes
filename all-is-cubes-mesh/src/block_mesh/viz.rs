@@ -150,29 +150,11 @@ impl Viz {
         }
     }
 
-    pub(crate) fn clear_analysis(&self) {
-        #[cfg(feature = "rerun")]
-        if let Self::Enabled(state) = self {
-            state.destination.clear_recursive(&state.occupied_path);
-        }
-    }
-
     pub(crate) fn analysis_in_progress(&mut self, #[allow(unused)] analysis: &Analysis) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
             state.analysis = analysis.clone();
-            let state = &state;
-            let iter = Face6::ALL.into_iter().flat_map(|face| {
-                analysis
-                    .occupied_planes(face)
-                    .map(move |(layer, _)| state.layer_box(face, layer))
-            });
-            state.destination.log(
-                &state.occupied_path,
-                &rg::convert_grid_aabs(iter)
-                    .with_class_ids([rg::ClassId::MeshVizOccupiedPlane])
-                    .with_radii([OCCUPIED_RADIUS]),
-            );
+            state.log_analysis();
         }
     }
 
@@ -184,7 +166,7 @@ impl Viz {
     }
 
     pub(crate) fn set_layer_in_progress(
-        &self,
+        &mut self,
         #[allow(unused)] face: Face6,
         #[allow(unused)] layer: GridCoordinate,
     ) {
@@ -195,7 +177,12 @@ impl Viz {
                 &rg::convert_grid_aabs([state.layer_box(face, layer)])
                     .with_class_ids([rg::ClassId::MeshVizWipPlane])
                     .with_radii([OCCUPIED_RADIUS * 2.0]),
-            )
+            );
+
+            // Delete the corresponding analysis rect, to indicate that we're (about to be)
+            // entirely done with it.
+            state.analysis.delete_occupied_plane(face, layer);
+            state.log_analysis();
         }
     }
 
@@ -243,5 +230,19 @@ impl Viz {
 impl Inner {
     fn layer_box(&self, face: Face6, layer: GridCoordinate) -> GridAab {
         self.analysis.occupied_plane_box(face, layer).unwrap()
+    }
+
+    fn log_analysis(&self) {
+        let iter = Face6::ALL.into_iter().flat_map(|face| {
+            self.analysis
+                .occupied_planes(face)
+                .map(move |(layer, _)| self.layer_box(face, layer))
+        });
+        self.destination.log(
+            &self.occupied_path,
+            &rg::convert_grid_aabs(iter)
+                .with_class_ids([rg::ClassId::MeshVizOccupiedPlane])
+                .with_radii([OCCUPIED_RADIUS]),
+        );
     }
 }

@@ -98,6 +98,11 @@ impl Analysis {
             empty @ None => *empty = Some(PlaneBox::new(center, center)),
         }
     }
+
+    #[cfg(feature = "rerun")]
+    pub(crate) fn delete_occupied_plane(&mut self, face: Face6, layer: GridCoordinate) {
+        self.occupied_planes[face][layer as usize] = None;
+    }
 }
 
 /// Analyze a block's voxel array and find characteristics its mesh will have.
