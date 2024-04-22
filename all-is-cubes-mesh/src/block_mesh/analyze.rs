@@ -4,18 +4,40 @@ use itertools::Itertools;
 
 use all_is_cubes::block::{Evoxel, Resolution};
 use all_is_cubes::euclid::vec3;
-use all_is_cubes::math::{Face6, FaceMap, GridCoordinate, GridPoint, Rgba, Vol};
+use all_is_cubes::math::{Cube, Face6, FaceMap, GridCoordinate, GridPoint, Rgba, Vol};
+
+#[cfg(feature = "rerun")]
+use all_is_cubes::math::GridAab;
 
 use crate::block_mesh::viz::Viz;
 
-const NBITS: usize = Resolution::MAX.to_grid() as usize + 1;
+/// Maximum number of occupied planes/layers in any block.
+///
+/// The plus one is because we're counting fenceposts (coordinate planes) — wait.
+/// TODO: We should never have anything in the deepest plane. Reduce this and test that's ok.
+const MAX_PLANES: usize = Resolution::MAX.to_grid() as usize + 1;
 
-#[derive(Debug)]
+type Rect = all_is_cubes::euclid::Box2D<GridCoordinate, Cube>;
+
+/// Flat (one axis zero sized) box whose bounds are a voxel surface that needs triangles
+/// generated for it.
+///
+/// TODO: Investigate representation improvements for this, and if none succeed, make this an
+/// ordinary `GridAab` (after we get rid of the `GridAab` volume restriction).
+type PlaneBox = all_is_cubes::euclid::Box3D<GridCoordinate, Cube>;
+
+#[derive(Clone, Debug)] // could be Copy, but it's large so let's not
 pub(crate) struct Analysis {
-    /// For each face normal, which depths will need any triangles generated.
-    /// Bit 0 is depth 0 (the surface of the block volume), bit 1 is one voxel
+    resolution: Resolution,
+
+    /// For each face normal, which depths will need any triangles generated,
+    /// and for those that do, which bounds need to be scanned.
+    ///
+    /// Index 0 is depth 0 (the surface of the block volume), index 1 is one voxel
     /// deeper, and so on.
-    occupied_planes: FaceMap<bitvec::BitArr!(for NBITS)>,
+    ///
+    /// The boxes' thickness happens to be equal to the layer position but this is coincidental.
+    occupied_planes: FaceMap<[Option<PlaneBox>; MAX_PLANES]>,
 
     /// Whether there are any adjacent visible voxels that have different colors, and therefore
     /// probably need a texture rather than vertex colors.
@@ -23,30 +45,69 @@ pub(crate) struct Analysis {
 }
 
 impl Analysis {
+    pub fn empty() -> Self {
+        Analysis {
+            occupied_planes: FaceMap::repeat([None; MAX_PLANES]),
+            needs_texture: false,
+            resolution: Resolution::R1,
+        }
+    }
+
     /// For each face normal, which depths will need any triangles generated.
-    /// Bit 0 is depth 0 (the surface of the block volume), bit 1 is one voxel
+    /// Index 0 is depth 0 (the surface of the block volume), index 1 is one voxel
     /// deeper, and so on.
-    pub fn occupied_planes(&self, face: Face6) -> impl Iterator<Item = GridCoordinate> + '_ {
-        self.occupied_planes[face]
-            .iter_ones()
-            .map(|i| i as GridCoordinate)
+    pub fn occupied_planes(
+        &self,
+        face: Face6,
+    ) -> impl Iterator<Item = (GridCoordinate, Rect)> + '_ {
+        (0i32..)
+            .zip(self.occupied_planes[face])
+            .filter_map(move |(i, pbox)| pbox.map(move |pbox| (i, self.pbox_to_rect(face, pbox))))
+    }
+
+    #[cfg(feature = "rerun")]
+    pub fn occupied_plane_box(&self, face: Face6, layer: GridCoordinate) -> Option<GridAab> {
+        let pbox = self.occupied_planes[face][usize::try_from(layer).unwrap()]?;
+        Some(GridAab::from_lower_upper(pbox.min, pbox.max))
     }
 
     pub(crate) fn surface_is_occupied(&self, face: Face6) -> bool {
-        self.occupied_planes[face][0]
+        self.occupied_planes[face][0].is_some()
+    }
+
+    fn pbox_to_rect(&self, face: Face6, pbox: PlaneBox) -> Rect {
+        let t = face.face_transform(self.resolution.into()).inverse();
+        Rect::from_points([
+            t.transform_point(pbox.min).to_2d(),
+            t.transform_point(pbox.max).to_2d(),
+        ])
+    }
+
+    #[inline(always)] // we want this specialized for each case
+    fn expand_rect(&mut self, face: Face6, layer: GridCoordinate, center: GridPoint) {
+        // We didn't check *exactly* which voxels in the window need pixels, but this is
+        // exactly compensated for by the fact that we'll always have a window spilling over
+        // the edge, so the range of window-center-points is equal to the range we need to
+        // consider meshing.
+        match &mut self.occupied_planes[face][layer as usize] {
+            Some(existing_box) => {
+                // Can't use union() because that special cases zero-sized boxes.
+                *existing_box =
+                    PlaneBox::new(existing_box.min.min(center), existing_box.max.max(center))
+            }
+            empty @ None => *empty = Some(PlaneBox::new(center, center)),
+        }
     }
 }
 
 /// Analyze a block's voxel array and find characteristics its mesh will have.
 ///
 /// This is a preliminary step before creating the actual vertices and texture of a `BlockMesh`.
-pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &Viz) -> Analysis {
-    let resolution = usize::from(resolution);
+pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut Viz) -> Analysis {
+    let resolution_coord = GridCoordinate::from(resolution);
 
-    let mut analysis = Analysis {
-        occupied_planes: Default::default(),
-        needs_texture: false,
-    };
+    let mut analysis = Analysis::empty();
+    analysis.resolution = resolution;
     viz.analysis_in_progress(&analysis);
 
     // TODO: Have EvaluatedBlock tell us when a block is fully cubical and opaque,
@@ -59,8 +120,6 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &Viz)
         let opaque = bitmask(colors, Rgba::fully_opaque);
         let semitransparent = !(opaque | bitmask(colors, Rgba::fully_transparent));
         let renderable = opaque | semitransparent;
-
-        let planes = center.to_usize();
 
         // First, quickly check if there are any visible surfaces at all here.
         if opaque != 0x00 && opaque != 0xFF || semitransparent != 0x00 && semitransparent != 0xFF {
@@ -75,22 +134,22 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &Viz)
             // and not covered by opaque blocks in the shallower side,
             // and mark that plane as occupied if so.
             if renderable & shift_px(0xFF) & !shift_px(opaque) != 0 {
-                analysis.occupied_planes.nx.set(planes.x, true);
+                analysis.expand_rect(Face6::NX, center.x, center);
             }
             if renderable & shift_py(0xFF) & !shift_py(opaque) != 0 {
-                analysis.occupied_planes.ny.set(planes.y, true);
+                analysis.expand_rect(Face6::NY, center.y, center);
             }
             if renderable & shift_pz(0xFF) & !shift_pz(opaque) != 0 {
-                analysis.occupied_planes.nz.set(planes.z, true);
+                analysis.expand_rect(Face6::NZ, center.z, center);
             }
             if renderable & shift_nx(0xFF) & !shift_nx(opaque) != 0 {
-                analysis.occupied_planes.px.set(resolution - planes.x, true);
+                analysis.expand_rect(Face6::PX, resolution_coord - center.x, center);
             }
             if renderable & shift_ny(0xFF) & !shift_ny(opaque) != 0 {
-                analysis.occupied_planes.py.set(resolution - planes.y, true);
+                analysis.expand_rect(Face6::PY, resolution_coord - center.y, center);
             }
             if renderable & shift_nz(0xFF) & !shift_nz(opaque) != 0 {
-                analysis.occupied_planes.pz.set(resolution - planes.z, true);
+                analysis.expand_rect(Face6::PZ, resolution_coord - center.z, center);
             }
         }
 
@@ -165,6 +224,7 @@ fn shift_nz(bits: u8) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::euclid::{point2, size2};
     use all_is_cubes::math::{GridAab, ZMaj};
     use all_is_cubes::rgba_const;
     use all_is_cubes::universe::Universe;
@@ -213,7 +273,11 @@ mod tests {
             eprintln!("thickness {thickness}:");
             let slab = all_is_cubes::content::make_slab(&mut u, thickness, Resolution::R4);
             let ev = slab.evaluate().unwrap();
-            let analysis = analyze(ev.resolution(), ev.voxels.as_vol_ref(), &Viz::disabled());
+            let analysis = analyze(
+                ev.resolution(),
+                ev.voxels.as_vol_ref(),
+                &mut Viz::disabled(),
+            );
 
             let occupied_planes = FaceMap::from_fn(|f| analysis.occupied_planes(f).collect_vec());
             if thickness == 0 {
@@ -224,15 +288,38 @@ mod tests {
                 );
             } else {
                 assert_eq!(analysis.needs_texture, true, "needs_texture");
+                // Note: the orientation of these rects depends on the arbitrary choices of
+                // Face6::face_transform().
                 assert_eq!(
                     occupied_planes,
                     FaceMap {
-                        nx: vec![0],
-                        ny: vec![0],
-                        nz: vec![0],
-                        px: vec![0],
-                        py: vec![4 - thickness],
-                        pz: vec![0],
+                        nx: vec![(
+                            0,
+                            Rect::from_origin_and_size(point2(0, 0), size2(thickness, 4))
+                        )],
+                        ny: vec![(0, Rect::from_origin_and_size(point2(0, 0), size2(4, 4)))],
+                        nz: vec![(
+                            0,
+                            Rect::from_origin_and_size(point2(0, 0), size2(4, thickness))
+                        )],
+                        px: vec![(
+                            0,
+                            Rect::from_origin_and_size(
+                                point2(4 - thickness, 0),
+                                size2(thickness, 4)
+                            )
+                        )],
+                        py: vec![(
+                            4 - thickness,
+                            Rect::from_origin_and_size(point2(0, 0), size2(4, 4))
+                        )],
+                        pz: vec![(
+                            0,
+                            Rect::from_origin_and_size(
+                                point2(0, 4 - thickness),
+                                size2(4, thickness)
+                            )
+                        )],
                     }
                 );
             }

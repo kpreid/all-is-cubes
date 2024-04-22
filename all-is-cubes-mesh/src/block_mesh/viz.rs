@@ -7,6 +7,8 @@
 use all_is_cubes::block::Evoxels;
 use all_is_cubes::math::{Face6, FreePoint, GridCoordinate, GridPoint};
 
+use crate::block_mesh::analyze::Analysis;
+
 #[cfg(feature = "rerun")]
 use {
     all_is_cubes::block::Resolution,
@@ -35,9 +37,11 @@ pub enum Viz {
 #[doc(hidden)]
 #[allow(missing_debug_implementations)]
 pub struct Inner {
-    // Info captured from the `Evoxels` to give context to later data`
+    // Info captured from the `Evoxels` to give context to later data
     resolution: Option<Resolution>,
     data_bounds: Option<GridAab>,
+
+    analysis: Analysis,
 
     destination: rg::Destination,
     window_path: rg::EntityPath,
@@ -73,6 +77,7 @@ impl Viz {
                 mesh_edges_path: rg::entity_path!["compute", "mesh_edges"],
                 resolution: None,
                 data_bounds: None,
+                analysis: Analysis::empty(),
                 mesh_edge_positions: Vec::new(),
                 mesh_edge_classes: Vec::new(),
             })
@@ -152,16 +157,15 @@ impl Viz {
         }
     }
 
-    pub(crate) fn analysis_in_progress(
-        &self,
-        #[allow(unused)] analysis: &super::analyze::Analysis,
-    ) {
+    pub(crate) fn analysis_in_progress(&mut self, #[allow(unused)] analysis: &Analysis) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
+            state.analysis = analysis.clone();
+            let state = &state;
             let iter = Face6::ALL.into_iter().flat_map(|face| {
                 analysis
                     .occupied_planes(face)
-                    .map(move |layer| state.layer_box(face, layer))
+                    .map(move |(layer, _)| state.layer_box(face, layer))
             });
             state.destination.log(
                 &state.occupied_path,
@@ -238,15 +242,6 @@ impl Viz {
 #[cfg(feature = "rerun")]
 impl Inner {
     fn layer_box(&self, face: Face6, layer: GridCoordinate) -> GridAab {
-        let layer_box = GridAab::for_block(self.resolution.unwrap())
-            .abut(face, -layer)
-            .unwrap()
-            .abut(face.opposite(), 0)
-            .unwrap();
-
-        // trim to data bounds for a tidier visualization
-        layer_box
-            .intersection_box(self.data_bounds.unwrap())
-            .unwrap_or(layer_box)
+        self.analysis.occupied_plane_box(face, layer).unwrap()
     }
 }

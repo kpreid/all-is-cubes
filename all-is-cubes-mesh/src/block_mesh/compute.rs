@@ -115,7 +115,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             return;
         }
 
-        let analysis = analyze(resolution, voxels_array, &viz);
+        let analysis = analyze(resolution, voxels_array, &mut viz);
 
         let mut used_any_vertex_colors = false;
 
@@ -152,23 +152,30 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                 .transform(voxel_transform.inverse())
                 .unwrap();
 
-            // Check the case where the block's voxels don't meet its front face, or don't fill
-            // that face. If they do, then we'll take care of it later, but if we don't even
-            // iterate over the full surface (as layer 0), we need this extra check.
-            if !analysis.surface_is_occupied(face)
-                || rotated_voxel_range.x_range() != (0..block_resolution)
-                || rotated_voxel_range.y_range() != (0..block_resolution)
-            {
+            // Check the case where the block's voxels don't meet its front face.
+            // If they do, then we'll take care of `fully_opaque` later, but if we don't even
+            // iterate over layer 0, we need this extra check.
+            if !analysis.surface_is_occupied(face) {
                 face_mesh.fully_opaque = false;
             }
 
             // Layer 0 is the outside surface of the cube and successive layers are
             // deeper below that surface.
-            for layer in analysis.occupied_planes(face) {
+            for (layer, occupied_rect) in analysis.occupied_planes(face) {
                 if !rotated_voxel_range.z_range().contains(&layer) {
                     // TODO: This is a workaround for a bug in the analyzer; it should not be
                     // marking out-of-bounds planes as occupied.
                     continue;
+                }
+
+                // Check the case where we aren't iterating over the entire front face.
+                // If they are, then we'll take care of `fully_opaque` later, but if we don't even
+                // iterate over the whole face, we need this extra check.
+                if layer == 0
+                    && (occupied_rect.x_range() != (0..block_resolution)
+                        || occupied_rect.y_range() != (0..block_resolution))
+                {
+                    face_mesh.fully_opaque = false;
                 }
 
                 viz.set_layer_in_progress(face, layer);
@@ -181,9 +188,8 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                 // That is, it excludes all obscured interior volume.
                 // First, we traverse the block and fill this with non-obscured voxels,
                 // then we erase it as we convert contiguous rectangles of it to quads.
-                let mut visible_image: Vec<Rgba> = Vec::with_capacity(
-                    rotated_voxel_range.x_range().len() * rotated_voxel_range.y_range().len(),
-                );
+                let mut visible_image: Vec<Rgba> =
+                    Vec::with_capacity(usize::try_from(occupied_rect.area()).unwrap_or(0));
 
                 let texture_plane_if_needed: Option<<M::Tile as texture::Tile>::Plane> =
                     if let Some(ref texture) = texture_if_needed {
@@ -191,8 +197,8 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                         // TODO: It would be better if this were shrunk to the visible voxels
                         // in this specific layer, not just all voxels.
                         let slice_range = GridAab::from_ranges([
-                            rotated_voxel_range.x_range(),
-                            rotated_voxel_range.y_range(),
+                            occupied_rect.x_range(),
+                            occupied_rect.y_range(),
                             layer..layer + 1,
                         ])
                         .transform(face.face_transform(block_resolution))
@@ -203,9 +209,9 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                         None
                     };
 
-                for (t, s) in rotated_voxel_range
+                for (t, s) in occupied_rect
                     .y_range()
-                    .cartesian_product(rotated_voxel_range.x_range())
+                    .cartesian_product(occupied_rect.x_range())
                 {
                     let cube: Cube = voxel_transform.transform_cube(Cube::new(s, t, layer));
 
@@ -291,8 +297,8 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                 // breaking an irregular shape into quads.
                 greedy_mesh(
                     visible_image,
-                    rotated_voxel_range.x_range(),
-                    rotated_voxel_range.y_range(),
+                    occupied_rect.x_range(),
+                    occupied_rect.y_range(),
                 )
                 .for_each(|rect| {
                     let GmRect {
