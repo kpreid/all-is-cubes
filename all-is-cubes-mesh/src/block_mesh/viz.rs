@@ -5,7 +5,7 @@
 #![allow(clippy::unused_self)]
 
 use all_is_cubes::block::{Evoxel, Evoxels};
-use all_is_cubes::math::{Face6, FreePoint, GridCoordinate, GridPoint, Vol};
+use all_is_cubes::math::{Face6, FreePoint, GridCoordinate, GridPoint, Rgba, Vol};
 
 use crate::block_mesh::analyze::Analysis;
 
@@ -15,6 +15,7 @@ use {
     all_is_cubes::math::{Cube, GridAab, GridVector},
     all_is_cubes::rerun_glue as rg,
     alloc::vec::Vec,
+    itertools::Itertools as _,
 };
 
 /// Optional handle to Rerun recording used by the block mesh generator
@@ -47,11 +48,18 @@ pub struct Inner {
     window_voxels_path: rg::EntityPath,
     occupied_path: rg::EntityPath,
     layer_path: rg::EntityPath,
+    mesh_surface_path: rg::EntityPath,
     mesh_edges_path: rg::EntityPath,
 
-    // These two together make up the mesh display entity's data
+    // These two together make up the mesh edge display entity's data
     mesh_edge_positions: Vec<rg::components::LineStrip3D>,
     mesh_edge_classes: Vec<rg::components::ClassId>,
+
+    // Ingredients for a Mesh3D
+    mesh_vertex_positions: Vec<rg::components::Position3D>,
+    mesh_vertex_colors: Vec<rg::components::Color>,
+    mesh_vertex_normals: Vec<rg::components::Vector3D>,
+    mesh_triangle_indices: Vec<u32>,
 }
 
 cfg_if::cfg_if! {
@@ -60,6 +68,8 @@ cfg_if::cfg_if! {
         const VOXEL_RADIUS: f32 = 0.1;
         const OCCUPIED_RADIUS: f32 = 0.01;
         const EDGE_LINE_RADIUS: f32 = 0.04;
+        // should be larger than EDGE_LINE_RADIUS and OCCUPIED_RADIUS
+        const IN_PROGRESS_LINE_RADIUS: f32 = 0.07;
     }
 }
 
@@ -71,15 +81,20 @@ impl Viz {
         } else {
             Self::Enabled(Inner {
                 destination,
-                window_voxels_path: rg::entity_path!["analysis", "window_voxels"],
-                occupied_path: rg::entity_path!["analysis", "occupied"],
-                layer_path: rg::entity_path!["compute", "layer"],
-                mesh_edges_path: rg::entity_path!["compute", "mesh_edges"],
+                window_voxels_path: rg::entity_path!["progress", "analysis_window"],
+                occupied_path: rg::entity_path!["occupied_planes"],
+                layer_path: rg::entity_path!["progress", "mesh_plane"],
+                mesh_surface_path: rg::entity_path!["mesh", "surface"],
+                mesh_edges_path: rg::entity_path!["mesh", "edges"],
                 resolution: None,
                 data_bounds: None,
                 analysis: Analysis::empty(),
                 mesh_edge_positions: Vec::new(),
                 mesh_edge_classes: Vec::new(),
+                mesh_vertex_positions: Vec::new(),
+                mesh_vertex_colors: Vec::new(),
+                mesh_vertex_normals: Vec::new(),
+                mesh_triangle_indices: Vec::new(),
             })
         }
     }
@@ -170,7 +185,7 @@ impl Viz {
                 &state.layer_path,
                 &rg::convert_grid_aabs([state.layer_box(face, layer)])
                     .with_class_ids([rg::ClassId::MeshVizWipPlane])
-                    .with_radii([OCCUPIED_RADIUS * 2.0]),
+                    .with_radii([IN_PROGRESS_LINE_RADIUS]),
             );
 
             // Delete the corresponding analysis rect, to indicate that we're (about to be)
@@ -180,42 +195,80 @@ impl Viz {
         }
     }
 
-    pub(crate) fn extend_vertices<I: Iterator<Item = FreePoint>>(
+    pub(crate) fn extend_vertices(
         &mut self,
-        #[allow(unused)] mut vertex_position_iter: I,
+        #[allow(unused)] mut vertex_position_iter: impl Iterator<Item = FreePoint> + Clone,
+        #[allow(unused)] mut relative_indices_iter: impl Iterator<Item = u32> + Clone,
+        #[allow(unused)] color_fn: impl FnOnce() -> Rgba,
         #[allow(unused)] normal: Face6,
     ) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
-            let [a, b, c, d] = std::array::from_fn(|_| {
-                rg::convert_vec(vertex_position_iter.next().unwrap().to_vector())
-            });
+            let vertex_positions = vertex_position_iter.map(rg::convert_point).collect_vec();
 
-            // Fake the triangles by drawing 5 lines as 1 line strip.
-            // We'll have to change that when we for-real use arbitrary triangles.
+            // Append vertices for real mesh
+            let index_base = state.mesh_vertex_positions.len() as u32;
             state
-                .mesh_edge_positions
-                .push(rg::components::LineStrip3D(vec![a, b, d, c, a, d]));
-            state.mesh_edge_classes.push(
-                match normal {
-                    Face6::NX => rg::ClassId::MeshVizEdgeNx,
-                    Face6::NY => rg::ClassId::MeshVizEdgeNy,
-                    Face6::NZ => rg::ClassId::MeshVizEdgeNz,
-                    Face6::PX => rg::ClassId::MeshVizEdgePx,
-                    Face6::PY => rg::ClassId::MeshVizEdgePy,
-                    Face6::PZ => rg::ClassId::MeshVizEdgePz,
-                }
-                .into(),
+                .mesh_vertex_positions
+                .extend(vertex_positions.iter().copied());
+            state.mesh_vertex_colors.extend(
+                std::iter::repeat(rg::components::Color(color_fn().into()))
+                    .take(vertex_positions.len()),
+            );
+            state.mesh_vertex_normals.extend(
+                std::iter::repeat(rg::components::Vector3D(rg::convert_vec(
+                    normal.normal_vector::<f32, ()>(),
+                )))
+                .take(vertex_positions.len()),
+            );
+            state.mesh_triangle_indices.extend(
+                relative_indices_iter
+                    .clone()
+                    .map(|rel_index| rel_index + index_base),
             );
 
-            // Log the *entire* mesh so far.
-            // (Rerun doesn't have a way to say "add new instances".)
+            // Draw edges of each triangle — by interpreting the indices
+            for (i1, i2, i3) in relative_indices_iter.tuples() {
+                let p1 = vertex_positions[i1 as usize];
+                let p2 = vertex_positions[i2 as usize];
+                let p3 = vertex_positions[i3 as usize];
+                state
+                    .mesh_edge_positions
+                    .push(rg::components::LineStrip3D(vec![p1.0, p2.0, p3.0, p1.0]));
+                state.mesh_edge_classes.push(
+                    match normal {
+                        Face6::NX => rg::ClassId::MeshVizEdgeNx,
+                        Face6::NY => rg::ClassId::MeshVizEdgeNy,
+                        Face6::NZ => rg::ClassId::MeshVizEdgeNz,
+                        Face6::PX => rg::ClassId::MeshVizEdgePx,
+                        Face6::PY => rg::ClassId::MeshVizEdgePy,
+                        Face6::PZ => rg::ClassId::MeshVizEdgePz,
+                    }
+                    .into(),
+                );
+            }
+
+            // Rerun doesn't have a way to say "add new instances", so we have to re-log the
+            // entire mesh so far.
+
+            // Log edges.
             state.destination.log(
                 &state.mesh_edges_path,
                 &rg::archetypes::LineStrips3D::new(state.mesh_edge_positions.iter().cloned())
                     .with_class_ids(state.mesh_edge_classes.iter().copied())
                     .with_radii([EDGE_LINE_RADIUS]),
-            )
+            );
+
+            // Log mesh triangles. (Do this second so that they appear inside the edges.)
+            state.destination.log(
+                &state.mesh_surface_path,
+                &rg::archetypes::Mesh3D::new(state.mesh_vertex_positions.iter().copied())
+                    .with_vertex_colors(state.mesh_vertex_colors.iter().copied())
+                    .with_vertex_normals(state.mesh_vertex_normals.iter().copied())
+                    .with_mesh_properties(rg::datatypes::MeshProperties {
+                        indices: Some(state.mesh_triangle_indices.as_slice().into()),
+                    }),
+            );
         }
     }
 }

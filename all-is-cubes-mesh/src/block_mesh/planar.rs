@@ -8,6 +8,7 @@ use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D};
 use all_is_cubes::math::{
     Axis, Cube, Face6, FreeCoordinate, FreePoint, GridCoordinate, Rgba, VectorOps,
 };
+use all_is_cubes::rgba_const;
 
 use crate::texture::{self, TexelUnit, TextureCoordinate, TilePoint};
 use crate::{BlockVertex, Coloring, IndexVec, Viz};
@@ -199,6 +200,11 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
         position_iter
             .clone()
             .map(|p| transform.transform_position(p) * f64::from(transform.resolution)),
+        QUAD_INDICES.iter().copied(),
+        || match coloring {
+            QuadColoring::Solid(color) => color,
+            QuadColoring::Texture(_) => rgba_const!(0.5, 0.5, 0.5, 1.0),
+        },
         transform.face,
     );
 
