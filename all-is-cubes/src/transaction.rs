@@ -57,7 +57,7 @@ pub trait Transaction<T: ?Sized>: Merge {
     fn check(&self, target: &T) -> Result<Self::CommitCheck, PreconditionFailed>;
 
     /// Perform the mutations specified by this transaction. The `check` value should have
-    /// been created by a prior call to [`Transaction::commit`].
+    /// been created by a prior call to [`Transaction::check()`].
     ///
     /// Returns [`Ok`] if the transaction completed normally, and [`Err`] if there was a
     /// problem which was not detected as a precondition; in this case the transaction may
@@ -67,8 +67,8 @@ pub trait Transaction<T: ?Sized>: Merge {
     /// The `outputs` callback function is called to produce information resulting from
     /// the transaction; what that information is is up to the individual transaction type.
     ///
-    /// The target should not be mutated between the call to [`Transaction::check`] and
-    /// [`Transaction::commit`] (including via interior mutability, however that applies
+    /// The target should not be mutated between the call to [`Transaction::check()`] and
+    /// [`Transaction::commit()`] (including via interior mutability, however that applies
     /// to the particular `T`). The consequences of doing so may include mutating the
     /// wrong components, signaling an error partway through the transaction, or merely
     /// committing the transaction while its preconditions do not hold.
