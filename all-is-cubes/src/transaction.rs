@@ -90,13 +90,13 @@ pub trait Transaction<T: ?Sized>: Merge {
     /// # let outputs = &mut no_outputs;
     /// let check = transaction.check(target).map_err(ExecuteError::Check)?;
     /// transaction.commit(target, check, outputs).map_err(ExecuteError::Commit)?;
-    /// # Ok::<(), ExecuteError>(())
+    /// # Ok::<(), ExecuteError<UniverseTransaction>>(())
     /// ```
     fn execute(
         &self,
         target: &mut T,
         outputs: &mut dyn FnMut(Self::Output),
-    ) -> Result<(), ExecuteError> {
+    ) -> Result<(), ExecuteError<Self>> {
         let check = self.check(target).map_err(ExecuteError::Check)?;
         self.commit(target, check, outputs)
             .map_err(ExecuteError::Commit)
@@ -184,32 +184,77 @@ pub trait Merge: Sized {
     }
 }
 
-/// Error type from [`Transaction::execute()`].
-#[derive(Clone, Debug)]
+/// Error type from [`Transaction::execute()`] and other high-level operations.
 #[allow(clippy::exhaustive_enums)]
-pub enum ExecuteError {
+pub enum ExecuteError<Txn: Merge = UniverseTransaction> {
+    /// A conflict was discovered between parts that were to be assembled into the transaction.
+    ///
+    /// This error cannot be produced by [`Transaction::execute()`].
+    /// TODO: This is going to be used by future utilities.
+    Merge(<Txn as Merge>::Conflict),
+
     /// The transaction's preconditions were not met; it does not apply to the current
     /// state of the target. No change has been made.
     Check(PreconditionFailed),
+
     /// An unexpected error occurred while applying the transaction's effects.
     /// See the documentation of [`Transaction::commit()`] for the unfortunate
     /// implications of this.
     Commit(CommitError),
 }
 
+// Manual impl required to set proper associated type bounds.
+impl<Txn> Clone for ExecuteError<Txn>
+where
+    Txn: Merge,
+    <Txn as Merge>::Conflict: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::Merge(e) => Self::Merge(e.clone()),
+            Self::Check(e) => Self::Check(e.clone()),
+            Self::Commit(e) => Self::Commit(e.clone()),
+        }
+    }
+}
+
 #[cfg(feature = "std")]
-impl std::error::Error for ExecuteError {
+impl<Txn> std::error::Error for ExecuteError<Txn>
+where
+    Txn: Merge,
+    <Txn as Merge>::Conflict: std::error::Error + 'static,
+{
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            ExecuteError::Merge(e) => e.source(),
             ExecuteError::Check(e) => e.source(),
             ExecuteError::Commit(e) => e.source(),
         }
     }
 }
 
-impl fmt::Display for ExecuteError {
+impl<Txn> fmt::Debug for ExecuteError<Txn>
+where
+    Txn: Merge,
+    <Txn as Merge>::Conflict: fmt::Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Merge(e) => f.debug_tuple("Merge").field(e).finish(),
+            Self::Check(e) => f.debug_tuple("Check").field(e).finish(),
+            Self::Commit(e) => f.debug_tuple("Commit").field(e).finish(),
+        }
+    }
+}
+
+impl<Txn> fmt::Display for ExecuteError<Txn>
+where
+    Txn: Merge,
+    <Txn as Merge>::Conflict: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ExecuteError::Merge(e) => e.fmt(f),
             ExecuteError::Check(e) => e.fmt(f),
             ExecuteError::Commit(e) => e.fmt(f),
         }

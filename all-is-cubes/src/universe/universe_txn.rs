@@ -221,7 +221,7 @@ pub struct UniverseCommitCheck {
 }
 
 /// Transaction conflict error type for [`UniverseTransaction`].
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum UniverseConflict {
     /// The two transactions modify members of different [`Universe`]s.

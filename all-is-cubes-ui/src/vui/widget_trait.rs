@@ -249,6 +249,9 @@ pub enum InstallVuiError {
     Conflict {
         // TODO: Include the widget(s) involved, once `Arc<dyn Widget>` is piped around everywhere
         // and not just sometimes Widget or sometimes WidgetController.
+        //
+        // TODO: Now that `ExecuteError` contains conflicts, we should consider making this a
+        // sub-case of `ExecuteInstallation`.
         #[allow(missing_docs)]
         error: space::SpaceTransactionConflict,
     },
@@ -278,7 +281,7 @@ pub enum InstallVuiError {
     #[non_exhaustive]
     ExecuteInstallation {
         #[allow(missing_docs)]
-        error: transaction::ExecuteError,
+        error: transaction::ExecuteError<SpaceTransaction>,
     },
 }
 

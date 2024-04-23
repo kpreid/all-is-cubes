@@ -224,12 +224,14 @@ impl<T: 'static> Handle<T> {
         &self,
         transaction: &<T as Transactional>::Transaction,
         outputs: &mut dyn FnMut(<<T as Transactional>::Transaction as Transaction<T>>::Output),
-    ) -> Result<(), ExecuteError>
+    ) -> Result<(), ExecuteError<<T as Transactional>::Transaction>>
     where
         T: Transactional,
     {
-        let outcome: Result<Result<(), ExecuteError>, HandleError> =
-            self.try_modify(|data| transaction.execute(data, outputs));
+        let outcome: Result<
+            Result<(), ExecuteError<<T as Transactional>::Transaction>>,
+            HandleError,
+        > = self.try_modify(|data| transaction.execute(data, outputs));
         outcome.map_err(|_| {
             ExecuteError::Check(PreconditionFailed {
                 location: "Handle::execute()",

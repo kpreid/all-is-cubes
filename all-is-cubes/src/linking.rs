@@ -18,7 +18,7 @@ use exhaust::Exhaust;
 use hashbrown::HashMap as HbHashMap;
 
 use crate::block::{Block, BlockDef};
-use crate::space::SetCubeError;
+use crate::space::{SetCubeError, SpaceTransaction};
 use crate::transaction::ExecuteError;
 use crate::universe::{Handle, InsertError, Name, Universe, UniverseTransaction};
 use crate::util::{ErrorIfStd, YieldProgress};
@@ -361,11 +361,11 @@ impl From<InsertError> for GenError {
     }
 }
 
-impl From<ExecuteError> for GenError {
+impl From<ExecuteError<UniverseTransaction>> for GenError {
     // TODO: Ideally, this works only for `UniverseTransaction` errors, which relate to
     // specific members, but we don't have a static distinction between different transactions'
     // errors yet.
-    fn from(error: ExecuteError) -> Self {
+    fn from(error: ExecuteError<UniverseTransaction>) -> Self {
         GenError {
             for_object: None,
             detail: error.into(),
@@ -404,9 +404,11 @@ pub enum InGenError {
     /// Failed during [`Space`](crate::space::Space) manipulation.
     SetCube(SetCubeError),
 
-    /// Failed during a transaction.
-    // TODO: This isn't very coherent; we're just aggregating various errors
-    Transaction(ExecuteError),
+    /// Failed during a transaction executed as part of generation.
+    UniverseTransaction(ExecuteError<UniverseTransaction>),
+
+    /// Failed during a transaction executed as part of generation.
+    SpaceTransaction(ExecuteError<SpaceTransaction>),
 }
 
 impl InGenError {
@@ -426,7 +428,8 @@ impl std::error::Error for InGenError {
             InGenError::Insert(e) => e.source(),
             InGenError::Provider(e) => e.source(),
             InGenError::SetCube(e) => e.source(),
-            InGenError::Transaction(e) => e.source(),
+            InGenError::UniverseTransaction(e) => e.source(),
+            InGenError::SpaceTransaction(e) => e.source(),
         }
     }
 }
@@ -439,7 +442,8 @@ impl fmt::Display for InGenError {
             InGenError::Insert(e) => e.fmt(f),
             InGenError::Provider(e) => e.fmt(f),
             InGenError::SetCube(e) => e.fmt(f),
-            InGenError::Transaction(e) => e.fmt(f),
+            InGenError::UniverseTransaction(e) => e.fmt(f),
+            InGenError::SpaceTransaction(e) => e.fmt(f),
         }
     }
 }
@@ -465,9 +469,14 @@ impl From<SetCubeError> for InGenError {
         InGenError::SetCube(error)
     }
 }
-impl From<ExecuteError> for InGenError {
-    fn from(error: ExecuteError) -> Self {
-        InGenError::Transaction(error)
+impl From<ExecuteError<UniverseTransaction>> for InGenError {
+    fn from(error: ExecuteError<UniverseTransaction>) -> Self {
+        InGenError::UniverseTransaction(error)
+    }
+}
+impl From<ExecuteError<SpaceTransaction>> for InGenError {
+    fn from(error: ExecuteError<SpaceTransaction>) -> Self {
+        InGenError::SpaceTransaction(error)
     }
 }
 

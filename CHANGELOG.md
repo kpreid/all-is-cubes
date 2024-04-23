@@ -53,6 +53,8 @@
     - `math::GridAab::intersection()` has been renamed to `intersection_cubes()`, and its precise behavior with zero-volume boxes clarified.
       If the alternative behavior is desired, see `intersection_box()`.
     
+    - `transaction::ExecuteError` is now generic over the type of transaction it is an error from.
+
     - Renamed `universe::URef` to `universe::Handle`. Related items have also been renamed:
         - `URefErased` to `ErasedHandle`
         - `AnyURef` to `AnyHandle`

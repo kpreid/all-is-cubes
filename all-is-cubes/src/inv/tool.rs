@@ -685,7 +685,7 @@ mod tests {
     #[allow(dead_code)] // fields only used in Debug if an expect() fails
     enum EucError {
         Use(ToolError),
-        Commit(transaction::ExecuteError),
+        Commit(transaction::ExecuteError<UniverseTransaction>),
     }
 
     async fn dummy_icons() -> BlockProvider<Icons> {
