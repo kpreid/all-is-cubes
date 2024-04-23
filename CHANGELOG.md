@@ -16,10 +16,10 @@
     - `listen::Notifier::buffer()` and `listen::Buffer` allows creating and sending batches of messages, to improve efficiency over dispatching each message individually to all listeners.
 
     - `math::FaceMap` now implements `Exhaust`.
-
     - `math::GridAab::intersection_box()` is a new definition of box intersection which returns a bigger box in some zero-volume/flat cases.
-
     - `math::GridSize` type alias for `euclid::Size3D<GridCoordinate, Cube>`.
+
+    - `transaction::Transactional::transact()` provides a convenient way to create and immediately execute transactions.
 
 - `all-is-cubes-mesh` library:
     - New features in `dynamic::ChunkedSpaceMesh`:

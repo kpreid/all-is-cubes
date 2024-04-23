@@ -92,6 +92,8 @@ pub trait Transaction<T: ?Sized>: Merge {
     /// transaction.commit(target, check, outputs).map_err(ExecuteError::Commit)?;
     /// # Ok::<(), ExecuteError<UniverseTransaction>>(())
     /// ```
+    ///
+    /// See also: [`Transactional::transact()`], for building a transaction through mutations.
     fn execute(
         &self,
         target: &mut T,
@@ -184,13 +186,13 @@ pub trait Merge: Sized {
     }
 }
 
-/// Error type from [`Transaction::execute()`] and other high-level operations.
+/// Error type from [`Transaction::execute()`] and [`Transactional::transact()`].
 #[allow(clippy::exhaustive_enums)]
 pub enum ExecuteError<Txn: Merge = UniverseTransaction> {
     /// A conflict was discovered between parts that were to be assembled into the transaction.
     ///
-    /// This error cannot be produced by [`Transaction::execute()`].
-    /// TODO: This is going to be used by future utilities.
+    /// This error cannot be produced by [`Transaction::execute()`], but only by
+    /// [`Transactional::transact()`].
     Merge(<Txn as Merge>::Conflict),
 
     /// The transaction's preconditions were not met; it does not apply to the current
@@ -359,6 +361,38 @@ impl std::error::Error for CommitError {
 pub trait Transactional {
     /// The type of transaction which should be used with `Self`.
     type Transaction: Transaction<Self>;
+
+    /// Convenience method for building and then applying a transaction to `self`,
+    /// equivalent to the following steps:
+    ///
+    /// 1. Call [`default()`](Default::default()) to create the transaction.
+    /// 2. Mutate the transaction using the function `f`.
+    /// 3. Call [`Transaction::execute()`] with `self`.
+    ///
+    /// `f` is given an empty transaction to write into,
+    /// and a reference to `self` in case it is needed.
+    /// It may return merge conflict errors, or a successful return value of any type.
+    ///
+    /// The transaction must not have outputs.
+    ///
+    /// # Design note
+    ///
+    /// Ideally, we would have an `async` version of this function too, but that
+    /// is not possible, because the required borrowing pattern is not currently
+    /// expressible when writing the future-returning closure it would require.
+    fn transact<F, O>(&mut self, f: F) -> Result<O, ExecuteError<Self::Transaction>>
+    where
+        F: FnOnce(
+            &mut Self::Transaction,
+            &Self,
+        ) -> Result<O, <Self::Transaction as Merge>::Conflict>,
+        Self::Transaction: Transaction<Self, Output = NoOutput> + Default,
+    {
+        let mut transaction = Self::Transaction::default();
+        let output = f(&mut transaction, self).map_err(ExecuteError::Merge)?;
+        transaction.execute(self, &mut no_outputs)?;
+        Ok(output)
+    }
 }
 
 /// Type of `Output` for a [`Transaction`] that never produces any outputs.
