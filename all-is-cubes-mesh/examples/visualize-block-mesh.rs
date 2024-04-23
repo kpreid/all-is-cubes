@@ -44,8 +44,10 @@ fn main() {
 
     let blocks = [
         content::make_slab(&mut universe, 8, Resolution::R16),
-        demo_blocks[DemoBlocks::LamppostBase].clone(),
         demo_blocks[DemoBlocks::Signboard].clone(),
+        demo_blocks[DemoBlocks::LamppostBase].clone(),
+        demo_blocks[DemoBlocks::Arrow].clone(),
+        demo_blocks[DemoBlocks::Pedestal].clone(),
     ];
 
     std::thread::scope(|scope| {
