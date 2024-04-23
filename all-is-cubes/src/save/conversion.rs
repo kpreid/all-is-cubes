@@ -15,7 +15,7 @@ mod behavior {
     use crate::behavior::{
         Behavior, BehaviorHost, BehaviorPersistence, BehaviorSet, BehaviorSetTransaction,
     };
-    use crate::transaction::{Merge as _, Transaction as _};
+    use crate::transaction::{Merge as _, Transactional as _};
 
     // TODO: Stop serializing H::Attachment directly or document that it has to be stable.
 
@@ -47,19 +47,21 @@ mod behavior {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             match schema::BehaviorSetSer::<H::Attachment>::deserialize(deserializer)? {
                 schema::BehaviorSetSer::BehaviorSetV1 { behaviors } => {
-                    let mut txn = BehaviorSetTransaction::default();
-                    for schema::BehaviorSetEntryV1Ser {
-                        behavior,
-                        attachment,
-                    } in behaviors
-                    {
-                        txn.merge_from(BehaviorSetTransaction::insert(attachment, behavior.into()))
-                            .expect("BehaviorSet merge failure");
-                    }
-
                     let mut set = BehaviorSet::new();
-                    txn.execute(&mut set, &mut drop)
-                        .expect("BehaviorSet execute failure");
+                    set.transact(|txn, _| {
+                        for schema::BehaviorSetEntryV1Ser {
+                            behavior,
+                            attachment,
+                        } in behaviors
+                        {
+                            txn.merge_from(BehaviorSetTransaction::insert(
+                                attachment,
+                                behavior.into(),
+                            ))?;
+                        }
+                        Ok(())
+                    })
+                    .expect("BehaviorSet execute failure");
                     Ok(set)
                 }
             }

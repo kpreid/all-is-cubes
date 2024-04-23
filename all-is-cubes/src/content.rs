@@ -21,7 +21,7 @@ use crate::inv::{Slot, Tool};
 use crate::math::{Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, Rgb, Rgba};
 use crate::raycast::Raycaster;
 use crate::space::{SetCubeError, Space};
-use crate::transaction::{self, Transaction as _};
+use crate::transaction::Transactional as _;
 use crate::universe::{Universe, UniverseTransaction};
 
 mod draw_box;
@@ -80,10 +80,9 @@ fn make_one_block(i: usize, n: usize) -> Block {
 ///
 /// [`Primitive::Recur`]: crate::block::Primitive::Recur
 pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [Block; COUNT] {
-    let mut txn = UniverseTransaction::default();
-    let blocks = make_some_voxel_blocks_txn(&mut txn);
-    txn.execute(universe, &mut transaction::no_outputs).unwrap();
-    blocks
+    universe
+        .transact(|txn, _| Ok(make_some_voxel_blocks_txn(txn)))
+        .unwrap()
 }
 
 #[doc(hidden)] // TODO: make this replace the other version once we've confirmed that `&mut SomeTransaction` is the direction we want to go for composing worldgen transactions
@@ -144,10 +143,9 @@ pub fn make_slab(
     numerator: GridCoordinate,
     denominator: Resolution,
 ) -> Block {
-    let mut txn = UniverseTransaction::default();
-    let slab = make_slab_txn(&mut txn, numerator, denominator);
-    txn.execute(universe, &mut transaction::no_outputs).unwrap();
-    slab
+    universe
+        .transact(|txn, _| Ok(make_slab_txn(txn, numerator, denominator)))
+        .unwrap()
 }
 
 #[doc(hidden)] // exported for all-is-cubes-content usage, not reexport

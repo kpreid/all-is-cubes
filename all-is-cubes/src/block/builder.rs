@@ -410,6 +410,7 @@ mod tests {
     use crate::math::{Face6, Vol};
     use crate::op::Operation;
     use crate::space::SpacePhysics;
+    use crate::transaction::Transactional as _;
 
     use super::*;
 
@@ -573,14 +574,15 @@ mod tests {
     #[test]
     fn explicit_txn() {
         let resolution = R8;
-        let mut txn = UniverseTransaction::default();
-        let _block = Block::builder()
-            .display_name("hello world")
-            .voxels_fn(resolution, |_cube| &AIR)
-            .unwrap()
-            .build_txn(&mut txn);
         let mut universe = Universe::new();
-        txn.execute(&mut universe, &mut transaction::no_outputs)
+        let _block = universe
+            .transact(|txn, _| {
+                Ok(Block::builder()
+                    .display_name("hello world")
+                    .voxels_fn(resolution, |_cube| &AIR)
+                    .unwrap()
+                    .build_txn(txn))
+            })
             .unwrap();
 
         assert_eq!(universe.iter_by_type::<Space>().count(), 1);

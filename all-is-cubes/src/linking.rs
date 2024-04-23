@@ -486,7 +486,7 @@ mod tests {
     use crate::block::{Quote, Resolution::*, AIR};
     use crate::content::make_some_blocks;
     use crate::math::GridAab;
-    use crate::transaction::{self, Transaction as _};
+    use crate::transaction::Transactional as _;
     use crate::util::assert_send_sync;
 
     #[derive(Exhaust, Clone, Debug, Eq, Hash, PartialEq)]
@@ -523,9 +523,10 @@ mod tests {
         let mut universe = Universe::new();
         let (_, provider) = test_provider();
 
-        let mut txn = UniverseTransaction::default();
-        let installed = provider.install(&mut txn).unwrap();
-        txn.execute(&mut universe, &mut transaction::no_outputs)
+        // TODO: double-unwrap in this case is a bad sign (InsertError != UniverseConflict)
+        let installed = universe
+            .transact(|txn, _| Ok(provider.install(txn)))
+            .unwrap()
             .unwrap();
 
         assert_eq!(installed, BlockProvider::using(&universe).unwrap());
