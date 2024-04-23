@@ -20,6 +20,41 @@ check if their documentation is correct and comprehensible when viewed as `rustd
 
 Consider running `cargo xtask fuzz` to fuzz-test changes to modules that have fuzz test coverage.
 
+Code style
+----------
+
+*   Public items should follow the
+    [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/),
+    except as otherwise specified.
+
+    *   Function documentation is encouraged to describe the circumstances under which the function
+        may panic, but this information may be presented as “Panics if…” rather than using
+        a “`# Panics`” heading.
+
+*   Misbehaviors due to internal numeric overflow, or due to other forms of out-of-bounds input,
+    are considered bugs.
+    Code should panic, or return errors, rather than allowing invariants to be broken
+    or misinterpreting input.
+
+*   Panics due to user input are considered bugs.
+    That is, library code should be designed to be usable even when aborting is unacceptable and
+    `catch_unwind()` is unavailable.
+    (No, I don't mean high-reliability embedded; I mean `wasm32-unknown-unknown` web applications.)
+
+*   Use “pure Rust” code, without any dependencies upon non-Rust libraries, whenever practical.
+    Consult each crate’s documentation for specific restrictions it may obey;
+    for example, the `all-is-cubes` library is `no_std` compatible.
+
+*   `unsafe` code is permitted but should be used sparingly.
+    Prefer using existing libraries whenever possible, as long as this does not trade off against
+    soundness.
+    Use small modules to keep the `unsafe` code's dependencies clear.
+
+*   Avoid adding large amounts of data to version control.
+    For example, image files for image-comparison testing should be kept as small as practical
+    (by keeping the image dimensions low, and by using compression like `pngcrush -brute`)
+    and should not require frequent updates.
+
 Code formatting
 ---------------
 
@@ -30,7 +65,7 @@ Special cases:
 *   Doc comments currently must be manually formatted.
     Their lines must be wrapped to at most 100 columns.
     Shorter wrapping such as to approximately 90 columns is encouraged,
-    to reduce churn upon reindentation and to avoid wasting mental effort on precise manual line   wrapping.
+    to reduce churn upon reindentation and to avoid wasting mental effort on precise manual line wrapping.
 
 *   “Semantic” line breaks (such as at the end of sentences within a paragraph)
     are encouraged in doc comments and other Markdown.
