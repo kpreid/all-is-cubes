@@ -26,6 +26,8 @@ mod face;
 pub use face::*;
 mod grid_aab;
 pub use grid_aab::*;
+mod grid_iter;
+pub use grid_iter::*;
 mod rigid;
 pub use rigid::*;
 mod matrix;
