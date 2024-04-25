@@ -383,7 +383,7 @@ fn TEXT(_: Context<'_>) {
     let bounds_for_text = texts
         .iter()
         .map(|ex| ex.text.bounding_blocks().translate(ex.offset))
-        .reduce(|a, b| a.union(b).unwrap())
+        .reduce(|a, b| a.union_box(b))
         .unwrap();
 
     let mut space = Space::builder(bounds_for_text).build();
@@ -1123,7 +1123,7 @@ fn COLORED_BOUNCE(_: Context<'_>) {
     for dir in Face6::ALL {
         let far_end = GridAab::ORIGIN_CUBE.translate(dir.normal_vector() * (total_radius - 1));
         space
-            .fill_uniform(GridAab::ORIGIN_CUBE.union(far_end).unwrap(), &AIR)
+            .fill_uniform(GridAab::ORIGIN_CUBE.union_box(far_end), &AIR)
             .unwrap();
         space.fill_uniform(far_end, &light_block).unwrap();
     }

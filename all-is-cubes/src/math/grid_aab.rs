@@ -408,6 +408,7 @@ impl GridAab {
     /// );
     /// ```
     #[inline]
+    #[must_use]
     pub fn intersection_cubes(self, other: GridAab) -> Option<GridAab> {
         let lower = self.lower_bounds().max(other.lower_bounds());
         let upper = self.upper_bounds().min(other.upper_bounds());
@@ -454,6 +455,7 @@ impl GridAab {
     /// );
     /// ```
     #[inline]
+    #[must_use]
     pub fn intersection_box(self, other: GridAab) -> Option<GridAab> {
         let lower = self.lower_bounds().max(other.lower_bounds());
         let upper = self.upper_bounds().min(other.upper_bounds());
@@ -465,27 +467,24 @@ impl GridAab {
         Some(GridAab::from_lower_upper(lower, upper))
     }
 
-    /// Returns the smallest [`GridAab`] which fully encloses the two inputs,
-    /// or [`GridOverflowError`] if the volume of the result exceeds [`usize::MAX`].
+    /// Returns the smallest [`GridAab`] which fully encloses the two inputs' boundaries.
     ///
     /// ```
     /// use all_is_cubes::math::GridAab;
     ///
     /// let g1 = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
-    /// assert_eq!(g1.union(g1), Ok(g1));
+    /// assert_eq!(g1.union_box(g1), g1);
     ///
     /// let g2 = GridAab::from_lower_size([4, 7, 11], [1, 1, 1]);
-    /// assert_eq!(g1.union(g2), Ok(GridAab::from_lower_upper([1, 2, 3], [5, 8, 12])));
-    ///
-    /// let u = i32::MAX - 1;
-    /// g1.union(GridAab::from_lower_size([u, u, u], [1, 1, 1]))
-    ///     .unwrap_err();
+    /// assert_eq!(g1.union_box(g2), GridAab::from_lower_upper([1, 2, 3], [5, 8, 12]));
     /// ```
     #[inline]
-    pub fn union(self, other: GridAab) -> Result<GridAab, GridOverflowError> {
+    #[must_use]
+    pub fn union_box(self, other: Self) -> Self {
         let lower = self.lower_bounds().min(other.lower_bounds());
         let upper = self.upper_bounds().max(other.upper_bounds());
-        Self::checked_from_lower_size(lower, upper - lower)
+        // Subtraction and construction should not fail.
+        Self::from_lower_size(lower, upper - lower)
     }
 
     pub(crate) fn minkowski_sum(self, other: GridAab) -> Result<GridAab, GridOverflowError> {

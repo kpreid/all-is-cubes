@@ -200,7 +200,7 @@ impl<P, Txn> BlockBuilder<P, Txn> {
                 if block.as_ref() != &AIR {
                     let cube_bb = cube.grid_aab();
                     not_air_bounds = Some(if let Some(bounds) = not_air_bounds {
-                        bounds.union(cube_bb).unwrap()
+                        bounds.union_box(cube_bb)
                     } else {
                         cube_bb
                     });

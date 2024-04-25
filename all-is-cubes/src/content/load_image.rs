@@ -52,7 +52,7 @@ impl<'a> PngAdapter<'a> {
                 .entry(color)
                 .or_insert_with(|| pixel_function(color));
             if let Some(bounds) = brush.bounds() {
-                max_brush = max_brush.map(|m| m.union(bounds).unwrap()).or(Some(bounds));
+                max_brush = max_brush.map(|m| m.union_box(bounds)).or(Some(bounds));
             }
         }
 

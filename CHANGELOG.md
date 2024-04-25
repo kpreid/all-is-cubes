@@ -53,6 +53,7 @@
     - `math::GridAab::size()` and `math::Aab::size()` now return `GridSize` instead of `GridVector`.
     - `math::GridAab::intersection()` has been renamed to `intersection_cubes()`, and its precise behavior with zero-volume boxes clarified.
       If the alternative behavior is desired, see `intersection_box()`.
+    - `math::GridAab::union()` has been renamed to `union_box()`, and is no longer fallible.
     
     - `transaction::ExecuteError` is now generic over the type of transaction it is an error from.
 

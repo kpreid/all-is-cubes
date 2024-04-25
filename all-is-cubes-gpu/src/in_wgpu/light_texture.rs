@@ -185,7 +185,7 @@ impl LightTexture {
                             .abut(axis.negative_face(), old_range.start - new_range.start)
                             .unwrap();
                         updated_volume += self.copy_region(queue, space, ext);
-                        self.mapped_region = self.mapped_region.union(ext).unwrap();
+                        self.mapped_region = self.mapped_region.union_box(ext);
                     }
                     if new_range.end > old_range.end {
                         // expand positiveward
@@ -194,7 +194,7 @@ impl LightTexture {
                             .abut(axis.positive_face(), new_range.end - old_range.end)
                             .unwrap();
                         updated_volume += self.copy_region(queue, space, ext);
-                        self.mapped_region = self.mapped_region.union(ext).unwrap();
+                        self.mapped_region = self.mapped_region.union_box(ext);
                     }
                 };
 

@@ -213,10 +213,9 @@ impl DemoTheme {
             let eb = room_data.extended_map_bounds();
             self.dungeon_grid
                 .room_box_at(room_position + eb.lower_bounds().to_vector())
-                .union(self.dungeon_grid.room_box_at(
+                .union_box(self.dungeon_grid.room_box_at(
                     room_position + eb.upper_bounds().to_vector() - GridVector::new(1, 1, 1),
                 ))
-                .unwrap()
         }
     }
 }
@@ -283,8 +282,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                 )
                                 .unwrap();
                                 let bridge_box = GridAab::single_cube(midpoint)
-                                    .union(GridAab::single_cube(wall_cube))
-                                    .unwrap();
+                                    .union_box(GridAab::single_cube(wall_cube));
                                 space.fill_uniform(bridge_box, &self.blocks[FloorTile])?;
                             }
                         }

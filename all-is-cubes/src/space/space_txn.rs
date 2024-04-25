@@ -136,7 +136,7 @@ impl SpaceTransaction {
         for &cube_array in cubes.keys() {
             let cube = Cube::from(cube_array);
             if let Some(bounds) = &mut bounds {
-                *bounds = (*bounds).union(GridAab::single_cube(cube)).unwrap();
+                *bounds = (*bounds).union_box(GridAab::single_cube(cube));
             } else {
                 bounds = Some(GridAab::single_cube(cube));
             }
@@ -158,7 +158,7 @@ impl SpaceTransaction {
 
         for attachment in behaviors.attachments_affected() {
             if let Some(bounds) = &mut bounds {
-                *bounds = (*bounds).union(attachment.bounds).unwrap();
+                *bounds = (*bounds).union_box(attachment.bounds);
             } else {
                 bounds = Some(attachment.bounds);
             }

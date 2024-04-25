@@ -414,7 +414,7 @@ fn union_ignoring_empty(a: GridAab, b: GridAab) -> GridAab {
     } else if a.is_empty() {
         b
     } else {
-        a.union(b).unwrap()
+        a.union_box(b)
     }
 }
 

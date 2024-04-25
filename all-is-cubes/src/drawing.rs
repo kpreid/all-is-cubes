@@ -455,8 +455,7 @@ impl<'a> VoxelBrush<'a> {
         for &(offset, _) in self.0.iter() {
             let cube = Cube::from(offset.to_point()).grid_aab();
             if let Some(bounds) = &mut bounds {
-                // TODO: don't panic?
-                *bounds = (*bounds).union(cube).unwrap();
+                *bounds = (*bounds).union_box(cube);
             } else {
                 bounds = Some(cube);
             }
