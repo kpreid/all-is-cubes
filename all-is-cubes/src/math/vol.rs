@@ -9,10 +9,7 @@ use alloc::vec::Vec;
 use euclid::Point3D;
 use manyfmt::Refmt as _;
 
-use crate::math::{
-    Cube, GridAab, GridCoordinate, GridIter, GridOverflowError, GridPoint, GridVector,
-    VectorOps as _,
-};
+use crate::math::{Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector, VectorOps as _};
 
 // #[derive(Clone, Copy, Debug)]
 // pub struct XMaj;
@@ -58,11 +55,12 @@ pub struct Vol<C, O = ZMaj> {
 
 impl<O> Vol<(), O> {
     /// Use `GridAab::to_vol()` to call this.
-    pub(crate) fn new_dataless(bounds: GridAab, ordering: O) -> Result<Self, GridOverflowError> {
+    pub(crate) fn new_dataless(bounds: GridAab, ordering: O) -> Result<Self, VolLengthError> {
         if bounds.volume().is_none() {
-            Err(GridOverflowError(format!(
-                "{bounds:?} has too large a volume to become a Vol"
-            )))
+            Err(VolLengthError {
+                input_length: None,
+                bounds,
+            })
         } else {
             Ok(Self {
                 bounds,
@@ -88,7 +86,7 @@ impl<O> Vol<(), O> {
             })
         } else {
             Err(VolLengthError {
-                input_length: elements.len(),
+                input_length: Some(elements.len()),
                 bounds: self.bounds(),
             })
         }
@@ -117,7 +115,7 @@ where
             })
         } else {
             Err(VolLengthError {
-                input_length: elements.len(),
+                input_length: Some(elements.len()),
                 bounds,
             })
         }
@@ -271,7 +269,7 @@ impl<C, O> Vol<C, O> {
             panic!(
                 "{}",
                 VolLengthError {
-                    input_length: contents.len(),
+                    input_length: Some(contents.len()),
                     bounds: self.bounds,
                 }
             )
@@ -642,10 +640,13 @@ pub(crate) mod vol_arb {
     }
 }
 
-/// Error from [`Vol::from_elements()`] being given the wrong length.
+/// Error from [`Vol::from_elements()`] being given the wrong length,
+/// or from constructing a [`Vol`] with a volume greater than [`usize::MAX`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct VolLengthError {
-    input_length: usize,
+    /// The length of the linear data, or [`None`] if we're constructing a dataless [`Vol`].
+    input_length: Option<usize>,
+    /// The attempted bounds, whose volume is either unequal to `input_length` or overflowing.
     bounds: GridAab,
 }
 
@@ -658,17 +659,26 @@ impl fmt::Display for VolLengthError {
             input_length,
             bounds,
         } = self;
-        match bounds.volume() {
-            Some(volume) => write!(
+        match (input_length, bounds.volume()) {
+            (Some(input_length), Some(volume)) => write!(
                 f,
                 "data of length {input_length} cannot fill volume {volume} of {bounds:?}",
             ),
 
-            None => write!(
+            (Some(input_length), None) => write!(
                 f,
                 "data of length {input_length} cannot fill {bounds:?}, \
-                    which is too large to be represented",
+                    which is too large to be linearized at all",
             ),
+
+            (None, None) => write!(
+                f,
+                "{bounds:?} has a volume of {volume_f64}, \
+                    which is too large to be linearized",
+                volume_f64 = bounds.volume_f64(),
+            ),
+
+            (None, Some(_)) => write!(f, "<malformed error {self:?}>"),
         }
     }
 }
@@ -774,7 +784,7 @@ mod tests {
         assert_eq!(
             VolBox::from_elements(bounds, vec![10i32, 11, 12]),
             Err(VolLengthError {
-                input_length: 3,
+                input_length: Some(3),
                 bounds,
             })
         );

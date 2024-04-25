@@ -572,7 +572,7 @@ impl GridAab {
     ///
     /// Returns an error if the volume of `self` is greater than [`usize::MAX`].
     #[inline]
-    pub fn to_vol<O: Default>(self) -> Result<Vol<(), O>, GridOverflowError> {
+    pub fn to_vol<O: Default>(self) -> Result<Vol<(), O>, crate::math::VolLengthError> {
         Vol::new_dataless(self, O::default())
     }
 
@@ -817,10 +817,10 @@ impl<'a> arbitrary::Arbitrary<'a> for GridAab {
 }
 
 /// Error when a [`GridAab`] or [`Cube`] cannot be constructed from the given input.
-// TODO: Make this an enum, and split off the Vol-related cases
+// TODO: Make this allocation-free
 #[derive(Clone, Debug, displaydoc::Display, Eq, PartialEq)]
 #[displaydoc("{0}")]
-pub struct GridOverflowError(pub(in crate::math) String);
+pub struct GridOverflowError(String);
 
 /// `Debug`-formatting helper
 struct RangeWithLength(Range<GridCoordinate>);
@@ -839,7 +839,8 @@ impl fmt::Debug for RangeWithLength {
 mod tests {
     use super::*;
     use crate::block::Resolution::*;
-    use crate::math::GridRotation;
+    use crate::math::{GridRotation, ZMaj};
+    use alloc::string::ToString as _;
     use indoc::indoc;
 
     #[test]
@@ -889,6 +890,16 @@ mod tests {
     #[should_panic(expected = "GridAab::divide: divisor must be > 0, not -10")]
     fn divide_by_negative() {
         let _ = GridAab::from_lower_size([-10, -10, -10], [20, 20, 20]).divide(-10);
+    }
+
+    #[test]
+    fn to_vol_error() {
+        let big = GridAab::from_lower_size([0, 0, 0], [i32::MAX, i32::MAX, i32::MAX]);
+        assert_eq!(
+            big.to_vol::<ZMaj>().unwrap_err().to_string(),
+            "GridAab(0..2147483647, 0..2147483647, 0..2147483647) has a volume of \
+                9903520300447984000000000000, which is too large to be linearized"
+        );
     }
 
     #[test]
