@@ -9,7 +9,9 @@ use alloc::vec::Vec;
 use euclid::Point3D;
 use manyfmt::Refmt as _;
 
-use crate::math::{Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector, VectorOps as _};
+use crate::math::{
+    Axis, Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector, VectorOps as _,
+};
 
 // #[derive(Clone, Copy, Debug)]
 // pub struct XMaj;
@@ -90,6 +92,25 @@ impl<O> Vol<(), O> {
                 bounds: self.bounds(),
             })
         }
+    }
+}
+
+impl Vol<(), ZMaj> {
+    /// Divide `self` into two approximately equal-sized parts which, if they had elements, would
+    /// each be contiguous in the linear ordering.
+    ///
+    /// Returns [`None`] if `self` does not have at least two cubes.
+    ///
+    /// Note that this is one of several `subdivide()` methods for different container types;
+    /// it is also implemented for immutable and mutable references.
+    /// These are intended to be useful in executing parallel algorithms on volume data.
+    pub fn subdivide(self) -> Option<(Self, Self)> {
+        let (lower_half, upper_half, _) = find_zmaj_subdivision(self.bounds)?;
+
+        Some((
+            Vol::new_dataless(lower_half, self.ordering).unwrap_or_else(unreachable_wrong_size),
+            Vol::new_dataless(upper_half, self.ordering).unwrap_or_else(unreachable_wrong_size),
+        ))
     }
 }
 
@@ -393,6 +414,46 @@ where
     }
 }
 
+impl<'a, V> Vol<&'a [V], ZMaj> {
+    /// Divide `self` into two approximately equal-sized parts,
+    /// each of which refers to the appropriate sub-slice of elements.
+    ///
+    /// Returns [`None`] if `self` does not have at least two cubes.
+    ///
+    /// Note that this is one of several `subdivide()` methods for different container types;
+    /// it is also implemented for mutable references and `()`.
+    /// These are intended to be useful in executing parallel algorithms on volume data.
+    pub fn subdivide(self) -> Option<(Self, Self)> {
+        let (lower_half, upper_half, lower_half_len) = find_zmaj_subdivision(self.bounds)?;
+        let (lower_contents, upper_contents) = self.contents.split_at(lower_half_len);
+
+        Some((
+            Vol::from_elements(lower_half, lower_contents).unwrap_or_else(unreachable_wrong_size),
+            Vol::from_elements(upper_half, upper_contents).unwrap_or_else(unreachable_wrong_size),
+        ))
+    }
+}
+
+impl<'a, V> Vol<&'a mut [V], ZMaj> {
+    /// Divide `self` into two approximately equal-sized parts.
+    /// each of which refers to the appropriate sub-slice of elements.
+    ///
+    /// Returns [`None`] if `self` does not have at least two cubes.
+    ///
+    /// Note that this is one of several `subdivide()` methods for different container types;
+    /// it is also implemented for immutable references and `()`.
+    /// These are intended to be useful in executing parallel algorithms on volume data.
+    pub fn subdivide(self) -> Option<(Self, Self)> {
+        let (lower_half, upper_half, lower_half_len) = find_zmaj_subdivision(self.bounds)?;
+        let (lower_contents, upper_contents) = self.contents.split_at_mut(lower_half_len);
+
+        Some((
+            Vol::from_elements(lower_half, lower_contents).unwrap_or_else(unreachable_wrong_size),
+            Vol::from_elements(upper_half, upper_contents).unwrap_or_else(unreachable_wrong_size),
+        ))
+    }
+}
+
 impl<V: Clone, O> Vol<Arc<[V]>, O> {
     /// Returns the linear contents viewed as a mutable slice, as if by [`Arc::make_mut()`].
     pub(crate) fn make_linear_mut(&mut self) -> &mut [V] {
@@ -683,6 +744,56 @@ impl fmt::Display for VolLengthError {
     }
 }
 
+/// Find a way to split the bounds of a `Vol` which results in two adjacent volumes
+/// whose linear elements are also adjacent.
+/// Returns the two boxes and the linear split point.
+fn find_zmaj_subdivision(bounds: GridAab) -> Option<(GridAab, GridAab, usize)> {
+    // The order of these tests must reflect the ordering in use
+    // for the result to be valid.
+    for axis in [Axis::X, Axis::Y, Axis::Z] {
+        let axis_range = bounds.axis_range(axis);
+        if axis_range.len() >= 2 {
+            let split_size = (axis_range.end - axis_range.start) / 2;
+
+            let mut lower_half_size = bounds.size();
+            lower_half_size[axis] = split_size;
+            let lower_half = GridAab::from_lower_size(bounds.lower_bounds(), lower_half_size);
+
+            let mut upper_half_lb = bounds.lower_bounds();
+            upper_half_lb[axis] += split_size;
+            let upper_half = GridAab::from_lower_upper(upper_half_lb, bounds.upper_bounds());
+
+            let lower_half_volume = lower_half
+                .volume()
+                .unwrap_or_else(unreachable_volume_overflow);
+            debug_assert_eq!(
+                lower_half_volume
+                    + upper_half
+                        .volume()
+                        .unwrap_or_else(unreachable_volume_overflow),
+                bounds.volume().unwrap_or_else(unreachable_volume_overflow)
+            );
+            return Some((lower_half, upper_half, lower_half_volume));
+        }
+    }
+    None
+}
+
+/// Function for `.volume().unwrap_or_else()`s inside subdivision operations.
+/// The advantage of this over many `unwrap()`s is generating fewer distinct panic sites for
+/// these cases which are impossible.
+#[cold]
+fn unreachable_volume_overflow<T>() -> T {
+    panic!("impossible volume overflow")
+}
+/// Function for `.unwrap_or_else()`s inside slicing operations.
+/// The advantage of this over many `unwrap()`s is generating fewer distinct panic sites for
+/// these cases which are impossible.
+#[cold]
+fn unreachable_wrong_size<T>(error: VolLengthError) -> T {
+    panic!("impossible size mismatch: {error}")
+}
+
 /// As [`Arc::make_mut()`], but for slices, `Arc<[_]>`.
 fn arc_make_mut_slice<T: Clone>(mut arc: &mut Arc<[T]>) -> &mut [T] {
     // Use `get_mut()` to emulate `make_mut()`.
@@ -861,6 +972,52 @@ mod tests {
             vol.index(cube(1500, 1500, 1500)),
             Some(((1500 * 2000) + 1500) * 2000 + 1500)
         );
+    }
+
+    /// Test the properties of the `subdivide()` operations, starting from this example.
+    #[inline(never)]
+    fn check_subdivide_case(vol: Vol<&mut [Cube]>) {
+        eprintln!("Checking {:?}", vol.bounds());
+
+        // Check the elements are as expected
+        for (cube, &value) in vol.iter() {
+            assert_eq!(cube, value);
+        }
+
+        if vol.volume() < 2 {
+            // Never subdivide a cube or empty
+            assert_eq!(vol.without_elements().subdivide(), None);
+            assert_eq!(vol.as_ref().subdivide(), None);
+            assert_eq!(vol.subdivide(), None);
+        } else {
+            let Some((a, b)) = vol.without_elements().subdivide() else {
+                panic!("{vol:?} failed to subdivide");
+            };
+            assert_ne!(a.volume(), 0);
+            assert_ne!(b.volume(), 0);
+
+            // Compare immutable slice subdivide
+            let (aref, bref) = vol.as_ref().subdivide().unwrap();
+            assert_eq!((a, b), (aref.without_elements(), bref.without_elements()));
+
+            // Compare mutable slice subdivide
+            let (amut, bmut) = vol.subdivide().unwrap();
+            assert_eq!((a, b), (amut.without_elements(), bmut.without_elements()));
+
+            // Recurse
+            check_subdivide_case(amut);
+            check_subdivide_case(bmut);
+        }
+    }
+    fn check_subdivide(bounds: GridAab) {
+        check_subdivide_case(Vol::<Box<[Cube]>>::from_fn(bounds, std::convert::identity).as_mut());
+    }
+
+    #[test]
+    fn subdivide_test() {
+        check_subdivide(GridAab::ORIGIN_CUBE);
+        check_subdivide(GridAab::ORIGIN_EMPTY);
+        check_subdivide(GridAab::from_lower_upper([0, 0, 0], [2, 4, 5]));
     }
 
     #[cfg(feature = "arbitrary")]
