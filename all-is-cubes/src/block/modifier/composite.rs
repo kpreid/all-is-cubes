@@ -394,7 +394,7 @@ impl CompositeOperator {
     /// Compute the bounds of the result given the bounds of the source and destination.
     fn bounds(self, source: GridAab, destination: GridAab) -> GridAab {
         match self {
-            Self::Over => union_ignoring_empty(source, destination),
+            Self::Over => source.union_cubes(destination),
             // We could equally well use intersection_cubes() here, but prefer the one that
             // more often returns a box related to the input.
             Self::In => source
@@ -403,18 +403,6 @@ impl CompositeOperator {
             Self::Out => source,
             Self::Atop => destination,
         }
-    }
-}
-
-/// Union but tighter, ignoring the edges of empty volumes and only caring about included cubes.
-/// TODO: Make this a method on [`GridAab`]?
-fn union_ignoring_empty(a: GridAab, b: GridAab) -> GridAab {
-    if b.is_empty() {
-        a
-    } else if a.is_empty() {
-        b
-    } else {
-        a.union_box(b)
     }
 }
 

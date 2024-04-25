@@ -17,6 +17,7 @@
 
     - `math::FaceMap` now implements `Exhaust`.
     - `math::GridAab::intersection_box()` is a new definition of box intersection which returns a bigger box in some zero-volume/flat cases.
+    - `math::GridAab::union_cubes()` is a new definition of union which returns a smaller box in zero-volume/flat cases.
     - `math::GridSize` type alias for `euclid::Size3D<GridCoordinate, Cube>`.
 
     - `transaction::Transactional::transact()` provides a convenient way to create and immediately execute transactions.

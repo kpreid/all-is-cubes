@@ -467,7 +467,40 @@ impl GridAab {
         Some(GridAab::from_lower_upper(lower, upper))
     }
 
+    /// Returns the smallest [`GridAab`] which fully encloses the two inputs' cubes.
+    ///
+    /// The boundaries of empty boxes are ignored.
+    /// If this is not desired, call [`GridAab::union_box()`] instead.
+    /// If both inputs are empty, then `self` is returned.
+    ///
+    /// ```
+    /// use all_is_cubes::math::GridAab;
+    ///
+    /// let g1 = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
+    /// assert_eq!(g1.union_cubes(g1), g1);
+    ///
+    /// let g2 = GridAab::from_lower_size([4, 7, 11], [1, 1, 1]);
+    /// assert_eq!(g1.union_cubes(g2), GridAab::from_lower_upper([1, 2, 3], [5, 8, 12]));
+    ///
+    /// // Empty boxes (any size equal to zero) have no effect.
+    /// let empty = GridAab::from_lower_size([0, 0, 0], [0, 1, 7]);
+    /// assert_eq!(g1.union_cubes(empty), g1);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn union_cubes(self, other: Self) -> Self {
+        if other.is_empty() {
+            self
+        } else if self.is_empty() {
+            other
+        } else {
+            self.union_box(other)
+        }
+    }
     /// Returns the smallest [`GridAab`] which fully encloses the two inputs' boundaries.
+    ///
+    /// The boundaries of empty boxes are included.
+    /// If this is not desired, call [`GridAab::union_cubes()`] instead for a tighter bound.
     ///
     /// ```
     /// use all_is_cubes::math::GridAab;
@@ -477,6 +510,16 @@ impl GridAab {
     ///
     /// let g2 = GridAab::from_lower_size([4, 7, 11], [1, 1, 1]);
     /// assert_eq!(g1.union_box(g2), GridAab::from_lower_upper([1, 2, 3], [5, 8, 12]));
+    ///
+    /// // Empty boxes (any size equal to zero) are included even though they contain no cubes.
+    /// let empty = GridAab::from_lower_size([0, 0, 0], [0, 1, 7]);
+    /// assert_eq!(g1.union_box(empty), GridAab::from_lower_upper([0, 0, 0], [2, 3, 7]));
+    ///
+    /// // A union of empty boxes can become non-empty by including the volume within.
+    /// assert_eq!(
+    ///     empty.union_box(empty.translate([3, 0, 0])),
+    ///     GridAab::from_lower_upper([0, 0, 0], [3, 1, 7]),
+    /// )
     /// ```
     #[inline]
     #[must_use]
