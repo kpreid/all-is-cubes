@@ -892,6 +892,27 @@ where
     }
 }
 
+macro_rules! impl_binary_operator_for_facemap {
+    ($trait:ident :: $method:ident) => {
+        impl<V: ops::$trait> ops::$trait for FaceMap<V> {
+            type Output = FaceMap<V::Output>;
+            /// Apply the operator pairwise to the values for all six faces.
+            #[inline]
+            fn $method(self, other: FaceMap<V>) -> FaceMap<V::Output> {
+                self.zip(other, |_, a, b| <V as ops::$trait>::$method(a, b))
+            }
+        }
+    };
+}
+impl_binary_operator_for_facemap!(BitAnd::bitand);
+impl_binary_operator_for_facemap!(BitOr::bitor);
+impl_binary_operator_for_facemap!(BitXor::bitxor);
+impl_binary_operator_for_facemap!(Add::add);
+impl_binary_operator_for_facemap!(Mul::mul);
+impl_binary_operator_for_facemap!(Sub::sub);
+impl_binary_operator_for_facemap!(Div::div);
+impl_binary_operator_for_facemap!(Rem::rem);
+
 /// The combination of a [`Cube`] and [`Face7`] identifying one face of it or the interior.
 /// This pattern appears in cursor selection and collision detection.
 #[derive(Clone, Copy, Hash, Eq, PartialEq)]
