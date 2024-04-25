@@ -48,6 +48,7 @@
     - `listen::Listener::receive()` now accepts batches of messages instead of single messages, and the `alive()` method has been replaced with a return value from `receive()`. Implementors should review the new requirements documentation.
 
     - `math::FaceMap`’s `Debug` deduplicates identical elements.
+    - `math::GridAab` no longer has a limit on total volume (only `Vol` does).
     - `math::GridAab::from_lower_size()` now takes a `GridSize` instead of `GridVector`.
     - `math::GridAab::size()` and `math::Aab::size()` now return `GridSize` instead of `GridVector`.
     - `math::GridAab::intersection()` has been renamed to `intersection_cubes()`, and its precise behavior with zero-volume boxes clarified.

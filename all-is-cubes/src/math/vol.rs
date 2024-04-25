@@ -9,7 +9,10 @@ use alloc::vec::Vec;
 use euclid::Point3D;
 use manyfmt::Refmt as _;
 
-use crate::math::{Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector, VectorOps as _};
+use crate::math::{
+    Cube, GridAab, GridCoordinate, GridIter, GridOverflowError, GridPoint, GridVector,
+    VectorOps as _,
+};
 
 // #[derive(Clone, Copy, Debug)]
 // pub struct XMaj;
@@ -55,11 +58,17 @@ pub struct Vol<C, O = ZMaj> {
 
 impl<O> Vol<(), O> {
     /// Use `GridAab::to_vol()` to call this.
-    pub(crate) fn new_dataless(bounds: GridAab, ordering: O) -> Self {
-        Self {
-            bounds,
-            ordering,
-            contents: (),
+    pub(crate) fn new_dataless(bounds: GridAab, ordering: O) -> Result<Self, GridOverflowError> {
+        if bounds.volume().is_none() {
+            Err(GridOverflowError(format!(
+                "{bounds:?} has too large a volume to become a Vol"
+            )))
+        } else {
+            Ok(Self {
+                bounds,
+                ordering,
+                contents: (),
+            })
         }
     }
 
@@ -125,11 +134,14 @@ where
 {
     /// Constructs a `Vol<C>` by using the provided function to compute a value
     /// for each point.
+    ///
+    /// Panics if `bounds` has a volume exceeding `usize::MAX`.
+    /// (But there will likely be a memory allocation failure well below that point.)
     pub fn from_fn<F>(bounds: GridAab, f: F) -> Self
     where
         F: FnMut(Cube) -> V,
     {
-        let bounds = bounds.to_vol::<ZMaj>().unwrap(); // TODO: shouldn't unwrap. For now, this will not fail
+        let bounds = bounds.to_vol::<ZMaj>().unwrap();
         bounds
             .with_elements(bounds.iter_cubes().map(f).collect())
             .unwrap()

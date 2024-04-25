@@ -122,6 +122,9 @@ impl Space {
 
     /// Returns a [`SpaceBuilder`] with the given bounds and all default values,
     /// which may be used to construct a new [`Space`].
+    ///
+    /// Panics if `bounds` has a volume exceeding `usize::MAX`.
+    /// (But there will likely be a memory allocation failure well below that point.)
     pub fn builder(bounds: GridAab) -> SpaceBuilder<Vol<()>> {
         SpaceBuilder::new().bounds(bounds)
     }

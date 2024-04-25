@@ -112,9 +112,12 @@ impl SpaceBuilder<()> {
     }
 
     /// Set the bounds of the space, outside which no blocks may be placed.
+    ///
+    /// Panics if `bounds` has a volume exceeding `usize::MAX`.
+    /// (But there will likely be a memory allocation failure well below that point.)
     pub fn bounds(self, bounds: GridAab) -> SpaceBuilder<Vol<()>> {
         SpaceBuilder {
-            bounds: bounds.to_vol().unwrap(), // TODO: Document this panic once it can panic
+            bounds: bounds.to_vol().unwrap(),
             spawn: self.spawn,
             physics: self.physics,
             behaviors: self.behaviors,

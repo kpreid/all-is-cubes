@@ -13,7 +13,7 @@ use crate::math::{
     GridPoint, GridSize, GridVector, Gridgid, VectorOps as _, Vol,
 };
 
-/// An axis-aligned box with integer coordinates, whose volume is no larger than [`usize::MAX`].
+/// An axis-aligned box with integer coordinates.
 /// [`GridAab`]s are used to specify the coordinate extent of [`Space`](crate::space::Space)s, and
 /// regions within them.
 ///
@@ -84,7 +84,7 @@ impl GridAab {
     /// (inclusive) and the occupied volume (from a perspective of continuous
     /// rather than discrete coordinates) spans 5 to 15.
     ///
-    /// Returns [`Err`] if the sizes are non-negative or the resulting range would cause
+    /// Returns [`Err`] if the sizes are negative or the resulting range would cause
     /// numeric overflow.
     pub fn checked_from_lower_size(
         lower_bounds: impl Into<GridPoint>,
@@ -104,9 +104,6 @@ impl GridAab {
                     GridOverflowError(format!("lower_bounds.{axis:x} too large for sizes"))
                 })?;
             }
-            GridAab::checked_volume_helper(sizes).map_err(|()| {
-                GridOverflowError(format!("volume too large; {sizes:?} overflows"))
-            })?;
 
             Ok(GridAab {
                 lower_bounds,
@@ -123,6 +120,8 @@ impl GridAab {
     /// then the positions where blocks can exist are numbered 5 through 9
     /// (inclusive) and the occupied volume (from a perspective of continuous
     /// rather than discrete coordinates) spans 5 to 10.
+    ///
+    /// Panics if the `upper_bounds` are less than the `lower_bounds`.
     #[track_caller]
     pub fn from_lower_upper(
         lower_bounds: impl Into<GridPoint>,
@@ -146,8 +145,7 @@ impl GridAab {
 
     /// Constructs a [`GridAab`] from inclusive lower bounds and exclusive upper bounds.
     ///
-    /// Returns [`Err`] if the bounds are reversed or the resulting range would cause
-    /// numeric overflow.
+    /// Returns [`Err`] if the `upper_bounds` are less than the `lower_bounds`.
     #[track_caller]
     pub fn checked_from_lower_upper(
         lower_bounds: impl Into<GridPoint>,
@@ -182,18 +180,6 @@ impl GridAab {
         }
     }
 
-    /// Compute volume with checked arithmetic. In a function solely for the convenience
-    /// of the `?` operator without which this is even worse.
-    fn checked_volume_helper(sizes: GridSize) -> Result<usize, ()> {
-        let mut volume: usize = 1;
-        for i in Axis::ALL {
-            volume = volume
-                .checked_mul(usize::try_from(sizes[i]).map_err(|_| ())?)
-                .ok_or(())?;
-        }
-        Ok(volume)
-    }
-
     /// Computes the volume of this box in cubes, i.e. the product of all sizes.
     ///
     /// Returns [`None`] if the volume does not fit in a `usize`.
@@ -211,7 +197,12 @@ impl GridAab {
     //---
     // TODO: add doctest example of failure
     pub fn volume(&self) -> Option<usize> {
-        Self::checked_volume_helper(self.sizes).ok()
+        let sizes = self.sizes;
+        let mut volume: usize = 1;
+        for i in Axis::ALL {
+            volume = volume.checked_mul(usize::try_from(sizes[i]).ok()?)?;
+        }
+        Some(volume)
     }
 
     /// Computes the approximate volume of this box in cubes, i.e. the product of all sizes
@@ -536,9 +527,11 @@ impl GridAab {
     /// Creates a [`Vol`] with `self` as the bounds and no data.
     ///
     /// This introduces a particular linear ordering of the cubes in the volume.
+    ///
+    /// Returns an error if the volume of `self` is greater than [`usize::MAX`].
     #[inline]
     pub fn to_vol<O: Default>(self) -> Result<Vol<(), O>, GridOverflowError> {
-        Ok(Vol::new_dataless(self, O::default()))
+        Vol::new_dataless(self, O::default())
     }
 
     /// Displaces the box by the given `offset`, leaving its size unchanged
@@ -782,10 +775,10 @@ impl<'a> arbitrary::Arbitrary<'a> for GridAab {
 }
 
 /// Error when a [`GridAab`] or [`Cube`] cannot be constructed from the given input.
-// TODO: Make this an enum
+// TODO: Make this an enum, and split off the Vol-related cases
 #[derive(Clone, Debug, displaydoc::Display, Eq, PartialEq)]
 #[displaydoc("{0}")]
-pub struct GridOverflowError(String);
+pub struct GridOverflowError(pub(in crate::math) String);
 
 /// `Debug`-formatting helper
 struct RangeWithLength(Range<GridCoordinate>);
