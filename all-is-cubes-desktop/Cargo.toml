@@ -16,6 +16,9 @@ exclude = ["*.app", "*.desktop"]
 [package.metadata.docs.rs]
 features = []
 
+[lib]
+bench = false
+
 [[bin]]
 name = "all-is-cubes"
 doc = false # Do not overwrite library crate's documentation just because of the same crate name
