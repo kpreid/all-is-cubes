@@ -22,8 +22,7 @@ type Rect = all_is_cubes::euclid::Box2D<GridCoordinate, Cube>;
 /// Flat (one axis zero sized) box whose bounds are a voxel surface that needs triangles
 /// generated for it.
 ///
-/// TODO: Investigate representation improvements for this, and if none succeed, make this an
-/// ordinary `GridAab` (after we get rid of the `GridAab` volume restriction).
+/// Note: I tried using [`u8`] coordinate storage and it was significantly slower.
 type PlaneBox = all_is_cubes::euclid::Box2D<GridCoordinate, Cube>;
 
 /// A maximally inside-out box, used as the `occupied_planes` value containing no voxels.
@@ -317,6 +316,20 @@ mod tests {
         assert_eq!(shift_py(0xFF), 0b11001100);
         assert_eq!(shift_nz(0xFF), 0b01010101);
         assert_eq!(shift_pz(0xFF), 0b10101010);
+    }
+
+    /// `Analysis` is a huge data type.
+    /// Check that it doesn't get any bigger without warning.
+    #[test]
+    fn analysis_size() {
+        let plane_box_size = 16; // 4 × i32
+        let planes_per_face = MAX_PLANES;
+        let faces = Face6::ALL.len();
+        let other_fields = 16; // 2 byte-sized fields, aligned to 16
+        assert_eq!(
+            dbg!(std::mem::size_of::<Analysis>()),
+            plane_box_size * planes_per_face * faces + other_fields
+        );
     }
 
     /// Exercise the analysis on the outputs of `make_slab()`.
