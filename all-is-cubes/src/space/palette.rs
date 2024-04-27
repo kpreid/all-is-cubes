@@ -130,8 +130,9 @@ impl Palette {
     ///
     /// The caller is responsible for incrementing the count to indicate usage of the entry.
     ///
-    /// If `use_zeroed_entries` is true, then zeroed entries will not be considered free
-    /// — every returned index will be either an existing block or extend the palette.
+    /// If `use_zeroed_entries` is true, then entries which currently have a count of zero
+    /// will be considered free for reuse. If it is false, they will not, and every returned index
+    /// will either be an existing block or extend the palette.
     #[inline]
     pub(super) fn ensure_index(
         &mut self,
