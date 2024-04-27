@@ -8,7 +8,7 @@ use core::{fmt, mem};
 
 use manyfmt::Fmt;
 
-#[cfg(feature = "threads")]
+#[cfg(feature = "auto-threads")]
 use rayon::iter::{IntoParallelRefMutIterator as _, ParallelIterator as _};
 
 use super::debug::LightComputeOutput;
@@ -210,7 +210,7 @@ impl LightStorage {
             // them when we have this current opportunity.
             // This will require making stored light data `Arc`ed and double-buffered or atomic,
             // so it can be consulted by the calculation.
-            #[cfg(feature = "threads")]
+            #[cfg(feature = "auto-threads")]
             while self.light_update_queue.len() > 0 {
                 use core::array::from_fn;
 
@@ -253,7 +253,7 @@ impl LightStorage {
                 }
             }
 
-            #[cfg(not(feature = "threads"))]
+            #[cfg(not(feature = "auto-threads"))]
             while let Some(LightUpdateRequest { cube, .. }) = self.light_update_queue.pop() {
                 if false {
                     // Log cubes that were updated for debug visualization.

@@ -40,9 +40,9 @@ wgpu = ["dep:wgpu"]
 # Adds automatic parallelism to some algorithms.
 # If disabled, `std::thread` is never used.
 # If enabled, threads may be created and the active `rayon` thread pool may be used.
-threads = [
+auto-threads = [
     "dep:rayon",
-    "all-is-cubes-mesh/threads", # not mandatory, but almost certainly wanted
+    "all-is-cubes-mesh/auto-threads", # not mandatory, but almost certainly wanted
 ]
 
 [dependencies]

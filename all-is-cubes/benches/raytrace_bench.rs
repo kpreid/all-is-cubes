@@ -65,7 +65,7 @@ impl TestData {
 pub fn raytrace_bench(c: &mut Criterion) {
     let t = TestData::new();
 
-    let mut group = c.benchmark_group(if cfg!(feature = "threads") {
+    let mut group = c.benchmark_group(if cfg!(feature = "auto-threads") {
         "threaded"
     } else {
         "serial"

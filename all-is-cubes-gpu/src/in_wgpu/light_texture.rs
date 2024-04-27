@@ -1,5 +1,5 @@
 use cfg_if::cfg_if;
-#[cfg(feature = "threads")]
+#[cfg(feature = "auto-threads")]
 use rayon::{
     iter::{IndexedParallelIterator as _, IntoParallelIterator as _, ParallelIterator as _},
     slice::ParallelSliceMut as _,
@@ -255,7 +255,7 @@ impl LightTexture {
 
         buffer.clear();
         cfg_if::cfg_if! {
-            if #[cfg(feature = "threads")] {
+            if #[cfg(feature = "auto-threads")] {
                 buffer.resize(volume, [0; Self::COMPONENTS]);
 
                 let x_chunk_size = region.x_range().len();
@@ -394,8 +394,8 @@ fn split_axis(
     texture_size: i32,
     buffer: &mut Vec<Texel>,
     // This bounds change is valid because this is an internal function.
-    #[cfg(feature = "threads")] function: impl Fn(Range, &mut Vec<Texel>) + Sync,
-    #[cfg(not(feature = "threads"))] function: impl Fn(Range, &mut Vec<Texel>),
+    #[cfg(feature = "auto-threads")] function: impl Fn(Range, &mut Vec<Texel>) + Sync,
+    #[cfg(not(feature = "auto-threads"))] function: impl Fn(Range, &mut Vec<Texel>),
 ) {
     let range_size = space_range.end - space_range.start;
     assert!(
@@ -411,7 +411,7 @@ fn split_axis(
         let part_1 = space_range.start..first_half_endpoint;
         let part_2 = first_half_endpoint..space_range.end;
         cfg_if! {
-            if #[cfg(feature = "threads")] {
+            if #[cfg(feature = "auto-threads")] {
                 rayon::join(
                     || function(part_1, buffer),
                     || function(part_2, &mut Vec::new()),

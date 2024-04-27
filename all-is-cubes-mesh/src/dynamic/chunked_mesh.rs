@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use indoc::indoc;
-#[cfg(feature = "threads")]
+#[cfg(feature = "auto-threads")]
 use rayon::iter::{ParallelBridge, ParallelIterator as _};
 
 use all_is_cubes::camera::{Camera, Flaws};
@@ -454,11 +454,11 @@ where
 
             state
         };
-        #[cfg(feature = "threads")]
+        #[cfg(feature = "auto-threads")]
         let to_put_back = ParallelBridge::par_bridge(chunk_update_iterator)
             .map(chunk_updater)
             .collect::<Vec<_>>();
-        #[cfg(not(feature = "threads"))]
+        #[cfg(not(feature = "auto-threads"))]
         let to_put_back = chunk_update_iterator.map(chunk_updater).collect::<Vec<_>>();
 
         // Put updated chunks back in the maps

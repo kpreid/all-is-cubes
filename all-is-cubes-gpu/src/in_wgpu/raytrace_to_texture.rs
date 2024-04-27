@@ -2,13 +2,13 @@
 
 use std::sync::{Arc, Mutex};
 // TODO: if not using threads, don't even use a Mutex as it's entirely wasted
-#[cfg(feature = "threads")]
+#[cfg(feature = "auto-threads")]
 use std::sync::Weak;
 
 use half::f16;
 use rand::prelude::SliceRandom as _;
 use rand::SeedableRng as _;
-#[cfg(feature = "threads")]
+#[cfg(feature = "auto-threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use web_time::{Duration, Instant};
 
@@ -59,7 +59,7 @@ impl RaytraceToTexture {
             render_target: DrawableTexture::new(wgpu::TextureFormat::Rgba16Float),
         }));
 
-        #[cfg(feature = "threads")]
+        #[cfg(feature = "auto-threads")]
         {
             let weak_inner = Arc::downgrade(&inner);
             match std::thread::Builder::new()
@@ -188,9 +188,9 @@ impl Inner {
             Pixel(point, color)
         };
 
-        #[cfg(feature = "threads")]
+        #[cfg(feature = "auto-threads")]
         let traces: Vec<Pixel<Rgbf16>> = this_frame_pixels.into_par_iter().map(trace).collect();
-        #[cfg(not(feature = "threads"))]
+        #[cfg(not(feature = "auto-threads"))]
         let traces: Vec<Pixel<Rgbf16>> = this_frame_pixels.into_iter().map(trace).collect();
 
         let tracing_duration = Instant::now().duration_since(start_time);
@@ -210,7 +210,7 @@ impl Inner {
     }
 }
 
-#[cfg(feature = "threads")]
+#[cfg(feature = "auto-threads")]
 /// Runs raytracing, periodically releasing the lock to allow updating input and retrieving output.
 #[allow(clippy::needless_pass_by_value)] // let thread function own its state
 fn background_tracing_task(weak_inner: Weak<Mutex<Inner>>) {

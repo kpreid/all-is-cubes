@@ -31,13 +31,15 @@
         - Parallelism for block and chunk mesh calculations:
             - Block mesh updates may be executed in the background rather than strictly during `update()`.
             This must be externally driven; if you wish to do so, clone the `ChunkedSpaceMesh::job_queue()`, and create one or more tasks/threads which take work from it.
-            - Chunk mesh updates are performed in parallel using `rayon` if the `"threads"` feature is enabled. They are not performed in the background, because they currently still require read access to the `Space` being rendered.
+            - Chunk mesh updates are performed in parallel using `rayon` if the `"auto-threads"` feature is enabled. They are not performed in the background, because they currently still require read access to the `Space` being rendered.
 
 - `all-is-cubes-ui` library:
     - New widget `ProgressBar`.
     - New module `notification` and method `Session::show_notification()` for displaying notifications to the user (within the window, not platform notification integration).
 
 ### Changed
+
+- The `"threads"` feature has been renamed to `"auto-threads"` in those libraries which have it, for clarity.
 
 - `all-is-cubes` library:
     - `camera::Camera::projection_matrix()` now produces a depth range of 0 to 1 instead of −1 to 1.

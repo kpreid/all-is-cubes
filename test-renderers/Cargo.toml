@@ -54,7 +54,7 @@ gltf = [
 ]
 
 [dependencies]
-all-is-cubes = { workspace = true, features = ["save", "threads"] }
+all-is-cubes = { workspace = true, features = ["auto-threads", "save"] }
 all-is-cubes-content = { workspace = true }
 all-is-cubes-gpu = { workspace = true, features = ["wgpu"] }
 all-is-cubes-port = { workspace = true, optional = true, features = [] }

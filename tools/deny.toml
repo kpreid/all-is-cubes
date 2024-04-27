@@ -4,7 +4,7 @@
 # This list of features excludes the "rerun" and "gltf" features
 # as they are only intended for testing (i.e. no binaries will be distributed
 # with them enabled).
-features = ["std", "arbitrary", "save", "threads", "wgpu"]
+features = ["std", "arbitrary", "auto-threads", "save", "wgpu"]
 
 [licenses]
 unlicensed = "deny"

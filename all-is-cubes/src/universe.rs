@@ -396,7 +396,7 @@ impl Universe {
         // If we are allowed to use threads, update in parallel.
         // This may fail with borrow conflicts if BlockDefs depend on other BlockDefs;
         // therefore we unconditionally do a synchronous update afterward.
-        #[cfg(feature = "threads")]
+        #[cfg(feature = "auto-threads")]
         let mut info: BlockDefStepInfo = {
             use rayon::prelude::{IntoParallelRefIterator as _, ParallelIterator as _};
 
@@ -417,7 +417,7 @@ impl Universe {
                 )
                 .reduce(BlockDefStepInfo::default, |a, b| a + b)
         };
-        #[cfg(not(feature = "threads"))]
+        #[cfg(not(feature = "auto-threads"))]
         let mut info = BlockDefStepInfo::default();
 
         // TODO: In the event of dependencies between BlockDefs, this may miss some updates and

@@ -425,7 +425,7 @@ pub(crate) struct BlockDefStepInfo {
 }
 
 impl BlockDefStepInfo {
-    #[cfg(feature = "threads")]
+    #[cfg(feature = "auto-threads")]
     pub(crate) const IN_USE: Self = Self {
         attempted: 1,
         updated: 0,

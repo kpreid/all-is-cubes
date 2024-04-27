@@ -21,7 +21,7 @@ use manyfmt::Fmt;
 use num_traits::float::Float as _;
 use ordered_float::NotNan;
 
-#[cfg(feature = "threads")]
+#[cfg(feature = "auto-threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use crate::block::{Evoxels, Resolution, AIR};
@@ -290,7 +290,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         self.trace_scene_to_text_impl::<P, F, E>(camera, line_ending, write)
     }
 
-    #[cfg(feature = "threads")]
+    #[cfg(feature = "auto-threads")]
     fn trace_scene_to_text_impl<P, F, E>(
         &self,
         camera: &Camera,
@@ -330,7 +330,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         Ok(info_sum.result())
     }
 
-    #[cfg(not(feature = "threads"))]
+    #[cfg(not(feature = "auto-threads"))]
     fn trace_scene_to_text_impl<P, F, E>(
         &self,
         camera: &Camera,
@@ -633,7 +633,7 @@ pub(crate) struct EvalTrace {
     pub emission: Vector3D<f32, Intensity>,
 }
 
-#[cfg(feature = "threads")]
+#[cfg(feature = "auto-threads")]
 mod rayon_helper {
     use core::iter::{empty, once, Sum};
     use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator as _};

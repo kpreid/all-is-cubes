@@ -37,7 +37,7 @@ arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary", "ordered-float/arbitrary
 # Adds automatic parallelism to some algorithms (but not all possible uses of concurrency).
 # If disabled, `std::thread` is never used.
 # If enabled, threads may be created and the active `rayon` thread pool may be used.
-threads = ["dep:rayon"]
+auto-threads = ["dep:rayon"]
 
 
 [dependencies]

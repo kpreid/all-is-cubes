@@ -418,7 +418,7 @@ mod trace_image {
     ///
     /// TODO: Add a mechanism for incrementally rendering (not 100% of pixels) for
     /// interactive use.
-    #[cfg(feature = "threads")]
+    #[cfg(feature = "auto-threads")]
     pub(super) fn trace_scene_to_image_impl<P, E, O>(
         scene: &RtScene<'_, P>,
         encoder: E,
@@ -478,7 +478,7 @@ mod trace_image {
     ///
     /// TODO: Add a mechanism for incrementally rendering (not 100% of pixels) for
     /// interactive use.
-    #[cfg(not(feature = "threads"))]
+    #[cfg(not(feature = "auto-threads"))]
     pub(super) fn trace_scene_to_image_impl<P, E, O>(
         scene: &RtScene<'_, P>,
         encoder: E,

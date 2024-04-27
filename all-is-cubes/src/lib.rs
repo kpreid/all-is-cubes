@@ -81,15 +81,16 @@
 //!
 //! This crate, `all_is_cubes`, defines the following feature flags:
 //!
-//! * `save`:
+//! * `"save"`:
 //!   Enable [`serde`] serialization of [`Universe`]s and some other types.
-//! * `threads`:
+//! * `"auto-threads"`:
 //!   Enable use of threads for parallel and background processing, including via
 //!   [`rayon`]’s global thread pool.
-//!   This feature does not affect the public API, only performance and dependencies.
-//! * `arbitrary`: Adds implementations of the [`arbitrary::Arbitrary`] trait for
+//!   This feature does not affect the public API (except via enabling other features),
+//!   only performance and dependencies.
+//! * `"arbitrary"`: Adds implementations of the [`arbitrary::Arbitrary`] trait for
 //!   fuzzing / property testing on types defined by this crate.
-//! * `std` (enabled by default):
+//! * `"std"` (enabled by default):
 //!   If disabled, the library becomes `no_std` compatible, at this cost:
 //!   * Many types are no longer [`Send`] or [`Sync`].
 //!   * [`Listener`](crate::listen::Listener) callbacks are no longer required to be `Send + Sync`,
@@ -132,7 +133,10 @@
     not(feature = "arbitrary"),
     doc = "[`arbitrary::Arbitrary`]: https://docs.rs/arbitrary/1.0.2/arbitrary/trait.Arbitrary.html"
 )]
-#![cfg_attr(not(feature = "threads"), doc = "[`rayon`]: https://docs.rs/rayon/")]
+#![cfg_attr(
+    not(feature = "auto-threads"),
+    doc = "[`rayon`]: https://docs.rs/rayon/"
+)]
 #![no_std]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 // * This crate contains some unsafe code and therefore does not `forbid(unsafe_code)`.
