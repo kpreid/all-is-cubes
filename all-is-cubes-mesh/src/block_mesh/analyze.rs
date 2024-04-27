@@ -34,9 +34,8 @@ const EMPTY_PLANE_BOX: PlaneBox = PlaneBox {
 };
 
 #[derive(Clone, Debug)] // could be Copy, but it's large so let's not
+#[repr(C, align(16))] // For perf, ensure the arrays are aligned to whole `PlaneBox`es, 4 × i32
 pub(crate) struct Analysis {
-    resolution: Resolution,
-
     /// For each face normal, which depths will need any triangles generated,
     /// and for those that do, which bounds need to be scanned.
     ///
@@ -47,6 +46,8 @@ pub(crate) struct Analysis {
     ///
     /// The boxes' thickness happens to be equal to the layer position but this is coincidental.
     occupied_planes: FaceMap<[PlaneBox; MAX_PLANES]>,
+
+    resolution: Resolution,
 
     /// Whether there are any adjacent visible voxels that have different colors, and therefore
     /// probably need a texture rather than vertex colors.
