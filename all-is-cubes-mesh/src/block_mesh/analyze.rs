@@ -151,8 +151,6 @@ impl Analysis {
 ///
 /// This is a preliminary step before creating the actual vertices and texture of a `BlockMesh`.
 pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut Viz) -> Analysis {
-    let resolution_coord = GridCoordinate::from(resolution);
-
     let mut analysis = Analysis::empty();
     analysis.resolution = resolution;
     viz.analysis_in_progress(&analysis);
@@ -163,50 +161,56 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut 
 
     for (center, colors) in windows(voxels) {
         viz.window(center, voxels);
-
-        let opaque = bitmask(colors, Rgba::fully_opaque);
-        let semitransparent = !(opaque | bitmask(colors, Rgba::fully_transparent));
-        let renderable = opaque | semitransparent;
-
-        // First, quickly check if there are any visible surfaces at all here.
-        if opaque != 0x00 && opaque != 0xFF || semitransparent != 0x00 && semitransparent != 0xFF {
-            // TODO: false positives — look only at visible cubes on each axis, instead of all cubes
-            analysis.needs_texture = analysis.needs_texture
-                || !colors
-                    .iter()
-                    .filter(|color| !color.fully_transparent())
-                    .all_equal();
-
-            // For each direction, check if any of the voxels in the deeper side are visible
-            // and not covered by opaque blocks in the shallower side,
-            // and mark that plane as occupied if so.
-            //
-            // `unflatten()` undoes the axis dropping/swapping this code does.
-            if renderable & shift_px(0xFF) & !shift_px(opaque) != 0 {
-                analysis.expand_rect(Face6::NX, center.x, center.yz());
-            }
-            if renderable & shift_py(0xFF) & !shift_py(opaque) != 0 {
-                analysis.expand_rect(Face6::NY, center.y, center.xz());
-            }
-            if renderable & shift_pz(0xFF) & !shift_pz(opaque) != 0 {
-                analysis.expand_rect(Face6::NZ, center.z, center.xy());
-            }
-            if renderable & shift_nx(0xFF) & !shift_nx(opaque) != 0 {
-                analysis.expand_rect(Face6::PX, resolution_coord - center.x, center.yz());
-            }
-            if renderable & shift_ny(0xFF) & !shift_ny(opaque) != 0 {
-                analysis.expand_rect(Face6::PY, resolution_coord - center.y, center.xz());
-            }
-            if renderable & shift_nz(0xFF) & !shift_nz(opaque) != 0 {
-                analysis.expand_rect(Face6::PZ, resolution_coord - center.z, center.xy());
-            }
-        }
-
+        analyze_one_window(&mut analysis, center, colors);
         viz.analysis_in_progress(&analysis);
     }
     viz.clear_window();
 
     analysis
+}
+
+/// Take one of the outputs of [`windows()`] and compute its contribution to [`analysis`].
+#[inline]
+fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, colors: [Rgba; 8]) {
+    let opaque = bitmask(colors, Rgba::fully_opaque);
+    let semitransparent = !(opaque | bitmask(colors, Rgba::fully_transparent));
+    let renderable = opaque | semitransparent;
+
+    // First, quickly check if there are any visible surfaces at all here.
+    if opaque != 0x00 && opaque != 0xFF || semitransparent != 0x00 && semitransparent != 0xFF {
+        let resolution_coord = GridCoordinate::from(analysis.resolution);
+
+        // TODO: false positives — look only at visible cubes on each axis, instead of all cubes
+        analysis.needs_texture = analysis.needs_texture
+            || !colors
+                .iter()
+                .filter(|color| !color.fully_transparent())
+                .all_equal();
+
+        // For each direction, check if any of the voxels in the deeper side are visible
+        // and not covered by opaque blocks in the shallower side,
+        // and mark that plane as occupied if so.
+        //
+        // `unflatten()` undoes the axis dropping/swapping this code does.
+        if renderable & shift_px(0xFF) & !shift_px(opaque) != 0 {
+            analysis.expand_rect(Face6::NX, center.x, center.yz());
+        }
+        if renderable & shift_py(0xFF) & !shift_py(opaque) != 0 {
+            analysis.expand_rect(Face6::NY, center.y, center.xz());
+        }
+        if renderable & shift_pz(0xFF) & !shift_pz(opaque) != 0 {
+            analysis.expand_rect(Face6::NZ, center.z, center.xy());
+        }
+        if renderable & shift_nx(0xFF) & !shift_nx(opaque) != 0 {
+            analysis.expand_rect(Face6::PX, resolution_coord - center.x, center.yz());
+        }
+        if renderable & shift_ny(0xFF) & !shift_ny(opaque) != 0 {
+            analysis.expand_rect(Face6::PY, resolution_coord - center.y, center.xz());
+        }
+        if renderable & shift_nz(0xFF) & !shift_nz(opaque) != 0 {
+            analysis.expand_rect(Face6::PZ, resolution_coord - center.z, center.xy());
+        }
+    }
 }
 
 /// Iterates over all 2×2×2 windows that intersect at least one voxel, and returns their center
