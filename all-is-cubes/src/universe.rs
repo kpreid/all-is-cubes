@@ -801,6 +801,7 @@ impl fmt::Display for InsertError {
     }
 }
 
+#[cfg(feature = "save")]
 #[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[displaydoc("data contains a handle to {to} that was not defined")]
 pub(crate) struct DeserializeHandlesError {
