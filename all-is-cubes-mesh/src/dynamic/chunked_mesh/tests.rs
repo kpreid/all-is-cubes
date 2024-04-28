@@ -183,7 +183,7 @@ impl<const MBM: usize> CsmTester<MBM> {
     where
         F: FnMut(dynamic::RenderDataUpdate<'_, Mt<MBM>>) + Send,
     {
-        let updater_cell = std::sync::Mutex::new(render_data_updater);
+        let updater_cell = Mutex::new(render_data_updater);
         self.csm
             .update(&self.camera, time::DeadlineNt::Whenever, |u| {
                 updater_cell.lock().unwrap()(u)
