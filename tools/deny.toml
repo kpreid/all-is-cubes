@@ -32,7 +32,6 @@ skip = [
     { name = "sync_wrapper" },
     { name = "cfg_aliases" }, # winit and wgpu use different versions
     { name = "wasi" }, # not actually used on our targets
-    { name = "web-time", version = "=0.2.4" },
     { name = "syn", version = "1" },
     { name = "libloading" },
     { name = "libredox", version = "=0.0.1" },

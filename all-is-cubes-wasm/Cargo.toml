@@ -51,7 +51,7 @@ wasm-bindgen-futures = "0.4.40"
 web-time = { version = "1.0.0" }
 wgpu = { version = "0.19.3", default-features = false, features = ["webgpu", "webgl"] }
 # Feature enabling
-yield-progress = { version = "0.1.5", features = ["log_hiccups"] }
+yield-progress = { version = "0.1.6", features = ["log_hiccups"] }
 
 [dependencies.web-sys]
 version = "0.3.67"

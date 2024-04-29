@@ -6790,12 +6790,12 @@ checksum = "09041cd90cf85f7f8b2df60c646f853b7f535ce68f85244eb6731cf89fa498ec"
 
 [[package]]
 name = "yield-progress"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47617d3de0d5d22d008ea6abb7561db939c3a352a4bd6a5d831d5f6721e689f2"
+checksum = "6787d4071dde0d550627dbe9c191eea3025b7a69e83ef4742e77946617f3a7d6"
 dependencies = [
  "log",
- "web-time 0.2.4",
+ "web-time 1.1.0",
 ]
 
 [[package]]
