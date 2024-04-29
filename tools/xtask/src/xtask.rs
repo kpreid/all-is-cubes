@@ -655,8 +655,21 @@ fn do_for_all_packages(
                 // first).
                 cmd!("cargo test --manifest-path=all-is-cubes-wasm/Cargo.toml").run()?;
 
-                // TODO: control over choice of browser
-                cmd!("wasm-pack test --headless --firefox all-is-cubes-wasm/").run()?;
+                // TODO: more general control over choice of browser / autodetection, and
+                // run tests on *all* available browsers.
+
+                let browser_arg = if option_env!("CI").is_some() && cfg!(target_os = "macos") {
+                    // 2024-04: GitHub's new Apple Silicon macOS CI images don't have Firefox,
+                    // only Chrome and Safari.
+                    "--chrome"
+                } else {
+                    "--firefox"
+                };
+
+                cmd!("wasm-pack test --headless")
+                    .arg(browser_arg)
+                    .arg("all-is-cubes-wasm/")
+                    .run()?;
             }
             TestOrCheck::BuildTests | TestOrCheck::Lint => {
                 let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
