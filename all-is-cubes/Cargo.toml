@@ -19,32 +19,32 @@ features = ["arbitrary", "save", "std"]
 bench = false
 
 [[bench]]
-name = "block_bench"
+name = "block"
 harness = false
 
 [[bench]]
-name = "chunk_bench"
+name = "chunk"
 harness = false
 
 [[bench]]
-name = "lighting_bench"
+name = "light"
 harness = false
 
 [[bench]]
-name = "raycast_bench"
+name = "raycast"
 harness = false
 
 [[bench]]
-name = "raytrace_bench"
+name = "raytrace"
 harness = false
 
 [[bench]]
-name = "save_bench"
+name = "save"
 harness = false
 required-features = ["save"]
 
 [[bench]]
-name = "space_bench"
+name = "space"
 harness = false
 
 # See src/lib.rs documentation for more details on features.

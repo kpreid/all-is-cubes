@@ -142,7 +142,7 @@ fn dump_frustum_culling() {
 
     let (chart, camera, chunked_bounds) = config();
 
-    let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes/chunk_bench")
+    let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes/benches/chunk")
         .default_enabled(true)
         .connect()
         .unwrap();

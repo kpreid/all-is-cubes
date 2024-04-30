@@ -21,7 +21,7 @@ bench = false
 doctest = false
 
 [[bench]]
-name = "mesh_bench"
+name = "mesh"
 harness = false
 
 [[example]]

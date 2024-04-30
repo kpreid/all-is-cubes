@@ -34,7 +34,7 @@ fn main() {
                 eprintln!("GPU not available; skipping actually testing bench functions");
                 return;
             } else {
-                panic!("wgpu_bench requires a GPU, but no adapter was found");
+                panic!("benches/wgpu requires a GPU, but no adapter was found");
             }
         }
     };

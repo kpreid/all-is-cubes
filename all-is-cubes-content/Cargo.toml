@@ -18,7 +18,7 @@ features = ["arbitrary"]
 bench = false
 
 [[bench]]
-name = "gen_bench"
+name = "gen"
 harness = false
 
 [features]

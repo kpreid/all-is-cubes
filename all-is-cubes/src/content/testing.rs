@@ -11,7 +11,7 @@ use crate::space::{LightPhysics, Space, SpacePhysics};
 use crate::universe::Universe;
 use crate::util::YieldProgress;
 
-/// Test space for the `lighting_bench` benchmark, designed to exercise a variety of
+/// Test space for the `all-is-cubes/benches/light` benchmark, designed to exercise a variety of
 /// geometric and color circumstances for the lighting algorithm.
 ///
 /// (Since being created, it has found uses in many other tests as a fast-to-create yet
