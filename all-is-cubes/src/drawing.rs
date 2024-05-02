@@ -21,7 +21,7 @@ use core::marker::PhantomData;
 use core::ops::Range;
 
 use embedded_graphics::geometry::{Dimensions, Point, Size};
-use embedded_graphics::pixelcolor::{PixelColor, Rgb888, RgbColor};
+use embedded_graphics::pixelcolor::{PixelColor, Rgb888};
 use embedded_graphics::prelude::{DrawTarget, Drawable, Pixel};
 use embedded_graphics::primitives::Rectangle;
 
@@ -260,15 +260,6 @@ impl<C> Dimensions for DrawingPlane<'_, SpaceTransaction, C> {
     }
 }
 
-/// Adapt [`embedded_graphics`]'s most general color type to ours.
-// TODO: Also adapt the other types, so that if someone wants to use them they can.
-impl From<Rgb888> for Rgb {
-    #[inline]
-    fn from(color: Rgb888) -> Rgb {
-        Rgba::from_srgb8([color.r(), color.g(), color.b(), u8::MAX]).to_rgb()
-    }
-}
-
 /// Allows “drawing” blocks onto a [`DrawingPlane`], a two-dimensional coordinate system
 /// established within a [`Space`].
 ///
@@ -289,18 +280,12 @@ impl<'a> VoxelColor<'a> for &'a Block {
     }
 }
 
-impl PixelColor for Rgb {
-    type Raw = ();
-}
 impl<'a> VoxelColor<'a> for Rgb {
     fn into_blocks(self) -> VoxelBrush<'a> {
         VoxelBrush::single(Block::from(self))
     }
 }
 
-impl PixelColor for Rgba {
-    type Raw = ();
-}
 impl<'a> VoxelColor<'a> for Rgba {
     fn into_blocks(self) -> VoxelBrush<'a> {
         VoxelBrush::single(Block::from(self))

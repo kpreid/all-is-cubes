@@ -31,8 +31,8 @@ use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 #[allow(unused_imports)]
 use crate::math::Euclid as _;
 use crate::math::{
-    area_usize, smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab,
-    GridMatrix, Intensity, Rgb, Rgba, VectorOps, Vol,
+    area_usize, rgb_const, smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector,
+    GridAab, GridMatrix, Intensity, Rgb, Rgba, VectorOps, Vol,
 };
 use crate::raycast::Ray;
 use crate::space::{BlockIndex, BlockSky, PackedLight, Sky, Space, SpaceBlockData};
@@ -668,6 +668,7 @@ mod rayon_helper {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::math::rgba_const;
 
     #[test]
     fn apply_transmittance_identity() {

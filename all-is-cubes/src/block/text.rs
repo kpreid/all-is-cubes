@@ -11,7 +11,9 @@ use euclid::vec3;
 use crate::block::{self, Block, BlockAttributes, Evoxel, MinEval, Resolution};
 use crate::content::palette;
 use crate::drawing::{rectangle_to_aab, DrawingPlane};
-use crate::math::{FaceMap, GridAab, GridCoordinate, GridVector, Gridgid, Rgb, Rgba, Vol};
+use crate::math::{
+    rgba_const, FaceMap, GridAab, GridCoordinate, GridVector, Gridgid, Rgb, Rgba, Vol,
+};
 use crate::space::{self, SpaceTransaction};
 use crate::universe;
 

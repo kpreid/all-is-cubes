@@ -36,7 +36,8 @@ pub struct GridMatrix {
 }
 
 impl GridMatrix {
-    pub(crate) const ZERO: Self = Self {
+    /// The zero matrix, which transforms all points to zero.
+    pub const ZERO: Self = Self {
         x: Vector3D::new(0, 0, 0),
         y: Vector3D::new(0, 0, 0),
         z: Vector3D::new(0, 0, 0),
@@ -107,6 +108,7 @@ impl GridMatrix {
     /// Skews or scaling cannot be performed using this constructor.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Face7::*, GridMatrix, GridPoint};
     ///
     /// let transform = GridMatrix::from_origin([10, 10, 10], PX, PZ, NY);
@@ -152,6 +154,7 @@ impl GridMatrix {
     /// that cube.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Cube, Face7::*, GridMatrix, GridPoint};
     ///
     /// // Translation without rotation has the usual definition.
@@ -178,6 +181,7 @@ impl GridMatrix {
     /// [`Gridgid`]. Returns `None` if the matrix has any scaling or skew.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Face6::*, Gridgid, GridMatrix, GridRotation, GridVector};
     ///
     /// assert_eq!(
@@ -254,6 +258,7 @@ impl GridMatrix {
     }
 
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{GridMatrix, GridPoint};
     ///
     /// let transform_1 = GridMatrix::new(

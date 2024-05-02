@@ -1,0 +1,54 @@
+[package]
+name = "all-is-cubes-base"
+version = "0.7.1"
+authors = ["Kevin Reid <kpreid@switchb.org>"]
+edition = "2021"
+rust-version = "1.73"
+description = "Helper library for all-is-cubes. Do not use directly."
+repository = "https://github.com/kpreid/all-is-cubes"
+license = "MIT OR Apache-2.0"
+
+[lib]
+# Disable running as benchmark so that the default doesn't interfere with Criterion usage.
+bench = false
+
+[features]
+std = []
+# Adds `impl arbitrary::Arbitrary for ...`
+# Note: Not using euclid/arbitrary because it's broken
+arbitrary = ["dep:arbitrary", "ordered-float/arbitrary"]
+rerun = ["dep:re_types"]
+serde = [
+    "dep:serde",
+    "ordered-float/serde",
+]
+
+[dependencies]
+arbitrary = { workspace = true, optional = true }
+bytemuck = { workspace = true, features = ["derive"] }
+cfg-if = { workspace = true }
+displaydoc = { workspace = true }
+embedded-graphics = { workspace = true }
+# mint feature to guarantee that our callers can use mint types
+# libm feature to guarantee compilability and compatibility with no_std
+euclid = { version = "0.22.9", default-features = false, features = ["libm", "mint"] }
+exhaust = { workspace = true, default-features = false }
+futures-core = { workspace = true }
+futures-util = { workspace = true }
+manyfmt = { workspace = true }
+mutants = { workspace = true }
+num-traits = { workspace = true }
+ordered-float = { workspace = true }
+polonius-the-crab = { workspace = true }
+rand = { workspace = true }
+re_types = { workspace = true, optional = true }
+serde = { workspace = true, optional = true, features = ["derive"] }
+
+[dev-dependencies]
+indoc = { workspace = true }
+itertools = { workspace = true }
+pretty_assertions = { workspace = true }
+rand_xoshiro = { workspace = true }
+
+[lints]
+workspace = true

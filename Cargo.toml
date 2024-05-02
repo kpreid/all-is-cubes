@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "all-is-cubes",
+  "all-is-cubes-base",
   "all-is-cubes-content",
   "all-is-cubes-desktop",
   "all-is-cubes-gpu",
@@ -39,6 +40,7 @@ resolver = "2"
 
 [workspace.dependencies]
 all-is-cubes = { path = "all-is-cubes", version = "0.7.1", default-features = false }
+all-is-cubes-base = { path = "all-is-cubes-base", version = "0.7.1", default-features = false }
 all-is-cubes-content = { path = "all-is-cubes-content", version = "0.7.0", default-features = false }
 all-is-cubes-desktop = { path = "all-is-cubes-desktop", version = "0.7.0", default-features = false }
 all-is-cubes-gpu = { path = "all-is-cubes-gpu", version = "0.7.0", default-features = false }
@@ -65,6 +67,7 @@ clap = { version = "4.2.4", default-features = false, features = ["cargo", "depr
 criterion = { version = "0.5.1", features = ["async_tokio", "cargo_bench_support", "html_reports"] }
 displaydoc = { version = "0.2.4", default-features = false}
 either = { version = "1.10.0", default-features = false }
+embedded-graphics = "0.8.0"
 exhaust = { version = "0.1.0", default-features = false }
 flume = { version = "0.11.0", default-features = false, features = ["async"] }
 futures-channel = { version = "0.3.28", default-features = false, features = ["alloc"] }

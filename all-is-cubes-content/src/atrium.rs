@@ -8,18 +8,18 @@ use exhaust::Exhaust;
 
 use all_is_cubes::block::{self, Block, Resolution, RotationPlacementRule, Zoom, AIR};
 use all_is_cubes::character::Spawn;
+use all_is_cubes::color_block;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate, GridPoint,
-    GridRotation, GridVector, Gridgid, Rgb, Rgba, VectorOps,
+    rgb_const, Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate,
+    GridPoint, GridRotation, GridVector, Gridgid, Rgb, Rgba, VectorOps,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::{color_block, rgb_const};
 
 use crate::alg::{array_of_noise, four_walls, scale_color};
 use crate::Fire;
@@ -461,9 +461,9 @@ impl fmt::Display for BannerColor {
 impl BannerColor {
     fn color(self) -> Rgb {
         match self {
-            BannerColor::Red => palette::UNIFORM_LUMINANCE_RED,
-            BannerColor::Green => palette::UNIFORM_LUMINANCE_GREEN,
-            BannerColor::Blue => palette::UNIFORM_LUMINANCE_BLUE,
+            BannerColor::Red => Rgb::UNIFORM_LUMINANCE_RED,
+            BannerColor::Green => Rgb::UNIFORM_LUMINANCE_GREEN,
+            BannerColor::Blue => Rgb::UNIFORM_LUMINANCE_BLUE,
         }
     }
 }

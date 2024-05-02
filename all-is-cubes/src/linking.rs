@@ -307,7 +307,7 @@ pub struct ProviderError {
     missing: Box<[Name]>,
 }
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl std::error::Error for ProviderError {}
 }
 
@@ -321,7 +321,7 @@ pub struct GenError {
     for_object: Option<Name>,
 }
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl std::error::Error for GenError {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             Some(&self.detail)
@@ -421,7 +421,7 @@ impl InGenError {
     }
 }
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl std::error::Error for InGenError {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             match self {

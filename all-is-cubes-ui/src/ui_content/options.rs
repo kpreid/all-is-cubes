@@ -3,8 +3,7 @@ use core::fmt;
 
 use all_is_cubes::arcstr::{self, literal};
 use all_is_cubes::camera::{self, AntialiasingOption, GraphicsOptions};
-use all_is_cubes::math::Face6;
-use all_is_cubes::notnan;
+use all_is_cubes::math::{notnan, Face6};
 
 use crate::apps::ControlMessage;
 use crate::ui_content::hud::HudInputs;

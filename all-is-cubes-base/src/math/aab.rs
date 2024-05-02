@@ -19,7 +19,7 @@ use crate::math::{
 /// Note that this has continuous coordinates, and a discrete analogue exists as
 /// [`GridAab`].
 ///
-#[doc = include_str!("../save/serde-warning.md")]
+#[doc = include_str!("../serde-warning.md")]
 // TODO(euclid migration): Replace this with `euclid` box type? Probably not.
 #[derive(Copy, Clone, PartialEq)]
 pub struct Aab {
@@ -139,6 +139,7 @@ impl Aab {
     /// The center of the enclosed volume.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Aab, FreePoint};
     ///
     /// let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
@@ -150,7 +151,8 @@ impl Aab {
 
     /// Iterates over the eight corner points of the box.
     /// The ordering is deterministic but not currently declared stable.
-    pub(crate) fn corner_points(
+    #[doc(hidden)]
+    pub fn corner_points(
         self,
     ) -> impl DoubleEndedIterator<Item = FreePoint> + ExactSizeIterator + FusedIterator {
         let l = self.lower_bounds;
@@ -216,6 +218,7 @@ impl Aab {
     /// at the center point of `self`.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::Aab;
     ///
     /// assert_eq!(
@@ -241,8 +244,8 @@ impl Aab {
     }
 
     #[inline]
-    // Not public because this is an odd interface that primarily helps with collision.
-    pub(crate) fn leading_corner(&self, direction: FreeVector) -> FreeVector {
+    #[doc(hidden)] // Not public because this is an odd interface that primarily helps with collision.
+    pub fn leading_corner(&self, direction: FreeVector) -> FreeVector {
         let mut leading_corner = Vector3D::zero();
         for axis in Axis::ALL {
             if direction[axis] >= 0.0 {
@@ -261,6 +264,7 @@ impl Aab {
     /// expect, while non-integer bounds will be rounded outward:
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Aab, GridAab};
     ///
     /// let grid_aab = Aab::from_lower_upper([3.0, 0.5, 0.0], [5.0, 1.5, 1.0])
@@ -275,6 +279,7 @@ impl Aab {
     /// then they will be clamped.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// # use all_is_cubes::math::{Aab, GridAab};
     /// use all_is_cubes::math::{FreeCoordinate, GridCoordinate};
     ///

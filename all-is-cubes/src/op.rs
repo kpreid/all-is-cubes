@@ -113,7 +113,7 @@ impl VisitHandles for Operation {
 #[non_exhaustive]
 pub(crate) enum OperationError {}
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl std::error::Error for OperationError {}
 }
 

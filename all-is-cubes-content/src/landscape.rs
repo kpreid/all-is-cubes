@@ -12,8 +12,7 @@ use all_is_cubes::block::{
     AIR,
 };
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
-use all_is_cubes::math::{Cube, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb};
-use all_is_cubes::notnan;
+use all_is_cubes::math::{notnan, Cube, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb};
 use all_is_cubes::space::Sky;
 use all_is_cubes::space::{SetCubeError, Space};
 use all_is_cubes::universe::UniverseTransaction;

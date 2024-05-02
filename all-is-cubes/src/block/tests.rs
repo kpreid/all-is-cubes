@@ -17,8 +17,8 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::listen::{self, NullListener, Sink};
 use crate::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, NotNan,
-    OpacityCategory, Rgb, Rgba, Vol,
+    notnan, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector,
+    NotNan, OpacityCategory, Rgb, Rgba, Vol,
 };
 use crate::space::{Space, SpaceTransaction};
 use crate::time::DeadlineNt;

@@ -32,7 +32,7 @@ impl GridIter {
 
     /// Returns the bounds which this iterator iterates over.
     /// This may be larger than the union of produced cubes, but it will not be smaller.
-    pub(crate) fn bounds(&self) -> GridAab {
+    pub fn bounds(&self) -> GridAab {
         GridAab::from_ranges([
             self.x_range.clone(),
             self.y_range.clone(),
@@ -40,8 +40,8 @@ impl GridIter {
         ])
     }
 
-    // Returns whether the iterator will produce the given cube.
-    pub(crate) fn contains_cube(&self, cube: Cube) -> bool {
+    /// Returns whether the iterator will produce the given cube.
+    pub fn contains_cube(&self, cube: Cube) -> bool {
         if !self.bounds().contains_cube(cube) {
             return false;
         }

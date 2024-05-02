@@ -6,13 +6,13 @@ use std::sync::{Arc, Mutex};
 use all_is_cubes::block::{self, Block, BlockDef, BlockDefTransaction, AIR};
 use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, TransparencyOption, Viewport};
 use all_is_cubes::chunking::ChunkPos;
+use all_is_cubes::color_block;
 use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::listen::Listener as _;
+use all_is_cubes::math::{notnan, GridPoint, NotNan};
 use all_is_cubes::math::{Cube, FreePoint, GridAab, GridCoordinate};
-use all_is_cubes::math::{GridPoint, NotNan};
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange, SpaceTransaction};
 use all_is_cubes::universe::{Handle, Universe};
-use all_is_cubes::{color_block, notnan};
 use all_is_cubes::{time, transaction};
 
 use crate::texture::NoTextures;

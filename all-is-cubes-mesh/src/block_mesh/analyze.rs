@@ -278,8 +278,8 @@ fn shift_nz(bits: u8) -> u8 {
 mod tests {
     use super::*;
     use all_is_cubes::euclid::{point2, size2};
-    use all_is_cubes::math::{GridAab, ZMaj};
-    use all_is_cubes::rgba_const;
+    use all_is_cubes::math::{rgba_const, GridAab, ZMaj};
+
     use all_is_cubes::universe::Universe;
     use alloc::sync::Arc;
     use alloc::vec::Vec;

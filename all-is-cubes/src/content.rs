@@ -18,7 +18,7 @@ use crate::arcstr::{literal, ArcStr};
 use crate::block::{Block, Resolution, Resolution::R16, RotationPlacementRule};
 use crate::color_block;
 use crate::inv::{Slot, Tool};
-use crate::math::{Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, Rgb, Rgba};
+use crate::math::{rgb_const, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, Rgb, Rgba};
 use crate::raycast::Raycaster;
 use crate::space::{SetCubeError, Space};
 use crate::transaction::Transactional as _;

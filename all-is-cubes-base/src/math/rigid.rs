@@ -81,6 +81,7 @@ impl Gridgid {
     /// the same as a [`GridAab::single_cube`] containing that cube.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Cube, Gridgid, GridPoint, GridRotation, GridVector};
     ///
     /// // Translation without rotation has the usual definition.

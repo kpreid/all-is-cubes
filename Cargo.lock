@@ -43,6 +43,7 @@ dependencies = [
 name = "all-is-cubes"
 version = "0.7.1"
 dependencies = [
+ "all-is-cubes-base",
  "allocation-counter",
  "arbitrary",
  "arcstr",
@@ -70,7 +71,6 @@ dependencies = [
  "once_cell",
  "ordered-float",
  "png-decoder",
- "polonius-the-crab",
  "pretty_assertions",
  "rand 0.8.5",
  "rand_xoshiro",
@@ -80,10 +80,36 @@ dependencies = [
  "re_types",
  "serde",
  "serde_json",
- "serde_repr",
  "tokio",
  "unicode-segmentation",
  "yield-progress",
+]
+
+[[package]]
+name = "all-is-cubes-base"
+version = "0.7.1"
+dependencies = [
+ "arbitrary",
+ "bytemuck",
+ "cfg-if",
+ "displaydoc",
+ "embedded-graphics",
+ "euclid",
+ "exhaust",
+ "futures-core",
+ "futures-util",
+ "indoc",
+ "itertools 0.12.1",
+ "manyfmt",
+ "mutants",
+ "num-traits",
+ "ordered-float",
+ "polonius-the-crab",
+ "pretty_assertions",
+ "rand 0.8.5",
+ "rand_xoshiro",
+ "re_types",
+ "serde",
 ]
 
 [[package]]

@@ -66,6 +66,8 @@
         - `AnyURef` to `AnyHandle`
         - `VisitRefs` to `VisitHandles`
         - `RefVisitor` to `HandleVisitor`
+        
+    - The macros `rgb_const!`, `rgba_const!`, and `notnan!` have been moved to the `math` module.
 
 - `all-is-cubes-mesh` library:
     - The return type of `GetBlockMesh::get_block_mesh()` has changed to `Option<&BlockMesh>`.

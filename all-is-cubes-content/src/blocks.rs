@@ -11,6 +11,7 @@ use all_is_cubes::block::{
     self, AnimationHint, Atom, Block, BlockCollision, BlockDefTransaction, Primitive,
     Resolution::*, RotationPlacementRule, TickAction, AIR,
 };
+use all_is_cubes::color_block;
 use all_is_cubes::drawing::embedded_graphics::{
     prelude::Point,
     primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable},
@@ -19,15 +20,14 @@ use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector, Gridgid, Rgb,
-    Rgba, VectorOps,
+    rgb_const, rgba_const, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation,
+    GridVector, Gridgid, Rgb, Rgba, VectorOps,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::{color_block, rgb_const, rgba_const};
 
 use crate::alg::{gradient_lookup, scale_color, square_radius, NoiseFnExt as _};
 use crate::landscape::install_landscape_blocks;

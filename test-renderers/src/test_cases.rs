@@ -17,18 +17,18 @@ use all_is_cubes::camera::{
     ViewTransform, Viewport,
 };
 use all_is_cubes::character::{Character, Spawn};
+use all_is_cubes::color_block;
 use all_is_cubes::euclid::{point3, size2, size3, vec2, vec3, Point2D, Size2D, Vector3D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
-    GridVector, NotNan, Rgb, Rgba, VectorOps, Vol,
+    notnan, rgb_const, rgba_const, Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate,
+    GridPoint, GridRotation, GridVector, NotNan, Rgb, Rgba, VectorOps, Vol,
 };
 use all_is_cubes::space::{self, LightPhysics, Space, SpaceBuilder};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Handle, HandleError, Universe, UniverseTransaction};
 use all_is_cubes::util::yield_progress_for_testing;
-use all_is_cubes::{color_block, notnan, rgb_const, rgba_const};
 use all_is_cubes_content::{make_some_voxel_blocks, palette, UniverseTemplate};
 
 use crate::{
@@ -780,9 +780,9 @@ async fn sky(mut context: RenderTestContext, face: Face6) {
     let [block] = make_some_voxel_blocks(&mut universe);
 
     let [r, g, b] = [
-        palette::UNIFORM_LUMINANCE_RED,
-        palette::UNIFORM_LUMINANCE_GREEN,
-        palette::UNIFORM_LUMINANCE_BLUE,
+        Rgb::UNIFORM_LUMINANCE_RED,
+        Rgb::UNIFORM_LUMINANCE_GREEN,
+        Rgb::UNIFORM_LUMINANCE_BLUE,
     ];
     // axis-colored sky (+x has red and -x has no red, and so on) to disambiguate
     // all directions

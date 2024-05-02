@@ -4,7 +4,7 @@ use euclid::Vector3D;
 use ordered_float::NotNan;
 
 use crate::camera::GraphicsOptions;
-use crate::math::{Intensity, Rgb, Rgba};
+use crate::math::{notnan, rgb_const, Intensity, Rgb, Rgba};
 use crate::space::SpaceBlockData;
 
 /// Borrowed data which may be used to customize the result of raytracing.

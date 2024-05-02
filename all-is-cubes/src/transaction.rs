@@ -220,7 +220,7 @@ where
     }
 }
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl<Txn> std::error::Error for ExecuteError<Txn>
     where
         Txn: Merge,
@@ -278,7 +278,7 @@ pub struct PreconditionFailed {
     pub(crate) problem: &'static str,
 }
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl std::error::Error for PreconditionFailed {}
 }
 
@@ -345,7 +345,7 @@ impl CommitError {
     }
 }
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl std::error::Error for CommitError {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             match &self.0 {

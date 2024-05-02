@@ -26,14 +26,14 @@ use crate::math::GridAab;
 ///   rotation about that axis.
 /// * [`GridMatrix`] is more general, specifying an affine transformation.
 ///
-#[doc = include_str!("../save/serde-warning.md")]
+#[doc = include_str!("../serde-warning.md")]
 #[rustfmt::skip]
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::exhaustive_enums)]
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 pub enum GridRotation {
     // TODO: shuffle or explicitly number these to choose a meaningful numbering
@@ -85,6 +85,7 @@ impl GridRotation {
     /// The rotation that is clockwise in our Y-up right-handed coordinate system.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Face6::*, GridRotation};
     ///
     /// assert_eq!(GridRotation::CLOCKWISE.transform(PX), PZ);
@@ -99,6 +100,7 @@ impl GridRotation {
     /// The rotation that is counterclockwise in our Y-up right-handed coordinate system.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Face6::*, GridRotation};
     ///
     /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(PX), NZ);
@@ -293,6 +295,10 @@ impl GridRotation {
     /// That is, a [`GridAab`] of that volume will be unchanged by rotation:
     ///
     /// ```
+    /// # mod all_is_cubes {
+    /// #   pub mod block { pub use all_is_cubes_base::resolution::Resolution; }
+    /// #   pub use all_is_cubes_base::math;
+    /// # }
     /// use all_is_cubes::block::Resolution;
     /// use all_is_cubes::math::{GridAab, GridRotation};
     ///
@@ -306,6 +312,7 @@ impl GridRotation {
     /// *not* [`GridMatrix::transform_point`]
     /// (due to the lower-corner format of cube coordinates).
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{GridAab, Cube, GridRotation};
     ///
     /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_transform(4);
@@ -402,6 +409,7 @@ impl GridRotation {
     /// Returns whether this is a reflection.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{GridRotation, Face6::*};
     ///
     /// assert!(!GridRotation::IDENTITY.is_reflection());
@@ -421,6 +429,7 @@ impl GridRotation {
     /// Returns the inverse of this rotation; the one which undoes this.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::GridRotation;
     ///
     /// for &rotation in &GridRotation::ALL {
@@ -454,6 +463,7 @@ impl GridRotation {
     /// just before it would produce the identity again.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::Face6::*;
     /// use all_is_cubes::math::GridRotation;
     ///
@@ -513,7 +523,9 @@ impl Mul<Self> for GridRotation {
 
     /// Multiplication is concatenation: `self * rhs` is equivalent to
     /// applying `rhs` and then applying `self`.
+    ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Face6, Face6::*, GridRotation, GridPoint};
     ///
     /// let transform_1 = GridRotation::from_basis([NY, PX, PZ]);

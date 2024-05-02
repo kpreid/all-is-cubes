@@ -7,24 +7,13 @@ use core::ops::Range;
 
 use euclid::{Size3D, Vector3D};
 
-use crate::block::Resolution;
 use crate::math::{
     sort_two, Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridCoordinate, GridIter,
     GridPoint, GridSize, GridVector, Gridgid, VectorOps as _, Vol,
 };
+use crate::resolution::Resolution;
 
-/// An axis-aligned box with integer coordinates.
-/// [`GridAab`]s are used to specify the coordinate extent of [`Space`](crate::space::Space)s, and
-/// regions within them.
-///
-/// When we refer to “a cube” in a [`GridAab`], that is a unit cube which is identified by the
-/// integer coordinates of its most negative corner, in the fashion of [`Cube`].
-///
-/// A [`GridAab`] may have a zero-size range in any direction, thus making its total volume zero.
-/// The different possibilities are not considered equal; thus, points, lines, and planes may be
-/// represented, which may be useful for procedural-generation purposes.
-///
-#[doc = include_str!("../save/serde-warning.md")]
+#[allow(missing_docs)] // documented in its all-is-cubes reexport
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct GridAab {
     lower_bounds: GridPoint,
@@ -40,6 +29,10 @@ impl GridAab {
     /// be constructed, but they're all kind of verbose:
     ///
     /// ```
+    /// # mod all_is_cubes {
+    /// #   pub mod block { pub use all_is_cubes_base::resolution::Resolution; }
+    /// #   pub use all_is_cubes_base::math;
+    /// # }
     /// use all_is_cubes::block::Resolution;
     /// use all_is_cubes::math::{GridAab, Cube};
     ///
@@ -186,6 +179,7 @@ impl GridAab {
     /// (If this fallibility is undesirable, consider using a [`Vol<()>`] instead of [`GridAab.`])
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::GridAab;
     ///
     /// let a = GridAab::from_lower_size([-10, 3, 7], [100, 200, 300]);
@@ -297,6 +291,7 @@ impl GridAab {
     /// may be at a half-block position.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{FreePoint, GridAab};
     ///
     /// let b = GridAab::from_lower_size([0, 0, -2], [10, 3, 4]);
@@ -313,6 +308,7 @@ impl GridAab {
     /// and may change in later versions. If order matters, use [`Vol::iter_cubes()`] instead.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{GridAab, Cube};
     ///
     /// let b = GridAab::from_lower_size([10, 20, 30], [1, 2, 3]);
@@ -335,7 +331,10 @@ impl GridAab {
     /// Returns whether the box includes the given cube position in its volume.
     ///
     /// ```
-    /// let b = all_is_cubes::math::GridAab::from_lower_size([4, 4, 4], [6, 6, 6]);
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{GridAab, Cube};
+    ///
+    /// let b = GridAab::from_lower_size([4, 4, 4], [6, 6, 6]);
     /// assert!(!b.contains_cube([3, 5, 5].into()));
     /// assert!(b.contains_cube([4, 5, 5].into()));
     /// assert!(b.contains_cube([9, 5, 5].into()));
@@ -355,6 +354,7 @@ impl GridAab {
     /// TODO: Precisely define the behavior on zero volume boxes.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::GridAab;
     /// let b46 = GridAab::from_lower_size([4, 4, 4], [6, 6, 6]);
     /// assert!(b46.contains_box(b46));
@@ -384,6 +384,7 @@ impl GridAab {
     /// the box coordinates, call [`GridAab::intersection_box()`] instead.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::GridAab;
     ///
     /// // Simple example of an intersection.
@@ -431,6 +432,7 @@ impl GridAab {
     /// is overlap, call [`GridAab::intersection_cubes()`] instead for a tighter bound.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::GridAab;
     ///
     /// // Simple example of an intersection.
@@ -474,6 +476,7 @@ impl GridAab {
     /// If both inputs are empty, then `self` is returned.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::GridAab;
     ///
     /// let g1 = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
@@ -503,6 +506,7 @@ impl GridAab {
     /// If this is not desired, call [`GridAab::union_cubes()`] instead for a tighter bound.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::GridAab;
     ///
     /// let g1 = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
@@ -530,7 +534,8 @@ impl GridAab {
         Self::from_lower_size(lower, upper - lower)
     }
 
-    pub(crate) fn minkowski_sum(self, other: GridAab) -> Result<GridAab, GridOverflowError> {
+    #[doc(hidden)] // TODO: good public API?
+    pub fn minkowski_sum(self, other: GridAab) -> Result<GridAab, GridOverflowError> {
         // TODO: needs checked sums
         Self::checked_from_lower_size(
             self.lower_bounds() + other.lower_bounds().to_vector(),
@@ -541,8 +546,10 @@ impl GridAab {
     /// Returns a random cube contained by the box, if there are any.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::GridAab;
     /// use rand::SeedableRng;
+    ///
     /// let mut rng = &mut rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
     ///
     /// let b = GridAab::from_lower_size([4, 4, 4], [6, 6, 6]);
@@ -580,6 +587,7 @@ impl GridAab {
     /// (unless that is impossible due to numeric overflow).
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::GridAab;
     ///
     /// assert_eq!(
@@ -627,7 +635,9 @@ impl GridAab {
     /// Panics if the divisor is not positive.
     ///
     /// ```
-    /// # use all_is_cubes::math::GridAab;
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::GridAab;
+    ///
     /// assert_eq!(
     ///     GridAab::from_lower_size([-10, -10, -10], [20, 20, 20]).divide(10),
     ///     GridAab::from_lower_size([-1, -1, -1], [2, 2, 2]),
@@ -669,6 +679,7 @@ impl GridAab {
     /// Panics on numeric overflow.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// # use all_is_cubes::math::GridAab;
     /// assert_eq!(
     ///     GridAab::from_lower_size([-1, 2, 3], [4, 5, 6]).multiply(10),
@@ -688,8 +699,8 @@ impl GridAab {
     /// instead.
     ///
     /// ```
-    /// use all_is_cubes::math::GridAab;
-    /// use all_is_cubes::math::FaceMap;
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{GridAab, FaceMap};
     ///
     /// assert_eq!(
     ///     GridAab::from_lower_upper([10, 10, 10], [20, 20, 20])
@@ -725,8 +736,8 @@ impl GridAab {
     /// For example, it may be used to construct the walls of a room:
     ///
     /// ```
-    /// use all_is_cubes::math::GridAab;
-    /// use all_is_cubes::math::Face6;
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{GridAab, Face6};
     ///
     /// let interior = GridAab::from_lower_upper([10, 10, 10], [20, 20, 20]);
     /// let left_wall = interior.abut(Face6::NX, 2)?;
@@ -740,8 +751,8 @@ impl GridAab {
     /// Example of negative thickness:
     ///
     /// ```
-    /// # use all_is_cubes::math::GridAab;
-    /// # use all_is_cubes::math::Face6;
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// # use all_is_cubes::math::{GridAab, Face6};
     ///
     /// let b = GridAab::from_lower_upper([10, 10, 10], [20, 20, 20]);
     /// assert_eq!(
@@ -838,8 +849,8 @@ impl fmt::Debug for RangeWithLength {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::Resolution::*;
     use crate::math::{GridRotation, ZMaj};
+    use crate::resolution::Resolution::*;
     use alloc::string::ToString as _;
     use indoc::indoc;
 

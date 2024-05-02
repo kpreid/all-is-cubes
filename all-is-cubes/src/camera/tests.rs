@@ -6,7 +6,7 @@ use crate::camera::{
     look_at_y_up, Camera, ExposureOption, FrustumPoints, GraphicsOptions, LightingOption,
     ViewTransform, Viewport,
 };
-use crate::math::{Aab, NotNan};
+use crate::math::{notnan, rgba_const, Aab, NotNan};
 
 #[test]
 fn camera_bad_viewport_doesnt_panic() {
