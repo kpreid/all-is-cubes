@@ -330,9 +330,9 @@ fn delete_wrong_universe_fails() {
 fn step_time() {
     let mut u = Universe::new();
     assert_eq!(u.session_step_time, 0);
-    u.step(false, time::DeadlineStd::Whenever);
+    u.step(false, time::DeadlineNt::Whenever);
     assert_eq!(u.session_step_time, 1);
-    u.step(true, time::DeadlineStd::Whenever);
+    u.step(true, time::DeadlineNt::Whenever);
     assert_eq!(u.session_step_time, 1);
 }
 
@@ -370,13 +370,13 @@ fn universe_behavior() {
     dbg!(&u);
     assert!(u.get_any(&"foo".into()).is_none());
 
-    u.step(false, time::DeadlineStd::Whenever);
+    u.step(false, time::DeadlineNt::Whenever);
 
     // After stepping, the behavior should have done its thing
     assert!(u.get_any(&"foo".into()).is_some());
 
     // A further step should not fail since the behavior removed itself
-    u.step(false, time::DeadlineStd::Whenever);
+    u.step(false, time::DeadlineNt::Whenever);
 }
 
 #[test]
@@ -393,7 +393,7 @@ fn gc_implicit() {
     let mut u = Universe::new();
     u.insert_anonymous(BlockDef::new(AIR));
     assert_eq!(1, u.iter_by_type::<BlockDef>().count());
-    u.step(false, time::DeadlineStd::Whenever);
+    u.step(false, time::DeadlineNt::Whenever);
     assert_eq!(0, u.iter_by_type::<BlockDef>().count());
 }
 

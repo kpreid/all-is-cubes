@@ -185,7 +185,7 @@ mod tests {
             //     .fill_uniform(space.bounds().expand(FaceMap::repeat(-1)), AIR)
             //     .unwrap();
 
-            space.evaluate_light::<std::time::Instant>(0, |_| {});
+            space.evaluate_light::<crate::time::NoTime>(0, |_| {});
             space
         });
         let mut character = Character::spawn_default(space);

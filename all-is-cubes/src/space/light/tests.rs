@@ -98,7 +98,7 @@ fn step() {
     assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::NO_RAYS);
     assert_eq!(space.get_lighting([2, 0, 0]), PackedLight::NO_RAYS);
 
-    let (info, _) = space.step(None, time::Tick::arbitrary(), time::DeadlineStd::Whenever);
+    let (info, _) = space.step(None, time::Tick::arbitrary(), time::DeadlineNt::Whenever);
     assert_eq!(
         info.light,
         LightUpdatesInfo {
@@ -280,7 +280,7 @@ fn disabled_lighting_does_not_update() {
         .light_needs_update(Cube::new(0, 0, 0), Priority::UNINIT);
     assert_eq!(
         space
-            .step(None, time::Tick::arbitrary(), time::DeadlineStd::Whenever)
+            .step(None, time::Tick::arbitrary(), time::DeadlineNt::Whenever)
             .0
             .light,
         LightUpdatesInfo::default()

@@ -340,7 +340,7 @@ mod tests {
         // TODO: We need a "step until idle" function, or for the UniverseStepInfo to convey how many blocks were updated / are waiting
         // TODO: Some tests will want to look at the partial results
         for _ in 0..257 {
-            universe.step(false, time::DeadlineStd::Whenever);
+            universe.step(false, time::DeadlineNt::Whenever);
         }
         checker(&space.read().unwrap(), &block);
     }
