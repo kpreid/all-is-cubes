@@ -741,25 +741,6 @@ impl From<Rgba> for Block {
         Block::from_primitive(Primitive::Atom(Atom::from(color)))
     }
 }
-// TODO: Eliminate these Cow impls given the new Block-is-a-pointer world.
-impl From<Rgb> for Cow<'_, Block> {
-    /// Construct a [`Block`] with the given reflectance color, and default attributes.
-    ///
-    /// This operation allocates a new [`Primitive`] value on the heap.
-    /// If the color is a constant, you may use [`color_block!`] instead to avoid allocation.
-    fn from(color: Rgb) -> Self {
-        Cow::Owned(Block::from(color))
-    }
-}
-impl From<Rgba> for Cow<'_, Block> {
-    /// Construct a [`Block`] with the given reflectance color, and default attributes.
-    ///
-    /// This operation allocates a new [`Primitive`] value on the heap.
-    /// If the color is a constant, you may use [`color_block!`] instead to avoid allocation.
-    fn from(color: Rgba) -> Self {
-        Cow::Owned(Block::from(color))
-    }
-}
 
 #[cfg(feature = "arbitrary")]
 mod arbitrary_block {

@@ -504,7 +504,9 @@ fn space_debug() {
 #[test]
 fn set_physics_light_none() {
     let mut space = Space::empty_positive(1, 1, 1);
-    space.set([0, 0, 0], Rgba::new(1.0, 1.0, 1.0, 0.5)).unwrap();
+    space
+        .set([0, 0, 0], color_block!(1.0, 1.0, 1.0, 0.5))
+        .unwrap();
     assert_eq!(space.light.light_update_queue.len(), 1);
     // Check that a no-op update doesn't clear
     space.set_physics(SpacePhysics::default());
@@ -524,8 +526,12 @@ fn set_physics_light_none() {
 #[test]
 fn set_physics_light_rays() {
     let mut space = Space::empty_positive(2, 1, 1);
-    space.set([0, 0, 0], Rgba::new(1.0, 1.0, 1.0, 0.5)).unwrap();
-    space.set([1, 0, 0], Rgba::new(1.0, 1.0, 1.0, 1.0)).unwrap();
+    space
+        .set([0, 0, 0], color_block!(1.0, 1.0, 1.0, 0.5))
+        .unwrap();
+    space
+        .set([1, 0, 0], color_block!(1.0, 1.0, 1.0, 1.0))
+        .unwrap();
     space.set_physics(SpacePhysics {
         light: LightPhysics::None,
         ..SpacePhysics::default()

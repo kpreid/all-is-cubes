@@ -12,7 +12,7 @@ use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
 use all_is_cubes::math::GridRotation;
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::{include_image, rgba_const};
+use all_is_cubes::{color_block, include_image};
 
 use crate::vui::widgets;
 use crate::vui::widgets::{BoxStyle, ButtonBase as _, ButtonVisualState, ToggleButtonVisualState};
@@ -267,10 +267,12 @@ impl ToolbarButtonState {
         match self {
             // same color as the icon image has for a background
             // (but TODO: this choice of constant doesn't make sense)
-            Self::Unmapped => VoxelBrush::with_thickness(palette::HUD_TOOLBAR_BACK, 0..1),
-            Self::Mapped => VoxelBrush::with_thickness(palette::BUTTON_BACK, 0..3),
+            Self::Unmapped => {
+                VoxelBrush::with_thickness(color_block!(palette::HUD_TOOLBAR_BACK), 0..1)
+            }
+            Self::Mapped => VoxelBrush::with_thickness(color_block!(palette::BUTTON_BACK), 0..3),
             // TODO: figure out a palette color for this
-            Self::Pressed => VoxelBrush::with_thickness(rgba_const!(0.1, 0.1, 0.1, 1.0), 0..2),
+            Self::Pressed => VoxelBrush::with_thickness(color_block!(0.1, 0.1, 0.1, 1.0), 0..2),
         }
     }
 }

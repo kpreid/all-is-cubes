@@ -92,7 +92,7 @@ fn step() {
         .build();
     let sky_light = PackedLight::from(color);
 
-    space.set([0, 0, 0], Rgb::ONE).unwrap();
+    space.set([0, 0, 0], color_block!(Rgb::ONE)).unwrap();
     // Not changed yet... except for the now-opaque block
     assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::NO_RAYS);
@@ -118,7 +118,7 @@ fn step() {
 fn evaluate_light() {
     let mut space = Space::empty_positive(3, 1, 1);
     assert_eq!(0, space.evaluate_light::<time::NoTime>(0, |_| {}));
-    space.set([1, 0, 0], Rgb::ONE).unwrap();
+    space.set([1, 0, 0], color_block!(Rgb::ONE)).unwrap();
     assert_eq!(2, space.evaluate_light::<time::NoTime>(0, |_| {}));
     assert_eq!(0, space.evaluate_light::<time::NoTime>(0, |_| {}));
     // This is just a smoke test, "is it plausible that it's working".

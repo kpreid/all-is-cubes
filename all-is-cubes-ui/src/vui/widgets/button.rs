@@ -602,7 +602,7 @@ impl ButtonBase for ButtonVisualState {
 
     fn button_block(&self, txn: &mut UniverseTransaction) -> Result<Block, InGenError> {
         let label_z = self.button_label_z();
-        let back_block = palette::BUTTON_BACK; // TODO: different color theme for action than toggle?
+        let back_block = color_block!(palette::BUTTON_BACK); // TODO: different color theme for action than toggle?
         let frame_brush = VoxelBrush::single(color_block!(palette::BUTTON_FRAME));
         let back_brush = VoxelBrush::with_thickness(back_block, 0..label_z);
         let cap_rim_brush = VoxelBrush::new([(
