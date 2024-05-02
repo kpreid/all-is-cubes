@@ -749,7 +749,7 @@ fn space_light_queue_remembered() {
     );
 
     // Then, when stepped, they are updated
-    let (_, _) = space2.step(None, Tick::arbitrary(), time::DeadlineStd::Whenever);
+    let (_, _) = space2.step(None, Tick::arbitrary(), time::DeadlineNt::Whenever);
     assert_eq!(
         [0, 1, 2].map(|x| space2.get_lighting([x, 0, 0]).status()),
         [Opaque, Visible, NoRays]

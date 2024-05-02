@@ -513,7 +513,7 @@ mod tests {
             if template != UniverseTemplate::Blank {
                 let _ = u.get_default_character().unwrap().read().unwrap();
             }
-            u.step(false, time::DeadlineStd::Asap);
+            u.step(false, time::DeadlineNt::Asap);
         }
     }
 }

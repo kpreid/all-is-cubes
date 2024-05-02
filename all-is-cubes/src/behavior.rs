@@ -905,8 +905,8 @@ mod tests {
         });
         let character = u.insert_anonymous(character);
 
-        u.step(false, time::DeadlineStd::Whenever);
-        u.step(false, time::DeadlineStd::Whenever);
+        u.step(false, time::DeadlineNt::Whenever);
+        u.step(false, time::DeadlineNt::Whenever);
 
         // Until we have a way to query the behavior set, the best test we can do is to
         // read its effects.
@@ -934,7 +934,7 @@ mod tests {
                 .count(),
             1
         );
-        u.step(false, time::DeadlineStd::Whenever);
+        u.step(false, time::DeadlineNt::Whenever);
         assert_eq!(
             character
                 .read()

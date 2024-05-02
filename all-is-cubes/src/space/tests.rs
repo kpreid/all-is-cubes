@@ -420,7 +420,7 @@ fn listens_to_block_changes() {
     // computations like reevaluation to happen during the notification process.
     assert_eq!(sink.drain(), vec![]);
     // Instead, it only happens the next time the space is stepped.
-    let (_, _) = space.step(None, Tick::arbitrary(), time::DeadlineStd::Whenever);
+    let (_, _) = space.step(None, Tick::arbitrary(), time::DeadlineNt::Whenever);
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(sink.drain(), vec![SpaceChange::BlockEvaluation(0)]);
     assert_eq!(space.get_evaluated([0, 0, 0]), &new_evaluated);
@@ -450,7 +450,7 @@ fn indirect_becomes_evaluation_error() {
         .unwrap();
 
     // Step the space to let it notice.
-    let (_, _) = space.step(None, Tick::arbitrary(), time::DeadlineStd::Whenever);
+    let (_, _) = space.step(None, Tick::arbitrary(), time::DeadlineNt::Whenever);
 
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(sink.drain(), vec![SpaceChange::BlockEvaluation(0)]);
@@ -586,11 +586,11 @@ fn block_tick_action_does_not_run_paused() {
     let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
 
     // No effect when paused
-    _ = space.step(None, clock.advance(true), time::DeadlineStd::Whenever);
+    _ = space.step(None, clock.advance(true), time::DeadlineNt::Whenever);
     assert_eq!(space[[0, 0, 0]], vanisher);
 
     // Operation applied when unpaused
-    _ = space.step(None, clock.advance(false), time::DeadlineStd::Whenever);
+    _ = space.step(None, clock.advance(false), time::DeadlineNt::Whenever);
     assert_eq!(space[[0, 0, 0]], AIR);
 }
 
@@ -631,7 +631,7 @@ fn block_tick_action_timing() {
             99
         });
 
-        let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineStd::Whenever);
+        let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineNt::Whenever);
         // TODO: the block effect isn't a returned transaction yet but it perhaps should be.
         // This test will need reworking at that point.
         assert_eq!(step_txn, UniverseTransaction::default());
@@ -681,7 +681,7 @@ fn block_tick_action_conflict() {
     space.set(left, &modifies_px_neighbor).unwrap();
     space.set(right, &modifies_nx_neighbor).unwrap();
 
-    let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineStd::Whenever);
+    let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineNt::Whenever);
     assert_eq!(step_txn, UniverseTransaction::default());
 
     assert_eq!(
@@ -707,7 +707,7 @@ fn block_tick_action_conflict() {
     // should take effect.
     space.set(right, &AIR).unwrap();
 
-    let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineStd::Whenever);
+    let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineNt::Whenever);
     assert_eq!(step_txn, UniverseTransaction::default());
     assert_eq!(fluff_sink.drain(), vec![]);
     assert_eq!(
