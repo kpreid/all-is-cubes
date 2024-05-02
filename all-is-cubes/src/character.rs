@@ -791,14 +791,15 @@ pub enum CharacterTransactionConflict {
     Behaviors(behavior::BehaviorTransactionConflict),
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for CharacterTransactionConflict {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            CharacterTransactionConflict::SetSpace => None,
-            CharacterTransactionConflict::Body(_) => None,
-            CharacterTransactionConflict::Inventory(e) => Some(e),
-            CharacterTransactionConflict::Behaviors(e) => Some(e),
+cfg_should_impl_error! {
+    impl std::error::Error for CharacterTransactionConflict {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                CharacterTransactionConflict::SetSpace => None,
+                CharacterTransactionConflict::Body(_) => None,
+                CharacterTransactionConflict::Inventory(e) => Some(e),
+                CharacterTransactionConflict::Behaviors(e) => Some(e),
+            }
         }
     }
 }

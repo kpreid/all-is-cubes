@@ -480,8 +480,9 @@ pub enum InventoryConflict {
     ReplaceSameSlot { slot: usize },
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for InventoryConflict {}
+cfg_should_impl_error! {
+    impl std::error::Error for InventoryConflict {}
+}
 
 /// Description of a change to an [`Inventory`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

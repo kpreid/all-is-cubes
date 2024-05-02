@@ -220,17 +220,18 @@ where
     }
 }
 
-#[cfg(feature = "std")]
-impl<Txn> std::error::Error for ExecuteError<Txn>
-where
-    Txn: Merge,
-    <Txn as Merge>::Conflict: std::error::Error + 'static,
-{
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            ExecuteError::Merge(e) => e.source(),
-            ExecuteError::Check(e) => e.source(),
-            ExecuteError::Commit(e) => e.source(),
+cfg_should_impl_error! {
+    impl<Txn> std::error::Error for ExecuteError<Txn>
+    where
+        Txn: Merge,
+        <Txn as Merge>::Conflict: std::error::Error + 'static,
+    {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                ExecuteError::Merge(e) => e.source(),
+                ExecuteError::Check(e) => e.source(),
+                ExecuteError::Commit(e) => e.source(),
+            }
         }
     }
 }
@@ -277,8 +278,9 @@ pub struct PreconditionFailed {
     pub(crate) problem: &'static str,
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for PreconditionFailed {}
+cfg_should_impl_error! {
+    impl std::error::Error for PreconditionFailed {}
+}
 
 /// Type of “unexpected errors” from [`Transaction::commit()`].
 //
@@ -343,13 +345,14 @@ impl CommitError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for CommitError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match &self.0 {
-            CommitErrorKind::Leaf { error, .. } => Some(error),
-            CommitErrorKind::LeafMessage { .. } => None,
-            CommitErrorKind::Context { error, .. } => Some(error),
+cfg_should_impl_error! {
+    impl std::error::Error for CommitError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match &self.0 {
+                CommitErrorKind::Leaf { error, .. } => Some(error),
+                CommitErrorKind::LeafMessage { .. } => None,
+                CommitErrorKind::Context { error, .. } => Some(error),
+            }
         }
     }
 }

@@ -1162,8 +1162,9 @@ pub enum SetCubeError {
     TooManyBlocks(),
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for SetCubeError {}
+cfg_should_impl_error! {
+    impl std::error::Error for SetCubeError {}
+}
 
 impl fmt::Display for SetCubeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

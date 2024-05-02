@@ -474,7 +474,7 @@ pub enum ToolError {
     Internal(String),
 }
 
-#[cfg(feature = "std")]
+cfg_should_impl_error! {
 impl std::error::Error for ToolError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
@@ -486,6 +486,7 @@ impl std::error::Error for ToolError {
             ToolError::Internal(_) => None,
         }
     }
+}
 }
 
 impl ToolError {

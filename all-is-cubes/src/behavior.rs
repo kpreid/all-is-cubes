@@ -773,8 +773,9 @@ pub struct BehaviorTransactionConflict {
     key: Key,
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for BehaviorTransactionConflict {}
+cfg_should_impl_error! {
+    impl std::error::Error for BehaviorTransactionConflict {}
+}
 
 #[cfg(test)]
 pub(crate) use testing::*;

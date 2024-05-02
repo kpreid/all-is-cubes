@@ -113,8 +113,9 @@ impl VisitHandles for Operation {
 #[non_exhaustive]
 pub(crate) enum OperationError {}
 
-#[cfg(feature = "std")]
-impl std::error::Error for OperationError {}
+cfg_should_impl_error! {
+    impl std::error::Error for OperationError {}
+}
 
 #[cfg(test)]
 mod tests {

@@ -125,9 +125,24 @@ mod error_chain {
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {
+
         /// Alias for [`std::error::Error`] that is a substitute when not on `std`.
+        /// Used to conditionally disable `Error` trait bounds.
         #[doc(hidden)]
         pub use std::error::Error as ErrorIfStd;
+
+        /// Macro that causes conditional compilation on *this* crate's `std` feature,
+        /// which should be used around `impl std::error::Error`s.
+        ///
+        /// This macro can be gotten rid of once `core::error::Error` is stable.
+        #[macro_export]
+        #[doc(hidden)]
+        macro_rules! cfg_should_impl_error {
+            ($($body:tt)*) => {
+                $($body)*
+            }
+        }
+
     } else {
         use alloc::boxed::Box;
 
@@ -141,6 +156,19 @@ cfg_if::cfg_if! {
                 Box::new(alloc::string::String::from(s))
             }
         }
+
+        /// Macro that causes conditional compilation on *this* crate's `std` feature,
+        /// which should be used around `impl std::error::Error`s.
+        ///
+        /// This macro can be gotten rid of once `core::error::Error` is stable.
+        #[macro_export]
+        #[doc(hidden)]
+        macro_rules! cfg_should_impl_error {
+            ($($body:tt)*) => {
+                // ignored
+            }
+        }
+
     }
 }
 

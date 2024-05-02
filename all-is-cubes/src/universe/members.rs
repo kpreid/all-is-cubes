@@ -374,12 +374,13 @@ macro_rules! member_enums_and_impls {
             )*
         }
 
-        #[cfg(feature = "std")]
-        impl std::error::Error for AnyTransactionConflict {
-            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-                match self {
-                    Self::Mismatch => None,
-                    $( Self::$member_type(e) => Some(e), )*
+        cfg_should_impl_error! {
+            impl std::error::Error for AnyTransactionConflict {
+                fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                    match self {
+                        Self::Mismatch => None,
+                        $( Self::$member_type(e) => Some(e), )*
+                    }
                 }
             }
         }

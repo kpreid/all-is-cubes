@@ -515,8 +515,9 @@ pub enum HandleError {
     NotReady(Name),
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for HandleError {}
+cfg_should_impl_error! {
+    impl std::error::Error for HandleError {}
+}
 
 /// Read access to the referent of a [`Handle`].
 ///
