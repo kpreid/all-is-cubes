@@ -28,12 +28,12 @@ use all_is_cubes::euclid::{size3, vec3, Point3D, Rotation2D, Vector2D, Vector3D}
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
-    GridVector, Gridgid, NotNan, Rgb, Rgba, VectorOps,
+    rgb_const, rgba_const, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate,
+    GridPoint, GridRotation, GridVector, Gridgid, NotNan, Rgb, Rgba, VectorOps,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpaceBuilder, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::{color_block, include_image, rgb_const, rgba_const};
+use all_is_cubes::{color_block, include_image};
 
 use crate::alg::{four_walls, voronoi_pattern};
 use crate::city::exhibit::{exhibit, Context, Exhibit, ExhibitTransaction, Placement};

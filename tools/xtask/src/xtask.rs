@@ -448,8 +448,9 @@ impl Scope {
 /// TODO: fetch this list (or at least cross-check it) using `cargo metadata`.
 ///
 /// See also [`Config::do_for_all_workspaces`].
-const ALL_NONTEST_PACKAGES: [&str; 9] = [
+const ALL_NONTEST_PACKAGES: [&str; 10] = [
     "all-is-cubes",
+    "all-is-cubes-base",
     "all-is-cubes-ui",
     "all-is-cubes-mesh",
     "all-is-cubes-gpu",

@@ -154,12 +154,6 @@ extern crate std;
 #[macro_use]
 extern crate alloc;
 
-#[macro_use]
-pub mod util;
-
-#[macro_use]
-pub mod math;
-
 pub mod behavior;
 pub mod block;
 pub mod camera;
@@ -174,6 +168,7 @@ pub mod intalloc;
 pub mod inv;
 pub mod linking;
 pub mod listen;
+pub mod math;
 pub mod op;
 pub mod physics;
 pub mod raycast;
@@ -186,6 +181,7 @@ pub mod space;
 pub mod time;
 pub mod transaction;
 pub mod universe;
+pub mod util;
 
 /// Re-export the version of the `arcstr` string type library we're using.
 pub use arcstr;

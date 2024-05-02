@@ -3,7 +3,7 @@ use core::fmt;
 use num_traits::One;
 use ordered_float::NotNan;
 
-use crate::math::{FreeCoordinate, Rgb, Rgba};
+use crate::math::{notnan, FreeCoordinate, Rgb, Rgba};
 use crate::util::ShowStatus;
 
 #[cfg(doc)]
@@ -455,9 +455,8 @@ impl AntialiasingOption {
 
 #[cfg(test)]
 mod tests {
-    use crate::math::OpacityCategory;
-
     use super::*;
+    use crate::math::{rgba_const, OpacityCategory};
     use pretty_assertions::assert_eq;
 
     #[test]

@@ -5,8 +5,8 @@ use core::fmt;
 #[cfg(doc)]
 use crate::universe::Universe;
 
-mod deadline;
-pub use deadline::*;
+#[doc(inline)]
+pub use all_is_cubes_base::time::*;
 
 /// Specifies an amount of time passing “in game” Home in a [`Universe`]
 /// and its contents.

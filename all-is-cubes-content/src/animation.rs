@@ -9,13 +9,13 @@ use rand_xoshiro::Xoshiro256Plus;
 
 use all_is_cubes::behavior;
 use all_is_cubes::block::{Block, BlockCollision, AIR};
+use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{Cube, GridAab, GridArray, GridPoint, GridVector, Rgba};
+use all_is_cubes::math::{rgba_const, Cube, GridAab, GridArray, GridPoint, GridVector, Rgba};
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{HandleVisitor, UniverseTransaction, VisitHandles};
-use all_is_cubes::{color_block, rgba_const};
 
 #[cfg(doc)]
 use all_is_cubes::time::TickSchedule;

@@ -480,7 +480,7 @@ pub enum InventoryConflict {
     ReplaceSameSlot { slot: usize },
 }
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl std::error::Error for InventoryConflict {}
 }
 

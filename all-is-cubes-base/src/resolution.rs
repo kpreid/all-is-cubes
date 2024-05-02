@@ -1,28 +1,6 @@
 use core::ops;
 
-#[cfg(doc)]
-use crate::block::{EvaluatedBlock, Modifier, Primitive};
-
-/// Scale factor between a [recursive block](Primitive::Recur) and its component voxels.
-///
-/// This resolution cubed is the number of voxels making up a block.
-///
-/// Resolutions are always powers of 2. This ensures that the arithmetic is well-behaved
-/// (no division by zero, exact floating-point representation, and the potential of
-/// fixed-point representation),
-/// and that it is always possible to subdivide a block further (up to the limit) without
-/// shifting the existing voxel boundaries.
-///
-/// Note that while quite high resolutions are permitted, this does not mean that it is
-/// practical to routinely use full blocks at that resolution. For example, 64 × 64 × 64
-/// = 262,144 voxels, occupying several megabytes just for color data.
-/// High resolutions are permitted for special purposes that do not necessarily use the
-/// full cube volume:
-///
-/// * *Thin* blocks (e.g. 128 × 128 × 1) can display high resolution text and other 2D
-///   images.
-/// * Multi-block structures can be defined using [`Modifier::Zoom`]; their total size
-///   is limited by the resolution limit.
+// Note: Public documentation for this is in its re-export from `all_is_cubes::block`.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[allow(missing_docs)]
@@ -129,6 +107,7 @@ impl_try_from!(usize);
 
 impl From<Resolution> for i32 {
     /// ```
+    /// # mod all_is_cubes { pub mod block { pub use all_is_cubes_base::resolution::Resolution; } }
     /// use all_is_cubes::block::Resolution;
     ///
     /// assert_eq!(64, i32::from(Resolution::R64));
@@ -187,14 +166,14 @@ impl ops::Div<Resolution> for Resolution {
     }
 }
 
-#[cfg(feature = "save")]
+#[cfg(feature = "serde")]
 impl serde::Serialize for Resolution {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         u16::from(*self).serialize(serializer)
     }
 }
 
-#[cfg(feature = "save")]
+#[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for Resolution {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         u16::deserialize(deserializer)?
@@ -208,7 +187,7 @@ impl<'de> serde::Deserialize<'de> for Resolution {
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub struct IntoResolutionError<N>(N);
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl<N: fmt::Display + fmt::Debug> std::error::Error for IntoResolutionError<N> {}
 }
 

@@ -25,6 +25,7 @@ dependencies = [
 name = "all-is-cubes"
 version = "0.7.1"
 dependencies = [
+ "all-is-cubes-base",
  "arcstr",
  "arrayvec",
  "base64",
@@ -38,7 +39,6 @@ dependencies = [
  "exhaust",
  "flate2",
  "futures-core",
- "futures-util",
  "hashbrown",
  "indoc",
  "itertools 0.12.1",
@@ -49,13 +49,32 @@ dependencies = [
  "once_cell",
  "ordered-float",
  "png-decoder",
- "polonius-the-crab",
  "rand 0.8.5",
  "rand_xoshiro",
  "serde",
- "serde_repr",
  "unicode-segmentation",
  "yield-progress",
+]
+
+[[package]]
+name = "all-is-cubes-base"
+version = "0.7.1"
+dependencies = [
+ "bytemuck",
+ "cfg-if",
+ "displaydoc",
+ "embedded-graphics",
+ "euclid",
+ "exhaust",
+ "futures-core",
+ "futures-util",
+ "manyfmt",
+ "mutants",
+ "num-traits",
+ "ordered-float",
+ "polonius-the-crab",
+ "rand 0.8.5",
+ "serde",
 ]
 
 [[package]]
@@ -1617,17 +1636,6 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
-]
-
-[[package]]
-name = "serde_repr"
-version = "0.1.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b2e6b945e9d3df726b65d6ee24060aff8e3533d431f677a9695db04eff9dfdb"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.52",
 ]
 
 [[package]]

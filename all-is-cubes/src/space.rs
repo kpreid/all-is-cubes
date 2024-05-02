@@ -22,7 +22,8 @@ use crate::fluff::{self, Fluff};
 use crate::inv::{EphemeralOpaque, InventoryTransaction};
 use crate::listen::{Listen, Listener, Notifier};
 use crate::math::{
-    Cube, FreeCoordinate, GridAab, GridCoordinate, GridRotation, Gridgid, NotNan, VectorOps, Vol,
+    notnan, rgb_const, Cube, FreeCoordinate, GridAab, GridCoordinate, GridRotation, Gridgid,
+    NotNan, VectorOps, Vol,
 };
 use crate::physics::Acceleration;
 use crate::time;
@@ -1162,7 +1163,7 @@ pub enum SetCubeError {
     TooManyBlocks(),
 }
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl std::error::Error for SetCubeError {}
 }
 

@@ -18,7 +18,7 @@ use crate::character::{Character, Spawn};
 use crate::content::make_some_blocks;
 use crate::drawing::VoxelBrush;
 use crate::inv::{EphemeralOpaque, Inventory, Tool};
-use crate::math::{Cube, Face6, GridAab, GridRotation, Rgb, Rgba};
+use crate::math::{notnan, Cube, Face6, GridAab, GridRotation, Rgb, Rgba};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::time::{self, Tick};

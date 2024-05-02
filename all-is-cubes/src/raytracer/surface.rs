@@ -350,7 +350,7 @@ mod tests {
     use super::*;
     use crate::block::{Block, Resolution::*, AIR};
     use crate::camera::GraphicsOptions;
-    use crate::math::GridAab;
+    use crate::math::{rgba_const, GridAab};
     use crate::space::Space;
     use crate::universe::Universe;
     use alloc::vec::Vec;

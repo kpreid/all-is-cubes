@@ -7,6 +7,7 @@ use core::ops::{Index, IndexMut};
 use euclid::Vector3D;
 
 use manyfmt::formats::Unquote;
+use manyfmt::Refmt as _;
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
@@ -16,19 +17,18 @@ use crate::math::{
     Axis, ConciseDebug, Cube, FreeCoordinate, FreeVector, Geometry, GridCoordinate, GridPoint,
     GridRotation, GridVector, Gridgid, LineVertex, VectorOps, Zero,
 };
-use crate::util::Refmt as _;
 
 /// Identifies a face of a cube or an orthogonal unit vector.
 ///
 /// See also the similar type [`Face7`], which adds a “zero” or “within the cube”
 /// variant. The two enums use the same discriminant numbering.
 ///
-#[doc = include_str!("../save/serde-warning.md")]
+#[doc = include_str!("../serde-warning.md")]
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 pub enum Face6 {
     /// Negative X; the face whose normal vector is `(-1, 0, 0)`.
@@ -51,12 +51,12 @@ pub enum Face6 {
 /// This is essentially `Option<`[`Face6`]`>`, except with `Face`-specific methods
 /// provided. The two enums use the same discriminant numbering.
 ///
-#[doc = include_str!("../save/serde-warning.md")]
+#[doc = include_str!("../serde-warning.md")]
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 pub enum Face7 {
     /// The interior volume of a cube, or an undefined direction. Corresponds to the vector `(0, 0, 0)`.
@@ -151,6 +151,7 @@ impl Face6 {
     /// coordinate is positive.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::Face6;
     ///
     /// assert_eq!(Face6::PX.is_positive(), true);
@@ -165,6 +166,7 @@ impl Face6 {
     /// coordinate is negative.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::Face6;
     ///
     /// assert_eq!(Face6::PX.is_negative(), false);
@@ -218,6 +220,7 @@ impl Face6 {
     /// implemented by selecting the relevant component.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Face6, FreeVector};
     ///
     /// let sample_vector = FreeVector::new(1.0, 2.0, 5.0_f64);
@@ -329,6 +332,7 @@ impl Face7 {
     /// coordinate is positive.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::Face7;
     ///
     /// assert_eq!(Face7::PX.is_positive(), true);
@@ -344,6 +348,7 @@ impl Face7 {
     /// coordinate is negative.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::Face7;
     ///
     /// assert_eq!(Face7::PX.is_negative(), false);
@@ -451,6 +456,7 @@ impl Face7 {
     /// implemented by selecting the relevant component.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Face7, FreeVector};
     ///
     /// let sample_vector = FreeVector::new(1.0, 2.0, 5.0_f64);
@@ -507,6 +513,7 @@ impl TryFrom<GridVector> for Face6 {
     /// are rejected.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Face6, GridVector};
     ///
     /// // A Face6 may be converted from its normal vector.
@@ -533,6 +540,7 @@ impl TryFrom<GridVector> for Face7 {
     /// are rejected.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Face7, GridVector};
     ///
     /// // A Face7 may be converted from its normal vector.
@@ -566,6 +574,39 @@ impl TryFrom<GridVector> for Face7 {
 #[displaydoc("Face7::Within does not have a direction or axis")]
 #[allow(clippy::exhaustive_structs)]
 pub struct Faceless;
+
+#[cfg(feature = "rerun")]
+impl From<Face6> for re_types::view_coordinates::SignedAxis3 {
+    fn from(face: Face6) -> Self {
+        use re_types::view_coordinates::{Axis3, Sign, SignedAxis3};
+        match face {
+            Face6::NX => SignedAxis3 {
+                sign: Sign::Negative,
+                axis: Axis3::X,
+            },
+            Face6::NY => SignedAxis3 {
+                sign: Sign::Negative,
+                axis: Axis3::Y,
+            },
+            Face6::NZ => SignedAxis3 {
+                sign: Sign::Negative,
+                axis: Axis3::Z,
+            },
+            Face6::PX => SignedAxis3 {
+                sign: Sign::Positive,
+                axis: Axis3::X,
+            },
+            Face6::PY => SignedAxis3 {
+                sign: Sign::Positive,
+                axis: Axis3::Y,
+            },
+            Face6::PZ => SignedAxis3 {
+                sign: Sign::Positive,
+                axis: Axis3::Z,
+            },
+        }
+    }
+}
 
 /// Container for values keyed by [`Face6`]s. Always holds exactly six elements.
 #[allow(clippy::exhaustive_structs)]
@@ -698,6 +739,7 @@ impl<V> FaceMap<V> {
     /// This may be used for constructing a map with only one interesting entry:
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Face6, FaceMap};
     ///
     /// assert_eq!(

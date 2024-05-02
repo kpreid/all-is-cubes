@@ -93,6 +93,17 @@ impl Rgb {
     /// Note that brighter values may exist; the color system “supports HDR”.
     pub const ONE: Rgb = Rgb(vec3(NN1, NN1, NN1));
 
+    /// Pure red that is as bright as it can be,
+    /// while being a sRGB color that is the same luminance as the other colors in this set.
+    pub const UNIFORM_LUMINANCE_RED: Rgb = Rgb::from_srgb8([0x9E, 0x00, 0x00]);
+    /// Pure green that is as bright as it can be,
+    /// while being a sRGB color that is the same luminance as the other colors in this set.
+    pub const UNIFORM_LUMINANCE_GREEN: Rgb = Rgb::from_srgb8([0x00, 0x59, 0x00]);
+    /// Pure blue that is as bright as it can be,
+    /// while being a sRGB color that is the same luminance as the other colors in this set.
+    /// (That turns out to be 100% blue, `#0000FF`.)
+    pub const UNIFORM_LUMINANCE_BLUE: Rgb = Rgb::from_srgb8([0x00, 0x00, 0xFF]);
+
     /// Constructs a color from components. Panics if any component is NaN.
     /// No other range checks are performed.
     #[inline]
@@ -158,6 +169,7 @@ impl Rgb {
     /// (“grayscale”) value. This will be equal to 1 if all components are 1.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::Rgb;
     ///
     /// assert_eq!(0.0, Rgb::ZERO.luminance());
@@ -548,6 +560,44 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgba {
     }
 }
 
+/// Implementations necessary for `all_is_cubes::drawing` to be able to use these types
+mod eg {
+    use embedded_graphics::pixelcolor::{self, RgbColor as _};
+
+    use super::*;
+    impl pixelcolor::PixelColor for Rgb {
+        type Raw = ();
+    }
+    impl pixelcolor::PixelColor for Rgba {
+        type Raw = ();
+    }
+    /// Adapt [`embedded_graphics`]'s most general color type to ours.
+    impl From<pixelcolor::Rgb888> for Rgb {
+        #[inline]
+        fn from(color: pixelcolor::Rgb888) -> Rgb {
+            Rgba::from_srgb8([color.r(), color.g(), color.b(), u8::MAX]).to_rgb()
+        }
+    }
+}
+
+#[cfg(feature = "rerun")]
+mod rerun {
+    use super::*;
+    use re_types::datatypes;
+
+    impl From<Rgb> for datatypes::Rgba32 {
+        fn from(value: Rgb) -> Self {
+            value.with_alpha_one().into()
+        }
+    }
+    impl From<Rgba> for datatypes::Rgba32 {
+        fn from(value: Rgba) -> Self {
+            let [r, g, b, a] = value.to_srgb8();
+            datatypes::Rgba32::from_unmultiplied_rgba(r, g, b, a)
+        }
+    }
+}
+
 #[inline]
 fn component_to_srgb(c: NotNan<f32>) -> f32 {
     // Source: <https://en.wikipedia.org/w/index.php?title=SRGB&oldid=1002296118#The_forward_transformation_(CIE_XYZ_to_sRGB)> (version as of Feb 3, 2020)
@@ -728,7 +778,8 @@ const CONST_LINEAR_LOOKUP_TABLE: [f32; 256] = [
 mod tests {
     use super::*;
     use alloc::vec::Vec;
-    use itertools::Itertools;
+    use exhaust::Exhaust as _;
+    use itertools::Itertools as _;
 
     // TODO: Add tests of the color not-NaN mechanisms.
 
@@ -833,5 +884,36 @@ mod tests {
         println!("\n];");
 
         assert_eq!(CONST_LINEAR_LOOKUP_TABLE.to_vec(), generated_table);
+    }
+
+    #[test]
+    fn check_uniform_luminance() {
+        fn optimize(channel: usize) -> [u8; 4] {
+            // Blue is the primary color whose maximum intensity is darkest;
+            // therefore it is the standard by which we check the other.
+            let reference_luminance = Rgb::UNIFORM_LUMINANCE_BLUE.luminance();
+            let (_color, srgb, luminance_difference) = u8::exhaust()
+                .map(|srgb_byte| {
+                    let mut srgb = [0, 0, 0, 255];
+                    srgb[channel] = srgb_byte;
+                    let color = Rgba::from_srgb8(srgb);
+                    (color, srgb, (color.luminance() - reference_luminance).abs())
+                })
+                .min_by(|a, b| a.2.total_cmp(&b.2))
+                .unwrap();
+            println!("best luminance difference = {luminance_difference}");
+            srgb
+        }
+
+        println!("red:");
+        assert_eq!(
+            Rgb::UNIFORM_LUMINANCE_RED.with_alpha_one().to_srgb8(),
+            optimize(0)
+        );
+        println!("green:");
+        assert_eq!(
+            Rgb::UNIFORM_LUMINANCE_GREEN.with_alpha_one().to_srgb8(),
+            optimize(1)
+        );
     }
 }

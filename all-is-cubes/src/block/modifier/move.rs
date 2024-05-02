@@ -203,7 +203,7 @@ mod tests {
     use super::*;
     use crate::block::{Composite, EvaluatedBlock, Resolution::*};
     use crate::content::make_some_blocks;
-    use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgb, Rgba};
+    use crate::math::{notnan, rgba_const, FaceMap, GridPoint, OpacityCategory, Rgb, Rgba};
     use crate::space::Space;
     use crate::time;
     use crate::universe::Universe;

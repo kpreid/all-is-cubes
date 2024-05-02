@@ -6,7 +6,7 @@ use super::{data::LightStatus, LightUpdatesInfo, PackedLight, Priority};
 use crate::block::{self, Block, AIR};
 use crate::color_block;
 use crate::listen::{Listen as _, Listener, Sink};
-use crate::math::{Cube, Face6, FaceMap, GridPoint, Rgb, Rgba};
+use crate::math::{rgb_const, Cube, Face6, FaceMap, GridPoint, Rgb, Rgba};
 use crate::space::{GridAab, LightPhysics, Sky, Space, SpaceChange, SpacePhysics};
 use crate::time;
 

@@ -14,7 +14,7 @@
 //
 // 0xBB is the sRGB value approximating linear value 0.5.
 
-use crate::math::Rgb;
+use crate::math::{rgb_const, Rgb};
 
 /// Define a color constant and preview it in the documentation.
 macro_rules! palette_entry {
@@ -133,48 +133,4 @@ palette! {
     DEBUG_COLLISION_CUBE_WITHIN = srgb[0xFF 0x22 0x00 0xFF];
     DEBUG_CHUNK_MAJOR = srgb[0x00 0x00 0xE8 0xFF];
     DEBUG_CHUNK_MINOR = srgb[0x00 0xE8 0xE8 0xFF];
-}
-
-palette! {
-    UNIFORM_LUMINANCE_RED = srgb[0x9E 0x00 0x00];
-    UNIFORM_LUMINANCE_GREEN = srgb[0x00 0x59 0x00];
-    UNIFORM_LUMINANCE_BLUE = srgb[0x00 0x00 0xFF];
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::math::Rgba;
-    use exhaust::Exhaust as _;
-
-    #[test]
-    fn uniform_luminance_check() {
-        fn optimize(channel: usize) -> [u8; 4] {
-            // Blue is the primary color whose maximum intensity is darkest;
-            // therefore it is the standard by which we check the other.
-            let reference_luminance = UNIFORM_LUMINANCE_BLUE.luminance();
-            let (_color, srgb, luminance_difference) = u8::exhaust()
-                .map(|srgb_byte| {
-                    let mut srgb = [0, 0, 0, 255];
-                    srgb[channel] = srgb_byte;
-                    let color = Rgba::from_srgb8(srgb);
-                    (color, srgb, (color.luminance() - reference_luminance).abs())
-                })
-                .min_by(|a, b| a.2.total_cmp(&b.2))
-                .unwrap();
-            println!("best luminance difference = {luminance_difference}");
-            srgb
-        }
-
-        println!("red:");
-        assert_eq!(
-            UNIFORM_LUMINANCE_RED.with_alpha_one().to_srgb8(),
-            optimize(0)
-        );
-        println!("green:");
-        assert_eq!(
-            UNIFORM_LUMINANCE_GREEN.with_alpha_one().to_srgb8(),
-            optimize(1)
-        );
-    }
 }

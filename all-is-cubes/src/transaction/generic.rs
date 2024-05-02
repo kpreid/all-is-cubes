@@ -14,7 +14,7 @@ pub struct MapConflict<K, C> {
     pub conflict: C,
 }
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl<K: fmt::Debug, C: std::error::Error + 'static> std::error::Error for MapConflict<K, C> {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             Some(&self.conflict)

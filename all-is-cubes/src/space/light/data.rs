@@ -256,6 +256,7 @@ impl From<crate::save::schema::LightSerV1> for PackedLight {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::math::notnan;
     use core::iter::once;
 
     fn packed_light_test_values() -> impl Iterator<Item = PackedLight> {

@@ -25,8 +25,7 @@ use crate::math::{
 #[allow(clippy::exhaustive_structs)]
 pub struct ZMaj;
 
-/// A 3-dimensional array with arbitrary element type instead of [`Space`](crate::space::Space)'s
-/// fixed types.
+/// A container of volume data.
 // ---
 // TOOD: deprecate/replace this
 pub type GridArray<V> = Vol<Box<[V]>, ZMaj>;
@@ -276,9 +275,9 @@ impl<C, O> Vol<C, O> {
         self
     }
 
-    // TODO: good public api?
     // TODO: reconcile this with from_elements() — should only be implemented once.
-    pub(crate) fn map_container<C2, V2, F>(self, f: F) -> Vol<C2, O>
+    #[doc(hidden)] // TODO: good public api?
+    pub fn map_container<C2, V2, F>(self, f: F) -> Vol<C2, O>
     where
         F: FnOnce(C) -> C2,
         C2: Deref<Target = [V2]>,
@@ -316,6 +315,7 @@ impl<C> Vol<C, ZMaj> {
     /// The linearized element order is defined by the `O` type.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Vol, GridAab};
     ///
     /// let vol = GridAab::from_lower_size([0, 0, 0], [10, 10, 10]).to_vol().unwrap();
@@ -456,7 +456,8 @@ impl<'a, V> Vol<&'a mut [V], ZMaj> {
 
 impl<V: Clone, O> Vol<Arc<[V]>, O> {
     /// Returns the linear contents viewed as a mutable slice, as if by [`Arc::make_mut()`].
-    pub(crate) fn make_linear_mut(&mut self) -> &mut [V] {
+    #[doc(hidden)] // TODO: good public API?
+    pub fn make_linear_mut(&mut self) -> &mut [V] {
         let slice: &mut [V] = arc_make_mut_slice(&mut self.contents);
         debug_assert_eq!(slice.len(), self.bounds.volume().unwrap());
         slice
@@ -636,7 +637,8 @@ pub(crate) mod vol_arb {
 
     impl<O: Default> Vol<(), O> {
         #[cfg(feature = "arbitrary")]
-        pub(crate) fn arbitrary_with_max_volume(
+        #[doc(hidden)]
+        pub fn arbitrary_with_max_volume(
             u: &mut arbitrary::Unstructured<'_>,
             volume: usize,
         ) -> arbitrary::Result<Self> {
@@ -711,7 +713,7 @@ pub struct VolLengthError {
     bounds: GridAab,
 }
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl std::error::Error for VolLengthError {}
 }
 

@@ -334,20 +334,6 @@ pub(crate) enum ToolSer {
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `math` module
 
-#[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct AabSer {
-    // This one isn't an enum because I expect we'll not need to change it
-    pub(crate) lower: [f64; 3],
-    pub(crate) upper: [f64; 3],
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct GridAabSer {
-    // This one isn't an enum because I expect we'll not need to change it
-    pub(crate) lower: [GridCoordinate; 3],
-    pub(crate) upper: [GridCoordinate; 3],
-}
-
 type RgbSer = [NotNan<f32>; 3];
 
 type RgbaSer = [NotNan<f32>; 4];

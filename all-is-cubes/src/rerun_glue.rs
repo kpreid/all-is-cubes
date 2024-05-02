@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use crate::math::{self, Axis, Rgb};
+use crate::math::{self, rgba_const, Axis, Rgb};
 
 // To support concise conditional debugging, this module re-exports many items from rerun.
 pub use re_log_types::{entity_path, EntityPath};
@@ -263,55 +263,4 @@ pub fn convert_camera_to_pinhole(
 
 pub fn milliseconds(d: core::time::Duration) -> archetypes::Scalar {
     archetypes::Scalar::new(d.as_secs_f64() * 1000.0)
-}
-
-impl From<math::Face6> for view_coordinates::SignedAxis3 {
-    fn from(face: math::Face6) -> Self {
-        use math::Face6;
-        use view_coordinates::{Axis3, Sign, SignedAxis3};
-        match face {
-            Face6::NX => SignedAxis3 {
-                sign: Sign::Negative,
-                axis: Axis3::X,
-            },
-            Face6::NY => SignedAxis3 {
-                sign: Sign::Negative,
-                axis: Axis3::Y,
-            },
-            Face6::NZ => SignedAxis3 {
-                sign: Sign::Negative,
-                axis: Axis3::Z,
-            },
-            Face6::PX => SignedAxis3 {
-                sign: Sign::Positive,
-                axis: Axis3::X,
-            },
-            Face6::PY => SignedAxis3 {
-                sign: Sign::Positive,
-                axis: Axis3::Y,
-            },
-            Face6::PZ => SignedAxis3 {
-                sign: Sign::Positive,
-                axis: Axis3::Z,
-            },
-        }
-    }
-}
-
-impl From<Rgb> for components::Color {
-    fn from(value: Rgb) -> Self {
-        value.with_alpha_one().into()
-    }
-}
-// impl From<math::Rgba> for components::Color {
-//     fn from(value: math::Rgba) -> Self {
-//         let [r, g, b, a] = value.to_srgb8();
-//         components::Color::from_unmultiplied_rgba(r, g, b, a)
-//     }
-// }
-impl From<math::Rgba> for datatypes::Rgba32 {
-    fn from(value: math::Rgba) -> Self {
-        let [r, g, b, a] = value.to_srgb8();
-        datatypes::Rgba32::from_unmultiplied_rgba(r, g, b, a)
-    }
 }

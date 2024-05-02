@@ -69,6 +69,7 @@ impl Cube {
     /// returns [`None`].
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{FreePoint, Cube};
     ///
     /// assert_eq!(Cube::containing(FreePoint::new(1.0, 1.5, -2.5)), Some(Cube::new(1, 1, -3)));
@@ -132,6 +133,7 @@ impl Cube {
     /// Returns the bounding box in floating-point coordinates containing this cube.
     ///
     /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Aab, Cube};
     ///
     /// assert_eq!(
@@ -147,9 +149,8 @@ impl Cube {
     }
 
     /// Componentwise [`GridCoordinate::checked_add()`].
-    #[inline]
     #[must_use]
-    pub(crate) fn checked_add(self, v: GridVector) -> Option<Self> {
+    pub fn checked_add(self, v: GridVector) -> Option<Self> {
         Some(Self {
             x: self.x.checked_add(v.x)?,
             y: self.y.checked_add(v.y)?,

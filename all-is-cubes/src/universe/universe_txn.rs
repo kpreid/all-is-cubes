@@ -234,7 +234,7 @@ pub enum UniverseConflict {
     Behaviors(behavior::BehaviorTransactionConflict),
 }
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl std::error::Error for UniverseConflict {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             match self {
@@ -784,7 +784,7 @@ pub enum MemberConflict {
     Modify(ModifyMemberConflict),
 }
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl std::error::Error for MemberConflict {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             match self {
@@ -805,7 +805,7 @@ cfg_should_impl_error! {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModifyMemberConflict(AnyTransactionConflict);
 
-cfg_should_impl_error! {
+crate::util::cfg_should_impl_error! {
     impl std::error::Error for ModifyMemberConflict {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             self.0.source()

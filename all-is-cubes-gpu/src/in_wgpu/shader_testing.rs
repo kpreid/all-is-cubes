@@ -15,8 +15,8 @@ use wgpu::util::DeviceExt as _;
 use all_is_cubes::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
 use all_is_cubes::euclid::{point3, Rotation3D};
 use all_is_cubes::listen::ListenableSource;
-use all_is_cubes::math::{Face6, FreeVector, GridSize, GridVector, Rgba};
-use all_is_cubes::{notnan, time};
+use all_is_cubes::math::{notnan, Face6, FreeVector, GridSize, GridVector, Rgba};
+use all_is_cubes::time;
 use all_is_cubes_mesh::{BlockVertex, Coloring};
 
 use crate::in_wgpu::shaders::Shaders;

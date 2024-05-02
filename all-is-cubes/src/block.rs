@@ -32,7 +32,7 @@ use crate::universe::{Handle, HandleVisitor, VisitHandles};
 /// or four [`f32`] literal color components.
 ///
 /// ```
-/// use all_is_cubes::{block::Block, color_block, math::Rgb, rgb_const};
+/// use all_is_cubes::{block::Block, color_block, math::{Rgb, rgb_const}};
 ///
 /// assert_eq!(
 ///     color_block!(rgb_const!(1.0, 0.5, 0.0)),
@@ -61,11 +61,11 @@ macro_rules! color_block {
     }};
 
     ($r:literal, $g:literal, $b:literal $(,)?) => {
-        $crate::color_block!($crate::rgb_const!($r, $g, $b))
+        $crate::color_block!($crate::math::rgb_const!($r, $g, $b))
     };
 
     ($r:literal, $g:literal, $b:literal, $a:literal $(,)?) => {
-        $crate::color_block!($crate::rgba_const!($r, $g, $b, $a))
+        $crate::color_block!($crate::math::rgba_const!($r, $g, $b, $a))
     };
 }
 
@@ -88,8 +88,28 @@ pub use evaluation::*;
 mod modifier;
 pub use modifier::*;
 
-mod resolution;
-pub use resolution::*;
+/// Scale factor between a [`Block`] and its component voxels.
+///
+/// This resolution cubed is the number of voxels making up a block.
+///
+/// Resolutions are always powers of 2. This ensures that the arithmetic is well-behaved
+/// (no division by zero, exact floating-point representation, and the potential of
+/// fixed-point representation),
+/// and that it is always possible to subdivide a block further (up to the limit) without
+/// shifting the existing voxel boundaries.
+///
+/// Note that while quite high resolutions are permitted, this does not mean that it is
+/// practical to routinely use full blocks at that resolution. For example, 64 × 64 × 64
+/// = 262,144 voxels, occupying several megabytes just for color data.
+/// High resolutions are permitted for special purposes that do not necessarily use the
+/// full cube volume:
+///
+/// * *Thin* blocks (e.g. 128 × 128 × 1) can display high resolution text and other 2D
+///   images.
+/// * Multi-block structures can be defined using [`Modifier::Zoom`]; their total size
+///   is limited by the resolution limit.
+pub use all_is_cubes_base::resolution::Resolution;
+pub use all_is_cubes_base::resolution::*;
 
 pub mod text;
 

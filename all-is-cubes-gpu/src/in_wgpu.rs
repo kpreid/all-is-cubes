@@ -15,8 +15,8 @@ use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Gray8, Drawable};
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::listen::DirtyFlag;
-use all_is_cubes::math::VectorOps;
-use all_is_cubes::notnan;
+use all_is_cubes::math::{notnan, VectorOps};
+
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::time;

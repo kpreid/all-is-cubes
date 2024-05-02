@@ -1,6 +1,5 @@
 use core::fmt;
 
-use crate::content::palette;
 use crate::math::{Face6, Rgb};
 
 /// Enumeration of the axes of three-dimensional space.
@@ -13,7 +12,7 @@ use crate::math::{Face6, Rgb};
 #[allow(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-// do after tests:#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+// do after tests:#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
 pub enum Axis {
@@ -35,9 +34,9 @@ impl Axis {
     #[mutants::skip]
     pub fn color(&self) -> Rgb {
         match self {
-            Axis::X => palette::UNIFORM_LUMINANCE_RED,
-            Axis::Y => palette::UNIFORM_LUMINANCE_GREEN,
-            Axis::Z => palette::UNIFORM_LUMINANCE_BLUE,
+            Axis::X => Rgb::UNIFORM_LUMINANCE_RED,
+            Axis::Y => Rgb::UNIFORM_LUMINANCE_GREEN,
+            Axis::Z => Rgb::UNIFORM_LUMINANCE_BLUE,
         }
     }
 
