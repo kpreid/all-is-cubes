@@ -307,8 +307,9 @@ pub struct ProviderError {
     missing: Box<[Name]>,
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for ProviderError {}
+cfg_should_impl_error! {
+    impl std::error::Error for ProviderError {}
+}
 
 /// An error resulting from “world generation”: failure to calculate/create/place objects
 /// (due to bad parameters or unforeseen edge cases), failure to successfully store them
@@ -320,10 +321,11 @@ pub struct GenError {
     for_object: Option<Name>,
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for GenError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.detail)
+cfg_should_impl_error! {
+    impl std::error::Error for GenError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            Some(&self.detail)
+        }
     }
 }
 
@@ -419,17 +421,18 @@ impl InGenError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for InGenError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            InGenError::Other(e) => e.source(),
-            InGenError::Gen(e) => e.source(),
-            InGenError::Insert(e) => e.source(),
-            InGenError::Provider(e) => e.source(),
-            InGenError::SetCube(e) => e.source(),
-            InGenError::UniverseTransaction(e) => e.source(),
-            InGenError::SpaceTransaction(e) => e.source(),
+cfg_should_impl_error! {
+    impl std::error::Error for InGenError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                InGenError::Other(e) => e.source(),
+                InGenError::Gen(e) => e.source(),
+                InGenError::Insert(e) => e.source(),
+                InGenError::Provider(e) => e.source(),
+                InGenError::SetCube(e) => e.source(),
+                InGenError::UniverseTransaction(e) => e.source(),
+                InGenError::SpaceTransaction(e) => e.source(),
+            }
         }
     }
 }

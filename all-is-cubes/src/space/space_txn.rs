@@ -373,12 +373,13 @@ pub enum SpaceTransactionConflict {
     Behaviors(behavior::BehaviorTransactionConflict),
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for SpaceTransactionConflict {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            SpaceTransactionConflict::Cube { conflict, .. } => Some(conflict),
-            SpaceTransactionConflict::Behaviors(conflict) => Some(conflict),
+cfg_should_impl_error! {
+    impl std::error::Error for SpaceTransactionConflict {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                SpaceTransactionConflict::Cube { conflict, .. } => Some(conflict),
+                SpaceTransactionConflict::Behaviors(conflict) => Some(conflict),
+            }
         }
     }
 }
@@ -583,8 +584,7 @@ pub struct CubeConflict {
     pub(crate) new: bool,
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for CubeConflict {}
+cfg_should_impl_error! {impl std::error::Error for CubeConflict {}}
 
 impl fmt::Display for CubeConflict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

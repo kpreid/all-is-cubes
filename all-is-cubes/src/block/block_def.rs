@@ -388,8 +388,9 @@ pub struct BlockDefConflict {
     pub(crate) new: bool,
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for BlockDefConflict {}
+cfg_should_impl_error! {
+    impl std::error::Error for BlockDefConflict {}
+}
 
 impl fmt::Display for BlockDefConflict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

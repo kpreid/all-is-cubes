@@ -208,8 +208,9 @@ impl<'de> serde::Deserialize<'de> for Resolution {
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub struct IntoResolutionError<N>(N);
 
-#[cfg(feature = "std")]
-impl<N: fmt::Display + fmt::Debug> std::error::Error for IntoResolutionError<N> {}
+cfg_should_impl_error! {
+    impl<N: fmt::Display + fmt::Debug> std::error::Error for IntoResolutionError<N> {}
+}
 
 impl<N: fmt::Display> fmt::Display for IntoResolutionError<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

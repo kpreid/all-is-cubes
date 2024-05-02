@@ -253,13 +253,14 @@ pub(in crate::block) enum InEvalError {
     Handle(HandleError),
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for EvalBlockError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            EvalBlockError::BudgetExceeded { .. } => None,
-            EvalBlockError::PriorBudgetExceeded { .. } => None,
-            EvalBlockError::Handle(e) => Some(e),
+cfg_should_impl_error! {
+    impl std::error::Error for EvalBlockError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                EvalBlockError::BudgetExceeded { .. } => None,
+                EvalBlockError::PriorBudgetExceeded { .. } => None,
+                EvalBlockError::Handle(e) => Some(e),
+            }
         }
     }
 }

@@ -711,8 +711,9 @@ pub struct VolLengthError {
     bounds: GridAab,
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for VolLengthError {}
+cfg_should_impl_error! {
+    impl std::error::Error for VolLengthError {}
+}
 
 impl fmt::Display for VolLengthError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

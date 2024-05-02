@@ -55,11 +55,12 @@ pub enum RenderError {
     // TODO: add errors for out of memory, lost GPU, etc.
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for RenderError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            RenderError::Read(e) => Some(e),
+cfg_should_impl_error! {
+    impl std::error::Error for RenderError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                RenderError::Read(e) => Some(e),
+            }
         }
     }
 }

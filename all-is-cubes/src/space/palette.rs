@@ -573,8 +573,9 @@ pub enum PaletteError {
     },
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for PaletteError {}
+cfg_should_impl_error! {
+    impl std::error::Error for PaletteError {}
+}
 
 impl fmt::Display for PaletteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

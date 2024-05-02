@@ -782,8 +782,9 @@ pub enum InsertErrorKind {
     AlreadyInserted,
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for InsertError {}
+cfg_should_impl_error! {
+    impl std::error::Error for InsertError {}
+}
 
 impl fmt::Display for InsertError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

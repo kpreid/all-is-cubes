@@ -234,13 +234,14 @@ pub enum UniverseConflict {
     Behaviors(behavior::BehaviorTransactionConflict),
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for UniverseConflict {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            UniverseConflict::DifferentUniverse(_, _) => None,
-            UniverseConflict::Member(mc) => Some(&mc.conflict),
-            UniverseConflict::Behaviors(c) => Some(c),
+cfg_should_impl_error! {
+    impl std::error::Error for UniverseConflict {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                UniverseConflict::DifferentUniverse(_, _) => None,
+                UniverseConflict::Member(mc) => Some(&mc.conflict),
+                UniverseConflict::Behaviors(c) => Some(c),
+            }
         }
     }
 }
@@ -783,13 +784,14 @@ pub enum MemberConflict {
     Modify(ModifyMemberConflict),
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for MemberConflict {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            MemberConflict::InsertVsOther => None,
-            MemberConflict::DeleteVsOther => None,
-            MemberConflict::Modify(e) => e.source(),
+cfg_should_impl_error! {
+    impl std::error::Error for MemberConflict {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                MemberConflict::InsertVsOther => None,
+                MemberConflict::DeleteVsOther => None,
+                MemberConflict::Modify(e) => e.source(),
+            }
         }
     }
 }
@@ -803,10 +805,11 @@ impl std::error::Error for MemberConflict {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModifyMemberConflict(AnyTransactionConflict);
 
-#[cfg(feature = "std")]
-impl std::error::Error for ModifyMemberConflict {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.0.source()
+cfg_should_impl_error! {
+    impl std::error::Error for ModifyMemberConflict {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            self.0.source()
+        }
     }
 }
 
