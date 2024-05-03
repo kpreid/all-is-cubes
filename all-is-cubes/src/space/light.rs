@@ -9,6 +9,8 @@ pub use debug::{LightComputeOutput, LightUpdateCubeInfo, LightUpdateRayInfo};
 mod queue;
 pub(crate) use queue::{LightUpdateQueue, LightUpdateRequest, Priority};
 
+mod chart_schema;
+
 mod rays;
 
 mod updater;

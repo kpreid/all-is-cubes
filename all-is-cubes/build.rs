@@ -3,30 +3,31 @@
 //! Does not do any native compilation; this is just precomputation and code-generation
 //! more convenient than a proc macro.
 
-use std::io::Write as _;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::{env, fs};
 
-use euclid::default::{Point3D, Vector3D};
+use all_is_cubes_base::math::{self, Face6, FaceMap, FreePoint, FreeVector};
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=src/space/light/chart_data.rs");
 
-    generate_light_ray_pattern(
-        &PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("light_ray_pattern.rs"),
-    );
+    let rays = generate_light_ray_pattern();
+
+    fs::write(
+        PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("light_ray_pattern.bin"),
+        bytemuck::cast_slice::<OneRay, u8>(rays.as_slice()),
+    )
+    .expect("failed to write light_ray_pattern");
 }
 
 const RAY_DIRECTION_STEP: isize = 5;
 
 // TODO: Make multiple ray patterns that suit the maximum_distance parameter.
-// TODO: Consider replacing this manual formatting with https://docs.rs/uneval/latest
-fn generate_light_ray_pattern(path: &Path) {
-    let mut file = fs::File::create(path).expect("failed to create light ray file");
+fn generate_light_ray_pattern() -> Vec<OneRay> {
+    let origin = FreePoint::new(0.5, 0.5, 0.5);
 
-    let origin = Point3D::new(0.5, 0.5, 0.5);
-
-    writeln!(file, "static LIGHT_RAYS: &[LightRayData] = &[").unwrap();
+    let mut rays = Vec::new();
 
     // TODO: octahedron instead of cube
     for x in -RAY_DIRECTION_STEP..=RAY_DIRECTION_STEP {
@@ -36,41 +37,73 @@ fn generate_light_ray_pattern(path: &Path) {
                     || y.abs() == RAY_DIRECTION_STEP
                     || z.abs() == RAY_DIRECTION_STEP
                 {
-                    let direction = Vector3D::new(x as f64, y as f64, z as f64).normalize();
+                    let direction = FreeVector::new(x as f64, y as f64, z as f64).normalize();
 
-                    writeln!(file, "LightRayData {{").unwrap();
-                    writeln!(file,
-                        "    ray: Ray {{ origin: Point3D::new({origin}), direction: Vector3D::new({direction}) }},\n    face_cosines: FaceMap {{",
-                        origin = vecfields(origin),
-                        direction = vecfields(direction),
-                    ).unwrap();
-
-                    for (name, unit_vector) in [
-                        ("nx", Vector3D::new(-1, 0, 0)),
-                        ("ny", Vector3D::new(0, -1, 0)),
-                        ("nz", Vector3D::new(0, 0, -1)),
-                        ("px", Vector3D::new(1, 0, 0)),
-                        ("py", Vector3D::new(0, 1, 0)),
-                        ("pz", Vector3D::new(0, 0, 1)),
-                    ] {
+                    let mut cosines = FaceMap::repeat(0.0f32);
+                    for face in Face6::ALL {
+                        let unit_vector: FreeVector = face.normal_vector();
                         let cosine = unit_vector.to_f32().dot(direction.to_f32()).max(0.0);
-                        writeln!(file, "        {name}: {cosine:?},").unwrap();
+                        cosines[face] = cosine;
                     }
 
-                    // close braces for `FaceMap` and `LightRayData` structs
-                    writeln!(file, "}} }},").unwrap();
+                    rays.push(OneRay::new(origin, direction, cosines))
                 }
             }
         }
     }
 
-    // end of LIGHT_RAYS
-    writeln!(file, "];").unwrap();
-
-    file.flush().unwrap();
+    rays
 }
 
-fn vecfields(value: impl Into<[f64; 3]>) -> String {
-    let [x, y, z] = value.into();
-    format!("{x:?}, {y:?}, {z:?},")
+use chart_schema::OneRay;
+#[path = "src/space/light/"]
+mod chart_schema {
+    use crate::math::{FaceMap, FreePoint, FreeVector, VectorOps as _};
+    use core::fmt;
+    use num_traits::ToBytes;
+    use std::env;
+
+    mod chart_schema_shared;
+    pub(crate) use chart_schema_shared::OneRay;
+
+    impl OneRay {
+        pub fn new(origin: FreePoint, direction: FreeVector, face_cosines: FaceMap<f32>) -> Self {
+            let face_cosines = face_cosines.map(|_, c| TargetEndian::from(c));
+            Self {
+                origin: origin.map(TargetEndian::from).into(),
+                direction: direction.map(TargetEndian::from).into(),
+                face_cosines: [
+                    face_cosines.nx,
+                    face_cosines.ny,
+                    face_cosines.nz,
+                    face_cosines.px,
+                    face_cosines.py,
+                    face_cosines.pz,
+                ],
+            }
+        }
+    }
+
+    /// Used as `super::TargetEndian` by `shared`.
+    #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+    #[repr(C, packed)]
+    pub(crate) struct TargetEndian<T>(<T as ToBytes>::Bytes)
+    where
+        T: ToBytes,
+        <T as ToBytes>::Bytes: Copy + Clone + fmt::Debug + bytemuck::Pod + bytemuck::Zeroable;
+
+    impl<T: ToBytes> From<T> for TargetEndian<T>
+    where
+        <T as ToBytes>::Bytes: Copy + Clone + fmt::Debug + bytemuck::Pod + bytemuck::Zeroable,
+    {
+        fn from(value: T) -> Self {
+            Self(
+                match env::var("CARGO_CFG_TARGET_ENDIAN").unwrap().as_str() {
+                    "big" => T::to_be_bytes(&value),
+                    "little" => T::to_le_bytes(&value),
+                    e => panic!("unknown endianness: {e}"),
+                },
+            )
+        }
+    }
 }

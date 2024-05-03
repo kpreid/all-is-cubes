@@ -3,17 +3,10 @@
 
 use alloc::vec::Vec;
 
-use euclid::{Point3D, Vector3D};
-
 use crate::math::{CubeFace, FaceMap};
 use crate::raycast::Ray;
+use crate::space::light::chart_schema::OneRay;
 use crate::space::LightPhysics;
-
-#[derive(Debug)]
-struct LightRayData {
-    ray: Ray,
-    face_cosines: FaceMap<f32>,
-}
 
 /// Derived from [`LightRayData`], but with a pre-calculated sequence of cubes instead of a ray
 ///  for maximum performance in the lighting calculation.
@@ -35,9 +28,26 @@ pub(in crate::space) struct LightRayStep {
     pub relative_ray_to_here: Ray,
 }
 
-// Build script generates the declaration:
-// static LIGHT_RAYS: &[LightRayData] = &[...
-include!(concat!(env!("OUT_DIR"), "/light_ray_pattern.rs"));
+/// `bytemuck::cast_slice()` can't be const, so we have to write a function,
+/// but this should all compile to a noop.
+fn light_rays_data() -> &'static [OneRay] {
+    const LIGHT_RAYS_BYTES_LEN: usize =
+        include_bytes!(concat!(env!("OUT_DIR"), "/light_ray_pattern.bin")).len();
+
+    // Ensure the data is sufficiently aligned
+    #[repr(C)]
+    struct Align {
+        _aligner: [OneRay; 0],
+        data: [u8; LIGHT_RAYS_BYTES_LEN],
+    }
+
+    static LIGHT_RAYS_BYTES: Align = Align {
+        _aligner: [],
+        data: *include_bytes!(concat!(env!("OUT_DIR"), "/light_ray_pattern.bin")),
+    };
+
+    bytemuck::cast_slice::<u8, OneRay>(&LIGHT_RAYS_BYTES.data)
+}
 
 /// Convert [`LIGHT_RAYS`] containing [`LightRayData`] into [`LightRayCubes`].
 #[inline(never)] // cold code shouldn't be duplicated
@@ -50,22 +60,25 @@ pub(in crate::space) fn calculate_propagation_table(physics: &LightPhysics) -> V
         // maximum_distance.
         LightPhysics::Rays { maximum_distance } => {
             let maximum_distance = f64::from(maximum_distance);
-            LIGHT_RAYS
+            light_rays_data()
                 .iter()
-                .map(|&LightRayData { ray, face_cosines }| LightRayCubes {
-                    relative_cube_sequence: ray
-                        .cast()
-                        .take_while(|step| step.t_distance() <= maximum_distance)
-                        .map(|step| LightRayStep {
-                            relative_cube_face: step.cube_face(),
-                            relative_ray_to_here: Ray {
-                                origin: ray.origin,
-                                direction: step.intersection_point(ray) - ray.origin,
-                            },
-                        })
-                        .collect(),
-                    ray,
-                    face_cosines,
+                .map(|&ray_data| {
+                    let ray = ray_data.ray();
+                    LightRayCubes {
+                        relative_cube_sequence: ray
+                            .cast()
+                            .take_while(|step| step.t_distance() <= maximum_distance)
+                            .map(|step| LightRayStep {
+                                relative_cube_face: step.cube_face(),
+                                relative_ray_to_here: Ray {
+                                    origin: ray.origin,
+                                    direction: step.intersection_point(ray) - ray.origin,
+                                },
+                            })
+                            .collect(),
+                        ray,
+                        face_cosines: ray_data.face_cosines(),
+                    }
                 })
                 .collect()
         }

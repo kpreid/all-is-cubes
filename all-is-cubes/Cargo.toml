@@ -131,8 +131,10 @@ unicode-segmentation = { workspace = true }
 yield-progress = { workspace = true }
 
 [build-dependencies]
-# for calculation in build script
+all-is-cubes-base = { workspace = true }
+bytemuck = { workspace = true, features = ["derive"] }
 euclid = { version = "0.22.9", default-features = false, features = ["libm", "mint"] }
+num-traits = { workspace = true }
 
 [dev-dependencies]
 allocation-counter = { workspace = true }
