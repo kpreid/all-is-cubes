@@ -23,6 +23,9 @@ extern crate alloc;
 pub mod math;
 
 /// Do not use this module directly; its contents are re-exported from `all-is-cubes`.
+pub mod raycast;
+
+/// Do not use this module directly; its contents are re-exported from `all-is-cubes`.
 pub mod resolution;
 
 /// Do not use this module directly; its contents are re-exported from `all-is-cubes`.
@@ -30,3 +33,7 @@ pub mod time;
 
 /// Do not use this module directly; its contents are re-exported from `all-is-cubes`.
 pub mod util;
+
+// reexport for convenience of our tests
+#[doc(hidden)]
+pub use euclid;

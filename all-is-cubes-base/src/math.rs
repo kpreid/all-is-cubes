@@ -115,6 +115,27 @@ macro_rules! notnan {
     };
 }
 
+#[cfg(not(feature = "std"))]
+/// Identical to [`num_traits::Euclid`] except that its signatures are compatible with
+/// `std` versions.
+///
+/// Note: this code is duplicated between `all-is-cubes` and
+/// `all-is-cubes-base` so that it doesn't need to be public.
+pub(crate) trait Euclid {
+    #[allow(dead_code)]
+    fn div_euclid(self, rhs: Self) -> Self;
+    fn rem_euclid(self, rhs: Self) -> Self;
+}
+#[cfg(not(feature = "std"))]
+impl<T: num_traits::Euclid + Copy> Euclid for T {
+    fn div_euclid(self, rhs: Self) -> Self {
+        <T as num_traits::Euclid>::div_euclid(&self, &rhs)
+    }
+    fn rem_euclid(self, rhs: Self) -> Self {
+        <T as num_traits::Euclid>::rem_euclid(&self, &rhs)
+    }
+}
+
 /// Sort exactly two items; swap them if `a > b`.
 #[inline]
 #[doc(hidden)]

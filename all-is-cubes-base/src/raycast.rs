@@ -1,10 +1,3 @@
-//! Algorithm for raycasting through voxel grids.
-//!
-//! This deals purely with the question “which cubes does this ray intersect”,
-//! and does not concern itself with what might occupy those cubes. If you’re
-//! looking for *raytracing*, forming an image from many rays, that’s
-//! [`all_is_cubes::raytracer`](crate::raytracer).
-
 use core::f64::consts::TAU;
 
 use euclid::Vector3D;
@@ -46,6 +39,7 @@ impl Ray {
     /// Other than the use of [`Into`], this is equivalent to a struct literal.
     ///
     /// ```
+    /// # use all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::euclid::{point3, vec3};
     /// use all_is_cubes::raycast::Ray;
     ///
@@ -65,13 +59,14 @@ impl Ray {
     }
 
     /// Prepares a [`Raycaster`] that will iterate over cubes intersected by this ray.
+    #[must_use]
     pub fn cast(&self) -> Raycaster {
         Raycaster::new(self.origin, self.direction)
     }
 
     /// Scale the ray's coordinates by the given factor.
-    #[allow(dead_code)] // TODO: this is expected to be used by voxel collision
-    pub(crate) fn scale_all(self, scale: FreeCoordinate) -> Self {
+    #[must_use]
+    pub fn scale_all(self, scale: FreeCoordinate) -> Self {
         Self {
             origin: self.origin * scale,
             direction: self.direction * scale,
@@ -79,7 +74,8 @@ impl Ray {
     }
 
     /// Scale the ray's direction vector by the given factor.
-    pub(crate) fn scale_direction(self, scale: FreeCoordinate) -> Self {
+    #[must_use]
+    pub fn scale_direction(self, scale: FreeCoordinate) -> Self {
         Self {
             origin: self.origin,
             direction: self.direction * scale,
@@ -89,8 +85,9 @@ impl Ray {
     /// Return `self.origin + self.direction`, the “far end” of the ray.
     ///
     /// This only makes sense in contexts which are specifically using the length of the
-    /// direction vector as a distance.
-    pub(crate) fn unit_endpoint(self) -> FreePoint {
+    /// direction vector as a distance, or for visualization as a line segment.
+    #[must_use]
+    pub fn unit_endpoint(self) -> FreePoint {
         self.origin + self.direction
     }
 
@@ -165,9 +162,7 @@ impl Geometry for Ray {
 /// Iterator over grid positions that intersect a given ray.
 ///
 /// The grid is of unit cubes which are identified by the integer coordinates of
-/// their most negative corners, the same definition used by [`Space`] and [`GridAab`].
-///
-/// [`Space`]: crate::space::Space
+/// their most negative corners, the same definition used by [`Cube`].
 //
 //---
 //
@@ -238,6 +233,7 @@ impl Raycaster {
     /// to restrict it.
     ///
     /// ```
+    /// # use all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::Cube;
     /// use all_is_cubes::raycast::Raycaster;
     ///
@@ -326,7 +322,8 @@ impl Raycaster {
     /// Like [`Self::within`] but not moving self.
     ///
     /// TODO: This function was added for the needs of the raytracer. Think about API design more.
-    pub(crate) fn set_bounds(&mut self, bounds: GridAab) {
+    #[doc(hidden)]
+    pub fn set_bounds(&mut self, bounds: GridAab) {
         if self.bounds.is_none() {
             self.bounds = Some(Vector3D::new(
                 bounds.x_range(),
@@ -346,7 +343,8 @@ impl Raycaster {
     /// intervening `next()` is not currently guaranteed.
     ///
     /// TODO: This function was added for the needs of the raytracer. Think about API design more.
-    pub(crate) fn remove_bound(&mut self) {
+    #[doc(hidden)]
+    pub fn remove_bound(&mut self) {
         self.bounds = None;
     }
 
@@ -608,6 +606,7 @@ impl RaycastStep {
     /// [`Face7::Within`].
     ///
     /// ```
+    /// # use all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::Face7;
     /// use all_is_cubes::raycast::Raycaster;
     ///
@@ -629,6 +628,7 @@ impl RaycastStep {
     /// `self.cube_ahead() == self.cube_behind()`.
     ///
     /// ```
+    /// # use all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::Cube;
     /// use all_is_cubes::raycast::Raycaster;
     ///
@@ -665,6 +665,7 @@ impl RaycastStep {
     /// no more than +1.0 different.
     ///
     /// ```
+    /// # use all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::euclid::point3;
     /// use all_is_cubes::raycast::Ray;
     ///

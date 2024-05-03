@@ -171,7 +171,6 @@ pub mod listen;
 pub mod math;
 pub mod op;
 pub mod physics;
-pub mod raycast;
 pub mod raytracer;
 #[cfg(feature = "rerun")]
 #[doc(hidden)]
@@ -182,6 +181,16 @@ pub mod time;
 pub mod transaction;
 pub mod universe;
 pub mod util;
+
+/// Algorithm for raycasting through voxel grids.
+///
+/// This deals purely with the question “which cubes does this ray intersect”,
+/// and does not concern itself with what might occupy those cubes. If you’re
+/// looking for *raytracing*, forming an image from many rays, that’s
+/// [`all_is_cubes::raytracer`](crate::raytracer).
+pub mod raycast {
+    pub use all_is_cubes_base::raycast::*;
+}
 
 /// Re-export the version of the `arcstr` string type library we're using.
 pub use arcstr;

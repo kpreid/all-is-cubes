@@ -31,6 +31,9 @@ pub use all_is_cubes_base::math::GridAab;
 #[cfg(not(feature = "std"))]
 /// Identical to [`num_traits::Euclid`] except that its signatures are compatible with
 /// `std` versions.
+///
+/// Note: this code is duplicated between `all-is-cubes` and
+/// `all-is-cubes-base` so that it doesn't need to be public.
 pub(crate) trait Euclid {
     fn div_euclid(self, rhs: Self) -> Self;
     fn rem_euclid(self, rhs: Self) -> Self;
