@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
-use all_is_cubes::block::{Block, Composite, CompositeOperator, AIR};
+use all_is_cubes::block::{self, Block, Composite, CompositeOperator, AIR};
+use all_is_cubes::color_block;
 use all_is_cubes::euclid::num::Zero as _;
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
-use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridSize, NotNan};
+use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridSize, NotNan, Rgb};
 use all_is_cubes::space::SpaceTransaction;
 
 use crate::vui;
@@ -122,12 +123,38 @@ impl ProgressBarController {
                 // Bar is empty above this cube
                 d.empty_style.cube_at(bounds, cube).unwrap_or(&AIR).clone()
             } else {
-                // TODO: Compose an actually fractionally-full block using a mask and maybe `Move`
-                Composite::new(
+                // Bar's filled edge lands within this cube
+
+                let partial_fill = state.sixteenths - lb_in_sixteenths;
+                assert!((0..16).contains(&partial_fill));
+
+                let mask_substance = color_block!(Rgb::ONE);
+                let fill_mask = mask_substance.clone().with_modifier(block::Move::new(
+                    Face6::NX,
+                    u16::try_from((16 - partial_fill) * 16).unwrap(),
+                    0,
+                ));
+                let empty_mask = mask_substance.with_modifier(block::Move::new(
+                    Face6::PX,
+                    u16::try_from(partial_fill * 16).unwrap(),
+                    0,
+                ));
+
+                // Mask off the portions that shouldn't bve used
+                let masked_fill = Composite::new(
                     d.filled_style.cube_at(bounds, cube).unwrap_or(&AIR).clone(),
-                    CompositeOperator::Over,
+                    CompositeOperator::In,
                 )
-                .compose_or_replace(d.empty_style.cube_at(bounds, cube).unwrap_or(&AIR).clone())
+                .compose_or_replace(fill_mask);
+                let masked_empty = Composite::new(
+                    d.empty_style.cube_at(bounds, cube).unwrap_or(&AIR).clone(),
+                    CompositeOperator::In,
+                )
+                .compose_or_replace(empty_mask);
+
+                // Combine the masked filled bar and the masked empty bar.
+                Composite::new(masked_fill, CompositeOperator::Over)
+                    .compose_or_replace(masked_empty)
             };
 
             txn.at(cube).overwrite(block);
