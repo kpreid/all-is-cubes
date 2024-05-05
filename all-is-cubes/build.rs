@@ -10,7 +10,7 @@ use all_is_cubes_base::math::{self, Face6, FaceMap, FreePoint, FreeVector};
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=src/space/light/chart_data.rs");
+    println!("cargo:rerun-if-changed=src/space/light/chart_schema_shared.rs");
 
     let rays = generate_light_ray_pattern();
 
