@@ -1,21 +1,22 @@
 # Configuration file for <https://crates.io/crates/cargo-deny>.
 # Use this as `cargo deny --config tools/deny.toml`.
 
+[graph]
 # This list of features excludes the "rerun" and "gltf" features
 # as they are only intended for testing (i.e. no binaries will be distributed
 # with them enabled).
 features = ["std", "arbitrary", "auto-threads", "save", "wgpu"]
 
 [licenses]
-unlicensed = "deny"
 allow = [
     "MIT",
     "Apache-2.0",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Zlib",
     "CC0-1.0",
 ]
-copyleft = "deny"
-allow-osi-fsf-free = "osi"
-default = "warn"
 private = { ignore = true }
 
 [bans]
@@ -33,6 +34,7 @@ skip = [
     { name = "web-time", version = "=0.2.4" },
     { name = "syn", version = "1" },
     { name = "redox_syscall", version = "=0.3.5" },
+    { name = "libloading" },
     { name = "libredox", version = "=0.0.1" },
     { name = "miniz_oxide", version = "0.4.4" }, # old used by png-decoder
 ]
