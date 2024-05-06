@@ -8,17 +8,17 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::camera::{self, GraphicsOptions, ImagePixel, Rendering, Viewport};
-use all_is_cubes::euclid::{point2, point3, vec2, vec3, Scale};
+use all_is_cubes::euclid::{point2, point3, vec2, vec3, Point2D, Scale};
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use all_is_cubes::math::{Cube, Face6, FreePoint, Rgba};
+use all_is_cubes::math::{Cube, Face6, FreePoint, GridAab, Rgba};
 use all_is_cubes::raycast::Ray;
 use all_is_cubes::space::Space;
 use all_is_cubes::time::NoTime;
 use all_is_cubes::transaction::Transaction as _;
 use all_is_cubes::universe::{Handle, Name, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::{raytracer, space, transaction};
+use all_is_cubes::{block, raytracer, space, transaction};
 
 use all_is_cubes_ui::apps::{Key, Session};
 use all_is_cubes_ui::notification::NotificationContent;
@@ -220,32 +220,16 @@ fn render_orthographic(space: &Handle<Space>) -> Rendering {
     // for "what's the highest resolution that was tested along this ray", we can do adaptive
     // sampling so we can trace whole blocks at once when they're simple, and also detect if
     // the image scale is too low to accurately capture the scene.
-
-    let cube_to_pixel: Scale<i32, Cube, ImagePixel> = Scale::new(32);
-    let pixel_to_cube: Scale<f64, ImagePixel, Cube> = cube_to_pixel.cast::<f64>().inverse();
-
     let space = &*space.read().expect("failed to read space to render");
-    let bounds = space.bounds();
-    let image_size = cube_to_pixel.transform_size(bounds.size().to_vector().xy().to_size());
+    let camera = OrthoCamera::new(block::Resolution::R32, space.bounds());
     let rt = &raytracer::SpaceRaytracer::new(space, GraphicsOptions::UNALTERED_COLORS, ());
-    let origin: FreePoint = point3(
-        bounds.lower_bounds().x,
-        bounds.upper_bounds().y, // note Y flip
-        bounds.upper_bounds().z,
-    )
-    .to_f64();
 
-    // TODO: Add side and top/bottom orthographic views.
-
-    let data = (0..image_size.height)
+    let camera = &camera;
+    let data = (0..camera.image_size.height)
         .into_par_iter()
         .flat_map(|y| {
-            (0..image_size.width).into_par_iter().map(move |x| {
-                let pixel_center = point2(x, -y).to_f64() + vec2(0.5, -0.5); // note Y flip
-                let ray = Ray {
-                    origin: origin + pixel_center.to_3d().to_vector() * pixel_to_cube,
-                    direction: vec3(0.0, 0.0, -1.0),
-                };
+            (0..camera.image_size.width).into_par_iter().map(move |x| {
+                let ray = camera.project_pixel_into_world(point2(x, y));
                 let (pixel, _): (raytracer::ColorBuf, _) = rt.trace_ray(ray, true);
                 Rgba::from(pixel).to_srgb8()
             })
@@ -253,8 +237,51 @@ fn render_orthographic(space: &Handle<Space>) -> Rendering {
         .collect();
 
     Rendering {
-        size: image_size.to_u32(),
+        size: camera.image_size.to_u32(),
         data,
         flaws: camera::Flaws::empty(), // TODO: wrong
+    }
+}
+
+/// A view of a `Space` from the +Z direction at a chosen pixel-perfect resolution.
+struct OrthoCamera {
+    image_size: camera::ImageSize,
+    pixel_to_cube_scale: Scale<f64, ImagePixel, Cube>,
+    origin: FreePoint,
+}
+
+impl OrthoCamera {
+    pub fn new(resolution: block::Resolution, bounds: GridAab) -> Self {
+        let cube_to_pixel_scale: Scale<i32, Cube, ImagePixel> = Scale::new(i32::from(resolution));
+        let pixel_to_cube_scale: Scale<f64, ImagePixel, Cube> =
+            cube_to_pixel_scale.cast::<f64>().inverse();
+
+        let image_size = cube_to_pixel_scale
+            .transform_size(bounds.size().to_vector().xy().to_size())
+            .to_u32();
+        let origin: FreePoint = point3(
+            bounds.lower_bounds().x,
+            bounds.upper_bounds().y, // note Y flip
+            bounds.upper_bounds().z,
+        )
+        .to_f64();
+
+        // TODO: Add side and top/bottom orthographic views.
+
+        Self {
+            image_size,
+            pixel_to_cube_scale,
+            origin,
+        }
+    }
+
+    pub fn project_pixel_into_world(&self, point: Point2D<u32, ImagePixel>) -> Ray {
+        let mut point = point.to_f64();
+        point.y *= -1.0;
+        let pixel_center = point + vec2(0.5, -0.5); // note Y flip
+        Ray {
+            origin: self.origin + pixel_center.to_3d().to_vector() * self.pixel_to_cube_scale,
+            direction: vec3(0.0, 0.0, -1.0),
+        }
     }
 }
