@@ -167,22 +167,18 @@ impl ComparisonRecord {
         }
     }
 
-    fn panic_if_unsuccessful(&self) {
+    fn describe_failure(&self) -> Option<String> {
         match self.outcome {
-            ComparisonOutcome::Equal | ComparisonOutcome::Flawed(_) => {}
+            ComparisonOutcome::Equal | ComparisonOutcome::Flawed(_) => None,
             ComparisonOutcome::Different { amount } => {
                 // TODO: show filenames
-                panic!("Image mismatch! ({amount})");
+                Some(format!("Image mismatch! ({amount})"))
             }
-            ComparisonOutcome::NoExpected => {
-                panic!(
-                    "Expected image not found; no comparison done: {p}",
-                    p = self.expected_file_name
-                );
-            }
-            ComparisonOutcome::Unfinished => {
-                panic!("Image unfinished!");
-            }
+            ComparisonOutcome::NoExpected => Some(format!(
+                "Expected image not found; no comparison done: {p}",
+                p = self.expected_file_name
+            )),
+            ComparisonOutcome::Unfinished => Some(String::from("Image unfinished!")),
         }
     }
 }

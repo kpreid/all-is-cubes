@@ -115,6 +115,9 @@ impl RenderTestContext {
     /// ourselves.
     ///
     /// If flaws are present, then comparison failures do not fail the test.
+    ///
+    /// Test failures are communicated through the context rather than panicking,
+    /// so that multi-image tests show all comparisons in the report.
     #[track_caller]
     pub fn compare_image(&mut self, allowed_difference: impl Into<Threshold>, image: Rendering) {
         let combo = ImageId {
@@ -137,9 +140,8 @@ impl RenderTestContext {
             outcome.outcome = ComparisonOutcome::Flawed(format!("{flaws:?}"));
         }
 
+        // The comparison log will be consulted to determine if the test should be marked failed.
         self.comparison_log.lock().unwrap().push(outcome.clone());
-
-        outcome.panic_if_unsuccessful(); // TODO: have a better failure result?
     }
 }
 
@@ -367,6 +369,15 @@ where
             comparison_log,
         } = result;
 
+        let comparisons = Arc::try_unwrap(comparison_log)
+            .expect("somebody hung onto the log")
+            .into_inner()
+            .unwrap();
+
+        let comparison_failure: Option<String> = comparisons
+            .iter()
+            .find_map(|entry| entry.describe_failure());
+
         // Print out outcome of test
         match format {
             Format::Pretty => {
@@ -374,8 +385,8 @@ where
             }
             Format::Terse => {}
         };
-        let outcome_for_report = match outcome {
-            Ok(case_time) => {
+        let outcome_for_report = match (comparison_failure, outcome) {
+            (None, Ok(case_time)) => {
                 match format {
                     Format::Pretty => {
                         println!(" ok in {}", case_time.refmt(&ConciseDebug))
@@ -386,7 +397,7 @@ where
                 cumulative_time += case_time;
                 Ok(())
             }
-            Err(e) => {
+            (_, Err(e)) => {
                 count_failed += 1;
                 if e.is_panic() {
                     let panic_str: String = match e.into_panic().downcast::<String>() {
@@ -414,6 +425,14 @@ where
                     Err(e.to_string())
                 }
             }
+            (Some(comparison_failure), _) => {
+                count_failed += 1;
+                match format {
+                    Format::Pretty => println!(" comparison failed: {comparison_failure}"),
+                    Format::Terse => print!("E"),
+                }
+                Err(comparison_failure)
+            }
         };
         io::stdout().flush().unwrap(); // in case of terse format
 
@@ -425,10 +444,7 @@ where
                     suite: suite_id,
                     test: name,
                 },
-                comparisons: Arc::try_unwrap(comparison_log)
-                    .expect("somebody hung onto the log")
-                    .into_inner()
-                    .unwrap(),
+                comparisons,
             },
         );
     }
