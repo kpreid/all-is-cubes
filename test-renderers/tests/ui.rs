@@ -8,10 +8,10 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::camera::{self, GraphicsOptions, ImagePixel, Rendering, Viewport};
-use all_is_cubes::euclid::{point2, point3, vec2, vec3, Point2D, Scale};
+use all_is_cubes::euclid::{point2, vec3, Point2D, Scale, Transform3D};
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use all_is_cubes::math::{Cube, Face6, FreePoint, GridAab, Rgba};
+use all_is_cubes::math::{Cube, Face6, FreeVector, GridAab, Rgba};
 use all_is_cubes::raycast::Ray;
 use all_is_cubes::space::Space;
 use all_is_cubes::time::NoTime;
@@ -246,8 +246,8 @@ fn render_orthographic(space: &Handle<Space>) -> Rendering {
 /// A view of a `Space` from the +Z direction at a chosen pixel-perfect resolution.
 struct OrthoCamera {
     image_size: camera::ImageSize,
-    pixel_to_cube_scale: Scale<f64, ImagePixel, Cube>,
-    origin: FreePoint,
+    transform: Transform3D<f64, ImagePixel, Cube>,
+    ray_direction: FreeVector,
 }
 
 impl OrthoCamera {
@@ -259,29 +259,34 @@ impl OrthoCamera {
         let image_size = cube_to_pixel_scale
             .transform_size(bounds.size().to_vector().xy().to_size())
             .to_u32();
-        let origin: FreePoint = point3(
+        let origin_translation: FreeVector = vec3(
             bounds.lower_bounds().x,
             bounds.upper_bounds().y, // note Y flip
             bounds.upper_bounds().z,
         )
         .to_f64();
 
+        let transform = Transform3D::translation(0.5, 0.5, 0.0) // pixel centers
+            .then_scale(1., -1., 1.) // Y flip
+            .then(&Transform3D::from_scale(pixel_to_cube_scale)) // overall scale
+            .then_translate(origin_translation); // image origin to world origin
+
         // TODO: Add side and top/bottom orthographic views.
 
         Self {
             image_size,
-            pixel_to_cube_scale,
-            origin,
+            transform,
+            ray_direction: transform.transform_vector3d(vec3(0., 0., -1.)),
         }
     }
 
     pub fn project_pixel_into_world(&self, point: Point2D<u32, ImagePixel>) -> Ray {
-        let mut point = point.to_f64();
-        point.y *= -1.0;
-        let pixel_center = point + vec2(0.5, -0.5); // note Y flip
         Ray {
-            origin: self.origin + pixel_center.to_3d().to_vector() * self.pixel_to_cube_scale,
-            direction: vec3(0.0, 0.0, -1.0),
+            origin: self
+                .transform
+                .transform_point3d(point.to_f64().to_3d())
+                .unwrap(),
+            direction: self.ray_direction,
         }
     }
 }
