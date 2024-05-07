@@ -66,7 +66,7 @@ unicode-width = { version = "0.1.9", default-features = false }
 # (As of wgpu 0.19, Vulkan is implicitly enabled on Linux.)
 wgpu = { workspace = true, features = ["dx12", "metal"] }
 # Note on feature selection: winit requires either "x11" or "wayland" to build at all on Linux, which is harmless elsewhere. I picked x11 because it should be the most compatible.
-winit = { version = "0.29.2", default-features = false, features = ["x11", "rwh_06"] }
+winit = { version = "0.30.0", default-features = false, features = ["x11", "rwh_06"] }
 # Enable the log_hiccups feature
 yield-progress = { workspace = true, features = ["log_hiccups"] }
 

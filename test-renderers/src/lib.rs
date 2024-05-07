@@ -281,7 +281,6 @@ pub fn initialize_logging() {
             simplelog::ConfigBuilder::new()
                 .add_filter_ignore_str("wgpu") // noisy
                 .add_filter_ignore_str("naga") // noisy
-                .add_filter_ignore_str("winit") // noisy at Trace level only
                 .build(),
             io::stderr(),
         )

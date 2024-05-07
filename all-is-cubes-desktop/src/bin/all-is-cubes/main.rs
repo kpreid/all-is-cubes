@@ -173,7 +173,7 @@ fn main() -> Result<(), anyhow::Error> {
                             // TODO: turn this inside out and stop having `WinAndState` exposed
                             aic_winit::WinAndState::new(
                                 elwt,
-                                &title_and_version(), // this will be overwritten with more detail later
+                                title_and_version(), // this will be overwritten with more detail later
                                 display_size,
                                 fullscreen,
                             )

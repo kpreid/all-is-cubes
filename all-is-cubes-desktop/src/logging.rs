@@ -59,9 +59,10 @@ pub fn install(
                 .set_target_level(Off)
                 .set_location_level(Off)
                 .set_time_level(if simplify_log_format { Off } else { Error })
+                .add_filter_ignore_str("tracing::span") // intentionally very verbose
                 .add_filter_ignore_str("wgpu") // noisy
                 .add_filter_ignore_str("naga") // noisy
-                .add_filter_ignore_str("winit") // noisy at Trace level only
+                .add_filter_ignore_str("winit") // noisy at Debug level since 0.30
                 .build(),
             std::io::stderr(),
         );

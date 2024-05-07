@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use winit::event::{DeviceEvent, ElementState, Event, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoopWindowTarget};
+use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::window::{CursorGrabMode, Window};
 
 use all_is_cubes::camera::{self, StandardCameras, Viewport};
@@ -45,8 +45,8 @@ pub struct WinAndState {
 impl WinAndState {
     /// Creates a window.
     pub fn new(
-        event_loop: &EventLoopWindowTarget<()>,
-        window_title: &str,
+        event_loop: &ActiveEventLoop,
+        window_title: String,
         requested_size: Option<Size2D<u32, camera::NominalPixel>>,
         fullscreen: bool,
     ) -> Result<WinAndState, winit::error::OsError> {
@@ -62,11 +62,12 @@ impl WinAndState {
             choose_graphical_window_size(maybe_monitor.as_ref().map(monitor_size_for_window))
         };
 
-        let window = winit::window::WindowBuilder::new()
-            .with_inner_size(to_logical_size(inner_size))
-            .with_title(window_title)
-            .with_fullscreen(fullscreen.then_some(winit::window::Fullscreen::Borderless(None)))
-            .build(event_loop)?;
+        let window = event_loop.create_window(
+            Window::default_attributes()
+                .with_inner_size(to_logical_size(inner_size))
+                .with_title(window_title)
+                .with_fullscreen(fullscreen.then_some(winit::window::Fullscreen::Borderless(None))),
+        )?;
 
         Ok(WinAndState {
             window: Arc::new(window),
@@ -148,7 +149,7 @@ impl crate::glue::Window for WinAndState {
 pub fn winit_main_loop_and_init<Ren: RendererToWinit + 'static>(
     dsession_fn: impl FnOnce(
         &crate::InnerMainParams,
-        &EventLoopWindowTarget<()>,
+        &ActiveEventLoop,
     ) -> Result<DesktopSession<Ren, WinAndState>, anyhow::Error>,
     inner_params: crate::InnerMainParams,
 ) -> Result<(), anyhow::Error> {
@@ -304,7 +305,7 @@ fn handle_winit_event<Ren: RendererToWinit>(
                     dsession
                         .window
                         .window
-                        .set_cursor_icon(cursor_icon_to_winit(dsession.session.cursor_icon()));
+                        .set_cursor(cursor_icon_to_winit(dsession.session.cursor_icon()));
 
                     dsession
                         .renderer
@@ -414,9 +415,10 @@ fn handle_winit_event<Ren: RendererToWinit>(
                 WindowEvent::AxisMotion { .. } => {}
                 WindowEvent::Touch(_) => {}
                 WindowEvent::ThemeChanged(_) => {}
-                WindowEvent::TouchpadMagnify { .. } => {}
-                WindowEvent::SmartMagnify { .. } => {}
-                WindowEvent::TouchpadRotate { .. } => {}
+                WindowEvent::PinchGesture { .. } => {}
+                WindowEvent::DoubleTapGesture { .. } => {}
+                WindowEvent::PanGesture { .. } => {}
+                WindowEvent::RotationGesture { .. } => {}
             }
         }
         Event::DeviceEvent {
