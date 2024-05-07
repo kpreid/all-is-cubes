@@ -50,10 +50,7 @@ fn ui_render_tests(c: &mut test_renderers::TestCaseCollector<'_>) {
 
     c.insert("session_initial_state", None, session_initial_state);
     c.insert("session_modal", None, session_modal);
-    if false {
-        // TODO: doesn't give the expected result and I don't know why
-        c.insert("session_page_pause", None, session_page_pause);
-    }
+    c.insert("session_page_pause", None, session_page_pause);
     c.insert("session_page_progress", None, session_page_progress);
     c.insert("widget_button_action", wu.clone(), widget_button_action);
     c.insert("widget_button_toggle", wu.clone(), widget_button_toggle);
