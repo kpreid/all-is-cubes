@@ -161,7 +161,7 @@ fn main() -> Result<(), anyhow::Error> {
     match graphics_type {
         GraphicsType::Window | GraphicsType::WindowRt => {
             winit_main_loop_and_init(
-                move |inner_params, elwt| {
+                Box::new(move |inner_params, elwt| {
                     // TODO: this logic should not be inside main(), really, it should be part
                     // of the winit module — it just has a mess of deps
                     // TODO: don't block_on, be async?
@@ -188,7 +188,7 @@ fn main() -> Result<(), anyhow::Error> {
                         });
                     }
                     Ok(dsession)
-                },
+                }),
                 inner_params,
             )
         }

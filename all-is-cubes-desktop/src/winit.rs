@@ -1,9 +1,10 @@
 //! Glue between [`all_is_cubes`], [`winit`], and `winit`-compatible renderers.
 
+use std::mem;
 use std::sync::Arc;
 use std::time::Instant;
 
-use winit::event::{DeviceEvent, ElementState, Event, WindowEvent};
+use winit::event::{DeviceEvent, ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::window::{CursorGrabMode, Window};
 
@@ -147,68 +148,17 @@ impl crate::glue::Window for WinAndState {
 ///
 /// Might not return but exit the process instead.
 pub fn winit_main_loop_and_init<Ren: RendererToWinit + 'static>(
-    dsession_fn: impl FnOnce(
-        &crate::InnerMainParams,
-        &ActiveEventLoop,
-    ) -> Result<DesktopSession<Ren, WinAndState>, anyhow::Error>,
+    dsession_fn: SessionFn<Ren>,
     inner_params: crate::InnerMainParams,
 ) -> Result<(), anyhow::Error> {
     let event_loop = winit::event_loop::EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    let loop_start_time = Instant::now();
-    let mut startup_params = Some((inner_params, dsession_fn));
-    let mut first_frame = true;
-    let mut dsession: Option<DesktopSession<Ren, WinAndState>> = None;
-    Ok(event_loop.run(move |event, elwt| {
-        if let Event::Resumed = event {
-            if let Some((inner_params, dsession_fn)) = startup_params.take() {
-                // “It’s recommended that applications should only initialize their graphics context
-                // and create a window after they have received their first Resumed event.
-                // Some systems (specifically Android) won’t allow applications to create a render
-                // surface until they are resumed.”
-                // — <https://docs.rs/winit/0.29.10/winit/event/enum.Event.html#variant.Resumed>
-
-                // TODO: Ideally, any of the errors occurring here would be handled by putting up
-                // a dialog box before exiting.
-                let ds = dsession_fn(&inner_params, elwt).unwrap();
-                crate::inner_main(
-                    inner_params,
-                    |ds| {
-                        dsession = Some(ds);
-                        Ok(())
-                    },
-                    ds,
-                )
-                .unwrap();
-            }
-        }
-
-        // If we have a session, run it
-        if let Some(dsession) = dsession.as_mut() {
-            if first_frame {
-                first_frame = false;
-                log::debug!(
-                    "First frame completed in {:.3} s",
-                    Instant::now().duration_since(loop_start_time).as_secs_f32()
-                );
-            }
-
-            // Sync UI state back to window
-            dsession
-                .window
-                .sync_cursor_grab(&mut dsession.session.input_processor);
-
-            // Compute when we want to resume.
-            if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
-                elwt.set_control_flow(ControlFlow::WaitUntil(t));
-            }
-
-            handle_winit_event(event, dsession)
-        } else {
-            // Events can't mean anything interesting until we have a session.
-            // TODO: But we should express that cleaner than ignoring everything
-        }
+    Ok(event_loop.run_app(&mut Handler {
+        loop_start_time: Instant::now(),
+        startup_params: Some((inner_params, dsession_fn)),
+        first_frame: true,
+        dsession: None,
     })?)
 }
 
@@ -274,163 +224,109 @@ pub async fn create_winit_wgpu_desktop_session(
     Ok(dsession)
 }
 
-/// Handle one winit event.
-///
-/// Modifies `control_flow` if an event indicates the application should exit.
-/// (TODO: Clarify this for possible multi-window)
-///
-/// This is separated from [`winit_main_loop`] for the sake of readability (more overall structure
-/// fitting on the screen) and possible refactoring towards having a common abstract main-loop.
-fn handle_winit_event<Ren: RendererToWinit>(
-    event: Event<()>,
-    dsession: &mut DesktopSession<Ren, WinAndState>,
-) {
-    let input_processor = &mut dsession.session.input_processor;
-    match event {
-        Event::NewEvents(_) => {}
-        Event::WindowEvent { window_id, event } if window_id == dsession.window.window.id() => {
-            match event {
-                WindowEvent::CloseRequested => drop(dsession.session.quit()),
+type SessionFn<Ren> = Box<
+    dyn FnOnce(
+        &crate::InnerMainParams,
+        &ActiveEventLoop,
+    ) -> Result<DesktopSession<Ren, WinAndState>, anyhow::Error>,
+>;
 
-                WindowEvent::RedrawRequested => {
-                    if dsession.window.occluded
-                        || dsession.window.window.is_visible() == Some(false)
-                        || dsession.window.window.is_minimized() == Some(true)
-                    {
-                        return;
-                    }
+struct Handler<Ren> {
+    loop_start_time: Instant,
+    first_frame: bool,
+    startup_params: Option<(crate::InnerMainParams, SessionFn<Ren>)>,
+    dsession: Option<DesktopSession<Ren, WinAndState>>,
+}
 
-                    dsession.renderer.update_world_camera();
-                    dsession.session.update_cursor(dsession.renderer.cameras());
-                    dsession
-                        .window
-                        .window
-                        .set_cursor(cursor_icon_to_winit(dsession.session.cursor_icon()));
+impl<Ren: RendererToWinit> winit::application::ApplicationHandler for Handler<Ren> {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if let Some((inner_params, dsession_fn)) = self.startup_params.take() {
+            // “It’s recommended that applications should only initialize their graphics context
+            // and create a window after they have received their first Resumed event.
+            // Some systems (specifically Android) won’t allow applications to create a render
+            // surface until they are resumed.”
+            // — <https://docs.rs/winit/0.29.10/winit/event/enum.Event.html#variant.Resumed>
 
-                    dsession
-                        .renderer
-                        .redraw(&dsession.session, &dsession.window.window);
-
-                    dsession.session.frame_clock.did_draw();
-                }
-
-                // Keyboard input
-                WindowEvent::KeyboardInput {
-                    event:
-                        winit::event::KeyEvent {
-                            physical_key,
-                            state,
-                            ..
-                        },
-                    ..
-                } => {
-                    if let Some(key) = map_key(physical_key) {
-                        match state {
-                            ElementState::Pressed => {
-                                input_processor.key_down(key);
-                            }
-                            ElementState::Released => {
-                                input_processor.key_up(key);
-                            }
-                        }
-                    }
-                }
-                WindowEvent::Ime(ime_event) => {
-                    log::warn!("received IME event even though IME not enabled: {ime_event:?}");
-                }
-                WindowEvent::ModifiersChanged(..) => {}
-
-                // Mouse input
-                WindowEvent::CursorMoved { position, .. } => {
-                    dsession.window.mouse_position = Some(position);
-                    let position: [f64; 2] = position.into();
-                    input_processor.mouse_pixel_position(
-                        *dsession.viewport_cell.get(),
-                        Some(Point2D::from(position) / dsession.window.window.scale_factor()),
-                        false,
-                    );
-                    // TODO: Is it worth improving responsiveness by immediately executing
-                    // an update_cursor()?
-                }
-                WindowEvent::CursorEntered { .. } => {
-                    // CursorEntered doesn't tell us position, so ignore
-                }
-                WindowEvent::CursorLeft { .. } => {
-                    dsession.window.mouse_position = None;
-                    input_processor.mouse_pixel_position(
-                        *dsession.viewport_cell.get(),
-                        None,
-                        false,
-                    );
-                }
-                WindowEvent::MouseInput { button, state, .. } => match state {
-                    ElementState::Pressed => {
-                        dsession.session.click(map_mouse_button(button));
-                    }
-                    ElementState::Released => {}
+            // TODO: Ideally, any of the errors occurring here would be handled by putting up
+            // a dialog box before exiting.
+            let ds = dsession_fn(&inner_params, event_loop).unwrap();
+            crate::inner_main(
+                inner_params,
+                |ds| {
+                    self.dsession = Some(ds);
+                    Ok(())
                 },
-                WindowEvent::MouseWheel { .. } => {
-                    // TODO: Hook up to input processor once we have customizable bindings
-                    // or otherwise something to do with it
-                }
-
-                // Window state
-                WindowEvent::Resized(physical_size) => {
-                    dsession.viewport_cell.set(physical_size_to_viewport(
-                        dsession.window.window.scale_factor(),
-                        physical_size,
-                    ));
-                }
-                WindowEvent::ScaleFactorChanged {
-                    scale_factor,
-                    inner_size_writer: _,
-                } => dsession.viewport_cell.set(physical_size_to_viewport(
-                    scale_factor,
-                    dsession.window.window.inner_size(),
-                )),
-                WindowEvent::Focused(has_focus) => {
-                    input_processor.key_focus(has_focus);
-                }
-                WindowEvent::Occluded(occluded) => {
-                    dsession.window.occluded = occluded;
-                    if !occluded {
-                        dsession.window.window.request_redraw();
-                    }
-                }
-
-                // File drop
-                // TODO: Handle multiple files and hover feedback
-                // (need all-is-cubes-ui mechanisms to help with this)
-                WindowEvent::HoveredFile(_) => {}
-                WindowEvent::DroppedFile(path) => {
-                    dsession.replace_universe_with_file(path);
-                }
-                WindowEvent::HoveredFileCancelled => {}
-
-                // Unused
-                WindowEvent::ActivationTokenDone { .. } => {}
-                WindowEvent::Moved(_) => {}
-                WindowEvent::Destroyed => {}
-                WindowEvent::TouchpadPressure { .. } => {}
-                WindowEvent::AxisMotion { .. } => {}
-                WindowEvent::Touch(_) => {}
-                WindowEvent::ThemeChanged(_) => {}
-                WindowEvent::PinchGesture { .. } => {}
-                WindowEvent::DoubleTapGesture { .. } => {}
-                WindowEvent::PanGesture { .. } => {}
-                WindowEvent::RotationGesture { .. } => {}
-            }
+                ds,
+            )
+            .unwrap();
         }
-        Event::DeviceEvent {
-            device_id: _,
-            event,
-        } => match event {
+    }
+
+    fn window_event(
+        &mut self,
+        _: &ActiveEventLoop,
+        window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        let Some(dsession) = &mut self.dsession else {
+            log::error!("event for a window we aren't managing: {event:?}");
+            return;
+        };
+        if dsession.window.window.id() != window_id {
+            log::error!("event for a window we aren't managing: {event:?}");
+            return;
+        }
+
+        // TODO: this placement makes no sense and should be after handling redraw
+        if self.first_frame {
+            self.first_frame = false;
+            log::debug!(
+                "First frame completed in {:.3} s",
+                Instant::now()
+                    .duration_since(self.loop_start_time)
+                    .as_secs_f32()
+            );
+        }
+
+        handle_window_event(event, dsession)
+    }
+
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        let Some(dsession) = &mut self.dsession else {
+            return;
+        };
+
+        // Sync UI state back to window
+        dsession
+            .window
+            .sync_cursor_grab(&mut dsession.session.input_processor);
+
+        // Compute when we want to resume.
+        if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
+            event_loop.set_control_flow(ControlFlow::WaitUntil(t));
+        }
+
+        // Run simulation if it's time
+        dsession.advance_time_and_maybe_step();
+        if dsession.session.frame_clock.should_draw() {
+            dsession.window.window.request_redraw();
+        }
+    }
+
+    fn device_event(&mut self, _: &ActiveEventLoop, _: winit::event::DeviceId, event: DeviceEvent) {
+        let Some(dsession) = &mut self.dsession else {
+            return;
+        };
+
+        match event {
             DeviceEvent::MouseMotion { delta } => {
-                if dsession.window.ignore_next_mouse_move {
-                    dsession.window.ignore_next_mouse_move = false;
+                if mem::take(&mut dsession.window.ignore_next_mouse_move) {
                     return;
                 }
-                input_processor.mouselook_delta(delta.into())
+                dsession
+                    .session
+                    .input_processor
+                    .mouselook_delta(delta.into())
             }
 
             // Unused
@@ -440,24 +336,148 @@ fn handle_winit_event<Ren: RendererToWinit>(
             DeviceEvent::Motion { .. } => {}
             DeviceEvent::Button { .. } => {}
             DeviceEvent::Key(_) => {}
-        },
-        e @ Event::WindowEvent { .. } => {
-            log::error!("event for a window we aren't managing: {:?}", e)
+        }
+    }
+}
+
+/// Handle one [`WindowEvent`].
+///
+/// Modifies `control_flow` if an event indicates the application should exit.
+/// (TODO: Clarify this for possible multi-window)
+///
+/// This is separated from [`winit_main_loop`] for the sake of readability (more overall structure
+/// fitting on the screen).
+fn handle_window_event<Ren: RendererToWinit>(
+    event: WindowEvent,
+    dsession: &mut DesktopSession<Ren, WinAndState>,
+) {
+    let input_processor = &mut dsession.session.input_processor;
+    match event {
+        WindowEvent::CloseRequested => drop(dsession.session.quit()),
+
+        WindowEvent::RedrawRequested => {
+            if dsession.window.occluded
+                || dsession.window.window.is_visible() == Some(false)
+                || dsession.window.window.is_minimized() == Some(true)
+            {
+                return;
+            }
+
+            dsession.renderer.update_world_camera();
+            dsession.session.update_cursor(dsession.renderer.cameras());
+            dsession
+                .window
+                .window
+                .set_cursor(cursor_icon_to_winit(dsession.session.cursor_icon()));
+
+            dsession
+                .renderer
+                .redraw(&dsession.session, &dsession.window.window);
+
+            dsession.session.frame_clock.did_draw();
         }
 
-        Event::AboutToWait => {
-            // Run simulation if it's time
-            dsession.advance_time_and_maybe_step();
-            if dsession.session.frame_clock.should_draw() {
+        // Keyboard input
+        WindowEvent::KeyboardInput {
+            event:
+                winit::event::KeyEvent {
+                    physical_key,
+                    state,
+                    ..
+                },
+            ..
+        } => {
+            if let Some(key) = map_key(physical_key) {
+                match state {
+                    ElementState::Pressed => {
+                        input_processor.key_down(key);
+                    }
+                    ElementState::Released => {
+                        input_processor.key_up(key);
+                    }
+                }
+            }
+        }
+        WindowEvent::Ime(ime_event) => {
+            log::warn!("received IME event even though IME not enabled: {ime_event:?}");
+        }
+        WindowEvent::ModifiersChanged(..) => {}
+
+        // Mouse input
+        WindowEvent::CursorMoved { position, .. } => {
+            dsession.window.mouse_position = Some(position);
+            let position: [f64; 2] = position.into();
+            input_processor.mouse_pixel_position(
+                *dsession.viewport_cell.get(),
+                Some(Point2D::from(position) / dsession.window.window.scale_factor()),
+                false,
+            );
+            // TODO: Is it worth improving responsiveness by immediately executing
+            // an update_cursor()?
+        }
+        WindowEvent::CursorEntered { .. } => {
+            // CursorEntered doesn't tell us position, so ignore
+        }
+        WindowEvent::CursorLeft { .. } => {
+            dsession.window.mouse_position = None;
+            input_processor.mouse_pixel_position(*dsession.viewport_cell.get(), None, false);
+        }
+        WindowEvent::MouseInput { button, state, .. } => match state {
+            ElementState::Pressed => {
+                dsession.session.click(map_mouse_button(button));
+            }
+            ElementState::Released => {}
+        },
+        WindowEvent::MouseWheel { .. } => {
+            // TODO: Hook up to input processor once we have customizable bindings
+            // or otherwise something to do with it
+        }
+
+        // Window state
+        WindowEvent::Resized(physical_size) => {
+            dsession.viewport_cell.set(physical_size_to_viewport(
+                dsession.window.window.scale_factor(),
+                physical_size,
+            ));
+        }
+        WindowEvent::ScaleFactorChanged {
+            scale_factor,
+            inner_size_writer: _,
+        } => dsession.viewport_cell.set(physical_size_to_viewport(
+            scale_factor,
+            dsession.window.window.inner_size(),
+        )),
+        WindowEvent::Focused(has_focus) => {
+            input_processor.key_focus(has_focus);
+        }
+        WindowEvent::Occluded(occluded) => {
+            dsession.window.occluded = occluded;
+            if !occluded {
                 dsession.window.window.request_redraw();
             }
         }
 
-        e @ Event::UserEvent(()) => log::error!("unexpected UserEvent: {e:?}"),
-        Event::Suspended => {}
-        Event::Resumed => {}
-        Event::LoopExiting => {}
-        Event::MemoryWarning => {}
+        // File drop
+        // TODO: Handle multiple files and hover feedback
+        // (need all-is-cubes-ui mechanisms to help with this)
+        WindowEvent::HoveredFile(_) => {}
+        WindowEvent::DroppedFile(path) => {
+            dsession.replace_universe_with_file(path);
+        }
+        WindowEvent::HoveredFileCancelled => {}
+
+        // Unused
+        WindowEvent::ActivationTokenDone { .. } => {}
+        WindowEvent::Moved(_) => {}
+        WindowEvent::Destroyed => {}
+        WindowEvent::TouchpadPressure { .. } => {}
+        WindowEvent::AxisMotion { .. } => {}
+        WindowEvent::Touch(_) => {}
+        WindowEvent::ThemeChanged(_) => {}
+        WindowEvent::PinchGesture { .. } => {}
+        WindowEvent::DoubleTapGesture { .. } => {}
+        WindowEvent::PanGesture { .. } => {}
+        WindowEvent::RotationGesture { .. } => {}
     }
 }
 
