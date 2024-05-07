@@ -325,18 +325,16 @@ impl<I: time::Instant> Session<I> {
 
                 self.frame_clock.did_step(u_clock.schedule());
 
-                if let Some(character_handle) = shuttle.game_character.borrow() {
-                    self.input_processor.apply_input(
-                        InputTargets {
-                            universe: Some(&mut shuttle.game_universe),
-                            character: Some(character_handle),
-                            paused: Some(&self.paused),
-                            graphics_options: Some(&shuttle.graphics_options),
-                            control_channel: Some(&self.control_channel_sender),
-                        },
-                        game_tick,
-                    );
-                }
+                self.input_processor.apply_input(
+                    InputTargets {
+                        universe: Some(&mut shuttle.game_universe),
+                        character: shuttle.game_character.borrow().as_ref(),
+                        paused: Some(&self.paused),
+                        graphics_options: Some(&shuttle.graphics_options),
+                        control_channel: Some(&self.control_channel_sender),
+                    },
+                    game_tick,
+                );
                 // TODO: switch from FrameClock tick to asking the universe for its tick
                 self.input_processor.step(game_tick);
 
@@ -1297,6 +1295,7 @@ fn wake_on_message() -> (impl listen::Listener<()>, impl Future<Output = ()>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::apps::Key;
     use all_is_cubes::character::CharacterTransaction;
     use all_is_cubes::math::Cube;
     use all_is_cubes::transaction::no_outputs;
@@ -1304,6 +1303,14 @@ mod tests {
     use all_is_cubes::util::assert_send_sync;
     use futures_channel::oneshot;
     use std::sync::atomic::AtomicUsize;
+
+    fn advance_time<T: time::Instant>(session: &mut Session<T>) {
+        session
+            .frame_clock
+            .advance_by(session.universe().clock().schedule().delta_t());
+        let step = session.maybe_step_universe();
+        assert_ne!(step, None);
+    }
 
     #[test]
     fn is_send_sync() {
@@ -1405,23 +1412,27 @@ mod tests {
         assert_eq!(noticed_step.load(Ordering::Relaxed), 0);
 
         // Try stepping.
-        // TODO: should be a cleaner way to express "advance one step"
-        session
-            .frame_clock
-            .advance_by(session.universe().clock().schedule().delta_t());
-        session.maybe_step_universe();
+        advance_time(&mut session);
         assert_eq!(noticed_step.load(Ordering::Relaxed), 1);
-        session
-            .frame_clock
-            .advance_by(session.universe().clock().schedule().delta_t());
-        session.maybe_step_universe();
+        advance_time(&mut session);
         assert_eq!(noticed_step.load(Ordering::Relaxed), 2);
 
         // Verify cleanup (that the next step can succeed even though the task exited).
-        session
-            .frame_clock
-            .advance_by(session.universe().clock().schedule().delta_t());
-        session.maybe_step_universe();
+        advance_time(&mut session);
         assert_eq!(noticed_step.load(Ordering::Relaxed), 2);
+    }
+
+    #[tokio::test]
+    async fn input_is_processed_even_without_character() {
+        let mut session = Session::<time::NoTime>::builder()
+            .ui(ListenableSource::constant(Viewport::ARBITRARY))
+            .build()
+            .await;
+        assert!(!*session.paused.get());
+
+        session.input_processor.key_momentary(Key::Escape); // need to not just use control_channel
+        advance_time(&mut session);
+
+        assert!(*session.paused.get());
     }
 }
