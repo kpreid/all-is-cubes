@@ -3,27 +3,27 @@
 //! Does not do any native compilation; this is just precomputation and code-generation
 //! more convenient than a proc macro.
 
-use std::path::PathBuf;
+extern crate alloc;
+
+use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-use all_is_cubes_base::math::{self, Face6, FaceMap, FreePoint, FreeVector};
+use all_is_cubes_base::math::{self, Face6, FaceMap, FreePoint, FreeVector, VectorOps};
+use all_is_cubes_base::raycast::Ray;
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/space/light/chart_schema_shared.rs");
 
     let rays = generate_light_ray_pattern();
-
-    fs::write(
-        PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("light_ray_pattern.bin"),
-        bytemuck::cast_slice::<OneRay, u8>(rays.as_slice()),
-    )
-    .expect("failed to write light_ray_pattern");
+    let chart = generate_light_propagation_chart(&rays);
+    write_light_propagation_chart(chart);
 }
 
 const RAY_DIRECTION_STEP: isize = 5;
 
-// TODO: Make multiple ray patterns that suit the maximum_distance parameter.
+// TODO: Use morerays once we have a more efficient chart format that
+// deduplicates work of near-parallel rays.
 fn generate_light_ray_pattern() -> Vec<OneRay> {
     let origin = FreePoint::new(0.5, 0.5, 0.5);
 
@@ -46,7 +46,7 @@ fn generate_light_ray_pattern() -> Vec<OneRay> {
                         cosines[face] = cosine;
                     }
 
-                    rays.push(OneRay::new(origin, direction, cosines))
+                    rays.push(OneRay::new(Ray::new(origin, direction), cosines))
                 }
             }
         }
@@ -55,23 +55,92 @@ fn generate_light_ray_pattern() -> Vec<OneRay> {
     rays
 }
 
-use chart_schema::OneRay;
+/// Convert rays into their steps (sequence of cube intersections).
+fn generate_light_propagation_chart(rays: &[OneRay]) -> Vec<chart_schema::Steps> {
+    let maximum_distance = 127.0;
+    rays.iter()
+        .map(|&info| {
+            let ray: Ray = info.ray.into();
+            chart_schema::Steps {
+                info,
+                relative_cube_sequence: ray
+                    .cast()
+                    .take_while(|step| step.t_distance() <= maximum_distance)
+                    .map(|step| chart_schema::Step {
+                        relative_cube: step
+                            .cube_ahead()
+                            .lower_bounds()
+                            .map(|coord| {
+                                TargetEndian::from(i8::try_from(coord).expect("coordinate too big"))
+                            })
+                            .into(),
+                        face: step.face().into(),
+                        distance: step.t_distance().ceil() as u8,
+                    })
+                    .collect(),
+            }
+        })
+        .collect()
+}
+
+fn write_light_propagation_chart(chart: Vec<chart_schema::Steps>) {
+    // Repack data into two vectors instead of a vector of vectors.
+    let mut offset = 0;
+    let info: Vec<chart_schema::IndirectSteps> = chart
+        .iter()
+        .map(|steps| {
+            let len = steps.relative_cube_sequence.len();
+            let start = offset;
+            let end = offset + len;
+            offset += len;
+            chart_schema::IndirectSteps {
+                info: steps.info,
+                relative_cube_sequence: [start, end],
+            }
+        })
+        .collect();
+    let all_steps_concat: Vec<chart_schema::Step> = chart
+        .into_iter()
+        .flat_map(|steps| steps.relative_cube_sequence)
+        .collect();
+
+    writemuck(Path::new("light_chart_info.bin"), info.as_slice());
+    writemuck(
+        Path::new("light_chart_steps.bin"),
+        all_steps_concat.as_slice(),
+    );
+}
+
+/// Write the bytes of the given data to the given path within `OUT_DIR`.
+fn writemuck<T: bytemuck::NoUninit>(out_relative_path: &Path, data: &[T]) {
+    assert!(out_relative_path.is_relative());
+    let path = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join(out_relative_path);
+    if let Err(e) = fs::write(&path, bytemuck::cast_slice::<T, u8>(data)) {
+        panic!(
+            "failed to write generated data to {path}: {e}",
+            path = path.display()
+        )
+    }
+}
+
+use chart_schema::{OneRay, TargetEndian};
+
 #[path = "src/space/light/"]
 mod chart_schema {
-    use crate::math::{FaceMap, FreePoint, FreeVector, VectorOps as _};
+    use crate::math::{FaceMap, VectorOps as _};
+    use all_is_cubes_base::raycast::Ray;
     use core::fmt;
-    use num_traits::ToBytes;
+    use num_traits::{FromBytes, ToBytes};
     use std::env;
 
     mod chart_schema_shared;
-    pub(crate) use chart_schema_shared::OneRay;
+    pub(crate) use chart_schema_shared::{IndirectSteps, OneRay, Step, Steps};
 
     impl OneRay {
-        pub fn new(origin: FreePoint, direction: FreeVector, face_cosines: FaceMap<f32>) -> Self {
+        pub fn new(ray: Ray, face_cosines: FaceMap<f32>) -> Self {
             let face_cosines = face_cosines.map(|_, c| TargetEndian::from(c));
             Self {
-                origin: origin.map(TargetEndian::from).into(),
-                direction: direction.map(TargetEndian::from).into(),
+                ray: ray.into(),
                 face_cosines: [
                     face_cosines.nx,
                     face_cosines.ny,
@@ -80,6 +149,15 @@ mod chart_schema {
                     face_cosines.py,
                     face_cosines.pz,
                 ],
+            }
+        }
+    }
+
+    impl From<Ray> for chart_schema_shared::Ray {
+        fn from(value: Ray) -> Self {
+            Self {
+                origin: value.origin.map(TargetEndian::from).into(),
+                direction: value.direction.map(TargetEndian::from).into(),
             }
         }
     }
@@ -104,6 +182,32 @@ mod chart_schema {
                     e => panic!("unknown endianness: {e}"),
                 },
             )
+        }
+    }
+
+    // Orphan rules don't allow this as a generic impl directly
+    impl<T> TargetEndian<T>
+    where
+        <T as ToBytes>::Bytes: Copy + Clone + bytemuck::Pod + bytemuck::Zeroable,
+        T: FromBytes<Bytes = <T as ToBytes>::Bytes> + ToBytes + bytemuck::Pod + bytemuck::Zeroable,
+    {
+        fn into_value(self) -> T {
+            let bytes = self.0;
+            match env::var("CARGO_CFG_TARGET_ENDIAN").unwrap().as_str() {
+                "big" => T::from_be_bytes(&bytes),
+                "little" => T::from_le_bytes(&bytes),
+                e => panic!("unknown endianness: {e}"),
+            }
+        }
+    }
+    impl From<TargetEndian<f32>> for f32 {
+        fn from(value: TargetEndian<f32>) -> Self {
+            value.into_value()
+        }
+    }
+    impl From<TargetEndian<f64>> for f64 {
+        fn from(value: TargetEndian<f64>) -> Self {
+            value.into_value()
         }
     }
 }

@@ -1,86 +1,68 @@
 //! Types and data pertaining to the pattern of rays that are cast from a block to potential
 //! light sources. Used by the algorithms in [`crate::space::light::updater`].
 
-use alloc::vec::Vec;
+use crate::space::light::chart_schema::{self, OneRay};
 
-use crate::math::{CubeFace, FaceMap};
-use crate::raycast::Ray;
-use crate::space::light::chart_schema::OneRay;
-use crate::space::LightPhysics;
-
-/// Derived from [`LightRayData`], but with a pre-calculated sequence of cubes instead of a ray
-///  for maximum performance in the lighting calculation.
-#[derive(Debug)]
-pub(in crate::space) struct LightRayCubes {
-    /// For diagnostics only
-    pub ray: Ray,
-    pub relative_cube_sequence: Vec<LightRayStep>,
-    pub face_cosines: FaceMap<f32>,
+/// Precalculated data about how light propagates through the cube grid,
+/// used to traverse a `Space` to determine what light falls on a single block.
+#[derive(Clone, Copy)]
+pub(crate) struct LightChart {
+    info: &'static [chart_schema::IndirectSteps],
+    all_steps: &'static [chart_schema::Step],
 }
 
-/// A raycast step pre-adapted.
-#[derive(Debug)]
-pub(in crate::space) struct LightRayStep {
-    /// Cube we just hit, relative to the origin of rays.
-    pub relative_cube_face: CubeFace,
-    /// Ray segment from the origin to the point where it struck the cube.
-    /// Used only for diagnostic purposes ("where did the rays go?").
-    pub relative_ray_to_here: Ray,
-}
+impl LightChart {
+    /// `bytemuck::cast_slice()` can't be const, so we have to write a function,
+    /// but this should all compile to a noop.
+    pub fn get() -> Self {
+        const INFO_BYTES_LEN: usize =
+            include_bytes!(concat!(env!("OUT_DIR"), "/light_chart_info.bin")).len();
+        const STEPS_BYTES_LEN: usize =
+            include_bytes!(concat!(env!("OUT_DIR"), "/light_chart_steps.bin")).len();
 
-/// `bytemuck::cast_slice()` can't be const, so we have to write a function,
-/// but this should all compile to a noop.
-fn light_rays_data() -> &'static [OneRay] {
-    const LIGHT_RAYS_BYTES_LEN: usize =
-        include_bytes!(concat!(env!("OUT_DIR"), "/light_ray_pattern.bin")).len();
+        // Ensure the data is sufficiently aligned
+        #[repr(C)]
+        struct AlignInfo {
+            _aligner: [chart_schema::IndirectSteps; 0],
+            data: [u8; INFO_BYTES_LEN],
+        }
+        #[repr(C)]
+        struct AlignStep {
+            _aligner: [chart_schema::Step; 0],
+            data: [u8; STEPS_BYTES_LEN],
+        }
 
-    // Ensure the data is sufficiently aligned
-    #[repr(C)]
-    struct Align {
-        _aligner: [OneRay; 0],
-        data: [u8; LIGHT_RAYS_BYTES_LEN],
+        static INFO_BYTES: AlignInfo = AlignInfo {
+            _aligner: [],
+            data: *include_bytes!(concat!(env!("OUT_DIR"), "/light_chart_info.bin")),
+        };
+        static STEPS_BYTES: AlignStep = AlignStep {
+            _aligner: [],
+            data: *include_bytes!(concat!(env!("OUT_DIR"), "/light_chart_steps.bin")),
+        };
+
+        LightChart {
+            info: bytemuck::cast_slice(&INFO_BYTES.data),
+            all_steps: bytemuck::cast_slice(&STEPS_BYTES.data),
+        }
     }
 
-    static LIGHT_RAYS_BYTES: Align = Align {
-        _aligner: [],
-        data: *include_bytes!(concat!(env!("OUT_DIR"), "/light_ray_pattern.bin")),
-    };
-
-    bytemuck::cast_slice::<u8, OneRay>(&LIGHT_RAYS_BYTES.data)
-}
-
-/// Convert [`LIGHT_RAYS`] containing [`LightRayData`] into [`LightRayCubes`].
-#[inline(never)] // cold code shouldn't be duplicated
-pub(in crate::space) fn calculate_propagation_table(physics: &LightPhysics) -> Vec<LightRayCubes> {
-    // TODO: Save memory for the table by adding mirroring support, like ChunkChart does
-
-    match *physics {
-        LightPhysics::None => vec![],
-        // TODO: Instead of having a constant ray pattern, choose one that suits the
-        // maximum_distance.
-        LightPhysics::Rays { maximum_distance } => {
-            let maximum_distance = f64::from(maximum_distance);
-            light_rays_data()
-                .iter()
-                .map(|&ray_data| {
-                    let ray = ray_data.ray();
-                    LightRayCubes {
-                        relative_cube_sequence: ray
-                            .cast()
-                            .take_while(|step| step.t_distance() <= maximum_distance)
-                            .map(|step| LightRayStep {
-                                relative_cube_face: step.cube_face(),
-                                relative_ray_to_here: Ray {
-                                    origin: ray.origin,
-                                    direction: step.intersection_point(ray) - ray.origin,
-                                },
-                            })
-                            .collect(),
-                        ray,
-                        face_cosines: ray_data.face_cosines(),
-                    }
-                })
-                .collect()
-        }
+    pub fn rays(
+        self,
+        maximum_distance: u8,
+    ) -> impl Iterator<Item = (OneRay, impl Iterator<Item = chart_schema::Step>)> {
+        self.info.iter().map(move |ist| {
+            let &chart_schema::IndirectSteps {
+                info,
+                relative_cube_sequence: [start, end],
+            } = ist;
+            (
+                info,
+                self.all_steps[start..end]
+                    .iter()
+                    .filter(move |step| step.distance <= maximum_distance)
+                    .copied(),
+            )
+        })
     }
 }
