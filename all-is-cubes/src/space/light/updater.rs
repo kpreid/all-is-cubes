@@ -58,9 +58,6 @@ pub(crate) struct LightStorage {
 
     pub(in crate::space) sky: Sky,
     pub(in crate::space) block_sky: BlockSky,
-
-    /// Pre-computed table of what adjacent blocks need to be consulted to update light.
-    propagation_table: Vec<rays::LightRayCubes>,
 }
 
 /// Methods on Space that specifically implement the lighting algorithm.
@@ -78,7 +75,6 @@ impl LightStorage {
             physics: physics.light.clone(),
             sky: physics.sky.clone(),
             block_sky: physics.sky.for_blocks(),
-            propagation_table: rays::calculate_propagation_table(&physics.light),
         }
     }
 
@@ -98,7 +94,6 @@ impl LightStorage {
             self.contents = self
                 .physics
                 .initialize_lighting(uc.contents.without_elements(), opacity);
-            self.propagation_table = rays::calculate_propagation_table(&self.physics);
 
             match self.physics {
                 LightPhysics::None => {
@@ -375,6 +370,11 @@ impl LightStorage {
         let mut cube_buffer = LightBuffer::new();
         let mut info_rays = D::RayInfoBuffer::default();
 
+        let maximum_distance = match self.physics {
+            LightPhysics::None => 0,
+            LightPhysics::Rays { maximum_distance } => maximum_distance,
+        };
+
         let ev_origin = uc.get_evaluated(cube);
         let origin_is_opaque = ev_origin.opaque == FaceMap::repeat(true);
         if origin_is_opaque {
@@ -387,14 +387,11 @@ impl LightStorage {
                 FaceMap::from_fn(|face| uc.get_evaluated(cube + face.normal_vector()));
             let direction_weights = directions_to_seek_light(ev_origin, ev_neighbors);
 
-            for &rays::LightRayCubes {
-                ray,
-                ref relative_cube_sequence,
-                face_cosines,
-            } in self.propagation_table.iter()
+            for (ray_info, relative_cube_sequence) in rays::LightChart::get().rays(maximum_distance)
             {
                 // TODO: Theoretically we should weight light rays by the cosine but that has caused poor behavior in the past.
-                let ray_weight_by_faces = face_cosines
+                let ray_weight_by_faces = ray_info
+                    .face_cosines()
                     .zip(direction_weights, |_face, ray_cosine, reflects| {
                         ray_cosine * reflects
                     })
@@ -403,7 +400,8 @@ impl LightStorage {
                 if ray_weight_by_faces <= 0.0 {
                     continue;
                 }
-                let mut ray_state = LightRayState::new(cube, ray, ray_weight_by_faces);
+                let mut ray_state =
+                    LightRayState::new(cube, ray_info.ray.into(), ray_weight_by_faces);
 
                 // Stores the light value that might have been fetched, if it was, from the previous
                 // step's cube_ahead, which is the current step's cube_behind.
@@ -411,7 +409,7 @@ impl LightStorage {
 
                 'raycast: for step in relative_cube_sequence {
                     let cube_face = step
-                        .relative_cube_face
+                        .relative_cube_face()
                         .translate(cube.lower_bounds().to_vector());
 
                     cube_buffer.cost += 1;
@@ -425,9 +423,9 @@ impl LightStorage {
                         &mut ray_state,
                         &mut info_rays,
                         self,
-                        step.relative_cube_face
+                        step.relative_cube_face()
                             .translate(cube.lower_bounds().to_vector()),
-                        step.relative_ray_to_here,
+                        f64::from(step.distance), // TODO: this will be sloppy
                         uc.get_evaluated(cube_face.cube),
                         &mut light_ahead_cache,
                         light_behind_cache,
@@ -638,9 +636,7 @@ struct LightRayState {
     /// Weighting factor for how much this ray contributes to the total light.
     /// If zero, this will not be counted as a ray at all.
     ray_weight_by_faces: f32,
-    /// The cube we're lighting; remembered to check for loopbacks
-    origin_cube: Cube,
-    /// The ray we're casting; remembered for debugging only. (TODO: avoid this?)
+    /// The ray we're casting; remembered for debugging and sky light sampling.
     translated_ray: Ray,
 }
 
@@ -659,7 +655,6 @@ impl LightRayState {
         LightRayState {
             alpha: 1.0,
             ray_weight_by_faces,
-            origin_cube,
             translated_ray,
         }
     }
@@ -690,7 +685,7 @@ impl LightBuffer {
         info: &mut D::RayInfoBuffer,
         current_light: &LightStorage,
         hit: CubeFace,
-        relative_ray_to_here: Ray,
+        distance: f64,
         ev_hit: &EvaluatedBlock,
         light_ahead_cache: &mut Option<PackedLight>,
         light_behind_cache: Option<PackedLight>,
@@ -764,8 +759,7 @@ impl LightBuffer {
                 // Iff this is the hit that terminates the ray, record it.
                 // TODO: Record transparency too.
                 D::push_ray(info, || LightUpdateRayInfo {
-                    ray: relative_ray_to_here
-                        .translate(ray_state.origin_cube.lower_bounds().to_vector().to_f64()),
+                    ray: ray_state.translated_ray.scale_direction(distance),
                     trigger_cube: hit.cube,
                     value_cube: light_cube,
                     value: stored_light,
