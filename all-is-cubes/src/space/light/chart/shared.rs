@@ -3,10 +3,6 @@
 //!
 //! This is the most efficient way I could think of to store and transfer the
 //! pre-computed light ray chart data.
-//!
-//! Currently, host and target endianness must be the same.
-//! In the future, this may be handled by using number types wrapped to be explicitly
-//! target endianness.
 
 use all_is_cubes_base::math::Face7;
 

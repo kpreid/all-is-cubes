@@ -19,7 +19,7 @@ use crate::math::{
 };
 use crate::raycast::Ray;
 use crate::space::light::{
-    rays, LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority,
+    chart::LightChart, LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority,
 };
 use crate::space::palette::Palette;
 use crate::space::{
@@ -387,8 +387,7 @@ impl LightStorage {
                 FaceMap::from_fn(|face| uc.get_evaluated(cube + face.normal_vector()));
             let direction_weights = directions_to_seek_light(ev_origin, ev_neighbors);
 
-            for (ray_info, relative_cube_sequence) in rays::LightChart::get().rays(maximum_distance)
-            {
+            for (ray_info, relative_cube_sequence) in LightChart::get().rays(maximum_distance) {
                 // TODO: Theoretically we should weight light rays by the cosine but that has caused poor behavior in the past.
                 let ray_weight_by_faces = ray_info
                     .face_cosines()

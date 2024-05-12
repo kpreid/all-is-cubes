@@ -1,17 +1,16 @@
-//! Types and data pertaining to the pattern of rays that are cast from a block to potential
-//! light sources. Used by the algorithms in [`crate::space::light::updater`].
-
-use crate::space::light::chart_schema::{self, OneRay};
+use crate::space::light::chart;
 
 /// Precalculated data about how light propagates through the cube grid,
 /// used to traverse a `Space` to determine what light falls on a single block.
 #[derive(Clone, Copy)]
 pub(crate) struct LightChart {
-    info: &'static [chart_schema::IndirectSteps],
-    all_steps: &'static [chart_schema::Step],
+    info: &'static [chart::IndirectSteps],
+    all_steps: &'static [chart::Step],
 }
 
 impl LightChart {
+    /// Returns the precalculated light propagation chart.
+    ///
     /// `bytemuck::cast_slice()` can't be const, so we have to write a function,
     /// but this should all compile to a noop.
     pub fn get() -> Self {
@@ -23,12 +22,12 @@ impl LightChart {
         // Ensure the data is sufficiently aligned
         #[repr(C)]
         struct AlignInfo {
-            _aligner: [chart_schema::IndirectSteps; 0],
+            _aligner: [chart::IndirectSteps; 0],
             data: [u8; INFO_BYTES_LEN],
         }
         #[repr(C)]
         struct AlignStep {
-            _aligner: [chart_schema::Step; 0],
+            _aligner: [chart::Step; 0],
             data: [u8; STEPS_BYTES_LEN],
         }
 
@@ -50,9 +49,9 @@ impl LightChart {
     pub fn rays(
         self,
         maximum_distance: u8,
-    ) -> impl Iterator<Item = (OneRay, impl Iterator<Item = chart_schema::Step>)> {
+    ) -> impl Iterator<Item = (chart::OneRay, impl Iterator<Item = chart::Step>)> {
         self.info.iter().map(move |ist| {
-            let &chart_schema::IndirectSteps {
+            let &chart::IndirectSteps {
                 info,
                 relative_cube_sequence: [start, end],
             } = ist;

@@ -1,15 +1,13 @@
 use euclid::Point3D;
 
-use all_is_cubes_base::math::{Cube, CubeFace};
+use all_is_cubes_base::math::{Cube, CubeFace, FaceMap};
 
-#[path = "chart_schema_shared.rs"]
-mod chart_schema_shared;
-pub(crate) use chart_schema_shared::*;
+use crate::space::light::chart;
 
-impl OneRay {
-    pub fn face_cosines(&self) -> crate::math::FaceMap<f32> {
+impl chart::OneRay {
+    pub fn face_cosines(&self) -> FaceMap<f32> {
         let [nx, ny, nz, px, py, pz] = self.face_cosines;
-        crate::math::FaceMap {
+        FaceMap {
             nx,
             ny,
             nz,
@@ -20,7 +18,7 @@ impl OneRay {
     }
 }
 
-impl Step {
+impl chart::Step {
     pub fn relative_cube_face(self) -> CubeFace {
         CubeFace {
             cube: Cube::from(Point3D::from(self.relative_cube).to_i32()),
@@ -29,5 +27,5 @@ impl Step {
     }
 }
 
-/// Used by `chart_data` type declarations to have compatible behavior when cross-compiling.
-type TargetEndian<T> = T;
+/// Used by `chart` type declarations to have compatible behavior when cross-compiling.
+pub(super) type TargetEndian<T> = T;

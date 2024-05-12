@@ -125,7 +125,7 @@ fn writemuck<T: bytemuck::NoUninit>(out_relative_path: &Path, data: &[T]) {
 
 use chart_schema::{OneRay, TargetEndian};
 
-#[path = "src/space/light/"]
+#[path = "src/space/light/chart/"]
 mod chart_schema {
     use crate::math::{FaceMap, VectorOps as _};
     use all_is_cubes_base::raycast::Ray;
@@ -133,8 +133,8 @@ mod chart_schema {
     use num_traits::{FromBytes, ToBytes};
     use std::env;
 
-    mod chart_schema_shared;
-    pub(crate) use chart_schema_shared::{IndirectSteps, OneRay, Step, Steps};
+    mod shared;
+    pub(crate) use shared::{IndirectSteps, OneRay, Step, Steps};
 
     impl OneRay {
         pub fn new(ray: Ray, face_cosines: FaceMap<f32>) -> Self {
@@ -153,7 +153,7 @@ mod chart_schema {
         }
     }
 
-    impl From<Ray> for chart_schema_shared::Ray {
+    impl From<Ray> for shared::Ray {
         fn from(value: Ray) -> Self {
             Self {
                 origin: value.origin.map(TargetEndian::from).into(),
