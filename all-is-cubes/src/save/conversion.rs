@@ -615,6 +615,15 @@ mod op {
                 op::Operation::Paint(brush) => schema::OperationSer::PaintV1 {
                     blocks: brush.entries_for_serialization(),
                 },
+                op::Operation::Neighbors(neighbors) => schema::OperationSer::NeighborsV1 {
+                    // TODO: arrange to be able to borrow here
+                    neighbors: Cow::Owned(
+                        neighbors
+                            .iter()
+                            .map(|&(offset, ref op)| (offset.into(), op.clone()))
+                            .collect(),
+                    ),
+                },
             }
             .serialize(serializer)
         }
@@ -630,6 +639,11 @@ mod op {
                 schema::OperationSer::PaintV1 { blocks } => {
                     op::Operation::Paint(VoxelBrush::new(blocks))
                 }
+                schema::OperationSer::NeighborsV1 { neighbors } => op::Operation::Neighbors(
+                    cow_into_iter(neighbors)
+                        .map(|(offset, op)| (offset.into(), op))
+                        .collect(),
+                ),
             })
         }
     }
@@ -1046,5 +1060,18 @@ mod universe {
                 *handle_context = None;
             });
         }
+    }
+}
+
+/// Create an efficient iterator of owned elements from a [`Cow`].
+///
+/// `cow.into_owned().into_iter()` creates a redundant `Vec`, and
+/// `cow.iter().cloned()` redundantly clones owned items;
+/// this function avoids both.
+fn cow_into_iter<T: Clone>(cow: Cow<'_, [T]>) -> impl Iterator<Item = T> + '_ {
+    use itertools::Either;
+    match cow {
+        Cow::Borrowed(slice) => Either::Left(slice.iter().cloned()),
+        Cow::Owned(vec) => Either::Right(vec.into_iter()),
     }
 }

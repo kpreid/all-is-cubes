@@ -522,6 +522,7 @@ fn operation_become() {
         }),
     );
 }
+
 #[test]
 fn operation_paint() {
     assert_round_trip_value(
@@ -534,6 +535,28 @@ fn operation_paint() {
                     {
                         "type": "BlockV1",
                         "primitive": {"type": "AirV1"},
+                    }
+                ]
+            ]
+        }),
+    );
+}
+
+#[test]
+fn operation_neighbors() {
+    assert_round_trip_value(
+        &op::Operation::Neighbors(vec![(Cube::new(1, 2, 3), op::Operation::Become(AIR))]),
+        json!({
+            "type": "NeighborsV1",
+            "neighbors": [
+                [
+                    [1, 2, 3],
+                    {
+                        "type": "BecomeV1",
+                        "block": {
+                            "type": "BlockV1",
+                            "primitive": {"type": "AirV1"},
+                        }
                     }
                 ]
             ]

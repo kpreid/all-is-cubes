@@ -501,7 +501,11 @@ impl ToolError {
 
 impl From<op::OperationError> for ToolError {
     fn from(value: op::OperationError) -> Self {
-        match value {}
+        match value {
+            // TODO: should not forget source()s but we can't do that generically in no_std for now;
+            // need more custom user-facing error processing.
+            op::OperationError::InternalConflict(c) => ToolError::Internal(c.to_string()),
+        }
     }
 }
 

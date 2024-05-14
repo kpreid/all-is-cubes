@@ -27,7 +27,7 @@ use crate::block::Block;
 use crate::math::{Aab, Face6, GridAab, GridCoordinate, GridRotation};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::universe::Handle;
-use crate::{behavior, block, character, inv, space, universe};
+use crate::{behavior, block, character, inv, op, space, universe};
 
 /// Placeholder type for when we want to serialize the *contents* of a `Handle`,
 /// without cloning or referencing those contents immediately.
@@ -144,7 +144,7 @@ pub(crate) enum RotationPlacementRuleSer {
 /// Unversioned because it's versioned by the parent struct
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct TickActionSer<'a> {
-    pub operation: Cow<'a, crate::op::Operation>,
+    pub operation: Cow<'a, op::Operation>,
     pub period: NonZeroU16,
 }
 #[derive(Copy, Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -310,25 +310,14 @@ pub(crate) struct InvStackSer {
 #[serde(tag = "type")]
 pub(crate) enum ToolSer {
     ActivateV1 {},
-    RemoveBlockV1 {
-        keep: bool,
-    },
-    BlockV1 {
-        block: Block,
-    },
-    InfiniteBlocksV1 {
-        block: Block,
-    },
+    RemoveBlockV1 { keep: bool },
+    BlockV1 { block: Block },
+    InfiniteBlocksV1 { block: Block },
     CopyFromSpaceV1 {},
     EditBlockV1 {},
     PushPullV1 {},
-    JetpackV1 {
-        active: bool,
-    },
-    CustomV1 {
-        op: crate::op::Operation,
-        icon: Block,
-    },
+    JetpackV1 { active: bool },
+    CustomV1 { op: op::Operation, icon: Block },
 }
 
 //------------------------------------------------------------------------------------------------//
@@ -343,9 +332,16 @@ type RgbaSer = [NotNan<f32>; 4];
 
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum OperationSer {
-    BecomeV1 { block: Block },
-    PaintV1 { blocks: Vec<([i32; 3], Block)> },
+pub(crate) enum OperationSer<'a> {
+    BecomeV1 {
+        block: Block,
+    },
+    PaintV1 {
+        blocks: Vec<([i32; 3], Block)>,
+    },
+    NeighborsV1 {
+        neighbors: Cow<'a, [([i32; 3], op::Operation)]>,
+    },
 }
 
 //------------------------------------------------------------------------------------------------//
