@@ -231,6 +231,7 @@ mod tests {
     use crate::content::make_some_voxel_blocks;
     use crate::raytracer::{CharacterBuf, CharacterRtData};
     use crate::universe::Universe;
+    use alloc::string::ToString;
     use euclid::{size2, vec3};
     use manyfmt::{formats::Unquote, Refmt};
     use pretty_assertions::assert_eq;
@@ -279,14 +280,16 @@ mod tests {
             let image_updating = self
                 .updating
                 .get()
-                .trace_scene_to_string::<CharacterBuf>(&self.camera, "\n");
+                .to_text::<CharacterBuf>(&self.camera, "\n")
+                .to_string();
             #[allow(clippy::unit_arg)]
             let image_fresh = SpaceRaytracer::<CharacterRtData>::new(
                 &self.space.read().unwrap(),
                 self.graphics_options.snapshot(),
                 self.custom_options.snapshot(),
             )
-            .trace_scene_to_string::<CharacterBuf>(&self.camera, "\n");
+            .to_text::<CharacterBuf>(&self.camera, "\n")
+            .to_string();
 
             assert_eq!(image_updating.refmt(&Unquote), image_fresh.refmt(&Unquote));
             print!("{image_updating}");

@@ -60,6 +60,8 @@
       If the alternative behavior is desired, see `intersection_box()`.
     - `math::GridAab::union()` has been renamed to `union_box()`, and is no longer fallible.
     
+    - `raytracer::SpaceRaytracer::trace_scene_to_text()` and `trace_scene_to_string()` have been replaced with the single method `to_text()`.
+
     - `transaction::ExecuteError` is now generic over the type of transaction it is an error from.
 
     - Renamed `universe::URef` to `universe::Handle`. Related items have also been renamed:

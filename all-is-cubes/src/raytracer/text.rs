@@ -3,6 +3,7 @@
 #![cfg_attr(not(feature = "std"), allow(unused_imports))]
 
 use alloc::string::String;
+use core::fmt;
 
 use arcstr::{literal_substr, ArcStr, Substr};
 use euclid::size2;
@@ -10,7 +11,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, Viewport};
 use crate::math::{FreeVector, Rgba};
-use crate::raytracer::{Accumulate, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer};
+use crate::raytracer::{Accumulate, RtBlockData, RtOptionsRef, SpaceRaytracer};
 use crate::space::{Space, SpaceBlockData};
 
 /// TODO: better name, docs
@@ -99,51 +100,57 @@ impl From<CharacterBuf> for String {
 /// the center of the space. The text output will be 80 columns wide.
 #[cfg(any(feature = "std", test))]
 pub fn print_space(space: &Space, direction: impl Into<FreeVector>) {
-    print_space_impl(space, direction.into(), &mut |s| {
-        std::print!("{s}");
-    });
+    std::print!(
+        "{}",
+        PrintSpace {
+            space,
+            direction: direction.into()
+        }
+    );
 }
 
-/// Version of `print_space` that takes a destination, for testing, and is non-generic,
-/// for build performance.
+/// Wrapper struct for the implementation of [`print_space()`].
+/// and which allows testing its output.
 #[cfg(any(feature = "std", test))]
-fn print_space_impl(
-    space: &Space,
+struct PrintSpace<'a> {
+    space: &'a Space,
     direction: FreeVector,
-    write: &mut dyn FnMut(&str),
-) -> RaytraceInfo {
-    // TODO: optimize height (and thus aspect ratio) for the shape of the space
+}
 
-    let mut camera = Camera::new(
-        GraphicsOptions::default(),
-        Viewport {
-            nominal_size: size2(40., 40.),
-            framebuffer_size: size2(80, 40),
-        },
-    );
-    camera.look_at_y_up(
-        eye_for_look_at(space.bounds(), direction),
-        space.bounds().center(),
-    );
+#[cfg(any(feature = "std", test))]
+impl fmt::Display for PrintSpace<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // TODO: optimize height (and thus aspect ratio) for the shape of the space
 
-    SpaceRaytracer::<CharacterRtData>::new(space, GraphicsOptions::default(), ())
-        .trace_scene_to_text::<CharacterBuf, _, _>(&camera, "\n", move |s| {
-            write(s);
-            let r: Result<(), ()> = Ok(());
-            r
-        })
-        .unwrap()
+        let mut camera = Camera::new(
+            GraphicsOptions::default(),
+            Viewport {
+                nominal_size: size2(40., 40.),
+                framebuffer_size: size2(80, 40),
+            },
+        );
+        camera.look_at_y_up(
+            eye_for_look_at(self.space.bounds(), self.direction),
+            self.space.bounds().center(),
+        );
+
+        SpaceRaytracer::<CharacterRtData>::new(self.space, GraphicsOptions::default(), ())
+            .to_text::<CharacterBuf>(&camera, "\n")
+            .fmt(f)?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use euclid::vec3;
-
     use super::*;
     use crate::block::{Block, Resolution::R4};
     use crate::color_block;
     use crate::content::make_some_blocks;
     use crate::universe::Universe;
+    use euclid::vec3;
+    use std::string::ToString;
 
     #[test]
     fn print_space_test() {
@@ -153,8 +160,11 @@ mod tests {
         space.set([1, 0, 0], &b1).unwrap();
         space.set([2, 0, 0], &b2).unwrap();
 
-        let mut output = String::new();
-        print_space_impl(&space, vec3(1., 1., 1.), &mut |s| output += s);
+        let output = PrintSpace {
+            space: &space,
+            direction: vec3(1., 1., 1.),
+        }
+        .to_string();
         print!("{output}");
         pretty_assertions::assert_eq!(
             output,
@@ -223,8 +233,11 @@ mod tests {
         space.set([0, 0, 0], &b0).unwrap();
         space.set([1, 0, 0], &partial_block).unwrap();
 
-        let mut output = String::new();
-        print_space_impl(&space, vec3(1., 1., 1.), &mut |s| output += s);
+        let output = PrintSpace {
+            space: &space,
+            direction: vec3(1., 1., 1.),
+        }
+        .to_string();
         print!("{output}");
         pretty_assertions::assert_eq!(
             output,

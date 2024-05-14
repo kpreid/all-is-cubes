@@ -12,6 +12,7 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
+use core::marker::PhantomData;
 
 use euclid::{vec3, Vector3D};
 use manyfmt::Fmt;
@@ -31,8 +32,8 @@ use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 #[allow(unused_imports)]
 use crate::math::Euclid as _;
 use crate::math::{
-    area_usize, rgb_const, smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector,
-    GridAab, GridMatrix, Intensity, Rgb, Rgba, VectorOps, Vol,
+    rgb_const, smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab,
+    GridMatrix, Intensity, Rgb, Rgba, VectorOps, Vol,
 };
 use crate::raycast::Ray;
 use crate::space::{BlockIndex, BlockSky, PackedLight, Sky, Space, SpaceBlockData};
@@ -270,36 +271,49 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 impl<D: RtBlockData> SpaceRaytracer<D> {
     /// Raytrace to text, using any [`Accumulate`] whose output can be [`String`].
     ///
-    /// `F` is the function accepting the output, and `E` is the type of error it may
-    /// produce. This function-based interface is intended to abstract over the
-    /// inconvenient difference between [`std::io::Write`] and [`core::fmt::Write`].
-    ///
-    /// After each line (row) of the image, `write(line_ending)` will be called.
-    pub fn trace_scene_to_text<P, F, E>(
-        &self,
-        camera: &Camera,
-        line_ending: &str,
-        write: F,
-    ) -> Result<RaytraceInfo, E>
+    /// After each line (row) of the image, including the last, `line_ending` will be inserted.
+    pub fn to_text<'a, P>(
+        &'a self,
+        camera: &'a Camera,
+        line_ending: &'a str,
+    ) -> impl fmt::Display + 'a
     where
-        P: Accumulate<BlockData = D> + Into<String>,
-        F: FnMut(&str) -> Result<(), E>,
+        P: Accumulate<BlockData = D> + Into<String> + 'a,
     {
-        // This wrapper function ensures that the two implementations have consistent
-        // signatures.
-        self.trace_scene_to_text_impl::<P, F, E>(camera, line_ending, write)
+        struct ToText<'a, D: RtBlockData, P> {
+            rt: &'a SpaceRaytracer<D>,
+            camera: &'a Camera,
+            line_ending: &'a str,
+            _p: PhantomData<fn() -> P>,
+        }
+
+        impl<'a, D: RtBlockData, P: Accumulate<BlockData = D> + Into<String>> fmt::Display
+            for ToText<'a, D, P>
+        {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                self.rt
+                    .trace_scene_to_text_impl::<P>(self.camera, self.line_ending, f)?;
+                Ok(())
+            }
+        }
+
+        ToText::<'a, D, P> {
+            rt: self,
+            camera,
+            line_ending,
+            _p: PhantomData,
+        }
     }
 
     #[cfg(feature = "auto-threads")]
-    fn trace_scene_to_text_impl<P, F, E>(
+    fn trace_scene_to_text_impl<P>(
         &self,
         camera: &Camera,
         line_ending: &str,
-        mut write: F,
-    ) -> Result<RaytraceInfo, E>
+        stream: &mut dyn fmt::Write,
+    ) -> Result<RaytraceInfo, fmt::Error>
     where
         P: Accumulate<BlockData = D> + Into<String>,
-        F: FnMut(&str) -> Result<(), E>,
     {
         let viewport = camera.viewport();
         let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
@@ -325,21 +339,20 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
         let (text, info_sum): (String, rayon_helper::ParExtSum<RaytraceInfo>) =
             output_iterator.unzip();
-        write(text.as_str())?;
+        stream.write_str(text.as_str())?;
 
         Ok(info_sum.result())
     }
 
     #[cfg(not(feature = "auto-threads"))]
-    fn trace_scene_to_text_impl<P, F, E>(
+    fn trace_scene_to_text_impl<P>(
         &self,
         camera: &Camera,
         line_ending: &str,
-        mut write: F,
-    ) -> Result<RaytraceInfo, E>
+        stream: &mut dyn fmt::Write,
+    ) -> Result<RaytraceInfo, fmt::Error>
     where
         P: Accumulate<BlockData = D> + Into<String>,
-        F: FnMut(&str) -> Result<(), E>,
     {
         let mut total_info = RaytraceInfo::default();
 
@@ -352,27 +365,12 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                 let (buf, info) =
                     self.trace_ray::<P>(camera.project_ndc_into_world(NdcPoint2::new(x, y)), true);
                 total_info += info;
-                write(buf.into().as_str())?;
+                stream.write_str(buf.into().as_str())?;
             }
-            write(line_ending)?;
+            stream.write_str(line_ending)?;
         }
 
         Ok(total_info)
-    }
-
-    /// As [`Self::trace_scene_to_text()`], but returning a string.
-    pub fn trace_scene_to_string<P>(&self, camera: &Camera, line_ending: &str) -> String
-    where
-        P: Accumulate<BlockData = D> + Into<String>,
-    {
-        let mut out =
-            String::with_capacity(area_usize(camera.viewport().framebuffer_size).unwrap());
-        self.trace_scene_to_text::<P, _, _>(camera, line_ending, |s| {
-            out.push_str(s);
-            Ok::<(), core::convert::Infallible>(())
-        })
-        .unwrap();
-        out
     }
 }
 
