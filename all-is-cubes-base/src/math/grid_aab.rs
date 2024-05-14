@@ -583,6 +583,17 @@ impl GridAab {
         Vol::new_dataless(self, O::default())
     }
 
+    /// Converts this box to floating-point coordinates.
+    ///
+    /// This conversion is also available via the [`From`] trait.
+    #[inline]
+    pub fn to_free(self) -> Aab {
+        Aab::from_lower_upper(
+            self.lower_bounds().map(FreeCoordinate::from),
+            self.upper_bounds().map(FreeCoordinate::from),
+        )
+    }
+
     /// Displaces the box by the given `offset`, leaving its size unchanged
     /// (unless that is impossible due to numeric overflow).
     ///
@@ -807,11 +818,12 @@ impl fmt::Debug for GridAab {
 }
 
 impl From<GridAab> for Aab {
-    fn from(input: GridAab) -> Self {
-        Aab::from_lower_upper(
-            input.lower_bounds().map(FreeCoordinate::from),
-            input.upper_bounds().map(FreeCoordinate::from),
-        )
+    /// Converts `value` to floating-point coordinates.
+    ///
+    /// This conversion is also available as [`GridAab::to_free()`],
+    /// which may be more convenient in a method chain.
+    fn from(value: GridAab) -> Self {
+        value.to_free()
     }
 }
 

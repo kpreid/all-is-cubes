@@ -1202,7 +1202,7 @@ mod tests {
         // A one-cube box, so that all possible rays should either intersect
         // exactly this cube, or none at all.
         let bounds = GridAab::from_lower_size([0, 0, 0], [1, 1, 1]);
-        let ray_origins: Aab = bounds.expand(FaceMap::repeat(1)).into();
+        let ray_origins: Aab = bounds.expand(FaceMap::repeat(1)).to_free();
 
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         for _ in 0..1000 {

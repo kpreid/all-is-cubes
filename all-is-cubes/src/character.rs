@@ -197,7 +197,7 @@ impl Character {
                 // TODO: Account for different gravity.
                 let mut pos: FreePoint = spawn.bounds.center();
                 pos.y = collision_box.face_coordinate(Face6::NY)
-                    - Aab::from(spawn.bounds).face_coordinate(Face6::NY);
+                    - spawn.bounds.to_free().face_coordinate(Face6::NY);
                 pos
             }
         };

@@ -320,7 +320,8 @@ impl Body {
                         cubes.map(|cube| {
                             let ev = space.get_evaluated(cube);
                             // approximation of block's actual collision bounds
-                            Aab::from(ev.voxels_bounds())
+                            ev.voxels_bounds()
+                                .to_free()
                                 .scale(FreeCoordinate::from(ev.voxels.resolution()).recip())
                                 .translate(cube.lower_bounds().to_f64().to_vector())
                         }),

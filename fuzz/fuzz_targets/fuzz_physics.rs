@@ -3,7 +3,7 @@ extern crate all_is_cubes;
 
 use all_is_cubes::character::Character;
 use all_is_cubes::euclid::Vector3D;
-use all_is_cubes::math::{self, Aab, FreeCoordinate, NotNan, VectorOps};
+use all_is_cubes::math::{self, FreeCoordinate, NotNan, VectorOps};
 use all_is_cubes::space::Space;
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::Universe;
@@ -14,7 +14,7 @@ use libfuzzer_sys::fuzz_target;
 fuzz_target!(|input: ([FreeCoordinate; 3], [FreeCoordinate; 3], Space)| {
     let (position, velocity, space) = input;
 
-    let interesting_bounds_aab = Aab::from(space.bounds()).expand(10.0);
+    let interesting_bounds_aab = space.bounds().to_free().expand(10.0);
 
     // TODO: write a proper Arbitrary impl on a wrapper
     let position: math::FreePoint = position.into();

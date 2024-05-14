@@ -5,7 +5,7 @@ use core::mem;
 use core::ops;
 
 use all_is_cubes::chunking::ChunkPos;
-use all_is_cubes::math::{Aab, Cube, Geometry, GridCoordinate, LineVertex};
+use all_is_cubes::math::{Cube, Geometry, GridCoordinate, LineVertex};
 use all_is_cubes::space::{BlockIndex, Space};
 
 use crate::dynamic::{self, DynamicMeshTypes};
@@ -284,7 +284,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
 
     pub(crate) fn chunk_debug_lines(&self, output: &mut impl Extend<LineVertex>) {
         if !self.mesh.is_empty() {
-            let aab = Aab::from(self.position().bounds());
+            let aab = self.position().bounds().to_free();
             aab.wireframe_points(output);
 
             // Additional border that wiggles when updates happen.

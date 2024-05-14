@@ -228,7 +228,7 @@ pub fn convert_aabs(
 
 pub fn convert_grid_aabs(aabs: impl IntoIterator<Item = math::GridAab>) -> archetypes::Boxes3D {
     convert_aabs(
-        aabs.into_iter().map(math::Aab::from),
+        aabs.into_iter().map(math::GridAab::to_free),
         math::FreeVector::zero(),
     )
 }

@@ -159,7 +159,7 @@ where
             .filter_map(|pos| self.chunk(pos))
             .filter(|chunk| {
                 !camera.options().use_frustum_culling
-                    || camera.aab_in_view(chunk.position.bounds().into())
+                    || camera.aab_in_view(chunk.position.bounds().to_free())
             })
     }
 

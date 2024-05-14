@@ -9,7 +9,7 @@ use euclid::point3;
 use crate::block::{recursive_ray, Block, EvaluatedBlock, Evoxel, Evoxels};
 use crate::content::palette;
 use crate::math::{
-    Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry, GridCoordinate,
+    Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry, GridCoordinate,
     GridVector, LineVertex, VectorOps,
 };
 use crate::raycast::Ray;
@@ -239,7 +239,9 @@ impl Geometry for Cursor {
         // will often be oversized.
         // (But maybe we should guarantee it is right-sized within block evaluation?)
         // (Perhaps a better box would be the bounds of all `selectable` voxels?)
-        let block_aabb = Aab::from(evaluated.voxels_bounds())
+        let block_aabb = evaluated
+            .voxels_bounds()
+            .to_free()
             .scale(FreeCoordinate::from(evaluated.resolution()).recip())
             .translate(
                 self.cube()

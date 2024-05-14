@@ -7,7 +7,7 @@ use crate::character::{cursor_raycast, Character, CharacterChange, CharacterTran
 use crate::color_block;
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::{Listen as _, Sink};
-use crate::math::{Aab, Face6, GridAab, Rgb};
+use crate::math::{Face6, GridAab, Rgb};
 use crate::physics::BodyTransaction;
 use crate::raycast::Ray;
 use crate::space::Space;
@@ -36,7 +36,7 @@ fn spawn_inferred_position() {
     let cbox = character.body.collision_box_abs();
     dbg!(character.body.position, cbox);
     assert_eq!(
-        Aab::from(bounds).face_coordinate(Face6::NY),
+        bounds.to_free().face_coordinate(Face6::NY),
         cbox.face_coordinate(Face6::NY)
     );
 }

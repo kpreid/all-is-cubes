@@ -1,7 +1,7 @@
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{Aab, Face7, FreePoint, Geometry, LineVertex, Rgba};
+use all_is_cubes::math::{Face7, FreePoint, Geometry, LineVertex, Rgba};
 use all_is_cubes::space::Space;
 use all_is_cubes::util::MapExtend;
 
@@ -24,7 +24,7 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
                 wireframe_vertices(
                     v,
                     palette::DEBUG_BEHAVIOR_BOUNDS,
-                    &Aab::from(item.attachment.bounds()),
+                    &item.attachment.bounds().to_free(),
                 );
             }
         }
