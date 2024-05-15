@@ -175,7 +175,7 @@ fn block_atom_with_all_attributes() {
             .selectable(false)
             .rotation_rule(block::RotationPlacementRule::Attach { by: Face6::PX })
             .tick_action(Some(block::TickAction {
-                operation: op::Operation::Paint(VoxelBrush::new([([0, 0, 0], AIR)])),
+                operation: op::Operation::Become(AIR),
                 period: NonZeroU16::new(3).unwrap(),
             }))
             .light_emission(Rgb::new(1.0, 0.0, 10.0))
@@ -199,16 +199,11 @@ fn block_atom_with_all_attributes() {
                 "tick_action": {
                     "period": 3,
                     "operation": {
-                        "type": "PaintV1",
-                        "blocks": [
-                            [
-                                [0, 0, 0],
-                                {
-                                    "type": "BlockV1",
-                                    "primitive": {"type": "AirV1"},
-                                }
-                            ]
-                        ]
+                        "type": "BecomeV1",
+                        "block": {
+                            "type": "BlockV1",
+                            "primitive": {"type": "AirV1"},
+                        }
                     }
                 },
                 "light_emission": [1.0, 0.0, 10.0],

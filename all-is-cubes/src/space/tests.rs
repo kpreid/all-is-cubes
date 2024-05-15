@@ -16,7 +16,6 @@ use crate::block::{
 };
 use crate::color_block;
 use crate::content::make_some_blocks;
-use crate::drawing::VoxelBrush;
 use crate::fluff::{self, Fluff};
 use crate::listen::{Listen as _, Sink};
 use crate::math::{Cube, Face6, GridAab, GridCoordinate, GridPoint, Rgba, Vol};
@@ -655,10 +654,10 @@ fn block_tick_action_conflict() {
                 TickAction {
                     // TODO: replace this with a better-behaved neighbor-modifying operation,
                     // once we have one
-                    operation: Operation::Paint(VoxelBrush::new([(
-                        face.normal_vector(),
-                        to.clone(),
-                    )])),
+                    operation: Operation::Neighbors(vec![(
+                        Cube::from(face.normal_vector().to_point()),
+                        Operation::Become(to.clone()),
+                    )]),
                     period: NonZeroU16::new(1).unwrap(),
                 }
             });
