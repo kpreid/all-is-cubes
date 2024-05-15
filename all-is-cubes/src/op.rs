@@ -3,7 +3,7 @@
 use crate::block::Block;
 use crate::drawing::VoxelBrush;
 use crate::inv::{Inventory, InventoryTransaction};
-use crate::math::{GridRotation, Gridgid};
+use crate::math::{Cube, GridRotation, Gridgid};
 use crate::space::{CubeTransaction, Space, SpaceTransaction};
 use crate::universe::VisitHandles;
 
@@ -58,10 +58,9 @@ impl Operation {
         _inventory: Option<&Inventory>,
         transform: Gridgid,
     ) -> Result<(SpaceTransaction, InventoryTransaction), OperationError> {
-        let target_cube = transform.translation.to_point().into();
-
         match self {
             Operation::Become(block) => {
+                let target_cube = transform.transform_cube(Cube::ORIGIN);
                 let space_txn = CubeTransaction::replacing(
                     Some(space[target_cube].clone()),
                     Some(block.clone().rotate(transform.rotation)),
@@ -75,7 +74,7 @@ impl Operation {
                 let space_txn = brush
                     .clone()
                     .rotate(transform.rotation)
-                    .paint_transaction(target_cube)
+                    .paint_transaction(transform.transform_cube(Cube::ORIGIN))
                     .nonconserved();
 
                 Ok((space_txn, InventoryTransaction::default()))
