@@ -91,6 +91,8 @@
     - `block::AnimationHint::{TEMPORARY, CONTINUOUS}` constants have been removed.
       Use the new constructor functions and `AnimationChange` instead.
 
+    - `drawing::draw_to_blocks()` has been removed. There is no replacement.
+
     - `From<Rgb> for Cow<Block>` and `From<Rgba> for Cow<Block>` have been removed.
       Use explicit conversion through `Block` instead.
       Consider using the new `color_block!()` macro for constant colors.

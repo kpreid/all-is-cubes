@@ -22,22 +22,23 @@ use core::ops::Range;
 
 use embedded_graphics::geometry::{Dimensions, Point, Size};
 use embedded_graphics::pixelcolor::{PixelColor, Rgb888};
-use embedded_graphics::prelude::{DrawTarget, Drawable, Pixel};
+use embedded_graphics::prelude::{DrawTarget, Pixel};
 use embedded_graphics::primitives::Rectangle;
 
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
 
-use crate::block::{space_to_blocks, text, Block, BlockAttributes, Evoxel, Resolution};
+use crate::block::{text, Block, Evoxel};
 use crate::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid,
-    Rgb, Rgba, Vol,
+    Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid, Rgb,
+    Rgba, Vol,
 };
-use crate::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
-use crate::universe::Universe;
+use crate::space::{SetCubeError, Space, SpaceTransaction};
 
 #[cfg(doc)]
 use crate::space::CubeTransaction;
+#[cfg(doc)]
+use embedded_graphics::Drawable;
 
 /// Convert a bounding-box rectangle, as from [`embedded_graphics::geometry::Dimensions`],
 /// to a [`GridAab`] which encloses the voxels that would be affected by drawing a
@@ -539,65 +540,14 @@ fn ignore_out_of_bounds(result: Result<bool, SetCubeError>) -> Result<(), SetCub
     }
 }
 
-/// Generate a set of blocks which together display the given [`Drawable`] which may be
-/// larger than one block.
-///
-/// `z` specifies the origin z-coordinate within the blocks.
-/// `z_range` specifies the range which is available for drawing; keeping this small
-/// increases performance due to not processing many empty voxels.
-///
-/// Returns a `Space` containing all the blocks properly arranged, or an error if reading
-/// the `Drawable`'s color-blocks fails.
-pub fn draw_to_blocks<'c, D, C>(
-    universe: &mut Universe,
-    resolution: Resolution,
-    z: GridCoordinate,
-    z_range: Range<GridCoordinate>,
-    attributes: BlockAttributes,
-    object: &D,
-) -> Result<Space, SetCubeError>
-where
-    D: Drawable<Color = C> + Dimensions,
-    C: VoxelColor<'c>,
-{
-    assert!(z_range.contains(&z));
-
-    let bbox = object.bounding_box();
-    let top_left_2d = bbox.top_left;
-    let bottom_right_2d = bbox.bottom_right().unwrap_or(top_left_2d);
-    // Compute corners as GridAab knows them. Note that the Y coordinate is flipped
-    // because for text drawing, embedded_graphics assumes a Y-down coordinate system.
-    // TODO: Instead, apply matrix transform to bounds
-    let drawing_bounds = GridAab::from_lower_upper(
-        [top_left_2d.x, -bottom_right_2d.y, z_range.start],
-        [bottom_right_2d.x, -top_left_2d.y, z_range.end],
-    );
-
-    let mut drawing_space = Space::builder(drawing_bounds)
-        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build();
-    object.draw(&mut drawing_space.draw_target(Gridgid {
-        translation: GridVector::new(0, 0, z),
-        rotation: GridRotation::from_basis([Face6::PX, Face6::NY, Face6::PZ]),
-    }))?;
-
-    Ok(space_to_blocks(
-        resolution,
-        attributes,
-        // TODO: give caller control over name used
-        universe.insert_anonymous(drawing_space),
-    )
-    .unwrap())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{self, Resolution::R16, AIR};
+    use crate::block::AIR;
     use crate::color_block;
     use crate::content::make_some_blocks;
-    use crate::raytracer::print_space;
     use embedded_graphics::primitives::{Primitive, PrimitiveStyle};
+    use embedded_graphics::Drawable as _;
 
     /// With identity transform, `rectangle_to_aab`'s output matches exactly as one might
     /// expect.
@@ -806,96 +756,6 @@ mod tests {
                 .unwrap_err(),
             SetCubeError::EvalBlock(EvalBlockError::Handle(HandleError::Gone(name)))
         );
-    }
-
-    fn a_primitive_style() -> PrimitiveStyle<Rgba> {
-        PrimitiveStyle::with_fill(a_primitive_color())
-    }
-    /// Cube color corresponding to `a_primitive_style()`.
-    fn a_primitive_color() -> Rgba {
-        Rgba::new(0.0, 0.5, 1.5, 1.0)
-    }
-
-    #[test]
-    fn draw_to_blocks_bounds_one_block() {
-        let resolution: Resolution = R16;
-        let z = 4;
-        let mut universe = Universe::new();
-        let drawable = Rectangle::with_corners(Point::new(0, 0), Point::new(2, 3))
-            .into_styled(a_primitive_style());
-        let space = draw_to_blocks(
-            &mut universe,
-            resolution,
-            z,
-            z..z + 1,
-            BlockAttributes::default(),
-            &drawable,
-        )
-        .unwrap();
-        print_space(&space, [0., 1., -1.]);
-        assert_eq!(
-            space.bounds(),
-            GridAab::from_lower_size([0, -1, 0], [1, 1, 1])
-        );
-        if let &block::Primitive::Recur {
-            space: ref block_space_handle,
-            offset,
-            ..
-        } = space[[0, -1, 0]].primitive()
-        {
-            print_space(&block_space_handle.read().unwrap(), [0., 1., -1.]);
-            assert_eq!(
-                offset,
-                GridPoint::new(0, -GridCoordinate::from(resolution), 0)
-            );
-            assert_eq!(
-                block_space_handle.read().unwrap()[[0, -2, z]].color(),
-                a_primitive_color()
-            );
-        } else {
-            panic!("not a recursive block");
-        }
-    }
-
-    #[test]
-    fn draw_to_blocks_bounds_negative_coords_one_block() {
-        let resolution: Resolution = R16;
-        let z = 4;
-        let mut universe = Universe::new();
-        let drawable = Rectangle::with_corners(Point::new(-3, -2), Point::new(0, 0))
-            .into_styled(a_primitive_style());
-        let space = draw_to_blocks(
-            &mut universe,
-            resolution,
-            z,
-            z..z + 1,
-            BlockAttributes::default(),
-            &drawable,
-        )
-        .unwrap();
-        print_space(&space, [0., 1., -1.]);
-        assert_eq!(
-            space.bounds(),
-            GridAab::from_lower_size([-1, 0, 0], [1, 1, 1])
-        );
-        if let block::Primitive::Recur {
-            space: block_space_handle,
-            offset,
-            ..
-        } = space[[-1, 0, 0]].primitive()
-        {
-            print_space(&block_space_handle.read().unwrap(), [0., 1., -1.]);
-            assert_eq!(
-                *offset,
-                GridPoint::new(-GridCoordinate::from(resolution), 0, 0)
-            );
-            assert_eq!(
-                block_space_handle.read().unwrap()[[-2, 1, z]].color(),
-                a_primitive_color()
-            );
-        } else {
-            panic!("not a recursive block");
-        }
     }
 
     #[test]
