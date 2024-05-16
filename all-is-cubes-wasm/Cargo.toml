@@ -145,6 +145,7 @@ clippy.should_panic_without_expect = "deny"
 
 # clippy lints that are set to warn
 clippy.pedantic = { level = "warn", priority = -1 }
+clippy.assigning_clones = "warn"
 clippy.cast_lossless = "warn"
 clippy.doc_markdown = "warn"
 clippy.exhaustive_enums = "warn"
