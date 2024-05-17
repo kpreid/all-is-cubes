@@ -1,5 +1,6 @@
 //! Tools that we could imagine being in the Rust standard library, but aren't.
 
+use alloc::sync::Arc;
 use core::fmt;
 use core::marker::PhantomData;
 use core::ops::AddAssign;
@@ -48,7 +49,7 @@ impl<T: ?Sized + Executor> Executor for &T {
         (**self).yield_now()
     }
 }
-impl<T: ?Sized + Executor> Executor for alloc::sync::Arc<T> {
+impl<T: ?Sized + Executor> Executor for Arc<T> {
     fn spawn_background(&self, task_factory: &mut dyn FnMut() -> SyncBoxFuture<'static, ()>) {
         (**self).spawn_background(task_factory)
     }
@@ -199,6 +200,21 @@ where
     {
         self.target.extend(iter.into_iter().map(&self.function));
     }
+}
+
+/// As [`Arc::make_mut()`], but for slices, `Arc<[_]>`.
+#[doc(hidden)] // internal helper function
+pub fn arc_make_mut_slice<T: Clone>(mut arc: &mut Arc<[T]>) -> &mut [T] {
+    // Use `get_mut()` to emulate `make_mut()`.
+    // And since this is a "maybe return a mutable borrow" pattern, we have to appease
+    // the borrow checker about it, hence `polonius_the_crab` getting involved.
+    polonius_the_crab::polonius!(|arc| -> &'polonius mut [T] {
+        if let Some(slice) = Arc::get_mut(arc) {
+            polonius_the_crab::polonius_return!(slice);
+        }
+    });
+    *arc = Arc::from_iter(arc.iter().cloned());
+    Arc::get_mut(arc).unwrap()
 }
 
 /// Aggregation of the time taken by a set of events.

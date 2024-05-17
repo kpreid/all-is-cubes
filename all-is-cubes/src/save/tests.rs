@@ -540,7 +540,7 @@ fn operation_paint() {
 #[test]
 fn operation_neighbors() {
     assert_round_trip_value(
-        &op::Operation::Neighbors(vec![(Cube::new(1, 2, 3), op::Operation::Become(AIR))]),
+        &op::Operation::Neighbors([(Cube::new(1, 2, 3), op::Operation::Become(AIR))].into()),
         json!({
             "type": "NeighborsV1",
             "neighbors": [

@@ -1,8 +1,9 @@
 //! [`Operation`]s that modify the world due to player or world actions.
 
-use alloc::vec::Vec;
+use alloc::sync::Arc;
+use core::mem;
 
-use crate::block::Block;
+use crate::block::{Block, AIR};
 use crate::drawing::VoxelBrush;
 use crate::inv::{Inventory, InventoryTransaction};
 use crate::math::{Cube, GridRotation, Gridgid};
@@ -46,7 +47,7 @@ pub enum Operation {
     // Design note: This would arguably make more sense as `GridVector` rather than `Cube`,
     // but that would currently interfere with `derive(Arbitrary)` because `euclid`'s
     // `Arbitrary` feature isn't properly functional at this time.
-    Neighbors(Vec<(Cube, Operation)>),
+    Neighbors(Arc<[(Cube, Operation)]>),
 }
 
 impl Operation {
@@ -93,7 +94,7 @@ impl Operation {
             }
             Operation::Neighbors(neighbors) => {
                 let mut txns = OpTxn::default();
-                for &(cube, ref op) in neighbors {
+                for &(cube, ref op) in neighbors.iter() {
                     txns.merge_from(op.apply(
                         space,
                         inventory,
@@ -123,20 +124,19 @@ impl Operation {
             // TODO: need to provide a way for blocks to opt out
             Operation::Become(block) => Operation::Become(block.rotate(rotation)),
             Operation::Paint(brush) => Operation::Paint(brush.rotate(rotation)),
-            Operation::Neighbors(neighbors) => Operation::Neighbors(
-                neighbors
-                    .into_iter()
-                    .map(|(cube, op)| {
-                        (
-                            rotation
-                                .transform_vector(cube.lower_bounds().to_vector())
-                                .to_point()
-                                .into(),
-                            op.rotate(rotation),
-                        )
-                    })
-                    .collect(),
-            ),
+            Operation::Neighbors(mut neighbors) => {
+                // TODO: cheaper placeholder value, like an Operation::Nop
+                let mut placeholder = Operation::Become(AIR);
+                for (cube_ref, op_ref) in crate::util::arc_make_mut_slice(&mut neighbors) {
+                    *cube_ref = rotation
+                        .transform_vector(cube_ref.lower_bounds().to_vector())
+                        .to_point()
+                        .into();
+                    let op = mem::replace(op_ref, placeholder);
+                    placeholder = mem::replace(op_ref, op.rotate(rotation));
+                }
+                Operation::Neighbors(neighbors)
+            }
         }
     }
 }
@@ -147,7 +147,7 @@ impl VisitHandles for Operation {
             Operation::Become(block) => block.visit_handles(visitor),
             Operation::Paint(brush) => brush.visit_handles(visitor),
             Operation::Neighbors(neighbors) => {
-                for (_, op) in neighbors {
+                for (_, op) in neighbors.iter() {
                     op.visit_handles(visitor);
                 }
             }
@@ -190,10 +190,13 @@ mod tests {
     #[test]
     fn neighbors_simple_and_rotated() {
         let [b1, b2] = make_some_blocks();
-        let op = Operation::Neighbors(vec![
-            (Cube::new(0, 0, 0), Operation::Become(b1.clone())),
-            (Cube::new(1, 0, 0), Operation::Become(b2.clone())),
-        ]);
+        let op = Operation::Neighbors(
+            [
+                (Cube::new(0, 0, 0), Operation::Become(b1.clone())),
+                (Cube::new(1, 0, 0), Operation::Become(b2.clone())),
+            ]
+            .into(),
+        );
         let space = Space::empty_positive(2, 2, 2);
 
         assert_eq!(

@@ -654,10 +654,13 @@ fn block_tick_action_conflict() {
                 TickAction {
                     // TODO: replace this with a better-behaved neighbor-modifying operation,
                     // once we have one
-                    operation: Operation::Neighbors(vec![(
-                        Cube::from(face.normal_vector().to_point()),
-                        Operation::Become(to.clone()),
-                    )]),
+                    operation: Operation::Neighbors(
+                        [(
+                            Cube::from(face.normal_vector().to_point()),
+                            Operation::Become(to.clone()),
+                        )]
+                        .into(),
+                    ),
                     period: NonZeroU16::new(1).unwrap(),
                 }
             });

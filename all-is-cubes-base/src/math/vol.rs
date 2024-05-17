@@ -458,7 +458,7 @@ impl<V: Clone, O> Vol<Arc<[V]>, O> {
     /// Returns the linear contents viewed as a mutable slice, as if by [`Arc::make_mut()`].
     #[doc(hidden)] // TODO: good public API?
     pub fn make_linear_mut(&mut self) -> &mut [V] {
-        let slice: &mut [V] = arc_make_mut_slice(&mut self.contents);
+        let slice: &mut [V] = crate::util::arc_make_mut_slice(&mut self.contents);
         debug_assert_eq!(slice.len(), self.bounds.volume().unwrap());
         slice
     }
@@ -795,20 +795,6 @@ fn unreachable_volume_overflow<T>() -> T {
 #[cold]
 fn unreachable_wrong_size<T>(error: VolLengthError) -> T {
     panic!("impossible size mismatch: {error}")
-}
-
-/// As [`Arc::make_mut()`], but for slices, `Arc<[_]>`.
-fn arc_make_mut_slice<T: Clone>(mut arc: &mut Arc<[T]>) -> &mut [T] {
-    // Use `get_mut()` to emulate `make_mut()`.
-    // And since this is a "maybe return a mutable borrow" pattern, we have to appease
-    // the borrow checker about it, hence `polonius_the_crab` getting involved.
-    polonius_the_crab::polonius!(|arc| -> &'polonius mut [T] {
-        if let Some(slice) = Arc::get_mut(arc) {
-            polonius_the_crab::polonius_return!(slice);
-        }
-    });
-    *arc = Arc::from_iter(arc.iter().cloned());
-    Arc::get_mut(arc).unwrap()
 }
 
 #[cfg(test)]
