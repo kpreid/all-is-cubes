@@ -707,6 +707,7 @@ const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
     selectable: false,
     rotation_rule: block::RotationPlacementRule::Never,
     tick_action: None,
+    activation_action: None,
     animation_hint: block::AnimationHint::UNCHANGING,
 };
 

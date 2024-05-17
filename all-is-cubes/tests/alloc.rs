@@ -2,6 +2,7 @@
 //!
 //! In a separate test crate to avoid modifying the global allocator elsewhere.
 
+use all_is_cubes::op::Operation;
 use allocation_counter::{measure, AllocationInfo};
 
 use all_is_cubes::block::{self, BlockAttributes};
@@ -15,8 +16,10 @@ fn clone_block_attributes() {
         selectable: true,
         animation_hint: block::AnimationHint::UNCHANGING,
 
-        // TODO: This field could allocate when cloned and we should fix that and test it
-        tick_action: None,
+        // TODO: These fields could allocate when cloned and we should fix that and test it
+        // (though that's more of an `Operation` problem)
+        tick_action: Some(block::TickAction::from(Operation::Become(block::AIR))),
+        activation_action: Some(Operation::Become(block::AIR)),
 
         // These fields currently will never allocate when cloned
         rotation_rule: block::RotationPlacementRule::Never,

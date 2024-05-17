@@ -190,6 +190,7 @@ mod block {
                 selectable,
                 rotation_rule,
                 ref tick_action,
+                ref activation_action,
                 animation_hint,
             } = value;
             schema::BlockAttributesV1Ser {
@@ -205,6 +206,7 @@ mod block {
                         period,
                     },
                 ),
+                activation_action: activation_action.clone(),
                 animation_hint: animation_hint.into(),
             }
         }
@@ -212,12 +214,12 @@ mod block {
 
     impl<'a> From<schema::BlockAttributesV1Ser<'a>> for BlockAttributes {
         fn from(value: schema::BlockAttributesV1Ser<'a>) -> Self {
-            // TODO: implement deserializing all attributes
             let schema::BlockAttributesV1Ser {
                 display_name,
                 selectable,
                 rotation_rule,
                 tick_action,
+                activation_action,
                 animation_hint,
             } = value;
             Self {
@@ -230,6 +232,7 @@ mod block {
                         period,
                     }
                 }),
+                activation_action,
                 animation_hint: animation_hint.into(),
             }
         }

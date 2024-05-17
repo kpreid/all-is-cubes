@@ -180,7 +180,7 @@ impl Transaction<Space> for SpaceTransaction {
                 old,
                 new: _,
                 conserved,
-                activate: _,
+                activate_behavior: _,
                 fluff: _,
             },
         ) in &self.cubes
@@ -241,7 +241,7 @@ impl Transaction<Space> for SpaceTransaction {
                 old: _,
                 new,
                 conserved,
-                activate,
+                activate_behavior: activate,
                 fluff,
             },
         ) in &self.cubes
@@ -413,9 +413,9 @@ pub struct CubeTransaction {
     /// If true, two transactions with the same `new` block may not be merged.
     conserved: bool,
 
-    /// The cube was “activated” (clicked on, more or less) and should
-    /// respond to that.
-    activate: bool,
+    /// The cube was “activated” (clicked on, more or less) and behaviors attached to
+    /// that region of space should respond to that.
+    activate_behavior: bool,
 
     /// [`Fluff`] to emit at this location when the transaction is committed.
     ///
@@ -433,7 +433,7 @@ impl fmt::Debug for CubeTransaction {
             old,
             new,
             conserved,
-            activate,
+            activate_behavior,
             fluff,
         } = self;
         let mut ds = f.debug_struct("CubeTransaction");
@@ -442,8 +442,8 @@ impl fmt::Debug for CubeTransaction {
             ds.field("new", &new);
             ds.field("conserved", &conserved);
         }
-        if *activate {
-            ds.field("activate", &activate);
+        if *activate_behavior {
+            ds.field("activate_behavior", &activate_behavior);
         }
         if !fluff.is_empty() {
             ds.field("fluff", &fluff);
@@ -461,11 +461,11 @@ impl CubeTransaction {
         }
     }
 
-    pub(crate) const ACTIVATE: Self = Self {
+    pub(crate) const ACTIVATE_BEHAVIOR: Self = Self {
         old: None,
         new: None,
         conserved: false,
-        activate: true,
+        activate_behavior: true,
         fluff: Vec::new(),
     };
 
@@ -548,7 +548,7 @@ impl Merge for CubeTransaction {
             old,
             new,
             conserved,
-            activate,
+            activate_behavior,
             fluff,
         } = self;
 
@@ -558,7 +558,7 @@ impl Merge for CubeTransaction {
         transaction::merge_option(old, other.old, transaction::panic_if_not_equal);
         transaction::merge_option(new, other.new, transaction::panic_if_not_equal);
 
-        *activate |= other.activate;
+        *activate_behavior |= other.activate_behavior;
 
         fluff.extend(other.fluff);
     }
@@ -670,7 +670,7 @@ mod tests {
                         old: Some(b1.clone()),
                         new: Some(b2.clone()),
                         conserved: true,
-                        activate: false,
+                        activate_behavior: false,
                         fluff: vec![],
                     }
                 ),
@@ -680,7 +680,7 @@ mod tests {
                         old: Some(b1.clone()),
                         new: Some(b3.clone()),
                         conserved: true,
-                        activate: false,
+                        activate_behavior: false,
                         fluff: vec![],
                     }
                 ),
@@ -757,7 +757,7 @@ mod tests {
         .execute(&mut space, &mut no_outputs)
         .unwrap();
 
-        CubeTransaction::ACTIVATE
+        CubeTransaction::ACTIVATE_BEHAVIOR
             .at(cube)
             .execute(&mut space, &mut drop)
             .unwrap();
@@ -805,12 +805,12 @@ mod tests {
                 |_, _| Ok(()),
             )
             .transaction(
-                CubeTransaction::ACTIVATE.at(Cube::new(0, 0, 0)),
+                CubeTransaction::ACTIVATE_BEHAVIOR.at(Cube::new(0, 0, 0)),
                 // TODO: Add a test that activation happened once that's possible
                 |_, _| Ok(()),
             )
             .transaction(
-                CubeTransaction::ACTIVATE.at(Cube::new(1, 0, 0)),
+                CubeTransaction::ACTIVATE_BEHAVIOR.at(Cube::new(1, 0, 0)),
                 // TODO: Add a test that activation happened once that's possible
                 |_, _| Ok(()),
             )

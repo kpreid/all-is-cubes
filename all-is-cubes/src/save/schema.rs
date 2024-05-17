@@ -110,6 +110,8 @@ pub(crate) struct BlockAttributesV1Ser<'a> {
     pub rotation_rule: RotationPlacementRuleSer,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tick_action: Option<TickActionSer<'a>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub activation_action: Option<op::Operation>, // no Cow because Operation is cheap to clone
     #[serde(default, skip_serializing_if = "is_default")]
     pub animation_hint: AnimationHintSer,
 }
@@ -330,7 +332,7 @@ type RgbaSer = [NotNan<f32>; 4];
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `op` module
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub(crate) enum OperationSer<'a> {
     BecomeV1 {

@@ -103,6 +103,12 @@ impl<P, Txn> BlockBuilder<P, Txn> {
         self
     }
 
+    /// Sets the value for [`BlockAttributes::activation_action`].
+    pub fn activation_action(mut self, value: impl Into<Option<crate::op::Operation>>) -> Self {
+        self.attributes.activation_action = value.into();
+        self
+    }
+
     /// Sets the value for [`BlockAttributes::animation_hint`].
     pub fn animation_hint(mut self, value: AnimationHint) -> Self {
         self.attributes.animation_hint = value;
@@ -442,6 +448,7 @@ mod tests {
         let emission = Rgb::new(0.1, 3.0, 0.1);
         let rotation_rule = RotationPlacementRule::Attach { by: Face6::NZ };
         let tick_action = Some(TickAction::from(Operation::Become(AIR)));
+        let activation_action = Some(Operation::Become(color_block!(1.0, 1.0, 1.0)));
         assert_eq!(
             Block::builder()
                 .color(color)
@@ -451,6 +458,7 @@ mod tests {
                 .selectable(false)
                 .light_emission(emission)
                 .tick_action(tick_action.clone())
+                .activation_action(activation_action.clone())
                 .animation_hint(AnimationHint::replacement(block::AnimationChange::Shape))
                 .build(),
             Block::from(Atom {
@@ -459,6 +467,7 @@ mod tests {
                     rotation_rule,
                     selectable: false,
                     tick_action,
+                    activation_action,
                     animation_hint: AnimationHint::replacement(block::AnimationChange::Shape),
                 },
                 color,

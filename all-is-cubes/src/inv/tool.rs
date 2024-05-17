@@ -97,12 +97,20 @@ impl Tool {
         match self {
             Self::Activate => {
                 let cursor = input.cursor()?;
-                Ok((
-                    Some(self),
-                    CubeTransaction::ACTIVATE
-                        .at(cursor.cube())
-                        .bind(cursor.space().clone()),
-                ))
+                if let Some(activation_action) =
+                    &cursor.hit().evaluated.attributes.activation_action
+                {
+                    input.apply_operation(self, activation_action)
+                } else {
+                    // TODO: we should probably replace the activate transaction with some other
+                    // mechanism, that can communicate "nothing found".
+                    Ok((
+                        Some(self),
+                        CubeTransaction::ACTIVATE_BEHAVIOR
+                            .at(cursor.cube())
+                            .bind(cursor.space().clone()),
+                    ))
+                }
             }
             Self::RemoveBlock { keep } => {
                 let cursor = input.cursor()?;
@@ -208,35 +216,7 @@ impl Tool {
                 Some(Self::Jetpack { active: !active }),
                 UniverseTransaction::default(),
             )),
-            Self::Custom { ref op, icon: _ } => {
-                // TODO: This is a mess; figure out how much impedance-mismatch we want to fix here.
-
-                let cursor = input.cursor()?; // TODO: allow op to not be spatial, i.e. not always fail here?
-                let character_guard: Option<UBorrow<Character>> =
-                    input.character.as_ref().map(|c| c.read()).transpose()?;
-
-                let (space_txn, inventory_txn) = op.apply(
-                    &*cursor.space().read()?,
-                    character_guard.as_ref().map(|c| c.inventory()),
-                    // TODO: Should there be rotation based on cursor ray direction?
-                    // Or is that a separate input?
-                    // (Should `ToolInput` be merged into `Operation` stuff?)
-                    Gridgid::from_translation(cursor.cube().lower_bounds().to_vector()),
-                )?;
-                let mut txn = space_txn.bind(cursor.space().clone());
-                if inventory_txn != InventoryTransaction::default() {
-                    txn.merge_from(CharacterTransaction::inventory(inventory_txn).bind(
-                        input.character.clone().ok_or_else(|| {
-                            ToolError::Internal(format!(
-                                "operation produced inventory transaction \
-                                    without being given an inventory: {op:?}"
-                            ))
-                        })?,
-                    ))
-                    .unwrap();
-                }
-                Ok((Some(self), txn))
-            }
+            Self::Custom { ref op, icon: _ } => input.apply_operation(self.clone(), op),
         }
     }
 
@@ -444,6 +424,41 @@ impl ToolInput {
             Err(ToolError::NotUsable)
         }
     }
+
+    pub(crate) fn apply_operation(
+        &self,
+        tool: Tool,
+        op: &Operation,
+    ) -> Result<(Option<Tool>, UniverseTransaction), ToolError> {
+        // TODO: This is a mess; figure out how much impedance-mismatch we want to fix here.
+
+        let cursor = self.cursor()?; // TODO: allow op to not be spatial, i.e. not always fail
+                                     // if this returns None?
+        let character_guard: Option<UBorrow<Character>> =
+            self.character.as_ref().map(|c| c.read()).transpose()?;
+
+        let (space_txn, inventory_txn) = op.apply(
+            &*cursor.space().read()?,
+            character_guard.as_ref().map(|c| c.inventory()),
+            // TODO: Should there be rotation based on cursor ray direction?
+            // Or is that a separate input?
+            // (Should `ToolInput` be merged into `Operation` stuff?)
+            Gridgid::from_translation(cursor.cube().lower_bounds().to_vector()),
+        )?;
+        let mut txn = space_txn.bind(cursor.space().clone());
+        if inventory_txn != InventoryTransaction::default() {
+            txn.merge_from(CharacterTransaction::inventory(inventory_txn).bind(
+                self.character.clone().ok_or_else(|| {
+                    ToolError::Internal(format!(
+                        "operation produced inventory transaction \
+                                    without being given an inventory: {op:?}"
+                    ))
+                })?,
+            ))
+            .unwrap();
+        }
+        Ok((Some(tool), txn))
+    }
 }
 
 /// Ways that a tool can fail.
@@ -599,6 +614,7 @@ mod tests {
     use crate::transaction;
     use crate::universe::Universe;
     use crate::util::yield_progress_for_testing;
+    use all_is_cubes_base::math::Rgba;
     use pretty_assertions::assert_eq;
 
     #[derive(Debug)]
@@ -710,20 +726,45 @@ mod tests {
     }
 
     #[test]
-    fn use_activate() {
+    fn use_activate_on_behavior() {
         let [existing] = make_some_blocks();
         let tester = ToolTester::new(|space| {
             space.set([1, 0, 0], &existing).unwrap();
         });
         assert_eq!(
             tester.equip_and_use_tool(Tool::Activate),
-            Ok(CubeTransaction::ACTIVATE
+            Ok(CubeTransaction::ACTIVATE_BEHAVIOR
                 .at(Cube::new(1, 0, 0))
                 .bind(tester.space_handle.clone()))
         );
 
-        // Tool::Activate currently has no cases where it fails
+        // Tool::Activate on a behavior currently has no cases where it fails
         // (unless the transaction fails), so there are no tests for that.
+    }
+
+    #[test]
+    fn use_activate_on_block_action() {
+        let after = Block::builder()
+            .color(Rgba::WHITE)
+            .display_name("after")
+            .build();
+        let before = Block::builder()
+            .color(Rgba::WHITE)
+            .display_name("before")
+            .activation_action(Operation::Become(after.clone()))
+            .build();
+        let tester = ToolTester::new(|space| {
+            space.set([1, 0, 0], &before).unwrap();
+        });
+
+        assert_eq!(
+            tester.equip_and_use_tool(Tool::Activate),
+            Ok(CubeTransaction::replacing(Some(before), Some(after))
+                .at(Cube::new(1, 0, 0))
+                .bind(tester.space_handle.clone()))
+        );
+
+        // TODO: Should have another test with a failing `Operation`, but we can't set that up yet.
     }
 
     #[tokio::test]

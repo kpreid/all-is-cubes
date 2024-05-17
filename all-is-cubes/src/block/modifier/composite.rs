@@ -172,6 +172,7 @@ impl Composite {
             selectable: src_att.selectable | dst_att.selectable,
             rotation_rule: dst_att.rotation_rule, // TODO merge
             tick_action: dst_att.tick_action,     // TODO: merge
+            activation_action: dst_att.activation_action, // TODO: merge
             animation_hint: src_att.animation_hint | dst_att.animation_hint, // TODO: some operators should ignore some hints (e.g. `In` should ignore destination color changes)
         };
 

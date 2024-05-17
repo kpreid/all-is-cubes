@@ -45,6 +45,9 @@ pub struct BlockAttributes {
     /// Something this block does when time passes.
     pub tick_action: Option<TickAction>,
 
+    /// Something this block does when activated with [`Activate`](crate::inv::Tool::Activate).
+    pub activation_action: Option<Operation>,
+
     /// Advice to the renderer about how to expect this block to change, and hence
     /// what rendering strategy to use.
     ///
@@ -69,6 +72,7 @@ impl fmt::Debug for BlockAttributes {
                 selectable,
                 rotation_rule,
                 tick_action,
+                activation_action,
                 animation_hint,
             } = self;
 
@@ -86,6 +90,9 @@ impl fmt::Debug for BlockAttributes {
             if *tick_action != Self::DEFAULT_REF.tick_action {
                 s.field("tick_action", tick_action);
             }
+            if *activation_action != Self::DEFAULT_REF.activation_action {
+                s.field("activation_action", activation_action);
+            }
             if *animation_hint != Self::DEFAULT_REF.animation_hint {
                 s.field("animation_hint", animation_hint);
             }
@@ -100,6 +107,7 @@ impl BlockAttributes {
         selectable: true,
         rotation_rule: RotationPlacementRule::Never,
         tick_action: None,
+        activation_action: None,
         animation_hint: AnimationHint::UNCHANGING,
     };
     const DEFAULT_REF: &'static Self = &Self::DEFAULT;
@@ -118,11 +126,15 @@ impl BlockAttributes {
             selectable: _,
             rotation_rule,
             tick_action,
+            activation_action,
             animation_hint: _,
         } = self;
 
         rotation_rule.rotationally_symmetric()
             && !tick_action
+                .as_ref()
+                .is_some_and(|a| !a.rotationally_symmetric())
+            && !activation_action
                 .as_ref()
                 .is_some_and(|a| !a.rotationally_symmetric())
     }
@@ -133,11 +145,15 @@ impl BlockAttributes {
             selectable,
             rotation_rule,
             mut tick_action,
+            mut activation_action,
             animation_hint,
         } = self;
 
         if let Some(a) = tick_action {
             tick_action = Some(a.rotate(rotation));
+        }
+        if let Some(a) = activation_action {
+            activation_action = Some(a.rotate(rotation));
         }
 
         Self {
@@ -145,6 +161,7 @@ impl BlockAttributes {
             selectable,
             rotation_rule: rotation_rule.rotate(rotation),
             tick_action,
+            activation_action,
             animation_hint,
         }
     }
@@ -167,6 +184,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
             selectable: u.arbitrary()?,
             rotation_rule: u.arbitrary()?,
             tick_action: u.arbitrary()?,
+            activation_action: u.arbitrary()?,
             animation_hint: u.arbitrary()?,
         })
     }
@@ -189,9 +207,11 @@ impl crate::universe::VisitHandles for BlockAttributes {
             selectable: _,
             rotation_rule: _,
             tick_action,
+            activation_action,
             animation_hint: _,
         } = self;
         tick_action.visit_handles(visitor);
+        activation_action.visit_handles(visitor);
     }
 }
 
