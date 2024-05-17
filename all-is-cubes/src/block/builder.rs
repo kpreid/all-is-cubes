@@ -306,10 +306,10 @@ impl<Txn> BlockBuilder<BlockBuilderAtom, Txn> {
 
     /// Sets the light emission of a [`Primitive::Atom`] block.
     ///
-    /// This quantity is the [_luminance_](https://en.wikipedia.org/wiki/Luminance) of
-    /// the block surface, in unspecified units where 1.0 is the display white level
-    /// (except for the effects of tone mapping).
-    /// In the future this may be redefined in terms of a physical unit, but with the same
+    /// This quantity is the [_luminous emittance_](https://en.wikipedia.org/wiki/Luminous_emittance)
+    /// (the emitted portion of luminance) of the block surface, in unspecified units where 1.0 is
+    /// the display white level (except for the effects of tone mapping).
+    /// In the future, this may be redefined in terms of a physical unit, but with the same
     /// dimensions.
     ///
     /// TODO: Define the interpretation for non-opaque blocks.

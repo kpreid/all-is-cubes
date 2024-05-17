@@ -46,7 +46,7 @@ pub struct EvaluatedBlock {
 
     /// The overall light emission aggregated from individual voxels.
     /// This should be interpreted in the same way as the emission field of
-    /// [`block::Primitive::Atom`].
+    /// [`block::Atom`].
     ///
     /// TODO: Add *some* directionality to this.
     pub light_emission: Rgb,

@@ -231,9 +231,9 @@ pub struct Atom {
 
     /// Light emitted (not reflected) by the block.
     ///
-    /// This quantity is the [_luminance_](https://en.wikipedia.org/wiki/Luminance) of
-    /// the block surface, in unspecified units where 1.0 is the display white level
-    /// (except for the effects of tone mapping).
+    /// This quantity is the [_luminous emittance_](https://en.wikipedia.org/wiki/Luminous_emittance)
+    /// (the emitted portion of luminance) of the block surface, in unspecified units where 1.0 is
+    /// the display white level (except for the effects of tone mapping).
     /// In the future this may be redefined in terms of a physical unit, but with the same
     /// dimensions.
     ///
