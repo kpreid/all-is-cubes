@@ -97,7 +97,6 @@ impl Tool {
         match self {
             Self::Activate => {
                 let cursor = input.cursor()?;
-                // TODO: cursor is probably not _exactly_ the right set of data that should be passed on
                 Ok((
                     Some(self),
                     CubeTransaction::ACTIVATE
