@@ -369,6 +369,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     let mut spawn = Spawn::default_for_new_space(space.bounds());
                     spawn.set_bounds(interior);
                     spawn.set_inventory(vec![
+                        Tool::Activate.into(),
                         Tool::RemoveBlock { keep: true }.into(),
                         Tool::Jetpack { active: false }.into(),
                     ]);
@@ -438,14 +439,14 @@ pub(crate) async fn demo_dungeon(
         blocks: BlockProvider::using(universe)?,
         // TODO: use more appropriate blocks
         wall_block: landscape_blocks[LandscapeBlocks::Stone].clone(),
-        lamp_block: demo_blocks[DemoBlocks::Lamp].clone(),
+        lamp_block: demo_blocks[DemoBlocks::Lamp(true)].clone(),
         window_glass_block: demo_blocks[DemoBlocks::GlassBlock].clone(),
         item_pedestal: demo_blocks[DemoBlocks::Pedestal].clone(),
     };
     // Random assortment of blocks to provide
     // TODO: make this things like keys for doors
     let grantable_items = [
-        demo_blocks[DemoBlocks::Lamp].clone(),
+        demo_blocks[DemoBlocks::Lamp(false)].clone(),
         demo_blocks[DemoBlocks::Signboard].clone(),
         // TODO: can't do this until we have an "item" form: &demo_blocks[DemoBlocks::Explosion(0)],
         landscape_blocks[LandscapeBlocks::Leaves(tree::TreeGrowth::Block)].clone(),

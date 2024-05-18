@@ -716,7 +716,7 @@ fn COMPOSITE(ctx: Context<'_>) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
 
     let sources = [
-        &demo_blocks[DemoBlocks::Lamp],
+        &demo_blocks[DemoBlocks::Lamp(true)],
         &demo_blocks[DemoBlocks::Arrow],
         &demo_blocks[DemoBlocks::Signboard],
     ];

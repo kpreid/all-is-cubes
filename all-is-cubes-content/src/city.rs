@@ -99,14 +99,14 @@ pub(crate) async fn demo_city<I: Instant>(
             // Initial inventory contents. TODO: Make a better list.
             let mut inventory = vec![
                 Tool::RemoveBlock { keep: true }.into(),
+                Tool::Activate.into(),
                 Tool::Jetpack { active: false }.into(),
                 Tool::PushPull.into(),
             ];
             for block in [
                 &landscape_blocks[Stone],
-                &demo_blocks[GlassBlock],
-                &demo_blocks[Lamp],
                 &demo_blocks[Arrow],
+                &demo_blocks[Lamp(true)],
             ] {
                 inventory.push(Slot::stack(40, Tool::Block(block.clone())));
             }
@@ -196,7 +196,7 @@ pub(crate) async fn demo_city<I: Instant>(
                 for (side, &p) in [-road_radius, road_radius].iter().enumerate() {
                     space.set(
                         step.cube_ahead() + GridVector::new(0, -2, 0) + perpendicular * p,
-                        demo_blocks[Sconce]
+                        demo_blocks[Sconce(true)]
                             .clone()
                             .rotate(GridRotation::CLOCKWISE * rotations[side]),
                     )?;
@@ -684,7 +684,7 @@ fn place_lamppost(
         space.set(this_cube, block)?;
     }
 
-    space.set(globe_position, &demo_blocks[Lamp])?;
+    space.set(globe_position, &demo_blocks[Lamp(true)])?;
 
     Ok(())
 }

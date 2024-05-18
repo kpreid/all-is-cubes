@@ -39,11 +39,11 @@ use crate::palette;
 #[allow(missing_docs)]
 pub enum DemoBlocks {
     GlassBlock,
-    Lamp,
+    Lamp(bool),
     LamppostSegment,
     LamppostBase,
     LamppostTop,
-    Sconce,
+    Sconce(bool),
     Arrow,
     Road,
     Curb,
@@ -66,6 +66,8 @@ impl fmt::Display for DemoBlocks {
         match self {
             DemoBlocks::BecomeBlinker(state) => write!(f, "{variant}/{state}"),
             DemoBlocks::Explosion(i) => write!(f, "{variant}/{i}"),
+            DemoBlocks::Lamp(on) => write!(f, "{variant}/{on}"),
+            DemoBlocks::Sconce(on) => write!(f, "{variant}/{on}"),
             _ => write!(f, "{variant}"),
         }
     }
@@ -110,10 +112,12 @@ pub async fn install_demo_blocks(
         }
     };
 
-    let lamp_globe = Block::builder()
-        .color(Rgba::WHITE)
-        .light_emission(Rgb::ONE * 20.0)
-        .build();
+    let lamp_globe_off_on: [Block; 2] = core::array::from_fn(|on| {
+        Block::builder()
+            .color(Rgba::WHITE)
+            .light_emission(Rgb::ONE * 20.0 * on as f32)
+            .build()
+    });
     let lamppost_metal = Block::builder()
         .color(palette::ALMOST_BLACK.with_alpha_one())
         .build();
@@ -175,14 +179,14 @@ pub async fn install_demo_blocks(
                     .build_txn(txn)
             }
 
-            Lamp => Block::builder()
+            Lamp(on) => Block::builder()
                 .display_name("Lamp")
                 .voxels_fn(resolution, |cube| {
                     if (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
                         .square_length()
                         <= resolution_g.pow(2)
                     {
-                        &lamp_globe
+                        &lamp_globe_off_on[usize::from(on)]
                     } else {
                         &AIR
                     }
@@ -241,7 +245,7 @@ pub async fn install_demo_blocks(
                 })?
                 .build_txn(txn),
 
-            Sconce => Block::builder()
+            Sconce(on) => Block::builder()
                 .display_name("Sconce")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
                 .voxels_fn(resolution, |cube| {
@@ -254,7 +258,7 @@ pub async fn install_demo_blocks(
                     .component_mul(GridVector::new(3, 1, 1))
                     .square_length();
                     if r2 <= (resolution_g - 2).pow(2) {
-                        &lamp_globe
+                        &lamp_globe_off_on[usize::from(on)]
                     } else if r2 <= (resolution_g + 4).pow(2) && cube.z == 0 {
                         &lamppost_metal
                     } else {
@@ -491,6 +495,19 @@ pub async fn install_demo_blocks(
                 period: NonZeroU16::new(60).unwrap(),
             });
         });
+    }
+
+    // Join up lamp blocks as toggleable on/off
+    for state in bool::exhaust() {
+        for ctor in [Lamp, Sconce] {
+            modify_def(&provider_for_patch[ctor(state)], |block| {
+                let Primitive::Recur { attributes, .. } = block.primitive_mut() else {
+                    panic!("lamp not recur");
+                };
+                attributes.activation_action =
+                    Some(Operation::Become(provider_for_patch[ctor(!state)].clone()));
+            });
+        }
     }
 
     // Join up explosion blocks

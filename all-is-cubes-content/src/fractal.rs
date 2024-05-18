@@ -36,7 +36,7 @@ pub(crate) fn menger_sponge(
             spawn.set_inventory(
                 [
                     free_editing_starter_inventory(true),
-                    vec![Tool::InfiniteBlocks(demo_blocks[DemoBlocks::Lamp].clone()).into()],
+                    vec![Tool::InfiniteBlocks(demo_blocks[DemoBlocks::Lamp(true)].clone()).into()],
                 ]
                 .concat(),
             );
