@@ -39,7 +39,7 @@ pub(crate) struct IndirectSteps {
     pub info: OneRay,
     /// Sequence of steps to take, specified by an inclusive-exclusive range of a slice of
     /// separately stored [`Step`]s.
-    pub relative_cube_sequence: [usize; 2],
+    pub relative_cube_sequence: [TargetEndian<u32>; 2],
 }
 
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]

@@ -89,13 +89,13 @@ fn write_light_propagation_chart(chart: Vec<chart_schema::Steps>) {
     let info: Vec<chart_schema::IndirectSteps> = chart
         .iter()
         .map(|steps| {
-            let len = steps.relative_cube_sequence.len();
+            let len = u32::try_from(steps.relative_cube_sequence.len()).unwrap();
             let start = offset;
             let end = offset + len;
             offset += len;
             chart_schema::IndirectSteps {
                 info: steps.info,
-                relative_cube_sequence: [start, end],
+                relative_cube_sequence: [start, end].map(TargetEndian::from),
             }
         })
         .collect();

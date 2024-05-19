@@ -41,8 +41,8 @@ impl LightChart {
         };
 
         LightChart {
-            info: bytemuck::cast_slice(&INFO_BYTES.data),
-            all_steps: bytemuck::cast_slice(&STEPS_BYTES.data),
+            info: bytemuck::try_cast_slice(&INFO_BYTES.data).expect("info"),
+            all_steps: bytemuck::try_cast_slice(&STEPS_BYTES.data).expect("steps"),
         }
     }
 
@@ -57,7 +57,7 @@ impl LightChart {
             } = ist;
             (
                 info,
-                self.all_steps[start..end]
+                self.all_steps[start as usize..end as usize]
                     .iter()
                     .filter(move |step| step.distance <= maximum_distance)
                     .copied(),
