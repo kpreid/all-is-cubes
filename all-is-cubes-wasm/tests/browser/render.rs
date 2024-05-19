@@ -3,15 +3,18 @@
 //!
 //! TODO: Consider expanding this out to running all of test-renderers. This will need more work.
 
+use core::time::Duration;
 use std::sync::Arc;
 
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use all_is_cubes::camera::{GraphicsOptions, HeadlessRenderer as _, StandardCameras, Viewport};
 use all_is_cubes::euclid::vec3;
+use all_is_cubes::time::Instant as _;
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 use all_is_cubes_gpu::in_wgpu::init;
+use all_is_cubes_wasm::AdaptedInstant as Instant;
 
 #[wasm_bindgen_test]
 async fn renderer_test() {
@@ -21,13 +24,18 @@ async fn renderer_test() {
     // Skip this test if no adapter available
     let Some(adapter) = adapter else { return };
 
-    let universe = UniverseTemplate::LightingBench
-        .build::<all_is_cubes_wasm::AdaptedInstant>(
-            yield_progress_for_testing(),
-            TemplateParameters::default(),
-        )
+    let mut universe = UniverseTemplate::LightingBench
+        .build::<Instant>(yield_progress_for_testing(), TemplateParameters::default())
         .await
         .unwrap();
+
+    // Step the universe, letting it update light and such.
+    // This is not strictly related to rendering but it gives us some more test coverage cheaply.
+    universe.step(
+        false,
+        all_is_cubes::time::Deadline::At(Instant::now() + Duration::from_millis(100)),
+    );
+
     let cameras = StandardCameras::from_constant_for_test(
         GraphicsOptions::UNALTERED_COLORS,
         Viewport::with_scale(1.0, [256, 256]),
