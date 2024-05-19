@@ -12,8 +12,7 @@ use all_is_cubes_base::math::{self, Face6, FaceMap, FreePoint, FreeVector, Vecto
 use all_is_cubes_base::raycast::Ray;
 
 fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=src/space/light/chart_schema_shared.rs");
+    println!("cargo:rerun-if-changed=src/space/light/chart/shared.rs");
 
     let rays = generate_light_ray_pattern();
     let chart = generate_light_propagation_chart(&rays);
@@ -125,6 +124,7 @@ fn writemuck<T: bytemuck::NoUninit>(out_relative_path: &Path, data: &[T]) {
 
 use chart_schema::{OneRay, TargetEndian};
 
+// If this module path changes, update the rerun-if-changed directive above!
 #[path = "src/space/light/chart/"]
 mod chart_schema {
     use crate::math::{FaceMap, VectorOps as _};
@@ -133,6 +133,7 @@ mod chart_schema {
     use num_traits::{FromBytes, ToBytes};
     use std::env;
 
+    // If this module name changes, update the rerun-if-changed directive above!
     mod shared;
     pub(crate) use shared::{IndirectSteps, OneRay, Step, Steps};
 
