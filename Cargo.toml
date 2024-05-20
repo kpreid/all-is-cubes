@@ -132,6 +132,9 @@ yield-progress = { version = "0.1.6", default-features = false }
 
 # Note: Lints are also necessarily redefined in the workspaces other than this one.
 [workspace.lints]
+# rustc lints that are set to allow
+rust.non_local_definitions = "allow" # known issue with displaydoc; we will replace it if necessary
+
 # rustc lints that are set to deny
 rust.rust_2018_idioms = { level = "deny", priority = -1 }
 rust.unsafe_op_in_unsafe_fn = "deny"
@@ -163,6 +166,7 @@ clippy.cast_possible_truncation = "allow" # we would need an alternative for int
 clippy.cast_precision_loss = "allow" # consider enabling
 clippy.cast_sign_loss = "allow" # consider enabling
 clippy.default_trait_access = "allow"
+clippy.empty_enum = "allow" # https://internals.rust-lang.org/t/idiomatic-definition-of-uninhabited-never-newtypes/20877 and https://github.com/rust-lang/rust/issues/38885
 clippy.enum_glob_use = "allow"
 clippy.explicit_iter_loop = "allow" # I prefer the opposite style
 clippy.float_cmp = "allow"
