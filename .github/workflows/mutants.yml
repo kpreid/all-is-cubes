@@ -22,7 +22,7 @@ jobs:
         run: rustup toolchain install stable --profile=minimal
 
       - name: Install cargo-mutants
-        run: cargo install --locked cargo-mutants@24.1.0
+        run: cargo install cargo-mutants@24.5.0
 
       - name: Run mutation testing for all-is-cubes
         timeout-minutes: 60
