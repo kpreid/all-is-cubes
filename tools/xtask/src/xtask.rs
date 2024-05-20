@@ -315,7 +315,7 @@ fn main() -> Result<(), ActionError> {
                 eprint!("Editing {manifest_path}...");
                 let _ = std::io::stderr().flush();
 
-                let mut manifest: toml_edit::Document =
+                let mut manifest: toml_edit::DocumentMut =
                     fs::read_to_string(&manifest_path)?.parse()?;
 
                 // For packages only
