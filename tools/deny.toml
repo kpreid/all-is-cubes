@@ -34,7 +34,9 @@ skip = [
     { name = "wasi" }, # not actually used on our targets
     { name = "syn", version = "1" },
     { name = "libloading" },
-    { name = "libredox", version = "=0.0.1" },
+    { name = "libredox", version = "=0.0.2" },
+    { name = "redox_syscall", version = "=0.4.1" },
+    { name = "heck" }, # old used by strum
     { name = "miniz_oxide", version = "0.4.4" }, # old used by png-decoder
 ]
 
