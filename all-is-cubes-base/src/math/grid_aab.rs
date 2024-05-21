@@ -219,8 +219,7 @@ impl GridAab {
     /// This does not necessarily mean that its size is zero on all axes.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        // euclid's Size3D::is_empty() is broken
-        self.sizes.width == 0 || self.sizes.height == 0 || self.sizes.depth == 0
+        self.sizes.is_empty()
     }
 
     /// Inclusive upper bounds on cube coordinates, or the most negative corner of the
