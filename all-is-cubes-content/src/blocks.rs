@@ -21,7 +21,7 @@ use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
     rgb_const, rgba_const, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation,
-    GridVector, Gridgid, Rgb, Rgba, VectorOps,
+    GridVector, Gridgid, Rgb, Rgba,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};

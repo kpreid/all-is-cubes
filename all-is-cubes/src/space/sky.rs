@@ -1,7 +1,7 @@
 use euclid::point3;
 
 use crate::content::palette;
-use crate::math::{Cube, Face6, FaceMap, FreeVector, GridAab, Rgb, VectorOps};
+use crate::math::{Cube, Face6, FaceMap, FreeVector, GridAab, Rgb};
 use crate::space::PackedLight;
 
 #[cfg(doc)]

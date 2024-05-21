@@ -17,7 +17,7 @@ use crate::block::Evoxels;
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{
     Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridAab, GridCoordinate,
-    LineVertex, VectorOps, Vol,
+    LineVertex, Vol,
 };
 use crate::raycast::{Ray, Raycaster};
 use crate::space::Space;

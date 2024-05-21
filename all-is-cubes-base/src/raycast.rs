@@ -12,7 +12,7 @@ use num_traits::float::Float as _;
 use crate::math::Euclid as _;
 use crate::math::{
     Axis, Cube, CubeFace, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab,
-    GridCoordinate, GridPoint, GridVector, LineVertex, VectorOps,
+    GridCoordinate, GridPoint, GridVector, LineVertex,
 };
 
 /// Vector unit type for units of "t" (ray-length).

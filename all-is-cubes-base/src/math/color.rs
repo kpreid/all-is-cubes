@@ -12,7 +12,6 @@ use ordered_float::{FloatIsNan, NotNan};
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use crate::math::VectorOps as _;
 use crate::notnan;
 
 /// Allows writing a constant [`Rgb`] color value, provided that its components are float

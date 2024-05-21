@@ -10,7 +10,7 @@ use crate::block::{recursive_ray, Block, EvaluatedBlock, Evoxel, Evoxels};
 use crate::content::palette;
 use crate::math::{
     Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry, GridCoordinate,
-    GridVector, LineVertex, VectorOps,
+    GridVector, LineVertex,
 };
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};

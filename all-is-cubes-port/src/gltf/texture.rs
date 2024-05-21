@@ -6,7 +6,7 @@ use gltf_json::validation::Checked::Valid;
 
 use all_is_cubes::block::Evoxel;
 use all_is_cubes::euclid::Point2D;
-use all_is_cubes::math::{Axis, GridAab, GridRotation, VectorOps, Vol};
+use all_is_cubes::math::{Axis, GridAab, GridRotation, Vol};
 use all_is_cubes_mesh::texture::{self, TilePoint};
 
 use super::glue::push_and_return_index;

@@ -337,7 +337,7 @@ impl<C> Vol<C, ZMaj> {
         // injective mapping of integers, and every in-bounds maps to in-bounds, so
         // every out-of-bounds must also map to out-of-bounds.
         let deoffsetted: GridPoint =
-            GridPoint::from(cube).zip(self.bounds.lower_bounds(), GridCoordinate::wrapping_sub);
+            GridPoint::from(cube).zip(self.bounds.lower_bounds(), GridCoordinate::wrapping_sub).to_point();
 
         // Bounds check, expressed as a single unsigned comparison.
         if (deoffsetted.x as u32 >= sizes.width as u32)

@@ -22,7 +22,7 @@ use all_is_cubes::euclid::{point3, size2, size3, vec2, vec3, Point2D, Size2D, Ve
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
     notnan, rgb_const, rgba_const, Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate,
-    GridPoint, GridRotation, GridVector, NotNan, Rgb, Rgba, VectorOps, Vol,
+    GridPoint, GridRotation, GridVector, NotNan, Rgb, Rgba, Vol,
 };
 use all_is_cubes::space::{self, LightPhysics, Space, SpaceBuilder};
 use all_is_cubes::time;

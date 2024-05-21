@@ -23,7 +23,7 @@ use crate::inv::{EphemeralOpaque, InventoryTransaction};
 use crate::listen::{Listen, Listener, Notifier};
 use crate::math::{
     notnan, rgb_const, Cube, FreeCoordinate, GridAab, GridCoordinate, GridRotation, Gridgid,
-    NotNan, VectorOps, Vol,
+    NotNan, Vol,
 };
 use crate::physics::Acceleration;
 use crate::time;

@@ -1,5 +1,5 @@
 use all_is_cubes::euclid::default::Translation3D;
-use all_is_cubes::math::{self, Cube, GridAab, GridCoordinate, GridPoint, VectorOps};
+use all_is_cubes::math::{self, Cube, GridAab, GridCoordinate, GridPoint};
 
 /// An octree that knows how to allocate box regions of itself. It stores no other data.
 #[derive(Clone, Debug)]

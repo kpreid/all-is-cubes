@@ -7,7 +7,7 @@ use euclid::Vector3D;
 use hashbrown::hash_map::Entry;
 use hashbrown::HashMap as HbHashMap;
 
-use crate::math::{Cube, GridAab, GridCoordinate, GridIter, GridPoint, VectorOps as _};
+use crate::math::{Cube, GridAab, GridCoordinate, GridIter, GridPoint};
 use crate::space::light::PackedLightScalar;
 
 /// An entry in a [`LightUpdateQueue`], specifying a cubes that needs its light updated.

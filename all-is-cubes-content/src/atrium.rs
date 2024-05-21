@@ -14,7 +14,7 @@ use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
     rgb_const, Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate,
-    GridPoint, GridRotation, GridVector, Gridgid, Rgb, Rgba, VectorOps,
+    GridPoint, GridRotation, GridVector, Gridgid, Rgb, Rgba,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};

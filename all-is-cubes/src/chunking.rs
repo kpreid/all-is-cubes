@@ -21,7 +21,7 @@ use num_traits::float::FloatCore as _;
 #[allow(unused_imports)]
 use crate::math::Euclid as _;
 use crate::math::{
-    Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint, VectorOps,
+    Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint,
 };
 
 /// Unit-of-measure type for chunk positions *not* tracking the chunk size in the type.

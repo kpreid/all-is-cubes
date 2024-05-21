@@ -62,11 +62,6 @@ macro_rules! impl_vector_ops {
 }
 mod impl_euclid {
     use super::*;
-    use euclid::*;
-    impl_vector_ops!(Vector2D, (x y));
-    impl_vector_ops!(Vector3D, (x y z));
-    impl_vector_ops!(Point2D, (x y));
-    impl_vector_ops!(Point3D, (x y z));
     impl_vector_ops!(Size2D, (width height));
     impl_vector_ops!(Size3D, (width height depth));
 }

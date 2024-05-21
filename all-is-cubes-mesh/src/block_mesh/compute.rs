@@ -8,7 +8,7 @@ use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Reso
 use all_is_cubes::camera::Flaws;
 use all_is_cubes::euclid::point2;
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, OpacityCategory, Rgb, Rgba, VectorOps,
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, OpacityCategory, Rgb, Rgba,
 };
 
 use crate::block_mesh::planar::{greedy_mesh, push_quad, GmRect, QuadColoring, QuadTransform};

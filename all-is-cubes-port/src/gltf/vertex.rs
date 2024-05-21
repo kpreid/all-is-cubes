@@ -1,7 +1,7 @@
 //! [`GltfVertex`], vertex type for writing to glTF buffers.
 
 use all_is_cubes::euclid::{Point3D, Vector3D};
-use all_is_cubes::math::{Cube, VectorOps};
+use all_is_cubes::math::Cube;
 use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
 
 use super::glue::Lef32;

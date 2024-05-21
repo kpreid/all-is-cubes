@@ -9,7 +9,7 @@ use ordered_float::OrderedFloat;
 use all_is_cubes::camera::Flaws;
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, VectorOps as _, Vol,
+    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, Vol,
 };
 use all_is_cubes::space::{BlockIndex, Space};
 
@@ -448,17 +448,13 @@ impl<M: MeshTypes> SpaceMesh<M> {
     where
         I: num_traits::NumCast,
     {
-        use num_traits::float::FloatCore;
-
         let one_half =
             num_traits::cast::<f32, <M::Vertex as GfxVertex>::Coordinate>(0.5f32).unwrap();
         // We only need to look at one of the two triangles,
         // because they have the same bounding rectangle.
         let [v0, v1, v2, ..]: [VPos<M>; 6] =
             indices.map(|i| vertices[num_traits::cast::<I, usize>(i).unwrap()].position());
-        let max = v0.zip(v1, FloatCore::max).zip(v2, FloatCore::max);
-        let min = v0.zip(v1, FloatCore::min).zip(v2, FloatCore::min);
-        (max + min.to_vector()) * one_half
+        (v0.max(v1).max(v2) + v0.min(v1).min(v2).to_vector()) * one_half
     }
 }
 

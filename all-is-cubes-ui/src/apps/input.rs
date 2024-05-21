@@ -8,7 +8,7 @@ use all_is_cubes::camera::{
 use all_is_cubes::character::Character;
 use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use all_is_cubes::math::{notnan, FreeCoordinate, FreeVector, VectorOps};
+use all_is_cubes::math::{notnan, FreeCoordinate, FreeVector};
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{Handle, Universe};
 

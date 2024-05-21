@@ -5,7 +5,7 @@ use all_is_cubes::euclid::Point3D;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    rgba_const, Cube, GridAab, GridCoordinate, GridPoint, GridVector, VectorOps,
+    rgba_const, Cube, GridAab, GridCoordinate, GridPoint, GridVector, 
 };
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;

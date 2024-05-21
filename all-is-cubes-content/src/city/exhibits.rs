@@ -29,7 +29,7 @@ use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::{
     rgb_const, rgba_const, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate,
-    GridPoint, GridRotation, GridVector, Gridgid, NotNan, Rgb, Rgba, VectorOps,
+    GridPoint, GridRotation, GridVector, Gridgid, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpaceBuilder, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};

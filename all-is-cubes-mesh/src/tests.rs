@@ -14,7 +14,7 @@ use all_is_cubes::math::{
     Face6::{self, *},
     FaceMap, FreeCoordinate, GridAab, GridRotation, Rgba,
 };
-use all_is_cubes::math::{Cube, Rgb, VectorOps};
+use all_is_cubes::math::{Cube, Rgb};
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
 
@@ -653,7 +653,7 @@ fn depth_ordering_from_view_direction() {
 /// the data is a fully `pub` struct and enum.)
 #[test]
 fn texture_clamp_coordinate_ordering() {
-    const ALL_TRUE: Point3D<bool, TexelUnit> = Point3D::new(true, true, true);
+    const ALL_TRUE: Vector3D<bool, TexelUnit> = Vector3D::new(true, true, true);
 
     let mut universe = Universe::new();
     let [block] = make_some_voxel_blocks(&mut universe);

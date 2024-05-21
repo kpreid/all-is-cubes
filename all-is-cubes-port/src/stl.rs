@@ -8,7 +8,7 @@ use stl_io::Triangle;
 use all_is_cubes::block;
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::euclid::Vector3D;
-use all_is_cubes::math::{notnan, Cube, FreeCoordinate, VectorOps};
+use all_is_cubes::math::{notnan, Cube, FreeCoordinate};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::PartialUniverse;
 use all_is_cubes::util::YieldProgress;

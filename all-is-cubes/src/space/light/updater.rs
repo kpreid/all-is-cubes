@@ -15,7 +15,7 @@ use super::debug::LightComputeOutput;
 use crate::block::{self, EvaluatedBlock};
 use crate::math::{
     Cube, CubeFace, Face6, Face7, FaceMap, FreeCoordinate, Geometry, NotNan, OpacityCategory, Rgb,
-    Rgba, VectorOps, Vol,
+    Rgba, Vol,
 };
 use crate::raycast::Ray;
 use crate::space::light::{

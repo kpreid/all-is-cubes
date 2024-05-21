@@ -8,7 +8,7 @@ extern crate alloc;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-use all_is_cubes_base::math::{self, Face6, FaceMap, FreePoint, FreeVector, VectorOps};
+use all_is_cubes_base::math::{self, Face6, FaceMap, FreePoint, FreeVector};
 use all_is_cubes_base::raycast::Ray;
 
 fn main() {
@@ -127,7 +127,7 @@ use chart_schema::{OneRay, TargetEndian};
 // If this module path changes, update the rerun-if-changed directive above!
 #[path = "src/space/light/chart/"]
 mod chart_schema {
-    use crate::math::{FaceMap, VectorOps as _};
+    use crate::math::FaceMap;
     use all_is_cubes_base::raycast::Ray;
     use core::fmt;
     use num_traits::{FromBytes, ToBytes};

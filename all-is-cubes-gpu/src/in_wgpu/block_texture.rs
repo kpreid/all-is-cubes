@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex, MutexGuard, Weak};
 use all_is_cubes::block::Evoxel;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::Translation3D;
-use all_is_cubes::math::{GridAab, GridCoordinate, VectorOps, Vol};
+use all_is_cubes::math::{GridAab, GridCoordinate, Vol};
 use all_is_cubes::time;
 use all_is_cubes_mesh::texture::{self, Channels};
 

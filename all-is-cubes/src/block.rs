@@ -14,7 +14,7 @@ use core::fmt;
 use crate::listen::{Listen as _, Listener};
 use crate::math::{
     Cube, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba,
-    VectorOps, Vol,
+    Vol,
 };
 use crate::raycast::Ray;
 use crate::space::{SetCubeError, Space, SpaceChange};

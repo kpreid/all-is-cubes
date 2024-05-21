@@ -11,7 +11,7 @@ use num_traits::float::FloatCore as _;
 
 use crate::math::{
     Axis, Cube, Face6, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab, GridCoordinate,
-    LineVertex, VectorOps,
+    LineVertex,
 };
 
 /// Axis-Aligned Box data type.

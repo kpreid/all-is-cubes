@@ -6,7 +6,7 @@
 use core::marker::PhantomData;
 use core::ops::Mul;
 
-use crate::math::{Face6, GridCoordinate, GridMatrix, GridVector, Gridgid, Vector3D, VectorOps};
+use crate::math::{Face6, GridCoordinate, GridMatrix, GridVector, Gridgid, Vector3D};
 
 #[cfg(doc)]
 use crate::math::GridAab;

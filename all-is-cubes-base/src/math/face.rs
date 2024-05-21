@@ -15,7 +15,7 @@ use num_traits::float::FloatCore as _;
 
 use crate::math::{
     Axis, ConciseDebug, Cube, FreeCoordinate, FreeVector, Geometry, GridCoordinate, GridPoint,
-    GridRotation, GridVector, Gridgid, LineVertex, VectorOps, Zero,
+    GridRotation, GridVector, Gridgid, LineVertex, Zero,
 };
 
 /// Identifies a face of a cube or an orthogonal unit vector.

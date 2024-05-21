@@ -18,7 +18,7 @@ use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{
     rgb_const, rgba_const, Face6, FreeCoordinate, GridCoordinate, GridRotation, GridVector,
-    Gridgid, Rgba, VectorOps,
+    Gridgid, Rgba,
 };
 use crate::space::Space;
 use crate::universe::UniverseTransaction;

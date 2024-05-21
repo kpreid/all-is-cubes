@@ -236,10 +236,12 @@ impl GridAab {
     pub fn upper_bounds(&self) -> GridPoint {
         // Cannot overflow due to constructor-enforced invariants,
         // so always use un-checked arithmetic
-        self.lower_bounds.zip(
-            self.sizes.to_vector().to_point(),
-            GridCoordinate::wrapping_add,
-        )
+        self.lower_bounds
+            .zip(
+                self.sizes.to_vector().to_point(),
+                GridCoordinate::wrapping_add,
+            )
+            .to_point()
     }
 
     /// Size of the box in each axis; equivalent to
@@ -612,10 +614,12 @@ impl GridAab {
             let offset = offset.to_point();
             let new_lb = this
                 .lower_bounds()
-                .zip(offset, GridCoordinate::saturating_add);
+                .zip(offset, GridCoordinate::saturating_add)
+                .to_point();
             let new_ub = this
                 .upper_bounds()
-                .zip(offset, GridCoordinate::saturating_add);
+                .zip(offset, GridCoordinate::saturating_add)
+                .to_point();
             GridAab::from_lower_upper(new_lb, new_ub)
         }
 

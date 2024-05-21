@@ -7,7 +7,6 @@ use num_traits::float::FloatCore as _;
 
 use crate::math::{
     Aab, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint, GridVector,
-    VectorOps,
 };
 use crate::util::ConciseDebug;
 

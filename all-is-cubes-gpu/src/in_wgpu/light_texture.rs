@@ -8,7 +8,7 @@ use rayon::{
 use all_is_cubes::camera::Camera;
 use all_is_cubes::euclid::{size3, Vector3D};
 use all_is_cubes::math::{
-    Aab, Axis, Cube, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, VectorOps,
+    Aab, Axis, Cube, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize,
 };
 use all_is_cubes::space::Space;
 
@@ -301,7 +301,8 @@ impl LightTexture {
                     .lower_bounds()
                     .zip(ts.to_vector().to_point(), |coord, size| {
                         coord.rem_euclid(size)
-                    }),
+                    })
+                    .to_point(),
                 region.size(),
             ),
             buffer,

@@ -1,14 +1,11 @@
 use euclid::Point3D;
 
+use crate::block::{
+    self, Evoxel, Evoxels, MinEval, Modifier,
+    Resolution::{self, R1},
+};
 use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, Vol};
 use crate::universe;
-use crate::{
-    block::{
-        self, Evoxel, Evoxels, MinEval, Modifier,
-        Resolution::{self, R1},
-    },
-    math::VectorOps,
-};
 
 /// Data for [`Modifier::Zoom`], describing a portion of the original block that is scaled
 /// up to become the whole block.

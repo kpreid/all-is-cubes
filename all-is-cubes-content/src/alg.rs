@@ -9,7 +9,7 @@ use all_is_cubes::block::{Atom, Block, Primitive, Resolution, AIR};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::math::{
     Cube, CubeFace, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridArray, GridCoordinate,
-    GridPoint, GridVector, Gridgid, NotNan, VectorOps as _,
+    GridPoint, GridVector, Gridgid, NotNan,
 };
 use all_is_cubes::space::{CubeTransaction, SetCubeError, Space, SpaceTransaction};
 

@@ -3,7 +3,7 @@ extern crate all_is_cubes;
 
 use all_is_cubes::character::Character;
 use all_is_cubes::euclid::Vector3D;
-use all_is_cubes::math::{self, FreeCoordinate, NotNan, VectorOps};
+use all_is_cubes::math::{self, FreeCoordinate, NotNan};
 use all_is_cubes::space::Space;
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::Universe;

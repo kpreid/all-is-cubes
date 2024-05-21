@@ -8,7 +8,7 @@ use rand::{Rng as _, SeedableRng as _};
 
 use crate::block::{Resolution, AIR};
 use crate::content::{make_slab, make_some_blocks};
-use crate::math::{Aab, Cube, CubeFace, Face7, FreeCoordinate, Geometry, GridAab, VectorOps};
+use crate::math::{Aab, Cube, CubeFace, Face7, FreeCoordinate, Geometry, GridAab};
 use crate::physics::{Body, Contact, Velocity, POSITION_EPSILON, VELOCITY_MAGNITUDE_LIMIT};
 use crate::space::{Space, SpacePhysics};
 use crate::time::Tick;

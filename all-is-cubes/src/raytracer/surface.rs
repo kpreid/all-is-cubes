@@ -3,7 +3,7 @@ use euclid::Vector3D;
 
 use crate::block::{recursive_ray, Evoxel, Evoxels};
 use crate::camera::LightingOption;
-use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, FreePoint, Rgb, Rgba, VectorOps, Vol};
+use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, FreePoint, Rgb, Rgba, Vol};
 use crate::raycast::{Ray, Raycaster};
 use crate::raytracer::{RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData};
 

@@ -5,7 +5,7 @@ use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::euclid::{vec3, Point3D, Vector3D};
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{Cube, GridAab, GridRotation, GridVector, Gridgid, Rgb, Rgba, VectorOps};
+use all_is_cubes::math::{Cube, GridAab, GridRotation, GridVector, Gridgid, Rgb, Rgba};
 use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
 use all_is_cubes::universe::{self, Name, PartialUniverse, Universe};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};

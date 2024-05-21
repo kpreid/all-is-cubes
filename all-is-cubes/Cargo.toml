@@ -101,7 +101,7 @@ displaydoc = { workspace = true }
 downcast-rs = { version = "1.2.0", default-features = false }
 # mint feature to guarantee that our callers can use mint types
 # libm feature to guarantee compilability and compatibility with no_std
-euclid = { version = "0.22.9", default-features = false, features = ["libm", "mint"] }
+euclid = { workspace = true, default-features = false, features = ["arbitrary", "libm", "mint"] }
 embedded-graphics = { workspace = true }
 exhaust = { workspace = true, default-features = false }
 flate2 = { version = "1.0.26", optional = true }
@@ -134,7 +134,7 @@ yield-progress = { workspace = true }
 [build-dependencies]
 all-is-cubes-base = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
-euclid = { version = "0.22.9", default-features = false, features = ["libm", "mint"] }
+euclid = { workspace = true }
 num-traits = { workspace = true }
 
 [dev-dependencies]

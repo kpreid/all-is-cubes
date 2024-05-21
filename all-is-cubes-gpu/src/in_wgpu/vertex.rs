@@ -1,5 +1,5 @@
 use all_is_cubes::euclid::{Point3D, Vector3D};
-use all_is_cubes::math::{Cube, GridVector, VectorOps};
+use all_is_cubes::math::{Cube, GridVector};
 use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
 
 use crate::DebugLineVertex;
