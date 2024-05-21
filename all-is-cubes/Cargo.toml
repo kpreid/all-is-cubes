@@ -58,10 +58,10 @@ std = [
     "yield-progress/sync",
 ]
 # Adds `impl arbitrary::Arbitrary for ...`
-# Note: Not using euclid/arbitrary because it's broken
 arbitrary = [
     "dep:arbitrary",
     "all-is-cubes-base/arbitrary",
+    "euclid/arbitrary",
     "ordered-float/arbitrary",
 ]
 # Adds serde implementations.

@@ -1096,6 +1096,7 @@ impl Default for SpacePhysics {
 impl<'a> arbitrary::Arbitrary<'a> for SpacePhysics {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self {
+            // Vector3D doesn't implement Arbitrary
             gravity: vec3(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
             sky: u.arbitrary()?,
             light: u.arbitrary()?,

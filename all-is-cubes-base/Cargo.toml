@@ -15,8 +15,11 @@ bench = false
 [features]
 std = []
 # Adds `impl arbitrary::Arbitrary for ...`
-# Note: Not using euclid/arbitrary because it's broken
-arbitrary = ["dep:arbitrary", "ordered-float/arbitrary"]
+arbitrary = [
+    "dep:arbitrary",
+    "euclid/arbitrary",
+    "ordered-float/arbitrary"
+]
 rerun = ["dep:re_types"]
 serde = [
     "dep:serde",

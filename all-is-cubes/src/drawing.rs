@@ -509,6 +509,7 @@ impl<'a, 'b> arbitrary::Arbitrary<'a> for VoxelBrush<'b> {
         Ok(VoxelBrush(
             u.arbitrary_iter()?
                 .map(|result| {
+                    // `GridVector` doesn't implement `Arbitrary`
                     result.map(|(offset, block): ([i32; 3], Block)| {
                         (offset.into(), Cow::Owned(block))
                     })

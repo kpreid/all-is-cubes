@@ -175,6 +175,7 @@ impl Default for BlockAttributes {
     }
 }
 
+// `ArcStr` and `GridPoint` don't implement `Arbitrary`
 #[cfg(feature = "arbitrary")]
 #[mutants::skip]
 impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {

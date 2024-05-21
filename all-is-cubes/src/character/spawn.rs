@@ -171,11 +171,12 @@ impl<'a> arbitrary::Arbitrary<'a> for Spawn {
         Ok(Self {
             bounds: GridAab::arbitrary(u)?,
             eye_position: if u.arbitrary()? {
+                // Point3D doesn't implement Arbitrary
                 Some(Point3D::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?))
             } else {
                 None
             },
-            look_direction: Vector3D::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
+            look_direction: Vector3D::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?), // Vector3D doesn't implement Arbitrary
             inventory: vec![], // TODO: need impl Arbitrary for Tool
         })
     }

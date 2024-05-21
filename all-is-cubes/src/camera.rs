@@ -494,6 +494,7 @@ pub type ImageSize = Size2D<u32, ImagePixel>;
 /// aspect ratio.
 #[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Viewport {
     /// Viewport dimensions to use for determining aspect ratio and interpreting
     /// pointer events.
@@ -609,24 +610,6 @@ impl Viewport {
 
     // TODO: Maybe have a validate() that checks if the data is not fit for producing an
     // invertible transform.
-}
-
-#[cfg(feature = "arbitrary")]
-#[mutants::skip]
-impl<'a> arbitrary::Arbitrary<'a> for Viewport {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Viewport {
-            nominal_size: Size2D::new(u.arbitrary()?, u.arbitrary()?),
-            framebuffer_size: Size2D::new(u.arbitrary()?, u.arbitrary()?),
-        })
-    }
-
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        arbitrary::size_hint::and(
-            <[u32; 2]>::size_hint(depth),
-            <[FreeCoordinate; 2]>::size_hint(depth),
-        )
-    }
 }
 
 /// Calculate an “eye position” (camera position) to view the entire given `bounds`.
