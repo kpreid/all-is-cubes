@@ -59,7 +59,7 @@ pub struct Inner {
     mesh_vertex_positions: Vec<rg::components::Position3D>,
     mesh_vertex_colors: Vec<rg::components::Color>,
     mesh_vertex_normals: Vec<rg::components::Vector3D>,
-    mesh_triangle_indices: Vec<u32>,
+    mesh_triangle_indices: Vec<rg::components::TriangleIndices>,
 }
 
 cfg_if::cfg_if! {
@@ -224,7 +224,11 @@ impl Viz {
             state.mesh_triangle_indices.extend(
                 relative_indices_iter
                     .clone()
-                    .map(|rel_index| rel_index + index_base),
+                    .map(|rel_index| rel_index + index_base)
+                    .tuples()
+                    .map(|(i1, i2, i3)| {
+                        rg::components::TriangleIndices(rg::datatypes::UVec3D::new(i1, i2, i3))
+                    }),
             );
 
             // Draw edges of each triangle — by interpreting the indices
@@ -265,9 +269,7 @@ impl Viz {
                 &rg::archetypes::Mesh3D::new(state.mesh_vertex_positions.iter().copied())
                     .with_vertex_colors(state.mesh_vertex_colors.iter().copied())
                     .with_vertex_normals(state.mesh_vertex_normals.iter().copied())
-                    .with_mesh_properties(rg::datatypes::MeshProperties {
-                        indices: Some(state.mesh_triangle_indices.as_slice().into()),
-                    }),
+                    .with_triangle_indices(state.mesh_triangle_indices.iter().copied()),
             );
         }
     }

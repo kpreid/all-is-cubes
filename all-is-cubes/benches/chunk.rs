@@ -157,13 +157,13 @@ fn dump_frustum_culling() {
         .map(|(a, b)| rg::components::LineStrip3D(vec![a, b]));
 
     stream
-        .log_timeless(
+        .log_static(
             rg::entity_path!["frustum"],
             &rg::archetypes::LineStrips3D::new(frustum_lines),
         )
         .unwrap();
     stream
-        .log_timeless(
+        .log_static(
             rg::entity_path!["aabs"],
             &rg::convert_grid_aabs(
                 chart

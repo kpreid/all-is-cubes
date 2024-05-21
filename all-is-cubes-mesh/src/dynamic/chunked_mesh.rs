@@ -586,15 +586,15 @@ where
         self.rerun_destination = destination;
 
         // Set up time series styling
-        self.rerun_destination.log_timeless(
+        self.rerun_destination.log_static(
             &"one_chunk_compute_ms".into(),
             &rg::archetypes::SeriesPoint::new(),
         );
-        self.rerun_destination.log_timeless(
+        self.rerun_destination.log_static(
             &"one_chunk_update_ms".into(),
             &rg::archetypes::SeriesPoint::new(),
         );
-        self.rerun_destination.log_timeless(
+        self.rerun_destination.log_static(
             &"all_meshes_done".into(),
             &rg::archetypes::SeriesPoint::new().with_name("all meshes done"),
         );

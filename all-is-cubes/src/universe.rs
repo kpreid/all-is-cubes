@@ -680,18 +680,15 @@ impl Universe {
 
         // Initialize axes.
         // TODO: this should be per-Space in principle
-        self.rerun_destination
-            .stream
-            .log_timeless(
-                self.rerun_destination.path.clone(),
-                &rg::archetypes::ViewCoordinates::new(
-                    rg::components::ViewCoordinates::from_up_and_handedness(
-                        crate::math::Face6::PY.into(),
-                        rg::view_coordinates::Handedness::Right,
-                    ),
+        self.rerun_destination.log_static(
+            &rg::entity_path![],
+            &rg::archetypes::ViewCoordinates::new(
+                rg::components::ViewCoordinates::from_up_and_handedness(
+                    crate::math::Face6::PY.into(),
+                    rg::view_coordinates::Handedness::Right,
                 ),
-            )
-            .unwrap();
+            ),
+        );
 
         // Write current timepoint
         self.log_rerun_time();

@@ -42,8 +42,8 @@ impl Destination {
         let path = EntityPath::from(vec![]);
         self.catch(|| {
             self.stream
-                .log_timeless(path.clone(), &annotation_context())?;
-            self.stream.log_timeless(
+                .log_static(path.clone(), &annotation_context())?;
+            self.stream.log_static(
                 path.clone(),
                 &archetypes::ViewCoordinates::new(OUR_VIEW_COORDINATES),
             )?;
@@ -67,8 +67,8 @@ impl Destination {
         self.catch(|| self.stream.log(self.path.join(path_suffix), data))
     }
 
-    pub fn log_timeless(&self, path_suffix: &EntityPath, data: &impl re_sdk::AsComponents) {
-        self.catch(|| self.stream.log_timeless(self.path.join(path_suffix), data))
+    pub fn log_static(&self, path_suffix: &EntityPath, data: &impl re_sdk::AsComponents) {
+        self.catch(|| self.stream.log_static(self.path.join(path_suffix), data))
     }
 
     pub fn clear_recursive(&self, path_suffix: &EntityPath) {

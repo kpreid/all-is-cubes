@@ -146,12 +146,9 @@ fn convert_to_rerun_mesh(input: &mesh::SpaceMesh<Mt>, output: &mut rg::archetype
     colors.clear();
     colors.extend(input.vertices().iter().map(|v| v.color));
 
-    // can't reuse this alloc because ArrowBuffer<u32> doesn't work that way
-    output.mesh_properties = Some(rg::components::MeshProperties::from_triangle_indices(
-        input
-            .indices()
-            .iter_u32()
-            .tuples()
-            .map(|(i1, i2, i3)| rg::datatypes::UVec3D::new(i1, i2, i3)),
-    ));
+    let indices = output.triangle_indices.get_or_insert_with(Vec::new);
+    indices.clear();
+    indices.extend(input.indices().iter_u32().tuples().map(|(i1, i2, i3)| {
+        rg::components::TriangleIndices(rg::datatypes::UVec3D::new(i1, i2, i3))
+    }));
 }
