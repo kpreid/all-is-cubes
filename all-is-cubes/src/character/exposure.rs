@@ -7,6 +7,11 @@ use euclid::{vec3, Point3D};
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
+/// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
+use crate::math::Euclid as _;
+
 use crate::camera;
 use crate::math::FreeCoordinate;
 use crate::raycast::Ray;

@@ -28,6 +28,26 @@ pub use all_is_cubes_base::{notnan, rgb_const, rgba_const};
 #[doc = include_str!("save/serde-warning.md")]
 pub use all_is_cubes_base::math::GridAab;
 
+#[cfg(not(feature = "std"))]
+/// Identical to [`num_traits::Euclid`] except that its signatures are compatible with
+/// `std` versions.
+///
+/// Note: this code is duplicated between `all-is-cubes` and
+/// `all-is-cubes-base` so that it doesn't need to be public.
+pub(crate) trait Euclid {
+    fn div_euclid(self, rhs: Self) -> Self;
+    fn rem_euclid(self, rhs: Self) -> Self;
+}
+#[cfg(not(feature = "std"))]
+impl<T: num_traits::Euclid + Copy> Euclid for T {
+    fn div_euclid(self, rhs: Self) -> Self {
+        <T as num_traits::Euclid>::div_euclid(&self, &rhs)
+    }
+    fn rem_euclid(self, rhs: Self) -> Self {
+        <T as num_traits::Euclid>::rem_euclid(&self, &rhs)
+    }
+}
+
 #[inline]
 pub(crate) fn smoothstep(x: f64) -> f64 {
     let x = x.clamp(0.0, 1.0);
