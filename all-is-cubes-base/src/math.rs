@@ -115,22 +115,19 @@ macro_rules! notnan {
     };
 }
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(any(feature = "std", test)))]
+#[allow(dead_code)] // TODO: Not sure why we sometimes get "trait `Euclid` is never used" w/o this
 /// Identical to [`num_traits::Euclid`] except that its signatures are compatible with
 /// `std` versions.
-///
-/// Note: this code is duplicated between `all-is-cubes` and
-/// `all-is-cubes-base` so that it doesn't need to be public.
 pub(crate) trait Euclid {
-    #[allow(dead_code)]
-    fn div_euclid(self, rhs: Self) -> Self;
+    // fn div_euclid(self, rhs: Self) -> Self;
     fn rem_euclid(self, rhs: Self) -> Self;
 }
-#[cfg(not(feature = "std"))]
+#[cfg(not(any(feature = "std", test)))]
 impl<T: num_traits::Euclid + Copy> Euclid for T {
-    fn div_euclid(self, rhs: Self) -> Self {
-        <T as num_traits::Euclid>::div_euclid(&self, &rhs)
-    }
+    // fn div_euclid(self, rhs: Self) -> Self {
+    //     <T as num_traits::Euclid>::div_euclid(&self, &rhs)
+    // }
     fn rem_euclid(self, rhs: Self) -> Self {
         <T as num_traits::Euclid>::rem_euclid(&self, &rhs)
     }

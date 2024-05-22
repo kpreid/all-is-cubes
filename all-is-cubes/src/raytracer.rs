@@ -28,9 +28,6 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use crate::block::{Evoxels, Resolution, AIR};
 use crate::camera::NdcPoint2;
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
-#[cfg(not(feature = "std"))]
-#[allow(unused_imports)]
-use crate::math::Euclid as _;
 use crate::math::{
     rgb_const, smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab,
     GridMatrix, Intensity, Rgb, Rgba, Vol,

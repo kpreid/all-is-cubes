@@ -17,9 +17,6 @@ use euclid::{vec3, Point3D, Vector3D};
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
-#[cfg(not(feature = "std"))]
-#[allow(unused_imports)]
-use crate::math::Euclid as _;
 use crate::math::{
     Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint,
 };

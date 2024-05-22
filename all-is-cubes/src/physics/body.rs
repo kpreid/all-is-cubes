@@ -16,9 +16,6 @@ use super::collision::{
 };
 use crate::block::{BlockCollision, Resolution};
 use crate::fluff::Fluff;
-#[cfg(not(feature = "std"))]
-#[allow(unused_imports)]
-use crate::math::Euclid as _;
 use crate::math::{Aab, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry as _};
 use crate::physics::{StopAt, Velocity, POSITION_EPSILON};
 use crate::raycast::Ray;
