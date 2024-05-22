@@ -9,9 +9,7 @@ use alloc::vec::Vec;
 use euclid::Point3D;
 use manyfmt::Refmt as _;
 
-use crate::math::{
-    Axis, Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector, VectorOps as _,
-};
+use crate::math::{Axis, Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector};
 
 // #[derive(Clone, Copy, Debug)]
 // pub struct XMaj;
@@ -336,8 +334,9 @@ impl<C> Vol<C, ZMaj> {
         // of bounds, just in the other direction, because wrapping subtraction is an
         // injective mapping of integers, and every in-bounds maps to in-bounds, so
         // every out-of-bounds must also map to out-of-bounds.
-        let deoffsetted: GridPoint =
-            GridPoint::from(cube).zip(self.bounds.lower_bounds(), GridCoordinate::wrapping_sub).to_point();
+        let deoffsetted: GridPoint = GridPoint::from(cube)
+            .zip(self.bounds.lower_bounds(), GridCoordinate::wrapping_sub)
+            .to_point();
 
         // Bounds check, expressed as a single unsigned comparison.
         if (deoffsetted.x as u32 >= sizes.width as u32)
@@ -356,15 +355,16 @@ impl<C> Vol<C, ZMaj> {
         // overflow check.
         let ixvec: Point3D<usize, _> = deoffsetted.map(|s| s as usize);
 
-        let usizes = sizes.map(|s| s as usize);
-
         // Compute index.
         // Always use wrapping (rather than maybe-checked) arithmetic, because we
         // checked the criteria for it to not overflow.
         Some(
-            (ixvec.x.wrapping_mul(usizes.height).wrapping_add(ixvec.y))
-                .wrapping_mul(usizes.depth)
-                .wrapping_add(ixvec.z),
+            (ixvec
+                .x
+                .wrapping_mul(sizes.height as usize)
+                .wrapping_add(ixvec.y))
+            .wrapping_mul(sizes.depth as usize)
+            .wrapping_add(ixvec.z),
         )
     }
 }

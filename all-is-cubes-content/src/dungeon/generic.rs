@@ -1,7 +1,7 @@
 use all_is_cubes::euclid::Size3D;
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridSize, GridVector, VectorOps,
+    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridSize, GridVector, VectorOps as _,
 };
 use all_is_cubes::space::Space;
 use all_is_cubes::util::YieldProgress;

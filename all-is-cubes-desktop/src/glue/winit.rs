@@ -3,12 +3,11 @@ use winit::monitor::MonitorHandle;
 
 use all_is_cubes::camera::{self, Viewport};
 use all_is_cubes::euclid::Size2D;
-use all_is_cubes::math::VectorOps;
 
 pub fn physical_size_to_viewport(scale_factor: f64, size: PhysicalSize<u32>) -> Viewport {
     let size: camera::ImageSize = <[u32; 2]>::from(size).into();
     // max(1) because wgpu wants guaranteed nonzero viewports
-    Viewport::with_scale(scale_factor, size.map(|c| c.max(1)))
+    Viewport::with_scale(scale_factor, size.max(Size2D::splat(1)))
 }
 
 pub fn to_logical_size(size: Size2D<u32, camera::NominalPixel>) -> LogicalSize<u32> {
@@ -22,7 +21,7 @@ pub fn monitor_size_for_window(monitor: &MonitorHandle) -> Size2D<u32, camera::N
     // TODO: monitor.size() doesn't specify whether it's the usable-area or the outer size
     physical_size_to_viewport(monitor.scale_factor(), monitor.size())
         .nominal_size
-        .map(|c| c as u32)
+        .to_u32()
 }
 
 pub fn map_mouse_button(button: winit::event::MouseButton) -> usize {

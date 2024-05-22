@@ -13,7 +13,7 @@ use crate::camera::{
 use crate::character::Cursor;
 use crate::content::palette;
 use crate::listen::ListenableSource;
-use crate::math::{area_usize, Rgba, VectorOps};
+use crate::math::{area_usize, Rgba};
 use crate::raytracer::{
     Accumulate, ColorBuf, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer,
     UpdatingSpaceRaytracer,
@@ -435,7 +435,7 @@ mod trace_image {
         use rayon::slice::ParallelSliceMut as _;
 
         let viewport = scene.cameras.world.viewport();
-        let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
+        let viewport_size = viewport.framebuffer_size.to_usize();
         let encoder = &encoder; // make shareable
 
         // x.max(1) is zero-sized-viewport protection; the chunk size will be wrong, but there
@@ -490,7 +490,7 @@ mod trace_image {
         O: Send + Sync,
     {
         let viewport = scene.cameras.world.viewport();
-        let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
+        let viewport_size = viewport.framebuffer_size.to_usize();
 
         let mut total_info = RaytraceInfo::default();
         let mut index = 0;

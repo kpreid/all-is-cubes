@@ -33,7 +33,7 @@ use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 use crate::math::Euclid as _;
 use crate::math::{
     rgb_const, smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab,
-    GridMatrix, Intensity, Rgb, Rgba, VectorOps, Vol,
+    GridMatrix, Intensity, Rgb, Rgba, Vol,
 };
 use crate::raycast::Ray;
 use crate::space::{BlockIndex, BlockSky, PackedLight, Sky, Space, SpaceBlockData};
@@ -316,7 +316,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         P: Accumulate<BlockData = D> + Into<String>,
     {
         let viewport = camera.viewport();
-        let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
+        let viewport_size = viewport.framebuffer_size.to_usize();
         let output_iterator = (0..viewport_size.height)
             .into_par_iter()
             .map(move |ych| {
@@ -357,7 +357,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let mut total_info = RaytraceInfo::default();
 
         let viewport = camera.viewport();
-        let viewport_size = viewport.framebuffer_size.map(|s| s as usize);
+        let viewport_size = viewport.framebuffer_size.to_usize();
         for ych in 0..viewport_size.height {
             let y = viewport.normalize_fb_y(ych);
             for xch in 0..viewport_size.width {

@@ -261,6 +261,7 @@ impl GridAab {
         // Convert the i32 we know to be positive to u32.
         // Declaring the parameter type ensures that if we ever decide to change the numeric type
         // of `GridCoordinate`, this will fail to compile.
+        // Not using `to_u32()` because that has an unnecessary range check and panic branch.
         self.sizes.map(|s: i32| s as u32)
     }
 

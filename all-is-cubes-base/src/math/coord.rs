@@ -29,7 +29,8 @@ pub type FreePoint = Point3D<FreeCoordinate, Cube>;
 /// Vectors that are not locked to the cube grid but may interact with it.
 pub type FreeVector = Vector3D<FreeCoordinate, Cube>;
 
-/// Additional operations, mostly element-wise, on `euclid` vector/point types.
+/// Additional element-wise operations on `euclid` types.
+// TODO: Contribute these to `euclid` itself
 pub trait VectorOps<O> {
     /// Input vector element type.
     type Elem;
@@ -37,7 +38,7 @@ pub trait VectorOps<O> {
     type Output;
     /// Apply the function to each element.
     fn map<F: FnMut(Self::Elem) -> O>(self, f: F) -> Self::Output;
-    /// Apply the function to each element of the two vectors, pairwise.
+    /// Apply the function to each element of the two inputs, pairwise.
     fn zip<F: FnMut(Self::Elem, Self::Elem) -> O>(self, rhs: Self, f: F) -> Self::Output;
 }
 

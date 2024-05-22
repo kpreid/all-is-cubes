@@ -16,7 +16,6 @@ use num_traits::float::Float as _;
 use crate::chunking::OctantMask;
 use crate::math::{
     Aab, Axis, Cube, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab, LineVertex, Rgba,
-    VectorOps,
 };
 use crate::raycast::Ray;
 
@@ -518,7 +517,7 @@ impl Viewport {
         let framebuffer_size = framebuffer_size.into();
         Self {
             framebuffer_size,
-            nominal_size: framebuffer_size.map(f64::from).cast_unit() / scale_factor,
+            nominal_size: framebuffer_size.to_f64().cast_unit() / scale_factor,
         }
     }
 

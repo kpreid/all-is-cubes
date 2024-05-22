@@ -1,7 +1,8 @@
+use all_is_cubes::euclid::Size3D;
 use alloc::sync::Arc;
 
 use all_is_cubes::block::{Block, BlockAttributes, Primitive, Resolution};
-use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector, VectorOps};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::universe::Handle;
 
@@ -45,12 +46,13 @@ impl Voxels {
 impl vui::Layoutable for Voxels {
     fn requirements(&self) -> vui::LayoutRequest {
         let scale = GridCoordinate::from(self.scale);
+        let size = self.region.size();
 
         vui::LayoutRequest {
             // Divide rounding up.
             // Note: Not using GridAab::divide because that would take into account the
             // absolute position, which we *don't* want.
-            minimum: self.region.size().map(|size| (size + scale - 1) / scale),
+            minimum: (size + Size3D::splat(scale - 1)) / scale,
         }
     }
 }

@@ -12,7 +12,6 @@ use clap::{CommandFactory as _, Parser as _};
 use all_is_cubes::camera::{GraphicsOptions, Viewport};
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::listen::ListenableCell;
-use all_is_cubes::math::VectorOps;
 use all_is_cubes_ui::notification;
 use all_is_cubes_ui::vui::widgets::ProgressBarState;
 
@@ -234,7 +233,8 @@ fn main() -> Result<(), anyhow::Error> {
                         // (but not necessarily the full height)
                         display_size
                             .unwrap_or_else(|| Size2D::new(80, 24))
-                            .map(|component| component.min(u16::MAX.into()) as u16)
+                            .min(Size2D::splat(u16::MAX.into()))
+                            .cast::<u16>()
                             .cast_unit(),
                     )?;
 
