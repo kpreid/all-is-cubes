@@ -101,7 +101,7 @@ displaydoc = { workspace = true }
 downcast-rs = { version = "1.2.0", default-features = false }
 # mint feature to guarantee that our callers can use mint types
 # libm feature to guarantee compilability and compatibility with no_std
-euclid = { workspace = true, default-features = false, features = ["arbitrary", "libm", "mint"] }
+euclid = { workspace = true, default-features = false, features = ["libm", "mint"] }
 embedded-graphics = { workspace = true }
 exhaust = { workspace = true, default-features = false }
 flate2 = { version = "1.0.26", optional = true }
