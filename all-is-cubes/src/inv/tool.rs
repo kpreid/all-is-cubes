@@ -89,6 +89,9 @@ impl Tool {
     /// If the result is `None` then the tool is deleted.
     /// If the transaction does not succeed, the original `Tool` value should be kept.
     ///
+    /// This function has no side effects; for example, it may be safely used to determine
+    /// *whether* a tool applies or not.
+    ///
     /// TODO: Return type is inelegant
     pub fn use_tool(
         self,
