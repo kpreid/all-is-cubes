@@ -73,6 +73,7 @@ mod inner {
 
 /// Polls all [`wgpu::Device`]s delivered to it on `POLLING_CHANNEL`.
 /// To be run on a thread or async task as the platform permits.
+#[allow(clippy::infinite_loop)]
 async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
     // 10 milliseconds is much better than acceptable latency for our applications, which are all
     // non-realtime headless rendering.

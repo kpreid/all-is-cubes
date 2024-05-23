@@ -75,7 +75,7 @@ static POLLED_RELOADABLES: Lazy<Mutex<Vec<Reloadable>>> = Lazy::new(|| {
     Mutex::new(Vec::new())
 });
 
-fn poll_reloadables_loop() {
+fn poll_reloadables_loop() -> ! {
     loop {
         std::thread::sleep(Duration::from_secs(1));
 
