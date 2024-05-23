@@ -178,6 +178,9 @@ clippy.too_many_lines = "allow"
 clippy.unreadable_literal = "allow"
 clippy.wildcard_imports = "allow" # we use this sparingly
 
+# clippy::restriction lints that are set to allow (to note why we aren't using them)
+clippy.shadow_unrelated = "allow" # would use except for <https://github.com/rust-lang/rust-clippy/issues/10780>
+
 # clippy lints that are set to deny
 clippy.should_panic_without_expect = "deny"
 
