@@ -1,3 +1,5 @@
+#![allow(clippy::missing_inline_in_public_items)]
+
 use core::fmt;
 use core::marker::PhantomData;
 use core::time::Duration;

@@ -135,6 +135,7 @@ impl core::ops::Mul for Gridgid {
 }
 
 impl From<GridRotation> for Gridgid {
+    #[inline]
     fn from(value: GridRotation) -> Self {
         Self::from_rotation_about_origin(value)
     }

@@ -248,6 +248,7 @@ impl Face6 {
     /// To work with floating-point coordinates, use `.face_transform().to_matrix().to_free()`.
     #[must_use]
     #[rustfmt::skip]
+    #[allow(clippy::missing_inline_in_public_items)]
     pub const fn face_transform(self, scale: GridCoordinate) -> Gridgid {
         use GridRotation::*;
         match self {
@@ -553,6 +554,7 @@ impl TryFrom<GridVector> for Face7 {
     /// assert_eq!(Face7::try_from(v), Err(v));
     /// ```
     #[rustfmt::skip]
+    #[allow(clippy::missing_inline_in_public_items)] // unsure whether good
     fn try_from(value: GridVector) -> Result<Self, Self::Error> {
         use Face7::*;
         match value {
@@ -577,6 +579,7 @@ pub struct Faceless;
 
 #[cfg(feature = "rerun")]
 impl From<Face6> for re_types::view_coordinates::SignedAxis3 {
+    #[inline]
     fn from(face: Face6) -> Self {
         use re_types::view_coordinates::{Axis3, Sign, SignedAxis3};
         match face {
@@ -627,6 +630,7 @@ pub struct FaceMap<V> {
     pub pz: V,
 }
 
+#[allow(clippy::missing_inline_in_public_items)] // all methods are generic code
 impl<V> FaceMap<V> {
     /// Constructs a [`FaceMap`] by using the provided function to compute
     /// a value for each [`Face6`] enum variant.
@@ -751,6 +755,7 @@ impl<V> FaceMap<V> {
     ///     },
     /// );
     /// ```
+    #[inline]
     #[must_use]
     pub fn with(mut self, face: Face6, value: V) -> Self {
         self[face] = value;
@@ -804,6 +809,7 @@ impl<V: Copy> FaceMap<V> {
 
 impl<V> Index<Face6> for FaceMap<V> {
     type Output = V;
+    #[inline]
     fn index(&self, face: Face6) -> &V {
         match face {
             Face6::NX => &self.nx,
@@ -817,6 +823,7 @@ impl<V> Index<Face6> for FaceMap<V> {
 }
 
 impl<V> IndexMut<Face6> for FaceMap<V> {
+    #[inline]
     fn index_mut(&mut self, face: Face6) -> &mut V {
         match face {
             Face6::NX => &mut self.nx,
@@ -835,6 +842,7 @@ where
 {
     /// In addition to the usual formatting behaviors, [`FaceMap`] will detect whether
     /// elements are equal and avoid redundant printing.
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let FaceMap {
             nx,
@@ -900,6 +908,7 @@ impl CubeFace {
 }
 
 impl fmt::Debug for CubeFace {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             fmt,
@@ -920,6 +929,7 @@ impl Geometry for CubeFace {
         self
     }
 
+    #[allow(clippy::missing_inline_in_public_items)]
     fn wireframe_points<E>(&self, output: &mut E)
     where
         E: Extend<LineVertex>,

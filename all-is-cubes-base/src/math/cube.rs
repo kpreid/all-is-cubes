@@ -173,12 +173,14 @@ impl Cube {
 }
 
 impl fmt::Debug for Cube {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { x, y, z } = self;
         write!(f, "({x:+.3?}, {y:+.3?}, {z:+.3?})")
     }
 }
 impl manyfmt::Fmt<ConciseDebug> for Cube {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>, _: &ConciseDebug) -> fmt::Result {
         fmt::Debug::fmt(self, f)
     }

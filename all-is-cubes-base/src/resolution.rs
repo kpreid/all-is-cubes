@@ -63,11 +63,13 @@ impl Resolution {
 }
 
 impl fmt::Debug for Resolution {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         GridCoordinate::from(*self).fmt(f)
     }
 }
 impl fmt::Display for Resolution {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         GridCoordinate::from(*self).fmt(f)
     }
@@ -151,6 +153,7 @@ impl From<Resolution> for f64 {
 impl ops::Mul<Resolution> for Resolution {
     type Output = Option<Resolution>;
 
+    #[inline]
     fn mul(self, rhs: Resolution) -> Self::Output {
         // not the most efficient way to implement this, but straightforward
         Self::try_from(u32::from(self) * u32::from(rhs)).ok()
@@ -160,6 +163,7 @@ impl ops::Mul<Resolution> for Resolution {
 impl ops::Div<Resolution> for Resolution {
     type Output = Option<Resolution>;
 
+    #[inline]
     fn div(self, rhs: Resolution) -> Self::Output {
         // not the most efficient way to implement this, but straightforward
         Self::try_from(u32::from(self) / u32::from(rhs)).ok()
@@ -168,6 +172,7 @@ impl ops::Div<Resolution> for Resolution {
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for Resolution {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         u16::from(*self).serialize(serializer)
     }
@@ -175,6 +180,7 @@ impl serde::Serialize for Resolution {
 
 #[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for Resolution {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         u16::deserialize(deserializer)?
             .try_into()
@@ -192,6 +198,7 @@ crate::util::cfg_should_impl_error! {
 }
 
 impl<N: fmt::Display> fmt::Display for IntoResolutionError<N> {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

@@ -189,6 +189,7 @@ impl GridRotation {
     ///
     /// If it is not possible to leave `up` unaffected, returns [`None`]. (Trying two
     /// perpendicular `up` directions will always succeed.)
+    #[allow(clippy::missing_inline_in_public_items)]
     pub fn from_to(source: Face6, destination: Face6, up: Face6) -> Option<Self> {
         let perpendicular = source.cross(up);
         if source == destination {
@@ -323,6 +324,7 @@ impl GridRotation {
     /// ```
     //
     // TODO: add tests
+    #[inline]
     pub fn to_positive_octant_transform(self, size: GridCoordinate) -> Gridgid {
         fn offset(face: Face6, size: GridCoordinate) -> GridVector {
             if face.is_positive() {
@@ -340,6 +342,7 @@ impl GridRotation {
 
     /// Expresses this rotation as a matrix without any translation.
     // TODO: add tests
+    #[inline]
     pub fn to_rotation_matrix(self) -> GridMatrix {
         let basis = self.to_basis();
         GridMatrix {
@@ -488,6 +491,7 @@ impl GridRotation {
     ///    ],
     /// );
     /// ```
+    #[allow(clippy::missing_inline_in_public_items)]
     pub fn iterate(self) -> impl Iterator<Item = Self> {
         let mut item = Self::IDENTITY;
         core::iter::once(Self::IDENTITY).chain(core::iter::from_fn(move || {

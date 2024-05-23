@@ -1,3 +1,5 @@
+#![allow(clippy::missing_inline_in_public_items)]
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::math::{Aab, Cube, GridAab, GridCoordinate};

@@ -40,6 +40,7 @@ impl Aab {
     };
 
     /// Constructs an [`Aab`] from individual coordinates.
+    #[inline]
     #[track_caller]
     pub fn new(
         lx: FreeCoordinate,
@@ -55,6 +56,7 @@ impl Aab {
     /// Constructs an [`Aab`] from most-negative and most-positive corner points.
     ///
     /// Panics if the points are not in the proper order or if they are NaN.
+    #[inline]
     #[track_caller]
     pub fn from_lower_upper(
         lower_bounds: impl Into<FreePoint>,
@@ -95,21 +97,25 @@ impl Aab {
     }
 
     /// The most negative corner of the box, as a [`Point3D`].
+    #[inline]
     pub const fn lower_bounds_p(&self) -> FreePoint {
         self.lower_bounds
     }
 
     /// The most positive corner of the box, as a [`Point3D`].
+    #[inline]
     pub const fn upper_bounds_p(&self) -> FreePoint {
         self.upper_bounds
     }
 
     /// The most negative corner of the box, as a [`Vector3D`].
+    #[inline]
     pub fn lower_bounds_v(&self) -> FreeVector {
         self.lower_bounds.to_vector()
     }
 
     /// The most positive corner of the box, as a [`Vector3D`].
+    #[inline]
     pub fn upper_bounds_v(&self) -> FreeVector {
         self.upper_bounds.to_vector()
     }
@@ -119,6 +125,7 @@ impl Aab {
     ///
     /// Note that negative faces' coordinates _are_ inverted; that is, all results
     /// will be positive if the box contains its origin.
+    #[inline]
     pub fn face_coordinate(&self, face: Face6) -> FreeCoordinate {
         match face {
             Face6::NX => -self.lower_bounds.x,
@@ -132,6 +139,7 @@ impl Aab {
 
     /// Size of the box in each axis; equivalent to
     /// `self.upper_bounds() - self.lower_bounds()`.
+    #[inline]
     pub fn size(&self) -> Size3D<FreeCoordinate, Cube> {
         self.sizes
     }
@@ -145,6 +153,7 @@ impl Aab {
     /// let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
     /// assert_eq!(aab.center(), FreePoint::new(1.5, 3.5, 5.5));
     /// ```
+    #[inline]
     pub fn center(&self) -> FreePoint {
         self.lower_bounds + self.sizes / 2.0
     }
@@ -152,6 +161,7 @@ impl Aab {
     /// Iterates over the eight corner points of the box.
     /// The ordering is deterministic but not currently declared stable.
     #[doc(hidden)]
+    #[inline]
     pub fn corner_points(
         self,
     ) -> impl DoubleEndedIterator<Item = FreePoint> + ExactSizeIterator + FusedIterator {
@@ -169,6 +179,7 @@ impl Aab {
     /// Returns whether this AAB, including the boundary, contains the point.
     ///
     /// TODO: example + tests
+    #[inline]
     pub fn contains(&self, point: FreePoint) -> bool {
         // I tried changing this to an Iterator::all() and the asm was longer.
         // I tried changing this to be completely unrolled and it was more or less the same.
@@ -183,6 +194,7 @@ impl Aab {
     /// Returns whether this AAB, including the boundary, intersects the other AAB.
     ///
     /// TODO: example + tests
+    #[inline]
     pub fn intersects(&self, other: Aab) -> bool {
         for axis in Axis::ALL {
             let intersection_min = self.lower_bounds[axis].max(other.lower_bounds[axis]);
@@ -197,6 +209,7 @@ impl Aab {
 
     /// Returns a random point within this box, using inclusive ranges
     /// (`lower_bounds[axis] ≤ random_point()[axis] ≤ upper_bounds[axis]`).
+    #[allow(clippy::missing_inline_in_public_items)]
     pub fn random_point(self, rng: &mut impl rand::Rng) -> FreePoint {
         FreePoint::new(
             rng.gen_range(self.lower_bounds.x..=self.upper_bounds.x),
@@ -207,6 +220,7 @@ impl Aab {
 
     /// Scale this AAB by the given amount (about the zero point, not its center).
     #[must_use]
+    #[inline]
     pub fn scale(self, scalar: FreeCoordinate) -> Self {
         Self::from_lower_upper(self.lower_bounds * scalar, self.upper_bounds * scalar)
     }
@@ -227,10 +241,11 @@ impl Aab {
     /// );
     /// ````
     #[must_use]
+    #[inline]
     pub fn expand(self, distance: FreeCoordinate) -> Self {
         // We could imagine a non-uniform version of this, but the fully general one
         // looks a lot like generally constructing a new Aab.
-        let distance_vec = Vector3D::new(1.0, 1.0, 1.0) * distance;
+        let distance_vec = Vector3D::splat(distance);
         match Self::checked_from_lower_upper(
             self.lower_bounds - distance_vec,
             self.upper_bounds + distance_vec,
@@ -300,6 +315,7 @@ impl Aab {
     /// ```
     ///
     /// (There is no handling of NaN, because [`Aab`] does not allow NaN values.)
+    #[inline]
     pub fn round_up_to_grid(self) -> GridAab {
         GridAab::from_lower_upper(
             self.lower_bounds.map(|c| c.floor() as GridCoordinate),
@@ -309,6 +325,7 @@ impl Aab {
 }
 
 impl fmt::Debug for Aab {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Aab {
             lower_bounds: l,
@@ -326,10 +343,12 @@ impl fmt::Debug for Aab {
 impl Geometry for Aab {
     type Coord = FreeCoordinate;
 
+    #[inline]
     fn translate(self, offset: FreeVector) -> Self {
         Self::from_lower_upper(self.lower_bounds + offset, self.upper_bounds + offset)
     }
 
+    #[inline(never)]
     fn wireframe_points<E>(&self, output: &mut E)
     where
         E: Extend<LineVertex>,

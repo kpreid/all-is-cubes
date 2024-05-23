@@ -32,6 +32,7 @@ impl Axis {
     /// * Y = green
     /// * Z = blue
     #[mutants::skip]
+    #[inline]
     pub fn color(&self) -> Rgb {
         match self {
             Axis::X => Rgb::UNIFORM_LUMINANCE_RED,
@@ -41,6 +42,7 @@ impl Axis {
     }
 
     /// Returns the [`Face6`] value which corresponds to the positive direction on this axis.
+    #[inline]
     pub fn positive_face(&self) -> Face6 {
         match self {
             Axis::X => Face6::PX,
@@ -50,6 +52,7 @@ impl Axis {
     }
 
     /// Returns the [`Face6`] value which corresponds to the negative direction on this axis.
+    #[inline]
     pub fn negative_face(&self) -> Face6 {
         match self {
             Axis::X => Face6::NX,
@@ -89,6 +92,7 @@ impl Axis {
 
 /// Format the axis as one of the strings "x", "y", or "z" (lowercase).
 impl fmt::LowerHex for Axis {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Axis::X => "x",
@@ -99,6 +103,7 @@ impl fmt::LowerHex for Axis {
 }
 /// Format the axis as one of the strings "X", "Y", or "Z" (uppercase).
 impl fmt::UpperHex for Axis {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Axis::X => "X",
@@ -128,11 +133,13 @@ mod impl_index_axis {
     impl<T> ops::Index<Axis> for [T; 3] {
         type Output = T;
 
+        #[inline]
         fn index(&self, index: Axis) -> &Self::Output {
             &self[index as usize]
         }
     }
     impl<T> ops::IndexMut<Axis> for [T; 3] {
+        #[inline]
         fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
             &mut self[index as usize]
         }
@@ -143,6 +150,7 @@ mod impl_index_axis {
             impl<T, U> ops::Index<Axis> for $($type)*<T, U> {
                 type Output = T;
 
+                #[inline]
                 fn index(&self, index: Axis) -> &Self::Output {
                     match index {
                         Axis::X => &self.$x,
@@ -152,6 +160,7 @@ mod impl_index_axis {
                 }
             }
             impl<T, U> ops::IndexMut<Axis> for $($type)*<T, U> {
+                #[inline]
                 fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
                     match index {
                         Axis::X => &mut self.$x,

@@ -319,6 +319,7 @@ impl Rgba {
 
     /// Applies a function to the RGB portion of this color.
     #[must_use]
+    #[inline]
     pub fn map_rgb(self, f: impl FnOnce(Rgb) -> Rgb) -> Self {
         f(self.to_rgb()).with_alpha(self.alpha())
     }
@@ -499,6 +500,7 @@ impl Mul<f32> for Rgb {
 /// There is no corresponding `impl Sum for Rgba` because the alpha would
 /// not have a universally reasonable interpretation.
 impl Sum for Rgb {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         // Using Vector3 as the accumulator type avoids intermediate NaN checks.
         Rgb::try_from(iter.fold(Vector3D::<f32, Intensity>::zero(), |accum, rgb| {
@@ -508,6 +510,7 @@ impl Sum for Rgb {
 }
 
 impl fmt::Debug for Rgb {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             fmt,
@@ -519,6 +522,7 @@ impl fmt::Debug for Rgb {
     }
 }
 impl fmt::Debug for Rgba {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             fmt,
@@ -533,6 +537,7 @@ impl fmt::Debug for Rgba {
 
 #[cfg(feature = "arbitrary")]
 #[mutants::skip]
+#[allow(clippy::missing_inline_in_public_items)]
 impl<'a> arbitrary::Arbitrary<'a> for Rgb {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Rgb::new_nn(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?))
@@ -544,6 +549,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgb {
 }
 #[cfg(feature = "arbitrary")]
 #[mutants::skip]
+#[allow(clippy::missing_inline_in_public_items)]
 impl<'a> arbitrary::Arbitrary<'a> for Rgba {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Rgba::new_nn(
@@ -585,11 +591,13 @@ mod rerun {
     use re_types::datatypes;
 
     impl From<Rgb> for datatypes::Rgba32 {
+        #[inline]
         fn from(value: Rgb) -> Self {
             value.with_alpha_one().into()
         }
     }
     impl From<Rgba> for datatypes::Rgba32 {
+        #[inline]
         fn from(value: Rgba) -> Self {
             let [r, g, b, a] = value.to_srgb8();
             datatypes::Rgba32::from_unmultiplied_rgba(r, g, b, a)

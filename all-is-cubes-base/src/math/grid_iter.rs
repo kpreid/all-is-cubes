@@ -32,6 +32,7 @@ impl GridIter {
 
     /// Returns the bounds which this iterator iterates over.
     /// This may be larger than the union of produced cubes, but it will not be smaller.
+    #[inline]
     pub fn bounds(&self) -> GridAab {
         GridAab::from_ranges([
             self.x_range.clone(),
@@ -41,6 +42,7 @@ impl GridIter {
     }
 
     /// Returns whether the iterator will produce the given cube.
+    #[inline]
     pub fn contains_cube(&self, cube: Cube) -> bool {
         if !self.bounds().contains_cube(cube) {
             return false;
@@ -84,6 +86,7 @@ impl Iterator for GridIter {
         Some(result.into())
     }
 
+    #[allow(clippy::missing_inline_in_public_items)] // unclear benefit
     fn size_hint(&self) -> (usize, Option<usize>) {
         match usize::try_from((self.x_range.end - self.cube.x) - 1) {
             Err(_) => {
@@ -102,6 +105,7 @@ impl Iterator for GridIter {
     }
 
     // Override fold() to achieve greater performance via simpler iteration.
+    #[allow(clippy::missing_inline_in_public_items)] // is generic already
     fn fold<B, F>(mut self, init: B, mut f: F) -> B
     where
         F: FnMut(B, Self::Item) -> B,

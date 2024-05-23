@@ -23,10 +23,12 @@ where
 
 #[cfg(any(feature = "std", test))]
 impl Instant for std::time::Instant {
+    #[inline]
     fn now() -> Self {
         std::time::Instant::now()
     }
 
+    #[inline]
     fn saturating_duration_since(self, other: Self) -> Duration {
         std::time::Instant::saturating_duration_since(&self, other)
     }
@@ -42,10 +44,12 @@ impl Instant for std::time::Instant {
 pub struct NoTime;
 
 impl Instant for NoTime {
+    #[inline]
     fn now() -> Self {
         Self
     }
 
+    #[inline]
     fn saturating_duration_since(self, _: Self) -> Duration {
         Duration::ZERO
     }
@@ -53,12 +57,14 @@ impl Instant for NoTime {
 
 impl ops::Add<Duration> for NoTime {
     type Output = Self;
+    #[inline]
     fn add(self, _: Duration) -> Self::Output {
         NoTime
     }
 }
 impl ops::Sub<Duration> for NoTime {
     type Output = Self;
+    #[inline]
     fn sub(self, _: Duration) -> Self::Output {
         NoTime
     }
@@ -89,6 +95,7 @@ impl<I: Instant> Deadline<I> {
     ///
     /// (This does not return [`Duration::MAX`] since that would be likely to cause
     /// unintended arithmetic overflows.)
+    #[inline]
     pub fn remaining_since(&self, start: I) -> Option<Duration> {
         match self {
             Deadline::Asap => Some(Duration::ZERO),
@@ -100,6 +107,7 @@ impl<I: Instant> Deadline<I> {
 
 impl<I: Instant> ops::Add<Duration> for Deadline<I> {
     type Output = Self;
+    #[inline]
     fn add(self, rhs: Duration) -> Self::Output {
         match self {
             Deadline::Asap => Deadline::Asap,
@@ -110,6 +118,7 @@ impl<I: Instant> ops::Add<Duration> for Deadline<I> {
 }
 impl<I: Instant> ops::Sub<Duration> for Deadline<I> {
     type Output = Self;
+    #[inline]
     fn sub(self, rhs: Duration) -> Self::Output {
         match self {
             Deadline::Asap => Deadline::Asap,
@@ -122,12 +131,14 @@ impl<I: Instant> ops::Sub<Duration> for Deadline<I> {
 // Allow comparing `Deadline` and `Instant` without wrapping.
 impl<I: Instant> PartialEq<I> for Deadline<I> {
     #[mutants::skip] // trivial
+    #[inline]
     fn eq(&self, other: &I) -> bool {
         self.partial_cmp(other) == Some(Ordering::Equal)
     }
 }
 /// Note: The reverse `PartialOrd<Deadline<I>> for I` is not permitted by the orphan rules.
 impl<I: Instant> PartialOrd<I> for Deadline<I> {
+    #[inline]
     fn partial_cmp(&self, other: &I) -> Option<Ordering> {
         Some(match self {
             Deadline::Asap => Ordering::Less,
@@ -151,6 +162,7 @@ pub type DeadlineNt = Deadline<NoTime>;
 pub type DeadlineStd = Deadline<std::time::Instant>;
 
 impl<I: Instant> From<I> for Deadline<I> {
+    #[inline]
     fn from(value: I) -> Self {
         Self::At(value)
     }

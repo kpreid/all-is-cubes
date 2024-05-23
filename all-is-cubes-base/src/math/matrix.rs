@@ -197,6 +197,7 @@ impl GridMatrix {
     ///     }),
     /// );
     /// ```
+    #[allow(clippy::missing_inline_in_public_items)]
     pub fn decompose(self) -> Option<Gridgid> {
         Some(Gridgid {
             rotation: GridRotation::from_basis([
@@ -276,6 +277,7 @@ impl GridMatrix {
     /// );
     /// ```
     #[must_use]
+    #[inline]
     pub fn concat(&self, other: &Self) -> Self {
         GridMatrix {
             x: self.transform_vector(other.x),
@@ -288,6 +290,7 @@ impl GridMatrix {
     }
 
     /// Invert this matrix. Returns [`None`] if it is not invertible.
+    #[allow(clippy::missing_inline_in_public_items)]
     pub fn inverse_transform(&self) -> Option<Self> {
         // For now, implement this the expensive but simple way of borrowing float matrix ops.
 

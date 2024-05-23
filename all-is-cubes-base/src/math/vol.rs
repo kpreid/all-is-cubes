@@ -73,6 +73,7 @@ impl<O> Vol<(), O> {
     ///
     /// Returns a [`VolLengthError`] if the number of elements does not match
     /// [`bounds.volume()`](GridAab::volume).
+    #[allow(clippy::missing_inline_in_public_items)] // is generic already
     pub fn with_elements<C, V>(self, elements: C) -> Result<Vol<C, O>, VolLengthError>
     where
         C: Deref<Target = [V]>,
@@ -101,6 +102,7 @@ impl Vol<(), ZMaj> {
     /// Note that this is one of several `subdivide()` methods for different container types;
     /// it is also implemented for immutable and mutable references.
     /// These are intended to be useful in executing parallel algorithms on volume data.
+    #[allow(clippy::missing_inline_in_public_items)]
     pub fn subdivide(self) -> Option<(Self, Self)> {
         let (lower_half, upper_half, _) = find_zmaj_subdivision(self.bounds)?;
 
@@ -123,6 +125,7 @@ where
     /// [`bounds.volume()`](GridAab::volume).
     //---
     // TODO: Remove this in favor of with_elements()?
+    #[allow(clippy::missing_inline_in_public_items)] // is generic already
     pub fn from_elements(bounds: GridAab, elements: impl Into<C>) -> Result<Self, VolLengthError> {
         let elements = elements.into();
         if Some(elements.len()) == bounds.volume() {
@@ -143,6 +146,7 @@ where
 /// Constructors from elements.
 //---
 // TODO: This should be `O: Ordering` instead of `ZMaj` once we have alternative orderings
+#[allow(clippy::missing_inline_in_public_items)] // is generic already
 impl<C, V> Vol<C, ZMaj>
 where
     // Note that the Deref bound is necessary to give this a unique `V`.
@@ -224,6 +228,7 @@ impl<C, O> Vol<C, O> {
     }
 
     /// Returns the volume, also known as the number of elements.
+    #[inline]
     pub fn volume(&self) -> usize {
         // Ideally, we could specialize on C and return self.contents.len() if possible,
         // as it doesn't require doing any multiplications, but that's not currently possible
@@ -235,6 +240,7 @@ impl<C, O> Vol<C, O> {
     }
 
     /// Extracts the linear contents, discarding the bounds and ordering.
+    #[inline]
     pub fn into_elements(self) -> C {
         self.contents
     }
@@ -242,6 +248,7 @@ impl<C, O> Vol<C, O> {
     /// Returns a `Vol` with the same bounds and ordering but no data.
     ///
     /// This is the inverse operation to [`Vol::with_elements()`].
+    #[inline]
     pub fn without_elements(&self) -> Vol<(), O>
     where
         O: Clone,
@@ -260,11 +267,13 @@ impl<C, O> Vol<C, O> {
     /// TODO: example
     #[must_use]
     #[track_caller]
+    #[inline]
     pub fn translate(self, offset: impl Into<GridVector>) -> Self {
         self.translate_impl(offset.into())
     }
 
     #[track_caller]
+    #[inline]
     fn translate_impl(mut self, offset: GridVector) -> Self {
         let new_bounds = self.bounds.translate(offset);
         if new_bounds.size() != self.bounds.size() {
@@ -278,6 +287,7 @@ impl<C, O> Vol<C, O> {
 
     // TODO: reconcile this with from_elements() — should only be implemented once.
     #[doc(hidden)] // TODO: good public api?
+    #[inline]
     pub fn map_container<C2, V2, F>(self, f: F) -> Vol<C2, O>
     where
         F: FnOnce(C) -> C2,
@@ -306,6 +316,7 @@ impl<C, O> Vol<C, O> {
 impl<C> Vol<C, ZMaj> {
     /// Iterate over all cubes that this contains, in the order of the linearization,
     /// without including the stored data (if there is any).
+    #[inline]
     pub fn iter_cubes(&self) -> GridIter {
         GridIter::new(self.bounds)
     }
@@ -373,6 +384,7 @@ impl<C> Vol<C, ZMaj> {
 }
 
 /// Linear data access.
+#[allow(clippy::missing_inline_in_public_items)] // is generic already
 impl<C, O, V> Vol<C, O>
 where
     C: Deref<Target = [V]>,
@@ -426,6 +438,7 @@ impl<'a, V> Vol<&'a [V], ZMaj> {
     /// Note that this is one of several `subdivide()` methods for different container types;
     /// it is also implemented for mutable references and `()`.
     /// These are intended to be useful in executing parallel algorithms on volume data.
+    #[allow(clippy::missing_inline_in_public_items)]
     pub fn subdivide(self) -> Option<(Self, Self)> {
         let (lower_half, upper_half, lower_half_len) = find_zmaj_subdivision(self.bounds)?;
         let (lower_contents, upper_contents) = self.contents.split_at(lower_half_len);
@@ -446,6 +459,7 @@ impl<'a, V> Vol<&'a mut [V], ZMaj> {
     /// Note that this is one of several `subdivide()` methods for different container types;
     /// it is also implemented for immutable references and `()`.
     /// These are intended to be useful in executing parallel algorithms on volume data.
+    #[allow(clippy::missing_inline_in_public_items)]
     pub fn subdivide(self) -> Option<(Self, Self)> {
         let (lower_half, upper_half, lower_half_len) = find_zmaj_subdivision(self.bounds)?;
         let (lower_contents, upper_contents) = self.contents.split_at_mut(lower_half_len);
@@ -460,6 +474,7 @@ impl<'a, V> Vol<&'a mut [V], ZMaj> {
 impl<V: Clone, O> Vol<Arc<[V]>, O> {
     /// Returns the linear contents viewed as a mutable slice, as if by [`Arc::make_mut()`].
     #[doc(hidden)] // TODO: good public API?
+    #[allow(clippy::missing_inline_in_public_items)]
     pub fn make_linear_mut(&mut self) -> &mut [V] {
         let slice: &mut [V] = crate::util::arc_make_mut_slice(&mut self.contents);
         debug_assert_eq!(slice.len(), self.bounds.volume().unwrap());
@@ -468,6 +483,7 @@ impl<V: Clone, O> Vol<Arc<[V]>, O> {
 }
 
 /// Element lookup operations by 3D coordinates.
+#[allow(clippy::missing_inline_in_public_items)] // is generic already
 impl<C, V> Vol<C, ZMaj>
 where
     C: Deref<Target = [V]>,
@@ -511,6 +527,7 @@ where
     }
 }
 
+#[allow(clippy::missing_inline_in_public_items)] // is generic already
 impl<V, O> Vol<Box<[V]>, O> {
     /// Apply `f` to each element and collect the results into the same shape and ordering.
     pub fn map<T, F>(self, f: F) -> Vol<Box<[T]>, O>
@@ -525,6 +542,7 @@ impl<V, O> Vol<Box<[V]>, O> {
     }
 }
 
+#[allow(clippy::missing_inline_in_public_items)] // is generic already
 impl<C: fmt::Debug, O: fmt::Debug> fmt::Debug for Vol<C, O> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Note: If specialization was available we'd like to use it to print the elements under
@@ -621,6 +639,7 @@ mod aab_compat {
 }
 
 #[cfg(feature = "arbitrary")]
+#[allow(clippy::missing_inline_in_public_items)]
 pub(crate) mod vol_arb {
     use super::*;
     use arbitrary::Arbitrary;
@@ -721,6 +740,7 @@ crate::util::cfg_should_impl_error! {
 }
 
 impl fmt::Display for VolLengthError {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             input_length,

@@ -184,6 +184,7 @@ pub struct LineVertex {
 }
 
 impl From<FreePoint> for LineVertex {
+    #[inline]
     fn from(position: FreePoint) -> Self {
         Self {
             position,

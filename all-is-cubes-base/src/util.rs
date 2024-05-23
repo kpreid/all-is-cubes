@@ -41,6 +41,7 @@ pub trait Executor: fmt::Debug + Send + Sync {
     // If Rust ever gets object-safe async fn in trait without boxing, use it here.
     fn yield_now(&self) -> SyncBoxFuture<'static, ()>;
 }
+#[allow(clippy::missing_inline_in_public_items)]
 impl<T: ?Sized + Executor> Executor for &T {
     fn spawn_background(&self, task_factory: &mut dyn FnMut() -> SyncBoxFuture<'static, ()>) {
         (**self).spawn_background(task_factory)
@@ -49,6 +50,7 @@ impl<T: ?Sized + Executor> Executor for &T {
         (**self).yield_now()
     }
 }
+#[allow(clippy::missing_inline_in_public_items)]
 impl<T: ?Sized + Executor> Executor for Arc<T> {
     fn spawn_background(&self, task_factory: &mut dyn FnMut() -> SyncBoxFuture<'static, ()>) {
         (**self).spawn_background(task_factory)
@@ -58,6 +60,7 @@ impl<T: ?Sized + Executor> Executor for Arc<T> {
     }
 }
 /// No-op executor for applications which cannot provide one.
+#[allow(clippy::missing_inline_in_public_items)]
 impl Executor for () {
     fn spawn_background(&self, _: &mut dyn FnMut() -> SyncBoxFuture<'static, ()>) {}
     fn yield_now(&self) -> futures_util::future::BoxFuture<'static, ()> {
@@ -89,6 +92,7 @@ mod error_chain {
     pub struct ErrorChain<'a>(pub &'a (dyn Error + 'a));
 
     impl fmt::Display for ErrorChain<'_> {
+        #[allow(clippy::missing_inline_in_public_items)]
         fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
             format_error_chain(fmt, self.0)
         }
@@ -180,6 +184,7 @@ where
     T: Extend<B>,
     F: Fn(A) -> B,
 {
+    #[inline]
     pub fn new(target: &'a mut T, function: F) -> Self {
         Self {
             target,
@@ -194,6 +199,7 @@ where
     T: Extend<B>,
     F: Fn(A) -> B,
 {
+    #[inline]
     fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = A>,
@@ -204,6 +210,7 @@ where
 
 /// As [`Arc::make_mut()`], but for slices, `Arc<[_]>`.
 #[doc(hidden)] // internal helper function
+#[inline]
 pub fn arc_make_mut_slice<T: Clone>(mut arc: &mut Arc<[T]>) -> &mut [T] {
     // Use `get_mut()` to emulate `make_mut()`.
     // And since this is a "maybe return a mutable borrow" pattern, we have to appease
@@ -238,6 +245,7 @@ impl TimeStats {
     /// Constructs a [`TimeStats`] for a single event.
     ///
     /// Multiple of these may then be aggregated using the `+=` operator.
+    #[inline]
     pub const fn one(duration: Duration) -> Self {
         Self {
             count: 1,
@@ -252,6 +260,7 @@ impl TimeStats {
     ///
     /// Returns the duration that was recorded.
     #[doc(hidden)] // for now, not making writing conveniences public
+    #[inline]
     pub fn record_consecutive_interval<I: crate::time::Instant>(
         &mut self,
         last_marked_instant: &mut I,
@@ -267,6 +276,7 @@ impl TimeStats {
 }
 
 impl AddAssign for TimeStats {
+    #[inline]
     fn add_assign(&mut self, rhs: Self) {
         *self = TimeStats {
             count: self.count + rhs.count,
@@ -278,6 +288,8 @@ impl AddAssign for TimeStats {
 }
 
 impl fmt::Display for TimeStats {
+    #[allow(clippy::missing_inline_in_public_items)]
+
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.min {
             None => write!(
@@ -300,6 +312,7 @@ impl fmt::Display for TimeStats {
 }
 
 #[doc(hidden)] // for use in internal tests only
+#[allow(clippy::missing_inline_in_public_items)]
 pub fn assert_send_sync<T: Send + Sync>() {
     // We don't need to do anything in this function; the call to it having been successfully
     // compiled is the assertion.
@@ -308,6 +321,7 @@ pub fn assert_send_sync<T: Send + Sync>() {
 // Assert `Send + Sync` only if the `std` feature is active.
 #[cfg(feature = "std")]
 #[doc(hidden)] // for use in internal tests only
+#[allow(clippy::missing_inline_in_public_items)]
 pub fn assert_conditional_send_sync<T: Send + Sync>() {}
 #[cfg(not(feature = "std"))]
 #[doc(hidden)] // for use in internal tests only

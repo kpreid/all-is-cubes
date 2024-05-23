@@ -51,6 +51,7 @@ impl Ray {
     ///     }
     /// );
     /// ```
+    #[allow(clippy::missing_inline_in_public_items)] // is generic already
     pub fn new(origin: impl Into<FreePoint>, direction: impl Into<FreeVector>) -> Self {
         Self {
             origin: origin.into(),
@@ -60,12 +61,14 @@ impl Ray {
 
     /// Prepares a [`Raycaster`] that will iterate over cubes intersected by this ray.
     #[must_use]
+    #[allow(clippy::missing_inline_in_public_items)]
     pub fn cast(&self) -> Raycaster {
         Raycaster::new(self.origin, self.direction)
     }
 
     /// Scale the ray's coordinates by the given factor.
     #[must_use]
+    #[inline]
     pub fn scale_all(self, scale: FreeCoordinate) -> Self {
         Self {
             origin: self.origin * scale,
@@ -75,6 +78,7 @@ impl Ray {
 
     /// Scale the ray's direction vector by the given factor.
     #[must_use]
+    #[inline]
     pub fn scale_direction(self, scale: FreeCoordinate) -> Self {
         Self {
             origin: self.origin,
@@ -87,6 +91,7 @@ impl Ray {
     /// This only makes sense in contexts which are specifically using the length of the
     /// direction vector as a distance, or for visualization as a line segment.
     #[must_use]
+    #[inline]
     pub fn unit_endpoint(self) -> FreePoint {
         self.origin + self.direction
     }
@@ -110,6 +115,7 @@ impl Geometry for Ray {
         }
     }
 
+    #[allow(clippy::missing_inline_in_public_items)]
     fn wireframe_points<E>(&self, output: &mut E)
     where
         E: Extend<LineVertex>,
@@ -247,6 +253,7 @@ impl Raycaster {
     /// assert_eq!(next().cube_ahead(), Cube::new(2, 1, 0));
     /// ```
     #[must_use]
+    #[allow(clippy::missing_inline_in_public_items)] // is generic already
     pub fn new(origin: impl Into<FreePoint>, direction: impl Into<FreeVector>) -> Self {
         Self::new_impl(origin.into(), direction.into())
     }
@@ -314,6 +321,7 @@ impl Raycaster {
     /// forevermore once there are no more cubes intersecting the bounds to report.
     #[must_use]
     #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
+    #[inline]
     pub fn within(mut self, bounds: GridAab) -> Self {
         self.set_bounds(bounds);
         self
@@ -323,6 +331,7 @@ impl Raycaster {
     ///
     /// TODO: This function was added for the needs of the raytracer. Think about API design more.
     #[doc(hidden)]
+    #[allow(clippy::missing_inline_in_public_items)]
     pub fn set_bounds(&mut self, bounds: GridAab) {
         if self.bounds.is_none() {
             self.bounds = Some(Vector3D::new(
@@ -344,6 +353,7 @@ impl Raycaster {
     ///
     /// TODO: This function was added for the needs of the raytracer. Think about API design more.
     #[doc(hidden)]
+    #[inline]
     pub fn remove_bound(&mut self) {
         self.bounds = None;
     }
@@ -678,6 +688,7 @@ impl RaycastStep {
     /// assert_eq!(next(), point3(1.0, 0.5, 0.5));
     /// assert_eq!(next(), point3(2.0, 0.5, 0.5));
     /// ```
+    #[allow(clippy::missing_inline_in_public_items)]
     pub fn intersection_point(&self, ray: Ray) -> FreePoint {
         let current_face_axis = self.cube_face.face.axis();
         if current_face_axis.is_none() {
@@ -731,6 +742,7 @@ fn signum_101(x: FreeCoordinate) -> GridCoordinate {
 /// it means that the less-than comparisons in the raycast algorithm will never pick
 /// the corresponding axis. If any input is NaN, returns NaN.
 #[doc(hidden)] // public for GPU implementation comparison tests
+#[inline]
 pub fn scale_to_integer_step(mut s: FreeCoordinate, mut ds: FreeCoordinate) -> FreeCoordinate {
     if ds == 0.0 && !s.is_nan() {
         // Explicitly handle zero case.

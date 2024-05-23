@@ -48,9 +48,12 @@ macro_rules! impl_vector_ops {
             type Elem = T;
             type Output = $vec<O, U>;
 
+            #[inline]
             fn map<F: FnMut(Self::Elem) -> O>(self, mut f: F) -> Self::Output {
                 $vec::new($(f(self.$field),)*)
             }
+
+            #[inline]
             fn zip<F: FnMut(Self::Elem, Self::Elem) -> O>(
                 self,
                 rhs: Self,
@@ -68,6 +71,7 @@ mod impl_euclid {
 }
 
 /// Calculate area and convert to `usize`, which is a common operation for image data lengths.
+#[inline]
 #[doc(hidden)]
 pub fn area_usize<T: TryInto<usize>, U>(size: Size2D<T, U>) -> Option<usize> {
     let width = size.width.try_into().ok()?;

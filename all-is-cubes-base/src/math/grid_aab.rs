@@ -65,6 +65,7 @@ impl GridAab {
     /// Panics if the sizes are negative or the resulting range would cause
     /// numeric overflow. Use [`GridAab::checked_from_lower_size`] to avoid panics.
     #[track_caller]
+    #[allow(clippy::missing_inline_in_public_items)] // is generic already
     pub fn from_lower_size(lower_bounds: impl Into<GridPoint>, sizes: impl Into<GridSize>) -> Self {
         Self::checked_from_lower_size(lower_bounds.into(), sizes.into())
             .expect("GridAab::from_lower_size")
@@ -79,6 +80,7 @@ impl GridAab {
     ///
     /// Returns [`Err`] if the sizes are negative or the resulting range would cause
     /// numeric overflow.
+    #[allow(clippy::missing_inline_in_public_items)] // is generic already
     pub fn checked_from_lower_size(
         lower_bounds: impl Into<GridPoint>,
         sizes: impl Into<GridSize>,
@@ -116,6 +118,7 @@ impl GridAab {
     ///
     /// Panics if the `upper_bounds` are less than the `lower_bounds`.
     #[track_caller]
+    #[allow(clippy::missing_inline_in_public_items)] // is generic already
     pub fn from_lower_upper(
         lower_bounds: impl Into<GridPoint>,
         upper_bounds: impl Into<GridPoint>,
@@ -127,6 +130,7 @@ impl GridAab {
     /// Constructs a [`GridAab`] from [`Range`]s.
     ///
     /// This is identical to [`GridAab::from_lower_upper()`] except for the input type.
+    #[allow(clippy::missing_inline_in_public_items)] // is generic already
     #[track_caller]
     pub fn from_ranges(ranges: impl Into<Vector3D<Range<GridCoordinate>, Cube>>) -> GridAab {
         let ranges = ranges.into();
@@ -140,6 +144,7 @@ impl GridAab {
     ///
     /// Returns [`Err`] if the `upper_bounds` are less than the `lower_bounds`.
     #[track_caller]
+    #[allow(clippy::missing_inline_in_public_items)] // is generic already
     pub fn checked_from_lower_upper(
         lower_bounds: impl Into<GridPoint>,
         upper_bounds: impl Into<GridPoint>,
@@ -366,6 +371,7 @@ impl GridAab {
     /// assert!(!b46.contains_box(GridAab::from_lower_size([4, 4, 4], [7, 6, 6])));
     /// assert!(!GridAab::from_lower_size((0, 0, 0), (6, 6, 6)).contains_box(b46));
     /// ```
+    #[inline]
     pub fn contains_box(&self, other: GridAab) -> bool {
         let self_upper = self.upper_bounds();
         let other_upper = other.upper_bounds();
@@ -540,6 +546,7 @@ impl GridAab {
     }
 
     #[doc(hidden)] // TODO: good public API?
+    #[inline]
     pub fn minkowski_sum(self, other: GridAab) -> Result<GridAab, GridOverflowError> {
         // TODO: needs checked sums
         Self::checked_from_lower_size(
@@ -565,6 +572,7 @@ impl GridAab {
     /// let empty = GridAab::from_lower_size([1, 2, 3], [0, 9, 9]);
     /// assert_eq!(empty.random_cube(rng), None);
     /// ```
+    #[allow(clippy::missing_inline_in_public_items)]
     pub fn random_cube(&self, rng: &mut impl rand::Rng) -> Option<Cube> {
         if self.is_empty() {
             None
@@ -612,6 +620,7 @@ impl GridAab {
     /// );
     /// ```
     #[must_use]
+    #[allow(clippy::missing_inline_in_public_items)] // already generic
     pub fn translate(&self, offset: impl Into<GridVector>) -> Self {
         fn inner(this: &GridAab, offset: GridVector) -> GridAab {
             let offset = offset.to_point();
@@ -634,6 +643,7 @@ impl GridAab {
     /// TODO: Fail nicely on numeric overflow.
     /// The `Option` return is not currently used.
     #[must_use]
+    #[inline]
     pub fn transform(self, transform: Gridgid) -> Option<Self> {
         let mut p1 = transform.transform_point(self.lower_bounds());
         let mut p2 = transform.transform_point(self.upper_bounds());
@@ -815,6 +825,7 @@ impl GridAab {
 }
 
 impl fmt::Debug for GridAab {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("GridAab")
             .field(&RangeWithLength(self.x_range()))
@@ -829,6 +840,7 @@ impl From<GridAab> for Aab {
     ///
     /// This conversion is also available as [`GridAab::to_free()`],
     /// which may be more convenient in a method chain.
+    #[inline]
     fn from(value: GridAab) -> Self {
         value.to_free()
     }
@@ -837,10 +849,12 @@ impl From<GridAab> for Aab {
 #[cfg(feature = "arbitrary")]
 #[mutants::skip]
 impl<'a> arbitrary::Arbitrary<'a> for GridAab {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Vol::<()>::arbitrary_with_max_volume(u, usize::MAX)?.bounds())
     }
 
+    #[allow(clippy::missing_inline_in_public_items)]
     fn size_hint(_depth: usize) -> (usize, Option<usize>) {
         crate::math::vol::vol_arb::ARBITRARY_BOUNDS_SIZE_HINT
     }
@@ -855,6 +869,7 @@ pub struct GridOverflowError(String);
 /// `Debug`-formatting helper
 struct RangeWithLength(Range<GridCoordinate>);
 impl fmt::Debug for RangeWithLength {
+    #[allow(clippy::missing_inline_in_public_items)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let range = &self.0;
         if f.alternate() {
