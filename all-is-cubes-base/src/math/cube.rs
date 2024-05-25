@@ -149,6 +149,7 @@ impl Cube {
 
     /// Componentwise [`GridCoordinate::checked_add()`].
     #[must_use]
+    #[inline]
     pub fn checked_add(self, v: GridVector) -> Option<Self> {
         Some(Self {
             x: self.x.checked_add(v.x)?,
@@ -161,6 +162,7 @@ impl Cube {
     ///
     /// If a different return type is desired, use `.lower_bounds().map(f)` instead.
     #[allow(clippy::return_self_not_must_use)]
+    #[inline]
     pub fn map(self, mut f: impl FnMut(GridCoordinate) -> GridCoordinate) -> Self {
         Self {
             x: f(self.x),

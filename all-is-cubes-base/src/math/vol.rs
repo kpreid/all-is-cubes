@@ -153,6 +153,7 @@ where
     ///
     /// Panics if `bounds` has a volume exceeding `usize::MAX`.
     /// (But there will likely be a memory allocation failure well below that point.)
+    #[inline]
     pub fn from_fn<F>(bounds: GridAab, f: F) -> Self
     where
         F: FnMut(Cube) -> V,
@@ -167,6 +168,7 @@ where
     ///
     /// TODO: This feels like it should be called 'filled' or 'cloned', but if so,
     /// maybe [`FaceMap::repeat`](crate::math::FaceMap::repeat) should also change?
+    #[inline]
     pub fn repeat(bounds: GridAab, value: V) -> Self
     where
         V: Clone,
@@ -179,6 +181,7 @@ where
     /// If the single element should be at a different location, you can call
     /// [`.translate(offset)`](Self::translate), or use [`Vol::from_elements()`]
     /// instead.
+    #[inline]
     pub fn from_element(value: V) -> Self {
         Self::from_elements(GridAab::ORIGIN_CUBE, core::iter::once(value).collect::<C>()).unwrap()
     }

@@ -190,6 +190,7 @@ impl GridAab {
     /// ```
     //---
     // TODO: add doctest example of failure
+    #[inline]
     pub fn volume(&self) -> Option<usize> {
         let sizes = self.sizes;
         let mut volume: usize = 1;
@@ -201,6 +202,7 @@ impl GridAab {
 
     /// Computes the approximate volume of this box in cubes, i.e. the product of all sizes
     /// converted to [`f64`].
+    #[inline]
     pub fn volume_f64(&self) -> f64 {
         self.size().to_f64().volume()
     }
@@ -209,6 +211,7 @@ impl GridAab {
     ///
     /// Returns `f64` to avoid needing overflow considerations, and because all internal uses
     /// want float anyway.
+    #[inline]
     pub fn surface_area_f64(&self) -> f64 {
         let size = self.sizes.to_f64();
         size.width * size.height * 2. + size.width * size.depth * 2. + size.height * size.depth * 2.
