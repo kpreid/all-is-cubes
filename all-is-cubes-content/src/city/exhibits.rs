@@ -31,6 +31,7 @@ use all_is_cubes::math::{
     rgb_const, rgba_const, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate,
     GridPoint, GridRotation, GridVector, Gridgid, NotNan, Rgb, Rgba,
 };
+use all_is_cubes::op::Operation;
 use all_is_cubes::space::{SetCubeError, Space, SpaceBuilder, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::{color_block, include_image};
@@ -1501,6 +1502,7 @@ fn DESTRUCTION(ctx: Context<'_>) {
         txn: &mut ExhibitTransaction,
         resolution: Resolution,
         fraction: f64,
+        next_mask: Option<Block>,
     ) -> Result<Block, InGenError> {
         let solid = color_block!(Rgba::WHITE);
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3887829);
@@ -1519,12 +1521,20 @@ fn DESTRUCTION(ctx: Context<'_>) {
 
         Ok(Block::builder()
             .voxels_fn(resolution, pattern)?
+            .activation_action(next_mask.map(Operation::Become))
             .build_txn(txn))
     }
 
+    let mut next_mask = None;
     for stage in 0i32..width {
-        let mask =
-            generate_destruction_mask(&mut txn, R16, (f64::from(stage) + 0.5) / f64::from(width))?;
+        let mask = generate_destruction_mask(
+            &mut txn,
+            R16,
+            (f64::from(stage) + 0.5) / f64::from(width),
+            next_mask,
+        )?;
+        next_mask = Some(mask.clone());
+
         let destroyed = block_to_destroy
             .clone()
             .with_modifier(Composite::new(mask, CompositeOperator::In).reversed());
