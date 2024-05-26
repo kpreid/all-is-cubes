@@ -615,6 +615,9 @@ mod op {
                 op::Operation::Become(block) => schema::OperationSer::BecomeV1 {
                     block: block.clone(),
                 },
+                op::Operation::DestroyTo(block) => schema::OperationSer::DestroyToV1 {
+                    block: block.clone(),
+                },
                 op::Operation::Paint(brush) => schema::OperationSer::PaintV1 {
                     blocks: brush.entries_for_serialization(),
                 },
@@ -639,6 +642,7 @@ mod op {
         {
             Ok(match schema::OperationSer::deserialize(deserializer)? {
                 schema::OperationSer::BecomeV1 { block } => op::Operation::Become(block),
+                schema::OperationSer::DestroyToV1 { block } => op::Operation::DestroyTo(block),
                 schema::OperationSer::PaintV1 { blocks } => {
                     op::Operation::Paint(VoxelBrush::new(blocks))
                 }

@@ -22,6 +22,9 @@
     - `math::GridSize` type alias for `euclid::Size3D<GridCoordinate, Cube>`.
     - `math::Vol::subdivide()` splits a `Vol`'s bounds and data into parts that can be processed in parallel.
 
+    - `op::Operation::Neighbors` allows an operation to modify nearby blocks.
+    - `op::Operation::DestroyTo` allows an operation to express replacing a block when the replacement is less important than `Operation::Become`.
+
     - `transaction::Transactional::transact()` provides a convenient way to create and immediately execute transactions.
 
 - `all-is-cubes-mesh` library:

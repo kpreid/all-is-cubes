@@ -519,6 +519,20 @@ fn operation_become() {
 }
 
 #[test]
+fn operation_destroy_to() {
+    assert_round_trip_value(
+        &op::Operation::DestroyTo(AIR),
+        json!({
+            "type": "DestroyToV1",
+            "block": {
+                "type": "BlockV1",
+                "primitive": {"type": "AirV1"},
+            }
+        }),
+    );
+}
+
+#[test]
 fn operation_paint() {
     assert_round_trip_value(
         &op::Operation::Paint(VoxelBrush::new([([0, 0, 0], AIR)])),

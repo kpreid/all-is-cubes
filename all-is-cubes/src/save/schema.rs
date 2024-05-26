@@ -338,6 +338,9 @@ pub(crate) enum OperationSer<'a> {
     BecomeV1 {
         block: Block,
     },
+    DestroyToV1 {
+        block: Block,
+    },
     PaintV1 {
         blocks: Vec<([i32; 3], Block)>,
     },

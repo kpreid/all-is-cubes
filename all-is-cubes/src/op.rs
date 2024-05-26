@@ -37,7 +37,22 @@ pub enum Operation {
     /// becoming another block”, meaning that circumstances which modify the block the operation
     /// applies to may also modify the operation's block in the same way. For example, a rotated
     /// block with a tick action will `Become` a rotated block.
+    ///
+    /// This produces a conservative transaction; that is, it will fail if any other change
+    /// is made to the same cube, including performing the same replacement.
     Become(Block),
+
+    /// Replace the cube's block with the given block, regardless of what it is.
+    ///
+    /// This is intended to be used for situations where the current block is being destroyed or
+    /// removed, and the replacement is less important.
+    ///
+    /// This produces a non-conservative transaction; that is, it will still succeed if another
+    /// simultaneous effect also wishes to replace this block. However, replacements with
+    /// non-identical blocks will still fail (for now).
+    ///
+    /// TODO: Better name
+    DestroyTo(Block),
 
     /// Apply the brush centered on the cube.
     Paint(VoxelBrush<'static>),
@@ -82,6 +97,17 @@ impl Operation {
 
                 Ok((space_txn, InventoryTransaction::default()))
             }
+            Operation::DestroyTo(block) => {
+                let target_cube = transform.transform_cube(Cube::ORIGIN);
+                let space_txn = CubeTransaction::replacing(
+                    Some(space[target_cube].clone()),
+                    Some(block.clone().rotate(transform.rotation)),
+                )
+                .at(target_cube)
+                .nonconserved();
+
+                Ok((space_txn, InventoryTransaction::default()))
+            }
             Operation::Paint(brush) => {
                 // TODO: avoid clone
                 let space_txn = brush
@@ -109,8 +135,9 @@ impl Operation {
 
     pub(crate) fn rotationally_symmetric(&self) -> bool {
         match self {
-            // TODO: need to ask if blocks are relevantly symmetric
+            // TODO: should ask if blocks are relevantly symmetric
             Operation::Become(_) => false,
+            Operation::DestroyTo(_) => false,
             Operation::Paint(_) => false,
             Operation::Neighbors(_) => false,
         }
@@ -123,6 +150,7 @@ impl Operation {
         match self {
             // TODO: need to provide a way for blocks to opt out
             Operation::Become(block) => Operation::Become(block.rotate(rotation)),
+            Operation::DestroyTo(block) => Operation::DestroyTo(block.rotate(rotation)),
             Operation::Paint(brush) => Operation::Paint(brush.rotate(rotation)),
             Operation::Neighbors(mut neighbors) => {
                 // TODO: cheaper placeholder value, like an Operation::Nop
@@ -144,7 +172,7 @@ impl Operation {
 impl VisitHandles for Operation {
     fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
         match self {
-            Operation::Become(block) => block.visit_handles(visitor),
+            Operation::Become(block) | Operation::DestroyTo(block) => block.visit_handles(visitor),
             Operation::Paint(brush) => brush.visit_handles(visitor),
             Operation::Neighbors(neighbors) => {
                 for (_, op) in neighbors.iter() {
@@ -185,6 +213,40 @@ mod tests {
         let [atom] = make_some_blocks();
         let op = Operation::Become(atom);
         assert_eq!(op.clone(), op.rotate(GridRotation::CLOCKWISE));
+    }
+
+    #[test]
+    fn become_txn() {
+        let [block] = make_some_blocks();
+        let space = Space::empty_positive(2, 2, 2);
+
+        let op = Operation::Become(block.clone());
+
+        assert_eq!(
+            op.apply(&space, None, Gridgid::IDENTITY).unwrap(),
+            (
+                CubeTransaction::replacing(Some(AIR), Some(block)).at(Cube::ORIGIN),
+                InventoryTransaction::default()
+            )
+        );
+    }
+
+    #[test]
+    fn destroy_to_txn() {
+        let [block] = make_some_blocks();
+        let space = Space::empty_positive(2, 2, 2);
+
+        let op = Operation::DestroyTo(block.clone());
+
+        assert_eq!(
+            op.apply(&space, None, Gridgid::IDENTITY).unwrap(),
+            (
+                CubeTransaction::replacing(Some(AIR), Some(block))
+                    .at(Cube::ORIGIN)
+                    .nonconserved(),
+                InventoryTransaction::default()
+            )
+        );
     }
 
     #[test]
