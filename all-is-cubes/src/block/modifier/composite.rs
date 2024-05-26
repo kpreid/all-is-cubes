@@ -446,10 +446,8 @@ pub(in crate::block) fn render_inventory(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::EvaluatedBlock;
-    use crate::block::Resolution::*;
-    use crate::content::make_slab;
-    use crate::content::make_some_blocks;
+    use crate::block::{EvaluatedBlock, Resolution::*};
+    use crate::content::{make_slab, make_some_blocks};
     use crate::math::Rgba;
     use crate::space::Space;
     use crate::universe::Universe;
@@ -457,7 +455,7 @@ mod tests {
     use BlockCollision::{Hard, None as CNone};
     use CompositeOperator::{Atop, In, Over};
 
-    // --- Helpers
+    // --- Helpers ---
 
     /// Check the result of applying an operator to a single `Evoxel`
     #[track_caller]
@@ -571,218 +569,233 @@ mod tests {
         );
     }
 
-    #[test]
-    fn blend_over_silly_floats() {
-        // We just want to see this does not panic on NaN.
-        Over.blend_evoxel(
-            evcolor(Rgba::new(2e25, 2e25, 2e25, 2e25)),
-            evcolor(Rgba::new(2e25, 2e25, 2e25, 2e25)),
-        );
+    /// Test each operator’s treatment of input blocks’ individual voxels (not attributes).
+    mod voxel {
+        use super::*;
+
+        #[test]
+        fn over_silly_floats() {
+            // We just want to see this does not panic on NaN.
+            Over.blend_evoxel(
+                evcolor(Rgba::new(2e25, 2e25, 2e25, 2e25)),
+                evcolor(Rgba::new(2e25, 2e25, 2e25, 2e25)),
+            );
+        }
+
+        #[test]
+        fn over_emission() {
+            let red_1 = evemit(Rgb::new(1., 0., 0.), 1.0);
+            let green_0 = evemit(Rgb::new(0., 1., 0.), 0.0);
+            let green_05 = evemit(Rgb::new(0., 1., 0.), 0.5);
+            let none_1 = evemit(Rgb::ZERO, 1.0);
+            let none_0 = evemit(Rgb::ZERO, 0.0);
+
+            // Simple 100% blending cases
+            assert_blend(red_1, Over, none_1, red_1);
+            assert_blend(none_1, Over, red_1, none_1);
+            assert_blend(none_1, Over, none_1, none_1);
+            assert_blend(red_1, Over, red_1, red_1);
+            assert_blend(red_1, Over, none_0, red_1);
+            assert_blend(none_0, Over, red_1, red_1);
+
+            // Partial alpha
+            assert_blend(red_1, Over, green_05, red_1);
+            assert_blend(green_05, Over, red_1, evemit(Rgb::new(0.5, 0.5, 0.0), 1.0));
+            assert_blend(
+                green_05,
+                Over,
+                green_05,
+                evemit(Rgb::new(0.0, 0.75, 0.0), 0.75),
+            );
+            // assert_blend(green_05, Over, none_0, green_05); // TODO: broken, too dim
+
+            // What if emission with zero alpha is blended in?
+            assert_blend(green_0, Over, none_1, none_1);
+            // assert_blend(green_0, Over, none_0, green_0); // TODO
+            assert_blend(none_1, Over, green_0, none_1);
+            // assert_blend(green_0, Over, green_0, green_0); // TODO: goes to zero
+        }
+
+        #[test]
+        fn over_collision() {
+            assert_blend(evcoll(Hard), Over, evcoll(Hard), evcoll(Hard));
+            assert_blend(evcoll(CNone), Over, evcoll(CNone), evcoll(CNone));
+            assert_blend(evcoll(Hard), Over, evcoll(CNone), evcoll(Hard));
+            assert_blend(evcoll(CNone), Over, evcoll(Hard), evcoll(Hard));
+        }
+
+        #[test]
+        fn in_emission() {
+            let red_1 = evemit(Rgb::new(1., 0., 0.), 1.0);
+            let green_1 = evemit(Rgb::new(0., 1., 0.), 1.0);
+            let green_0 = evemit(Rgb::new(0., 1., 0.), 0.0);
+            let green_05 = evemit(Rgb::new(0., 1., 0.), 0.5);
+            let none_1 = evemit(Rgb::ZERO, 1.0);
+            let none_0 = evemit(Rgb::ZERO, 0.0);
+
+            // Simple 100% blending cases
+            assert_blend(red_1, In, none_1, red_1);
+            assert_blend(red_1, In, red_1, red_1);
+            assert_blend(red_1, In, green_1, red_1);
+            assert_blend(red_1, In, none_0, none_0);
+            assert_blend(none_1, In, red_1, none_1);
+            assert_blend(none_0, In, red_1, none_0);
+            assert_blend(none_1, In, none_1, none_1);
+            assert_blend(none_0, In, none_1, none_0);
+
+            // Partial alpha
+            assert_blend(red_1, In, green_05, evemit(Rgb::new(0.5, 0.0, 0.0), 0.5));
+            assert_blend(green_05, In, red_1, evemit(Rgb::new(0.0, 0.5, 0.0), 0.5));
+            assert_blend(
+                green_05,
+                In,
+                green_05,
+                evemit(Rgb::new(0.0, 0.25, 0.0), 0.25),
+            );
+            assert_blend(green_05, In, none_0, none_0); // TODO: broken, too dim
+
+            // What if emission with zero alpha is blended in?
+            assert_blend(green_0, In, none_1, none_0);
+            assert_blend(green_0, In, none_0, none_0);
+            assert_blend(none_1, In, green_0, none_0);
+            assert_blend(green_0, In, green_0, none_0); // TODO: this should plausibly stay
+        }
+
+        #[test]
+        fn in_collision() {
+            assert_blend(evcoll(Hard), In, evcoll(Hard), evcoll(Hard));
+            assert_blend(evcoll(CNone), In, evcoll(CNone), evcoll(CNone));
+            assert_blend(evcoll(Hard), In, evcoll(CNone), evcoll(CNone));
+            assert_blend(evcoll(CNone), In, evcoll(Hard), evcoll(CNone));
+        }
+
+        #[test]
+        fn atop_color() {
+            let opaque1 = evcolor(Rgba::new(1.0, 0.0, 0.0, 1.0));
+            let opaque2 = evcolor(Rgba::new(0.0, 1.0, 0.0, 1.0));
+            let half_red = evcolor(Rgba::new(1.0, 0.0, 0.0, 0.5));
+            let clear = evcolor(Rgba::TRANSPARENT);
+
+            assert_blend(opaque1, Atop, opaque2, opaque1);
+            assert_blend(
+                half_red,
+                Atop,
+                opaque2,
+                evcolor(Rgba::new(0.5, 0.5, 0.0, 1.0)),
+            );
+            assert_blend(opaque1, Atop, clear, clear);
+            assert_blend(clear, Atop, opaque2, opaque2);
+            assert_blend(clear, Atop, clear, clear);
+        }
+
+        #[test]
+        fn atop_emission() {
+            let red_1 = evemit(Rgb::new(1., 0., 0.), 1.0);
+            let green_1 = evemit(Rgb::new(0., 1., 0.), 1.0);
+            let green_0 = evemit(Rgb::new(0., 1., 0.), 0.0);
+            let green_05 = evemit(Rgb::new(0., 1., 0.), 0.5);
+            let none_1 = evemit(Rgb::ZERO, 1.0);
+            let none_0 = evemit(Rgb::ZERO, 0.0);
+
+            // Simple 100% blending cases
+            assert_blend(red_1, Atop, none_1, red_1);
+            assert_blend(red_1, Atop, red_1, red_1);
+            assert_blend(red_1, Atop, green_1, red_1);
+            assert_blend(red_1, Atop, none_0, none_0);
+            assert_blend(none_1, Atop, red_1, none_1);
+            assert_blend(none_0, Atop, red_1, red_1);
+            assert_blend(none_1, Atop, none_1, none_1);
+            assert_blend(none_0, Atop, none_1, none_1);
+
+            // Partial alpha
+            assert_blend(red_1, Atop, green_05, evemit(Rgb::new(0.5, 0.0, 0.0), 0.5));
+            assert_blend(green_05, Atop, red_1, evemit(Rgb::new(0.5, 0.5, 0.0), 1.0));
+            assert_blend(
+                green_05,
+                Atop,
+                green_05,
+                evemit(Rgb::new(0.0, 0.5, 0.0), 0.5),
+            );
+            assert_blend(green_05, Atop, none_0, none_0);
+
+            // What if emission with zero alpha is blended in?
+            assert_blend(green_0, Atop, none_1, none_1);
+            assert_blend(green_0, Atop, none_0, none_0);
+            assert_blend(none_1, Atop, green_0, none_0);
+            assert_blend(green_0, Atop, green_0, none_0); // TODO: this should plausibly stay
+        }
+
+        #[test]
+        fn blend_atop_collision() {
+            assert_blend(evcoll(Hard), Atop, evcoll(Hard), evcoll(Hard));
+            assert_blend(evcoll(CNone), Atop, evcoll(CNone), evcoll(CNone));
+            assert_blend(evcoll(Hard), Atop, evcoll(CNone), evcoll(CNone));
+            assert_blend(evcoll(CNone), Atop, evcoll(Hard), evcoll(Hard));
+        }
     }
 
-    #[test]
-    fn blend_over_emission() {
-        let red_1 = evemit(Rgb::new(1., 0., 0.), 1.0);
-        let green_0 = evemit(Rgb::new(0., 1., 0.), 0.0);
-        let green_05 = evemit(Rgb::new(0., 1., 0.), 0.5);
-        let none_1 = evemit(Rgb::ZERO, 1.0);
-        let none_0 = evemit(Rgb::ZERO, 0.0);
+    /// Test each operator’s treatment of input blocks’ attributes (not voxels).
+    mod attributes {
+        use super::*;
 
-        // Simple 100% blending cases
-        assert_blend(red_1, Over, none_1, red_1);
-        assert_blend(none_1, Over, red_1, none_1);
-        assert_blend(none_1, Over, none_1, none_1);
-        assert_blend(red_1, Over, red_1, red_1);
-        assert_blend(red_1, Over, none_0, red_1);
-        assert_blend(none_0, Over, red_1, red_1);
+        #[test]
+        pub(crate) fn selectable_if_either_is_selectable() {
+            // TODO: make this a more thorough test by making the two blocks slabs so that
+            // all four types of voxels are involved. This currently doesn't matter but it may.
+            let is_sel = &Block::builder().color(Rgba::WHITE).selectable(true).build();
+            let not_sel = &Block::builder()
+                .color(Rgba::WHITE)
+                .selectable(false)
+                .build();
 
-        // Partial alpha
-        assert_blend(red_1, Over, green_05, red_1);
-        assert_blend(green_05, Over, red_1, evemit(Rgb::new(0.5, 0.5, 0.0), 1.0));
-        assert_blend(
-            green_05,
-            Over,
-            green_05,
-            evemit(Rgb::new(0.0, 0.75, 0.0), 0.75),
-        );
-        // assert_blend(green_05, Over, none_0, green_05); // TODO: broken, too dim
+            assert!(eval_compose(is_sel, Over, is_sel).attributes.selectable);
+            assert!(eval_compose(is_sel, Over, not_sel).attributes.selectable);
+            assert!(eval_compose(not_sel, Over, is_sel).attributes.selectable);
+            assert!(!eval_compose(not_sel, Over, not_sel).attributes.selectable);
 
-        // What if emission with zero alpha is blended in?
-        assert_blend(green_0, Over, none_1, none_1);
-        // assert_blend(green_0, Over, none_0, green_0); // TODO
-        assert_blend(none_1, Over, green_0, none_1);
-        // assert_blend(green_0, Over, green_0, green_0); // TODO: goes to zero
+            assert!(eval_compose(is_sel, In, is_sel).attributes.selectable);
+            assert!(eval_compose(is_sel, In, not_sel).attributes.selectable);
+            assert!(eval_compose(not_sel, In, is_sel).attributes.selectable);
+            assert!(!eval_compose(not_sel, In, not_sel).attributes.selectable);
+        }
     }
 
-    #[test]
-    fn blend_over_collision() {
-        assert_blend(evcoll(Hard), Over, evcoll(Hard), evcoll(Hard));
-        assert_blend(evcoll(CNone), Over, evcoll(CNone), evcoll(CNone));
-        assert_blend(evcoll(Hard), Over, evcoll(CNone), evcoll(Hard));
-        assert_blend(evcoll(CNone), Over, evcoll(Hard), evcoll(Hard));
-    }
+    /// Operations on the `Composite` modifier or block themselves.
+    mod ops {
+        use super::{assert_eq, *};
 
-    #[test]
-    fn blend_in_emission() {
-        let red_1 = evemit(Rgb::new(1., 0., 0.), 1.0);
-        let green_1 = evemit(Rgb::new(0., 1., 0.), 1.0);
-        let green_0 = evemit(Rgb::new(0., 1., 0.), 0.0);
-        let green_05 = evemit(Rgb::new(0., 1., 0.), 0.5);
-        let none_1 = evemit(Rgb::ZERO, 1.0);
-        let none_0 = evemit(Rgb::ZERO, 0.0);
+        #[test]
+        fn compose_or_replace_source_is_air() {
+            let [block] = make_some_blocks();
+            assert_eq!(
+                Composite::new(AIR, Over).compose_or_replace(block.clone()),
+                block
+            );
+        }
 
-        // Simple 100% blending cases
-        assert_blend(red_1, In, none_1, red_1);
-        assert_blend(red_1, In, red_1, red_1);
-        assert_blend(red_1, In, green_1, red_1);
-        assert_blend(red_1, In, none_0, none_0);
-        assert_blend(none_1, In, red_1, none_1);
-        assert_blend(none_0, In, red_1, none_0);
-        assert_blend(none_1, In, none_1, none_1);
-        assert_blend(none_0, In, none_1, none_0);
+        #[test]
+        fn compose_or_replace_destination_is_air() {
+            let [block] = make_some_blocks();
+            assert_eq!(
+                Composite::new(block.clone(), Over).compose_or_replace(AIR),
+                block
+            );
+        }
 
-        // Partial alpha
-        assert_blend(red_1, In, green_05, evemit(Rgb::new(0.5, 0.0, 0.0), 0.5));
-        assert_blend(green_05, In, red_1, evemit(Rgb::new(0.0, 0.5, 0.0), 0.5));
-        assert_blend(
-            green_05,
-            In,
-            green_05,
-            evemit(Rgb::new(0.0, 0.25, 0.0), 0.25),
-        );
-        assert_blend(green_05, In, none_0, none_0); // TODO: broken, too dim
+        #[test]
+        fn unspecialize_no() {
+            let [b1, b2] = make_some_blocks();
+            let composed = b1.clone().with_modifier(Composite::new(b2.clone(), Over));
+            assert_eq!(composed.unspecialize(), vec![composed]);
+        }
 
-        // What if emission with zero alpha is blended in?
-        assert_blend(green_0, In, none_1, none_0);
-        assert_blend(green_0, In, none_0, none_0);
-        assert_blend(none_1, In, green_0, none_0);
-        assert_blend(green_0, In, green_0, none_0); // TODO: this should plausibly stay
-    }
-
-    #[test]
-    fn blend_in_collision() {
-        assert_blend(evcoll(Hard), In, evcoll(Hard), evcoll(Hard));
-        assert_blend(evcoll(CNone), In, evcoll(CNone), evcoll(CNone));
-        assert_blend(evcoll(Hard), In, evcoll(CNone), evcoll(CNone));
-        assert_blend(evcoll(CNone), In, evcoll(Hard), evcoll(CNone));
-    }
-
-    #[test]
-    fn blend_atop_color() {
-        let opaque1 = evcolor(Rgba::new(1.0, 0.0, 0.0, 1.0));
-        let opaque2 = evcolor(Rgba::new(0.0, 1.0, 0.0, 1.0));
-        let half_red = evcolor(Rgba::new(1.0, 0.0, 0.0, 0.5));
-        let clear = evcolor(Rgba::TRANSPARENT);
-
-        assert_blend(opaque1, Atop, opaque2, opaque1);
-        assert_blend(
-            half_red,
-            Atop,
-            opaque2,
-            evcolor(Rgba::new(0.5, 0.5, 0.0, 1.0)),
-        );
-        assert_blend(opaque1, Atop, clear, clear);
-        assert_blend(clear, Atop, opaque2, opaque2);
-        assert_blend(clear, Atop, clear, clear);
-    }
-
-    #[test]
-    fn blend_atop_emission() {
-        let red_1 = evemit(Rgb::new(1., 0., 0.), 1.0);
-        let green_1 = evemit(Rgb::new(0., 1., 0.), 1.0);
-        let green_0 = evemit(Rgb::new(0., 1., 0.), 0.0);
-        let green_05 = evemit(Rgb::new(0., 1., 0.), 0.5);
-        let none_1 = evemit(Rgb::ZERO, 1.0);
-        let none_0 = evemit(Rgb::ZERO, 0.0);
-
-        // Simple 100% blending cases
-        assert_blend(red_1, Atop, none_1, red_1);
-        assert_blend(red_1, Atop, red_1, red_1);
-        assert_blend(red_1, Atop, green_1, red_1);
-        assert_blend(red_1, Atop, none_0, none_0);
-        assert_blend(none_1, Atop, red_1, none_1);
-        assert_blend(none_0, Atop, red_1, red_1);
-        assert_blend(none_1, Atop, none_1, none_1);
-        assert_blend(none_0, Atop, none_1, none_1);
-
-        // Partial alpha
-        assert_blend(red_1, Atop, green_05, evemit(Rgb::new(0.5, 0.0, 0.0), 0.5));
-        assert_blend(green_05, Atop, red_1, evemit(Rgb::new(0.5, 0.5, 0.0), 1.0));
-        assert_blend(
-            green_05,
-            Atop,
-            green_05,
-            evemit(Rgb::new(0.0, 0.5, 0.0), 0.5),
-        );
-        assert_blend(green_05, Atop, none_0, none_0);
-
-        // What if emission with zero alpha is blended in?
-        assert_blend(green_0, Atop, none_1, none_1);
-        assert_blend(green_0, Atop, none_0, none_0);
-        assert_blend(none_1, Atop, green_0, none_0);
-        assert_blend(green_0, Atop, green_0, none_0); // TODO: this should plausibly stay
-    }
-
-    #[test]
-    fn blend_atop_collision() {
-        assert_blend(evcoll(Hard), Atop, evcoll(Hard), evcoll(Hard));
-        assert_blend(evcoll(CNone), Atop, evcoll(CNone), evcoll(CNone));
-        assert_blend(evcoll(Hard), Atop, evcoll(CNone), evcoll(CNone));
-        assert_blend(evcoll(CNone), Atop, evcoll(Hard), evcoll(Hard));
-    }
-
-    #[test]
-    fn attribute_selectable_if_either_is_selectable() {
-        // TODO: make this a more thorough test by making the two blocks slabs so that
-        // all four types of voxels are involved. This currently doesn't matter but it may.
-        let is_sel = &Block::builder().color(Rgba::WHITE).selectable(true).build();
-        let not_sel = &Block::builder()
-            .color(Rgba::WHITE)
-            .selectable(false)
-            .build();
-
-        assert!(eval_compose(is_sel, Over, is_sel).attributes.selectable);
-        assert!(eval_compose(is_sel, Over, not_sel).attributes.selectable);
-        assert!(eval_compose(not_sel, Over, is_sel).attributes.selectable);
-        assert!(!eval_compose(not_sel, Over, not_sel).attributes.selectable);
-
-        assert!(eval_compose(is_sel, In, is_sel).attributes.selectable);
-        assert!(eval_compose(is_sel, In, not_sel).attributes.selectable);
-        assert!(eval_compose(not_sel, In, is_sel).attributes.selectable);
-        assert!(!eval_compose(not_sel, In, not_sel).attributes.selectable);
-    }
-
-    #[test]
-    fn compose_or_replace_source_is_air() {
-        let [block] = make_some_blocks();
-        assert_eq!(
-            Composite::new(AIR, Over).compose_or_replace(block.clone()),
-            block
-        );
-    }
-
-    #[test]
-    fn compose_or_replace_destination_is_air() {
-        let [block] = make_some_blocks();
-        assert_eq!(
-            Composite::new(block.clone(), Over).compose_or_replace(AIR),
-            block
-        );
-    }
-
-    #[test]
-    fn unspecialize_no() {
-        let [b1, b2] = make_some_blocks();
-        let composed = b1.clone().with_modifier(Composite::new(b2.clone(), Over));
-        assert_eq!(composed.unspecialize(), vec![composed]);
-    }
-
-    #[test]
-    fn unspecialize_yes() {
-        let [b1, b2] = make_some_blocks();
-        let composed = b1
-            .clone()
-            .with_modifier(Composite::new(b2.clone(), Over).with_disassemblable());
-        assert_eq!(composed.unspecialize(), vec![b2, b1]);
+        #[test]
+        fn unspecialize_yes() {
+            let [b1, b2] = make_some_blocks();
+            let composed = b1
+                .clone()
+                .with_modifier(Composite::new(b2.clone(), Over).with_disassemblable());
+            assert_eq!(composed.unspecialize(), vec![b2, b1]);
+        }
     }
 }
