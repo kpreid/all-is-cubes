@@ -1,6 +1,7 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
+use alloc::sync::Arc;
 use core::fmt;
 use core::num::NonZeroU16;
 
@@ -16,7 +17,6 @@ use all_is_cubes::drawing::embedded_graphics::{
     prelude::Point,
     primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable},
 };
-use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
@@ -516,51 +516,53 @@ pub async fn install_demo_blocks(
             let Primitive::Recur { attributes, .. } = block.primitive_mut() else {
                 panic!("explosion not atom");
             };
-            let brush = if i > 22 {
+            let neighbor_ops: Arc<[(Cube, Operation)]> = if i > 22 {
                 // Expire because we're invisible by now
-                VoxelBrush::single(AIR)
+                [(Cube::ORIGIN, Operation::Become(AIR))].into()
             } else {
-                let next = &provider_for_patch[Explosion(i + 1)];
+                let next = Operation::DestroyTo(provider_for_patch[Explosion(i + 1)].clone());
                 if i > 0 && i < 10 {
                     // Expand at first out to ~5 blocks
                     if i.rem_euclid(2) == 0 {
                         if i.rem_euclid(4) == 0 {
-                            VoxelBrush::new([
-                                ([0, 0, 0], next.clone()),
-                                ([1, 0, 0], next.clone()),
-                                ([-1, 0, 0], next.clone()),
-                                ([0, 1, 0], next.clone()),
-                                ([0, -1, 0], next.clone()),
-                                ([0, 0, 1], next.clone()),
-                                ([0, 0, -1], next.clone()),
-                            ])
+                            [
+                                (Cube::new(0, 0, 0), next.clone()),
+                                (Cube::new(1, 0, 0), next.clone()),
+                                (Cube::new(-1, 0, 0), next.clone()),
+                                (Cube::new(0, 1, 0), next.clone()),
+                                (Cube::new(0, -1, 0), next.clone()),
+                                (Cube::new(0, 0, 1), next.clone()),
+                                (Cube::new(0, 0, -1), next.clone()),
+                            ]
+                            .into()
                         } else {
-                            VoxelBrush::new([
-                                ([0, 0, 0], next.clone()),
-                                ([1, 1, 0], next.clone()),
-                                ([-1, 1, 0], next.clone()),
-                                ([0, 1, 1], next.clone()),
-                                ([0, -1, 1], next.clone()),
-                                ([1, 0, 1], next.clone()),
-                                ([1, 0, -1], next.clone()),
-                                ([1, -1, 0], next.clone()),
-                                ([-1, -1, 0], next.clone()),
-                                ([0, 1, -1], next.clone()),
-                                ([0, -1, -1], next.clone()),
-                                ([-1, 0, 1], next.clone()),
-                                ([-1, 0, -1], next.clone()),
-                            ])
+                            [
+                                (Cube::new(0, 0, 0), next.clone()),
+                                (Cube::new(1, 1, 0), next.clone()),
+                                (Cube::new(-1, 1, 0), next.clone()),
+                                (Cube::new(0, 1, 1), next.clone()),
+                                (Cube::new(0, -1, 1), next.clone()),
+                                (Cube::new(1, 0, 1), next.clone()),
+                                (Cube::new(1, 0, -1), next.clone()),
+                                (Cube::new(1, -1, 0), next.clone()),
+                                (Cube::new(-1, -1, 0), next.clone()),
+                                (Cube::new(0, 1, -1), next.clone()),
+                                (Cube::new(0, -1, -1), next.clone()),
+                                (Cube::new(-1, 0, 1), next.clone()),
+                                (Cube::new(-1, 0, -1), next.clone()),
+                            ]
+                            .into()
                         }
                     } else {
-                        VoxelBrush::new([([0, 0, 0], next.clone())])
+                        [(Cube::ORIGIN, next.clone())].into()
                     }
                 } else {
                     // Just tick or fade
-                    VoxelBrush::new([([0, 0, 0], next.clone())])
+                    [(Cube::ORIGIN, next.clone())].into()
                 }
             };
             attributes.tick_action = Some(TickAction {
-                operation: Operation::Paint(brush),
+                operation: Operation::Neighbors(neighbor_ops),
                 period: NonZeroU16::new(2).unwrap(),
             });
         });
