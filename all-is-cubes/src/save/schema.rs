@@ -341,9 +341,6 @@ pub(crate) enum OperationSer<'a> {
     DestroyToV1 {
         block: Block,
     },
-    PaintV1 {
-        blocks: Vec<([i32; 3], Block)>,
-    },
     NeighborsV1 {
         neighbors: Cow<'a, [([i32; 3], op::Operation)]>,
     },

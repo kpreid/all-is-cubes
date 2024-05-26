@@ -442,9 +442,7 @@ fn visit_handles_block_tick_action() {
     let b1 = Handle::new_pending("foo".into(), BlockDef::new(AIR));
     let b2 = Block::builder()
         .color(Rgba::WHITE)
-        .tick_action(Some(TickAction::from(Operation::Paint(
-            crate::drawing::VoxelBrush::single(Block::from(b1)),
-        ))))
+        .tick_action(Some(TickAction::from(Operation::Become(Block::from(b1)))))
         .build();
     assert_eq!(list_handles(&b2), vec!["foo".into()]);
 }

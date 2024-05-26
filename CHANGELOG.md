@@ -102,6 +102,8 @@
 
     - `listen::Sink::take_equal()`
 
+    - `op::Operation::Paint` has been removed. Use `Operation::Neighbors` and `Operation::DestroyTo` to get the same effect.
+
 ## 0.7.1 (2024-01-27)
 
 - `all-is-cubes` library:

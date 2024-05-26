@@ -4,7 +4,6 @@ use alloc::sync::Arc;
 use core::mem;
 
 use crate::block::{Block, AIR};
-use crate::drawing::VoxelBrush;
 use crate::inv::{Inventory, InventoryTransaction};
 use crate::math::{Cube, GridRotation, Gridgid};
 use crate::space::{CubeTransaction, Space, SpaceTransaction};
@@ -53,9 +52,6 @@ pub enum Operation {
     ///
     /// TODO: Better name
     DestroyTo(Block),
-
-    /// Apply the brush centered on the cube.
-    Paint(VoxelBrush<'static>),
 
     /// Apply the given operations to the cubes offset from this one.
     //---
@@ -108,16 +104,6 @@ impl Operation {
 
                 Ok((space_txn, InventoryTransaction::default()))
             }
-            Operation::Paint(brush) => {
-                // TODO: avoid clone
-                let space_txn = brush
-                    .clone()
-                    .rotate(transform.rotation)
-                    .paint_transaction(transform.transform_cube(Cube::ORIGIN))
-                    .nonconserved();
-
-                Ok((space_txn, InventoryTransaction::default()))
-            }
             Operation::Neighbors(neighbors) => {
                 let mut txns = OpTxn::default();
                 for &(cube, ref op) in neighbors.iter() {
@@ -138,7 +124,6 @@ impl Operation {
             // TODO: should ask if blocks are relevantly symmetric
             Operation::Become(_) => false,
             Operation::DestroyTo(_) => false,
-            Operation::Paint(_) => false,
             Operation::Neighbors(_) => false,
         }
     }
@@ -151,7 +136,6 @@ impl Operation {
             // TODO: need to provide a way for blocks to opt out
             Operation::Become(block) => Operation::Become(block.rotate(rotation)),
             Operation::DestroyTo(block) => Operation::DestroyTo(block.rotate(rotation)),
-            Operation::Paint(brush) => Operation::Paint(brush.rotate(rotation)),
             Operation::Neighbors(mut neighbors) => {
                 // TODO: cheaper placeholder value, like an Operation::Nop
                 let mut placeholder = Operation::Become(AIR);
@@ -173,7 +157,6 @@ impl VisitHandles for Operation {
     fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
         match self {
             Operation::Become(block) | Operation::DestroyTo(block) => block.visit_handles(visitor),
-            Operation::Paint(brush) => brush.visit_handles(visitor),
             Operation::Neighbors(neighbors) => {
                 for (_, op) in neighbors.iter() {
                     op.visit_handles(visitor);

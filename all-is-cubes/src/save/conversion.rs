@@ -603,7 +603,6 @@ mod inv {
 
 mod op {
     use super::*;
-    use crate::drawing::VoxelBrush;
     use crate::op;
 
     impl Serialize for op::Operation {
@@ -617,9 +616,6 @@ mod op {
                 },
                 op::Operation::DestroyTo(block) => schema::OperationSer::DestroyToV1 {
                     block: block.clone(),
-                },
-                op::Operation::Paint(brush) => schema::OperationSer::PaintV1 {
-                    blocks: brush.entries_for_serialization(),
                 },
                 op::Operation::Neighbors(neighbors) => schema::OperationSer::NeighborsV1 {
                     // TODO: arrange to be able to borrow here
@@ -643,9 +639,6 @@ mod op {
             Ok(match schema::OperationSer::deserialize(deserializer)? {
                 schema::OperationSer::BecomeV1 { block } => op::Operation::Become(block),
                 schema::OperationSer::DestroyToV1 { block } => op::Operation::DestroyTo(block),
-                schema::OperationSer::PaintV1 { blocks } => {
-                    op::Operation::Paint(VoxelBrush::new(blocks))
-                }
                 schema::OperationSer::NeighborsV1 { neighbors } => op::Operation::Neighbors(
                     cow_into_iter(neighbors)
                         .map(|(offset, op)| (offset.into(), op))

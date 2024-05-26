@@ -16,7 +16,6 @@ use crate::block::{
 };
 use crate::character::{Character, Spawn};
 use crate::content::make_some_blocks;
-use crate::drawing::VoxelBrush;
 use crate::inv::{EphemeralOpaque, Inventory, Tool};
 use crate::math::{notnan, Cube, Face6, GridAab, GridRotation, Rgb, Rgba};
 use crate::save::compress::{GzSerde, Leu16};
@@ -528,25 +527,6 @@ fn operation_destroy_to() {
                 "type": "BlockV1",
                 "primitive": {"type": "AirV1"},
             }
-        }),
-    );
-}
-
-#[test]
-fn operation_paint() {
-    assert_round_trip_value(
-        &op::Operation::Paint(VoxelBrush::new([([0, 0, 0], AIR)])),
-        json!({
-            "type": "PaintV1",
-            "blocks": [
-                [
-                    [0, 0, 0],
-                    {
-                        "type": "BlockV1",
-                        "primitive": {"type": "AirV1"},
-                    }
-                ]
-            ]
         }),
     );
 }

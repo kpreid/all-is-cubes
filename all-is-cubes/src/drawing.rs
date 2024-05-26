@@ -458,14 +458,6 @@ impl<'a> VoxelBrush<'a> {
             .find(|&&(p, _)| p == GridVector::zero())
             .map(|(_, block)| &**block)
     }
-
-    #[cfg(feature = "save")]
-    pub(crate) fn entries_for_serialization(&self) -> Vec<([i32; 3], Block)> {
-        self.0
-            .iter()
-            .map(|&(offset, ref block)| (offset.into(), Block::clone(block)))
-            .collect()
-    }
 }
 
 impl<'a> PixelColor for &'a VoxelBrush<'a> {
