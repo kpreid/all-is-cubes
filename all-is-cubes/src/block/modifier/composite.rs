@@ -7,6 +7,7 @@ use crate::block::{
     self, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, Resolution::R1, AIR,
 };
 use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Vol};
+use crate::op::Operation;
 use crate::universe;
 
 /// Data for [`Modifier::Composite`], describing how to combine the voxels of another
@@ -172,7 +173,10 @@ impl Composite {
             selectable: src_att.selectable | dst_att.selectable,
             rotation_rule: dst_att.rotation_rule, // TODO merge
             tick_action: dst_att.tick_action,     // TODO: merge
-            activation_action: dst_att.activation_action, // TODO: merge
+            activation_action: operator.blend_operations(
+                src_att.activation_action.as_ref(),
+                dst_att.activation_action.as_ref(),
+            ),
             animation_hint: src_att.animation_hint | dst_att.animation_hint, // TODO: some operators should ignore some hints (e.g. `In` should ignore destination color changes)
         };
 
@@ -392,6 +396,17 @@ impl CompositeOperator {
         }
     }
 
+    fn blend_operations(
+        self,
+        source: Option<&Operation>,
+        destination: Option<&Operation>,
+    ) -> Option<Operation> {
+        // TODO: Actually implement merging of multiple operations.
+        _ = self;
+        _ = source;
+        destination.cloned()
+    }
+
     /// Compute the bounds of the result given the bounds of the source and destination.
     fn bounds(self, source: GridAab, destination: GridAab) -> GridAab {
         match self {
@@ -449,7 +464,6 @@ mod tests {
     use crate::block::{EvaluatedBlock, Resolution::*};
     use crate::content::{make_slab, make_some_blocks};
     use crate::math::Rgba;
-    use crate::op::Operation;
     use crate::space::Space;
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
