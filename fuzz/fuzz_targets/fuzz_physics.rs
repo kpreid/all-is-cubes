@@ -41,14 +41,14 @@ fuzz_target!(|input: ([FreeCoordinate; 3], [FreeCoordinate; 3], Space)| {
         }
 
         // dbg!((i, character.body.position));
-        let (info, _tx) = character.step(None, Tick::arbitrary());
+        let (_txn, _char_info, body_info) = character.step(None, Tick::arbitrary());
         // dbg!(info);
 
         // Check for no push out, but not on the first step, which might have been due to initial
         // placement in a bad location.
         if i != 0 {
             assert_eq!(
-                info.expect("should be making body steps").push_out,
+                body_info.expect("should be making body steps").push_out,
                 None,
                 "triggered push_out"
             );

@@ -23,8 +23,9 @@ use core::sync::atomic::{self, Ordering};
 use arcstr::ArcStr;
 use manyfmt::Fmt;
 
+use crate::behavior::BehaviorSetStepInfo;
 use crate::block::{self, BlockDefStepInfo};
-use crate::character::Character;
+use crate::character::{Character, CharacterStepInfo};
 use crate::save::WhenceUniverse;
 use crate::space::{Space, SpaceStepInfo};
 use crate::transaction::{self, Transaction as _};
@@ -318,16 +319,14 @@ impl Universe {
         self.sync_block_defs();
 
         // Run behaviors attached to the universe itself.
-        if let Err(e) = self
-            .behaviors
-            .step(
-                self,
-                &core::convert::identity,
-                &UniverseTransaction::behaviors,
-                tick,
-            )
-            .execute(self, &mut transaction::no_outputs)
-        {
+        let (behavior_txn, behavior_info) = self.behaviors.step(
+            self,
+            &core::convert::identity,
+            &UniverseTransaction::behaviors,
+            tick,
+        );
+        info.behaviors += behavior_info;
+        if let Err(e) = behavior_txn.execute(self, &mut transaction::no_outputs) {
             // TODO: Need to report these failures back to the source
             // ... and perhaps in the UniverseStepInfo
             log::info!("Transaction failure: {}", e);
@@ -366,13 +365,14 @@ impl Universe {
         info.active_members += self.spaces_with_work;
 
         for character_root in self.tables.characters.values() {
-            let (_body_step_info, transaction) = character_root
+            let (transaction, character_info, _body_info) = character_root
                 .try_modify(|ch| {
                     // TODO: avoid needing downgrade() unless the ref is actually used?
                     ch.step(Some(&character_root.downgrade()), tick)
                 })
                 .expect("character borrowed during universe.step()");
             transactions.push(transaction);
+            info.character_step += character_info;
             info.total_members += 1;
         }
 
@@ -820,7 +820,9 @@ pub struct UniverseStepInfo {
     /// Number of members which were processed at all.
     total_members: usize,
     block_def_step: BlockDefStepInfo,
+    character_step: CharacterStepInfo,
     space_step: SpaceStepInfo,
+    behaviors: BehaviorSetStepInfo,
 }
 impl core::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
     fn add_assign(&mut self, other: Self) {
@@ -828,7 +830,9 @@ impl core::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
         self.active_members += other.active_members;
         self.total_members += other.total_members;
         self.block_def_step += other.block_def_step;
+        self.character_step += other.character_step;
         self.space_step += other.space_step;
+        self.behaviors += other.behaviors;
     }
 }
 impl Fmt<StatusText> for UniverseStepInfo {
@@ -838,7 +842,9 @@ impl Fmt<StatusText> for UniverseStepInfo {
             active_members,
             total_members,
             block_def_step,
+            character_step,
             space_step,
+            behaviors,
         } = self;
         writeln!(
             fmt,
@@ -848,9 +854,13 @@ impl Fmt<StatusText> for UniverseStepInfo {
         if fopt.show.contains(ShowStatus::BLOCK) {
             writeln!(fmt, "Block defs: {}", block_def_step.refmt(fopt))?;
         }
-        if fopt.show.contains(ShowStatus::SPACE) {
-            write!(fmt, "{}", space_step.refmt(fopt))?;
+        if fopt.show.contains(ShowStatus::CHARACTER) {
+            writeln!(fmt, "{}", character_step.refmt(fopt))?;
         }
+        if fopt.show.contains(ShowStatus::SPACE) {
+            writeln!(fmt, "{}", space_step.refmt(fopt))?;
+        }
+        write!(fmt, "Universe behaviors: {}", behaviors.refmt(fopt))?;
         Ok(())
     }
 }

@@ -6,6 +6,7 @@ use alloc::vec::Vec;
 use core::any::TypeId;
 use core::fmt;
 use core::mem;
+use core::ops;
 
 #[cfg(doc)]
 use core::{future::Future, task::Waker};
@@ -19,6 +20,7 @@ use crate::util::maybe_sync::{Mutex, SendSyncIfStd};
 
 #[cfg(doc)]
 use crate::universe::Universe;
+use crate::util::StatusText;
 
 /// Dynamic add-ons to game objects; we might also have called them “components”.
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
@@ -200,8 +202,13 @@ impl<H: BehaviorHost> BehaviorSet<H> {
         // most of the time.
         set_transaction_binder: impl Fn(BehaviorSetTransaction<H>) -> H::Transaction,
         tick: Tick,
-    ) -> UniverseTransaction {
+    ) -> (UniverseTransaction, BehaviorSetStepInfo) {
         let mut transactions = Vec::new();
+        let mut info = BehaviorSetStepInfo {
+            stepped: 0,
+            acted: 0,
+            total: self.members.len(),
+        };
 
         // TODO: Find a way to drain the set without holding the lock and without
         // reallocating.
@@ -235,8 +242,10 @@ impl<H: BehaviorHost> BehaviorSet<H> {
                     ))
                 },
             };
+            info.stepped += 1;
             let (txn, then) = entry.behavior.step(context);
             if txn != UniverseTransaction::default() {
+                info.acted += 1;
                 transactions.push(txn);
             }
             match then {
@@ -252,8 +261,10 @@ impl<H: BehaviorHost> BehaviorSet<H> {
         }
         let transaction = transactions
             .into_iter()
-            .reduce(|a, b| a.merge(b).expect("TODO: handle merge failure"));
-        transaction.unwrap_or_default()
+            .reduce(|a, b| a.merge(b).expect("TODO: handle merge failure"))
+            .unwrap_or_default();
+
+        (transaction, info)
     }
 
     #[allow(unused)] // currently only used on feature=save
@@ -820,6 +831,43 @@ pub struct BehaviorPersistence(
     #[cfg(feature = "save")] pub(crate) crate::save::schema::BehaviorV1Ser,
     #[cfg(not(feature = "save"))] (),
 );
+
+/// Performance data returned by [`BehaviorSet::step()`].
+///
+/// Use `Debug` or [`StatusText`] formatting to examine this.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct BehaviorSetStepInfo {
+    /// Number of behaviors in the set.
+    total: usize,
+    /// Number of behaviors stepped this tick.
+    stepped: usize,
+    /// Of the stepped behaviors, how many returned a nonempty transaction.
+    acted: usize,
+}
+
+impl ops::AddAssign for BehaviorSetStepInfo {
+    fn add_assign(&mut self, other: Self) {
+        let Self {
+            total,
+            stepped,
+            acted,
+        } = self;
+        *total += other.total;
+        *stepped += other.stepped;
+        *acted += other.acted;
+    }
+}
+
+impl crate::util::Fmt<StatusText> for BehaviorSetStepInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
+        let Self {
+            total,
+            stepped,
+            acted,
+        } = self;
+        write!(f, "{acted} acted of {stepped} stepped of {total}")
+    }
+}
 
 #[cfg(test)]
 mod tests {

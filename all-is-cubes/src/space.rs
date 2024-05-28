@@ -12,6 +12,7 @@ use euclid::{vec3, Vector3D};
 use hashbrown::{HashMap as HbHashMap, HashSet as HbHashSet};
 use manyfmt::Fmt;
 
+use crate::behavior::BehaviorSetStepInfo;
 use crate::behavior::{self, BehaviorSet};
 use crate::block::{Block, EvaluatedBlock, Resolution, TickAction, AIR, AIR_EVALUATED_REF};
 #[cfg(doc)]
@@ -593,17 +594,18 @@ impl Space {
         };
         let cube_ticks_to_space_behaviors = I::now();
 
-        let mut transaction = UniverseTransaction::default();
-        if let Some(self_handle) = self_handle {
-            if !tick.paused() {
-                transaction = self.behaviors.step(
+        // this should be an if-let-chain
+        let (transaction, behavior_step_info) =
+            if let Some(self_handle) = self_handle.filter(|_| !tick.paused()) {
+                self.behaviors.step(
                     &*self,
                     &(|t: SpaceTransaction| t.bind(self_handle.clone())),
                     SpaceTransaction::behaviors,
                     tick,
-                );
-            }
-        }
+                )
+            } else {
+                Default::default()
+            };
 
         let space_behaviors_to_lighting = I::now();
 
@@ -623,6 +625,7 @@ impl Space {
                 cube_ticks,
                 cube_time: cube_ticks_to_space_behaviors
                     .saturating_duration_since(start_cube_ticks),
+                behaviors: behavior_step_info,
                 behaviors_time: space_behaviors_to_lighting
                     .saturating_duration_since(cube_ticks_to_space_behaviors),
                 light,
@@ -1264,6 +1267,8 @@ pub struct SpaceStepInfo {
     /// (measured as a whole because transaction conflict checking is needed),
     cube_time: Duration,
 
+    behaviors: BehaviorSetStepInfo,
+
     /// Time spent on processing behaviors.
     behaviors_time: Duration,
 
@@ -1276,12 +1281,22 @@ impl ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
             // Specifically don't count those that did nothing.
             return;
         }
-        self.spaces += other.spaces;
-        self.evaluations += other.evaluations;
-        self.cube_ticks += other.cube_ticks;
-        self.cube_time += other.cube_time;
-        self.behaviors_time += other.behaviors_time;
-        self.light += other.light;
+        let Self {
+            spaces,
+            evaluations,
+            cube_ticks,
+            cube_time,
+            behaviors,
+            behaviors_time,
+            light,
+        } = self;
+        *spaces += other.spaces;
+        *evaluations += other.evaluations;
+        *cube_ticks += other.cube_ticks;
+        *cube_time += other.cube_time;
+        *behaviors += other.behaviors;
+        *behaviors_time += other.behaviors_time;
+        *light += other.light;
     }
 }
 impl Fmt<StatusText> for SpaceStepInfo {
@@ -1291,12 +1306,14 @@ impl Fmt<StatusText> for SpaceStepInfo {
             evaluations,
             cube_ticks,
             cube_time,
+            behaviors,
             behaviors_time,
             light,
         } = self;
         if self.spaces > 0 {
             let light = light.refmt(fopt);
             let cube_time = cube_time.refmt(&ConciseDebug);
+            let behaviors = behaviors.refmt(fopt);
             let behaviors_time = behaviors_time.refmt(&ConciseDebug);
             write!(
                 fmt,
@@ -1304,7 +1321,7 @@ impl Fmt<StatusText> for SpaceStepInfo {
                 {spaces} spaces' steps:\n\
                 Block reeval: {evaluations}\n\
                 Cubes: {cube_ticks} cubes ticked in {cube_time}\n\
-                Behaviors: {behaviors_time}\n\
+                Behaviors: {behaviors_time} for {behaviors}\n\
                 Light: {light}\
                 "
             )?;

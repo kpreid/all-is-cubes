@@ -2,6 +2,7 @@
 
 use alloc::sync::Arc;
 use core::fmt;
+use core::ops;
 
 use euclid::{Angle, Rotation3D, Vector3D};
 use hashbrown::HashSet as HbHashSet;
@@ -77,7 +78,7 @@ pub struct Character {
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu
     pub colliding_cubes: HbHashSet<Contact>,
 
-    /// Last [`Character::step`] info result, for debugging.
+    /// Last body step from [`Character::step`], for debugging.
     pub(crate) last_step_info: Option<BodyStepInfo>,
 
     exposure: exposure::State,
@@ -292,10 +293,10 @@ impl Character {
         &mut self,
         self_handle: Option<&Handle<Character>>,
         tick: Tick,
-    ) -> (Option<BodyStepInfo>, UniverseTransaction) {
+    ) -> (UniverseTransaction, CharacterStepInfo, Option<BodyStepInfo>) {
         let mut result_transaction = UniverseTransaction::default();
         if tick.paused() {
-            return (None, result_transaction);
+            return (result_transaction, CharacterStepInfo::default(), None);
         }
 
         // Override flying state using state of jetpack from inventory.
@@ -326,7 +327,7 @@ impl Character {
 
         let control_delta_v = (velocity_target - self.body.velocity).component_mul(stiffness) * dt;
 
-        let body_step_info = if let Ok(space) = self.space.read() {
+        self.last_step_info = if let Ok(space) = self.space.read() {
             self.exposure.step(&space, self.view(), dt);
 
             let colliding_cubes = &mut self.colliding_cubes;
@@ -387,8 +388,8 @@ impl Character {
         // TODO: Think about what order we want sequence of effects to be in. In particular,
         // combining behavior calls with step() means behaviors on different characters
         // see other characters as not having been stepped yet.
-        if let Some(self_handle) = self_handle {
-            let t = self.behaviors.step(
+        let behavior_step_info = if let Some(self_handle) = self_handle {
+            let (t, info) = self.behaviors.step(
                 self,
                 &(|t: CharacterTransaction| t.bind(self_handle.clone())),
                 CharacterTransaction::behaviors,
@@ -397,6 +398,9 @@ impl Character {
             result_transaction
                 .merge_from(t)
                 .expect("TODO: we should be applying these transactions separately");
+            info
+        } else {
+            behavior::BehaviorSetStepInfo::default()
         };
 
         // Apply accelerations on the body inversely to the eye displacement.
@@ -417,8 +421,14 @@ impl Character {
         self.eye_displacement_pos += self.eye_displacement_vel.cast_unit() * dt;
         // TODO: Clamp eye_displacement_pos to be within the body AAB.
 
-        self.last_step_info = body_step_info;
-        (body_step_info, result_transaction)
+        (
+            result_transaction,
+            CharacterStepInfo {
+                count: 1,
+                behaviors: behavior_step_info,
+            },
+            self.last_step_info,
+        )
     }
 
     /// Returns the character's current automatic-exposure calculation based on the light
@@ -634,6 +644,36 @@ impl<'de> serde::Deserialize<'de> for Character {
                 exposure: exposure::State::default(),
             }),
         }
+    }
+}
+
+/// Performance data returned by [`Character::step()`].
+///
+/// Use `Debug` or [`StatusText`] formatting to examine this.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CharacterStepInfo {
+    /// Number of characters whose updates were aggregated into this value.
+    count: usize,
+
+    behaviors: behavior::BehaviorSetStepInfo,
+}
+
+impl Fmt<StatusText> for CharacterStepInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
+        let Self { count, behaviors } = self;
+        write!(
+            f,
+            "{count} characters' steps:\nBehaviors: {}",
+            behaviors.refmt(fopt)
+        )
+    }
+}
+
+impl ops::AddAssign for CharacterStepInfo {
+    fn add_assign(&mut self, other: Self) {
+        let Self { count, behaviors } = self;
+        *count += other.count;
+        *behaviors += other.behaviors;
     }
 }
 

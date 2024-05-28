@@ -596,6 +596,9 @@ impl Body {
 /// Diagnostic data returned by `Body::step()`. The exact contents of this structure
 /// are unstable; use only [`Debug`] formatting to examine its contents unless you have
 /// a specific need for one of the values.
+///
+/// Note: Unlike most `*StepInfo` types, this one cannot be meaningfully aggregated,
+/// because it contains specific spatial details of the body step.
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 pub struct BodyStepInfo {
