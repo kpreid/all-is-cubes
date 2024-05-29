@@ -14,9 +14,9 @@ use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Handle, Name};
 
 fn space_bulk_mutation(c: &mut Criterion) {
-    let mut group = c.benchmark_group("space-bulk-mutation");
+    let mut group = c.benchmark_group("bulk");
 
-    for &mutation_size in &[1, 4, 64] {
+    for &mutation_size in &[1, 4, 16] {
         let bounds =
             GridAab::from_lower_size([0, 0, 0], [mutation_size, mutation_size, mutation_size]);
         let bigger_bounds = bounds.multiply(2);
@@ -24,36 +24,30 @@ fn space_bulk_mutation(c: &mut Criterion) {
         let mutation_volume = bounds.volume().unwrap();
         group.throughput(Throughput::Elements(mutation_volume as u64));
 
-        group.bench_function(
-            BenchmarkId::new("fill() entire space", &size_description),
-            |b| {
-                let [block] = make_some_blocks();
-                b.iter_batched(
-                    || Space::empty(bounds),
-                    |mut space| {
-                        space.fill(space.bounds(), |_| Some(&block)).unwrap();
-                    },
-                    BatchSize::SmallInput,
-                )
-            },
-        );
+        group.bench_function(BenchmarkId::new("fill() entire", &size_description), |b| {
+            let [block] = make_some_blocks();
+            b.iter_batched(
+                || Space::empty(bounds),
+                |mut space| {
+                    space.fill(space.bounds(), |_| Some(&block)).unwrap();
+                },
+                BatchSize::SmallInput,
+            )
+        });
+
+        group.bench_function(BenchmarkId::new("fill() partial", &size_description), |b| {
+            let [block] = make_some_blocks();
+            b.iter_batched(
+                || Space::empty(bigger_bounds),
+                |mut space| {
+                    space.fill(bounds, |_| Some(&block)).unwrap();
+                },
+                BatchSize::SmallInput,
+            )
+        });
 
         group.bench_function(
-            BenchmarkId::new("fill() part of space", &size_description),
-            |b| {
-                let [block] = make_some_blocks();
-                b.iter_batched(
-                    || Space::empty(bigger_bounds),
-                    |mut space| {
-                        space.fill(bounds, |_| Some(&block)).unwrap();
-                    },
-                    BatchSize::SmallInput,
-                )
-            },
-        );
-
-        group.bench_function(
-            BenchmarkId::new("fill() part with notification", &size_description),
+            BenchmarkId::new("fill() partial with notification", &size_description),
             |b| {
                 let [block] = make_some_blocks();
                 b.iter_batched(
@@ -80,7 +74,7 @@ fn space_bulk_mutation(c: &mut Criterion) {
         );
 
         group.bench_function(
-            BenchmarkId::new("fill_uniform() entire space", &size_description),
+            BenchmarkId::new("fill_uniform() entire", &size_description),
             |b| {
                 let [block] = make_some_blocks();
                 b.iter_batched(
@@ -94,7 +88,7 @@ fn space_bulk_mutation(c: &mut Criterion) {
         );
 
         group.bench_function(
-            BenchmarkId::new("fill_uniform() part of space", &size_description),
+            BenchmarkId::new("fill_uniform() partial", &size_description),
             |b| {
                 let [block] = make_some_blocks();
                 b.iter_batched(
@@ -107,28 +101,25 @@ fn space_bulk_mutation(c: &mut Criterion) {
             },
         );
 
-        group.bench_function(
-            BenchmarkId::new("set() entire space", &size_description),
-            |b| {
-                let [block] = make_some_blocks();
-                b.iter_batched(
-                    || Space::empty(bounds),
-                    |mut space| {
-                        for x in 0..mutation_size {
-                            for y in 0..mutation_size {
-                                for z in 0..mutation_size {
-                                    space.set([x, y, z], &block).unwrap();
-                                }
+        group.bench_function(BenchmarkId::new("set() entire", &size_description), |b| {
+            let [block] = make_some_blocks();
+            b.iter_batched(
+                || Space::empty(bounds),
+                |mut space| {
+                    for x in 0..mutation_size {
+                        for y in 0..mutation_size {
+                            for z in 0..mutation_size {
+                                space.set([x, y, z], &block).unwrap();
                             }
                         }
-                    },
-                    BatchSize::SmallInput,
-                )
-            },
-        );
+                    }
+                },
+                BatchSize::SmallInput,
+            )
+        });
 
         group.bench_function(
-            BenchmarkId::new("transaction entire space", &size_description),
+            BenchmarkId::new("transaction entire", &size_description),
             |b| {
                 let [block] = make_some_blocks();
                 b.iter_batched(
