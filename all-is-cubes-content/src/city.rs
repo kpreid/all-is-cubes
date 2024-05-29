@@ -15,9 +15,10 @@ use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::{Slot, Tool};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSize,
-    GridVector, Gridgid,
+    rgba_const, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation,
+    GridSize, GridVector, Gridgid,
 };
+use all_is_cubes::op::Operation;
 use all_is_cubes::raycast::Raycaster;
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder, SpacePhysics};
 use all_is_cubes::time::Instant;
@@ -97,17 +98,27 @@ pub(crate) async fn demo_city<I: Instant>(
             ));
             //spawn.set_eye_position(bounds.center() + Vector3::new(0.5, 2.91, 8.5));
             // Initial inventory contents. TODO: Make a better list.
-            let mut inventory = vec![
-                Tool::RemoveBlock { keep: true }.into(),
-                Tool::Activate.into(),
-                Tool::Jetpack { active: false }.into(),
-                Tool::PushPull.into(),
-            ];
-            for block in [
-                &landscape_blocks[Stone],
-                &demo_blocks[Arrow],
-                &demo_blocks[Lamp(true)],
-            ] {
+            let mut inventory: Vec<Slot> = Vec::new();
+            inventory.extend(
+                [
+                    Tool::RemoveBlock { keep: true },
+                    Tool::Activate,
+                    Tool::Jetpack { active: false },
+                    Tool::PushPull,
+                    Tool::Custom {
+                        op: Operation::AddModifiers(
+                            [block::Modifier::Rotate(GridRotation::CLOCKWISE)].into(),
+                        ),
+                        icon: block::Block::builder()
+                            .color(rgba_const!(0.0, 0.5, 0.0, 1.0))
+                            .display_name("Rotate")
+                            .build(),
+                    },
+                ]
+                .into_iter()
+                .map(Slot::from),
+            );
+            for block in [&landscape_blocks[Stone], &demo_blocks[Lamp(true)]] {
                 inventory.push(Slot::stack(40, Tool::Block(block.clone())));
             }
             inventory.push(Slot::stack(
