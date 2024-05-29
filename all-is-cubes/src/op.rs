@@ -3,7 +3,7 @@
 use alloc::sync::Arc;
 use core::mem;
 
-use crate::block::{Block, AIR};
+use crate::block::{self, Block, AIR};
 use crate::inv::{Inventory, InventoryTransaction};
 use crate::math::{Cube, GridRotation, Gridgid};
 use crate::space::{CubeTransaction, Space, SpaceTransaction};
@@ -52,6 +52,13 @@ pub enum Operation {
     ///
     /// TODO: Better name
     DestroyTo(Block),
+
+    /// Attach the given modifier to the cube's block.
+    ///
+    /// This operation will not necessarily apply the modifier unaltered,
+    /// but may combine rotations and otherwise canonicalize the result.
+    /// TODO: Document these rules in a single location.
+    AddModifiers(Arc<[block::Modifier]>),
 
     /// Apply the given operations to the cubes offset from this one.
     //---
@@ -104,6 +111,32 @@ impl Operation {
 
                 Ok((space_txn, InventoryTransaction::default()))
             }
+            Operation::AddModifiers(modifiers) => {
+                let target_cube = transform.transform_cube(Cube::ORIGIN);
+                let target_block = space[target_cube].clone();
+
+                let mut replacement = target_block.clone();
+                for modifier in modifiers.iter() {
+                    // TODO: We should not have a special case for `Rotate` *here alone*;
+                    // there should be a general function to do this job.
+                    replacement = if let &block::Modifier::Rotate(r) = modifier {
+                        replacement.rotate(r)
+                    } else {
+                        replacement.with_modifier(modifier.clone())
+                    };
+                }
+
+                if replacement == target_block {
+                    // TODO: Should this count as a sort of error, or at least "warning" that
+                    // it is doing nothing even though it succeeds?
+                    return Ok((SpaceTransaction::default(), InventoryTransaction::default()));
+                }
+
+                let space_txn = CubeTransaction::replacing(Some(target_block), Some(replacement))
+                    .at(target_cube);
+
+                Ok((space_txn, InventoryTransaction::default()))
+            }
             Operation::Neighbors(neighbors) => {
                 let mut txns = OpTxn::default();
                 for &(cube, ref op) in neighbors.iter() {
@@ -124,6 +157,7 @@ impl Operation {
             // TODO: should ask if blocks are relevantly symmetric
             Operation::Become(_) => false,
             Operation::DestroyTo(_) => false,
+            Operation::AddModifiers(_) => true, // TODO: there is not a general notion of rotating a modifier, but probably there should be
             Operation::Neighbors(_) => false,
         }
     }
@@ -136,6 +170,8 @@ impl Operation {
             // TODO: need to provide a way for blocks to opt out
             Operation::Become(block) => Operation::Become(block.rotate(rotation)),
             Operation::DestroyTo(block) => Operation::DestroyTo(block.rotate(rotation)),
+            // TODO: there is not a general notion of rotating a modifier, but probably there should be
+            op @ Operation::AddModifiers(_) => op,
             Operation::Neighbors(mut neighbors) => {
                 // TODO: cheaper placeholder value, like an Operation::Nop
                 let mut placeholder = Operation::Become(AIR);
@@ -157,6 +193,7 @@ impl VisitHandles for Operation {
     fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
         match self {
             Operation::Become(block) | Operation::DestroyTo(block) => block.visit_handles(visitor),
+            Operation::AddModifiers(modifier) => modifier.visit_handles(visitor),
             Operation::Neighbors(neighbors) => {
                 for (_, op) in neighbors.iter() {
                     op.visit_handles(visitor);
@@ -188,7 +225,9 @@ crate::util::cfg_should_impl_error! {
 mod tests {
     use super::*;
     use crate::block::AIR;
-    use crate::content::make_some_blocks;
+    use crate::content::{make_some_blocks, make_some_voxel_blocks};
+    use crate::universe::Universe;
+    use all_is_cubes_base::math::Face6;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -227,6 +266,60 @@ mod tests {
                 CubeTransaction::replacing(Some(AIR), Some(block))
                     .at(Cube::ORIGIN)
                     .nonconserved(),
+                InventoryTransaction::default()
+            )
+        );
+    }
+
+    #[test]
+    fn add_modifier_rotate_txn() {
+        let mut universe = Universe::new();
+        // must use voxel blocks because they aren't considered symmetric
+        let [block] = make_some_voxel_blocks(&mut universe);
+        let mut space = Space::empty_positive(2, 1, 1);
+        space.set([0, 0, 0], block.clone()).unwrap();
+
+        let op = Operation::AddModifiers([block::Modifier::Rotate(GridRotation::CLOCKWISE)].into());
+
+        assert_eq!(
+            op.apply(&space, None, Gridgid::IDENTITY).unwrap(),
+            (
+                CubeTransaction::replacing(
+                    Some(block.clone()),
+                    Some(block.clone().rotate(GridRotation::CLOCKWISE))
+                )
+                .at(Cube::ORIGIN),
+                InventoryTransaction::default()
+            )
+        );
+
+        // Test effect on AIR; it should do nothing because the block is symmetric
+        assert_eq!(
+            op.apply(&space, None, Gridgid::from_translation([1, 0, 0]))
+                .unwrap(),
+            (SpaceTransaction::default(), InventoryTransaction::default())
+        );
+    }
+
+    /// `Rotate` has special cases; try other modifiers
+    #[test]
+    fn add_modifier_not_rotate_txn() {
+        let [block] = make_some_blocks();
+        let block = block.with_modifier(block::Modifier::Quote(block::Quote::default()));
+        let mut space = Space::empty_positive(1, 1, 1);
+        space.set([0, 0, 0], block.clone()).unwrap();
+
+        let modifier = block::Modifier::Move(block::Move::new(Face6::PX, 4, 0));
+        let op = Operation::AddModifiers([modifier.clone()].into());
+
+        assert_eq!(
+            op.apply(&space, None, Gridgid::IDENTITY).unwrap(),
+            (
+                CubeTransaction::replacing(
+                    Some(block.clone()),
+                    Some(block.clone().with_modifier(modifier))
+                )
+                .at(Cube::ORIGIN),
                 InventoryTransaction::default()
             )
         );

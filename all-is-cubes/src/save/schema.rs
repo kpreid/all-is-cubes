@@ -173,7 +173,7 @@ pub(crate) enum AnimationChangeV1Ser {
     Shape,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub(crate) enum ModifierSer<'a> {
     QuoteV1 {
@@ -340,6 +340,9 @@ pub(crate) enum OperationSer<'a> {
     },
     DestroyToV1 {
         block: Block,
+    },
+    AddModifiersV1 {
+        modifiers: Cow<'a, [ModifierSer<'a>]>,
     },
     NeighborsV1 {
         neighbors: Cow<'a, [([i32; 3], op::Operation)]>,

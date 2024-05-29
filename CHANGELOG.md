@@ -22,6 +22,7 @@
     - `math::GridSize` type alias for `euclid::Size3D<GridCoordinate, Cube>`.
     - `math::Vol::subdivide()` splits a `Vol`'s bounds and data into parts that can be processed in parallel.
 
+    - `op::Operation::AddModifiers` allows an operation to add modifiers rather than replacing a block.
     - `op::Operation::Neighbors` allows an operation to modify nearby blocks.
     - `op::Operation::DestroyTo` allows an operation to express replacing a block when the replacement is less important than `Operation::Become`.
 

@@ -617,6 +617,9 @@ mod op {
                 op::Operation::DestroyTo(block) => schema::OperationSer::DestroyToV1 {
                     block: block.clone(),
                 },
+                op::Operation::AddModifiers(modifiers) => schema::OperationSer::AddModifiersV1 {
+                    modifiers: modifiers.iter().map(schema::ModifierSer::from).collect(),
+                },
                 op::Operation::Neighbors(neighbors) => schema::OperationSer::NeighborsV1 {
                     // TODO: arrange to be able to borrow here
                     neighbors: Cow::Owned(
@@ -639,6 +642,11 @@ mod op {
             Ok(match schema::OperationSer::deserialize(deserializer)? {
                 schema::OperationSer::BecomeV1 { block } => op::Operation::Become(block),
                 schema::OperationSer::DestroyToV1 { block } => op::Operation::DestroyTo(block),
+                schema::OperationSer::AddModifiersV1 { modifiers } => op::Operation::AddModifiers(
+                    cow_into_iter(modifiers)
+                        .map(crate::block::Modifier::from)
+                        .collect(),
+                ),
                 schema::OperationSer::NeighborsV1 { neighbors } => op::Operation::Neighbors(
                     cow_into_iter(neighbors)
                         .map(|(offset, op)| (offset.into(), op))
