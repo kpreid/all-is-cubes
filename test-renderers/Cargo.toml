@@ -18,6 +18,7 @@ bench = false
 name = "bless-render"
 test = false
 doctest = false
+bench = false
 
 [[test]]
 name = "gltf-render"
