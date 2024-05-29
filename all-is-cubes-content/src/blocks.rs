@@ -112,10 +112,11 @@ pub async fn install_demo_blocks(
         }
     };
 
-    let lamp_globe_off_on: [Block; 2] = core::array::from_fn(|on| {
+    let lamp_globe = color_block!(1.0, 1.0, 1.0, 0.75);
+    let lamp_emitter_off_on: [Block; 2] = core::array::from_fn(|on| {
         Block::builder()
             .color(Rgba::WHITE)
-            .light_emission(Rgb::ONE * 20.0 * on as f32)
+            .light_emission(Rgb::ONE * 180.0 * on as f32)
             .build()
     });
     let lamppost_metal = Block::builder()
@@ -179,19 +180,24 @@ pub async fn install_demo_blocks(
                     .build_txn(txn)
             }
 
-            Lamp(on) => Block::builder()
-                .display_name("Lamp")
-                .voxels_fn(resolution, |cube| {
-                    if (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
-                        .square_length()
-                        <= resolution_g.pow(2)
-                    {
-                        &lamp_globe_off_on[usize::from(on)]
-                    } else {
-                        &AIR
-                    }
-                })?
-                .build_txn(txn),
+            Lamp(on) => {
+                let emitter_r2 = (resolution_g * 3 / 8).pow(2);
+                let globe_r2 = resolution_g.pow(2);
+                Block::builder()
+                    .display_name("Lamp")
+                    .voxels_fn(resolution, |cube| {
+                        let r2 = (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
+                            .square_length();
+                        if r2 <= emitter_r2 {
+                            &lamp_emitter_off_on[usize::from(on)]
+                        } else if r2 <= globe_r2 {
+                            &lamp_globe
+                        } else {
+                            &AIR
+                        }
+                    })?
+                    .build_txn(txn)
+            }
 
             LamppostSegment => Block::builder()
                 .display_name("Lamppost")
@@ -245,27 +251,33 @@ pub async fn install_demo_blocks(
                 })?
                 .build_txn(txn),
 
-            Sconce(on) => Block::builder()
-                .display_name("Sconce")
-                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
-                .voxels_fn(resolution, |cube| {
-                    // TODO: fancier/tidier appearance; this was just some tinkering from the original `Lamp` sphere
-                    let r2 = (cube.lower_bounds() * 2 + one_diagonal
-                        - center_point_doubled
-                            .to_vector()
-                            .component_mul(GridVector::new(1, 1, 0)))
-                    .to_vector()
-                    .component_mul(GridVector::new(3, 1, 1))
-                    .square_length();
-                    if r2 <= (resolution_g - 2).pow(2) {
-                        &lamp_globe_off_on[usize::from(on)]
-                    } else if r2 <= (resolution_g + 4).pow(2) && cube.z == 0 {
-                        &lamppost_metal
-                    } else {
-                        &AIR
-                    }
-                })?
-                .build_txn(txn),
+            Sconce(on) => {
+                let emitter_r2 = (resolution_g / 4).pow(2);
+                let globe_r2 = (resolution_g - 2).pow(2);
+                Block::builder()
+                    .display_name("Sconce")
+                    .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
+                    .voxels_fn(resolution, |cube| {
+                        // TODO: fancier/tidier appearance; this was just some tinkering from the original `Lamp` sphere
+                        let r2 = (cube.lower_bounds() * 2 + one_diagonal
+                            - center_point_doubled
+                                .to_vector()
+                                .component_mul(GridVector::new(1, 1, 0)))
+                        .to_vector()
+                        .component_mul(GridVector::new(3, 1, 1))
+                        .square_length();
+                        if r2 <= emitter_r2 {
+                            &lamp_emitter_off_on[usize::from(on)]
+                        } else if r2 <= globe_r2 {
+                            &lamp_globe
+                        } else if r2 <= (resolution_g + 4).pow(2) && cube.z == 0 {
+                            &lamppost_metal
+                        } else {
+                            &AIR
+                        }
+                    })?
+                    .build_txn(txn)
+            }
 
             Arrow => {
                 let mut space = Space::for_block(resolution).build();
