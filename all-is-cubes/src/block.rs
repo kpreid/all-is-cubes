@@ -12,11 +12,7 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use crate::listen::{Listen as _, Listener};
-use crate::math::{
-    Cube, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba,
-    Vol,
-};
-use crate::raycast::Ray;
+use crate::math::{GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba, Vol};
 use crate::space::{SetCubeError, Space, SpaceChange};
 use crate::universe::{Handle, HandleVisitor, VisitHandles};
 
@@ -845,21 +841,6 @@ mod arbitrary_block {
 ///
 /// When evaluated, will always produce [`AIR_EVALUATED`].
 pub const AIR: Block = Block(BlockPtr::Static(&Primitive::Air));
-
-/// Given the `resolution` of some recursive block occupying `cube`, transform `ray`
-/// into an equivalent ray intersecting the recursive grid.
-///
-// TODO: Replace this with the ability to ask a Raycaster to zoom in,
-// for more precision in edge cases
-#[inline]
-pub(crate) fn recursive_ray(ray: Ray, cube: Cube, resolution: Resolution) -> Ray {
-    Ray {
-        origin: ((ray.origin - cube.lower_bounds().map(FreeCoordinate::from))
-            * FreeCoordinate::from(resolution))
-        .to_point(),
-        direction: ray.direction,
-    }
-}
 
 // TODO: uncomfortable with where this impl block is located
 impl Primitive {

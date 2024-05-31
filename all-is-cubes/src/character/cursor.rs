@@ -6,7 +6,7 @@ use core::fmt;
 
 use euclid::point3;
 
-use crate::block::{recursive_ray, Block, EvaluatedBlock, Evoxel, Evoxels};
+use crate::block::{Block, EvaluatedBlock, Evoxel, Evoxels};
 use crate::content::palette;
 use crate::math::{
     Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry, GridCoordinate,
@@ -48,24 +48,23 @@ pub fn cursor_raycast(
                 face_selected = Some(step.face());
             }
             Evoxels::Many(resolution, ref voxels) => {
-                let recursive_hit: Option<(Cube, &Evoxel)> =
-                    recursive_ray(ray, step.cube_ahead(), resolution)
-                        .cast()
-                        .within(voxels.bounds())
-                        .filter_map(|voxel_step| {
-                            if face_selected.is_none() {
-                                // Set the selected face to the first face we hit, which
-                                // will be the face of the bounding box we hit.
-                                // TODO: Either don't rely on the bounding box (perhaps
-                                // only take faces of selectable voxels) or change block
-                                // evaluation to make the bounding box guaranteed tight.
-                                face_selected = Some(voxel_step.face());
-                            }
-                            voxels
-                                .get(voxel_step.cube_ahead())
-                                .map(|v| (voxel_step.cube_ahead(), v))
-                        })
-                        .find(|(_, v)| v.selectable);
+                let recursive_hit: Option<(Cube, &Evoxel)> = step
+                    .recursive_raycast(ray, resolution, voxels.bounds())
+                    .0
+                    .filter_map(|voxel_step| {
+                        if face_selected.is_none() {
+                            // Set the selected face to the first face we hit, which
+                            // will be the face of the bounding box we hit.
+                            // TODO: Either don't rely on the bounding box (perhaps
+                            // only take faces of selectable voxels) or change block
+                            // evaluation to make the bounding box guaranteed tight.
+                            face_selected = Some(voxel_step.face());
+                        }
+                        voxels
+                            .get(voxel_step.cube_ahead())
+                            .map(|v| (voxel_step.cube_ahead(), v))
+                    })
+                    .find(|(_, v)| v.selectable);
                 if recursive_hit.is_none() {
                     continue;
                 }

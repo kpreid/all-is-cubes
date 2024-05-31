@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use euclid::Vector3D;
 
-use crate::block::{recursive_ray, Evoxel, Evoxels};
+use crate::block::{Evoxel, Evoxels};
 use crate::camera::LightingOption;
 use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, FreePoint, Rgb, Rgba, Vol};
 use crate::raycast::{Ray, Raycaster};
@@ -223,12 +223,13 @@ impl<'a, D> Iterator for SurfaceIter<'a, D> {
             }
             Evoxels::Many(resolution, ref array) => {
                 let block_cube = rc_step.cube_ahead();
-                let sub_ray = recursive_ray(self.ray, block_cube, resolution);
+                let (sub_raycaster, sub_ray) =
+                    rc_step.recursive_raycast(self.ray, resolution, array.bounds());
                 let antiscale = FreeCoordinate::from(resolution).recip();
 
                 self.current_block = Some(VoxelSurfaceIter {
                     voxel_ray: sub_ray,
-                    voxel_raycaster: sub_ray.cast().within(array.bounds()),
+                    voxel_raycaster: sub_raycaster,
                     block_data: &tb.block_data,
                     antiscale,
                     array,
@@ -278,7 +279,7 @@ impl<'a, D> VoxelSurfaceIter<'a, D> {
             emission: voxel.emission,
             cube: self.block_cube,
             // Note: The proper scaling here depends on the direction vector scale, that
-            // recursive_ray() _doesn't_ change.
+            // recursive_raycast() _doesn't_ change.
             t_distance: rc_step.t_distance() * self.antiscale,
             intersection_point: rc_step.intersection_point(self.voxel_ray) * self.antiscale
                 + self

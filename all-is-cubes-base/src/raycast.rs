@@ -192,6 +192,15 @@ impl Geometry for Ray {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Raycaster {
     /// The ray being cast.
+    ///
+    /// Note that this is not the *original* ray, in two cases:
+    ///
+    /// * [`Self::fast_forward()`] replaces it with a ray moved forward.
+    /// * If the original ray numbers are large and would break the algorithm,
+    ///   they are replaced with zero.
+    ///
+    /// TODO: Remove those cases so that we can provide a getter for the original ray,
+    /// which is useful in `intersection_point()` and `recursive_raycast()`.
     ray: Ray,
 
     /// Have we not yet produced the origin cube itself?
@@ -719,6 +728,43 @@ impl RaycastStep {
             }
             intersection_point
         }
+    }
+
+    /// Subdivide the [`cube_ahead`](Self::cube_ahead) into smaller cubes,
+    /// and start a raycast on that grid.
+    ///
+    /// `bounds` will constrain the raycaster exactly like [`Raycaster::within()`].
+    /// It should be no larger than `GridAab::for_block(resolution)`;
+    /// if it is, then whether the output includes those additional cubes is unspecified.
+    ///
+    /// The length of the adjusted ray is unaltered, so the `t` increments per cube will be
+    /// the same as they were for the original raycast.
+    // TODO: That length may not be ideal; review use cases.
+    //
+    // TODO: This doc comment could really use a diagram.
+    //
+    // TODO: Remove `Ray` from the return value, and instead make it possible to get the
+    // real original `Ray` from any `Raycaster`.
+    #[allow(clippy::missing_inline_in_public_items)]
+    #[doc(hidden)] // want to improve its robustness before making it public API
+    pub fn recursive_raycast(
+        &self,
+        ray: Ray,
+        resolution: crate::resolution::Resolution,
+        bounds: GridAab,
+    ) -> (Raycaster, Ray) {
+        // TODO: Replace this with making use of the step and raycaster's information
+        // such that the produced raycaster is guaranteed to produce at least one cube
+        // on the face that `self` hits (rather than possibly missing everything due to
+        // rounding error).
+        let cube = self.cube_ahead();
+        let sub_ray = Ray {
+            origin: ((ray.origin - cube.lower_bounds().map(FreeCoordinate::from))
+                * FreeCoordinate::from(resolution))
+            .to_point(),
+            direction: ray.direction,
+        };
+        (sub_ray.cast().within(bounds), sub_ray)
     }
 }
 
