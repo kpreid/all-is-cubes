@@ -14,6 +14,7 @@ use crate::math::{
     Axis, Cube, CubeFace, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab,
     GridCoordinate, GridPoint, GridVector, LineVertex,
 };
+use crate::resolution::Resolution;
 
 /// Vector unit type for units of "t" (ray-length).
 enum Tc {}
@@ -750,7 +751,7 @@ impl RaycastStep {
     pub fn recursive_raycast(
         &self,
         ray: Ray,
-        resolution: crate::resolution::Resolution,
+        resolution: Resolution,
         bounds: GridAab,
     ) -> (Raycaster, Ray) {
         // TODO: Replace this with making use of the step and raycaster's information
@@ -1294,6 +1295,30 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn recursive_simple() {
+        let ray = Ray::new([-1., 10.125, 0.125], [1.0, 0.0, 0.0]);
+        let resolution = Resolution::R4;
+
+        let outer_step = ray.cast().nth(1).unwrap();
+        assert_eq!(outer_step.cube_ahead(), Cube::new(0, 10, 0));
+
+        let (mut inner_raycaster, inner_ray) =
+            outer_step.recursive_raycast(ray, resolution, GridAab::for_block(resolution));
+
+        assert_eq!(inner_ray, Ray::new([-4., 0.5, 0.5], [1.0, 0.0, 0.0]));
+        assert_steps_option(
+            &mut inner_raycaster,
+            vec![
+                Some(step(0, 0, 0, Face7::NX, 4.0)),
+                Some(step(1, 0, 0, Face7::NX, 5.0)),
+                Some(step(2, 0, 0, Face7::NX, 6.0)),
+                Some(step(3, 0, 0, Face7::NX, 7.0)),
+                None,
+            ],
+        );
     }
 
     #[test]
