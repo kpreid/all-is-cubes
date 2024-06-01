@@ -2,7 +2,7 @@
 //! This module is private but reexported by its parent.
 
 use core::fmt;
-use core::ops::{Index, IndexMut};
+use core::ops;
 
 use euclid::Vector3D;
 
@@ -211,7 +211,7 @@ impl Face6 {
     #[must_use]
     pub fn normal_vector<S, U>(self) -> Vector3D<S, U>
     where
-        S: Zero + num_traits::One + core::ops::Neg<Output = S>,
+        S: Zero + num_traits::One + ops::Neg<Output = S>,
     {
         self.into7().normal_vector()
     }
@@ -232,7 +232,7 @@ impl Face6 {
     #[must_use]
     pub fn dot<S, U>(self, vector: Vector3D<S, U>) -> S
     where
-        S: Zero + core::ops::Neg<Output = S>,
+        S: Zero + ops::Neg<Output = S>,
     {
         self.into7().dot(vector)
     }
@@ -440,7 +440,7 @@ impl Face7 {
     #[must_use]
     pub fn normal_vector<S, U>(self) -> Vector3D<S, U>
     where
-        S: Zero + num_traits::One + core::ops::Neg<Output = S>,
+        S: Zero + num_traits::One + ops::Neg<Output = S>,
     {
         match self {
             Face7::Within => Vector3D::new(S::zero(), S::zero(), S::zero()),
@@ -469,7 +469,7 @@ impl Face7 {
     #[must_use]
     pub fn dot<S, U>(self, vector: Vector3D<S, U>) -> S
     where
-        S: Zero + core::ops::Neg<Output = S>,
+        S: Zero + ops::Neg<Output = S>,
     {
         match self {
             Face7::Within => S::zero(),
@@ -807,7 +807,7 @@ impl<V: Copy> FaceMap<V> {
     }
 }
 
-impl<V> Index<Face6> for FaceMap<V> {
+impl<V> ops::Index<Face6> for FaceMap<V> {
     type Output = V;
     #[inline]
     fn index(&self, face: Face6) -> &V {
@@ -822,7 +822,7 @@ impl<V> Index<Face6> for FaceMap<V> {
     }
 }
 
-impl<V> IndexMut<Face6> for FaceMap<V> {
+impl<V> ops::IndexMut<Face6> for FaceMap<V> {
     #[inline]
     fn index_mut(&mut self, face: Face6) -> &mut V {
         match face {
