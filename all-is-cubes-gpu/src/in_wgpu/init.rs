@@ -4,27 +4,70 @@
 //! for downstream users of the libraries.
 
 use std::future::Future;
+use std::io::Write as _;
 use std::sync::Arc;
 
 use all_is_cubes::camera::{self, Rendering};
 use all_is_cubes::math::area_usize;
 
-/// Create a [`wgpu::Instance`] and [`wgpu::Adapter`] controlled by environment variables,
+/// Create a [`wgpu::Instance`] controlled by environment variables.
+/// Then, check if the instance has any usable adapters,
+/// and exit the process if it does not.
+/// Print status information to stderr.
+#[doc(hidden)]
+pub async fn create_instance_for_test_or_exit() -> wgpu::Instance {
+    let stderr = &mut std::io::stderr();
+    let backends = wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
+
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends,
+        ..Default::default()
+    });
+
+    // Report adapters that we *could* pick
+    _ = writeln!(
+        stderr,
+        "Available adapters (backend filter = {backends:?}):"
+    );
+    for adapter in instance.enumerate_adapters(wgpu::Backends::all()) {
+        _ = writeln!(stderr, "  {}", shortened_adapter_info(&adapter.get_info()));
+    }
+
+    let adapter = try_create_adapter_for_test(&instance, |m| _ = writeln!(stderr, "{m}")).await;
+    if adapter.is_none() {
+        let _ = writeln!(
+            stderr,
+            "Skipping rendering tests due to lack of suitable wgpu::Adapter."
+        );
+        std::process::exit(0);
+    }
+
+    instance
+}
+
+/// Create a [`wgpu::Adapter`] controlled by environment variables.
+///
+/// Panics if creation fails.
+/// This should not happen unless the `Instance` was not obtained from
+/// [`create_instance_for_test_or_exit()`], or an adapter becomes unavailable
+/// while the test is running.
+#[doc(hidden)]
+pub async fn create_adapter_for_test(instance: &wgpu::Instance) -> wgpu::Adapter {
+    try_create_adapter_for_test(instance, |_| {})
+        .await
+        .expect("adapter creation unexpectedly failed")
+}
+
+/// Create a [`wgpu::Adapter`] controlled by environment variables,
 /// and print information about the decision made.
 ///
 /// `log` receives whole lines with no trailing newlines, as suitable for logging or
 /// printing using [`println!()`].
 #[doc(hidden)]
-pub async fn create_instance_and_adapter_for_test(
+pub async fn try_create_adapter_for_test(
+    instance: &wgpu::Instance,
     mut log: impl FnMut(std::fmt::Arguments<'_>),
-) -> (wgpu::Instance, Option<wgpu::Adapter>) {
-    let requested_backends =
-        wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: requested_backends,
-        ..Default::default()
-    });
-
+) -> Option<wgpu::Adapter> {
     // For WebGL we need a Surface.
     #[cfg(target_family = "wasm")]
     let surface = {
@@ -33,29 +76,18 @@ pub async fn create_instance_and_adapter_for_test(
         match instance.create_surface(wgpu::SurfaceTarget::OffscreenCanvas(canvas)) {
             Ok(surface) => Some(surface),
             // If we can't make a surface then we can't make an adapter.
-            Err(_) => return (instance, None),
+            Err(_) => return None,
         }
     };
     #[cfg(not(target_family = "wasm"))]
     let surface = None;
-
-    // Report adapters that we *could* pick
-    log(format_args!(
-        "Available adapters (backend filter = {requested_backends:?}):"
-    ));
-    for adapter in instance.enumerate_adapters(wgpu::Backends::all()) {
-        log(format_args!(
-            "  {}",
-            shortened_adapter_info(&adapter.get_info())
-        ));
-    }
 
     // Pick an adapter.
     // TODO: Replace this with
     //   wgpu::util::initialize_adapter_from_env_or_default(&instance, wgpu::Backends::all(), None)
     // (which defaults to low-power) or even better, test on *all* available adapters?
     let mut adapter: Option<wgpu::Adapter> =
-        wgpu::util::initialize_adapter_from_env(&instance, surface.as_ref());
+        wgpu::util::initialize_adapter_from_env(instance, surface.as_ref());
     if adapter.is_none() {
         log(format_args!(
             "No adapter specified via WGPU_ADAPTER_NAME; picking automatically."
@@ -90,7 +122,7 @@ pub async fn create_instance_and_adapter_for_test(
         ));
     }
 
-    (instance, adapter)
+    adapter
 }
 
 #[allow(dead_code)] // conditionally used

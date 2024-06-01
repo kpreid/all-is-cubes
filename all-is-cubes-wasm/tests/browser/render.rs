@@ -4,7 +4,6 @@
 //! TODO: Consider expanding this out to running all of test-renderers. This will need more work.
 
 use core::time::Duration;
-use std::sync::Arc;
 
 use wasm_bindgen_test::wasm_bindgen_test;
 
@@ -18,8 +17,8 @@ use all_is_cubes_wasm::AdaptedInstant as Instant;
 
 #[wasm_bindgen_test]
 async fn renderer_test() {
-    let (_instance, adapter) =
-        init::create_instance_and_adapter_for_test(|msg| eprintln!("{msg}")).await;
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
+    let adapter = init::try_create_adapter_for_test(&instance, |msg| eprintln!("{msg}")).await;
 
     // Skip this test if no adapter available
     let Some(adapter) = adapter else { return };
@@ -43,11 +42,10 @@ async fn renderer_test() {
     );
     let world_space = cameras.world_space().snapshot().unwrap();
 
-    let mut renderer =
-        all_is_cubes_gpu::in_wgpu::headless::Builder::from_adapter(Arc::new(adapter))
-            .await
-            .unwrap()
-            .build(cameras.clone());
+    let mut renderer = all_is_cubes_gpu::in_wgpu::headless::Builder::from_adapter(adapter)
+        .await
+        .unwrap()
+        .build(cameras.clone());
     renderer.update(None).await.unwrap();
     let image = renderer.draw("").await.unwrap();
 
