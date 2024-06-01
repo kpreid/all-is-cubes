@@ -142,6 +142,7 @@ cfg_if::cfg_if! {
         impl<T> ErrorIfStd for T where T: fmt::Debug + fmt::Display {}
 
         impl From<&str> for Box<dyn ErrorIfStd + Send + Sync> {
+            #[allow(clippy::missing_inline_in_public_items)]
             fn from(s: &str) -> Self {
                 Box::new(alloc::string::String::from(s))
             }
@@ -325,6 +326,7 @@ pub fn assert_send_sync<T: Send + Sync>() {
 pub fn assert_conditional_send_sync<T: Send + Sync>() {}
 #[cfg(not(feature = "std"))]
 #[doc(hidden)] // for use in internal tests only
+#[allow(clippy::missing_inline_in_public_items)]
 pub fn assert_conditional_send_sync<T>() {}
 
 #[cfg(test)]
