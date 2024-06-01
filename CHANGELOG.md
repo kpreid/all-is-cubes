@@ -76,6 +76,9 @@
         
     - The macros `rgb_const!`, `rgba_const!`, and `notnan!` have been moved to the `math` module.
 
+- `all-is-cubes-gpu` library:
+    - `in_wgpu::headless::Builder::from_adapter()` requires `wgpu::Adapter` instead of `Arc<wgpu::Adapter>`.
+
 - `all-is-cubes-mesh` library:
     - The return type of `GetBlockMesh::get_block_mesh()` has changed to `Option<&BlockMesh>`.
       `None` is to be returned when the implementor intends to request that the block be _omitted_ from a produced `SpaceMesh` (such as when it is being rendered separately) rather than the mesh merely being empty (invisible).

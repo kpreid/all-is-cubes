@@ -23,37 +23,22 @@ fn main() {
 
     let mut criterion: Criterion<_> = Criterion::default().configure_from_args();
 
-    let (_, adapter) = runtime.block_on(init::create_instance_and_adapter_for_test(|msg| {
-        eprintln!("{msg}")
-    }));
-    let adapter = match adapter {
-        Some(adapter) => Arc::new(adapter),
-        None => {
-            // TODO: kludge; would be better if we could get the mode out of Criterion
-            if cfg!(test) || std::env::args().any(|s| s == "--test") {
-                eprintln!("GPU not available; skipping actually testing bench functions");
-                return;
-            } else {
-                panic!("benches/wgpu requires a GPU, but no adapter was found");
-            }
-        }
-    };
+    let instance = runtime.block_on(init::create_instance_for_test_or_exit());
 
-    render_benches(&runtime, &mut criterion, &adapter);
-    module_benches(&runtime, &mut criterion, &adapter);
+    render_benches(&runtime, &mut criterion, &instance);
+    module_benches(&runtime, &mut criterion, &instance);
 
     criterion.final_summary();
 }
 
 #[allow(clippy::await_holding_lock)]
-fn render_benches(runtime: &Runtime, c: &mut Criterion, adapter: &Arc<wgpu::Adapter>) {
+fn render_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance) {
     let mut g = c.benchmark_group("render");
 
     // Benchmark for running update() only. Insofar as this touches the GPU it will
     // naturally fill up the pipeline as Criterion iterates it.
     g.bench_function("update-only", |b| {
-        let (mut universe, space, renderer) =
-            runtime.block_on(create_updated_renderer(adapter.clone()));
+        let (mut universe, space, renderer) = runtime.block_on(create_updated_renderer(instance));
 
         let [block] = make_some_blocks();
         let txn1 =
@@ -74,8 +59,7 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion, adapter: &Arc<wgpu::Adap
     // latency since it must wait for the image to be fetched. TODO: Figure out how to
     // improve that.
     g.bench_function("draw-only", |b| {
-        let (_universe, _space, renderer) =
-            runtime.block_on(create_updated_renderer(adapter.clone()));
+        let (_universe, _space, renderer) = runtime.block_on(create_updated_renderer(instance));
 
         b.to_async(runtime).iter_with_large_drop(move || {
             let renderer = renderer.clone();
@@ -94,7 +78,7 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion, adapter: &Arc<wgpu::Adap
 }
 
 async fn create_updated_renderer(
-    adapter: Arc<wgpu::Adapter>,
+    instance: &wgpu::Instance,
 ) -> (
     Universe,
     universe::Handle<Space>,
@@ -113,6 +97,7 @@ async fn create_updated_renderer(
         .insert("character".into(), Character::spawn_default(space.clone()))
         .unwrap();
 
+    let adapter = init::create_adapter_for_test(instance).await;
     let mut renderer = headless::Builder::from_adapter(adapter)
         .await
         .unwrap()
@@ -129,13 +114,18 @@ async fn create_updated_renderer(
 }
 
 /// Benchmarks for internal components
-fn module_benches(runtime: &Runtime, c: &mut Criterion, adapter: &Arc<wgpu::Adapter>) {
+fn module_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance) {
     let mut g = c.benchmark_group("mod");
     g.sample_size(400); // increase sample size from default 100 to reduce noise
     g.measurement_time(Duration::from_secs(10));
 
     let (device, queue) = runtime
-        .block_on(adapter.request_device(&wgpu::DeviceDescriptor::default(), None))
+        .block_on(async {
+            let adapter = init::create_adapter_for_test(instance).await;
+            adapter
+                .request_device(&wgpu::DeviceDescriptor::default(), None)
+                .await
+        })
         .unwrap();
 
     g.bench_function("light-update", |b| {

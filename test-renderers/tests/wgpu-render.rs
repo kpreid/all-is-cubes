@@ -1,8 +1,5 @@
 //! Runs [`test_renderers::harness_main`] against [`all_is_cubes_gpu::in_wgpu`].
 
-use std::process::ExitCode;
-use std::sync::Arc;
-
 use clap::Parser as _;
 use tokio::sync::OnceCell;
 
@@ -14,14 +11,9 @@ use test_renderers::{RendererFactory, RendererId};
 async fn main() -> test_renderers::HarnessResult {
     test_renderers::initialize_logging();
 
-    let (_instance, adapter) =
-        init::create_instance_and_adapter_for_test(|msg| eprintln!("{msg}")).await;
-    if let Some(adapter) = adapter {
-        WGPU_ADAPTER.set(Arc::new(adapter)).unwrap();
-    } else {
-        eprintln!("Skipping rendering tests due to lack of wgpu::Adapter.");
-        return ExitCode::SUCCESS;
-    };
+    WGPU_INSTANCE
+        .set(init::create_instance_for_test_or_exit().await)
+        .unwrap();
 
     let parallelism = if option_env!("CI").is_some() && cfg!(target_os = "macos") {
         // Workaround for limited available memory on macOS CI.
@@ -35,29 +27,25 @@ async fn main() -> test_renderers::HarnessResult {
         RendererId::Wgpu,
         test_renderers::SuiteId::Renderers,
         test_renderers::test_cases::all_tests,
-        get_factory,
+        move || async move { get_factory().await.unwrap() },
         parallelism,
     )
     .await
 }
 
 /// We don't share the [`wgpu::Device`] because it can enter failure states,
-/// but we can use just one [`wgpu::Adapter`] to create all of them.
-/// TODO: Should we bother not making this global, but threading it through
-/// the test harness? Probably, in the form of some `impl TestRenderer`.
-static WGPU_ADAPTER: OnceCell<Arc<wgpu::Adapter>> = OnceCell::const_new();
+/// but we can use just one [`wgpu::Instance`] to create all of them.
+static WGPU_INSTANCE: OnceCell<wgpu::Instance> = OnceCell::const_new();
 
-async fn get_factory() -> WgpuFactory {
+async fn get_factory() -> Result<WgpuFactory, Box<dyn std::error::Error + Send + Sync>> {
     // Temporary workaround for <https://github.com/gfx-rs/wgpu/issues/3498>:
     // Create a new adapter every time, rather than sharing one.
     // TODO: Either remove this or keep it and remove WGPU_ADAPTER.
-    let (_instance, adapter) = init::create_instance_and_adapter_for_test(|_| {}).await;
-    let adapter = Arc::new(adapter.expect("failed to obtain wgpu::Adapter"));
+    let adapter =
+        init::create_adapter_for_test(WGPU_INSTANCE.get().expect("instance not initialized")).await;
 
-    let builder = headless::Builder::from_adapter(adapter)
-        .await
-        .expect("Adapter::request_device() failed");
-    WgpuFactory { builder }
+    let builder = headless::Builder::from_adapter(adapter).await?;
+    Ok(WgpuFactory { builder })
 }
 
 #[derive(Clone, Debug)]

@@ -13,7 +13,10 @@ use all_is_cubes::util::Executor;
 use crate::common::{AdaptedInstant, FrameBudget};
 use crate::in_wgpu::{self, init};
 
-/// Builder for the headless [`Renderer`].
+/// Builder for configuring a headless [`Renderer`].
+///
+/// The builder owns a `wgpu::Device`; all created renderers will share this device.
+/// If the device is lost, a new `Builder` must be created.
 #[derive(Clone, Debug)]
 pub struct Builder {
     executor: Arc<dyn Executor>,
@@ -25,9 +28,7 @@ pub struct Builder {
 impl Builder {
     /// Create a [`Builder`] by obtaining a new [`wgpu::Device`] from the given adapter.
     #[cfg_attr(target_family = "wasm", allow(clippy::arc_with_non_send_sync))]
-    pub async fn from_adapter(
-        adapter: Arc<wgpu::Adapter>,
-    ) -> Result<Self, wgpu::RequestDeviceError> {
+    pub async fn from_adapter(adapter: wgpu::Adapter) -> Result<Self, wgpu::RequestDeviceError> {
         let (device, queue) = adapter
             .request_device(
                 &in_wgpu::EverythingRenderer::<AdaptedInstant>::device_descriptor(adapter.limits()),
@@ -37,7 +38,7 @@ impl Builder {
         Ok(Self {
             device: Arc::new(device),
             queue: Arc::new(queue),
-            adapter,
+            adapter: Arc::new(adapter),
             executor: Arc::new(()),
         })
     }
