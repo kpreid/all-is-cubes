@@ -483,6 +483,21 @@ impl Face7 {
     }
 }
 
+impl ops::Neg for Face6 {
+    type Output = Self;
+    #[inline]
+    fn neg(self) -> Self::Output {
+        self.opposite()
+    }
+}
+impl ops::Neg for Face7 {
+    type Output = Self;
+    #[inline]
+    fn neg(self) -> Self::Output {
+        self.opposite()
+    }
+}
+
 impl From<Face6> for Face7 {
     #[inline]
     fn from(value: Face6) -> Self {
