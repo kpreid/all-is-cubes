@@ -4,10 +4,9 @@ use std::fmt;
 
 use all_is_cubes::euclid;
 
-use gltf_json::validation::Checked::Valid;
-use gltf_json::Index;
+use gltf::Index;
 
-/// For a [`gltf_json::Accessor`], find the elementwise minimum and maximum values
+/// For a [`gltf::Accessor`], find the elementwise minimum and maximum values
 /// in a slice of arrays of some kind of value.
 pub(crate) fn accessor_minmax<I, const N: usize>(items: I) -> [Option<serde_json::Value>; 2]
 where
@@ -73,29 +72,9 @@ impl From<Lef32> for f32 {
     }
 }
 
-pub(crate) fn convert_quaternion<Src, Dst>(
-    q: euclid::Rotation3D<f64, Src, Dst>,
-) -> gltf_json::scene::UnitQuaternion {
+pub(crate) fn convert_quaternion<Src, Dst>(q: euclid::Rotation3D<f64, Src, Dst>) -> [f32; 4] {
     let q = q.normalize(); // shouldn't be *necessary* but…
-    gltf_json::scene::UnitQuaternion([q.i as f32, q.j as f32, q.k as f32, q.r as f32])
-}
-
-/// Shorthand to construct a `Node` having no contents until modified.
-pub(crate) fn empty_node(name: Option<String>) -> gltf_json::Node {
-    gltf_json::Node {
-        camera: None,
-        children: None,
-        extensions: Default::default(),
-        extras: Default::default(),
-        matrix: None,
-        mesh: None,
-        name,
-        rotation: None,
-        scale: None,
-        translation: None,
-        skin: None,
-        weights: None,
-    }
+    [q.i as f32, q.j as f32, q.k as f32, q.r as f32]
 }
 
 /// Create an Accessor and compute the min and max from the data, which must be consistent with the buffer.
@@ -104,10 +83,10 @@ pub(crate) fn empty_node(name: Option<String>) -> gltf_json::Node {
 #[track_caller]
 pub(crate) fn create_accessor<I, const COMPONENTS: usize>(
     name: String,
-    buffer_view: Index<gltf_json::buffer::View>,
+    buffer_view: Index<gltf::buffer::View>,
     byte_offset: usize,
     data_view: I,
-) -> gltf_json::Accessor
+) -> gltf::Accessor
 where
     I: IntoIterator<Item = [f32; COMPONENTS], IntoIter: ExactSizeIterator>,
 {
@@ -121,28 +100,26 @@ where
         "glTF accessor {name:?} must have a size greater than 0"
     );
 
-    gltf_json::Accessor {
+    gltf::Accessor {
         buffer_view: Some(buffer_view),
         byte_offset: Some(byte_offset.into()),
         count: count.into(),
-        component_type: Valid(gltf_json::accessor::GenericComponentType(
-            gltf_json::accessor::ComponentType::F32,
-        )),
-        type_: Valid(match COMPONENTS {
-            1 => gltf_json::accessor::Type::Scalar,
-            2 => gltf_json::accessor::Type::Vec2,
-            3 => gltf_json::accessor::Type::Vec3,
-            4 => gltf_json::accessor::Type::Vec4,
+        component_type: gltf::accessor::ComponentType::F32,
+        attribute_type: match COMPONENTS {
+            1 => gltf::accessor::AttributeType::Scalar,
+            2 => gltf::accessor::AttributeType::Vec2,
+            3 => gltf::accessor::AttributeType::Vec3,
+            4 => gltf::accessor::AttributeType::Vec4,
             _ => panic!(
                 "glTF accessor {name:?} must have a component count of 1 to 4, not {COMPONENTS}"
             ),
-        }),
+        },
         min,
         max,
         name: Some(name),
         normalized: false,
         sparse: None,
-        extensions: Default::default(),
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     }
 }

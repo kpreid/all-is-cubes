@@ -14,7 +14,7 @@ use all_is_cubes_mesh as mesh;
 use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, MeshId};
 use all_is_cubes_mesh::MeshTypes;
 use all_is_cubes_port::gltf::{
-    json as gltf_json, GltfMt, GltfTextureAllocator, GltfWriter, MeshInstance,
+    gltf_lib as gltf, GltfMt, GltfTextureAllocator, GltfWriter, MeshInstance,
 };
 use all_is_cubes_render::camera;
 
@@ -133,7 +133,7 @@ pub(crate) enum MeshRecordMsg {
 ///
 /// If the inner `Option` is `None`, then the original input mesh was empty, so there is
 /// no glTF mesh.
-type MeshIndexCell = Arc<std::sync::OnceLock<Option<gltf_json::Index<gltf_json::Mesh>>>>;
+type MeshIndexCell = Arc<std::sync::OnceLock<Option<gltf::Index<gltf::Mesh>>>>;
 
 /// Spawn a thread that receives [`MeshRecordMsg`] and writes glTF data.
 pub(super) fn start_gltf_writing(
@@ -189,11 +189,7 @@ pub(super) fn start_gltf_writing(
             }
 
             // Write and close file
-            writer
-                .into_root(frame_pace)
-                .unwrap()
-                .to_writer_pretty(&file)
-                .unwrap();
+            serde_json::to_writer_pretty(&file, &writer.into_root(frame_pace).unwrap()).unwrap();
             file.sync_all().unwrap();
             drop(file);
             // TODO: communicate "successfully completed" or errors on the status channel

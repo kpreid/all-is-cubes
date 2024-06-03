@@ -2,8 +2,6 @@
 
 use std::io;
 
-use gltf_json::validation::Checked::Valid;
-
 use all_is_cubes::block::Evoxel;
 use all_is_cubes::euclid::Point2D;
 use all_is_cubes::math::{Axis, GridAab, GridRotation, Vol};
@@ -46,7 +44,7 @@ impl GltfTextureAllocator {
         self.gatherer.is_empty()
     }
 
-    pub(crate) fn write_png_atlas(&self) -> Result<gltf_json::Buffer, io::Error> {
+    pub(crate) fn write_png_atlas(&self) -> Result<gltf::Buffer, io::Error> {
         let image: image::RgbaImage = self.gatherer.build_atlas();
         let buffer = self
             .destination
@@ -209,44 +207,44 @@ pub struct GltfAtlasPoint {
 
 /// Generate the atlas texture and necessary glTF entities.
 pub(super) fn insert_block_texture_atlas(
-    root: &mut gltf_json::Root,
+    root: &mut gltf::Root,
     allocator: &GltfTextureAllocator,
-) -> Result<gltf_json::Index<gltf_json::Texture>, io::Error> {
+) -> Result<gltf::Index<gltf::Texture>, io::Error> {
     let block_texture_buffer = allocator.write_png_atlas()?;
-    let block_texture_len = block_texture_buffer.byte_length;
+    let block_texture_len = block_texture_buffer.length;
     let block_texture_buffer = root.push(block_texture_buffer);
-    let block_texture_buffer_view = root.push(gltf_json::buffer::View {
+    let block_texture_buffer_view = root.push(gltf::buffer::View {
         buffer: block_texture_buffer,
-        byte_length: block_texture_len,
-        byte_offset: None,
-        byte_stride: None,
+        length: block_texture_len,
+        offset: gltf::validation::USize64(0),
+        stride: None,
         name: Some("block texture".into()),
         target: None,
-        extensions: None,
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
-    let block_texture_sampler = root.push(gltf_json::texture::Sampler {
-        mag_filter: Some(Valid(gltf_json::texture::MagFilter::Nearest)),
-        min_filter: Some(Valid(gltf_json::texture::MinFilter::Linear)),
+    let block_texture_sampler = root.push(gltf::texture::Sampler {
+        mag_filter: Some(gltf::texture::MagFilter::Nearest),
+        min_filter: Some(gltf::texture::MinFilter::Linear),
         name: Some("block texture".into()),
-        wrap_s: Valid(gltf_json::texture::WrappingMode::ClampToEdge),
-        wrap_t: Valid(gltf_json::texture::WrappingMode::ClampToEdge),
-        extensions: None,
+        wrap_s: gltf::texture::WrappingMode::ClampToEdge,
+        wrap_t: gltf::texture::WrappingMode::ClampToEdge,
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
-    let block_texture_image = root.push(gltf_json::Image {
+    let block_texture_image = root.push(gltf::Image {
         buffer_view: Some(block_texture_buffer_view),
-        mime_type: Some(gltf_json::image::MimeType("image/png".into())),
+        mime_type: Some(gltf::image::MimeType("image/png".into())),
         name: Some("block texture".into()),
         uri: None,
-        extensions: None,
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
-    let block_texture = root.push(gltf_json::Texture {
+    let block_texture = root.push(gltf::Texture {
         name: None,
         sampler: Some(block_texture_sampler),
         source: block_texture_image,
-        extensions: None,
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
     Ok(block_texture)

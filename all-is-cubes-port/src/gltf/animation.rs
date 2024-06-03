@@ -1,8 +1,7 @@
 use std::io;
 use std::time::Duration;
 
-use gltf_json::validation::Checked::Valid;
-use gltf_json::Index;
+use gltf::Index;
 
 use super::buffer::create_buffer_and_accessor;
 use super::glue::convert_quaternion;
@@ -24,7 +23,7 @@ pub(crate) struct FrameState {
 
 pub(crate) fn add_camera_animation(
     writer: &mut GltfWriter,
-    camera_node_index: Index<gltf_json::Node>,
+    camera_node_index: Index<gltf::Node>,
     frame_pace: Duration,
 ) -> io::Result<()> {
     let mut animation_channels = Vec::new();
@@ -43,12 +42,12 @@ pub(crate) fn add_camera_animation(
     )?;
 
     // Translation
-    animation_channels.push(gltf_json::animation::Channel {
+    animation_channels.push(gltf::animation::Channel {
         sampler: Index::push(
             &mut animation_samplers,
-            gltf_json::animation::Sampler {
+            gltf::animation::Sampler {
                 input: time_accessor,
-                interpolation: Valid(gltf_json::animation::Interpolation::Linear),
+                interpolation: gltf::animation::Interpolation::Linear,
                 output: create_buffer_and_accessor(
                     &mut writer.root,
                     &writer.buffer_dest,
@@ -59,26 +58,26 @@ pub(crate) fn add_camera_animation(
                         .iter()
                         .map(|frame| frame.camera_transform.translation.to_f32().into()),
                 )?,
-                extensions: Default::default(),
+                unrecognized_extensions: Default::default(),
                 extras: Default::default(),
             },
         ),
-        target: gltf_json::animation::Target {
+        target: gltf::animation::Target {
             node: camera_node_index,
-            path: Valid(gltf_json::animation::Property::Translation),
-            extensions: Default::default(),
+            path: gltf::animation::Property::Translation,
+            unrecognized_extensions: Default::default(),
             extras: Default::default(),
         },
-        extensions: Default::default(),
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
     // Rotation
-    animation_channels.push(gltf_json::animation::Channel {
+    animation_channels.push(gltf::animation::Channel {
         sampler: Index::push(
             &mut animation_samplers,
-            gltf_json::animation::Sampler {
+            gltf::animation::Sampler {
                 input: time_accessor,
-                interpolation: Valid(gltf_json::animation::Interpolation::Linear),
+                interpolation: gltf::animation::Interpolation::Linear,
                 output: create_buffer_and_accessor(
                     &mut writer.root,
                     &writer.buffer_dest,
@@ -87,27 +86,27 @@ pub(crate) fn add_camera_animation(
                     writer
                         .frame_states
                         .iter()
-                        .map(|frame| convert_quaternion(frame.camera_transform.rotation).0),
+                        .map(|frame| convert_quaternion(frame.camera_transform.rotation)),
                 )?,
-                extensions: Default::default(),
+                unrecognized_extensions: Default::default(),
                 extras: Default::default(),
             },
         ),
-        target: gltf_json::animation::Target {
+        target: gltf::animation::Target {
             node: camera_node_index,
-            path: Valid(gltf_json::animation::Property::Rotation),
-            extensions: Default::default(),
+            path: gltf::animation::Property::Rotation,
+            unrecognized_extensions: Default::default(),
             extras: Default::default(),
         },
-        extensions: Default::default(),
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
 
-    writer.root.push(gltf_json::Animation {
+    writer.root.push(gltf::Animation {
         name: Some("camera movement".into()),
         channels: animation_channels,
         samplers: animation_samplers,
-        extensions: Default::default(),
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
 

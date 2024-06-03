@@ -7,8 +7,8 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use gltf_json::validation::USize64;
-use gltf_json::Index;
+use gltf::validation::USize64;
+use gltf::Index;
 
 use super::glue::{create_accessor, Lef32};
 
@@ -69,11 +69,11 @@ impl GltfDataDestination {
         }))
     }
 
-    /// Write glTF buffer data, then return a [`gltf_json::Buffer`] pointing to it by
+    /// Write glTF buffer data, then return a [`gltf::Buffer`] pointing to it by
     /// one of the permitted means.
     ///
     /// * `contents_fn` will be called with a buffered writer to write the data to.
-    /// * `buffer_entity_name` is the `name` that will be in the returned [`gltf_json::Buffer`]
+    /// * `buffer_entity_name` is the `name` that will be in the returned [`gltf::Buffer`]
     ///   entity.
     /// * `proposed_file_name` will be included in the name of the generated data file,
     ///   if there is one; for example, `foo.gltf` will have data files named like
@@ -98,7 +98,7 @@ impl GltfDataDestination {
         proposed_file_name: &str,
         proposed_file_extension: &str,
         contents_fn: F,
-    ) -> io::Result<gltf_json::Buffer>
+    ) -> io::Result<gltf::Buffer>
     where
         F: FnOnce(&mut dyn io::Write) -> io::Result<()>,
     {
@@ -166,11 +166,11 @@ impl GltfDataDestination {
         contents_fn(&mut implementation)?;
         let (uri, byte_length) = implementation.close()?;
 
-        Ok(gltf_json::Buffer {
-            byte_length: USize64::from(byte_length),
+        Ok(gltf::Buffer {
+            length: USize64::from(byte_length),
             name: Some(buffer_entity_name),
             uri,
-            extensions: Default::default(),
+            unrecognized_extensions: Default::default(),
             extras: Default::default(),
         })
     }
@@ -305,12 +305,12 @@ impl io::Write for SwitchingWriter {
 /// This function only creates non-interleaved and non-concatenated buffers,
 /// and does not set the `target`, so it is not suitable for vertices.
 pub(crate) fn create_buffer_and_accessor<I, const COMPONENTS: usize>(
-    root: &mut gltf_json::Root,
+    root: &mut gltf::Root,
     dest: &GltfDataDestination,
     name: String,
     file_suffix: &str,
     data_source: I,
-) -> io::Result<Index<gltf_json::Accessor>>
+) -> io::Result<Index<gltf::Accessor>>
 where
     I: IntoIterator<Item = [f32; COMPONENTS], IntoIter: ExactSizeIterator> + Clone,
     [Lef32; COMPONENTS]: bytemuck::Pod,
@@ -324,14 +324,14 @@ where
     })?;
     let buffer_index = root.push(buffer);
 
-    let buffer_view = root.push(gltf_json::buffer::View {
+    let buffer_view = root.push(gltf::buffer::View {
         buffer: buffer_index,
-        byte_length: (length * size_of::<[Lef32; COMPONENTS]>()).into(),
-        byte_offset: None,
-        byte_stride: None,
+        length: (length * size_of::<[Lef32; COMPONENTS]>()).into(),
+        offset: USize64(0),
+        stride: None,
         name: Some(name.clone()),
         target: None,
-        extensions: Default::default(),
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
 
@@ -370,7 +370,7 @@ mod tests {
             .unwrap();
         assert_eq!(buffer_entity.name, Some("foo".into()));
         assert_eq!(buffer_entity.uri, None);
-        assert_eq!(buffer_entity.byte_length, USize64(3));
+        assert_eq!(buffer_entity.length, USize64(3));
     }
 
     #[test]
@@ -384,7 +384,7 @@ mod tests {
             buffer_entity.uri.as_deref(),
             Some("data:application/gltf-buffer;base64,AQL/") // AQL/ = 000000 010000 001011 111111
         );
-        assert_eq!(buffer_entity.byte_length, USize64(3));
+        assert_eq!(buffer_entity.length, USize64(3));
     }
 
     #[test]
@@ -417,7 +417,7 @@ mod tests {
         assert_eq!(buffer_entity.name, Some("foo".into()));
         // Note that the URL is relative, not including the temp dir.
         assert_eq!(buffer_entity.uri.as_deref(), Some("basepath-bar.glbin"));
-        assert_eq!(buffer_entity.byte_length, USize64(6));
+        assert_eq!(buffer_entity.length, USize64(6));
     }
 
     #[test]

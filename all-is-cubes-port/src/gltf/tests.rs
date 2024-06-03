@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use gltf_json::validation::Validate;
-use gltf_json::Index;
+use gltf::validation::Validate;
+use gltf::Index;
 
 use all_is_cubes::block::{Block, BlockDef, Resolution, AIR};
 use all_is_cubes::character::Character;
@@ -21,7 +21,7 @@ use crate::{ExportError, ExportSet, Format};
 pub(crate) fn gltf_mesh(
     space: &Space,
     writer: &mut GltfWriter,
-) -> (SpaceMesh<GltfMt>, Option<Index<gltf_json::Mesh>>) {
+) -> (SpaceMesh<GltfMt>, Option<Index<gltf::Mesh>>) {
     let options = &MeshOptions::new(&GraphicsOptions::default());
     let blocks = block_meshes_for_space(space, &writer.texture_allocator(), options);
     let mesh: SpaceMesh<GltfMt> = SpaceMesh::new(space, space.bounds(), options, &*blocks);
@@ -67,7 +67,7 @@ fn gltf_smoke_test() {
     );
 
     // TODO: better way to call validate()?
-    root.validate(&root, gltf_json::Path::new, &mut |pf, error| {
+    root.validate(&root, gltf::Path::new, &mut |pf, error| {
         panic!("{path} {error}", path = pf())
     });
 }
