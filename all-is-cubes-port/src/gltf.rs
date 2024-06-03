@@ -13,10 +13,12 @@ use std::path::PathBuf;
 use std::time::Duration;
 use std::{fmt, fs, io, mem};
 
+// Special alias to reduce rebase conflicts — TODO: replace this with direct use of the new name
+use ::gltf as gltf_json;
+pub use ::gltf as json;
+pub use ::gltf as gltf_lib;
 use futures_core::future::BoxFuture;
-pub use gltf_json as json;
 use gltf_json::Index;
-use gltf_json::validation::Checked::Valid;
 use itertools::izip;
 
 use all_is_cubes::block;
@@ -38,7 +40,7 @@ use animation::FrameState;
 mod mesh;
 use mesh::MaterialKey;
 mod glue;
-use glue::{convert_quaternion, empty_node};
+use glue::convert_quaternion;
 mod texture;
 pub use texture::{GltfAtlasPoint, GltfTextureAllocator, GltfTexturePlane, GltfTile};
 mod vertex;
@@ -59,18 +61,18 @@ impl MeshTypes for GltfMt {
 /// "This mesh with this translation." A value type that specifies that, in some frame
 /// of the output, the particular mesh should be visible at a particular location.
 ///
-/// These are then converted into [`gltf_json::Node`]s with animations controlling when they
+/// These are then converted into [`gltf::Node`]s with animations controlling when they
 /// are visible.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[expect(clippy::exhaustive_structs)]
 pub struct MeshInstance {
     /// The mesh to display.
-    pub mesh: Index<gltf_json::Mesh>,
+    pub mesh: Index<gltf::Mesh>,
     /// Translation applied to this instance of the mesh, in integer (whole block) amounts only.
     pub translation: [i32; 3],
 }
 
-/// Handles the construction of [`gltf_json::Root`] and the writing of supporting files
+/// Handles the construction of [`gltf::Root`] and the writing of supporting files
 /// for a single glTF asset.
 ///
 /// Life cycle:
@@ -86,7 +88,7 @@ pub struct GltfWriter {
     /// Contains all the glTF entities written so far.
     /// Each operation that adds data appends to the vectors of entities inside this.
     /// Entities must not be deleted or reordered, to ensure [`Index`]es stay valid.
-    root: gltf_json::Root,
+    root: gltf::Root,
 
     /// Where to write the buffers and textures.
     buffer_dest: GltfDataDestination,
@@ -110,7 +112,7 @@ pub struct GltfWriter {
 
     /// glTF camera entity, if created yet.
     /// Its settings are taken from the first [`Camera`] encountered.
-    camera: Option<Index<gltf_json::Camera>>,
+    camera: Option<Index<gltf::Camera>>,
 
     /// The state of the world in each frame of an animated scene.
     /// If its length is greater than 1, [`GltfWriter::into_root()`] will turn it into
@@ -138,12 +140,12 @@ impl GltfWriter {
         let root = gltf_json::Root {
             asset: gltf_json::Asset {
                 generator: Some(String::from("all-is-cubes")),
-                ..gltf_json::Asset::default()
+                ..gltf::Asset::default()
             },
             extensions_used: ["KHR_materials_transmission", "KHR_materials_volume"]
                 .map(String::from)
                 .to_vec(),
-            ..gltf_json::Root::default()
+            ..gltf::Root::default()
         };
 
         Self {
@@ -210,7 +212,7 @@ impl GltfWriter {
         &mut self,
         name: &dyn fmt::Display,
         mesh: &SpaceMesh<M>,
-    ) -> Option<Index<gltf_json::Mesh>>
+    ) -> Option<Index<gltf::Mesh>>
     where
         M: MeshTypes<Vertex = GltfVertex, Alloc = GltfTextureAllocator>,
     {
@@ -220,13 +222,13 @@ impl GltfWriter {
         mesh::add_mesh(self, name, mesh)
     }
 
-    /// Finish all scene preparation and return the [`gltf_json::Root`] which is to be
+    /// Finish all scene preparation and return the [`gltf::Root`] which is to be
     /// written to a JSON file.
     ///
     /// # Errors
     ///
     /// Returns an error if writing any of the buffer or image data fails.
-    pub fn into_root(mut self, frame_pace: Duration) -> io::Result<gltf_json::Root> {
+    pub fn into_root(mut self, frame_pace: Duration) -> io::Result<gltf::Root> {
         if !self.texture_allocator.is_empty() {
             let texture::Atlas {
                 reflectance,
@@ -248,13 +250,13 @@ impl GltfWriter {
             }
         }
 
-        let mut scene_nodes: Vec<Index<gltf_json::Node>> = Vec::new();
+        let mut scene_nodes: Vec<Index<gltf::Node>> = Vec::new();
 
         // If we have a camera entity, create a node for it.
         if let Some(camera_index) = self.camera {
-            let mut camera_node = gltf_json::Node {
+            let mut camera_node = gltf::Node {
                 camera: Some(camera_index),
-                ..empty_node(None)
+                ..Default::default()
             };
             if let Some(initial_state) = self.frame_states.first() {
                 let t = initial_state.camera_transform;
@@ -271,14 +273,14 @@ impl GltfWriter {
         }
 
         // For each needed mesh instance, create a node with that translation and that mesh.
-        let mut instance_nodes: BTreeMap<MeshInstance, Index<gltf_json::Node>> = BTreeMap::new();
+        let mut instance_nodes: BTreeMap<MeshInstance, Index<gltf::Node>> = BTreeMap::new();
         for &instance in self.any_time_visible_mesh_instances.iter() {
             let MeshInstance { mesh, translation } = instance;
-            let node_index = self.root.push(gltf_json::Node {
+            let node_index = self.root.push(gltf::Node {
                 mesh: Some(mesh),
                 translation: Some(translation.map(|c| c as f32)),
                 // TODO: give this node a name if we can figure out what a good, cheap one is
-                ..empty_node(None)
+                ..Default::default()
             });
             instance_nodes.insert(instance, node_index);
             scene_nodes.push(node_index);
@@ -346,46 +348,47 @@ impl GltfWriter {
                     &format!("node-{node_index}-vis"),
                     timeline.iter().map(|&(_t, vis)| [f32::from(u8::from(vis)); 3]),
                 )?;
-                animation_channels.push(gltf_json::animation::Channel {
+                animation_channels.push(gltf::animation::Channel {
                     sampler: Index::push(
                         &mut animation_samplers,
-                        gltf_json::animation::Sampler {
+                        gltf::animation::Sampler {
                             input: time_accessor,
-                            interpolation: Valid(gltf_json::animation::Interpolation::Step),
+                            interpolation: gltf::animation::Interpolation::Step,
                             output: scale_accessor,
-                            extensions: Default::default(),
+                            unrecognized_extensions: Default::default(),
                             extras: Default::default(),
                         },
                     ),
-                    target: gltf_json::animation::Target {
-                        node: node_index,
-                        path: Valid(gltf_json::animation::Property::Scale),
-                        extensions: Default::default(),
+                    target: gltf::animation::Target {
+                        node: Some(node_index),
+                        path: gltf::animation::Property::Scale,
+                        pointer: None,
+                        unrecognized_extensions: Default::default(),
                         extras: Default::default(),
                     },
-                    extensions: Default::default(),
+                    unrecognized_extensions: Default::default(),
                     extras: Default::default(),
                 });
             }
 
             // Generate animation. Spec requires animation to be nonempty.
             if !animation_channels.is_empty() {
-                self.root.push(gltf_json::Animation {
+                self.root.push(gltf::Animation {
                     name: Some("world changes".into()),
                     channels: animation_channels,
                     samplers: animation_samplers,
-                    extensions: Default::default(),
+                    unrecognized_extensions: Default::default(),
                     extras: Default::default(),
                 });
             }
         }
 
         if !scene_nodes.is_empty() {
-            self.root.scenes.push(gltf_json::Scene {
+            self.root.scenes.push(gltf::Scene {
                 name: Some("recording".into()),
                 nodes: scene_nodes,
                 extras: Default::default(),
-                extensions: None,
+                unrecognized_extensions: Default::default(),
             });
         }
 
@@ -488,10 +491,11 @@ pub(crate) fn export_gltf(
                     let mesh_index = writer.add_mesh(&name, &mesh);
                     // TODO: if the mesh is empty/None, should we include the node anyway or not?
                     let mesh_node = writer.root.push(gltf_json::Node {
+                        name: Some(name.to_string()),
                         mesh: mesh_index,
                         // translate each block so they are spaced out evenly for viewing
                         translation: Some([index as f32 * 2.0, 0.0, 0.0]),
-                        ..empty_node(Some(name.to_string()))
+                        ..Default::default()
                     });
 
                     block_nodes.push(mesh_node);
@@ -507,7 +511,7 @@ pub(crate) fn export_gltf(
                 writer.root.scenes.push(json::Scene {
                     name: Some("block preview scene".into()),
                     nodes: block_nodes,
-                    extensions: None,
+                    unrecognized_extensions: Default::default(),
                     extras: Default::default(),
                 });
             }
@@ -521,17 +525,18 @@ pub(crate) fn export_gltf(
             {
                 let mesh_index = writer.add_mesh(&name, &mesh);
                 let mesh_node = writer.root.push(gltf_json::Node {
+                    name: Some(name.to_string()),
                     mesh: mesh_index,
                     // SpaceMesh translates everything so the lower bounds of the requested region
                     // are at [0, 0, 0], so we must undo that.
                     translation: Some(translation),
-                    ..empty_node(Some(name.to_string()))
+                    ..Default::default()
                 });
 
                 writer.root.scenes.push(json::Scene {
                     name: Some(format!("{name} space scene")),
                     nodes: vec![mesh_node],
-                    extensions: None,
+                    unrecognized_extensions: Default::default(),
                     extras: Default::default(),
                 });
             }
@@ -541,9 +546,7 @@ pub(crate) fn export_gltf(
 
         {
             let file = fs::File::create(destination)?;
-            writer
-                .into_root(Duration::from_secs(1))?
-                .to_writer_pretty(&file) // TODO: non-pretty option
+            serde_json::to_writer_pretty(&file, &writer.into_root(Duration::from_secs(1))?) // TODO: non-pretty option
                 .map_err(|_| -> ExportError { todo!("serialization error conversion") })?;
             file.sync_all()?;
         }
@@ -554,20 +557,20 @@ pub(crate) fn export_gltf(
 
 /// Construct gltf camera entity.
 /// Note that this is not complete since it does not contain the viewpoint; a node is also needed.
-fn convert_camera(name: Option<String>, camera: &Camera) -> gltf_json::Camera {
-    gltf_json::Camera {
+fn convert_camera(name: Option<String>, camera: &Camera) -> gltf::Camera {
+    gltf::Camera {
         name,
-        type_: Valid(gltf_json::camera::Type::Perspective),
-        orthographic: None,
-        perspective: Some(gltf_json::camera::Perspective {
-            aspect_ratio: Some(camera.viewport().nominal_aspect_ratio() as f32),
-            yfov: camera.options().fov_y.into_inner() as f32 * (std::f32::consts::PI / 180.),
-            zfar: Some(camera.options().view_distance.into_inner() as f32),
-            znear: camera.near_plane_distance().into_inner() as f32,
-            extensions: Default::default(),
-            extras: Default::default(),
-        }),
-        extensions: Default::default(),
+        projection: gltf::camera::Projection::Perspective {
+            perspective: gltf::camera::Perspective {
+                aspect_ratio: Some(camera.viewport().nominal_aspect_ratio() as f32),
+                yfov: camera.options().fov_y.into_inner() as f32 * (std::f32::consts::PI / 180.),
+                zfar: Some(camera.options().view_distance.into_inner() as f32),
+                znear: camera.near_plane_distance().into_inner() as f32,
+                unrecognized_extensions: Default::default(),
+                extras: Default::default(),
+            },
+        },
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     }
 }
