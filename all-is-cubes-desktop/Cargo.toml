@@ -102,7 +102,8 @@ winit = { version = "0.30.0", default-features = false, features = ["x11", "rwh_
 yield-progress = { workspace = true, features = ["log_hiccups"] }
 
 [dev-dependencies]
-gltf = "1.4.0" # for round-trip test; must match version of gltf-json
+# for testing of the results of glTF exports
+gltf = { workspace = true, features = ["import"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros"] }
 trycmd = { workspace = true }

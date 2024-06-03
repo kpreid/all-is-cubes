@@ -91,6 +91,7 @@ futures-task = { version = "0.3.28", default-features = false }
 futures-util = { version = "0.3.28", default-features = false, features = ["alloc"] }
 gilrs = { version = "0.10.4" }
 gloo-timers = { version = "0.3.0", default-features = false }
+gltf = { git = "https://github.com/alteous/gltf/", branch = "v2-with-extension-macro", default-features = false }
 half = { version = "2.3.1", features = ["bytemuck"] }
 hashbrown = { version = "0.14.0", default-features = false, features = ["ahash", "inline-more"] }
 image = { version = "0.25.1", default-features = false }
