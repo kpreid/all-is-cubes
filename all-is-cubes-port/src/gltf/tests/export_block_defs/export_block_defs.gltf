@@ -1,11 +1,11 @@
 {
   "accessors": [
     {
+      "type": "VEC3",
       "bufferView": 0,
       "byteOffset": 0,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC3",
       "min": [
         0.0,
         0.0,
@@ -19,11 +19,11 @@
       "name": "'block0' position"
     },
     {
+      "type": "VEC4",
       "bufferView": 0,
       "byteOffset": 12,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC4",
       "min": [
         0.04288181662559509,
         0.040675945580005646,
@@ -39,11 +39,11 @@
       "name": "'block0' base color"
     },
     {
+      "type": "VEC2",
       "bufferView": 0,
       "byteOffset": 28,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC2",
       "min": [
         0.0,
         0.0
@@ -55,19 +55,19 @@
       "name": "'block0' base color texcoords"
     },
     {
+      "type": "SCALAR",
       "bufferView": 1,
       "byteOffset": 0,
       "count": 36,
       "componentType": 5123,
-      "type": "SCALAR",
       "name": "'block0' opaque index"
     },
     {
+      "type": "VEC3",
       "bufferView": 2,
       "byteOffset": 0,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC3",
       "min": [
         0.0,
         0.0,
@@ -81,11 +81,11 @@
       "name": "'block1' position"
     },
     {
+      "type": "VEC4",
       "bufferView": 2,
       "byteOffset": 12,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC4",
       "min": [
         0.873272180557251,
         0.8710663318634033,
@@ -101,11 +101,11 @@
       "name": "'block1' base color"
     },
     {
+      "type": "VEC2",
       "bufferView": 2,
       "byteOffset": 28,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC2",
       "min": [
         0.0,
         0.0
@@ -117,11 +117,11 @@
       "name": "'block1' base color texcoords"
     },
     {
+      "type": "SCALAR",
       "bufferView": 3,
       "byteOffset": 0,
       "count": 36,
       "componentType": 5123,
-      "type": "SCALAR",
       "name": "'block1' opaque index"
     }
   ],
@@ -177,47 +177,21 @@
   ],
   "materials": [
     {
-      "alphaMode": "OPAQUE",
-      "doubleSided": false,
       "name": "aic-vertex-opaque",
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
-        "metallicFactor": 0.0,
-        "roughnessFactor": 1.0
-      },
-      "emissiveFactor": [
-        0.0,
-        0.0,
-        0.0
-      ]
+        "metallicFactor": 0.0
+      }
     },
     {
       "alphaMode": "BLEND",
-      "doubleSided": false,
       "name": "aic-vertex-transparent",
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
-        "metallicFactor": 0.0,
-        "roughnessFactor": 1.0
+        "metallicFactor": 0.0
       },
-      "emissiveFactor": [
-        0.0,
-        0.0,
-        0.0
-      ],
       "extensions": {
-        "KHR_materials_transmission": {
-          "transmissionFactor": 0.0
+        "KHR_materials_transmission": {},
+        "KHR_materials_volume": {
+          "thicknessFactor": 1.0
         }
       }
     }
