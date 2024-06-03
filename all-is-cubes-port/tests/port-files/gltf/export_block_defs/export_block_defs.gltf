@@ -1,11 +1,11 @@
 {
   "accessors": [
     {
+      "type": "VEC3",
       "bufferView": 0,
       "byteOffset": 0,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC3",
       "min": [
         0.0,
         0.0,
@@ -19,11 +19,11 @@
       "name": "'block0' position"
     },
     {
+      "type": "VEC4",
       "bufferView": 0,
       "byteOffset": 12,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC4",
       "min": [
         0.0,
         0.0,
@@ -39,19 +39,19 @@
       "name": "'block0' base color"
     },
     {
+      "type": "SCALAR",
       "bufferView": 1,
       "byteOffset": 0,
       "count": 36,
       "componentType": 5123,
-      "type": "SCALAR",
       "name": "'block0' opaque index"
     },
     {
+      "type": "VEC3",
       "bufferView": 2,
       "byteOffset": 0,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC3",
       "min": [
         0.0,
         0.0,
@@ -65,11 +65,11 @@
       "name": "'block1' position"
     },
     {
+      "type": "VEC4",
       "bufferView": 2,
       "byteOffset": 12,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC4",
       "min": [
         1.0,
         1.0,
@@ -85,19 +85,19 @@
       "name": "'block1' base color"
     },
     {
+      "type": "SCALAR",
       "bufferView": 3,
       "byteOffset": 0,
       "count": 36,
       "componentType": 5123,
-      "type": "SCALAR",
       "name": "'block1' opaque index"
     },
     {
+      "type": "VEC3",
       "bufferView": 4,
       "byteOffset": 0,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC3",
       "min": [
         0.0,
         0.0,
@@ -111,11 +111,11 @@
       "name": "'block2' position"
     },
     {
+      "type": "VEC4",
       "bufferView": 4,
       "byteOffset": 12,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC4",
       "min": [
         1.0,
         1.0,
@@ -131,11 +131,11 @@
       "name": "'block2' base color"
     },
     {
+      "type": "VEC2",
       "bufferView": 4,
       "byteOffset": 28,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC2",
       "min": [
         0.01834862306714058,
         0.01834862306714058
@@ -147,19 +147,19 @@
       "name": "'block2' base color texcoords"
     },
     {
+      "type": "SCALAR",
       "bufferView": 5,
       "byteOffset": 0,
       "count": 36,
       "componentType": 5123,
-      "type": "SCALAR",
       "name": "'block2' opaque index"
     },
     {
+      "type": "VEC3",
       "bufferView": 6,
       "byteOffset": 0,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC3",
       "min": [
         0.0,
         0.0,
@@ -173,11 +173,11 @@
       "name": "'block3' position"
     },
     {
+      "type": "VEC4",
       "bufferView": 6,
       "byteOffset": 12,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC4",
       "min": [
         1.0,
         1.0,
@@ -193,11 +193,11 @@
       "name": "'block3' base color"
     },
     {
+      "type": "VEC2",
       "bufferView": 6,
       "byteOffset": 28,
       "count": 24,
       "componentType": 5126,
-      "type": "VEC2",
       "min": [
         0.01834862306714058,
         0.20183485746383667
@@ -209,11 +209,11 @@
       "name": "'block3' base color texcoords"
     },
     {
+      "type": "SCALAR",
       "bufferView": 7,
       "byteOffset": 0,
       "count": 36,
       "componentType": 5123,
-      "type": "SCALAR",
       "name": "'block3' opaque index"
     }
   ],
@@ -339,46 +339,21 @@
   ],
   "materials": [
     {
-      "alphaMode": "OPAQUE",
-      "doubleSided": false,
       "name": "all-is-cubes opaque untextured",
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
-        "metallicFactor": 0.0,
-        "roughnessFactor": 1.0
-      },
-      "emissiveFactor": [
-        0.0,
-        0.0,
-        0.0
-      ]
+        "metallicFactor": 0.0
+      }
     },
     {
-      "alphaMode": "OPAQUE",
-      "doubleSided": false,
       "name": "all-is-cubes opaque reflective+emissive",
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
         "baseColorTexture": {
-          "index": 0,
-          "texCoord": 0
+          "index": 0
         },
-        "metallicFactor": 0.0,
-        "roughnessFactor": 1.0
+        "metallicFactor": 0.0
       },
       "emissiveTexture": {
-        "index": 1,
-        "texCoord": 0
+        "index": 1
       },
       "emissiveFactor": [
         1.0,
