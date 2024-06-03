@@ -7,13 +7,6 @@ use all_is_cubes::euclid;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
-// TODO: contribute this to gltf_json
-pub(crate) fn push_and_return_index<T>(vec: &mut Vec<T>, value: T) -> Index<T> {
-    let index: u32 = vec.len().try_into().expect("Too many items");
-    vec.push(value);
-    Index::new(index)
-}
-
 /// For a [`gltf_json::Accessor`], find the elementwise minimum and maximum values
 /// in a slice of arrays of some kind of value.
 pub(crate) fn accessor_minmax<I, const N: usize>(items: I) -> [Option<serde_json::Value>; 2]

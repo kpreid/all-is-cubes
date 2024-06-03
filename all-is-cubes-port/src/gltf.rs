@@ -28,7 +28,7 @@ use animation::FrameState;
 mod mesh;
 use mesh::Materials;
 mod glue;
-use glue::{convert_quaternion, empty_node, push_and_return_index};
+use glue::{convert_quaternion, empty_node};
 mod texture;
 pub use texture::{GltfTextureAllocator, GltfTile};
 mod vertex;
@@ -160,10 +160,7 @@ impl GltfWriter {
         // Create camera if and only if one was given and we didn't have one.
         if self.camera.is_none() {
             if let Some(our_camera) = our_camera.as_ref() {
-                self.camera = Some(push_and_return_index(
-                    &mut self.root.cameras,
-                    convert_camera(None, our_camera),
-                ));
+                self.camera = Some(self.root.push(convert_camera(None, our_camera)));
             }
         }
 
@@ -220,7 +217,7 @@ impl GltfWriter {
                 camera_node.translation = Some(t.translation.map(|c| c as f32).into());
                 camera_node.rotation = Some(convert_quaternion(t.rotation));
             }
-            let camera_node_index = push_and_return_index(&mut self.root.nodes, camera_node);
+            let camera_node_index = self.root.push(camera_node);
             scene_nodes.push(camera_node_index);
 
             // Generate camera animation
@@ -233,15 +230,12 @@ impl GltfWriter {
         let mut instance_nodes: BTreeMap<MeshInstance, Index<gltf_json::Node>> = BTreeMap::new();
         for &instance in self.any_time_visible_mesh_instances.iter() {
             let MeshInstance { mesh, translation } = instance;
-            let node_index = push_and_return_index(
-                &mut self.root.nodes,
-                gltf_json::Node {
-                    mesh: Some(mesh),
-                    translation: Some(translation.map(|c| c as f32)),
-                    // TODO: give this node a name if we can figure out what a good, cheap one is
-                    ..empty_node(None)
-                },
-            );
+            let node_index = self.root.push(gltf_json::Node {
+                mesh: Some(mesh),
+                translation: Some(translation.map(|c| c as f32)),
+                // TODO: give this node a name if we can figure out what a good, cheap one is
+                ..empty_node(None)
+            });
             instance_nodes.insert(instance, node_index);
             scene_nodes.push(node_index);
         }
@@ -312,7 +306,7 @@ impl GltfWriter {
                         .map(|&(_t, vis)| [f32::from(u8::from(vis)); 3]),
                 )?;
                 animation_channels.push(gltf_json::animation::Channel {
-                    sampler: push_and_return_index(
+                    sampler: Index::push(
                         &mut animation_samplers,
                         gltf_json::animation::Sampler {
                             input: time_accessor,
@@ -335,16 +329,13 @@ impl GltfWriter {
 
             // Generate animation. Spec requires animation to be nonempty.
             if !animation_channels.is_empty() {
-                push_and_return_index(
-                    &mut self.root.animations,
-                    gltf_json::Animation {
-                        name: Some("world changes".into()),
-                        channels: animation_channels,
-                        samplers: animation_samplers,
-                        extensions: Default::default(),
-                        extras: Default::default(),
-                    },
-                );
+                self.root.push(gltf_json::Animation {
+                    name: Some("world changes".into()),
+                    channels: animation_channels,
+                    samplers: animation_samplers,
+                    extensions: Default::default(),
+                    extras: Default::default(),
+                });
             }
         }
 
@@ -411,13 +402,10 @@ pub(crate) async fn export_gltf(
 
             let mesh_index = writer.add_mesh(&name, &mesh);
             // TODO: if the mesh is empty/None, should we include the node anyway or not?
-            let mesh_node = push_and_return_index(
-                &mut writer.root.nodes,
-                gltf_json::Node {
-                    mesh: mesh_index,
-                    ..empty_node(Some(name.to_string()))
-                },
-            );
+            let mesh_node = writer.root.push(gltf_json::Node {
+                mesh: mesh_index,
+                ..empty_node(Some(name.to_string()))
+            });
 
             writer.root.scenes.push(json::Scene {
                 name: Some(format!("{name} block display scene")),
@@ -448,13 +436,10 @@ pub(crate) async fn export_gltf(
             // TODO: everything after here is duplicated vs. the blockdef code above
 
             let mesh_index = writer.add_mesh(&name, &mesh);
-            let mesh_node = push_and_return_index(
-                &mut writer.root.nodes,
-                gltf_json::Node {
-                    mesh: mesh_index,
-                    ..empty_node(Some(name.to_string()))
-                },
-            );
+            let mesh_node = writer.root.push(gltf_json::Node {
+                mesh: mesh_index,
+                ..empty_node(Some(name.to_string()))
+            });
 
             writer.root.scenes.push(json::Scene {
                 name: Some(format!("{name} space scene")),

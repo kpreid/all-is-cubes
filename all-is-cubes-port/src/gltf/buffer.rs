@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use gltf_json::validation::USize64;
 use gltf_json::Index;
 
-use super::glue::{create_accessor, push_and_return_index, Lef32};
+use super::glue::{create_accessor, Lef32};
 
 /// Designates the location where glTF buffer data (meshes, textures) should be written
 /// (either to disk files or inline in the glTF JSON).
@@ -324,26 +324,20 @@ where
         }
         Ok(())
     })?;
-    let buffer_index = push_and_return_index(&mut root.buffers, buffer);
+    let buffer_index = root.push(buffer);
 
-    let buffer_view = push_and_return_index(
-        &mut root.buffer_views,
-        gltf_json::buffer::View {
-            buffer: buffer_index,
-            byte_length: (length * size_of::<[Lef32; COMPONENTS]>()).into(),
-            byte_offset: None,
-            byte_stride: None,
-            name: Some(name.clone()),
-            target: None,
-            extensions: Default::default(),
-            extras: Default::default(),
-        },
-    );
+    let buffer_view = root.push(gltf_json::buffer::View {
+        buffer: buffer_index,
+        byte_length: (length * size_of::<[Lef32; COMPONENTS]>()).into(),
+        byte_offset: None,
+        byte_stride: None,
+        name: Some(name.clone()),
+        target: None,
+        extensions: Default::default(),
+        extras: Default::default(),
+    });
 
-    let accessor_index = push_and_return_index(
-        &mut root.accessors,
-        create_accessor(name, buffer_view, 0, data_source),
-    );
+    let accessor_index = root.push(create_accessor(name, buffer_view, 0, data_source));
 
     Ok(accessor_index)
 }

@@ -41,7 +41,7 @@ thiserror = { workspace = true }
 base64 = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 # gltf-json often has semver-incompatible changes, so pin it
-gltf-json = { version = ">=1.4.0, <1.5.0", default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }
+gltf-json = { version = ">=1.4.1, <1.5.0", default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }
 
 [dev-dependencies]
 snapbox = { workspace = true, features = ["path"] }

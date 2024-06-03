@@ -9,7 +9,6 @@ use all_is_cubes::euclid::Point2D;
 use all_is_cubes::math::{Axis, GridAab, GridRotation, Vol};
 use all_is_cubes_mesh::texture::{self, TilePoint};
 
-use super::glue::push_and_return_index;
 use super::GltfDataDestination;
 
 /// [`texture::Allocator`] implementation for glTF exports.
@@ -216,53 +215,41 @@ pub(super) fn insert_block_texture_atlas(
 ) -> Result<gltf_json::Index<gltf_json::Texture>, io::Error> {
     let block_texture_buffer = allocator.write_png_atlas()?;
     let block_texture_len = block_texture_buffer.byte_length;
-    let block_texture_buffer = push_and_return_index(&mut root.buffers, block_texture_buffer);
-    let block_texture_buffer_view = push_and_return_index(
-        &mut root.buffer_views,
-        gltf_json::buffer::View {
-            buffer: block_texture_buffer,
-            byte_length: block_texture_len,
-            byte_offset: None,
-            byte_stride: None,
-            name: Some("block texture".into()),
-            target: None,
-            extensions: None,
-            extras: Default::default(),
-        },
-    );
-    let block_texture_sampler = push_and_return_index(
-        &mut root.samplers,
-        gltf_json::texture::Sampler {
-            mag_filter: Some(Valid(gltf_json::texture::MagFilter::Nearest)),
-            min_filter: Some(Valid(gltf_json::texture::MinFilter::Linear)),
-            name: Some("block texture".into()),
-            wrap_s: Valid(gltf_json::texture::WrappingMode::ClampToEdge),
-            wrap_t: Valid(gltf_json::texture::WrappingMode::ClampToEdge),
-            extensions: None,
-            extras: Default::default(),
-        },
-    );
-    let block_texture_image = push_and_return_index(
-        &mut root.images,
-        gltf_json::Image {
-            buffer_view: Some(block_texture_buffer_view),
-            mime_type: Some(gltf_json::image::MimeType("image/png".into())),
-            name: Some("block texture".into()),
-            uri: None,
-            extensions: None,
-            extras: Default::default(),
-        },
-    );
-    let block_texture = push_and_return_index(
-        &mut root.textures,
-        gltf_json::Texture {
-            name: None,
-            sampler: Some(block_texture_sampler),
-            source: block_texture_image,
-            extensions: None,
-            extras: Default::default(),
-        },
-    );
+    let block_texture_buffer = root.push(block_texture_buffer);
+    let block_texture_buffer_view = root.push(gltf_json::buffer::View {
+        buffer: block_texture_buffer,
+        byte_length: block_texture_len,
+        byte_offset: None,
+        byte_stride: None,
+        name: Some("block texture".into()),
+        target: None,
+        extensions: None,
+        extras: Default::default(),
+    });
+    let block_texture_sampler = root.push(gltf_json::texture::Sampler {
+        mag_filter: Some(Valid(gltf_json::texture::MagFilter::Nearest)),
+        min_filter: Some(Valid(gltf_json::texture::MinFilter::Linear)),
+        name: Some("block texture".into()),
+        wrap_s: Valid(gltf_json::texture::WrappingMode::ClampToEdge),
+        wrap_t: Valid(gltf_json::texture::WrappingMode::ClampToEdge),
+        extensions: None,
+        extras: Default::default(),
+    });
+    let block_texture_image = root.push(gltf_json::Image {
+        buffer_view: Some(block_texture_buffer_view),
+        mime_type: Some(gltf_json::image::MimeType("image/png".into())),
+        name: Some("block texture".into()),
+        uri: None,
+        extensions: None,
+        extras: Default::default(),
+    });
+    let block_texture = root.push(gltf_json::Texture {
+        name: None,
+        sampler: Some(block_texture_sampler),
+        source: block_texture_image,
+        extensions: None,
+        extras: Default::default(),
+    });
     Ok(block_texture)
 }
 

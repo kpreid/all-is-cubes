@@ -9,7 +9,7 @@ use gltf_json::Index;
 
 use all_is_cubes_mesh::{IndexSlice, MeshTypes, SpaceMesh};
 
-use crate::gltf::glue::{create_accessor, push_and_return_index};
+use crate::gltf::glue::create_accessor;
 use crate::gltf::{GltfTextureAllocator, GltfVertex, GltfWriter};
 
 /// Create [`gltf_json::Mesh`] and all its parts (accessors, buffers) from a [`SpaceMesh`].
@@ -62,80 +62,65 @@ where
             },
         )
         .expect("buffer write error");
-    let buffer_index = push_and_return_index(&mut writer.root.buffers, buffer_entity);
-    let vertex_buffer_view = push_and_return_index(
-        &mut writer.root.buffer_views,
-        gltf_json::buffer::View {
-            buffer: buffer_index,
-            byte_length: USize64::from(vertex_bytes.len()),
-            byte_offset: None,
-            byte_stride: Some(Stride(size_of::<GltfVertex>())),
-            name: Some(format!("{name} vertex")),
-            target: Some(Valid(gltf_json::buffer::Target::ArrayBuffer)),
-            extensions: Default::default(),
-            extras: Default::default(),
-        },
-    );
-    let index_buffer_view = push_and_return_index(
-        &mut writer.root.buffer_views,
-        gltf_json::buffer::View {
-            buffer: buffer_index,
-            byte_length: USize64::from(mesh.indices().as_bytes().len()),
-            // Indexes are packed into the same buffer, so they start at the end of the vertex bytes
-            byte_offset: Some(USize64::from(vertex_bytes.len())),
-            byte_stride: None,
-            name: Some(format!("{name} index")),
-            // ElementArrayBuffer means index buffer
-            target: Some(Valid(gltf_json::buffer::Target::ElementArrayBuffer)),
-            extensions: Default::default(),
-            extras: Default::default(),
-        },
-    );
+    let buffer_index = writer.root.push(buffer_entity);
+    let vertex_buffer_view = writer.root.push(gltf_json::buffer::View {
+        buffer: buffer_index,
+        byte_length: USize64::from(vertex_bytes.len()),
+        byte_offset: None,
+        byte_stride: Some(Stride(size_of::<GltfVertex>())),
+        name: Some(format!("{name} vertex")),
+        target: Some(Valid(gltf_json::buffer::Target::ArrayBuffer)),
+        extensions: Default::default(),
+        extras: Default::default(),
+    });
+    let index_buffer_view = writer.root.push(gltf_json::buffer::View {
+        buffer: buffer_index,
+        byte_length: USize64::from(mesh.indices().as_bytes().len()),
+        // Indexes are packed into the same buffer, so they start at the end of the vertex bytes
+        byte_offset: Some(USize64::from(vertex_bytes.len())),
+        byte_stride: None,
+        name: Some(format!("{name} index")),
+        // ElementArrayBuffer means index buffer
+        target: Some(Valid(gltf_json::buffer::Target::ElementArrayBuffer)),
+        extensions: Default::default(),
+        extras: Default::default(),
+    });
 
     let vertex_colored_attributes = BTreeMap::from([
         (
             Valid(gltf_json::mesh::Semantic::Positions),
-            push_and_return_index(
-                &mut writer.root.accessors,
-                create_accessor(
-                    format!("{name} position"),
-                    vertex_buffer_view,
-                    offset_of!(GltfVertex, position),
-                    mesh.vertices().iter().map(|v| v.position.map(f32::from)),
-                ),
-            ),
+            writer.root.push(create_accessor(
+                format!("{name} position"),
+                vertex_buffer_view,
+                offset_of!(GltfVertex, position),
+                mesh.vertices().iter().map(|v| v.position.map(f32::from)),
+            )),
         ),
         (
             Valid(gltf_json::mesh::Semantic::Colors(0)),
-            push_and_return_index(
-                &mut writer.root.accessors,
-                create_accessor(
-                    format!("{name} base color"),
-                    vertex_buffer_view,
-                    offset_of!(GltfVertex, base_color),
-                    mesh.vertices().iter().map(|v| v.base_color.map(f32::from)),
-                ),
-            ),
+            writer.root.push(create_accessor(
+                format!("{name} base color"),
+                vertex_buffer_view,
+                offset_of!(GltfVertex, base_color),
+                mesh.vertices().iter().map(|v| v.base_color.map(f32::from)),
+            )),
         ),
         (
             Valid(gltf_json::mesh::Semantic::TexCoords(0)),
-            push_and_return_index(
-                &mut writer.root.accessors,
-                create_accessor(
-                    format!("{name} base color texcoords"),
-                    vertex_buffer_view,
-                    offset_of!(GltfVertex, base_color_tc),
-                    mesh.vertices()
-                        .iter()
-                        .map(|v| v.base_color_tc.map(f32::from)),
-                ),
-            ),
+            writer.root.push(create_accessor(
+                format!("{name} base color texcoords"),
+                vertex_buffer_view,
+                offset_of!(GltfVertex, base_color_tc),
+                mesh.vertices()
+                    .iter()
+                    .map(|v| v.base_color_tc.map(f32::from)),
+            )),
         ),
     ]);
 
     writer.flaws |= mesh.flaws();
 
-    let mesh_index = push_and_return_index(
+    let mesh_index = Index::push(
         &mut writer.root.meshes,
         gltf_json::Mesh {
             name: Some(format!("{name} mesh")),
@@ -156,7 +141,7 @@ where
                 if !index_range.is_empty() {
                     Some(gltf_json::mesh::Primitive {
                         attributes: vertex_colored_attributes.clone(),
-                        indices: Some(push_and_return_index(
+                        indices: Some(Index::push(
                             &mut writer.root.accessors,
                             gltf_json::Accessor {
                                 buffer_view: Some(index_buffer_view),
@@ -218,19 +203,18 @@ impl Materials {
             ..<_>::default()
         };
         Self {
-            opaque_vertex_colored: push_and_return_index(
-                materials_json,
-                gltf_json::Material {
+            opaque_vertex_colored: {
+                let value = gltf_json::Material {
                     name: Some("aic-vertex-opaque".into()),
                     alpha_mode: Valid(gltf_json::material::AlphaMode::Opaque),
                     double_sided: false,
                     pbr_metallic_roughness: pbr_metallic_roughness.clone(),
                     ..gltf_json::Material::default()
-                },
-            ),
-            transparent_vertex_colored: push_and_return_index(
-                materials_json,
-                gltf_json::Material {
+                };
+                Index::push(materials_json, value)
+            },
+            transparent_vertex_colored: {
+                let value = gltf_json::Material {
                     name: Some("aic-vertex-transparent".into()),
                     alpha_mode: Valid(gltf_json::material::AlphaMode::Blend),
                     double_sided: false,
@@ -257,8 +241,9 @@ impl Materials {
                         ..Default::default() // feature-variable additional fields
                     }),
                     ..gltf_json::Material::default()
-                },
-            ),
+                };
+                Index::push(materials_json, value)
+            },
         }
     }
 }

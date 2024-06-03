@@ -5,7 +5,7 @@ use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
 use super::buffer::create_buffer_and_accessor;
-use super::glue::{convert_quaternion, push_and_return_index};
+use super::glue::convert_quaternion;
 use super::{GltfWriter, MeshInstance};
 
 #[derive(Debug)]
@@ -44,7 +44,7 @@ pub(crate) fn add_camera_animation(
 
     // Translation
     animation_channels.push(gltf_json::animation::Channel {
-        sampler: push_and_return_index(
+        sampler: Index::push(
             &mut animation_samplers,
             gltf_json::animation::Sampler {
                 input: time_accessor,
@@ -74,7 +74,7 @@ pub(crate) fn add_camera_animation(
     });
     // Rotation
     animation_channels.push(gltf_json::animation::Channel {
-        sampler: push_and_return_index(
+        sampler: Index::push(
             &mut animation_samplers,
             gltf_json::animation::Sampler {
                 input: time_accessor,
@@ -103,16 +103,13 @@ pub(crate) fn add_camera_animation(
         extras: Default::default(),
     });
 
-    push_and_return_index(
-        &mut writer.root.animations,
-        gltf_json::Animation {
-            name: Some("camera movement".into()),
-            channels: animation_channels,
-            samplers: animation_samplers,
-            extensions: Default::default(),
-            extras: Default::default(),
-        },
-    );
+    writer.root.push(gltf_json::Animation {
+        name: Some("camera movement".into()),
+        channels: animation_channels,
+        samplers: animation_samplers,
+        extensions: Default::default(),
+        extras: Default::default(),
+    });
 
     Ok(())
 }
