@@ -1,5 +1,6 @@
 #![no_main]
 
+use all_is_cubes::block::Resolution::R4;
 use all_is_cubes::math::{Cube, Face7, FaceMap, GridAab};
 use all_is_cubes::raycast;
 
@@ -38,23 +39,26 @@ libfuzzer_sys::fuzz_target!(|input: Input| {
 
     match kind {
         Kind::General { origin, direction } => {
-            let mut raycaster = raycast::Raycaster::new(origin, direction);
+            let ray = raycast::Ray::new(origin, direction);
+            let mut raycaster = ray.cast();
             if let Some(bounds) = bounds {
                 raycaster = raycaster.within(bounds, include_exit)
             }
-            exercise(raycaster, bounds, include_exit)
+            exercise(ray, raycaster, bounds, include_exit)
         }
         Kind::AxisAligned { origin, direction } => {
-            let mut raycaster = raycast::AaRay::new(origin, direction).cast();
+            let ray = raycast::AaRay::new(origin, direction);
+            let mut raycaster = ray.cast();
             if let Some(bounds) = bounds {
                 raycaster = raycaster.within(bounds, include_exit)
             }
-            exercise(raycaster, bounds, include_exit)
+            exercise(ray.into(), raycaster, bounds, include_exit)
         }
     }
 });
 
 fn exercise(
+    ray: raycast::Ray,
     raycaster: impl Iterator<Item = raycast::RaycastStep> + std::fmt::Debug,
     bounds: Option<GridAab>,
     expect_exit: bool,
@@ -90,5 +94,19 @@ fn exercise(
         }
 
         // TODO: Check that intersection_point() is good (see existing unit test).
+
+        // TODO: This test doesn't work, but it should.
+        // Fixing it will require a new approach to `recursive_raycast` more aware of what should
+        // be guaranteed based on the outer raycast step.
+        if false {
+            // Check `recursive_raycast` hits at least one cube ... if the direction vector is not
+            // so wildly out of scale that the arithmetic might not work anyway.
+            // (We consider it okay to return nothing in those edge cases.)
+            if (1e-50..1e50).contains(&ray.direction.length()) {
+                let (mut r_raycaster, _r_ray) =
+                    step.recursive_raycast(ray, R4, GridAab::for_block(R4));
+                assert_ne!(r_raycaster.next(), None);
+            }
+        }
     }
 }
