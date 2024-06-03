@@ -109,6 +109,7 @@ futures-util = { version = "0.3.31", default-features = false, features = ["allo
 # TODO: evaluate which gilrs features should be enabled
 gilrs = { version = "0.11.0" }
 gloo-timers = { version = "0.4.0", default-features = false }
+gltf = { git = "https://github.com/alteous/gltf/", branch = "v2-with-extension-macro", default-features = false }
 half = { version = "2.6.0", default-features = false, features = ["bytemuck"] }
 hashbrown = { version = "0.16.1", default-features = false, features = ["default-hasher", "inline-more"] }
 image = { version = "0.25.10", default-features = false }
