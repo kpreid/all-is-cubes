@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use gltf_json::Index;
-use gltf_json::validation::Validate;
+use gltf as gltf_json;
+use gltf::Index;
+use gltf::validation::Validate;
 
 use all_is_cubes::block::{AIR, Block, BlockDef, Resolution};
 use all_is_cubes::character::Character;
@@ -69,7 +70,7 @@ fn gltf_smoke_test() {
     );
 
     // TODO: better way to call validate()?
-    root.validate(&root, gltf_json::Path::new, &mut |pf, error| {
+    root.validate(&root, gltf::Path::new, &mut |pf, error| {
         panic!("{path} {error}", path = pf())
     });
 }

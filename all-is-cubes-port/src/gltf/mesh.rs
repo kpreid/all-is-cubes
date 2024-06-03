@@ -3,10 +3,9 @@ use std::fmt;
 use std::io;
 use std::mem::{offset_of, size_of};
 
-use gltf_json::Index;
-use gltf_json::buffer::Stride;
-use gltf_json::validation::Checked::Valid;
-use gltf_json::validation::USize64;
+use gltf as gltf_json; // TODO: migrate
+use gltf::Index;
+use gltf::validation::USize64;
 
 use all_is_cubes_mesh::{IndexSlice, MeshTypes, SpaceMesh};
 
@@ -25,7 +24,7 @@ pub(crate) fn add_mesh<M>(
     writer: &mut GltfWriter,
     name: &dyn fmt::Display,
     mesh: &SpaceMesh<M>,
-) -> Option<Index<gltf_json::Mesh>>
+) -> Option<Index<gltf::Mesh>>
 where
     // TODO: This generic bound (rather than `SpaceMesh<GltfMt>`) is a workaround to allow
     // `all-is-cubes-port` to define its own `DynamicMeshTypes`. This is a sign that maybe
@@ -38,8 +37,8 @@ where
 
     let needs_texture = mesh.vertices().0.iter().any(GltfVertex::needs_uv_mapping);
     let index_type = match mesh.indices() {
-        IndexSlice::U16(_) => gltf_json::accessor::ComponentType::U16,
-        IndexSlice::U32(_) => gltf_json::accessor::ComponentType::U32,
+        IndexSlice::U16(_) => gltf::accessor::ComponentType::U16,
+        IndexSlice::U32(_) => gltf::accessor::ComponentType::U32,
     };
     let vertices_byte_len = bytemuck::cast_slice::<GltfVertex, u8>(mesh.vertices().0).len();
     let indices_byte_len = mesh.indices().as_bytes().len();
@@ -50,39 +49,39 @@ where
     // If we are doing texture coordinates, we need to fill this in later with texture coordinates
     // from the texture atlas, but have the object index now.
     let buffer_index = writer.root.push(gltf_json::Buffer {
-        byte_length: USize64::from(vertices_byte_len.strict_add(indices_byte_len)),
+        length: USize64::from(vertices_byte_len.strict_add(indices_byte_len)),
         name: Some(buffer_object_name.clone()),
         uri: None, // to be filled in later
-        extensions: Default::default(),
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
 
     let vertex_buffer_view = writer.root.push(gltf_json::buffer::View {
         buffer: buffer_index,
-        byte_length: USize64::from(vertices_byte_len),
-        byte_offset: None,
-        byte_stride: Some(Stride(size_of::<GltfVertex>())),
+        length: USize64::from(vertices_byte_len),
+        offset: USize64(0),
+        stride: Some(size_of::<GltfVertex>()),
         name: Some(format!("{name} vertex")),
-        target: Some(Valid(gltf_json::buffer::Target::ArrayBuffer)),
-        extensions: Default::default(),
+        target: Some(gltf_json::buffer::Target::ArrayBuffer),
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
     let index_buffer_view = writer.root.push(gltf_json::buffer::View {
         buffer: buffer_index,
-        byte_length: USize64::from(indices_byte_len),
+        length: USize64::from(indices_byte_len),
         // Indexes are packed into the same buffer, so they start at the end of the vertex bytes
-        byte_offset: Some(USize64::from(vertices_byte_len)),
-        byte_stride: None,
+        offset: USize64::from(vertices_byte_len),
+        stride: None,
         name: Some(format!("{name} index")),
         // ElementArrayBuffer means index buffer
-        target: Some(Valid(gltf_json::buffer::Target::ElementArrayBuffer)),
-        extensions: Default::default(),
+        target: Some(gltf_json::buffer::Target::ElementArrayBuffer),
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
 
     let mut attributes = BTreeMap::from([
         (
-            Valid(gltf_json::mesh::Semantic::Positions),
+            gltf_json::mesh::Semantic::Positions,
             writer.root.push(create_accessor(
                 format!("{name} position"),
                 vertex_buffer_view,
@@ -91,7 +90,7 @@ where
             )),
         ),
         (
-            Valid(gltf_json::mesh::Semantic::Colors(0)),
+            gltf_json::mesh::Semantic::Colors(0),
             writer.root.push(create_accessor(
                 format!("{name} base color"),
                 vertex_buffer_view,
@@ -116,7 +115,7 @@ where
             mesh.vertices().0.iter().map(|v| v.base_color_tc.map(f32::from)),
         ));
         attributes.insert(
-            Valid(gltf_json::mesh::Semantic::TexCoords(0)),
+            gltf_json::mesh::Semantic::TexCoords(0),
             texcoord_accessor_index,
         );
 
@@ -206,12 +205,10 @@ where
                         buffer_view: Some(index_buffer_view),
                         byte_offset: Some(USize64::from(index_range.start * index_type.size())),
                         count: USize64::from(index_range.len()),
-                        component_type: Valid(gltf_json::accessor::GenericComponentType(
-                            index_type,
-                        )),
-                        extensions: Default::default(),
+                        component_type: index_type,
+                        unrecognized_extensions: Default::default(),
                         extras: Default::default(),
-                        type_: Valid(gltf_json::accessor::Type::Scalar),
+                        attribute_type: gltf::accessor::AttributeType::Scalar,
                         min: None,
                         max: None,
                         name: Some(name),
@@ -219,16 +216,17 @@ where
                         sparse: None,
                     },
                 )),
-                mode: Valid(gltf_json::mesh::Mode::Triangles),
+                mode: gltf_json::mesh::Mode::Triangles,
                 material: Some(material_index),
-                targets: None,
-                extensions: Default::default(),
-                extras: Default::default(),
+                targets: vec![],
+                unrecognized_extensions: Default::default(),
+                extras: None,
+                variants: None,
             })
         })
         .collect(),
-        weights: None,
-        extensions: Default::default(),
+        weights: vec![],
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     };
     let mesh_index = Index::push(&mut writer.root.meshes, mesh_object);
@@ -335,25 +333,26 @@ impl MaterialKey {
             }
         );
 
-        let pbr_metallic_roughness = gltf_json::material::PbrMetallicRoughness {
+        let pbr_metallic_roughness = Some(gltf_json::material::PbrMetallicRoughness {
             // Per glTF 2.0 § 3.9.2, the base_color_factor will be
             // multiplied by the vertex color.
-            base_color_factor: gltf_json::material::PbrBaseColorFactor([1.0, 1.0, 1.0, 1.0]),
+            base_color_factor: [1.0, 1.0, 1.0, 1.0],
             base_color_texture: use_texture.map(|index| gltf_json::texture::Info {
                 index,
                 tex_coord: 0,
-                extensions: Default::default(),
+                transform: None,
+                unrecognized_extensions: Default::default(),
                 extras: Default::default(),
             }),
-            metallic_factor: gltf_json::material::StrengthFactor(0.0),
-            roughness_factor: gltf_json::material::StrengthFactor(1.0),
+            metallic_factor: 0.0,
+            roughness_factor: 1.0,
             ..<_>::default()
-        };
+        });
 
         if !transparent {
             gltf_json::Material {
                 name: Some(name),
-                alpha_mode: Valid(gltf_json::material::AlphaMode::Opaque),
+                alpha_mode: gltf_json::material::AlphaMode::Opaque,
                 double_sided: false,
                 pbr_metallic_roughness,
                 ..gltf_json::Material::default()
@@ -361,30 +360,21 @@ impl MaterialKey {
         } else {
             gltf_json::Material {
                 name: Some(name),
-                alpha_mode: Valid(gltf_json::material::AlphaMode::Blend),
+                alpha_mode: gltf_json::material::AlphaMode::Blend,
                 double_sided: false,
                 pbr_metallic_roughness,
-                extensions: Some(gltf_json::extensions::material::Material {
-                    volume: None,
-                    // TODO: Reenable this when attenuation_distance serialization bug is fixed.
-                    // https://github.com/gltf-rs/gltf/issues/364
-                    // Some(gltf_json::extensions::material::Volume {
-                    //     thickness_factor: gltf_json::extensions::material::ThicknessFactor(1.0),
-                    //     thickness_texture: None,
-                    //     attenuation_distance:
-                    //         gltf_json::extensions::material::AttenuationDistance::default(),
-                    //     attenuation_color:
-                    //         gltf_json::extensions::material::AttenuationColor::default(),
-                    //     extras: Void::default(),
-                    // }),
-                    transmission: Some(gltf_json::extensions::material::Transmission {
-                        transmission_factor:
-                            gltf_json::extensions::material::TransmissionFactor::default(),
-                        transmission_texture: None,
-                        extras: Default::default(), // feature-variable type
-                    }),
-                    ..Default::default() // feature-variable additional fields
-                }),
+                // TODO: Reenable this when attenuation_distance serialization bug is fixed.
+                // https://github.com/gltf-rs/gltf/issues/364
+                // Some(gltf_json::extensions::material::Volume {
+                //     thickness_factor: gltf_json::extensions::material::ThicknessFactor(1.0),
+                //     thickness_texture: None,
+                //     attenuation_distance:
+                //         gltf_json::extensions::material::AttenuationDistance::default(),
+                //     attenuation_color:
+                //         gltf_json::extensions::material::AttenuationColor::default(),
+                //     extras: Void::default(),
+                // }),
+                // TODO: add transmission: { transmission_texture }
                 ..gltf_json::Material::default()
             }
         }
@@ -423,7 +413,7 @@ mod tests {
         let vertex_buffer = root.get(vertex_buffer_view.buffer).unwrap();
         let index_buffer = root.get(index_buffer_view.buffer).unwrap();
 
-        let index_size = index_accessor.component_type.unwrap().0.size();
+        let index_size = index_accessor.component_type.size();
         dbg!(
             vertex_accessor.count,
             index_accessor.count,
@@ -442,7 +432,7 @@ mod tests {
             index_buffer_view.buffer.value()
         );
         assert_eq!(
-            vertex_buffer.byte_length.0 as usize,
+            vertex_buffer.length.0 as usize,
             6 * 6 * index_size + 4 * 6 * size_of::<GltfVertex>(),
             "buffer size"
         );
