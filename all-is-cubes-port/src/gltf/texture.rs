@@ -6,7 +6,8 @@ use std::iter;
 use std::mem;
 use std::sync::{Arc, Mutex, OnceLock};
 
-use gltf_json::validation::Checked::Valid;
+use gltf as gltf_json;
+use gltf::validation::USize64; // TODO remove
 
 use all_is_cubes::block::Evoxel;
 use all_is_cubes::euclid::{Point2D, Point3D, Scale, Vector2D, point2};
@@ -329,7 +330,7 @@ pub struct GltfAtlasPoint {
 
 /// Generates the atlas textures and necessary glTF entities.
 pub(super) fn insert_block_texture_atlas(
-    root: &mut gltf_json::Root,
+    root: &mut gltf::Root,
     allocator: &GltfTextureAllocator,
     min_filter: gltf_json::texture::MinFilter,
 ) -> Result<Atlas<gltf_json::Index<gltf_json::Texture>>, io::Error> {
@@ -340,12 +341,12 @@ pub(super) fn insert_block_texture_atlas(
     } = allocator.write_png_atlas()?;
 
     let sampler = root.push(gltf_json::texture::Sampler {
-        mag_filter: Some(Valid(gltf_json::texture::MagFilter::Nearest)),
-        min_filter: Some(Valid(min_filter)),
+        mag_filter: Some(gltf_json::texture::MagFilter::Nearest),
+        min_filter: Some(min_filter),
         name: Some("block texture".into()),
-        wrap_s: Valid(gltf_json::texture::WrappingMode::ClampToEdge),
-        wrap_t: Valid(gltf_json::texture::WrappingMode::ClampToEdge),
-        extensions: None,
+        wrap_s: gltf::texture::WrappingMode::ClampToEdge,
+        wrap_t: gltf::texture::WrappingMode::ClampToEdge,
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
     let reflectance = insert_one_image(root, "reflectance", reflectance, sampler);
@@ -365,16 +366,16 @@ fn insert_one_image(
     image_buffer: gltf_json::Buffer,
     sampler: gltf_json::Index<gltf_json::texture::Sampler>,
 ) -> gltf_json::Index<gltf_json::Texture> {
-    let block_texture_len = image_buffer.byte_length;
+    let block_texture_len = image_buffer.length;
     let block_texture_buffer = root.push(image_buffer);
     let block_texture_buffer_view = root.push(gltf_json::buffer::View {
         buffer: block_texture_buffer,
-        byte_length: block_texture_len,
-        byte_offset: None,
-        byte_stride: None,
+        length: block_texture_len,
+        offset: USize64::from(0usize),
+        stride: None,
         name: Some(name.into()),
         target: None,
-        extensions: None,
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
     let block_texture_image = root.push(gltf_json::Image {
@@ -382,15 +383,16 @@ fn insert_one_image(
         mime_type: Some(gltf_json::image::MimeType("image/png".into())),
         name: Some(name.into()),
         uri: None,
-        extensions: None,
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     });
 
     root.push(gltf_json::Texture {
         name: None,
         sampler: Some(sampler),
-        source: block_texture_image,
-        extensions: None,
+        source: Some(block_texture_image),
+        basisu: None,
+        unrecognized_extensions: Default::default(),
         extras: Default::default(),
     })
 }
