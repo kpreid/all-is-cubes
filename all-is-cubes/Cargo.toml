@@ -47,6 +47,10 @@ required-features = ["save"]
 name = "space"
 harness = false
 
+[[example]]
+name = "visualize-raycast"
+required-features = ["rerun"]
+
 # See src/lib.rs documentation for more details on features.
 [features]
 default = ["std"]

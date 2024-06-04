@@ -3,7 +3,6 @@
 //! Note: This is *not* a code sample to be imitated, as it uses unstable/pseudo-private APIs.
 //! It is listed as an “example” because it is a program that only makes sense to run manually.
 
-use content::DemoBlocks;
 use pollster::block_on;
 
 use all_is_cubes::block::{EvaluatedBlock, Resolution};
@@ -14,6 +13,7 @@ use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_content as content;
 use all_is_cubes_mesh as mesh;
+use content::DemoBlocks;
 
 /// Private — do not use.
 use all_is_cubes::rerun_glue as rg;
