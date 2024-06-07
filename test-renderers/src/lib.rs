@@ -184,29 +184,32 @@ impl ComparisonRecord {
 }
 
 /// Finish a rendering test by storing/displaying/comparing the output image.
+#[allow(clippy::needless_pass_by_value)]
 pub fn compare_rendered_image(
     test: ImageId,
     allowed_difference: &Threshold,
-    actual_image: Rendering,
+    actual_rendering: Rendering,
 ) -> ComparisonRecord {
     let actual_file_path = image_path(&test, Version::Actual);
     let diff_file_path = image_path(&test, Version::Diff);
 
-    let actual_image = RgbaImage::from_raw(
-        actual_image.size.width,
-        actual_image.size.height,
-        bytemuck::cast_vec::<[u8; 4], u8>(actual_image.data),
-    )
-    .unwrap();
+    {
+        let actual_to_save = image::ImageBuffer::<image::Rgba<u8>, _>::from_raw(
+            actual_rendering.size.width,
+            actual_rendering.size.height,
+            bytemuck::cast_slice::<[u8; 4], u8>(&actual_rendering.data),
+        )
+        .unwrap();
 
-    actual_image
-        .save(&actual_file_path)
-        .expect("failed to write renderer output image");
+        actual_to_save
+            .save(&actual_file_path)
+            .expect("failed to write renderer output image");
+    }
 
     // TODO: all this needs a bunch of code deduplication for conveniently trying-to-open and carrying around the image and path
 
     // Load expected image, if any
-    let (expected_image, expected_file_path): (RgbaImage, PathBuf) =
+    let (expected_image, expected_file_path): (imgref::ImgVec<[u8; 4]>, PathBuf) =
         match load_and_copy_expected_image(&test) {
             Ok(r) => r,
             Err(NotFound(_)) => {
@@ -230,11 +233,16 @@ pub fn compare_rendered_image(
         };
 
     // Compare expected and actual images
-    let diff_result = rendiff::diff(&actual_image, &expected_image);
-    if let Some(image) = &diff_result.diff_image {
-        image
-            .save(&diff_file_path)
-            .expect("failed to write renderer diff image");
+    let diff_result = rendiff::diff((&actual_rendering).into(), expected_image.as_ref());
+    if let Some(image) = diff_result.diff_image() {
+        RgbaImage::from_raw(
+            image.width() as u32,
+            image.height() as u32,
+            bytemuck::cast_vec::<[u8; 4], u8>(image.buf().to_vec()),
+        )
+        .unwrap()
+        .save(&diff_file_path)
+        .expect("failed to write renderer diff image");
     } else {
         match fs::remove_file(&diff_file_path) {
             Ok(()) => {}
@@ -252,13 +260,13 @@ pub fn compare_rendered_image(
         &expected_file_path,
         &actual_file_path,
         Some(&diff_file_path),
-        diff_result.histogram,
-        if allowed_difference.allows(diff_result.histogram) {
+        diff_result.histogram(),
+        if allowed_difference.allows(diff_result.histogram()) {
             ComparisonOutcome::Equal
         } else {
             ComparisonOutcome::Different {
                 amount: diff_result
-                    .histogram
+                    .histogram()
                     .0
                     .iter()
                     .copied()

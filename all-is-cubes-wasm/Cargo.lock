@@ -40,6 +40,7 @@ dependencies = [
  "flate2",
  "futures-core",
  "hashbrown",
+ "imgref",
  "indoc",
  "itertools 0.12.1",
  "log",
@@ -949,6 +950,12 @@ dependencies = [
  "num-traits",
  "png",
 ]
+
+[[package]]
+name = "imgref"
+version = "1.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44feda355f4159a7c757171a77de25daf6411e217b4cabd03bd6650690468126"
 
 [[package]]
 name = "indexmap"

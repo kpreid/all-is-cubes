@@ -81,6 +81,27 @@ pub struct Rendering {
     pub flaws: Flaws,
 }
 
+impl From<Rendering> for imgref::ImgVec<[u8; 4]> {
+    fn from(value: Rendering) -> Self {
+        imgref::Img::new(
+            value.data,
+            // cannot overflow — we statically assert size_of(usize) >= size_of(u32)
+            value.size.width as usize,
+            value.size.height as usize,
+        )
+    }
+}
+impl<'a> From<&'a Rendering> for imgref::ImgRef<'a, [u8; 4]> {
+    fn from(value: &'a Rendering) -> Self {
+        imgref::Img::new(
+            value.data.as_slice(),
+            // cannot overflow — we statically assert size_of(usize) >= size_of(u32)
+            value.size.width as usize,
+            value.size.height as usize,
+        )
+    }
+}
+
 /// Provides the standard text style and positioning to draw the “debug info text”
 /// (as in [`HeadlessRenderer::draw()`]'s parameter).
 ///

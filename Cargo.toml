@@ -79,6 +79,7 @@ gilrs = { version = "0.10.4" }
 gloo-timers = { version = "0.3.0", default-features = false }
 hashbrown = { version = "0.14.0", default-features = false, features = ["ahash", "inline-more"] }
 image = { version = "0.24.6", default-features = false }
+imgref = "1.10.1"
 indoc = "2.0.1"
 itertools = { version = "0.12.0", default-features = false, features = ["use_alloc"] }
 log = { version = "0.4.17", default-features = false }
@@ -98,7 +99,7 @@ rayon = { version = "1.8.0" }
 re_log_types = { version = "0.16.0", default-features = false }
 re_sdk = { version = "0.16.0", default-features = false }
 re_types = { version = "0.16.0", default-features = false }
-rendiff = { version = "0.1.0" }
+rendiff = { version = "0.2.0" }
 scopeguard = { version = "1.2.0", default-features = false }
 send_wrapper = { version = "0.6.0", features = ["futures"] }
 serde = { version = "1.0.160", default-features = false, features = ["derive"] }

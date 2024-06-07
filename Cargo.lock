@@ -62,6 +62,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "hashbrown",
+ "imgref",
  "indoc",
  "itertools 0.12.1",
  "log",
@@ -2808,6 +2809,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "imgref"
+version = "1.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44feda355f4159a7c757171a77de25daf6411e217b4cabd03bd6650690468126"
+
+[[package]]
 name = "include_dir"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4951,12 +4958,12 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "rendiff"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db1c9da5ffadf446501d23eed30295b03a5701aa4a733fe18d05df182b10f77f"
+checksum = "d72f43a183ef0c17e65c604cfc5a77d34a7dd88a2c733ff7393c6fbaf13b33c2"
 dependencies = [
  "embed-doc-image",
- "image 0.24.9",
+ "imgref",
 ]
 
 [[package]]
@@ -5681,6 +5688,7 @@ dependencies = [
  "futures-util",
  "glam 0.24.2",
  "image 0.24.9",
+ "imgref",
  "itertools 0.12.1",
  "mint",
  "rayon",

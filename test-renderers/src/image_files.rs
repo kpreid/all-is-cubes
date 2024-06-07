@@ -135,7 +135,7 @@ pub(crate) fn test_data_dir_path(suite_id: SuiteId, version: Version) -> PathBuf
 /// Returns error if not found, or panics if an IO error occurs.
 pub(crate) fn load_and_copy_expected_image(
     image_id: &ImageId,
-) -> Result<(image::RgbaImage, PathBuf), NotFound> {
+) -> Result<(imgref::ImgVec<[u8; 4]>, PathBuf), NotFound> {
     let expected_file_path = image_path(image_id, Version::ExpectedSrc);
     let snapshot_file_path = image_path(image_id, Version::ExpectedSnapshot);
 
@@ -145,6 +145,19 @@ pub(crate) fn load_and_copy_expected_image(
             // We write the image back from pixels, not bytewise.
             // This makes it canonical and contain only the information we actually compared.
             image.save(&snapshot_file_path).unwrap();
+
+            // Convert to what `rendiff` wants.
+            let width = image.width() as usize;
+            let height = image.height() as usize;
+            let image = imgref::ImgVec::new(
+                image
+                    .into_vec()
+                    .chunks(4)
+                    .map(|pixel| <[u8; 4]>::try_from(pixel).unwrap())
+                    .collect(),
+                width,
+                height,
+            );
 
             Ok((image, snapshot_file_path))
         }

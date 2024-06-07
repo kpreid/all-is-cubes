@@ -70,6 +70,7 @@ futures-util = { workspace = true, features = ["std"] }
 # Must be the same version of glam as rend3 uses
 glam = { version = "0.24", optional = true, features = ["mint"] }
 image = { workspace = true, features = ["png"] }
+imgref = { workspace = true }
 itertools = { workspace = true }
 mint = { version = "0.5.9", optional = true }
 rayon = { workspace = true }
