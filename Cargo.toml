@@ -38,6 +38,16 @@ members = [
 # in a workspace, but would be implicit in a single package with edition="2021".)
 resolver = "2"
 
+[workspace.package]
+# When changing any of these values, be sure to also update the non-workspace packages
+# as listed above, if applicable.
+edition = "2021"
+rust-version = "1.77"
+license = "MIT OR Apache-2.0"
+authors = ["Kevin Reid <kpreid@switchb.org>"]
+# TODO: add homepage = "..." when we have one
+repository = "https://github.com/kpreid/all-is-cubes"
+
 [workspace.dependencies]
 all-is-cubes = { path = "all-is-cubes", version = "0.7.1", default-features = false }
 all-is-cubes-base = { path = "all-is-cubes-base", version = "0.7.1", default-features = false }

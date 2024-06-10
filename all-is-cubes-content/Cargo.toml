@@ -1,12 +1,12 @@
 [package]
 name = "all-is-cubes-content"
 version = "0.7.0"
-authors = ["Kevin Reid <kpreid@switchb.org>"]
-edition = "2021"
-rust-version = "1.73"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 description = "Demo/default game content for the all-is-cubes engine."
 # TODO: add homepage = "..." when we have one
-repository = "https://github.com/kpreid/all-is-cubes"
+repository.workspace = true
 license = "MIT OR Apache-2.0"
 categories = ["games"]
 

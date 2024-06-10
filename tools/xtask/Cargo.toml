@@ -1,7 +1,7 @@
 [package]
 name = "xtask"
-edition = "2021"
-rust-version = "1.75"
+edition.workspace = true
+rust-version.workspace = true
 publish = false
 
 [[bin]]
