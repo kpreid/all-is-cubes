@@ -13,8 +13,11 @@ use all_is_cubes::space::SpaceTransaction;
 use crate::LandscapeBlocks::{self, Leaves, Log};
 
 /// Tree segment sizes or growth stages.
+///
+/// TODO: make the public version of this a struct with private contents
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, exhaust::Exhaust)]
 #[allow(clippy::exhaustive_enums)]
+#[allow(unnameable_types)] // TODO: this should be public with an opaque struct wrapper
 pub enum TreeGrowth {
     Sapling = 1, // radius = 1
     G2,          // radius = 2
@@ -371,7 +374,7 @@ mod graph {
 
     /// Note that this is and must be a directed edge, even though the graph itself is undirected.
     #[derive(Clone, Copy, Debug)]
-    pub struct GrowphEdgeRef {
+    pub(crate) struct GrowphEdgeRef {
         cube: Cube,
         face: Face6,
         pub growth: Option<TreeGrowth>,

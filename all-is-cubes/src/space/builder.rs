@@ -278,6 +278,7 @@ impl SpaceBuilderBounds for Vol<()> {
 mod sbb {
     use super::*;
     #[doc(hidden)]
+    #[allow(unnameable_types)]
     pub trait SbbSealed {}
     impl SbbSealed for () {}
     impl SbbSealed for Vol<()> {}

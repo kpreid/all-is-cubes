@@ -20,7 +20,7 @@ pub(crate) mod rerun_mesh;
 pub(crate) mod winit;
 
 /// Abstraction over different window types.
-// TODO: seal this trait
+#[doc(hidden)] // TODO: not sorting out how to make this cleanly public for now
 pub trait Window {
     fn set_title(&self, title: String);
 }
@@ -29,7 +29,7 @@ impl Window for () {
     fn set_title(&self, _title: String) {}
 }
 
-// TODO: seal this trait
+#[doc(hidden)] // TODO: not sorting out how to make this cleanly public for now
 pub trait Renderer {
     // having the filter here is an abstraction violation but meh
     #[cfg(feature = "rerun")]

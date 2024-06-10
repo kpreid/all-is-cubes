@@ -842,6 +842,7 @@ impl LightBuffer {
 /// TODO: better name
 #[derive(Clone, Debug)]
 #[doc(hidden)] // used for debug rendering
+#[allow(unnameable_types)]
 pub struct ComputedLight<D> {
     pub cube: Cube,
 

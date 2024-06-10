@@ -36,6 +36,7 @@ pub enum Viz {
 /// Use [`Viz::new()`] instead of constructing this directly.
 #[cfg(feature = "rerun")]
 #[doc(hidden)]
+#[allow(unnameable_types)]
 #[allow(missing_debug_implementations)]
 pub struct Inner {
     // Info captured from the `Evoxels` to give context to later data

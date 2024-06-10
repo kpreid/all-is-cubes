@@ -746,6 +746,7 @@ mod private {
     /// Private type making it impossible to call [`ErasedHandle::connect_deserialized`] outside
     /// the crate.
     #[derive(Debug)]
+    #[allow(unnameable_types)]
     pub struct ErasedHandleInternalToken;
 }
 #[cfg(feature = "save")]

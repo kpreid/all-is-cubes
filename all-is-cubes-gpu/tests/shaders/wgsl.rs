@@ -20,9 +20,9 @@ trait WgslTypeName {
 
 /// Serialize data structures to WGSL text.
 #[derive(Clone, Copy, Debug)]
-pub struct ToWgsl;
+pub(crate) struct ToWgsl;
 
-pub fn to_wgsl<T: Fmt<ToWgsl>>(value: T) -> String {
+pub(crate) fn to_wgsl<T: Fmt<ToWgsl>>(value: T) -> String {
     value.refmt(&ToWgsl).to_string()
 }
 

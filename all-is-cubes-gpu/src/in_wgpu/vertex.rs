@@ -249,6 +249,7 @@ impl DebugLineVertex for WgpuLinesVertex {
 /// This type should not be used directly; it is public as an element of [`WgpuBlockVertex`]'s
 /// trait implementations.
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+#[allow(unnameable_types)]
 #[repr(C)]
 pub struct FixTexCoord(u16);
 

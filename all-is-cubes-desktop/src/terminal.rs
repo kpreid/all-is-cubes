@@ -25,7 +25,8 @@ pub use options::TerminalOptions;
 mod ray_image;
 use ray_image::TextRayImage;
 mod ui;
-use ui::{InventoryDisplay, OutMsg, TerminalWindow, UiFrame};
+pub use ui::TerminalWindow;
+use ui::{InventoryDisplay, OutMsg, UiFrame};
 
 /// Print the scene to stdout and return, instead of starting any interaction.
 ///

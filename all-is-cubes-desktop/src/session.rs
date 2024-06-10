@@ -47,7 +47,7 @@ pub struct DesktopSession<Ren, Win> {
 
     /// If present, connection to system audio output.
     /// If absent, sound is not produced
-    pub audio: Option<crate::audio::AudioOut>,
+    pub(crate) audio: Option<crate::audio::AudioOut>,
 
     /// Portion of window title that describes the application rather than the session's current
     /// universe.

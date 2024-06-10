@@ -25,7 +25,7 @@ use all_is_cubes_ui::apps::{ExitMainTask, MainTaskContext};
 mod audio;
 mod config_files;
 mod glue;
-pub use glue::Executor;
+pub use glue::{Executor, Renderer, Window};
 pub mod logging;
 pub mod record;
 mod session;
@@ -49,7 +49,7 @@ pub type Session = all_is_cubes_ui::apps::Session<Instant>;
 /// If it does, it will return exactly what `looper` does, and there will be no other effects.
 /// (In particular, it is acceptable for `looper` to return *before* the event loop starts, if
 /// that suits the caller.)
-pub fn inner_main<Ren: glue::Renderer, Win: glue::Window>(
+pub fn inner_main<Ren: Renderer, Win: Window>(
     params: InnerMainParams,
     looper: impl FnOnce(DesktopSession<Ren, Win>) -> Result<(), anyhow::Error>,
     mut dsession: DesktopSession<Ren, Win>,

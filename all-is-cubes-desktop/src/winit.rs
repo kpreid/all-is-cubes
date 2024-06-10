@@ -484,6 +484,7 @@ fn handle_window_event<Ren: RendererToWinit>(
 /// TODO: Give this a better name and definition.
 /// Or remove it entirely since we no longer have multiple renderers targeting winit windows.
 #[doc(hidden)]
+#[allow(unnameable_types)]
 pub trait RendererToWinit: crate::glue::Renderer + 'static {
     #[doc(hidden)]
     fn update_world_camera(&mut self);

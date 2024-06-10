@@ -153,7 +153,7 @@ impl texture::Tile for GltfTile {
     }
 }
 
-/// [`Plane`] produced by [`GltfTextureAllocator`].
+/// [`texture::Plane`] produced by [`GltfTextureAllocator`].
 ///
 /// You should not generally need to refer to this type.
 #[derive(Clone, Debug, PartialEq)]

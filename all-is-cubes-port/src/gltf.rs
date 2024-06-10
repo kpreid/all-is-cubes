@@ -30,7 +30,7 @@ use mesh::Materials;
 mod glue;
 use glue::{convert_quaternion, empty_node};
 mod texture;
-pub use texture::{GltfTextureAllocator, GltfTile};
+pub use texture::{GltfAtlasPoint, GltfTextureAllocator, GltfTexturePlane, GltfTile};
 mod vertex;
 pub use vertex::GltfVertex;
 

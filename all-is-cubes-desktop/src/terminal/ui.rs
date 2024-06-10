@@ -23,7 +23,7 @@ use all_is_cubes::util::{Refmt as _, StatusText};
 use crate::terminal::chars::{image_patch_to_character, write_colored_and_measure};
 use crate::terminal::TextRayImage;
 
-/// Fills the window slot of [`DesktopSession`] for terminal sessions.
+/// Fills the window slot of [`DesktopSession`](crate::DesktopSession) for terminal sessions.
 ///
 /// Tracks the terminal state and acts as communication channel.
 #[derive(Debug)]
@@ -139,7 +139,7 @@ impl TerminalWindow {
         }
     }
 
-    pub fn wait_for_sync(&self) {
+    pub(crate) fn wait_for_sync(&self) {
         let (ping_sender, ping_receiver) = mpsc::sync_channel(1);
         let _ = self
             .out_sender
@@ -152,7 +152,7 @@ impl TerminalWindow {
 
     /// Send the cleanup command and wait for the thread to exit.
     #[allow(clippy::unnecessary_wraps)] // see TODO below
-    pub fn stop(mut self) -> Result<(), anyhow::Error> {
+    pub(crate) fn stop(mut self) -> Result<(), anyhow::Error> {
         // Drop channel to signal thread to shut down
         self.out_sender = None;
         if let Some(handle) = self.thread.take() {
@@ -164,7 +164,7 @@ impl TerminalWindow {
         Ok(())
     }
 
-    pub fn viewport_position(&mut self) -> Rect {
+    pub(crate) fn viewport_position(&mut self) -> Rect {
         self.update();
         self.viewport_position
     }
