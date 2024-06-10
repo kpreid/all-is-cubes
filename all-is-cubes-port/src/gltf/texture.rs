@@ -54,7 +54,7 @@ impl GltfTextureAllocator {
                 // `image` wants `Write + Seek` but `w` is not currently `Seek`
                 let mut tmp = io::Cursor::new(Vec::new());
                 image
-                    .write_to(&mut tmp, image::ImageOutputFormat::Png)
+                    .write_to(&mut tmp, image::ImageFormat::Png)
                     .expect("failed to write image to in-memory buffer");
                 w.write_all(tmp.into_inner().as_slice())?;
                 Ok(())

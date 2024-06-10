@@ -78,7 +78,7 @@ futures-util = { version = "0.3.28", default-features = false, features = ["allo
 gilrs = { version = "0.10.4" }
 gloo-timers = { version = "0.3.0", default-features = false }
 hashbrown = { version = "0.14.0", default-features = false, features = ["ahash", "inline-more"] }
-image = { version = "0.24.6", default-features = false }
+image = { version = "0.25.1", default-features = false }
 imgref = "1.10.1"
 indoc = "2.0.1"
 itertools = { version = "0.12.0", default-features = false, features = ["use_alloc"] }

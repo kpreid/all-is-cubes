@@ -197,7 +197,7 @@ dependencies = [
  "futures-util",
  "gloo-timers",
  "half",
- "image 0.24.9",
+ "image 0.25.1",
  "itertools 0.12.1",
  "log",
  "once_cell",
@@ -256,7 +256,7 @@ dependencies = [
  "either",
  "futures-core",
  "gltf-json",
- "image 0.24.9",
+ "image 0.25.1",
  "itertools 0.12.1",
  "log",
  "once_cell",
@@ -2791,7 +2791,6 @@ dependencies = [
  "byteorder",
  "color_quant",
  "num-traits",
- "png",
 ]
 
 [[package]]
@@ -5687,7 +5686,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "glam 0.24.2",
- "image 0.24.9",
+ "image 0.25.1",
  "imgref",
  "itertools 0.12.1",
  "mint",
