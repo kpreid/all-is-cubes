@@ -107,8 +107,7 @@ where
 /// Manual implementation to avoid `O: Clone` bound.
 impl<O> Clone for TransactionInUniverse<O>
 where
-    O: Transactional,
-    O::Transaction: Clone,
+    O: Transactional<Transaction: Clone>,
 {
     fn clone(&self) -> Self {
         Self {
@@ -118,9 +117,9 @@ where
     }
 }
 /// Manual implementation to avoid `O: PartialEq` bound.
-impl<O: Transactional> PartialEq for TransactionInUniverse<O>
+impl<O> PartialEq for TransactionInUniverse<O>
 where
-    O::Transaction: PartialEq,
+    O: Transactional<Transaction: PartialEq>,
 {
     fn eq(&self, other: &Self) -> bool {
         self.target == other.target && self.transaction == other.transaction

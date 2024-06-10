@@ -265,10 +265,9 @@ impl<M: MeshTypes> Default for BlockMesh<M> {
     }
 }
 
-impl<M: MeshTypes> PartialEq for BlockMesh<M>
+impl<M> PartialEq for BlockMesh<M>
 where
-    M::Vertex: PartialEq,
-    M::Tile: PartialEq,
+    M: MeshTypes<Vertex: PartialEq, Tile: PartialEq>,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self {

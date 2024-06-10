@@ -313,8 +313,7 @@ pub(crate) fn create_buffer_and_accessor<I, const COMPONENTS: usize>(
     data_source: I,
 ) -> io::Result<Index<gltf_json::Accessor>>
 where
-    I: IntoIterator<Item = [f32; COMPONENTS]> + Clone,
-    I::IntoIter: ExactSizeIterator,
+    I: IntoIterator<Item = [f32; COMPONENTS], IntoIter: ExactSizeIterator> + Clone,
     [Lef32; COMPONENTS]: bytemuck::Pod,
 {
     let length = data_source.clone().into_iter().len();

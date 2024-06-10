@@ -19,9 +19,9 @@ mod behavior {
 
     // TODO: Stop serializing H::Attachment directly or document that it has to be stable.
 
-    impl<H: BehaviorHost> Serialize for BehaviorSet<H>
+    impl<H> Serialize for BehaviorSet<H>
     where
-        H::Attachment: Serialize,
+        H: BehaviorHost<Attachment: Serialize>,
     {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             schema::BehaviorSetSer::BehaviorSetV1 {
@@ -40,9 +40,9 @@ mod behavior {
         }
     }
 
-    impl<'de, H: BehaviorHost> Deserialize<'de> for BehaviorSet<H>
+    impl<'de, H> Deserialize<'de> for BehaviorSet<H>
     where
-        H::Attachment: serde::de::DeserializeOwned,
+        H: BehaviorHost<Attachment: serde::de::DeserializeOwned>,
     {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             match schema::BehaviorSetSer::<H::Attachment>::deserialize(deserializer)? {

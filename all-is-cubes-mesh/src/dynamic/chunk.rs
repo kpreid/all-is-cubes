@@ -44,11 +44,9 @@ pub struct ChunkMesh<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> {
     update_debug: bool,
 }
 
-impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> PartialEq for ChunkMesh<M, CHUNK_SIZE>
+impl<M, const CHUNK_SIZE: GridCoordinate> PartialEq for ChunkMesh<M, CHUNK_SIZE>
 where
-    M::Vertex: PartialEq,
-    M::Tile: PartialEq,
-    M::RenderData: PartialEq,
+    M: DynamicMeshTypes<Vertex: PartialEq, Tile: PartialEq, RenderData: PartialEq>,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self {

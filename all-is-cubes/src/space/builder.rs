@@ -169,8 +169,7 @@ impl SpaceBuilder<Vol<()>> {
         light: Option<Vol<Box<[PackedLight]>>>,
     ) -> Result<Self, PaletteError>
     where
-        P: IntoIterator,
-        P::IntoIter: ExactSizeIterator<Item = Block>,
+        P: IntoIterator<IntoIter: ExactSizeIterator<Item = Block>>,
     {
         self.palette_and_contents_impl(&mut palette.into_iter(), contents, light)
     }

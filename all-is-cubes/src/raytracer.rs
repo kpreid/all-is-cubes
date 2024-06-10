@@ -375,9 +375,9 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 }
 
 // manual impl avoids `D: Debug` bound and avoids printing the entire grid
-impl<D: RtBlockData> fmt::Debug for SpaceRaytracer<D>
+impl<D> fmt::Debug for SpaceRaytracer<D>
 where
-    D::Options: fmt::Debug,
+    D: RtBlockData<Options: fmt::Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SpaceRaytracer")

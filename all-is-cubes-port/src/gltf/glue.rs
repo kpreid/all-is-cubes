@@ -109,8 +109,7 @@ pub(crate) fn create_accessor<I, const COMPONENTS: usize>(
     data_view: I,
 ) -> gltf_json::Accessor
 where
-    I: IntoIterator<Item = [f32; COMPONENTS]>,
-    I::IntoIter: ExactSizeIterator,
+    I: IntoIterator<Item = [f32; COMPONENTS], IntoIter: ExactSizeIterator>,
 {
     let iter = data_view.into_iter();
     let count = iter.len();

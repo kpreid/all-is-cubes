@@ -217,8 +217,7 @@ pub async fn harness_main<Factory, Ff>(
 ) -> HarnessResult
 where
     Factory: RendererFactory + 'static,
-    Ff: AsyncFn0<Output = Factory> + Send + Sync + 'static,
-    Ff::OutputFuture: Send,
+    Ff: AsyncFn0<Output = Factory, OutputFuture: Send> + Send + Sync + 'static,
 {
     let HarnessArgs {
         ignored,
@@ -489,8 +488,11 @@ impl<'a> TestCaseCollector<'a> {
         universe_source: Option<UniverseFuture>,
         test_function: F,
     ) where
-        F: AsyncFn1<RenderTestContext, Output = ()> + Send + Sync + Clone + 'static,
-        F::OutputFuture: Send,
+        F: AsyncFn1<RenderTestContext, Output = (), OutputFuture: Send>
+            + Send
+            + Sync
+            + Clone
+            + 'static,
     {
         match self.0.entry(name.to_owned()) {
             btree_map::Entry::Vacant(e) => {
@@ -522,14 +524,12 @@ impl<'a> TestCaseCollector<'a> {
         test_function: F,
         values: I,
     ) where
-        I: IntoIterator,
-        <I as IntoIterator>::Item: serde::Serialize + Clone + Send + Sync + 'static,
-        F: AsyncFn2<RenderTestContext, <I as IntoIterator>::Item, Output = ()>
+        I: IntoIterator<Item: serde::Serialize + Clone + Send + Sync + 'static>,
+        F: AsyncFn2<RenderTestContext, <I as IntoIterator>::Item, Output = (), OutputFuture: Send>
             + Send
             + Sync
             + Clone
             + 'static,
-        F::OutputFuture: Send,
     {
         for variant_value in values {
             let test_function = test_function.clone();

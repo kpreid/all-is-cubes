@@ -168,12 +168,11 @@ mod chart_schema {
     #[repr(C, packed)]
     pub(crate) struct TargetEndian<T>(<T as ToBytes>::Bytes)
     where
-        T: ToBytes,
-        <T as ToBytes>::Bytes: Copy + Clone + fmt::Debug + bytemuck::Pod + bytemuck::Zeroable;
+        T: ToBytes<Bytes: Copy + Clone + fmt::Debug + bytemuck::Pod + bytemuck::Zeroable>;
 
-    impl<T: ToBytes> From<T> for TargetEndian<T>
+    impl<T> From<T> for TargetEndian<T>
     where
-        <T as ToBytes>::Bytes: Copy + Clone + fmt::Debug + bytemuck::Pod + bytemuck::Zeroable,
+        T: ToBytes<Bytes: Copy + Clone + fmt::Debug + bytemuck::Pod + bytemuck::Zeroable>,
     {
         fn from(value: T) -> Self {
             Self(
@@ -189,7 +188,7 @@ mod chart_schema {
     // Orphan rules don't allow this as a generic impl directly
     impl<T> TargetEndian<T>
     where
-        <T as ToBytes>::Bytes: Copy + Clone + bytemuck::Pod + bytemuck::Zeroable,
+        T: ToBytes<Bytes: Copy + Clone + bytemuck::Pod + bytemuck::Zeroable>,
         T: FromBytes<Bytes = <T as ToBytes>::Bytes> + ToBytes + bytemuck::Pod + bytemuck::Zeroable,
     {
         fn into_value(self) -> T {

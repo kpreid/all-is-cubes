@@ -294,8 +294,8 @@ impl<'provider, E: Exhaust + Eq + Hash, V> Iterator for ModuleIter<'provider, E,
     }
 }
 
-impl<E: Exhaust + Eq + Hash, V> ExactSizeIterator for ModuleIter<'_, E, V> where
-    E::Iter: ExactSizeIterator
+impl<E, V> ExactSizeIterator for ModuleIter<'_, E, V> where
+    E: Exhaust<Iter: ExactSizeIterator> + Eq + Hash
 {
 }
 

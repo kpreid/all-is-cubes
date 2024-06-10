@@ -42,9 +42,9 @@ pub struct RtRenderer<D: RtBlockData = ()> {
     had_cursor: bool,
 }
 
-impl<D: RtBlockData> RtRenderer<D>
+impl<D> RtRenderer<D>
 where
-    D::Options: Clone + Sync + 'static,
+    D: RtBlockData<Options: Clone + Sync + 'static>,
 {
     /// * `cameras`: Scene to draw.
     /// * `size_policy`: Modifier to the `cameras`' provided viewport to control how many
@@ -81,14 +81,14 @@ where
         self.cameras.update();
         self.custom_options_cache = self.custom_options.get();
 
-        fn sync_space<D: RtBlockData>(
+        fn sync_space<D>(
             cached_rt: &mut Option<UpdatingSpaceRaytracer<D>>,
             optional_space: Option<&Handle<Space>>,
             graphics_options_source: &ListenableSource<GraphicsOptions>,
             custom_options_source: &ListenableSource<D::Options>,
         ) -> Result<(), RenderError>
         where
-            D::Options: Clone + Sync + 'static,
+            D: RtBlockData<Options: Clone + Sync + 'static>,
         {
             // TODO: this Option-synchronization pattern is recurring in renderers but also ugly ... look for ways to make it nicer
 
@@ -260,9 +260,9 @@ impl RtRenderer<()> {
 }
 
 // manual impl avoids `D: Debug` bound
-impl<D: RtBlockData> fmt::Debug for RtRenderer<D>
+impl<D> fmt::Debug for RtRenderer<D>
 where
-    D::Options: fmt::Debug,
+    D: RtBlockData<Options: fmt::Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {

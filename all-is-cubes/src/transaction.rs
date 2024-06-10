@@ -208,8 +208,7 @@ pub enum ExecuteError<Txn: Merge = UniverseTransaction> {
 // Manual impl required to set proper associated type bounds.
 impl<Txn> Clone for ExecuteError<Txn>
 where
-    Txn: Merge,
-    <Txn as Merge>::Conflict: Clone,
+    Txn: Merge<Conflict: Clone>,
 {
     fn clone(&self) -> Self {
         match self {
@@ -223,8 +222,7 @@ where
 crate::util::cfg_should_impl_error! {
     impl<Txn> std::error::Error for ExecuteError<Txn>
     where
-        Txn: Merge,
-        <Txn as Merge>::Conflict: std::error::Error + 'static,
+        Txn: Merge<Conflict: std::error::Error + 'static>,
     {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             match self {
@@ -238,8 +236,7 @@ crate::util::cfg_should_impl_error! {
 
 impl<Txn> fmt::Debug for ExecuteError<Txn>
 where
-    Txn: Merge,
-    <Txn as Merge>::Conflict: fmt::Debug,
+    Txn: Merge<Conflict: fmt::Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -252,8 +249,7 @@ where
 
 impl<Txn> fmt::Display for ExecuteError<Txn>
 where
-    Txn: Merge,
-    <Txn as Merge>::Conflict: fmt::Display,
+    Txn: Merge<Conflict: fmt::Display>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

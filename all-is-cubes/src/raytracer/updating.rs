@@ -25,9 +25,9 @@ pub struct UpdatingSpaceRaytracer<D: RtBlockData> {
 }
 
 // manual impl avoids `D: Debug` bound
-impl<D: RtBlockData> fmt::Debug for UpdatingSpaceRaytracer<D>
+impl<D> fmt::Debug for UpdatingSpaceRaytracer<D>
 where
-    D::Options: fmt::Debug,
+    D: RtBlockData<Options: fmt::Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("UpdatingSpaceRaytracer")
@@ -40,9 +40,9 @@ where
     }
 }
 
-impl<D: RtBlockData> UpdatingSpaceRaytracer<D>
+impl<D> UpdatingSpaceRaytracer<D>
 where
-    D::Options: Clone + Sync + 'static,
+    D: RtBlockData<Options: Clone + Sync + 'static>,
 {
     /// Construct a new [`UpdatingSpaceRaytracer`] which follows the given `space`.
     ///
