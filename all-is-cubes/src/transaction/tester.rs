@@ -110,7 +110,7 @@ where
         }
     }
 
-    fn derived_transactions<'b: 'a>(
+    fn derived_transactions<'b>(
         &'b self,
     ) -> impl Iterator<Item = TransactionAndPredicate<'a, Tr, Ta>> + 'b {
         self.transactions.iter().flat_map(move |t1| {
