@@ -1025,7 +1025,7 @@ mod tests {
         // General query should find both
         assert_eq!(
             set.query_any(None)
-                .map(|qi| qi.behavior as *const dyn Behavior<Character>)
+                .map(|qi| core::ptr::from_ref(qi.behavior))
                 .collect::<Vec<_>>(),
             vec![
                 Arc::as_ptr(&arc_qe) as *const dyn Behavior<Character>,
