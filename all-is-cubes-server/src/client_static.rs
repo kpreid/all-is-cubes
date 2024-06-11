@@ -78,3 +78,11 @@ mod embedded {
         }
     }
 }
+
+// for unused-dependencies analysis
+#[cfg(not(feature = "embed"))]
+mod embedded {
+    use include_dir as _;
+    use mime_guess as _;
+}
+

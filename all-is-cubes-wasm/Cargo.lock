@@ -121,7 +121,6 @@ dependencies = [
  "rand_xoshiro",
  "resource",
  "send_wrapper",
- "thiserror",
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
@@ -133,7 +132,6 @@ name = "all-is-cubes-mesh"
 version = "0.7.0"
 dependencies = [
  "all-is-cubes",
- "bitflags 2.5.0",
  "bitvec",
  "bytemuck",
  "cfg-if",
@@ -164,7 +162,6 @@ dependencies = [
  "image",
  "itertools 0.12.1",
  "log",
- "once_cell",
  "rectangle-pack",
  "serde_json",
  "stl_io",

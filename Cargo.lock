@@ -136,7 +136,6 @@ dependencies = [
  "rand_xoshiro",
  "strum",
  "tokio",
- "yield-progress",
 ]
 
 [[package]]
@@ -156,7 +155,6 @@ dependencies = [
  "crossterm",
  "directories-next",
  "futures-core",
- "futures-util",
  "gilrs",
  "gltf",
  "indicatif",
@@ -173,7 +171,6 @@ dependencies = [
  "simplelog",
  "strum",
  "tempfile",
- "thiserror",
  "tokio",
  "trycmd",
  "unicode-width",
@@ -208,7 +205,6 @@ dependencies = [
  "resource",
  "scopeguard",
  "send_wrapper",
- "thiserror",
  "tokio",
  "wasm-bindgen-futures",
  "web-sys",
@@ -223,7 +219,6 @@ dependencies = [
  "all-is-cubes",
  "all-is-cubes-content",
  "arbitrary",
- "bitflags 2.5.0",
  "bitvec",
  "bytemuck",
  "cfg-if",
@@ -259,7 +254,6 @@ dependencies = [
  "image 0.25.1",
  "itertools 0.12.1",
  "log",
- "once_cell",
  "pretty_assertions",
  "rectangle-pack",
  "serde_json",

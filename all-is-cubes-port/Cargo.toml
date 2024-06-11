@@ -30,7 +30,6 @@ image = { workspace = true, features = ["png"] }
 itertools = { workspace = true }
 # TODO: replace logging with explicit reporting data flow
 log = { workspace = true }
-once_cell = { workspace = true }
 rectangle-pack = { version = "0.4.2" }
 stl_io = { version = "0.7.0" }
 # json is used for native and glTF

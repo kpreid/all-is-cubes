@@ -43,7 +43,6 @@ auto-threads = ["dep:rayon"]
 [dependencies]
 all-is-cubes = { workspace = true }
 arbitrary = { workspace = true, optional = true }
-bitflags = { workspace = true }
 bitvec = { workspace = true }
 bytemuck = { workspace = true }
 cfg-if = { workspace = true }
