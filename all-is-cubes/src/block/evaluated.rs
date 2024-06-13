@@ -503,14 +503,12 @@ impl Evoxel {
     /// Construct the [`Evoxel`] that would have resulted from evaluating a voxel block
     /// with the given color and default attributes.
     pub const fn from_color(color: Rgba) -> Self {
-        // Use the selectable value from BlockAttributes's default for consistency.
-        // Force constant promotion so that this doesn't look like a
-        // feature(const_precise_live_drops) requirement
-        const DA: &BlockAttributes = &BlockAttributes::default();
         Self {
             color,
             emission: Rgb::ZERO,
-            selectable: DA.selectable,
+            // Use the selectable value from BlockAttributes's default for consistency.
+            // with the result of a default atom block.
+            selectable: BlockAttributes::DEFAULT_REF.selectable,
             collision: BlockCollision::DEFAULT_FOR_FROM_COLOR,
         }
     }

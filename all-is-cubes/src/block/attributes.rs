@@ -110,7 +110,10 @@ impl BlockAttributes {
         activation_action: None,
         animation_hint: AnimationHint::UNCHANGING,
     };
-    const DEFAULT_REF: &'static Self = &Self::DEFAULT;
+    /// Declaring a &'static reference allows accessing the default's fields in constant
+    /// without constructing and dropping an instance which would trigger a
+    /// `feature(const_precise_live_drops)` requirement.
+    pub(crate) const DEFAULT_REF: &'static Self = &Self::DEFAULT;
 
     /// Block attributes suitable as default values for in-game use.
     ///
