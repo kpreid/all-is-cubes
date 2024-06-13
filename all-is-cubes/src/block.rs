@@ -49,12 +49,11 @@ use crate::universe::{Handle, HandleVisitor, VisitHandles};
 // Must declare this macro before child modules, so they can use it.
 #[macro_export]
 macro_rules! color_block {
-    ($color:expr) => {{
-        const PRIMITIVE: &$crate::block::Primitive =
-            &$crate::block::Primitive::from_color($color.with_alpha_one_if_has_no_alpha());
-
-        $crate::block::Block::from_static_primitive(PRIMITIVE)
-    }};
+    ($color:expr) => {
+        $crate::block::Block::from_static_primitive(const {
+            &$crate::block::Primitive::from_color($color.with_alpha_one_if_has_no_alpha())
+        })
+    };
 
     ($r:literal, $g:literal, $b:literal $(,)?) => {
         $crate::color_block!($crate::math::rgb_const!($r, $g, $b))
