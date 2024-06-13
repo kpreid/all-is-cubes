@@ -609,7 +609,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             ),
             meta: MeshMeta {
                 opaque_range: 0..0,
-                transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
+                transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
                 textures_used: block_mesh.textures().to_vec(),
                 flaws: block_mesh.flaws(),
             },
@@ -816,15 +816,12 @@ impl<M: MeshTypes> MeshMeta<M> {
             textures_used,
             flaws,
         } = self;
-        *opaque_range = ZERO_RANGE;
-        *transparent_ranges = [ZERO_RANGE; DepthOrdering::COUNT];
+        *opaque_range = 0..0;
+        *transparent_ranges = [const { 0..0 }; DepthOrdering::COUNT];
         textures_used.clear();
         *flaws = Flaws::empty();
     }
 }
-
-/// We need a Range constant to be able to initialize arrays.
-const ZERO_RANGE: Range<usize> = 0..0;
 
 impl<M: MeshTypes> Default for MeshMeta<M> {
     /// Construct an empty [`MeshMeta`] which designates nothing (using the index range `0..0`).
@@ -832,8 +829,8 @@ impl<M: MeshTypes> Default for MeshMeta<M> {
     fn default() -> Self {
         // Note that this must be consistent with `Self::clear()`.
         Self {
-            opaque_range: ZERO_RANGE,
-            transparent_ranges: [ZERO_RANGE; DepthOrdering::COUNT],
+            opaque_range: 0..0,
+            transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
             textures_used: Vec::new(),
             flaws: Flaws::empty(),
         }
