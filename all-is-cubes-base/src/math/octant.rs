@@ -2,7 +2,7 @@ use core::{fmt, ops};
 
 use euclid::Vector3D;
 
-use crate::math::FreeVector;
+use crate::math::{Face6, FreeVector};
 
 /// Identifies one of eight octants, or elements of a 2×2×2 cube.
 ///
@@ -62,7 +62,7 @@ impl Octant {
         }
     }
 
-    fn to_zmaj_index(self) -> u8 {
+    const fn to_zmaj_index(self) -> u8 {
         self as u8
     }
 
@@ -137,6 +137,12 @@ impl OctantMask {
     /// The mask including no octants (no bits set).
     pub const NONE: Self = Self { flags: 0x00 };
 
+    #[inline]
+    #[doc(hidden)]
+    pub const fn from_zmaj_bits(flags: u8) -> Self {
+        Self { flags }
+    }
+
     /// Get the flag for the given octant.
     #[inline]
     pub fn get(self, octant: Octant) -> bool {
@@ -153,6 +159,24 @@ impl OctantMask {
     #[inline]
     pub fn clear(&mut self, octant: Octant) {
         self.flags &= !(1 << octant.to_zmaj_index());
+    }
+
+    /// Shift the data in the specified direction, discarding overflows and filling with
+    /// [`false`]/clear.
+    #[inline]
+    #[must_use]
+    pub fn shift(self, direction: Face6) -> Self {
+        let flags = self.flags;
+        Self {
+            flags: match direction {
+                Face6::NX => flags >> 4,
+                Face6::PX => flags << 4,
+                Face6::NY => (flags & 0b11001100) >> 2,
+                Face6::PY => (flags & 0b00110011) << 2,
+                Face6::NZ => (flags & 0b10101010) >> 1,
+                Face6::PZ => (flags & 0b01010101) << 1,
+            },
+        }
     }
 
     /// Returns the first octant included in the mask.
@@ -235,6 +259,32 @@ impl fmt::Debug for OctantMask {
     }
 }
 
+impl ops::BitOr for OctantMask {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self {
+            flags: self.flags | rhs.flags,
+        }
+    }
+}
+impl ops::BitAnd for OctantMask {
+    type Output = Self;
+    #[inline]
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self {
+            flags: self.flags & rhs.flags,
+        }
+    }
+}
+impl ops::Not for OctantMask {
+    type Output = Self;
+    #[inline]
+    fn not(self) -> Self::Output {
+        Self { flags: !self.flags }
+    }
+}
+
 impl FromIterator<Octant> for OctantMask {
     #[inline]
     fn from_iter<T: IntoIterator<Item = Octant>>(iter: T) -> Self {
@@ -250,6 +300,7 @@ impl FromIterator<Octant> for OctantMask {
 mod tests {
     use super::*;
     use euclid::vec3;
+    use Face6::*;
 
     #[test]
     fn reflect() {
@@ -275,6 +326,17 @@ mod tests {
 
         assert_eq!(format!("{some:?}"), "OctantMask[+X−Y−Z, +X+Y−Z]");
         assert_eq!(format!("{some:#?}"), "OctantMask[+X−Y−Z, +X+Y−Z]");
+    }
+
+    #[test]
+    fn shifts() {
+        let all = OctantMask::ALL;
+        assert_eq!(all.shift(NX), OctantMask::from_zmaj_bits(0b00001111));
+        assert_eq!(all.shift(PX), OctantMask::from_zmaj_bits(0b11110000));
+        assert_eq!(all.shift(NY), OctantMask::from_zmaj_bits(0b00110011));
+        assert_eq!(all.shift(PY), OctantMask::from_zmaj_bits(0b11001100));
+        assert_eq!(all.shift(NZ), OctantMask::from_zmaj_bits(0b01010101));
+        assert_eq!(all.shift(PZ), OctantMask::from_zmaj_bits(0b10101010));
     }
 
     #[test]

@@ -4,7 +4,9 @@ use itertools::Itertools;
 
 use all_is_cubes::block::{Evoxel, Resolution};
 use all_is_cubes::euclid::{point3, vec3, Point2D};
-use all_is_cubes::math::{Axis, Cube, Face6, FaceMap, GridCoordinate, GridPoint, Rgba, Vol};
+use all_is_cubes::math::{
+    Axis, Cube, Face6, FaceMap, GridCoordinate, GridPoint, OctantMask, Rgba, Vol,
+};
 
 #[cfg(feature = "rerun")]
 use all_is_cubes::math::GridAab;
@@ -172,12 +174,16 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut 
 /// Take one of the outputs of [`windows()`] and compute its contribution to [`analysis`].
 #[inline]
 fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, colors: [Rgba; 8]) {
+    use Face6::*;
+    const ALL: OctantMask = OctantMask::ALL;
+    const NONE: OctantMask = OctantMask::NONE;
+
     let opaque = bitmask(colors, Rgba::fully_opaque);
     let semitransparent = !(opaque | bitmask(colors, Rgba::fully_transparent));
     let renderable = opaque | semitransparent;
 
     // First, quickly check if there are any visible surfaces at all here.
-    if opaque != 0x00 && opaque != 0xFF || semitransparent != 0x00 && semitransparent != 0xFF {
+    if opaque != NONE && opaque != ALL || semitransparent != NONE && semitransparent != ALL {
         let resolution_coord = GridCoordinate::from(analysis.resolution);
 
         // TODO: false positives — look only at visible cubes on each axis, instead of all cubes
@@ -192,23 +198,23 @@ fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, colors: [Rgba;
         // and mark that plane as occupied if so.
         //
         // `unflatten()` undoes the axis dropping/swapping this code does.
-        if renderable & shift_px(0xFF) & !shift_px(opaque) != 0 {
-            analysis.expand_rect(Face6::NX, center.x, center.yz());
+        if renderable & ALL.shift(PX) & !opaque.shift(PX) != NONE {
+            analysis.expand_rect(NX, center.x, center.yz());
         }
-        if renderable & shift_py(0xFF) & !shift_py(opaque) != 0 {
-            analysis.expand_rect(Face6::NY, center.y, center.xz());
+        if renderable & ALL.shift(PY) & !opaque.shift(PY) != NONE {
+            analysis.expand_rect(NY, center.y, center.xz());
         }
-        if renderable & shift_pz(0xFF) & !shift_pz(opaque) != 0 {
-            analysis.expand_rect(Face6::NZ, center.z, center.xy());
+        if renderable & ALL.shift(PZ) & !opaque.shift(PZ) != NONE {
+            analysis.expand_rect(NZ, center.z, center.xy());
         }
-        if renderable & shift_nx(0xFF) & !shift_nx(opaque) != 0 {
-            analysis.expand_rect(Face6::PX, resolution_coord - center.x, center.yz());
+        if renderable & ALL.shift(NX) & !opaque.shift(NX) != NONE {
+            analysis.expand_rect(PX, resolution_coord - center.x, center.yz());
         }
-        if renderable & shift_ny(0xFF) & !shift_ny(opaque) != 0 {
-            analysis.expand_rect(Face6::PY, resolution_coord - center.y, center.xz());
+        if renderable & ALL.shift(NY) & !opaque.shift(NY) != NONE {
+            analysis.expand_rect(PY, resolution_coord - center.y, center.xz());
         }
-        if renderable & shift_nz(0xFF) & !shift_nz(opaque) != 0 {
-            analysis.expand_rect(Face6::PZ, resolution_coord - center.z, center.xy());
+        if renderable & ALL.shift(NZ) & !opaque.shift(NZ) != NONE {
+            analysis.expand_rect(PZ, resolution_coord - center.z, center.xy());
         }
     }
 }
@@ -246,32 +252,12 @@ fn windows(voxels: Vol<&[Evoxel]>) -> impl Iterator<Item = (GridPoint, [Rgba; 8]
 }
 
 /// Given a group of colors produced by [`windows()`], map it to a bitmask.
-fn bitmask(v: [Rgba; 8], f: impl Fn(Rgba) -> bool) -> u8 {
+fn bitmask(v: [Rgba; 8], f: impl Fn(Rgba) -> bool) -> OctantMask {
     let mut output = 0;
     for (i, &color) in v.iter().enumerate() {
         output |= u8::from(f(color)) << i;
     }
-    output
-}
-
-// Shift the contents of a [`bitmask()`] in the specified direction, discarding overflows.
-fn shift_px(bits: u8) -> u8 {
-    bits << 4
-}
-fn shift_nx(bits: u8) -> u8 {
-    bits >> 4
-}
-fn shift_py(bits: u8) -> u8 {
-    (bits & 0b00110011) << 2
-}
-fn shift_ny(bits: u8) -> u8 {
-    (bits & 0b11001100) >> 2
-}
-fn shift_pz(bits: u8) -> u8 {
-    (bits & 0b01010101) << 1
-}
-fn shift_nz(bits: u8) -> u8 {
-    (bits & 0b10101010) >> 1
+    OctantMask::from_zmaj_bits(output)
 }
 
 #[cfg(test)]
@@ -306,16 +292,6 @@ mod tests {
                 (GridPoint::new(1, 1, 1), [red, tr, tr, tr, tr, tr, tr, tr]),
             ]
         )
-    }
-
-    #[test]
-    fn shifts() {
-        assert_eq!(shift_nx(0xFF), 0b00001111);
-        assert_eq!(shift_px(0xFF), 0b11110000);
-        assert_eq!(shift_ny(0xFF), 0b00110011);
-        assert_eq!(shift_py(0xFF), 0b11001100);
-        assert_eq!(shift_nz(0xFF), 0b01010101);
-        assert_eq!(shift_pz(0xFF), 0b10101010);
     }
 
     /// `Analysis` is a huge data type.
