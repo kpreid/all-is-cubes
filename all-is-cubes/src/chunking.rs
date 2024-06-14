@@ -1,5 +1,6 @@
 //! Algorithms for grouping cubes into cubical batches (chunks).
 
+use all_is_cubes_base::math::Octant;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -21,7 +22,7 @@ use num_traits::float::FloatCore as _;
 #[allow(unused_imports)]
 use crate::math::Euclid as _;
 use crate::math::{
-    Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint,
+    Cube, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint, OctantMask,
 };
 
 /// Unit-of-measure type for chunk positions *not* tracking the chunk size in the type.
@@ -227,6 +228,9 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     /// The chunks are ordered from nearest to farthest in Euclidean distance; the iterator is a
     /// [`DoubleEndedIterator`] so that [`Iterator::rev`] may be used to iterate from
     /// farthest to nearest.
+    ///
+    /// `mask` specifies which directions are in view, in terms of octants of direction vectors.
+    /// Chunks only visible in directions not in the mask will be culled.
     pub fn chunks(
         &self,
         origin: ChunkPos<CHUNK_SIZE>,
@@ -397,102 +401,6 @@ fn chunk_distance_squared_for_view(chunk: Ccv) -> Distance {
 #[cfg(feature = "std")]
 static CHUNK_CHART_CACHE: Mutex<BTreeMap<GridCoordinate, Arc<[Ccv]>>> = Mutex::new(BTreeMap::new());
 
-/// A specification of which octants to include in [`ChunkChart::chunks()`].
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct OctantMask {
-    /// A bit-mask of octants, where the bit positions are, LSB first, [-X-Y-Z, -X-Y+Z, ..., +X+Y+Z]
-    flags: u8,
-}
-
-impl fmt::Debug for OctantMask {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "OctantMask[")?;
-        let mut first = true;
-        for i in 0..8 {
-            if self.flags & (1 << i) != 0 {
-                if !first {
-                    write!(f, ", ")?;
-                }
-                first = false;
-                write!(
-                    f,
-                    "{}",
-                    match i {
-                        0 => "-X-Y-Z",
-                        1 => "-X-Y+Z",
-                        2 => "-X+Y-Z",
-                        3 => "-X+Y+Z",
-                        4 => "+X-Y-Z",
-                        5 => "+X-Y+Z",
-                        6 => "+X+Y-Z",
-                        7 => "+X+Y+Z",
-                        _ => unreachable!(),
-                    }
-                )?;
-            }
-        }
-        write!(f, "]")?;
-        Ok(())
-    }
-}
-
-impl OctantMask {
-    /// The mask including all octants.
-    pub const ALL: Self = Self { flags: 0xFF };
-    /// The mask including no octants.
-    pub const NONE: Self = Self { flags: 0x00 };
-
-    /// Set the flag for the octant the given vector occupies.
-    pub(crate) fn set_octant_of(&mut self, vector: FreeVector) {
-        let index = u8::from(vector.x >= 0.) << 2
-            | u8::from(vector.y >= 0.) << 1
-            | u8::from(vector.z >= 0.);
-        self.flags |= 1 << index;
-    }
-
-    // TODO: formerly used for iterator size estimation that didn't work; bring this back?
-    // #[inline(always)]
-    // fn count(self) -> usize {
-    //     self.flags.count_ones() as usize
-    // }
-
-    /// Returns the index of the first octant included in the mask.
-    ///
-    /// Here “first” means the arbitrary ordering [`ChunkChart`] uses, which corresponds
-    /// to the binary-counting ordering with X as MSB and Z as LSB:
-    ///
-    /// ```text
-    /// 0 = -X -Y -Z
-    /// 1 = -X -Y +Z
-    /// 2 = -X +Y -Z
-    /// 3 = -X +Y +Z
-    /// 4 = +X -Y -Z
-    /// 5 = +X -Y +Z
-    /// 6 = +X +Y -Z
-    /// 7 = +X +Y +Z
-    /// ```
-    #[inline(always)]
-    fn first(self) -> Option<u8> {
-        let tz = self.flags.trailing_zeros();
-        if tz >= u8::BITS {
-            None
-        } else {
-            Some(tz as u8)
-        }
-    }
-
-    /// As [`Self::first()`], but the opposite ordering.
-    #[inline(always)]
-    fn last(self) -> Option<u8> {
-        let lz = self.flags.leading_zeros();
-        if lz >= u8::BITS {
-            None
-        } else {
-            Some((7 - lz) as u8)
-        }
-    }
-}
-
 /// An iterator that returns a vector and its opposite in the specified axis,
 ///
 /// Part of the implementation of [`ChunkChart`].
@@ -505,37 +413,14 @@ impl AxisMirrorIter {
     #[inline]
     fn new(v: Ccv, mask: OctantMask) -> Self {
         // For each axis whose value is zero, collapse the mask into being one-sided on that axis
-        // Note that it is critical that each of these reads the preceding stage; otherwise multiple
-        // axes won't combine the effects of collapsing properly.
-        let mut todo = mask;
-        if v.x == 0 {
-            todo.flags = (todo.flags & 0b00001111) | ((todo.flags & 0b11110000) >> 4);
-        }
-        if v.y == 0 {
-            todo.flags = (todo.flags & 0b00110011) | ((todo.flags & 0b11001100) >> 2);
-        }
-        if v.z == 0 {
-            todo.flags = (todo.flags & 0b01010101) | ((todo.flags & 0b10101010) >> 1);
-        }
+        // to avoid duplicating the vector.
+        let todo = mask.collapse_to_negative(v.x == 0, v.y == 0, v.z == 0);
         Self { v, todo }
     }
 
-    fn generate_and_clear(&mut self, octant_index: u8) -> Ccv {
-        self.todo.flags &= !(1 << octant_index);
-        let mut result = self.v;
-        if octant_index & 0b100 == 0 {
-            // mirrored x
-            result.x *= -1;
-        }
-        if octant_index & 0b10 == 0 {
-            // mirrored y
-            result.y *= -1;
-        }
-        if octant_index & 0b1 == 0 {
-            // mirrored z
-            result.z *= -1;
-        }
-        result
+    fn generate_and_clear(&mut self, octant: Octant) -> Ccv {
+        self.todo.clear(octant);
+        octant.reflect(self.v)
     }
 }
 impl Iterator for AxisMirrorIter {
@@ -685,7 +570,7 @@ mod tests {
                 .chunks(
                     ChunkPos::new(0, 0, 0),
                     // Include three octants: [+x +y +z], [+x, +y, -z], and [+x, -y, -z]
-                    OctantMask { flags: 0b11010000 }
+                    OctantMask::from_iter([Octant::Ppp, Octant::Ppn, Octant::Pnn])
                 )
                 .collect::<Vec<_>>(),
             vec![
@@ -841,17 +726,5 @@ mod tests {
                     .collect::<Vec<_>>()
             );
         }
-    }
-
-    #[test]
-    fn octant_mask_smoke_test() {
-        let mut mask = OctantMask::NONE;
-        assert_eq!(mask, OctantMask::NONE);
-        mask.set_octant_of(vec3(1., 1., 1.));
-        assert_eq!(mask, OctantMask { flags: 0b1000_0000 });
-        mask.set_octant_of(vec3(-1., -1., -1.));
-        assert_eq!(mask, OctantMask { flags: 0b1000_0001 });
-        assert_eq!(mask.first(), Some(0));
-        assert_eq!(mask.last(), Some(7));
     }
 }

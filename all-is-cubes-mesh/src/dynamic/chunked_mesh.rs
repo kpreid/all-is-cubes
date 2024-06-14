@@ -10,9 +10,9 @@ use indoc::indoc;
 use rayon::iter::{ParallelBridge, ParallelIterator as _};
 
 use all_is_cubes::camera::{Camera, Flaws};
-use all_is_cubes::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos, OctantMask};
+use all_is_cubes::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos};
 use all_is_cubes::listen::{Listen as _, Listener};
-use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex};
+use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex, OctantMask};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};

@@ -13,9 +13,9 @@ use ordered_float::NotNan;
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use crate::chunking::OctantMask;
 use crate::math::{
-    Aab, Axis, Cube, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab, LineVertex, Rgba,
+    Aab, Axis, Cube, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab, LineVertex, Octant,
+    OctantMask, Rgba,
 };
 use crate::raycast::Ray;
 
@@ -292,19 +292,19 @@ impl Camera {
         let lt = ltf - ltn;
         let rb = rbf - rbn;
         let rt = rtf - rtn;
-        mask.set_octant_of(lb);
-        mask.set_octant_of(lt);
-        mask.set_octant_of(rb);
-        mask.set_octant_of(rt);
+        mask.set(Octant::from_vector(lb));
+        mask.set(Octant::from_vector(lt));
+        mask.set(Octant::from_vector(rb));
+        mask.set(Octant::from_vector(rt));
         // Midpoints
         let lmid = lb + lt;
         let rmid = rb + rt;
-        mask.set_octant_of(lmid);
-        mask.set_octant_of(rmid);
-        mask.set_octant_of(lt + rt);
-        mask.set_octant_of(lb + rb);
+        mask.set(Octant::from_vector(lmid));
+        mask.set(Octant::from_vector(rmid));
+        mask.set(Octant::from_vector(lt + rt));
+        mask.set(Octant::from_vector(lb + rb));
         // Center line
-        mask.set_octant_of(lmid + rmid);
+        mask.set(Octant::from_vector(lmid + rmid));
 
         mask
     }

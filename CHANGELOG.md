@@ -20,6 +20,7 @@
     - `math::GridAab::union_cubes()` is a new definition of union which returns a smaller box in zero-volume/flat cases.
     - `math::GridAab::to_free()` is another name for `Aab::from()`, useful for method chaining and not importing `Aab`.
     - `math::GridSize` type alias for `euclid::Size3D<GridCoordinate, Cube>`.
+    - `math::Octant` is a new type identifying an octant.
     - `math::Vol::subdivide()` splits a `Vol`'s bounds and data into parts that can be processed in parallel.
 
     - `op::Operation::AddModifiers` allows an operation to add modifiers rather than replacing a block.
@@ -53,6 +54,8 @@
     - Renamed `camera::Camera` methods:
         - `projection()` to `projection_matrix()`
         - `get_view_transform()` to `view_transform()`
+
+    - `chunking::OctantMask` has been moved to the `math` module.
 
     - `listen::Listener::receive()` now accepts batches of messages instead of single messages, and the `alive()` method has been replaced with a return value from `receive()`. Implementors should review the new requirements documentation.
 

@@ -32,6 +32,8 @@ mod rigid;
 pub use rigid::*;
 mod matrix;
 pub use matrix::*;
+mod octant;
+pub use octant::*;
 mod rotation;
 pub use rotation::*;
 #[cfg(feature = "serde")]
