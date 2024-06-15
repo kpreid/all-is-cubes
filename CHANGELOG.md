@@ -21,6 +21,7 @@
     - `math::GridAab::to_free()` is another name for `Aab::from()`, useful for method chaining and not importing `Aab`.
     - `math::GridSize` type alias for `euclid::Size3D<GridCoordinate, Cube>`.
     - `math::Octant` is a new type identifying an octant.
+    - `math::OctantMap` is a new type storing eight values associated with octants (like `FaceMap` is to `Face6`).
     - `math::Vol::subdivide()` splits a `Vol`'s bounds and data into parts that can be processed in parallel.
 
     - `op::Operation::AddModifiers` allows an operation to add modifiers rather than replacing a block.

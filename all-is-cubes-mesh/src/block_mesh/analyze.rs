@@ -1,11 +1,9 @@
-use std::array::from_fn as arr;
-
 use itertools::Itertools;
 
 use all_is_cubes::block::{Evoxel, Resolution};
-use all_is_cubes::euclid::{point3, vec3, Point2D};
+use all_is_cubes::euclid::{point3, Point2D};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, GridCoordinate, GridPoint, OctantMask, Rgba, Vol,
+    Axis, Cube, Face6, FaceMap, GridCoordinate, GridPoint, OctantMap, OctantMask, Rgba, Vol,
 };
 
 #[cfg(feature = "rerun")]
@@ -173,7 +171,7 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut 
 
 /// Take one of the outputs of [`windows()`] and compute its contribution to [`analysis`].
 #[inline]
-fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, colors: [Rgba; 8]) {
+fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, colors: OctantMap<Rgba>) {
     use Face6::*;
     const ALL: OctantMask = OctantMask::ALL;
     const NONE: OctantMask = OctantMask::NONE;
@@ -189,7 +187,7 @@ fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, colors: [Rgba;
         // TODO: false positives — look only at visible cubes on each axis, instead of all cubes
         analysis.needs_texture = analysis.needs_texture
             || !colors
-                .iter()
+                .values()
                 .filter(|color| !color.fully_transparent())
                 .all_equal();
 
@@ -228,7 +226,7 @@ fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, colors: [Rgba;
 /// * `colors[0b001] = voxels[[low, low, high]]`
 /// * `colors[0b010] = voxels[[low, high, low]]`
 /// * ...
-fn windows(voxels: Vol<&[Evoxel]>) -> impl Iterator<Item = (GridPoint, [Rgba; 8])> + '_ {
+fn windows(voxels: Vol<&[Evoxel]>) -> impl Iterator<Item = (GridPoint, OctantMap<Rgba>)> + '_ {
     // For 2³ windows that spill 1 voxel outside, expand by 1 to get the lower cubes.
     let window_lb_bounds = voxels.bounds().expand(FaceMap {
         nx: 1,
@@ -240,10 +238,9 @@ fn windows(voxels: Vol<&[Evoxel]>) -> impl Iterator<Item = (GridPoint, [Rgba; 8]
     });
 
     window_lb_bounds.interior_iter().map(move |window_lb| {
-        let colors: [Rgba; 8] = arr(|i| {
-            let i = i as GridCoordinate;
+        let colors: OctantMap<Rgba> = OctantMap::from_fn(|octant| {
             voxels
-                .get(window_lb + vec3((i >> 2) & 1, (i >> 1) & 1, i & 1).to_i32())
+                .get(window_lb + octant.to_positive_cube().lower_bounds().to_vector())
                 .unwrap_or(&Evoxel::AIR)
                 .color
         });
@@ -252,12 +249,8 @@ fn windows(voxels: Vol<&[Evoxel]>) -> impl Iterator<Item = (GridPoint, [Rgba; 8]
 }
 
 /// Given a group of colors produced by [`windows()`], map it to a bitmask.
-fn bitmask(v: [Rgba; 8], f: impl Fn(Rgba) -> bool) -> OctantMask {
-    let mut output = 0;
-    for (i, &color) in v.iter().enumerate() {
-        output |= u8::from(f(color)) << i;
-    }
-    OctantMask::from_zmaj_bits(output)
+fn bitmask(v: OctantMap<Rgba>, f: impl Fn(Rgba) -> bool) -> OctantMask {
+    v.to_mask(|&color| f(color))
 }
 
 #[cfg(test)]
@@ -280,7 +273,9 @@ mod tests {
         let vol: Vol<Arc<[Evoxel]>, ZMaj> =
             Vol::from_elements(GridAab::ORIGIN_CUBE, vec![Evoxel::from_color(red)]).unwrap();
         assert_eq!(
-            windows(vol.as_ref()).collect::<Vec<_>>(),
+            windows(vol.as_ref())
+                .map(|(point, colors)| (point, colors.into_zmaj_array()))
+                .collect::<Vec<(GridPoint, [Rgba; 8])>>(),
             vec![
                 (GridPoint::new(0, 0, 0), [tr, tr, tr, tr, tr, tr, tr, red]),
                 (GridPoint::new(0, 0, 1), [tr, tr, tr, tr, tr, tr, red, tr]),

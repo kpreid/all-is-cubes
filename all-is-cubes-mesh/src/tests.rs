@@ -363,7 +363,7 @@ fn shrunken_box_uniform_color() {
 
     let (tex, _, space_rendered) = mesh_blocks_and_space(&outer_space);
 
-    assert_eq!(tex.count_allocated(), 0);
+    assert_eq!(tex.count_allocated(), 0, "should have no texture");
     assert_eq!(
         space_rendered.vertices().to_vec(),
         vec![

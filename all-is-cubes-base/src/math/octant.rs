@@ -2,11 +2,11 @@ use core::{fmt, ops};
 
 use euclid::Vector3D;
 
-use crate::math::{Face6, FreeVector};
+use crate::math::{Cube, Face6, FreeVector, GridCoordinate};
 
 /// Identifies one of eight octants, or elements of a 2×2×2 cube.
 ///
-/// Used with [`OctantMask`] and [`OctantSet`].
+/// Used with [`OctantMask`] and [`OctantMap`].
 ///
 /// This enum's discriminants are not currently to be considered stable; they may be reordered.
 //---
@@ -36,6 +36,8 @@ pub enum Octant {
 
 impl Octant {
     /// All values of the enum.
+    //---
+    // Note: `OctantMap::iter()` depends on the ordering of this.
     pub const ALL: [Self; 8] = [
         Self::Nnn,
         Self::Nnp,
@@ -76,6 +78,16 @@ impl Octant {
             | u8::from(vector.y >= 0.) << 1
             | u8::from(vector.z >= 0.);
         Self::from_zmaj_index(index)
+    }
+
+    /// Returns this octant of the volume (0..2)³.
+    ///
+    /// That is, each coordinate of the returned [`Cube`] is either 0 or 1.
+    #[inline]
+    #[must_use]
+    pub fn to_positive_cube(self) -> Cube {
+        let i = GridCoordinate::from(self.to_zmaj_index());
+        Cube::new((i >> 2) & 1, (i >> 1) & 1, i & 1)
     }
 
     /// For each component of `vector`, negate it if `self` is on the negative side of that axis.
@@ -293,6 +305,102 @@ impl FromIterator<Octant> for OctantMask {
             this.set(octant);
         });
         this
+    }
+}
+
+/// Collection of 8 values keyed by [`Octant`]s.
+///
+/// If the values are [`bool`], use [`OctantMask`] instead for a more efficient representation.
+#[derive(Clone, Copy, Default, Hash, PartialEq, Eq, exhaust::Exhaust)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+
+pub struct OctantMap<T>([T; 8]);
+
+impl<T> OctantMap<T> {
+    /// Constructs an [`OctantMap`] by using the provided function to compute
+    /// a value for each octant.
+    #[inline]
+    #[must_use]
+    pub fn from_fn(mut function: impl FnMut(Octant) -> T) -> Self {
+        Self(core::array::from_fn(|i| {
+            function(Octant::from_zmaj_index(i as u8))
+        }))
+    }
+
+    /// Returns an [`OctantMask`] constructed by applying the given `predicate` to each octant
+    /// of the data in `self`.
+    #[inline]
+    #[must_use]
+    pub fn to_mask(&self, mut predicate: impl FnMut(&T) -> bool) -> OctantMask {
+        let mut output = 0;
+        for (i, value) in self.0.iter().enumerate() {
+            output |= u8::from(predicate(value)) << i;
+        }
+        OctantMask::from_zmaj_bits(output)
+    }
+
+    // /// Moves the data into a [`Vol`] that covers the same volume as
+    // /// [`Octant::to_positive_cube()`].
+    // #[inline]
+    // #[must_use]
+    // pub fn into_positive_vol(self) -> Vol<Box<[T]>> {
+    //     Vol::from_elements(GridAab::for_block(Resolution::R2), self.0).unwrap()
+    // }
+
+    #[doc(hidden)]
+    #[inline]
+    #[must_use]
+    pub fn into_zmaj_array(self) -> [T; 8] {
+        self.0
+    }
+
+    /// Returns an iterator over all elements by reference, and their octants.
+    ///
+    /// The order of iteration is not guarateed.
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = (Octant, &T)> + '_ {
+        Octant::ALL.into_iter().zip(self.0.iter())
+    }
+
+    /// Returns an iterator over all elements by reference.
+    ///
+    /// The order of iteration is not currently guarateed.
+    #[inline]
+    pub fn values(&self) -> impl Iterator<Item = &T> + '_ {
+        self.0.iter()
+    }
+
+    /// Returns an iterator over all elements by mutable reference.
+    ///
+    /// The order of iteration is not currently guarateed.
+    #[inline]
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Octant, &mut T)> + '_ {
+        Octant::ALL.into_iter().zip(self.0.iter_mut())
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for OctantMap<T> {
+    #[inline(never)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = f.debug_struct("OctantMap");
+        for octant in Octant::ALL {
+            s.field(&format!("{octant:?}"), &self[octant]);
+        }
+        s.finish()
+    }
+}
+
+impl<T> ops::Index<Octant> for OctantMap<T> {
+    type Output = T;
+    #[inline]
+    fn index(&self, octant: Octant) -> &Self::Output {
+        &self.0[octant.to_zmaj_index() as usize]
+    }
+}
+impl<T> ops::IndexMut<Octant> for OctantMap<T> {
+    #[inline]
+    fn index_mut(&mut self, octant: Octant) -> &mut Self::Output {
+        &mut self.0[octant.to_zmaj_index() as usize]
     }
 }
 
