@@ -1,5 +1,5 @@
 use all_is_cubes::euclid::default::Translation3D;
-use all_is_cubes::math::{self, Cube, GridAab, GridCoordinate, GridPoint};
+use all_is_cubes::math::{self, Cube, GridAab, GridCoordinate, GridPoint, Octant, OctantMap};
 
 /// An octree that knows how to allocate box regions of itself. It stores no other data.
 #[derive(Clone, Debug)]
@@ -162,22 +162,15 @@ enum AlloctreeNode {
     Full,
 
     /// Subdivided into parts with `size_exponent` decremented by one.
-    Oct(Box<[AlloctreeNode; 8]>),
+    Oct(Box<OctantMap<AlloctreeNode>>),
 }
 
 impl AlloctreeNode {
     /// Construct a node with this child in the low corner.
     fn wrap_in_oct(self) -> Self {
-        AlloctreeNode::Oct(Box::new([
-            self,
-            AlloctreeNode::Empty,
-            AlloctreeNode::Empty,
-            AlloctreeNode::Empty,
-            AlloctreeNode::Empty,
-            AlloctreeNode::Empty,
-            AlloctreeNode::Empty,
-            AlloctreeNode::Empty,
-        ]))
+        let mut oct = Box::new(OctantMap::repeat(AlloctreeNode::Empty));
+        oct[Octant::Nnn] = self;
+        AlloctreeNode::Oct(oct)
     }
 
     fn allocate(
@@ -239,16 +232,14 @@ impl AlloctreeNode {
                 }
                 let child_size = expsize(size_exponent - 1);
 
-                children
-                    .iter_mut()
-                    .zip(linearization().iter_cubes())
-                    .find_map(|(child, child_position)| {
-                        child.allocate(
-                            size_exponent - 1,
-                            low_corner + child_position.lower_bounds().to_vector() * child_size,
-                            request,
-                        )
-                    })
+                children.iter_mut().find_map(|(octant, child)| {
+                    child.allocate(
+                        size_exponent - 1,
+                        low_corner
+                            + octant.to_positive_cube().lower_bounds().to_vector() * child_size,
+                        request,
+                    )
+                })
             }
         }
     }
@@ -265,24 +256,18 @@ impl AlloctreeNode {
             AlloctreeNode::Oct(children) => {
                 debug_assert!(size_exponent > 0, "tree is deeper than size");
                 let child_size = expsize(size_exponent - 1);
-                let which_child = relative_low_corner.map(|c| c.div_euclid(child_size));
-                let child_index = linearization()
-                    .index(Cube::from(which_child))
-                    .expect("Alloctree::free: out of bounds");
-                children[child_index].free(
+                let octant = Octant::try_from_positive_cube(Cube::from(
+                    relative_low_corner.map(|c| c.div_euclid(child_size)),
+                ))
+                .expect("Alloctree::free: out of bounds");
+                children[octant].free(
                     size_exponent - 1,
-                    relative_low_corner - which_child.to_vector() * child_size,
+                    relative_low_corner
+                        - octant.to_positive_cube().lower_bounds().to_vector() * child_size,
                 );
             }
         }
     }
-}
-
-// TODO: ideally this would be a constant
-fn linearization() -> math::Vol<(), math::ZMaj> {
-    GridAab::from_lower_size([0, 0, 0], [2, 2, 2])
-        .to_vol()
-        .unwrap()
 }
 
 /// Description of an allocated region in an [`Alloctree`].

@@ -64,6 +64,22 @@ impl Octant {
         }
     }
 
+    /// Given a cube in the volume (0..2)³, return which octant of that volume it is.
+    #[inline]
+    pub fn try_from_positive_cube(cube: Cube) -> Option<Self> {
+        match <[i32; 3]>::from(cube) {
+            [0, 0, 0] => Some(Self::Nnn),
+            [0, 0, 1] => Some(Self::Nnp),
+            [0, 1, 0] => Some(Self::Npn),
+            [0, 1, 1] => Some(Self::Npp),
+            [1, 0, 0] => Some(Self::Pnn),
+            [1, 0, 1] => Some(Self::Pnp),
+            [1, 1, 0] => Some(Self::Ppn),
+            [1, 1, 1] => Some(Self::Ppp),
+            _ => None,
+        }
+    }
+
     const fn to_zmaj_index(self) -> u8 {
         self as u8
     }
@@ -327,6 +343,24 @@ impl<T> OctantMap<T> {
         }))
     }
 
+    /// Constructs an [`OctantMap`] by cloning the provided value.
+    #[inline]
+    #[must_use]
+    pub fn repeat(value: T) -> Self
+    where
+        T: Clone,
+    {
+        Self([
+            value.clone(),
+            value.clone(),
+            value.clone(),
+            value.clone(),
+            value.clone(),
+            value.clone(),
+            value.clone(),
+            value,
+        ])
+    }
     /// Returns an [`OctantMask`] constructed by applying the given `predicate` to each octant
     /// of the data in `self`.
     #[inline]
@@ -356,7 +390,7 @@ impl<T> OctantMap<T> {
 
     /// Returns an iterator over all elements by reference, and their octants.
     ///
-    /// The order of iteration is not guarateed.
+    /// The order of iteration is not currently guarateed.
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = (Octant, &T)> + '_ {
         Octant::ALL.into_iter().zip(self.0.iter())
