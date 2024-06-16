@@ -110,8 +110,7 @@ clippy.needless_update = "allow"
 clippy.single_match = "allow"
 
 # clippy::pedantic lints that are set to allow
-clippy.cast_possible_truncation = "allow" # consider enabling
-clippy.cast_possible_wrap = "allow" # consider enabling
+clippy.cast_possible_truncation = "allow" # we would need an alternative for intentional from-float saturation and to-float precision loss
 clippy.cast_precision_loss = "allow" # consider enabling
 clippy.cast_sign_loss = "allow" # consider enabling
 clippy.default_trait_access = "allow"
@@ -152,6 +151,7 @@ clippy.should_panic_without_expect = "deny"
 clippy.pedantic = { level = "warn", priority = -1 }
 clippy.assigning_clones = "warn"
 clippy.cast_lossless = "warn"
+clippy.cast_possible_wrap = "warn"
 clippy.doc_markdown = "warn"
 clippy.exhaustive_enums = "warn"
 clippy.exhaustive_structs = "warn"

@@ -73,6 +73,7 @@ pub fn rectangle_to_aab(rectangle: Rectangle, transform: Gridgid, max_brush: Gri
     // 2D-pixel.
 
     // TODO: propagate numeric overflow cases
+    #![allow(clippy::cast_possible_wrap)]
 
     if rectangle.size.width == 0 || rectangle.size.height == 0 {
         // Handle zero-sized rectangles — they don't draw any pixels, so don't enlarge them

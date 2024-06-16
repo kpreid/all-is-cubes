@@ -6,7 +6,7 @@ use core::ops::{Deref, DerefMut};
 #[cfg(doc)]
 use alloc::vec::Vec;
 
-use euclid::Point3D;
+use euclid::{vec3, Point3D};
 use manyfmt::Refmt as _;
 
 use crate::math::{Axis, Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector};
@@ -207,14 +207,7 @@ where
         V: Clone,
     {
         Self::from_fn(
-            GridAab::from_lower_size(
-                [0, 0, 0],
-                [
-                    DX as GridCoordinate,
-                    DY as GridCoordinate,
-                    DZ as GridCoordinate,
-                ],
-            ),
+            GridAab::from_lower_size([0, 0, 0], vec3(DX, DY, DZ).to_i32()),
             |p| array[p.z as usize][(DY - 1) - (p.y as usize)][p.x as usize].clone(),
         )
     }

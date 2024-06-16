@@ -1,6 +1,7 @@
 //! Graphical test cases that can be run in any renderer.
 
 #![allow(clippy::unused_async)]
+#![allow(clippy::cast_possible_wrap)]
 
 use std::future::Future;
 use std::str::FromStr;

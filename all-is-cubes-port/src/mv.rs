@@ -5,7 +5,9 @@ use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::euclid::{vec3, Point3D, Vector3D};
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{Cube, GridAab, GridRotation, GridVector, Gridgid, Rgb, Rgba};
+use all_is_cubes::math::{
+    Cube, GridAab, GridCoordinate, GridRotation, GridVector, Gridgid, Rgb, Rgba,
+};
 use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
 use all_is_cubes::universe::{self, Name, PartialUniverse, Universe};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
@@ -160,11 +162,7 @@ fn dot_vox_model_to_space(
     let transform = mv_to_aic_coordinate_transform(model.size);
     let bounds = GridAab::from_lower_size(
         [0, 0, 0],
-        [
-            model.size.x as i32,
-            model.size.y as i32,
-            model.size.z as i32,
-        ],
+        vec3(model.size.x, model.size.y, model.size.z).to_i32(),
     )
     .transform(transform)
     .expect("TODO: return error");
@@ -293,7 +291,9 @@ fn mv_to_aic_coordinate_transform(mv_size: dot_vox::Size) -> Gridgid {
     // (This is not a `GridRotation::to_positive_octant_matrix()` because the `sizes` are
     // not necessarily equal.)
     Gridgid {
-        translation: GridVector::new(0, 0, mv_size.y as i32),
+        // Unwrap OK-ish because the actual allowed data size is limited to much smaller values
+        // (1024?). Still, TODO: make this an import error instead.
+        translation: GridVector::new(0, 0, GridCoordinate::try_from(mv_size.y).unwrap()),
         rotation: GridRotation::RXzY,
     }
 }

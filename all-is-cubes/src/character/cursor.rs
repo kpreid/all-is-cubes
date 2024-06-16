@@ -322,11 +322,11 @@ mod tests {
     use crate::content::{make_slab, make_some_blocks};
     use crate::math::{GridAab, Rgba};
     use crate::universe::Universe;
-    use euclid::{Point3D, Vector3D};
+    use euclid::{vec3, Point3D, Vector3D};
 
     fn test_space<const N: usize>(universe: &mut Universe, blocks: [&Block; N]) -> Handle<Space> {
         let mut space =
-            Space::builder(GridAab::from_lower_size([0, 0, 0], [N as i32, 1, 1])).build();
+            Space::builder(GridAab::from_lower_size([0, 0, 0], vec3(N, 1, 1).to_i32())).build();
         space
             .fill(space.bounds(), |p| Some(blocks[p.x as usize]))
             .unwrap();

@@ -926,6 +926,7 @@ fn choose_surface_format(capabilities: &wgpu::SurfaceCapabilities) -> wgpu::Text
                 // TODO: repro and report to wgpu, supposing that it is a wgpu bug
                 is_float: matches!(format, Rgba16Float | Rgba32Float | Rgb9e5Ufloat)
                     && !cfg!(target_family = "wasm"),
+                #[allow(clippy::cast_possible_wrap)]
                 negated_original_order: -(index as isize),
             }
         })

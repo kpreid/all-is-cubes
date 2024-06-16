@@ -697,6 +697,7 @@ impl Universe {
     #[allow(clippy::unused_self)]
     fn log_rerun_time(&self) {
         #[cfg(feature = "rerun")]
+        #[allow(clippy::cast_possible_wrap)]
         self.rerun_destination
             .stream
             .set_time_sequence("session_step_time", self.session_step_time as i64);

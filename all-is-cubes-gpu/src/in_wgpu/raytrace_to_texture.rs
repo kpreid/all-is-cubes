@@ -260,6 +260,7 @@ impl PixelPicker {
 impl Iterator for PixelPicker {
     type Item = Point;
 
+    #[allow(clippy::cast_possible_wrap)]
     fn next(&mut self) -> Option<Self::Item> {
         // `as usize` is safe because we would have failed earlier if it doesn't fit in usize.
         let size = self.viewport.framebuffer_size.map(|s| s as usize);

@@ -245,7 +245,7 @@ mod tests {
     use all_is_cubes::block::text::Font;
     use all_is_cubes::color_block;
     use all_is_cubes::euclid::size3;
-    use all_is_cubes::math::Rgba;
+    use all_is_cubes::math::{GridCoordinate, Rgba};
     use all_is_cubes::space::{SpaceBuilder, SpacePhysics};
 
     #[test]
@@ -260,7 +260,7 @@ mod tests {
         assert_eq!(
             widget.requirements(),
             LayoutRequest {
-                minimum: size3(9 * text.len() as i32, 15, 1)
+                minimum: size3(9 * GridCoordinate::try_from(text.len()).unwrap(), 15, 1)
             }
         );
     }

@@ -84,6 +84,7 @@ impl LightTexture {
         space_bounds: GridAab,
         view_distance: FreeCoordinate,
     ) -> GridSize {
+        #[allow(clippy::cast_possible_wrap)] // protected by min()
         let max_texture_size = limits.max_texture_dimension_3d.min(i32::MAX as u32) as i32;
 
         // Extra volume of 1 extra cube around all sides automatically captures sky light.

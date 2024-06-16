@@ -14,7 +14,7 @@ use png_decoder::PngHeader;
 
 use crate::block::{Block, AIR};
 use crate::drawing::{rectangle_to_aab, VoxelBrush};
-use crate::math::{GridAab, GridRotation, Rgba};
+use crate::math::{GridAab, GridCoordinate, GridRotation, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics};
 
 /// Return type of `png_decoder::decode`.
@@ -142,8 +142,9 @@ pub fn space_from_image<'b>(
     let header = &png.0;
 
     // TODO: let caller control the transform offsets (not necessarily positive-octant)
-    let transform =
-        rotation.to_positive_octant_transform(header.width.max(header.height) as i32 - 1);
+    let transform = rotation.to_positive_octant_transform(
+        GridCoordinate::try_from(header.width.max(header.height)).unwrap() - 1,
+    );
 
     let ia = &PngAdapter::adapt(png, pixel_function);
     let eg_image = embedded_graphics::image::Image::new(&ia, Point::zero());
