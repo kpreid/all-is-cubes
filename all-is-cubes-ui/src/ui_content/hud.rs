@@ -18,7 +18,7 @@ use crate::ui_content::{CueNotifier, VuiMessage, VuiPageState};
 use crate::vui::widgets::{self, TooltipState, WidgetBlocks};
 use crate::vui::{self, LayoutTree, UiBlocks, Widget, WidgetTree};
 
-pub(crate) const TOOLBAR_POSITIONS: usize = 10;
+pub(crate) const TOOLBAR_POSITIONS: u16 = 10;
 
 /// Ad-hoc bundle of elements needed to construct HUD UI widgets.
 ///

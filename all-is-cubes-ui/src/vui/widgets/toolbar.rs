@@ -31,7 +31,7 @@ pub(crate) struct Toolbar {
     cue_channel: CueNotifier,
 
     /// Number of slots this toolbar draws.
-    slot_count: usize,
+    slot_count: u16,
 
     slot_info_text_template: text::TextBuilder,
 }
@@ -44,7 +44,7 @@ impl Toolbar {
         character_source: ListenableSource<Option<Handle<Character>>>,
         // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
         hud_blocks: Arc<HudBlocks>,
-        slot_count: usize,
+        slot_count: u16,
         universe: &mut Universe,
         cue_channel: CueNotifier,
     ) -> Arc<Self> {
@@ -76,7 +76,7 @@ impl Layoutable for Toolbar {
     fn requirements(&self) -> LayoutRequest {
         LayoutRequest {
             minimum: GridSize::new(
-                self.slot_count as GridCoordinate * Self::TOOLBAR_STEP + 1,
+                GridCoordinate::from(self.slot_count) * Self::TOOLBAR_STEP + 1,
                 3,
                 3,
             ),
@@ -99,7 +99,7 @@ impl Widget for Toolbar {
             // TODO: obey gravity when positioning within the grant
             first_slot_position: Cube::new(
                 (bounds.lower_bounds().x + bounds.upper_bounds().x) / 2
-                    - (self.slot_count as GridCoordinate) * Toolbar::TOOLBAR_STEP / 2
+                    - GridCoordinate::from(self.slot_count) * Toolbar::TOOLBAR_STEP / 2
                     + 1,
                 bounds.lower_bounds().y + 1,
                 bounds.lower_bounds().z + 1,
@@ -117,8 +117,8 @@ struct ToolbarController {
 }
 
 impl ToolbarController {
-    fn slot_position(&self, slot_index: usize) -> Cube {
-        self.first_slot_position + GridVector::new(2, 0, 0) * slot_index as GridCoordinate
+    fn slot_position(&self, slot_index: u16) -> Cube {
+        self.first_slot_position + GridVector::new(2, 0, 0) * GridCoordinate::from(slot_index)
     }
 
     /// Returns a transaction to draw items and their stack counts, without using self.character
@@ -128,7 +128,7 @@ impl ToolbarController {
         slots: &[Slot],
     ) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         let mut txn = SpaceTransaction::default();
-        for (index, stack) in slots.iter().enumerate() {
+        for (index, stack) in (0..).zip(slots.iter()) {
             if index >= self.definition.slot_count {
                 // TODO: must clear nonexistent positions, eventually
                 break;
@@ -154,10 +154,16 @@ impl ToolbarController {
                         self.definition
                             .slot_info_text_template
                             .clone()
-                            .string(match slots.get(index).unwrap_or(&Slot::Empty).count() {
-                                0 | 1 => arcstr::ArcStr::default(),
-                                count => arcstr::format!("{count}"),
-                            })
+                            .string(
+                                match slots
+                                    .get(usize::from(index))
+                                    .unwrap_or(&Slot::Empty)
+                                    .count()
+                                {
+                                    0 | 1 => arcstr::ArcStr::default(),
+                                    count => arcstr::format!("{count}"),
+                                },
+                            )
                             .build()
                             .single_block(),
                     ),
@@ -179,7 +185,10 @@ impl ToolbarController {
         for index in 0..self.definition.slot_count {
             let position = self.slot_position(index);
             let this_slot_selected_mask = core::array::from_fn(|sel| {
-                if selected_slots.get(sel).is_some_and(|&i| i == index) {
+                if selected_slots
+                    .get(sel)
+                    .is_some_and(|&i| i == usize::from(index))
+                {
                     if pressed[sel] {
                         ToolbarButtonState::Pressed
                     } else {
@@ -213,7 +222,7 @@ impl WidgetController for ToolbarController {
             nx: 1,
             ny: 1,
             nz: 1,
-            px: (slot_count as i32) * 2 - 1, // TODO: magic number for spacing
+            px: GridCoordinate::from(slot_count) * 2 - 1, // TODO: magic number for spacing
             py: -1,
             pz: 1,
             ..Default::default()
@@ -244,7 +253,7 @@ impl WidgetController for ToolbarController {
                 GridPoint::new(2, relative.y + 1, relative.z + 1),
             );
 
-            let frame_part = if x == (slot_count as i32) * 2 - 1 {
+            let frame_part = if x == i32::from(slot_count) * 2 - 1 {
                 // Right end cap of row.
                 right
             } else if x.rem_euclid(2) == 1 && x > 0 {
