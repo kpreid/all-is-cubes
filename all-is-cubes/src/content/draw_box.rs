@@ -52,7 +52,7 @@ impl BoxStyle {
     // TODO: figure out if this is good public api
     pub fn from_nine_and_thin(multiblock: &Block) -> Self {
         use core::array::from_fn;
-        fn twiddle(coord: usize) -> usize {
+        fn twiddle(coord: usize) -> GridCoordinate {
             [1, 0, 2, 3][coord]
         }
 
@@ -62,7 +62,7 @@ impl BoxStyle {
                     from_fn(|_z| {
                         Some(multiblock.clone().with_modifier(block::Zoom::new(
                             Resolution::R4,
-                            GridPoint::new(twiddle(x) as i32, twiddle(y) as i32, 0),
+                            GridPoint::new(twiddle(x), twiddle(y), 0),
                         )))
                     })
                 })
