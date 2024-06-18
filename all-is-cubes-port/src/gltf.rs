@@ -69,7 +69,7 @@ pub struct MeshInstance {
 /// 1. Create this (providing a [`GltfDataDestination`] for buffers and textures).
 /// 2. Call methods to add entities that will be exported.
 /// 3. Call [`GltfWriter::into_root()`] to obtain the main
-/// [`gltf_json::Root`] value which should be written to the `.gltf` file.
+///    [`gltf_json::Root`] value which should be written to the `.gltf` file.
 ///
 /// TODO: Split this struct into "root and buffers" (knows glTF generically) and
 /// "scene and animation" (knows how we intend to use it). This will simplify some borrows.

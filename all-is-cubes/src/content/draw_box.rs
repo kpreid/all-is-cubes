@@ -14,8 +14,10 @@ use crate::space;
 pub struct BoxStyle {
     /// Contains every type of block that can appear in a box.
     /// 3D array `.parts[x][y][z]` indexed by two bitflags:
+    ///
     /// * Bit 0 (1) = the block is on an lower edge.
     /// * Bit 1 (2) = the block is on an upper edge.
+    ///
     /// So the sequence on each axis is [interior, lower, upper, lower & upper].
     ///
     /// `Arc`ed to allow it to be passed around cheaply even though it contains 64 `Block`s
