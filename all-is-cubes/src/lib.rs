@@ -145,10 +145,6 @@
 // * This crate contains some unsafe code and therefore does not `forbid(unsafe_code)`.
 //   The majority of it is trivial unchecked constructors that are run at compile time;
 //   `universe::owning_guard` contains the scary part.
-#![cfg_attr(
-    not(any(test, feature = "arbitrary")),
-    warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)
-)]
 #![cfg_attr(not(feature = "std"), allow(clippy::arc_with_non_send_sync))]
 
 #[cfg(any(feature = "std", test))]

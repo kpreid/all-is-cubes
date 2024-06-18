@@ -11,10 +11,6 @@
 //
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![allow(clippy::cast_possible_wrap)]
-#![cfg_attr(
-    not(test),
-    warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)
-)]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
