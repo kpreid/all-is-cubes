@@ -1,9 +1,9 @@
 //! Logging. And terminal progress bars. And their cooperation.
 
 use std::collections::HashSet;
+use std::sync::LazyLock;
 
 use anyhow::Context as _;
-use once_cell::sync::Lazy;
 
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
@@ -185,8 +185,8 @@ fn suspend_indicatif_in<R>(f: impl FnOnce() -> R) -> R {
     COOPERATIVE_PROGRESS.suspend(f)
 }
 
-pub(crate) static COOPERATIVE_PROGRESS: Lazy<indicatif::MultiProgress> =
-    Lazy::new(indicatif::MultiProgress::new);
+pub(crate) static COOPERATIVE_PROGRESS: LazyLock<indicatif::MultiProgress> =
+    LazyLock::new(indicatif::MultiProgress::new);
 
 /// Constructs a progress bar which cooperates with logging to share stderr cleanly.
 ///

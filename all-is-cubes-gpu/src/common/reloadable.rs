@@ -5,8 +5,8 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
+use std::sync::LazyLock;
 
-use once_cell::sync::Lazy;
 use resource::Resource;
 
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
@@ -65,7 +65,7 @@ fn res_arc_str(r: &Resource<str>) -> Arc<str> {
     Arc::from(<Resource<str> as AsRef<str>>::as_ref(r))
 }
 
-static POLLED_RELOADABLES: Lazy<Mutex<Vec<Reloadable>>> = Lazy::new(|| {
+static POLLED_RELOADABLES: LazyLock<Mutex<Vec<Reloadable>>> = LazyLock::new(|| {
     // Spawn a thread to poll for reloading, as soon as anyone cares,
     // but only if it's possible and useful.
     if cfg!(all(not(target_family = "wasm"), debug_assertions)) {

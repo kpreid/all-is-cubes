@@ -1,11 +1,10 @@
 //! Hot-reloadable shader loading.
 
 use std::borrow::Cow;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 use std::task;
 
 use futures_core::future::BoxFuture;
-use once_cell::sync::Lazy;
 
 use all_is_cubes::listen;
 

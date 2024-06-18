@@ -1,10 +1,10 @@
 //! DOM and JS environment manipulation that isn't application-specific.
 
+use std::sync::LazyLock;
 use std::sync::Mutex;
 
 use futures_core::future::BoxFuture;
 use js_sys::{Error, Function};
-use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast; // dyn_into()
 use web_sys::{AddEventListenerOptions, Document, Element, Event, EventTarget, Text};
@@ -111,4 +111,4 @@ pub(crate) async fn yield_to_event_loop() {
 
 /// Time used by [`yield_to_event_loop`] to decude whether to actually yield.
 /// TODO: A thread-local would be a better expression of intent here.
-static NEXT_YIELD_INSTANT: Lazy<Mutex<Instant>> = Lazy::new(|| Mutex::new(Instant::now()));
+static NEXT_YIELD_INSTANT: LazyLock<Mutex<Instant>> = LazyLock::new(|| Mutex::new(Instant::now()));
