@@ -193,10 +193,18 @@ fn insert_duplicate_name_via_txn() {
     ))
     .execute(&mut u, &mut transaction::no_outputs)
     .unwrap_err();
-    // not a great assertion but it'll do
+
     assert_eq!(
-        error.to_string(),
-        "Transaction precondition not met: UniverseTransaction: insert(): name already in use"
+        error,
+        transaction::ExecuteError::Check(universe::UniverseMismatch::Member(
+            transaction::MapMismatch {
+                key: "test_thing".into(),
+                mismatch: universe::MemberMismatch::Insert(InsertError {
+                    name: "test_thing".into(),
+                    kind: InsertErrorKind::AlreadyExists,
+                })
+            }
+        ))
     );
 }
 
@@ -213,16 +221,24 @@ fn insert_anonym_prohibited_direct() {
 
 #[test]
 fn insert_anonym_prohibited_via_txn() {
-    let e = UniverseTransaction::insert(Handle::new_pending(
+    let error = UniverseTransaction::insert(Handle::new_pending(
         Name::Anonym(0),
         Space::empty_positive(1, 1, 1),
     ))
     .execute(&mut Universe::new(), &mut drop)
     .unwrap_err();
-    // TODO: structured transaction errors
+
     assert_eq!(
-        e.to_string(),
-        "Transaction precondition not met: UniverseTransaction: insert(): cannot insert Name::Anonym"
+        error,
+        transaction::ExecuteError::Check(universe::UniverseMismatch::Member(
+            transaction::MapMismatch {
+                key: Name::Anonym(0),
+                mismatch: universe::MemberMismatch::Insert(InsertError {
+                    name: Name::Anonym(0),
+                    kind: InsertErrorKind::InvalidName
+                })
+            }
+        ))
     );
 }
 

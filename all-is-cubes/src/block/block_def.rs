@@ -318,18 +318,12 @@ impl Transaction for BlockDefTransaction {
     type Target = BlockDef;
     type CommitCheck = ();
     type Output = transaction::NoOutput;
-    type Mismatch = transaction::PreconditionFailed;
+    type Mismatch = BlockDefMismatch;
 
-    fn check(
-        &self,
-        target: &BlockDef,
-    ) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
+    fn check(&self, target: &BlockDef) -> Result<Self::CommitCheck, Self::Mismatch> {
         if let Some(old) = &self.old {
             if target.state.block != *old {
-                return Err(transaction::PreconditionFailed {
-                    location: "BlockDef",
-                    problem: "existing block not as expected",
-                });
+                return Err(BlockDefMismatch::Unexpected);
             }
         }
         Ok(())
@@ -378,6 +372,14 @@ impl transaction::Merge for BlockDefTransaction {
     }
 }
 
+/// Transaction precondition error type for a [`BlockDefTransaction`].
+#[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
+#[non_exhaustive]
+pub enum BlockDefMismatch {
+    /// old definition not as expected
+    Unexpected,
+}
+
 /// Transaction conflict error type for a [`BlockDefTransaction`].
 // ---
 // TODO: this is identical to `CubeConflict` but for the names
@@ -391,6 +393,7 @@ pub struct BlockDefConflict {
 }
 
 crate::util::cfg_should_impl_error! {
+    impl std::error::Error for BlockDefMismatch {}
     impl std::error::Error for BlockDefConflict {}
 }
 

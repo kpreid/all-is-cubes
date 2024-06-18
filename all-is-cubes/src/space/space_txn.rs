@@ -14,7 +14,7 @@ use crate::fluff::Fluff;
 use crate::math::{Cube, GridCoordinate, GridPoint, Gridgid};
 use crate::space::{ActivatableRegion, GridAab, SetCubeError, Space};
 use crate::transaction::{
-    self, no_outputs, CommitError, Merge, NoOutput, PreconditionFailed, Transaction, Transactional,
+    self, no_outputs, CommitError, Merge, NoOutput, Transaction, Transactional,
 };
 use crate::util::{ConciseDebug, Refmt as _};
 
@@ -175,9 +175,9 @@ impl Transaction for SpaceTransaction {
     type Target = Space;
     type CommitCheck = <BehaviorSetTransaction<Space> as Transaction>::CommitCheck;
     type Output = NoOutput;
-    type Mismatch = PreconditionFailed;
+    type Mismatch = SpaceTransactionMismatch;
 
-    fn check(&self, space: &Space) -> Result<Self::CommitCheck, PreconditionFailed> {
+    fn check(&self, space: &Space) -> Result<Self::CommitCheck, Self::Mismatch> {
         for (
             &cube,
             CubeTransaction {
@@ -189,7 +189,8 @@ impl Transaction for SpaceTransaction {
             },
         ) in &self.cubes
         {
-            if let Some(cube_index) = space.contents.index(cube.into()) {
+            let cube = Cube::from(cube);
+            if let Some(cube_index) = space.contents.index(cube) {
                 if let Some(old) = old {
                     // Raw lookup because we already computed the index for a bounds check
                     // (TODO: Put this in a function, like get_block_index)
@@ -199,10 +200,7 @@ impl Transaction for SpaceTransaction {
                         .block()
                         != old
                     {
-                        return Err(PreconditionFailed {
-                            location: "Space",
-                            problem: "existing block not as expected",
-                        });
+                        return Err(SpaceTransactionMismatch::Cube(cube));
                     }
                 }
             } else {
@@ -212,14 +210,16 @@ impl Transaction for SpaceTransaction {
                     // TODO: Should we allow `old: Some(AIR), new: None`, since we treat
                     // outside-space as being AIR? Let's wait until a use case appears rather than
                     // making AIR more special.
-                    return Err(PreconditionFailed {
-                        location: "Space",
-                        problem: "cube out of space's bounds",
+                    return Err(SpaceTransactionMismatch::OutOfBounds {
+                        transaction: cube.grid_aab(),
+                        space: space.bounds(),
                     });
                 }
             }
         }
-        self.behaviors.check(&space.behaviors)
+        self.behaviors
+            .check(&space.behaviors)
+            .map_err(SpaceTransactionMismatch::Behaviors)
     }
 
     fn commit(
@@ -364,6 +364,27 @@ impl fmt::Debug for SpaceTransaction {
     }
 }
 
+/// Transaction precondition error type for a [`SpaceTransaction`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum SpaceTransactionMismatch {
+    #[allow(missing_docs)]
+    Cube(Cube),
+
+    /// The transaction tried to modify something outside of the space bounds.
+    OutOfBounds {
+        /// Bounds within which the transaction attempted to make a change.
+        /// (This is not necessarily equal to [`SpaceTransaction::bounds()`])
+        transaction: GridAab,
+
+        /// Bounds of the space.
+        space: GridAab,
+    },
+
+    #[allow(missing_docs)]
+    Behaviors(behavior::BehaviorTransactionMismatch),
+}
+
 /// Transaction conflict error type for a [`SpaceTransaction`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -378,6 +399,15 @@ pub enum SpaceTransactionConflict {
 }
 
 crate::util::cfg_should_impl_error! {
+    impl std::error::Error for SpaceTransactionMismatch {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                SpaceTransactionMismatch::Cube(_) => None,
+                SpaceTransactionMismatch::OutOfBounds {.. } => None,
+                SpaceTransactionMismatch::Behaviors(mismatch) => Some(mismatch),
+            }
+        }
+    }
     impl std::error::Error for SpaceTransactionConflict {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             match self {
@@ -388,6 +418,24 @@ crate::util::cfg_should_impl_error! {
     }
 }
 
+impl fmt::Display for SpaceTransactionMismatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SpaceTransactionMismatch::Cube(cube) => {
+                write!(f, "mismatch at cube {c}", c = cube.refmt(&ConciseDebug))
+            }
+
+            SpaceTransactionMismatch::OutOfBounds { transaction, space } => {
+                // TODO: don't use Debug formatting here — we'll need to decide what Display formatting for an AAB is
+                write!(
+                    f,
+                    "transaction bounds {transaction:?} exceed space bounds {space:?}"
+                )
+            }
+            SpaceTransactionMismatch::Behaviors(_) => write!(f, "in behaviors"),
+        }
+    }
+}
 impl fmt::Display for SpaceTransactionConflict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

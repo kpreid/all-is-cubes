@@ -10,7 +10,7 @@ use crate::block::Block;
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::inv::{Icons, Tool, ToolError, ToolInput};
 use crate::linking::BlockProvider;
-use crate::transaction::{CommitError, Merge, PreconditionFailed, Transaction};
+use crate::transaction::{CommitError, Merge, Transaction};
 use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 
 /// A collection of [`Tool`]s (items).
@@ -362,9 +362,9 @@ impl Transaction for InventoryTransaction {
     type Target = Inventory;
     type CommitCheck = Option<InventoryCheck>;
     type Output = InventoryChange;
-    type Mismatch = PreconditionFailed;
+    type Mismatch = InventoryMismatch;
 
-    fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, PreconditionFailed> {
+    fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, Self::Mismatch> {
         // Don't do the expensive copy if we have one already
         if self.replace.is_empty() && self.insert.is_empty() {
             return Ok(None);
@@ -383,16 +383,10 @@ impl Transaction for InventoryTransaction {
         for (&index, (old, new)) in self.replace.iter() {
             match slots.get_mut(index) {
                 None => {
-                    return Err(PreconditionFailed {
-                        location: "Inventory",
-                        problem: "slot out of bounds",
-                    });
+                    return Err(InventoryMismatch::OutOfBounds);
                 }
                 Some(actual_old) if actual_old != old => {
-                    return Err(PreconditionFailed {
-                        location: "Inventory",
-                        problem: "old slot not as expected",
-                    }); // TODO: it would be nice to squeeze in the slot number
+                    return Err(InventoryMismatch::UnexpectedSlot(index));
                 }
                 Some(slot) => {
                     *slot = new.clone();
@@ -413,10 +407,7 @@ impl Transaction for InventoryTransaction {
                 }
             }
             if new_stack != Slot::Empty {
-                return Err(PreconditionFailed {
-                    location: "Inventory",
-                    problem: "insufficient empty slots",
-                });
+                return Err(InventoryMismatch::Full);
             }
         }
 
@@ -471,6 +462,20 @@ pub struct InventoryCheck {
     change: InventoryChange,
 }
 
+/// Transaction precondition error type for an [`InventoryTransaction`].
+#[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
+#[non_exhaustive]
+pub enum InventoryMismatch {
+    /// insufficient empty slots
+    Full,
+
+    /// slot out of bounds
+    OutOfBounds,
+
+    /// contents of slot {0} not as expected
+    UnexpectedSlot(usize),
+}
+
 /// Transaction conflict error type for an [`InventoryTransaction`].
 #[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
@@ -483,6 +488,7 @@ pub enum InventoryConflict {
 }
 
 crate::util::cfg_should_impl_error! {
+    impl std::error::Error for InventoryMismatch {}
     impl std::error::Error for InventoryConflict {}
 }
 
