@@ -863,7 +863,6 @@ mod tests {
     use euclid::vec3;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
-    use std::mem::size_of;
 
     #[test]
     fn evaluated_block_debug_simple() {

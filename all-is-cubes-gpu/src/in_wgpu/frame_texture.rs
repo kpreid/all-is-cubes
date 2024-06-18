@@ -1,5 +1,5 @@
+use std::fmt;
 use std::sync::atomic::AtomicBool;
-use std::{fmt, mem};
 
 use all_is_cubes::camera::{Flaws, GraphicsOptions, ImagePixel};
 use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
@@ -112,9 +112,7 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
                     ),
                     wgpu::ImageDataLayout {
                         offset: 0,
-                        bytes_per_row: Some(
-                            u32::try_from(mem::size_of::<Out>()).unwrap() * full_width,
-                        ),
+                        bytes_per_row: Some(u32::try_from(size_of::<Out>()).unwrap() * full_width),
                         rows_per_image: None,
                     },
                     wgpu::Extent3d {

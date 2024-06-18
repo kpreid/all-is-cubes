@@ -646,7 +646,7 @@ pub(crate) mod vol_arb {
         // 6 bounding coordinates plus one permutation selection.
         // Depending on the volume we could *maybe* end up consuming only 1 byte each
         // for the sizes.
-        let gc = core::mem::size_of::<GridCoordinate>();
+        let gc = size_of::<GridCoordinate>();
         ((gc + 1) * 3 + 1, Some(gc * 6 + 1))
     };
 

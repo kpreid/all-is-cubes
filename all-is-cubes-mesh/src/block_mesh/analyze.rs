@@ -298,7 +298,7 @@ mod tests {
         let faces = Face6::ALL.len();
         let other_fields = 16; // 2 byte-sized fields, aligned to 16
         assert_eq!(
-            dbg!(std::mem::size_of::<Analysis>()),
+            dbg!(size_of::<Analysis>()),
             plane_box_size * planes_per_face * faces + other_fields
         );
     }

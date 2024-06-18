@@ -128,7 +128,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     /// Returns the total memory (not counting allocator overhead) occupied by this
     /// [`SpaceMesh`] value and all its owned objects.
     pub fn total_byte_size(&self) -> usize {
-        use core::mem::size_of;
+        use size_of;
 
         let SpaceMesh {
             vertices,
@@ -997,7 +997,6 @@ mod tests {
     use crate::BlockVertex;
     use all_is_cubes::color_block;
     use all_is_cubes::math::Rgba;
-    use core::mem;
 
     type TestMesh = SpaceMesh<TextureMt>;
 
@@ -1009,7 +1008,7 @@ mod tests {
         assert_eq!(mesh.vertices(), &[]);
         assert_eq!(mesh.indices(), IndexSlice::U16(&[]));
         assert_eq!(mesh.count_indices(), 0);
-        assert_eq!(dbg!(mesh.total_byte_size()), mem::size_of::<TestMesh>());
+        assert_eq!(dbg!(mesh.total_byte_size()), size_of::<TestMesh>());
     }
 
     #[test]
@@ -1021,12 +1020,12 @@ mod tests {
 
         assert_eq!(mesh.count_indices(), 6 /* faces */ * 6 /* vertices */);
 
-        let expected_data_size = mem::size_of_val::<[BlockVertex<TexPoint>]>(mesh.vertices())
+        let expected_data_size = size_of_val::<[BlockVertex<TexPoint>]>(mesh.vertices())
             + mesh.indices().as_bytes().len();
 
         let actual_size = dbg!(mesh.total_byte_size());
-        assert!(actual_size > mem::size_of::<TestMesh>() + expected_data_size);
-        assert!(actual_size <= mem::size_of::<TestMesh>() + expected_data_size * 3);
+        assert!(actual_size > size_of::<TestMesh>() + expected_data_size);
+        assert!(actual_size <= size_of::<TestMesh>() + expected_data_size * 3);
     }
 
     #[test]
