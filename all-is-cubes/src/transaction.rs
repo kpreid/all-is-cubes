@@ -310,24 +310,6 @@ where
     }
 }
 
-/// Error type returned by [`Transaction::check`].
-///
-/// Note: This type is designed to be cheap to construct, as it is expected that game
-/// mechanics _may_ result in transactions repeatedly failing. Hence, it does not contain
-/// full details on the failure.
-#[derive(Clone, Debug, PartialEq, displaydoc::Display)]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[displaydoc("Transaction precondition not met: {location}: {problem}")]
-pub struct PreconditionFailed {
-    // TODO: Figure out how to have at least a little dynamic information. `Option<[i32; 3]>` ???
-    pub(crate) location: &'static str,
-    pub(crate) problem: &'static str,
-}
-
-crate::util::cfg_should_impl_error! {
-    impl std::error::Error for PreconditionFailed {}
-}
-
 /// Type of “unexpected errors” from [`Transaction::commit()`].
 //---
 // Design note: `CommitError` doesn't need to be cheap because it should never happen

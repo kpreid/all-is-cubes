@@ -24,9 +24,7 @@ use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};
 use crate::save::schema;
 use crate::space::{CubeTransaction, Space};
 use crate::time::Tick;
-use crate::transaction::{
-    self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
-};
+use crate::transaction::{self, CommitError, Merge, Transaction, Transactional};
 use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText};
 
@@ -733,9 +731,9 @@ impl Transaction for CharacterTransaction {
         <BehaviorSetTransaction<Character> as Transaction>::CommitCheck,
     );
     type Output = transaction::NoOutput;
-    type Mismatch = PreconditionFailed;
+    type Mismatch = CharacterTransactionMismatch;
 
-    fn check(&self, target: &Character) -> Result<Self::CommitCheck, PreconditionFailed> {
+    fn check(&self, target: &Character) -> Result<Self::CommitCheck, Self::Mismatch> {
         let Self {
             set_space: _, // no check needed
             body,
@@ -743,9 +741,14 @@ impl Transaction for CharacterTransaction {
             behaviors,
         } = self;
         Ok((
-            body.check(&target.body)?,
-            inventory.check(&target.inventory)?,
-            behaviors.check(&target.behaviors)?,
+            body.check(&target.body)
+                .map_err(CharacterTransactionMismatch::Body)?,
+            inventory
+                .check(&target.inventory)
+                .map_err(CharacterTransactionMismatch::Inventory)?,
+            behaviors
+                .check(&target.behaviors)
+                .map_err(CharacterTransactionMismatch::Behaviors)?,
         ))
     }
 
@@ -819,6 +822,18 @@ impl Merge for CharacterTransaction {
     }
 }
 
+/// Transaction precondition error type for a [`CharacterTransaction`].
+#[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
+#[non_exhaustive]
+pub enum CharacterTransactionMismatch {
+    /// in character body
+    Body(<BodyTransaction as Transaction>::Mismatch),
+    /// in character inventory
+    Inventory(<InventoryTransaction as Transaction>::Mismatch),
+    /// in character behaviors
+    Behaviors(<BehaviorSetTransaction<Character> as Transaction>::Mismatch),
+}
+
 /// Transaction conflict error type for a [`CharacterTransaction`].
 #[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
@@ -834,6 +849,16 @@ pub enum CharacterTransactionConflict {
 }
 
 crate::util::cfg_should_impl_error! {
+    impl std::error::Error for CharacterTransactionMismatch {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                CharacterTransactionMismatch::Body(e) => Some(e),
+                CharacterTransactionMismatch::Inventory(e) => Some(e),
+                CharacterTransactionMismatch::Behaviors(e) => Some(e),
+            }
+        }
+    }
+
     impl std::error::Error for CharacterTransactionConflict {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             match self {

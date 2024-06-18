@@ -4,6 +4,16 @@ use core::{fmt, mem};
 
 use crate::transaction::{Merge, NoOutput, Transaction};
 
+/// Transaction precondition error type for transactions on map types such as [`BTreeMap`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct MapMismatch<K, E> {
+    /// The key in the map for which `self.mismatch` occurred.
+    pub key: K,
+    /// The precondition which failed.
+    pub mismatch: E,
+}
+
 /// Transaction conflict error type for transactions on map types such as [`BTreeMap`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -15,10 +25,23 @@ pub struct MapConflict<K, C> {
 }
 
 crate::util::cfg_should_impl_error! {
+    impl<K: fmt::Debug, E: std::error::Error + 'static> std::error::Error for MapMismatch<K, E> {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            Some(&self.mismatch)
+        }
+    }
+
     impl<K: fmt::Debug, C: std::error::Error + 'static> std::error::Error for MapConflict<K, C> {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             Some(&self.conflict)
         }
+    }
+}
+
+impl<K: fmt::Debug, E> fmt::Display for MapMismatch<K, E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let MapMismatch { key, mismatch: _ } = self;
+        write!(f, "transaction precondition not met at key {key:?}")
     }
 }
 

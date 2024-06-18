@@ -577,38 +577,35 @@ impl<H: BehaviorHost> Transaction for BehaviorSetTransaction<H> {
     type Target = BehaviorSet<H>;
     type CommitCheck = CommitCheck;
     type Output = transaction::NoOutput;
-    type Mismatch = transaction::PreconditionFailed;
+    type Mismatch = BehaviorTransactionMismatch;
 
     #[allow(ambiguous_wide_pointer_comparisons)] // The hazards should be okay for this use case
-    fn check(
-        &self,
-        target: &BehaviorSet<H>,
-    ) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
+    fn check(&self, target: &BehaviorSet<H>) -> Result<Self::CommitCheck, Self::Mismatch> {
         let Self { replace, insert } = self;
         // TODO: need to compare replacement preconditions
-        for (key, Replace { old, new: _ }) in replace {
+        for (&key, Replace { old, new: _ }) in replace {
             if let Some(BehaviorSetEntry {
                 attachment,
                 behavior,
                 waker: _,
-            }) = target.members.get(key)
+            }) = target.members.get(&key)
             {
-                if attachment != &old.attachment {
-                    return Err(transaction::PreconditionFailed {
-                        location: "BehaviorSet",
-                        problem: "existing behavior attachment is not as expected",
-                    });
-                }
-                if !Arc::ptr_eq(behavior, &old.behavior) {
-                    return Err(transaction::PreconditionFailed {
-                        location: "BehaviorSet",
-                        problem: "existing behavior value is not as expected",
+                let wrong_attachment = attachment != &old.attachment;
+                let wrong_value = !Arc::ptr_eq(behavior, &old.behavior);
+                if wrong_attachment || wrong_value {
+                    return Err(BehaviorTransactionMismatch {
+                        key,
+                        key_not_found: false,
+                        wrong_attachment,
+                        wrong_value,
                     });
                 }
             } else {
-                return Err(transaction::PreconditionFailed {
-                    location: "BehaviorSet",
-                    problem: "behavior(s) not found",
+                return Err(BehaviorTransactionMismatch {
+                    key,
+                    key_not_found: true,
+                    wrong_attachment: false,
+                    wrong_value: false,
                 });
             }
         }
@@ -775,10 +772,17 @@ pub struct MergeCheck {
     _private: (),
 }
 
+/// Transaction precondition error type for a [`BehaviorSet`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BehaviorTransactionMismatch {
+    key: Key,
+    // These should probably really be an ErrorKind-style enum
+    key_not_found: bool,
+    wrong_attachment: bool,
+    wrong_value: bool,
+}
+
 /// Transaction conflict error type for a [`BehaviorSet`].
-//---
-// Currently private internals, because we will probably want to have a better strategy
-// for addressing behaviors than indices.
 #[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 #[displaydoc("tried to replace the same behavior slot, {key}, twice")]
@@ -787,7 +791,35 @@ pub struct BehaviorTransactionConflict {
 }
 
 crate::util::cfg_should_impl_error! {
+    impl std::error::Error for BehaviorTransactionMismatch {}
     impl std::error::Error for BehaviorTransactionConflict {}
+}
+
+impl fmt::Display for BehaviorTransactionMismatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let &Self {
+            key,
+            key_not_found,
+            wrong_attachment,
+            wrong_value,
+        } = self;
+        write!(f, "behavior {key} ")?;
+        if key_not_found {
+            write!(f, "not found")?;
+        } else {
+            write!(f, "does not have a matching ")?;
+            if wrong_attachment && wrong_value {
+                write!(f, "attachment or value")?;
+            } else if wrong_attachment {
+                write!(f, "attachment")?;
+            } else if wrong_value {
+                write!(f, "value")?;
+            } else {
+                write!(f, "<error in error details>")?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1128,7 +1160,8 @@ mod tests {
         let mut set = BehaviorSet::<Space>::new();
         let attachment =
             SpaceBehaviorAttachment::new(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]));
-        BehaviorSetTransaction::insert(attachment, Arc::new(NoopBehavior(1)))
+        let correct_old_behavior = Arc::new(NoopBehavior(1));
+        BehaviorSetTransaction::insert(attachment, correct_old_behavior.clone())
             .execute(&mut set, &mut no_outputs)
             .unwrap();
         let key = *set.members.keys().next().unwrap();
@@ -1151,9 +1184,11 @@ mod tests {
         );
         assert_eq!(
             transaction.check(&set).unwrap_err(),
-            transaction::PreconditionFailed {
-                location: "BehaviorSet",
-                problem: "existing behavior value is not as expected"
+            BehaviorTransactionMismatch {
+                key,
+                key_not_found: false,
+                wrong_attachment: false,
+                wrong_value: true,
             }
         );
 
@@ -1167,21 +1202,23 @@ mod tests {
                         [100, 0, 0],
                         [1, 1, 1],
                     )),
-                    behavior: Arc::new(NoopBehavior(1)),
+                    behavior: correct_old_behavior,
                     waker: None,
                 },
                 new: Some(BehaviorSetEntry {
                     attachment,
-                    behavior: Arc::new(NoopBehavior(1)),
+                    behavior: Arc::new(NoopBehavior(4)),
                     waker: None,
                 }),
             },
         );
         assert_eq!(
             transaction.check(&set).unwrap_err(),
-            transaction::PreconditionFailed {
-                location: "BehaviorSet",
-                problem: "existing behavior attachment is not as expected"
+            BehaviorTransactionMismatch {
+                key,
+                key_not_found: false,
+                wrong_attachment: true,
+                wrong_value: false,
             }
         );
     }

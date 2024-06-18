@@ -3,7 +3,7 @@ use core::fmt;
 use core::hash;
 use core::ops::{Deref, DerefMut};
 
-use crate::transaction::{self, ExecuteError, PreconditionFailed, Transaction, Transactional};
+use crate::transaction::{self, ExecuteError, Transaction, Transactional};
 use crate::universe::{
     owning_guard, AnyHandle, InsertError, InsertErrorKind, Name, Universe, UniverseId,
     UniverseMember, VisitHandles,
@@ -254,41 +254,52 @@ impl<T: 'static> Handle<T> {
     pub(in crate::universe) fn check_upgrade_pending(
         &self,
         future_universe_id: UniverseId,
-    ) -> Result<(), PreconditionFailed>
+    ) -> Result<(), InsertError>
     where
         T: VisitHandles,
     {
         match self.state.lock() {
             Ok(state_guard) => match &*state_guard {
                 State::Pending { .. } => {}
-                State::Member { .. } => {
-                    return Err(PreconditionFailed {
-                        location: "UniverseTransaction",
-                        problem: "insert(): the Handle is already in a universe",
+                &State::Member {
+                    ref name,
+                    universe_id,
+                    ..
+                } => {
+                    return Err(InsertError {
+                        name: name.clone(),
+                        kind: if future_universe_id == universe_id {
+                            InsertErrorKind::AlreadyExists
+                        } else {
+                            InsertErrorKind::AlreadyInserted
+                        },
                     });
                 }
                 #[cfg(feature = "save")]
-                State::Deserializing { .. } => {
-                    return Err(PreconditionFailed {
-                        location: "UniverseTransaction",
-                        problem: "insert(): the Handle is already in a universe being deserialized",
+                State::Deserializing { name, .. } => {
+                    return Err(InsertError {
+                        name: name.clone(),
+                        kind: InsertErrorKind::Deserializing,
                     });
                 }
-                State::Gone { .. } => {
-                    return Err(PreconditionFailed {
-                        location: "UniverseTransaction",
-                        problem: "insert(): the Handle never had a value",
+                State::Gone { name, .. } => {
+                    return Err(InsertError {
+                        name: name.clone(),
+                        kind: InsertErrorKind::Gone,
                     });
                 }
             },
             Err(_) => {
-                return Err(PreconditionFailed {
-                    location: "UniverseTransaction",
-                    problem: "insert(): the Handle experienced an error previously",
+                return Err(InsertError {
+                    name: Name::Pending,
+                    kind: InsertErrorKind::Poisoned,
                 })
             }
         }
 
+        // TODO: This check (which also doesn't do anything yet)
+        // should be applied to *both* transaction-based insertion and
+        // direct `&mut self` insertions, but isn't.
         match self.read() {
             Ok(data_guard) => {
                 // TODO: We need to enforce rules about not referring to items from another
@@ -304,27 +315,28 @@ impl<T: 'static> Handle<T> {
                         },
                     );
                     if !ok {
-                        return Err(PreconditionFailed {
-                            location: "UniverseTransaction",
-                            problem: "insert(): the Handle contains another ref \
-                            which belongs to a different universe",
-                        });
+                        // TODO:
+                        // return Err(PreconditionFailed {
+                        //     location: "UniverseTransaction",
+                        //     problem: "insert(): the Handle contains another ref \
+                        //     which belongs to a different universe",
+                        // });
                     }
                 }
             }
-            Err(HandleError::InUse(_)) => {
-                return Err(PreconditionFailed {
-                    location: "UniverseTransaction",
-                    problem: "insert(): the Handle is currently being mutated",
+            Err(HandleError::InUse(name)) => {
+                return Err(InsertError {
+                    name,
+                    kind: InsertErrorKind::InUse,
                 })
             }
             Err(HandleError::NotReady(_)) => {
                 unreachable!("tried to insert a Handle from deserialization via transaction")
             }
-            Err(HandleError::Gone(_)) => {
-                return Err(PreconditionFailed {
-                    location: "UniverseTransaction",
-                    problem: "insert(): the Handle is already gone",
+            Err(HandleError::Gone(name)) => {
+                return Err(InsertError {
+                    name,
+                    kind: InsertErrorKind::Gone,
                 })
             }
         }

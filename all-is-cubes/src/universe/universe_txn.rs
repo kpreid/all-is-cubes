@@ -6,20 +6,20 @@ use core::fmt;
 
 use hashbrown::HashMap as HbHashMap;
 
-use crate::transaction::{
-    self, CommitError, Merge, PreconditionFailed, Transaction, Transactional,
-};
+use crate::behavior;
+use crate::transaction::{self, CommitError, Merge, Transaction, Transactional};
 #[cfg(doc)]
 use crate::universe::HandleError;
 use crate::universe::{
-    AnyHandle, ErasedHandle, Handle, InsertError, Name, UBorrowMut, Universe, UniverseId,
-    UniverseMember, UniverseTable,
+    AnyHandle, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, UBorrowMut, Universe,
+    UniverseId, UniverseMember, UniverseTable,
 };
-use crate::{behavior, universe};
 
 // Reëxports for macro-generated types
 #[doc(inline)]
-pub(in crate::universe) use crate::universe::members::{AnyTransaction, AnyTransactionConflict};
+pub(in crate::universe) use crate::universe::members::{
+    AnyTransaction, AnyTransactionConflict, AnyTransactionMismatch,
+};
 
 /// Conversion from concrete transaction types to [`UniverseTransaction`].
 ///
@@ -61,6 +61,7 @@ where
         let guard = self
             .target
             .try_borrow_mut()
+            // TODO: return this error
             .expect("Attempted to execute transaction with target already borrowed");
         let check = self.transaction.check(&guard)?;
         Ok(TransactionInUniverseCheck { guard, check })
@@ -221,6 +222,28 @@ pub struct UniverseCommitCheck {
     behaviors: behavior::CommitCheck,
 }
 
+/// Transaction precondition error type for [`UniverseTransaction`].
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub enum UniverseMismatch {
+    /// The transaction modifies members of a different [`Universe`] than it was applied to.
+    DifferentUniverse {
+        /// The universe mentioned in the transaction.
+        transaction: UniverseId,
+        /// The universe to which the transaction was applied.
+        target: UniverseId,
+    },
+
+    /// The member is not in an appropriate state.
+    Member(transaction::MapMismatch<Name, MemberMismatch>),
+
+    /// Universe transactions may not modify handles that are in the [`Name::Pending`] state.
+    InvalidPending,
+
+    /// The behavior set is not in an appropriate state.
+    Behaviors(<behavior::BehaviorSetTransaction<Universe> as Transaction>::Mismatch),
+}
+
 /// Transaction conflict error type for [`UniverseTransaction`].
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
@@ -236,12 +259,54 @@ pub enum UniverseConflict {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for UniverseConflict {
+    impl std::error::Error for UniverseMismatch {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                UniverseMismatch::DifferentUniverse {..} => None,
+                UniverseMismatch::Member(mc) => Some(&mc.mismatch),
+                UniverseMismatch::Behaviors(c) => Some(c),
+                UniverseMismatch::InvalidPending => None,
+            }
+        }
+    } impl std::error::Error for UniverseConflict {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             match self {
                 UniverseConflict::DifferentUniverse(_, _) => None,
                 UniverseConflict::Member(mc) => Some(&mc.conflict),
                 UniverseConflict::Behaviors(c) => Some(c),
+            }
+        }
+    }
+}
+
+impl fmt::Display for UniverseMismatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UniverseMismatch::DifferentUniverse { .. } => {
+                write!(
+                    f,
+                    "cannot commit a transaction to a different universe \
+                        than it was constructed for"
+                )
+            }
+            UniverseMismatch::Member(c) => {
+                // details reported via source()
+                write!(
+                    f,
+                    "transaction precondition not met in member {key}",
+                    key = c.key
+                )
+            }
+            UniverseMismatch::InvalidPending => {
+                write!(
+                    f,
+                    "universe transactions may not modify handles that \
+                        are in the [`Name::Pending`] state"
+                )
+            }
+            UniverseMismatch::Behaviors(_) => {
+                // details reported via source()
+                write!(f, "transaction precondition not met in behaviors")
             }
         }
     }
@@ -328,7 +393,7 @@ impl UniverseTransaction {
                         // Equivalent to how transaction merge would fail
                         Err(InsertError {
                             name: name.clone(),
-                            kind: universe::InsertErrorKind::AlreadyExists,
+                            kind: InsertErrorKind::AlreadyExists,
                         })
                     }
                     hashbrown::hash_map::Entry::Vacant(ve) => {
@@ -404,15 +469,14 @@ impl Transaction for UniverseTransaction {
     type Target = Universe;
     type CommitCheck = UniverseCommitCheck;
     type Output = transaction::NoOutput;
-    type Mismatch = PreconditionFailed;
+    type Mismatch = UniverseMismatch;
 
-    fn check(&self, target: &Universe) -> Result<Self::CommitCheck, PreconditionFailed> {
+    fn check(&self, target: &Universe) -> Result<Self::CommitCheck, UniverseMismatch> {
         if let Some(universe_id) = self.universe_id() {
             if universe_id != target.id {
-                return Err(PreconditionFailed {
-                    location: "UniverseTransaction",
-                    problem: "cannot commit a transaction to a different universe \
-                        than it was constructed for",
+                return Err(UniverseMismatch::DifferentUniverse {
+                    transaction: universe_id,
+                    target: target.id,
                 });
             }
         }
@@ -424,25 +488,42 @@ impl Transaction for UniverseTransaction {
                     // TODO: This is a weird place to implement this constraint.
                     // It would be better (?) to check when the transaction is created,
                     // but that will be quite a lot of fallibility...
-                    return Err(PreconditionFailed {
-                        location: "UniverseTransaction",
-                        problem: "universe transactions may not involve pending Handles",
-                    });
+                    return Err(UniverseMismatch::InvalidPending);
                 }
             }
 
-            member_checks.insert(name.clone(), member.check(target, name)?);
+            member_checks.insert(
+                name.clone(),
+                member.check(target, name).map_err(|e| {
+                    UniverseMismatch::Member(transaction::MapMismatch {
+                        key: name.clone(),
+                        mismatch: e,
+                    })
+                })?,
+            );
         }
 
         let mut insert_checks = Vec::with_capacity(self.anonymous_insertions.len());
         for insert_txn in self.anonymous_insertions.iter() {
-            insert_checks.push(insert_txn.check(target, &Name::Pending)?);
+            insert_checks.push(
+                insert_txn
+                    .check(target, &Name::Pending)
+                    .map_err(|mismatch| {
+                        UniverseMismatch::Member(transaction::MapMismatch {
+                            key: Name::Pending,
+                            mismatch,
+                        })
+                    })?,
+            );
         }
 
         Ok(UniverseCommitCheck {
             members: member_checks,
             anonymous_insertions: insert_checks,
-            behaviors: self.behaviors.check(&target.behaviors)?,
+            behaviors: self
+                .behaviors
+                .check(&target.behaviors)
+                .map_err(UniverseMismatch::Behaviors)?,
         })
     }
 
@@ -592,45 +673,48 @@ struct MemberMergeCheck(Option<AnyTransactionCheck>);
 struct MemberCommitCheck(Option<AnyTransactionCheck>);
 
 impl MemberTxn {
-    fn check(
-        &self,
-        universe: &Universe,
-        name: &Name,
-    ) -> Result<MemberCommitCheck, PreconditionFailed> {
+    fn check(&self, universe: &Universe, name: &Name) -> Result<MemberCommitCheck, MemberMismatch> {
         match self {
             MemberTxn::Noop => Ok(MemberCommitCheck(None)),
             // Kludge: The individual `AnyTransaction`s embed the `Handle<T>` they operate on --
             // so we don't actually pass anything here.
-            MemberTxn::Modify(txn) => Ok(MemberCommitCheck(Some(txn.check(&())?))),
+            MemberTxn::Modify(txn) => {
+                Ok(MemberCommitCheck(Some(txn.check(&()).map_err(|e| {
+                    MemberMismatch::Modify(ModifyMemberMismatch(e))
+                })?)))
+            }
             MemberTxn::Insert(pending_handle) => {
-                if pending_handle.name() != *name {
-                    return Err(PreconditionFailed {
-                        location: "UniverseTransaction",
-                        // TODO: better error reporting
-                        problem: "insert(): the Handle is already in a universe (or name data is erroneous)",
-                    });
+                {
+                    if pending_handle.name() != *name {
+                        return Err(MemberMismatch::Insert(InsertError {
+                            name: name.clone(),
+                            kind: InsertErrorKind::AlreadyInserted,
+                        }));
+                    }
                 }
 
                 // TODO: Deduplicate this check logic vs. Universe::allocate_name
                 match name {
                     Name::Specific(_) | Name::Pending => {}
                     Name::Anonym(_) => {
-                        return Err(PreconditionFailed {
-                            location: "UniverseTransaction",
-                            problem: "insert(): cannot insert Name::Anonym",
-                        })
+                        return Err(MemberMismatch::Insert(InsertError {
+                            name: name.clone(),
+                            kind: InsertErrorKind::InvalidName,
+                        }))
                     }
                 }
 
                 if universe.get_any(name).is_some() {
-                    return Err(PreconditionFailed {
-                        location: "UniverseTransaction",
-                        problem: "insert(): name already in use",
-                    });
+                    return Err(MemberMismatch::Insert(InsertError {
+                        name: name.clone(),
+                        kind: InsertErrorKind::AlreadyExists,
+                    }));
                 }
                 // TODO: This has a TOCTTOU problem because it doesn't ensure another thread
                 // couldn't insert the ref in the mean time.
-                pending_handle.check_upgrade_pending(universe.id)?;
+                pending_handle
+                    .check_upgrade_pending(universe.id)
+                    .map_err(MemberMismatch::Insert)?;
                 Ok(MemberCommitCheck(None))
             }
             MemberTxn::Delete => {
@@ -638,16 +722,10 @@ impl MemberTxn {
                     if universe.get_any(name).is_some() {
                         Ok(MemberCommitCheck(None))
                     } else {
-                        Err(PreconditionFailed {
-                            location: "UniverseTransaction",
-                            problem: "delete(): no member by that name",
-                        })
+                        Err(MemberMismatch::DeleteNonexistent(name.clone()))
                     }
                 } else {
-                    Err(PreconditionFailed {
-                        location: "UniverseTransaction",
-                        problem: "delete(): cannot be used on anonymous members",
-                    })
+                    Err(MemberMismatch::DeleteInvalid(name.clone()))
                 }
             }
         }
@@ -799,6 +877,45 @@ crate::util::cfg_should_impl_error! {
     }
 }
 
+/// Transaction precondition error type for a single member in a [`UniverseTransaction`].
+#[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
+#[non_exhaustive]
+pub enum MemberMismatch {
+    /// {0}
+    Insert(InsertError),
+
+    /// member {0} does not exist
+    DeleteNonexistent(Name),
+
+    /// only explicitly named members may be deleted, not {0}
+    DeleteInvalid(Name),
+
+    /// Preconditions of the member transaction weren't met
+    #[displaydoc("{0}")]
+    Modify(ModifyMemberMismatch),
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for MemberMismatch {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            MemberMismatch::Insert(e) => e.source(),
+            MemberMismatch::DeleteNonexistent(_) => None,
+            MemberMismatch::DeleteInvalid(_) => None,
+            MemberMismatch::Modify(e) => e.source(),
+        }
+    }
+}
+
+/// Transaction precondition error type for modifying a [`Universe`] member (something a
+/// [`Handle`] refers to).
+//
+// Public wrapper hiding the details of [`AnyTransactionMismatch`] which is an enum.
+// TODO: Probably this should just _be_ that enum, but let's hold off till a use case
+// shows up.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModifyMemberMismatch(AnyTransactionMismatch);
+
 /// Transaction conflict error type for modifying a [`Universe`] member (something a
 /// [`Handle`] refers to).
 //
@@ -809,6 +926,11 @@ crate::util::cfg_should_impl_error! {
 pub struct ModifyMemberConflict(AnyTransactionConflict);
 
 crate::util::cfg_should_impl_error! {
+    impl std::error::Error for ModifyMemberMismatch {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            self.0.source()
+        }
+    }
     impl std::error::Error for ModifyMemberConflict {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             self.0.source()
@@ -816,12 +938,22 @@ crate::util::cfg_should_impl_error! {
     }
 }
 
+impl fmt::Display for ModifyMemberMismatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
 impl fmt::Display for ModifyMemberConflict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
 }
 
+impl From<AnyTransactionMismatch> for ModifyMemberMismatch {
+    fn from(value: AnyTransactionMismatch) -> Self {
+        Self(value)
+    }
+}
 impl From<AnyTransactionConflict> for ModifyMemberConflict {
     fn from(value: AnyTransactionConflict) -> Self {
         Self(value)
@@ -843,7 +975,7 @@ mod tests {
     use crate::space::SpaceTransaction;
     use crate::space::SpaceTransactionConflict;
     use crate::transaction::{ExecuteError, MapConflict, TransactionTester};
-    use crate::universe::HandleError;
+    use crate::universe::{self, HandleError};
     use alloc::sync::Arc;
     use indoc::indoc;
 
@@ -1109,13 +1241,16 @@ mod tests {
         let txn = UniverseTransaction::insert(handle);
 
         let e = txn.execute(&mut u2, &mut drop).unwrap_err();
-        assert!(matches!(
+        assert_eq!(
             dbg!(e),
-            ExecuteError::Check(PreconditionFailed {
-                problem: "insert(): the Handle is already in a universe",
-                ..
-            })
-        ));
+            ExecuteError::Check(UniverseMismatch::Member(transaction::MapMismatch {
+                key: "foo".into(),
+                mismatch: MemberMismatch::Insert(InsertError {
+                    name: "foo".into(),
+                    kind: InsertErrorKind::AlreadyInserted
+                })
+            }))
+        );
     }
 
     #[test]
@@ -1128,14 +1263,16 @@ mod tests {
         txn.execute(&mut u1, &mut drop).unwrap();
         let e = txn.execute(&mut u2, &mut drop).unwrap_err();
 
-        assert!(matches!(
+        assert_eq!(
             dbg!(e),
-            ExecuteError::Check(PreconditionFailed {
-                problem:
-                    "insert(): the Handle is already in a universe (or name data is erroneous)",
-                ..
-            })
-        ));
+            ExecuteError::Check(UniverseMismatch::Member(transaction::MapMismatch {
+                key: Name::Pending,
+                mismatch: MemberMismatch::Insert(InsertError {
+                    name: Name::Pending,
+                    kind: InsertErrorKind::AlreadyInserted
+                })
+            }))
+        );
     }
 
     #[test]

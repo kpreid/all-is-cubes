@@ -244,7 +244,7 @@ macro_rules! member_enums_and_impls {
             pub(crate) fn check_upgrade_pending(
                 &self,
                 universe_id: $crate::universe::UniverseId,
-            ) -> Result<(), $crate::transaction::PreconditionFailed> {
+            ) -> Result<(), $crate::universe::InsertError> {
                 match self {
                     $( Self::$member_type(handle) => handle.check_upgrade_pending(universe_id), )*
                 }
@@ -275,7 +275,8 @@ macro_rules! member_enums_and_impls {
 
         $( impl_universe_for_member!($member_type, $table_name); )*
 
-        /// Polymorphic container for transactions in a [`UniverseTransaction`].
+        /// Polymorphic container for [`TransactionInUniverse`] which is
+        /// used to store transactions in a [`UniverseTransaction`].
         #[derive(Clone, Default, PartialEq)]
         #[allow(clippy::large_enum_variant)]
         #[non_exhaustive]
@@ -308,15 +309,18 @@ macro_rules! member_enums_and_impls {
             type Target = ();
             type CommitCheck = ut::AnyTransactionCheck;
             type Output = transaction::NoOutput;
-            type Mismatch = transaction::PreconditionFailed;
+            type Mismatch = AnyTransactionMismatch;
 
             fn check(
                 &self,
                 _target: &(),
-            ) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
-                Ok::<Self::CommitCheck, transaction::PreconditionFailed>(match self {
+            ) -> Result<Self::CommitCheck, Self::Mismatch> {
+                Ok::<Self::CommitCheck, Self::Mismatch>(match self {
                     Self::Noop => Box::new(()),
-                    $(  Self::$member_type(t) => Box::new(t.check(&())?), )*
+                    $(
+                        Self::$member_type(t) => Box::new(t.check(&())
+                            .map_err(AnyTransactionMismatch::$member_type)?),
+                    )*
                 })
             }
 
@@ -347,7 +351,7 @@ macro_rules! member_enums_and_impls {
                                 .map_err(AnyTransactionConflict::$member_type)?;
                         Ok(Box::new(check))
                     } )*
-                    (_, _) => Err(AnyTransactionConflict::Mismatch),
+                    (_, _) => Err(AnyTransactionConflict::TypeMismatch),
                 }
             }
 
@@ -363,12 +367,27 @@ macro_rules! member_enums_and_impls {
             }
         }
 
+        /// [`AnyTransaction`] precondition errors.
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        #[allow(clippy::large_enum_variant)]
+        #[non_exhaustive]
+        pub(in crate::universe) enum AnyTransactionMismatch {
+            $(
+                $member_type(
+                    <
+                        <$member_type as transaction::Transactional>::Transaction
+                        as transaction::Transaction
+                    >::Mismatch
+                ),
+            )*
+        }
+
         /// [`AnyTransaction`] conflict errors.
         #[derive(Clone, Debug, Eq, PartialEq)]
         #[allow(clippy::large_enum_variant)]
         #[non_exhaustive]
         pub(in crate::universe) enum AnyTransactionConflict {
-            Mismatch,
+            TypeMismatch,
             $(
                 $member_type(
                     <
@@ -380,20 +399,35 @@ macro_rules! member_enums_and_impls {
         }
 
         crate::util::cfg_should_impl_error! {
+            impl std::error::Error for AnyTransactionMismatch {
+                fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                    match self {
+                        $( Self::$member_type(e) => Some(e), )*
+                    }
+                }
+            }
+
             impl std::error::Error for AnyTransactionConflict {
                 fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
                     match self {
-                        Self::Mismatch => None,
+                        Self::TypeMismatch => None,
                         $( Self::$member_type(e) => Some(e), )*
                     }
                 }
             }
         }
 
+        impl fmt::Display for AnyTransactionMismatch {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self {
+                    $( Self::$member_type(e) => e.fmt(f), )*
+                }
+            }
+        }
         impl fmt::Display for AnyTransactionConflict {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 match self {
-                    Self::Mismatch => write!(f, "Mismatched transaction target types"),
+                    Self::TypeMismatch => write!(f, "Mismatched transaction target types"),
                     $( Self::$member_type(e) => e.fmt(f), )*
                 }
             }

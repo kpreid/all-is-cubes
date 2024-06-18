@@ -116,6 +116,8 @@
 
     - `op::Operation::Paint` has been removed. Use `Operation::Neighbors` and `Operation::DestroyTo` to get the same effect.
 
+    - `transaction::PreconditionFailed` no longer exists. It has been replaced with error types specific to each transaction type.
+
 ## 0.7.1 (2024-01-27)
 
 - `all-is-cubes` library:

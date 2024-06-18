@@ -704,9 +704,9 @@ impl Transaction for BodyTransaction {
     type Target = Body;
     type CommitCheck = ();
     type Output = transaction::NoOutput;
-    type Mismatch = transaction::PreconditionFailed;
+    type Mismatch = BodyMismatch;
 
-    fn check(&self, _body: &Body) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
+    fn check(&self, _body: &Body) -> Result<Self::CommitCheck, Self::Mismatch> {
         // No conflicts currently possible.
         Ok(())
     }
@@ -733,6 +733,20 @@ impl transaction::Merge for BodyTransaction {
     fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
         let Self { delta_yaw } = self;
         *delta_yaw += other.delta_yaw;
+    }
+}
+
+/// Transaction precondition error type for a [`BodyTransaction`].
+#[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
+#[non_exhaustive]
+pub enum BodyMismatch {}
+
+crate::util::cfg_should_impl_error! {
+    impl std::error::Error for BodyMismatch {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match *self {
+            }
+        }
     }
 }
 

@@ -773,11 +773,24 @@ pub enum InsertErrorKind {
     /// An object already exists with the proposed name.
     AlreadyExists,
     /// The proposed name may not be used.
+    ///
+    /// In particular, a [`Name::Anonym`] may not be inserted explicitly.
     InvalidName,
     /// The provided [`Handle`] does not have a value.
     Gone,
+    /// The provided [`Handle`]’s value is being mutated and cannot
+    /// be checked.
+    InUse,
     /// The provided [`Handle`] was already inserted into some universe.
     AlreadyInserted,
+    #[doc(hidden)] // should be unreachable
+    /// The provided [`Handle`] is being used in the deserialization process
+    /// and cannot be inserted otherwise.
+    Deserializing,
+    #[doc(hidden)]
+    /// The provided [`Handle`] experienced an error during a previous operation and
+    /// cannot be used.
+    Poisoned,
 }
 
 crate::util::cfg_should_impl_error! {
@@ -795,7 +808,18 @@ impl fmt::Display for InsertError {
                 write!(f, "the name {name} may not be used in an insert operation")
             }
             InsertErrorKind::Gone => write!(f, "the Handle {name} was already dead"),
+            InsertErrorKind::InUse => write!(
+                f,
+                "the object {name} is being mutated during this insertion attempt"
+            ),
             InsertErrorKind::AlreadyInserted => write!(f, "the object {name} is already inserted"),
+            InsertErrorKind::Deserializing => write!(
+                f,
+                "the object {name} is already in a universe being deserialized"
+            ),
+            InsertErrorKind::Poisoned => {
+                write!(f, "the object is invalid due to a previous failure")
+            }
         }
     }
 }
