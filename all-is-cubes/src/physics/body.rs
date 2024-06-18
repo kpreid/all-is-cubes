@@ -700,7 +700,8 @@ impl transaction::Transactional for Body {
     type Transaction = BodyTransaction;
 }
 
-impl Transaction<Body> for BodyTransaction {
+impl Transaction for BodyTransaction {
+    type Target = Body;
     type CommitCheck = ();
     type Output = transaction::NoOutput;
 

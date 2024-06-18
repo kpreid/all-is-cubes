@@ -7,7 +7,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::{fmt, mem};
 
-use crate::behavior::{self, BehaviorSet, BehaviorSetTransaction};
+use crate::behavior::{self, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::drawing::DrawingPlane;
 use crate::fluff::Fluff;
@@ -17,6 +17,9 @@ use crate::transaction::{
     self, no_outputs, CommitError, Merge, NoOutput, PreconditionFailed, Transaction, Transactional,
 };
 use crate::util::{ConciseDebug, Refmt as _};
+
+#[cfg(doc)]
+use crate::behavior::BehaviorSet;
 
 impl Transactional for Space {
     type Transaction = SpaceTransaction;
@@ -168,9 +171,9 @@ impl SpaceTransaction {
     }
 }
 
-impl Transaction<Space> for SpaceTransaction {
-    type CommitCheck =
-        <BehaviorSetTransaction<Space> as Transaction<BehaviorSet<Space>>>::CommitCheck;
+impl Transaction for SpaceTransaction {
+    type Target = Space;
+    type CommitCheck = <BehaviorSetTransaction<Space> as Transaction>::CommitCheck;
     type Output = NoOutput;
 
     fn check(&self, space: &Space) -> Result<Self::CommitCheck, PreconditionFailed> {

@@ -358,7 +358,8 @@ impl InventoryTransaction {
     }
 }
 
-impl Transaction<Inventory> for InventoryTransaction {
+impl Transaction for InventoryTransaction {
+    type Target = Inventory;
     type CommitCheck = Option<InventoryCheck>;
     type Output = InventoryChange;
 

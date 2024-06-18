@@ -157,20 +157,21 @@ macro_rules! impl_transaction_for_tuple {
             /// A tuple of transactions may act as a transaction on tuples.
             ///
             /// TODO: This functionality is not currently used and is of dubious value.
-            impl<$( [<Ta $name>], )* $( [<Tr $name>] ),*>
-                Transaction<($( [<Ta $name>], )*)> for ($( [<Tr $name>], )*)
+            impl<$( [<Tr $name>] ),*>
+                Transaction for ($( [<Tr $name>], )*)
             where
-                $( [<Tr $name>]: Transaction<[<Ta $name>], Output = NoOutput>  ),*
+                $( [<Tr $name>]: Transaction<Output = NoOutput>  ),*
             {
+                type Target = ($( [<Tr $name>]::Target, )*);
                 type CommitCheck = (
-                    $( <[<Tr $name>] as Transaction<[<Ta $name>]>>::CommitCheck, )*
+                    $( <[<Tr $name>] as Transaction>::CommitCheck, )*
                 );
                 type Output = NoOutput;
 
                 fn check(
                     &self,
                     #[allow(unused_variables)] // empty tuple case
-                    target: &($( [<Ta $name>], )*),
+                    target: &($( [<Tr $name>]::Target, )*),
                 ) -> Result<Self::CommitCheck, PreconditionFailed> {
                     let ($( [<txn_ $name>], )*) = self;
                     let ($( [<target_ $name>], )*) = target;
@@ -182,7 +183,7 @@ macro_rules! impl_transaction_for_tuple {
                 fn commit(
                     &self,
                     #[allow(unused_variables)] // empty tuple case
-                    target: &mut ($( [<Ta $name>], )*),
+                    target: &mut ($( [<Tr $name>]::Target, )*),
                     check: Self::CommitCheck,
                     outputs: &mut dyn FnMut(Self::Output),
                 ) -> Result<(), super::CommitError> {
@@ -267,19 +268,23 @@ impl_transaction_for_tuple!(4: 0, 1, 2, 3);
 impl_transaction_for_tuple!(5: 0, 1, 2, 3, 4);
 impl_transaction_for_tuple!(6: 0, 1, 2, 3, 4, 5);
 
-/// Does nothing to anything.
-impl<T> Transaction<T> for () {
+/// Does nothing.
+// The empty tuple gets a special implementation because it cannot fail to commit,
+// and this is best represented without using a custom type.
+// Other than that, this is identical to the macro-generated code.
+impl Transaction for () {
+    type Target = ();
     type CommitCheck = ();
 
     type Output = core::convert::Infallible;
 
-    fn check(&self, _: &T) -> Result<Self::CommitCheck, PreconditionFailed> {
+    fn check(&self, (): &()) -> Result<Self::CommitCheck, PreconditionFailed> {
         Ok(())
     }
 
     fn commit(
         &self,
-        _: &mut T,
+        (): &mut (),
         (): Self::CommitCheck,
         _: &mut dyn FnMut(Self::Output),
     ) -> Result<(), super::CommitError> {

@@ -725,11 +725,12 @@ impl CharacterTransaction {
 }
 
 #[allow(clippy::type_complexity)]
-impl Transaction<Character> for CharacterTransaction {
+impl Transaction for CharacterTransaction {
+    type Target = Character;
     type CommitCheck = (
-        <BodyTransaction as Transaction<Body>>::CommitCheck,
-        <InventoryTransaction as Transaction<Inventory>>::CommitCheck,
-        <BehaviorSetTransaction<Character> as Transaction<BehaviorSet<Character>>>::CommitCheck,
+        <BodyTransaction as Transaction>::CommitCheck,
+        <InventoryTransaction as Transaction>::CommitCheck,
+        <BehaviorSetTransaction<Character> as Transaction>::CommitCheck,
     );
     type Output = transaction::NoOutput;
 

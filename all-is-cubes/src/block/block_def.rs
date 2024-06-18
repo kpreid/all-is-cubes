@@ -279,7 +279,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockDef {
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[must_use]
 pub struct BlockDefTransaction {
-    // TODO: This struct is the second occurrence (the first is space::CubeTransaction) of a "assign to a mutable location" transaction. If we figure out how to have conveniently _composable_ transactions then we should have an `impl Transaction<&mut T> for Assign<T>` transaction (targeting `&mut` to discourage use otherwise).
+    // TODO: This struct is the second occurrence (the first is space::CubeTransaction) of a "assign to a mutable location" transaction. If we figure out how to have conveniently _composable_ transactions then we should have an `impl Transaction<Target = &mut T> for Assign<T>` transaction (targeting `&mut` to discourage use otherwise).
     /// If `None`, no precondition.
     old: Option<Block>,
     /// If `None`, no change is made and this transaction is only a precondition.
@@ -314,7 +314,8 @@ impl BlockDefTransaction {
     }
 }
 
-impl Transaction<BlockDef> for BlockDefTransaction {
+impl Transaction for BlockDefTransaction {
+    type Target = BlockDef;
     type CommitCheck = ();
     type Output = transaction::NoOutput;
 

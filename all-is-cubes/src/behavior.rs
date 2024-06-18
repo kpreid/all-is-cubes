@@ -573,7 +573,8 @@ impl<H: BehaviorHost> BehaviorSetTransaction<H> {
     }
 }
 
-impl<H: BehaviorHost> Transaction<BehaviorSet<H>> for BehaviorSetTransaction<H> {
+impl<H: BehaviorHost> Transaction for BehaviorSetTransaction<H> {
+    type Target = BehaviorSet<H>;
     type CommitCheck = CommitCheck;
     type Output = transaction::NoOutput;
 

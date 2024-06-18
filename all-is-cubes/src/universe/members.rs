@@ -304,7 +304,8 @@ macro_rules! member_enums_and_impls {
             }
         }
 
-        impl transaction::Transaction<()> for AnyTransaction {
+        impl transaction::Transaction for AnyTransaction {
+            type Target = ();
             type CommitCheck = ut::AnyTransactionCheck;
             type Output = transaction::NoOutput;
 

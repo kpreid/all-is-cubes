@@ -223,7 +223,7 @@ impl<T: 'static> Handle<T> {
     pub fn execute(
         &self,
         transaction: &<T as Transactional>::Transaction,
-        outputs: &mut dyn FnMut(<<T as Transactional>::Transaction as Transaction<T>>::Output),
+        outputs: &mut dyn FnMut(<<T as Transactional>::Transaction as Transaction>::Output),
     ) -> Result<(), ExecuteError<<T as Transactional>::Transaction>>
     where
         T: Transactional,

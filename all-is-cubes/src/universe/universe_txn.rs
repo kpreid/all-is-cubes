@@ -48,12 +48,13 @@ pub(in crate::universe) struct TransactionInUniverse<O: Transactional + 'static>
     pub(crate) transaction: O::Transaction,
 }
 
-impl<O> Transaction<()> for TransactionInUniverse<O>
+impl<O> Transaction for TransactionInUniverse<O>
 where
     O: Transactional + 'static,
 {
+    type Target = ();
     type CommitCheck = TransactionInUniverseCheck<O>;
-    type Output = <O::Transaction as Transaction<O>>::Output;
+    type Output = <O::Transaction as Transaction>::Output;
 
     fn check(&self, _dummy_target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
         let guard = self
@@ -81,7 +82,7 @@ where
     O: Transactional + 'static,
 {
     guard: UBorrowMut<O>,
-    check: <O::Transaction as Transaction<O>>::CommitCheck,
+    check: <O::Transaction as Transaction>::CommitCheck,
 }
 
 impl<O> Merge for TransactionInUniverse<O>
@@ -151,10 +152,10 @@ impl fmt::Debug for AnyTransaction {
 pub(in crate::universe) fn anytxn_merge_helper<O>(
     t1: &mut TransactionInUniverse<O>,
     t2: TransactionInUniverse<O>,
-    check: AnyTransactionCheck, // contains <TransactionInUniverse<O> as Transaction<()>>::MergeCheck,
+    check: AnyTransactionCheck, // contains <TransactionInUniverse<O> as Transaction>::MergeCheck,
 ) where
     O: Transactional,
-    TransactionInUniverse<O>: Transaction<()>,
+    TransactionInUniverse<O>: Transaction,
 {
     t1.commit_merge(t2, *check.downcast().unwrap())
 }
@@ -163,13 +164,13 @@ pub(in crate::universe) fn anytxn_merge_helper<O>(
 pub(in crate::universe) fn anytxn_commit_helper<O>(
     transaction: &TransactionInUniverse<O>,
     check: AnyTransactionCheck,
-    outputs: &mut dyn FnMut(<TransactionInUniverse<O> as Transaction<()>>::Output),
+    outputs: &mut dyn FnMut(<TransactionInUniverse<O> as Transaction>::Output),
 ) -> Result<(), CommitError>
 where
     O: Transactional,
-    TransactionInUniverse<O>: Transaction<()>,
+    TransactionInUniverse<O>: Transaction<Target = ()>,
 {
-    let check: <TransactionInUniverse<O> as Transaction<()>>::CommitCheck =
+    let check: <TransactionInUniverse<O> as Transaction>::CommitCheck =
         *(check.downcast().map_err(|_| {
             CommitError::message::<AnyTransaction>("type mismatch in check data".into())
         })?);
@@ -398,7 +399,8 @@ impl From<AnyTransaction> for UniverseTransaction {
     }
 }
 
-impl Transaction<Universe> for UniverseTransaction {
+impl Transaction for UniverseTransaction {
+    type Target = Universe;
     type CommitCheck = UniverseCommitCheck;
     type Output = transaction::NoOutput;
 

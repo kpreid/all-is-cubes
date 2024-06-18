@@ -17,15 +17,19 @@ use super::Transaction;
 /// finish with [`Self::test`].
 #[must_use]
 #[allow(missing_debug_implementations)]
-pub struct TransactionTester<'a, Tr, Ta> {
-    transactions: Vec<TransactionAndPredicate<'a, Tr, Ta>>,
-    target_factories: Vec<Box<dyn Fn() -> Ta + 'a>>,
+pub struct TransactionTester<'a, Tr>
+where
+    Tr: Transaction + Clone + Debug + 'a,
+    Tr::Target: Debug + 'a,
+{
+    transactions: Vec<TransactionAndPredicate<'a, Tr>>,
+    target_factories: Vec<Box<dyn Fn() -> Tr::Target + 'a>>,
 }
 
-impl<'a, Tr, Ta> TransactionTester<'a, Tr, Ta>
+impl<'a, Tr> TransactionTester<'a, Tr>
 where
-    Tr: Transaction<Ta> + Clone + Debug + 'a,
-    Ta: Debug + 'a,
+    Tr: Transaction + Clone + Debug + 'a,
+    Tr::Target: Debug + 'a,
 {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
@@ -46,7 +50,7 @@ where
     pub fn transaction(
         mut self,
         transaction: Tr,
-        predicate: impl Fn(&Ta, &Ta) -> PredicateRes + 'a,
+        predicate: impl Fn(&Tr::Target, &Tr::Target) -> PredicateRes + 'a,
     ) -> Self {
         self.transactions.push(TransactionAndPredicate {
             transaction,
@@ -59,7 +63,7 @@ where
     ///
     /// To avoid requiring the targets to implement [`Clone`], a factory function is
     /// required here.
-    pub fn target(mut self, factory: impl Fn() -> Ta + 'a) -> Self {
+    pub fn target(mut self, factory: impl Fn() -> Tr::Target + 'a) -> Self {
         self.target_factories.push(Box::new(factory));
         self
     }
@@ -112,7 +116,7 @@ where
 
     fn derived_transactions<'b>(
         &'b self,
-    ) -> impl Iterator<Item = TransactionAndPredicate<'a, Tr, Ta>> + 'b {
+    ) -> impl Iterator<Item = TransactionAndPredicate<'a, Tr>> + 'b {
         self.transactions.iter().flat_map(move |t1| {
             core::iter::once(t1.clone()).chain(
                 self.transactions
@@ -125,13 +129,13 @@ where
 
 pub type PredicateRes = Result<(), Box<dyn Error>>;
 
-struct TransactionAndPredicate<'a, Tr, Ta> {
+struct TransactionAndPredicate<'a, Tr: Transaction> {
     transaction: Tr,
     #[allow(clippy::type_complexity)] // https://github.com/rust-lang/rust-clippy/issues/9299
-    predicate: Rc<dyn Fn(&Ta, &Ta) -> PredicateRes + 'a>,
+    predicate: Rc<dyn Fn(&Tr::Target, &Tr::Target) -> PredicateRes + 'a>,
 }
 
-impl<'a, Tr: Clone, Ta> Clone for TransactionAndPredicate<'a, Tr, Ta> {
+impl<'a, Tr: Transaction + Clone> Clone for TransactionAndPredicate<'a, Tr> {
     fn clone(&self) -> Self {
         TransactionAndPredicate {
             transaction: self.transaction.clone(),
@@ -140,10 +144,9 @@ impl<'a, Tr: Clone, Ta> Clone for TransactionAndPredicate<'a, Tr, Ta> {
     }
 }
 
-impl<'a, Tr, Ta> TransactionAndPredicate<'a, Tr, Ta>
+impl<'a, Tr> TransactionAndPredicate<'a, Tr>
 where
-    Tr: Transaction<Ta>,
-    Ta: 'a,
+    Tr: Transaction<Target: 'a>,
 {
     fn try_merge(mut self, other: Self) -> Option<Self> {
         let merge_check = self.transaction.check_merge(&other.transaction).ok()?;
