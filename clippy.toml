@@ -2,6 +2,12 @@ doc-valid-idents = ["glTF", "sRGB", "DirectX", "MagicaVoxel", "NaN", "OpenGL", "
 enforced-import-renames = [
     { path = "all_is_cubes::rerun_glue", rename = "rg" },
 ]
+ignore-interior-mutability = [
+    "arcstr::ArcStr",
+    "arcstr::SubStr",
+    "all_is_cubes::block::Block",
+    "test_renderers::harness::UniverseFuture",
+]
 
 # --- Configurations for "large values" kinds of lints ---
 # It'd be nice if these were per-package/per-crate, but clippy doesn't support that,
