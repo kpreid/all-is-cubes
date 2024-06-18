@@ -740,7 +740,7 @@ mod space {
 
                     let space = Space::builder(bounds)
                         .physics(physics.into())
-                        .palette_and_contents(&mut blocks.into_iter(), contents, light)
+                        .palette_and_contents(blocks, contents, light)
                         .map_err(serde::de::Error::custom)?
                         .behaviors(behaviors.into_owned())
                         .spawn(spawn.into_owned())
