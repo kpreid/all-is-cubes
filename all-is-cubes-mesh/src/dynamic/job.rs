@@ -32,8 +32,7 @@ pub struct MeshJobQueue<M: DynamicMeshTypes> {
     texture_allocator: M::Alloc,
 }
 
-impl<M: DynamicMeshTypes<Alloc: Clone>> Clone for MeshJobQueue<M>
-{
+impl<M: DynamicMeshTypes<Alloc: Clone>> Clone for MeshJobQueue<M> {
     fn clone(&self) -> Self {
         Self {
             queue: self.queue.clone(),

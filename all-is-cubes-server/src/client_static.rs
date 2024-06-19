@@ -85,4 +85,3 @@ mod embedded {
     use include_dir as _;
     use mime_guess as _;
 }
-
