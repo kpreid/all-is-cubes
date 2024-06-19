@@ -5,7 +5,7 @@ use alloc::sync::Arc;
 use core::any::type_name;
 use core::{fmt, mem};
 
-use crate::universe::{Handle, UTransactional, UniverseTransaction};
+use crate::universe::{Handle, HandleError, UTransactional, UniverseTransaction};
 use crate::util::ErrorIfStd;
 
 mod generic;
@@ -218,6 +218,19 @@ pub enum ExecuteError<Txn: Transaction = UniverseTransaction> {
     /// See the documentation of [`Transaction::commit()`] for the unfortunate
     /// implications of this.
     Commit(CommitError),
+
+    /// Executing the transaction required accessing a [`Handle`] that was unavailable.
+    ///
+    /// The [`HandleError`] will include the name of the problematic handle.
+    ///
+    /// This error may be transient, and
+    /// unlike [`ExecuteError::Commit`], does not indicate data corruption,
+    /// but code which triggers it should generally be considered incorrect.
+    ///
+    /// Note that this error is returned by [`Handle::execute()`], but transactions whose
+    /// `check` involves accessing handles will instead produce [`ExecuteError::Check`]s.
+    /// This may change in the future.
+    Handle(HandleError),
 }
 
 // Manual impl required to set proper associated type bounds.
@@ -230,6 +243,7 @@ where
             Self::Merge(e) => Self::Merge(e.clone()),
             Self::Check(e) => Self::Check(e.clone()),
             Self::Commit(e) => Self::Commit(e.clone()),
+            Self::Handle(e) => Self::Handle(e.clone()),
         }
     }
 }
@@ -244,6 +258,7 @@ crate::util::cfg_should_impl_error! {
                 ExecuteError::Merge(e) => e.source(),
                 ExecuteError::Check(e) => e.source(),
                 ExecuteError::Commit(e) => e.source(),
+                ExecuteError::Handle(e) => e.source(),
             }
         }
     }
@@ -258,6 +273,7 @@ where
             Self::Merge(e) => f.debug_tuple("Merge").field(e).finish(),
             Self::Check(e) => f.debug_tuple("Check").field(e).finish(),
             Self::Commit(e) => f.debug_tuple("Commit").field(e).finish(),
+            Self::Handle(e) => f.debug_tuple("Handle").field(e).finish(),
         }
     }
 }
@@ -271,6 +287,7 @@ where
             ExecuteError::Merge(e) => e.fmt(f),
             ExecuteError::Check(e) => e.fmt(f),
             ExecuteError::Commit(e) => e.fmt(f),
+            ExecuteError::Handle(e) => e.fmt(f),
         }
     }
 }

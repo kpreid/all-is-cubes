@@ -216,9 +216,10 @@ impl<T: 'static> Handle<T> {
 
     /// Execute the given transaction on the referent.
     ///
-    /// Returns an error if the transaction's preconditions were not met, if the
-    /// referent was already borrowed (which is denoted as an [`ExecuteError::Check`]),
-    /// or if the transaction encountered an unexpected error.
+    /// Returns an error if the transaction's preconditions are not met,
+    /// if the transaction encountered an internal error, or if the referent
+    /// was already being read or written (which is expressed as an
+    /// [`ExecuteError::Commit`], because it is a shouldn’t-happen kind of error).
     #[inline(never)]
     pub fn execute(
         &self,
@@ -226,23 +227,16 @@ impl<T: 'static> Handle<T> {
     ) -> Result<(), ExecuteError<<T as Transactional>::Transaction>>
     where
         T: Transactional,
-        // TODO: relax `Mismatch` bound and use a wrapper type instead, when custom error types are actually in use
-        //
         // `Output = NoOutput` is required because, if there *were* outputs,
         // they would need to be directed to some destination in the `Universe`,
         // not the caller.
-        T::Transaction: Transaction<Mismatch = PreconditionFailed, Output = transaction::NoOutput>,
+        T::Transaction: Transaction<Output = transaction::NoOutput>,
     {
         let outcome: Result<
             Result<(), ExecuteError<<T as Transactional>::Transaction>>,
             HandleError,
         > = self.try_modify(|data| transaction.execute(data, &mut transaction::no_outputs));
-        outcome.map_err(|_| {
-            ExecuteError::Check(PreconditionFailed {
-                location: "Handle::execute()",
-                problem: "target is currently in use",
-            })
-        })?
+        outcome.map_err(ExecuteError::Handle)?
     }
 
     fn upgrade(&self) -> Result<StrongEntryRef<T>, HandleError> {
