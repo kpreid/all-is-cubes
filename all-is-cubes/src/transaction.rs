@@ -294,11 +294,11 @@ crate::util::cfg_should_impl_error! {
 }
 
 /// Type of “unexpected errors” from [`Transaction::commit()`].
-//
-/// Design note: `CommitError` doesn't need to be cheap because it should never happen
-/// during normal game operation; it exists because we want to do better than panicking
-/// if it does, and give a report that's detailed enough that someone might be able to
-/// fix the underlying bug.
+//---
+// Design note: `CommitError` doesn't need to be cheap because it should never happen
+// during normal game operation; it exists because we want to do better than panicking
+// if it does, and give a report that's detailed enough that someone might be able to
+// fix the underlying bug.
 #[derive(Clone, Debug, displaydoc::Display)]
 #[displaydoc("Unexpected error while committing a transaction")]
 pub struct CommitError(CommitErrorKind);
@@ -315,7 +315,7 @@ enum CommitErrorKind {
         transaction_type: &'static str,
         message: String,
     },
-    /// A transaction forwarded an error to one of its parts and that failed.
+    /// One of the component transactions in this transaction failed.
     #[displaydoc("in transaction part '{component}'")]
     Context {
         component: String,
