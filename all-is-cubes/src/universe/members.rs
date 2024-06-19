@@ -308,6 +308,7 @@ macro_rules! member_enums_and_impls {
             type Target = ();
             type CommitCheck = ut::AnyTransactionCheck;
             type Output = transaction::NoOutput;
+            type Mismatch = transaction::PreconditionFailed;
 
             fn check(
                 &self,

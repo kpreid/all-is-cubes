@@ -51,10 +51,13 @@ pub(in crate::universe) struct TransactionInUniverse<O: Transactional + 'static>
 impl<O> Transaction for TransactionInUniverse<O>
 where
     O: Transactional + 'static,
+    // TODO: relax this bound and use a wrapper type instead, when custom error types are actually in use
+    O::Transaction: Transaction<Mismatch = PreconditionFailed>,
 {
     type Target = ();
     type CommitCheck = TransactionInUniverseCheck<O>;
     type Output = <O::Transaction as Transaction>::Output;
+    type Mismatch = PreconditionFailed;
 
     fn check(&self, _dummy_target: &()) -> Result<Self::CommitCheck, PreconditionFailed> {
         let guard = self
@@ -403,6 +406,7 @@ impl Transaction for UniverseTransaction {
     type Target = Universe;
     type CommitCheck = UniverseCommitCheck;
     type Output = transaction::NoOutput;
+    type Mismatch = PreconditionFailed;
 
     fn check(&self, target: &Universe) -> Result<Self::CommitCheck, PreconditionFailed> {
         if let Some(universe_id) = self.universe_id() {

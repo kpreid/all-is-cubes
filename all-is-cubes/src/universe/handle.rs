@@ -227,6 +227,8 @@ impl<T: 'static> Handle<T> {
     ) -> Result<(), ExecuteError<<T as Transactional>::Transaction>>
     where
         T: Transactional,
+        // TODO: relax this bound and use a wrapper type instead, when custom error types are actually in use
+        T::Transaction: Transaction<Mismatch = PreconditionFailed>,
     {
         let outcome: Result<
             Result<(), ExecuteError<<T as Transactional>::Transaction>>,

@@ -318,6 +318,7 @@ impl Transaction for BlockDefTransaction {
     type Target = BlockDef;
     type CommitCheck = ();
     type Output = transaction::NoOutput;
+    type Mismatch = transaction::PreconditionFailed;
 
     fn check(
         &self,

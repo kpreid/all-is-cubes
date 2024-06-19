@@ -2,7 +2,7 @@ use alloc::collections::BTreeMap;
 use core::hash::Hash;
 use core::{fmt, mem};
 
-use crate::transaction::{Merge, NoOutput, PreconditionFailed, Transaction};
+use crate::transaction::{Merge, NoOutput, Transaction};
 
 /// Transaction conflict error type for transactions on map types such as [`BTreeMap`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -167,16 +167,22 @@ macro_rules! impl_transaction_for_tuple {
                     $( <[<Tr $name>] as Transaction>::CommitCheck, )*
                 );
                 type Output = NoOutput;
+                type Mismatch = [< TupleError $count >]<
+                $( <[<Tr $name >] as Transaction>::Mismatch, )*
+            >;
 
                 fn check(
                     &self,
                     #[allow(unused_variables)] // empty tuple case
                     target: &($( [<Tr $name>]::Target, )*),
-                ) -> Result<Self::CommitCheck, PreconditionFailed> {
+                ) -> Result<Self::CommitCheck, Self::Mismatch> {
                     let ($( [<txn_ $name>], )*) = self;
                     let ($( [<target_ $name>], )*) = target;
                     Ok((
-                        $( [<txn_ $name>].check([<target_ $name>])?, )*
+                        $(
+                            [<txn_ $name>].check([<target_ $name>])
+                                .map_err([< TupleError $count >]::[<At $name>])?,
+                        )*
                     ))
                 }
 
@@ -225,6 +231,15 @@ macro_rules! impl_transaction_for_tuple {
                 }
             }
 
+            #[doc = concat!("Transaction precondition error type for tuples of length ", $count, ".")]
+            #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+            #[allow(clippy::exhaustive_enums)]
+            pub enum [< TupleError $count >]<$( [<E $name>], )*> {
+                $(
+                    #[doc = concat!("Error at tuple element ", $name, ".")]
+                    [<At $name>]([<E $name>]),
+                )*
+            }
             #[doc = concat!("Transaction conflict error type for tuples of length ", $count, ".")]
             #[derive(Clone, Copy, Debug, Eq, PartialEq)]
             #[allow(clippy::exhaustive_enums)]
@@ -238,12 +253,30 @@ macro_rules! impl_transaction_for_tuple {
             // TODO: TupleConflict should have its own message to report the position,
             // instead of delegating.
             crate::util::cfg_should_impl_error! {
+                impl<$( [<E $name>]: std::error::Error, )*> std::error::Error for
+                        [< TupleError $count >]<$( [<E $name>], )*> {
+                    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                        match *self {
+                            $( Self::[<At $name>](ref [<e $name>]) => [<e $name>].source(), )*
+                        }
+                    }
+                }
+
                 impl<$( [<C $name>]: std::error::Error, )*> std::error::Error for
                         [< TupleConflict $count >]<$( [<C $name>], )*> {
                     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
                         match *self {
                             $( Self::[<At $name>](ref [<c $name>]) => [<c $name>].source(), )*
                         }
+                    }
+                }
+            }
+
+            impl<$( [<E $name>]: fmt::Display, )*> fmt::Display for
+                    [< TupleError $count >]<$( [<E $name>], )*> {
+                fn fmt(&self, #[allow(unused)] f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    match *self {
+                        $( Self::[<At $name>](ref [<e $name>]) => [<e $name>].fmt(f), )*
                     }
                 }
             }
@@ -275,10 +308,10 @@ impl_transaction_for_tuple!(6: 0, 1, 2, 3, 4, 5);
 impl Transaction for () {
     type Target = ();
     type CommitCheck = ();
-
     type Output = core::convert::Infallible;
+    type Mismatch = core::convert::Infallible;
 
-    fn check(&self, (): &()) -> Result<Self::CommitCheck, PreconditionFailed> {
+    fn check(&self, (): &()) -> Result<Self::CommitCheck, Self::Mismatch> {
         Ok(())
     }
 

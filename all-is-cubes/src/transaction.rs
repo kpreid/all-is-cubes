@@ -52,12 +52,25 @@ pub trait Transaction: Merge {
     /// owner's [`Notifier`](crate::listen::Notifier).
     type Output;
 
+    /// Error type describing a precondition not met, returned by [`Self::check()`].
+    ///
+    /// This type should be cheap to construct and drop (hopefully `Copy`) if at all
+    /// possible, because checks may be done very frequently during simulation; not every
+    /// such failure is an error of interest to the user.
+    ///
+    /// Accordingly, it might not describe the _entire_ set of unmet preconditions,
+    /// but only one example from it, so as to avoid needing to allocate a
+    /// data structure of arbitrary size.
+    ///
+    /// This type should implement [`std::error::Error`] when possible.
+    type Mismatch: fmt::Debug + fmt::Display + 'static;
+
     /// Checks whether the target's current state meets the preconditions and returns
-    /// [`Err`] if it does not. (TODO: Informative error return type.)
+    /// [`Err`] if it does not.
     ///
     /// If the preconditions are met, returns [`Ok`] containing data to be passed to
     /// [`Transaction::commit`].
-    fn check(&self, target: &Self::Target) -> Result<Self::CommitCheck, PreconditionFailed>;
+    fn check(&self, target: &Self::Target) -> Result<Self::CommitCheck, Self::Mismatch>;
 
     /// Perform the mutations specified by this transaction. The `check` value should have
     /// been created by a prior call to [`Transaction::check()`].
@@ -190,7 +203,7 @@ pub trait Merge: Sized {
 
 /// Error type from [`Transaction::execute()`] and [`Transactional::transact()`].
 #[allow(clippy::exhaustive_enums)]
-pub enum ExecuteError<Txn: Merge = UniverseTransaction> {
+pub enum ExecuteError<Txn: Transaction = UniverseTransaction> {
     /// A conflict was discovered between parts that were to be assembled into the transaction.
     ///
     /// This error cannot be produced by [`Transaction::execute()`], but only by
@@ -199,7 +212,7 @@ pub enum ExecuteError<Txn: Merge = UniverseTransaction> {
 
     /// The transaction's preconditions were not met; it does not apply to the current
     /// state of the target. No change has been made.
-    Check(PreconditionFailed),
+    Check(<Txn as Transaction>::Mismatch),
 
     /// An unexpected error occurred while applying the transaction's effects.
     /// See the documentation of [`Transaction::commit()`] for the unfortunate
@@ -210,7 +223,7 @@ pub enum ExecuteError<Txn: Merge = UniverseTransaction> {
 // Manual impl required to set proper associated type bounds.
 impl<Txn> Clone for ExecuteError<Txn>
 where
-    Txn: Merge<Conflict: Clone>,
+    Txn: Transaction<Mismatch: Clone> + Merge<Conflict: Clone>,
 {
     fn clone(&self) -> Self {
         match self {
@@ -224,7 +237,7 @@ where
 crate::util::cfg_should_impl_error! {
     impl<Txn> std::error::Error for ExecuteError<Txn>
     where
-        Txn: Merge<Conflict: std::error::Error + 'static>,
+        Txn: Transaction<Mismatch: std::error::Error + 'static> + Merge<Conflict: std::error::Error + 'static>,
     {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             match self {
@@ -238,7 +251,7 @@ crate::util::cfg_should_impl_error! {
 
 impl<Txn> fmt::Debug for ExecuteError<Txn>
 where
-    Txn: Merge<Conflict: fmt::Debug>,
+    Txn: Transaction<Mismatch: fmt::Debug> + Merge<Conflict: fmt::Debug>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -251,7 +264,7 @@ where
 
 impl<Txn> fmt::Display for ExecuteError<Txn>
 where
-    Txn: Merge<Conflict: fmt::Display>,
+    Txn: Transaction<Mismatch: fmt::Display> + Merge<Conflict: fmt::Display>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

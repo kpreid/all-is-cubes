@@ -704,6 +704,7 @@ impl Transaction for BodyTransaction {
     type Target = Body;
     type CommitCheck = ();
     type Output = transaction::NoOutput;
+    type Mismatch = transaction::PreconditionFailed;
 
     fn check(&self, _body: &Body) -> Result<Self::CommitCheck, transaction::PreconditionFailed> {
         // No conflicts currently possible.

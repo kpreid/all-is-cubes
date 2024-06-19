@@ -577,6 +577,7 @@ impl<H: BehaviorHost> Transaction for BehaviorSetTransaction<H> {
     type Target = BehaviorSet<H>;
     type CommitCheck = CommitCheck;
     type Output = transaction::NoOutput;
+    type Mismatch = transaction::PreconditionFailed;
 
     #[allow(ambiguous_wide_pointer_comparisons)] // The hazards should be okay for this use case
     fn check(

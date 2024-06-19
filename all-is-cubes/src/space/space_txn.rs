@@ -175,6 +175,7 @@ impl Transaction for SpaceTransaction {
     type Target = Space;
     type CommitCheck = <BehaviorSetTransaction<Space> as Transaction>::CommitCheck;
     type Output = NoOutput;
+    type Mismatch = PreconditionFailed;
 
     fn check(&self, space: &Space) -> Result<Self::CommitCheck, PreconditionFailed> {
         for (

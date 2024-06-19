@@ -733,6 +733,7 @@ impl Transaction for CharacterTransaction {
         <BehaviorSetTransaction<Character> as Transaction>::CommitCheck,
     );
     type Output = transaction::NoOutput;
+    type Mismatch = PreconditionFailed;
 
     fn check(&self, target: &Character) -> Result<Self::CommitCheck, PreconditionFailed> {
         let Self {

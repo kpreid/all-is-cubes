@@ -362,6 +362,7 @@ impl Transaction for InventoryTransaction {
     type Target = Inventory;
     type CommitCheck = Option<InventoryCheck>;
     type Output = InventoryChange;
+    type Mismatch = PreconditionFailed;
 
     fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, PreconditionFailed> {
         // Don't do the expensive copy if we have one already
