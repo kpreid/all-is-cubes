@@ -74,6 +74,8 @@
     - `transaction::ExecuteError` is now generic over the type of transaction it is an error from.
     - `transaction::Transaction` now has an associated type `Target` instead of a type parameter; it is no longer possible for a transaction type to be used with more than one target type.
 
+    - `universe::Handle::execute()` no longer takes a useless `outputs` parameter.
+
     - Renamed `universe::URef` to `universe::Handle`. Related items have also been renamed:
         - `URefErased` to `ErasedHandle`
         - `AnyURef` to `AnyHandle`

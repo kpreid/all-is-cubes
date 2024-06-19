@@ -144,16 +144,10 @@ fn insert_anonymous_makes_distinct_names() {
     let handle_a = u.insert_anonymous(BlockDef::new(AIR));
     let handle_b = u.insert_anonymous(BlockDef::new(AIR));
     handle_a
-        .execute(
-            &BlockDefTransaction::overwrite(block_0),
-            &mut transaction::no_outputs,
-        )
+        .execute(&BlockDefTransaction::overwrite(block_0))
         .unwrap();
     handle_b
-        .execute(
-            &BlockDefTransaction::overwrite(block_1),
-            &mut transaction::no_outputs,
-        )
+        .execute(&BlockDefTransaction::overwrite(block_1))
         .unwrap();
     assert_ne!(handle_a, handle_b, "not equal");
     assert_ne!(

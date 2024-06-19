@@ -90,10 +90,9 @@ fn inventory_transaction() {
 
     let item = Tool::InfiniteBlocks(AIR);
     character_handle
-        .execute(
-            &CharacterTransaction::inventory(InventoryTransaction::insert([item.clone()])),
-            &mut transaction::no_outputs,
-        )
+        .execute(&CharacterTransaction::inventory(
+            InventoryTransaction::insert([item.clone()]),
+        ))
         .unwrap();
 
     // Check notification

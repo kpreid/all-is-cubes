@@ -670,9 +670,7 @@ mod tests {
                 self.character().inventory().slots[index].clone(),
                 stack.into(),
             ));
-            self.character_handle
-                .execute(&insert_txn, &mut transaction::no_outputs)
-                .unwrap();
+            self.character_handle.execute(&insert_txn).unwrap();
 
             // Invoke Inventory::use_tool, which knows how to assemble the answer into a
             // single transaction.
@@ -945,10 +943,11 @@ mod tests {
             // Place the obstacle after the raycast
             tester
                 .space_handle()
-                .execute(
-                    &SpaceTransaction::set_cube([0, 0, 0], None, Some(obstacle.clone())),
-                    &mut transaction::no_outputs,
-                )
+                .execute(&SpaceTransaction::set_cube(
+                    [0, 0, 0],
+                    None,
+                    Some(obstacle.clone()),
+                ))
                 .unwrap();
             assert_eq!(tester.equip_and_use_tool(tool), Err(ToolError::Obstacle));
             print_space(&tester.space(), [-1., 1., 1.]);

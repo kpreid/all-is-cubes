@@ -206,8 +206,8 @@ pub enum WatcherChange {
 mod tests {
     use super::*;
     use all_is_cubes::character::CharacterTransaction;
+    use all_is_cubes::inv;
     use all_is_cubes::space::Space;
-    use all_is_cubes::{inv, transaction};
 
     struct Tester {
         universe: Universe,
@@ -252,12 +252,9 @@ mod tests {
 
         // Make a change to the character and observe update
         t.character
-            .execute(
-                &CharacterTransaction::inventory(inv::InventoryTransaction::insert([
-                    inv::Tool::Activate,
-                ])),
-                &mut transaction::no_outputs,
-            )
+            .execute(&CharacterTransaction::inventory(
+                inv::InventoryTransaction::insert([inv::Tool::Activate]),
+            ))
             .unwrap();
         assert_eq!(t.sink.drain(), vec![WatcherChange::NeedsUpdate]);
         t.watcher.update();
@@ -273,12 +270,9 @@ mod tests {
             .universe
             .insert_anonymous(Character::spawn_default(t.space));
         new_character
-            .execute(
-                &CharacterTransaction::inventory(inv::InventoryTransaction::insert([
-                    inv::Tool::Activate,
-                ])),
-                &mut transaction::no_outputs,
-            )
+            .execute(&CharacterTransaction::inventory(
+                inv::InventoryTransaction::insert([inv::Tool::Activate]),
+            ))
             .unwrap();
 
         t.character_cell.set(Some(new_character.clone()));

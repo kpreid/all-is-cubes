@@ -1301,7 +1301,6 @@ mod tests {
     use crate::apps::Key;
     use all_is_cubes::character::CharacterTransaction;
     use all_is_cubes::math::Cube;
-    use all_is_cubes::transaction::no_outputs;
     use all_is_cubes::universe::Name;
     use all_is_cubes::util::assert_send_sync;
     use futures_channel::oneshot;
@@ -1337,22 +1336,19 @@ mod tests {
         session.listen_fluff(sink.listener());
 
         // Try some fluff with the initial state (we haven't even stepped the session)
-        space1.execute(&st, &mut no_outputs).unwrap();
+        space1.execute(&st).unwrap();
         assert_eq!(sink.drain(), vec![Fluff::Happened]);
 
         // Change spaces
         character
-            .execute(
-                &CharacterTransaction::move_to_space(space2.clone()),
-                &mut no_outputs,
-            )
+            .execute(&CharacterTransaction::move_to_space(space2.clone()))
             .unwrap();
         session.maybe_step_universe();
 
         // Check we're now listening to the new space only
-        space1.execute(&st, &mut no_outputs).unwrap();
+        space1.execute(&st).unwrap();
         assert_eq!(sink.drain(), vec![]);
-        space2.execute(&st, &mut no_outputs).unwrap();
+        space2.execute(&st).unwrap();
         assert_eq!(sink.drain(), vec![Fluff::Happened]);
     }
 

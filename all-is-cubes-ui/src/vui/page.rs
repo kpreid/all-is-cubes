@@ -10,7 +10,6 @@ use all_is_cubes::euclid::{size2, Size2D};
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridSize, Rgba};
 use all_is_cubes::space::{self, Space, SpaceBuilder, SpacePhysics};
 use all_is_cubes::time;
-use all_is_cubes::transaction;
 use all_is_cubes::universe::{Handle, Universe};
 
 use crate::vui::{
@@ -158,7 +157,7 @@ impl PageInst {
         // TODO: error handling for layout
         let txn = install_widgets(LayoutGrant::new(size.space_bounds()), &self.tree)?;
         space
-            .execute(&txn, &mut transaction::no_outputs)
+            .execute(&txn)
             .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;
 
         // Initialize lighting

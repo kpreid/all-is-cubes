@@ -12,8 +12,8 @@ use all_is_cubes::listen::Listener as _;
 use all_is_cubes::math::{notnan, GridPoint, NotNan};
 use all_is_cubes::math::{Cube, FreePoint, GridAab, GridCoordinate};
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange, SpaceTransaction};
+use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, Universe};
-use all_is_cubes::{time, transaction};
 
 use crate::texture::NoTextures;
 use crate::{dynamic, testing};
@@ -237,10 +237,11 @@ fn sort_view_every_frame_only_if_transparent() {
     });
     tester
         .space
-        .execute(
-            &SpaceTransaction::set_cube([0, 0, 0], None, Some(color_block!(1.0, 1.0, 1.0, 0.5))),
-            &mut transaction::no_outputs,
-        )
+        .execute(&SpaceTransaction::set_cube(
+            [0, 0, 0],
+            None,
+            Some(color_block!(1.0, 1.0, 1.0, 0.5)),
+        ))
         .unwrap();
     let mut did_call = false;
     tester.update(|u| {
@@ -438,15 +439,12 @@ fn instances_dont_dirty_mesh_when_block_changes() {
 
     // Make a change to the block defunition...
     anim_def
-        .execute(
-            &BlockDefTransaction::overwrite(
-                Block::builder()
-                    .display_name("replaced")
-                    .color(will_be_anim.color())
-                    .build(),
-            ),
-            &mut transaction::no_outputs,
-        )
+        .execute(&BlockDefTransaction::overwrite(
+            Block::builder()
+                .display_name("replaced")
+                .color(will_be_anim.color())
+                .build(),
+        ))
         .unwrap();
 
     // ...and an update should not include updating any meshes.
@@ -489,10 +487,11 @@ fn instances_dont_dirty_mesh_when_space_changes() {
     // Make a change to the space...
     tester
         .space
-        .execute(
-            &SpaceTransaction::set_cube([1, 0, 0], Some(anim.clone()), Some(AIR)),
-            &mut transaction::no_outputs,
-        )
+        .execute(&SpaceTransaction::set_cube(
+            [1, 0, 0],
+            Some(anim.clone()),
+            Some(AIR),
+        ))
         .unwrap();
 
     // ...and an update should not include updating any meshes.

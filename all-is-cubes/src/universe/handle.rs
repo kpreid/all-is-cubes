@@ -3,7 +3,7 @@ use core::fmt;
 use core::hash;
 use core::ops::{Deref, DerefMut};
 
-use crate::transaction::{ExecuteError, PreconditionFailed, Transaction, Transactional};
+use crate::transaction::{self, ExecuteError, PreconditionFailed, Transaction, Transactional};
 use crate::universe::{
     owning_guard, AnyHandle, InsertError, InsertErrorKind, Name, Universe, UniverseId,
     UniverseMember, VisitHandles,
@@ -223,17 +223,20 @@ impl<T: 'static> Handle<T> {
     pub fn execute(
         &self,
         transaction: &<T as Transactional>::Transaction,
-        outputs: &mut dyn FnMut(<<T as Transactional>::Transaction as Transaction>::Output),
     ) -> Result<(), ExecuteError<<T as Transactional>::Transaction>>
     where
         T: Transactional,
-        // TODO: relax this bound and use a wrapper type instead, when custom error types are actually in use
-        T::Transaction: Transaction<Mismatch = PreconditionFailed>,
+        // TODO: relax `Mismatch` bound and use a wrapper type instead, when custom error types are actually in use
+        //
+        // `Output = NoOutput` is required because, if there *were* outputs,
+        // they would need to be directed to some destination in the `Universe`,
+        // not the caller.
+        T::Transaction: Transaction<Mismatch = PreconditionFailed, Output = transaction::NoOutput>,
     {
         let outcome: Result<
             Result<(), ExecuteError<<T as Transactional>::Transaction>>,
             HandleError,
-        > = self.try_modify(|data| transaction.execute(data, outputs));
+        > = self.try_modify(|data| transaction.execute(data, &mut transaction::no_outputs));
         outcome.map_err(|_| {
             ExecuteError::Check(PreconditionFailed {
                 location: "Handle::execute()",

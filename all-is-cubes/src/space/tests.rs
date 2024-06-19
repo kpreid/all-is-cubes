@@ -410,10 +410,7 @@ fn listens_to_block_changes() {
     let new_block = color_block!(Rgba::BLACK);
     let new_evaluated = new_block.evaluate().unwrap();
     block_def_handle
-        .execute(
-            &BlockDefTransaction::overwrite(new_block),
-            &mut transaction::no_outputs,
-        )
+        .execute(&BlockDefTransaction::overwrite(new_block))
         .unwrap();
     // This does not result in an outgoing notification, because we don't want
     // computations like reevaluation to happen during the notification process.
@@ -445,7 +442,7 @@ fn indirect_becomes_evaluation_error() {
 
     // Make the block def refer to itself, guaranteeing an evaluation error
     block_def_ref
-        .execute(&BlockDefTransaction::overwrite(block.clone()), &mut drop)
+        .execute(&BlockDefTransaction::overwrite(block.clone()))
         .unwrap();
 
     // Step the space to let it notice.
