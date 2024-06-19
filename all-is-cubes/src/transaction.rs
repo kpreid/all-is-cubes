@@ -292,6 +292,24 @@ where
     }
 }
 
+/// Note: [`ExecuteError::Commit`] never compares equal, because it contains
+/// arbitrary errors which may not implement [`PartialEq`].
+/// TODO: push this down to `impl PartialEq for CommitError` for more precision.
+impl<Txn> PartialEq for ExecuteError<Txn>
+where
+    Txn: Transaction<Mismatch: PartialEq> + Merge<Conflict: PartialEq>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Merge(a), Self::Merge(b)) => a == b,
+            (Self::Check(a), Self::Check(b)) => a == b,
+            (Self::Commit(_), Self::Commit(_)) => false,
+            (Self::Handle(a), Self::Handle(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
 /// Error type returned by [`Transaction::check`].
 ///
 /// Note: This type is designed to be cheap to construct, as it is expected that game

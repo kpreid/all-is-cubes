@@ -222,7 +222,7 @@ pub struct UniverseCommitCheck {
 }
 
 /// Transaction conflict error type for [`UniverseTransaction`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum UniverseConflict {
     /// The two transactions modify members of different [`Universe`]s.
@@ -843,6 +843,7 @@ mod tests {
     use crate::space::SpaceTransaction;
     use crate::space::SpaceTransactionConflict;
     use crate::transaction::{ExecuteError, MapConflict, TransactionTester};
+    use crate::universe::HandleError;
     use alloc::sync::Arc;
     use indoc::indoc;
 
@@ -1135,5 +1136,24 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn handle_error_from_handle_execute() {
+        let e = Handle::<Space>::new_gone("foo".into())
+            .execute(&SpaceTransaction::default())
+            .unwrap_err();
+
+        assert_eq!(e, ExecuteError::Handle(HandleError::Gone("foo".into())));
+    }
+
+    // This is not specifically desirable, but more work will be needed to avoid it
+    #[test]
+    #[should_panic = "Attempted to execute transaction with target already borrowed: Gone(Specific(\"foo\"))"]
+    fn handle_error_from_universe_txn() {
+        let mut u = Universe::new();
+        let txn = SpaceTransaction::default().bind(Handle::<Space>::new_gone("foo".into()));
+
+        _ = txn.execute(&mut u, &mut transaction::no_outputs);
     }
 }
