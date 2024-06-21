@@ -441,7 +441,6 @@ impl Universe {
     /// a reference to it.
     pub fn insert_anonymous<T>(&mut self, value: T) -> Handle<T>
     where
-        Self: UniverseOps<T>,
         T: UniverseMember,
     {
         self.insert(Name::Pending, value)
@@ -465,10 +464,11 @@ impl Universe {
     /// Returns an error if the name is already in use.
     pub fn insert<T>(&mut self, name: Name, value: T) -> Result<Handle<T>, InsertError>
     where
-        Self: UniverseOps<T>,
         T: UniverseMember,
     {
-        UniverseOps::insert(self, name, value)
+        let handle = Handle::new_pending(name, value);
+        handle.to_any_handle().insert_and_upgrade_pending(self)?;
+        Ok(handle)
     }
 
     /// Returns a `Handle` to a member whose referent may or may not be deserialized yet.

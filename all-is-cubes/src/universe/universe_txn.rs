@@ -749,7 +749,7 @@ impl MemberTxn {
             MemberTxn::Insert(pending_handle) => {
                 pending_handle
                     .insert_and_upgrade_pending(universe)
-                    .map_err(CommitError::catch::<Self, _>)?;
+                    .map_err(CommitError::catch::<UniverseTransaction, InsertError>)?;
                 Ok(())
             }
             MemberTxn::Delete => {
@@ -784,14 +784,12 @@ impl MemberTxn {
 pub(in crate::universe) fn any_handle_insert_and_upgrade_pending<T>(
     universe: &mut Universe,
     pending_handle: &Handle<T>,
-) -> Result<(), CommitError>
+) -> Result<(), InsertError>
 where
     T: 'static,
     Universe: UniverseTable<T, Table = super::Storage<T>>,
 {
-    let new_root_handle = pending_handle.upgrade_pending(universe).map_err(|e| {
-        CommitError::message::<UniverseTransaction>(format!("insert() unable to upgrade: {e}"))
-    })?;
+    let new_root_handle = pending_handle.upgrade_pending(universe)?;
 
     UniverseTable::<T>::table_mut(universe).insert(pending_handle.name(), new_root_handle);
     universe.wants_gc = true;

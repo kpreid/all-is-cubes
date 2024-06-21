@@ -68,8 +68,6 @@ where
 
     fn get(&self, name: &Name) -> Option<Handle<T>>;
 
-    fn insert(&mut self, name: Name, value: T) -> Result<Handle<T>, InsertError>;
-
     fn iter_by_type(&self) -> UniverseIter<'_, T>;
 }
 
@@ -98,33 +96,6 @@ where
     <Universe as UniverseTable<T>>::table(this)
         .get(name)
         .map(RootHandle::downgrade)
-}
-/// Implementation of inserting an item in a universe.
-/// Note that the same logic also exists in `UniverseTransaction`.
-pub(super) fn ops_insert<T>(
-    this: &mut Universe,
-    mut name: Name,
-    value: T,
-) -> Result<Handle<T>, InsertError>
-where
-    Universe: UniverseTable<T, Table = Storage<T>>,
-{
-    use alloc::collections::btree_map::Entry::*;
-
-    name = this.allocate_name(&name)?;
-
-    this.wants_gc = true;
-
-    let id = this.id;
-    match this.table_mut().entry(name.clone()) {
-        Occupied(_) => unreachable!(/* should have already checked for existence */),
-        Vacant(vacant) => {
-            let root_handle = RootHandle::new(id, name, value);
-            let returned_handle = root_handle.downgrade();
-            vacant.insert(root_handle);
-            Ok(returned_handle)
-        }
-    }
 }
 
 /// Generates impls for a specific Universe member type.
@@ -161,13 +132,6 @@ macro_rules! impl_universe_for_member {
         impl UniverseOps<$member_type> for Universe {
             fn get(&self, name: &Name) -> Option<Handle<$member_type>> {
                 ops_get(self, name)
-            }
-            fn insert(
-                &mut self,
-                name: Name,
-                value: $member_type,
-            ) -> Result<Handle<$member_type>, InsertError> {
-                ops_insert(self, name, value)
             }
             fn iter_by_type(&self) -> UniverseIter<'_, $member_type> {
                 UniverseIter(UniverseTable::<$member_type>::table(self).iter())
@@ -254,7 +218,7 @@ macro_rules! member_enums_and_impls {
             pub(crate) fn insert_and_upgrade_pending(
                 &self,
                 universe: &mut Universe,
-            ) -> Result<(), transaction::CommitError> {
+            ) -> Result<(), InsertError> {
                 match self {
                     $( AnyHandle::$member_type(pending_handle) => {
                         ut::any_handle_insert_and_upgrade_pending(universe, pending_handle)

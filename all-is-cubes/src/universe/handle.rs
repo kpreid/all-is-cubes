@@ -605,6 +605,7 @@ pub(super) struct UEntry<T> {
 
 /// The unique reference to an entry in a [`Universe`] from that `Universe`.
 /// Normal usage is via [`Handle`] instead.
+/// Construct this using [`Handle::upgrade_pending()`].
 ///
 /// This is essentially a strong-reference version of [`Handle`] (which is weak).
 #[derive(Debug)]
@@ -614,15 +615,6 @@ pub(crate) struct RootHandle<T> {
 }
 
 impl<T> RootHandle<T> {
-    pub(super) fn new(universe_id: UniverseId, name: Name, initial_value: T) -> Self {
-        RootHandle {
-            strong_ref: Arc::new(RwLock::new(UEntry {
-                data: Some(initial_value),
-            })),
-            state: Arc::new(Mutex::new(State::Member { name, universe_id })),
-        }
-    }
-
     /// Construct a root with no value for mid-deserialization states.
     #[cfg(feature = "save")]
     pub(super) fn new_deserializing(universe_id: UniverseId, name: Name) -> Self {
@@ -770,6 +762,7 @@ mod tests {
     use crate::color_block;
     use crate::math::Rgba;
     use crate::space::Space;
+    use crate::universe::UniverseTransaction;
     use alloc::string::ToString;
     use pretty_assertions::assert_eq;
 
@@ -888,26 +881,34 @@ mod tests {
         );
     }
 
+    /// Handles are compared by pointer (each `Handle::new_pending()` is a new identity),
+    /// not by name or member-value.
     #[test]
     #[allow(clippy::eq_op)]
     fn handle_equality_is_pointer_equality() {
-        let uid = UniverseId::new();
-        let root_a = RootHandle::new(uid, "space".into(), Space::empty_positive(1, 1, 1));
-        let root_b = RootHandle::new(uid, "space".into(), Space::empty_positive(1, 1, 1));
-        let handle_a_1 = root_a.downgrade();
-        let handle_a_2 = root_a.downgrade();
-        let handle_b_1 = root_b.downgrade();
-        assert_eq!(handle_a_1, handle_a_1, "reflexive eq");
-        assert_eq!(handle_a_1, handle_a_2, "separately constructed are equal");
-        assert!(handle_a_1 != handle_b_1, "not equal");
-    }
+        let handle_a_1 = Handle::new_pending("space".into(), Space::empty_positive(1, 1, 1));
+        let handle_a_2 = handle_a_1.clone();
+        let handle_b_1 = Handle::new_pending("space".into(), Space::empty_positive(1, 1, 1));
 
-    #[test]
-    #[allow(clippy::eq_op)]
-    fn pending_handle_equality_is_pointer_equality() {
-        let handle_a = Handle::new_pending("space".into(), Space::empty_positive(1, 1, 1));
-        let handle_b = Handle::new_pending("space".into(), Space::empty_positive(1, 1, 1));
-        assert_eq!(handle_a, handle_a, "reflexive eq");
-        assert!(handle_a != handle_b, "not equal");
+        assert_eq!(handle_a_1, handle_a_1, "reflexive eq");
+        assert_eq!(handle_a_1, handle_a_2, "clones are equal");
+        assert!(handle_a_1 != handle_b_1, "not equal");
+
+        // Try again but with the handles having been inserted into a universe --
+        // consecutively, because they have the same name and would conflict.
+        let mut universe = Universe::new();
+        for txn in [
+            UniverseTransaction::insert(handle_a_1.clone()),
+            UniverseTransaction::delete(handle_a_1.clone()),
+            UniverseTransaction::insert(handle_b_1.clone()),
+            UniverseTransaction::delete(handle_b_1.clone()),
+        ] {
+            txn.execute(&mut universe, &mut transaction::no_outputs)
+                .unwrap()
+        }
+
+        assert_eq!(handle_a_1, handle_a_1, "reflexive eq");
+        assert_eq!(handle_a_1, handle_a_2, "clones are equal");
+        assert!(handle_a_1 != handle_b_1, "not equal");
     }
 }
