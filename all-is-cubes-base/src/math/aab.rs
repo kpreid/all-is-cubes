@@ -27,8 +27,6 @@ pub struct Aab {
     // The upper > lower checks will reject NaNs anyway.
     lower_bounds: FreePoint,
     upper_bounds: FreePoint,
-    // TODO: revisit which things we should be precalculating
-    sizes: Size3D<FreeCoordinate, Cube>,
 }
 
 impl Aab {
@@ -36,7 +34,6 @@ impl Aab {
     pub const ZERO: Aab = Aab {
         lower_bounds: Point3D::new(0., 0., 0.),
         upper_bounds: Point3D::new(0., 0., 0.),
-        sizes: Size3D::new(0., 0., 0.),
     };
 
     /// Constructs an [`Aab`] from individual coordinates.
@@ -85,11 +82,9 @@ impl Aab {
             && lower_bounds.y <= upper_bounds.y
             && lower_bounds.z <= upper_bounds.z
         {
-            let sizes = Size3D::from(upper_bounds - lower_bounds);
             Some(Self {
                 lower_bounds,
                 upper_bounds,
-                sizes,
             })
         } else {
             None
@@ -139,9 +134,16 @@ impl Aab {
 
     /// Size of the box in each axis; equivalent to
     /// `self.upper_bounds() - self.lower_bounds()`.
+    ///
+    /// Note that due to floating-point rounding, translating one corner point by the size
+    /// does not necessarily exactly reach the opposite corner.
+    /// (See the [Sterbenz lemma](https://en.wikipedia.org/wiki/Sterbenz_lemma) for when
+    /// it does.)
+    /// Therefore, in cases where exact comparisons matter, take care to prefer the corner
+    /// points over calculating with the size.
     #[inline]
     pub fn size(&self) -> Size3D<FreeCoordinate, Cube> {
-        self.sizes
+        Size3D::from(self.upper_bounds - self.lower_bounds)
     }
 
     /// The center of the enclosed volume.
@@ -155,7 +157,7 @@ impl Aab {
     /// ```
     #[inline]
     pub fn center(&self) -> FreePoint {
-        self.lower_bounds + self.sizes / 2.0
+        (self.lower_bounds + self.upper_bounds.to_vector()) * 0.5
     }
 
     /// Iterates over the eight corner points of the box.
