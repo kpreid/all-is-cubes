@@ -210,6 +210,9 @@ where
 }
 
 /// As [`Arc::make_mut()`], but for slices, `Arc<[_]>`.
+///
+/// TODO: When Rust 1.81 is stable, remove this function since `make_mut()` will work.
+/// <https://github.com/rust-lang/rust/pull/116113>
 #[doc(hidden)] // internal helper function
 #[inline]
 pub fn arc_make_mut_slice<T: Clone>(mut arc: &mut Arc<[T]>) -> &mut [T] {
