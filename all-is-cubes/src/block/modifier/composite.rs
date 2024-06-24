@@ -143,66 +143,8 @@ impl Composite {
         if reverse {
             mem::swap(&mut src_evaluated, &mut dst_evaluated);
         }
-        // Unpack blocks.
-        let MinEval {
-            attributes: dst_att,
-            voxels: dst_voxels,
-        } = dst_evaluated;
-        let MinEval {
-            attributes: src_att,
-            voxels: src_voxels,
-        } = src_evaluated;
 
-        let src_resolution = src_voxels.resolution();
-        let dst_resolution = dst_voxels.resolution();
-        let effective_resolution = src_resolution.max(dst_resolution);
-        let src_scale =
-            GridCoordinate::from(effective_resolution) / GridCoordinate::from(src_resolution);
-        let dst_scale =
-            GridCoordinate::from(effective_resolution) / GridCoordinate::from(dst_resolution);
-
-        let src_bounds_scaled = bounds_excluding_air(&src_voxels, src_scale);
-        let dst_bounds_scaled = bounds_excluding_air(&dst_voxels, dst_scale);
-
-        let output_bounds = operator.bounds(src_bounds_scaled, dst_bounds_scaled);
-
-        block::Budget::decrement_voxels(&filter.budget, output_bounds.volume().unwrap())?;
-
-        let attributes = block::BlockAttributes {
-            display_name: dst_att.display_name, // TODO merge
-            selectable: src_att.selectable | dst_att.selectable,
-            rotation_rule: dst_att.rotation_rule, // TODO merge
-            tick_action: dst_att.tick_action,     // TODO: merge
-            activation_action: operator.blend_operations(
-                src_att.activation_action.as_ref(),
-                dst_att.activation_action.as_ref(),
-            ),
-            animation_hint: src_att.animation_hint | dst_att.animation_hint, // TODO: some operators should ignore some hints (e.g. `In` should ignore destination color changes)
-        };
-
-        let voxels = if effective_resolution == R1 && output_bounds == GridAab::ORIGIN_CUBE {
-            Evoxels::One(operator.blend_evoxel(
-                src_voxels.single_voxel().unwrap(),
-                dst_voxels.single_voxel().unwrap(),
-            ))
-        } else {
-            Evoxels::Many(
-                effective_resolution,
-                Vol::from_fn(output_bounds, |cube| {
-                    let p = cube.lower_bounds();
-                    operator.blend_evoxel(
-                        src_voxels
-                            .get(Cube::from(p / src_scale))
-                            .unwrap_or(Evoxel::AIR),
-                        dst_voxels
-                            .get(Cube::from(p / dst_scale))
-                            .unwrap_or(Evoxel::AIR),
-                    )
-                }),
-            )
-        };
-
-        Ok(MinEval { attributes, voxels })
+        evaluate_composition(src_evaluated, dst_evaluated, operator, filter)
     }
 
     /// Called by [`Modifier::unspecialize()`].
@@ -218,6 +160,76 @@ impl Composite {
             block::ModifierUnspecialize::Keep
         }
     }
+}
+
+/// Implementation of [`Composite::evaluate()`], without the requirement that the source
+/// be a [`Block`] rather than a [`MinEval`].
+fn evaluate_composition(
+    src_evaluated: MinEval,
+    dst_evaluated: MinEval,
+    operator: CompositeOperator,
+    filter: &block::EvalFilter,
+) -> Result<MinEval, block::InEvalError> {
+    // Unpack blocks.
+    let MinEval {
+        attributes: dst_att,
+        voxels: dst_voxels,
+    } = dst_evaluated;
+    let MinEval {
+        attributes: src_att,
+        voxels: src_voxels,
+    } = src_evaluated;
+
+    let src_resolution = src_voxels.resolution();
+    let dst_resolution = dst_voxels.resolution();
+    let effective_resolution = src_resolution.max(dst_resolution);
+    let src_scale =
+        GridCoordinate::from(effective_resolution) / GridCoordinate::from(src_resolution);
+    let dst_scale =
+        GridCoordinate::from(effective_resolution) / GridCoordinate::from(dst_resolution);
+
+    let src_bounds_scaled = bounds_excluding_air(&src_voxels, src_scale);
+    let dst_bounds_scaled = bounds_excluding_air(&dst_voxels, dst_scale);
+
+    let output_bounds = operator.bounds(src_bounds_scaled, dst_bounds_scaled);
+
+    block::Budget::decrement_voxels(&filter.budget, output_bounds.volume().unwrap())?;
+
+    let attributes = block::BlockAttributes {
+        display_name: dst_att.display_name, // TODO merge
+        selectable: src_att.selectable | dst_att.selectable,
+        rotation_rule: dst_att.rotation_rule, // TODO merge
+        tick_action: dst_att.tick_action,     // TODO: merge
+        activation_action: operator.blend_operations(
+            src_att.activation_action.as_ref(),
+            dst_att.activation_action.as_ref(),
+        ),
+        animation_hint: src_att.animation_hint | dst_att.animation_hint, // TODO: some operators should ignore some hints (e.g. `In` should ignore destination color changes)
+    };
+
+    let voxels = if effective_resolution == R1 && output_bounds == GridAab::ORIGIN_CUBE {
+        Evoxels::One(operator.blend_evoxel(
+            src_voxels.single_voxel().unwrap(),
+            dst_voxels.single_voxel().unwrap(),
+        ))
+    } else {
+        Evoxels::Many(
+            effective_resolution,
+            Vol::from_fn(output_bounds, |cube| {
+                let p = cube.lower_bounds();
+                operator.blend_evoxel(
+                    src_voxels
+                        .get(Cube::from(p / src_scale))
+                        .unwrap_or(Evoxel::AIR),
+                    dst_voxels
+                        .get(Cube::from(p / dst_scale))
+                        .unwrap_or(Evoxel::AIR),
+                )
+            }),
+        )
+    };
+
+    Ok(MinEval { attributes, voxels })
 }
 
 /// Rescale the bounds of the input to the resolution of the output, but also, if the voxels are
@@ -290,7 +302,7 @@ pub enum CompositeOperator {
 }
 
 impl CompositeOperator {
-    /// Entry point by which [`Composite::evaluate()`] uses [`Self`].
+    /// Entry point by which [`evaluate_composition()`] uses [`Self`].
     fn blend_evoxel(self, src_ev: Evoxel, dst_ev: Evoxel) -> Evoxel {
         use BlockCollision as Coll;
         Evoxel {
@@ -433,14 +445,12 @@ pub(in crate::block) fn render_inventory(
     // this modifier.
     // For now, we never render anything.
     if true {
+        // TODO(inventory): condition should be if filter.skip_eval
         return Ok(input);
     }
 
-    // TODO: scale the icon down and place it in a location determined by previously established
-    // block attributes.
-    // TODO: icon_only_if_intrinsic is a kludge
-
-    let Some(source) = inventory
+    // TODO(inventory): icon_only_if_intrinsic is a kludge
+    let Some(icon) = inventory
         .slots
         .iter()
         .find_map(|slot| slot.icon_only_if_intrinsic())
@@ -449,13 +459,15 @@ pub(in crate::block) fn render_inventory(
         // no nonempty slot to show
         return Ok(input);
     };
-    Composite {
-        source,
-        operator: CompositeOperator::Over,
-        reverse: false,
-        disassemblable: true,
-    }
-    .evaluate(input, filter)
+    let icon_evaluated = {
+        let _recursion_scope = block::Budget::recurse(&filter.budget)?;
+        icon.evaluate_impl(filter)?
+    };
+
+    // TODO(inventory): scale the icon down and place it in a location determined by previously
+    // established block attributes.
+
+    evaluate_composition(icon_evaluated, input, CompositeOperator::Over, filter)
 }
 
 #[cfg(test)]
