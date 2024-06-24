@@ -1,6 +1,7 @@
 //! [`Inventory`] for storing items.
 
 use alloc::borrow::Cow;
+use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -28,7 +29,11 @@ use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 #[non_exhaustive]
 pub struct Inventory {
     /// TODO: This probably shouldn't be public forever.
-    pub slots: Vec<Slot>,
+    // ---
+    // Design note: This is a boxed slice to keep the size of the type small,
+    // and because inventories have sizes determined by game mechanics,
+    // so they do not need to resize to accomodate their contents.
+    pub slots: Box<[Slot]>,
 }
 
 impl Inventory {
@@ -37,14 +42,15 @@ impl Inventory {
     /// Ordinary user actions cannot change the number of slots.
     pub fn new(size: usize) -> Self {
         Inventory {
-            slots: vec![Slot::Empty; size],
+            slots: vec![Slot::Empty; size].into_boxed_slice(),
         }
     }
 
     /// TODO: temporary interface, reevaluate design
-    pub(crate) fn from_slots(mut items: Vec<Slot>) -> Self {
-        items.shrink_to_fit();
-        Inventory { slots: items }
+    pub(crate) fn from_slots(items: impl Into<Box<[Slot]>>) -> Self {
+        Inventory {
+            slots: items.into(),
+        }
     }
 
     /// Returns whether all slots in this inventory are empty.
@@ -458,7 +464,7 @@ impl Merge for InventoryTransaction {
 /// Implementation type for [`InventoryTransaction::CommitCheck`].
 #[derive(Debug)]
 pub struct InventoryCheck {
-    new: Vec<Slot>,
+    new: Box<[Slot]>,
     change: InventoryChange,
 }
 
@@ -570,7 +576,8 @@ mod tests {
         let contents = vec![
             Slot::from(Tool::CopyFromSpace),
             Slot::from(Tool::CopyFromSpace),
-        ];
+        ]
+        .into_boxed_slice();
         let inventory = Inventory::from_slots(contents.clone());
         let new_item = Tool::InfiniteBlocks(Rgba::WHITE.into());
 
@@ -606,6 +613,7 @@ mod tests {
                 Slot::stack(10, this.clone()),
                 Slot::Empty,
             ]
+            .into_boxed_slice()
         );
     }
 

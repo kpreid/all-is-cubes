@@ -149,7 +149,7 @@ impl Character {
         // * And not every character should have a CopyFromSpace.
         const SLOT_COUNT: usize = 11;
         const INVISIBLE_SLOT: usize = SLOT_COUNT - 1;
-        let mut inventory = vec![Slot::Empty; SLOT_COUNT];
+        let mut inventory = vec![Slot::Empty; SLOT_COUNT].into_boxed_slice();
         inventory[INVISIBLE_SLOT] = Tool::CopyFromSpace.into();
         let mut free = 0;
         let mut ordinary_tool_selection = 0;

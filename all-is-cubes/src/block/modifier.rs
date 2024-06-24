@@ -218,7 +218,20 @@ mod tests {
     use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
     use crate::op::Operation;
     use crate::universe::Universe;
+    use core::mem::size_of;
     use pretty_assertions::assert_eq;
+
+    /// Track the size of the `Modifier` enum to make sure we don't accidentally make it bigger
+    /// by giving one variant more data.
+    #[test]
+    fn size_of_modifier() {
+        // The largest modifier, currently, is `Composite`, which contains a `Block` plus
+        // additional data, and a `Block` is a pointer plus additional data;
+        // in each case the additional data does not exceed 4 bytes, so on both 32 and
+        // 64-bit systems, the size will be rounded up to three pointers
+        // (unless the alignment of pointers is less than their size).
+        assert_eq!(size_of::<Modifier>(), 3 * size_of::<*const ()>());
+    }
 
     #[test]
     fn rotate_evaluation() {
