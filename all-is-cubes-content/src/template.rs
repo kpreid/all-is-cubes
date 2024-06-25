@@ -23,7 +23,6 @@ use all_is_cubes::util::{ErrorIfStd, YieldProgress};
 use all_is_cubes::{time, transaction};
 
 use crate::fractal::menger_sponge;
-use crate::menu::template_menu;
 use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_blocks};
 use crate::{free_editing_starter_inventory, palette};
 use crate::{wavy_landscape, LandscapeBlocks};
@@ -164,7 +163,14 @@ impl UniverseTemplate {
             let mut p = Some(p);
             use UniverseTemplate::*;
             let maybe_space: Option<Result<Space, InGenError>> = match self {
-                Menu => Some(template_menu(&mut universe, p.take().unwrap()).await),
+                Menu => Some(
+                    crate::menu::template_menu_space(
+                        &mut universe,
+                        p.take().unwrap(),
+                        Arc::new(|_| {}),
+                    )
+                    .await,
+                ),
                 Blank => None,
                 Fail => Some(Err(InGenError::Other(
                     "the Fail template always fails to generate".into(),

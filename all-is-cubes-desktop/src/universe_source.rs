@@ -7,6 +7,7 @@ use indicatif::ProgressBar;
 use rand::Rng as _;
 use tokio::sync::oneshot;
 
+//use all_is_cubes::transaction::{self, Merge, Transaction};
 use all_is_cubes::space::{LightUpdatesInfo, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
@@ -34,6 +35,7 @@ impl UniverseSource {
         self,
         precompute_light: bool,
         notif_rx: oneshot::Receiver<Notification>,
+        replace_universe_callback: Arc<dyn Fn(&UniverseTemplate) + Send + Sync>,
     ) -> Result<Universe, anyhow::Error> {
         let start_time = Instant::now();
 
@@ -64,6 +66,27 @@ impl UniverseSource {
         };
 
         let universe = match self.clone() {
+            // TODO: awkward kludge for hooking up the menu's universe-selection buttons. Instead, `TemplateParameters` should have an extension mechanism by which we can pass the hook function.
+            UniverseSource::Template(UniverseTemplate::Menu, _parameters) => {
+                let mut universe = Universe::new();
+                // let mut txn = UniverseTransaction::default();
+
+                let space = all_is_cubes_content::template_menu_space(
+                    &mut universe,
+                    yield_progress,
+                    replace_universe_callback,
+                )
+                .await?;
+                // txn.merge_from(menu_txn).unwrap();
+
+                let space = universe.insert("menu".into(), space)?;
+                universe.insert(
+                    "character".into(),
+                    all_is_cubes::character::Character::spawn_default(space),
+                )?;
+
+                universe
+            }
             UniverseSource::Template(template, TemplateParameters { seed, size }) => {
                 let seed: u64 = seed.unwrap_or_else(|| {
                     let seed = rand::thread_rng().gen();
@@ -82,15 +105,15 @@ impl UniverseSource {
                     .await
                     .with_context(|| {
                         format!("failed while constructing universe from template {template:?}")
-                    })
+                    })?
             }
             UniverseSource::File(path) => {
                 let path = Arc::new(path);
                 all_is_cubes_port::load_universe_from_file(yield_progress, path.clone())
                     .await
-                    .with_context(|| format!("could not load universe from file {path:?}"))
+                    .with_context(|| format!("could not load universe from file {path:?}"))?
             }
-        }?;
+        };
         universe_progress_bar.finish();
         let universe_done_time = Instant::now();
         log::debug!(

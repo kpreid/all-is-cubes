@@ -1,8 +1,10 @@
 //! Creation of a [`DesktopSession`] and main loop.
 
 use std::mem;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use all_is_cubes_content::TemplateParameters;
 use anyhow::Context as _;
 
 use all_is_cubes::universe::Universe;
@@ -32,7 +34,12 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
         application_title,
         runtime,
         before_loop_time,
-        universe_task,
+        universe_task:
+            UniverseTask {
+                future: universe_task_future,
+                progress_notification_handoff_tx: _,
+                mut replace_universe_command_rx,
+            },
         headless,
         logging,
         recording,
@@ -82,7 +89,8 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
     }
 
     dsession.session.set_main_task(|mut ctx| async move {
-        let universe_result: Result<Universe, anyhow::Error> = match universe_task.future.await {
+        let universe_result: Result<Universe, anyhow::Error> = match universe_task_future.await {
+            // nested Results because one is template failure and the other is tokio JoinHandle failure
             Ok(Ok(u)) => Ok(u),
             Ok(Err(e)) => {
                 Err(e).context("failed to create universe from requested template or file")
@@ -115,7 +123,12 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
                     universe.get_default_character().as_ref(),
                     &record_options,
                 );
-                match record::Recorder::new(record_options, recording_cameras, universe, executor) {
+                match record::Recorder::new(
+                    record_options,
+                    recording_cameras,
+                    universe,
+                    executor.clone(),
+                ) {
                     Ok(recorder) => recorder,
                     Err(e) => report_error_and_exit(
                         &ctx,
@@ -129,9 +142,24 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
             _ = ctx.quit().await;
         }
 
-        log::trace!("Startup task has completed all activities.");
+        log::trace!("Startup task has completed all startup activities.");
 
         _ = task_done_signal.send(());
+
+        while let Some(template) = replace_universe_command_rx.recv().await {
+            log::trace!("Startup task received request for new universe");
+            let task = UniverseTask::new(
+                &executor,
+                crate::UniverseSource::Template(template, TemplateParameters::default()),
+                false,
+            );
+            // TODO: should attach_to_session() for progress reporting but we can't have the `&mut Session` for it; it should be generalized better
+            // TODO: error reporting
+            ctx.set_universe(task.future.await.unwrap().unwrap());
+            log::trace!("Startup task completed new universe");
+        }
+
+        log::trace!("Startup task exiting.");
 
         ExitMainTask
     });
@@ -212,6 +240,8 @@ pub struct UniverseTask {
     future: tokio::task::JoinHandle<Result<Universe, anyhow::Error>>,
     progress_notification_handoff_tx:
         Option<tokio::sync::oneshot::Sender<notification::Notification>>,
+    replace_universe_command_rx:
+        tokio::sync::mpsc::Receiver<all_is_cubes_content::UniverseTemplate>,
 }
 
 #[allow(missing_docs)] // sloppy API anyway
@@ -219,12 +249,18 @@ impl UniverseTask {
     pub fn new(executor: &Executor, source: crate::UniverseSource, precompute_light: bool) -> Self {
         // Kick off constructing the universe in the background.
         let (n_tx, n_rx) = tokio::sync::oneshot::channel();
-        let future = executor
-            .tokio()
-            .spawn(source.create_universe(precompute_light, n_rx));
+        let (r_tx, r_rx) = tokio::sync::mpsc::channel(1);
+        let future = executor.tokio().spawn(source.create_universe(
+            precompute_light,
+            n_rx,
+            Arc::new(move |t| {
+                _ = r_tx.try_send(t.clone());
+            }),
+        ));
         Self {
             future,
             progress_notification_handoff_tx: Some(n_tx),
+            replace_universe_command_rx: r_rx,
         }
     }
 
