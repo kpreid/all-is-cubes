@@ -7,6 +7,8 @@ mod icons;
 pub use icons::*;
 mod inventory;
 pub use inventory::*;
+mod inv_in_block;
+pub use inv_in_block::InvInBlock;
 mod tool;
 pub use tool::*;
 

@@ -11,6 +11,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 
+use crate::inv::{self, InvInBlock};
 use crate::listen::{Listen as _, Listener};
 use crate::math::{GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba, Vol};
 use crate::space::{SetCubeError, Space, SpaceChange};
@@ -349,6 +350,27 @@ impl Block {
     pub fn with_modifier(mut self, modifier: impl Into<Modifier>) -> Self {
         self.modifiers_mut().push(modifier.into());
         self
+    }
+
+    /// Given a block that does not yet have an [`Modifier::Inventory`], add it.
+    ///
+    /// The size of the added inventory is the maximum of the size set by [`InvInBlock`]
+    /// and the size of `contents`.
+    ///
+    /// TODO: It is not yet decided what happens when this is called on a block which already
+    /// has an inventory. Currently, it just attaches another modifier.
+    #[must_use]
+    pub fn with_inventory(self, contents: impl Iterator<Item = inv::Slot>) -> Block {
+        let inventory = inv::Inventory::from_slots(
+            itertools::Itertools::zip_longest(
+                contents,
+                // TODO(inventory): InvInBlock should be part of block attributes
+                core::iter::repeat(inv::Slot::Empty).take(InvInBlock::default().size),
+            )
+            .map(|z| z.into_left())
+            .collect::<Box<[inv::Slot]>>(),
+        );
+        self.with_modifier(Modifier::Inventory(inventory))
     }
 
     /// Rotates this block by the specified rotation.

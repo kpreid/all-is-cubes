@@ -3,8 +3,10 @@ use core::mem;
 use alloc::vec;
 use ordered_float::NotNan;
 
-use crate::block::{self, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, AIR};
-use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Vol};
+use crate::block::{
+    self, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, Resolution::R1, AIR,
+};
+use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, GridSize, Rgb, Vol};
 use crate::op::Operation;
 use crate::universe;
 
@@ -438,38 +440,65 @@ impl CompositeOperator {
 
 // Inventories are rendered by compositing their icon blocks in.
 pub(in crate::block) fn render_inventory(
-    input: MinEval,
+    mut input: MinEval,
     inventory: &crate::inv::Inventory,
     filter: &block::EvalFilter,
 ) -> Result<MinEval, block::InEvalError> {
-    // TODO(inventory): Define rules under which the inventory is rendered at all, and if so, where
-    // each icon should be placed. This should be controlled by the evaluation result *preceding*
-    // this modifier.
-    // For now, we never render anything.
-    if true {
-        // TODO(inventory): condition should be if filter.skip_eval
+    if filter.skip_eval {
         return Ok(input);
     }
 
-    // TODO(inventory): icon_only_if_intrinsic is a kludge
-    let Some(icon) = inventory
-        .slots
-        .iter()
-        .find_map(|slot| slot.icon_only_if_intrinsic())
-        .cloned()
-    else {
-        // no nonempty slot to show
-        return Ok(input);
-    };
-    let icon_evaluated = {
-        let _recursion_scope = block::Budget::recurse(&filter.budget)?;
-        icon.evaluate_impl(filter)?
-    };
+    // TODO(inventory): InvInBlock should be part of block attributes
+    let config = crate::inv::InvInBlock::default();
+    for (slot_index, icon_position) in config.icon_positions() {
+        let Some(placed_icon_bounds) = GridAab::from_lower_size(
+            icon_position,
+            GridSize::splat(
+                (config.icon_resolution / config.icon_scale)
+                    .unwrap_or(R1)
+                    .into(),
+            ),
+        )
+        .intersection_cubes(GridAab::for_block(config.icon_resolution)) else {
+            // Icon's position doesn't intersect the block's bounds.
+            continue;
+        };
 
-    // TODO(inventory): scale the icon down and place it in a location determined by previously
-    // established block attributes.
+        // TODO(inventory): icon_only_if_intrinsic is a kludge
+        let Some(icon): Option<&Block> = inventory
+            .slots
+            .get(slot_index)
+            .and_then(|slot| slot.icon_only_if_intrinsic())
+        else {
+            // No slot to render at this position.
+            continue;
+        };
 
-    evaluate_composition(icon_evaluated, input, CompositeOperator::Over, filter)
+        let mut icon_evaluated = {
+            let _recursion_scope = block::Budget::recurse(&filter.budget)?;
+            // this is the wrong cost value but it doesn't matter
+            icon.evaluate_impl(filter)?
+                .finish(filter.budget.get().to_cost())
+        };
+
+        // TODO(inventory): We should be downsampling the icons (or more precisely,
+        // asking evaluation to generate a lower resolution as per `config.icon_resolution`).
+        // For now, we just always generate the resolution-1 form.
+        let icon_voxel = Evoxel::from_block(&icon_evaluated);
+        icon_evaluated.voxels = Evoxels::Many(
+            config.icon_resolution,
+            Vol::repeat(placed_icon_bounds, icon_voxel),
+        );
+
+        input = evaluate_composition(
+            icon_evaluated.into(),
+            input,
+            CompositeOperator::Over,
+            filter,
+        )?;
+    }
+
+    Ok(input)
 }
 
 #[cfg(test)]

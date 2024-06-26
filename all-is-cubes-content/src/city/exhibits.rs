@@ -25,6 +25,7 @@ use all_is_cubes::drawing::embedded_graphics::{
 };
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{size3, vec3, Point3D, Rotation2D, Size3D, Vector2D, Vector3D};
+use all_is_cubes::inv;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::{
@@ -36,7 +37,7 @@ use all_is_cubes::space::{SetCubeError, Space, SpaceBuilder, SpacePhysics, Space
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::{color_block, include_image};
 
-use crate::alg::{four_walls, voronoi_pattern};
+use crate::alg::{self, four_walls, voronoi_pattern};
 use crate::city::exhibit::{exhibit, Context, Exhibit, ExhibitTransaction, Placement};
 use crate::{
     make_slab_txn, make_some_blocks, make_some_voxel_blocks_txn, palette, tree, AnimatedVoxels,
@@ -48,6 +49,7 @@ use crate::{
 /// Ordered by distance from the center.
 pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     ELEVATOR,
+    INVENTORY,
     KNOT,
     TRANSPARENCY_LARGE,
     TRANSPARENCY_SMALL,
@@ -786,6 +788,47 @@ fn COMPOSITE(ctx: Context<'_>) {
 
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
+    name: "Modifier::Inventory",
+    subtitle: "",
+    placement: Placement::Surface,
+)]
+fn INVENTORY(ctx: Context<'_>) {
+    let mut txn = ExhibitTransaction::default();
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
+    let pedestal = &demo_blocks[DemoBlocks::Pedestal];
+
+    let mut space = Space::empty(GridAab::from_lower_size([0, 0, 0], [4, 2, 1]));
+
+    let inventory_display_block = Block::builder()
+        .display_name("Has some inventory")
+        .voxels_fn(R16, |cube| {
+            // tray shape
+            if cube.y == 0 || cube.y == 1 && alg::square_radius(R16, cube)[0] == 8 {
+                const { &color_block!(palette::STEEL) }
+            } else {
+                &AIR
+            }
+        })?
+        .build_txn(&mut txn);
+
+    let has_items_block = inventory_display_block.with_inventory(
+        [
+            inv::Tool::Block(demo_blocks[DemoBlocks::ExhibitBackground].clone()).into(),
+            inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_RED)).into(),
+            inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_GREEN)).into(),
+            inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_BLUE)).into(),
+            inv::Tool::Block(demo_blocks[DemoBlocks::Lamp(true)].clone()).into(),
+        ]
+        .into_iter(),
+    );
+
+    stack(&mut space, [0, 0, 0], [pedestal, &has_items_block])?;
+
+    Ok((space, txn))
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
     name: "Modifier::Move",
     subtitle: "Stationary but not animated cases.",
     placement: Placement::Surface,
@@ -1326,7 +1369,7 @@ fn UI_BLOCKS(ctx: Context<'_>) {
     use all_is_cubes_ui::vui::blocks::UiBlocks;
     use all_is_cubes_ui::vui::widgets::{ToolbarButtonState, WidgetBlocks};
 
-    let icons = BlockProvider::<all_is_cubes::inv::Icons>::using(ctx.universe)?;
+    let icons = BlockProvider::<inv::Icons>::using(ctx.universe)?;
     let icons = icons.iter().map(|(_, block)| block.clone());
 
     let widget_blocks = BlockProvider::<WidgetBlocks>::using(ctx.universe)?;
